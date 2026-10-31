@@ -61,6 +61,9 @@ PiSharp.WebAgent.Presets.PresetsModule.AddPresetsArea(builder.Services, options)
 // Evals (run W5, E0): after the Spend Guard and the run engine, so suite runs, judge calls and Arena columns are guarded and recorded;
 // the evals webagent.db migrations (2000-2999) and one hook per W5 unit (Evals/EvalsModule.cs).
 PiSharp.WebAgent.Evals.EvalsModule.AddEvalsArea(builder.Services, options);
+// Idle exit (run W5, integration fix 2): with --faux, an hour with no request stops the app (--idle-exit sets the time, 0 never), so a
+// forgotten review or test server does not keep its data folder and the build output it runs from locked (Hosting/WebAgentIdleExit.cs).
+builder.Services.AddWebAgentIdleExit(options);
 
 var app = builder.Build();
 app.UseWebAgentCore();
