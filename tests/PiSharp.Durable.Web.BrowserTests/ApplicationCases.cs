@@ -349,7 +349,7 @@ internal static partial class Program
                     await card.GetByRole(AriaRole.Button, new() { Name = "Dismiss" }).ClickAsync();
                     await Expect(card.Locator("[data-feedback-state]")).ToHaveTextAsync("Saved: Dismiss · profile default r1");
                 }
-                Check(!await page.OverflowsAsync(), "no sideways scroll on " + name);
+                await page.NoSidewaysScrollAsync("no sideways scroll on " + name);
                 await ShotAsync(page, name + "-phone");
             }
         }, width: 390, height: 844),

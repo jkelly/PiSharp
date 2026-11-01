@@ -170,7 +170,22 @@ internal static partial class Program
         await Expect(dialog).ToBeHiddenAsync();
     }
 
-    /// <summary>Whether the page scrolls sideways.</summary>
-    internal static Task<bool> OverflowsAsync(this IPage page) =>
-        page.EvaluateAsync<bool>("() => document.documentElement.scrollWidth > window.innerWidth || document.body.scrollWidth > window.innerWidth");
+    /// <summary>Fails with <paramref name="what"/> when the page scrolls sideways, naming the outermost elements that reach past the
+    /// window (a CI runner's fonts are wider than a desktop's, so the failure has to say what moved).</summary>
+    internal static async Task NoSidewaysScrollAsync(this IPage page, string what)
+    {
+        var overflow = await page.EvaluateAsync<string?>("""
+            () => {
+              const width = window.innerWidth;
+              if (document.documentElement.scrollWidth <= width && document.body.scrollWidth <= width) return null;
+              const past = el => el.getBoundingClientRect().right > width + 0.5;
+              const name = el => el.tagName.toLowerCase() + (el.id ? '#' + el.id : '')
+                + (typeof el.className === 'string' && el.className.trim() ? '.' + el.className.trim().split(/\s+/).join('.') : '');
+              return 'scrollWidth ' + document.documentElement.scrollWidth + ' > ' + width + '; past the window: ' + [...document.body.querySelectorAll('*')]
+                .filter(el => past(el) && !(el.parentElement && el.parentElement !== document.body && past(el.parentElement)))
+                .slice(0, 6).map(el => name(el) + ' to ' + Math.round(el.getBoundingClientRect().right) + 'px').join(', ');
+            }
+            """);
+        Check(overflow is null, what + ": " + overflow);
+    }
 }

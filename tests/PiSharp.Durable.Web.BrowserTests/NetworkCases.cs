@@ -304,12 +304,12 @@ internal static partial class Program
 
     private static async Task PhoneLayoutAsync(IPage page, string session, string theme)
     {
-        Check(!await page.OverflowsAsync(), $"no sideways scroll at 390 px ({theme})");
+        await page.NoSidewaysScrollAsync($"no sideways scroll at 390 px ({theme})");
         await page.Locator("header [aria-label='Open network']").ClickAsync();
         var tree = page.Locator("#netTree");
         await Expect(tree).ToHaveClassAsync(new Regex(@"\bshow\b"));
         await Expect(page.Row(session)).ToBeVisibleAsync();
-        Check(!await page.OverflowsAsync(), $"no sideways scroll with the network drawer open ({theme})");
+        await page.NoSidewaysScrollAsync($"no sideways scroll with the network drawer open ({theme})");
         await tree.Locator("[aria-label='Close network']").ClickAsync();
         await Expect(tree).Not.ToHaveClassAsync(new Regex(@"\bshow\b"));
         await Expect(tree).ToBeHiddenAsync();
@@ -317,7 +317,7 @@ internal static partial class Program
         var inspector = page.Locator("#inspector");
         await Expect(inspector).ToHaveClassAsync(new Regex(@"\bshow\b"));
         await Expect(inspector.Locator("[data-session-tab] .ins-title")).ToBeVisibleAsync();
-        Check(!await page.OverflowsAsync(), $"no sideways scroll with the inspector open ({theme})");
+        await page.NoSidewaysScrollAsync($"no sideways scroll with the inspector open ({theme})");
         await inspector.Locator("[aria-label='Close inspector']").ClickAsync();
         await Expect(inspector).ToBeHiddenAsync();
     }

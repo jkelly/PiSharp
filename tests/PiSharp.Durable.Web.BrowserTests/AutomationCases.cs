@@ -95,7 +95,7 @@ internal static partial class Program
                 await Expect(window.Page.Locator("[data-session] option")).ToHaveCountAsync(1);
                 if (path == "/executions") await Expect(window.Page.Locator("[data-detail]")).ToContainTextAsync("Completion audit: passed");
                 else await Expect(window.Page.Locator("[data-schedules] tr")).ToHaveCountAsync(1);
-                Check(!await window.Page.OverflowsAsync(), "no sideways scroll on " + path);
+                await window.Page.NoSidewaysScrollAsync("no sideways scroll on " + path);
                 await Expect(window.Page.Locator("[data-error]")).ToBeHiddenAsync();
                 if (Artifacts is { } artifacts)
                 {
