@@ -52,7 +52,7 @@ public static class Workflow
             var grantId = grant.Text("id"); if (grantId.Length == 0) throw new ArgumentException("Grant ID required.");
             var expired = DateOnly.ParseExact(grant.Text("expiresOn"), "yyyy-MM-dd") <= asOf;
             var exception = exceptions.SingleOrDefault(e => e.Text("grantId") == grantId);
-            var validException = exception is not null && exception.Text("approvedBy").Length > 0 && DateOnly.ParseExact(exception.Text("validUntil"), "yyyy-MM-dd") > asOf;
+            var validException = exception is not null && !string.IsNullOrWhiteSpace(exception.Text("approvedBy")) && DateOnly.ParseExact(exception.Text("validUntil"), "yyyy-MM-dd") > asOf;
             var inRole = allowed.Contains(grant.Text("resource"));
             var reason = expired ? "grant-expired" : inRole ? "role-policy" : validException ? "approved-exception" : exception is null ? "outside-role" : "exception-expired-or-unapproved";
             var decision = removed.Contains(grantId) ? "removed" : !grant["active"]!.GetValue<bool>() ? "inactive" : expired || (!inRole && !validException) ? "remove" : "retain";

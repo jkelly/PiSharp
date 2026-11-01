@@ -23,6 +23,22 @@ public static class SelfTests
                 var c = Context(false); var w = Workflow.Create(c); await Call(w, 0); Assert(w.Tools[1].RequiresApproval, "Missing approval metadata."); await Reject(() => Call(w, 1));
                 Assert(!File.Exists(c.ResolvePath("repo/Client.cs")), "Unapproved edit wrote source.");
             });
+            await Check("chained edits verify final contents and reject tampered output", async () =>
+            {
+                var c = Context();
+                c.Input["migrations"]![0]!["edits"]!.AsArray().Add(new JsonObject
+                {
+                    ["path"] = "repo/Client.cs", ["find"] = "client.FetchAsync(",
+                    ["replace"] = "client.FetchV2(", ["expectedOccurrences"] = 1
+                });
+                var w = Workflow.Create(c); await Call(w, 0); await Call(w, 1);
+                var expected = c.Input["files"]!["repo/Client.cs"]!.GetValue<string>().Replace("client.FetchLegacy(", "client.FetchV2(", StringComparison.Ordinal);
+                Assert(await File.ReadAllTextAsync(c.ResolvePath("repo/Client.cs")) == expected && (await Call(w, 2))["verified"]!.GetValue<bool>(), "Chained final output did not verify.");
+                await Call(w, 1);
+                await File.WriteAllTextAsync(c.ResolvePath("repo/Client.cs"), expected.Replace("client.FetchV2(", "client.FetchAsync(", StringComparison.Ordinal));
+                Assert(!(await Call(w, 2))["verified"]!.GetValue<bool>(), "Intermediate output passed final verification.");
+                await Reject(() => Call(w, 1));
+            });
             await Check("apply is idempotent and post-edit tampering fails verification", async () =>
             {
                 var c = Context(); var w = Workflow.Create(c); await Call(w, 0); var first = (await Call(w, 1)).ToJsonString(); Assert(first == (await Call(w, 1)).ToJsonString(), "Repeat apply not idempotent.");

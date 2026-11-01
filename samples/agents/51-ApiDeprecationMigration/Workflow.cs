@@ -82,7 +82,7 @@ public static class Workflow
                 }
                 state["applied"] = true;
                 return new JsonObject { ["migrationId"] = a.Text("migrationId"), ["applied"] = true, ["fileCount"] = files.Count };
-            }, RequiresApproval: true), new("verify_migration", "Verify full expected contents, old usages absent and new usages present; persist local verification.", schema, async (a, ct) =>
+            }, RequiresApproval: true), new("verify_migration", "Verify full final contents after all configured edits; persist local verification.", schema, async (a, ct) =>
             {
                 Migration(a);
                 if (c.State[a.Text("migrationId") + "-source"]?.GetValue<string>() != c.Input.ToJsonString()) throw new InvalidOperationException("Migration configuration changed; inspect again.");
@@ -90,11 +90,6 @@ public static class Workflow
                 if (state?["applied"]?.GetValue<bool>() != true) throw new InvalidOperationException("Apply this migration first.");
                 var files = state["files"]!.AsObject(); var verified = true;
                 foreach (var file in files) verified &= Source(file.Key) == file.Value!["after"]!.GetValue<string>();
-                foreach (var match in state["matches"]!.AsArray().OfType<JsonObject>())
-                {
-                    var text = Source(match.Text("path"));
-                    verified &= Count(text, match.Text("oldUsage")) == 0 && Count(text, match.Text("newUsage")) >= match["occurrences"]!.GetValue<int>();
-                }
                 var result = new JsonObject { ["migrationId"] = a.Text("migrationId"), ["verified"] = verified, ["fileCount"] = files.Count, ["executedCode"] = false };
                 var artifact = "verification-" + a.Text("migrationId") + ".json"; await c.WriteJsonAsync(artifact, result, ct);
                 result["artifact"] = artifact; return result;

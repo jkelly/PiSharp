@@ -49,6 +49,13 @@ public static class SelfTests
             Check(markerResult.Text == "█" && !markerResult.Text.Contains("Ted", StringComparison.OrdinalIgnoreCase), "safe marker avoids matching its own replacement text");
             await Workflow.Export(markerContext, new JsonObject { ["documentId"] = "letter-1", ["expectedHash"] = markerResult.Hash }, default);
             Check(await File.ReadAllTextAsync(markerContext.ResolvePath("redacted-letter-1.txt")) == "█", "marker collision exports without original data");
+            var boundaryInput = (JsonObject)input.DeepClone();
+            boundaryInput["documents"]![0]!["text"] = "][]["; boundaryInput["documents"]![0]!["sensitiveLiterals"] = new JsonArray("][");
+            var boundaryContext = new SampleContext(Path.Combine(root, "marker-boundary"), boundaryInput, approved: true);
+            var boundaryResult = Workflow.Redact(boundaryContext, "letter-1");
+            Check(boundaryResult.Text == "██" && boundaryResult.Matches.Length == 2, "adjacent replacements cannot reconstruct a sensitive literal");
+            await Workflow.Export(boundaryContext, new JsonObject { ["documentId"] = "letter-1", ["expectedHash"] = boundaryResult.Hash }, default);
+            Check(await File.ReadAllTextAsync(boundaryContext.ResolvePath("redacted-letter-1.txt")) == "██", "boundary collision exports without reconstructed sensitive data");
             var approved = new SampleContext(Path.Combine(root, "approved"), (JsonObject)input.DeepClone(), approved: true);
             var receipt = await Workflow.Export(approved, args, default);
             Check(JsonNode.DeepEquals(receipt, await Workflow.Export(approved, args, default)), "repeated approved export idempotent");

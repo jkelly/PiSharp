@@ -25,7 +25,7 @@ public static class Workflow
     }
     static double Travel(SampleContext c, JsonNode origin, JsonNode destination)
     {
-        var distance = Math.Abs(Data.Number(origin,"x") - Data.Number(destination,"x")) + Math.Abs(Data.Number(origin,"y") - Data.Number(destination,"y"));
+        var distance = checked(Math.Abs(Data.Number(origin,"x") - Data.Number(destination,"x")) + Math.Abs(Data.Number(origin,"y") - Data.Number(destination,"y")));
         return checked(distance * Data.Number(c.Input,"travelMinutesPerUnit",1));
     }
     static JsonNode Inspect(SampleContext c, JsonObject a)

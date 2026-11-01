@@ -39,6 +39,22 @@ public static class SelfTests
                 Check(plan!["Merges"]![0]!["Blockers"]!.AsArray().Count > 0, "Contradictions overmerged.");
                 await Throws(() => Call(w, "apply_duplicate_merges", args)); Check(!File.Exists(c.ResolvePath("customer-state.json")), "Ambiguous merge wrote state.");
             }),
+            ("reused merge ID cannot overwrite an earlier group's provenance", async (c, w) =>
+            {
+                var args = Workflow.Args("merge-alex");
+                await Call(w, "propose_duplicate_merges", args); await Call(w, "apply_duplicate_merges", args);
+                var before = await File.ReadAllTextAsync(c.ResolvePath("customer-state.json"));
+                var reused = c.Input["merges"]![1]!.DeepClone().AsObject(); reused["id"] = "merge-alex";
+                c.Input["merges"] = new JsonArray(reused);
+                var restart = Workflow.Create(new SampleContext(c.Workspace, c.Input, true));
+                await Throws(() => Call(restart, "propose_duplicate_merges", args));
+                await Throws(() => Call(w, "apply_duplicate_merges", args));
+                var after = await File.ReadAllTextAsync(c.ResolvePath("customer-state.json"));
+                Check(before == after, "Reused merge ID changed records or archived provenance.");
+                var store = JsonNode.Parse(after)!;
+                Check(store["records"]!.AsArray().Any(r => r!["Id"]!.GetValue<string>() == "c4"), "Rejected group removed its duplicate.");
+                Check(store["mergeHistory"]!["merge-alex"]!["merge"]!["Originals"]!.AsArray().Any(r => r!["Id"]!.GetValue<string>() == "c2"), "First group's source archive was overwritten.");
+            }),
             ("duplicate-group phone conflict cannot hide behind blank survivor", (c, w) => GroupConflict(c, w, "phone", "3125550101", "3125550999")),
             ("duplicate-group external ID conflict cannot hide behind blank survivor", (c, w) => GroupConflict(c, w, "externalId", "acct-first", "acct-second")),
             ("unresolved field conflict blocks the complete batch", async (c, w) =>

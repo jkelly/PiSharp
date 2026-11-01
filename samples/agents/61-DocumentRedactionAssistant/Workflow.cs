@@ -71,18 +71,23 @@ public static class Workflow
             merged[^1] = new(previous.Start, end - previous.Start, "merged", source.Substring(previous.Start, end - previous.Start));
         }
         var marker = "[REDACTED]";
-        if (spans.Any(s => marker.Contains(s.Value, StringComparison.OrdinalIgnoreCase)))
+        string Substitute(string replacement)
+        {
+            var builder = new StringBuilder(); var offset = 0;
+            foreach (var span in merged) { builder.Append(source, offset, span.Start - offset); builder.Append(replacement); offset = span.Start + span.Length; }
+            builder.Append(source, offset, source.Length - offset);
+            return builder.ToString();
+        }
+        var sanitized = Substitute(marker);
+        if (spans.Any(s => sanitized.Contains(s.Value, StringComparison.OrdinalIgnoreCase)))
         {
             // Use a single character absent from the source so it cannot contain a detected
             // value or reconstruct one across a replacement boundary. Prefer a visible block.
             marker = new[] { "█" }.Concat(Enumerable.Range(0xE000, 0x1900).Select(n => ((char)n).ToString()))
                 .FirstOrDefault(candidate => !source.Contains(candidate, StringComparison.Ordinal))
                 ?? throw new InvalidOperationException("No safe replacement marker is available for this source.");
+            sanitized = Substitute(marker);
         }
-        var builder = new StringBuilder(); var offset = 0;
-        foreach (var span in merged) { builder.Append(source, offset, span.Start - offset); builder.Append(marker); offset = span.Start + span.Length; }
-        builder.Append(source, offset, source.Length - offset);
-        var sanitized = builder.ToString();
         Verify(sanitized, spans);
         var hash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(doc.ToJsonString())));
         return new(id, hash, sanitized, spans.ToArray(), merged.ToArray());

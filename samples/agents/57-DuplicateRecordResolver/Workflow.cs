@@ -85,6 +85,8 @@ public static class Workflow
         var plans = selected.Select(request =>
         {
             var history = Store(c)["mergeHistory"]?[request.Id];
+            if (history is not null && !JsonNode.DeepEquals(history["request"], Node(request)))
+                throw new InvalidOperationException("Merge ID is already used by a different request.");
             if (history is not null && JsonNode.DeepEquals(history["request"], Node(request)))
             {
                 var previous = Read<Merge>(history["merge"]);

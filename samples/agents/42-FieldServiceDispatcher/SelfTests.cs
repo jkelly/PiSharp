@@ -25,6 +25,17 @@ public static class SelfTests
             Check(Data.Text(await Call(1,"JOB-72"),"recommendedTechnicianId") == "TECH-CAM","second job distinct skills");
             Check(!(await Call(1,"UNKNOWN"))["found"]!.GetValue<bool>(),"missing job");
             Check(JsonNode.DeepEquals(rank,await Call(1,"JOB-71")),"no stale cache");
+            foreach (var y in new[] { long.MaxValue, 1L })
+            {
+                var oversized = (JsonObject)input.DeepClone();
+                oversized["technicians"]![1]!["location"]!["x"] = long.MaxValue;
+                oversized["technicians"]![1]!["location"]!["y"] = y;
+                var oversizedContext = new SampleContext(Path.Combine(root,"overflow-" + y),oversized,approved:true);
+                var oversizedWorkflow = Workflow.Create(oversizedContext);
+                await ThrowsOverflow(() => oversizedWorkflow.Tools[1].Execute(new() { ["jobId"] = "JOB-71" },default),"unrepresentable travel cannot rank feasible");
+                await ThrowsOverflow(() => oversizedWorkflow.Tools[2].Execute(Assign("overflow","TECH-BEN"),default),"unrepresentable travel cannot assign");
+                Check(!Directory.Exists(oversizedContext.ResolvePath("assignments")),"overflow creates no assignment");
+            }
             var denied = Workflow.Create(new SampleContext(Path.Combine(root,"denied"),input));
             Check(w.Tools[2].RequiresApproval,"approval metadata");
             await Throws(() => denied.Tools[2].Execute(Assign("deny"),default),"direct callback guard");
@@ -54,7 +65,7 @@ public static class SelfTests
             // Existing assignments participate in scheduling a different overlapping job.
             input["jobs"]!.AsArray().Add(SampleJson.Object("""{"id":"JOB-73","startAt":"2026-11-02T10:30:00Z","durationMinutes":30,"skills":["electrical"],"location":{"x":2,"y":1}}"""));
             Check((await Call(1,"JOB-73"))["recommendedTechnicianId"] is null,"persisted assignment prevents overlap");
-            Console.WriteLine("PASS 42-FieldServiceDispatcher (21 focused checks)");
+            Console.WriteLine("PASS 42-FieldServiceDispatcher (27 focused checks)");
             return 0;
         }
         finally { if (Directory.Exists(root)) Directory.Delete(root,true); }
@@ -64,5 +75,10 @@ public static class SelfTests
     {
         try { await action(); } catch (InvalidOperationException) { return; }
         throw new Exception("Expected rejection: " + name);
+    }
+    static async Task ThrowsOverflow(Func<Task> action,string name)
+    {
+        try { await action(); } catch (OverflowException) { return; }
+        throw new Exception("Expected overflow rejection: " + name);
     }
 }

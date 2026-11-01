@@ -16,6 +16,25 @@ public static class SelfTests
         var no = Context(false); await Call(no,"inspect_runbook"); Check(Workflow.Create(no).Tools.Single(t => t.Name == "execute_runbook").RequiresApproval); await Reject(() => Call(no,"execute_runbook")); Check(!Directory.Exists(no.ResolvePath("operations/recovery"))); count++;
         await Reject(() => Call(Context(),"execute_runbook")); await Reject(() => Call(Context(),"inspect_runbook","missing")); count++;
         var malicious = Context(); malicious.Input["runbooks"]![0]!["steps"]![0]!["action"] = "shell"; await Reject(() => Call(malicious,"inspect_runbook")); count++;
+        foreach (var invalid in new JsonNode?[] { null, JsonValue.Create("invalid step") })
+        {
+            var malformed = Context(); malformed.Input["runbooks"]![0]!["steps"]!.AsArray().Add(invalid);
+            await Reject(() => Call(malformed,"inspect_runbook")); await Reject(() => Call(malformed,"execute_runbook"));
+            Check(!Directory.Exists(malformed.ResolvePath("operations/recovery")) && !File.Exists(malformed.ResolvePath("runbook-execution.json"))); count++;
+        }
+        var oversized = Context(); var oversizedSteps = oversized.Input["runbooks"]![0]!["steps"]!.AsArray();
+        while (oversizedSteps.Count <= 20) oversizedSteps.Add((JsonNode?)null);
+        await Reject(() => Call(oversized,"inspect_runbook")); await Reject(() => Call(oversized,"execute_runbook"));
+        Check(!Directory.Exists(oversized.ResolvePath("operations/recovery")) && !File.Exists(oversized.ResolvePath("runbook-execution.json"))); count++;
+        var tooManyObjects = Context(); var validSteps = new JsonArray();
+        for (var index = 0; index < 21; index++)
+        {
+            var step = (JsonObject)tooManyObjects.Input["runbooks"]![0]!["steps"]![0]!.DeepClone();
+            step["id"] = "step-" + index; step["path"] = "operations/recovery/step-" + index + ".txt"; validSteps.Add(step);
+        }
+        tooManyObjects.Input["runbooks"]![0]!["steps"] = validSteps;
+        await Reject(() => Call(tooManyObjects,"inspect_runbook")); await Reject(() => Call(tooManyObjects,"execute_runbook"));
+        Check(!Directory.Exists(tooManyObjects.ResolvePath("operations/recovery")) && !File.Exists(tooManyObjects.ResolvePath("runbook-execution.json"))); count++;
         var escape = Context(); escape.Input["runbooks"]![0]!["steps"]![0]!["path"] = "operations/recovery/../../outside.txt"; await Reject(() => Call(escape,"inspect_runbook")); count++;
         var cycle = Context(); cycle.Input["runbooks"]![0]!["steps"]![0]!["dependsOn"]!.AsArray().Add("digest"); await Reject(() => Call(cycle,"inspect_runbook")); count++;
         var changed = Context(); await Call(changed,"inspect_runbook"); changed.Input["runbooks"]![0]!["steps"]![0]!["content"] = "changed"; await Reject(() => Call(changed,"execute_runbook")); count++;

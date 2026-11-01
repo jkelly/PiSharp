@@ -24,7 +24,10 @@ public static class Workflow
     }
     static List<JsonObject> Plan(SampleContext c,string id)
     {
-        var steps = Rows(Runbook(c,id),"steps").OfType<JsonObject>().ToList(); if (steps.Count is < 1 or > 20) throw new FormatException("Use 1–20 runbook steps.");
+        var rows = Rows(Runbook(c,id),"steps");
+        if (rows.Count is < 1 or > 20) throw new FormatException("Use 1–20 runbook steps.");
+        if (rows.Any(step => step is not JsonObject)) throw new FormatException("Every runbook step must be an object.");
+        var steps = rows.Cast<JsonObject>().ToList();
         if (steps.Any(s => s.Text("id").Length == 0) || steps.Select(s => s.Text("id")).Distinct().Count() != steps.Count) throw new FormatException("Unique step IDs required.");
         foreach (var step in steps)
         {

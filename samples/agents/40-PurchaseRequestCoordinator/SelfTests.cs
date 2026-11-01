@@ -34,9 +34,19 @@ public static class SelfTests
             Check(Data.Number(await Call(1,"PR-100"),"availableCents") == 75000,"local commitments reduce budget");
             await Throws(() => w.Tools[2].Execute(Submit("once",75001),default),"same key changed payload");
             await Throws(() => w.Tools[2].Execute(Submit("another"),default),"duplicate request new key");
+            foreach (var approver in new[] { "", " \t " })
+            {
+                var malformed = (JsonObject)input.DeepClone();
+                malformed["approvalRules"]![1]!["approvers"] = new JsonArray(JsonValue.Create(approver));
+                var malformedContext = new SampleContext(Path.Combine(root,"malformed-route-" + approver.Length),malformed,approved:true);
+                var malformedWorkflow = Workflow.Create(malformedContext);
+                await Throws(() => malformedWorkflow.Tools[1].Execute(new() { ["requestId"] = "PR-100" },default),"blank approver route rejected");
+                await Throws(() => malformedWorkflow.Tools[2].Execute(Submit("blank-approver"),default),"blank approver cannot submit");
+                Check(!Directory.Exists(malformedContext.ResolvePath("purchases")),"invalid approver creates no receipt or reservation");
+            }
             input["requests"]![0]!["lines"]![0]!["quantity"] = 0L;
             await Throws(() => Call(1,"PR-100"),"invalid line quantity");
-            Console.WriteLine("PASS 40-PurchaseRequestCoordinator (15 focused checks)");
+            Console.WriteLine("PASS 40-PurchaseRequestCoordinator (21 focused checks)");
             return 0;
         }
         finally { if (Directory.Exists(root)) Directory.Delete(root,true); }

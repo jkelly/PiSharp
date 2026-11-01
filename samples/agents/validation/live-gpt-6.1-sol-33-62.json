@@ -1,7 +1,7 @@
 {
   "validatedOn": "2026-11-01",
   "timeZone": "America/Chicago",
-  "generatedAtUtc": "2026-11-01T23:00:11.583554+00:00",
+  "generatedAtUtc": "2026-11-01T23:07:45.801433+00:00",
   "workingTreeBaseCommit": "585a7c61d89e70c2604756c919070e0687a5e21a",
   "model": "gpt-6.1-sol",
   "api": "openai-responses",
@@ -20,14 +20,14 @@
     "sampleBuildWarnings": 0,
     "sampleBuildErrors": 0
   },
-  "inputTokens": 56286.0,
-  "outputTokens": 8214.0,
+  "inputTokens": 56270.0,
+  "outputTokens": 8234.0,
   "allAttempts": {
-    "count": 48,
-    "passed": 43,
+    "count": 55,
+    "passed": 50,
     "failed": 5,
-    "inputTokens": 76793.0,
-    "outputTokens": 12058.0
+    "inputTokens": 90109.0,
+    "outputTokens": 13822.0
   },
   "results": [
     {
@@ -139,9 +139,9 @@
         "gpt-6.1-sol"
       ],
       "inputTokens": 2304.0,
-      "outputTokens": 248.0,
+      "outputTokens": 257.0,
       "failures": [],
-      "durationSeconds": 8.39,
+      "durationSeconds": 9.29,
       "fixtureResultsCompared": true
     },
     {
@@ -247,9 +247,9 @@
         "gpt-6.1-sol"
       ],
       "inputTokens": 2617.0,
-      "outputTokens": 247.0,
+      "outputTokens": 263.0,
       "failures": [],
-      "durationSeconds": 7.78,
+      "durationSeconds": 9.14,
       "fixtureResultsCompared": true
     },
     {
@@ -301,9 +301,9 @@
         "gpt-6.1-sol"
       ],
       "inputTokens": 1706.0,
-      "outputTokens": 269.0,
+      "outputTokens": 264.0,
       "failures": [],
-      "durationSeconds": 8.5,
+      "durationSeconds": 9.47,
       "fixtureResultsCompared": true
     },
     {
@@ -409,9 +409,9 @@
         "gpt-6.1-sol"
       ],
       "inputTokens": 1961.0,
-      "outputTokens": 305.0,
+      "outputTokens": 329.0,
       "failures": [],
-      "durationSeconds": 11.32,
+      "durationSeconds": 12.83,
       "fixtureResultsCompared": true
     },
     {
@@ -543,10 +543,10 @@
       "modelsObserved": [
         "gpt-6.1-sol"
       ],
-      "inputTokens": 1936.0,
-      "outputTokens": 143.0,
+      "inputTokens": 1920.0,
+      "outputTokens": 139.0,
       "failures": [],
-      "durationSeconds": 6.64,
+      "durationSeconds": 7.37,
       "fixtureResultsCompared": true
     },
     {
@@ -706,9 +706,9 @@
         "gpt-6.1-sol"
       ],
       "inputTokens": 1481.0,
-      "outputTokens": 297.0,
+      "outputTokens": 279.0,
       "failures": [],
-      "durationSeconds": 9.13,
+      "durationSeconds": 9.26,
       "fixtureResultsCompared": true
     },
     {
@@ -818,9 +818,9 @@
         "gpt-6.1-sol"
       ],
       "inputTokens": 1327.0,
-      "outputTokens": 235.0,
+      "outputTokens": 233.0,
       "failures": [],
-      "durationSeconds": 8.45,
+      "durationSeconds": 10.33,
       "fixtureResultsCompared": true
     },
     {

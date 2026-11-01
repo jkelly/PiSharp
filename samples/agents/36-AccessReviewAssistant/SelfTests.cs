@@ -35,6 +35,12 @@ public static class SelfTests
             }
             var expired = (JsonObject)input.DeepClone(); expired["employees"]![0]!["exceptions"]![0]!["validUntil"] = "2026-11-01";
             Check(Workflow.Review(new SampleContext(Path.Combine(root, "expired"), expired), "emp-301")["recommendedRemovalCount"]!.GetValue<int>() == 3, "Exception expiration cannot retain grant at boundary.");
+            var unapproved = (JsonObject)input.DeepClone(); unapproved["employees"]![0]!["exceptions"]![0]!["approvedBy"] = " \t ";
+            var unapprovedContext = new SampleContext(Path.Combine(root, "unapproved"), unapproved, approved: true);
+            var unapprovedDecision = Workflow.Review(unapprovedContext, "emp-301")["decisions"]!.AsArray().OfType<JsonObject>().Single(d => d.Text("grantId") == "g-admin");
+            Check(unapprovedDecision.Text("decision") == "remove" && unapprovedDecision.Text("reason") == "exception-expired-or-unapproved", "Whitespace-only approver cannot authorize an exception.");
+            var unapprovedReceipt = await Workflow.Remove(unapprovedContext, "emp-301");
+            Check(unapprovedReceipt["removedGrantIds"]!.AsArray().Any(n => n!.GetValue<string>() == "g-admin"), "Local removal includes grants with whitespace-only exception approvers.");
             Check(Workflow.Review(c, "emp-302")["recommendedRemovalCount"]!.GetValue<int>() == 0, "Second employee has independent policy result.");
             await RejectAsync(async () => { await Workflow.Create(c).Tools.Single(t => t.Name == "remove_local_access").Execute(Workflow.Args("emp-301"), default); }, "Direct callback requires approval.");
             Check(!File.Exists(c.ResolvePath("access-removals-emp-301.json")), "Denied callback makes no local changes.");

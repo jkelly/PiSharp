@@ -7,14 +7,14 @@ Validated November 1, 2026 (America/Chicago), using the existing `OPENAI_API_KEY
 - **30/30 new live integrations passed**, including strict comparisons of computed tool results against fresh fixture baselines.
 - All **62 sample self-test programs and 62 offline demos passed**; 13 shared runtime checks passed.
 - The full sample solution built with zero warnings and errors.
-- Final validated attempts recorded 56,286.0 input tokens and 8,214.0 output tokens. No cost estimate is claimed.
-- Across all 48 attempts (including regression reruns), usage was 76,793.0 input and 12,058.0 output tokens. Five initial attempts were blocked by the local network sandbox before provider usage; rerunning with network access succeeded.
+- Final validated attempts recorded 56,270.0 input tokens and 8,234.0 output tokens. No cost estimate is claimed.
+- Across all 55 attempts (including regression reruns), usage was 90,109.0 input and 13,822.0 output tokens. Five initial attempts were blocked by the local network sandbox before provider usage; rerunning with network access succeeded.
 
 Each live run required success from the process and native host, every expected tool stage, the requested model in the transcript, nonzero provider usage, and matching structured fixture results. Comparison normalizes JSON property order and workspace roots while preserving meaningful array order. It does not grade free-form prose or establish comprehensive production correctness.
 
 ## Review fixes
 
-Independent review and added negative regressions addressed malformed calendar/source records, persisted roster recovery, ambiguous incident deduplication keys, stale runbook reports, omitted retention intervals, contradictory duplicate-group identities, missing redaction source text and redaction-marker collisions. Every affected workflow was rebuilt and retested live after its final source change.
+Independent review and added negative regressions addressed malformed calendar/source records, persisted roster recovery, ambiguous incident deduplication keys, stale runbook reports, omitted retention intervals, contradictory duplicate-group identities, missing redaction source text and redaction-marker collisions. PR review additionally fixed blank approvers, overflowed travel arithmetic, malformed runbook steps, chained migration verification, reused merge IDs and redaction replacement-boundary collisions. Every affected workflow was rebuilt and retested live after its final source change.
 
 ## Scope and reproduction
 

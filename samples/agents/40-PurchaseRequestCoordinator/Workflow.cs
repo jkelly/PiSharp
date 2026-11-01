@@ -44,6 +44,7 @@ public static class Workflow
         var rules = Data.Rows(c.Input["approvalRules"]).OrderBy(x => Data.Number(x,"maximumCents")).ToArray();
         var route = rules.FirstOrDefault(x => total <= Data.Number(x,"maximumCents"));
         var approvers = route is null ? [] : Data.Strings(route["approvers"]);
+        if (approvers.Any(string.IsNullOrWhiteSpace)) throw new InvalidOperationException("Approval route requires nonempty approver IDs.");
         var alreadySubmitted = receipts.Any(x => Data.Text(x["result"]!,"requestId") == Data.Text(r,"id"));
         return Data.Json(new { found = true, requestId = Data.Text(r,"id"), department, totalCents = total,
             availableCents = available, remainingCents = available-total, approvers,
