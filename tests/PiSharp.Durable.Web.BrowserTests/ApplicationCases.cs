@@ -38,16 +38,20 @@ internal static partial class Program
     }
 
     /// <summary>Clicks the page's Refresh until <paramref name="target"/> shows <paramref name="text"/>: these pages do not poll.</summary>
-    private static async Task RefreshUntilAsync(IPage page, ILocator target, string text)
+    private static Task RefreshUntilAsync(IPage page, ILocator target, string text) =>
+        RefreshUntilAsync(page, async () => (await target.AllTextContentsAsync()).Any(content => content.Contains(text, StringComparison.Ordinal)), text);
+
+    /// <summary>Clicks the page's Refresh until <paramref name="shown"/> holds; <paramref name="what"/> names it in the timeout.</summary>
+    private static async Task RefreshUntilAsync(IPage page, Func<Task<bool>> shown, string what)
     {
         for (var attempt = 0; attempt < 60; attempt++)
         {
             await Expect(page.Locator("[data-automation]")).Not.ToHaveAttributeAsync("aria-busy", "true");
-            if ((await target.AllTextContentsAsync()).Any(content => content.Contains(text, StringComparison.Ordinal))) return;
+            if (await shown()) return;
             await page.Locator("[data-refresh]").ClickAsync();
             await Task.Delay(250);
         }
-        throw new TimeoutException($"The page never showed {text}.");
+        throw new TimeoutException($"The page never showed {what}.");
     }
 
     private static async Task ShotAsync(IPage page, string name)
@@ -115,8 +119,10 @@ internal static partial class Program
             await page.GetByRole(AriaRole.Button, new() { Name = "Evaluate", Exact = true }).ClickAsync();
             await Expect(page.Locator("[data-evaluated]")).ToContainTextAsync("Started run #");
             var row = page.Locator("[data-judgments] [data-judgment]");
-            // Until the run classifies the input the row shows the run's status, "pending" too; then the label, the route and the decision.
-            await RefreshUntilAsync(page, row, "relevant · 70%");
+            // The run commits the label and the route, then in a later step asks a person; only then is the decision "pending" and the
+            // row has a reason box. Its status before the label is "pending" too, so the box is what to wait for, not the text.
+            await RefreshUntilAsync(page, async () => await row.Locator("[data-reason]").CountAsync() > 0, "the decision waiting for a person");
+            await Expect(row).ToContainTextAsync("relevant · 70%");
             await Expect(row).ToContainTextAsync("confirm");
             await row.Locator("[data-reason]").FillAsync("Ships our fix");
             await row.GetByRole(AriaRole.Button, new() { Name = "Approve", Exact = true }).ClickAsync();
