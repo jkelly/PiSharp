@@ -1,8 +1,5 @@
-using System.Runtime.CompilerServices;
 using System.Text;
 using System.Text.Json;
-using PiSharp.AI;
-using PiSharp.Agent;
 using PiSharp.Cli.Commands;
 using PiSharp.Cli.Reloading;
 using PiSharp.CodingAgent;
@@ -66,7 +63,7 @@ internal static class CliReloadRoutingTests
         var first = profile.ReloadAsync(initial);
         try
         {
-            await callbacks.StartEntered.Task;
+            await Entered(callbacks.StartEntered, first);
             Check(!ReferenceEquals(initial, owner.Current));
             Check(ReferenceEquals(first, profile.ReloadAsync(initial)));
             Check(ReferenceEquals(first, profile.ReloadAsync(owner.Current)));
@@ -78,7 +75,7 @@ internal static class CliReloadRoutingTests
         Check(ReferenceEquals(first, profile.ReloadAsync(initial)));
         callbacks.BuildEntered = Gate(); callbacks.BuildRelease = Gate();
         var second = profile.ReloadAsync(owner.Current);
-        await callbacks.BuildEntered.Task;
+        await Entered(callbacks.BuildEntered, second);
         Check(!second.IsCompleted && ReferenceEquals(second, profile.ReloadAsync(owner.Current)));
         Task? closing = null;
         try
@@ -111,7 +108,9 @@ internal static class CliReloadRoutingTests
                 BuildRuntimeAsync = async (candidate, generation, _) =>
                 {
                     Candidate = candidate; Check(generation.Flags["flag"].Boolean == false);
-                    var registry = new SessionRuntimeRegistry([new(candidate.Session.Snapshot.Agent.Model, new UnusedTransport())], [], new Policy());
+                    // The profile admits only a registry that carries its own prompt-section preparation and
+                    // decorated bindings, so the candidate runtime is built from the attachment's registry.
+                    var registry = candidate.Session.ReadToolCatalogRegistry().WithToolCatalog([], null);
                     var runtime = new SessionRuntimeLease(registry, new Release(() => Released++));
                     BuildEntered?.TrySetResult();
                     if (BuildRelease is not null) await BuildRelease.Task;
@@ -131,13 +130,6 @@ internal static class CliReloadRoutingTests
     }
     private sealed class Release(Action release) : IAsyncDisposable
     { public ValueTask DisposeAsync() { release(); return ValueTask.CompletedTask; } }
-    private sealed class Policy : IToolActionPolicy
-    { public ValueTask<ToolActionAuthorization> AuthorizeAsync(ToolInvocation invocation, PreparedToolAction action, CancellationToken token) => ValueTask.FromResult(new ToolActionAuthorization(false)); }
-    private sealed class UnusedTransport : IChatTransport
-    {
-        public async IAsyncEnumerable<StreamEvent> StreamAsync(ChatRequest request, [EnumeratorCancellation] CancellationToken token = default)
-        { await Task.FromException(new InvalidOperationException("Reload must not invoke a provider.")); yield break; }
-    }
     private sealed class CommandInput : MemoryStream
     {
         internal readonly TaskCompletionSource End = Gate();
@@ -177,6 +169,15 @@ internal static class CliReloadRoutingTests
         }
     }
     private static TaskCompletionSource Gate() => new(TaskCreationOptions.RunContinuationsAsynchronously);
+    // A reload that settles without reaching the held callback would leave the gate unset forever;
+    // report how it settled instead of waiting.
+    private static async Task Entered(TaskCompletionSource gate, Task<NativeHostReloadReceipt> reload)
+    {
+        if (await Task.WhenAny(gate.Task, reload).WaitAsync(TimeSpan.FromSeconds(30)) == gate.Task) return;
+        var receipt = await reload;
+        throw new InvalidOperationException($"Reload settled as {receipt.Workflow.Authority} before it reached the held callback.",
+            new AggregateException(receipt.Workflow.Failures.Select(failure => failure.Cause)));
+    }
     private static async Task Settle(Task task) { try { await task; } catch (Exception) { } }
     private static void Check(bool value) { if (!value) throw new InvalidOperationException("CLI reload routing contract failed."); }
 }

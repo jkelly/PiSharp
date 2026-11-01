@@ -1,5 +1,7 @@
 using System.Collections.Immutable;
+using System.Runtime.CompilerServices;
 using System.Text.Json;
+using PiSharp.AI;
 using PiSharp.Agent;
 using PiSharp.Cli.Commands;
 using PiSharp.CodingAgent;
@@ -164,7 +166,7 @@ internal static class CoreResumeToolSelectionTests
         var first = Path.Combine(f.Root, "first.jsonl"); var second = Path.Combine(f.Root, "second.jsonl");
         await Seed(first, f.Root, "legacy"); await Seed(second, f.Root, "legacy");
         var beforeFirst = await Bytes(first); var beforeSecond = await Bytes(second); var ids = 0; var factories = 0;
-        var rootCatalog = ExtensionCatalog(includeLater: false);
+        var transport = new Settled(profile.SelectedModel); var rootCatalog = ExtensionCatalog(includeLater: false);
         var root = ExtensionRegistry(profile, rootCatalog, new() { LifetimeToolSelection = policy,
             InitialActiveToolNames = policy.SelectInitial(rootCatalog.Select(tool => new ToolSelectionDescriptor(tool.Adapter.Name,
                 tool.Exposure, tool.DefaultActive, tool.IsExtension)).ToImmutableArray()), BindNestedCallsToSessionOwner = true });
@@ -173,13 +175,17 @@ internal static class CoreResumeToolSelectionTests
             {
                 factories++;
                 // A fresh incoming catalog adds a default extension absent from the retained root projection.
-                return ExtensionRegistry(profile, ExtensionCatalog(includeLater: true), new() { BindNestedCallsToSessionOwner = true });
+                return ExtensionRegistry(profile, ExtensionCatalog(includeLater: true), new() { BindNestedCallsToSessionOwner = true }, transport);
             });
         var initial = await lifecycle.OpenAsync(new(first), profile.SelectedModel);
         await using var owner = lifecycle.Attach(initial);
         Names(initial, expected.ToArray());
         Check(initial.Snapshot.Agent.Tools.Select(tool => tool.Name).SequenceEqual(expected, StringComparer.Ordinal),
             "Fresh factory lost default extension projection or promoted builtin/script-only metadata.");
+        // Pi 1.1.0 constructor (_buildRuntime): the projection is applied in memory; the open writes nothing and the next prompt
+        // records its delta from the recorded loadout (agent-loop declareToolChanges).
+        Check((await Bytes(first)).SequenceEqual(beforeFirst), "Factory initial projection was written at open.");
+        Recorded(await PromptRecord(initial), ["legacy"], [.. expected]);
         var openedFirst = await Bytes(first);
         Check(openedFirst.Length > beforeFirst.Length && openedFirst.Take(beforeFirst.Length).SequenceEqual(beforeFirst),
             "Factory initial checkpoint rewrote source history.");
@@ -189,10 +195,13 @@ internal static class CoreResumeToolSelectionTests
         Names(owner.Current.Session, expected.ToArray());
         Check(owner.Current.Session.Snapshot.Agent.Tools.Select(tool => tool.Name).SequenceEqual(expected, StringComparer.Ordinal),
             "Replacement catalog projection lost declarable defaults or escaped exact cap.");
+        var retiredFirst = await Bytes(first); var openedSecond = await Bytes(second);
+        Check(openedFirst.SequenceEqual(retiredFirst) && openedSecond.SequenceEqual(beforeSecond), "Replacement changed retired source or wrote the target at open.");
+        Recorded(await PromptRecord(owner.Current.Session), ["legacy"], [.. expected]);
         var afterFirst = await Bytes(first); var afterSecond = await Bytes(second);
         Check(openedFirst.SequenceEqual(afterFirst) && afterSecond.Length > beforeSecond.Length && afterSecond.Take(beforeSecond.Length).SequenceEqual(beforeSecond),
             "Replacement changed retired source or rewrote target historical bytes.");
-        Check(profile.UsedTurns == 0 && profile.Actions.Length == 0, "Projection executed a tool or provider call.");
+        Check(profile.UsedTurns == 0 && profile.Actions.Length == 0 && transport.Calls == 2, "Projection executed a tool or a provider call beyond its two prompts.");
     }
     private static ImmutableArray<SessionRegisteredTool> ExtensionCatalog(bool includeLater)
     {
@@ -211,8 +220,8 @@ internal static class CoreResumeToolSelectionTests
         => new(JsonData.Parse(JsonSerializer.Serialize(new { name, description = "current " + name, parameters = new { type = "object" } })), new NeverExecute(name))
             { IsExtension = isExtension, DefaultActive = defaultActive, Exposure = exposure };
     private static SessionRuntimeRegistry ExtensionRegistry(OfflineSessionProfile profile, ImmutableArray<SessionRegisteredTool> catalog,
-        SessionRuntimeRegistryOptions options) => new([new(profile.SelectedModel, profile.Registry.Resolve(profile.SelectedModel, []).Configuration.Transport)],
-            catalog, new Deny(), options);
+        SessionRuntimeRegistryOptions options, IChatTransport? transport = null) => new([new(profile.SelectedModel,
+            transport ?? profile.Registry.Resolve(profile.SelectedModel, []).Configuration.Transport)], catalog, new Deny(), options);
     private sealed class NeverExecute(string name) : IPreparedToolAdapter
     {
         public string Name => name;
@@ -226,10 +235,11 @@ internal static class CoreResumeToolSelectionTests
         {
             using var f = new StartupSettingsTests.Fixture(); await using var profile = await Profile(f);
             var path = Path.Combine(f.Root, "legacy-exposure.jsonl"); var ids = 0;
-            var registry = ExposureRegistry(profile, origin, lifetime: null);
+            var transport = new Settled(profile.SelectedModel); var registry = ExposureRegistry(profile, origin, lifetime: null, transport: transport);
             var session = await PersistentAgentSession.CreateAsync(path, ExposureHeader(path, f.Root), registry, profile.SelectedModel, () => 1, () => "legacy-" + ++ids);
             await using (var owner = new ReplaceableAgentSession(session, (_, _) => throw new InvalidOperationException("No replacement expected.")))
             {
+                var created = await Bytes(path);
                 await session.SetActiveToolsAsync(["hidden", "missing", "direct", "model", "code", "deferred", "code"]);
                 Names(session, "direct", "model", "code", "deferred");
                 Check(session.Snapshot.Agent.Tools.Select(tool => tool.Name).SequenceEqual(new[] { "direct", "model", "code", "deferred" }),
@@ -241,6 +251,9 @@ internal static class CoreResumeToolSelectionTests
                 Check(logical.Names.SequenceEqual(new[] { "code", "deferred" }), "Callback logical activation dropped callable script tools.");
                 await session.SetActiveToolsAsync(["code", "deferred"]);
                 Names(session, "code", "deferred");
+                // Pi 1.1.0 setActiveToolsByName applies each selection in memory; the next prompt records the loadout (declareToolChanges).
+                Check((await Bytes(path)).SequenceEqual(created), "Idle activation was written before the next prompt.");
+                Recorded(await PromptRecord(session), [], ["code", "deferred"]);
             }
             var before = await Bytes(path);
             await using (var reopened = await PersistentAgentSession.OpenWithRegistryAsync(path, registry, () => 1, () => "reopen-" + ++ids, fallbackModel: profile.SelectedModel))
@@ -250,7 +263,7 @@ internal static class CoreResumeToolSelectionTests
                     "Ordinary recorded replay rejected legacy script exposure declarations.");
                 var after = await Bytes(path); Check(before.SequenceEqual(after), "Ordinary exposure replay mutated durable source.");
             }
-            Check(profile.UsedTurns == 0 && profile.Actions.Length == 0, "Exposure selection acquired execution effects.");
+            Check(profile.UsedTurns == 0 && profile.Actions.Length == 0 && transport.Calls == 1, "Exposure selection acquired execution effects.");
         }
     }
     private static async Task CappedExposureActivation()
@@ -259,7 +272,7 @@ internal static class CoreResumeToolSelectionTests
         {
             using var f = new StartupSettingsTests.Fixture(); await using var profile = await Profile(f); var ids = 0;
             var policy = AllowedToolSelection.Create(["code", "deferred", "hidden"]);
-            var registry = ExposureRegistry(profile, origin, policy);
+            var transport = new Settled(profile.SelectedModel); var registry = ExposureRegistry(profile, origin, policy, transport: transport);
             // New initial projection still omits script-only/hidden entries; later explicit activation is a separate operation.
             Check(registry.Resolve(profile.SelectedModel, [], initialActiveToolNames: policy.InitialNames).Configuration.Tools.IsEmpty,
                 "New initial projection advertised hidden/script-only entries.");
@@ -267,6 +280,7 @@ internal static class CoreResumeToolSelectionTests
             var session = await PersistentAgentSession.CreateAsync(path, ExposureHeader(path, f.Root), registry, profile.SelectedModel, () => 1, () => "capped-" + ++ids);
             await using (var owner = new ReplaceableAgentSession(session, (_, _) => throw new InvalidOperationException("No replacement expected.")))
             {
+                var created = await Bytes(path);
                 await session.SetActiveToolsAsync(["hidden", "code", "deferred"]); Names(session, "code", "deferred");
                 var state = session.Snapshot; var before = await Bytes(path);
                 // Pi 1.1.0 ignores the capped-out name: the unchanged selection appends nothing.
@@ -274,6 +288,9 @@ internal static class CoreResumeToolSelectionTests
                 var after = await Bytes(path); Check(before.SequenceEqual(after) && state.Log.Sequence == session.Snapshot.Log.Sequence && session.Snapshot.Fault is null,
                     "Forbidden capped activation changed authoritative state.");
                 Names(session, "code", "deferred");
+                // The admitted selection is applied in memory (Pi 1.1.0 setActiveToolsByName); the next prompt records it.
+                Check(created.SequenceEqual(before), "Idle activation was written before the next prompt.");
+                Recorded(await PromptRecord(session), [], ["code", "deferred"]);
             }
             await using (var reopened = await PersistentAgentSession.OpenWithRegistryAsync(path, registry, () => 1, () => "cap-reopen-" + ++ids, fallbackModel: profile.SelectedModel))
                 Names(reopened, "code", "deferred");
@@ -284,6 +301,7 @@ internal static class CoreResumeToolSelectionTests
             await emptySession.SetActiveToolsAsync(["code"]); // Ignored under the exact empty cap, as Pi 1.1.0 does.
             var emptyAfter = await Bytes(emptyPath); Check(emptyBefore.SequenceEqual(emptyAfter) && emptyState.Log.Sequence == emptySession.Snapshot.Log.Sequence,
                 "Empty-cap refusal appended a loadout."); Names(emptySession);
+            Check(transport.Calls == 1, "Capped exposure selection made an unexpected provider call.");
         }
     }
     private static async Task ActualInitialExposureOpen()
@@ -300,7 +318,7 @@ internal static class CoreResumeToolSelectionTests
                     _ => null
                 };
                 var expected = kind == "unrestricted" ? new[] { "direct", "model" } : Array.Empty<string>();
-                var registry = ExposureRegistry(profile, origin, cap, rawInitial);
+                var transport = new Settled(profile.SelectedModel); var registry = ExposureRegistry(profile, origin, cap, rawInitial, transport);
                 var path = Path.Combine(f.Root, "initial-exposure.jsonl"); await Seed(path, f.Root, "legacy");
                 var oldBytes = await Bytes(path); byte[] admittedBytes;
                 var opened = await PersistentAgentSession.OpenWithRegistryAsync(path, registry, () => 1,
@@ -311,6 +329,9 @@ internal static class CoreResumeToolSelectionTests
                     Names(opened, expected);
                     Check(opened.Snapshot.Agent.Tools.Select(tool => tool.Name).SequenceEqual(expected, StringComparer.Ordinal),
                         "Actual startup scheduler reintroduced script-only or hidden raw initial names.");
+                    // Pi 1.1.0 constructor (_buildRuntime): the effective initial names are applied in memory; the next prompt records them.
+                    Check((await Bytes(path)).SequenceEqual(oldBytes), "Opening with initial names wrote to the session file.");
+                    Recorded(await PromptRecord(opened), ["legacy"], expected);
                     admittedBytes = await Bytes(path);
                     Check(admittedBytes.Length > oldBytes.Length && admittedBytes.Take(oldBytes.Length).SequenceEqual(oldBytes),
                         "Initial checkpoint omitted effective selection or rewrote historical bytes.");
@@ -322,19 +343,20 @@ internal static class CoreResumeToolSelectionTests
                     Names(reopened, expected);
                     Check(reopened.Snapshot.Agent.Tools.Select(tool => tool.Name).SequenceEqual(expected, StringComparer.Ordinal),
                         "Reopened startup selection was not the effective admitted subset.");
-                    var repeatedBytes = await Bytes(path);
-                    Check(admittedBytes.SequenceEqual(repeatedBytes), "Idempotent effective reopen appended a duplicate checkpoint.");
+                    var repeatedBytes = await Bytes(path); var messages = reopened.Snapshot.Context.LlmMessages;
+                    Check(admittedBytes.SequenceEqual(repeatedBytes) && reopened.WithPendingSystemRecord(messages).Length == messages.Length,
+                        "Idempotent effective reopen appended or owes a duplicate checkpoint.");
                 }
-                Check(profile.UsedTurns == 0 && profile.Actions.Length == 0, "Initial exposure selection executed a provider or tool action.");
+                Check(profile.UsedTurns == 0 && profile.Actions.Length == 0 && transport.Calls == 1, "Initial exposure selection executed a provider or tool action.");
             }
     }
     private static SessionRuntimeRegistry ExposureRegistry(OfflineSessionProfile profile, bool isExtension, AllowedToolSelection? lifetime,
-        ImmutableArray<string>? initial = null)
+        ImmutableArray<string>? initial = null, IChatTransport? transport = null)
     {
         var catalog = ImmutableArray.Create(CatalogTool("direct", isExtension), CatalogTool("model", isExtension, exposure: ToolExposure.ModelOnly),
             CatalogTool("code", isExtension, exposure: ToolExposure.Codemode), CatalogTool("deferred", isExtension, exposure: ToolExposure.Deferred),
             CatalogTool("hidden", isExtension, exposure: ToolExposure.Hidden));
-        return ExtensionRegistry(profile, catalog, new() { LifetimeToolSelection = lifetime, InitialActiveToolNames = initial, BindNestedCallsToSessionOwner = true });
+        return ExtensionRegistry(profile, catalog, new() { LifetimeToolSelection = lifetime, InitialActiveToolNames = initial, BindNestedCallsToSessionOwner = true }, transport);
     }
     private static SessionEntry ExposureHeader(string path, string root) => new SessionEntryCodec().Parse(JsonSerializer.Serialize(new
         { type = "session", version = 3, id = Path.GetFileNameWithoutExtension(path), timestamp = "2026-10-05T00:00:00.000Z", cwd = root }));
@@ -362,6 +384,32 @@ internal static class CoreResumeToolSelectionTests
         await using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite, 4096, FileOptions.Asynchronous);
         Check(stream.Length is > 0 and <= 65_536, "Unbounded fixture read."); var length = stream.Length; var bytes = new byte[checked((int)length)];
         await stream.ReadExactlyAsync(bytes); Check(stream.Length == length, "Fixture read crossed mutation."); return bytes;
+    }
+    // Pi agent-loop declareToolChanges: the run's first entry is the loadout record (a system message on the previous leaf), then the
+    // prompt's user message on it. Returns the record's message.
+    private static async Task<JsonElement> PromptRecord(PersistentAgentSession session)
+    {
+        var count = session.Snapshot.Log.Entries.Length; var leaf = session.Snapshot.Context.LeafId;
+        await session.PromptAsync(new TranscriptEntry("user", JsonData.Parse("{\"role\":\"user\",\"content\":\"record\",\"timestamp\":1}")));
+        await session.WaitForIdleAsync(); var added = session.Snapshot.Log.Entries.Skip(count).ToArray();
+        Check(added.Length >= 2 && added[0].ParentId == leaf && added[1].ParentId == added[0].Id &&
+            added[0].WireBody.Value.GetProperty("message").GetProperty("role").GetString() == "system" &&
+            added[1].WireBody.Value.GetProperty("message").GetProperty("role").GetString() == "user", "The prompt did not record the loadout before its message.");
+        return added[0].WireBody.Value.GetProperty("message");
+    }
+    private static void Recorded(JsonElement record, string[] removed, string[] added) =>
+        Check(Declared(record, "toolsRemoved").SequenceEqual(removed) && Declared(record, "toolsAdded").SequenceEqual(added), "The prompt recorded another loadout delta.");
+    private static string[] Declared(JsonElement record, string field) =>
+        record.TryGetProperty(field, out var tools) ? [.. tools.EnumerateArray().Select(tool => tool.GetProperty("name").GetString()!)] : [];
+    private sealed class Settled(ModelDescriptor model) : IChatTransport
+    {
+        internal int Calls;
+        public async IAsyncEnumerable<StreamEvent> StreamAsync(ChatRequest request, [EnumeratorCancellation] CancellationToken token = default)
+        {
+            await Task.CompletedTask; Calls++; token.ThrowIfCancellationRequested();
+            var message = new AssistantMessage(model.Api, model.Provider, model.Id, 1, [], TokenUsage.Zero, StopReason.Stop);
+            yield return new StreamStarted(message with { StopReason = StopReason.Pending }); yield return new StreamDone(StopReason.Stop, message);
+        }
     }
     private sealed class Deny : IToolActionPolicy
     { public ValueTask<ToolActionAuthorization> AuthorizeAsync(ToolInvocation invocation, PreparedToolAction action, CancellationToken token)

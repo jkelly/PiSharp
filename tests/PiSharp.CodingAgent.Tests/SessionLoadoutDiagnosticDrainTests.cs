@@ -76,9 +76,20 @@ internal static class SessionLoadoutDiagnosticDrainTests
         try { await gate.Entered.Task.WaitAsync(Bound); Check(!original.IsCompleted && f.Session.Snapshot.IsConfiguring && f.Session.Snapshot.Log.Sequence == snapshot.Log.Sequence &&
             f.Session.Snapshot.Agent.Tools.Single().Name == "a" && f.Transport.Calls == 0, "SetActiveTools acknowledged or changed scheduler before report join."); }
         finally { gate.Release.TrySetResult(); await original; }
-        var after = await Bytes(f.Source); Check(after.Length > before.Length && after.AsSpan(0, before.Length).SequenceEqual(before) &&
-            f.Session.GetActiveTools().SequenceEqual(new[] { "b" }) && f.Probe.Reported.Count == reports + 1 && f.Probe.Reported[^1].Error == f.Probe.BFailure && f.Session.Snapshot.Fault is null,
-            "Configured loadout did not preserve fallback/actual checkpoint or report original failure once.");
+        // Pi 1.1.0 setActiveToolsByName applies the selection in memory; the next prompt records it (agent-loop declareToolChanges).
+        var after = await Bytes(f.Source); Check(after.SequenceEqual(before) && f.Session.Snapshot.Log.Sequence == snapshot.Log.Sequence &&
+            f.Session.GetActiveTools().SequenceEqual(new[] { "b" }) && f.Session.Snapshot.Agent.Tools.Single().Name == "b" &&
+            f.Probe.Reported.Count == reports + 1 && f.Probe.Reported[^1].Error == f.Probe.BFailure && f.Session.Snapshot.Fault is null,
+            "Configured loadout did not preserve fallback/actual selection or report original failure once.");
+        var count = f.Session.Snapshot.Log.Entries.Length; await f.Session.PromptAsync(Input()); await f.Session.WaitForIdleAsync();
+        var record = f.Session.Snapshot.Log.Entries[count]; var message = record.WireBody.Value.GetProperty("message");
+        var recorded = await Bytes(f.Source); Check(recorded.Length > before.Length && recorded.AsSpan(0, before.Length).SequenceEqual(before) &&
+            record.ParentId == "left" && message.GetProperty("role").GetString() == "system" &&
+            message.GetProperty("toolsRemoved").EnumerateArray().Select(tool => tool.GetProperty("name").GetString()).SequenceEqual(["a"]) &&
+            message.GetProperty("toolsAdded").EnumerateArray().Select(tool => tool.GetProperty("name").GetString()).SequenceEqual(["b"]) &&
+            f.Session.Snapshot.Log.Entries[count + 1].ParentId == record.Id && f.Transport.Calls == 1 && f.Probe.Reported.Count == reports + 1 &&
+            f.Session.GetActiveTools().SequenceEqual(new[] { "b" }) && f.Session.Snapshot.Fault is null,
+            "The next prompt did not checkpoint the configured loadout first or reported its fallback again.");
     }
     private static async Task FailureIdentity()
     {

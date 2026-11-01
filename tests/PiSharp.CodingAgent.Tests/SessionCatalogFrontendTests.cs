@@ -140,7 +140,10 @@ internal static class SessionCatalogFrontendTests
             var bytes = await File.ReadAllBytesAsync(target); Check(bytes.AsSpan().StartsWith(targetBytes), "Cooked prompt changed B's original bytes.");
             var entries = reopened.ValidatedPrefix.Skip(1).Select(record => record.Entry).ToArray();
             var user = entries.Single(entry => entry.Type == "message" && entry.WireBody.Value.GetProperty("message").GetProperty("role").GetString() == "user");
-            Check(user.ParentId == "left" && entries.Any(entry => entry.Type == "message" && entry.WireBody.Value.GetProperty("message").GetProperty("role").GetString() == "assistant"), "Actual fresh prompt ignored selected leaf or lost final durable output.");
+            // The resume applies its tool loadout in memory and records it at the next prompt, before the user (78195257).
+            var loadout = entries.Single(entry => entry.Type == "message" && entry.WireBody.Value.GetProperty("message").GetProperty("role").GetString() == "system");
+            Check(loadout.ParentId == "left" && loadout.WireBody.Value.GetProperty("message").TryGetProperty("toolsAdded", out _), "Resumed loadout was not recorded on the selected leaf.");
+            Check(user.ParentId == loadout.Id && entries.Any(entry => entry.Type == "message" && entry.WireBody.Value.GetProperty("message").GetProperty("role").GetString() == "assistant"), "Actual fresh prompt ignored selected leaf or lost final durable output.");
         }
         finally
         {

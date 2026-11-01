@@ -27,7 +27,7 @@ internal static partial class NativeExtensionSessionCommandTests
         using var files = await Files.CreateAsync("todo"); await Create(files, api); var initial = await Complete(files); TodoLoadout(initial);
         const string alpha = "Alpha \u4E2D\uD83D\uDE42\nnext", beta = "Beta", sibling = "Sibling only";
         var batch = TodoBatch(api, [("todo-first", new { action = "add", text = alpha }), ("todo-second", new { action = "add", text = beta })], "todo batch");
-        batch["expectedRequest"] = TodoInitialRequest(api, "todo batch");
+        batch["expectedRequest"] = TodoInitialRequest(api, "todo batch", initial.Header!.Id);
         await Script(files, batch, Text(api, "batch final", ["Added todo #1: " + alpha, "Added todo #2: " + beta]));
         var literal = await File.ReadAllBytesAsync(files.Script); var report = Success(await Command(files, "prompt", api, "todo batch"));
         TodoRequests(report, api); Equal(2, report.GetProperty("usedScriptTurns").GetInt32()); Equal(2, report.GetProperty("actions").GetArrayLength());
@@ -103,8 +103,10 @@ internal static partial class NativeExtensionSessionCommandTests
         TodoResult(results[1], api, "rpc-toggle", "Todo #1 completed", "toggle", [TodoRow(1, "RPC item", true)], 2);
         TodoResult(results[2], api, "rpc-list", "[x] #1: RPC item", "list", [TodoRow(1, "RPC item", true)], 2);
         var before = rpc;
+        // Pi's validateToolArguments coerces a numeric string to a number and a number to a string, so the invalid
+        // id and text are values no coercion admits.
         foreach (var (id, args, denied) in new (string, object, bool)[] { ("bad-action", new { action = "remove" }, false),
-            ("bad-id", new { action = "toggle", id = "1" }, false), ("bad-text", new { action = "add", text = 7 }, false),
+            ("bad-id", new { action = "toggle", id = "first" }, false), ("bad-text", new { action = "add", text = new[] { "must not add" } }, false),
             ("missing-action", new { text = "must not add" }, false), ("denied-add", new { action = "add", text = "must not add" }, true) })
         {
             await Script(files, Tool(api, "todo", id, args, id), Text(api, "failure observed"));
@@ -153,10 +155,10 @@ internal static partial class NativeExtensionSessionCommandTests
         else { events.Add(tail[^2]!.DeepClone()); events.Add(tail[^1]!.DeepClone()); }
         return new JsonObject { ["requiredInputTexts"] = new JsonArray(prompt), ["events"] = events };
     }
-    private static JsonNode TodoInitialRequest(string api, string prompt)
+    private static JsonNode TodoInitialRequest(string api, string prompt, string sessionId)
     {
         // Existing independently authored provider body; replace only its sample declaration.
-        var request = HelloInitialRequest(api, prompt); var declaration = request["tools"]![2]!;
+        var request = HelloInitialRequest(api, prompt, sessionId); var declaration = request["tools"]![2]!;
         if (api == "openai-completions") declaration = declaration["function"]!;
         declaration["name"] = "todo"; declaration["description"] = TodoDescription;
         declaration[api == "anthropic-messages" ? "input_schema" : "parameters"] = JsonNode.Parse(TodoParameters);

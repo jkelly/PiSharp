@@ -65,9 +65,14 @@ internal static class StartupToolSelectionTests
         }
         Equal(true, File.Exists(Path.Combine(fixture.Root, "session.jsonl")));
         Names(["ls", "edit", "read"], await DurableTools(fixture)); Equal(1, fs.Reads.Count);
+        // Pi 1.1.0 AgentSession constructor: the open applies --tools in memory and writes nothing; the next prompt records it.
+        var recorded = await Bytes(fixture);
         await using (var host = new StartupSettingsTests.Host(fixture, fs, ["--tools", ""], "open"))
-        { await host.Response("ready", "get_state"); Equal(0, await host.Finish()); }
-        Names([], await DurableTools(fixture));
+        {
+            await host.Response("ready", "get_state"); Equal(true, (await Bytes(fixture)).SequenceEqual(recorded));
+            await host.MaterializeConversation(); Equal(0, await host.Finish());
+        }
+        Names([], await DurableTools(fixture)); Equal(true, Extends(await Bytes(fixture), recorded));
     }
     private static async Task Invalid()
     {
@@ -96,9 +101,15 @@ internal static class StartupToolSelectionTests
         { await host.Response("ready", "get_state"); Equal(0, await host.Finish()); }
         Names(["edit", "ls"], await DurableTools(fixture)); Equal(0, fs.Reads.Count);
         fs.Text[fixture.User] = "{\"defaultTools\":[\"write\",\"read\",\"-write\",\"+ls\"]}";
+        // The settings selection (read, ls) is applied in memory at open; the next prompt records its delta from the recorded edit, ls.
+        var recorded = await Bytes(fixture);
         await using (var host = new StartupSettingsTests.Host(fixture, fs, ["--user-settings", fixture.User], "open"))
-        { await host.Response("ready", "get_state"); Equal(0, await host.Finish()); }
-        Names(["read", "ls"], await DurableTools(fixture));
+        {
+            await host.Response("ready", "get_state"); Equal(true, (await Bytes(fixture)).SequenceEqual(recorded));
+            await host.MaterializeConversation(); Equal(0, await host.Finish());
+        }
+        // pi-ai getCurrentTools replays that delta (edit removed, read added) in declaration order: the transcript restores ls, read.
+        Names(["ls", "read"], await DurableTools(fixture)); Equal(true, Extends(await Bytes(fixture), recorded));
     }
     private static async Task OneShot()
     {
@@ -147,8 +158,12 @@ internal static class StartupToolSelectionTests
         {
             await File.WriteAllBytesAsync(path, original);
             var selected = flags.Contains("") ? Array.Empty<string>() : new[] { "read" };
+            // The open applies the selection in memory without acquiring Bash; the next prompt records it.
             await using (var host = new StartupSettingsTests.Host(fixture, null, flags, "open"))
-            { await host.Response("ready", "get_state"); Equal(0, await host.Finish()); }
+            {
+                await host.Response("ready", "get_state"); Equal(true, (await Bytes(fixture)).SequenceEqual(original));
+                await host.MaterializeConversation(); Equal(0, await host.Finish());
+            }
             Names(selected, await DurableTools(fixture));
             var afterRpc = await File.ReadAllBytesAsync(path);
             Equal(true, afterRpc.Length > original.Length && afterRpc.Take(original.Length).SequenceEqual(original));
@@ -209,6 +224,13 @@ internal static class StartupToolSelectionTests
         Equal(0, await SessionCommands.RunAsync(["session", "create", "--session", Path.Combine(fixture.Root, "session.jsonl"),
             "--workspace", fixture.Root, .. flags], output, error, stop.Token)); Equal("", error.ToString());
     }
+    /// <summary>The session file as written so far, read beside a running host's writer.</summary>
+    private static async Task<byte[]> Bytes(StartupSettingsTests.Fixture fixture)
+    {
+        await using var stream = new FileStream(Path.Combine(fixture.Root, "session.jsonl"), FileMode.Open, FileAccess.Read, FileShare.ReadWrite, 4096, FileOptions.Asynchronous);
+        var bytes = new byte[checked((int)stream.Length)]; await stream.ReadExactlyAsync(bytes); return bytes;
+    }
+    private static bool Extends(byte[] after, byte[] before) => after.Length > before.Length && after.AsSpan(0, before.Length).SequenceEqual(before);
     private static async Task<ImmutableArray<string>> DurableTools(StartupSettingsTests.Fixture fixture)
     {
         var path = Path.Combine(fixture.Root, "session.jsonl");

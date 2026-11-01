@@ -151,8 +151,7 @@ internal static class OfflineBashCommandTests
         foreach (var input in new object[]
         {
             new { command = "printf denied > forbidden.txt" },
-            new { command = allowed, timeout = 1 },
-            new { command = allowed, unexpected = true }
+            new { command = allowed, timeout = 1 }
         })
         {
             using var files = new Files();
@@ -168,6 +167,20 @@ internal static class OfflineBashCommandTests
             var log = await new SessionLogReader().ReadFileAsync(files.Session);
             Check(Messages(log).Any(message => message.GetProperty("role").GetString() == "toolResult" && message.GetProperty("isError").GetBoolean()),
                 "Rejected tool result was not durably finalized.");
+        }
+        // Source bashSchema admits additional properties and execute reads only command and timeout: the extra property
+        // never reaches the final action, which is exactly the allowed one.
+        foreach (var api in new[] { "openai-responses", "anthropic-messages" })
+        {
+            using var files = new Files();
+            Success(await OneShot(files, CreateArgs(files, api, allowed)));
+            await Script(files.Script, Tool(api, "extra", new { command = allowed, unexpected = true }), Text(api, "extra admitted"));
+            var admitted = Success(await OneShot(files, PromptArgs(files, api, "extra property", allowed))).GetProperty("actions").EnumerateArray().Single();
+            Check(admitted.GetProperty("allowed").GetBoolean() && !admitted.GetProperty("arguments").TryGetProperty("unexpected", out _) &&
+                admitted.GetProperty("CommandArguments").EnumerateArray().Select(item => item.GetString()).SequenceEqual(["-c", allowed]),
+                "An admitted extra property changed the exact allowed action.");
+            var ran = Messages(await new SessionLogReader().ReadFileAsync(files.Session)).Single(message => message.GetProperty("role").GetString() == "toolResult");
+            Check(!ran.GetProperty("isError").GetBoolean(), "Allowed action with an extra property was not durably successful."); Equal("allowed", ResultText(ran));
         }
         using var timeoutFiles = new Files();
         Success(await OneShot(timeoutFiles, CreateArgs(timeoutFiles, "openai-responses", allowed, "2")));

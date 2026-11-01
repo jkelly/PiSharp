@@ -115,8 +115,13 @@ internal static class PromptTemplateInputAdmissionTests
         try { await admission.ReduceAsync(new("/review"), default); }
         catch (PromptInputAdmissionException error) when (error.Failure == PromptInputAdmissionFailure.ResourceLimit) { bounded = true; }
         Equal(true, bounded);
+        // d45adff0, f0304a67: without explicit limits the reducer adds no bound of its own and keeps a lone surrogate as a JavaScript
+        // string does; the submitting session admits it under its own options.
+        var kept = await new PromptTemplateInputAdmission(Catalog("$1"), PromptTemplateInputOperation.Prompt,
+            new Handler(_ => new(PromptInputAction.Transform, "\uD800"))).ReduceAsync(new("raw"), default);
+        Equal(PromptInputAction.Transform, kept.Action); Equal("\uD800", kept.Text);
         var invalid = new PromptTemplateInputAdmission(Catalog("$1"), PromptTemplateInputOperation.Prompt,
-            new Handler(_ => new(PromptInputAction.Transform, "\uD800")));
+            new Handler(_ => new(PromptInputAction.Transform, "\uD800")), limits: new());
         try { await invalid.ReduceAsync(new("raw"), default); }
         catch (PromptInputAdmissionException error) when (error.Failure == PromptInputAdmissionFailure.InvalidInput) { return; }
         throw new InvalidOperationException("Invalid transformed scalar was accepted.");

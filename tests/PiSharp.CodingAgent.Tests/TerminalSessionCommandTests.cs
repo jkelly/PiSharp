@@ -194,7 +194,7 @@ internal static class TerminalSessionCommandTests
             if (plugin)
             {
                 var published = Path.Combine(repository.FullName, "artifacts", "extensions", "published-fixtures", "cli-ui");
-                Check(File.Exists(Path.Combine(published, "PublishedFixture.CliUi.dll")), "The existing native UI package must be published by the root gate.");
+                PublishedFixtures.Require(published, "PublishedFixture.CliUi.dll");
                 Directory.CreateDirectory(files.Package);
                 foreach (var source in Directory.GetFiles(published, "*", SearchOption.AllDirectories))
                 { var target = Path.Combine(files.Package, Path.GetRelativePath(published, source)); Directory.CreateDirectory(Path.GetDirectoryName(target)!); File.Copy(source, target, overwrite: false); }

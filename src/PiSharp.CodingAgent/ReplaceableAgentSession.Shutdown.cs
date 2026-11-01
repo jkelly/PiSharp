@@ -54,7 +54,7 @@ public sealed partial class ReplaceableAgentSession
                     if (needsReservation)
                     {
                         await retiring.Session.WaitForIdleAsync().ConfigureAwait(false);
-                        resourceReservation = retiring.Session.ReserveReplacement();
+                        resourceReservation = retiring.Session.ReserveShutdownRetirement();
                     }
                 }
                 catch (Exception error) { failures.Add(error); }
