@@ -115,8 +115,8 @@ internal static partial class Program
             await page.GetByRole(AriaRole.Button, new() { Name = "Evaluate", Exact = true }).ClickAsync();
             await Expect(page.Locator("[data-evaluated]")).ToContainTextAsync("Started run #");
             var row = page.Locator("[data-judgments] [data-judgment]");
-            await RefreshUntilAsync(page, row, "pending");
-            await Expect(row).ToContainTextAsync("relevant · 70%");
+            // Until the run classifies the input the row shows the run's status, "pending" too; then the label, the route and the decision.
+            await RefreshUntilAsync(page, row, "relevant · 70%");
             await Expect(row).ToContainTextAsync("confirm");
             await row.Locator("[data-reason]").FillAsync("Ships our fix");
             await row.GetByRole(AriaRole.Button, new() { Name = "Approve", Exact = true }).ClickAsync();
