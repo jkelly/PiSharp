@@ -179,7 +179,7 @@ internal static class NativeHookOnlyActivationTests
             var files = new Files();
             try
             {
-                Check(File.Exists(Path.Combine(published, "PublishedFixture.Cli.dll")), "Root must publish existing native PluginCli fixture.");
+                PublishedFixtures.Require(published, "PublishedFixture.Cli.dll");
                 foreach (var path in new[] { files.Root, files.Package, files.Snapshots, files.Markers }) Directory.CreateDirectory(path);
                 foreach (var source in Directory.GetFiles(published, "*", SearchOption.AllDirectories))
                 { var target = Path.Combine(files.Package, Path.GetRelativePath(published, source)); Directory.CreateDirectory(Path.GetDirectoryName(target)!); File.Copy(source, target); }

@@ -106,11 +106,22 @@ internal static class BuiltinToolInstallationTests
         Names(["read", "write"], session.GetActiveTools());
         await session.SetActiveToolsAsync(["edit", "read"]);
         Names(["edit", "read"], session.GetActiveTools());
-        var declarations = new SessionSystemReplay().Replay(session.Snapshot.Context.LlmMessages).Tools;
-        Names(["edit", "read"], declarations.Select(tool => tool.Value.GetProperty("name").GetString()!));
+        // Pi 1.1.0 setActiveToolsByName applies the selection in memory: the transcript declares read, write until the next prompt.
+        Names(["read", "write"], Declared(session));
+        var count = session.Snapshot.Log.Entries.Length;
         await session.PromptAsync(Input());
         Check(session.Snapshot.Fault is null && profile.UsedTurns == 2 && await File.ReadAllTextAsync(files.Target) == "changed",
             "Real profile did not execute the explicitly activated edit.");
+        // agent-loop declareToolChanges: the run's first entry records the delta (write removed, edit added) before the prompt, so the
+        // transcript and its requests (normalizeContext) declare read, edit in declaration order; the loadout keeps its selected order.
+        var record = session.Snapshot.Log.Entries[count].WireBody.Value.GetProperty("message");
+        Check(record.GetProperty("role").GetString() == "system" &&
+            record.GetProperty("toolsRemoved").EnumerateArray().Select(tool => tool.GetProperty("name").GetString()).SequenceEqual(["write"]) &&
+            record.GetProperty("toolsAdded").EnumerateArray().Select(tool => tool.GetProperty("name").GetString()).SequenceEqual(["edit"]) &&
+            session.Snapshot.Log.Entries[count + 1].WireBody.Value.GetProperty("message").GetProperty("role").GetString() == "user", "The prompt did not record the edit selection first.");
+        Names(["read", "edit"], Declared(session)); Names(["edit", "read"], session.GetActiveTools());
+        foreach (var request in JsonSerializer.SerializeToElement(profile.Requests).EnumerateArray())
+            Names(["read", "edit"], request.GetProperty("toolNames").EnumerateArray().Select(name => name.GetString()!));
         var actions = JsonSerializer.SerializeToElement(profile.Actions).EnumerateArray().ToArray();
         Check(actions.Length == 1 && actions[0].GetProperty("ToolName").GetString() == "edit" &&
             actions[0].GetProperty("allowed").GetBoolean() && actions[0].GetProperty("Target").GetString() == files.Target,
@@ -148,10 +159,12 @@ internal static class BuiltinToolInstallationTests
     private static async Task CliResume()
     {
         using var files = new Fixture();
-        await using (var profile = await Profile(files, [], [], []))
+        await using (var profile = await Profile(files, Turns(SessionCommandTests.CompletionsText("selected")), [], []))
         {
             await using var session = await NewSession(files, profile); profile.AttachOwner(session);
-            await session.SetActiveToolsAsync(["edit", "read"]);
+            // Pi 1.1.0 records an idle selection at the next prompt (agent-loop declareToolChanges), not when it is made.
+            await session.SetActiveToolsAsync(["edit", "read"]); await session.PromptAsync(Input());
+            Check(session.Snapshot.Fault is null && profile.UsedTurns == 1 && profile.Actions.Length == 0, "Selection prompt did not settle without tool effects.");
         }
         await File.WriteAllTextAsync(files.Script, JsonSerializer.Serialize(new { schemaVersion = 1, turns = new[]
         {
@@ -168,8 +181,9 @@ internal static class BuiltinToolInstallationTests
         using var body = JsonDocument.Parse(output.ToString());
         var requests = body.RootElement.GetProperty("requests").EnumerateArray().ToArray();
         Check(requests.Length == 2, "Resumed edit did not finish the literal turns.");
+        // The resume restores the transcript's loadout by name (_restoreToolsFromTranscript), in its declaration order.
         foreach (var request in requests)
-            Names(["edit", "read"], request.GetProperty("toolNames").EnumerateArray().Select(name => name.GetString()!));
+            Names(["read", "edit"], request.GetProperty("toolNames").EnumerateArray().Select(name => name.GetString()!));
     }
 
     private static Task<OfflineSessionProfile> Profile(Fixture files, ImmutableArray<JsonData> turns,
@@ -197,6 +211,8 @@ internal static class BuiltinToolInstallationTests
     private static TranscriptEntry Input() => new("user", JsonData.Parse("{\"role\":\"user\",\"content\":\"edit fixture\",\"timestamp\":1}"));
     private static IEnumerable<JsonElement> Results(PersistentAgentSession session) => session.Snapshot.Context.LlmMessages
         .Where(entry => entry.Role == "toolResult").Select(entry => entry.WireBody.Value);
+    private static IEnumerable<string> Declared(PersistentAgentSession session) => new SessionSystemReplay().Replay(session.Snapshot.Context.LlmMessages).Tools
+        .Select(tool => tool.Value.GetProperty("name").GetString()!);
     private static void Names(IEnumerable<string> expected, IEnumerable<string> actual) => Check(expected.SequenceEqual(actual), "Ordered tool selection changed.");
     private static void Check(bool condition, string message) { if (!condition) throw new InvalidOperationException(message); }
     private static void Throws<T>(Action operation) where T : Exception

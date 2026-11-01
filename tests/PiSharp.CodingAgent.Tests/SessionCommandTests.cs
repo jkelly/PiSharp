@@ -498,7 +498,8 @@ internal static class SessionCommandTests
             if (failure != "request")
             {
                 var diagnostic=report.GetProperty("nativeDiagnostics").GetProperty("entries").EnumerateArray().Last();
-                Equal(failure == "arguments" ? "MalformedStream" : "UnexpectedEof", diagnostic.GetProperty("diagnostic").GetProperty("code").GetString());
+                // parseStreamingJson finalizes the malformed "{" as {} and the turn continues: the follow-up request finds the one-turn script spent.
+                Equal(failure == "arguments" ? "SourceFailed" : "UnexpectedEof", diagnostic.GetProperty("diagnostic").GetProperty("code").GetString());
                 Equal("declared-native-record",diagnostic.GetProperty("provenance").GetString());
                 var inspected=await Child(files,"session","inspect","--session",files.Session);
                 Success(inspected);
@@ -508,6 +509,19 @@ internal static class SessionCommandTests
             Check(!File.Exists(target) && !failed.Output.Contains("private wrong expected request", StringComparison.Ordinal), "Failed literal stream/request acquired effect authority or leaked expected payload.");
             var closed = await new SessionLogReader().ReadFileAsync(files.Session); Check(closed.SourceComplete && closed.Status == SessionLogReadStatus.Complete, "Completions wire failure left an incomplete log.");
             Equal((long)closed.OriginalBytes.Length, report.GetProperty("committedByteLength").GetInt64());
+            if (failure == "arguments")
+            {
+                // The {} call reaches write's validator, which refuses it before any effect; then the failed follow-up assistant.
+                var turnMessages = closed.ValidatedPrefix.Where(record => record.Entry.Type == "message").Select(record => record.Entry.WireBody.Value.GetProperty("message"))
+                    .SkipWhile(message => message.GetProperty("role").GetString() != "user" || message.GetProperty("content").GetString() != "arguments").ToArray();
+                Equal(4, turnMessages.Length); Equal("toolUse", turnMessages[1].GetProperty("stopReason").GetString());
+                var call = turnMessages[1].GetProperty("content").EnumerateArray().Single();
+                Equal("bad-arguments", call.GetProperty("id").GetString()); Equal("{}", call.GetProperty("arguments").GetRawText());
+                Equal("bad-arguments", turnMessages[2].GetProperty("toolCallId").GetString()); Check(turnMessages[2].GetProperty("isError").GetBoolean(), "Malformed arguments acquired a successful tool result.");
+                Equal("Validation failed for tool \"write\":\n  - path: must have required properties path, content\n\nReceived arguments:\n{}",
+                    turnMessages[2].GetProperty("content").EnumerateArray().Single().GetProperty("text").GetString());
+                Equal("error", turnMessages[3].GetProperty("stopReason").GetString());
+            }
             await using var reopened = await SessionLogStore.OpenAsync(files.Session); Equal((long)closed.OriginalBytes.Length, reopened.Snapshot.CommittedByteLength);
         }
     }

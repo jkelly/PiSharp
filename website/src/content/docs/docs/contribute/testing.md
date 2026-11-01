@@ -57,6 +57,8 @@ $env:INTERACTIVEPARITY_FILTER = 'changelog.'; dotnet run --project tests/PiSharp
 | `SKIPPED_PLATFORM` | `CliParity`: a case for another platform. |
 | `SKIPPED_NO_UPSTREAM` | `Durable`: the case needs a Pi checkout that `PISHARP_DURABLE_UPSTREAM` doesn't name. |
 | `SKIP_NO_NODE`, `SKIP_NO_NPM`, `SKIP_NO_GIT`, `SKIP_NO_PI_RUNTIME` | `ExtensionParity`: the case needs Node.js, npm, Git or the installed Pi packages, and they are missing. |
+| `SKIP`, `skipped` | `CodingAgent`: a native extension case, and `artifacts/extensions/published-fixtures` doesn't exist. |
+| `HUNG`, `hung` | `CodingAgent`: the case was still running after 10 minutes. The run stops there and exits with 1. |
 
 A skip is not a failure. Check the skip counts when you expect a case to run.
 
@@ -109,7 +111,7 @@ Most of these test one library each. They are in `PiSharp.slnx`, but no workflow
 | `PiSharp.Transport.Tests` | The HTTP and SSE transports. Also takes `--require-node-absent` and `--strict-completions-lifecycle`, which can't be combined with `--filter`. |
 | `PiSharp.Sessions.Tests` | Session files, branches, context and compaction. |
 | `PiSharp.Tools.Tests` | The built-in tools. Its process and shell fixtures are Windows-only. |
-| `PiSharp.CodingAgent.Tests` | The coding agent runtime. Requires `--dotnet-host <path> --cli <path>`. |
+| `PiSharp.CodingAgent.Tests` | The coding agent runtime. Requires `--dotnet-host <path> --cli <path>`, the built `src/PiSharp.Cli` DLL. Its native extension cases load the packages that `tools/publish-native-extension-fixtures.ps1` publishes to `artifacts/extensions/published-fixtures`. Without that folder they skip and give the reason. Once it exists, a missing package fails its cases. |
 | `PiSharp.Rpc.Tests` | The JSONL RPC mode. |
 | `PiSharp.Tui.Tests` | Terminal input, rendering and leases. Requires `--dotnet-host <path>`. |
 | `PiSharp.Extensions.ContractTests` | The extension contracts. `Consumer/PublishedConsumer.csproj` is a native extension built against them, as a third-party extension would be. |

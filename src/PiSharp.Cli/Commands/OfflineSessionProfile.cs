@@ -1004,10 +1004,12 @@ internal sealed partial class OfflineSessionProfile : IAsyncDisposable, IRpcExte
             var strings = Strings(input).ToArray();
             if (requirements.Any(expectedText => !strings.Any(actual => actual.Contains(expectedText, StringComparison.Ordinal))))
                 throw new SessionCommandException(SessionCommandFailure.InvalidScript);
-            // Completions publishes Start only after actual headers/OnResponse. Holding headers
-            // would prevent an RPC client waiting for Start from sending its gate-release command.
-            // Other families retain their historical send gate; Completions holds the first body read.
-            if (!completions && beforeSendAsync is not null) await beforeSendAsync(token).ConfigureAwait(false);
+            // Pi openai-responses.ts and openai-completions.ts push "start" only once create() has the response headers
+            // (after onResponse); their transports publish Start there too. Holding headers would prevent an RPC client
+            // waiting for Start from sending its gate-release command, so both hold the first body read instead.
+            // Anthropic opens its source lazily, publishes Start before the send and keeps the send gate.
+            var bodyGate = !anthropic;
+            if (!bodyGate && beforeSendAsync is not null) await beforeSendAsync(token).ConfigureAwait(false);
             token.ThrowIfCancellationRequested();
             Requests.Add(new { sequence = Requests.Count + 1, model = model.Id, api = model.Api, provider = model.Provider,
                 requestUri = endpoint.AbsoluteUri, authHeader = anthropic ? "x-api-key" : "authorization",
@@ -1025,7 +1027,7 @@ internal sealed partial class OfflineSessionProfile : IAsyncDisposable, IRpcExte
             }
             var literal = Encoding.UTF8.GetBytes(wire.ToString());
             HttpContent content;
-            if (completions && beforeSendAsync is not null)
+            if (bodyGate && beforeSendAsync is not null)
             {
                 // The admitted source script is at most 1 MiB and 256 events per turn;
                 // the only extra wire bytes are fixed data/blank-line framing, not another queue.

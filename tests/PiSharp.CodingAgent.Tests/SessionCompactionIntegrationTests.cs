@@ -1188,13 +1188,17 @@ internal static class SessionCompactionIntegrationTests
                 }
                 else
                 {
-                    // Input itself exactly fits its combined character budget; framing makes the real
-                    // prospective checkpoint exceed the separate per-record snapshot bound.
-                    var rejected = await Throws<ExtensionRegistrationException>(() => summaries.AppendCompactionSummaryAsync(new(null, new string('x', 65_528))).AsTask());
-                    Equal("capture-session-snapshot", rejected.Operation); Equal(1, fixture.Ids); Equal(1, fixture.Clocks);
-                    var accepted = await summaries.AppendCompactionSummaryAsync(new(null, "usable after rejected output", SummaryUsage));
-                    Check(accepted is not null && accepted.Checkpoint.DurableCheckpointAcknowledged &&
-                        accepted.Snapshot.BranchEntries.Length == 3, "Rejected prospective output left source unusable.");
+                    // Input itself exactly fits its combined character budget. Snapshot entries take no per-record bound (d8e5d09d:
+                    // runner.ts hands every handler the whole session), so the framed checkpoint past 65,536 characters is accepted whole.
+                    var exact = await summaries.AppendCompactionSummaryAsync(new(null, new string('x', 65_528)));
+                    Check(exact is not null && exact.Checkpoint.DurableCheckpointAcknowledged && exact.Snapshot.BranchEntries.Length == 3 &&
+                        exact.Checkpoint.Entry.ToString().Length > 65_536 && exact.Checkpoint.Entry.Value.GetProperty("summary").GetString() == new string('x', 65_528),
+                        "Exact-budget summary was not checkpointed whole.");
+                    Equal(1, fixture.Ids); Equal(1, fixture.Clocks);
+                    // The branch now ends in that compaction: a further summary is "Already compacted" and writes nothing.
+                    var compacted = await Bytes(fixture.Files.A);
+                    Check(await summaries.AppendCompactionSummaryAsync(new(null, "after exact output", SummaryUsage)) is null, "Summary over a compacted leaf was appended.");
+                    SameBytes(compacted, await Bytes(fixture.Files.A));
                 }
                 if (invalidIdentity) SameBytes(original, await Bytes(fixture.Files.A)); else Prefix(original, await Bytes(fixture.Files.A));
                 Check(fixture.Owner.Current.Session.Snapshot.Fault is null, "SDK output policy failure poisoned the actual writer.");
@@ -1327,7 +1331,10 @@ internal static class SessionCompactionIntegrationTests
                 var session = await fixture.Open(fixture.Files.A);
                 fixture.Owner = new(session, (request, _) => fixture.Open(request.Path));
                 var native = new NativeSessionSnapshotProvider(); native.Attach(fixture.Owner);
-                fixture.Provider = new(native, holdValidator); fixture.Registry = new(null, null, fixture.Provider);
+                // The SDK host bounds its callback views explicitly here (the former 4,096-entry/1 MiB defaults), so the count boundary
+                // fixture stays small; the defaults (ExtensionSessionSnapshotLimits) grow with the session as the request budgets do (d8e5d09d).
+                fixture.Provider = new(native, holdValidator); fixture.Registry = new(new() { MaximumSessionBranchEntries = 4_096,
+                    MaximumSessionCharacters = 1_048_576, MaximumSessionUtf8Bytes = 1_048_576 }, null, fixture.Provider);
                 return fixture;
             }
             catch { await fixture.DisposeAsync(); throw; }
