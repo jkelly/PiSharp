@@ -534,18 +534,14 @@ internal sealed class TerminalChatInput
         var readToken = readStop.Token;
         var provider = clock ?? TimeProvider.System; var decoder = new TerminalInputDecoder(timeProvider: provider, kittyProtocolActive: kittyProtocolActive);
         var clearGesture = new TerminalInterruptGesture(provider);
-        var buffer = new char[4096]; Task<int>? physical = null; long physicalSessionGeneration = 0;
+        var buffer = new char[4096]; Task<int>? physical = null;
         using var timer = new PeriodicTimer(TimeSpan.FromMilliseconds(35), provider);
         Task<bool>? tick = null; Exception? failure = null, inputOverflow = null;
         try
         {
             while (true)
             {
-                if (physical is null)
-                {
-                    physicalSessionGeneration = captureTerminalSessionGeneration?.Invoke() ?? 0;
-                    physical = terminal.ReadAsync(buffer.AsMemory(), readToken).AsTask();
-                }
+                physical ??= terminal.ReadAsync(buffer.AsMemory(), readToken).AsTask();
                 tick ??= timer.WaitForNextTickAsync(readToken).AsTask();
                 if (await Task.WhenAny(physical, tick).ConfigureAwait(false) == tick)
                 {
@@ -558,14 +554,16 @@ internal sealed class TerminalChatInput
                 if (terminalInputAdmission is null) Publish(decoder.Feed(buffer.AsSpan(0, count)));
                 else
                 {
-                    if (physicalSessionGeneration != captureTerminalSessionGeneration!()) continue;
-                    var dispatchOriginal = terminalInputAdmission.DispatchAsync(new string(buffer, 0, count), physicalSessionGeneration, readToken);
+                    // A chunk belongs to the generation current when it arrives: the read pending across a session switch delivers
+                    // the first input after it (Pi's TUI keeps reading); only a switch during raw dispatch retires its outcome.
+                    var arrivedGeneration = captureTerminalSessionGeneration!();
+                    var dispatchOriginal = terminalInputAdmission.DispatchAsync(new string(buffer, 0, count), arrivedGeneration, readToken);
                     ExtensionTerminalInputOutcome outcome;
                     try { outcome = await dispatchOriginal.ConfigureAwait(false); }
                     catch when (dispatchOriginal.IsFaulted)
                     { System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(dispatchOriginal.Exception!).Throw(); throw; }
                     readToken.ThrowIfCancellationRequested();
-                    if (physicalSessionGeneration != captureTerminalSessionGeneration!()) continue;
+                    if (arrivedGeneration != captureTerminalSessionGeneration!()) continue;
                     if (outcome.Disposition == ExtensionTerminalInputDisposition.Forward)
                         Publish(decoder.Feed(outcome.Data.AsSpan()));
                 }
