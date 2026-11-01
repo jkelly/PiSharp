@@ -1,7 +1,7 @@
 # .NET build outputs
 [Bb]in/
 [Oo]bj/
-artifacts/
+/artifacts/
 TestResults/
 *.trx
 *.coverage

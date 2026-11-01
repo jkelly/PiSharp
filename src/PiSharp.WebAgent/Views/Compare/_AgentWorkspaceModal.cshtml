@@ -1,0 +1,25 @@
+@* Decision 0011 (run W4, R6): compare.html's _AgentWorkspaceModal (#modal-agent-workspace). The content is _AgentWorkspace: a run's
+   read-only facts (model given), or in setup the content _AgentProject brings once the folder is inspected (model null: a placeholder
+   until then). compare-agent.js moves the modal to the body. Model: AgentWorkspaceView, or null. *@
+@using PiSharp.WebAgent.AgentCompare.Pages
+@model AgentWorkspaceView?
+<div class="modal fade" id="modal-agent-workspace" tabindex="-1" aria-labelledby="modal-agent-workspace-title" aria-hidden="true" data-ac-modal>
+  <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+    @if (Model is not null)
+    {
+      <partial name="/Views/Compare/_AgentWorkspace.cshtml" model="Model" />
+    }
+    else
+    {
+      <div class="modal-content" data-ac-workspace-content>
+        <div class="modal-header">
+          <h2 class="modal-title" id="modal-agent-workspace-title">Workspaces</h2>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <div class="d-flex align-items-center gap-2 fs-7 text-ps-faint"><span class="spinner-border spinner-border-sm" aria-hidden="true"></span>Checking the project folder…</div>
+        </div>
+      </div>
+    }
+  </div>
+</div>

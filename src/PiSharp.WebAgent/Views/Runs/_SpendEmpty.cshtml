@@ -1,0 +1,15 @@
+@* Decision 0011 (run W3, S4): the mockups' _SpendEmpty: no request has been recorded yet; how the guard works, Set spend caps, Start a chat,
+   and where the ledger lives. Model: SpendHistoryPage. *@
+@model SpendHistoryPage
+<div class="ps-card" data-spend-empty>
+  <div class="empty-state">
+    <div class="empty-icon"><i class="bi bi-wallet2" aria-hidden="true"></i></div>
+    <h3 class="ps-heading fs-2 text-body mb-2">No spend <em>yet</em></h3>
+    <p class="fs-7 mx-auto mb-4" style="max-width:52ch">Before each provider request, Spend Guard reserves the worst-case cost and checks it against your caps. When the request ends, the reservation settles to the cost the provider reports. Every request will appear here.</p>
+    <div class="d-flex flex-wrap justify-content-center gap-2">
+      <a class="btn btn-primary" href="/settings/spend"><i class="bi bi-sliders me-1" aria-hidden="true"></i>Set spend caps</a>
+      <a class="btn btn-outline-secondary" href="/chat/new"><i class="bi bi-chat-square-text me-1" aria-hidden="true"></i>Start a chat</a>
+    </div>
+    <div class="fs-8 ps-mono text-ps-faint mt-4 text-break">@Model.DatabasePath</div>
+  </div>
+</div>

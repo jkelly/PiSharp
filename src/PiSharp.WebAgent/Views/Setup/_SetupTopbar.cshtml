@@ -1,0 +1,10 @@
+@* Decision 0011 (run W3, SU): the mockups' _SetupTopbar: the brand (home), the app's version and the theme toggle (shell.js). Model: SetupPage. *@
+@model SetupPage
+<header class="setup-topbar w-100 d-flex align-items-center gap-2 mb-4">
+  <a href="/" class="d-flex align-items-center gap-2 text-decoration-none" aria-label="PiSharp Web Agent home">
+    <img src="@WebCommonAssets.Mark" alt="" width="34" height="28">
+    <span class="app-brand-name">PiSharp<span class="app-brand-sub">Web Agent</span></span>
+  </a>
+  <span class="ps-chip d-none d-sm-inline-flex" title="PiSharp Web Agent version">v@(Model.Versions.App)</span>
+  <button class="btn btn-icon ms-auto" type="button" data-theme-toggle title="Toggle theme" aria-label="Toggle theme"><i class="bi bi-moon-stars" data-theme-icon></i></button>
+</header>

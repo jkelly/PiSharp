@@ -1,0 +1,33 @@
+@* Decision 0011 (run W4, R3): the mockups' "Clear all run history?" confirm (#modal-clear-history, after the shared _ConfirmModal's
+   markup): how many runs and how much runs.db holds, where it is, and "Keep pinned runs". Clearing posts {keepPinned} to
+   /api/history/clear; chats keep their own transcripts (only their run records go), agent compare runs go with their sessions and
+   workspaces (AgentCompareRunner follows runs.db's deletes, W4 fix 2), and presets and the Spend ledger are not touched.
+   history.js runs it. Model: RunHistoryPage. *@
+@using System.Globalization
+@model RunHistoryPage
+<div class="modal fade" id="modal-clear-history" tabindex="-1" aria-labelledby="modal-clear-history-title" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-body p-4">
+        <div class="d-flex gap-3">
+          <span class="provider-logo lg" style="background:var(--ps-danger-bg);color:var(--ps-danger);border-color:transparent"><i class="bi bi-trash3" aria-hidden="true"></i></span>
+          <div>
+            <h2 class="modal-title mb-1" id="modal-clear-history-title">Clear all run history?</h2>
+            <p class="text-secondary fs-7 mb-2">All @Model.TotalAll.ToString("#,0", CultureInfo.InvariantCulture) runs and their stream events and raw request and response payloads will be permanently deleted from <span class="ps-mono">runs.db</span>. Agent compare runs go too, with their models' sessions and workspaces (a model continued as a chat keeps its own). Chats keep their transcripts, and presets and the Spend ledger are kept. This can't be undone.</p>
+            <div class="ps-mono fs-8 text-ps-faint mb-3 text-break">@Model.DbPath · @RunHistoryText.Bytes(Model.SizeBytes)</div>
+            <div class="form-check">
+              <input class="form-check-input" type="checkbox" id="clearKeepPinned" checked data-clear-keep-pinned>
+              <label class="form-check-label fs-7" for="clearKeepPinned">Keep pinned runs</label>
+              <div class="form-text mt-0">@(Model.PinnedCount == 0 ? "No run is pinned." : Model.PinnedCount.ToString("#,0", CultureInfo.InvariantCulture) + (Model.PinnedCount == 1 ? " pinned run stays" : " pinned runs stay") + ", with their models and turns.")</div>
+            </div>
+            <div class="text-ps-danger fs-8 mt-2" data-clear-error hidden></div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-danger" data-clear-confirm>Clear history</button>
+      </div>
+    </div>
+  </div>
+</div>

@@ -1,0 +1,54 @@
+@* Decision 0011 (run W5, E6): Evals › Leaderboard (GET /evals/leaderboard?mode=&tag=), after the mockups' evals-leaderboard.html, states
+   default (a request tag), provisional (some model under the threshold), agent (an agent tag: cost per run, run time, check) and empty
+   (no vote yet: _LeaderboardEmpty). The header's Blind vote opens Compare with its Blind switch on; _EvalsTabs; _LeaderboardToolbar (the tag
+   menu, request and agent tags apart, the votes and models count, provisional, Export votes); _LeaderboardTable; the left-position line
+   (request tags) or the agent note; How ratings work. Only voted battles reach this page (ArenaService.Voted): nothing of a held battle
+   does. Model: LeaderboardPage. *@
+@model LeaderboardPage
+@{
+    ViewData["Title"] = "Evals";
+    ViewData[ShellViewData.Nav] = ShellNav.Evals;
+    ViewData[ShellViewData.Page] = "evals-leaderboard";
+    var agent = Model.Mode == ArenaMode.Agent;
+}
+@section Styles { <link href="~/css/evals.css" rel="stylesheet" asp-append-version="true" /> }
+@section TopbarStart { <h1 class="app-title">Evals</h1> }
+@section Scripts { <script type="module" src="~/js/evals.js" asp-append-version="true"></script> }
+<div class="page" data-evals="leaderboard" data-state="@Model.State" data-mode="@EvalJson.Wire(Model.Mode)" data-tag="@Model.Tag">
+  <div class="page-header">
+    <partial name="_EvalsHeader" />
+    <div class="d-flex flex-wrap gap-2">
+      <a class="btn btn-primary" href="@Model.BlindUrl"><i class="bi bi-shuffle me-1" aria-hidden="true"></i>Blind vote</a>
+    </div>
+  </div>
+  <partial name="_EvalsTabs" model="EvalsTab.Leaderboard" />
+  @if (Model.NoVotes)
+  {
+    <partial name="_LeaderboardEmpty" model="Model" />
+  }
+  else
+  {
+    <partial name="_LeaderboardToolbar" model="Model" />
+    <partial name="_LeaderboardTable" model="Model" />
+    @if (!agent && Model.PositionText is { } position)
+    {
+      <p class="fs-8 text-ps-faint mt-2 mb-0" data-position-bias>@position</p>
+    }
+    @if (agent)
+    {
+      <p class="fs-8 text-ps-faint mt-2 mb-0">An agent vote compares whole runs: each workspace's diff and check result, with names, turns, time and cost shown after you vote. Agent tags are kept apart from request tags.</p>
+    }
+    <details class="mt-3 fs-7">
+      <summary class="text-ps-faint">How ratings work</summary>
+      <div class="text-secondary mt-2 eval-prose">
+        <p class="mb-2">Ratings use a Bradley–Terry model with a Gaussian prior, so a handful of votes can't produce an extreme score. 1000 is the average model in the tag. A model 100 points higher wins about 64% of the time.</p>
+        <p class="mb-2">A tie counts as half a win, and a ranking of three or four answers counts as several pairs. The 95% interval and the rank range come from 500 seeded bootstrap samples, so the order you voted in makes no difference.</p>
+        <p class="mb-0">A model here is its provider, model and settings (thinking, temperature, service tier), not the account it ran on. Costs and speeds are medians of the answers you voted on; subscription models show list price.</p>
+        @if (agent)
+        {
+          <p class="mb-0 mt-2">In agent tags, cost and time are per run rather than per answer, and Check shows whether the run's check command passed in that model's workspace.</p>
+        }
+      </div>
+    </details>
+  }
+</div>

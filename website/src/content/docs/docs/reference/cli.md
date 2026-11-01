@@ -315,7 +315,7 @@ Reports go to stdout. Failures go to stderr as one JSON line such as `{"schemaVe
 | `--tier <tier>`, `--service-tier <tier>` | Service tier for a new session (experimental, unreleased). Without it, a new session takes the `serviceTier` setting. A session that `--continue` reopens keeps its stored tier; change it with `/tier`. |
 | `-h`, `--help` | Prints the durable help and exits without opening a session. |
 
-Any other argument is an error, `Unknown argument: <arg>`. The command prints a notice on stderr that it is experimental. `--tier` and the media tools in `pisharp durable` are not in any release yet and need a CLI built from source.
+Any other argument is an error, `Unknown argument: <arg>`. The command prints a notice on stderr that it is experimental. Inside it, `/plan` turns [plan mode](/docs/guides/durable/#plan-mode) on or off, and `/plan <message>` turns it on and sends the message. `--tier` and the media tools in `pisharp durable` are not in any release yet and need a CLI built from source.
 
 ## Exit codes
 

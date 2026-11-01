@@ -1,0 +1,30 @@
+@* Decision 0011 (run W5, fix 1 arena): GET /runs/{id} for a run of an Arena battle that is held or ready (ArenaBlindSet: a request battle's
+   column, an agent battle's run, one of its models or their turns). The inspector would name its model, so until the vote this page says
+   so and links to the battle, whose vote reveals it; it names no model, provider, account, usage or timing. Model: the battle's id. *@
+@model string
+@{
+    ViewData["Title"] = "Blind round";
+    ViewData[ShellViewData.Nav] = ShellNav.History;
+    ViewData[ShellViewData.Page] = "inspector";
+}
+@section TopbarStart
+{
+  <nav class="app-breadcrumb" aria-label="Breadcrumb">
+    <a href="/history">History</a>
+    <span aria-hidden="true">›</span>
+    <h1 class="app-title current fs-7 mb-0">Blind round</h1>
+  </nav>
+}
+<div class="page">
+  <div class="ps-card">
+    <div class="empty-state py-5" data-run-blind="@Model">
+      <div class="empty-icon"><i class="bi bi-eye-slash" aria-hidden="true"></i></div>
+      <h2 class="h5 mb-1">This run is part of a blind round</h2>
+      <p class="fs-7 text-ps-faint mb-3">Its model stays hidden until you vote, so the inspector opens after the vote.</p>
+      <div class="d-flex flex-wrap justify-content-center gap-2">
+        <a class="btn btn-sm btn-primary" href="@PiSharp.WebAgent.Evals.Arena.ArenaBlindText.Href(Model)"><i class="bi bi-trophy me-1" aria-hidden="true"></i>Open the blind round</a>
+        <a class="btn btn-sm btn-outline-secondary" href="/history"><i class="bi bi-clock-history me-1" aria-hidden="true"></i>Back to History</a>
+      </div>
+    </div>
+  </div>
+</div>

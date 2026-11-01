@@ -1,0 +1,30 @@
+@* Decision 0011 (run W2, WU4): the mockups' _ShortcutsModal (#modal-shortcuts), opened from the top bar or with "?". Global keys are wired
+   by shell.js; the Chat keys by the chat page's script (W2 WU8). The Playground keys (W4): Run by playground.js (also Compare's Run all and
+   the Tool Bench's Run), Save preset by presets-host.js on the Playground, Compare and the Tool Bench. *@
+<div class="modal fade" id="modal-shortcuts" tabindex="-1" aria-labelledby="modal-shortcuts-title" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 class="modal-title" id="modal-shortcuts-title">Keyboard shortcuts</h2>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div class="ps-label mb-2">Global</div>
+        <div class="kv"><span class="k">Model picker</span><span class="v"><kbd class="ps-kbd">Ctrl</kbd> <kbd class="ps-kbd">K</kbd></span></div>
+        <div class="kv"><span class="k">New chat</span><span class="v"><kbd class="ps-kbd">Ctrl</kbd> <kbd class="ps-kbd">Shift</kbd> <kbd class="ps-kbd">O</kbd></span></div>
+        <div class="kv"><span class="k">Toggle theme</span><span class="v"><kbd class="ps-kbd">Ctrl</kbd> <kbd class="ps-kbd">Shift</kbd> <kbd class="ps-kbd">L</kbd></span></div>
+        <div class="kv"><span class="k">Show shortcuts</span><span class="v"><kbd class="ps-kbd">?</kbd></span></div>
+        <div class="ps-label mt-3 mb-2">Chat</div>
+        <div class="kv"><span class="k">Send / steer</span><span class="v"><kbd class="ps-kbd">Enter</kbd></span></div>
+        <div class="kv"><span class="k">New line</span><span class="v"><kbd class="ps-kbd">Shift</kbd> <kbd class="ps-kbd">Enter</kbd></span></div>
+        <div class="kv"><span class="k">Queue follow-up</span><span class="v"><kbd class="ps-kbd">Alt</kbd> <kbd class="ps-kbd">Enter</kbd></span></div>
+        <div class="kv"><span class="k">Stop</span><span class="v"><kbd class="ps-kbd">Esc</kbd></span></div>
+        <div class="kv"><span class="k">Cycle thinking level</span><span class="v"><kbd class="ps-kbd">Shift</kbd> <kbd class="ps-kbd">Tab</kbd></span></div>
+        <div class="kv"><span class="k">Session tree</span><span class="v"><kbd class="ps-kbd">Esc</kbd> <kbd class="ps-kbd">Esc</kbd></span></div>
+        <div class="ps-label mt-3 mb-2">Playground</div>
+        <div class="kv"><span class="k">Run</span><span class="v"><kbd class="ps-kbd">Ctrl</kbd> <kbd class="ps-kbd">Enter</kbd></span></div>
+        <div class="kv"><span class="k">Save preset</span><span class="v"><kbd class="ps-kbd">Ctrl</kbd> <kbd class="ps-kbd">S</kbd></span></div>
+      </div>
+    </div>
+  </div>
+</div>

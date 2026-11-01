@@ -1,0 +1,30 @@
+@* Decision 0011 (run W4, R1): the mockups' _ModelPickerModal (#modal-model-picker, Ctrl+K through shell.js): the two linked dropdowns
+   Provider → Model (_ProviderModelSelect, prefix "mp" by convention), never one long list. The form is [data-model-picker]; the page's
+   script applies the choice (the Playground re-reads the model's options, Compare sets a column) and nothing changes a model by itself.
+   "Connect another provider" opens Settings › Providers. Model: ModelPickerView. *@
+@using PiSharp.WebAgent.Playground
+@model ModelPickerView
+<div class="modal fade" id="modal-model-picker" tabindex="-1" aria-labelledby="modal-model-picker-title" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <form class="modal-content" data-model-picker data-prefix="@Model.Select.IdPrefix">
+      <div class="modal-header">
+        <h2 class="modal-title" id="modal-model-picker-title">Choose a model</h2>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <partial name="_ProviderModelSelect" model="Model.Select" />
+        @if (Model.Note is { } note)
+        {
+          <div class="form-text mt-2">@note</div>
+        }
+      </div>
+      <div class="modal-footer justify-content-between">
+        <a class="fs-7 text-ps-faint" href="/settings/providers">Connect another provider</a>
+        <div class="d-flex gap-2">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary">@Model.Submit</button>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>

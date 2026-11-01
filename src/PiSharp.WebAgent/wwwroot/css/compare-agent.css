@@ -1,0 +1,100 @@
+/* Decision 0011 (run W4, R6): agent compare's own rules (prefix ac-), after compare.html's page-specific block. Loaded by _AgentMode
+   after compare.css (R2's: .cmp-page, .compare-grid, .compare-col, .ac-mode). Colours are the shell's tokens only, so both themes work;
+   diff lines differ by background, weight and the + / − marker, never by a status colour. No horizontal page scroll at 375px: the
+   columns scroll inside .compare-grid, long paths wrap anywhere. */
+
+/* Column heads: the position letter, the logo and the model's name. */
+.ac-letter { width: 1.6rem; height: 1.6rem; border-radius: 50%; display: inline-grid; place-items: center; flex: none; background: var(--ps-surface-3); color: var(--ps-text); font-weight: 600; font-size: .8125rem; }
+.ac-page .compare-col-head .provider-logo { width: 24px; height: 24px; flex: none; }
+.ac-col-title { min-width: 0; line-height: 1.3; flex: 1 1 0; }
+.ac-col-name { font-weight: 500; font-size: .875rem; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ac-held { display: grid; place-items: center; text-align: center; min-height: 12rem; color: var(--ps-faint); font-size: .8125rem; }
+.ac-chips:empty { display: none !important; }
+
+/* Setup and run rows. */
+.ac-project { display: flex; flex-wrap: wrap; align-items: center; gap: .35rem .5rem; font-size: .8125rem; min-width: 0; }
+.ac-path { font-family: var(--ps-font-mono); font-size: .75rem; overflow-wrap: anywhere; min-width: 0; }
+.ac-iso { cursor: pointer; max-width: 100%; }
+.ac-iso:hover, .ac-iso:focus-visible { background: var(--ps-hover); border-color: var(--ps-border); }
+.ac-iso-host { display: inline-flex; min-width: 0; max-width: 100%; }
+.ac-iso-host .spinner-border-sm { width: .7rem; height: .7rem; border-width: .12em; }
+.ac-folder-menu { width: min(21rem, calc(100vw - 2rem)); }
+.ac-folder-menu .dropdown-item { white-space: normal; }
+.ac-task { font-size: .9rem; line-height: 1.5; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
+.ac-summary { flex: 1 1 14rem; min-width: 0; text-align: right; }
+.ac-check { flex: 1 1 18rem; min-width: 0; max-width: 40rem; }
+.ac-cap-input { max-width: 6rem; }
+.ac-cap-mode { max-width: 7rem; }
+.ac-limits-toggle { min-width: 0; max-width: 100%; }
+.ac-limits-toggle .bi-chevron-right, .ac-limits-toggle .bi-chevron-down { transition: transform .15s ease; }
+.ac-limits-toggle[aria-expanded="true"] .bi-chevron-right { transform: rotate(90deg); }
+.ac-banner-text { flex: 1 1 16rem; min-width: 0; overflow-wrap: anywhere; }
+.ac-sandbox { overflow-wrap: anywhere; }
+.ac-modal-heading { min-width: 0; }
+@media (max-width: 767.98px) { .ac-limits { max-height: 34vh; overflow-y: auto; } }
+/* The task, project, limits and banners scroll on their own when they would leave the columns too little height (a phone, an open Limits
+   panel, several banners); the folder menu is positioned fixed so the scroll does not clip it. */
+.ac-page > .compare-prompt { max-height: 62vh; overflow-y: auto; }
+@media (max-width: 767.98px), (max-height: 640px) { .ac-page > .compare-prompt { max-height: 48vh; } }
+
+/* Run columns. */
+.ac-tool { font-family: var(--ps-font-mono); font-size: .75rem; color: var(--ps-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: .3rem .55rem; border-radius: 8px; background: var(--ps-surface-3); }
+.ac-files { list-style: none; padding: 0; margin: 0; }
+.ac-files li { display: flex; align-items: baseline; justify-content: space-between; gap: .75rem; padding: .15rem 0; }
+.ac-delta { font-size: .75rem; color: var(--ps-faint); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.ac-tail > summary { list-style: none; cursor: pointer; display: inline-flex; align-items: center; gap: .3rem; font-size: .75rem; color: var(--ps-faint); }
+.ac-tail > summary::-webkit-details-marker { display: none; }
+.ac-tail > summary:hover { color: var(--ps-text); }
+.ac-tail > summary .bi { font-size: .65rem; transition: transform .15s ease; }
+.ac-tail[open] > summary .bi { transform: rotate(90deg); }
+.ac-tail .ps-term { margin-top: .4rem; }
+.ac-tail .ps-term pre { font-size: .72rem; max-height: 18rem; overflow-y: auto; }
+.ac-col-actions { display: flex; flex-wrap: wrap; gap: .4rem; margin-top: 1rem; }
+/* W4 fix 2: a column's live transcript (the chat's own items, read-only), scrolling inside the column. The page does not load chat.css, so
+   the few item rules it needs are here, scoped to the transcript: entry ids, event lines and live output as the chat page shows them; no
+   "kept running" note and no "paused while reconnecting" text (the chat page's tab states). */
+.ac-transcript-body { margin-top: .5rem; max-height: 26rem; overflow-y: auto; overflow-x: hidden; padding-right: .25rem; }
+.ac-transcript-body .msg { margin-bottom: 1rem; }
+.ac-transcript-body .msg-content { font-size: .8125rem; line-height: 1.6; }
+.ac-transcript-body .msg-plain { white-space: pre-wrap; }
+.ac-transcript-body .msg-user .msg-body { max-width: 92%; }
+.ac-transcript-body .msg-user .entry-hover { display: flex; justify-content: flex-end; margin-top: .2rem; }
+.ac-transcript-body .msg-footer { font-size: .7rem; }
+.ac-transcript-body .entry-id { font-size: .7rem; color: var(--ps-faint); font-variant-numeric: tabular-nums; }
+.ac-transcript-body .msg-actions .entry-id { align-self: center; margin-left: .35rem; }
+.ac-transcript-body .event-line { display: flex; align-items: center; gap: .55rem; font-size: .75rem; color: var(--ps-faint); margin: 0 0 1rem; }
+.ac-transcript-body .event-line::before, .ac-transcript-body .event-line::after { content: ""; height: 1px; background: var(--ps-border); flex: 1; min-width: 1rem; }
+.ac-transcript-body .tool-card .tool-status { font-size: .75rem; color: var(--ps-faint); white-space: nowrap; }
+.ac-transcript-body .tool-card .tool-body .result-head { display: flex; align-items: center; gap: .5rem; margin-bottom: .25rem; }
+.ac-transcript-body .nested-calls { margin-top: .6rem; padding-left: .75rem; border-left: 1px solid var(--ps-border-strong); }
+.ac-transcript-body .live-output { max-height: 220px; overflow-y: auto; }
+.ac-transcript-body .msg-partial { color: var(--ps-muted); }
+.ac-transcript-body .run-note[data-run-note], .ac-transcript-body .msg-live-footer [data-live-status="reconnecting"] { display: none; }
+.ac-note code { overflow-wrap: anywhere; }
+.ac-note > :last-child { margin-bottom: 0; }
+.ac-page .awaiting-card .ps-term pre { max-height: 12rem; overflow-y: auto; }
+
+/* Diff view: neutral lines; + and − lines differ by background, text weight and the marker glyph (no status colour). */
+.ac-diff-layout { display: grid; grid-template-columns: minmax(0, 15rem) minmax(0, 1fr); gap: 1rem; align-items: start; }
+.ac-diff-files { display: flex; flex-direction: column; gap: 2px; position: sticky; top: 0; }
+.ac-diff-file-link { display: flex; align-items: baseline; justify-content: space-between; gap: .5rem; padding: .4rem .6rem; border-radius: 8px; color: var(--ps-text); text-decoration: none; }
+.ac-diff-file-link:hover, .ac-diff-file-link:focus-visible { background: var(--ps-hover); color: var(--ps-text); }
+.ac-diff { border: 1px solid var(--ps-code-border); border-radius: 12px; overflow: hidden; background: var(--ps-code-bg); margin-bottom: 1rem; scroll-margin-top: 1rem; }
+.ac-diff:last-child { margin-bottom: 0; }
+.ac-diff-head { display: flex; align-items: baseline; gap: .75rem; padding: .4rem .75rem; background: var(--ps-code-bar); color: var(--ps-muted); }
+.ac-diff-code { overflow-x: auto; padding: .35rem 0; font-family: var(--ps-font-mono); font-size: .75rem; line-height: 1.6; color: var(--ps-code-text); }
+.ac-diff-lines { display: inline-block; min-width: 100%; }
+.ac-diff-code .ln { white-space: pre; padding-right: 1rem; }
+.ac-diff-code .ln .m { display: inline-block; width: 1.75rem; text-align: center; color: var(--ps-faint); user-select: none; }
+.ac-diff-code .ln.add, .ac-diff-code .ln.del { background: var(--ps-surface-3); }
+.ac-diff-code .ln.add .m, .ac-diff-code .ln.del .m { color: var(--ps-text); font-weight: 600; }
+.ac-diff-code .ln.del { color: var(--ps-muted); }
+.ac-diff-code .ln.hunk { color: var(--ps-faint); }
+.ac-diff-header { flex-wrap: wrap; }
+.ac-diff-heading { flex: 1 1 0; min-width: 0; }
+.ac-diff-switch { flex: none; }
+@media (max-width: 767.98px) {
+  .ac-diff-layout { grid-template-columns: minmax(0, 1fr); }
+  .ac-diff-files { position: static; }
+  .ac-diff-switch { order: 3; flex-basis: 100%; }
+}

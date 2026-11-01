@@ -1,0 +1,49 @@
+@* Decision 0011 (run W2, WU8): a run of session-tree entries: the entry, its only child and so on as sibling list items; where entries
+   split into branches, a nested list holds one run per branch. Text is a plain preview, encoded. Model: ChatTreeRunView. *@
+@model ChatTreeRunView
+@{
+    var node = Model.Start;
+}
+@while (true)
+{
+  var branchName = node.LeafOf.Count > 0 && Model.Tree.AgentNames.TryGetValue(node.LeafOf[0], out var name) ? name : null;
+  <li>
+    <button class="tree-node@(node.Current ? " current" : "")@(node.OnCurrentPath ? " on-path" : "")" type="button" data-tree-node data-entry="@node.EntryId" data-prev="@node.PreviousId" data-agent="@node.AgentId" data-role="@node.Role" data-leaf-of="@(node.LeafOf.Count > 0 ? string.Join(",", node.LeafOf) : null)" aria-current="@(node.Current ? "true" : null)">
+      <span class="role">@node.Role</span><span class="text@(node.Role is "compaction" or "reset" ? " text-secondary" : "")">@node.Text</span>
+      @if (node.Tools > 0)
+      {
+        <span class="ps-chip ms-auto">@node.Tools tool@(node.Tools == 1 ? "" : "s")</span>
+      }
+      @if (node.Current)
+      {
+        <span class="ps-chip@(node.Tools > 0 ? "" : " ms-auto")" data-tone="accent">current leaf</span>
+      }
+      else if (node.Running)
+      {
+        <span class="ps-chip@(node.Tools > 0 ? "" : " ms-auto")" title="This branch's run is still going on the server"><span class="status-dot live" aria-hidden="true"></span>running</span>
+      }
+      else if (branchName is not null)
+      {
+        <span class="ps-chip@(node.Tools > 0 ? "" : " ms-auto")" title="This branch's newest entry">@branchName</span>
+      }
+    </button>
+    @if (node.Children.Count > 1)
+    {
+      <ul>
+        @foreach (var child in node.Children)
+        {
+          <li class="tree-branch">
+            <ul class="tree-run">
+              @await Html.PartialAsync("~/Views/Chat/_ChatTreeRun.cshtml", new ChatTreeRunView(child, Model.Tree))
+            </ul>
+          </li>
+        }
+      </ul>
+    }
+  </li>
+  if (node.Children.Count != 1)
+  {
+    break;
+  }
+  node = node.Children[0];
+}

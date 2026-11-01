@@ -1,0 +1,141 @@
+@* Decision 0011 (run W3, S4): the mockups' modal-spend-cap (_SpendCapModal, Settings › Spend): add a cap (pane new: everything metered,
+   one provider, one account or one source; the window: Request, Run, Day or Month; the limit; Block or Ask) or edit one (pane edit: the
+   scope and window stay fixed; the limit and Block or Ask change), and remove it. Only metered providers and accounts are offered. A run is
+   what one run key groups: a whole chat, or one Playground, Compare or eval run (the mockups' separate Chat window is this Run window).
+   spend-settings.js fills the edit pane from the row's data-cap-* and posts to /api/spend/caps. Model: SpendCapModalView. *@
+@using PiSharp.WebAgent.Spend
+@model SpendCapModalView
+<div class="modal fade" id="modal-spend-cap" tabindex="-1" aria-labelledby="modal-spend-cap-title" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+    <form class="modal-content" novalidate autocomplete="off" data-cap-form data-mode="new">
+      <div class="modal-header">
+        <div>
+          <h2 class="modal-title" id="modal-spend-cap-title"><span data-cap-only="new">Add a spend cap</span><span data-cap-only="edit" hidden>Edit cap</span></h2>
+          <div class="modal-subtitle"><span data-cap-only="new">Checked before each metered request is sent</span><span data-cap-only="edit" data-cap-field="title" hidden></span></div>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div data-cap-only="new">
+          <label class="form-label" for="capScope">Applies to</label>
+          <select class="form-select" id="capScope" data-cap-scope-select>
+            <option value="everything" selected>Everything metered</option>
+            <option value="provider" disabled="@(Model.Providers.Count == 0)">One provider</option>
+            <option value="account" disabled="@(Model.Accounts.Count == 0)">One account</option>
+            <option value="source">One source</option>
+          </select>
+          <div class="mt-2" data-cap-scope-pane="everything">
+            <div class="form-text mt-0">All metered providers and accounts together.</div>
+          </div>
+          <div class="mt-2" data-cap-scope-pane="provider" hidden>
+            <label class="form-label" for="capProvider">Provider</label>
+            <select class="form-select" id="capProvider" data-cap-key="provider">
+              @foreach (var provider in Model.Providers)
+              {
+                <option value="@provider.Value">@provider.Text</option>
+              }
+            </select>
+            <div class="form-text">Only metered providers are listed.</div>
+          </div>
+          <div class="mt-2" data-cap-scope-pane="account" hidden>
+            <div class="row g-2">
+              <div class="col-sm-6">
+                <label class="form-label" for="capAccountProvider">Provider</label>
+                <select class="form-select" id="capAccountProvider" data-cap-account-provider>
+                  @foreach (var provider in Model.Accounts.GroupBy(account => account.Provider))
+                  {
+                    <option value="@provider.Key">@provider.First().ProviderName</option>
+                  }
+                </select>
+              </div>
+              <div class="col-sm-6">
+                <label class="form-label" for="capAccount">Account</label>
+                <select class="form-select" id="capAccount" data-cap-key="account">
+                  @foreach (var account in Model.Accounts)
+                  {
+                    <option value="@account.Id" data-provider="@account.Provider">@account.Text</option>
+                  }
+                </select>
+              </div>
+            </div>
+          </div>
+          <div class="mt-2" data-cap-scope-pane="source" hidden>
+            <label class="form-label" for="capSource">Source</label>
+            <select class="form-select" id="capSource" data-cap-key="source">
+              @foreach (var source in SpendSources.All)
+              {
+                <option value="@source.Wire()">@source.Label()</option>
+              }
+            </select>
+            <div class="form-text">Counts only metered spend started from there.</div>
+          </div>
+
+          <fieldset class="mt-3">
+            <legend class="form-label">Window</legend>
+            <div class="btn-group btn-group-sm flex-wrap" role="group" aria-label="Window">
+              <input type="radio" class="btn-check" name="capWindow" id="capWinRequest" value="request"><label class="btn btn-outline-secondary" for="capWinRequest">Request</label>
+              <input type="radio" class="btn-check" name="capWindow" id="capWinRun" value="run"><label class="btn btn-outline-secondary" for="capWinRun">Run</label>
+              <input type="radio" class="btn-check" name="capWindow" id="capWinDay" value="day" checked><label class="btn btn-outline-secondary" for="capWinDay">Day</label>
+              <input type="radio" class="btn-check" name="capWindow" id="capWinMonth" value="month"><label class="btn btn-outline-secondary" for="capWinMonth">Month</label>
+            </div>
+            <div class="form-text">A run is one chat with all its turns, or one Playground, Compare or eval run, with all its model calls. Days and months are UTC.</div>
+          </fieldset>
+
+          <label class="form-label mt-3" for="capAmount">Limit</label>
+          <div class="input-group" style="max-width:11rem">
+            <span class="input-group-text">$</span>
+            <input class="form-control ps-mono" id="capAmount" type="number" min="0.01" step="0.01" placeholder="5.00" inputmode="decimal" data-cap-amount-new>
+          </div>
+
+          <fieldset class="mt-3">
+            <legend class="form-label">At the limit</legend>
+            <div class="row g-2">
+              <div class="col-sm-6">
+                <input type="radio" class="btn-check" name="capBehaviour" id="capBlock" value="block">
+                <label class="choice-card h-100" for="capBlock"><span class="choice-title d-block">Block</span><span class="choice-desc d-block">Don't send the request.</span></label>
+              </div>
+              <div class="col-sm-6">
+                <input type="radio" class="btn-check" name="capBehaviour" id="capAsk" value="ask" checked>
+                <label class="choice-card h-100" for="capAsk"><span class="choice-title d-block">Ask</span><span class="choice-desc d-block">Send it once, or cap its output so it fits.</span></label>
+              </div>
+            </div>
+          </fieldset>
+          <div class="fs-8 text-ps-faint mt-3">Subscription and free accounts never count. The cap turns amber at @(Model.WarnPercent)%.</div>
+        </div>
+
+        <div data-cap-only="edit" hidden>
+          <div class="ps-panel p-3 mb-3">
+            <div class="kv"><span class="k">Applies to</span><span class="v" data-cap-field="scope"></span></div>
+            <div class="kv"><span class="k">Window</span><span class="v" data-cap-field="window"></span></div>
+            <div class="kv"><span class="k">Spent</span><span class="v" data-cap-field="used"></span></div>
+          </div>
+          <label class="form-label" for="capEditAmount">Limit</label>
+          <div class="input-group" style="max-width:11rem">
+            <span class="input-group-text">$</span>
+            <input class="form-control ps-mono" id="capEditAmount" type="number" min="0.01" step="0.01" inputmode="decimal" data-cap-amount-edit>
+          </div>
+          <fieldset class="mt-3">
+            <legend class="form-label">At the limit</legend>
+            <div class="row g-2">
+              <div class="col-sm-6">
+                <input type="radio" class="btn-check" name="capEditBehaviour" id="capEditBlock" value="block">
+                <label class="choice-card h-100" for="capEditBlock"><span class="choice-title d-block">Block</span><span class="choice-desc d-block">Don't send the request.</span></label>
+              </div>
+              <div class="col-sm-6">
+                <input type="radio" class="btn-check" name="capEditBehaviour" id="capEditAsk" value="ask">
+                <label class="choice-card h-100" for="capEditAsk"><span class="choice-title d-block">Ask</span><span class="choice-desc d-block">Send it once, or cap its output so it fits.</span></label>
+              </div>
+            </div>
+          </fieldset>
+          <div class="form-text mt-2">To change what a cap applies to, add a new cap and remove this one.</div>
+        </div>
+        <div class="text-ps-danger fs-7 mt-3" role="alert" data-cap-error hidden></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-danger me-auto" data-cap-only="edit" data-cap-remove hidden>Remove cap</button>
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="submit" class="btn btn-primary" data-cap-save><span data-cap-only="new">Add cap</span><span data-cap-only="edit" hidden>Save changes</span></button>
+      </div>
+    </form>
+  </div>
+</div>

@@ -39,7 +39,7 @@ internal static partial class Program
             // Footer: usage, the context share of the newest answer (1540 of faux-1's 100k), the cwd, then the hints.
             Check(screen.Contains(" ↑2.7k ↓340 $0.012 1.5%/100k  /work/project", StringComparison.Ordinal), "footer stats:\n" + screen);
             var hints = $"main · faux/faux-1 · thinking:medium ({KeybindingHints.KeyText("app.thinking.cycle")}) · " +
-                $"{KeybindingHints.KeyText("app.model.select")} or /model · /agents · /compact · /tasks · " +
+                $"{KeybindingHints.KeyText("app.model.select")} or /model · /agents · /compact · /tasks · /plan · " +
                 $"{KeybindingHints.KeyText("app.message.followUp")} follow-up · {KeybindingHints.KeyText("app.clear")} exit";
             Check(Flat(screen).Contains(hints, StringComparison.Ordinal), $"footer hints \"{hints}\":\n" + screen);
             Check(Flat(screen).Contains("main · faux/faux-1 · thinking:medium (shift+tab) · ctrl+l or /model", StringComparison.Ordinal),

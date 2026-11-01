@@ -1,0 +1,26 @@
+@model DevicesPage
+@{
+    ViewData["Title"] = "Executions";
+    ViewData["Page"] = "executions";
+}
+<div class="dn-shell">
+  <partial name="~/Views/Shared/_Topbar.cshtml" model="Model.Devices" />
+  <main class="dn-content"><div class="page" data-automation="executions">
+    <div class="page-header"><div><h1>Execution history</h1><p class="text-body-secondary">Durable jobs and chat generations, including subagents, tool calls, recorded usage and completion audits.</p></div><a href="/" class="btn btn-outline-secondary">Back to agents</a></div>
+    <div class="alert alert-danger" role="alert" data-error hidden></div>
+    <form class="row g-2 align-items-end mb-4" data-history-filters>
+      <div class="col-md-2"><label class="form-label" for="history-device">Device</label><select id="history-device" data-device class="form-select">@foreach (var device in Model.Devices) { <option value="@device.Id">@device.Name</option> }</select></div>
+      <div class="col-md-3"><label class="form-label" for="history-session">Session</label><select id="history-session" data-session class="form-select" required></select></div>
+      <div class="col-md-2"><label class="form-label" for="history-kind">Kind</label><select id="history-kind" data-kind class="form-select"><option value="">All runs</option><option value="job">Jobs</option><option value="chat">Chat</option></select></div>
+      <div class="col-md-2"><label class="form-label" for="history-status">Status</label><select id="history-status" data-status class="form-select"><option value="">All statuses</option>@foreach (var status in new[] { "pending", "running", "waiting", "completed", "failed", "aborted", "declined" }) { <option value="@status">@status</option> }</select></div>
+      <div class="col-md-2"><label class="form-label" for="history-query">Search</label><input id="history-query" data-query class="form-control" maxlength="200" placeholder="Job, result or error" /></div>
+      <div class="col-md-1"><button class="btn btn-primary" type="submit" data-refresh>Refresh</button></div>
+    </form>
+    <p role="status" class="text-body-secondary" data-loading></p>
+    <div class="table-responsive"><table class="table align-middle"><thead><tr><th>Execution</th><th>Agent</th><th>Status</th><th>Started</th><th>Duration</th><th>Audit</th></tr></thead><tbody data-executions></tbody></table></div>
+    <p data-history-empty class="text-body-secondary" hidden>No executions match these filters.</p>
+    <button class="btn btn-outline-secondary" type="button" data-more hidden>Load older runs</button>
+    <section class="border-top mt-4 pt-4" data-detail aria-live="polite" hidden></section>
+  </div></main>
+</div>
+@section Scripts { <script type="module" src="/js/automation.js" asp-append-version="true"></script> }

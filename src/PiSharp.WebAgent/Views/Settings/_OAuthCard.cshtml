@@ -1,0 +1,92 @@
+@* Decision 0011 (run W2, WU9): the mockups' _OAuthCard (settings-accounts): one subscription sign-in provider: its plan name and id, whether
+   it is connected, how it signs in (Browser PKCE, Device code, Paste code), its sign-in accounts (the active one marked), when the active
+   account's access token expires, and Test sign-in (the mockups' "Refresh": it refreshes the token through the stored refresh token and
+   says whether the provider accepts it), Manage accounts, Add account or Sign in, and Sign out. Model: ProviderEntry. *@
+@model ProviderEntry
+@{
+    var signIns = Model.Accounts.Where(account => account.Kind == AccountKind.OAuth).ToList();
+    var active = signIns.FirstOrDefault(account => account.IsActive) ?? (signIns.Count == 1 ? signIns[0] : null);
+    var connected = signIns.Any(account => account.Status == AccountStatus.Connected);
+    var expired = !connected && signIns.Any(account => account.Status == AccountStatus.Expired);
+    var offline = !Model.SignInAvailable;
+    var href = "/settings/providers/" + Uri.EscapeDataString(Model.Id);
+}
+<div class="col">
+  <div class="oauth-card h-100 @(connected ? "connected" : null)" data-oauth-card="@Model.Id">
+    <div class="d-flex align-items-start gap-3 mb-2">
+      <partial name="/Views/Settings/_ProviderLogo.cshtml" model="LogoModel.Of(Model)" />
+      <div class="flex-grow-1" style="min-width:0">
+        <div class="provider-name">@(Model.SubscriptionName ?? Model.Name)</div>
+        <div class="d-flex align-items-center gap-2 flex-wrap mt-1"><span class="provider-id">@Model.Id</span>
+          @if (connected)
+          {
+            <span class="ps-chip" data-tone="ok"><span class="status-dot ok"></span>connected</span>
+          }
+          else if (expired)
+          {
+            <span class="ps-chip" data-tone="warn"><span class="status-dot warn"></span>sign-in expired</span>
+          }
+          else
+          {
+            <span class="ps-chip" data-tone="outline">not connected</span>
+          }
+        </div>
+      </div>
+    </div>
+    <div class="d-flex flex-wrap gap-1 mb-2">
+      @foreach (var method in Model.SignIns)
+      {
+        <span class="ps-chip" data-tone="outline">@(method.Method == SignInMethod.Browser ? "Browser PKCE" : "Device code")</span>
+      }
+      @if (Model.SignIns.Any(method => method.Method == SignInMethod.Browser))
+      {
+        <span class="ps-chip" data-tone="outline" title="Paste the redirect URL when the callback can't reach the app">Paste code</span>
+      }
+    </div>
+    <div class="fs-8 text-secondary">@(signIns.Count == 0 ? Model.Description : SettingsText.Plural(signIns.Count, "account") + (Model.Models.Count > 0 ? " · " + SettingsText.Plural(Model.Models.Count, "model") : ""))</div>
+    @foreach (var account in signIns)
+    {
+      <div class="fs-8 mt-1 @(account.IsActive ? null : "text-secondary")">@(account.Label + (account.Details.GetValueOrDefault("plan") is { } plan && account.Label != SettingsText.Plan(plan) ? " · " + SettingsText.Plan(plan) : ""))
+        @if (account.IsActive)
+        {
+          <span class="ps-chip" data-tone="outline">active</span>
+        }
+        @if (account.Status == AccountStatus.Expired)
+        {
+          <span class="ps-chip" data-tone="warn">expired</span>
+        }
+      </div>
+    }
+    @if (active?.ExpiresAt is { } expires)
+    {
+      <div class="fs-8 text-ps-faint mt-1"><i class="bi bi-clock me-1" aria-hidden="true"></i>@(expires > DateTimeOffset.UtcNow ? "Access token expires " + SettingsText.Until(expires) + " · " + SettingsText.Date(expires) + " · refreshes automatically" : "Access token " + SettingsText.Until(expires))</div>
+    }
+    else if (signIns.Count == 0)
+    {
+      <div class="fs-8 text-ps-faint mt-1"><i class="bi bi-dash-circle me-1" aria-hidden="true"></i>No token stored</div>
+    }
+    <div class="fs-8 mt-1" data-account-test-result hidden aria-live="polite"></div>
+    <div class="mt-auto pt-3 d-flex flex-wrap gap-2">
+      @if (active is not null && active.Status != AccountStatus.Unavailable)
+      {
+        <button class="btn btn-sm btn-outline-secondary" type="button" data-account-action="test" data-account-id="@active.Id" data-account-label="@active.Label"
+                disabled="@offline" title="@(offline ? ProviderDirectory.OfflineMessage : "Refreshes the access token if needed and checks that the provider accepts it")"><i class="bi bi-arrow-repeat me-1" aria-hidden="true"></i>Test sign-in</button>
+      }
+      @if (signIns.Count > 0)
+      {
+        <a class="btn btn-sm btn-ghost" href="@(href + "#connected-accounts")">Manage accounts</a>
+        <partial name="/Views/Settings/_CredentialButton.cshtml" model='new CredentialButton(Model, "Add account", "btn btn-sm btn-outline-secondary")  { SignIn = true }' />
+      }
+      else
+      {
+        <partial name="/Views/Settings/_CredentialButton.cshtml" model='new CredentialButton(Model, "Sign in", "btn btn-sm btn-primary") { SignIn = true, Icon = "bi-box-arrow-in-right me-1" }' />
+        <a class="btn btn-sm btn-ghost" href="@href">Details</a>
+      }
+      @if (active is not null)
+      {
+        <button class="btn btn-sm btn-outline-danger ms-auto" type="button" data-account-action="remove" data-account-id="@active.Id" data-account-label="@active.Label"
+                data-account-kind="oauth" data-provider-name="@Model.Name">Sign out</button>
+      }
+    </div>
+  </div>
+</div>

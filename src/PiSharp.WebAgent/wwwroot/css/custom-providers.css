@@ -1,0 +1,25 @@
+/* Decision 0011 (run W3, CP): what Settings › Custom providers adds to settings.css: rows whose text may shrink, the editor's wide tables
+   (they scroll inside .ps-table-wrap, never the page, so nothing scrolls sideways at 375px), and the previews' height. Neutral grey; colour
+   only for status (the shared chips and status dots). */
+
+.cp-row-main,
+.cp-row-text { min-width: 0; }
+
+.cp-models-table { min-width: 1100px; }
+.cp-models-table .cp-col-id { min-width: 15rem; }
+.cp-models-table .cp-col-name { min-width: 12rem; }
+.cp-tlm-table { min-width: 520px; }
+
+.cp-preview {
+  max-height: 28rem;
+  margin: 0;
+  overflow: auto;
+  white-space: pre;
+}
+
+.cp-discovered-item .form-check-label { overflow-wrap: anywhere; }
+
+@media (max-width: 575.98px) {
+  [data-cp-row] > .ms-auto,
+  [data-cp-override] > .ms-auto { width: 100%; justify-content: flex-end; }
+}

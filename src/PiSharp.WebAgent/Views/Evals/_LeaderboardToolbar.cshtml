@@ -1,0 +1,55 @@
+@* Decision 0011 (run W5, E6): the mockups' _LeaderboardToolbar: the tag menu (request tags and agent tags in separate groups: an agent
+   vote compares whole runs, never single answers; each tag links to its own leaderboard), "32 votes · 4 models", the provisional chip when
+   a model has fewer comparisons than the threshold, and the actions menu (Export votes as CSV, History). Model: LeaderboardPage. *@
+@model LeaderboardPage
+@{
+    var request = Model.Tags.Where(tag => tag.Mode == ArenaMode.Request).ToList();
+    var agent = Model.Tags.Where(tag => tag.Mode == ArenaMode.Agent).ToList();
+}
+<div class="d-flex flex-wrap align-items-center gap-2 mb-2" data-leaderboard-toolbar>
+  <div class="dropdown">
+    <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" data-tag-menu>@Model.TagLabel</button>
+    <ul class="dropdown-menu">
+      @if (request.Count > 0)
+      {
+        <li><h6 class="dropdown-header">Request tags</h6></li>
+        @foreach (var tag in request)
+        {
+          var active = Model.Mode == tag.Mode && Model.Tag == tag.Tag;
+          <li><a class="dropdown-item d-flex justify-content-between gap-3@(active ? " active" : "")" aria-current="@(active ? "true" : null)" href="@LeaderboardPage.Url(tag.Mode, tag.Tag)" data-tag-link="@tag.Tag"><span>@tag.Tag</span><span class="fs-8 eval-menu-meta">@tag.Summary</span></a></li>
+        }
+      }
+      @if (request.Count > 0 && agent.Count > 0)
+      {
+        <li><hr class="dropdown-divider"></li>
+      }
+      @if (agent.Count > 0)
+      {
+        <li><h6 class="dropdown-header">Agent tags</h6></li>
+        @foreach (var tag in agent)
+        {
+          var active = Model.Mode == tag.Mode && Model.Tag == tag.Tag;
+          <li><a class="dropdown-item d-flex justify-content-between gap-3@(active ? " active" : "")" aria-current="@(active ? "true" : null)" href="@LeaderboardPage.Url(tag.Mode, tag.Tag)" data-tag-link="@tag.Tag"><span>@tag.Tag</span><span class="fs-8 eval-menu-meta">@tag.Summary</span></a></li>
+        }
+      }
+    </ul>
+  </div>
+  @if (Model.Board is { } board)
+  {
+    <span class="fs-8 text-ps-faint" data-leaderboard-summary>@board.Summary</span>
+    @if (board.Provisional)
+    {
+      <span class="ps-chip" data-provisional title="@($"Some models have fewer than {board.Ratings.ProvisionalBelow.ToString(CultureInfo.InvariantCulture)} comparisons. Ratings will move as you vote.")">provisional</span>
+    }
+  }
+  <div class="dropdown ms-auto">
+    <button class="btn btn-icon" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Leaderboard actions" title="More"><i class="bi bi-three-dots" aria-hidden="true"></i></button>
+    <ul class="dropdown-menu dropdown-menu-end">
+      @if (Model.CsvUrl is { } csv)
+      {
+        <li><a class="dropdown-item" href="@csv" download data-votes-csv><i class="bi bi-filetype-csv me-2" aria-hidden="true"></i>Export votes (CSV)</a></li>
+      }
+      <li><a class="dropdown-item" href="/history"><i class="bi bi-clock-history me-2" aria-hidden="true"></i>Runs in History</a></li>
+    </ul>
+  </div>
+</div>

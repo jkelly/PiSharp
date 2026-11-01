@@ -212,7 +212,7 @@ internal static partial class Program
             await using var durable = await agent.OpenAsync(ScriptedStreams.Queue());
             var root = await durable.Harness.ConversationAsync(ConversationId.Root, DurableRuntime.Context);
             var resolved = await root!.AgentAsync(DurableRuntime.Context);
-            Equal("read,write,edit,bash,subagent", string.Join(",", resolved.Tools.Select(tool => tool.Name)), "the tools the model is offered");
+            Equal("read,write,edit,bash,ask_user_question,exit_plan_mode,subagent", string.Join(",", resolved.Tools.Select(tool => tool.Name)), "the tools the model is offered");
             Check(resolved.Deferred.IsEmpty, "nothing deferred");
             Check(!resolved.Extensions.Any(extension => extension.Name == "tool-search"), "tool-search not selected");
         }),

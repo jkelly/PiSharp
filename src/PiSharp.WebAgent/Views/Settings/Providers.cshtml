@@ -1,0 +1,118 @@
+@* Decision 0011 (run W2, WU9): the mockups' settings-providers page (route GET /settings/providers): the header (Sign-ins; Custom provider
+   is a later milestone), the credential order, the empty state, the filters (search, status pills, auth kind: settings.js), Connected
+   (_ProviderRow for every provider with a credential) and Available providers (the rest, the first ProvidersPage.AvailableShown shown and
+   "Show N more"), and the credential modals (_CredentialModals). Model: ProvidersPage. *@
+@model ProvidersPage
+@{
+    Layout = "_SettingsLayout";
+    ViewData["Title"] = "Providers";
+    ViewData[ShellViewData.SettingsSection] = "providers";
+    var connected = Model.Connected;
+    var available = Model.Available;
+    var codex = Model.Providers.FirstOrDefault(entry => entry.Id == SignInFlows.CodexProvider && entry.SignsIn);
+    var keyed = Model.Providers.FirstOrDefault(entry => entry.TakesApiKey && entry.State == ProviderState.NotConfigured);
+}
+@section Styles { <link href="~/css/settings.css" rel="stylesheet" asp-append-version="true"> }
+@section Modals { <partial name="/Views/Settings/_CredentialModals.cshtml" model="Model.Modals" /> }
+@section Scripts { <script type="module" src="~/js/settings.js" asp-append-version="true"></script> }
+<header class="settings-header d-flex flex-wrap align-items-end gap-3">
+  <div class="flex-grow-1">
+    <div class="ps-eyebrow">Connections</div>
+    <h2>Providers</h2>
+    <p>Connect model providers with an API key or a subscription sign-in. Keys are encrypted at rest with ASP.NET Data Protection. They are only sent to the provider they belong to.</p>
+  </div>
+  <div class="d-flex gap-2 flex-wrap">
+    <a class="btn btn-primary btn-ps" href="/settings/accounts"><i class="bi bi-person-badge me-1"></i>Sign-ins</a>
+  </div>
+</header>
+
+<partial name="/Views/Settings/_OfflineNote.cshtml" model="Model.Offline" />
+
+<p class="fs-7 text-ps-faint mb-4">Each provider uses its active account. The first key or sign-in you add becomes active, ahead of an environment variable; after that, only you switch it. Each chat keeps the account it was created with.</p>
+
+@if (Model.NothingConnected)
+{
+  <div class="ps-card mb-4" data-providers-empty>
+    <div class="empty-state">
+      <div class="empty-icon"><i class="bi bi-plug"></i></div>
+      <h3 class="ps-heading fs-2 text-body">No providers <em>connected</em> yet</h3>
+      <p class="mb-3">Sign in with a subscription you already pay for, or paste an API key.</p>
+      <div class="d-flex flex-wrap gap-2 justify-content-center">
+        @if (codex is not null)
+        {
+          <partial name="/Views/Settings/_CredentialButton.cshtml" model='new CredentialButton(codex, "Sign in with ChatGPT", "btn btn-primary btn-ps") { SignIn = true, Icon = "bi-openai me-1" }' />
+        }
+        @if (keyed is not null)
+        {
+          <a class="btn btn-outline-secondary" href="#available-providers"><i class="bi bi-key me-1"></i>Add an API key</a>
+        }
+      </div>
+    </div>
+  </div>
+}
+
+<div class="d-flex flex-wrap gap-2 align-items-center mb-3" data-provider-filters>
+  <div class="position-relative flex-grow-1 provider-search">
+    <i class="bi bi-search position-absolute top-50 translate-middle-y ms-2 text-ps-faint fs-8"></i>
+    <label class="visually-hidden" for="providerSearch">Search providers</label>
+    <input class="form-control form-control-sm ps-4" id="providerSearch" type="search" placeholder="Search @Model.Providers.Count providers" data-provider-search autocomplete="off">
+  </div>
+  <div class="nav nav-pills flex-nowrap overflow-auto" role="group" aria-label="Status filter">
+    <button class="nav-link active" type="button" data-provider-filter="" aria-pressed="true">All <span class="ps-mono fs-8 opacity-75">@Model.Count(null)</span></button>
+    <button class="nav-link" type="button" data-provider-filter="connected" aria-pressed="false">Connected <span class="ps-mono fs-8 opacity-75">@Model.Count(ProviderState.Connected)</span></button>
+    <button class="nav-link" type="button" data-provider-filter="env" aria-pressed="false">Env detected <span class="ps-mono fs-8 opacity-75">@Model.Count(ProviderState.Environment)</span></button>
+    <button class="nav-link" type="button" data-provider-filter="none" aria-pressed="false">Not configured <span class="ps-mono fs-8 opacity-75">@Model.Count(ProviderState.NotConfigured)</span></button>
+  </div>
+  <label class="visually-hidden" for="authKindFilter">Auth kind</label>
+  <select class="form-select form-select-sm w-auto" id="authKindFilter" data-provider-auth>
+    <option value="">Any auth kind</option>
+    <option value="apiKey">API key</option>
+    <option value="oauth">Subscription / OAuth</option>
+    <option value="cloud">Cloud credentials</option>
+  </select>
+</div>
+<p class="fs-7 text-ps-faint" data-provider-no-match hidden>No provider matches these filters.</p>
+
+<section class="settings-section" id="connected-providers" data-provider-section>
+  <h3>Connected</h3>
+  <p class="section-desc">Providers with a credential. Their models appear in the model picker.</p>
+  <div class="ps-card">
+    @foreach (var entry in connected)
+    {
+      <partial name="/Views/Settings/_ProviderRow.cshtml" model="entry" />
+    }
+    @if (connected.Count == 0)
+    {
+      <div class="provider-row text-ps-faint fs-7" data-provider-placeholder>Nothing is connected yet.</div>
+    }
+  </div>
+</section>
+
+<section class="settings-section" id="available-providers" data-provider-section>
+  <h3>Available providers</h3>
+  <p class="section-desc">Built-in providers from the PiSharp catalog. Connect one to use its models.</p>
+  <div class="ps-card">
+    @for (var index = 0; index < available.Count; index++)
+    {
+      if (index < ProvidersPage.AvailableShown)
+      {
+        <partial name="/Views/Settings/_ProviderRow.cshtml" model="available[index]" />
+      }
+      else
+      {
+        <div class="provider-more" data-provider-more hidden><partial name="/Views/Settings/_ProviderRow.cshtml" model="available[index]" /></div>
+      }
+    }
+    @if (available.Count > ProvidersPage.AvailableShown)
+    {
+      var rest = available.Skip(ProvidersPage.AvailableShown).ToList();
+      <div class="provider-row justify-content-center" data-provider-more-toggle>
+        <button class="btn btn-sm btn-ghost text-wrap" type="button" data-provider-show-more><i class="bi bi-chevron-down me-1"></i>Show @rest.Count more: @(string.Join(", ", rest.Take(10).Select(entry => entry.Name)))@(rest.Count > 10 ? "…" : "")</button>
+      </div>
+    }
+    @if (available.Count == 0)
+    {
+      <div class="provider-row text-ps-faint fs-7" data-provider-placeholder>Every provider is connected.</div>
+    }
+  </div>
+</section>

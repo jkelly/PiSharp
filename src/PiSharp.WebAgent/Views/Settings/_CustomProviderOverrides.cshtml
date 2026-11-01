@@ -1,0 +1,76 @@
+@* Decision 0011 (run W3, CP): the mockups' Model overrides section (their _ModelOverrideList): each override of a built-in model with
+   chips for what it changes (the catalog value struck through, then the new one), an editor for its JSON (Save override, Cancel) and
+   Remove; "Add override" picks the model with the Provider -> Model dropdowns (_ProviderModelSelect, built-in providers only; none with
+   --faux, where the faux catalog has no built-in models), a field and a value; and the empty state. Saved under
+   providers.<id>.modelOverrides through /api/custom-providers/overrides (custom-providers.js). Model: CustomProvidersPage. *@
+@using PiSharp.WebAgent.CustomProviders
+@model CustomProvidersPage
+<section class="settings-section" id="overrides">
+  <h3>Model overrides</h3>
+  <p class="section-desc">Change fields of a built-in model without redefining it. Overrides are saved under <span class="ps-mono">providers.&lt;id&gt;.modelOverrides</span>. Any field you don't set still comes from the catalog and picks up catalog updates.</p>
+  @if (Model.Overrides.Count > 0)
+  {
+    <div class="ps-card" data-cp-overrides>
+      @for (var index = 0; index < Model.Overrides.Count; index++)
+      {
+        var row = Model.Overrides[index];
+        <div class="provider-row flex-wrap@(index > 0 ? " border-top" : "")" data-cp-override data-provider="@row.Provider" data-model="@row.Model">
+          <div class="d-flex align-items-center gap-3 flex-grow-1 cp-row-main">
+            @if (row.LogoUrl is { } logo)
+            {
+              <span class="provider-logo" role="img" aria-label="@row.Provider logo"><img class="provider-logo-mark" src="@logo" alt="" width="20" height="20" decoding="async"></span>
+            }
+            else
+            {
+              <span class="provider-logo" role="img" aria-label="@row.Provider"><span class="provider-logo-initial" aria-hidden="true">@(row.Provider.Length > 0 ? char.ToUpperInvariant(row.Provider[0]).ToString() : "?")</span></span>
+            }
+            <div class="cp-row-text">
+              <div class="d-flex align-items-center gap-2 flex-wrap"><span class="provider-name">@row.Name</span><span class="provider-id">@row.Provider/@row.Model</span></div>
+              <div class="d-flex flex-wrap gap-1 mt-1">
+                @foreach (var chip in row.Chips)
+                {
+                  <span class="ps-chip" data-tone="info">@chip.Field @if (chip.Old is not null) {<s class="opacity-75">@chip.Old</s>} @if (chip.New is not null) {<text>→ @chip.New</text>}</span>
+                }
+              </div>
+            </div>
+          </div>
+          <div class="d-flex align-items-center gap-1 ms-auto">
+            <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#@row.Key-edit" aria-expanded="false" aria-controls="@row.Key-edit"><i class="bi bi-pencil me-1"></i>Edit</button>
+            <button class="btn btn-sm btn-ghost text-ps-danger" type="button" data-cp-override-remove><i class="bi bi-x-lg me-1"></i>Remove</button>
+          </div>
+        </div>
+        <div class="collapse border-top" id="@row.Key-edit">
+          <div class="p-3">
+            <label class="form-label" for="@row.Key-json">Override for <span class="ps-mono">@row.Provider/@row.Model</span></label>
+            <textarea class="form-control font-monospace" id="@row.Key-json" rows="6" spellcheck="false" data-cp-override-json data-provider="@row.Provider" data-model="@row.Model">@row.Json</textarea>
+            <div class="form-text">Allowed fields: @string.Join(", ", CustomProviderJson.OverrideFields). Partial cost objects are merged with the catalog's.</div>
+            <div class="d-flex gap-2 justify-content-end mt-2">
+              <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#@row.Key-edit">Cancel</button>
+              <button class="btn btn-sm btn-primary" type="button" data-cp-override-save data-target="#@row.Key-json">Save override</button>
+            </div>
+          </div>
+        </div>
+      }
+      <div class="provider-row border-top">
+        <button class="btn btn-sm btn-ghost" type="button" data-bs-toggle="collapse" data-bs-target="#ovr-add" aria-expanded="false" aria-controls="ovr-add" disabled="@(!Model.Snapshot.Valid)"><i class="bi bi-plus-lg me-1"></i>Add override</button>
+        <a class="fs-8 ms-auto" href="/settings/models">Browse models →</a>
+      </div>
+      <div class="collapse border-top" id="ovr-add">
+        <div class="p-3"><partial name="/Views/Settings/_CustomProviderOverrideAdd.cshtml" model="Model" /></div>
+      </div>
+    </div>
+  }
+  else
+  {
+    <div class="ps-card" data-cp-overrides-empty>
+      <div class="p-3 d-flex flex-wrap align-items-center gap-2">
+        <i class="bi bi-sliders text-ps-faint" aria-hidden="true"></i>
+        <span class="fs-7 text-secondary flex-grow-1">No overrides. Every built-in model uses its catalog values.</span>
+        <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#ovr-add" aria-expanded="false" aria-controls="ovr-add" disabled="@(!Model.Snapshot.Valid)"><i class="bi bi-plus-lg me-1"></i>Override a model…</button>
+      </div>
+      <div class="collapse border-top" id="ovr-add">
+        <div class="p-3"><partial name="/Views/Settings/_CustomProviderOverrideAdd.cshtml" model="Model" /></div>
+      </div>
+    </div>
+  }
+</section>

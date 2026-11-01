@@ -1,0 +1,301 @@
+// PiSharp-only (decision 0008). A model that needs no provider, for tests and UI work at no cost. Streaming follows the durable examples'
+// ScriptedModels (samples/Durable.Examples/ScriptedModels.cs, after pi-ai's faux provider); the prompt grammar adapts durable-pi's faux model
+// (apps/dpi-backend/src/faux.ts, MIT): "!command" runs bash, "slow:" streams slowly, a tool result is answered "Tool finished: …", anything
+// else is echoed. "tool: <name> <json>" calls any tool, and "error: <message>" ends the answer with a provider error (PiSharp-only: a host's
+// error paths, offline).
+using System.Collections.Immutable;
+using System.Runtime.CompilerServices;
+using System.Text.Json;
+using PiSharp.Contracts;
+using PiSharp.Durable.Chord;
+
+namespace PiSharp.Durable.Hosting.Testing;
+
+/// <summary>One faux chat model.</summary>
+public sealed record FauxModel(string Id, string Name, double ContextWindow, double MaxTokens = 8192, bool Reasoning = false);
+
+/// <summary>A chat request <see cref="FauxDurableModels.RespondAsync"/> answers: the model, its thinking level (null when off) and the newest
+/// user text.</summary>
+public sealed record FauxChat(string ModelId, string? Reasoning, string Text)
+{
+    /// <summary>The request's options, with the metadata a host attached (see <see cref="SessionStreamMetadata"/>).</summary>
+    public DurableStreamOptions? Options { get; init; }
+}
+
+/// <summary>
+/// Model access without a provider. Each request answers the newest user message or tool result:
+/// <list type="bullet">
+/// <item><c>!command</c> calls <c>bash</c> with the command.</item>
+/// <item><c>tool: name {json}</c> calls any tool with the JSON object as its arguments (default <c>{}</c>); so does a scripted answer of that form.</item>
+/// <item><c>slow: text</c> answers the text a word at a time, <see cref="SlowDelay"/> apart.</item>
+/// <item><c>error: message</c> ends the answer with a provider error (<see cref="StreamError"/>, stop reason <c>error</c>, the message as its
+/// <c>errorMessage</c>; <see cref="ErrorMessage"/> when none is given) and no content. A message a provider would be retried for (such as
+/// <c>overloaded</c>) is retried by a durable session as that provider's would be.</item>
+/// <item>A tool result is answered <c>Tool finished: &lt;tool&gt;: &lt;its first 200 characters&gt;</c>.</item>
+/// <item>Anything else is answered <c>Echo: &lt;text&gt;</c>.</item>
+/// </list>
+/// Usage is zero.
+/// </summary>
+public sealed class FauxDurableModels : IDurableModels
+{
+    /// <summary>The faux provider's ID.</summary>
+    public const string ProviderId = "faux";
+
+    /// <summary>The default model, <c>faux/echo</c>, with a 128000-token window.</summary>
+    public static FauxModel Echo { get; } = new("echo", "Echo", 128_000);
+
+    /// <summary><c>faux/echo-small</c>, with a 40000-token window.</summary>
+    public static FauxModel EchoSmall { get; } = new("echo-small", "Echo small", 40_000);
+
+    /// <summary>A provider with <see cref="Echo"/> and <see cref="EchoSmall"/>.</summary>
+    public FauxDurableModels() : this([Echo, EchoSmall]) { }
+
+    /// <summary>A provider with these models.</summary>
+    public FauxDurableModels(IEnumerable<FauxModel> models)
+    {
+        ArgumentNullException.ThrowIfNull(models);
+        Models = [.. models];
+    }
+
+    /// <summary>The provider's models.</summary>
+    public ImmutableArray<FauxModel> Models { get; }
+
+    /// <summary>The prompt prefix of an answer that ends with a provider error: <c>error:</c>.</summary>
+    public const string ErrorPrefix = "error:";
+
+    /// <summary>The error of an <c>error:</c> prompt with no message of its own.</summary>
+    public const string ErrorMessage = "The faux provider failed this request.";
+
+    /// <summary>The pause between the words of a <c>slow:</c> answer.</summary>
+    public TimeSpan SlowDelay { get; init; } = TimeSpan.FromMilliseconds(40);
+
+    /// <summary><c>faux/echo</c>.</summary>
+    public static ModelRef EchoRef { get; } = new(ProviderId, Echo.Id);
+
+    /// <summary>The faux classifier's model ID, <c>faux/judge</c>, listed when <see cref="Classify"/> is set.</summary>
+    public const string JudgeId = "judge";
+
+    /// <summary>Answers classifier requests (pi-ai <c>classify</c>): given the classifier context, the <c>answers</c> object. Null leaves the
+    /// provider without classification.</summary>
+    public Func<JsonObjectValue, CancellationToken, Task<JsonObjectValue>>? Classify { get; init; }
+
+    /// <summary>Usage reported with each classification (pi-ai Usage JSON); null reports none, so the cost is unknown.</summary>
+    public JsonObjectValue? ClassifierUsage { get; init; }
+
+    /// <summary>Scripted chat answers: given the newest user text, an answer, or null for the default grammar. An answer of the form
+    /// <c>tool: name {json}</c> calls that tool.</summary>
+    public Func<string, string?>? Respond { get; init; }
+
+    /// <summary>Scripted chat answers that may wait or throw (a thrown error fails the generation): given the request, an answer, or null
+    /// for <see cref="Respond"/> and the default grammar. Called before <see cref="Respond"/>.</summary>
+    public Func<FauxChat, CancellationToken, Task<string?>>? RespondAsync { get; init; }
+
+    /// <summary>Called as each chat request starts, summaries included, with its model and options: a test reads the stream metadata a
+    /// host attached here.</summary>
+    public Action<DurableModel, DurableStreamOptions?>? OnRequest { get; init; }
+
+    /// <summary>How many classifications were requested.</summary>
+    public int ClassifyCalls => Volatile.Read(ref classifyCalls);
+
+    private int classifyCalls;
+
+    /// <inheritdoc/>
+    public async Task<JsonObjectValue> ClassifyAsync(JsonObjectValue model, JsonObjectValue context, CancellationToken cancellationToken)
+    {
+        await Task.Yield();
+        Interlocked.Increment(ref classifyCalls);
+        if (Classify is not { } classify)
+            return DurableModelOperations.ClassifierError(model, "Provider faux does not support classification", cancellationToken.IsCancellationRequested);
+        cancellationToken.ThrowIfCancellationRequested();
+        var answers = await classify(context, cancellationToken).ConfigureAwait(false);
+        var result = JsonValue.Object([new("api", ProviderId), new("provider", ProviderId), new("model", JudgeId), new("answers", answers),
+            new("stopReason", "stop"), new("timestamp", DateTimeOffset.UtcNow.ToUnixTimeMilliseconds())]);
+        return ClassifierUsage is { } usage ? result.SetItem("usage", usage) : result;
+    }
+
+    /// <inheritdoc/>
+    public JsonObjectValue? GetModelOfType(string type, string provider, string id) =>
+        GetModelsOfType(type, provider).FirstOrDefault(model => model.TryGetValue("id", out var value) && value is JsonStringValue text && text.Value == id);
+
+    /// <inheritdoc/>
+    public DurableModel? GetModel(string provider, string modelId) =>
+        provider == ProviderId && Models.FirstOrDefault(model => model.Id == modelId) is { } found ? ToDurable(found) : null;
+
+    /// <inheritdoc/>
+    public ImmutableArray<JsonObjectValue> GetModelsOfType(string type, string? provider) => provider is null or ProviderId ? type switch
+    {
+        "chat" => [.. Models.Select(Json)],
+        "classifier" when Classify is not null => [JsonValue.Object([new("id", JudgeId), new("name", "Judge"), new("api", ProviderId), new("provider", ProviderId),
+            new("type", "classifier"), new("baseUrl", "http://localhost:0"), new("input", JsonValue.Array(["text"])),
+            new("cost", JsonValue.Object([new("input", 0.0), new("output", 0.0), new("cacheRead", 0.0), new("cacheWrite", 0.0)]))])],
+        _ => [],
+    } : [];
+
+    /// <inheritdoc/>
+    public Task<ImmutableArray<JsonObjectValue>> GetAvailableOfTypeAsync(string type, string? provider, CancellationToken cancellationToken) =>
+        Task.FromResult(GetModelsOfType(type, provider));
+
+    /// <inheritdoc/>
+    public async IAsyncEnumerable<StreamEvent> StreamSimple(DurableModel model, ImmutableArray<JsonValue> messages, DurableStreamOptions? options,
+        [EnumeratorCancellation] CancellationToken cancellationToken)
+    {
+        await Task.Yield();
+        OnRequest?.Invoke(model, options);
+        var partial = new AssistantMessage(model.Api, model.Provider, model.Id, DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(), [], TokenUsage.Zero,
+            StopReason.Pending);
+        var asked = LastUserText(messages);
+        var awaited = RespondAsync is { } respondAsync && asked is not null
+            ? await respondAsync(new FauxChat(model.Id, options?.Reasoning, asked) { Options = options }, cancellationToken).ConfigureAwait(false) : null;
+        var reply = awaited is not null ? Scripted(awaited)
+            : Respond is { } respond && asked is not null && respond(asked) is { } scripted ? Scripted(scripted) : Reply(messages);
+        yield return new StreamStarted(partial);
+        if (reply.Error is { } error)
+        {
+            var failed = partial with
+            {
+                StopReason = StopReason.Error,
+                ExtraProperties = JsonFields.Empty.Set("errorMessage", JsonData.Parse(JsonSerializer.Serialize(error))),
+            };
+            yield return new StreamError(StopReason.Error, failed);
+            yield break;
+        }
+        if (reply.Call is { } call)
+        {
+            yield return new ToolCallStarted(0, call with { Arguments = JsonData.Parse("{}") });
+            yield return new ToolCallDelta(0, call.Arguments.ToString());
+            yield return new ToolCallEnded(0, call);
+            yield return new StreamDone(StopReason.ToolUse, partial with { Content = [call], StopReason = StopReason.ToolUse });
+            yield break;
+        }
+        yield return new TextStarted(0, new TextContent(""));
+        if (reply.Slow)
+        {
+            var words = reply.Text.Split(' ');
+            for (var index = 0; index < words.Length; index++)
+            {
+                await Task.Delay(SlowDelay, cancellationToken);
+                yield return new TextDelta(0, index == 0 ? words[index] : " " + words[index]);
+            }
+        }
+        else
+        {
+            yield return new TextDelta(0, reply.Text);
+        }
+        yield return new TextEnded(0, reply.Text);
+        yield return new StreamDone(StopReason.Stop, partial with { Content = [new TextContent(reply.Text)], StopReason = StopReason.Stop });
+    }
+
+    /// <inheritdoc/>
+    public async Task<AssistantMessage> CompleteSimpleAsync(DurableModel model, ImmutableArray<JsonValue> messages, DurableStreamOptions? options,
+        CancellationToken cancellationToken)
+    {
+        StreamTerminalEvent? terminal = null;
+        await foreach (var item in StreamSimple(model, messages, options, cancellationToken)) if (item is StreamTerminalEvent end) terminal = end;
+        return terminal!.Message;
+    }
+
+    /// <inheritdoc/>
+    public IAsyncEnumerable<StreamEvent> StreamDeferred(DurableModel model, DurableDeferredHandle handle, CancellationToken cancellationToken) =>
+        throw new NotSupportedException("The faux model does not defer responses.");
+
+    /// <inheritdoc/>
+    public Task<AssistantMessage> FetchDeferredAsync(DurableModel model, DurableDeferredHandle handle, CancellationToken cancellationToken) =>
+        Task.FromException<AssistantMessage>(new NotSupportedException("The faux model does not defer responses."));
+
+    /// <inheritdoc/>
+    public Task CancelDeferredAsync(DurableModel model, DurableDeferredHandle handle, CancellationToken cancellationToken) => Task.CompletedTask;
+
+    /// <summary>What the model answers to <paramref name="messages"/> (pi-ai wire messages).</summary>
+    internal static FauxReply Reply(ImmutableArray<JsonValue> messages)
+    {
+        var last = messages.OfType<JsonObjectValue>().LastOrDefault(message => Role(message) is "user" or "toolResult");
+        if (last is null) return FauxReply.Answer("Echo: ");
+        if (Role(last) == "toolResult")
+        {
+            var output = TextOf(last).Trim();
+            return FauxReply.Answer($"Tool finished: {String(last, "toolName") ?? "tool"}: {(output.Length > 200 ? output[..200] : output)}");
+        }
+        var input = TextOf(last).Trim();
+        if (input.StartsWith('!')) return FauxReply.Calling("bash", JsonValue.Object([new("command", input[1..].Trim())]));
+        if (input.StartsWith("tool:", StringComparison.Ordinal)) return ToolCall(input);
+        if (input.StartsWith("slow:", StringComparison.Ordinal)) return FauxReply.Answer(input[5..].Trim(), slow: true);
+        if (input.StartsWith(ErrorPrefix, StringComparison.Ordinal)) return FauxReply.Failing(input[ErrorPrefix.Length..].Trim() is { Length: > 0 } message ? message : ErrorMessage);
+        return FauxReply.Answer("Echo: " + input);
+    }
+
+    /// <summary>A scripted answer: a tool call when it is <c>tool: name {json}</c>, else the text.</summary>
+    private static FauxReply Scripted(string answer) => answer.StartsWith("tool:", StringComparison.Ordinal) ? ToolCall(answer) : FauxReply.Answer(answer);
+
+    /// <summary>The call of <c>tool: name {json}</c>; arguments that do not parse as an object are <c>{}</c>.</summary>
+    private static FauxReply ToolCall(string input)
+    {
+        var rest = input[5..].Trim();
+        var space = rest.IndexOfAny([' ', '\n', '\t']);
+        var toolName = space < 0 ? rest : rest[..space];
+        JsonObjectValue arguments;
+        try
+        {
+            arguments = space < 0 ? JsonObjectValue.Empty : JsonValue.Parse(rest[space..].Trim()) as JsonObjectValue ?? JsonObjectValue.Empty;
+        }
+        catch (Exception)
+        {
+            arguments = JsonObjectValue.Empty;
+        }
+        return FauxReply.Calling(toolName, arguments);
+    }
+
+    private static DurableModel ToDurable(FauxModel model) => new()
+    {
+        Id = model.Id,
+        Name = model.Name,
+        Api = ProviderId,
+        Provider = ProviderId,
+        BaseUrl = "http://localhost:0",
+        Reasoning = model.Reasoning,
+        Input = ["text"],
+        ContextWindow = model.ContextWindow,
+        MaxTokens = model.MaxTokens,
+        Wire = Json(model),
+    };
+
+    private static JsonObjectValue Json(FauxModel model) => JsonValue.Object(
+    [
+        new("id", model.Id),
+        new("name", model.Name),
+        new("api", ProviderId),
+        new("provider", ProviderId),
+        new("baseUrl", "http://localhost:0"),
+        new("reasoning", model.Reasoning),
+        new("input", JsonValue.Array(["text"])),
+        new("cost", JsonValue.Object([new("input", 0.0), new("output", 0.0), new("cacheRead", 0.0), new("cacheWrite", 0.0)])),
+        new("contextWindow", model.ContextWindow),
+        new("maxTokens", model.MaxTokens),
+    ]);
+
+    private static string? LastUserText(ImmutableArray<JsonValue> messages) =>
+        messages.OfType<JsonObjectValue>().LastOrDefault(message => Role(message) is "user" or "toolResult") is { } last && Role(last) == "user" ? TextOf(last).Trim() : null;
+
+    private static string? Role(JsonObjectValue message) => String(message, "role");
+
+    private static string? String(JsonObjectValue json, string key) => json.TryGetValue(key, out var value) && value is JsonStringValue text ? text.Value : null;
+
+    /// <summary>A message's text: its string content, or its text blocks joined.</summary>
+    private static string TextOf(JsonObjectValue message) => message.TryGetValue("content", out var content) ? content switch
+    {
+        JsonStringValue text => text.Value,
+        JsonArrayValue blocks => string.Join("\n", blocks.OfType<JsonObjectValue>()
+            .Where(block => String(block, "type") == "text").Select(block => String(block, "text") ?? "")),
+        _ => "",
+    } : "";
+}
+
+/// <summary>What <see cref="FauxDurableModels"/> answers: a text, one tool call, or a provider error.</summary>
+internal sealed record FauxReply(string Text, ToolCallContent? Call, bool Slow, string? Error = null)
+{
+    public static FauxReply Answer(string text, bool slow = false) => new(text, null, slow);
+
+    public static FauxReply Failing(string message) => new("", null, false, message);
+
+    public static FauxReply Calling(string tool, JsonObjectValue arguments) =>
+        new("", new ToolCallContent("faux:" + Guid.NewGuid().ToString("N")[..12], tool, JsonData.Parse(arguments.ToJson())), false);
+}

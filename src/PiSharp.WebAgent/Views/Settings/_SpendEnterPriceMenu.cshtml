@@ -1,0 +1,40 @@
+@* Decision 0011 (run W3, S4): the mockups' _EnterPriceMenu: a price per 1M tokens (input and output) for one model of a provider that has
+   none, saved at once by POST /api/spend/prices (spend-settings.js), outside the page's save bar ([data-spend-ignore]). The model then counts
+   as metered and is checked like any other. Model: (SpendUnknownRow, int) — the provider's row and its index on the page. *@
+@using PiSharp.WebAgent.Spend
+@model (SpendUnknownRow Row, int Index)
+@{
+    var row = Model.Row;
+    var id = "price" + Model.Index;
+}
+<div class="dropdown" data-spend-ignore>
+  <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false"><i class="bi bi-tag me-1" aria-hidden="true"></i>Enter price</button>
+  <div class="dropdown-menu dropdown-menu-end p-3 spend-price-menu" data-price-menu data-provider="@row.Provider">
+    <div class="fw-semibold fs-7 mb-2">Price per 1M tokens</div>
+    <div class="row g-2">
+      <div class="col-6">
+        <label class="form-label fs-8 mb-1" for="@(id)Provider">Provider</label>
+        <select class="form-select form-select-sm" id="@(id)Provider" disabled><option selected>@row.Name</option></select>
+      </div>
+      <div class="col-6">
+        <label class="form-label fs-8 mb-1" for="@(id)Model">Model</label>
+        <select class="form-select form-select-sm" id="@(id)Model" data-price-model>
+          @foreach (var item in row.Models.Where(unpriced => unpriced.Entered is null))
+          {
+            <option value="@item.Model.Id">@item.Model.Id</option>
+          }
+        </select>
+      </div>
+      <div class="col-6">
+        <label class="form-label fs-8 mb-1" for="@(id)Input">Input</label>
+        <div class="input-group input-group-sm"><span class="input-group-text">$</span><input class="form-control ps-mono" id="@(id)Input" type="number" min="0" step="0.01" placeholder="0.00" inputmode="decimal" data-price-input></div>
+      </div>
+      <div class="col-6">
+        <label class="form-label fs-8 mb-1" for="@(id)Output">Output</label>
+        <div class="input-group input-group-sm"><span class="input-group-text">$</span><input class="form-control ps-mono" id="@(id)Output" type="number" min="0" step="0.01" placeholder="0.00" inputmode="decimal" data-price-output></div>
+      </div>
+    </div>
+    <div class="form-text">Saved with your spend settings in <span class="ps-mono">webagent.db</span>. The model then counts as metered.</div>
+    <button class="btn btn-sm btn-primary w-100 mt-2" type="button" data-price-save>Save price</button>
+  </div>
+</div>
