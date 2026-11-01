@@ -1,0 +1,143 @@
+@* Decision 0011 (run W4, R8): the mockups' _PresetCard. A Playground or Tool Bench preset shows its provider's logo and model chip; a Compare
+   preset its column models; then the actions menu (Edit, Duplicate, Export JSON, Open in the third page, Delete), the description, the
+   capability chips (thinking, options, tools, prompts), the tags, how often it was used and where, and the Open buttons. A preset whose model
+   this app does not know, or whose provider has no credentials, is marked (is-warn, a warning chip and the reason): its Open buttons are
+   disabled with the reason, and Connect links to the provider's settings. Model: PresetCardView. *@
+@model PresetCardView
+@{
+    var preset = Model.Preset;
+    var ok = Model.Availability.Ok;
+    var shown = Model.Model;
+    var kindIcon = preset.Kind == PresetPages.Playground ? null : PresetPages.Icon(preset.Kind);
+}
+<article class="ps-card ps-card-hover preset-card p-3 h-100 d-flex flex-column@(ok ? "" : " is-warn")" data-preset-card="@preset.Id" data-preset-name="@preset.Name" data-preset-uses="@preset.Uses" data-preset-kind="@preset.Kind">
+  <div class="d-flex align-items-start gap-2 mb-2">
+    @if (kindIcon is not null)
+    {
+      <span class="provider-logo text-ps-blue" aria-hidden="true"><i class="bi @kindIcon"></i></span>
+    }
+    else if (shown?.LogoUrl is { } logo)
+    {
+      <span class="provider-logo" role="img" aria-label="@shown.ProviderName logo"><img class="provider-logo-mark" src="@logo" alt="" width="20" height="20" decoding="async"></span>
+    }
+    else
+    {
+      <span class="provider-logo" aria-hidden="true"><i class="bi bi-bookmark"></i></span>
+    }
+    <div class="flex-grow-1 min-w-0">
+      <h3 class="preset-name text-break">@preset.Name</h3>
+      @if (preset.Kind == PresetPages.Compare)
+      {
+        <div class="d-flex flex-wrap gap-1 mt-1">
+          <span class="ps-chip" data-tone="info">compare · @(Model.Models.Count == 1 ? "1 model" : $"{Model.Models.Count} models")</span>
+          @if (!ok)
+          {
+            <span class="ps-chip" data-tone="warn"><i class="bi bi-exclamation-triangle" aria-hidden="true"></i>@Model.Availability.Chip</span>
+          }
+        </div>
+      }
+      else
+      {
+        <div class="d-flex flex-wrap gap-1 mt-1">
+          @if (preset.Kind == PresetPages.Bench)
+          {
+            <span class="ps-chip" data-tone="info">tool bench</span>
+          }
+          @if (shown is not null)
+          {
+            <span class="ps-chip preset-model" data-tone="outline" title="Model: @shown.Name"><span class="status-dot @(shown.Ok ? "ok" : "warn")"></span>@shown.Id</span>
+          }
+          else
+          {
+            <span class="ps-chip" data-tone="outline" title="This preset keeps the page's model">no model saved</span>
+          }
+          @if (!ok)
+          {
+            <span class="ps-chip" data-tone="warn"><i class="bi bi-exclamation-triangle" aria-hidden="true"></i>@Model.Availability.Chip</span>
+          }
+        </div>
+      }
+    </div>
+    <div class="dropdown">
+      <button class="btn btn-icon" type="button" data-bs-toggle="dropdown" aria-expanded="false" title="Preset actions" aria-label="Actions for @preset.Name"><i class="bi bi-three-dots" aria-hidden="true"></i></button>
+      <ul class="dropdown-menu dropdown-menu-end">
+        <li><button class="dropdown-item" type="button" data-preset-edit><i class="bi bi-pencil me-2" aria-hidden="true"></i>Edit</button></li>
+        <li><button class="dropdown-item" type="button" data-preset-duplicate><i class="bi bi-copy me-2" aria-hidden="true"></i>Duplicate</button></li>
+        <li><a class="dropdown-item" href="/api/presets/@Uri.EscapeDataString(preset.Id)/export" download data-preset-export><i class="bi bi-filetype-json me-2" aria-hidden="true"></i>Export JSON</a></li>
+        @if (ok)
+        {
+          <li><a class="dropdown-item" href="@Model.Other.Url" title="@Model.Other.Title"><i class="bi @Model.Other.Icon me-2" aria-hidden="true"></i>@Model.Other.Label</a></li>
+        }
+        <li><hr class="dropdown-divider"></li>
+        <li><button class="dropdown-item text-danger" type="button" data-preset-delete><i class="bi bi-trash3 me-2" aria-hidden="true"></i>Delete</button></li>
+      </ul>
+    </div>
+  </div>
+  @if (preset.Kind == PresetPages.Compare && Model.Models.Count > 0)
+  {
+    <div class="d-flex flex-column gap-1 mb-2">
+      @foreach (var column in Model.Models)
+      {
+        <span class="ps-chip preset-model align-self-start" data-tone="outline" title="@column.Name"><span class="status-dot @(column.Ok ? "ok" : "warn")"></span>@column.Id</span>
+      }
+    </div>
+  }
+  @if (preset.Description is { } description)
+  {
+    <p class="fs-7 text-secondary mb-2 text-break preset-description">@description</p>
+  }
+  @if (Model.Caps.Count > 0)
+  {
+    <div class="d-flex flex-wrap gap-1 mb-2">
+      @foreach (var cap in Model.Caps)
+      {
+        if (cap.Reasoning)
+        {
+          <span class="cap cap-reasoning"><i class="bi bi-lightbulb" aria-hidden="true"></i>@cap.Text</span>
+        }
+        else
+        {
+          <span class="cap">@cap.Text</span>
+        }
+      }
+    </div>
+  }
+  @if (preset.Tags.Count > 0)
+  {
+    <div class="d-flex flex-wrap gap-1 mb-3">
+      @foreach (var tag in preset.Tags)
+      {
+        <span class="ps-chip" data-tone="accent"><i class="bi bi-tag" aria-hidden="true"></i>@tag</span>
+      }
+    </div>
+  }
+  @if (!ok && Model.Availability.Problem is { } problem)
+  {
+    <div class="fs-8 text-ps-warn mb-3"><i class="bi bi-info-circle me-1" aria-hidden="true"></i>@problem</div>
+  }
+  <div class="mt-auto">
+    <div class="d-flex flex-wrap gap-2 fs-8 ps-mono text-ps-faint mb-2">
+      <span>@Model.UsedText</span>
+      @if (preset.Pinned)
+      {
+        <span title="Pinned to the top"><i class="bi bi-pin-angle" aria-hidden="true"></i><span class="visually-hidden">pinned</span></span>
+      }
+      <span class="ms-auto">@Model.UsedInText</span>
+    </div>
+    <div class="d-flex flex-wrap gap-2">
+      @if (ok)
+      {
+        <a class="btn btn-primary btn-sm" href="@Model.Primary.Url" title="@Model.Primary.Title" data-preset-open="@Model.Primary.Page"><i class="bi @Model.Primary.Icon me-1" aria-hidden="true"></i>@Model.Primary.Label</a>
+        <a class="btn btn-outline-secondary btn-sm" href="@Model.Secondary.Url" title="@Model.Secondary.Title" data-preset-open="@Model.Secondary.Page"><i class="bi @Model.Secondary.Icon me-1" aria-hidden="true"></i>@Model.Secondary.Label</a>
+      }
+      else
+      {
+        <button class="btn btn-primary btn-sm" type="button" disabled title="@Model.Availability.Title"><i class="bi @Model.Primary.Icon me-1" aria-hidden="true"></i>@Model.Primary.Label</button>
+        @if (Model.Availability.ConnectUrl is { } connect)
+        {
+          <a class="btn btn-outline-warning btn-sm" href="@connect"><i class="bi bi-key me-1" aria-hidden="true"></i>@Model.Availability.ConnectLabel</a>
+        }
+      }
+    </div>
+  </div>
+</article>

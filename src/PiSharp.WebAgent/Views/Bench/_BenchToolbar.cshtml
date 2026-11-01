@@ -1,0 +1,66 @@
+@* Decision 0011 (run W4, R7): the mockups' _BenchToolbar: the model chip (opens #modal-model-picker, Ctrl+K), the thinking level (levels
+   the model does not take are disabled), the system prompt (a collapse with its character count), the run controls (_BenchRunControls:
+   Run, or Running/Paused with Stop), Reset conversation, Save preset (Presets wire [data-preset-save]) and, at the end, the auto-respond
+   switch with its rules: pause on schema violations, pause when no mock matches, the simulated tool latency. "Run built-in tools for real"
+   stays off: the bench never runs a tool. Every control saves the setup (POST /api/bench/sessions/{id}/setup); it applies from the next
+   turn. Model: BenchView. *@
+@model BenchView
+@{
+    var setup = Model.Setup;
+    var rules = setup.Rules;
+    var chars = (setup.SystemPrompt ?? "").Length;
+}
+<div class="pg-toolbar" role="toolbar" aria-label="Bench controls" data-bench-toolbar>
+  <button class="model-chip" type="button" data-bs-toggle="modal" data-bs-target="#modal-model-picker" title="Change model (Ctrl+K)" data-model-chip>
+    <span class="status-dot @(Model.Known ? "ok" : "warn")" data-chip-dot></span>
+    <span class="model-chip-provider" data-chip-provider>@setup.Provider</span>
+    <span class="model-chip-name" data-chip-name>@(Model.ModelName.Length > 0 ? Model.ModelName : "Choose a model")</span>
+    <i class="bi bi-chevron-down"></i>
+  </button>
+  <select class="form-select form-select-sm w-auto" aria-label="Thinking level" title="Thinking level" data-bench-thinking>
+    @foreach (var level in Model.Levels)
+    {
+      var selected = level.Value == Model.Level;
+      <option value="@level.Value" selected="@selected" disabled="@(!level.Taken && !selected)" title="@level.Why">@(level.Taken ? level.Value : level.Value + " (unsupported)")</option>
+    }
+  </select>
+  <button class="btn btn-sm btn-outline-secondary d-inline-flex align-items-center gap-1" type="button" data-bs-toggle="collapse" data-bs-target="#benchSystem" aria-expanded="false" aria-controls="benchSystem">
+    <i class="bi bi-chat-left-text"></i>System prompt <span class="ps-mono fs-8 text-ps-faint d-none d-sm-inline" data-bench-system-count>@chars.ToString("N0", System.Globalization.CultureInfo.InvariantCulture) chars</span><i class="bi bi-chevron-down fs-8"></i>
+  </button>
+  <span class="vr d-none d-md-inline-block mx-1"></span>
+
+  <span class="d-inline-flex align-items-center gap-2" data-bench-part="controls"><partial name="~/Views/Bench/_BenchRunControls.cshtml" model="Model" /></span>
+  <button class="btn btn-sm btn-outline-secondary" type="button" title="Clear assistant turns and tool results; keep the user messages" data-bench-reset disabled="@(Model.State == BenchStates.Running)"><i class="bi bi-arrow-counterclockwise me-1"></i>Reset conversation</button>
+  <button class="btn btn-sm btn-outline-secondary" type="button" title="Save preset (Ctrl+S)" aria-label="Save preset" data-preset-save><i class="bi bi-bookmark-plus"></i><span class="d-none d-lg-inline ms-1">Save preset</span></button>
+
+  <div class="ms-auto d-flex align-items-center gap-1 bench-rules">
+    <div class="form-check form-switch mb-0">
+      <input class="form-check-input" type="checkbox" role="switch" id="autoRespond" checked="@rules.AutoRespond" data-bench-rule="autoRespond">
+      <label class="form-check-label fs-7" for="autoRespond">Auto-respond with mock results</label>
+    </div>
+    <div class="dropdown">
+      <button class="btn btn-icon" type="button" data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false" title="Auto-respond rules" aria-label="Auto-respond rules"><i class="bi bi-sliders"></i></button>
+      <div class="dropdown-menu dropdown-menu-end p-3 bench-rules-menu">
+        <div class="dropdown-header px-0 pt-0">Auto-respond rules</div>
+        <p class="fs-8 text-secondary mb-2">Each call is answered with the first saved mock whose <span class="ps-mono">match</span> fits its arguments. Mocks without a match are the fallback.</p>
+        <div class="form-check"><input class="form-check-input" type="checkbox" id="ruleSchema" checked="@rules.PauseOnSchema" data-bench-rule="pauseOnSchema"><label class="form-check-label fs-7" for="ruleSchema">Pause on schema violations</label></div>
+        <div class="form-check"><input class="form-check-input" type="checkbox" id="ruleNoMock" checked="@rules.PauseOnNoMock" data-bench-rule="pauseOnNoMock"><label class="form-check-label fs-7" for="ruleNoMock">Pause when no mock matches</label></div>
+        <div class="form-check"><input class="form-check-input" type="checkbox" id="ruleBuiltin" disabled aria-describedby="ruleBuiltinHelp"><label class="form-check-label fs-7" for="ruleBuiltin">Run built-in tools for real (read, grep)</label></div>
+        <div class="fs-8 text-ps-faint ms-4" id="ruleBuiltinHelp">The Tool Bench never runs a tool: built-ins are answered by mocks or by you.</div>
+        <label class="form-label fs-8 mt-2 mb-1" for="ruleDelay">Simulated tool latency</label>
+        <select class="form-select form-select-sm" id="ruleDelay" data-bench-rule="latency">
+          @foreach (var (value, label) in BenchLatency.All)
+          {
+            <option value="@value" selected="@(rules.Latency == value)">@label</option>
+          }
+        </select>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="collapse flex-shrink-0 border-bottom" id="benchSystem">
+  <div class="px-3 py-2 bg-surface-2">
+    <label class="ps-label mb-1" for="benchSystemText">System prompt</label>
+    <textarea class="form-control font-monospace" id="benchSystemText" rows="3" maxlength="@BenchSetup.MaxSystemPrompt" spellcheck="false" data-bench-system>@setup.SystemPrompt</textarea>
+  </div>
+</div>

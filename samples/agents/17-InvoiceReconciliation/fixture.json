@@ -1,0 +1,51 @@
+{
+  "purchase_orders": [
+    {
+      "id": "PO-7",
+      "vendor": "SupplyCo",
+      "lines": [
+        {
+          "sku": "PEN",
+          "quantity": 100,
+          "unit_price": 1.5
+        },
+        {
+          "sku": "PAD",
+          "quantity": 40,
+          "unit_price": 3.0
+        }
+      ]
+    }
+  ],
+  "receipts": [
+    {
+      "po_id": "PO-7",
+      "sku": "PEN",
+      "quantity": 100
+    },
+    {
+      "po_id": "PO-7",
+      "sku": "PAD",
+      "quantity": 35
+    }
+  ],
+  "invoices": [
+    {
+      "id": "INV-9",
+      "po_id": "PO-7",
+      "vendor": "SupplyCo",
+      "lines": [
+        {
+          "sku": "PEN",
+          "quantity": 100,
+          "unit_price": 1.5
+        },
+        {
+          "sku": "PAD",
+          "quantity": 40,
+          "unit_price": 3.0
+        }
+      ]
+    }
+  ]
+}

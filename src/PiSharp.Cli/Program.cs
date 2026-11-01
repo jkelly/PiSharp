@@ -21,6 +21,7 @@ internal static class Program
                 if (crash.ExceptionObject is Exception error)
                     Diagnostics.CrashReporting.ReportUncaughtException(error, Console.Error, [], null, Environment.CurrentDirectory);
             };
+        if (Commands.SessionHelp.For(args) is { } sessionHelp) { Console.Out.Write(sessionHelp); return 0; }
         // Pi rpc/print modes: SIGTERM and SIGHUP shut the host down gracefully, then exit 143 or 129.
         if (args.Length > 0 && args[0] == "session")
             return args is ["session", "terminal", ..] ? await RunSessionAsync(args).ConfigureAwait(false)

@@ -1,0 +1,261 @@
+@* Decision 0011 (run W2, WU9): the mockups' _ApiKeyModal (#modal-api-key), one modal for every provider that takes a key, in five variants
+   (data-key-step: single, azure, bedrock, vertex, cloudflare). A _CredentialButton opens it and settings-keys.js fills it from the button's
+   data attributes (provider, name, logo, variant, variables, an account to replace). The key is typed into a password field, POSTed once
+   (/api/credentials/accounts, or /accounts/{id}/key to replace) and cleared after saving and whenever the modal closes; no answer repeats it,
+   and the page shows only the masked hint the server answers. Non-secret settings (data-setting: baseUrl and the provider's own variable
+   names such as AWS_REGION) are stored with the account. "Test connection" (/api/credentials/test) is turned off offline. Left out (gaps):
+   the reference/command key source, "Send as" and the extra header. Model: bool (offline). *@
+@model bool
+@{
+    var offline = Model;
+}
+<div class="modal fade" id="modal-api-key" tabindex="-1" aria-labelledby="modal-api-key-title" aria-hidden="true" data-key-modal>
+  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <form class="modal-content" novalidate autocomplete="off" data-key-form>
+      <div class="modal-header">
+        <div class="d-flex align-items-center gap-3" style="min-width:0">
+          <span class="provider-logo lg" role="img" aria-label="Provider logo" data-key-logo><i class="bi bi-key" aria-hidden="true"></i></span>
+          <div style="min-width:0">
+            <h2 class="modal-title" id="modal-api-key-title"><span data-key-verb>Connect</span> <span data-key-title>provider</span></h2>
+            <div class="modal-subtitle ps-mono text-break" data-key-subtitle></div>
+          </div>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+
+      <div class="modal-body">
+        <div class="alert alert-secondary d-flex gap-2 py-2 fs-7" data-key-replacing hidden>
+          <i class="bi bi-arrow-repeat mt-1" aria-hidden="true"></i>
+          <div>Replacing the key of <strong data-key-account-label></strong> (<span class="ps-mono" data-key-hint></span>). The account keeps its name and its chats. Leave the key blank to change only the settings.</div>
+        </div>
+
+        @* Variant: single key *@
+        <div data-key-step="single">
+          <div data-key-sources>
+            <div class="ps-label mb-2">Credential source</div>
+            <div class="d-grid gap-2 mb-3">
+              <input type="radio" class="btn-check" name="keySource" id="keySourceStore" value="store" checked data-key-source>
+              <label class="choice-card" for="keySourceStore">
+                <span class="choice-title d-block"><i class="bi bi-safe me-2 text-ps-blue" aria-hidden="true"></i>Store a key in PiSharp Web Agent</span>
+                <span class="choice-desc d-block">Encrypted with ASP.NET Data Protection in the app's data folder. Recommended.</span>
+              </label>
+              <input type="radio" class="btn-check" name="keySource" id="keySourceEnv" value="env" data-key-source>
+              <label class="choice-card" for="keySourceEnv">
+                <span class="choice-title d-block"><i class="bi bi-terminal me-2 text-ps-blue" aria-hidden="true"></i>Use an environment variable</span>
+                <span class="choice-desc d-block"><span class="ps-mono" data-key-variables>A variable</span>. Read from the web host's environment as a read-only account. Nothing is stored here.</span>
+              </label>
+            </div>
+          </div>
+          <div data-key-store>
+            <div class="row g-3">
+              <div class="col-md-8">
+                <label class="form-label" for="apiKeyInput">API key</label>
+                <div class="input-group">
+                  <input class="form-control secret-field" id="apiKeyInput" type="password" autocomplete="off" spellcheck="false" data-key-secret>
+                  <button class="btn btn-outline-secondary" type="button" data-reveal="#apiKeyInput" aria-label="Show or hide key"><i class="bi bi-eye" aria-hidden="true"></i></button>
+                </div>
+                <div class="form-text">Stored encrypted and never shown again; the pages show only a masked hint.</div>
+              </div>
+              <div class="col-md-4">
+                <label class="form-label" for="apiKeyLabel">Account name</label>
+                <input class="form-control" id="apiKeyLabel" maxlength="80" placeholder="Optional" data-key-label>
+              </div>
+            </div>
+            <details class="mt-3">
+              <summary class="fs-7 text-secondary">Advanced</summary>
+              <div class="row g-3 mt-1">
+                <div class="col-md-8">
+                  <label class="form-label" for="baseUrlOverride">Base URL override</label>
+                  <input class="form-control font-monospace" id="baseUrlOverride" type="url" spellcheck="false" data-setting="baseUrl">
+                  <div class="form-text">Leave blank for the provider's default.</div>
+                </div>
+              </div>
+            </details>
+          </div>
+          <div class="ps-panel p-3 fs-7 text-secondary" data-key-env hidden>
+            Set <span class="ps-mono" data-key-variables>the variable</span> for the web host process and restart it. The provider then shows
+            <span class="ps-chip" data-tone="info">env</span> and the key is read at request time; it can't be changed or removed here.
+          </div>
+        </div>
+
+        @* Variant: Azure OpenAI *@
+        <div data-key-step="azure" hidden>
+          <div class="row g-3">
+            <div class="col-12">
+              <label class="form-label" for="azKey">API key</label>
+              <div class="input-group">
+                <input class="form-control secret-field" id="azKey" type="password" placeholder="Azure OpenAI key" autocomplete="off" spellcheck="false" data-key-secret>
+                <button class="btn btn-outline-secondary" type="button" data-reveal="#azKey" aria-label="Show or hide key"><i class="bi bi-eye" aria-hidden="true"></i></button>
+              </div>
+              <div class="form-text">Env fallback: <span class="ps-mono">AZURE_OPENAI_API_KEY</span></div>
+            </div>
+            <div class="col-12">
+              <div class="ps-label mb-2">Endpoint</div>
+              <div class="btn-group mb-2" role="group" aria-label="Endpoint style">
+                <input type="radio" class="btn-check" name="azEndpoint" id="azRes" value="resource" checked data-az-endpoint><label class="btn btn-sm btn-outline-secondary" for="azRes">Resource name</label>
+                <input type="radio" class="btn-check" name="azEndpoint" id="azUrl" value="url" data-az-endpoint><label class="btn btn-sm btn-outline-secondary" for="azUrl">Base URL</label>
+              </div>
+              <div class="input-group" data-az-only="resource">
+                <span class="input-group-text ps-mono fs-8">https://</span>
+                <input class="form-control font-monospace" id="azResource" aria-label="Resource name" spellcheck="false" data-setting="AZURE_OPENAI_RESOURCE_NAME">
+                <span class="input-group-text ps-mono fs-8">.openai.azure.com</span>
+              </div>
+              <div data-az-only="url" hidden>
+                <input class="form-control font-monospace" id="azBaseUrl" type="url" aria-label="Base URL" placeholder="https://contoso.openai.azure.com/openai/v1" spellcheck="false" data-setting="AZURE_OPENAI_BASE_URL">
+              </div>
+              <div class="form-text">Env: <span class="ps-mono">AZURE_OPENAI_RESOURCE_NAME</span> or <span class="ps-mono">AZURE_OPENAI_BASE_URL</span></div>
+            </div>
+            <div class="col-md-5">
+              <label class="form-label" for="azVersion">API version</label>
+              <input class="form-control font-monospace" id="azVersion" placeholder="v1" spellcheck="false" data-setting="AZURE_OPENAI_API_VERSION">
+              <div class="form-text">Env: <span class="ps-mono">AZURE_OPENAI_API_VERSION</span></div>
+            </div>
+            <div class="col-md-7">
+              <label class="form-label" for="azLabel">Account name</label>
+              <input class="form-control" id="azLabel" maxlength="80" placeholder="Optional" data-key-label>
+            </div>
+            <div class="col-12">
+              <div class="d-flex align-items-center flex-wrap mb-2"><span class="ps-label">Deployment map</span><span class="fs-8 text-ps-faint ms-2">model id → deployment name (<span class="ps-mono">AZURE_OPENAI_DEPLOYMENT_NAME_MAP</span>)</span></div>
+              <div class="ps-table-wrap">
+                <table class="table table-sm align-middle mb-0">
+                  <thead><tr><th>Model id</th><th>Deployment</th><th class="text-end"><span class="visually-hidden">Actions</span></th></tr></thead>
+                  <tbody data-az-map></tbody>
+                </table>
+              </div>
+              <template data-az-row>
+                <tr>
+                  <td><input class="form-control form-control-sm font-monospace" aria-label="Model id" spellcheck="false" data-az-model></td>
+                  <td><input class="form-control form-control-sm font-monospace" aria-label="Deployment" spellcheck="false" data-az-deployment></td>
+                  <td class="text-end"><button class="btn btn-icon" type="button" aria-label="Remove row" data-az-remove><i class="bi bi-x-lg" aria-hidden="true"></i></button></td>
+                </tr>
+              </template>
+              <button class="btn btn-sm btn-ghost mt-1" type="button" data-az-add><i class="bi bi-plus-lg me-1" aria-hidden="true"></i>Add mapping</button>
+            </div>
+          </div>
+        </div>
+
+        @* Variant: Amazon Bedrock *@
+        <div data-key-step="bedrock" hidden>
+          <div class="ps-label mb-2">Authentication</div>
+          <div class="d-grid gap-2 mb-3">
+            <input type="radio" class="btn-check" name="awsAuth" id="awsBearer" value="bearer" data-auth-choice>
+            <label class="choice-card" for="awsBearer"><span class="choice-title d-block">Bedrock API key (bearer token)</span><span class="choice-desc d-block">Stored encrypted. Env: <span class="ps-mono">AWS_BEARER_TOKEN_BEDROCK</span></span></label>
+            <input type="radio" class="btn-check" name="awsAuth" id="awsProfile" value="profile" checked data-auth-choice>
+            <label class="choice-card" for="awsProfile"><span class="choice-title d-block">AWS profile</span><span class="choice-desc d-block">Uses <span class="ps-mono">~/.aws/credentials</span> and <span class="ps-mono">~/.aws/config</span> on this machine. Env: <span class="ps-mono">AWS_PROFILE</span></span></label>
+            <input type="radio" class="btn-check" name="awsAuth" id="awsChain" value="chain" data-auth-choice>
+            <label class="choice-card" for="awsChain"><span class="choice-title d-block">Default credential chain</span><span class="choice-desc d-block">Access keys from env, ECS task role or web identity. Nothing secret is stored here.</span></label>
+          </div>
+          <div class="row g-3">
+            <div class="col-12" data-auth-only="bearer" hidden>
+              <label class="form-label" for="awsToken">Bedrock API key</label>
+              <div class="input-group">
+                <input class="form-control secret-field" id="awsToken" type="password" autocomplete="off" spellcheck="false" data-key-secret>
+                <button class="btn btn-outline-secondary" type="button" data-reveal="#awsToken" aria-label="Show or hide key"><i class="bi bi-eye" aria-hidden="true"></i></button>
+              </div>
+            </div>
+            <div class="col-md-6" data-auth-only="profile">
+              <label class="form-label" for="awsProfileName">Profile</label>
+              <input class="form-control font-monospace" id="awsProfileName" placeholder="default" spellcheck="false" data-setting="AWS_PROFILE">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label" for="awsRegion">Region</label>
+              <input class="form-control font-monospace" id="awsRegion" list="awsRegions" placeholder="us-east-1" spellcheck="false" data-setting="AWS_REGION">
+              <datalist id="awsRegions"><option value="us-east-1"></option><option value="us-west-2"></option><option value="eu-central-1"></option><option value="eu-west-1"></option><option value="ap-northeast-1"></option><option value="ap-southeast-2"></option></datalist>
+              <div class="form-text">Env: <span class="ps-mono">AWS_REGION</span></div>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label" for="awsLabel">Account name</label>
+              <input class="form-control" id="awsLabel" maxlength="80" placeholder="Optional" data-key-label>
+            </div>
+          </div>
+        </div>
+
+        @* Variant: Google Vertex AI *@
+        <div data-key-step="vertex" hidden>
+          <div class="ps-label mb-2">Authentication</div>
+          <div class="d-grid gap-2 mb-3">
+            <input type="radio" class="btn-check" name="gcpAuth" id="gcpKey" value="key" data-auth-choice>
+            <label class="choice-card" for="gcpKey"><span class="choice-title d-block">API key</span><span class="choice-desc d-block">Stored encrypted. Env: <span class="ps-mono">GOOGLE_CLOUD_API_KEY</span></span></label>
+            <input type="radio" class="btn-check" name="gcpAuth" id="gcpAdc" value="adc" checked data-auth-choice>
+            <label class="choice-card" for="gcpAdc"><span class="choice-title d-block">Application Default Credentials</span><span class="choice-desc d-block">Run <span class="ps-mono">gcloud auth application-default login</span> on this machine.</span></label>
+            <input type="radio" class="btn-check" name="gcpAuth" id="gcpSa" value="file" data-auth-choice>
+            <label class="choice-card" for="gcpSa"><span class="choice-title d-block">Service account file</span><span class="choice-desc d-block">Path to a JSON key on this machine. Env: <span class="ps-mono">GOOGLE_APPLICATION_CREDENTIALS</span></span></label>
+          </div>
+          <div class="row g-3">
+            <div class="col-12" data-auth-only="key" hidden>
+              <label class="form-label" for="gcpApiKey">API key</label>
+              <div class="input-group">
+                <input class="form-control secret-field" id="gcpApiKey" type="password" autocomplete="off" spellcheck="false" data-key-secret>
+                <button class="btn btn-outline-secondary" type="button" data-reveal="#gcpApiKey" aria-label="Show or hide key"><i class="bi bi-eye" aria-hidden="true"></i></button>
+              </div>
+            </div>
+            <div class="col-12" data-auth-only="file" hidden>
+              <label class="form-label" for="gcpFile">Service account file</label>
+              <input class="form-control font-monospace" id="gcpFile" placeholder="C:\keys\service-account.json" spellcheck="false" data-setting="GOOGLE_APPLICATION_CREDENTIALS">
+              <div class="form-text">Only the path is stored; the file stays where it is.</div>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label" for="gcpProject">Project ID</label>
+              <input class="form-control font-monospace" id="gcpProject" spellcheck="false" data-setting="GOOGLE_CLOUD_PROJECT">
+              <div class="form-text">Env: <span class="ps-mono">GOOGLE_CLOUD_PROJECT</span></div>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label" for="gcpLocation">Location</label>
+              <input class="form-control font-monospace" id="gcpLocation" list="gcpLocations" placeholder="global" spellcheck="false" data-setting="GOOGLE_CLOUD_LOCATION">
+              <datalist id="gcpLocations"><option value="global"></option><option value="us-central1"></option><option value="europe-west4"></option><option value="asia-northeast1"></option></datalist>
+              <div class="form-text">Env: <span class="ps-mono">GOOGLE_CLOUD_LOCATION</span></div>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label" for="gcpLabel">Account name</label>
+              <input class="form-control" id="gcpLabel" maxlength="80" placeholder="Optional" data-key-label>
+            </div>
+          </div>
+        </div>
+
+        @* Variant: Cloudflare (AI Gateway, Workers AI) *@
+        <div data-key-step="cloudflare" hidden>
+          <div class="row g-3">
+            <div class="col-12">
+              <label class="form-label" for="cfKey">API token</label>
+              <div class="input-group">
+                <input class="form-control secret-field" id="cfKey" type="password" placeholder="Cloudflare API token" autocomplete="off" spellcheck="false" data-key-secret>
+                <button class="btn btn-outline-secondary" type="button" data-reveal="#cfKey" aria-label="Show or hide token"><i class="bi bi-eye" aria-hidden="true"></i></button>
+              </div>
+              <div class="form-text">Env: <span class="ps-mono">CLOUDFLARE_API_KEY</span></div>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label" for="cfAccount">Account ID</label>
+              <input class="form-control font-monospace" id="cfAccount" placeholder="32-character account id" spellcheck="false" data-setting="CLOUDFLARE_ACCOUNT_ID">
+              <div class="form-text">Env: <span class="ps-mono">CLOUDFLARE_ACCOUNT_ID</span></div>
+            </div>
+            <div class="col-md-6" data-cf-gateway>
+              <label class="form-label" for="cfGateway">Gateway ID</label>
+              <input class="form-control font-monospace" id="cfGateway" placeholder="my-gateway" spellcheck="false" data-setting="CLOUDFLARE_GATEWAY_ID">
+              <div class="form-text">Env: <span class="ps-mono">CLOUDFLARE_GATEWAY_ID</span></div>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label" for="cfLabel">Account name</label>
+              <input class="form-control" id="cfLabel" maxlength="80" placeholder="Optional" data-key-label>
+            </div>
+          </div>
+        </div>
+
+        @* The connection test's result and the save error, set as text by settings-keys.js. *@
+        <div class="mt-4" aria-live="polite">
+          <div class="fs-8 text-ps-faint" data-key-test="idle"><i class="bi bi-info-circle me-1" aria-hidden="true"></i>@(offline ? ProviderDirectory.OfflineMessage : "Test connection asks the provider for its model list; it doesn't run a model.")</div>
+          <div class="ps-panel p-2 fs-7 d-flex align-items-center gap-2" data-key-test="running" hidden><span class="spinner-border spinner-border-sm text-primary" aria-hidden="true"></span>Testing…</div>
+          <div class="alert alert-success d-flex gap-2 mb-0 py-2" data-key-test="ok" hidden><i class="bi bi-check-circle" aria-hidden="true"></i><div><strong>Connected.</strong> <span data-key-test-text></span></div></div>
+          <div class="alert alert-danger d-flex gap-2 mb-0 py-2" data-key-test="fail" hidden><i class="bi bi-x-circle" aria-hidden="true"></i><div><strong>The test failed.</strong> <span data-key-test-text></span></div></div>
+          <div class="alert alert-secondary d-flex gap-2 mb-0 py-2" data-key-test="unsupported" hidden><i class="bi bi-info-circle" aria-hidden="true"></i><div data-key-test-text></div></div>
+          <div class="alert alert-danger d-flex gap-2 mt-2 mb-0 py-2" role="alert" data-key-error hidden><i class="bi bi-x-octagon" aria-hidden="true"></i><div data-key-error-text></div></div>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary me-auto" data-key-test-button disabled="@offline" title="@(offline ? ProviderDirectory.OfflineMessage : null)"><i class="bi bi-activity me-1" aria-hidden="true"></i>Test connection</button>
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="submit" class="btn btn-primary" data-key-save>Save</button>
+      </div>
+    </form>
+  </div>
+</div>

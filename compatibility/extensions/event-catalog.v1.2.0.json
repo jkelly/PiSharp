@@ -249,7 +249,7 @@
       },
       "nativeEvidence": {
         "assessedAt": "b831158a9379e8a7f454a069ee18551c90bd7eac",
-        "registration": "IExtensionRegistry.RegisterEventHandler (topic project_trust)",
+        "registration": "IExtensionEventHandlerRegistry.RegisterEventHandler (topic project_trust)",
         "hostEmission": "PiExtensionEvents.ProjectTrustAsync (registry.DispatchUntilAsync over the extensions loaded before trust) from the Pi entry project-trust resolution",
         "tests": [
           {
@@ -426,7 +426,7 @@
       },
       "nativeEvidence": {
         "assessedAt": "b831158a9379e8a7f454a069ee18551c90bd7eac",
-        "registration": "IExtensionRegistry.RegisterEventHandler (topic resources_discover)",
+        "registration": "IExtensionEventHandlerRegistry.RegisterEventHandler (topic resources_discover)",
         "hostEmission": "PiExtensionEvents.ResourcesDiscoverAsync (startup and reload) feeding the run's skill, prompt and theme paths",
         "tests": [
           {
@@ -1328,7 +1328,7 @@
       },
       "nativeEvidence": {
         "assessedAt": "b831158a9379e8a7f454a069ee18551c90bd7eac",
-        "registration": "IExtensionRegistry.RegisterEventHandler (topic session_before_compact)",
+        "registration": "IExtensionEventHandlerRegistry.RegisterEventHandler (topic session_before_compact)",
         "hostEmission": "NativeSessionEventBinding configures PersistentAgentSession.ConfigureBeforeCompaction (last truthy result wins; cancel or extension compaction)",
         "tests": [
           {
@@ -2937,7 +2937,7 @@
       },
       "nativeEvidence": {
         "assessedAt": "b831158a9379e8a7f454a069ee18551c90bd7eac",
-        "registration": "IExtensionRegistry.RegisterEventHandler (topic cache_warming_decision)",
+        "registration": "IExtensionEventHandlerRegistry.RegisterEventHandler (topic cache_warming_decision)",
         "hostEmission": "NativeExtensionActivation cache-warming decision callback (registry.ReduceEventAsync) handed to the CacheWarmer",
         "tests": [
           {
@@ -3121,7 +3121,7 @@
       },
       "nativeEvidence": {
         "assessedAt": "b831158a9379e8a7f454a069ee18551c90bd7eac",
-        "registration": "IExtensionRegistry.RegisterEventHandler (topic before_provider_request)",
+        "registration": "IExtensionEventHandlerRegistry.RegisterEventHandler (topic before_provider_request)",
         "hostEmission": "ExtensionProviderHttpHandler (provider HTTP pipeline built by OfflineSessionProfile when handlers exist)",
         "tests": [
           {
@@ -3305,7 +3305,7 @@
       },
       "nativeEvidence": {
         "assessedAt": "b831158a9379e8a7f454a069ee18551c90bd7eac",
-        "registration": "IExtensionRegistry.RegisterEventHandler (topic before_provider_headers)",
+        "registration": "IExtensionEventHandlerRegistry.RegisterEventHandler (topic before_provider_headers)",
         "hostEmission": "ExtensionProviderHttpHandler (headers mutated in handler order before signing)",
         "tests": [
           {
@@ -4459,7 +4459,7 @@
       },
       "nativeEvidence": {
         "assessedAt": "b831158a9379e8a7f454a069ee18551c90bd7eac",
-        "registration": "IExtensionRegistry.RegisterEventHandler (topic agent_before_settle; boundary entries/continue)",
+        "registration": "IExtensionEventHandlerRegistry.RegisterEventHandler (topic agent_before_settle; boundary entries/continue)",
         "hostEmission": "NativeSessionEventBinding boundary handler through PersistentAgentSession.ConfigureBoundaryHandlers",
         "tests": [
           {
@@ -5367,7 +5367,7 @@
       },
       "nativeEvidence": {
         "assessedAt": "b831158a9379e8a7f454a069ee18551c90bd7eac",
-        "registration": "IExtensionRegistry.Observe and RegisterEventHandler (topic turn_end; boundary entries/continue)",
+        "registration": "IExtensionRegistry.Observe and IExtensionEventHandlerRegistry.RegisterEventHandler (topic turn_end; boundary entries/continue)",
         "hostEmission": "NativeSessionEventBinding (attached by NativeExtensionActivation on every attachment generation; Node extensions are registry owners through PiNodeOwner, so the same dispatch reaches them); boundary results through PersistentAgentSession.ConfigureBoundaryHandlers",
         "tests": [
           {
@@ -5924,7 +5924,7 @@
       },
       "nativeEvidence": {
         "assessedAt": "b831158a9379e8a7f454a069ee18551c90bd7eac",
-        "registration": "IExtensionRegistry.Observe and RegisterEventHandler (topic message_end; same-role message replacement)",
+        "registration": "IExtensionRegistry.Observe and IExtensionEventHandlerRegistry.RegisterEventHandler (topic message_end; same-role message replacement)",
         "hostEmission": "NativeSessionEventBinding (attached by NativeExtensionActivation on every attachment generation; Node extensions are registry owners through PiNodeOwner, so the same dispatch reaches them); replacements through PersistentAgentSession.ConfigureMessageEndHandler",
         "tests": [
           {

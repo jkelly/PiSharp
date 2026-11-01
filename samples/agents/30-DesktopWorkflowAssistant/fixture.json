@@ -1,0 +1,7 @@
+{
+  "requestId": "desk-001",
+  "intent": "prepare-meeting",
+  "title": "Quarterly planning",
+  "participants": ["Ada", "Grace"],
+  "notes": ["Review roadmap", "Confirm owners"]
+}

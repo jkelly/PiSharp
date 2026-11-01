@@ -121,7 +121,8 @@ internal static class PiCommand
             return await PiSharp.Cli.Packages.PiPackageCommands.RunAsync(args, host, token).ConfigureAwait(false) ??
                 await PiSharp.Cli.Packages.PiPackageCommands.RunConfigAsync(args, host, token).ConfigureAwait(false) ?? 1;
         // Decision 0005: `durable [--continue|-c]` runs the experimental durable agent (Pi v1.1.0 experimental/durable/main.ts, which ran from
-        // source with no pi subcommand; upstream deleted it in v1.2.0 and PiSharp keeps it as a PiSharp-only mode). Hidden from --help.
+        // source with no pi subcommand; upstream deleted it in v1.2.0 and PiSharp keeps it as a PiSharp-only mode). Listed in --help as
+        // experimental since 1.2.0.1.
         if (args.Length > 0 && args[0] == "durable") return await PiSharp.Cli.Durable.DurableMain.RunAsync(args[1..], host, token).ConfigureAwait(false);
         // main.ts: `mcp` runs runMcpCommand(args.slice(1), { cwd, agentDir }) after that setup, before the main argument parser.
         if (args.Length > 0 && args[0] == "mcp")
@@ -386,11 +387,19 @@ internal static class PiCommand
         // main.ts configureHttpDispatcher(settingsManager.getHttpIdleTimeoutMs()): provider requests time out when headers or body data
         // stall; an invalid setting stops startup.
         long idleTimeout;
-        try { idleTimeout = PiHttpIdleTimeout.FromSettings(settings.Merged); }
+        TimeSpan websocketConnectTimeout;
+        try
+        {
+            idleTimeout = PiHttpIdleTimeout.FromSettings(settings.Merged);
+            websocketConnectTimeout = PiHttpIdleTimeout.WebSocketConnectTimeoutFromSettings(settings.Merged);
+        }
         catch (InvalidDataException error) { await Error(error.Message).ConfigureAwait(false); return 1; }
         // sdk.ts transport: settingsManager.getTransport() ("auto" by default); /settings changes it for the running session.
         PiTransportSetting.Start(settings.String("transport"));
+        // PiSharp-only (decision 0007): the service tier from --tier, else the serviceTier setting; /tier changes it.
+        PiServiceTierSetting.Start(parsed.Tier ?? settings.String("serviceTier"));
         var runtime = host.LiveRuntime with { CreateHttpHandler = PiHttpIdleTimeout.Wrap(host.LiveRuntime.CreateHttpHandler, idleTimeout),
+            WebSocketConnectTimeout = websocketConnectTimeout,
             Transport = host.LiveRuntime.Transport ?? (() => PiTransportSetting.Current()),
             // extensions/llama: the llama.cpp provider is the built-in llama.cpp extension's registration.
             LlamaProvider = () => builtins.IsEnabled(PiBuiltinExtensions.Llama) };

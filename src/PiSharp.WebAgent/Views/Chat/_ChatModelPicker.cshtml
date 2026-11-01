@@ -1,0 +1,26 @@
+@* Decision 0011 (run W2, WU7, WU8): the mockups' _ModelPickerModal (#modal-model-picker, Ctrl+K): _ProviderModelSelect with prefix "mp",
+   always the two linked dropdowns Provider → Model. On a new chat it sets the model the first message is sent with; on a chat page it
+   changes the chat's model for its next requests (refused while the chat runs) and says so in a toast, with any thinking level it had to
+   clamp. Nothing switches a chat's model by itself. "Connect another provider" opens Settings › Providers. Model: ProviderModelSelect. *@
+@model ProviderModelSelect
+<div class="modal fade" id="modal-model-picker" tabindex="-1" aria-labelledby="modal-model-picker-title" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <form class="modal-content" data-model-picker>
+      <div class="modal-header">
+        <h2 class="modal-title" id="modal-model-picker-title">Choose a model</h2>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <partial name="_ProviderModelSelect" model="Model" />
+        <div class="form-text mt-2">The chat keeps this model and its account until you change it here.</div>
+      </div>
+      <div class="modal-footer justify-content-between">
+        <a class="fs-7 text-ps-faint" href="/settings/providers">Connect another provider</a>
+        <div class="d-flex gap-2">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary">Use model</button>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>

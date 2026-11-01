@@ -1,0 +1,14 @@
+@* Decision 0011 (run W2, WU4): the toast area. shell.js showToast({ title, body, tone }) clones #toast-template into #toasts; tone is "ok",
+   "warn", "danger" or "info" (the status dot's colour). A page may also render toasts here itself with the same markup. *@
+<div class="toast-container position-fixed bottom-0 end-0 p-3" id="toasts" aria-live="polite" aria-atomic="false"></div>
+<template id="toast-template">
+  <div class="toast" role="status" aria-live="polite" aria-atomic="true">
+    <div class="toast-header">
+      <span class="status-dot ok me-2" data-toast-dot></span>
+      <strong class="me-auto" data-toast-title></strong>
+      <small>now</small>
+      <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Close"></button>
+    </div>
+    <div class="toast-body" data-toast-body></div>
+  </div>
+</template>

@@ -1,0 +1,28 @@
+@* Decision 0011 (run W5, E6): GET /evals/suites/{id} or /evals/runs/{id} for an id webagent.db doesn't have (deleted, or never there): a 404
+   page that says so and goes back to the suites. Model: EvalNotFound. *@
+@model EvalNotFound
+@{
+    ViewData["Title"] = (Model.What == "run" ? "Run" : "Suite") + " not found";
+    ViewData[ShellViewData.Nav] = ShellNav.Evals;
+    ViewData[ShellViewData.Page] = "evals-not-found";
+}
+@section TopbarStart
+{
+  <nav class="app-breadcrumb" aria-label="Breadcrumb">
+    <a class="d-none d-sm-inline" href="@EvalRoutes.Leaderboard">Evals</a>
+    <span class="d-none d-sm-inline" aria-hidden="true">›</span>
+    <a href="@EvalRoutes.Suites">Suites</a>
+    <span aria-hidden="true">›</span>
+    <h1 class="app-title current fs-7 mb-0">@ViewData["Title"]</h1>
+  </nav>
+}
+<div class="page">
+  <div class="ps-card">
+    <div class="empty-state py-5" data-eval-not-found="@Model.What">
+      <div class="empty-icon"><i class="bi bi-question-circle" aria-hidden="true"></i></div>
+      <h2 class="h5 mb-1">There is no @(Model.What == "run" ? "suite run" : "suite") <span class="ps-mono text-break">@Model.Id</span></h2>
+      <p class="fs-7 text-ps-faint mb-3">It may have been deleted@(Model.What == "run" ? ", or its suite was" : "").</p>
+      <a class="btn btn-sm btn-primary" href="@EvalRoutes.Suites"><i class="bi bi-list-check me-1" aria-hidden="true"></i>Back to suites</a>
+    </div>
+  </div>
+</div>

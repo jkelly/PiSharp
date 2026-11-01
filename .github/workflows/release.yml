@@ -11,7 +11,7 @@ on:
       version:
         description: Version to build and validate (dry run, nothing is published)
         required: true
-        default: '1.2.0'
+        default: '1.2.0.1'
       skip_tests:
         description: Skip the offline tests (dry runs only; tag releases always run them)
         type: boolean
@@ -58,7 +58,7 @@ jobs:
       - name: Run offline tests
         if: github.event_name == 'push' || !inputs.skip_tests
         run: |
-          for t in PiSharp.AzureResponses.Tests PiSharp.MistralConversations.Tests PiSharp.AnthropicAuthSync.Tests PiSharp.McpSync.Tests PiSharp.ProviderSync.Tests PiSharp.WireSync.Tests PiSharp.CliSync.Tests PiSharp.ToolSearch.Tests PiSharp.Classifiers.Tests PiSharp.Models.Tests PiSharp.Codemode.Tests PiSharp.ProviderApis.Tests PiSharp.CliParity.Tests PiSharp.McpParity.Tests PiSharp.SessionParity.Tests PiSharp.InteractiveParity.Tests PiSharp.ExtensionParity.Tests; do
+          for t in PiSharp.AzureResponses.Tests PiSharp.MistralConversations.Tests PiSharp.AnthropicAuthSync.Tests PiSharp.McpSync.Tests PiSharp.ProviderSync.Tests PiSharp.WireSync.Tests PiSharp.CliSync.Tests PiSharp.ToolSearch.Tests PiSharp.Classifiers.Tests PiSharp.Models.Tests PiSharp.Codemode.Tests PiSharp.ProviderApis.Tests PiSharp.CliParity.Tests PiSharp.McpParity.Tests PiSharp.SessionParity.Tests PiSharp.InteractiveParity.Tests PiSharp.ExtensionParity.Tests PiSharp.Durable.Tests PiSharp.DurableCli.Tests; do
             dotnet run --project "tests/$t/$t.csproj" -c Release \
               -p:RestoreSources=https://api.nuget.org/v3/index.json -p:RestoreLockedMode=false
           done
@@ -69,6 +69,29 @@ jobs:
           ./tools/release/build-release-packages.ps1
           -Version '${{ steps.version.outputs.version }}'
           -SourceCommit '${{ github.sha }}'
+
+      # Decision 0005: `pisharp durable` stores its sessions in SQLite. The tool must carry the durable assemblies, Microsoft.Data.Sqlite,
+      # their licenses, and SQLitePCLRaw's e_sqlite3 build for each release platform, byte for byte as restored. Reads the archive only.
+      - name: Check the tool's durable SQLite payload
+        shell: bash
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          tool="artifacts/packages/PiSharp.Cli.$VERSION.nupkg"
+          prefix=tools/net10.0/any
+          members=$(unzip -Z1 "$tool")
+          for member in PiSharp.Durable.dll PiSharp.Durable.Tools.dll PiSharp.Durable.Sqlite.dll Microsoft.Data.Sqlite.dll \
+            SQLitePCLRaw.core.dll SQLitePCLRaw.provider.e_sqlite3.dll SQLitePCLRaw.batteries_v2.dll \
+            licenses/Microsoft.Data.Sqlite.LICENSE.txt licenses/SQLitePCLRaw.LICENSE.txt licenses/SQLitePCLRaw.NOTICE.txt \
+            licenses/SQLite.NOTICE.txt licenses/jsdiff.LICENSE.txt licenses/ripgrep-ignore.LICENSE-MIT.txt; do
+            if ! grep -qxF "$prefix/$member" <<< "$members"; then echo "::error::$member is missing from $tool"; exit 1; fi
+          done
+          version=$(jq -r '.dependencies["net10.0"]["SQLitePCLRaw.lib.e_sqlite3"].resolved' src/PiSharp.Durable.Sqlite/packages.lock.json)
+          for asset in win-x64/native/e_sqlite3.dll linux-x64/native/libe_sqlite3.so linux-musl-x64/native/libe_sqlite3.so \
+            osx-arm64/native/libe_sqlite3.dylib; do
+            unzip -p "$tool" "$prefix/runtimes/$asset" | cmp - "$HOME/.nuget/packages/sqlitepclraw.lib.e_sqlite3/$version/runtimes/$asset"
+            echo "$asset: SQLitePCLRaw.lib.e_sqlite3 $version"
+          done
 
       - uses: actions/upload-artifact@v4
         with:

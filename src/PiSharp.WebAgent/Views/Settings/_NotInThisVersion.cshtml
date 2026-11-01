@@ -1,0 +1,11 @@
+@* Decision 0011 (run W2, WU9; W5 integration fix 1): a mockup section this version does not build, shown as a short note (what it would
+   hold, and where the nearest thing is set today) instead of controls that would do nothing. No planned milestone builds these, so the
+   note no longer promises one. Model: NotInThisVersion. *@
+@model NotInThisVersion
+<section class="settings-section not-in-version" id="@Model.Id" data-not-in-version>
+  <h3>@Model.Title</h3>
+  <div class="ps-panel p-3 d-flex gap-2 align-items-start fs-7 text-secondary">
+    <i class="bi bi-info-circle mt-1" aria-hidden="true"></i>
+    <div><span class="ps-chip" data-tone="outline">Not in this version</span> @Model.Text</div>
+  </div>
+</section>

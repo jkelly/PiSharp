@@ -1,0 +1,9 @@
+@* Decision 0011 (run W2, WU7): the composer's queue, the mockups' queue chips: messages sent while the agent runs, as a follow-up or a steer,
+   until the agent takes them. Each can be withdrawn. Text is encoded. *@
+@model IReadOnlyList<InboxItem>
+@foreach (var item in Model)
+{
+  var kind = item.Mode switch { "steer" => "steer", "write" => "update", _ => "follow-up" };
+  <span class="queue-chip" data-submission="@item.Id"><span class="queue-kind">@kind</span><span class="queue-text">@ChatDisplay.Cut(item.Content ?? "", 80)</span>@if (item.Mode != "write")
+    {<button class="btn btn-icon p-0" type="button" title="Remove" aria-label="Remove queued @kind" data-action="withdraw" data-submission="@item.Id"><i class="bi bi-x"></i></button>}</span>
+}

@@ -1,0 +1,71 @@
+@model DevicesPage
+@{
+    ViewData["Title"] = "Sources";
+    ViewData["Page"] = "sources";
+}
+<div class="dn-shell">
+  <partial name="~/Views/Shared/_Topbar.cshtml" model="Model.Devices" />
+  <main class="dn-content"><div class="page" data-automation="sources">
+    <div class="page-header"><div><h1>Sources</h1><p class="text-body-secondary">Feeds, GitHub releases and pages a device watches. A check fetches each source safely, keeps what changed as evidence, and can judge the changes under a policy. Failing sites cool down instead of being retried at once.</p></div><a href="/" class="btn btn-outline-secondary">Back to agents</a></div>
+    <div class="d-flex gap-2 align-items-end mb-3 flex-wrap">
+      <label class="form-label">Device<select class="form-select" data-device aria-label="Device">@foreach (var device in Model.Devices) { <option value="@device.Id">@device.Name</option> }</select></label>
+      <button type="button" class="btn btn-outline-secondary mb-2" data-refresh>Refresh</button>
+      <span class="text-body-secondary mb-2" role="status" data-loading></span>
+    </div>
+    <div class="alert alert-danger" role="alert" data-error hidden></div>
+    <div class="alert alert-secondary" role="status" data-unsupported hidden>This device does not offer source monitoring. Update its PiSharp Durable host to use this page.</div>
+    <div data-supported hidden>
+      <section aria-labelledby="sources-title" class="mb-4">
+        <h2 class="h5" id="sources-title">Watched sources</h2>
+        <div class="table-responsive"><table class="table align-middle"><thead><tr><th>Source</th><th>Status</th><th>Checked</th><th>Changed</th><th>Items</th><th>Next retry</th><th></th></tr></thead><tbody data-sources></tbody></table></div>
+        <p data-sources-empty class="text-body-secondary" hidden>No sources on this device yet. Add one below.</p>
+      </section>
+      <section aria-labelledby="source-detail-title" class="border-top pt-4 mb-4" data-source-detail aria-live="polite" hidden></section>
+      <section aria-labelledby="check-title" class="border-top pt-4 mb-4">
+        <h2 class="h5" id="check-title">Check now</h2>
+        <form data-check class="row g-3">
+          <div class="col-md-4"><label class="form-label" for="check-session">Session</label><select id="check-session" data-session class="form-select" required></select>
+            <div class="form-text">The check runs as a durable execution in this session.</div></div>
+          <div class="col-md-4"><label class="form-label" for="check-policy">Judge changes with</label><select id="check-policy" data-check-policy class="form-select"></select></div>
+          <div class="col-md-4"><label class="form-label" for="check-requests">Request budget</label><input id="check-requests" data-check-requests class="form-control" type="number" min="1" max="1000" placeholder="Device default" />
+            <div class="form-text">The most fetches and model calls this run may make.</div></div>
+          <fieldset class="col-12"><legend class="form-label">Sources</legend><div data-check-sources class="d-flex flex-wrap gap-3"></div>
+            <div class="form-text">None ticked checks every enabled source.</div></fieldset>
+          <div class="col-12 d-flex flex-wrap gap-3">
+            <div class="form-check"><input class="form-check-input" type="checkbox" id="check-force" data-check-force /><label class="form-check-label" for="check-force">Ignore cool-downs (a site's own Retry-After still applies)</label></div>
+            <div class="form-check"><input class="form-check-input" type="checkbox" id="check-reevaluate" data-check-reevaluate /><label class="form-check-label" for="check-reevaluate">Re-judge current items, not only changes</label></div>
+          </div>
+          <div class="col-12"><button class="btn btn-primary" type="submit">Start check</button> <span class="ms-2" role="status" data-checked></span></div>
+        </form>
+      </section>
+      <section aria-labelledby="edit-title" class="border-top pt-4 mb-4">
+        <h2 class="h5" id="edit-title" data-edit-title>Add a source</h2>
+        <form data-edit class="row g-3">
+          <div class="col-md-3"><label class="form-label" for="source-id">ID</label><input id="source-id" data-field="id" class="form-control" pattern="[a-z0-9][a-z0-9_\-]{0,39}" maxlength="40" required placeholder="dotnet-releases" /></div>
+          <div class="col-md-3"><label class="form-label" for="source-kind">Kind</label><select id="source-kind" data-field="kind" class="form-select">
+            <option value="feed">RSS or Atom feed</option><option value="github-releases">GitHub releases</option><option value="page">Web page</option></select></div>
+          <div class="col-md-6"><label class="form-label" for="source-title">Title</label><input id="source-title" data-field="title" class="form-control" maxlength="200" placeholder="Defaults to the ID" /></div>
+          <div class="col-md-6" data-for-kind="feed page"><label class="form-label" for="source-url">URL</label><input id="source-url" data-field="url" class="form-control" type="url" maxlength="2000" placeholder="https://example.com/feed.xml" /></div>
+          <div class="col-md-6" data-for-kind="github-releases" hidden><label class="form-label" for="source-repository">Repository</label><input id="source-repository" data-field="repository" class="form-control" maxlength="200" placeholder="owner/name" /></div>
+          <div class="col-md-2"><label class="form-label" for="source-max-items">Max items</label><input id="source-max-items" data-field="maxItems" class="form-control" type="number" min="1" max="500" placeholder="100" /></div>
+          <div class="col-md-2"><label class="form-label" for="source-max-pages">Max pages</label><input id="source-max-pages" data-field="maxPages" class="form-control" type="number" min="1" max="20" placeholder="1" /></div>
+          <div class="col-md-4"><label class="form-label" for="source-credential">Credential</label><input id="source-credential" data-field="credentialRef" class="form-control" maxlength="80" placeholder="A name configured on the device" />
+            <div class="form-text">The device holds the secret; the page never sees it.</div></div>
+          <div class="col-12 d-flex flex-wrap gap-3">
+            <div class="form-check"><input class="form-check-input" type="checkbox" id="source-enabled" data-field="enabled" checked /><label class="form-check-label" for="source-enabled">Enabled</label></div>
+            <div class="form-check" data-for-kind="github-releases" hidden><input class="form-check-input" type="checkbox" id="source-prereleases" data-field="includePrereleases" /><label class="form-check-label" for="source-prereleases">Include prereleases</label></div>
+            <div class="form-check"><input class="form-check-input" type="checkbox" id="source-fallback" data-field="allowFallback" /><label class="form-check-label" for="source-fallback">Allow fallback providers (never with a credential; they may cost money)</label></div>
+          </div>
+          <div class="col-12"><button class="btn btn-primary" type="submit" data-edit-submit>Add source</button>
+            <button class="btn btn-outline-secondary" type="button" data-edit-cancel hidden>Cancel editing</button> <span class="ms-2" role="status" data-saved></span></div>
+        </form>
+      </section>
+      <section aria-labelledby="health-title" class="border-top pt-4">
+        <h2 class="h5" id="health-title">Retrieval health</h2>
+        <div class="table-responsive"><table class="table table-sm align-middle"><thead><tr><th>Provider</th><th>Origin</th><th>Failures</th><th>Last failure</th><th>Cooling down until</th></tr></thead><tbody data-health></tbody></table></div>
+        <p data-health-empty class="text-body-secondary" hidden>Every site answered its last request.</p>
+      </section>
+    </div>
+  </div></main>
+</div>
+@section Scripts { <script type="module" src="/js/sources.js" asp-append-version="true"></script> }

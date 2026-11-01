@@ -62,6 +62,9 @@ public sealed class PersistentAgentSessionException : Exception
         _ => "Session coordinator operation failed."
     }, inner) => Fault = fault;
 }
+/// <summary>The session refused an operation because an owner operation holds its replacement reservation (a resource close, reload
+/// or switch); the owner can tell it from other refusals and join that operation (<see cref="ReplaceableAgentSession.AccessSessionAsync"/>).</summary>
+internal sealed class SessionReplacementInProgressException() : InvalidOperationException("Session replacement is in progress.");
 public sealed record PersistentAgentSessionSnapshot(AgentSnapshot Agent, SessionLogStoreSnapshot Log,
     SessionContextProjection Context, PersistentAgentSessionFault? Fault, bool IsDisposed, bool IsConfiguring = false)
 {
@@ -1569,8 +1572,11 @@ public sealed partial class PersistentAgentSession : IAsyncDisposable
         if (_admissionStopped) throw Error(PersistentAgentSessionFailure.Disposed);
         if (_fault is not null) throw Error(PersistentAgentSessionFailure.Faulted);
         if (_retired) throw Error(PersistentAgentSessionFailure.SessionReplaced);
-        if (_replacing) throw new InvalidOperationException("Session replacement is in progress.");
+        if (_replacing) throw new SessionReplacementInProgressException();
     }
+
+    /// <summary>Whether an owner operation holds this session's replacement reservation, which most operations refuse meanwhile.</summary>
+    internal bool ReservedForReplacement { get { lock (_gate) return _replacing && !_retired; } }
     private void ThrowConfigurationSelfWait()
     {
         ThrowRetrySelfWait();

@@ -142,6 +142,9 @@ public sealed record AgentChange
     public Patch<string>? Instructions { get; init; }
     /// <summary>Directory within the environment's file system, passed to <c>HarnessOptions.Env</c>.</summary>
     public Patch<string>? Cwd { get; init; }
+    /// <summary>PiSharp-only (decision 0007): the service tier of the conversation's requests (auto, normal, economy, priority, fast,
+    /// ultrafast). A child conversation starts with its owner's.</summary>
+    public Patch<string>? ServiceTier { get; init; }
 }
 
 /// <summary>A conversation's agent resolved against a registry snapshot and the settings (upstream <c>Agent</c>).</summary>
@@ -166,6 +169,8 @@ public sealed record Agent
     public string? Instructions { get; init; }
     /// <summary>The environment directory.</summary>
     public string? Cwd { get; init; }
+    /// <summary>PiSharp-only (decision 0007): the service tier; null when unset.</summary>
+    public string? ServiceTier { get; init; }
 }
 
 // ─── Tools ──────────────────────────────────────────────────────────────

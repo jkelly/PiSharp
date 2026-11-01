@@ -286,6 +286,8 @@ internal sealed partial class FooterComponent : IComponent
             var thinkingLevel = session.StateThinkingLevel is { Length: > 0 } level ? level : "off";
             rightSideWithoutProvider = thinkingLevel == "off" ? $"{modelName} • thinking off" : $"{modelName} • {thinkingLevel}";
         }
+        // PiSharp-only (decision 0007): the session's service tier, when one is set.
+        if (PiSharp.Cli.Pi.PiServiceTierSetting.Current() is { } tier) rightSideWithoutProvider += $" • {tier}";
         // A virtual model routes each request; show where the latest response went.
         if (session.RoutedModel is { } routed)
         {

@@ -1,0 +1,12 @@
+{
+  "source": {
+    "welcome": "Hello {name}!",
+    "cart": "{count} items in cart",
+    "bye": "Goodbye"
+  },
+  "target": {
+    "welcome": "Hola {name}!",
+    "cart": "{total} art\u00edculos",
+    "extra": "Sobra"
+  }
+}

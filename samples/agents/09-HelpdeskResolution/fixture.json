@@ -1,0 +1,28 @@
+{
+  "tickets": [
+    {
+      "id": "hd-901",
+      "product": "VPN",
+      "symptoms": [
+        "authentication failed"
+      ],
+      "description": "VPN authentication failed after password reset."
+    }
+  ],
+  "articles": [
+    {
+      "id": "kb-901",
+      "product": "VPN",
+      "keywords": [
+        "authentication",
+        "password"
+      ],
+      "steps": [
+        "Confirm the account is active.",
+        "Refresh saved VPN credentials.",
+        "Retry sign-in and record the result."
+      ],
+      "escalate_if": "Failure persists after credential refresh"
+    }
+  ]
+}

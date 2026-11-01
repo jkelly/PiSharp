@@ -1,0 +1,24 @@
+@* Decision 0011 (run W3, SU): the wizard's own layout. The mockups' setup.html is a full page without the sidebar or the app's top bar,
+   so it does not use _Layout; it renders the same head (the shared _AppHead partial, W3 fix: Web.Common's _WebCommonHead, the Appearance
+   script and styles, so the wizard honours this browser's theme, a System choice too, font size and motion before the first paint, then
+   site.css), the toast area and the same scripts (_AppScripts: Bootstrap, then site.js, which starts the shell: the theme toggle and the
+   toasts). Dark is the default. No inline script (the Content-Security-Policy has script-src 'self'). A page sets
+   ViewData["Title"] and may define the sections Styles, Modals and Scripts. *@
+@{
+    var title = ViewData["Title"] as string ?? "Setup";
+}
+<!doctype html>
+<html lang="en" data-bs-theme="dark">
+<head>
+  <partial name="_AppHead" model="title" />
+  @await RenderSectionAsync("Styles", required: false)
+</head>
+<body class="setup-body" data-page="setup">
+@RenderBody()
+@await RenderSectionAsync("Modals", required: false)
+<partial name="_Toasts" model="null" />
+
+<partial name="_AppScripts" model="null" />
+@await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>

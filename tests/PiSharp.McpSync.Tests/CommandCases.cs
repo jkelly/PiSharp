@@ -22,27 +22,27 @@ internal static partial class Program
         try
         {
             var global = Path.Combine(root, "agent", "mcp.json"); var project = Path.Combine(options.Cwd, ".pi", "mcp.json");
-            Equal((0, $"Added global MCP server \"docs\" in {global}.\nCheck it with: PiSharp.Cli mcp list\n", ""),
+            Equal((0, $"Added global MCP server \"docs\" in {global}.\nCheck it with: pisharp mcp list\n", ""),
                 await Mcp(options, "add", "docs", "--env", "TOKEN=${DOCS_TOKEN}", "--exposure", "direct", "--description", "Docs.", "--", "docs-server", "--port", "1"));
-            Equal((0, $"Added global MCP server \"remote\" in {global}.\nCheck it with: PiSharp.Cli mcp list\n", ""),
+            Equal((0, $"Added global MCP server \"remote\" in {global}.\nCheck it with: pisharp mcp list\n", ""),
                 await Mcp(options, "add", "remote", "--url", "https://remote.example.test/mcp", "--bearer-token-env-var", "REMOTE_TOKEN", "--header", "X-Team=a=b"));
-            Equal((0, $"Added global MCP server \"signin\" in {global}.\nCheck it with: PiSharp.Cli mcp list. If it requires sign-in: PiSharp.Cli mcp login signin\n", ""),
+            Equal((0, $"Added global MCP server \"signin\" in {global}.\nCheck it with: pisharp mcp list. If it requires sign-in: pisharp mcp login signin\n", ""),
                 await Mcp(options, "add", "signin", "--url", "https://signin.example.test/mcp", "--oauth-client-id", "client", "--oauth-callback-port", "8123"));
-            Equal((0, $"Replaced global MCP server \"docs\" in {global}.\nCheck it with: PiSharp.Cli mcp list\n", ""),
+            Equal((0, $"Replaced global MCP server \"docs\" in {global}.\nCheck it with: pisharp mcp list\n", ""),
                 await Mcp(options, "add", "docs", "docs-server", "--flag-of-the-server"));
             Equal("{\n    \"autoEnableCodemode\": false,\n    \"mcpServers\": {\n        \"docs\": {\n            \"command\": \"docs-server\",\n            \"args\": [\n                \"--flag-of-the-server\"\n            ]\n        },\n" +
                 "        \"remote\": {\n            \"url\": \"https://remote.example.test/mcp\",\n            \"headers\": {\n                \"X-Team\": \"a=b\",\n                \"Authorization\": \"Bearer ${REMOTE_TOKEN}\"\n            }\n        },\n" +
                 "        \"signin\": {\n            \"url\": \"https://signin.example.test/mcp\",\n            \"oauth\": {\n                \"clientId\": \"client\",\n                \"callbackPort\": 8123\n            }\n        }\n    }\n}\n",
                 File.ReadAllText(global).ReplaceLineEndings("\n"));
             // -l writes the project file, which is read only once the project is trusted.
-            Equal((0, $"Added project MCP server \"local\" in {project}.\nThe project is not trusted, so {project} is ignored until you start PiSharp.Cli in the project and trust it.\nCheck it with: PiSharp.Cli mcp list\n", ""),
+            Equal((0, $"Added project MCP server \"local\" in {project}.\nThe project is not trusted, so {project} is ignored until you start pisharp in the project and trust it.\nCheck it with: pisharp mcp list\n", ""),
                 await Mcp(options, "add", "local", "-l", "--", "local-server"));
-            Equal((0, $"Replaced project MCP server \"local\" in {project}.\nCheck it with: PiSharp.Cli mcp list\n", ""),
+            Equal((0, $"Replaced project MCP server \"local\" in {project}.\nCheck it with: pisharp mcp list\n", ""),
                 await Mcp(options with { IsProjectTrusted = cwd => cwd == options.Cwd }, "add", "local", "-l", "--", "local-server"));
             Equal("{\n  \"mcpServers\": {\n    \"local\": {\n      \"command\": \"local-server\"\n    }\n  }\n}\n", File.ReadAllText(project).ReplaceLineEndings("\n"));
 
-            const string Hint = "Use \"PiSharp.Cli mcp --help\" for usage.\n";
-            var usage = "Usage: PiSharp.Cli mcp add <server> [options] (--url <url> | -- <command> [args...])\n" + Hint;
+            const string Hint = "Use \"pisharp mcp --help\" for usage.\n";
+            var usage = "Usage: pisharp mcp add <server> [options] (--url <url> | -- <command> [args...])\n" + Hint;
             Equal((1, "", usage), await Mcp(options, "add", "x"));
             Equal((1, "", usage), await Mcp(options, "add", "x", "--url", "https://x.example.test/mcp", "--", "cmd"));
             Equal((1, "", "--env only applies to stdio servers.\n"), await Mcp(options, "add", "x", "--url", "https://x.example.test/mcp", "--env", "A=1"));
@@ -72,7 +72,7 @@ internal static partial class Program
             Equal((1, "", $"No project MCP server named \"docs\" in {project}. It is defined in {global}; omit --local.\n"), await Mcp(options, "remove", "docs", "-l"));
             Equal((1, "", $"No global MCP server named \"projected\" in {global}. It is defined in {project}; use --local.\n"), await Mcp(options, "remove", "projected"));
             Equal((0, $"Removed project MCP server \"projected\" from {project}.\n", ""), await Mcp(options, "remove", "projected", "--local"));
-            Equal((1, "", "Usage: PiSharp.Cli mcp remove <server> [-l]\nUse \"PiSharp.Cli mcp --help\" for usage.\n"), await Mcp(options, "remove"));
+            Equal((1, "", "Usage: pisharp mcp remove <server> [-l]\nUse \"pisharp mcp --help\" for usage.\n"), await Mcp(options, "remove"));
         }
         finally { Delete(root); }
     }
@@ -105,7 +105,7 @@ internal static partial class Program
             Equal(string.Join("\n",
                 "docs: connected, 1 tool (direct, global)", "  docs-server --port 1", "  tools: search [hidden]",
                 "broken: failed (codemode, global)", "  broken-server", "  spawn broken-server ENOENT", "  second line",
-                "signin: needs sign-in (codemode, global)", "  https://signin.example.test/mcp", "  sign in with: PiSharp.Cli mcp login signin",
+                "signin: needs sign-in (codemode, global)", "  https://signin.example.test/mcp", "  sign in with: pisharp mcp login signin",
                 "  MCP server \"signin\" requires sign-in. Run /mcp to sign in.",
                 "off: disabled (codemode, global)", "  off-server",
                 await ConfigError(global), ""), output);
@@ -130,7 +130,7 @@ internal static partial class Program
             Equal((0, "docs: connected, 1 tool (codemode, global)\n  docs-server\n  tools: search\n", ""), await Mcp(clean, "list"));
             var (_, empty) = CliFixture("{}");
             Equal((0, $"No MCP servers configured. Add them to {Path.Combine(empty.AgentDirectory, "mcp.json")} or .pi/mcp.json.\n", ""), await Mcp(empty, "list"));
-            Equal((1, "", "Usage: PiSharp.Cli mcp list [--json]\nUse \"PiSharp.Cli mcp --help\" for usage.\n"), await Mcp(options, "list", "extra"));
+            Equal((1, "", "Usage: pisharp mcp list [--json]\nUse \"pisharp mcp --help\" for usage.\n"), await Mcp(options, "list", "extra"));
         }
         finally { Delete(root); }
     }

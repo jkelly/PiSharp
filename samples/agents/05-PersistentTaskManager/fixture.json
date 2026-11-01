@@ -1,0 +1,15 @@
+{
+  "task": "List the durable task board, then inspect task-501 and report its status and whether it is persisted. Do not change any tasks.",
+  "tasks": [
+    {
+      "id": "task-501",
+      "title": "Review budget",
+      "status": "open"
+    },
+    {
+      "id": "task-502",
+      "title": "Publish notes",
+      "status": "done"
+    }
+  ]
+}

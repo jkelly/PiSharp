@@ -1,0 +1,26 @@
+@* Decision 0011 (run W3, SU): the wizard's Welcome step: what the app is, and where it runs and keeps its keys (the address the browser
+   reached it at and the real data folder). Model: SetupPage. *@
+@model SetupPage
+<section data-setup-step="welcome" hidden="@(Model.Step != SetupStep.Welcome)" aria-labelledby="setupWelcomeTitle">
+  <div class="ps-eyebrow mb-2">First-run setup · about 2 minutes</div>
+  <h1 class="ps-heading setup-hero mb-3" id="setupWelcomeTitle" tabindex="-1">The minimal agent harness, <em>native to .NET</em>, now in your browser.</h1>
+  <p class="text-secondary mb-4">PiSharp Web Agent puts the PiSharp agent, its @Model.BuiltinProviderCount built-in providers and its coding tools behind a local web UI. Connect a provider and pick a default model, and you're ready to go.</p>
+  <ul class="list-unstyled d-grid gap-3 mb-4">
+    <li class="d-flex gap-3">
+      <span class="provider-logo" aria-hidden="true"><i class="bi bi-chat-square-text"></i></span>
+      <div><div class="fw-semibold">Chat</div><div class="fs-7 text-secondary">Agent sessions with tools (read, bash, edit, write, grep, find, ls), steering, branching and compaction.</div></div>
+    </li>
+    <li class="d-flex gap-3">
+      <span class="provider-logo" aria-hidden="true"><i class="bi bi-sliders2"></i></span>
+      <div><div class="fw-semibold">Playground</div><div class="fs-7 text-secondary">Every request option in one place: thinking budgets, tool choice, caching, service tier, with the raw events and the cost.</div></div>
+    </li>
+    <li class="d-flex gap-3">
+      <span class="provider-logo" aria-hidden="true"><i class="bi bi-layout-three-columns"></i></span>
+      <div><div class="fw-semibold">Compare &amp; Tool Bench</div><div class="fs-7 text-secondary">Run one prompt across up to four models side by side, and test tool calling with mock results.</div></div>
+    </li>
+  </ul>
+  <div class="ps-panel p-3 d-flex gap-2 fs-7">
+    <i class="bi bi-house-lock text-ps-blue mt-1" aria-hidden="true"></i>
+    <div>Everything runs locally on <span class="ps-mono">@Model.Host</span>. Keys and tokens are encrypted with ASP.NET Data Protection in <span class="ps-mono text-break">@Model.DataDirectory</span> and are only sent to the provider they belong to.</div>
+  </div>
+</section>

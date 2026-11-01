@@ -17,7 +17,7 @@
     "already-ported": "PiSharp already has the behaviour; the evidence field cites the file and any tests the sync added.",
     "no-op": "Nothing to change in PiSharp; the evidence field says why.",
     "exclude": "Outside native scope per the linked decision; no port.",
-    "branch-port": "Ported on branch feature/pi-durable only (decision 0005), not on main; the row names the branch port map and work list that track it."
+    "branch-port": "Ported on branch feature/pi-durable (decision 0005) and released to main as experimental in 1.2.0.1; the row names the port map and work list that track it."
   },
   "notesMeaning": "A row's notes are the planning notes written before its port and describe the code as it was then; status, evidence and deferred record the outcome.",
   "areas": [
@@ -1247,7 +1247,7 @@
         "src/PiSharp.Codemode/Runtime/CodemodeWorkerProtocol.cs",
         "src/PiSharp.Codemode/CodemodeTypes.cs"
       ],
-      "release": "experimental (branch feature/pi-durable; not released)",
+      "release": "1.2.0.1 (experimental)",
       "test": [
         "tests/PiSharp.Codemode.Tests/DeterministicCases.cs",
         "tests/PiSharp.Codemode.Tests/Deterministic/deterministic-goldens.json"
@@ -1576,7 +1576,7 @@
         "src/PiSharp.Durable.Tools",
         "src/PiSharp.Cli/Durable"
       ],
-      "release": "experimental (branch feature/pi-durable; not released)",
+      "release": "1.2.0.1 (experimental)",
       "test": [
         "tests/PiSharp.Durable.Tests",
         "tests/PiSharp.DurableCli.Tests"

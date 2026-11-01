@@ -17,6 +17,7 @@ using PiSharp.AI.Providers;
 using PiSharp.Contracts;
 using PiSharp.Contracts.ModelOperations;
 using PiSharp.Durable.Chord;
+using PiSharp.Durable.Internal.PiAi;
 
 namespace PiSharp.Durable;
 
@@ -87,8 +88,8 @@ public sealed record NativeDurableModelsOptions
 /// with <c>error</c> "Request timed out."). <c>MaxRetries</c> and <c>MaxRetryDelayMs</c> reach google-generative-ai only; the other
 /// native transports make one attempt, so durable generation retries own retrying. Unsupported: <c>Transport</c> (only openai-codex
 /// reads it upstream), other <c>Metadata</c> fields (no upstream provider reads them) and <c>Deferred</c> (no pi-ai 1.2.0 provider
-/// implements deferred responses; the request runs in the foreground, as upstream providers without deferred support do). Not mapped:
-/// pi-ai <c>clampMaxTokensToContext</c> (the cap is not reduced to the context room the transcript leaves).</para>
+/// implements deferred responses; the request runs in the foreground, as upstream providers without deferred support do). The output cap
+/// is reduced to the estimated remaining context, reserving 4096 tokens as pi-ai <c>clampMaxTokensToContext</c> does.</para>
 /// </remarks>
 public sealed class NativeDurableModels : IDurableModels, IDisposable
 {
@@ -336,7 +337,7 @@ public sealed class NativeDurableModels : IDurableModels, IDisposable
         {
             var levels = routed is IThinkingLevelTransport capability ? capability.GetSupportedThinkingLevels(model.Descriptor) : ["off"];
             var hosted = ThinkingLevels.Clamp(levels, options?.Reasoning ?? "off");
-            return new(routed, null, new ChatRequest(model.Descriptor, Transcript(messages), timestamp) { ThinkingLevel = hosted, SessionId = options?.SessionId });
+            return new(routed, null, new ChatRequest(model.Descriptor, Transcript(messages), timestamp) { ThinkingLevel = hosted, SessionId = options?.SessionId, ServiceTier = options?.ServiceTier });
         }
         if (!providers.ContainsKey(model.Provider)) throw new InvalidOperationException($"Unknown provider: {model.Provider}");
         var metadata = Metadata(model);
@@ -351,18 +352,22 @@ public sealed class NativeDurableModels : IDurableModels, IDisposable
         var maximum = options?.MaxTokens is { } requested && double.IsFinite(requested) && requested >= 1
             ? (int)Math.Min(Math.Floor(requested), int.MaxValue)
             : raw.TryGetProperty("maxTokens", out var cap) && cap.TryGetDouble(out var modelCap) && modelCap >= 1 ? (int)Math.Min(modelCap, int.MaxValue) : 4096;
+        var contextWindow = raw.TryGetProperty("contextWindow", out var window) && window.TryGetDouble(out var size) ? size : model.ContextWindow;
+        var available = contextWindow > 0 ? Math.Max(1, contextWindow - PiAiEstimate.EstimateContextTokens(messages) - 4096) : int.MaxValue;
+        int Clamp(int value) => (int)Math.Min(value, Math.Floor(available));
+        maximum = Clamp(maximum);
         var settings = Settings(options, maximum);
         var provider = NativeModelRoutes.Bind(descriptor, metadata, key, settings, handler);
         try
         {
             var level = ThinkingLevels.Clamp(provider.GetSupportedThinkingLevels(descriptor), options?.Reasoning ?? "off");
-            var thinkingCap = NativeModelRoutes.ThinkingCap(raw, model.Api, level, maximum);
+            var thinkingCap = Clamp(NativeModelRoutes.ThinkingCap(raw, model.Api, level, maximum));
             if (thinkingCap != maximum)
             {
                 provider.Dispose();
                 provider = NativeModelRoutes.Bind(descriptor, metadata, key, settings with { MaxTokens = thinkingCap }, handler);
             }
-            var request = new ChatRequest(descriptor, transcript, timestamp) { ThinkingLevel = level, SessionId = options?.SessionId };
+            var request = new ChatRequest(descriptor, transcript, timestamp) { ThinkingLevel = level, SessionId = options?.SessionId, ServiceTier = options?.ServiceTier };
             return new(provider.Transport, provider, request);
         }
         catch

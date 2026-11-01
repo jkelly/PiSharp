@@ -1,0 +1,27 @@
+@* Decision 0011 (run W2, WU4): the mockups' "_Layout: sidebar" (Views/Shared/_Sidebar.cshtml): the brand, New chat · Playground · Compare ·
+   Tool Bench · History · Evals · Presets (ShellNav.Primary), the recent chats (_RecentChats) and Settings at the bottom. Below 768px it is
+   Bootstrap's off-canvas drawer, opened from the top bar. The active item is ViewData[ShellViewData.Nav]. *@
+@{
+    var nav = ViewData[ShellViewData.Nav] as string;
+    var settings = ShellNav.SettingsLink;
+}
+<aside class="app-sidebar offcanvas-md offcanvas-start" tabindex="-1" id="appSidebar" aria-label="Main navigation">
+  <div class="app-brand">
+    <a href="/" aria-label="PiSharp Web Agent home">
+      <img src="@WebCommonAssets.Mark" alt="" width="24" height="20">
+      <span class="app-brand-name">PiSharp</span>
+    </a>
+    <button type="button" class="btn-close d-md-none ms-auto" data-bs-dismiss="offcanvas" data-bs-target="#appSidebar" aria-label="Close navigation"></button>
+  </div>
+  <nav class="app-nav" aria-label="Primary">
+    @foreach (var item in ShellNav.Primary)
+    {
+      var active = item.Id == nav;
+      <a class="nav-link@(active ? " active" : "")" aria-current="@(active ? "page" : null)" href="@item.Href" data-nav="@item.Id"><i class="bi @item.Icon"></i><span>@item.Label</span></a>
+    }
+  </nav>
+  <partial name="_RecentChats" model="null" />
+  <div class="app-sidebar-footer">
+    <a class="nav-link@(nav == settings.Id ? " active" : "")" aria-current="@(nav == settings.Id ? "page" : null)" href="@settings.Href" data-nav="@settings.Id"><i class="bi @settings.Icon"></i><span>@settings.Label</span></a>
+  </div>
+</aside>

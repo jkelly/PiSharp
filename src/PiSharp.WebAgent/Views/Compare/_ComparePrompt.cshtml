@@ -1,0 +1,85 @@
+@* Decision 0011 (run W4, R2): the mockups' _ComparePrompt (request mode): "Shared prompt", the collapsible shared system prompt, Load preset
+   and Save as preset ([data-preset-load] and [data-preset-save], which the Presets unit's presets-host.js wires), the
+   prompt, the Request · Agent switch (_CompareModeSwitch), the shared options (thinking, maxTokens, temperature: inline from sm up, a
+   Settings dropdown below; each column clamps or leaves out what its model does not take, and says so), View options (Sync scroll), Stop
+   all (Esc), Run all (Ctrl+Enter) and the estimate by Run all (_RunEstimate: the Spend Guard's preflight of every column; the over-cap chip
+   when a column would be asked about or blocked). The over-cap banner shows when the Spend Guard refused the group's reservation, so
+   nothing ran; Review opens modal-spend-confirm again. W5 E5 adds the Blind switch (see Views/Compare/Arena.cshtml). Model: ComparePage. *@
+@model ComparePage
+@{
+    var draft = Model.Draft;
+    var running = Model.Running;
+    var preview = draft.SystemPrompt is { Length: > 0 } system ? "· " + (system.Length > 70 ? system[..70] + "…" : system) : "· none";
+}
+<section class="compare-prompt" aria-label="Shared prompt" data-compare-prompt>
+  <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+    <span class="ps-label">Shared prompt</span>
+    <button class="btn btn-sm btn-ghost py-0 px-1 d-inline-flex align-items-center gap-1 fs-8 cmp-system-toggle" type="button" data-bs-toggle="collapse" data-bs-target="#cmpSystem" aria-expanded="@(draft.SystemPrompt is null ? "false" : "true")" aria-controls="cmpSystem">
+      <i class="bi bi-chevron-right"></i><span>System prompt</span><span class="text-ps-faint text-truncate d-none d-md-inline cmp-system-preview" data-system-preview>@preview</span>
+    </button>
+    <div class="ms-auto d-flex gap-1">
+      <button class="btn btn-sm btn-outline-secondary" type="button" title="Load preset" aria-label="Load preset" data-preset-load><i class="bi bi-folder2-open"></i><span class="d-none d-sm-inline ms-1">Load preset</span></button>
+      <button class="btn btn-sm btn-outline-secondary" type="button" title="Save as preset (Ctrl+S)" aria-label="Save as preset" data-preset-save><i class="bi bi-bookmark-plus"></i><span class="d-none d-sm-inline ms-1">Save as preset</span></button>
+    </div>
+  </div>
+  <div class="collapse@(draft.SystemPrompt is null ? "" : " show")" id="cmpSystem">
+    <label class="visually-hidden" for="cmpSystemText">Shared system prompt</label>
+    <textarea class="form-control form-control-sm mb-2" id="cmpSystemText" rows="2" placeholder="Optional. Sent to every model before the prompt." data-compare-system>@draft.SystemPrompt</textarea>
+  </div>
+  <label class="visually-hidden" for="cmpPrompt">User prompt</label>
+  <textarea class="form-control mb-2" id="cmpPrompt" rows="2" placeholder="Ask every model the same thing…" data-compare-text>@draft.Prompt</textarea>
+
+  <div class="d-flex flex-wrap align-items-center gap-2">
+    <partial name="_CompareModeSwitch" model="Model" />
+    <div class="dropdown cmp-settings">
+      <button class="btn btn-sm btn-outline-secondary dropdown-toggle d-sm-none" type="button" data-bs-toggle="dropdown" data-bs-display="static" data-bs-auto-close="outside" aria-expanded="false">Settings</button>
+      <div class="dropdown-menu cmp-settings-menu" data-compare-shared>
+        <div class="input-group input-group-sm w-auto">
+          <label class="input-group-text ps-mono" for="cmpThinking">thinking</label>
+          <select class="form-select ps-mono" id="cmpThinking" data-shared="thinking">
+            @foreach (var level in Model.ThinkingLevels)
+            {
+              <option value="@level" selected="@(level == (draft.Thinking ?? "off"))">@level</option>
+            }
+          </select>
+        </div>
+        <div class="input-group input-group-sm w-auto">
+          <label class="input-group-text ps-mono" for="cmpMaxTokens">maxTokens</label>
+          <input class="form-control ps-mono cmp-num-wide" id="cmpMaxTokens" type="number" min="1" step="512" placeholder="not set" value="@draft.MaxTokens" data-shared="maxTokens" title="Not set: each column reserves its model's own output cap">
+        </div>
+        <div class="input-group input-group-sm w-auto">
+          <label class="input-group-text ps-mono" for="cmpTemp">temperature</label>
+          <input class="form-control ps-mono cmp-num" id="cmpTemp" type="number" min="0" max="2" step="0.1" placeholder="—" value="@draft.Temperature?.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)" data-shared="temperature">
+          <span class="input-group-text" tabindex="0" data-bs-toggle="tooltip" title="Not sent to models that reject it (reasoning models, some while they think). Each column shows when that applies."><i class="bi bi-info-circle"></i></span>
+        </div>
+      </div>
+    </div>
+    <span class="fs-8 ps-mono text-ps-faint d-none d-xxl-inline">Levels are clamped per model</span>
+    <div class="ms-auto d-flex flex-wrap align-items-center gap-2">
+      @* W5 E5: the Blind switch. On, Run all starts a blind round (POST /api/evals/arena) and opens it; overrides are locked. *@
+      <div class="form-check form-switch mb-0" title="Blind: the server shuffles the models into A, B and C and hides names, logos, metrics and cost until you vote">
+        <input class="form-check-input" type="checkbox" role="switch" id="cmpBlind" aria-describedby="cmpBlindHelp" data-arena-blind="request" disabled="@running">
+        <label class="form-check-label fs-7" for="cmpBlind">Blind</label>
+        <span class="visually-hidden" id="cmpBlindHelp">Shuffles the models into columns A, B and C and hides names, logos, metrics and cost until you vote. Overrides are locked, so every answer uses the shared settings.</span>
+      </div>
+      <div class="dropdown">
+        <button class="btn btn-icon" type="button" data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false" title="View options" aria-label="View options"><i class="bi bi-three-dots"></i></button>
+        <div class="dropdown-menu dropdown-menu-end px-3 py-2">
+          <div class="form-check form-switch mb-0">
+            <input class="form-check-input" type="checkbox" role="switch" id="cmpSync" checked data-sync-scroll>
+            <label class="form-check-label fs-7 text-nowrap" for="cmpSync">Sync scroll</label>
+          </div>
+        </div>
+      </div>
+      <button class="btn btn-sm btn-outline-danger" type="button" title="Stop all (Esc)" data-stop-all hidden="@(!running)"><i class="bi bi-stop-fill me-1"></i>Stop all</button>
+      <button class="btn btn-sm btn-primary btn-ps" type="button" title="@(Model.Message is { } why ? "Run all (Ctrl+Enter) · " + why : "Run all (Ctrl+Enter)")" data-run-all disabled="@running"><i class="bi bi-play-fill me-1"></i>Run all</button>
+      <span class="d-inline-flex align-items-center gap-1" data-estimate-host><partial name="~/Views/Playground/_RunEstimate.cshtml" model="Model.Estimate" /></span>
+    </div>
+  </div>
+
+  <div class="app-banner info mx-0 mt-2 mb-0" role="status" data-overcap hidden>
+    <span class="ps-chip" data-tone="warn">Over a cap</span>
+    <span class="fs-7 cmp-banner-text" data-overcap-text></span>
+    <button class="btn btn-sm btn-primary" type="button" data-overcap-review>Review</button>
+  </div>
+</section>

@@ -1,0 +1,40 @@
+@* Decision 0011 (run W4, R1): the mockups' _PlaygroundToolbar: the model chip (opens #modal-model-picker, Ctrl+K), Run (Ctrl+Enter) and the
+   disabled "Running" spinner while a run streams, the estimate by Run (_RunEstimate), Stop (Esc; cancels the run through
+   POST /api/runs/{id}/cancel), Save preset and Load preset ([data-preset-save] and [data-preset-load], which the Presets unit's presets-host.js
+   wires), View code, Open in inspector (the last run), the Reset menu and the status line. Its state follows the output
+   pane's (data-state: empty, streaming, completed, stopped, error). Model: PlaygroundPage. *@
+@model PlaygroundPage
+@{
+    var output = Model.Output;
+    var state = output.State;
+    var streaming = state == "streaming";
+    var tone = state switch { "streaming" => "text-ps-blue", "error" => "text-ps-danger", _ => "text-ps-faint" };
+}
+<div class="pg-toolbar" data-playground-toolbar data-state="@state">
+  <button class="model-chip" type="button" data-bs-toggle="modal" data-bs-target="#modal-model-picker" title="Change model (Ctrl+K)" data-model-chip>
+    <span class="status-dot @(Model.Known ? "ok" : "warn")" data-chip-dot></span>
+    <span class="model-chip-provider" data-chip-provider>@Model.Config.Draft.Provider</span>
+    <span class="model-chip-name" data-chip-name>@Model.ModelName</span>
+    <i class="bi bi-chevron-down"></i>
+  </button>
+  <button class="btn btn-sm btn-primary btn-ps" type="button" title="Run (Ctrl+Enter)" data-run hidden="@streaming" disabled="@(!Model.Known)"><i class="bi bi-play-fill me-1"></i>Run<kbd class="ps-kbd ms-2 d-none d-xl-inline">Ctrl ↵</kbd></button>
+  <button class="btn btn-sm btn-primary btn-ps" type="button" disabled data-running hidden="@(!streaming)"><span class="spinner-border spinner-border-sm me-1 pg-spinner" aria-hidden="true"></span>Running</button>
+  <span class="d-inline-flex align-items-center gap-1" data-estimate-host><partial name="_RunEstimate" model="Model.Estimate" /></span>
+  <button class="btn btn-sm @(streaming ? "btn-outline-danger" : "btn-outline-secondary")" type="button" title="Stop (Esc)" data-stop disabled="@(!streaming)"><i class="bi bi-stop-fill me-1"></i>Stop</button>
+  <span class="vr d-none d-md-block mx-1"></span>
+  <button class="btn btn-sm btn-outline-secondary" type="button" title="Save preset (Ctrl+S)" aria-label="Save preset" data-preset-save><i class="bi bi-bookmark-plus"></i><span class="d-none d-lg-inline ms-1">Save preset</span></button>
+  <button class="btn btn-sm btn-outline-secondary" type="button" title="Load preset" aria-label="Load preset" data-preset-load><i class="bi bi-folder2-open"></i><span class="d-none d-lg-inline ms-1">Load preset</span></button>
+  <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="modal" data-bs-target="#modal-view-code" title="View code (C#, cURL, JSON)" aria-label="View code" data-view-code><i class="bi bi-code-slash"></i><span class="d-none d-lg-inline ms-1">View code</span></button>
+  <a class="btn btn-sm btn-outline-secondary@(output.InspectorUrl is null ? " disabled" : "")" href="@(output.InspectorUrl ?? "#")" aria-disabled="@(output.InspectorUrl is null ? "true" : null)" title="Open the last run in the inspector" aria-label="Open in inspector" data-open-inspector><i class="bi bi-braces"></i><span class="d-none d-lg-inline ms-1">Open in inspector</span></a>
+  <div class="dropdown">
+    <button class="btn btn-sm btn-ghost" type="button" data-bs-toggle="dropdown" aria-expanded="false" title="Reset" aria-label="Reset"><i class="bi bi-arrow-counterclockwise"></i><span class="d-none d-lg-inline ms-1">Reset</span></button>
+    <ul class="dropdown-menu">
+      <li><button class="dropdown-item" type="button" data-reset="parameters"><i class="bi bi-sliders me-2"></i>Reset parameters to defaults</button></li>
+      <li><button class="dropdown-item" type="button" data-reset="messages"><i class="bi bi-chat-left me-2"></i>Clear messages (keep system)</button></li>
+      <li><button class="dropdown-item" type="button" data-reset="output"><i class="bi bi-eraser me-2"></i>Clear output</button></li>
+      <li><hr class="dropdown-divider"></li>
+      <li><button class="dropdown-item text-danger" type="button" data-reset="everything"><i class="bi bi-arrow-counterclockwise me-2"></i>Reset everything</button></li>
+    </ul>
+  </div>
+  <span class="ms-auto fs-8 ps-mono d-none d-xl-inline @tone" role="status" data-run-status>@if (streaming){<span class="status-dot live me-1"></span>}<span data-run-status-text>@output.StatusLine</span></span>
+</div>

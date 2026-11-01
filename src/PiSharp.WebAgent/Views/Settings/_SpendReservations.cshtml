@@ -1,0 +1,87 @@
+@* Decision 0011 (run W3, S4): the mockups' _SpendReservations: the default reservation output cap (spend.reservationOutputTokens), the
+   warning threshold (spend.warnPercent), the uncertain reservations still counted (with Review, which opens History › Spend on them), and how
+   the worst case is worked out, with a real example from a connected metered model's catalog price (none when no metered model with a
+   price is connected) and which caps it fits. Model: SpendSettingsPage. *@
+@using System.Globalization
+@using PiSharp.WebAgent.Spend
+@model SpendSettingsPage
+@{
+    var settings = Model.Settings;
+    var latest = Model.LatestUncertain;
+    var review = "/history/spend?status=uncertain" + (Model.UncertainCount == 1 && latest is not null && latest.Blind is null ? "&resolve=" + Uri.EscapeDataString(latest.Op) : "");
+}
+<section class="settings-section" id="reservations">
+  <h3>Reservations</h3>
+  <p class="section-desc">The worst case is held against every matching cap while a request runs. It settles to the actual cost when usage arrives, or is released if the request fails before any output.</p>
+  <div class="ps-card">
+    <div class="setting-row" data-setting-row="reservationOutputTokens">
+      <div>
+        <div class="setting-label d-flex align-items-center gap-2 flex-wrap"><label for="reserveOutput">Default reservation output cap</label> <span class="ps-chip" data-tone="warn" data-modified-chip hidden>modified</span></div>
+        <div class="setting-desc">Requests that don't set max output tokens reserve this many instead of the model's maximum, so normal use isn't blocked near a cap.</div>
+        <div class="setting-key">spend.reservationOutputTokens · default @SpendSettings.DefaultReservationOutputTokens</div>
+      </div>
+      <div class="setting-control">
+        <div class="input-group input-group-sm" style="width:11rem">
+          <input class="form-control ps-mono" id="reserveOutput" type="number" min="1" max="@SpendSettings.MaxReservationOutputTokens" step="1024" required
+                 value="@settings.ReservationOutputTokens.ToString(CultureInfo.InvariantCulture)" data-spend-field="reservationOutputTokens" data-initial="@settings.ReservationOutputTokens.ToString(CultureInfo.InvariantCulture)">
+          <span class="input-group-text">tokens</span>
+        </div>
+      </div>
+    </div>
+    <div class="setting-row" data-setting-row="warnPercent">
+      <div>
+        <div class="setting-label d-flex align-items-center gap-2 flex-wrap"><label for="warnPercent">Warning threshold</label> <span class="ps-chip" data-tone="warn" data-modified-chip hidden>modified</span></div>
+        <div class="setting-desc">A cap turns amber at this share of its limit.</div>
+        <div class="setting-key">spend.warnPercent · default @SpendSettings.DefaultWarnPercent</div>
+      </div>
+      <div class="setting-control">
+        <div class="input-group input-group-sm" style="width:7rem">
+          <input class="form-control ps-mono" id="warnPercent" type="number" min="1" max="100" required value="@settings.WarnPercent.ToString(CultureInfo.InvariantCulture)"
+                 data-spend-field="warnPercent" data-initial="@settings.WarnPercent.ToString(CultureInfo.InvariantCulture)">
+          <span class="input-group-text">%</span>
+        </div>
+      </div>
+    </div>
+    <div class="setting-row">
+      <div>
+        <div class="setting-label">Uncertain reservations</div>
+        <div class="setting-desc">If a stream drops without reporting usage, its reservation stays counted until you resolve it in the ledger. It is never settled automatically.</div>
+        @if (latest is { Blind: not null })
+        {
+          <div class="fs-8 text-ps-faint mt-1" data-uncertain-latest>@latest.SourceLabel · resolve it after you vote</div>
+        }
+        else if (latest is not null)
+        {
+          <div class="fs-8 text-ps-faint mt-1" data-uncertain-latest><span class="ps-mono">@latest.Row.Provider/@latest.Row.Model</span> · @latest.SourceLabel.ToLowerInvariant() · reserved @SpendMoney.Format(latest.Row.ReservedMicros ?? 0) · @(latest.Row.Reason ?? "no usage reported")</div>
+        }
+      </div>
+      <div class="setting-control">
+        @if (Model.UncertainCount > 0)
+        {
+          <span class="ps-chip" data-tone="warn" data-uncertain-count>@Model.UncertainCount uncertain · @SpendMoney.Format(Model.UncertainMicros)</span>
+          <a class="btn btn-sm btn-outline-secondary" href="@review">Review</a>
+        }
+        else
+        {
+          <span class="ps-chip" data-tone="ok" data-uncertain-count>None</span>
+        }
+      </div>
+    </div>
+  </div>
+  <details class="mt-2">
+    <summary class="fs-7 text-secondary">How the worst case is worked out</summary>
+    <div class="ps-panel p-3 mt-2">
+      <div class="fs-7 mb-2">Input tokens × input price + max output tokens × output price. Input is estimated from the request size (UTF-8 bytes ÷ 3, plus 10%), using the higher price near a tier boundary.</div>
+      @if (Model.Example is { } example)
+      {
+        <div class="ps-label mb-1">Example · <span class="ps-mono">@example.Model</span>, @SpendPages.ExampleInputTokens.ToString("#,0", CultureInfo.InvariantCulture) input tokens</div>
+        <div class="ps-mono fs-8 text-break" data-worst-case-example>@example.Formula</div>
+        <div class="fs-8 text-ps-faint mt-1">@(example.Fit is null ? "" : example.Fit + " ")Through a subscription the same request reserves nothing; its cost is shown only as ≈ list.</div>
+      }
+      else
+      {
+        <div class="fs-8 text-ps-faint">No metered model with a known price is connected, so there is no example yet. Through a subscription a request reserves nothing; its cost is shown only as ≈ list.</div>
+      }
+    </div>
+  </details>
+</section>

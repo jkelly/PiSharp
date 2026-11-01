@@ -1,0 +1,61 @@
+@model PendingModel
+@{
+    var count = Model.Calls.Count + Model.Approvals.Count;
+}
+@if (count > 0)
+{
+  <div class="pending-panel" role="region" aria-label="Waiting for you">
+    <div class="pending-head"><span class="status-dot waiting"></span>Waiting for you<span class="ps-chip">@count</span><span class="ms-auto fs-8 text-ps-faint fw-normal d-none d-sm-inline">Saved on @Model.DeviceName. Answer any time, even after a restart.</span></div>
+    @foreach (var call in Model.Calls)
+    {
+      if (call.IsPlan)
+      {
+        <form class="pending-body" data-pending="plan" data-task="@call.TaskId">
+          <div class="fs-8 text-ps-faint mb-1">@Model.AgentName submitted a plan with <code>exit_plan_mode</code></div>
+          @if (Display.Str(call.Details, "planFile") is { } file)
+          {
+            <div class="fs-7 mb-1"><span class="ps-mono">@file</span></div>
+          }
+          @if (Display.Str(call.Details, "plan") is { } plan)
+          {
+            <div class="ps-term mb-2"><pre class="wrap plan-text">@plan</pre></div>
+          }
+          <label class="form-label fs-7" for="plan-feedback-@call.TaskId">Feedback if you reject it <span class="text-ps-faint">(optional)</span></label>
+          <textarea class="form-control form-control-sm" id="plan-feedback-@call.TaskId" rows="2" name="feedback"></textarea>
+          <div class="d-flex gap-2 justify-content-end mt-2"><button class="btn btn-sm btn-outline-secondary" type="button" data-action="review-plan" data-approved="false">Reject</button><button class="btn btn-sm btn-primary" type="button" data-action="review-plan" data-approved="true">Approve plan</button></div>
+        </form>
+      }
+      else
+      {
+        var questions = Display.Objects(call.Details, "questions").ToList();
+        <form class="pending-body" data-pending="questions" data-task="@call.TaskId">
+          <div class="fs-8 text-ps-faint mb-1">@Model.AgentName asks with <code>ask_user_question</code></div>
+          @for (var q = 0; q < questions.Count; q++)
+          {
+            var question = questions[q];
+            var multi = Display.Bool(question, "multiSelect");
+            var options = Display.Objects(question, "options").ToList();
+            <fieldset class="mb-2" data-question="@q">
+              <legend class="q-text">@Display.Str(question, "question")</legend>
+              @for (var o = 0; o < options.Count; o++)
+              {
+                var id = $"q-{call.TaskId}-{q}-{o}";
+                <input type="@(multi ? "checkbox" : "radio")" class="btn-check" name="q-@call.TaskId-@q" id="@id" value="@Display.Str(options[o], "label")" checked="@(!multi && o == 0)">
+                <label class="choice-card" for="@id"><span class="choice-title">@Display.Str(options[o], "label")</span><span class="choice-desc d-block">@Display.Str(options[o], "description")</span></label>
+              }
+              @{ var other = $"q-{call.TaskId}-{q}-other"; }
+              <input type="@(multi ? "checkbox" : "radio")" class="btn-check" name="q-@call.TaskId-@q" id="@other" value="" data-other>
+              <label class="choice-card" for="@other"><span class="choice-title">Other</span><input class="form-control form-control-sm mt-1" placeholder="Type your answer" aria-label="Other answer" data-other-text></label>
+            </fieldset>
+          }
+          <div class="d-flex gap-2 justify-content-end mt-2"><button class="btn btn-sm btn-ghost" type="button" data-action="decline-questions">Decline</button><button class="btn btn-sm btn-primary" type="button" data-action="answer-questions">Submit answer</button></div>
+        </form>
+      }
+    }
+    @foreach (var run in Model.Approvals)
+    {
+      var task = Display.Long(run, "id");
+      <div class="pending-row"><i class="bi bi-shield-check text-secondary"></i><span class="pr-text"><strong>@Display.Str(run, "title") #@(Display.Long(run, "run") ?? 1)</strong> waits for your approval.</span><a class="btn btn-sm btn-ghost" href="#job-@task" data-scroll-to="#job-@task">Show</a><button class="btn btn-sm btn-outline-secondary" type="button" data-action="approve-job" data-task="@task" data-approved="false">Decline</button><button class="btn btn-sm btn-primary" type="button" data-action="approve-job" data-task="@task" data-approved="true">Approve</button></div>
+    }
+  </div>
+}

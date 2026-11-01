@@ -1,0 +1,42 @@
+@* Decision 0011 (run W4, unit R9): the import review of Settings › Data & storage (#modal-data-import). After a settings file is chosen,
+   data.js asks POST /api/data/import/preview what it would change and lists it here: each item (a settings section, a custom provider, a
+   built-in provider's overrides, a preset) with a checkbox and every changed key with this machine's value and the file's, an item that
+   can't be imported with why (unchecked and disabled), and what the file leaves out. Nothing is saved until Import; then only the checked
+   items are imported (POST /api/data/import). Everything is set as text, never HTML. Model: none. *@
+<div class="modal fade" id="modal-data-import" tabindex="-1" aria-labelledby="modal-data-import-title" aria-hidden="true" data-data-import>
+  <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <div style="min-width:0">
+          <h2 class="modal-title" id="modal-data-import-title">Import settings</h2>
+          <div class="fs-8 text-ps-faint ps-mono text-break" data-import-source></div>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <p class="fs-7 text-secondary mb-3" data-import-summary></p>
+        <div class="d-grid gap-2" data-import-items></div>
+        <ul class="fs-8 text-ps-faint mt-3 mb-0 ps-3" data-import-notes hidden></ul>
+        <template data-import-item-template>
+          <div class="ps-card p-3" data-import-item>
+            <div class="form-check mb-1">
+              <input class="form-check-input" type="checkbox" data-import-check>
+              <label class="form-check-label fw-semibold fs-7" data-import-title></label>
+            </div>
+            <div class="fs-8 text-ps-warn mb-1" data-import-problem hidden></div>
+            <div class="table-responsive">
+              <table class="table table-sm fs-8 mb-0 align-top">
+                <thead><tr><th scope="col">Setting</th><th scope="col">This machine</th><th scope="col">The file</th></tr></thead>
+                <tbody data-import-changes></tbody>
+              </table>
+            </div>
+          </div>
+        </template>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-primary" data-import-apply disabled>Import</button>
+      </div>
+    </div>
+  </div>
+</div>

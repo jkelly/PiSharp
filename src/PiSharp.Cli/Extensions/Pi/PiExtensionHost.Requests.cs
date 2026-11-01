@@ -473,7 +473,9 @@ internal sealed partial class PiExtensionHost
                 .Select(tool => (Name: tool["name"]!.GetValue<string>(), Extension: extension, Tool: tool)))
             .GroupBy(item => item.Name, StringComparer.Ordinal).ToDictionary(group => group.Key, group => group.First(), StringComparer.Ordinal);
         if (attached is null) return tools;
-        foreach (var registered in attached.Session.CaptureToolCatalogRegistry().RegisteredTools)
+        // Read, not captured: while a server closes (or a reload runs) the session still lists its tools, as the original's registry
+        // does. Waiting for the close instead could wait for a reload that awaits this extension.
+        foreach (var registered in attached.Session.ReadToolCatalogRegistry().RegisteredTools)
         {
             var declaration = registered.Declaration.Value;
             var name = declaration.GetProperty("name").GetString()!;
@@ -520,7 +522,8 @@ internal sealed partial class PiExtensionHost
     /// the tools a call reaches. A tool that no longer declares it reaches every tool.</summary>
     private JsonNode? ToolReachOf(string name, JsonElement input)
     {
-        var tool = Attached?.Session.CaptureToolCatalogRegistry().RegisteredTools.FirstOrDefault(item => item.Adapter.Name == name && item.ReachesTools is not null);
+        // Read like getAllTools: a server closing meanwhile does not refuse it.
+        var tool = Attached?.Session.ReadToolCatalogRegistry().RegisteredTools.FirstOrDefault(item => item.Adapter.Name == name && item.ReachesTools is not null);
         var reach = tool?.ReachesTools!(JsonData.Parse(input.ValueKind == JsonValueKind.Undefined ? "{}" : input.GetRawText())) ?? ToolReach.All;
         return reach.IsAll ? "all" : new JsonArray([.. reach.Words.Select(word => (JsonNode)word)]);
     }

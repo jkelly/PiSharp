@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Decision 0011 (run W2, WU4): PiSharp Web Agent (src/PiSharp.WebAgent). The app runs as a child process with the faux switch, a temporary
+       data folder and a free port (WebAgentApp in Support.cs), never against the user's own data folder, ~/.pi or provider keys; its
+       services (webagent.db migrations, settings, the faux catalog, the shell partials) also run in process. Area units add their own
+       *Cases.cs files; the runner is the hub tests' (Program.cs). The browser checks are tests/PiSharp.WebAgent.BrowserTests (WU10). -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <!-- CS0436: the app's own top-level Program class is visible here (InternalsVisibleTo); the runner's Program is the one meant. -->
+    <NoWarn>$(NoWarn);PISHARP_DURABLE001;CS0436</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- Built first. The tests use its services in process and start its output (bin/<configuration>/net10.0/PiSharp.WebAgent.dll) as a
+         child process. -->
+    <ProjectReference Include="../../src/PiSharp.WebAgent/PiSharp.WebAgent.csproj" />
+    <ProjectReference Include="../../src/PiSharp.Web.Common/PiSharp.Web.Common.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <AssemblyAttribute Include="System.Reflection.AssemblyMetadataAttribute">
+      <_Parameter1>WebProject</_Parameter1>
+      <_Parameter2>$(MSBuildProjectDirectory)/../../src/PiSharp.WebAgent</_Parameter2>
+    </AssemblyAttribute>
+    <AssemblyAttribute Include="System.Reflection.AssemblyMetadataAttribute">
+      <_Parameter1>Configuration</_Parameter1>
+      <_Parameter2>$(Configuration)</_Parameter2>
+    </AssemblyAttribute>
+  </ItemGroup>
+</Project>

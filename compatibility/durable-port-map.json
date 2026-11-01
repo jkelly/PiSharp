@@ -2176,7 +2176,7 @@
       "phase": "P12",
       "status": "pisharp-only",
       "upstreamChange": "removed",
-      "note": "parseArgs (--continue/-c, else \"Unknown argument: X\"), open, run DurableTui, close. Intentional difference (decision 0005): it runs as the hidden subcommand `pisharp durable`, dispatched in src/PiSharp.Cli/Pi/PiCommand.cs RunCoreAsync before `mcp`, and prints a one-line experimental notice to stderr; upstream runs main.ts from source. Tests: runtime.dispatch.*"
+      "note": "parseArgs (--continue/-c, else \"Unknown argument: X\"), open, run DurableTui, close. Intentional difference (decision 0005): it runs as the subcommand `pisharp durable` (listed in --help as experimental since 1.2.0.1), dispatched in src/PiSharp.Cli/Pi/PiCommand.cs RunCoreAsync before `mcp`, and prints a one-line experimental notice to stderr; upstream runs main.ts from source. Tests: runtime.dispatch.*"
     },
     {
       "upstream": "packages/coding-agent/src/experimental/durable/prompt.ts",

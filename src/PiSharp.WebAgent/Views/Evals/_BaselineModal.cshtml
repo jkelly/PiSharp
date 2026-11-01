@@ -1,0 +1,72 @@
+@* Decision 0011 (run W5, E6): the mockups' _BaselineModal (modal-baseline), shared by the suite, run and drift pages. With a null model it is
+   the empty shell; evals.js fills it from GET /evals/suites/{id}/baseline?run=&target= when Set baseline, Set as baseline or Accept as
+   baseline is pressed. The suite's complete runs (newest first, the current baseline marked); the targets to re-baseline, each with its
+   state (drift, suspect, info, ok, no baseline yet: drifted and baseline-less ones start checked, or only the one asked for), a target
+   the chosen run did not ask is disabled; and "also replace the reference outputs with this run's answers". Set baseline posts to the
+   Suites unit's baseline API, which clears the chosen targets' open signals. Model: BaselineModalView (or null). *@
+@model BaselineModalView?
+<div class="modal fade" id="modal-baseline" tabindex="-1" aria-labelledby="modal-baseline-title" aria-hidden="true" data-eval-modal="baseline">
+  <div class="modal-dialog modal-dialog-centered">
+    @if (Model is null)
+    {
+      <div class="modal-content" data-modal-content>
+        <div class="modal-header">
+          <h2 class="modal-title" id="modal-baseline-title">Set baseline</h2>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body"><div class="d-flex align-items-center gap-2 fs-7 text-ps-faint"><span class="spinner-border spinner-border-sm" aria-hidden="true"></span>Loading…</div></div>
+      </div>
+    }
+    else
+    {
+      var selected = Model.Runs.FirstOrDefault(option => option.RunId == Model.Selected);
+      <div class="modal-content" data-modal-content data-suite-id="@Model.Suite.Id" data-suite-name="@Model.Suite.Name">
+        <div class="modal-header">
+          <div>
+            <h2 class="modal-title" id="modal-baseline-title">Set baseline</h2>
+            <div class="modal-subtitle">@Model.Suite.Name · @Model.CurrentText</div>
+          </div>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          @if (Model.Runs.Count == 0)
+          {
+            <p class="fs-7 text-secondary mb-0" data-bl-no-runs>This suite has no complete run yet. Run it, then set one of its complete runs as the baseline.</p>
+          }
+          else
+          {
+            <label class="form-label" for="blRun">Run</label>
+            <select class="form-select" id="blRun" data-bl-run>
+              @foreach (var option in Model.Runs)
+              {
+                <option value="@option.RunId" selected="@(option.RunId == Model.Selected)" data-targets="@string.Join(' ', option.TargetIds)">@option.Text</option>
+              }
+            </select>
+            <div class="ps-label mt-3 mb-2" id="blTargetsLabel">Targets to re-baseline</div>
+            <div class="ps-panel px-3 py-2" role="group" aria-labelledby="blTargetsLabel">
+              @for (var index = 0; index < Model.Targets.Count; index++)
+              {
+                var target = Model.Targets[index];
+                var inRun = selected is null || selected.TargetIds.Contains(target.Target.Id);
+                var id = "blTarget" + index.ToString(CultureInfo.InvariantCulture);
+                <div class="form-check py-1">
+                  <input class="form-check-input" type="checkbox" id="@id" value="@target.Target.Id" data-bl-target checked="@(target.Checked && inRun)" disabled="@(!inRun)">
+                  <label class="form-check-label" for="@id"><span class="ps-mono fs-7">@target.Model.Name</span>@(target.Model.Settings != "default settings" ? " · " + target.Model.Settings : "")<span class="d-block fs-8 text-ps-faint">@target.Note</span></label>
+                </div>
+              }
+            </div>
+            <div class="form-text">Later runs are compared with this run for the chosen targets, and their flags are cleared. Earlier runs and baselines stay in history.</div>
+            <div class="form-check mt-3">
+              <input class="form-check-input" type="checkbox" id="blRefs" data-bl-refs>
+              <label class="form-check-label fs-7" for="blRefs">Also replace the reference outputs with this run's answers</label>
+            </div>
+          }
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="button" class="btn btn-primary" data-bl-save disabled="@(Model.Runs.Count == 0)">Set baseline</button>
+        </div>
+      </div>
+    }
+  </div>
+</div>

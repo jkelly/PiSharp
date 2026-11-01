@@ -2,9 +2,25 @@
 
 PiSharp is a native .NET 10 / C# port of the [Pi coding agent](https://github.com/earendil-works/pi). Its version names the Pi release it matches: the current baseline is Pi **v1.2.0** (commit `06a466935536f8c9bcacb2d5efc0fc021be1bdff`), and a fourth number marks a C#-only patch. The version names the porting baseline; the [Parity page](https://pisharp.ai/parity/) and [sync-1.2.0-applicability.json](compatibility/sync-1.2.0-applicability.json) record what is ported and what still differs.
 
-Install the CLI with `dotnet tool install -g PiSharp.Cli` and run `pisharp` as you would run `pi`. It takes Pi's command line and reads Pi's files in `~/.pi/agent` and `.pi`: settings, credentials, models, MCP servers, context files, skills, prompt templates, themes, extensions and sessions. It has every Pi v1.2.0 chat API and provider catalog, the built-in tools (with images), codemode and `tool_search`, Pi's interactive mode and slash commands, print, JSON and RPC modes, and Pi's TypeScript extensions and packages through a Node bridge that installs Pi's own npm packages. Native C# extensions load from the same folders. Release 1.2.0 is described in the [release notes](docs/release-notes/1.2.0.md).
+Install the CLI with `dotnet tool install -g PiSharp.Cli` and run `pisharp` as you would run `pi`. It takes Pi's command line and reads Pi's files in `~/.pi/agent` and `.pi`: settings, credentials, models, MCP servers, context files, skills, prompt templates, themes, extensions and sessions. It has every Pi v1.2.0 chat API and provider catalog, the built-in tools (with images), codemode and `tool_search`, Pi's interactive mode and slash commands, print, JSON and RPC modes, and Pi's TypeScript extensions and packages through a Node bridge that installs Pi's own npm packages. Native C# extensions load from the same folders. Release 1.2.0.1 is described in the [release notes](docs/release-notes/1.2.0.1.md).
+
+`pisharp durable` and the `PiSharp.Durable`, `PiSharp.Durable.Tools` and `PiSharp.Durable.Sqlite` packages ship as **experimental**: a port of Pi's durable agent harness whose sessions survive a crash. The command, its session format and the libraries' API may change in any release; see the [durable guide](https://pisharp.ai/docs/guides/durable/).
+
+`PiSharp.CustomAgents`, with `PiSharp.CustomAgents.JavaScript` and `PiSharp.CustomAgents.Scripting`, is an experimental library on that harness, not yet packaged:
+- custom agents in C#, with tools written in C#, JavaScript, C# scripts or plugin DLLs, which can change while the agents run;
+- a ready-made `web_search` tool over Brave Search, Tavily, Firecrawl, or the hosted search of OpenAI, Anthropic, xAI or OpenRouter, and X (Twitter) search through xAI;
+- workflows of typed actions over one shared Data object: code, model calls with structured output, or agent runs;
+- subagents that message the orchestrator and each other.
+
+Runs resume after a crash. [Decision 0012](docs/decisions/0012-custom-agents.md) describes the design.
+
+Two samples run on scripted models or a real provider:
+- [CustomAgents.Examples](samples/CustomAgents.Examples) runs the library's features one by one.
+- [CustomAgents.Research](samples/CustomAgents.Research) is a research team: a lead agent splits a topic between researcher subagents, which search X and the web in parallel, and merges their findings into one Markdown report.
 
 Documentation is at [pisharp.ai](https://pisharp.ai/docs/). The full-parity work is tracked in [full-parity-v1.1.0.md](docs/plans/full-parity-v1.1.0.md) and [full-parity-progress.json](docs/plans/full-parity-progress.json), and the Pi 1.2.0 sync in [decision 0006](docs/decisions/0006-pi-1.2.0-sync.md).
+
+Explore [32 runnable agent samples](samples/agents/README.md): practical workflows, fixture demos, live model integration, and automated model/pricing and NuGet vulnerability maintainers. Each sample includes inputs, documentation, and focused verification.
 
 ## Native validation tooling
 

@@ -1,0 +1,41 @@
+@* Decision 0011 (run W3, S4): the mockups' settings-spend page (route GET /settings/spend), states default, dirty and empty: the header with
+   the Spend ledger link, Caps (_SpendCaps; added and edited in _SpendCapModal), Accounts (_SpendAccounts: each account's billing mode, with
+   an override), Unknown prices (_SpendUnknownPrices with _SpendEnterPriceMenu), Reservations (_SpendReservations) and the save bar.
+   The caps save on their own (through the modal); the settings below them are one form that tracks what changed ("modified · was X") and
+   saves with the save bar. Everything goes through /api/spend (spend-settings.js). Left out: the mockups' subscription allowance gate, since
+   no account reports allowance windows yet. Model: SpendSettingsPage. *@
+@using PiSharp.WebAgent.Spend
+@model SpendSettingsPage
+@{
+    Layout = "_SettingsLayout";
+    ViewData["Title"] = "Spend";
+    ViewData[ShellViewData.SettingsSection] = "spend";
+}
+@section Styles {
+  <link href="~/css/settings.css" rel="stylesheet" asp-append-version="true" />
+  <link href="~/css/spend.css" rel="stylesheet" asp-append-version="true" />
+}
+@section Modals { <partial name="/Views/Shared/_SpendCapModal.cshtml" model="Model.CapModal" /> }
+@section Scripts { <script type="module" src="~/js/spend-settings.js" asp-append-version="true"></script> }
+<div data-spend-settings>
+<header class="settings-header d-flex flex-wrap align-items-end gap-3">
+  <div class="flex-grow-1" style="min-width:0">
+    <div class="ps-eyebrow">Agent</div>
+    <h2>Spend</h2>
+    <p>Limits on what metered providers can cost, across Chat, Playground, Compare, Arena and Drift Watch. Subscription and free accounts are tracked, but they never count toward these caps.</p>
+    <p class="fs-8 text-ps-faint mt-2">Every request reserves its worst case before it is sent, then settles to the actual cost.</p>
+  </div>
+  <div class="d-flex gap-2 flex-wrap">
+    <a class="btn btn-outline-secondary" href="/history/spend"><i class="bi bi-receipt me-1" aria-hidden="true"></i>Spend ledger</a>
+  </div>
+</header>
+
+<partial name="/Views/Settings/_SpendCaps.cshtml" model="Model" />
+
+<form novalidate autocomplete="off" data-spend-form>
+  <partial name="/Views/Settings/_SpendAccounts.cshtml" model="Model" />
+  <partial name="/Views/Settings/_SpendUnknownPrices.cshtml" model="Model" />
+  <partial name="/Views/Settings/_SpendReservations.cshtml" model="Model" />
+  <partial name="/Views/Settings/_SettingsSaveBar.cshtml" model="null" />
+</form>
+</div>

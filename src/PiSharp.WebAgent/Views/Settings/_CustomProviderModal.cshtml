@@ -1,0 +1,281 @@
+@* Decision 0011 (run W3, CP): the mockups' _CustomProviderModal (#modal-custom-provider), the editor of one custom provider, in tabs:
+   General (id, name, base URL with Discover models, API type, authHeader, the key and the headers), Models (id, name, reasoning, input,
+   context window, max tokens, prices), Advanced (compat for the provider or one model, and a model's thinkingLevelMap) and Preview JSON
+   (what Save writes, validated by the server). Test connection lists the provider's models (a free request, only on click; offline with
+   --faux). The key is either None, Stored (typed into a password field, POSTed once with the save or a test, cleared when the modal
+   closes; the page shows only the masked hint the server answers) or an environment reference ($VAR); !command is shown but not offered:
+   running commands from a web form is out of scope. Compat fields are three-way (default, true, false), so the provider's auto-detection
+   is kept unless a field is set. custom-providers.js fills and reads it. Model: CustomProvidersPage. *@
+@using PiSharp.WebAgent.CustomProviders
+@model CustomProvidersPage
+<div class="modal fade" id="modal-custom-provider" tabindex="-1" aria-labelledby="modal-custom-provider-title" aria-hidden="true" data-cp-modal>
+  <div class="modal-dialog modal-xl modal-dialog-scrollable">
+    <form class="modal-content" novalidate autocomplete="off" data-cp-form>
+      <div class="modal-header">
+        <div class="d-flex align-items-center gap-3 cp-row-main">
+          <span class="provider-logo lg" role="img" aria-label="Provider logo" data-cp-logo><i class="bi bi-hdd-network" aria-hidden="true"></i></span>
+          <div class="cp-row-text">
+            <h2 class="modal-title" id="modal-custom-provider-title" data-cp-title>Add custom provider</h2>
+            <div class="modal-subtitle text-break" data-cp-subtitle></div>
+          </div>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+
+      <ul class="nav nav-tabs px-3 pt-1 flex-nowrap flex-shrink-0 overflow-auto" role="tablist" aria-label="Provider editor sections">
+        <li class="nav-item" role="presentation"><button class="nav-link text-nowrap active" type="button" role="tab" data-cp-tab="general" aria-selected="true">General</button></li>
+        <li class="nav-item" role="presentation"><button class="nav-link text-nowrap" type="button" role="tab" data-cp-tab="models" aria-selected="false">Models <span class="ps-chip ms-1" data-cp-model-count>0</span></button></li>
+        <li class="nav-item" role="presentation"><button class="nav-link text-nowrap" type="button" role="tab" data-cp-tab="advanced" aria-selected="false">Advanced</button></li>
+        <li class="nav-item" role="presentation"><button class="nav-link text-nowrap" type="button" role="tab" data-cp-tab="preview" aria-selected="false">Preview JSON</button></li>
+      </ul>
+
+      <div class="modal-body">
+        <div class="alert alert-danger d-flex gap-2 py-2 fs-7" role="alert" data-cp-error hidden><i class="bi bi-x-circle mt-1" aria-hidden="true"></i><div data-cp-error-text></div></div>
+
+        <div data-cp-pane="general">
+          <div class="row g-3">
+            <div class="col-md-4">
+              <label class="form-label" for="cpId">Provider id</label>
+              <input class="form-control font-monospace" id="cpId" maxlength="64" spellcheck="false" aria-describedby="cpIdHelp" data-cp-field="id">
+              <div class="invalid-feedback" data-cp-id-feedback>Lower-case letters, digits and dashes, not a built-in provider's id.</div>
+              <div class="form-text" id="cpIdHelp">Lowercase letters, digits and dashes. Models are referenced as <span class="ps-mono"><span data-cp-id-echo>id</span>/&lt;model id&gt;</span>.</div>
+            </div>
+            <div class="col-md-8">
+              <label class="form-label" for="cpName">Display name</label>
+              <input class="form-control" id="cpName" maxlength="100" data-cp-field="name">
+              <div class="form-text">Shown in the model picker and on the Providers page.</div>
+            </div>
+
+            <div class="col-12">
+              <label class="form-label" for="cpBaseUrl">Base URL</label>
+              <div class="input-group">
+                <input class="form-control font-monospace" id="cpBaseUrl" spellcheck="false" placeholder="http://localhost:1234/v1" data-cp-field="baseUrl">
+                <button class="btn btn-outline-secondary" type="button" data-cp-discover disabled="@Model.Offline"><i class="bi bi-search me-1"></i>Discover models</button>
+              </div>
+              <div class="ps-panel p-3 mt-2" data-cp-discovered hidden>
+                <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+                  <span class="status-dot" data-cp-discover-dot></span><strong class="fs-7" data-cp-discover-title></strong>
+                  <span class="ps-mono fs-8 text-ps-faint" data-cp-discover-detail></span>
+                  <span class="ms-auto d-flex gap-2"><button class="btn btn-link p-0 fs-8" type="button" data-cp-discover-all>Select all</button><button class="btn btn-link p-0 fs-8" type="button" data-cp-discover-none>None</button></span>
+                </div>
+                <div class="row row-cols-1 row-cols-sm-2 g-1" data-cp-discover-list></div>
+                <div class="d-flex flex-wrap align-items-center gap-2 mt-2">
+                  <button class="btn btn-sm btn-primary" type="button" data-cp-discover-add>Add selected</button>
+                  <span class="fs-8 text-ps-faint"><span class="ps-mono">/models</span> doesn't report context size or max tokens. Defaults are filled in; check them on the Models tab.</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="col-md-6">
+              <label class="form-label" for="cpApi">API type</label>
+              <select class="form-select font-monospace" id="cpApi" data-cp-field="api">
+                @foreach (var api in CustomProviderJson.Apis)
+                {
+                  <option value="@api">@api</option>
+                }
+              </select>
+              <div class="form-text">The wire protocol. LM Studio, Ollama, vLLM and llama.cpp all serve <span class="ps-mono">/v1/chat/completions</span>.</div>
+            </div>
+            <div class="col-md-6">
+              <div class="form-label">Auth header</div>
+              <div class="form-check form-switch">
+                <input class="form-check-input" type="checkbox" role="switch" id="cpAuthHeader" data-cp-field="authHeader">
+                <label class="form-check-label" for="cpAuthHeader">Send the key as <span class="ps-mono">Authorization: Bearer</span> <span class="ps-mono fs-8 text-ps-faint">(authHeader)</span></label>
+              </div>
+              <div class="form-text">Turn on for gateways that expect a bearer token whatever the api type.</div>
+            </div>
+
+            <div class="col-12">
+              <div class="form-label">API key</div>
+              <div class="alert alert-warning d-flex gap-2 py-2 fs-7" data-cp-key-problem hidden><i class="bi bi-exclamation-triangle mt-1" aria-hidden="true"></i><div data-cp-key-problem-text></div></div>
+              <div class="d-flex flex-wrap gap-1 mb-2" role="radiogroup" aria-label="API key source">
+                <input type="radio" class="btn-check" name="cpKeySource" id="cpKeyNone" value="none" checked data-cp-key-source><label class="btn btn-sm btn-outline-secondary" for="cpKeyNone"><i class="bi bi-unlock me-1"></i>None</label>
+                <input type="radio" class="btn-check" name="cpKeySource" id="cpKeyStored" value="stored" data-cp-key-source><label class="btn btn-sm btn-outline-secondary" for="cpKeyStored"><i class="bi bi-safe me-1"></i>Literal (stored encrypted)</label>
+                <input type="radio" class="btn-check" name="cpKeySource" id="cpKeyEnv" value="env" data-cp-key-source><label class="btn btn-sm btn-outline-secondary" for="cpKeyEnv"><i class="bi bi-terminal me-1"></i>$ENV reference</label>
+                <input type="radio" class="btn-check" name="cpKeySource" id="cpKeyCmd" value="command" disabled><label class="btn btn-sm btn-outline-secondary" for="cpKeyCmd" title="Not offered in the web app"><i class="bi bi-braces me-1"></i>!command</label>
+              </div>
+              <div class="fs-8 text-ps-faint" data-cp-key-pane="none"><i class="bi bi-info-circle me-1"></i>No key is stored and <span class="ps-mono">apiKey</span> is left out of models.json. Requests carry the placeholder key <span class="ps-mono">@CustomProviderJson.PlaceholderKey</span>, which servers without authentication (LM Studio, Ollama, vLLM by default) ignore.</div>
+              <div data-cp-key-pane="stored" hidden>
+                <div class="input-group">
+                  <input class="form-control secret-field" id="cpKeyInput" type="password" placeholder="Paste the key" autocomplete="off" spellcheck="false" aria-label="API key" data-cp-key-input>
+                  <button class="btn btn-outline-secondary" type="button" data-cp-reveal aria-label="Show or hide key"><i class="bi bi-eye" aria-hidden="true"></i></button>
+                </div>
+                <div class="form-text"><span data-cp-key-hint hidden>Stored: <span class="ps-mono" data-cp-key-hint-text></span>. Leave the field blank to keep it. </span>Encrypted with ASP.NET Data Protection in this app's vault and injected at request time; it is never written into models.json, and Export leaves it out.</div>
+              </div>
+              <div data-cp-key-pane="env" hidden>
+                <div class="input-group">
+                  <span class="input-group-text ps-mono">$</span>
+                  <input class="form-control font-monospace" id="cpKeyVar" aria-label="Environment variable name" spellcheck="false" placeholder="LMSTUDIO_API_KEY" data-cp-key-var>
+                  <span class="input-group-text"><span class="ps-chip" data-cp-var-state>not checked</span></span>
+                </div>
+                <div class="form-text">Written as <span class="ps-mono">"apiKey": "$<span data-cp-var-echo>VAR</span>"</span>. <span class="ps-mono">${VAR}</span> also works in the file. Read from the web host's environment on each request.</div>
+              </div>
+              <div class="fs-8 text-ps-faint" data-cp-key-pane="command" hidden><i class="bi bi-info-circle me-1"></i><span class="ps-mono">!command</span> keys are not offered in the web app: running commands from a web form is out of scope. Store the key, or use a <span class="ps-mono">$VAR</span> reference.</div>
+            </div>
+
+            <div class="col-12">
+              <div class="d-flex align-items-center mb-2 flex-wrap gap-1"><span class="form-label mb-0">Headers</span><span class="fs-8 text-ps-faint ms-2">sent with every request to this provider (<span class="ps-mono">headers</span>); a header that carries a credential must be a <span class="ps-mono">$VAR</span> reference</span></div>
+              <div class="ps-table-wrap position-relative">
+                <table class="table table-sm align-middle mb-0">
+                  <thead><tr><th scope="col">Name</th><th scope="col">Value</th><th scope="col" class="text-end"><span class="visually-hidden">Actions</span></th></tr></thead>
+                  <tbody data-cp-headers></tbody>
+                </table>
+              </div>
+              <div class="fs-8 text-ps-faint mt-1" data-cp-headers-empty>No headers.</div>
+              <button class="btn btn-sm btn-ghost mt-1" type="button" data-cp-header-add><i class="bi bi-plus-lg me-1"></i>Add header</button>
+            </div>
+          </div>
+        </div>
+
+        <div data-cp-pane="models" hidden>
+          <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+            <span class="ps-label" data-cp-models-label>0 models</span>
+            <span class="fs-8 text-ps-faint">Referenced as <span class="ps-mono"><span data-cp-id-echo>id</span>/&lt;id&gt;</span>. Cost is per 1M tokens; leave 0 for local models.</span>
+            <button class="btn btn-sm btn-ghost ms-auto" type="button" data-cp-tab-go="general"><i class="bi bi-search me-1"></i>Discover more</button>
+          </div>
+          <div class="ps-table-wrap position-relative">
+            <table class="table table-sm align-middle mb-0 cp-models-table">
+              <thead>
+                <tr><th scope="col" class="cp-col-id">id</th><th scope="col" class="cp-col-name">Name</th><th scope="col">Reasoning</th><th scope="col">Input</th><th scope="col">contextWindow</th><th scope="col">maxTokens</th><th scope="col">$ in</th><th scope="col">$ out</th><th scope="col"><span class="visually-hidden">Remove</span></th></tr>
+              </thead>
+              <tbody data-cp-models></tbody>
+            </table>
+          </div>
+          <button class="btn btn-sm btn-ghost mt-2" type="button" data-cp-model-add><i class="bi bi-plus-lg me-1"></i>Add row</button>
+          <div class="form-text">Per-model compat and <span class="ps-mono">thinkingLevelMap</span> are on the Advanced tab.</div>
+        </div>
+
+        <div data-cp-pane="advanced" hidden>
+          <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
+            <label class="fs-7" for="cpCompatScope">Apply compat to</label>
+            <select class="form-select form-select-sm w-auto" id="cpCompatScope" data-cp-compat-scope><option value="">Provider (all models)</option></select>
+            <span class="fs-8 text-ps-faint">Model-level compat overrides provider-level compat. "default" leaves a field out, so it is auto-detected.</span>
+          </div>
+          <div class="accordion mb-4" id="cpCompatAccordion">
+            <div class="accordion-item">
+              <h3 class="accordion-header">
+                <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#cpAccCompletions" aria-expanded="true" aria-controls="cpAccCompletions">OpenAI Completions compat <span class="ps-chip ms-2" data-tone="outline">api: openai-completions</span></button>
+              </h3>
+              <div id="cpAccCompletions" class="accordion-collapse collapse show" data-bs-parent="#cpCompatAccordion">
+                <div class="accordion-body pb-3">
+                  <div class="row g-3">
+                    @foreach (var (field, help) in new[]
+                    {
+                        ("supportsDeveloperRole", "Send the system prompt as a developer message. LM Studio expects system."),
+                        ("supportsReasoningEffort", "Send reasoning_effort for the thinking level."),
+                        ("supportsUsageInStreaming", "Ask for token usage in the final stream chunk (stream_options.include_usage)."),
+                        ("requiresToolResultName", "Add name to tool-result messages. Some llama.cpp builds need it."),
+                        ("supportsStrictMode", "Send tool schemas with strict: true."),
+                    })
+                    {
+                      <div class="col-md-6">
+                        <label class="form-label ps-mono fs-7" for="cpc-@field">@field</label>
+                        <select class="form-select form-select-sm" id="cpc-@field" data-cp-compat="@field"><option value="">default</option><option value="true">true</option><option value="false">false</option></select>
+                        <div class="form-text mt-0">@help</div>
+                      </div>
+                    }
+                    @foreach (var field in new[] { "maxTokensField", "thinkingFormat", "cacheControlFormat" })
+                    {
+                      <div class="col-sm-6 col-md-4">
+                        <label class="form-label ps-mono fs-7" for="cpc-@field">@field</label>
+                        <select class="form-select form-select-sm font-monospace" id="cpc-@field" data-cp-compat="@field">
+                          <option value="">default (auto)</option>
+                          @foreach (var value in CustomProviderJson.EditableCompat[field]!)
+                          {
+                            <option value="@value">@value</option>
+                          }
+                        </select>
+                      </div>
+                    }
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="accordion-item">
+              <h3 class="accordion-header">
+                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#cpAccOther" aria-expanded="false" aria-controls="cpAccOther">Responses and Anthropic compat <span class="ps-chip ms-2">edit in models.json</span></button>
+              </h3>
+              <div id="cpAccOther" class="accordion-collapse collapse" data-bs-parent="#cpCompatAccordion">
+                <div class="accordion-body pb-3 fs-8 text-secondary">
+                  <p class="mb-1"><span class="ps-mono">openai-responses</span>: supportsDeveloperRole, supportsStrictMode, supportsMaxOutputTokens, supportsLongCacheRetention, sessionAffinityFormat.</p>
+                  <p class="mb-1"><span class="ps-mono">anthropic-messages</span>: supportsTemperature, forceAdaptiveThinking, supportsStrictTools, supportsCacheControlOnTools, supportsEagerToolInputStreaming, supportsMidConvoEffort.</p>
+                  <p class="mb-0">Set these in the file by hand; a save here keeps every compat field it does not show.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+            <span class="ps-label">thinkingLevelMap</span>
+            <label class="visually-hidden" for="cpTlmModel">Model</label>
+            <select class="form-select form-select-sm w-auto font-monospace" id="cpTlmModel" data-cp-tlm-model></select>
+            <span class="fs-8 text-ps-faint">Unmapped levels are sent as-is, except xhigh and max, which are unsupported unless mapped.</span>
+          </div>
+          <div class="ps-table-wrap position-relative">
+            <table class="table table-sm align-middle mb-0 cp-tlm-table">
+              <thead><tr><th scope="col">Level</th><th scope="col">Mode</th><th scope="col">Sent as</th></tr></thead>
+              <tbody>
+                @foreach (var level in CustomProviderJson.ThinkingLevels)
+                {
+                  <tr data-cp-tlm="@level">
+                    <td class="ps-mono">@level</td>
+                    <td><select class="form-select form-select-sm" aria-label="Mode for @level" data-cp-tlm-mode><option value="default">default</option><option value="map">map to…</option><option value="null">unsupported (null)</option></select></td>
+                    <td><input class="form-control form-control-sm font-monospace" placeholder="@level" disabled aria-label="Value for @level" spellcheck="false" data-cp-tlm-value></td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+          <div class="fs-8 text-ps-faint mt-1" data-cp-tlm-empty hidden>Turn on Reasoning for a model on the Models tab to map its thinking levels.</div>
+        </div>
+
+        <div data-cp-pane="preview" hidden>
+          <div class="d-flex flex-wrap gap-2 align-items-center mb-2">
+            <span class="ps-chip" data-cp-preview-state>checking…</span>
+            <span class="fs-8 text-ps-faint" data-cp-preview-note>Save merges this entry into models.json; other providers aren't touched.</span>
+          </div>
+          <div class="ps-term">
+            <div class="ps-term-bar"><span class="dot"></span><span data-cp-preview-title>providers</span><button class="btn btn-icon ms-auto" type="button" data-cp-copy="#cp-preview-json" title="Copy JSON" aria-label="Copy JSON"><i class="bi bi-copy" aria-hidden="true"></i></button></div>
+            <pre id="cp-preview-json" class="cp-preview"><code class="language-json" data-cp-preview-json></code></pre>
+          </div>
+        </div>
+
+        <div class="mt-4" data-cp-test-panel>
+          <div data-cp-test-state="idle" class="fs-8 text-ps-faint"><i class="bi bi-info-circle me-1"></i>@(Model.Offline ? CredentialsOptions.OfflineMessage : "Test connection lists the provider's models (GET {baseUrl}/models), a free request. Nothing is sent until you click.")</div>
+          <div data-cp-test-state="running" class="ps-panel p-2 fs-7 d-flex flex-wrap align-items-center gap-2" hidden><span class="spinner-border spinner-border-sm text-primary" aria-hidden="true"></span>Testing… <span class="ps-mono fs-8 text-ps-faint" data-cp-test-endpoint></span></div>
+          <div data-cp-test-state="ok" class="alert alert-success d-flex gap-2 mb-0 py-2" hidden><i class="bi bi-check-circle" aria-hidden="true"></i><div><strong>Connected.</strong> <span data-cp-test-ok-text></span></div></div>
+          <div data-cp-test-state="fail" class="alert alert-danger d-flex gap-2 mb-0 py-2" hidden><i class="bi bi-x-circle" aria-hidden="true"></i><div><strong data-cp-test-fail-title>Not connected.</strong> <span data-cp-test-fail-text></span></div></div>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary me-auto" data-cp-test-draft disabled="@Model.Offline"><i class="bi bi-activity me-1"></i>Test connection</button>
+        <span class="fs-8 text-ps-faint d-none d-sm-inline" data-cp-dirty hidden>unsaved changes</span>
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="submit" class="btn btn-primary" data-cp-save>Save provider</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<template id="cp-header-row">
+  <tr data-cp-header>
+    <td><input class="form-control form-control-sm font-monospace" aria-label="Header name" spellcheck="false" data-cp-header-name></td>
+    <td><input class="form-control form-control-sm font-monospace" aria-label="Header value" spellcheck="false" data-cp-header-value></td>
+    <td class="text-end text-nowrap"><span class="ps-chip" data-tone="accent" data-cp-new hidden>new</span><button class="btn btn-icon" type="button" aria-label="Remove header" data-cp-header-remove><i class="bi bi-x-lg" aria-hidden="true"></i></button></td>
+  </tr>
+</template>
+
+<template id="cp-model-row">
+  <tr data-cp-model>
+    <td><div class="d-flex align-items-center gap-1"><input class="form-control form-control-sm font-monospace" aria-label="Model id" spellcheck="false" data-cp-model-field="id"><span class="ps-chip" data-tone="accent" data-cp-new hidden>new</span></div></td>
+    <td><input class="form-control form-control-sm" aria-label="Model name" data-cp-model-field="name"></td>
+    <td><div class="form-check form-switch mb-0"><input class="form-check-input" type="checkbox" role="switch" aria-label="Reasoning" data-cp-model-field="reasoning"></div></td>
+    <td><select class="form-select form-select-sm" aria-label="Input" data-cp-model-field="images"><option value="false">text</option><option value="true">text + image</option></select></td>
+    <td><input class="form-control form-control-sm font-monospace" type="number" min="1" step="1" aria-label="Context window" data-cp-model-field="contextWindow"></td>
+    <td><input class="form-control form-control-sm font-monospace" type="number" min="1" step="1" aria-label="Max tokens" data-cp-model-field="maxTokens"></td>
+    <td><input class="form-control form-control-sm font-monospace" type="number" min="0" step="0.01" aria-label="Input cost per 1M" data-cp-model-field="costInput"></td>
+    <td><input class="form-control form-control-sm font-monospace" type="number" min="0" step="0.01" aria-label="Output cost per 1M" data-cp-model-field="costOutput"></td>
+    <td class="text-end"><button class="btn btn-icon" type="button" aria-label="Remove model" data-cp-model-remove><i class="bi bi-x-lg" aria-hidden="true"></i></button></td>
+  </tr>
+</template>

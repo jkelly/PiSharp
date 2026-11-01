@@ -1,0 +1,151 @@
+@* Decision 0011 (run W4, unit R9): the mockups' Locations section and its _StorageLocations card: the usage panel (_DataUsage), then one row
+   per location with its size and an Open folder button: the data folder (and what set it: the default, PISHARP_WEBAGENT_DATA or --data),
+   the chats (the durable device folder, with how many run now), run history (runs.db: its runs counted as History counts them, the
+   records apart when an agent compare run keeps one per model and call, its raw payloads and stream events), the Data
+   Protection key ring (its keys and when the active one expires, and what losing the folder means) and credentials.json (what it holds, by
+   provider; never a value). Model: DataPage. *@
+@using PiSharp.WebAgent.DataStorage
+@using PiSharp.WebAgent.Hosting
+@model DataPage
+@{
+    var folder = Model.Folder;
+    var chats = Model.Chats;
+    var runs = Model.Runs;
+    var keys = Model.Keys;
+    var credentials = Model.Credentials;
+    string Join(IReadOnlyList<string> names) => names.Count <= 1 ? string.Join("", names) : string.Join(", ", names.Take(names.Count - 1)) + " and " + names[^1];
+}
+<section class="settings-section" id="locations">
+  <h3>Locations</h3>
+  <p class="section-desc">Open a folder in @Model.Opener on the machine running the web agent.</p>
+
+  <partial name="/Views/Settings/_DataUsage.cshtml" model="Model" />
+
+  <div class="ps-card" data-locations>
+    <div class="provider-row" data-location="data">
+      <span class="provider-logo" aria-hidden="true"><i class="bi bi-folder2-open"></i></span>
+      <div class="flex-grow-1" style="min-width:0">
+        <div class="d-flex flex-wrap align-items-center gap-2"><span class="provider-name">Data folder</span><span class="ps-chip">@DataFolders.Size(folder.Bytes)</span></div>
+        <div class="ps-mono fs-8 text-secondary text-break">@folder.Display</div>
+        <div class="fs-8 text-ps-faint">
+          @switch (folder.Source)
+          {
+            case DataFolderSource.Environment:
+              <text>Set by env <span class="ps-mono">@WebAgentOptions.DataEnvironmentVariable</span>.</text>
+              break;
+            case DataFolderSource.CommandLine:
+              <text>Set with <span class="ps-mono">--data</span> when the app started (it wins over env <span class="ps-mono">@WebAgentOptions.DataEnvironmentVariable</span>).</text>
+              break;
+            default:
+              <text>Override with env <span class="ps-mono">@WebAgentOptions.DataEnvironmentVariable</span> (not set) or <span class="ps-mono">--data</span>.</text>
+              break;
+          }
+        </div>
+      </div>
+      <partial name="/Views/Settings/_DataOpenButton.cshtml" model='Model.Open(DataOpenTargets.Data, "Open data folder")' />
+    </div>
+
+    <div class="provider-row" data-location="chats">
+      <span class="provider-logo" aria-hidden="true"><i class="bi bi-chat-square-text"></i></span>
+      <div class="flex-grow-1" style="min-width:0">
+        <div class="d-flex flex-wrap align-items-center gap-2">
+          <span class="provider-name">Chats</span>
+          <span class="ps-chip">@DataStorageService.Plural(chats.Count, "chat")</span>
+          @if (chats.Running > 0)
+          {
+            <span class="ps-chip" data-tone="accent"><span class="status-dot ok" aria-hidden="true"></span>@chats.Running running now</span>
+          }
+          <span class="ps-chip">@DataFolders.Size(chats.DeviceBytes)</span>
+        </div>
+        <div class="ps-mono fs-8 text-secondary text-break">@chats.DeviceDisplay</div>
+        <div class="fs-8 text-ps-faint">Durable sessions: one <span class="ps-mono">agent.sqlite</span> per chat, plus the archive. Moves with the data folder when <span class="ps-mono">@WebAgentOptions.DataEnvironmentVariable</span> is set.</div>
+      </div>
+      <partial name="/Views/Settings/_DataOpenButton.cshtml" model='Model.Open(DataOpenTargets.Chats, "Open chats folder")' />
+    </div>
+
+    <div class="provider-row" data-location="runs">
+      <span class="provider-logo" aria-hidden="true"><i class="bi bi-clock-history"></i></span>
+      <div class="flex-grow-1" style="min-width:0">
+        <div class="d-flex flex-wrap align-items-center gap-2"><span class="provider-name">Run history</span><span class="ps-chip">@DataStorageService.Plural(runs.Count, "run")</span><span class="ps-chip">@DataFolders.Size(runs.Bytes)</span></div>
+        <div class="ps-mono fs-8 text-secondary text-break">@runs.Display</div>
+        <div class="fs-8 text-ps-faint">
+          @if (!runs.Available)
+          {
+            <text>Run history is not part of this app.</text>
+          }
+          else if (runs.Records == 0)
+          {
+            <text>SQLite, @DataFolders.Size(runs.Bytes) on disk. No runs recorded yet.</text>
+          }
+          else
+          {
+            <text>SQLite, @DataFolders.Size(runs.Bytes) on disk@(runs.RecordsText is { } records ? " in " + records + " (an agent compare run keeps one for each model and call)" : ""). Raw payloads take about @DataFolders.Size(runs.RawBytes)@(runs.RawRuns > 0 ? " (" + DataStorageService.Plural(runs.RawRuns, "run") + ")" : "") and stream events about @DataFolders.Size(runs.EventBytes).</text>
+          }
+        </div>
+      </div>
+      <partial name="/Views/Settings/_DataOpenButton.cshtml" model='Model.Open(DataOpenTargets.Runs, "Open the folder of runs.db")' />
+    </div>
+
+    <div class="provider-row" data-location="keys">
+      <span class="provider-logo" aria-hidden="true"><i class="bi bi-key"></i></span>
+      <div class="flex-grow-1" style="min-width:0">
+        <div class="d-flex flex-wrap align-items-center gap-2">
+          <span class="provider-name">Data Protection key ring</span>
+          <span class="ps-chip">@DataStorageService.Plural(keys.Count, "key")</span>
+          @if (keys.ActiveExpires is { } expires)
+          {
+            <span class="ps-chip" data-tone="ok">active key expires @expires.UtcDateTime.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture)</span>
+          }
+          else
+          {
+            <span class="ps-chip" data-tone="outline">no active key yet</span>
+          }
+        </div>
+        <div class="ps-mono fs-8 text-secondary text-break">@keys.Display</div>
+        @if (keys.Dpapi)
+        {
+          <div class="fs-8 text-ps-warn"><i class="bi bi-exclamation-triangle me-1" aria-hidden="true"></i>Keys are protected with Windows DPAPI for your account. If this folder is lost, stored credentials can't be decrypted and must be entered again.</div>
+        }
+        else
+        {
+          <div class="fs-8 text-ps-warn"><i class="bi bi-exclamation-triangle me-1" aria-hidden="true"></i>Keys are kept in this folder, readable by your account only as far as its permissions allow. If this folder is lost, stored credentials can't be decrypted and must be entered again.</div>
+        }
+      </div>
+      <partial name="/Views/Settings/_DataOpenButton.cshtml" model='Model.Open(DataOpenTargets.Keys, "Open key ring folder")' />
+    </div>
+
+    <div class="provider-row" data-location="credentials">
+      <span class="provider-logo" aria-hidden="true"><i class="bi bi-safe"></i></span>
+      <div class="flex-grow-1" style="min-width:0">
+        <div class="d-flex flex-wrap align-items-center gap-2">
+          <span class="provider-name">Credentials</span>
+          <span class="ps-chip">@DataStorageService.Plural(credentials.Stored, "entry", "entries")</span>
+          @if (credentials.Stored > 0)
+          {
+            <span class="ps-chip" data-tone="ok"><i class="bi bi-lock" aria-hidden="true"></i>encrypted</span>
+          }
+        </div>
+        <div class="ps-mono fs-8 text-secondary text-break">@credentials.Display</div>
+        <div class="fs-8 text-ps-faint" data-credentials-summary>
+          @if (credentials.Stored == 0)
+          {
+            <text>No API keys or sign-ins are stored.</text>
+          }
+          else
+          {
+            var parts = new List<string>();
+            if (credentials.ApiKeys.Count > 0) parts.Add(Join(credentials.ApiKeys) + (credentials.ApiKeys.Count == 1 ? " API key" : " API keys"));
+            if (credentials.SignIns.Count > 0) parts.Add("access and refresh tokens for the " + Join(credentials.SignIns) + (credentials.SignIns.Count == 1 ? " sign-in" : " sign-ins"));
+            <text>@(string.Join(", plus ", parts)). Values are encrypted with the key ring; account ids are not.</text>
+          }
+          @if (credentials.Environment.Count > 0)
+          {
+            <text> Keys from <span class="ps-mono">@string.Join(", ", credentials.Environment)</span> are read from the environment and never stored here.</text>
+          }
+          <a href="/settings/providers">Manage</a>
+        </div>
+      </div>
+      <partial name="/Views/Settings/_DataOpenButton.cshtml" model='Model.Open(DataOpenTargets.Credentials, "Open the folder of credentials.json")' />
+    </div>
+  </div>
+</section>

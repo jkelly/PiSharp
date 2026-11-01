@@ -1,0 +1,77 @@
+@model DevicesPage
+@if (Model.Devices.Count == 0)
+{
+  <div class="ps-card p-4 mb-4">
+    <div class="empty-state py-3">
+      <div class="empty-icon"><i class="bi bi-hdd-network"></i></div>
+      <h3 class="h5">No devices yet</h3>
+      <p class="mb-3">Start the device server on any machine you want agents on, then add it here with its address and token.</p>
+    </div>
+    <div class="row g-3">
+      <div class="col-md-6">
+        <div class="ps-label mb-1">1. Install and start, on the device</div>
+        <div class="ps-term"><div class="ps-term-bar">PowerShell or a terminal<button class="btn btn-icon ms-auto" type="button" data-copy="#cmd-install" title="Copy" aria-label="Copy commands"><i class="bi bi-copy"></i></button></div><pre id="cmd-install">dotnet tool install -g PiSharp
+pisharp durable serve</pre></div>
+      </div>
+      <div class="col-md-6">
+        <div class="ps-label mb-1">2. Print its token, on the device</div>
+        <div class="ps-term"><div class="ps-term-bar">PowerShell or a terminal<button class="btn btn-icon ms-auto" type="button" data-copy="#cmd-print" title="Copy" aria-label="Copy command"><i class="bi bi-copy"></i></button></div><pre id="cmd-print">pisharp durable token</pre></div>
+      </div>
+    </div>
+    <div class="fs-7 text-ps-faint mt-3">A device started on this computer appears here by itself as <span class="ps-mono">local</span>.</div>
+  </div>
+}
+else
+{
+  <div class="ps-table-wrap mb-4">
+    <table class="table devices-table align-middle">
+      <thead><tr><th>Device</th><th>Source</th><th class="d-none d-lg-table-cell">Address</th><th>Status</th><th class="d-none d-md-table-cell">Last seen</th><th class="text-end"><span class="visually-hidden">Actions</span></th></tr></thead>
+      <tbody>
+        @foreach (var device in Model.Devices)
+        {
+          var sessions = device.Tree?.Sessions.Count ?? 0;
+          var info = device.Info;
+          var sub = info is null ? device.Name : $"{info.Hostname} · {Display.PlatformName(info.Platform)} · API {info.ApiVersion}";
+          var source = device.Kind == "local" ? "This computer" : device.Source == "ui" ? "Added here" : "dpi-network.yaml";
+          <tr data-device-row="@device.Id">
+            <td><div class="device-cell"><span class="device-icon"><i class="bi @Display.PlatformIcon(device)"></i><span class="status-dot @Display.StatusDot(device.Status)"></span></span><div class="min-w-0"><div class="device-name">@device.Id</div><div class="device-sub">@sub</div></div></div></td>
+            <td><span class="ps-chip" data-tone="outline">@device.Kind</span><div class="device-sub mt-1">@source</div></td>
+            <td class="d-none d-lg-table-cell"><span class="ps-mono fs-7">@device.Url</span></td>
+            <td><span class="ps-chip" data-tone="@Display.StatusTone(device.Status)">@Display.StatusText(device.Status)</span><div class="device-sub mt-1" title="@device.Error">@(device.Status == "online" ? $"{sessions} session{(sessions == 1 ? "" : "s")}" : Display.Cut(device.Error ?? "", 60))</div></td>
+            <td class="d-none d-md-table-cell fs-7 text-secondary">@(device.Status == "online" ? "now" : Display.Ago(device.LastSeenAt))</td>
+            <td class="text-end text-nowrap">
+              @if (device.Status == "unauthorized")
+              {
+                <button class="btn btn-sm btn-outline-secondary me-1" type="button" data-action="token" data-device="@device.Id">Enter token</button>
+              }
+              else
+              {
+                <button class="btn btn-icon" type="button" title="Check @device.Id" aria-label="Check @device.Id" data-action="check" data-device="@device.Id"><i class="bi bi-arrow-clockwise"></i></button>
+              }
+              <div class="dropdown d-inline-block">
+                <button class="btn btn-icon" type="button" data-bs-toggle="dropdown" aria-expanded="false" title="More for @device.Id" aria-label="More for @device.Id"><i class="bi bi-three-dots"></i></button>
+                <ul class="dropdown-menu dropdown-menu-end">
+                  <li><a class="dropdown-item" href="#" data-action="token" data-device="@device.Id"><i class="bi bi-key me-2"></i>Enter token</a></li>
+                  @if (device.Status == "mismatch")
+                  {
+                    <li><a class="dropdown-item" href="#" data-action="forget" data-device="@device.Id"><i class="bi bi-arrow-counterclockwise me-2"></i>Forget identity</a></li>
+                  }
+                  @if (device.Source == "ui")
+                  {
+                    <li><a class="dropdown-item" href="#" data-action="edit" data-device="@device.Id" data-url="@device.Url"><i class="bi bi-pencil me-2"></i>Edit</a></li>
+                    <li><hr class="dropdown-divider"></li>
+                    <li><a class="dropdown-item text-danger" href="#" data-action="remove" data-device="@device.Id"><i class="bi bi-trash3 me-2"></i>Remove</a></li>
+                  }
+                  else
+                  {
+                    <li><span class="dropdown-item-text fs-8 text-ps-faint">@(device.Kind == "local" ? "This computer's device. Its address comes from pisharp durable serve." : "Declared in dpi-network.yaml. Edit it there, then import again.")</span></li>
+                  }
+                </ul>
+              </div>
+            </td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  </div>
+}

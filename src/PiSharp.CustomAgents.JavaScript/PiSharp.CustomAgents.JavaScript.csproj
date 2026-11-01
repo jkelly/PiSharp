@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Decision 0012: JavaScript for custom agents. Tools and workflow actions run on PiSharp.Codemode's Jint sandbox; tools that call other
+       tools run as durable code mode (PiSharp.Durable.Tools), whose journal replays a script after a restart. Opt-in authoring lets an agent
+       write its own tools. Jint and Acornima come in through PiSharp.Codemode (decision 0003). Experimental (PISHARP_AGENTS001). -->
+  <PropertyGroup>
+    <NoWarn>$(NoWarn);PISHARP_DURABLE001;PISHARP_AGENTS001</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="PiSharp.CustomAgents.Tests" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="../PiSharp.CustomAgents/PiSharp.CustomAgents.csproj" />
+    <ProjectReference Include="../PiSharp.Codemode/PiSharp.Codemode.csproj" />
+    <ProjectReference Include="../PiSharp.Durable.Tools/PiSharp.Durable.Tools.csproj" />
+  </ItemGroup>
+</Project>

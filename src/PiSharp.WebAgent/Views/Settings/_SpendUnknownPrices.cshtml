@@ -1,0 +1,86 @@
+@* Decision 0011 (run W3, S4): the mockups' _SpendUnknownPrices: each connected provider whose catalog lists models without a price (or
+   whose account is Unknown price with no model in the catalog), which ones, and what happens to their requests (Ask before sending, Block, or Allow and count tokens only; spend.unknownPriceRules), with Enter
+   price (_SpendEnterPriceMenu) for one model and the prices already entered (removable); then the behaviour for any other provider
+   (spend.unknownPrice). An entered price is kept with the spend settings in webagent.db, not in models.json, and never replaces a catalog
+   price. Model: SpendSettingsPage. *@
+@using PiSharp.WebAgent.Spend
+@model SpendSettingsPage
+@{
+    (string Value, string Text)[] behaviours = [("ask", "Ask before sending"), ("block", "Block"), ("allow", "Allow and count tokens only")];
+    static string Wire(UnknownPriceBehavior behavior) => behavior.ToString().ToLowerInvariant();
+    var global = Wire(Model.Settings.UnknownPrice);
+    var globalText = behaviours.First(choice => choice.Value == global).Text;
+}
+<section class="settings-section" id="unknown-prices">
+  <h3>Unknown prices</h3>
+  <p class="section-desc">Models with no price in the catalog. Their cost can't be estimated, so they can't be checked against caps.</p>
+  <div class="ps-card">
+    @if (Model.Unknown.Count == 0)
+    {
+      <div class="setting-row"><div class="setting-desc mb-0">Every model of your connected providers has a price.</div></div>
+    }
+    @foreach (var (row, index) in Model.Unknown.Select((row, index) => (row, index)))
+    {
+      var field = "unknown:" + row.Provider;
+      var current = Wire(row.Behavior);
+      var missing = row.Models.Where(model => model.Entered is null).Select(model => model.Model.Id).ToList();
+      var entered = row.Models.Where(model => model.Entered is not null).ToList();
+      <div class="setting-row" data-setting-row="@field">
+        <div>
+          <div class="setting-label d-flex align-items-center flex-wrap gap-2">@row.Name <span class="provider-id">@row.Provider</span> <span class="ps-chip" data-tone="warn" data-modified-chip hidden>modified</span></div>
+          @if (missing.Count > 0)
+          {
+            <div class="setting-desc">@missing.Count @(missing.Count == 1 ? "model" : "models") without a price:
+              @for (var i = 0; i < Math.Min(missing.Count, 6); i++)
+              {
+                <span class="ps-mono">@missing[i]</span>@(i < Math.Min(missing.Count, 6) - 1 ? ", " : missing.Count > 6 ? $" and {missing.Count - 6} more." : ".")
+              }
+            </div>
+          }
+          else if (row.Models.Count == 0)
+          {
+            <div class="setting-desc">None of its models is in the model catalog, so there is no price to enter here.</div>
+          }
+          @foreach (var price in entered)
+          {
+            <div class="fs-8 text-ps-faint mt-1 d-flex flex-wrap align-items-center gap-2">
+              <span><span class="ps-mono">@price.Model.Id</span> · entered @SpendMoney.Format(price.Entered!.InputMicrosPerMillion) in / @SpendMoney.Format(price.Entered.OutputMicrosPerMillion) out per 1M · metered</span>
+              <button class="btn btn-link btn-sm p-0 fs-8 align-baseline" type="button" data-price-remove data-provider="@row.Provider" data-model="@price.Model.Id">Remove</button>
+            </div>
+          }
+          <div class="setting-key">spend.unknownPriceRules["@row.Provider"] · default @global</div>
+        </div>
+        <div class="setting-control flex-wrap">
+          <label class="visually-hidden" for="@("unknownPrice" + index)">When the price is unknown</label>
+          <select class="form-select form-select-sm" id="@("unknownPrice" + index)" style="width:14rem" data-spend-field="@field" data-provider="@row.Provider" data-initial="@current">
+            @foreach (var (value, text) in behaviours)
+            {
+              <option value="@value" selected="@(value == current)">@text</option>
+            }
+          </select>
+          @if (missing.Count > 0)
+          {
+            <partial name="/Views/Settings/_SpendEnterPriceMenu.cshtml" model="(row, index)" />
+          }
+        </div>
+      </div>
+    }
+    <div class="setting-row" data-setting-row="unknownPrice">
+      <div>
+        <div class="setting-label d-flex align-items-center flex-wrap gap-2">@(Model.Unknown.Count == 0 ? "Any provider" : "Other providers") <span class="ps-chip" data-tone="warn" data-modified-chip hidden>modified</span></div>
+        <div class="setting-desc">For a provider without a rule of its own, such as a custom provider added later.</div>
+        <div class="setting-key">spend.unknownPrice · default ask</div>
+      </div>
+      <div class="setting-control">
+        <label class="visually-hidden" for="unknownPriceDefault">When the price is unknown, for other providers</label>
+        <select class="form-select form-select-sm" id="unknownPriceDefault" style="width:14rem" data-spend-field="unknownPrice" data-initial="@global" data-initial-text="@globalText">
+          @foreach (var (value, text) in behaviours)
+          {
+            <option value="@value" selected="@(value == global)">@text</option>
+          }
+        </select>
+      </div>
+    </div>
+  </div>
+  <p class="fs-8 text-ps-faint mt-2 mb-0">Ask confirms each request first. Block never sends it. Allow sends it and records tokens without a cost.</p>
+</section>

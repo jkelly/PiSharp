@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<rss version="2.0">
+  <channel>
+    <title>Widget releases</title>
+    <link>https://example.com/widget/releases</link>
+    <description>Recorded fixture: the first check sees two releases.</description>
+    <item>
+      <guid isPermaLink="false">widget-1.0.0</guid>
+      <title>Widget 1.0.0</title>
+      <link>https://example.com/widget/releases/1.0.0</link>
+      <pubDate>Mon, 05 Oct 2026 09:00:00 GMT</pubDate>
+      <description>Bug fixes and small improvements.</description>
+    </item>
+    <item>
+      <guid isPermaLink="false">widget-1.1.0</guid>
+      <title>Widget 1.1.0</title>
+      <link>https://example.com/widget/releases/1.1.0</link>
+      <pubDate>Mon, 12 Oct 2026 09:00:00 GMT</pubDate>
+      <description>BREAKING: removes the legacy Parse API; use ParseAsync instead.</description>
+    </item>
+  </channel>
+</rss>

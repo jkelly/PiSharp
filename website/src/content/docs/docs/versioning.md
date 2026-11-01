@@ -17,4 +17,6 @@ C#-only fixes that don't change the Pi baseline add a fourth number.
 
 Bumping the third number instead (`0.99.2`) would claim to match a Pi release that PiSharp doesn't match. NuGet and .NET both order four-part versions correctly, so `0.99.1.2` sorts after `0.99.1` and before `1.1.0`.
 
-The [changelog](/changelog/) labels each release as either a **Pi sync** or a **C# patch**.
+The [changelog](/changelog/) labels each release as either a **Pi sync** or a **C# patch**. [Releasing](/docs/contribute/releasing/) describes how a release is prepared and published.
+
+Features on the `main` branch that are in no release yet are marked **Unreleased** in these docs. A build of `main` still reports the last release's version.

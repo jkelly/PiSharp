@@ -14,7 +14,8 @@ using PiSharp.Cli.Pi;
 namespace PiSharp.Cli.Durable;
 
 /// <summary>One session directory holding <c>session.sqlite</c>, locked by this process (upstream <c>SessionLocation</c>).</summary>
-internal sealed class DurableSessionLocation(string id, string directory, string cwd, bool created, PiLockHandle handle) : IAsyncDisposable
+internal sealed class DurableSessionLocation(string id, string directory, string cwd, bool created, PiLockHandle handle, DurableLockLoss loss)
+    : IAsyncDisposable
 {
     private int released;
 
@@ -30,6 +31,18 @@ internal sealed class DurableSessionLocation(string id, string directory, string
     public bool Created { get; } = created;
     /// <summary>The held lock.</summary>
     internal PiLockHandle Lock { get; } = handle;
+
+    /// <summary>Why the lock was lost (removed, or taken over by another process); null while it is held.</summary>
+    internal DurableSessionLockLostException? LockLost => loss.Error;
+
+    /// <summary>Calls <paramref name="handler"/> once when the lock is lost, at once when it already was. One handler.</summary>
+    internal void OnLockLost(Action<DurableSessionLockLostException> handler) => loss.Attach(handler);
+
+    /// <summary>Throws <see cref="LockLost"/> when the lock was lost.</summary>
+    internal void ThrowIfLockLost()
+    {
+        if (loss.Error is { } lost) throw lost;
+    }
 
     /// <summary>Releases the lock (upstream <c>release()</c>); idempotent.</summary>
     public async Task ReleaseAsync()
@@ -86,16 +99,22 @@ internal static partial class DurableSessions
         }
 
         PiLockHandle handle;
+        // proper-lockfile's default onCompromised throws, which ends upstream's process: it never runs on with a lost lock. Here the loss is
+        // recorded for the session to fail on (DurableRuntime.OpenAsync); a caller's own callback still runs.
+        var loss = new DurableLockLoss(directory);
+        var options = lockOptions ?? DefaultLock;
+        var callerCallback = options.OnCompromised;
+        options = options with { OnCompromised = error => { loss.Lose(error); callerCallback?.Invoke(error); } };
         try
         {
             // A lock left by a crashed process goes stale after 10 s; wait that long before giving up.
-            handle = await PiLockfile.LockAsync(directory, lockOptions ?? DefaultLock, cancellationToken).ConfigureAwait(false);
+            handle = await PiLockfile.LockAsync(directory, options, cancellationToken).ConfigureAwait(false);
         }
         catch (Exception error) when (error is IOException or UnauthorizedAccessException)
         {
             throw new DurableSessionLockedException($"Session is already open in another process: {directory}", error);
         }
-        return new DurableSessionLocation(Path.GetFileName(directory), directory, cwd, created, handle);
+        return new DurableSessionLocation(Path.GetFileName(directory), directory, cwd, created, handle, loss);
     }
 
     /// <summary>Node's <c>fs.promises.realpath</c> (libuv <c>uv_fs_realpath</c>): every link resolved and, on Windows, every name in its
@@ -146,3 +165,45 @@ internal static partial class DurableSessions
 
 /// <summary>The session's lock is held by another process.</summary>
 internal sealed class DurableSessionLockedException(string message, Exception inner) : IOException(message, inner);
+
+/// <summary>The session's lock was lost while this process held it: its directory was removed, or another process took it over (proper-lockfile:
+/// compromised). Another process may be writing the session now, so this one must not commit to it again.</summary>
+internal sealed class DurableSessionLockLostException(string directory, Exception cause)
+    : IOException($"the session lock was lost (removed, or taken over by another process): {PiLockfile.LockPath(directory)}", cause);
+
+/// <summary>The loss of a session's lock, reported by the lock's renewal (any thread) and handled by whoever attached.</summary>
+internal sealed class DurableLockLoss(string directory)
+{
+    private readonly Lock gate = new();
+    private Action<DurableSessionLockLostException>? handler;
+    private volatile DurableSessionLockLostException? error;
+
+    /// <summary>The loss; null while the lock is held.</summary>
+    public DurableSessionLockLostException? Error => error;
+
+    /// <summary>proper-lockfile <c>onCompromised</c>: records the loss and tells the handler. Never throws.</summary>
+    public void Lose(Exception cause)
+    {
+        Action<DurableSessionLockLostException>? target;
+        DurableSessionLockLostException lost;
+        lock (gate)
+        {
+            if (error is not null) return;
+            error = lost = new DurableSessionLockLostException(directory, cause);
+            target = handler;
+        }
+        try { target?.Invoke(lost); } catch { /* The lock's callback must not throw. */ }
+    }
+
+    /// <summary>Sets the handler; it runs at once when the lock is already lost.</summary>
+    public void Attach(Action<DurableSessionLockLostException> target)
+    {
+        DurableSessionLockLostException? lost;
+        lock (gate)
+        {
+            handler = target;
+            lost = error;
+        }
+        if (lost is not null) target(lost);
+    }
+}

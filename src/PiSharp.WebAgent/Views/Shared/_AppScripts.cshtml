@@ -1,0 +1,4 @@
+@* Decision 0011 (W3 fix): the scripts both layouts (_Layout and _SetupLayout) end <body> with: Bootstrap, then site.js (the shell: the theme
+   toggle, the toasts, the shortcuts). A layout adds its own modules and its page's Scripts section after them. *@
+<script src="@WebCommonAssets.BootstrapJs"></script>
+<script type="module" src="~/js/site.js" asp-append-version="true"></script>

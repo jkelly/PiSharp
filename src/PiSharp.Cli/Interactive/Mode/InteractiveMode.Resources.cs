@@ -25,6 +25,7 @@ internal static class SlashCommands
         new("model", "Select model (opens selector UI)", "<provider/model>"),
         new("tree", "Navigate session tree (switch branches)"),
         new("thinking", "Set thinking level", "<level>"),
+        new("tier", "Set service tier (auto, normal, economy, priority, fast, ultrafast)", "<tier> [default]"),
         new("scoped-models", "Enable/disable models for Ctrl+P cycling"),
         new("export", "Export session (HTML default, or specify path: .html/.jsonl)"),
         new("import", "Import and resume a session from a JSONL file"),

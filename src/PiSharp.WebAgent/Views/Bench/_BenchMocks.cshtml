@@ -1,0 +1,40 @@
+@* Decision 0011 (run W4, R7): the bench's part of the mockups' _ToolEditorModal, as inert templates that bench-tools.js places in the
+   shared editor (#modal-tool-editor, R1's partial): the mock responses (a name, an optional match object, isError and the result text;
+   auto-respond uses the first mock whose match is a subset of a call's arguments, a mock with no match is the fallback), the note shown
+   for a built-in (its declaration is read-only and it never runs here), Delete tool, and the line under the editor's Strict switch that
+   says what the bench's model does with Strict (it replaces the shared editor's own line on this page; bench-tools.js fills it from the
+   tool list's data-strict-note). Model: BenchView. *@
+@model BenchView
+<template id="bench-mock-section">
+  <div data-bench-mocks>
+    <div class="d-flex align-items-center mt-4 mb-2">
+      <h3 class="fs-6 mb-0">Mock responses</h3>
+      <span class="ps-chip ms-2" data-mock-count>0</span>
+      <button class="btn btn-sm btn-outline-secondary ms-auto" type="button" data-mock-add><i class="bi bi-plus-lg me-1"></i>Add mock response</button>
+    </div>
+    <p class="fs-8 text-secondary">Saved canned results for quick fill and auto-respond. Auto-respond uses the first mock whose <span class="ps-mono">match</span> is a subset of the call's arguments; a mock with no match is the fallback. Nothing runs: the model gets the text you save.</p>
+    <div class="d-grid gap-2" data-mock-list></div>
+    <div class="fs-8 text-ps-faint" data-mock-empty>No mock responses yet: calls to this tool wait for your result (or get the "no mock" error when the bench does not pause).</div>
+  </div>
+</template>
+<template id="bench-mock-row">
+  <div class="ps-panel p-2" data-mock>
+    <div class="row g-2 align-items-center">
+      <div class="col-sm-4"><label class="visually-hidden" data-label-for="name">Name</label><input class="form-control form-control-sm" maxlength="80" placeholder="Name" data-mock-field="name"></div>
+      <div class="col-sm-5"><label class="visually-hidden" data-label-for="match">Match arguments</label><input class="form-control form-control-sm font-monospace" placeholder="match (optional)" spellcheck="false" data-mock-field="match"></div>
+      <div class="col-auto"><div class="form-check form-switch mb-0"><input class="form-check-input" type="checkbox" role="switch" data-mock-field="isError"><label class="form-check-label fs-8 ps-mono" data-label-for="isError">isError</label></div></div>
+      <div class="col-auto ms-auto"><button class="btn btn-icon" type="button" title="Remove mock" aria-label="Remove mock" data-mock-remove><i class="bi bi-trash3 fs-8"></i></button></div>
+    </div>
+    <label class="visually-hidden" data-label-for="text">Result</label>
+    <textarea class="form-control form-control-sm font-monospace mt-2" rows="2" spellcheck="false" maxlength="@BenchMock.MaxText" data-mock-field="text"></textarea>
+  </div>
+</template>
+<template id="bench-builtin-note">
+  <div class="alert alert-info py-2 px-3 fs-8 mb-3" role="note" data-bench-builtin-note><i class="bi bi-info-circle me-1"></i>PiSharp's own declaration: read-only (only Strict and the mock responses change). The Tool Bench never runs it; answer its calls with mocks or by hand.</div>
+</template>
+<template id="bench-strict-note">
+  <div class="form-text" data-bench-strict-editor-note><i class="bi bi-info-circle me-1" data-bench-strict-icon></i><span data-bench-strict-text></span></div>
+</template>
+<template id="bench-tool-delete">
+  <button type="button" class="btn btn-outline-danger me-auto" data-bench-delete-tool><i class="bi bi-trash3 me-1"></i>Delete tool</button>
+</template>

@@ -1,0 +1,32 @@
+@model ToolsTabModel
+@{
+    var tools = Model.Agent.Tools;
+    var readOnly = Model.Agent.Config.ReadOnly == true;
+}
+<div class="ins-section" data-tools-tab>
+  <h3>Tools <span class="ms-auto ps-chip">@tools.Count(tool => tool.Offered) / @tools.Count</span></h3>
+  <p class="ins-hint">Every tool this agent's extensions provide. A change applies from the next request.</p>
+  <div class="ro-card mb-3">
+    <i class="bi bi-shield-check"></i>
+    <div class="flex-grow-1"><div class="fw-medium fs-7">Read only</div><div class="fs-8 text-ps-faint">Offers this agent only tools that read. Tools that write, run commands or start work leave its next request.</div></div>
+    <div class="form-check form-switch mb-0"><input class="form-check-input" type="checkbox" role="switch" aria-label="Read only" data-action-change="read-only" checked="@readOnly"></div>
+  </div>
+  @foreach (var tool in tools)
+  {
+    <details class="tool-row @(tool.Writes ? "writes" : "")" data-tool="@tool.Name">
+      <summary><i class="bi bi-wrench"></i><span class="tool-row-name">@tool.Name</span><span class="tool-row-tags">@if (!tool.Offered)
+        {<span class="ps-chip" data-tone="warn">disabled</span>}@if (tool.Writes)
+        {<span class="ps-chip writes-chip" data-tone="outline">@(tool.Effect == "exec" ? "runs" : "writes")</span>}@if (tool.Deferred == true)
+        {<span class="ps-chip" data-tone="outline">deferred</span>}@if (tool.Name is "ask_user_question" or "exit_plan_mode")
+        {<span class="ps-chip" data-tone="outline">waits for you</span>}<span class="ps-chip" data-tone="outline">@(tool.Replay == "safe" ? "replay safe" : "interrupt on crash")</span></span></summary>
+      <div class="tool-row-body">
+        <p>@tool.Description</p>
+        <pre class="signature" aria-label="@tool.Name TypeScript definition">@Html.Raw(Signatures.Render(tool.Name, tool.Parameters))</pre>
+        @if (tool.Replay != "safe")
+        {
+          <div class="fs-8 text-ps-faint">A crash records an interrupted result instead of rerunning this effect.</div>
+        }
+      </div>
+    </details>
+  }
+</div>

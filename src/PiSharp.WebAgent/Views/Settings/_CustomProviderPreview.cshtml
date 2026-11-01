@@ -1,0 +1,38 @@
+@* Decision 0011 (run W3, CP): the mockups' "Preview models.json" section: the file as it is saved (validated against Pi's models.json
+   schema), with its size and counts and a copy button; "not created yet" before the first save; the error of a file edited into an
+   invalid state. A key is never in the file; a literal key or secret-like header written by hand is left out of the preview.
+   Model: CustomProvidersPage. *@
+@using PiSharp.WebAgent.CustomProviders
+@model CustomProvidersPage
+@{
+    var snapshot = Model.Snapshot;
+}
+<section class="settings-section" id="preview">
+  <h3>Preview models.json</h3>
+  <p class="section-desc">This is what Save writes. If you edit the file in another editor, the change is picked up on the next request and shows here.</p>
+  @if (Model.Preview is { } preview)
+  {
+    <div class="d-flex flex-wrap gap-2 align-items-center mb-2">
+      <span class="ps-chip" data-tone="ok"><i class="bi bi-check2-circle" aria-hidden="true"></i>valid against the models.json schema</span>
+      <span class="fs-8 ps-mono text-ps-faint">@Model.Rows.Count provider@(Model.Rows.Count == 1 ? "" : "s") · @snapshot.ModelCount model@(snapshot.ModelCount == 1 ? "" : "s") · @Model.Overrides.Count override@(Model.Overrides.Count == 1 ? "" : "s") · @CustomProviderJson.Size(snapshot.Size)</span>
+    </div>
+    <div class="ps-term">
+      <div class="ps-term-bar"><span class="dot"></span>models.json<span class="d-none d-md-inline text-truncate">· @System.IO.Path.GetDirectoryName(snapshot.Path)</span><button class="btn btn-icon ms-auto" type="button" data-cp-copy="#models-json-preview" title="Copy" aria-label="Copy models.json"><i class="bi bi-copy" aria-hidden="true"></i></button></div>
+      <pre id="models-json-preview" class="cp-preview"><code class="language-json">@preview</code></pre>
+    </div>
+  }
+  else if (!snapshot.Valid)
+  {
+    <div class="ps-card p-3 fs-7 text-secondary">The preview shows once the file is valid again.</div>
+  }
+  else
+  {
+    <div class="ps-term">
+      <div class="ps-term-bar"><span class="dot"></span>models.json · not created yet</div>
+      <pre class="cp-preview"><code class="language-json">// No custom providers or overrides yet. Save creates this file.
+{
+  "providers": {}
+}</code></pre>
+    </div>
+  }
+</section>

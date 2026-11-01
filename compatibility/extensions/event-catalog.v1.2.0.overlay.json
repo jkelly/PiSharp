@@ -1,5 +1,5 @@
 {
-  "$comment": "Authored native status for the v1.2.0 event catalog, applied by tools/SurfaceInventory/build-event-catalog.mjs --overlay over the v1.1.0 catalog (which already carries the v1.1.0 overlay). Only before_agent_start changed natively: its event is a union on messageType (user or custom) and it also fires for runs started by a custom message with triggerTurn. Assessed against PiSharp sources at f1d4b32d1e10a804b0b34e3c8522caa87d3f3f07. Tests are authored and registered, not executed by the refresh.",
+  "$comment": "Authored native status for the v1.2.0 event catalog, applied by tools/SurfaceInventory/build-event-catalog.mjs --overlay over the v1.1.0 catalog (which already carries the v1.1.0 overlay). Only before_agent_start changed natively: its event is a union on messageType (user or custom) and it also fires for runs started by a custom message with triggerTurn. Assessed against PiSharp sources at f1d4b32d1e10a804b0b34e3c8522caa87d3f3f07. Tests are authored and registered, not executed by the refresh. It also corrects the nativeEvidence.registration of the nine result-returning events: RegisterEventHandler is a member of IExtensionEventHandlerRegistry, not IExtensionRegistry (the v1.1.0 catalog keeps its original wording).",
   "events": {
     "before_agent_start": {
       "nativeEvidence": {
@@ -76,6 +76,51 @@
           "bridge.events-reach-node-handlers loads a Node extension, which registers through PiNodeOwner in the same ExtensionRegistry; it needs Node.js and reports SKIP_NO_NODE without it.",
           "Node extensions receive messageType and message once the Node bridge passes them (PiNodeOwner before_agent_start slot and runtime.mjs); until then a TypeScript handler sees a custom run as a user event with an empty prompt."
         ]
+      }
+    },
+    "project_trust": {
+      "nativeEvidence": {
+        "registration": "IExtensionEventHandlerRegistry.RegisterEventHandler (topic project_trust)"
+      }
+    },
+    "resources_discover": {
+      "nativeEvidence": {
+        "registration": "IExtensionEventHandlerRegistry.RegisterEventHandler (topic resources_discover)"
+      }
+    },
+    "session_before_compact": {
+      "nativeEvidence": {
+        "registration": "IExtensionEventHandlerRegistry.RegisterEventHandler (topic session_before_compact)"
+      }
+    },
+    "cache_warming_decision": {
+      "nativeEvidence": {
+        "registration": "IExtensionEventHandlerRegistry.RegisterEventHandler (topic cache_warming_decision)"
+      }
+    },
+    "before_provider_request": {
+      "nativeEvidence": {
+        "registration": "IExtensionEventHandlerRegistry.RegisterEventHandler (topic before_provider_request)"
+      }
+    },
+    "before_provider_headers": {
+      "nativeEvidence": {
+        "registration": "IExtensionEventHandlerRegistry.RegisterEventHandler (topic before_provider_headers)"
+      }
+    },
+    "agent_before_settle": {
+      "nativeEvidence": {
+        "registration": "IExtensionEventHandlerRegistry.RegisterEventHandler (topic agent_before_settle; boundary entries/continue)"
+      }
+    },
+    "turn_end": {
+      "nativeEvidence": {
+        "registration": "IExtensionRegistry.Observe and IExtensionEventHandlerRegistry.RegisterEventHandler (topic turn_end; boundary entries/continue)"
+      }
+    },
+    "message_end": {
+      "nativeEvidence": {
+        "registration": "IExtensionRegistry.Observe and IExtensionEventHandlerRegistry.RegisterEventHandler (topic message_end; same-role message replacement)"
       }
     }
   }

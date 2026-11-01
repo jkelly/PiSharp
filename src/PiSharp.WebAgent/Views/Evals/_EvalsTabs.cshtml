@@ -1,0 +1,8 @@
+@* Decision 0011 (run W5, E6): the mockups' _EvalsTabs: Leaderboard · Suites · Drift, the open one marked with aria-current. Model:
+   EvalsTab. *@
+@model EvalsTab
+<nav class="nav nav-tabs section-tabs" aria-label="Evals sections">
+  <a class="nav-link@(Model == EvalsTab.Leaderboard ? " active" : "")" aria-current="@(Model == EvalsTab.Leaderboard ? "page" : null)" href="@EvalRoutes.Leaderboard">Leaderboard</a>
+  <a class="nav-link@(Model == EvalsTab.Suites ? " active" : "")" aria-current="@(Model == EvalsTab.Suites ? "page" : null)" href="@EvalRoutes.Suites">Suites</a>
+  <a class="nav-link@(Model == EvalsTab.Drift ? " active" : "")" aria-current="@(Model == EvalsTab.Drift ? "page" : null)" href="@EvalRoutes.Drift">Drift</a>
+</nav>

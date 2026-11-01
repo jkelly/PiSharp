@@ -146,6 +146,36 @@ internal static partial class Program
             Check(held.Lock.Compromised, "compromised");
             await held.ReleaseAsync();
         }),
+        // The location records the loss for the session to fail on (upstream's onCompromised throws instead), still calls the caller's own
+        // callback, and a handler attached after the loss runs at once. Releasing a lost lock leaves whatever is at its path.
+        Case("sessions.lock.lost-lock-is-reported-and-not-removed", async () =>
+        {
+            await using var agent = new TestAgent("lost");
+            var compromised = new TaskCompletionSource<Exception>(TaskCreationOptions.RunContinuationsAsynchronously);
+            var held = await DurableSessions.SelectAsync(agent.Cwd, false, agent.AgentDir,
+                new PiLockOptions { Stale = TimeSpan.FromSeconds(2), OnCompromised = error => compromised.TrySetResult(error) });
+            var lockPath = held.Directory + ".lock";
+            var reported = new List<DurableSessionLockLostException>();
+            held.OnLockLost(error => { lock (reported) reported.Add(error); });
+            Equal<DurableSessionLockLostException?>(null, held.LockLost, "held");
+            held.ThrowIfLockLost();
+            // Another process takes the lock over.
+            var otherOwner = new DateTime(2001, 2, 3, 4, 5, 6, DateTimeKind.Utc);
+            await TakeOverAsync(lockPath, otherOwner, () => compromised.Task.IsCompleted);
+            var cause = await compromised.Task;
+            var lost = held.LockLost;
+            Check(lost is not null && ReferenceEquals(cause, lost.InnerException), "the loss wraps the lock's error");
+            Equal($"the session lock was lost (removed, or taken over by another process): {lockPath}", lost!.Message, "message");
+            lock (reported) Check(reported.Count == 1 && ReferenceEquals(reported[0], lost), "the handler ran once");
+            var late = new List<DurableSessionLockLostException>();
+            held.OnLockLost(late.Add);
+            Check(late.Count == 1 && ReferenceEquals(late[0], lost), "a later handler runs at once");
+            Check(ReferenceEquals(lost, Throws<DurableSessionLockLostException>(held.ThrowIfLockLost, "throws the loss")), "ThrowIfLockLost");
+            await held.ReleaseAsync();
+            Check(Directory.Exists(lockPath), "release kept the other owner's lock");
+            Equal(otherOwner, Directory.GetLastWriteTimeUtc(lockPath), "and did not renew it");
+            Directory.Delete(lockPath);
+        }),
         Case("sessions.lock.cross-process", async () =>
         {
             await using var agent = new TestAgent("cross");

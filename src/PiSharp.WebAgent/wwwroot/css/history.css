@@ -1,0 +1,54 @@
+/* Decision 0011 (run W4, R3): History › Runs and the Run inspector, after the mockups' history.html and inspector.html ("page-specific:
+   fold into app.css" blocks). The section tabs and pagination variables are spend.css's (History › Spend), repeated here so each page
+   loads one stylesheet of its own; the inspector also loads playground.css for .sse-row, .header-table, .redacted and the metric strip. */
+
+/* History › Runs */
+.section-tabs { flex-wrap: nowrap; overflow-x: auto; overflow-y: hidden; margin-bottom: 1rem; }
+.section-tabs .nav-link { white-space: nowrap; }
+.totals-strip { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); border-bottom: 0; }
+@media (min-width: 576px) { .totals-strip { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (min-width: 1200px) { .totals-strip { grid-template-columns: repeat(6, minmax(0, 1fr)); } }
+.totals-strip .metric { padding: .55rem .8rem; min-width: 0; }
+.totals-strip .metric-label { font-size: .72rem; color: var(--ps-faint); }
+.totals-strip .metric-value { font-size: .95rem; font-weight: 500; color: var(--ps-text); white-space: nowrap; font-variant-numeric: tabular-nums; overflow: hidden; text-overflow: ellipsis; }
+.totals-strip .metric-value small { font-size: .72rem; color: var(--ps-faint); font-weight: 400; }
+.totals-strip .metric-sub { font-size: .68rem; color: var(--ps-faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.run-prompt, .run-sub { max-width: 11rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.run-prompt { font-size: .84rem; }
+@media (min-width: 1400px) { .run-prompt, .run-sub { max-width: 16rem; } }
+.runs-table td { vertical-align: middle; }
+.runs-table .btn-icon { --bs-btn-padding-x: .3rem; }
+.runs-table .btn-icon .bi { font-size: .9rem; }
+.runs-table tr.row-sel { --bs-table-bg-state: var(--ps-accent-low); }
+.runs-table .run-models-row > td { background: var(--ps-surface-2); }
+.bulk-bar { border-color: var(--ps-accent); background: var(--ps-accent-low); }
+.bulk-bar[hidden] { display: none !important; }
+.pagination { --bs-pagination-active-bg: var(--ps-accent); --bs-pagination-active-border-color: var(--ps-accent); --bs-pagination-focus-box-shadow: 0 0 0 .2rem var(--bs-focus-ring-color); }
+.arena-letter { display: inline-flex; align-items: center; justify-content: center; width: 1.5rem; height: 1.5rem; flex: none; border-radius: 6px;
+  background: var(--ps-surface-3); color: var(--ps-text); font-family: var(--ps-font-mono); font-size: .75rem; font-weight: 600; }
+.run-model-line { min-width: 0; flex-basis: 12rem; }
+.runs-empty-text { max-width: 52ch; }
+.history-saved-menu { max-width: min(22rem, 90vw); }
+
+/* Run inspector */
+.run-header-main { min-width: 0; }
+.run-sse-filter { min-width: 180px; max-width: 360px; }
+.run-sse-head { font-size: .62rem; }
+#sseList.sse-wrap .sse-row .data,
+#sseList.sse-wrap .sse-row .ev { white-space: pre-wrap; word-break: break-all; }
+.run-events[data-collapsed="true"] .sse-row[data-extra="true"] { display: none; }
+.run-events[data-collapsed="false"] .sse-row[data-summary="true"] { display: none; }
+.run-term pre { max-height: 32rem; overflow: auto; }
+.waterfall-row { display: grid; grid-template-columns: 150px minmax(0, 1fr) 80px; gap: .75rem; align-items: center; padding: .3rem 0; font-size: .8rem; }
+@media (max-width: 767.98px) { .waterfall-row { grid-template-columns: 96px minmax(0, 1fr) 56px; gap: .5rem; } }
+.waterfall-track { position: relative; height: 10px; background: var(--ps-surface-3); border-radius: 5px; }
+.waterfall-bar { position: absolute; top: 0; bottom: 0; min-width: 3px; border-radius: 5px; background: var(--ps-border-strong); }
+.waterfall-bar[data-phase="request"] { background: var(--ps-blue); }
+.waterfall-bar[data-phase="wait"] { background: var(--ps-border-strong); opacity: .5; }
+.waterfall-bar[data-phase="ttfb"] { background: #fbbf24; }
+.waterfall-bar[data-phase="thinking"] { background: var(--ps-violet); }
+.waterfall-bar[data-phase="text"] { background: var(--ps-accent); }
+.waterfall-bar[data-phase="tool"] { background: #fbbf24; opacity: .7; }
+.waterfall-bar[data-phase="last"] { background: var(--ps-accent); opacity: .65; }
+.waterfall-bar[data-phase="done"] { background: #34d399; }
+.waterfall-bar[data-phase="error"] { background: var(--ps-danger-solid, var(--ps-danger)); }

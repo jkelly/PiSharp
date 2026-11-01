@@ -1,0 +1,47 @@
+{
+  "config": {
+    "schemaVersion": 1,
+    "overlayPath": "catalog-maintained/models.overlay.json",
+    "excludedProviders": ["excluded-provider"],
+    "providers": [
+      { "id": "openrouter", "enabled": true, "adapter": "openrouter", "endpoint": "https://openrouter.ai/api/v1/models", "officialHosts": ["openrouter.ai"] },
+      { "id": "example-lab", "enabled": true, "adapter": "structured-json", "endpoint": "https://models.example.test/catalog", "officialHosts": ["models.example.test"] },
+      { "id": "disabled-provider", "enabled": false },
+      { "id": "excluded-provider", "enabled": true }
+    ]
+  },
+  "baseline": {
+    "schemaVersion": 1,
+    "providers": {
+      "openrouter": {
+        "example/atlas": {
+          "metadata": { "id": "example/atlas", "provider": "openrouter", "name": "Example Atlas", "api": "openai-completions", "type": "chat", "baseUrl": "https://openrouter.ai/api/v1", "contextWindow": 64000, "maxTokens": 8000, "input": ["text"], "output": ["text"], "supportedParameters": ["tools"], "runtimeCandidate": true },
+          "prices": [
+            { "kind": "input", "currency": "USD", "unit": "million-tokens", "amount": 1, "tier": "catalog-default", "region": "unspecified", "conditions": {} },
+            { "kind": "output", "currency": "USD", "unit": "million-tokens", "amount": 3, "tier": "catalog-default", "region": "unspecified", "conditions": {} },
+            { "kind": "cache-read", "currency": "USD", "unit": "million-tokens", "amount": 0.2, "tier": "catalog-default", "region": "unspecified", "conditions": {} }
+          ]
+        },
+        "example/legacy": { "metadata": { "id": "example/legacy", "provider": "openrouter", "name": "Retained missing model" }, "prices": [] }
+      },
+      "disabled-provider": { "saved": { "metadata": { "id": "saved", "provider": "disabled-provider", "name": "Preserved disabled model" }, "prices": [] } },
+      "excluded-provider": { "saved": { "metadata": { "id": "saved", "provider": "excluded-provider", "name": "Preserved excluded model" }, "prices": [] } }
+    }
+  },
+  "responses": {
+    "openrouter": {
+      "data": [
+        { "id": "example/atlas", "name": "Example Atlas", "context_length": 128000, "top_provider": { "max_completion_tokens": 16000 }, "architecture": { "input_modalities": ["text", "image"], "output_modalities": ["text"] }, "supported_parameters": ["tools", "reasoning"], "pricing": { "prompt": "0.000002", "completion": "0.000002", "input_cache_read": null, "input_cache_write": "0.0000025", "overrides": [{ "min_prompt_tokens": 100000, "prompt": "0.000004" }] } },
+        { "id": "example/new-unpriced", "name": "Unpriced model", "context_length": 32000, "architecture": { "input_modalities": ["text"], "output_modalities": ["text"] }, "pricing": {} }
+      ]
+    },
+    "example-lab": {
+      "data": [
+        { "id": "future-protocol", "name": "Future protocol metadata", "api": "future-protocol-v9", "type": "chat", "baseUrl": "https://models.example.test/v9", "contextWindow": 200000, "input": ["text"], "output": ["text"], "prices": [
+          { "kind": "input", "amount": "0.0015", "currency": "usd", "unit": "thousand-tokens", "tier": "standard", "region": "us-east", "conditions": {} },
+          { "kind": "input", "amount": "1.4", "currency": "EUR", "unit": "million-tokens", "tier": "batch", "region": "eu-west", "conditions": {} }
+        ] }
+      ]
+    }
+  }
+}

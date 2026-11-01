@@ -1,0 +1,93 @@
+@model ArtifactsModel
+@* Decision 0010: artifact cards. Every value renders encoded; only finding details go through the Markdown sanitizer; links are HTTP(S) only;
+   an action button only asks the page to confirm and start it. *@
+<div class="artifact-list" data-artifact-list>
+  @if (Model.Items.Count == 0)
+  {
+    <p class="text-body-secondary mb-0" data-artifacts-empty>This execution saved no artifacts.</p>
+  }
+  @foreach (var artifact in Model.Items)
+  {
+    var card = new ArtifactCardModel(artifact, Model);
+    var id = Display.Str(artifact, "id") ?? "";
+    var kind = Display.Str(artifact, "kind") ?? "artifact";
+    var known = Display.Long(artifact, "schemaVersion") == 1 && ArtifactsModel.Kinds.Contains(kind);
+    var provenance = artifact["provenance"] as JsonObject;
+    var evidenceIds = (artifact["evidenceIds"] as JsonArray ?? []).Select(item => item?.GetValue<string>()).OfType<string>().ToList();
+    <article class="artifact-card" id="artifact-@id" data-artifact="@id" data-kind="@kind">
+      <header class="artifact-head">
+        <span class="ps-chip" data-tone="@(kind == "action-request" ? "warn" : "info")">@kind</span>
+        <h4 class="artifact-title">@Display.Str(artifact, "title")</h4>
+      </header>
+      @if (!known)
+      {
+        <pre class="small automation-output" data-artifact-fallback>@Display.Cut(Display.Pretty(artifact["props"]), 4000)</pre>
+      }
+      else
+      {
+        switch (kind)
+        {
+          case "finding": <partial name="~/Views/Fragments/Artifacts/_Finding.cshtml" model="card" /> break;
+          case "comparison": <partial name="~/Views/Fragments/Artifacts/_Comparison.cshtml" model="card" /> break;
+          case "evidence-list": <partial name="~/Views/Fragments/Artifacts/_EvidenceList.cshtml" model="card" /> break;
+          case "timeline": <partial name="~/Views/Fragments/Artifacts/_Timeline.cshtml" model="card" /> break;
+          case "action-request": <partial name="~/Views/Fragments/Artifacts/_ActionRequest.cshtml" model="card" /> break;
+        }
+      }
+      @if (evidenceIds.Count > 0 && kind != "evidence-list")
+      {
+        <details class="artifact-evidence"><summary>Evidence (@evidenceIds.Count)</summary><ul class="mb-0">
+          @foreach (var evidenceId in evidenceIds)
+          {
+            var record = card.Evidence(evidenceId);
+            var url = Display.Str(record, "url");
+            var name = Display.Str(record, "title") ?? evidenceId;
+            <li>
+              @if (ArtifactsModel.IsSafeUrl(url))
+              {
+                <a href="@url" target="_blank" rel="noopener noreferrer">@name</a>
+              }
+              else
+              {
+                <span>@name</span>
+              }
+              <a class="fs-8 ms-1" href="@Model.Api($"evidence/{Uri.EscapeDataString(evidenceId)}/text")" target="_blank" rel="noopener">text</a>
+            </li>
+          }
+        </ul></details>
+      }
+      @if (Model.Feedback is { } feedback)
+      {
+        var state = feedback.GetValueOrDefault(id);
+        var vote = Display.Str(state, "vote");
+        var undo = Display.Str(state, "undo");
+        <div class="artifact-feedback" role="group" aria-label="Feedback on @Display.Str(artifact, "title")" data-feedback="@id">
+          @foreach (var (action, label) in ArtifactsModel.Votes)
+          {
+            <button type="button" class="btn btn-sm btn-outline-secondary" data-feedback-action="@action" aria-pressed="@(vote == action ? "true" : "false")">@label</button>
+          }
+          <input type="text" class="form-control form-control-sm artifact-feedback-labels" data-feedback-labels maxlength="200" placeholder="labels, comma separated"
+                 aria-label="Labels this feedback is about" title="Optional. Judged findings already carry their label." />
+          <button type="button" class="btn btn-sm btn-outline-secondary" data-feedback-action="label">Label</button>
+          <label class="form-check-label fs-8"><input type="checkbox" class="form-check-input me-1" data-feedback-example checked="@Display.Bool(state, "example")" />Use as an example</label>
+          <button type="button" class="btn btn-sm btn-link" data-feedback-action="undo" hidden="@(undo is null)">Undo</button>
+          <button type="button" class="btn btn-sm btn-outline-danger" data-feedback-retry hidden>Retry</button>
+          <span class="fs-8 text-body-secondary" role="status" data-feedback-state>@(vote is not null && ArtifactsModel.Votes.TryGetValue(vote, out var chosen) ? $"Saved: {chosen}" : "")</span>
+        </div>
+      }
+      <footer class="artifact-foot">
+        @if (Display.Str(provenance, "policyId") is { } policy)
+        {
+          <span>Policy @policy v@(Display.Long(provenance, "policyVersion"))</span>
+        }
+        @if (Display.Str(provenance, "decision") is { } decision)
+        {
+          <span>Decision: @decision</span>
+        }
+        <span>@DateTimeOffset.FromUnixTimeMilliseconds(Display.Long(artifact, "createdAt") ?? 0).ToString("u", System.Globalization.CultureInfo.InvariantCulture)</span>
+        <a class="ms-auto" href="@Model.Api($"artifacts/{Uri.EscapeDataString(id)}/export")" download="@(id).json">Export JSON</a>
+        <a href="@Model.Api($"artifacts/{Uri.EscapeDataString(id)}/export?format=text")" target="_blank" rel="noopener">Text</a>
+      </footer>
+    </article>
+  }
+</div>

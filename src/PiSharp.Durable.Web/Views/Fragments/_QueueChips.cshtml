@@ -1,0 +1,7 @@
+@model IReadOnlyList<InboxItem>
+@foreach (var item in Model)
+{
+  var kind = item.Mode switch { "steer" => "Steer", "write" => "Update", _ => "Queued" };
+  <span class="queue-chip" data-submission="@item.Id"><span class="queue-kind">@kind</span><span class="queue-text">@Display.Cut(item.Content ?? "", 80)</span>@if (item.Mode != "write")
+    {<button class="btn btn-icon p-0" type="button" title="Withdraw submission @item.Id" aria-label="Withdraw submission @item.Id" data-action="withdraw" data-submission="@item.Id"><i class="bi bi-x"></i></button>}</span>
+}

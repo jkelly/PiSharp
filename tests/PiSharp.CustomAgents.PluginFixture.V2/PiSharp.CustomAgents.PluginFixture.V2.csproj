@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Decision 0012: version 2 of the fixture plugin (the same source built with FIXTURE_V2): the tests copy it over version 1 to reload. -->
+  <PropertyGroup>
+    <AssemblyName>AgentsPluginFixture.V2</AssemblyName>
+    <RootNamespace>AgentsPluginFixture</RootNamespace>
+    <IsPackable>false</IsPackable>
+    <DefineConstants>$(DefineConstants);FIXTURE_V2</DefineConstants>
+    <NoWarn>$(NoWarn);PISHARP_DURABLE001;PISHARP_AGENTS001</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../src/PiSharp.CustomAgents/PiSharp.CustomAgents.csproj" Private="false" />
+    <Compile Include="../PiSharp.CustomAgents.PluginFixture.V1/Entry.cs" Link="Entry.cs" />
+    <None Include="pisharp-agents-plugin.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>

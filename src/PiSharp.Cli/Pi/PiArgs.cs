@@ -11,6 +11,8 @@ internal sealed record PiArgsDiagnostic(string Type, string Message);
 internal sealed class PiArgs
 {
     public string? Provider, Model, ApiKey, SystemPrompt, Name, Session, SessionId, Fork, SessionDir, Export, UseTheme, TuiMode, Thinking, ToolPolicy;
+    /// <summary>PiSharp-only <c>--tier</c>: the service tier (decision 0007).</summary>
+    public string? Tier;
     public List<string>? AppendSystemPrompt, Models, Tools, ExcludeTools, Extensions, Skills, PromptTemplates, Themes;
     public bool Continue, Resume, Help, Version, NoSession, NoTools, NoBuiltinTools, NoExtensions, NoMcp, Print, NoSkills,
         NoPromptTemplates, NoThemes, NoContextFiles, Offline, Verbose;
@@ -103,6 +105,12 @@ internal sealed class PiArgs
                 var level = args[++i];
                 if (IsValidThinkingLevel(level)) result.Thinking = level;
                 else result.Diagnostics.Add(new("warning", $"Invalid thinking level \"{level}\". Valid values: {string.Join(", ", ValidThinkingLevels)}"));
+            }
+            else if (arg is "--tier" or "--service-tier" && HasValue())
+            {
+                var tier = args[++i];
+                if (PiSharp.AI.ServiceTiers.Normalize(tier) is { } normalized) result.Tier = normalized;
+                else result.Diagnostics.Add(new("warning", $"Invalid service tier \"{tier}\". Valid values: {string.Join(", ", PiSharp.AI.ServiceTiers.All)}"));
             }
             else if (arg is "--print" or "-p")
             {

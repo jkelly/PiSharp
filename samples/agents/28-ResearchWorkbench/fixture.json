@@ -1,0 +1,8 @@
+{
+  "question": "Which rollout option is easier to reverse?",
+  "sources": [
+    { "id": "s1", "title": "Pilot plan", "claim": "A one-team pilot can be rolled back in a day." },
+    { "id": "s2", "title": "Global plan", "claim": "A global cutover needs a multi-week migration." }
+  ],
+  "branchQuestion": "What evidence is missing before a global cutover?"
+}

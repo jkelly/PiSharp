@@ -1,0 +1,42 @@
+{
+  "feedback": [
+    {
+      "id": "F1",
+      "text": "Checkout crashes on mobile",
+      "severity": 3
+    },
+    {
+      "id": "F2",
+      "text": "Mobile checkout is slow",
+      "severity": 2
+    },
+    {
+      "id": "F3",
+      "text": "Delivery arrived late",
+      "severity": 2
+    },
+    {
+      "id": "F4",
+      "text": "Checkout payment failed",
+      "severity": 3
+    },
+    {
+      "id": "F5",
+      "text": "Packaging was great",
+      "severity": 1
+    }
+  ],
+  "themes": {
+    "checkout": [
+      "checkout",
+      "payment"
+    ],
+    "delivery": [
+      "delivery",
+      "late"
+    ],
+    "packaging": [
+      "packaging"
+    ]
+  }
+}

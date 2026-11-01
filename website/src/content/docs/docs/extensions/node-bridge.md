@@ -32,7 +32,7 @@ If the install can't run (offline, no npm, or a failed install), extensions stil
 
 ## What works
 
-The whole `ExtensionAPI`: tools, commands, shortcuts, flags, message and tool renderers, providers (chat, classifier and image), virtual models, MCP servers, the event bus, and every extension event. `ctx.ui` dialogs, widgets and custom components show in the terminal UI and over RPC.
+The whole `ExtensionAPI`: tools, commands, shortcuts, flags, message and tool renderers, providers (chat, classifier and image), virtual models, MCP servers, the event bus, and every extension event. [Extension events](/docs/extensions/events/) lists the events and when each one fires. `ctx.ui` dialogs, widgets and custom components show in the terminal UI and over RPC.
 
 `ctx.ui.setTheme()` switches the theme in the terminal UI and saves it, as in Pi. `pi.sendMessage(…, { triggerTurn: true })` starts its turn at once, also from inside a command's handler. Packages loaded with `-e` add their skills, prompt templates and themes as well as their extensions.
 

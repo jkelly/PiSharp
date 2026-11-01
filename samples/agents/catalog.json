@@ -1,0 +1,194 @@
+[
+  {
+    "number": 1,
+    "title": "Inbox Triage",
+    "folder": "01-InboxTriage",
+    "project": "01-InboxTriage/01-InboxTriage.csproj"
+  },
+  {
+    "number": 2,
+    "title": "Email Reply Assistant",
+    "folder": "02-EmailReplyAssistant",
+    "project": "02-EmailReplyAssistant/02-EmailReplyAssistant.csproj"
+  },
+  {
+    "number": 3,
+    "title": "Meeting Follow-through",
+    "folder": "03-MeetingFollowThrough",
+    "project": "03-MeetingFollowThrough/03-MeetingFollowThrough.csproj"
+  },
+  {
+    "number": 4,
+    "title": "Daily Work Planner",
+    "folder": "04-DailyWorkPlanner",
+    "project": "04-DailyWorkPlanner/04-DailyWorkPlanner.csproj"
+  },
+  {
+    "number": 5,
+    "title": "Persistent Task Manager",
+    "folder": "05-PersistentTaskManager",
+    "project": "05-PersistentTaskManager/05-PersistentTaskManager.csproj"
+  },
+  {
+    "number": 6,
+    "title": "Company Knowledge Assistant",
+    "folder": "06-CompanyKnowledgeAssistant",
+    "project": "06-CompanyKnowledgeAssistant/06-CompanyKnowledgeAssistant.csproj"
+  },
+  {
+    "number": 7,
+    "title": "Document Change Explainer",
+    "folder": "07-DocumentChangeExplainer",
+    "project": "07-DocumentChangeExplainer/07-DocumentChangeExplainer.csproj"
+  },
+  {
+    "number": 8,
+    "title": "Form Intake Assistant",
+    "folder": "08-FormIntakeAssistant",
+    "project": "08-FormIntakeAssistant/08-FormIntakeAssistant.csproj"
+  },
+  {
+    "number": 9,
+    "title": "Helpdesk Resolution Agent",
+    "folder": "09-HelpdeskResolution",
+    "project": "09-HelpdeskResolution/09-HelpdeskResolution.csproj"
+  },
+  {
+    "number": 10,
+    "title": "IT Troubleshooting Assistant",
+    "folder": "10-ItTroubleshooting",
+    "project": "10-ItTroubleshooting/10-ItTroubleshooting.csproj"
+  },
+  {
+    "number": 11,
+    "title": "Order Status Concierge",
+    "folder": "11-OrderStatusConcierge",
+    "project": "11-OrderStatusConcierge/OrderStatusConcierge.csproj"
+  },
+  {
+    "number": 12,
+    "title": "Returns Assistant",
+    "folder": "12-ReturnsAssistant",
+    "project": "12-ReturnsAssistant/ReturnsAssistant.csproj"
+  },
+  {
+    "number": 13,
+    "title": "CRM Update Assistant",
+    "folder": "13-CrmUpdateAssistant",
+    "project": "13-CrmUpdateAssistant/CrmUpdateAssistant.csproj"
+  },
+  {
+    "number": 14,
+    "title": "Client Meeting Briefing",
+    "folder": "14-ClientMeetingBriefing",
+    "project": "14-ClientMeetingBriefing/ClientMeetingBriefing.csproj"
+  },
+  {
+    "number": 15,
+    "title": "Customer Feedback Analyst",
+    "folder": "15-CustomerFeedbackAnalyst",
+    "project": "15-CustomerFeedbackAnalyst/CustomerFeedbackAnalyst.csproj"
+  },
+  {
+    "number": 16,
+    "title": "Receipt-to-Expense Assistant",
+    "folder": "16-ReceiptToExpense",
+    "project": "16-ReceiptToExpense/ReceiptToExpense.csproj"
+  },
+  {
+    "number": 17,
+    "title": "Invoice Reconciliation Agent",
+    "folder": "17-InvoiceReconciliation",
+    "project": "17-InvoiceReconciliation/InvoiceReconciliation.csproj"
+  },
+  {
+    "number": 18,
+    "title": "Vendor Quote Comparator",
+    "folder": "18-VendorQuoteComparator",
+    "project": "18-VendorQuoteComparator/VendorQuoteComparator.csproj"
+  },
+  {
+    "number": 19,
+    "title": "Inventory Reorder Assistant",
+    "folder": "19-InventoryReorder",
+    "project": "19-InventoryReorder/InventoryReorder.csproj"
+  },
+  {
+    "number": 20,
+    "title": "Weekly Operations Reporter",
+    "folder": "20-WeeklyOperationsReporter",
+    "project": "20-WeeklyOperationsReporter/WeeklyOperationsReporter.csproj"
+  },
+  {
+    "number": 21,
+    "title": "Spreadsheet Cleanup Agent",
+    "folder": "21-SpreadsheetCleanup",
+    "project": "21-SpreadsheetCleanup/PiSharp.Samples.SpreadsheetCleanup.csproj"
+  },
+  {
+    "number": 22,
+    "title": "Repository Onboarding Guide",
+    "folder": "22-RepositoryOnboarding",
+    "project": "22-RepositoryOnboarding/PiSharp.Samples.RepositoryOnboarding.csproj"
+  },
+  {
+    "number": 23,
+    "title": "Bug Investigation and Fix Agent",
+    "folder": "23-BugInvestigation",
+    "project": "23-BugInvestigation/PiSharp.Samples.BugInvestigation.csproj"
+  },
+  {
+    "number": 24,
+    "title": "Pull Request Review Assistant",
+    "folder": "24-PullRequestReview",
+    "project": "24-PullRequestReview/PiSharp.Samples.PullRequestReview.csproj"
+  },
+  {
+    "number": 25,
+    "title": "Release Notes Assistant",
+    "folder": "25-ReleaseNotes",
+    "project": "25-ReleaseNotes/PiSharp.Samples.ReleaseNotes.csproj"
+  },
+  {
+    "number": 26,
+    "title": "Localization Assistant",
+    "folder": "26-LocalizationAssistant",
+    "project": "26-LocalizationAssistant/PiSharp.Samples.LocalizationAssistant.csproj"
+  },
+  {
+    "number": 27,
+    "title": "Product Content Studio",
+    "folder": "27-ProductContentStudio",
+    "project": "27-ProductContentStudio/PiSharp.Samples.ProductContentStudio.csproj"
+  },
+  {
+    "number": 28,
+    "title": "Research Workbench",
+    "folder": "28-ResearchWorkbench",
+    "project": "28-ResearchWorkbench/PiSharp.Samples.ResearchWorkbench.csproj"
+  },
+  {
+    "number": 29,
+    "title": "Project Delivery Coordinator",
+    "folder": "29-ProjectDeliveryCoordinator",
+    "project": "29-ProjectDeliveryCoordinator/PiSharp.Samples.ProjectDeliveryCoordinator.csproj"
+  },
+  {
+    "number": 30,
+    "title": "Desktop Workflow Assistant",
+    "folder": "30-DesktopWorkflowAssistant",
+    "project": "30-DesktopWorkflowAssistant/PiSharp.Samples.DesktopWorkflowAssistant.csproj"
+  },
+  {
+    "number": 31,
+    "title": "Model Catalog and Pricing Maintainer",
+    "folder": "31-ModelCatalogMaintainer",
+    "project": "31-ModelCatalogMaintainer/ModelCatalogMaintainer.csproj"
+  },
+  {
+    "number": 32,
+    "title": "NuGet Vulnerability Remediation Agent",
+    "folder": "32-NuGetVulnerabilityMaintainer",
+    "project": "32-NuGetVulnerabilityMaintainer/PiSharp.Samples.NuGetVulnerabilityMaintainer.csproj"
+  }
+]

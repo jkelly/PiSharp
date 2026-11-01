@@ -49,7 +49,7 @@ internal static partial class Program
 
     /// <summary>A fake MCP server: tools, optional instructions and resources; tools/call answers with the call it received.</summary>
     internal sealed class FakeServer(string name, string[] tools, Task? initialized = null, bool resources = false, Exception? failure = null,
-        TaskCompletionSource? initializing = null) : IMcpAdmittedRequestChannel
+        TaskCompletionSource? initializing = null, Task? failsAfterClose = null) : IMcpAdmittedRequestChannel
     {
         public string Name => name;
         public readonly ConcurrentQueue<string> Calls = new();
@@ -65,9 +65,11 @@ internal static partial class Program
                 case "initialize":
                     if (initializing is not null)
                     {
-                        // Held until the channel closes, which then fails the request as a disposed transport does.
+                        // Held until the channel closes, which then fails the request as a disposed transport does (once
+                        // failsAfterClose completed, when given).
                         initializing.TrySetResult();
                         await closed.Task;
+                        if (failsAfterClose is not null) await failsAfterClose;
                         throw new ObjectDisposedException("MCP transport");
                     }
                     if (initialized is not null) await initialized.WaitAsync(token);
@@ -162,16 +164,26 @@ internal static partial class Program
         public readonly ConcurrentQueue<McpBackgroundConnectionReport> Reports = new();
         /// <summary>Servers whose initialize is held until their channel closes (completed when it started).</summary>
         public readonly ConcurrentDictionary<string, TaskCompletionSource> HeldUntilClosed = new();
+        /// <summary>Servers held until closed whose initialize then fails only once this task completed.</summary>
+        public readonly ConcurrentDictionary<string, Task> FailingAfterClose = new();
+        /// <summary>Servers whose binding to the session waits for Release (then completes Passed), just before the server captures the
+        /// session's tool catalog.</summary>
+        public readonly ConcurrentDictionary<string, (Task Release, TaskCompletionSource Passed)> BindingHeld = new();
         public readonly TaskCompletionSource<McpServerManager> Manager = new(TaskCreationOptions.RunContinuationsAsynchronously);
         public McpSessionHost Host(Func<string, bool>? trusted = null, TimeSpan? startupWait = null) =>
             new(Agent, Path.Combine(Root, "home"), () => [KeyValuePair.Create("PATH", Root)])
             {
-                CreateChannel = entry => entry.Config.Transport == PiSharp.Extensions.Mcp.Configuration.McpTransportKind.Http ? null : (actual, token) =>
+                // Called while a server binds, before it captures the session's tool catalog.
+                CreateChannel = entry =>
                 {
-                    var behavior = Behaviors.GetValueOrDefault(actual.Name, (["search", "fetch"], null, false, null));
-                    var server = new FakeServer(actual.Name, behavior.Tools, behavior.Initialized, behavior.Resources, behavior.Failure,
-                        HeldUntilClosed.GetValueOrDefault(actual.Name)); Servers.Add(server);
-                    return ValueTask.FromResult<IMcpAdmittedRequestChannel>(server);
+                    if (BindingHeld.TryGetValue(entry.Name, out var held)) { held.Release.Wait(TimeSpan.FromSeconds(30)); held.Passed.TrySetResult(); }
+                    return entry.Config.Transport == PiSharp.Extensions.Mcp.Configuration.McpTransportKind.Http ? null : (actual, token) =>
+                    {
+                        var behavior = Behaviors.GetValueOrDefault(actual.Name, (["search", "fetch"], null, false, null));
+                        var server = new FakeServer(actual.Name, behavior.Tools, behavior.Initialized, behavior.Resources, behavior.Failure,
+                            HeldUntilClosed.GetValueOrDefault(actual.Name), FailingAfterClose.GetValueOrDefault(actual.Name)); Servers.Add(server);
+                        return ValueTask.FromResult<IMcpAdmittedRequestChannel>(server);
+                    };
                 },
                 ObserveBackgroundConnection = Reports.Enqueue,
                 ObserveManager = manager => Manager.TrySetResult(manager),

@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Decision 0008, Phase 5 (PiSharp-only, branch feature/durable-network): the durable network's wire contract and its clients. The v1 DTOs
+       (shared with PiSharp.Durable.Server), an HTTP and SSE client for one device, and the reducers that turn a device's stream frames into
+       a transcript, after durable-pi's dpi-sdk (MIT). It depends on the base class library only, so a web hub or a terminal can use it
+       without the durable runtime. Not packed until the owner decides a release; every public type is [Experimental("PISHARP_DURABLE001")]. -->
+  <PropertyGroup>
+    <NoWarn>$(NoWarn);PISHARP_DURABLE001</NoWarn>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="PiSharp.Durable.Server.Tests" />
+  </ItemGroup>
+</Project>

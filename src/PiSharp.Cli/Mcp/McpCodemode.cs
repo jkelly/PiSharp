@@ -122,7 +122,8 @@ internal static class McpCodemode
             await session.AppendRunCustomEntryAsync(CodemodeToolDefinition.StoreEntryType, data, cancellationToken).ConfigureAwait(false);
     }
 
-    /// <summary>The CLI's model registry as scripts reach it (IMPL-B's facade): resolution by provider and id, headers dropped.</summary>
+    /// <summary>The CLI's model registry as scripts reach it (IMPL-B's facade): resolution by provider and id. Entries keep their
+    /// headers for the model calls; <see cref="CodemodeExecutor"/> drops them from what scripts see.</summary>
     internal sealed class ModelRuntime(NativeExtensionModelOperations operations) : ICodemodeModelRuntime
     {
         public static ModelRuntime CreateDefault(Func<bool>? llamaProvider = null) => new(new(NativeExtensionModelOperations.CreateDefaultRegistry(

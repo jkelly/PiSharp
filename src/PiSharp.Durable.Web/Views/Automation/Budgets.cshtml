@@ -1,0 +1,37 @@
+@model DevicesPage
+@{
+    ViewData["Title"] = "Budgets";
+    ViewData["Page"] = "budgets";
+}
+<div class="dn-shell">
+  <partial name="~/Views/Shared/_Topbar.cshtml" model="Model.Devices" />
+  <main class="dn-content"><div class="page" data-automation="budgets">
+    <div class="page-header"><div><h1>Budgets</h1><p class="text-body-secondary">Daily limits (UTC) on model requests, tokens, credits and money. Every call reserves first, so parallel runs cannot overspend; a call whose outcome is unknown stays counted until you reconcile it.</p></div><a href="/" class="btn btn-outline-secondary">Back to agents</a></div>
+    <div class="d-flex gap-2 align-items-end mb-3 flex-wrap">
+      <label class="form-label">Device<select class="form-select" data-device aria-label="Device">@foreach (var device in Model.Devices) { <option value="@device.Id">@device.Name</option> }</select></label>
+      <button type="button" class="btn btn-outline-secondary mb-2" data-refresh>Refresh</button>
+      <span class="text-body-secondary mb-2" role="status" data-loading></span>
+    </div>
+    <div class="alert alert-danger" role="alert" data-error hidden></div>
+    <div class="alert alert-secondary" role="status" data-unsupported hidden>This device does not offer budgets. Update its PiSharp Durable host to use this page.</div>
+    <div data-supported hidden>
+      <section aria-labelledby="limits-title" class="mb-4">
+        <h2 class="h5" id="limits-title">Today <small class="text-body-secondary" data-day></small></h2>
+        <form data-limits>
+          <div class="table-responsive"><table class="table align-middle"><thead><tr><th>Meter</th><th>Used today</th><th>Daily limit</th></tr></thead><tbody data-meters></tbody></table></div>
+          <div class="row g-2 align-items-end mb-3">
+            <div class="col-md-4"><label class="form-label" for="new-meter">Add a meter</label><input id="new-meter" data-new-meter class="form-control" placeholder="requests, tokens, credits:openrouter or money:USD" pattern="requests|tokens|credits:[a-z0-9._\-]{1,40}|money:[A-Z]{3}" /></div>
+            <div class="col-md-3"><label class="form-label" for="new-limit">Limit</label><input id="new-limit" data-new-limit class="form-control" type="number" min="0" step="any" /></div>
+          </div>
+          <button class="btn btn-primary" type="submit">Save limits</button> <small class="text-body-secondary">Money is in currency units; an empty limit removes it. A money limit refuses calls whose price is unknown.</small>
+        </form>
+      </section>
+      <section aria-labelledby="reservations-title" class="border-top pt-4">
+        <h2 class="h5" id="reservations-title">Open reservations</h2>
+        <div class="table-responsive"><table class="table align-middle"><thead><tr><th>Operation</th><th>Run</th><th>Status</th><th>Reserved</th><th>Reconcile</th></tr></thead><tbody data-reservations></tbody></table></div>
+        <p data-reservations-empty class="text-body-secondary" hidden>Nothing is reserved or uncertain.</p>
+      </section>
+    </div>
+  </div></main>
+</div>
+@section Scripts { <script type="module" src="/js/budgets.js" asp-append-version="true"></script> }

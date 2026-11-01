@@ -10,6 +10,10 @@ public sealed record ChatRequest(ModelDescriptor Model, ImmutableArray<Transcrip
     /// <summary>Source StreamOptions.sessionId (agent.sessionId): the session the request belongs to, for prompt-cache keys, session
     /// affinity headers and provider session headers. A transport configured with its own session id keeps it.</summary>
     public string? SessionId { get; init; }
+    /// <summary>PiSharp-only: the service tier for this request (<see cref="ServiceTiers"/>: auto, normal, economy, priority, fast,
+    /// ultrafast); each protocol maps it to its own field, and protocols without tiers ignore it. Null keeps the transport's own.</summary>
+    [System.Diagnostics.CodeAnalysis.Experimental("PISHARP_TIERS001")]
+    public string? ServiceTier { get; init; }
 }
 
 /// <summary>Explicit per-model native request support, independent of catalog/UI claims.</summary>

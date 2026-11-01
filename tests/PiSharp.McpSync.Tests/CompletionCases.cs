@@ -379,14 +379,14 @@ internal static partial class Program
         {
             var help = (0, McpCommand.Help + "\n", "");
             Equal(help, await Mcp(options)); Equal(help, await Mcp(options, "--help")); Equal(help, await Mcp(options, "login", "docs", "-h"));
-            Check(McpCommand.Help.StartsWith("Usage:\n  PiSharp.Cli mcp add <server> [options] -- <command> [args...]\n  PiSharp.Cli mcp add <server> [options] --url <url>\n" +
-                "  PiSharp.Cli mcp remove <server> [-l]\n  PiSharp.Cli mcp list [--json]\n  PiSharp.Cli mcp login <server> [--timeout <seconds>]\n  PiSharp.Cli mcp logout <server>\n", StringComparison.Ordinal));
+            Check(McpCommand.Help.StartsWith("Usage:\n  pisharp mcp add <server> [options] -- <command> [args...]\n  pisharp mcp add <server> [options] --url <url>\n" +
+                "  pisharp mcp remove <server> [-l]\n  pisharp mcp list [--json]\n  pisharp mcp login <server> [--timeout <seconds>]\n  pisharp mcp logout <server>\n", StringComparison.Ordinal));
             // Pi 1.2.0 mcp/cli.ts (#10636): --timeout limits the whole sign-in.
             Check(McpCommand.Help.EndsWith("  --timeout <seconds>     Time limit for the whole sign-in (default: 300)", StringComparison.Ordinal));
-            const string Hint = "Use \"PiSharp.Cli mcp --help\" for usage.\n";
+            const string Hint = "Use \"pisharp mcp --help\" for usage.\n";
             Equal((1, "", "Unknown mcp command \"bogus\".\n" + Hint), await Mcp(options, "bogus"));
-            Equal((1, "", "Usage: PiSharp.Cli mcp login <server>\n" + Hint), await Mcp(options, "login"));
-            Equal((1, "", "Usage: PiSharp.Cli mcp logout <server>\n" + Hint), await Mcp(options, "logout", "docs", "extra"));
+            Equal((1, "", "Usage: pisharp mcp login <server>\n" + Hint), await Mcp(options, "login"));
+            Equal((1, "", "Usage: pisharp mcp logout <server>\n" + Hint), await Mcp(options, "logout", "docs", "extra"));
             Equal((1, "", "Unknown option --bogus.\n" + Hint), await Mcp(options, "login", "docs", "--bogus"));
             Equal((1, "", "Unknown option --timeout.\n" + Hint), await Mcp(options, "logout", "docs", "--timeout", "5"));
             Equal((1, "", "--timeout needs a value.\n"), await Mcp(options, "login", "docs", "--timeout"));
@@ -398,7 +398,7 @@ internal static partial class Program
             // A project mcp.json is not read without project trust, and the message says so; a trusted project's servers are listed.
             Directory.CreateDirectory(Path.Combine(options.Cwd, ".pi"));
             File.WriteAllText(Path.Combine(options.Cwd, ".pi", "mcp.json"), "{\"mcpServers\":{\"team\":{\"command\":\"team-server\"},\"local\":{\"enabled\":false}}}");
-            Equal((1, "", $"No MCP server named \"nope\". {Path.Combine(options.Cwd, ".pi", "mcp.json")} is ignored because the project is not trusted. Start PiSharp.Cli in the project to trust it. Configured: docs, keyed, local.\n"),
+            Equal((1, "", $"No MCP server named \"nope\". {Path.Combine(options.Cwd, ".pi", "mcp.json")} is ignored because the project is not trusted. Start pisharp in the project to trust it. Configured: docs, keyed, local.\n"),
                 await Mcp(options, "login", "nope"));
             Equal((1, "", "No MCP server named \"nope\". Configured: docs, keyed, local, team.\n"),
                 await Mcp(options with { IsProjectTrusted = cwd => cwd == options.Cwd }, "login", "nope"));

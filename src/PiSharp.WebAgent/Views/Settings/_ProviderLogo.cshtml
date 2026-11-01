@@ -1,0 +1,7 @@
+@* Decision 0011 (run W2, WU9): a provider's logo: Web.Common's mark (inverted in dark mode by shell.css), or the provider's initial when
+   there is no mark. Model: LogoModel. *@
+@model LogoModel
+<span class="provider-logo @Model.Size" role="img" aria-label="@Model.Name logo">@if (Model.Url is not null)
+{<img class="provider-logo-mark" src="@Model.Url" alt="" width="20" height="20" decoding="async">}
+else
+{<span class="provider-logo-initial" aria-hidden="true">@(Model.Name.Length > 0 ? char.ToUpperInvariant(Model.Name[0]).ToString() : "?")</span>}</span>

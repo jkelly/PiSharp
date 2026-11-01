@@ -1,0 +1,33 @@
+@* Decision 0011 (run W4, unit R9): the mockups' settings-data page (route GET /settings/data), states default and dirty: the header, the
+   locations with the usage meter (_StorageLocations, _DataUsage), chats and the archive of deleted chats (_ChatStorage), compare workspaces
+   (_CompareWorkspaces), run history (_DataRunHistory, with _SettingsSaveBar while it has unsaved changes), export and import (_DataExport,
+   _DataImportModal) and the danger zone (_DangerZone, _DataConfirmModal). Every number is measured when the page is asked for; every change
+   is a POST to /api/data from data.js. The page holds no secret: credentials are counted and named by provider only.
+   Model: DataPage. *@
+@using PiSharp.WebAgent.DataStorage
+@model DataPage
+@{
+    Layout = "_SettingsLayout";
+    ViewData["Title"] = "Data & storage";
+    ViewData[ShellViewData.SettingsSection] = "data";
+}
+@section Styles { <link href="~/css/settings.css" rel="stylesheet" asp-append-version="true"> }
+@section Modals {
+  <partial name="/Views/Settings/_DataConfirmModal.cshtml" model="null" />
+  <partial name="/Views/Settings/_DataImportModal.cshtml" model="null" />
+}
+@section Scripts { <script type="module" src="~/js/data.js" asp-append-version="true"></script> }
+<div data-data-page data-opener="@Model.Opener">
+<header class="settings-header">
+  <div class="ps-eyebrow">App</div>
+  <h2>Data &amp; storage</h2>
+  <p>Everything the web agent keeps lives in one folder on this machine. Nothing is synced or uploaded; requests go only to the providers you call.</p>
+</header>
+
+<partial name="/Views/Settings/_StorageLocations.cshtml" model="Model" />
+<partial name="/Views/Settings/_ChatStorage.cshtml" model="Model" />
+<partial name="/Views/Settings/_CompareWorkspaces.cshtml" model="Model" />
+<partial name="/Views/Settings/_DataRunHistory.cshtml" model="Model" />
+<partial name="/Views/Settings/_DataExport.cshtml" model="Model" />
+<partial name="/Views/Settings/_DangerZone.cshtml" model="Model" />
+</div>

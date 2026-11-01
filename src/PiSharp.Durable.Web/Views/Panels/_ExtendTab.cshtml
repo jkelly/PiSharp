@@ -1,0 +1,36 @@
+@model ExtendTabModel
+<div class="ins-section">
+  <h3>Extensions</h3>
+  <p class="ins-hint">Turn extras on or off for this agent. Forks start with the same choices.</p>
+  @foreach (var extension in Model.Extensions.Extensions)
+  {
+    <div class="ext-card @(extension.Enabled ? "" : "off")" data-extension="@extension.Name">
+      <div class="ext-card-head">
+        <div class="flex-grow-1 min-w-0"><div class="ttl">@extension.Title</div><code>@extension.Name</code></div>
+        <div class="form-check form-switch mb-0"><input class="form-check-input" type="checkbox" role="switch" checked="@extension.Enabled" aria-label="@extension.Title" data-action-change="extension" data-extension="@extension.Name"></div>
+      </div>
+      <p>@extension.Description</p>
+      @if (extension.Prompts is { } prompts)
+      {
+        <div class="prompt-list">
+          @if (prompts.Count == 0)
+          {
+            <div class="prompt-item"><div class="min-w-0 text-ps-faint">No prompt files yet. Add <code>.md</code> files to the device's <code>prompts</code> folder.</div></div>
+          }
+          @foreach (var prompt in prompts)
+          {
+            var id = "prompt-" + prompt.Id.Replace('.', '-');
+            <div class="prompt-item"><input class="form-check-input" type="checkbox" id="@id" checked="@prompt.Enabled" data-action-change="prompt" data-prompt="@prompt.Id"><div class="min-w-0"><label for="@id"><code>@prompt.Id</code></label><div class="text-ps-faint">@prompt.Description</div>
+              <details><summary>View prompt</summary><pre>@prompt.Text</pre></details></div></div>
+          }
+        </div>
+      }
+    </div>
+  }
+</div>
+<div class="ins-section">
+  <h3>Built in</h3>
+  <p class="ins-hint">Always on for agents on this device.</p>
+  <div class="builtin-list">@foreach (var name in Model.Extensions.BuiltIn)
+    {<span class="ps-chip">@name</span>}</div>
+</div>

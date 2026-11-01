@@ -165,6 +165,13 @@ internal sealed partial class InteractiveMode
             await HandleThinkingCommandAsync(searchTerm);
             return;
         }
+        if (Is("/tier"))
+        {
+            var argument = text.StartsWith("/tier ", StringComparison.Ordinal) ? TextUtils.JsTrim(text[6..]) : null;
+            editor.SetText("");
+            HandleTierCommand(argument);
+            return;
+        }
         if (Is("/export")) { await HandleExportCommandAsync(text); editor.SetText(""); return; }
         if (Is("/import")) { await HandleImportCommandAsync(text); editor.SetText(""); return; }
         if (text == "/share") { await HandleShareCommandAsync(); editor.SetText(""); return; }

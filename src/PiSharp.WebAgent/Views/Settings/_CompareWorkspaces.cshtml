@@ -1,0 +1,98 @@
+@* Decision 0011 (run W4, unit R9): the mockups' _CompareWorkspaces (Settings › Data & storage), panes ac-ws-list and ac-ws-empty: the
+   workspaces folder with its size and Open folder, then each model's workspace still on disk (run · slot, model, worktree or copy, size,
+   applied or kept on a branch, until when it is kept) with View run (/compare?mode=agent&run=), Open folder and Remove…, which asks first (no typed
+   DELETE: _DataConfirmModal's plain variant) and says what stays. Clean up appears with more than one workspace. A workspace still running
+   or continued as a chat can't be removed, and the row says why. Model: DataPage. *@
+@using PiSharp.WebAgent.DataStorage
+@model DataPage
+@{
+    var workspaces = Model.Workspaces;
+    var rows = workspaces.Rows;
+}
+<section class="settings-section" id="compare-workspaces">
+  <h3>Compare workspaces</h3>
+  <p class="section-desc">In Compare's Agent mode, each model works on the task in its own copy of the project: a git worktree for a git repo, otherwise a temporary copy. Workspaces are copies, not sandboxes. Nothing in them is committed to your branches or pushed. Defaults are in <a href="/settings/tools#agent-compare">Tools &amp; workspace</a>.</p>
+  <div class="ps-card" data-workspaces data-pane-shown="@(rows.Count > 0 ? "ac-ws-list" : "ac-ws-empty")">
+    <div class="provider-row">
+      <span class="provider-logo" aria-hidden="true"><i class="bi bi-folder2-open"></i></span>
+      <div class="flex-grow-1" style="min-width:0">
+        <div class="d-flex flex-wrap align-items-center gap-2">
+          <span class="provider-name">Workspaces folder</span>
+          @if (rows.Count > 0)
+          {
+            <span class="ps-chip">@DataStorageService.Plural(rows.Count, "workspace") · @DataFolders.Size(workspaces.Bytes)</span>
+          }
+          else
+          {
+            <span class="ps-chip">empty@(workspaces.Bytes > 0 ? " · " + DataFolders.Size(workspaces.Bytes) : "")</span>
+          }
+        </div>
+        <div class="ps-mono fs-8 text-secondary text-break">@workspaces.Display</div>
+        <div class="fs-8 text-ps-faint">One folder per run, with one workspace per model. A workspace is removed when you discard its result, or after @DataStorageService.Plural((long)workspaces.Retention.TotalDays, "day"). Anything left over is removed at startup.</div>
+      </div>
+      <div class="d-flex gap-2 flex-shrink-0">
+        @if (rows.Count > 1)
+        {
+          <button class="btn btn-sm btn-outline-danger" type="button" data-ws-cleanup disabled="@(workspaces.Removable == 0)"
+                  title="@(workspaces.Removable == 0 ? "Every workspace is in use" : "Remove every workspace not in use")"
+                  data-confirm-title="Remove @(workspaces.Removable == 1 ? "1 compare workspace" : workspaces.Removable + " compare workspaces")?"
+                  data-confirm-body="@workspaces.CleanupBody"
+                  data-confirm-note="The runs stay in History. Nothing is committed or pushed, and branches you chose to keep are not deleted."
+                  data-confirm-detail="@workspaces.CleanupDetail"
+                  data-confirm-ok="Remove @(workspaces.Removable == 1 ? "workspace" : "workspaces")"><i class="bi bi-trash3 me-1" aria-hidden="true"></i>Clean up</button>
+        }
+        <partial name="/Views/Settings/_DataOpenButton.cshtml" model='Model.Open(DataOpenTargets.Workspaces, "Open workspaces folder")' />
+      </div>
+    </div>
+
+    @if (rows.Count > 0)
+    {
+      <div class="border-top" data-pane="ac-ws-list">
+        @foreach (var row in rows)
+        {
+          <div class="provider-row" data-ws-row data-run="@row.Run" data-slot="@row.Slot">
+            <span class="provider-logo" aria-hidden="true"><i class="bi @(row.Worktree ? "bi-git" : "bi-files")"></i></span>
+            <div class="flex-grow-1" style="min-width:0">
+              <div class="d-flex flex-wrap align-items-baseline gap-2">
+                <span class="ps-mono fs-7 fw-semibold">@row.Name</span>
+                <span class="ps-mono fs-8 text-ps-faint text-break">@row.Model</span>
+                @if (row.Busy is { } busy)
+                {
+                  <span class="ps-chip" data-tone="warn">@busy</span>
+                }
+              </div>
+              <div class="fs-8 text-ps-faint">@row.Summary</div>
+            </div>
+            <div class="dropdown flex-shrink-0">
+              <button class="btn btn-icon" type="button" data-bs-toggle="dropdown" aria-expanded="false" title="More actions" aria-label="More actions for workspace @row.Run @row.Slot"><i class="bi bi-three-dots" aria-hidden="true"></i></button>
+              <ul class="dropdown-menu dropdown-menu-end">
+                @if (row.RunKnown)
+                {
+                  <li><a class="dropdown-item" href="@row.RunHref"><i class="bi bi-layout-three-columns me-2" aria-hidden="true"></i>View run</a></li>
+                }
+                <li><button class="dropdown-item" type="button" data-open-folder="@DataOpenTargets.Workspace" data-run="@row.Run" data-slot="@row.Slot" disabled="@(!Model.OpenFolders)"><i class="bi bi-box-arrow-up-right me-2" aria-hidden="true"></i>Open folder</button></li>
+                <li><hr class="dropdown-divider"></li>
+                <li><button class="dropdown-item text-danger" type="button" data-ws-remove data-run="@row.Run" data-slot="@row.Slot" disabled="@(row.Busy is not null)"
+                            title="@(row.Busy is { } reason ? "Can't remove it now: " + reason : "Remove this workspace")"
+                            data-confirm-title="Remove compare workspace @row.Name?"
+                            data-confirm-body="@row.RemoveBody"
+                            data-confirm-note="The run stays in History. Nothing is committed or pushed, and branches you chose to keep are not deleted."
+                            data-confirm-detail="@row.RemoveDetail"
+                            data-confirm-ok="Remove workspace"><i class="bi bi-trash3 me-2" aria-hidden="true"></i>Remove…</button></li>
+              </ul>
+            </div>
+          </div>
+        }
+      </div>
+    }
+    else
+    {
+      <div class="border-top" data-pane="ac-ws-empty">
+        <div class="provider-row">
+          <span class="provider-logo" aria-hidden="true"><i class="bi bi-check2"></i></span>
+          <div class="flex-grow-1 fs-7 text-secondary" style="min-width:0">@(workspaces.Available ? "No compare workspaces. Agent compare creates one for each model when a run starts." : "Agent compare's workspaces are not part of this app.")</div>
+        </div>
+      </div>
+    }
+  </div>
+</section>

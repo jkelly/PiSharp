@@ -197,6 +197,12 @@ internal static partial class Program
             // The child agent does not offer the subagent tool.
             var childAgent = await (await durable.Harness.ConversationAsync(child.Id, DurableRuntime.Context))!.AgentAsync(DurableRuntime.Context);
             Check(!childAgent.Tools.Any(tool => tool.Name == "subagent") && childAgent.Tools.Any(tool => tool.Name == "read"), "child tools");
+            // Nor ask_user_question and exit_plan_mode (PiSharp-only, decision 0005): nobody sees a question the child asks.
+            Check(!childAgent.Extensions.Any(extension => extension.Name == "user-interaction") &&
+                !childAgent.Tools.Any(tool => tool.Name is "ask_user_question" or "exit_plan_mode"), "the child has no user-interaction: " +
+                string.Join(",", childAgent.Tools.Select(tool => tool.Name)));
+            var parentAgent = await (await durable.Harness.ConversationAsync(ConversationId.Root, DurableRuntime.Context))!.AgentAsync(DurableRuntime.Context);
+            Check(parentAgent.Tools.Any(tool => tool.Name == "ask_user_question"), "the parent keeps ask_user_question");
             var result = view.Conversation.Entries.Single(entry => entry.Kind == "pi.tool-result");
             Check(result.Model is { Count: > 0 } resultMessages && resultMessages[0] is JsonObjectValue resultMessage &&
                 resultMessage.TryGetValue("details", out var details) && details.ToJson() == $"{{\"conversationId\":{child.Id.Value}}}",
@@ -230,6 +236,15 @@ internal static partial class Program
             Equal($"<cwd>\n{durable.Location.Cwd.Replace('\\', '/')}\n</cwd>", Section("cwd"), "cwd");
             Equal("preamble,tools,rules,docs,project_context,cwd", string.Join(",", sections.Select(pair => pair.Key)), "pi's section order");
         }),
+        Case("runtime.settings.websocket-connect-timeout", () =>
+        {
+            var settings = PiSettings.FromObjects(new JsonObject { ["websocketConnectTimeoutMs"] = 250 });
+            var runtime = new LiveSessionRuntime(_ => null, () => null);
+            LiveSessionRuntime Configure() => DurableHarnessSetup.ConfigureHarnessHttp(settings, runtime, _ => null, (_, _) => { });
+            Equal<TimeSpan?>(TimeSpan.FromMilliseconds(250), Configure().WebSocketConnectTimeout, "configured handshake deadline");
+            settings.ApplyOverrides(new JsonObject { ["websocketConnectTimeoutMs"] = "disabled" });
+            Equal<TimeSpan?>(TimeSpan.Zero, Configure().WebSocketConnectTimeout, "disabled handshake deadline");
+        }),
         Case("runtime.settings.bridge-reads-at-each-access", () =>
         {
             var settings = PiSettings.FromObjects(new JsonObject());
@@ -253,6 +268,26 @@ internal static partial class Program
             Equal(1234d, bridge.Stream!.TimeoutMs, "provider timeout wins");
             Equal("Invalid compaction.reserveTokens setting: -1. Expected a non-negative safe integer.",
                 Throws<InvalidDataException>(() => _ = bridge.Compaction, "invalid").Message, "upstream message");
+        }),
+        Case("runtime.media.defaults-that-cannot-be-saved-still-apply-to-the-session", async () =>
+        {
+            // PiSharp-only (decision 0007): a global settings file that failed to load is not written, so set_media_defaults reports the
+            // change as applied but not saved, and it must then be applied.
+            var root = Temp("media-defaults");
+            var agentDir = Path.Combine(root, "agent");
+            Directory.CreateDirectory(agentDir);
+            var file = Path.Combine(agentDir, "settings.json");
+            await File.WriteAllTextAsync(file, "{ not json");
+            var settings = PiSettings.Load(root, agentDir, projectTrusted: true);
+            var defaults = new PiSharp.Durable.Tools.MediaDefaults
+            {
+                Persist = (kind, value, scope, _) => { DurableMedia.Save(settings, kind, value, scope); return Task.CompletedTask; },
+            };
+            var error = await ThrowsAsync<InvalidOperationException>(() => defaults.SetAsync(PiSharp.AI.Media.MediaKind.Image,
+                new PiSharp.Durable.Tools.MediaDefault("openai/gpt-image-1-mini", JsonObjectValue.Empty), "global", CancellationToken.None), "unsaved");
+            Check(error.Message.StartsWith("The defaults apply to this session but were not saved: ", StringComparison.Ordinal), error.Message);
+            Equal("openai/gpt-image-1-mini", defaults.Get(PiSharp.AI.Media.MediaKind.Image).Model, "applied to the session");
+            Equal("{ not json", await File.ReadAllTextAsync(file), "settings file left as it was");
         }),
         Case("runtime.models.live-route-auth-and-headers", async () =>
         {
@@ -308,7 +343,7 @@ internal static partial class Program
             var answer = await models.CompleteSimpleAsync(copilot!, [JsonValue.Parse("""{"role":"user","content":"hi","timestamp":1}""")], null, CancellationToken.None);
             Check(endpoint.Snapshot().Length > 0, "a request was sent through the live route: " + answer.ExtraProperties);
         }),
-        Case("runtime.dispatch.unknown-argument-and-hidden-help", async () =>
+        Case("runtime.dispatch.unknown-argument-and-experimental-help", async () =>
         {
             await using var agent = new TestAgent("dispatch");
             var stdout = new StringWriter(); var stderr = new StringWriter();
@@ -317,14 +352,31 @@ internal static partial class Program
                 Cwd = agent.Cwd, Home = agent.Home, GetEnvironment = TestAgent.Env(("PI_CODING_AGENT_DIR", agent.AgentDir)), Stdout = stdout, Stderr = stderr,
                 LiveRuntime = agent.Runtime(),
             };
-            Equal(1, await PiCommand.RunAsync(["durable", "--help"], host, CancellationToken.None), "exit code");
-            Equal("Unknown argument: --help", stderr.ToString().Trim(), "upstream parseArgs message");
+            Equal(1, await PiCommand.RunAsync(["durable", "--bogus"], host, CancellationToken.None), "exit code");
+            Equal("Unknown argument: --bogus", stderr.ToString().Trim(), "upstream parseArgs message");
             Equal("", stdout.ToString(), "nothing on stdout");
             Check(!Directory.Exists(Path.Combine(agent.AgentDir, "experimental")), "no session opened");
+            // PiSharp-only: --help and -h print the durable help on stdout, before the notice and without opening a session.
+            foreach (var flag in new[] { "--help", "-h" })
+            {
+                stdout.GetStringBuilder().Clear(); stderr.GetStringBuilder().Clear();
+                Equal(0, await PiCommand.RunAsync(["durable", "--continue", flag], host, CancellationToken.None), flag + " exit code");
+                Equal(DurableMain.Help, stdout.ToString(), flag + " help");
+                Equal("", stderr.ToString(), flag + " no notice");
+            }
+            Check(DurableMain.Help.StartsWith("Usage:\n  pisharp durable [options]\n", StringComparison.Ordinal) &&
+                DurableMain.Help.Contains("\n  --tier, --service-tier <tier>  Service tier for a new session: auto, normal, economy, priority, fast, ultrafast\n", StringComparison.Ordinal),
+                "durable help lists --tier: " + DurableMain.Help);
+            Check(!Directory.Exists(Path.Combine(agent.AgentDir, "experimental")), "help opened no session");
             Equal(new OpenDurableOptions { ContinueSession = true }, DurableMain.ParseArgs(["-c"]), "-c");
             Equal(new OpenDurableOptions { ContinueSession = true }, DurableMain.ParseArgs(["--continue", "--continue"]), "--continue");
             Equal(new OpenDurableOptions(), DurableMain.ParseArgs([]), "no arguments");
-            Check(!PiHelp.Text().Contains("durable", StringComparison.OrdinalIgnoreCase), "hidden from --help");
+            // Decision 0005 (1.2.0.1): listed in --help as experimental, PiSharp-only, among the commands that take --help.
+            var help = PiHelp.Text();
+            Check(help.Contains("\n  pisharp durable [options]         EXPERIMENTAL: PiSharp's crash-safe durable agent (--continue, --tier <tier>)\n",
+                StringComparison.Ordinal), "listed in --help as experimental");
+            Check(help.Contains("\n  pisharp <command> --help          Show help for install/remove/uninstall/update/list/config/auth/mcp/session/durable\n",
+                StringComparison.Ordinal), "durable takes --help");
         }),
         Case("runtime.kill-resume.headless-turn-finishes-after-continue", async () =>
         {

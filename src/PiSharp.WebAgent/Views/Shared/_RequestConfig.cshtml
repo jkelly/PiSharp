@@ -1,0 +1,294 @@
+@* Decision 0011 (run W4, R1): the mockups' _RequestConfig (the Playground's left pane; shared: Compare's per-column overrides, the Tool
+   Bench, Presets): every request option in the mockups' accordions (Model & auth, Sampling, Output, Reasoning, Tools, Caching & session,
+   Speed / service tier, Transport, Custom headers, Provider-specific). Each option row is [data-option=<RunModelOptions name>] and enabled
+   only when the chosen model takes it (RunCapabilities, the run engine's own source); request-config.js applies a newly chosen model's
+   capabilities the same way. A row the user set (data-set) keeps its value when the model does not take it, and says the run will be
+   refused until it is cleared: nothing is dropped silently (brief rule 4). Every option RunSpec takes has a live row: text verbosity
+   (Output) and the reasoning summary (Reasoning) where the OpenAI Responses, Azure and Codex APIs take them (the summary while the model
+   thinks), parallel tool calls (Tools) where the API has the switch, and the session id and timeout in _RequestConfigAdvanced; a tool's
+   strict flag comes from _ToolEditorModal, and the tools row is marked when a strict tool meets a model that takes none. W5 L4: thinking
+   budgets (Reasoning: four token inputs, one per budget level, [data-kind="budgets"]) are live where the model thinks by budget, and
+   _RequestConfigAdvanced has cache retention, retries, the retry delay and the Azure API version; Sampling's samplingParams row
+   ([data-sampling-params], read-only) shows the model's catalog sampling values and whether its API applies them. Options a run refuses
+   by design are [data-unsent]: shown disabled with why and where they are set, never sent; an API key is never taken from the page.
+   Sections: _RequestConfigModel and _RequestConfigAdvanced. Model: RequestConfigView. *@
+@using PiSharp.WebAgent.Playground
+@using PiSharp.WebAgent.Runs
+@model RequestConfigView
+@{
+    var p = Model.IdPrefix;
+    var modified = Model.Modified;
+    string Row(string option) => "param-row" + (Model.Off(option) ? " param-disabled" : "");
+    string? Set(string option) => Model.IsSet(option) ? "true" : "false";
+    string? Conflict(string option) => Model.Conflict(option) ? "true" : null;
+    int Dot(params string[] options) => Model.ModifiedOf(options);
+    var sampling = Dot(RunModelOptions.Temperature, RunModelOptions.TopP, RunModelOptions.TopK, RunModelOptions.PresencePenalty, RunModelOptions.FrequencyPenalty, RunModelOptions.Stop, RunModelOptions.Seed);
+    var output = Dot(RunModelOptions.MaxTokens, RunModelOptions.ResponseFormat, RunModelOptions.TextVerbosity);
+    var reasoning = Dot(RunModelOptions.Thinking, RunModelOptions.ThinkingBudgets, RunModelOptions.ReasoningSummary);
+    var tools = Model.Draft.Tools ?? [];
+}
+<section class="pane pg-config pane-alt" aria-label="Request configuration" data-request-config data-id-prefix="@p" data-provider="@Model.Draft.Provider" data-model="@Model.Draft.Model" data-api="@Model.Api" data-capabilities="@Model.CapabilitiesJson" data-thinking-on="@(Model.Thinking ? "true" : "false")">
+  <div class="pane-header">
+    <h2 class="pane-title">Request</h2>
+    <span class="ps-chip" data-tone="info" title="Options set away from the provider's defaults" data-modified-chip hidden="@(modified == 0)"><span class="status-dot info"></span><span data-modified-count>@modified</span> modified</span>
+    <a class="ms-auto fs-8 ps-mono text-ps-faint" href="@Model.DefaultsUrl">defaults</a>
+  </div>
+  <div class="pane-body">
+    <div class="alert alert-warning py-2 px-2 fs-8 m-2" role="status" data-config-conflicts hidden="@(!RequestConfigView.Counted.Any(Model.Conflict) && !Model.Conflict(RunModelOptions.Images) && !Model.ToolsConflict)"><i class="bi bi-exclamation-triangle me-1"></i><span data-config-conflicts-text>@(Model.Capabilities is null ? "" : "Some options you set aren't taken by this model, so Run will refuse the request until you clear them.")</span> <button class="btn btn-link btn-sm p-0 fs-8 align-baseline" type="button" data-config-clear-conflicts>Clear them</button></div>
+    <div class="accordion accordion-flush" id="@(p)-config">
+
+      @if (Model.ShowModel)
+      {
+        <partial name="_RequestConfigModel" model="Model" />
+      }
+
+      <!-- Sampling -->
+      <div class="accordion-item">
+        <h3 class="accordion-header">
+          <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#@(p)-cfg-sampling" aria-expanded="true" aria-controls="@(p)-cfg-sampling"><i class="bi bi-dice-5 me-2 text-ps-faint"></i><span class="flex-grow-1">Sampling</span><span class="status-dot info me-2" title="@sampling modified" data-section-dot hidden="@(sampling == 0)"></span></button>
+        </h3>
+        <div id="@(p)-cfg-sampling" class="accordion-collapse collapse show" data-section="sampling">
+          <div class="accordion-body">
+            <div class="@Row(RunModelOptions.Temperature)" data-option="temperature" data-set="@Set(RunModelOptions.Temperature)" data-conflict="@Conflict(RunModelOptions.Temperature)" data-temp-pane="@(Model.Takes(RunModelOptions.Temperature) ? "temp-supported" : "temp-unsupported")">
+              <div class="param-head">
+                <label class="param-name" for="@(p)-temperature">temperature <span class="status-dot info ms-1" data-option-dot title="Modified · default not sent"></span> <i class="bi bi-question-circle param-help" tabindex="0" data-bs-toggle="tooltip" title="Sampling randomness, 0 to 2. At its default it isn't sent and the provider default applies."></i></label>
+                <span class="param-value" data-option-value>@(Model.Draft.Temperature is { } temperature ? RequestConfigView.Number(temperature) : "default")</span>
+              </div>
+              <input type="range" class="form-range" id="@(p)-temperature" min="0" max="2" step="0.05" value="@(RequestConfigView.Number(Model.Draft.Temperature ?? 1))" data-default="1" data-opt="temperature" data-kind="range" disabled="@Model.Off(RunModelOptions.Temperature)">
+              <div class="d-flex align-items-start gap-2">
+                <div class="form-text mt-0 flex-grow-1" data-option-note>@(Model.Takes(RunModelOptions.Temperature) ? Model.Why(RunModelOptions.Temperature) ?? "Default · not sent." : "")</div>
+                <button class="btn btn-link btn-sm p-0 fs-8" type="button" data-option-clear hidden="@(!Model.IsSet(RunModelOptions.Temperature))">Clear</button>
+              </div>
+              <div class="alert alert-info py-2 px-2 fs-8 mb-2 mt-1" data-option-alert hidden="@(Model.Takes(RunModelOptions.Temperature))"><i class="bi bi-info-circle me-1"></i><span class="ps-mono" data-model-ref>@Model.ModelRef</span> <span data-option-reason>@(Model.Takes(RunModelOptions.Temperature) ? "" : "doesn't take temperature: " + Model.Why(RunModelOptions.Temperature) + ".")</span></div>
+            </div>
+
+            @if (Model.Sampling is { } samplingParams)
+            {
+              <div class="param-row" data-sampling-params data-applied="@(samplingParams.Applied ? "true" : "false")">
+                <div class="d-flex align-items-center gap-2">
+                  <span class="param-name">samplingParams</span>
+                  <i class="bi bi-question-circle param-help text-ps-faint" tabindex="0" data-bs-toggle="tooltip" title="Model-level sampling values from the catalog (or a models.json override), merged into the body by openai-completions, openai-responses and azure-openai-responses. Read-only: set an option here to replace one."></i>
+                  <span class="ps-chip ms-auto" data-sampling-chip>@samplingParams.Chip</span>
+                </div>
+                <div class="ps-mono fs-8 text-break mt-1" data-sampling-values hidden="@(samplingParams.Values is null)">@samplingParams.ValuesText</div>
+                <div class="fs-8 text-break mt-1" data-sampling-by-level hidden="@(samplingParams.ByLevel is null)">By thinking level: <span class="ps-mono" data-sampling-by-level-text>@samplingParams.ByLevelText</span></div>
+                <div class="form-text mt-1 mb-1" data-sampling-note>@samplingParams.Note</div>
+              </div>
+            }
+
+            <div class="@Row(RunModelOptions.TopP)" data-option="topP" data-set="@Set(RunModelOptions.TopP)" data-conflict="@Conflict(RunModelOptions.TopP)">
+              <div class="param-head"><label class="param-name" for="@(p)-top-p">top_p <span class="status-dot info ms-1" data-option-dot title="Modified"></span></label><span class="param-value" data-option-value>@(Model.Draft.TopP is { } topP ? RequestConfigView.Number(topP) : "default")</span></div>
+              <input type="range" class="form-range" id="@(p)-top-p" min="0" max="1" step="0.01" value="@(RequestConfigView.Number(Model.Draft.TopP ?? 1))" data-default="1" data-opt="topP" data-kind="range" disabled="@Model.Off(RunModelOptions.TopP)">
+              <div class="d-flex align-items-start gap-2"><div class="form-text mt-0 flex-grow-1" data-option-note>@Model.Why(RunModelOptions.TopP)</div><button class="btn btn-link btn-sm p-0 fs-8" type="button" data-option-clear hidden="@(!Model.IsSet(RunModelOptions.TopP))">Clear</button></div>
+            </div>
+
+            <div class="@Row(RunModelOptions.TopK)" data-option="topK" data-set="@Set(RunModelOptions.TopK)" data-conflict="@Conflict(RunModelOptions.TopK)">
+              <div class="param-head"><label class="param-name" for="@(p)-top-k">top_k <span class="status-dot info ms-1" data-option-dot title="Modified"></span></label><input type="number" class="form-control form-control-sm param-value input" id="@(p)-top-k" min="1" max="1000" step="1" placeholder="—" value="@RequestConfigView.Number(Model.Draft.TopK)" data-opt="topK" data-kind="int" disabled="@Model.Off(RunModelOptions.TopK)"></div>
+              <div class="d-flex align-items-start gap-2"><div class="form-text mt-0 flex-grow-1" data-option-note>@Model.Why(RunModelOptions.TopK)</div><button class="btn btn-link btn-sm p-0 fs-8" type="button" data-option-clear hidden="@(!Model.IsSet(RunModelOptions.TopK))">Clear</button></div>
+            </div>
+
+            <div class="@Row(RunModelOptions.PresencePenalty)" data-option="presencePenalty" data-set="@Set(RunModelOptions.PresencePenalty)" data-conflict="@Conflict(RunModelOptions.PresencePenalty)">
+              <div class="param-head"><label class="param-name" for="@(p)-presence">presence_penalty <span class="status-dot info ms-1" data-option-dot title="Modified"></span></label><span class="param-value" data-option-value>@(Model.Draft.PresencePenalty is { } presence ? RequestConfigView.Number(presence) : "default")</span></div>
+              <input type="range" class="form-range" id="@(p)-presence" min="-2" max="2" step="0.1" value="@(RequestConfigView.Number(Model.Draft.PresencePenalty ?? 0))" data-default="0" data-opt="presencePenalty" data-kind="range" disabled="@Model.Off(RunModelOptions.PresencePenalty)">
+              <div class="d-flex align-items-start gap-2"><div class="form-text mt-0 flex-grow-1" data-option-note>@Model.Why(RunModelOptions.PresencePenalty)</div><button class="btn btn-link btn-sm p-0 fs-8" type="button" data-option-clear hidden="@(!Model.IsSet(RunModelOptions.PresencePenalty))">Clear</button></div>
+            </div>
+
+            <div class="@Row(RunModelOptions.FrequencyPenalty)" data-option="frequencyPenalty" data-set="@Set(RunModelOptions.FrequencyPenalty)" data-conflict="@Conflict(RunModelOptions.FrequencyPenalty)">
+              <div class="param-head"><label class="param-name" for="@(p)-frequency">frequency_penalty <span class="status-dot info ms-1" data-option-dot title="Modified"></span></label><span class="param-value" data-option-value>@(Model.Draft.FrequencyPenalty is { } frequency ? RequestConfigView.Number(frequency) : "default")</span></div>
+              <input type="range" class="form-range" id="@(p)-frequency" min="-2" max="2" step="0.1" value="@(RequestConfigView.Number(Model.Draft.FrequencyPenalty ?? 0))" data-default="0" data-opt="frequencyPenalty" data-kind="range" disabled="@Model.Off(RunModelOptions.FrequencyPenalty)">
+              <div class="d-flex align-items-start gap-2"><div class="form-text mt-0 flex-grow-1" data-option-note>@Model.Why(RunModelOptions.FrequencyPenalty)</div><button class="btn btn-link btn-sm p-0 fs-8" type="button" data-option-clear hidden="@(!Model.IsSet(RunModelOptions.FrequencyPenalty))">Clear</button></div>
+            </div>
+
+            <div class="@Row(RunModelOptions.Stop)" data-option="stop" data-set="@Set(RunModelOptions.Stop)" data-conflict="@Conflict(RunModelOptions.Stop)">
+              <div class="param-head"><label class="param-name" for="@(p)-stop">stop <span class="status-dot info ms-1" data-option-dot title="Modified"></span> <i class="bi bi-question-circle param-help" tabindex="0" data-bs-toggle="tooltip" title="Stop sequences, one per line (at most @RunSpec.MaxStop)."></i></label></div>
+              <textarea class="form-control form-control-sm ps-mono" id="@(p)-stop" rows="2" placeholder="One sequence per line" data-opt="stop" data-kind="lines" disabled="@Model.Off(RunModelOptions.Stop)">@Model.StopText</textarea>
+              <div class="d-flex align-items-start gap-2"><div class="form-text mt-0 flex-grow-1" data-option-note>@Model.Why(RunModelOptions.Stop)</div><button class="btn btn-link btn-sm p-0 fs-8" type="button" data-option-clear hidden="@(!Model.IsSet(RunModelOptions.Stop))">Clear</button></div>
+            </div>
+
+            <div class="@Row(RunModelOptions.Seed)" data-option="seed" data-set="@Set(RunModelOptions.Seed)" data-conflict="@Conflict(RunModelOptions.Seed)">
+              <div class="param-head"><label class="param-name" for="@(p)-seed">seed <span class="status-dot info ms-1" data-option-dot title="Modified"></span></label><input type="number" class="form-control form-control-sm param-value input" id="@(p)-seed" step="1" placeholder="—" value="@RequestConfigView.Number(Model.Draft.Seed)" data-opt="seed" data-kind="int" disabled="@Model.Off(RunModelOptions.Seed)"></div>
+              <div class="d-flex align-items-start gap-2"><div class="form-text mt-0 flex-grow-1" data-option-note>@Model.Why(RunModelOptions.Seed)</div><button class="btn btn-link btn-sm p-0 fs-8" type="button" data-option-clear hidden="@(!Model.IsSet(RunModelOptions.Seed))">Clear</button></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Output -->
+      <div class="accordion-item">
+        <h3 class="accordion-header">
+          <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#@(p)-cfg-output" aria-expanded="false" aria-controls="@(p)-cfg-output"><i class="bi bi-text-paragraph me-2 text-ps-faint"></i><span class="flex-grow-1">Output</span><span class="status-dot info me-2" title="@output modified" data-section-dot hidden="@(output == 0)"></span></button>
+        </h3>
+        <div id="@(p)-cfg-output" class="accordion-collapse collapse" data-section="output">
+          <div class="accordion-body">
+            <div class="@Row(RunModelOptions.MaxTokens)" data-option="maxTokens" data-set="@Set(RunModelOptions.MaxTokens)" data-conflict="@Conflict(RunModelOptions.MaxTokens)">
+              <div class="param-head">
+                <label class="param-name" for="@(p)-max-tokens">maxTokens <span class="status-dot info ms-1" data-option-dot title="Modified"></span> <i class="bi bi-question-circle param-help" tabindex="0" data-bs-toggle="tooltip" title="Upper bound on output tokens. Empty leaves the model's own cap; the Spend Guard then reserves its default output."></i></label>
+                <input type="number" class="form-control form-control-sm param-value input" id="@(p)-max-tokens" min="1" max="@Model.Capabilities?.MaxTokens" step="1024" placeholder="—" value="@RequestConfigView.Number(Model.Draft.MaxTokens)" data-opt="maxTokens" data-kind="int" disabled="@Model.Off(RunModelOptions.MaxTokens)">
+              </div>
+              <div class="d-flex align-items-start gap-2"><div class="form-text mt-0 flex-grow-1" data-option-note>@(Model.Why(RunModelOptions.MaxTokens) ?? (Model.Capabilities?.MaxTokens is { } cap ? $"At most {cap:N0} (the model's output cap)." : ""))</div><button class="btn btn-link btn-sm p-0 fs-8" type="button" data-option-clear hidden="@(!Model.IsSet(RunModelOptions.MaxTokens))">Clear</button></div>
+            </div>
+
+            <div class="@Row(RunModelOptions.ResponseFormat)" data-option="responseFormat" data-set="@Set(RunModelOptions.ResponseFormat)" data-conflict="@Conflict(RunModelOptions.ResponseFormat)">
+              <div class="param-head"><label class="param-name" for="@(p)-format">responseFormat <span class="status-dot info ms-1" data-option-dot title="Modified"></span> <i class="bi bi-question-circle param-help" tabindex="0" data-bs-toggle="tooltip" title="text, a JSON object, or JSON matching a schema (response_format, text.format or responseMimeType by API)."></i></label></div>
+              <select class="form-select form-select-sm ps-mono" id="@(p)-format" data-opt="responseFormat" data-kind="format" disabled="@Model.Off(RunModelOptions.ResponseFormat)">
+                <option value="" selected="@(!Model.IsSet(RunModelOptions.ResponseFormat))">default (not sent)</option>
+                <option value="text" selected="@(Model.IsSet(RunModelOptions.ResponseFormat) && Model.FormatType == "text")">text</option>
+                <option value="json_object" selected="@(Model.FormatType == "json_object")">json_object</option>
+                <option value="json_schema" selected="@(Model.FormatType == "json_schema")">json_schema</option>
+              </select>
+              <div class="mt-2" data-format-schema hidden="@(Model.FormatType != "json_schema")">
+                <label class="visually-hidden" for="@(p)-format-name">Schema name</label>
+                <input class="form-control form-control-sm ps-mono mb-1" id="@(p)-format-name" placeholder="name (default: response)" value="@Model.FormatName" data-format-name>
+                <label class="visually-hidden" for="@(p)-format-schema">JSON Schema</label>
+                <textarea class="form-control form-control-sm font-monospace" id="@(p)-format-schema" rows="5" spellcheck="false" placeholder='{ "type": "object", "properties": { … } }' data-format-schema-text>@Model.FormatSchema</textarea>
+                <div class="form-check form-switch mt-1 mb-0"><input class="form-check-input" type="checkbox" role="switch" id="@(p)-format-strict" checked="@Model.FormatStrict" data-format-strict><label class="form-check-label fs-8" for="@(p)-format-strict">strict</label></div>
+              </div>
+              <div class="d-flex align-items-start gap-2"><div class="form-text mt-0 flex-grow-1" data-option-note>@Model.Why(RunModelOptions.ResponseFormat)</div><button class="btn btn-link btn-sm p-0 fs-8" type="button" data-option-clear hidden="@(!Model.IsSet(RunModelOptions.ResponseFormat))">Clear</button></div>
+            </div>
+
+            <div class="@Row(RunModelOptions.TextVerbosity)" data-option="textVerbosity" data-set="@Set(RunModelOptions.TextVerbosity)" data-conflict="@Conflict(RunModelOptions.TextVerbosity)">
+              <div class="param-head">
+                <span class="param-name" id="@(p)-lbl-verbosity">textVerbosity <span class="status-dot info ms-1" data-option-dot title="Modified · default not sent"></span> <i class="bi bi-question-circle param-help" tabindex="0" data-bs-toggle="tooltip" title="How long the answer is. OpenAI Responses, Azure and Codex: text.verbosity. At its default it isn't sent and the provider default applies."></i></span>
+                <span class="param-value" data-option-value>@(Model.Draft.TextVerbosity ?? "default")</span>
+              </div>
+              <div class="btn-group btn-group-sm w-100 pg-seg" role="group" aria-labelledby="@(p)-lbl-verbosity">
+                @foreach (var verbosity in RunSpec.TextVerbosities)
+                {
+                  <input type="radio" class="btn-check" name="@(p)-verbosity" id="@(p)-vb-@verbosity" value="@verbosity" checked="@(Model.Draft.TextVerbosity == verbosity)" disabled="@Model.Off(RunModelOptions.TextVerbosity)" data-opt="textVerbosity" data-kind="radio"><label class="btn btn-outline-secondary" for="@(p)-vb-@verbosity">@verbosity</label>
+                }
+              </div>
+              <div class="d-flex align-items-start gap-2"><div class="form-text mt-1 flex-grow-1" data-option-note data-default-note="Unset, it isn't sent and the provider's default applies.">@(Model.Why(RunModelOptions.TextVerbosity) ?? "Unset, it isn't sent and the provider's default applies.")</div><button class="btn btn-link btn-sm p-0 fs-8" type="button" data-option-clear hidden="@(!Model.IsSet(RunModelOptions.TextVerbosity))">Clear</button></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Reasoning -->
+      <div class="accordion-item">
+        <h3 class="accordion-header">
+          <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#@(p)-cfg-reasoning" aria-expanded="true" aria-controls="@(p)-cfg-reasoning"><i class="bi bi-lightbulb me-2 text-ps-faint"></i><span class="flex-grow-1">Reasoning</span><span class="status-dot info me-2" title="@reasoning modified" data-section-dot hidden="@(reasoning == 0)"></span></button>
+        </h3>
+        <div id="@(p)-cfg-reasoning" class="accordion-collapse collapse show" data-section="reasoning">
+          <div class="accordion-body">
+            <div class="@Row(RunModelOptions.Thinking)" data-option="thinking" data-set="@Set(RunModelOptions.Thinking)" data-conflict="@(Model.IsSet(RunModelOptions.Thinking) && !Model.LevelTaken(Model.Level) ? "true" : null)">
+              <div class="param-head">
+                <span class="param-name" id="@(p)-lbl-thinking">thinkingLevel <span class="status-dot info ms-1" data-option-dot title="Modified · default off"></span> <i class="bi bi-question-circle param-help" tabindex="0" data-bs-toggle="tooltip" title="Mapped through the model's thinking levels (reasoning.effort, a thinking budget or thinkingLevel by API)."></i></span>
+                <span class="param-value" data-option-value>@Model.Level</span>
+              </div>
+              <div class="btn-group btn-group-sm w-100 pg-seg" role="group" aria-labelledby="@(p)-lbl-thinking">
+                @foreach (var level in RequestConfigView.Levels)
+                {
+                  var taken = Model.LevelTaken(level);
+                  <input type="radio" class="btn-check" name="@(p)-thinking" id="@(p)-th-@level" value="@level" checked="@(Model.Level == level)" disabled="@(!taken)" data-opt="thinking" data-kind="level"><label class="btn btn-outline-secondary" for="@(p)-th-@level" title="@Model.LevelWhy(level)">@level</label>
+                }
+              </div>
+              <div class="form-text mt-1" data-option-note>@(Model.Capabilities is { ThinkingLevels.Count: > 1 } caps ? $"This model thinks at {string.Join(", ", caps.ThinkingLevels.Skip(1))}. Default: off." : "This model does not think.")</div>
+            </div>
+            <div class="@Row(RunModelOptions.ThinkingBudgets)" data-option="thinkingBudgets" data-set="@Set(RunModelOptions.ThinkingBudgets)" data-conflict="@Conflict(RunModelOptions.ThinkingBudgets)">
+              <div class="param-head">
+                <span class="param-name" id="@(p)-lbl-budgets">thinkingBudgets <span class="status-dot info ms-1" data-option-dot title="Modified · default not sent"></span> <i class="bi bi-question-circle param-help" tabindex="0" data-bs-toggle="tooltip" title="Token budget per thinking level, for models that think by budget (Anthropic budget thinking, Gemini 2.5) while they think. The run's level uses its own (xhigh and max use high's); an empty level keeps the model's. APIs that take a reasoning effort take no budget."></i></span>
+                <span class="ps-chip">tokens</span>
+              </div>
+              <div class="row g-1" role="group" aria-labelledby="@(p)-lbl-budgets">
+                @foreach (var level in RequestConfigView.BudgetLevels)
+                {
+                  <div class="col-6"><div class="input-group input-group-sm"><label class="input-group-text ps-mono fs-8" for="@(p)-budget-@level">@level</label><input class="form-control ps-mono" id="@(p)-budget-@level" type="number" min="1" max="10000000" step="1024" placeholder="—" value="@Model.Budget(level)" data-opt="thinkingBudgets" data-kind="budgets" data-level="@level" disabled="@Model.Off(RunModelOptions.ThinkingBudgets)"></div></div>
+                }
+              </div>
+              <div class="d-flex align-items-start gap-2"><div class="form-text mt-1 flex-grow-1" data-option-note data-default-note="Empty, each level keeps the model's own budget.">@(Model.Why(RunModelOptions.ThinkingBudgets) ?? "Empty, each level keeps the model's own budget.")</div><button class="btn btn-link btn-sm p-0 fs-8" type="button" data-option-clear hidden="@(!Model.IsSet(RunModelOptions.ThinkingBudgets))">Clear</button></div>
+            </div>
+            <div class="@Row(RunModelOptions.ReasoningSummary)" data-option="reasoningSummary" data-set="@Set(RunModelOptions.ReasoningSummary)" data-conflict="@Conflict(RunModelOptions.ReasoningSummary)">
+              <div class="param-head"><label class="param-name" for="@(p)-summary">reasoningSummary <span class="status-dot info ms-1" data-option-dot title="Modified · default not sent"></span> <i class="bi bi-question-circle param-help" tabindex="0" data-bs-toggle="tooltip" title="Responses, Azure and Codex, while the model thinks: reasoning.summary. The summary appears as the thinking block."></i></label></div>
+              <select class="form-select form-select-sm ps-mono" id="@(p)-summary" data-opt="reasoningSummary" data-kind="select" disabled="@Model.Off(RunModelOptions.ReasoningSummary)">
+                <option value="" selected="@(!Model.IsSet(RunModelOptions.ReasoningSummary))">default (not sent)</option>
+                @foreach (var summary in RunSpec.ReasoningSummaries)
+                {
+                  <option value="@summary" selected="@(Model.Draft.ReasoningSummary == summary)">@summary</option>
+                }
+              </select>
+              <div class="d-flex align-items-start gap-2"><div class="form-text mt-1 flex-grow-1" data-option-note>@Model.Why(RunModelOptions.ReasoningSummary)</div><button class="btn btn-link btn-sm p-0 fs-8" type="button" data-option-clear hidden="@(!Model.IsSet(RunModelOptions.ReasoningSummary))">Clear</button></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tools -->
+      <div class="accordion-item">
+        <h3 class="accordion-header">
+          <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#@(p)-cfg-tools" aria-expanded="true" aria-controls="@(p)-cfg-tools"><i class="bi bi-tools me-2 text-ps-faint"></i><span class="flex-grow-1">Tools</span><span class="ps-chip me-2" data-tools-count>@tools.Count</span></button>
+        </h3>
+        <div id="@(p)-cfg-tools" class="accordion-collapse collapse show" data-section="tools">
+          <div class="accordion-body">
+            <div class="param-row" data-option="tools" data-set="@Set(RunModelOptions.Tools)" data-conflict="@(Model.ToolsConflict ? "true" : null)">
+              <div class="param-head">
+                <span class="param-name">tools <i class="bi bi-question-circle param-help" tabindex="0" data-bs-toggle="tooltip" title="Tool definitions sent with the request. The Playground never runs tools: answer a call with a toolResult message or a mock response."></i></span>
+                <span class="fs-8 ps-mono text-ps-faint" data-tools-summary>@(tools.Count == 0 ? "none" : $"{tools.Count} sent")</span>
+              </div>
+              <ul class="list-unstyled mb-2" data-tool-list>
+                @foreach (var tool in tools)
+                {
+                  var id = p + "-tool-" + CatalogText.IdPart(tool.Name);
+                  <li class="d-flex align-items-center gap-2 py-1" data-tool="@RequestConfigView.ToolJson(tool)" data-tool-name="@tool.Name"><div class="form-check form-switch mb-0 min-w-0"><input class="form-check-input" type="checkbox" role="switch" id="@id" checked data-tool-on><label class="form-check-label ps-mono fs-8 text-truncate" for="@id">@tool.Name</label></div><span class="ps-chip fs-8" data-tool-strict hidden="@(tool.Strict != true)" title="Sent with strict: true">strict</span><span class="fs-8 text-ps-faint text-truncate" data-tool-props>@RequestJson.Properties(tool.Parameters)</span><button class="btn btn-icon ms-auto py-0" type="button" data-tool-edit title="Edit @tool.Name" aria-label="Edit @tool.Name"><i class="bi bi-pencil fs-8"></i></button><button class="btn btn-icon py-0" type="button" data-tool-remove title="Remove @tool.Name" aria-label="Remove @tool.Name"><i class="bi bi-x fs-8"></i></button></li>
+                }
+              </ul>
+              <div class="fs-8 text-ps-faint mb-2" data-tools-empty hidden="@(tools.Count > 0)">No tools. Add one to let the model call it; you answer each call yourself.</div>
+              <div class="d-flex flex-wrap gap-2">
+                <button class="btn btn-sm btn-outline-secondary" type="button" data-tool-add><i class="bi bi-plus-lg me-1"></i>Add tool</button>
+                <a class="btn btn-sm btn-ghost" href="/bench">Tool Bench →</a>
+              </div>
+              <div class="form-text mt-1@(Model.ToolsConflict ? " text-ps-warn" : "")" data-option-note>@Model.ToolsWhy</div>
+            </div>
+            <div class="@Row(RunModelOptions.ToolChoice)" data-option="toolChoice" data-set="@Set(RunModelOptions.ToolChoice)" data-conflict="@Conflict(RunModelOptions.ToolChoice)">
+              <div class="param-head">
+                <label class="param-name" for="@(p)-tool-choice">toolChoice <span class="status-dot info ms-1" data-option-dot title="Modified · default auto, not sent"></span> <i class="bi bi-question-circle param-help" tabindex="0" data-bs-toggle="tooltip" title="Whether and which tool the model must call. Sent as tool_choice (or the API's own spelling)."></i></label>
+              </div>
+              <select class="form-select form-select-sm ps-mono" id="@(p)-tool-choice" data-opt="toolChoice" data-kind="choice" disabled="@Model.Off(RunModelOptions.ToolChoice)">
+                <option value="" selected="@(!Model.IsSet(RunModelOptions.ToolChoice))">default (auto, not sent)</option>
+                <option value="auto" selected="@(Model.Draft.ToolChoice == "auto")">auto</option>
+                <option value="none" selected="@(Model.Draft.ToolChoice == "none")">none</option>
+                <option value="required" selected="@(Model.Draft.ToolChoice == "required")">required</option>
+                <option value="tool" selected="@(Model.ChoiceKind == "tool")">tool: by name…</option>
+              </select>
+              <div class="form-text mt-1" data-choice-note="auto" hidden="@(Model.ChoiceKind != "auto")">The model decides whether to call a tool.</div>
+              <div class="form-text mt-1" data-choice-note="none" hidden="@(Model.ChoiceKind != "none")">Tools stay in the request, but the model must answer in text.</div>
+              <div class="form-text mt-1" data-choice-note="required" hidden="@(Model.ChoiceKind != "required")">The model must call at least one tool (Anthropic and Bedrock spell it any).</div>
+              <div class="mt-2" data-choice-note="tool" hidden="@(Model.ChoiceKind != "tool")">
+                <label class="visually-hidden" for="@(p)-tool-choice-name">Tool name</label>
+                <select class="form-select form-select-sm ps-mono" id="@(p)-tool-choice-name" data-choice-tool>
+                  @foreach (var tool in tools)
+                  {
+                    <option value="@tool.Name" selected="@(tool.Name == Model.ChoiceTool)">@tool.Name</option>
+                  }
+                </select>
+                <div class="form-text mt-1">The model must call this tool.</div>
+              </div>
+              <div class="d-flex align-items-start gap-2"><div class="form-text mt-0 flex-grow-1" data-option-note>@Model.Why(RunModelOptions.ToolChoice)</div><button class="btn btn-link btn-sm p-0 fs-8" type="button" data-option-clear hidden="@(!Model.IsSet(RunModelOptions.ToolChoice))">Clear</button></div>
+            </div>
+            <div class="@Row(RunModelOptions.ParallelToolCalls)" data-option="parallelToolCalls" data-set="@Set(RunModelOptions.ParallelToolCalls)" data-conflict="@Conflict(RunModelOptions.ParallelToolCalls)">
+              <div class="param-head">
+                <div class="form-check form-switch mb-0 min-w-0">
+                  <input class="form-check-input" type="checkbox" role="switch" id="@(p)-parallel" checked="@(Model.Draft.ParallelToolCalls ?? true)" data-default="true" data-opt="parallelToolCalls" data-kind="bool" disabled="@Model.Off(RunModelOptions.ParallelToolCalls)">
+                  <label class="form-check-label param-name" for="@(p)-parallel">parallelToolCalls <span class="status-dot info ms-1" data-option-dot title="Modified · default not sent"></span> <i class="bi bi-question-circle param-help" tabindex="0" data-bs-toggle="tooltip" title="Whether the model may call several tools in one turn. OpenAI: parallel_tool_calls; Anthropic: tool_choice.disable_parallel_tool_use. At its default it isn't sent and the provider decides."></i></label>
+                </div>
+                <span class="param-value" data-option-value>@(Model.Draft.ParallelToolCalls is { } parallel ? (parallel ? "true" : "false") : "default")</span>
+              </div>
+              <div class="d-flex align-items-start gap-2"><div class="form-text mt-0 flex-grow-1" data-option-note data-default-note="Needs at least one tool. Unset, it isn't sent and the provider decides.">@(Model.Why(RunModelOptions.ParallelToolCalls) ?? "Needs at least one tool. Unset, it isn't sent and the provider decides.")</div><button class="btn btn-link btn-sm p-0 fs-8" type="button" data-option-clear hidden="@(!Model.IsSet(RunModelOptions.ParallelToolCalls))">Clear</button></div>
+            </div>
+            <div class="param-row" data-tool-execution>
+              <div class="param-head">
+                <span class="param-name" id="@(p)-lbl-exec">toolExecution <i class="bi bi-question-circle param-help" tabindex="0" data-bs-toggle="tooltip" title="How the Playground answers several tool calls with mock responses: all at once, or one at a time. Nothing is sent for it: parallelToolCalls decides whether the model may make several calls in one turn."></i></span>
+              </div>
+              <div class="btn-group btn-group-sm w-100 pg-seg" role="group" aria-labelledby="@(p)-lbl-exec">
+                <input type="radio" class="btn-check" name="@(p)-exec" id="@(p)-ex-parallel" value="parallel" checked data-exec><label class="btn btn-outline-secondary" for="@(p)-ex-parallel">parallel</label>
+                <input type="radio" class="btn-check" name="@(p)-exec" id="@(p)-ex-sequential" value="sequential" data-exec><label class="btn btn-outline-secondary" for="@(p)-ex-sequential">sequential</label>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <partial name="_RequestConfigAdvanced" model="Model" />
+
+    </div>
+  </div>
+</section>
