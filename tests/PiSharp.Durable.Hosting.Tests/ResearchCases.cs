@@ -248,6 +248,9 @@ internal static partial class Program
             var session = await device.CreateAsync();
             var taskId = await StartResearchAsync(session, Angles("Cost", "Risk").SetItem("maxAttempts", 1).SetItem("angleDeadlineSeconds", 30));
             await WaitUntilAsync(async () => Branches((await RunAsync(session, taskId))!, "research").Any(row => Jobs.String(row, "status") == "completed"), "one angle answered");
+            // The held angle's attempt arms its deadline timer after the attempt starts.
+            await WaitUntilArmedAsync(clock, async () => AttemptDeadline(Branches((await RunAsync(session, taskId))!, "research").Single(row => Jobs.String(row, "title") == "Cost")),
+                "the held angle's deadline timer is armed");
             clock.Advance(TimeSpan.FromSeconds(31));
             var run = await WaitForRunAsync(session, taskId, "completed");
             var cost = Branches(run, "research").Single(row => Jobs.String(row, "title") == "Cost");

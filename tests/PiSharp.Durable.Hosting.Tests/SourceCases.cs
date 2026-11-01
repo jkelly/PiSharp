@@ -311,6 +311,8 @@ internal static partial class Program
             var cooldown = Jobs.Long(health, "cooldownUntil")!.Value - clock.GetUtcNow().ToUnixTimeMilliseconds();
             Check(cooldown is > 100_000 and <= 132_000, "about two minutes with jitter: " + cooldown);
             Equal("new", Jobs.String((JsonObjectValue)device.Host.Sources.Get("flaky")!.ToJson()["state"], "status"), "a retry in progress is not a failed check");
+            // The run says "Retrying" before its next iteration arms the sleep until the cooldown ends.
+            await WaitUntilArmedAsync(clock, () => Task.FromResult<double?>(Jobs.Long(health, "cooldownUntil")), "the retry's timer is armed");
             clock.Advance(TimeSpan.FromMinutes(3));
             var run = await WaitForRunAsync(session, start.TaskId.Value, "completed");
             Equal("changed", Jobs.String(SourceResult(run, "flaky"), "status"), "the retry succeeded");
@@ -523,6 +525,9 @@ internal static partial class Program
                 throw new InvalidOperationException("No retry: " + Cut((await RunAsync(session, start.TaskId.Value))!.ToJson()) + " requests: " +
                     string.Join(", ", server.Requests.Select(request => request.Path)));
             }
+            // The run says "Retrying" before its next iteration arms the sleep until the earliest cooldown ends.
+            await WaitUntilArmedAsync(clock, () => Task.FromResult<double?>(device.Host.Sources.Health().Min(row => Jobs.Long(row, "cooldownUntil"))),
+                "the retry's timer is armed");
             clock.Advance(TimeSpan.FromMinutes(3));
             var run = await WaitForRunAsync(session, start.TaskId.Value, "completed");
             Equal(3L, Jobs.Long(SourceResult(run, "paged"), "new"), "both pages");

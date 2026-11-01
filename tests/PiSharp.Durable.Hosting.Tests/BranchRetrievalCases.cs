@@ -56,6 +56,9 @@ internal static partial class Program
             await WaitUntilAsync(() => Task.FromResult(server.Count("/slow") == 1), "the counted branch is fetching the slow page");
             await WaitUntilAsync(async () => Branches((await RunAsync(session, task))!, "fetch").Count(row => Jobs.String(row, "status") == "completed") == 4,
                 "the other branches answered");
+            // The slow branch's attempt arms its deadline timer after the attempt starts.
+            await WaitUntilArmedAsync(clock, async () => AttemptDeadline(Branches((await RunAsync(session, task))!, "fetch").Single(row => Jobs.String(row, "id") == "counted")),
+                "the slow fetch's deadline timer is armed");
             clock.Advance(TimeSpan.FromSeconds(61));
             var run = await WaitForRunAsync(session, task, "completed");
             var answers = (JsonObjectValue)run["result"];
