@@ -1,0 +1,38 @@
+/* PiSharp Durable Web: what the live app adds to the mockups' styles (PiSharp.Web.Common's shell.css and durable.css). */
+.d-contents { display: contents; }
+.msg-plain { white-space: pre-wrap; }
+.msg-image { display: block; max-width: min(100%, 28rem); max-height: 20rem; border-radius: .5rem; border: 1px solid var(--ps-border, rgba(127,127,127,.25)); margin-top: .5rem; }
+.msg-error { color: var(--bs-danger); font-size: .85rem; margin-top: .25rem; }
+.msg-content > :last-child { margin-bottom: 0; }
+.msg-content pre { white-space: pre-wrap; }
+.event-group { display: block; }
+.plan-text { max-height: 18rem; overflow-y: auto; }
+.pending-body fieldset { border: 0; padding: 0; margin: 0; }
+.pending-body legend { font-size: inherit; float: none; width: auto; margin-bottom: .35rem; }
+.pending-panel { max-height: 50vh; overflow-y: auto; }
+.chat-scroll[hidden], [data-connecting][hidden] { display: none !important; }
+.dn-center[hidden], .dn-agent[hidden], .dn-inspector[hidden] { display: none !important; }
+.tree-body { display: contents; }
+.job-card { scroll-margin: 6rem; }
+.signature { white-space: pre-wrap; }
+.tool-card .ps-term pre { max-height: 22rem; overflow: auto; }
+[data-automation] summary { overflow-wrap: anywhere; }
+[data-automation] .automation-output { white-space: pre-wrap; overflow-wrap: anywhere; word-break: break-word; }
+.artifact-list { display: grid; gap: .75rem; }
+.artifact-card { border: 1px solid var(--bs-border-color); border-radius: .5rem; padding: .75rem 1rem; scroll-margin: 6rem; overflow-wrap: anywhere; }
+.artifact-card:target { outline: 2px solid var(--bs-primary); }
+.artifact-head { display: flex; align-items: center; gap: .5rem; margin-bottom: .5rem; }
+.artifact-title { font-size: 1rem; margin: 0; }
+.artifact-summary { margin-bottom: .5rem; }
+.artifact-meta, .artifact-foot, .artifact-action, .job-artifacts { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; font-size: .85rem; }
+.artifact-feedback { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; margin-top: .5rem; }
+.artifact-feedback-labels { width: 13rem; max-width: 100%; }
+.artifact-feedback [aria-pressed="true"] { background: var(--bs-secondary-bg); border-color: var(--bs-emphasis-color); font-weight: 600; }
+.preference-bar { display: inline-block; vertical-align: middle; height: .5rem; width: calc(var(--weight) * 8rem); margin-left: .5rem; border-radius: .25rem; background: var(--bs-success); }
+.preference-bar[data-tone="less"] { background: var(--bs-danger); }
+.artifact-foot { border-top: 1px solid var(--bs-border-color); margin-top: .5rem; padding-top: .5rem; color: var(--bs-secondary-color); }
+.artifact-excerpt { border-left: 3px solid var(--bs-border-color); padding-left: .5rem; margin: .25rem 0; font-size: .85rem; white-space: pre-wrap; }
+.artifact-timeline time { font-variant-numeric: tabular-nums; margin-right: .5rem; color: var(--bs-secondary-color); }
+.job-artifacts { padding: 0 1rem .5rem; }
+.job-artifacts .ps-chip { text-decoration: none; }
+[data-automation] .spec-editor { font-family: var(--bs-font-monospace); font-size: .85rem; min-height: 16rem; }

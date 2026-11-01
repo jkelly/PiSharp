@@ -1,0 +1,171 @@
+@* Decision 0011 (run W3, SU): the wizard's Connect step: four ways to connect a provider, then "Connected so far".
+   - Sign in with ChatGPT: the Settings area's _CredentialButton opens its #modal-chatgpt-signin (settings-signin.js on /api/credentials/signin);
+     once connected, the account's plan chip shows instead. Offline (--faux) the button is disabled and says why.
+   - Paste an API key: a provider list (one-key providers, then cloud accounts that need more than a key) and a password field, POSTed once to
+     /api/credentials/accounts by setup.js and cleared; "More options" (and a cloud account) opens the Settings area's #modal-api-key for the
+     chosen provider (settings-keys.js), which also offers its environment variable and the base URL.
+   - Environment variables: the provider key variables the host process was started with, as the credentials area read them at start
+     (set or not set) and ambient credentials it found. The mockup's Rescan is left out: a running process's environment cannot change, so
+     the note says to restart the app instead.
+   - Local model server: Settings › Custom providers; "Add server" opens its editor on the LM Studio template (?add=lmstudio, read once by custom-providers.js).
+   Model: SetupPage. *@
+@model SetupPage
+@{
+    var codex = Model.Codex;
+    var codexAgain = codex is { IsConnected: false } ? codex.Accounts.FirstOrDefault(account => account.Kind == AccountKind.OAuth && account.Status == AccountStatus.Expired) : null;
+    var keys = Model.KeyProviders;
+    var single = keys.Where(entry => entry.KeyForm == ApiKeyForm.Single).ToList();
+    var cloud = keys.Where(entry => entry.KeyForm != ApiKeyForm.Single).ToList();
+    var first = keys.Count > 0 ? keys[0] : null;
+    var groups = new[] { (Label: "API key", Entries: single), (Label: "Cloud accounts", Entries: cloud) };
+}
+<section data-setup-step="connect" hidden="@(Model.Step != SetupStep.Connect)" aria-labelledby="setupConnectTitle">
+  <h2 class="fs-4 mb-1" id="setupConnectTitle" tabindex="-1">Connect a provider</h2>
+  <p class="text-secondary fs-7 mb-4">You need at least one. You can add more later in <a href="/settings/providers">Settings › Providers</a>.</p>
+  <partial name="/Views/Settings/_OfflineNote.cshtml" model="Model.Offline" />
+
+  <div class="d-grid gap-3">
+    @if (codex is not null)
+    {
+      <div class="choice-card setup-option" data-setup-option="chatgpt">
+        <div class="d-flex flex-wrap gap-3 align-items-start">
+          <partial name="/Views/Settings/_ProviderLogo.cshtml" model='new LogoModel("OpenAI Codex", codex.LogoUrl)' />
+          <div class="flex-grow-1" style="min-width:0">
+            <div class="choice-title d-flex align-items-center gap-2 flex-wrap">Sign in with ChatGPT (Plus/Pro) <span class="ps-chip" data-tone="accent">recommended</span></div>
+            <div class="choice-desc">Use the subscription you already pay for. @SetupText.CodexModels(codex)No API key and no per-token billing.</div>
+          </div>
+          @if (codex.IsConnected && codex.Active is { } signedIn)
+          {
+            <span class="ps-chip" data-tone="ok" data-setup-codex-connected><i class="bi bi-check2" aria-hidden="true"></i>@SettingsText.KindChip(signedIn)</span>
+          }
+          else
+          {
+            <partial name="/Views/Settings/_CredentialButton.cshtml" model='new CredentialButton(codex, codexAgain is null ? "Sign in" : "Sign in again", "btn btn-primary btn-ps btn-sm") { SignIn = true, Account = codexAgain, Icon = "bi-box-arrow-in-right me-1" }' />
+          }
+        </div>
+      </div>
+    }
+
+    <div class="choice-card setup-option" data-setup-option="api-key">
+      <div class="d-flex flex-wrap gap-3 align-items-start mb-3">
+        <span class="provider-logo" aria-hidden="true"><i class="bi bi-key"></i></span>
+        <div class="flex-grow-1" style="min-width:0">
+          <div class="choice-title">Paste an API key</div>
+          <div class="choice-desc">OpenAI, Anthropic, Google, xAI, DeepSeek, Mistral and more. Stored encrypted, billed per token by the provider.</div>
+        </div>
+      </div>
+      @if (first is null)
+      {
+        <div class="fs-7 text-secondary">No provider takes an API key here.</div>
+      }
+      else
+      {
+        <form class="row g-2 align-items-end" novalidate autocomplete="off" data-setup-key-form>
+          <div class="col-sm-4">
+            <label class="form-label fs-8" for="setupKeyProvider">Provider</label>
+            <select class="form-select form-select-sm" id="setupKeyProvider" data-setup-key-provider>
+              @foreach (var group in groups)
+              {
+                if (group.Entries.Count == 0) continue;
+                <optgroup label="@group.Label">
+                  @foreach (var entry in group.Entries)
+                  {
+                    <option value="@entry.Id" selected="@(entry.Id == first.Id)" data-key-provider="@entry.Id" data-key-name="@entry.Name" data-key-logo="@entry.LogoUrl"
+                            data-key-form="@SettingsText.FormName(entry.KeyForm)" data-key-subtitle="@SetupText.KeySubtitle(entry)"
+                            data-key-variables="@(string.Join(", ", entry.Variables))" data-key-base-url="@entry.BaseUrl" data-model-count="@entry.Models.Count">@entry.Id · @entry.Name</option>
+                  }
+                </optgroup>
+              }
+            </select>
+          </div>
+          <div class="col-sm-8">
+            <label class="form-label fs-8" for="setupKeyInput">API key</label>
+            <div class="input-group input-group-sm" data-setup-key-single hidden="@(first.KeyForm != ApiKeyForm.Single)">
+              <input class="form-control secret-field" id="setupKeyInput" type="password" placeholder="Paste the key" autocomplete="off" spellcheck="false" data-setup-key-input>
+              <button class="btn btn-outline-secondary" type="button" data-setup-reveal aria-label="Show or hide key"><i class="bi bi-eye" aria-hidden="true"></i></button>
+              <button class="btn btn-outline-primary" type="submit" data-setup-key-save>Save</button>
+            </div>
+            <div data-setup-key-cloud hidden="@(first.KeyForm == ApiKeyForm.Single)">
+              <button class="btn btn-sm btn-outline-secondary w-100" type="button" data-bs-toggle="modal" data-bs-target="#modal-api-key" data-setup-key-modal
+                      data-key-provider="@first.Id" data-key-name="@first.Name" data-key-logo="@first.LogoUrl" data-key-form="@SettingsText.FormName(first.KeyForm)"
+                      data-key-subtitle="@SetupText.KeySubtitle(first)" data-key-variables="@(string.Join(", ", first.Variables))" data-key-base-url="@first.BaseUrl">Set up <span data-setup-key-cloud-name>@first.Name</span>…</button>
+            </div>
+          </div>
+        </form>
+        <div class="alert alert-danger d-flex gap-2 py-2 fs-7 mt-2 mb-0" role="alert" data-setup-key-error hidden><i class="bi bi-x-octagon" aria-hidden="true"></i><div data-setup-key-error-text></div></div>
+        <div class="mt-2 fs-8">
+          <a href="#modal-api-key" data-bs-toggle="modal" data-bs-target="#modal-api-key" data-setup-key-modal data-key-provider="@first.Id" data-key-name="@first.Name"
+             data-key-logo="@first.LogoUrl" data-key-form="@SettingsText.FormName(first.KeyForm)" data-key-subtitle="@SetupText.KeySubtitle(first)"
+             data-key-variables="@(string.Join(", ", first.Variables))" data-key-base-url="@first.BaseUrl">More options: env var, Azure, Bedrock, Vertex, Cloudflare…</a>
+        </div>
+      }
+    </div>
+
+    <div class="choice-card setup-option" data-setup-option="environment">
+      <div class="d-flex flex-wrap gap-3 align-items-start mb-2">
+        <span class="provider-logo" aria-hidden="true"><i class="bi bi-terminal"></i></span>
+        <div class="flex-grow-1" style="min-width:0">
+          <div class="choice-title">Use environment variables</div>
+          <div class="choice-desc">Keys already set for the web host process are picked up automatically and never copied. They're read when the app starts: set one and restart the app to add it.</div>
+        </div>
+      </div>
+      <div class="d-flex flex-wrap gap-1" data-setup-variables>
+        @foreach (var variable in Model.Variables)
+        {
+          <span class="ps-chip" data-tone="@(variable.Set ? "ok" : "outline")" data-setup-variable="@variable.Name" data-set="@(variable.Set ? "true" : "false")">@variable.Name @(variable.Set ? "✓" : "✗")<span class="visually-hidden">@(variable.Set ? " set" : " not set")</span></span>
+        }
+        @if (Model.MoreVariables > 0)
+        {
+          <span class="ps-chip" data-tone="outline" data-setup-more-variables>+ @Model.MoreVariables more</span>
+        }
+      </div>
+    </div>
+
+    <div class="choice-card setup-option" data-setup-option="local-server">
+      <div class="d-flex flex-wrap gap-3 align-items-start">
+        <span class="provider-logo" aria-hidden="true"><i class="bi bi-hdd-network"></i></span>
+        <div class="flex-grow-1" style="min-width:0">
+          <div class="choice-title">Local model server (LM Studio, Ollama, vLLM)</div>
+          <div class="choice-desc">Any OpenAI-compatible endpoint, such as <span class="ps-mono">http://localhost:1234/v1</span>. Defined like a models.json provider.</div>
+        </div>
+        <a class="btn btn-sm btn-outline-secondary" href="/settings/custom-providers?add=lmstudio" data-setup-add-server><i class="bi bi-plus-lg me-1" aria-hidden="true"></i>Add server</a>
+      </div>
+    </div>
+  </div>
+
+  <div class="mt-4">
+    <div class="ps-label mb-2">Connected so far</div>
+    @if (Model.NothingConnected)
+    {
+      <div class="ps-panel p-3 fs-7 text-ps-faint text-center" data-setup-nothing><i class="bi bi-plug me-1" aria-hidden="true"></i>Nothing connected yet. Pick one of the options above to continue.</div>
+    }
+    else
+    {
+      <div class="ps-card" data-setup-connected-list>
+        @foreach (var connection in Model.Connected)
+        {
+          <div class="provider-row" data-setup-connected="@connection.Provider.Id">
+            <partial name="/Views/Settings/_ProviderLogo.cshtml" model="LogoModel.Of(connection.Provider)" />
+            <div class="flex-grow-1" style="min-width:0">
+              <div class="d-flex align-items-center gap-2 flex-wrap"><span class="provider-name">@connection.Provider.Name</span><span class="provider-id">@connection.Provider.Id</span><span class="ps-chip" data-tone="@connection.Tone"><i class="bi @connection.Icon" aria-hidden="true"></i>@connection.Chip</span></div>
+              <div class="fs-8 text-ps-faint text-break">
+                @if (connection.LeadMono)
+                {
+                  <span class="ps-mono">@connection.Lead</span>
+                }
+                else
+                {
+                  @connection.Lead
+                }
+                @if (connection.Rest.Length > 0)
+                {
+                  <text> · @connection.Rest</text>
+                }
+              </div>
+            </div>
+          </div>
+        }
+      </div>
+    }
+  </div>
+</section>

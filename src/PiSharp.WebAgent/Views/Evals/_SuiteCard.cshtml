@@ -1,0 +1,121 @@
+@* Decision 0011 (run W5, E6): the mockups' _SuiteCard: the suite's name (its page), Run now and Schedule; its size line; its targets with
+   their accounts; its schedule (the label and next slot, or paused and why, or off); its cost per run (the metered worst case against the
+   suite-run cap, the typical cost: the median of its last complete runs, and the list price of subscription targets, which caps never
+   count); and its last run (the drift chip, when, how many passed). Run now posts to the suite run API with the Spend Guard's confirm.
+   Model: SuiteCardView. *@
+@model SuiteCardView
+@{
+    var suite = Model.Suite;
+    var overview = Model.Overview;
+    var estimate = overview.Estimate;
+    var titleId = "suite-" + suite.Id;
+    var problem = suite.RunProblem(overview.Cases);
+    var schedule = suite.Schedule is { Enabled: true } enabled ? enabled : null;
+    var running = overview.ActiveRun is not null;
+}
+<article class="ps-card p-3 mb-3" aria-labelledby="@titleId" data-suite-card="@suite.Id">
+  <div class="d-flex flex-wrap align-items-center gap-2 mb-1">
+    <h3 class="fs-6 fw-semibold mb-0 me-auto text-break" id="@titleId"><a class="text-reset text-decoration-none" href="@EvalRoutes.Suite(suite.Id)">@suite.Name</a></h3>
+    @if (running)
+    {
+      <a class="btn btn-sm btn-outline-secondary" href="@EvalRoutes.Run(overview.ActiveRun!.Id)"><span class="status-dot live me-1" aria-hidden="true"></span>Running…</a>
+    }
+    else
+    {
+      <button class="btn btn-sm btn-outline-secondary" type="button" data-run-suite="@suite.Id" disabled="@(problem is not null)" title="@problem"><i class="bi bi-play me-1" aria-hidden="true"></i>Run now</button>
+    }
+    <button class="btn btn-sm btn-outline-secondary" type="button" data-open-schedule="@suite.Id"><i class="bi bi-calendar-event me-1" aria-hidden="true"></i>Schedule</button>
+  </div>
+  <div class="fs-8 text-ps-faint mb-3">@EvalText.Size(overview.Cases, suite.Targets.Count, suite.K) · @EvalText.Plural(overview.AnswersPerRun, "answer", "answers") per run</div>
+  <div class="row g-3 fs-7">
+    <div class="col-12 col-lg-5">
+      <div class="ps-label mb-1">Targets</div>
+      @if (Model.Targets.Count == 0)
+      {
+        <div class="text-ps-faint">No target yet. Add one on the suite's page.</div>
+      }
+      else
+      {
+        <ul class="list-unstyled mb-0 d-grid gap-1">
+          @foreach (var target in Model.Targets)
+          {
+            <li class="d-flex align-items-center gap-2 suite-target">
+              <partial name="/Views/Settings/_ProviderLogo.cshtml" model='new LogoModel(target.Model.ProviderName, target.Model.LogoUrl, "xs")' />
+              <span class="ps-mono fs-8 text-truncate" title="@target.Model.Name · @target.Model.Settings">@target.Model.Name</span>
+              <span class="fs-8 text-ps-faint text-nowrap">@target.Account</span>
+            </li>
+          }
+        </ul>
+      }
+    </div>
+    <div class="col-6 col-lg-2">
+      <div class="ps-label mb-1">Schedule</div>
+      @if (schedule is null)
+      {
+        <div>Off</div>
+        <div class="fs-8 text-ps-faint">runs when you choose Run now</div>
+      }
+      else
+      {
+        <div>@schedule.Label</div>
+        @if (Model.Paused is { } pause)
+        {
+          <div class="d-flex flex-wrap align-items-center gap-1 mt-1"><span class="ps-chip" data-tone="warn" data-paused>paused</span><span class="fs-8 text-ps-faint">@(pause.Code == SchedulePause.OverCap ? "over its cap" : pause.Code == SchedulePause.UnknownPrice ? "no known price" : "see why above")</span></div>
+        }
+        else if (Model.NextText is { } next)
+        {
+          <div class="fs-8 text-ps-faint">@next</div>
+        }
+      }
+    </div>
+    <div class="col-6 col-lg-2">
+      <div class="ps-label mb-1">Cost per run</div>
+      @if (problem is not null)
+      {
+        <div class="text-ps-faint">—</div>
+        <div class="fs-8 text-ps-faint">@problem</div>
+      }
+      else
+      {
+        @if (estimate.HasUnknownPrice)
+        {
+          <div title="A target or judge has no known price">worst unknown</div>
+        }
+        else
+        {
+          <div title="Expected worst case, metered spend">worst @EvalText.Money(estimate.WorstMicros)</div>
+        }
+        var parts = new List<string>();
+        parts.Add(estimate.TypicalMicros is { } typical ? "typical " + EvalText.Money(typical) : "no typical yet");
+        parts.Add(suite.CapMicros is { } cap ? "cap " + EvalText.Money(cap) : "no cap");
+        <div class="fs-8 text-ps-faint">@string.Join(" · ", parts)</div>
+        @if (estimate.ListMicros > 0)
+        {
+          <div class="fs-8 text-ps-faint" title="Subscription targets at list price; never counted toward money caps">@EvalText.ListMoney(estimate.ListMicros) list</div>
+        }
+      }
+    </div>
+    <div class="col-12 col-lg-3">
+      <div class="ps-label mb-1">Last run</div>
+      @if (Model.LastRun is { } last)
+      {
+        <a class="text-reset text-decoration-none d-inline-flex flex-wrap align-items-center gap-2" href="@last.Url">
+          @if (last.Run.Active)
+          {
+            <span class="ps-chip"><span class="status-dot live" aria-hidden="true"></span>running</span>
+          }
+          else
+          {
+            <span class="ps-chip" data-tone="@last.Tone">@last.Chip</span>
+          }
+          <span>@last.Title · @last.When</span>
+        </a>
+        <div class="fs-8 text-ps-faint">@last.Summary</div>
+      }
+      else
+      {
+        <div class="text-ps-faint">No runs yet</div>
+      }
+    </div>
+  </div>
+</article>

@@ -1,0 +1,87 @@
+@* Decision 0011 (run W3, S4): the mockups' modal-spend-confirm (_SpendConfirmModal), shown before anything is reserved or sent when the
+   Spend Guard says Ask or Block. One pane, for the first cause (Block before Ask): sc-request, sc-chat (a run cap: this chat's, or this
+   run's), sc-period (a day or month cap) or sc-unknown (no price); sc-allowance is left out, since no account reports allowance windows.
+   The worst case's parts, what is left, a shorter output that fits, the other causes, and cheaper models as suggestions only: PiSharp never
+   switches the model or account (the footnote mentions "the models above" only when some are listed). Footer: Cancel, Proceed once
+   (disabled for Block), Cap output at N. A host page renders it with a null model (an empty shell) and spend-confirm.js fills it from
+   POST /api/spend/confirm, which renders it with a model. Model: SpendConfirmView? *@
+@using PiSharp.WebAgent.Spend
+@model SpendConfirmView?
+<div class="modal fade" id="modal-spend-confirm" tabindex="-1" aria-labelledby="modal-spend-confirm-title" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+    <div class="modal-content" data-spend-confirm-content data-pane="@Model?.Pane" data-verdict="@(Model?.Decision.Verdict.ToString().ToLowerInvariant())">
+      @if (Model is { } view)
+      {
+        var lead = view.Lead;
+        <div class="modal-header">
+          <div>
+            <h2 class="modal-title" id="modal-spend-confirm-title">@view.Title</h2>
+            <div class="modal-subtitle"><span class="ps-mono">@view.Model</span>@view.Subtitle</div>
+          </div>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close" data-spend-choice="cancel"></button>
+        </div>
+        <div class="modal-body">
+          <div data-spend-pane="@view.Pane">
+            <p class="fs-7 mb-3">@(lead.Before)@if (lead.Mono) {<span class="ps-mono">@lead.Mark</span>} else {<strong>@lead.Mark</strong>}@(lead.After)</p>
+            <div class="ps-panel px-3 py-2 mb-3">
+              @foreach (var part in view.Parts)
+              {
+                <div class="kv"><span class="k">@part.Key</span><span class="@("v" + (part.Strong ? " fw-semibold" : "") + (part.Faint ? " text-ps-faint" : ""))">@part.Value</span></div>
+              }
+            </div>
+            @if (view.Others is not null)
+            {
+              <div class="fs-8 text-ps-faint mb-3">@view.Others</div>
+            }
+            @if (view.Fit is not null || view.EnterPrice || view.RaiseCap)
+            {
+              <p class="fs-7 text-secondary mb-3">
+                @view.Fit
+                @if (view.EnterPrice)
+                {
+                  <text>You can also <a href="/settings/spend#unknown-prices">enter a price</a>; the model is then checked like any other metered model.</text>
+                }
+                @if (view.RaiseCap)
+                {
+                  <text>To send it as it is, raise the cap in <a href="/settings/spend#caps">Settings › Spend</a>.</text>
+                }
+              </p>
+            }
+            @if (view.Suggestions.Count > 0)
+            {
+              <div class="ps-label mb-1">@view.SuggestionsLabel <span class="fw-normal text-ps-faint">· suggestions only, same request</span></div>
+              @foreach (var suggestion in view.Suggestions)
+              {
+                <div class="kv" data-spend-suggestion="@suggestion.Provider/@suggestion.Model"><span class="k ps-mono text-break">@suggestion.Provider/@suggestion.Model</span><span class="v text-nowrap" title="@suggestion.Title">@suggestion.Value</span></div>
+              }
+              @if (view.SubscriptionNote is not null)
+              {
+                <div class="fs-8 text-ps-faint mt-1">@view.SubscriptionNote</div>
+              }
+            }
+          </div>
+          <div class="d-flex flex-wrap align-items-center gap-2 mt-3 pt-3 border-top">
+            <span class="fs-8 text-ps-faint flex-grow-1" data-spend-footnote>@view.Footnote</span>
+            <button type="button" class="btn btn-sm btn-outline-secondary" data-spend-choice="choose-model" hidden>Choose a model…</button>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary me-auto" data-spend-choice="cancel">Cancel</button>
+          @if (view.CanProceed)
+          {
+            <button type="button" class="btn btn-outline-secondary" data-spend-choice="proceed-once" title="Send this request once. Your caps stay as they are.">Proceed once</button>
+          }
+          else
+          {
+            <button type="button" class="btn btn-outline-secondary" disabled aria-describedby="spend-confirm-blocked">Proceed once</button>
+            <span class="visually-hidden" id="spend-confirm-blocked">Not available: @(view.Pane == "sc-unknown" ? "unknown prices are set to Block." : "this cap is set to Block.")</span>
+          }
+          @if (view.CapOutputTokens is { } tokens)
+          {
+            <button type="button" class="btn btn-primary" data-spend-choice="cap-output" data-max-output-tokens="@tokens">Cap output at @SpendEstimateText.Tokens(tokens) tokens</button>
+          }
+        </div>
+      }
+    </div>
+  </div>
+</div>

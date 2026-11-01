@@ -1,0 +1,55 @@
+@model ArtifactCardModel
+@{
+    var props = Model.Props;
+    var severity = Display.Str(props, "severity");
+    var tone = severity switch { "critical" or "high" => "danger", "medium" => "warn", _ => "info" };
+    string Percent(string key) => (Display.Number(props, key) * 100).ToString("0", System.Globalization.CultureInfo.InvariantCulture) + "%";
+    var tags = (props["tags"] as JsonArray ?? []).Select(item => item?.GetValue<string>()).OfType<string>().ToList();
+    var links = Display.Objects(props, "links").ToList();
+}
+<p class="artifact-summary">@Display.Str(props, "summary")</p>
+<div class="artifact-meta">
+  @if (severity is not null)
+  {
+    <span class="ps-chip" data-tone="@tone">@severity</span>
+  }
+  @if (Display.Str(props, "label") is { } label)
+  {
+    <span class="ps-chip">@label</span>
+  }
+  @if (props["score"] is not null)
+  {
+    <span>Score @Percent("score")</span>
+  }
+  @if (props["confidence"] is not null)
+  {
+    <span>Confidence @Percent("confidence")</span>
+  }
+  @foreach (var tag in tags)
+  {
+    <span class="ps-chip">#@tag</span>
+  }
+</div>
+@if (Display.Str(props, "details") is { Length: > 0 } details)
+{
+  <div class="artifact-details md">@Html.Raw(Model.Owner.Markdown.Render(details))</div>
+}
+@if (links.Count > 0)
+{
+  <ul class="artifact-links">
+    @foreach (var link in links)
+    {
+      var url = Display.Str(link, "url");
+      <li>
+        @if (ArtifactsModel.IsSafeUrl(url))
+        {
+          <a href="@url" target="_blank" rel="noopener noreferrer">@Display.Str(link, "title")</a>
+        }
+        else
+        {
+          <span>@Display.Str(link, "title")</span>
+        }
+      </li>
+    }
+  </ul>
+}

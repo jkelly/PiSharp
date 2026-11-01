@@ -1,0 +1,16 @@
+@model ArtifactCardModel
+@{
+    var props = Model.Props;
+    var action = Display.Str(props, "action") ?? "";
+    var risk = Display.Str(props, "risk");
+    var label = Display.Str(props, "confirmLabel") ?? action switch { "reevaluate" => "Evaluate again", "start-research" => "Research this", _ => action };
+}
+<p class="artifact-summary">@Display.Str(props, "summary")</p>
+<div class="artifact-action">
+  @if (risk is not null)
+  {
+    <span class="ps-chip" data-tone="@(risk == "high" ? "danger" : risk == "medium" ? "warn" : "info")">@risk risk</span>
+  }
+  <button type="button" class="btn btn-sm btn-outline-primary" data-artifact-action="@action" data-artifact-id="@Display.Str(Model.Artifact, "id")" data-label="@label">@label</button>
+  <small class="text-body-secondary">Starts a new execution only after you confirm.</small>
+</div>

@@ -1,0 +1,42 @@
+@* Decision 0011 (run W3, fix spend-ui): Save current filters… of History › Spend's Saved filters menu (the mockups' history-spend has the
+   menu item and no modal of its own, so this follows the mockups' save-preset and rename-session modals): a name, suggested from the
+   active filters' values, and the filters it saves as chips. Dates are saved as they are, and the modal says so when the filters have
+   them. spend-history.js posts {name, query} to /api/spend/filters (a name already used replaces that filter) and reloads with the toast.
+   Model: SpendHistoryPage. *@
+@model SpendHistoryPage
+<div class="modal fade" id="modal-save-spend-filter" tabindex="-1" aria-labelledby="modal-save-spend-filter-title" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <form class="modal-content" novalidate autocomplete="off" data-save-filter data-query="@Model.Filter.QueryString(paging: false)">
+      <div class="modal-header">
+        <div>
+          <h2 class="modal-title" id="modal-save-spend-filter-title">Save current filters</h2>
+          <div class="modal-subtitle">Open this view of the ledger again from Saved filters.</div>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div class="mb-3">
+          <label class="form-label" for="sfName">Name</label>
+          <input class="form-control" id="sfName" maxlength="@SpendSavedFilters.MaxNameLength" value="@Model.SaveName" placeholder="e.g. Anthropic this month" required data-sf-name>
+          <div class="form-text">Saving under a name you already use replaces that filter.</div>
+        </div>
+        <div class="ps-label mb-2">Filters</div>
+        <div class="d-flex flex-wrap gap-2" data-sf-chips>
+          @foreach (var chip in Model.Chips)
+          {
+            <span class="ps-chip" data-tone="accent">@chip.Text</span>
+          }
+        </div>
+        @if (Model.Filter.From is not null || Model.Filter.To is not null)
+        {
+          <div class="fs-8 text-ps-faint mt-2">The dates are saved as they are: the range doesn't move with the calendar.</div>
+        }
+        <div class="text-ps-danger fs-7 mt-3" role="alert" data-sf-error hidden></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="submit" class="btn btn-primary" data-sf-submit>Save filter</button>
+      </div>
+    </form>
+  </div>
+</div>

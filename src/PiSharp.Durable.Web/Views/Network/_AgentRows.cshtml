@@ -1,0 +1,42 @@
+@model (IReadOnlyList<TreeNode> Nodes, int Depth, string Under, string Parent, bool Stale)
+@foreach (var node in Model.Nodes)
+{
+  var agent = node.Agent!;
+  var icon = agent.Kind switch { "fork" => "bi-signpost-split", "subagent" => "bi-arrow-return-right", _ => "bi-chat-square" };
+  var title = agent.Kind switch
+  {
+      "fork" => $"Fork of agent #{agent.ParentId} at entry #{agent.ForkedAt}",
+      "subagent" => $"Subagent owned by agent #{agent.OwnerAgentId}",
+      _ => "Root agent",
+  };
+  <div class="tree-row agent @(Model.Stale ? "stale" : "")" role="treeitem" aria-level="@(Model.Depth + 1)" data-key="@node.Key" data-parent="@Model.Parent" data-under="@Model.Under"
+       data-device="@node.DeviceId" data-session="@node.Session!.Id" data-agent="@agent.Id" style="--depth:@Model.Depth" tabindex="-1" title="@title">
+    <i class="bi bi-chevron-right chev"></i>
+    <i class="bi @icon row-icon" aria-hidden="true"></i>
+    <span class="row-name">@agent.Name</span>
+    <span class="row-end">
+      <span class="row-status d-inline-flex align-items-center gap-2">
+        @if (agent.Kind == "fork" && agent.ForkedAt is { } at)
+        {
+          <span class="row-meta">@@ #@at</span>
+        }
+        @if (agent.Busy)
+        {
+          <span class="status-dot live" title="Working"></span>
+        }
+        @if (agent.Background > 0)
+        {
+          <span class="bg-count" title="@agent.Background background task@(agent.Background == 1 ? "" : "s")">@agent.Background bg</span>
+        }
+      </span>
+      @if (!Model.Stale)
+      {
+        <span class="row-actions"><button class="btn btn-icon" type="button" title="Rename agent @agent.Name" aria-label="Rename agent @agent.Name" data-action="rename-agent" data-device="@node.DeviceId" data-session="@node.Session.Id" data-agent="@agent.Id" data-name="@agent.Name"><i class="bi bi-pencil"></i></button></span>
+      }
+    </span>
+  </div>
+  @if (node.Children.Count > 0)
+  {
+    @await Html.PartialAsync("~/Views/Network/_AgentRows.cshtml", (node.Children, Model.Depth + 1, Model.Under + " " + node.Key, node.Key, Model.Stale))
+  }
+}

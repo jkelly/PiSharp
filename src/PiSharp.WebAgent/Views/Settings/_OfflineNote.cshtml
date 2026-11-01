@@ -1,0 +1,10 @@
+@* Decision 0011 (run W2, WU9): the note the credential pages show while the app runs offline (--faux): keys can be stored, but nothing is
+   tested and nobody signs in. Model: bool (offline). *@
+@model bool
+@if (Model)
+{
+  <div class="alert alert-secondary d-flex gap-2 align-items-start py-2 fs-7 mb-3" role="status" data-offline-note>
+    <i class="bi bi-wifi-off mt-1" aria-hidden="true"></i>
+    <div><strong>Offline mode.</strong> @ProviderDirectory.OfflineMessage Keys you add are stored, and chats use the faux models.</div>
+  </div>
+}

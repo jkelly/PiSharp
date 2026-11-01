@@ -25,17 +25,28 @@ internal static class PiHttpIdleTimeout
             if (trimmed.Length == 0) return null;
             return Number(JsNumber(trimmed));
         }
-        return scalar.GetValueKind() == JsonValueKind.Number ? Number(scalar.GetValue<double>()) : null;
+        if (scalar.GetValueKind() != JsonValueKind.Number) return null;
+        // Programmatic settings can hold JsonValue<int/long/decimal>, which GetValue<double> cannot read directly.
+        if (scalar.TryGetValue<double>(out var floating)) return Number(floating);
+        if (scalar.TryGetValue<float>(out var single)) return Number(single);
+        return double.TryParse(scalar.ToJsonString(), NumberStyles.Float, CultureInfo.InvariantCulture, out var numeric) ? Number(numeric) : null;
 
-        static long? Number(double number) => !double.IsFinite(number) || number < 0 ? null : (long)Math.Min(Math.Floor(number), long.MaxValue);
+        static long? Number(double number) => !double.IsFinite(number) || number < 0 ? null :
+            number >= long.MaxValue ? long.MaxValue : (long)Math.Floor(number);
     }
 
     /// <summary>Source getHttpIdleTimeoutMs with parseTimeoutSetting: the merged setting, or the 300 s default when it is absent.</summary>
     /// <exception cref="InvalidDataException"><c>Invalid httpIdleTimeoutMs setting: &lt;value&gt;</c> for a present, invalid value.</exception>
-    internal static long FromSettings(JsonObject merged)
+    internal static long FromSettings(JsonObject merged) => ReadSetting(merged, "httpIdleTimeoutMs", DefaultMilliseconds);
+
+    /// <summary>The Codex WebSocket handshake deadline; zero disables it, as upstream's timeout setting does.</summary>
+    internal static TimeSpan WebSocketConnectTimeoutFromSettings(JsonObject merged) =>
+        TimeSpan.FromMilliseconds(Math.Min(ReadSetting(merged, "websocketConnectTimeoutMs", 15_000), int.MaxValue));
+
+    private static long ReadSetting(JsonObject merged, string name, long fallback)
     {
-        if (!merged.TryGetPropertyValue("httpIdleTimeoutMs", out var value)) return DefaultMilliseconds;
-        return Parse(value) ?? throw new InvalidDataException($"Invalid httpIdleTimeoutMs setting: {JsString(value)}");
+        if (!merged.TryGetPropertyValue(name, out var value)) return fallback;
+        return Parse(value) ?? throw new InvalidDataException($"Invalid {name} setting: {JsString(value)}");
     }
 
     /// <summary>Wraps a provider handler factory so its requests carry the idle timeout (0: unchanged). A null inner handler is the

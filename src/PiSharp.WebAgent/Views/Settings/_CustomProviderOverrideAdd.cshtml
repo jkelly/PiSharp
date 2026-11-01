@@ -1,0 +1,35 @@
+@* Decision 0011 (run W3, CP): the mockups' "Add override" form: the built-in model (Provider -> Model, _ProviderModelSelect), the field
+   and its value (a number, true or false, text, or JSON for cost, headers, compat and the other objects). Added to the model's override
+   (merged with what it already sets) through /api/custom-providers/overrides. With --faux the catalog has no built-in models, so the
+   dropdowns are empty. Model: CustomProvidersPage. *@
+@using PiSharp.WebAgent.CustomProviders
+@model CustomProvidersPage
+<div class="row g-2 align-items-end" data-cp-override-add>
+  <div class="col-md-5">
+    <partial name="/Views/Shared/_ProviderModelSelect.cshtml" model="@(new ProviderModelSelect("ovr") { Small = true, Providers = Model.OverrideProviders, ProviderField = "ovrProvider", ModelField = "ovrModel" })" />
+  </div>
+  <div class="col-6 col-md-3">
+    <label class="form-label" for="ovrField">Field</label>
+    <select class="form-select form-select-sm font-monospace" id="ovrField" data-cp-override-field>
+      @foreach (var field in new[] { "contextWindow", "maxTokens", "cost", "headers", "thinkingLevelMap", "compat", "promptCache", "samplingParams", "name", "reasoning", "input", "inputLimits" })
+      {
+        <option>@field</option>
+      }
+    </select>
+  </div>
+  <div class="col-6 col-md-2">
+    <label class="form-label" for="ovrValue">Value</label>
+    <input class="form-control form-control-sm font-monospace" id="ovrValue" placeholder="400000" spellcheck="false" autocomplete="off" data-cp-override-value>
+  </div>
+  <div class="col-md-2 d-grid">
+    <button class="btn btn-sm btn-primary" type="button" data-cp-override-add-button disabled="@(Model.OverrideProviders.Count == 0)">Add</button>
+  </div>
+  @if (Model.OverrideProviders.Count == 0)
+  {
+    <div class="col-12 form-text">@(Model.Offline ? "With --faux the catalog has no built-in models to override." : "No built-in models are listed.")</div>
+  }
+  else
+  {
+    <div class="col-12 form-text">Objects are JSON, such as <span class="ps-mono">{"input": 1.8, "output": 9}</span> for cost; a header that carries a credential must be a <span class="ps-mono">$VAR</span> reference.</div>
+  }
+</div>

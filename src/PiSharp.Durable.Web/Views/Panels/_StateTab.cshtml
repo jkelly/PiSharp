@@ -1,0 +1,21 @@
+<div data-state-tab>
+  <div class="ins-section">
+    <h3>App State <span class="ps-chip ms-auto" data-state-revision>revision 0</span></h3>
+    <p class="ins-hint">One shared JSON object for every agent, session and fork on <span data-device-name></span>. Agents read and change it with <code>read_state</code> and <code>update_state</code>.</p>
+    <label class="visually-hidden" for="stateJson">App State JSON</label>
+    <textarea class="form-control state-json" id="stateJson" rows="14" spellcheck="false"></textarea>
+    <div class="alert alert-warning mt-2 mb-2 py-2 fs-7" data-state-conflict hidden><i class="bi bi-exclamation-triangle me-1"></i>State changed elsewhere (revision <span data-state-latest></span>). Load the latest JSON before saving.</div>
+    <div class="alert alert-danger mt-2 mb-2 py-2 fs-7" data-state-error hidden></div>
+    <div class="d-flex align-items-center gap-2 mt-2 flex-wrap">
+      <span class="fs-7 text-ps-faint" data-state-dirty hidden>Unsaved changes</span>
+      <button class="btn btn-sm btn-outline-secondary ms-auto" type="button" data-action="state-reset" hidden>Reset</button>
+      <button class="btn btn-sm btn-outline-secondary ms-auto" type="button" data-action="state-load" hidden>Load latest</button>
+      <button class="btn btn-sm btn-primary" type="button" data-action="state-save" disabled>Save JSON</button>
+    </div>
+  </div>
+  <div class="ins-section">
+    <h3>Fields</h3>
+    <p class="ins-hint">Each control sends one atomic change, so agents never overwrite each other's fields. Disabled while the JSON above has unsaved edits.</p>
+    <div data-state-fields></div>
+  </div>
+</div>

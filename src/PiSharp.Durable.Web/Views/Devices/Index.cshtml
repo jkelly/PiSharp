@@ -1,0 +1,152 @@
+@model DevicesPage
+@{
+    ViewData["Title"] = "Devices";
+    ViewData["Page"] = "devices";
+}
+<div class="dn-shell">
+  <partial name="~/Views/Shared/_Topbar.cshtml" model="Model.Devices" />
+
+  <main class="dn-content">
+    <div class="page">
+      <div class="page-header">
+        <div>
+          <h2>Devices</h2>
+          <p>Each device runs <code>pisharp durable serve</code> and keeps its own sessions, agents and App State. This hub only stores how to reach each one.</p>
+        </div>
+        <div class="ms-auto d-flex gap-2 flex-wrap">
+          <button class="btn btn-outline-secondary" type="button" data-action="import"><i class="bi bi-file-earmark-arrow-up me-1"></i>Import dpi-network.yaml</button>
+          <button class="btn btn-primary" type="button" data-action="add-device"><i class="bi bi-plus-lg me-1"></i>Add device</button>
+        </div>
+      </div>
+
+      <div id="deviceTable">
+        <partial name="~/Views/Devices/_DeviceTable.cshtml" model="Model" />
+      </div>
+
+      <div class="settings-section">
+        <h3>Security</h3>
+        <p class="section-desc">Read this before you add a device on another machine.</p>
+        <div class="ps-card">
+          <div class="setting-row stack"><div><div class="setting-label">A device token is a shell</div><div class="setting-desc">Anyone holding a device's token can run commands there as the user who started <code>pisharp durable serve</code>. Start directories only choose where sessions begin. They are not a sandbox.</div></div></div>
+          <div class="setting-row stack"><div><div class="setting-label">Tokens stay on this computer</div><div class="setting-desc">The hub encrypts tokens with ASP.NET Data Protection under <span class="ps-mono">%LOCALAPPDATA%\PiSharpDurableWeb\</span> and adds them to requests itself. The browser never sees one.</div></div></div>
+          <div class="setting-row stack"><div><div class="setting-label">Plain HTTP sends the token in clear text</div><div class="setting-desc">A device on your LAN over <span class="ps-mono">http://</span> exposes its token to the network. Use HTTPS, an SSH tunnel, or keep it on <span class="ps-mono">127.0.0.1</span>.</div></div></div>
+          <div class="setting-row stack"><div><div class="setting-label">This page only listens on this computer</div><div class="setting-desc">The hub binds <span class="ps-mono">127.0.0.1:5181</span> and rejects other Host and Origin headers.</div></div></div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<div class="modal fade" id="modal-add-device" tabindex="-1" aria-labelledby="ad-title" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <form class="modal-content" id="ad-form" novalidate>
+      <div class="modal-header">
+        <div>
+          <h2 class="modal-title" id="ad-title" data-ad-title>Add device</h2>
+          <div class="modal-subtitle">A machine running <code>pisharp durable serve</code>.</div>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div data-ad-pane="form">
+          <div class="mb-3"><label class="form-label" for="ad-id">Name</label><input class="form-control" id="ad-id" placeholder="build-box" maxlength="32" autocomplete="off"><div class="form-text" data-ad-id-hint>Lower-case letters, digits and dashes.</div></div>
+          <div class="mb-3"><label class="form-label" for="ad-url">Address</label><input class="form-control font-monospace" id="ad-url" placeholder="http://build-box.lan:4780" autocomplete="off"><div class="form-text" data-ad-url-hint></div></div>
+          <div class="mb-1"><label class="form-label" for="ad-token">Token</label>
+            <div class="input-group"><input class="form-control font-monospace secret-field" id="ad-token" type="password" placeholder="dpi_…" autocomplete="off"><button class="btn btn-outline-secondary" type="button" data-reveal="#ad-token" title="Show token" aria-label="Show token"><i class="bi bi-eye"></i></button></div>
+            <div class="form-text" data-ad-token-hint>Run <code>pisharp durable token</code> on the device to print it. At least 32 characters.</div></div>
+          <div class="alert alert-danger mt-3 mb-0" data-ad-error hidden></div>
+        </div>
+        <div data-ad-pane="ok" hidden>
+          <div class="text-center py-2">
+            <div class="big-check mb-3"><i class="bi bi-check2"></i></div>
+            <h3 class="h6 mb-1" data-ad-ok-title></h3>
+            <p class="fs-7 text-secondary mb-3" data-ad-ok-sub></p>
+          </div>
+          <div class="kv"><span class="k">Device identity</span><span class="v ps-mono" data-ad-uid></span></div>
+          <div class="kv"><span class="k">Start directories</span><span class="v ps-mono" data-ad-dirs></span></div>
+          <div class="alert alert-warning mt-3 mb-0 fs-7" data-ad-plain hidden><i class="bi bi-exclamation-triangle me-1"></i>This address uses plain HTTP, so the token crosses your network unencrypted.</div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal" data-ad-cancel>Cancel</button>
+        <button type="submit" class="btn btn-primary" data-ad-submit>Check and add</button>
+        <button type="button" class="btn btn-primary" data-bs-dismiss="modal" data-ad-done hidden>Done</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="modal fade" id="modal-import" tabindex="-1" aria-labelledby="im-title" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <div><h2 class="modal-title" id="im-title">Import dpi-network.yaml</h2><div class="modal-subtitle">Adds the devices a durable-pi network file declares. Tokens never come from the file.</div></div>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div data-im-pane="paste">
+          <div class="d-flex gap-2 align-items-center mb-2"><label class="btn btn-sm btn-outline-secondary mb-0"><i class="bi bi-folder2-open me-1"></i>Choose file<input type="file" accept=".yaml,.yml" hidden data-im-file></label><span class="fs-7 text-ps-faint">or paste it below</span></div>
+          <label class="visually-hidden" for="im-yaml">YAML</label>
+          <textarea class="form-control font-monospace" id="im-yaml" rows="12" spellcheck="false" placeholder="devices:&#10;  build-box:&#10;    url: http://build-box.lan:4780"></textarea>
+        </div>
+        <div data-im-pane="preview" hidden>
+          <div class="ps-table-wrap">
+            <table class="table mb-0">
+              <thead><tr><th>Device</th><th>Address</th><th>Result</th></tr></thead>
+              <tbody data-im-rows></tbody>
+            </table>
+          </div>
+          <p class="fs-7 text-secondary mt-3 mb-0">Devices from the file are read-only here: edit the file and import it again. <span class="ps-mono">ssh</span> devices are added by their <span class="ps-mono">url</span>; provisioning them over SSH is not part of this app.</p>
+        </div>
+        <div class="alert alert-danger mt-3 mb-0" data-im-error hidden></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal" data-im-cancel>Cancel</button>
+        <button type="button" class="btn btn-outline-secondary" data-im-back hidden>Back</button>
+        <button type="button" class="btn btn-primary" data-im-preview>Preview</button>
+        <button type="button" class="btn btn-primary" data-im-apply hidden>Import</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="modal-token" tabindex="-1" aria-labelledby="tk-title" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <form class="modal-content" id="tk-form" novalidate>
+      <div class="modal-header">
+        <div><h2 class="modal-title" id="tk-title">Enter <span data-tk-device></span>'s token</h2><div class="modal-subtitle">Replaces the stored token. It is checked before it is saved.</div></div>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div class="ps-label mb-1">On <span data-tk-device></span></div>
+        <div class="ps-term mb-3"><div class="ps-term-bar">Prints the current token<button class="btn btn-icon ms-auto" type="button" data-copy="#cmd-tk" title="Copy" aria-label="Copy command"><i class="bi bi-copy"></i></button></div><pre id="cmd-tk">pisharp durable token</pre></div>
+        <label class="form-label" for="tk-value">Token</label>
+        <div class="input-group"><input class="form-control font-monospace secret-field" id="tk-value" type="password" placeholder="dpi_…" autocomplete="off"><button class="btn btn-outline-secondary" type="button" data-reveal="#tk-value" title="Show token" aria-label="Show token"><i class="bi bi-eye"></i></button></div>
+        <div class="alert alert-danger mt-3 mb-0" data-tk-error hidden></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="submit" class="btn btn-primary">Check and save</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="modal fade" id="modal-remove" tabindex="-1" aria-labelledby="rm-title" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header"><h2 class="modal-title" id="rm-title">Remove <span data-rm-device></span>?</h2><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
+      <div class="modal-body"><p class="mb-0">The hub forgets the device's address and token. Nothing on the device changes: its sessions and agents keep running, and you can add it again later.</p></div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-danger" data-rm-confirm>Remove</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<partial name="~/Views/Shared/_HelpModals.cshtml" />
+
+@section Scripts {
+  <script type="module" src="/js/devices.js" asp-append-version="true"></script>
+}

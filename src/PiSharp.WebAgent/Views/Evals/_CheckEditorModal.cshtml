@@ -1,0 +1,234 @@
+@* Decision 0011 (run W5, E6): the mockups' _CheckEditorModal (modal-check-editor) on the suite page: one pane per check kind (contains text,
+   matches regex, valid JSON with a schema, calls a tool, max cost and latency, LLM judge), the kind list switching between them. With a
+   null model it is the empty shell; evals.js fills it from GET /evals/cases/{id}/check?check=&kind= when a check (or "add") is pressed.
+   The check being edited fills its own pane; the others start empty. Under each pane, what the check makes of the case's reference output
+   (Try again asks the Checks unit's try API with the edited check). The judge pane uses _ProviderModelSelect "cej" (Provider → Model), says
+   whether the judge is the same family as a target (judges favour their own family) and what its judgements add per run (the Checks
+   unit's judge preview: nothing is sent to a model), and takes the rubric and the pass mark. Save check validates the check with the
+   Checks unit, then saves the case's checks through the Suites unit's case API; Remove check does the same without it. Model:
+   CheckEditorView (or null). *@
+@using System.Text.Json
+@using PiSharp.WebAgent.Evals.Checks
+@model CheckEditorView?
+<div class="modal fade" id="modal-check-editor" tabindex="-1" aria-labelledby="modal-check-editor-title" aria-hidden="true" data-eval-modal="check">
+  <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-lg">
+    @if (Model is null)
+    {
+      <div class="modal-content" data-modal-content>
+        <div class="modal-header">
+          <h2 class="modal-title" id="modal-check-editor-title">Edit check</h2>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body"><div class="d-flex align-items-center gap-2 fs-7 text-ps-faint"><span class="spinner-border spinner-border-sm" aria-hidden="true"></span>Loading…</div></div>
+      </div>
+    }
+    else
+    {
+      var check = Model.Check;
+      var kind = check.Kind;
+      var scope = check.Scope ?? CheckScope.Answer;
+      var schema = check.Schema is { } given
+          ? given.ToJsonString(new JsonSerializerOptions { WriteIndented = true })
+          : "{\n  \"type\": \"object\",\n  \"properties\": {},\n  \"required\": []\n}";
+      var arguments = check.Arguments ?? [];
+      var cost = check.MaxCostMicros is { } micros ? SpendMoney.ToUsd(micros).ToString("0.00####", CultureInfo.InvariantCulture) : "";
+      var latency = check.MaxLatencyMs is { } ms ? (ms / 1000.0).ToString("0.###", CultureInfo.InvariantCulture) : "";
+      var passAt = check.Judge?.PassAt ?? JudgeSpec.DefaultPassAt;
+      <div class="modal-content" data-modal-content data-case-id="@Model.Case.Id" data-check-id="@check.Id" data-suite-id="@Model.Suite.Id" data-kind="@EvalJson.Wire(kind)">
+        <div class="modal-header">
+          <div>
+            <h2 class="modal-title" id="modal-check-editor-title">@(Model.IsNew ? "Add check" : "Edit check")</h2>
+            <div class="modal-subtitle">@Model.Case.Name · @Model.Suite.Name</div>
+          </div>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3 eval-kind-select">
+            <label class="form-label" for="ceKind">Check</label>
+            <select class="form-select" id="ceKind" data-ce-kind>
+              @foreach (var option in Enum.GetValues<CheckKind>())
+              {
+                <option value="@EvalJson.Wire(option)" data-ce-target="@EvalPages.CheckPane(option)" selected="@(option == kind)">@Check.EditorLabel(option)</option>
+              }
+            </select>
+          </div>
+
+          <div data-ce-pane="ce-contains" hidden="@(Model.Pane != "ce-contains")">
+            <label class="form-label" for="ceContainsText">Text</label>
+            <input class="form-control font-monospace" id="ceContainsText" value="@(kind == CheckKind.Contains ? check.Text : null)" autocomplete="off" spellcheck="false">
+            <div class="row g-2 mt-1">
+              <div class="col-sm-6">
+                <label class="form-label fs-7" for="ceContainsWhere">Look in</label>
+                <select class="form-select form-select-sm" id="ceContainsWhere">
+                  <option value="answer" selected="@(kind != CheckKind.Contains || scope == CheckScope.Answer)">The answer text</option>
+                  <option value="first-code-block" selected="@(kind == CheckKind.Contains && scope == CheckScope.FirstCodeBlock)">The first code block</option>
+                </select>
+              </div>
+              <div class="col-sm-6 d-flex flex-wrap align-items-end gap-3 pb-1">
+                <div class="form-check mb-0"><input class="form-check-input" type="checkbox" id="ceContainsCase" checked="@(kind != CheckKind.Contains || check.MatchCase != false)"><label class="form-check-label fs-7" for="ceContainsCase">Match case</label></div>
+                <div class="form-check mb-0"><input class="form-check-input" type="checkbox" id="ceContainsNot" checked="@(kind == CheckKind.Contains && check.Negate == true)"><label class="form-check-label fs-7" for="ceContainsNot">Must not contain</label></div>
+              </div>
+            </div>
+          </div>
+
+          <div data-ce-pane="ce-regex" hidden="@(Model.Pane != "ce-regex")">
+            <label class="form-label" for="ceRegexPattern">Pattern</label>
+            <input class="form-control font-monospace" id="ceRegexPattern" value="@(kind == CheckKind.Regex ? check.Pattern : null)" autocomplete="off" spellcheck="false" maxlength="@CheckLimits.MaxPattern">
+            <div class="form-text">A .NET regular expression. Each match stops after 100 ms, and a timeout counts as a failed check.</div>
+            <div class="row g-2 mt-1">
+              <div class="col-sm-6">
+                <label class="form-label fs-7" for="ceRegexWhere">Look in</label>
+                <select class="form-select form-select-sm" id="ceRegexWhere">
+                  <option value="answer" selected="@(kind != CheckKind.Regex || scope == CheckScope.Answer)">The answer text</option>
+                  <option value="first-code-block" selected="@(kind == CheckKind.Regex && scope == CheckScope.FirstCodeBlock)">The first code block</option>
+                </select>
+              </div>
+              <div class="col-sm-6 d-flex align-items-end pb-1">
+                <div class="form-check mb-0"><input class="form-check-input" type="checkbox" id="ceRegexNot" checked="@(kind == CheckKind.Regex && check.Negate == true)"><label class="form-check-label fs-7" for="ceRegexNot">Must not match</label></div>
+              </div>
+            </div>
+          </div>
+
+          <div data-ce-pane="ce-schema" hidden="@(Model.Pane != "ce-schema")">
+            <label class="form-label" for="ceSchema">JSON schema</label>
+            <textarea class="form-control font-monospace" id="ceSchema" rows="13" spellcheck="false">@schema</textarea>
+            <div class="form-text">Checks the first JSON object in the answer, or a <code>json</code> code block. Supported: <code>type</code>, <code>properties</code>, <code>required</code>, <code>additionalProperties: false</code>, <code>enum</code>, <code>pattern</code>, <code>minLength</code>, <code>maxLength</code>, <code>minimum</code>, <code>maximum</code>, <code>items</code>, <code>minItems</code>, <code>maxItems</code> and <code>format: uri</code>. Every string needs <code>maxLength</code>, and every array needs <code>maxItems</code> and <code>items</code> (the InputSchema subset). A schema that uses anything else, or leaves those out, is refused when you save.</div>
+          </div>
+
+          <div data-ce-pane="ce-tool" hidden="@(Model.Pane != "ce-tool")">
+            <div class="row g-2">
+              <div class="col-sm-6">
+                <label class="form-label" for="ceToolName">Tool</label>
+                <input class="form-control font-monospace" id="ceToolName" list="ceToolList" autocomplete="off" spellcheck="false" value="@(kind == CheckKind.Tool ? check.Tool : Model.Tools.FirstOrDefault())">
+                <datalist id="ceToolList">
+                  @foreach (var tool in Model.Tools)
+                  {
+                    <option value="@tool"></option>
+                  }
+                </datalist>
+              </div>
+              <div class="col-sm-6">
+                <label class="form-label" for="ceToolCount">Called</label>
+                <select class="form-select" id="ceToolCount">
+                  <option value="at-least-once" selected="@(check.Calls is null or ToolCallCount.AtLeastOnce)">At least once</option>
+                  <option value="exactly-once" selected="@(kind == CheckKind.Tool && check.Calls == ToolCallCount.ExactlyOnce)">Exactly once</option>
+                  <option value="never" selected="@(kind == CheckKind.Tool && check.Calls == ToolCallCount.Never)">Never</option>
+                </select>
+              </div>
+            </div>
+            <div class="ps-label mt-3 mb-2">Arguments</div>
+            <div class="d-grid gap-2" data-ce-args>
+              @if (kind == CheckKind.Tool)
+              {
+                @for (var index = 0; index < arguments.Count; index++)
+                {
+                  var argument = arguments[index];
+                  var number = (index + 1).ToString(CultureInfo.InvariantCulture);
+                  <div class="row g-2 align-items-center" data-ce-arg>
+                    <div class="col-6 col-sm-4"><input class="form-control form-control-sm font-monospace" aria-label="Argument @number name" value="@argument.Name" data-arg-name></div>
+                    <div class="col-6 col-sm-3">
+                      <select class="form-select form-select-sm" aria-label="Argument @number rule" data-arg-rule>
+                        <option value="equals" selected="@(argument.Rule == ArgumentRule.EqualsValue)">equals</option>
+                        <option value="regex" selected="@(argument.Rule == ArgumentRule.Regex)">matches regex</option>
+                        <option value="present" selected="@(argument.Rule == ArgumentRule.Present)">is present</option>
+                      </select>
+                    </div>
+                    <div class="col-10 col-sm-4"><input class="form-control form-control-sm font-monospace" aria-label="Argument @number value" value="@argument.Value" data-arg-value></div>
+                    <div class="col-2 col-sm-1 text-end"><button class="btn btn-icon" type="button" aria-label="Remove argument @number" data-ce-remove-arg><i class="bi bi-x-lg fs-8" aria-hidden="true"></i></button></div>
+                  </div>
+                }
+              }
+            </div>
+            <template data-ce-arg-template>
+              <div class="row g-2 align-items-center" data-ce-arg>
+                <div class="col-6 col-sm-4"><input class="form-control form-control-sm font-monospace" aria-label="Argument name" data-arg-name></div>
+                <div class="col-6 col-sm-3">
+                  <select class="form-select form-select-sm" aria-label="Argument rule" data-arg-rule>
+                    <option value="equals">equals</option>
+                    <option value="regex">matches regex</option>
+                    <option value="present">is present</option>
+                  </select>
+                </div>
+                <div class="col-10 col-sm-4"><input class="form-control form-control-sm font-monospace" aria-label="Argument value" data-arg-value></div>
+                <div class="col-2 col-sm-1 text-end"><button class="btn btn-icon" type="button" aria-label="Remove argument" data-ce-remove-arg><i class="bi bi-x-lg fs-8" aria-hidden="true"></i></button></div>
+              </div>
+            </template>
+            <button class="btn btn-sm btn-ghost mt-2" type="button" data-ce-add-arg><i class="bi bi-plus-lg me-1" aria-hidden="true"></i>Add argument</button>
+            <div class="form-text">Suite runs don't execute tools. The check reads the tool call in the answer. Regex arguments have the same 100 ms limit.</div>
+          </div>
+
+          <div data-ce-pane="ce-limits" hidden="@(Model.Pane != "ce-limits")">
+            <div class="row g-3">
+              <div class="col-sm-6">
+                <label class="form-label" for="ceMaxCost">Max cost per answer</label>
+                <div class="input-group"><span class="input-group-text">$</span><input class="form-control" id="ceMaxCost" inputmode="decimal" autocomplete="off" value="@(kind == CheckKind.Limits ? cost : null)"></div>
+                <div class="form-text">Uses the settled cost. Subscription targets use list price.</div>
+              </div>
+              <div class="col-sm-6">
+                <label class="form-label" for="ceMaxLatency">Max latency</label>
+                <div class="input-group"><input class="form-control" id="ceMaxLatency" inputmode="decimal" autocomplete="off" value="@(kind == CheckKind.Limits ? latency : null)"><span class="input-group-text">s</span></div>
+                <div class="form-text">From sending the request to the last token. Leave either field empty to skip it.</div>
+              </div>
+            </div>
+          </div>
+
+          <div data-ce-pane="ce-judge" hidden="@(Model.Pane != "ce-judge")">
+            <div class="fs-7 text-secondary mb-3">An LLM judge is opt-in: each judgement is a metered model call, made only in suite runs.</div>
+            <div data-ce-judge-select>
+              <partial name="_ProviderModelSelect" model="Model.Judge" />
+            </div>
+            <div class="mt-2" data-ce-family>
+              @if (Model.Family is { } family)
+              {
+                <div class="ps-panel px-3 py-2 d-flex flex-wrap gap-2 align-items-start fs-7"><span class="ps-chip" data-tone="@(family.Same ? "warn" : "ok")">@family.Chip</span><span class="flex-grow-1 eval-notice-text">@family.Message</span></div>
+              }
+            </div>
+            <div class="fs-8 text-ps-faint mt-2" data-ce-judge-estimate></div>
+            <div class="fs-8 text-ps-faint mt-1">A judgement reads at most about @JudgeSpec.MaxInputTokens.ToString("N0", CultureInfo.InvariantCulture) input tokens (prompt, an answer of up to @JudgeSpec.MaxAnswerTokens.ToString("N0", CultureInfo.InvariantCulture) tokens and the rubric) and writes at most @JudgeSpec.MaxOutputTokens.ToString(CultureInfo.InvariantCulture).</div>
+            <label class="form-label mt-3" for="ceRubric">Rubric</label>
+            <textarea class="form-control" id="ceRubric" rows="4" placeholder="Score from 1 to 5. 5: … 3: … 1: …">@check.Judge?.Rubric</textarea>
+            <div class="row g-2 mt-1">
+              <div class="col-sm-6">
+                <label class="form-label fs-7" for="cePassAt">Pass at</label>
+                <select class="form-select form-select-sm" id="cePassAt">
+                  @for (var score = 1; score <= JudgeSpec.MaxScore; score++)
+                  {
+                    <option value="@score.ToString(CultureInfo.InvariantCulture)" selected="@(score == passAt)">@(score == JudgeSpec.MaxScore ? "Score " + score.ToString(CultureInfo.InvariantCulture) : "Score " + score.ToString(CultureInfo.InvariantCulture) + " or more")</option>
+                  }
+                </select>
+              </div>
+            </div>
+            <div class="d-flex gap-2 align-items-start fs-8 text-ps-faint mt-3"><i class="bi bi-eye-slash mt-1" aria-hidden="true"></i><span>The judge sees the prompt, the answer and this rubric. It never sees the target's provider or model name. Low-confidence scores are flagged for review instead of passing or failing, and judgements are never cached, so a changed answer is always judged again.</span></div>
+          </div>
+
+          <div class="d-flex flex-wrap align-items-center gap-2 mt-3 fs-7" data-ce-try hidden="@(kind == CheckKind.Judge)">
+            <span data-ce-try-result>
+              @if (Model.Tried is { } tried)
+              {
+                <span class="ps-chip" data-tone="@(tried.Verdict switch { CheckVerdict.Passed => "ok", CheckVerdict.Review => "warn", _ => "danger" })" data-try-verdict="@EvalJson.Wire(tried.Verdict)">@(tried.Verdict switch { CheckVerdict.Passed => "passes", CheckVerdict.Failed => "fails", CheckVerdict.Review => "review", _ => "error" })</span>
+                <span>@(tried.Detail ?? (tried.Verdict == CheckVerdict.Passed ? "Passes on the reference output." : "Fails on the reference output."))</span>
+              }
+              else if (Model.TryNote is { } note)
+              {
+                <span class="text-ps-faint">@note</span>
+              }
+            </span>
+            @if (Model.Case.Reference is not null)
+            {
+              <button class="btn btn-sm btn-ghost ms-auto" type="button" data-ce-try-button><i class="bi bi-play me-1" aria-hidden="true"></i>Try on the reference output</button>
+            }
+          </div>
+          <div class="msg-error mt-3" role="alert" data-ce-error hidden></div>
+        </div>
+        <div class="modal-footer">
+          @if (!Model.IsNew)
+          {
+            <button type="button" class="btn btn-ghost me-auto" data-ce-remove>Remove check</button>
+          }
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="button" class="btn btn-primary" data-ce-save>Save check</button>
+        </div>
+      </div>
+    }
+  </div>
+</div>

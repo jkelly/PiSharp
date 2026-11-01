@@ -10,19 +10,15 @@ using PiSharp.Cli.Interactive;
 
 namespace PiSharp.Cli.Authentication;
 
-/// <summary>One <c>auth.json</c> entry: <c>oauth</c>, <c>api_key</c> (with its configured, unresolved key and <c>env</c>) or another type.</summary>
-internal sealed record StoredCredentialEntry(string Type, string? Key, IReadOnlyDictionary<string, string>? Environment)
-{
-    public override string ToString() => $"StoredCredentialEntry ({Type}) [redacted]";
-}
-
 /// <summary>
 /// The source <c>auth.json</c> credential store (<c>&lt;agent dir&gt;/auth.json</c>, shared with Pi) as the stored OAuth source of
 /// <see cref="StoredOAuthLifecycle"/>. Entries are <c>{"type":"oauth","refresh","access","expires",...}</c>; other providers and
 /// credential types are preserved. A modification holds a process lock and an exclusive <c>auth.json.lock</c>, re-reads the file
 /// inside it and writes the merged document as <c>JSON.stringify(data, null, 2)</c>. A new file is created owner-only (0600 on Unix).
+/// It is the CLI's <see cref="IProviderCredentialSource"/> (PiSharp.ModelRuntime; its <see cref="StoredCredentialEntry"/> is one
+/// <c>auth.json</c> entry).
 /// </summary>
-internal sealed class AuthJsonCredentialStore : IAdmittedOAuthCredentialSource
+internal sealed class AuthJsonCredentialStore : IProviderCredentialSource
 {
     private static readonly ConcurrentDictionary<string, SemaphoreSlim> ProcessLocks = new(StringComparer.Ordinal);
     private static readonly TimeSpan StaleLock = TimeSpan.FromSeconds(30);

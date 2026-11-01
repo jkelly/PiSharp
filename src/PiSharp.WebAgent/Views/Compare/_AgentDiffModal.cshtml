@@ -1,0 +1,16 @@
+@* Decision 0011 (run W4, R6): compare.html's _AgentDiffModal (#modal-agent-diff): one model's changes, file list left and unified diff
+   right (stacked below 768px, full screen below 768px), with an A/B/C switch. The content is _AgentDiff, loaded from
+   GET /compare/agent/runs/{run}/diff?slot= when View diff (or View changes) opens it. Model: none. *@
+<div class="modal fade" id="modal-agent-diff" tabindex="-1" aria-labelledby="modal-agent-diff-title" aria-hidden="true" data-ac-modal>
+  <div class="modal-dialog modal-xl modal-dialog-scrollable modal-fullscreen-md-down">
+    <div class="modal-content" data-ac-diff-content>
+      <div class="modal-header">
+        <h2 class="modal-title" id="modal-agent-diff-title">Changes</h2>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div class="d-flex align-items-center gap-2 fs-7 text-ps-faint"><span class="spinner-border spinner-border-sm" aria-hidden="true"></span>Loading the diff…</div>
+      </div>
+    </div>
+  </div>
+</div>

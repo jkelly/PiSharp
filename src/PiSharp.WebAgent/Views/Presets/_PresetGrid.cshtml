@@ -1,0 +1,23 @@
+@* Decision 0011 (run W4, R8): the mockups' _PresetGrid: the cards that match the filters (a row of col-md-6 col-xl-4 cards), or a line
+   saying none match with a link that clears the filters. Also GET /presets/grid's answer; data-count is the filters' count line. Model:
+   PresetsPage. *@
+@model PresetsPage
+<div data-preset-grid data-count="@Model.CountText">
+  @if (Model.Cards.Count == 0)
+  {
+    <div class="ps-card p-4 text-center fs-7 text-secondary" data-presets-none>
+      <i class="bi bi-funnel me-1" aria-hidden="true"></i>No presets match these filters. <a href="/presets" data-preset-clear>Clear the filters</a>
+    </div>
+  }
+  else
+  {
+    <div class="row g-3">
+      @foreach (var card in Model.Cards)
+      {
+        <div class="col-md-6 col-xl-4">
+          <partial name="_PresetCard" model="card" />
+        </div>
+      }
+    </div>
+  }
+</div>

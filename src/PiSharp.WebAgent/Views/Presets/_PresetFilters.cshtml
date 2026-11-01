@@ -1,0 +1,54 @@
+@* Decision 0011 (run W4, R8): the mockups' _PresetFilters: search (name, description, model id or tag), Used in (the page a preset was saved
+   from or loaded into), Sort (recently used, most used, name, recently created; pinned presets first), the count and the tag chips (every tag
+   ticked must be on a preset). A GET form: presets.js swaps in GET /presets/grid as the filters change, and without script it reloads the
+   page. Model: PresetsPage. *@
+@model PresetsPage
+@{
+    var query = Model.Query;
+    var pages = new[] { ("", "Anywhere") }.Concat(PresetPages.All.Select(page => (page, PresetPages.Title(page))));
+}
+<form class="ps-card p-3 mb-3" method="get" action="/presets" aria-label="Filters" data-preset-filters>
+  <div class="row g-2 align-items-end">
+    <div class="col-12 col-md-6 col-lg-5">
+      <label class="ps-label d-block mb-1" for="pSearch">Search</label>
+      <div class="position-relative">
+        <i class="bi bi-search position-absolute top-50 translate-middle-y ms-2 text-ps-faint fs-8" aria-hidden="true"></i>
+        <input class="form-control form-control-sm ps-4" type="search" id="pSearch" name="q" value="@query.Search" placeholder="Name, description or model id…" autocomplete="off">
+      </div>
+    </div>
+    <div class="col-6 col-md-3 col-lg-2">
+      <label class="ps-label d-block mb-1" for="pUsedIn">Used in</label>
+      <select class="form-select form-select-sm" id="pUsedIn" name="in">
+        @foreach (var (value, label) in pages)
+        {
+          <option value="@value" selected="@((query.UsedIn ?? "") == value)">@label</option>
+        }
+      </select>
+    </div>
+    <div class="col-6 col-md-3 col-lg-2">
+      <label class="ps-label d-block mb-1" for="pSort">Sort</label>
+      <select class="form-select form-select-sm" id="pSort" name="sort">
+        @foreach (var (value, label) in PresetQuery.Sorts)
+        {
+          <option value="@value" selected="@(query.Sort == value)">@label</option>
+        }
+      </select>
+    </div>
+    <div class="col-12 col-lg-3 text-lg-end">
+      <span class="fs-8 ps-mono text-ps-faint" data-preset-count>@Model.CountText</span>
+    </div>
+  </div>
+  @if (Model.Tags.Count > 0)
+  {
+    <div class="d-flex flex-wrap align-items-center gap-1 mt-3" role="group" aria-label="Filter by tag">
+      <span class="ps-label me-1">Tags</span>
+      @foreach (var (tag, count, index) in Model.Tags.Select((pair, index) => (pair.Tag, pair.Count, index)))
+      {
+        var id = "pTag" + index;
+        <input type="checkbox" class="btn-check" id="@id" name="tag" value="@tag" autocomplete="off" checked="@query.Tags.Contains(tag, StringComparer.OrdinalIgnoreCase)">
+        <label class="btn btn-sm btn-outline-secondary rounded-pill" for="@id">@tag <span class="text-ps-faint ps-mono">@count</span></label>
+      }
+    </div>
+  }
+  <noscript><button class="btn btn-sm btn-outline-secondary mt-3" type="submit">Apply filters</button></noscript>
+</form>

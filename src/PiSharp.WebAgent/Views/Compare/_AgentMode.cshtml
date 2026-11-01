@@ -1,0 +1,37 @@
+@* Decision 0011 (run W4, R6): Compare's agent mode (GET /compare?mode=agent), after compare.html's agent states. Without ?run= it is a new
+   run's setup (agent-setup; agent-dirty when the project has uncommitted changes worktrees leave out): _AgentSetup, with ?from={run} copying
+   an earlier run's task, folder, models, check and limits (New run). With ?run={id} it is that run (agent-running, agent-approval,
+   agent-done, agent-kept): _AgentRun, live through R5's event stream. Modals: _AgentWorkspaceModal (modal-agent-workspace: editable in
+   setup, read-only once a run made its workspaces), _ModelPickerModal (setup), _AgentDiffModal (modal-agent-diff) and _KeepResultModal
+   (modal-keep-result). Index.cshtml (R2's) renders this partial inside main.app-content with compare.css and compare.js; this partial loads
+   compare-agent.css and the compare-agent.js module (no inline script: the CSP is script-src 'self'), which moves the modals to the body.
+   Both views' roots keep R2's data-agent-mode marker. Blind agent runs are W5. Model: ComparePage (R2's); the views come from
+   AgentComparePages. *@
+@using PiSharp.WebAgent.AgentCompare.Pages
+@model ComparePage
+@inject AgentComparePages Pages
+@{
+    var query = Context.Request.Query;
+    @* W5 E5 (blind-state lines): a run or a New run copy (?from=) of an unvoted blind battle would name its agents in column order. The gate
+       is ModeAsync's (fix 1, arena): on the id the page would open, so a blank ?run= can't let a blind ?from= through. *@
+    var mode = await Pages.ModeAsync(query["run"].ToString(), query["from"].ToString(), Context.RequestAborted);
+}
+<link href="~/css/compare-agent.css" rel="stylesheet" asp-append-version="true">
+@if (mode.BlindBattle is { } blindBattle)
+{
+  <partial name="/Views/Compare/_ArenaBlindNotice.cshtml" model="blindBattle" />
+}
+else if (mode.Run is { } run)
+{
+  <partial name="/Views/Compare/_AgentRun.cshtml" model="run" />
+  <partial name="/Views/Compare/_AgentWorkspaceModal.cshtml" model="run.Workspace" />
+  <partial name="/Views/Compare/_AgentDiffModal.cshtml" model="null" />
+  <partial name="/Views/Compare/_KeepResultModal.cshtml" model="null" />
+}
+else if (mode.Setup is { } setup)
+{
+  <partial name="/Views/Compare/_AgentSetup.cshtml" model="setup" />
+  <partial name="/Views/Compare/_AgentWorkspaceModal.cshtml" model="null" />
+  <partial name="/Views/Shared/_ModelPickerModal.cshtml" model="setup.Picker" />
+}
+<script type="module" src="~/js/compare-agent.js" asp-append-version="true"></script>

@@ -1,0 +1,66 @@
+@* Decision 0011 (run W4, R3): the inspector of a run that groups others (an agent compare run, or a run whose turns are calls): instead of
+   the raw tabs, one row per run it groups, in order, each with its outcome, tokens, cost and latency, and Inspect (that run's own
+   inspector, where its request and response are). Model: RunInspectorView. *@
+@model RunInspectorView
+<section class="ps-card overflow-hidden" aria-label="Runs in this group" data-run-children>
+  <div class="d-flex flex-wrap align-items-center gap-2 px-3 py-2 border-bottom">
+    <h2 class="ps-label mb-0">@(Model.Children.Count == 1 ? "1 run" : Model.Children.Count + " runs") in this group</h2>
+    <span class="fs-8 text-ps-faint">Each one's request, response and events are in its own inspector.</span>
+  </div>
+  @if (Model.Children.Count == 0)
+  {
+    <div class="empty-state py-4" data-children-none>
+      <div class="empty-icon"><i class="bi bi-diagram-2" aria-hidden="true"></i></div>
+      <div class="fs-7">No runs were recorded in this group</div>
+      <div class="fs-8 text-ps-faint">@(Model.Running ? "The group is still running." : "It ended before any model ran.")</div>
+    </div>
+  }
+  else
+  {
+    <div class="ps-table-wrap border-0 rounded-0">
+      <table class="table table-hover align-middle runs-table mb-0">
+        <thead>
+          <tr>
+            <th scope="col">Time</th>
+            <th scope="col">Provider / model</th>
+            <th scope="col">Prompt</th>
+            <th scope="col" class="text-end d-none d-md-table-cell">Tokens</th>
+            <th scope="col" class="text-end">Cost</th>
+            <th scope="col" class="text-end d-none d-lg-table-cell">Latency</th>
+            <th scope="col">Stop</th>
+            <th scope="col" class="text-end"><span class="visually-hidden">Actions</span></th>
+          </tr>
+        </thead>
+        <tbody>
+          @foreach (var row in Model.Children)
+          {
+            var run = row.Run;
+            <tr data-run-child="@run.Id">
+              <td class="text-nowrap"><div class="ps-mono fs-8">@row.Time</div><div class="fs-8 text-ps-faint">@row.Day</div></td>
+              @if (row.IsGroup)
+              {
+                <td class="fs-8">@row.Models.Count @(row.Models.Count == 1 ? "model" : "models")</td>
+              }
+              else
+              {
+                <td><div class="ps-mono fs-8"><span class="text-ps-faint text-nowrap">@(run.Provider)/</span><wbr><span class="text-nowrap">@run.Model</span></div>@if (row.ModelSub.Length > 0) {<div class="fs-8 text-ps-faint">@row.ModelSub</div>}</td>
+              }
+              <td><div class="run-prompt" title="@row.Prompt">@row.Prompt@if (row.ToolCalls is not null) {<text> </text><span class="text-ps-faint">→ @row.ToolCalls</span>}</div><div class="ps-mono fs-8 text-ps-faint run-sub">@row.Sub</div></td>
+              <td class="ps-mono fs-8 text-end text-nowrap d-none d-md-table-cell" title="@row.Tokens.Title"><div>@row.Tokens.Top</div>@if (row.Tokens.Bottom is not null) {<div class="text-ps-faint">@row.Tokens.Bottom</div>}</td>
+              <td class="@("ps-mono fs-8 text-end text-nowrap" + (row.Cost.Faint ? " text-ps-faint" : ""))" title="@row.Cost.Title"><div>@row.Cost.Top</div>@if (row.Cost.Bottom is not null) {<div class="text-ps-faint">@row.Cost.Bottom</div>}</td>
+              <td class="ps-mono fs-8 text-end text-nowrap d-none d-lg-table-cell" title="@row.Latency.Title"><div>@row.Latency.Top</div><div class="text-ps-faint">@row.Latency.Bottom</div></td>
+              <td>
+                <span class="ps-chip" data-tone="@row.Stop.Tone">@row.Stop.Text</span>
+                @if (row.StopSub is not null)
+                {
+                  <div class="@("fs-8 mt-1 text-nowrap" + (row.StopSubDanger ? " ps-mono text-ps-danger" : " text-ps-faint"))">@row.StopSub</div>
+                }
+              </td>
+              <td class="text-end text-nowrap"><a class="btn btn-icon" href="@row.InspectHref" title="Inspect" aria-label="Inspect run @run.Id"><i class="bi bi-braces" aria-hidden="true"></i></a></td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  }
+</section>

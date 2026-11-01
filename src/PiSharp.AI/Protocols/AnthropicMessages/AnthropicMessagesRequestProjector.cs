@@ -597,7 +597,10 @@ public sealed class AnthropicMessagesRequestProjector
         {
             case JsonValueKind.Object:
                 var result = new JsonObject(); foreach (var property in Properties(value)) result[JsonUtf16.GetName(property)] = Node(property.Value); return result;
-            case JsonValueKind.Array: return new JsonArray(value.EnumerateArray().Select(Node).ToArray());
+            // A loop, not Select(Node).ToArray(): a level costs this one frame, so a value JsonData.MaximumDepth (1,000) levels deep
+            // still fits a thread-pool thread's stack under a deep chain of inline continuations (json-fidelity.deep-values-*).
+            case JsonValueKind.Array:
+                var items = new JsonArray(); foreach (var item in value.EnumerateArray()) items.Add(Node(item)); return items;
             case JsonValueKind.String: return JsonUtf16.StringNode(Text(value));
             case JsonValueKind.Number:
                 if (!value.TryGetDouble(out var number)) throw Fail(AnthropicRequestFailure.UnsupportedNumber);

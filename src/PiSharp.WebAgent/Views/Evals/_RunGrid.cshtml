@@ -1,0 +1,201 @@
+@* Decision 0011 (run W5, E6): the mockups' _RunGrid: case × target. Each column head is a target with its totals ("33/36 passed · $0.15",
+   or "21 of 36 done · 19 passed" while the run goes); each cell is the k repeats as dots (passed, failed, flagged for review, answering,
+   queued) and the share of checks passed, linking to the first answered repeat in the inspector, with its median time and cost on hover;
+   while the run goes a cell says "1 of 3 · 9.3 s", "streaming" or "queued". The foot (once the run is over) sets each target against its
+   baseline: pass rate, median latency (with the change when a latency signal fired), cost, and the response model with what the baseline
+   answered as. Model: RunPage. *@
+@model RunPage
+@{
+    var run = Model.Run;
+    var k = run.K;
+    var anyReview = Model.Rows.Any(row => row.Cells.Any(cell => cell.Dots.Contains("warn")));
+}
+<div class="d-flex flex-wrap align-items-baseline gap-2 mb-2">
+  <h3 class="fs-6 fw-semibold mb-0">Results</h3>
+  <span class="fs-8 text-ps-faint">Dots are the k = @k.ToString(CultureInfo.InvariantCulture) repeats; the score is the share of checks passed. Hover a cell for its median time and the cost of its @EvalText.Plural(k, "answer", "answers"), or select it to open that run in the inspector.</span>
+</div>
+@if (Model.Rows.Count == 0 || Model.Columns.Count == 0)
+{
+  <div class="ps-panel p-3 fs-7 text-secondary">This run has no case or target to show.</div>
+}
+else
+{
+  <div class="ps-table-wrap">
+    <table class="table eval-grid" data-run-grid>
+      <thead>
+        <tr>
+          <th scope="col">Case</th>
+          @foreach (var column in Model.Columns)
+          {
+            var summary = column.Summary;
+            var money = summary.ListMicros > 0 && summary.CostMicros == 0
+                ? EvalText.ListMoney(summary.ListMicros) + " list"
+                : EvalText.Money(summary.CostMicros) + (summary.ListMicros > 0 ? " · " + EvalText.ListMoney(summary.ListMicros) + " list" : "");
+            <th scope="col" data-run-column="@column.Target.Id">
+              <div class="d-flex align-items-center gap-2">
+                <partial name="/Views/Settings/_ProviderLogo.cshtml" model='new LogoModel(column.Model.ProviderName, column.Model.LogoUrl, "xs")' />
+                <span class="ps-mono fs-8 text-body"><span class="text-ps-faint text-nowrap">@column.Model.Prefix</span><wbr><span class="text-nowrap">@column.Model.Model</span></span>
+              </div>
+              @if (column.Model.Settings != "default settings")
+              {
+                <div class="fs-8 text-ps-faint fw-normal">@column.Model.Settings</div>
+              }
+              <div class="fs-8 text-ps-faint fw-normal mt-1">
+                @if (Model.Running)
+                {
+                  <text>@summary.Done.ToString(CultureInfo.InvariantCulture) of @summary.Answers.ToString(CultureInfo.InvariantCulture) done · @summary.Passed.ToString(CultureInfo.InvariantCulture) passed</text>
+                }
+                else
+                {
+                  <text>@summary.Passed.ToString(CultureInfo.InvariantCulture)/@summary.Answers.ToString(CultureInfo.InvariantCulture) passed · @money</text>
+                }
+              </div>
+            </th>
+          }
+        </tr>
+      </thead>
+      <tbody>
+        @foreach (var row in Model.Rows)
+        {
+          <tr data-case-row="@row.CaseId">
+            <th scope="row"><div class="fs-7 text-break">@row.Name</div><div class="fs-8 text-ps-faint">@EvalText.Plural(row.CheckCount, "check", "checks")</div></th>
+            @foreach (var cell in row.Cells)
+            {
+              <td data-cell-state="@cell.State">
+                @if (cell.Url is { } url)
+                {
+                  <a class="eval-cell" href="@url" title="@cell.Title" aria-label="@cell.Label">
+                    <span class="eval-dots" aria-hidden="true">@foreach (var dot in cell.Dots)
+                    {<span class="status-dot @dot"></span>}</span>
+                    @if (cell.Note is { } note)
+                    {
+                      <span class="d-block fs-8 text-ps-faint ps-mono">@note</span>
+                    }
+                    else
+                    {
+                      <span class="ps-mono fs-7 ms-1">@(cell.Cell.Score is { } score ? EvalText.Rate(score) : cell.Cell.Passed.ToString(CultureInfo.InvariantCulture) + "/" + k.ToString(CultureInfo.InvariantCulture))</span>
+                    }
+                  </a>
+                }
+                else
+                {
+                  <div class="eval-cell" title="@cell.Title">
+                    <span class="visually-hidden">@cell.Label</span>
+                    <span class="eval-dots" aria-hidden="true">@foreach (var dot in cell.Dots)
+                    {<span class="status-dot @dot"></span>}</span>
+                    @if (cell.Note is { } note)
+                    {
+                      <span class="d-block fs-8 text-ps-faint" aria-hidden="true">@note</span>
+                    }
+                    else
+                    {
+                      <span class="ps-mono fs-7 ms-1" aria-hidden="true">@(cell.Cell.Score is { } score ? EvalText.Rate(score) : cell.Cell.Passed.ToString(CultureInfo.InvariantCulture) + "/" + k.ToString(CultureInfo.InvariantCulture))</span>
+                    }
+                  </div>
+                }
+              </td>
+            }
+          </tr>
+        }
+      </tbody>
+      @if (!Model.Running)
+      {
+        <tfoot>
+          <tr>
+            <th scope="row">Pass rate</th>
+            @foreach (var column in Model.Columns)
+            {
+              var summary = column.Summary;
+              <td>
+                @if (summary.PassRate is { } rate)
+                {
+                  <text>@EvalText.Rate(rate) <span class="text-ps-faint">(@summary.Passed.ToString(CultureInfo.InvariantCulture)/@summary.Done.ToString(CultureInfo.InvariantCulture))</span></text>
+                }
+                else
+                {
+                  <text>—</text>
+                }
+                @if (column.Baseline?.PassRate is { } before)
+                {
+                  <span class="d-block text-ps-faint">baseline @EvalText.Rate(before)</span>
+                }
+              </td>
+            }
+          </tr>
+          <tr>
+            <th scope="row">Median latency</th>
+            @foreach (var column in Model.Columns)
+            {
+              var summary = column.Summary;
+              var latency = Model.Signals.FirstOrDefault(item => item.Signal.TargetId == column.Target.Id && item.Signal.Rule == DriftRule.Latency)?.Signal.Effect;
+              <td>
+                @(summary.MedianLatencyMs is { } ms ? EvalText.Duration(ms) : "—")
+                @if (latency is { } change)
+                {
+                  <span class="text-ps-faint">(@DriftText.Percent(change))</span>
+                }
+                @if (column.Baseline?.MedianLatencyMs is { } before)
+                {
+                  <span class="d-block text-ps-faint">baseline @EvalText.Duration(before)</span>
+                }
+              </td>
+            }
+          </tr>
+          <tr>
+            <th scope="row">Cost</th>
+            @foreach (var column in Model.Columns)
+            {
+              var summary = column.Summary;
+              <td>
+                @if (summary.CostMicros > 0 || summary.ListMicros == 0)
+                {
+                  <span class="d-block">@EvalText.Money(summary.CostMicros)</span>
+                }
+                @if (summary.ListMicros > 0)
+                {
+                  <span class="d-block">@EvalText.ListMoney(summary.ListMicros) <span class="text-ps-faint">list</span></span>
+                }
+              </td>
+            }
+          </tr>
+          <tr>
+            <th scope="row">Response model</th>
+            @foreach (var column in Model.Columns)
+            {
+              var models = column.Summary.ResponseModels;
+              var was = column.BaselineModels;
+              <td>
+                @if (models.Count == 0)
+                {
+                  <span class="text-ps-faint">—</span>
+                }
+                else
+                {
+                  <span class="ps-mono text-break">@string.Join(", ", models)</span>
+                }
+                @if (was.Count > 0 && !was.SequenceEqual(models))
+                {
+                  <span class="d-block text-ps-faint">was <span class="ps-mono text-break">@string.Join(", ", was)</span></span>
+                }
+              </td>
+            }
+          </tr>
+        </tfoot>
+      }
+    </table>
+  </div>
+  <div class="d-flex flex-wrap gap-3 fs-8 text-ps-faint mt-2" data-run-legend>
+    <span class="d-inline-flex align-items-center gap-1"><span class="status-dot ok" aria-hidden="true"></span>passed every check</span>
+    <span class="d-inline-flex align-items-center gap-1"><span class="status-dot danger" aria-hidden="true"></span>failed a check</span>
+    @if (anyReview)
+    {
+      <span class="d-inline-flex align-items-center gap-1"><span class="status-dot warn" aria-hidden="true"></span>flagged for review</span>
+    }
+    @if (Model.Running)
+    {
+      <span class="d-inline-flex align-items-center gap-1"><span class="status-dot live" aria-hidden="true"></span>answering</span>
+      <span class="d-inline-flex align-items-center gap-1"><span class="status-dot pending" aria-hidden="true"></span>queued</span>
+    }
+    <span>Subscription costs are list prices.</span>
+  </div>
+}

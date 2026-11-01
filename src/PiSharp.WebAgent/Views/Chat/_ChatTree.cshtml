@@ -1,0 +1,34 @@
+@* Decision 0011 (run W2, WU8): the body of the mockups' _SessionTreeModal (#modal-session-tree), from GET /chat/{id}/tree?agent=N. Every
+   branch's entries (yours, answers, compactions and context resets) merged by entry id, so branches share the entries before their fork;
+   a run of entries with one child each stays flat, and the tree only indents where branches split, so a long chat stays readable at
+   375px. Each entry is a button (data-tree-node); chat.js selects it and offers Fork before this message, Fork at this message and Switch
+   to selected branch. A branch's newest entry says "current leaf" (the branch shown) or "running". *@
+@model ChatTreeView
+@{
+    var leafText = Model.Leaf is { } leaf ? $"leaf #{leaf}" : "no entries yet";
+    var summary = $"{Model.Branches} branch{(Model.Branches == 1 ? "" : "es")} · {Model.Running} running · {Model.Entries} entr{(Model.Entries == 1 ? "y" : "ies")} · {leafText}";
+}
+<div data-tree data-chat="@Model.SessionId" data-agent="@Model.AgentId" data-summary="@summary">
+  @if (Model.Roots.Count == 0)
+  {
+    <p class="text-secondary fs-7 mb-0">Nothing to show yet: send a message first.</p>
+  }
+  else
+  {
+    <ul class="tree" aria-label="Session tree">
+      @foreach (var root in Model.Roots)
+      {
+        @await Html.PartialAsync("~/Views/Chat/_ChatTreeRun.cshtml", new ChatTreeRunView(root, Model))
+      }
+    </ul>
+    <hr>
+    <div class="ps-label mb-2">Selected entry</div>
+    <div class="ps-panel p-3" data-tree-selected>
+      <div class="fs-7 mb-2 text-break"><span class="ps-chip me-1" data-tree-selected-role hidden></span><span data-tree-selected-text class="text-secondary">Select an entry above.</span></div>
+      <div class="d-flex flex-wrap gap-2">
+        <button class="btn btn-sm btn-outline-secondary" type="button" data-action="tree-fork-before" disabled title="A new branch from just before this entry"><i class="bi bi-signpost-split me-1"></i>Fork before this message</button>
+        <button class="btn btn-sm btn-outline-secondary" type="button" data-action="tree-fork-at" disabled title="A new branch that keeps this entry"><i class="bi bi-signpost me-1"></i>Fork at this message</button>
+      </div>
+    </div>
+  }
+</div>

@@ -1,0 +1,372 @@
+@* Decision 0011 (run W2, WU7, WU8): one transcript item of a chat (PiSharp.Durable.Client's TranscriptItem), after the mockups' chat.html
+   messages. The same partial renders the stored transcript of a page and every streamed change, keyed by the item's Key (data-key), so a
+   reattached tab and its stream agree. User text is encoded; model text goes through Web.Common's sanitizing MarkdownRenderer. W3 fix
+   (Settings › Appearance, "Render markdown in user messages"): a user message is rendered as typed (encoded, the one Copy and Edit read)
+   and, next to it, through the same sanitizing MarkdownRenderer; appearance.css shows one by <html data-user-markdown> (pisharp.appearance's
+   userMarkdown, off by default). Nothing is rendered in the browser.
+   WU8 adds the mockups' states from the item's facts (ChatFacts): the footer's tokens, list or metered cost, duration and tokens/s (or
+   "— tokens/s"), the account on hover ("provider · label", the chat's account, never a credential); the running turn's tail with its live
+   footer ("streaming · turn N of agent run", "paused while reconnecting" while the tab reconnects, "waiting for approval") and the
+   "Kept running while you were away" note (shown when the tab opened during the run); "Interrupted by restart · continued below" after an
+   answer whose tool call a restart cut off; an aborted partial that was answered again ("Stream dropped … answered again below") and the
+   answer after it ("Answered again after a server restart"); a provider error with Retry, Switch model and Details; and the expired
+   sign-in ("Not sent: sign-in expired.") with Retry, which forks and sends again with the same account. Fork, Edit, Retry and Regenerate
+   act on an entry id (data-entry). W3 (S5): footers mark costs from the spend ledger (ChatSpendText): metered "$x", list price "≈ $x list",
+   settled at an estimate "≈ $x · est.", uncertain (the chip, "$x reserved" and Resolve… on History › Spend), "price unknown"; the running
+   answer's live footer "≈ $x · est." from the tokens received so far; and a call the Spend Guard stopped before it was sent shows the
+   cap's stop (data-failure="spend") with Review…, which opens modal-spend-confirm and continues after the user's choice. W3 fix 2: when
+   that stop ended the run and messages wait in the queue behind it, the stop card says they are sent when the user continues or sends
+   another message (data-queued; the durable engine starts queued messages only after an answer). W4 fix 2: a read-only context
+   (ChatRenderContext.ReadOnly, an agent compare column's live transcript) renders the same items without a button that acts on the chat
+   (copy, edit, fork, retry, regenerate, switch model, review, details); links and entry ids stay. *@
+@model ChatItemView
+@{
+    var item = Model.Item;
+    var context = Model.Context;
+    var facts = context.FactsOf(item);
+    var actions = !context.ReadOnly;
+}
+@switch (item)
+{
+    case UserItem user:
+        <article class="msg msg-user" data-key="@user.Key" data-entry="@user.Id">
+          <div class="msg-body">
+            <div class="msg-role">You @if (facts.Meta?.Time is { } sent) {<time class="msg-time" datetime="@ChatDisplay.Iso(sent)">@ChatDisplay.Clock(sent)</time>}</div>
+            @if (user.Text is { Length: > 0 })
+            {
+              <div class="msg-content msg-plain" data-entry-text data-user-md>@user.Text</div>
+              <div class="msg-content msg-user-md">@Html.Raw(context.Markdown.Render(user.Text))</div>
+            }
+            else
+            {
+              <div class="msg-content msg-plain" data-entry-text>@user.Text</div>
+            }
+            @foreach (var image in user.Images)
+            {
+              <img class="msg-image" src="@image.DataUrl" alt="Attached image">
+            }
+            <div class="entry-hover">
+              @if (actions)
+              {
+                <button class="btn btn-icon" type="button" title="Copy" aria-label="Copy message @user.Id" data-action="copy-entry"><i class="bi bi-copy"></i></button>
+                <button class="btn btn-icon" type="button" title="Edit and resend on a new branch" aria-label="Edit message @user.Id" data-action="edit" data-entry="@user.Id"><i class="bi bi-pencil"></i></button>
+              }
+              <span class="entry-id">#@user.Id</span>
+            </div>
+          </div>
+        </article>
+        break;
+
+    case AssistantItem assistant:
+        {
+            var meta = facts.Meta;
+            var failure = facts.Failure;
+            var modelName = meta is { Provider: { } provider, Model: { } model } ? provider + "/" + model : assistant.Model;
+            var live = assistant.Streaming || facts.Tail;
+            var account = context.AccountFor(meta?.Provider);
+            var output = meta is { HasUsage: true } ? meta.Output : (double?)null;
+            var rate = ChatDisplay.OutputRate(output, meta?.DurationMs);
+            var texts = assistant.Blocks.OfType<TextBlockView>().ToList();
+            var lastText = texts.LastOrDefault();
+            var failureName = failure switch { ChatFailureKind.Error => "error", ChatFailureKind.Expired => "expired", ChatFailureKind.Aborted => "aborted", ChatFailureKind.Spend => "spend", _ => null };
+            var spendMark = live ? context.Spend.LiveFor(assistant) : context.Spend.For(assistant.Id);
+            var spendStop = failure == ChatFailureKind.Spend && ChatSpendStopView.From(meta?.ErrorMessage ?? assistant.Error, assistant.Id) is { } stopped
+                ? stopped with { Queued = context.QueuedBehind(assistant.Id) } : null;
+            var errorText = ChatFailures.Display(meta?.ErrorMessage ?? assistant.Error);
+            <article class="msg msg-assistant" data-key="@assistant.Key" data-entry="@assistant.Id" data-stop="@meta?.StopReason" data-failure="@failureName" data-tail="@(facts.Tail ? "true" : null)">
+              <div class="msg-body">
+                <div class="msg-role">
+                  @if (modelName is { Length: > 0 })
+                  {
+                    <span class="msg-model">@modelName</span>
+                  }
+                  @if (live)
+                  {
+                    <span class="ms-1"><span class="status-dot live" aria-hidden="true"></span><span class="visually-hidden">Working</span></span>
+                  }
+                </div>
+                @if (facts.Tail)
+                {
+                  <div class="run-note" data-run-note><i class="bi bi-arrow-repeat" aria-hidden="true"></i>Kept running while you were away@(facts.RunStarted is { } started ? " · started " + ChatDisplay.Clock(started) : "") · caught up</div>
+                }
+                @if (facts.AnsweredAfterRestart)
+                {
+                  <details class="run-break" data-detail="restart-@assistant.Key">
+                    <summary>Answered again after a server restart</summary>
+                    <div class="run-break-body">The PiSharp server stopped while the answer above was streaming. When it was back, the turn was sent again from its last saved point: what was already saved, tool results included, was not run again. You get this one answer; the partial one stays above.</div>
+                  </details>
+                }
+                @for (var index = 0; index < assistant.Blocks.Count; index++)
+                {
+                  switch (assistant.Blocks[index])
+                  {
+                      case ThinkingBlockView thinking:
+                        <details class="thinking" data-detail="thinking-@assistant.Key-@index"><summary><i class="bi bi-chevron-right"></i><i class="bi bi-lightbulb"></i> Thinking</summary><div class="thinking-body">@thinking.Text</div></details>
+                        break;
+                      case TextBlockView text:
+                        <div class="msg-content@(failure == ChatFailureKind.Aborted ? " msg-partial" : "")@(assistant.Streaming && ReferenceEquals(text, lastText) ? " stream-cursor" : "")" data-entry-text>@Html.Raw(context.Markdown.Render(text.Text))</div>
+                        break;
+                      case ToolBlockView tool:
+                        @await Html.PartialAsync("~/Views/Chat/_ChatToolCall.cshtml", new ChatToolView(tool.Call, context, false))
+                        break;
+                  }
+                }
+                @if (assistant.Streaming && texts.Count == 0)
+                {
+                  <div class="msg-content"><span class="stream-cursor"></span></div>
+                }
+                @if (facts.Interrupted)
+                {
+                  <details class="run-break" data-detail="interrupted-@assistant.Key" data-run-break="interrupted">
+                    <summary>Interrupted by restart · continued below</summary>
+                    <div class="run-break-body">The PiSharp server stopped during this turn@(facts.RestartedAt is { } back ? " and was back at " + ChatDisplay.Clock(back, seconds: true) : ""). The run picked up from its last saved point. Everything above was already saved; the cut-off tool call was not run again.</div>
+                  </details>
+                }
+                @switch (failure)
+                {
+                    case ChatFailureKind.Spend when spendStop is not null:
+                      <div class="msg-error msg-spend mt-2" role="alert" data-spend-stop data-op="@spendStop.Op" data-code="@spendStop.Code" data-queued="@spendStop.Queued">
+                        <div class="d-flex align-items-start gap-2">
+                          <i class="bi bi-shield-exclamation mt-1" aria-hidden="true"></i>
+                          <div class="flex-grow-1 min-w-0">
+                            <div class="fw-semibold">@spendStop.Title</div>
+                            <div class="small text-break">@ChatDisplay.Cut(spendStop.Text, 600) Nothing was sent or reserved.</div>
+                            @if (spendStop.QueuedText is { } waiting)
+                            {
+                              <div class="small mt-1" data-spend-queued><i class="bi bi-hourglass-split me-1" aria-hidden="true"></i>@waiting</div>
+                            }
+                            <div class="d-flex flex-wrap gap-2 mt-2">
+                              @if (actions && spendStop.Op is { Length: > 0 } stopOp)
+                              {
+                                <button class="btn btn-sm btn-outline-danger" type="button" data-action="spend-review" data-op="@stopOp" data-entry="@assistant.Id" title="See what the cap allows and choose how to go on. PiSharp never switches your model or account.">@(spendStop.CanProceed ? "Review and continue…" : "Review…")</button>
+                              }
+                              <a class="btn btn-sm btn-ghost" href="@spendStop.SettingsUrl">Settings › Spend</a>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                      break;
+                    case ChatFailureKind.Expired:
+                      <div class="msg-error mt-2" role="alert">
+                        <div class="d-flex flex-wrap align-items-center gap-2">
+                          <i class="bi bi-x-octagon" aria-hidden="true"></i>
+                          <span class="flex-grow-1">Not sent: sign-in expired.</span>
+                          @if (actions && assistant.Id is { } expiredId)
+                          {
+                            <button class="btn btn-sm btn-outline-danger" type="button" title="Retry with the same account after you sign in again. PiSharp never switches account or model on its own." data-action="retry" data-entry="@expiredId"><i class="bi bi-arrow-repeat me-1"></i>Retry</button>
+                          }
+                        </div>
+                      </div>
+                      break;
+                    case ChatFailureKind.Error when facts.RetriedAutomatically:
+                      <div class="d-flex flex-wrap align-items-center gap-2 fs-8 text-ps-faint mt-1" data-retried><i class="bi bi-arrow-repeat" aria-hidden="true"></i><span>Request failed: @ChatDisplay.Cut(errorText, 160) · retried automatically below</span></div>
+                      break;
+                    case ChatFailureKind.Error:
+                      <div class="msg-error mt-2" role="alert" data-error-detail data-error-model="@modelName" data-error-time="@ChatDisplay.Clock(meta?.Time, seconds: true)" data-error-stop="@(meta?.StopReason ?? "error")" data-error-attempts="@facts.Attempts" data-error-message="@errorText">
+                        <div class="d-flex align-items-start gap-2">
+                          <i class="bi bi-x-octagon mt-1" aria-hidden="true"></i>
+                          <div class="flex-grow-1 min-w-0">
+                            <div class="fw-semibold">Provider error</div>
+                            <div class="small text-break">@ChatDisplay.Cut(errorText.Length > 0 ? errorText : "The provider request failed.", 600)@(facts.Attempts > 1 ? $" Auto-retry gave up after {facts.Attempts} attempts." : "")</div>
+                            @if (actions)
+                            {
+                              <div class="d-flex flex-wrap gap-2 mt-2">
+                                @if (assistant.Id is { } errorId)
+                                {
+                                  <button class="btn btn-sm btn-outline-danger" type="button" data-action="retry" data-entry="@errorId" title="Send your message again on a new branch, with this chat's model and account"><i class="bi bi-arrow-repeat me-1"></i>Retry</button>
+                                }
+                                <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="modal" data-bs-target="#modal-model-picker"><i class="bi bi-arrow-left-right me-1"></i>Switch model</button>
+                                <button class="btn btn-sm btn-ghost" type="button" data-action="error-details">Details</button>
+                              </div>
+                            }
+                          </div>
+                        </div>
+                      </div>
+                      break;
+                    case ChatFailureKind.Aborted when facts.AnsweredAgain:
+                      <div class="d-flex flex-wrap align-items-center gap-2 fs-8 text-ps-faint mt-1" data-answered-again><i class="bi bi-wifi-off" aria-hidden="true"></i><span>Stream dropped@(meta?.Time is { } dropped ? " at " + ChatDisplay.Clock(dropped, seconds: true) : "")@(meta is { HasUsage: true } ? "" : " · no usage reported") · answered again below</span></div>
+                      break;
+                    case ChatFailureKind.Aborted:
+                      <div class="d-flex flex-wrap align-items-center gap-2 fs-8 text-ps-faint mt-1"><i class="bi bi-stop-circle" aria-hidden="true"></i><span>Stopped · the partial answer is kept</span></div>
+                      break;
+                }
+                @if (live)
+                {
+                  <div class="msg-footer msg-live-footer">
+                    @if (meta is { HasUsage: true })
+                    {
+                      <span title="Input tokens"><i class="bi bi-arrow-up"></i>@ChatDisplay.Count(meta.Input)</span>
+                      <span title="Output tokens"><i class="bi bi-arrow-down"></i>@ChatDisplay.Count(meta.Output)</span>
+                    }
+                    @{ var turn = facts.Turn > 0 ? $" · turn {facts.Turn} of agent run" : ""; var status = facts.LiveStatus ?? "streaming"; }
+                    <span data-live-status="live">@(status + turn)</span>
+                    <span data-live-status="reconnecting">@("paused while reconnecting" + turn)</span>
+                    @if (spendMark is not null)
+                    {
+                      <span class="text-nowrap" tabindex="0" data-bs-toggle="tooltip" title="@spendMark.Title" data-spend-mark="live">@spendMark.Text</span>
+                    }
+                  </div>
+                }
+                else if (assistant.Id is { } entryId)
+                {
+                  if (failure == ChatFailureKind.Expired)
+                  {
+                    <div class="msg-footer">
+                      <span class="ps-chip" data-tone="danger">error</span>
+                      <span>@(meta is { HasUsage: true } ? $"{ChatDisplay.Count(meta.Input)} input tokens" : "no usage · nothing counted")</span>
+                      @if (account is not null)
+                      {
+                        <span class="msg-actions"><span class="msg-account" title="Provider account used for this message">@account</span></span>
+                      }
+                    </div>
+                  }
+                  else if (failure == ChatFailureKind.Error && !facts.RetriedAutomatically)
+                  {
+                    <div class="msg-footer">
+                      @if (meta is { HasUsage: true })
+                      {
+                        <span title="Input tokens"><i class="bi bi-arrow-up"></i>@ChatDisplay.Count(meta.Input)</span>
+                      }
+                      <span class="ps-chip" data-tone="danger">error</span>
+                      <span class="msg-actions">
+                        @if (actions)
+                        {
+                          <button class="btn btn-icon" type="button" title="Fork from here" aria-label="Fork at entry @entryId" data-action="fork" data-entry="@entryId"><i class="bi bi-signpost-split"></i></button>
+                        }
+                        <span class="entry-id">#@entryId</span>
+                        @if (account is not null)
+                        {
+                          <span class="msg-account" title="Provider account used for this message">@account</span>
+                        }
+                      </span>
+                    </div>
+                  }
+                  else if (failure == ChatFailureKind.Spend)
+                  {
+                    <div class="msg-footer">
+                      <span class="ps-chip" data-tone="warn">stopped</span>
+                      <span>nothing sent · nothing counted</span>
+                      <span class="msg-actions">
+                        @if (actions)
+                        {
+                          <button class="btn btn-icon" type="button" title="Fork from here" aria-label="Fork at entry @entryId" data-action="fork" data-entry="@entryId"><i class="bi bi-signpost-split"></i></button>
+                        }
+                        <span class="entry-id">#@entryId</span>
+                      </span>
+                    </div>
+                  }
+                  else if (failure != ChatFailureKind.Error)
+                  {
+                    <div class="msg-footer" data-message-metrics data-output-tokens="@(output?.ToString(System.Globalization.CultureInfo.InvariantCulture))" data-elapsed-ms="@(meta?.DurationMs?.ToString(System.Globalization.CultureInfo.InvariantCulture))">
+                      @if (meta is { HasUsage: true })
+                      {
+                        <span title="Input tokens"><i class="bi bi-arrow-up"></i>@ChatDisplay.Count(meta.Input)</span>
+                        <span title="Output tokens"><i class="bi bi-arrow-down"></i>@ChatDisplay.Count(meta.Output)</span>
+                        if (meta.CacheRead > 0)
+                        {
+                          <span title="Cache read tokens"><i class="bi bi-lightning-charge"></i>@ChatDisplay.Count(meta.CacheRead) cached</span>
+                        }
+                        if (meta.CacheWrite > 0)
+                        {
+                          @* W5 live test: OpenAI reported 3 uncached input tokens and 1,772 written to the cache, so ↑ 3 alone hid most of the cost. *@
+                          <span title="Cache write tokens"><i class="bi bi-database"></i>@ChatDisplay.Count(meta.CacheWrite) cache write</span>
+                        }
+                      }
+                      @if (spendMark is not null)
+                      {
+                        if (spendMark.Chip is { } markChip)
+                        {
+                          <span class="ps-chip" data-tone="warn" tabindex="0" data-bs-toggle="tooltip" title="@spendMark.ChipTitle">@markChip</span>
+                        }
+                        <span class="text-nowrap" tabindex="0" data-bs-toggle="tooltip" title="@spendMark.Title" data-spend-mark="@spendMark.Kind.ToString().ToLowerInvariant()">@spendMark.Text</span>
+                        if (spendMark.ResolveUrl is { } resolve)
+                        {
+                          <a class="text-ps-faint" href="@resolve" data-spend-resolve>Resolve…</a>
+                        }
+                      }
+                      else if (meta is { HasUsage: true } && ChatDisplay.CostText(meta, context.Billing, meta.Provider is { } p && meta.Model is { } m ? context.Catalog?.FindModel(p, m) : null, account) is { } cost)
+                      {
+                        <span class="text-nowrap" tabindex="0" data-bs-toggle="tooltip" title="@cost.Title">@cost.Text</span>
+                      }
+                      @if (meta?.DurationMs is { } elapsed)
+                      {
+                        <span title="Duration"><i class="bi bi-stopwatch"></i>@ChatDisplay.Duration(elapsed)</span>
+                      }
+                      <span class="text-nowrap" data-output-rate data-bs-toggle="tooltip" tabindex="0" title="@rate.Title" aria-label="@rate.Label">@rate.Text</span>
+                      @if (meta?.StopReason is { Length: > 0 } stop)
+                      {
+                        <span class="ps-chip" data-tone="outline">@stop</span>
+                      }
+                      <span class="msg-actions">
+                        @if (actions && texts.Count > 0)
+                        {
+                          <button class="btn btn-icon" type="button" title="Copy" aria-label="Copy answer @entryId" data-action="copy-entry"><i class="bi bi-copy"></i></button>
+                        }
+                        @if (actions && !facts.AnsweredAgain)
+                        {
+                          <button class="btn btn-icon" type="button" title="Regenerate" aria-label="Regenerate answer @entryId" data-action="retry" data-entry="@entryId"><i class="bi bi-arrow-repeat"></i></button>
+                        }
+                        @if (actions)
+                        {
+                          <button class="btn btn-icon" type="button" title="Fork from here" aria-label="Fork at entry @entryId" data-action="fork" data-entry="@entryId"><i class="bi bi-signpost-split"></i></button>
+                        }
+                        @if (actions && failure == ChatFailureKind.None)
+                        {
+                          @* W5 (E7): Pin as test opens _TestCaseModal with this answer and the chat's request up to it. *@
+                          <button class="btn btn-icon" type="button" title="Pin as test" aria-label="Pin answer @entryId as a test case" data-bs-toggle="modal" data-bs-target="#modal-test-case" data-pin-source="chat" data-pin-chat="@context.SessionId" data-pin-agent="@context.AgentId" data-pin-entry="@entryId"><i class="bi bi-pin-angle"></i></button>
+                        }
+                        <span class="entry-id">#@entryId</span>
+                        @if (account is not null)
+                        {
+                          <span class="msg-account" title="Provider account used for this message">@account</span>
+                        }
+                      </span>
+                    </div>
+                  }
+                }
+              </div>
+            </article>
+        }
+        break;
+
+    case ToolResultItem result:
+        <article class="msg msg-assistant" data-key="@result.Key" data-entry="@result.Id">
+          <div class="msg-body">
+            <details class="tool-card @(result.IsError ? "is-error" : "")" data-detail="@result.Key">
+              <summary><span class="tool-icon"><i class="bi @(result.IsError ? "bi-exclamation-circle" : ChatDisplay.ToolIcon(result.Name))"></i></span><span class="tool-name">@result.Name</span><span class="tool-args-summary">Result of a call before this context</span><span class="ps-chip" data-tone="@(result.IsError ? "danger" : "ok")">@(result.IsError ? "error" : "done")</span></summary>
+              <div class="tool-body"><div class="ps-term"><pre class="wrap">@result.Text</pre></div></div>
+            </details>
+            <div class="msg-footer"><span class="msg-actions">@if (actions) {<button class="btn btn-icon" type="button" title="Fork from here" aria-label="Fork at entry @result.Id" data-action="fork" data-entry="@result.Id"><i class="bi bi-signpost-split"></i></button>}<span class="entry-id">#@result.Id</span></span></div>
+          </div>
+        </article>
+        break;
+
+    case ToolItem tool:
+        <article class="msg msg-assistant" data-key="@tool.Key">
+          <div class="msg-body">@await Html.PartialAsync("~/Views/Chat/_ChatToolCall.cshtml", new ChatToolView(tool.Call, context, false))</div>
+        </article>
+        break;
+
+    case EventItem entry:
+        {
+            var icon = entry.EntryKind switch
+            {
+                "pi.reset" => "bi-arrow-counterclockwise",
+                "pi.compaction" => "bi-layers",
+                _ => "bi-info-circle",
+            };
+            var noteTitle = entry.EntryKind == "pi.reset" ? "Handoff note" : "Context note";
+            <div class="event-group" data-key="@entry.Key" data-entry="@entry.Id">
+              <div class="event-line"><span class="ev-text"><i class="bi @icon"></i><span>@entry.Text</span><span class="entry-id">#@entry.Id</span>@if (actions) {<button class="btn btn-icon" type="button" title="Fork from here" aria-label="Fork at entry @entry.Id" data-action="fork" data-entry="@entry.Id"><i class="bi bi-signpost-split"></i></button>}</span></div>
+              @if (entry.Note is { Length: > 0 } note)
+              {
+                <div class="event-block">
+                  <details class="context-note" data-detail="note-@entry.Key"><summary>@noteTitle</summary>
+                    <div class="note-body">@Html.Raw(context.Markdown.Render(note))</div>
+                  </details>
+                </div>
+              }
+            </div>
+        }
+        break;
+}

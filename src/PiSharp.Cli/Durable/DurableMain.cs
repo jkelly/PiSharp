@@ -52,6 +52,27 @@ internal static class DurableMain
     /// <summary>Runs <c>pisharp durable</c> with the arguments after <c>durable</c>; returns the exit code.</summary>
     internal static async Task<int> RunAsync(string[] args, PiHost host, CancellationToken cancellationToken)
     {
+        // Decision 0008 (PiSharp-only): `serve` runs this machine as a durable device, `token` prints or rotates its token.
+        if (args is ["serve", .. var serve])
+        {
+            await host.Stderr.WriteLineAsync(ExperimentalNotice).ConfigureAwait(false);
+            // A service manager stops the device with SIGTERM (SIGHUP off Windows): it shuts down as on Ctrl+C (decision 0010, M6).
+            using var stopping = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, host.Signals?.Invoke().Token ?? CancellationToken.None);
+            return await DurableServe.ServeAsync(serve, host, stopping.Token).ConfigureAwait(false);
+        }
+        if (args is ["token", .. var token]) return await DurableServe.TokenAsync(token, host).ConfigureAwait(false);
+        // Decision 0010, M6 (PiSharp-only): the device's API as commands. Their first word is a group the TUI's arguments never use; --help
+        // and -h print Help below (main), which lists the TUI's options only.
+        if (args is ["help", .. var topic])
+        {
+            var text = topic is [var group, ..] && DurableRemote.Groups.Contains(group) ? DurableRemote.Help(group)
+                : topic is [var name, ..] && DurableOps.Names.Contains(name) ? DurableOps.Help(name)
+                : DurableRemote.Help() + "\nOn the device's data directory:\n" + DurableOps.Help();
+            await host.Stdout.WriteLineAsync(text.TrimEnd()).ConfigureAwait(false);
+            return 0;
+        }
+        if (args is [var first, ..] && DurableRemote.Groups.Contains(first)) return await DurableRemote.RunAsync(args, host, cancellationToken).ConfigureAwait(false);
+        if (args is [var op, ..] && DurableOps.Names.Contains(op)) return await DurableOps.RunAsync(args, host, cancellationToken).ConfigureAwait(false);
         if (args.Contains("--help") || args.Contains("-h"))
         {
             await host.Stdout.WriteAsync(Help.AsMemory(), cancellationToken).ConfigureAwait(false);

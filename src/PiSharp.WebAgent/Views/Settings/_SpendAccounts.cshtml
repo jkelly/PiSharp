@@ -1,0 +1,62 @@
+@* Decision 0011 (run W3, S4): the mockups' _SpendAccounts: every connected account (and each provider that needs none) with how it is
+   billed, worked out from how it connects (BillingModes: a stored or environment key is Metered, a ChatGPT or Copilot sign-in Subscription,
+   a loopback server Free, a provider without prices Unknown price). The mode is a dropdown: choosing another mode saves an override for
+   that account (spend.billingOverrides), choosing the detected one removes it. The select is as wide as its longest option, so "Unknown
+   price (detected)" is never clipped; on a narrow screen it moves under the name (spend.css). Offline (--faux) only the faux catalog's
+   providers are listed (BillingModes.Offline). Left out: the subscription allowance gate (no account reports allowance windows yet).
+   Model: SpendSettingsPage. *@
+@using PiSharp.WebAgent.Spend
+@model SpendSettingsPage
+@{
+    BillingKind[] modes = [BillingKind.Metered, BillingKind.Subscription, BillingKind.Free, BillingKind.Unknown];
+}
+<section class="settings-section" id="accounts">
+  <h3>Accounts</h3>
+  <p class="section-desc">How each connected account is billed, worked out from how it connects. Only metered accounts count toward caps.</p>
+  @if (Model.Accounts.Count == 0)
+  {
+    <div class="ps-card p-3 fs-7 text-secondary">No accounts are connected. Connect one in <a href="/settings/providers">Settings › Providers</a>.</div>
+  }
+  else
+  {
+    <div class="ps-card">
+      @foreach (var (row, index) in Model.Accounts.Select((row, index) => (row, index)))
+      {
+        var field = "billing:" + row.Provider + "|" + row.AccountId;
+        var current = SpendPages.ModeWire(row.Billing.Mode);
+        <div class="provider-row" data-setting-row="@field">
+          <partial name="/Views/Settings/_ProviderLogo.cshtml" model="new LogoModel(row.Row.ProviderName, row.LogoUrl)" />
+          <div class="spend-account-main">
+            <div class="d-flex flex-wrap align-items-center gap-2"><span class="provider-name">@row.Name</span><span class="provider-id">@row.Provider</span><span class="ps-chip" data-tone="warn" data-modified-chip hidden>modified</span></div>
+            <div class="fs-8 text-ps-faint">
+              @row.Basis
+              @if (row.Hint is not null)
+              {
+                <text>· </text><span class="ps-mono">@row.Hint</span>
+              }
+              @if (row.Billing.Mode == BillingKind.Unknown)
+              {
+                <text>· </text><a href="#unknown-prices">see below</a>
+              }
+              @if (row.Billing.Overridden)
+              {
+                <text>· override · detected @SpendPages.ModeText(row.Billing.Detected)</text>
+              }
+            </div>
+          </div>
+          <div class="spend-mode flex-shrink-0">
+            <label class="visually-hidden" for="@("spendMode" + index)">Billing mode of @row.Name</label>
+            <select class="form-select form-select-sm" id="@("spendMode" + index)" data-spend-field="@field" data-provider="@row.Provider" data-account="@row.AccountId" data-initial="@current">
+              @foreach (var mode in modes)
+              {
+                var wire = SpendPages.ModeWire(mode);
+                <option value="@wire" selected="@(wire == current)">@SpendPages.ModeText(mode)@(mode == row.Billing.Detected ? " (detected)" : "")</option>
+              }
+            </select>
+          </div>
+        </div>
+      }
+    </div>
+  }
+  <p class="fs-8 text-ps-faint mt-2 mb-0">Subscription requests show an “≈ $x list” cost for comparison. It is never counted toward money caps.</p>
+</section>

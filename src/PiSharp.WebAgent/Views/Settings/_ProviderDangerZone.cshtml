@@ -1,0 +1,29 @@
+@* Decision 0011 (run W2, WU9): the mockups' _ProviderDangerZone: "Forget all <provider> settings" removes the provider's stored keys and
+   sign-ins and shows its hidden models again (POST /api/settings/providers/{id}/forget, after a confirm). Environment variables and ambient
+   credentials are not touched. Disabled when there is nothing to forget. Model: ProviderPage. *@
+@model ProviderPage
+@{
+    var provider = Model.Provider;
+    var stored = provider.StoredAccounts.Count();
+    var variables = provider.Accounts.Where(account => account.Kind == AccountKind.Environment).Select(account => account.Source).OfType<string>().ToList();
+}
+<section class="settings-section" id="danger-zone">
+  <h3 class="text-ps-danger">Danger zone</h3>
+  <div class="ps-card danger-zone p-3 d-flex flex-wrap align-items-center gap-3">
+    <div class="flex-grow-1" style="min-width:0">
+      <div class="fw-semibold">Forget all @provider.Name settings</div>
+      <div class="fs-8 text-secondary">Deletes @(stored == 0 ? "the" : SettingsText.Plural(stored, "stored key or sign-in", "stored keys and sign-ins") + " and the") model switches for <span class="ps-mono">@provider.Id</span>.
+        @if (variables.Count > 0)
+        {
+          <span class="ps-mono">@string.Join(", ", variables)</span><text> in the environment isn't touched.</text>
+        }
+        else
+        {
+          <text>Environment variables aren't touched.</text>
+        }
+      </div>
+    </div>
+    <button class="btn btn-sm btn-outline-danger" type="button" data-forget-provider="@provider.Id" data-provider-name="@provider.Name" data-forget-count="@stored"
+            disabled="@(!Model.HasSomethingToForget)"><i class="bi bi-trash3 me-1" aria-hidden="true"></i>Forget @provider.Name settings…</button>
+  </div>
+</section>

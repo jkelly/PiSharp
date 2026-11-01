@@ -1,0 +1,82 @@
+@* Decision 0011 (run W2, WU9): one detail view for every provider, mapping the mockups' settings-provider-openai and
+   settings-provider-codex (route GET /settings/providers/{id}): _ProviderHeader; the expired warning (_ExpiredAccountCard) when the active
+   account stopped working; the call to action (_ProviderConnect) while it has no account; its accounts (_ProviderAccounts with an
+   _AccountCard each); its models (_ProviderModels); the sections this version does not build (_NotInThisVersion); and _ProviderDangerZone. The credential modals
+   come from _CredentialModals. W3 fix: a custom provider of models.json is edited in Settings › Custom providers (its key too), so its page
+   says so and links there instead of offering the generic key modal, its accounts or the danger zone. Model: ProviderPage. *@
+@model ProviderPage
+@{
+    Layout = "_SettingsLayout";
+    var provider = Model.Provider;
+    ViewData["Title"] = provider.Name;
+    ViewData[ShellViewData.SettingsSection] = "providers";
+    ViewData[ShellViewData.Page] = "settings-provider";
+}
+@section Styles { <link href="~/css/settings.css" rel="stylesheet" asp-append-version="true"> }
+@section Modals { <partial name="/Views/Settings/_CredentialModals.cshtml" model="Model.Modals" /> }
+@section Scripts { <script type="module" src="~/js/settings.js" asp-append-version="true"></script> }
+<div data-provider-page="@provider.Id">
+  <partial name="/Views/Settings/_ProviderHeader.cshtml" model="Model" />
+  <partial name="/Views/Settings/_OfflineNote.cshtml" model="Model.Offline" />
+
+  @if (Model.ExpiredAccount is { } expired)
+  {
+    <partial name="/Views/Settings/_ExpiredAccountCard.cshtml" model="new AccountCard(provider, expired, Model.Offline)" />
+  }
+
+  @if (provider.Custom is { } custom)
+  {
+    <section class="settings-section" data-custom-provider-note>
+      <div class="ps-panel p-3 fs-7 text-secondary d-flex flex-wrap gap-2 align-items-start">
+        <i class="bi bi-hdd-network mt-1" aria-hidden="true"></i>
+        <div class="flex-grow-1" style="min-width:0">@provider.Name is a custom provider from <span class="ps-mono">models.json</span>. Its base URL, key, headers and models are edited in Settings › Custom providers@(custom.KeySource == PiSharp.WebAgent.CustomProviders.CustomKeySource.Stored ? ", which keeps its key as the API key account “" + provider.Name + " key”" : "").</div>
+        <a class="btn btn-sm btn-outline-secondary" href="@provider.Href">Edit in Custom providers</a>
+      </div>
+    </section>
+  }
+  else if (provider.NoCredentials)
+  {
+    <section class="settings-section">
+      <div class="ps-panel p-3 fs-7 text-secondary d-flex gap-2"><i class="bi bi-check-circle text-ps-ok mt-1" aria-hidden="true"></i><div>@provider.Name needs no key or sign-in. Its models answer on this machine and nothing leaves it.</div></div>
+    </section>
+  }
+  else if (provider.Accounts.Count == 0)
+  {
+    <partial name="/Views/Settings/_ProviderConnect.cshtml" model="Model" />
+  }
+  else
+  {
+    <partial name="/Views/Settings/_ProviderAccounts.cshtml" model="Model" />
+  }
+
+  @if (provider.Id == SignInFlows.CodexProvider)
+  {
+    <partial name="/Views/Settings/_NotInThisVersion.cshtml" model='new NotInThisVersion("Usage limits", "This version does not read your ChatGPT plan allowance from the Codex backend. History › Spend lists the calls this app sent and what they cost.", "usage-limits")' />
+  }
+
+  @if (provider.Models.Count > 0)
+  {
+    <partial name="/Views/Settings/_ProviderModels.cshtml" model="Model" />
+  }
+  else if (!provider.NoCredentials)
+  {
+    <section class="settings-section" id="models">
+      <h3>Models</h3>
+      <p class="section-desc mb-0">@("The model catalog lists no models for " + provider.Name + (Model.Offline ? " while the app runs offline; the faux models stand in." : "."))</p>
+    </section>
+  }
+
+  @if (provider.Id == SignInFlows.CodexProvider)
+  {
+    <partial name="/Views/Settings/_NotInThisVersion.cshtml" model='new NotInThisVersion("Request defaults for Codex", "This version has no Codex defaults for text verbosity, reasoning summary or service tier. The default thinking level is in Settings › Defaults, and a chat or run picks its own.", "request-defaults")' />
+  }
+  else if (provider.TakesApiKey && !provider.NoCredentials)
+  {
+    <partial name="/Views/Settings/_NotInThisVersion.cshtml" model='new NotInThisVersion("Connection settings", "This version sends no organization, project or custom headers. A base URL override is set per key: Replace key › Advanced.", "connection")' />
+  }
+
+  @if (!provider.NoCredentials && provider.Custom is null)
+  {
+    <partial name="/Views/Settings/_ProviderDangerZone.cshtml" model="Model" />
+  }
+</div>

@@ -1,0 +1,17 @@
+@* Decision 0011 (run W4, R7): the mockups' _BenchTimeline: the conversation pane. Its header (_BenchTimelineHead: the state chip, the turn
+   and call counts, Inspect) and body (_BenchTimelineBody) are swapped in on every change; the footer's message box stays, so what the user
+   is typing survives an update. Add puts a user message at the end of the conversation; Add & run also runs it (disabled while the bench
+   waits for results). Model: BenchView. *@
+@model BenchView
+<section class="pane" aria-label="Conversation timeline">
+  <div class="pane-header" data-bench-part="timelineHead"><partial name="~/Views/Bench/_BenchTimelineHead.cshtml" model="Model" /></div>
+  <div class="pane-body position-relative" data-bench-part="timeline"><partial name="~/Views/Bench/_BenchTimelineBody.cshtml" model="Model" /></div>
+  <div class="pane-footer">
+    <label class="visually-hidden" for="benchUserMsg">Next user message</label>
+    <div class="d-flex gap-2 align-items-end">
+      <textarea class="form-control form-control-sm" id="benchUserMsg" rows="1" maxlength="@BenchSession.MaxMessage" placeholder="@(Model.PageState == "awaiting" ? "Send the pending tool result first" : "Add a user message…")" disabled="@(Model.PageState is "awaiting" or "running")" data-bench-message></textarea>
+      <button class="btn btn-sm btn-outline-secondary text-nowrap" type="button" disabled="@(Model.PageState is "awaiting" or "running")" data-bench-add>Add</button>
+      <button class="btn btn-sm btn-primary text-nowrap" type="button" hidden="@Model.NoTools" disabled="@(Model.PageState is "awaiting" or "running")" data-bench-add-run>Add &amp; run</button>
+    </div>
+  </div>
+</section>

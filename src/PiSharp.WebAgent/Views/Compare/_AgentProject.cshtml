@@ -1,0 +1,75 @@
+@* Decision 0011 (run W4, R6): the setup's project facts (POST /compare/agent/project), from R4's inspection: the isolation chip ("git worktree
+   from main @ 4f9c2e1", "temporary copy · 84 MB"; it opens modal-agent-workspace), the agent-dirty banner (uncommitted changes worktrees
+   don't get: Use a temporary copy instead, or Continue without it), a copy over the size warning (Run agents then asks first), a
+   worktree that was asked for but can't be used, or why the folder can't be used; and modal-agent-workspace's content for it.
+   compare-agent-setup.js moves the three parts into the page ([data-ac-iso-host], [data-ac-banners], the modal). Model: AgentProjectView. *@
+@using PiSharp.WebAgent.AgentCompare.Pages
+@using PiSharp.WebAgent.AgentCompare.Workspaces
+@model AgentProjectView
+@{
+    var inspection = Model.Inspection;
+    var kind = inspection?.Kind switch { WorkspaceKind.Worktree => "worktree", WorkspaceKind.Copy => "copy", _ => "" };
+    IReadOnlyList<UncommittedChange> dirty = inspection is { Kind: WorkspaceKind.Worktree, Uncommitted.Count: > 0 } ? inspection.Uncommitted : [];
+    const int Shown = 5;
+}
+<div data-ac-project-fragment data-kind="@kind" data-ok="@(inspection is null ? "false" : "true")" data-path="@Model.ProjectPath">
+  <div data-ac-iso-part>
+    @if (inspection is not null)
+    {
+      <button class="ps-chip ac-iso" type="button" data-tone="@Model.Tone" data-bs-toggle="modal" data-bs-target="#modal-agent-workspace" title="@Model.ChipTitle" data-ac-iso>
+        <i class="bi @(inspection.Kind == WorkspaceKind.Worktree ? "bi-git" : "bi-files")" aria-hidden="true"></i><span class="text-truncate">@Model.ChipLabel</span>
+      </button>
+    }
+    else
+    {
+      <span class="ps-chip" data-tone="danger" data-ac-iso-error><i class="bi bi-exclamation-triangle" aria-hidden="true"></i>Can't use this folder</span>
+    }
+  </div>
+  <div data-ac-banners-part>
+    @if (Model.Error is { } error)
+    {
+      <div class="app-banner warn mx-0 mb-2" data-ac-banner="error">
+        <span class="ps-chip" data-tone="danger">Folder</span>
+        <span class="fs-7 ac-banner-text">@error Choose another folder with Change.</span>
+      </div>
+    }
+    @if (dirty.Count > 0)
+    {
+      <div class="app-banner info mx-0 mb-2" data-ac-banner="dirty">
+        <span class="ps-chip" data-tone="warn">Not copied</span>
+        <div class="fs-7 ac-banner-text">
+          <div>@AgentText.Count(dirty.Count, "uncommitted file") @(dirty.Count == 1 ? "isn't" : "aren't") copied into the worktrees, so the agents won't see @(dirty.Count == 1 ? "this change" : "these changes"):</div>
+          @foreach (var change in dirty.Take(Shown))
+          {
+            <div class="mt-1"><span class="ac-path">@change.Path</span> <span class="fs-8 text-ps-faint">· @AgentText.Status(change.Status)</span></div>
+          }
+          @if (dirty.Count > Shown)
+          {
+            <div class="mt-1 fs-8 text-ps-faint">and @(dirty.Count - Shown) more (Workspace details lists them all)</div>
+          }
+        </div>
+        <div class="d-flex flex-wrap gap-2">
+          <button class="btn btn-sm btn-outline-secondary" type="button" data-ac-use-copy>Use a temporary copy instead</button>
+          <button class="btn btn-sm btn-ghost" type="button" data-ac-dismiss-banner>Continue without @(dirty.Count == 1 ? "it" : "them")</button>
+        </div>
+      </div>
+    }
+    @if (inspection is not null && Model.Workspace.Isolation == WorkspaceIsolation.Worktree && inspection.WorktreeUnavailable is { } why)
+    {
+      <div class="app-banner warn mx-0 mb-2" data-ac-banner="no-worktree">
+        <span class="ps-chip" data-tone="warn">No worktree</span>
+        <span class="fs-7 ac-banner-text">@why Run agents would be refused; use a temporary copy instead.</span>
+        <button class="btn btn-sm btn-outline-secondary" type="button" data-ac-use-copy>Use a temporary copy</button>
+      </div>
+    }
+    @if (inspection is { Kind: WorkspaceKind.Copy, OverWarnLimit: true })
+    {
+      <div class="app-banner info mx-0 mb-2" data-ac-banner="large">
+        <span class="ps-chip" data-tone="warn">Large copy</span>
+        <span class="fs-7 ac-banner-text">A copy of this folder is @(inspection.CopyEstimateComplete ? "" : "at least ")@WorkspaceText.Size(inspection.CopyBytes ?? 0) for each model, more than @WorkspaceText.Size(inspection.WarnAboveBytes). Run agents asks before copying; leave more out under Workspace details.</span>
+        <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="modal" data-bs-target="#modal-agent-workspace">Workspace details</button>
+      </div>
+    }
+  </div>
+  <partial name="/Views/Compare/_AgentWorkspace.cshtml" model="Model.Workspace" />
+</div>
