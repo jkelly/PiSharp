@@ -10681,8 +10681,8 @@
       "originalSha256": "6b228c2a1c550e664461250d372eb2b8dc58f730e83b9d4ccde3ec52338bf2c5"
     },
     {
-      "currentSha256": "9c5280f25d0ece9240ae6f12f7066beb175e3c02a4f2a97c98e077f34caa63fb",
-      "currentBytes": 23577,
+      "currentSha256": "a112ec5b568dd0284ab402a11d574e19806155ac29ab16a9fe29082a767298f8",
+      "currentBytes": 25067,
       "originalBytes": 23480,
       "path": "tests/packaging/distribution-validation.tests.ps1",
       "originalSha256": "c4363ce0b9ca7570f27058d7177e8b45426fc3855896e79b15f00358913d0809"
@@ -17996,8 +17996,8 @@
       "originalSha256": "96aef982693de523a759cbd0254d1fe61f6eb57ec3f1a2727b9d2c54ebab8cdb"
     },
     {
-      "currentSha256": "de3d7ea269e304b6a320591eb440d5485749b77f3d8983c9d715174bcfaf3cb8",
-      "currentBytes": 16816,
+      "currentSha256": "718bddd056e5eaab5dc15def72aded7a88dddaf3390be606e6af757f8a786529",
+      "currentBytes": 17520,
       "originalBytes": 15911,
       "path": "tools/packaging/distribution-validation.ps1",
       "originalSha256": "e5659e7a525ec6b21387c1a9dc2085f7107627ea2e001b4dcc5913ab36f71b3a"
