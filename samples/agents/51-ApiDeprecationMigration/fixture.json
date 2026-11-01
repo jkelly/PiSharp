@@ -1,0 +1,5 @@
+{
+ "task":"Inspect client-v2, apply the approved bounded local fixture edits, then verify old usage is absent and new usage is present. Do not execute code or contact a service.",
+ "files":{"repo/Client.cs":"// Preserve this comment and all surrounding text.\nvar client = new DemoClient();\nvar result = client.FetchLegacy(42);\nConsole.WriteLine(result);\n"},
+ "migrations":[{"id":"client-v2","edits":[{"path":"repo/Client.cs","find":"client.FetchLegacy(","replace":"client.FetchAsync(","expectedOccurrences":1}]}]
+}

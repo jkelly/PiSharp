@@ -1,0 +1,10 @@
+{
+  "task":"Collect source evidence for INC1, build its deduplicated UTC timeline and explicit request correlations, then publish the timeline with source evidence. State that root cause is not established.",
+  "incidents":[
+    {"id":"INC1","sources":[
+      {"id":"app-log","events":[{"id":"ev2","timestamp":"2026-11-01T10:02:00Z","kind":"error","summary":"Request returned 503","correlationId":"req-17"},{"id":"ev1","timestamp":"2026-11-01T10:00:00Z","kind":"deploy","summary":"Release r42 started","correlationId":"deploy-42"}]},
+      {"id":"monitor","events":[{"id":"ev2","timestamp":"2026-11-01T05:02:00-05:00","kind":"error","summary":"Request returned 503","correlationId":"req-17"},{"id":"ev3","timestamp":"2026-11-01T10:03:00Z","kind":"retry","summary":"Retry succeeded","correlationId":"req-17"}]}
+    ]},
+    {"id":"INC2","sources":[{"id":"audit","events":[{"id":"other1","timestamp":"2026-11-02T12:00:00Z","kind":"alert","summary":"Disk threshold crossed","correlationId":"disk-2"}]}]}
+  ]
+}

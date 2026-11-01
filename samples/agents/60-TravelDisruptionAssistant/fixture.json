@@ -1,0 +1,13 @@
+{
+  "task": "For trip-1, run inspect_disruption, rank_alternatives and save_rebooking_plan. Report feasible options and rejection reasons. If the host grants approval, also call rebook_local for connection (the cheapest feasible option) with its returned expectedHash to record a workspace-only simulation. Without approval, stop at the saved plan. Never contact a booking service.",
+  "itineraries": [
+    { "id": "trip-1", "origin": "CHI", "destination": "BOS", "disruptedServiceId": "F100", "earliestDeparture": "2026-12-01T08:00:00-06:00", "latestArrival": "2026-12-01T22:00:00-05:00", "maxBudgetCents": 45000, "minConnectionMinutes": 60, "allowedModes": ["flight", "rail"], "requireRefundable": true,
+      "alternatives": [
+        { "id": "direct", "costCents": 42000, "refundable": true, "legs": [ { "serviceId": "F200", "mode": "flight", "origin": "CHI", "destination": "BOS", "departure": "2026-12-01T10:00:00-06:00", "arrival": "2026-12-01T13:00:00-05:00" } ] },
+        { "id": "connection", "costCents": 32000, "refundable": true, "legs": [ { "serviceId": "F210", "mode": "flight", "origin": "CHI", "destination": "DTW", "departure": "2026-12-01T10:00:00-06:00", "arrival": "2026-12-01T12:00:00-05:00" }, { "serviceId": "F211", "mode": "flight", "origin": "DTW", "destination": "BOS", "departure": "2026-12-01T13:00:00-05:00", "arrival": "2026-12-01T15:00:00-05:00" } ] },
+        { "id": "tight", "costCents": 20000, "refundable": true, "legs": [ { "serviceId": "F220", "mode": "flight", "origin": "CHI", "destination": "DTW", "departure": "2026-12-01T10:00:00-06:00", "arrival": "2026-12-01T12:00:00-05:00" }, { "serviceId": "F221", "mode": "flight", "origin": "DTW", "destination": "BOS", "departure": "2026-12-01T12:30:00-05:00", "arrival": "2026-12-01T14:30:00-05:00" } ] },
+        { "id": "expensive", "costCents": 50000, "refundable": false, "legs": [ { "serviceId": "F230", "mode": "flight", "origin": "CHI", "destination": "BOS", "departure": "2026-12-01T10:00:00-06:00", "arrival": "2026-12-01T13:00:00-05:00" } ] }
+      ] },
+    { "id": "trip-2", "origin": "CHI", "destination": "SEA", "disruptedServiceId": "F300", "earliestDeparture": "2026-12-02T08:00:00-06:00", "latestArrival": "2026-12-02T22:00:00-08:00", "maxBudgetCents": 10000, "minConnectionMinutes": 45, "allowedModes": ["flight"], "requireRefundable": false, "alternatives": [] }
+  ]
+}

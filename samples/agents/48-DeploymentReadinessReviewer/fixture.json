@@ -1,0 +1,4 @@
+{
+  "task": "Inspect release-42, evaluate every deployment gate, and write its readiness report. Review supplied evidence without deploying or claiming tests ran.",
+  "releases": [{"id":"release-42","requiredTests":["unit","integration"],"tests":[{"name":"unit","status":"passed"},{"name":"integration","status":"passed"}],"migrations":[{"id":"add-index","reviewed":true,"rollbackVerified":true}],"requiredConfig":["Environment","Region"],"config":{"Environment":"staging","Region":"local"},"rollback":{"rehearsed":true,"artifact":"release-41.zip"}}]
+}

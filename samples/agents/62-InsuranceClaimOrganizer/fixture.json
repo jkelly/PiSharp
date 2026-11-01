@@ -1,0 +1,16 @@
+{
+  "task": "For claim-1, call inventory_evidence, reconcile_receipts and assemble_claim_manifest. Save a local sourced manifest; report duplicate receipts, totals and missing evidence. Do not file a claim or make a coverage determination.",
+  "claims": [
+    { "id": "claim-1", "lossDate": "2026-10-20", "currency": "USD", "claimedAmountCents": 37500,
+      "requirements": [ { "kind": "photo", "minCount": 2 }, { "kind": "receipt", "minCount": 1 }, { "kind": "correspondence", "minCount": 1 }, { "kind": "policy", "minCount": 1 } ],
+      "evidence": [
+        { "id": "photo-1", "kind": "photo", "fileName": "damage-front.jpg", "date": "2026-10-20", "description": "User-supplied description: front panel damage" },
+        { "id": "photo-2", "kind": "photo", "fileName": "damage-side.jpg", "date": "2026-10-20", "description": "User-supplied description: side panel damage" },
+        { "id": "receipt-1", "kind": "receipt", "fileName": "repair.pdf", "date": "2026-10-21", "description": "Repair invoice", "issuer": "Repair Shop", "receiptNumber": "R-17", "currency": "USD", "amountCents": 25000 },
+        { "id": "receipt-copy", "kind": "receipt", "fileName": "repair-copy.pdf", "date": "2026-10-21", "description": "Copy of repair invoice", "issuer": "Repair Shop", "receiptNumber": "R-17", "currency": "USD", "amountCents": 25000 },
+        { "id": "receipt-2", "kind": "receipt", "fileName": "parts.pdf", "date": "2026-10-22", "description": "Replacement parts", "issuer": "Parts Store", "receiptNumber": "P-8", "currency": "USD", "amountCents": 12500 },
+        { "id": "mail-1", "kind": "correspondence", "fileName": "acknowledgment.eml", "date": "2026-10-23", "description": "Insurer acknowledgment supplied by user" }
+      ] },
+    { "id": "claim-2", "lossDate": "2026-10-25", "currency": "USD", "claimedAmountCents": 0, "requirements": [ { "kind": "photo", "minCount": 1 } ], "evidence": [] }
+  ]
+}

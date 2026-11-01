@@ -1,0 +1,18 @@
+{
+  "task": "Inspect employee emp-101, build the engineering onboarding checklist with prerequisite status and owner assignments, and save the onboarding plan.",
+  "employeeId": "emp-101",
+  "employees": [
+    { "id": "emp-101", "roleId": "engineering", "managerId": "mgr-eng", "startDate": "2026-11-09", "completed": ["paperwork"] },
+    { "id": "emp-102", "roleId": "sales", "managerId": "mgr-sales", "startDate": "2026-11-16", "completed": [] }
+  ],
+  "owners": [{ "id": "hr" }, { "id": "it" }, { "id": "security" }, { "id": "mgr-eng" }, { "id": "mgr-sales" }],
+  "commonTasks": [
+    { "id": "paperwork", "title": "Complete employment paperwork", "owner": "hr", "daysFromStart": -3, "requires": [] },
+    { "id": "account", "title": "Provision standard account", "owner": "it", "daysFromStart": 0, "requires": ["paperwork"] },
+    { "id": "training", "title": "Complete security training", "owner": "security", "daysFromStart": 1, "requires": ["account"] }
+  ],
+  "roles": [
+    { "id": "engineering", "tasks": [{ "id": "repo", "title": "Approve repository access", "owner": "manager", "daysFromStart": 2, "requires": ["account", "training"] }] },
+    { "id": "sales", "tasks": [{ "id": "crm", "title": "Approve CRM access", "owner": "manager", "daysFromStart": 2, "requires": ["training"] }] }
+  ]
+}

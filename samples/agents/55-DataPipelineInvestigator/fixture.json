@@ -1,0 +1,18 @@
+{
+  "task": "Trace daily-sales and refunds, propose supplied repairs/quarantine, apply approved local remedies and rerun both pipelines to a validated aggregate.",
+  "pipelines": [
+    { "id": "daily-sales", "currency": "USD", "accountIds": ["acct-a", "acct-b"], "rows": [
+      { "id": "sale-1", "accountId": "acct-a", "amountCents": 2500, "currency": "USD" },
+      { "id": "sale-2", "accountId": "acct-b", "amountCents": "1200", "currency": "USD" },
+      { "id": "sale-3", "accountId": "missing", "amountCents": 800, "currency": "USD" }
+    ] },
+    { "id": "refunds", "currency": "USD", "accountIds": ["acct-a"], "rows": [
+      { "id": "refund-1", "accountId": "acct-a", "amountCents": 400, "currency": "EUR" }
+    ] }
+  ],
+  "remedies": [
+    { "pipelineId": "daily-sales", "rowId": "sale-2", "action": "repair", "values": { "amountCents": 1200 } },
+    { "pipelineId": "daily-sales", "rowId": "sale-3", "action": "quarantine", "values": null },
+    { "pipelineId": "refunds", "rowId": "refund-1", "action": "repair", "values": { "currency": "USD" } }
+  ]
+}

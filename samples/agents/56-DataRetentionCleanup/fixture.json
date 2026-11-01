@@ -1,0 +1,17 @@
+{
+  "task": "Inspect logs and exports as of 2026-11-01, plan exact keys logs:log-old and exports:export-old, and execute their approved local retention cleanup while preserving held and recent records.",
+  "asOf": "2026-11-01",
+  "policies": [ { "category": "diagnostic", "retainDays": 30 }, { "category": "export", "retainDays": 90 } ],
+  "approvedRecordKeys": [ "logs:log-old", "exports:export-old" ],
+  "datasets": [
+    { "id": "logs", "records": [
+      { "id": "log-old", "category": "diagnostic", "createdOn": "2026-09-01", "legalHold": false, "payload": "Expired diagnostic fixture" },
+      { "id": "log-held", "category": "diagnostic", "createdOn": "2026-01-01", "legalHold": true, "payload": "Preserve under legal hold" },
+      { "id": "log-new", "category": "diagnostic", "createdOn": "2026-10-30", "legalHold": false, "payload": "Recent diagnostic fixture" }
+    ] },
+    { "id": "exports", "records": [
+      { "id": "export-old", "category": "export", "createdOn": "2026-07-01", "legalHold": false, "payload": "Expired export fixture" },
+      { "id": "unclassified", "category": "unknown", "createdOn": "2025-01-01", "legalHold": false, "payload": "No policy; preserve" }
+    ] }
+  ]
+}

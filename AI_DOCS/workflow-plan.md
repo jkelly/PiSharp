@@ -52,3 +52,21 @@ Paths below are relative to the worktree. New directories/types are proposed own
 ## Current result and follow-ups
 
 The planning work D1/D2/P1 is complete. All future packages remain pending; there are no blockers to reviewing this plan. F1 and R1 are intentional future discovery gates, not unresolved reasons to stop the present task. Estimated effort and milestone acceptance are in the roadmap. Before assigning future workers, copy the exact row plus frozen contracts, dependencies and owned paths into their prompt; require status, changed files, commands, blockers and follow-ups in reports. Keep archive/delete and migration changes with one integrator.
+
+## Agent samples 33–62 execution (2026-11-01)
+
+| id | agent_type | complexity | model | reasoning_effort | service_tier | complexity_reason | goal | depends_on | owned_paths | inputs | outputs | verification | status |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| batch-a | worker | hard | gpt-6.1-sol | high | ultrafast | calendar, identity and obligation state | implement33–37 | contracts | samples33–37 | supplied catalog + contracts | runnable projects | focused self-tests | running |
+| batch-b | worker | hard | gpt-6.1-sol | high | ultrafast | budgets, citations and dispatch rules | implement38–42 | contracts | samples38–42 | supplied catalog + contracts | runnable projects | focused self-tests | running |
+| batch-c | worker | hard | gpt-6.1-sol | high | ultrafast | operational ordering and local restore | implement43–47 | contracts | samples43–47 | supplied catalog + contracts | runnable projects | focused self-tests | running |
+| batch-d | worker | hard | gpt-6.1-sol | high | ultrafast | code/schema validation and local edits | implement48–52 | contracts | samples48–52 | supplied catalog + contracts | runnable projects | focused self-tests | running |
+| batch-e | worker | hard | gpt-6.1-sol | high | ultrafast | baselines, data policies and guarded mutations | implement53–57 | contracts | samples53–57 | supplied catalog + contracts | runnable projects | focused self-tests | running |
+| batch-f | worker | hard | gpt-6.1-sol | high | ultrafast | evidence and document privacy | implement58–62 | contracts | samples58–62 | supplied catalog + contracts | runnable projects | focused self-tests | running |
+| integrate | main | very hard | inherited | inherited | unverified | native runtime integration and live validation | verify62, test30 live, commit and PR | batches | manifest, solution, README, scripts, CI, evidence | completed batches | reviewed PR | offline62/live30 | running |
+
+Requested worker tier is ultrafast; delegation API has no tier parameter, so effective tier is unverified. Models and reasoning follow the workflow skill. No change to main thread model is claimed.
+
+Independent cross-review completed for all 30 additions. Confirmed edge-case findings in33,43,45,46,56,57,61 were fixed with regressions. All 30 initial live tests passed; affected samples were repeated after final implementation changes. Integration remains running until full62 validation, evidence generation, commit and PR publication finish.
+
+Final local verification: full62-project solution build had0 warnings/errors; all62 self-test programs and fixture demos and13 shared checks passed. All30 new live integrations passed gpt-6.1-sol result comparison;13 affected cases were repeated after review fixes. Validation evidence: samples/agents/validation/live-gpt-6.1-sol-33-62.md and .json. Only commit and PR publication remain.

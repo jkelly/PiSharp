@@ -1,0 +1,11 @@
+{
+  "task": "Inspect tracking for SHIP-501, detect its timestamp-based delivery exceptions, and save grounded customer/carrier notification drafts with save_notification_drafts. Include evidence event IDs, do not invent an ETA, and do not send messages.",
+  "asOf": "2026-11-01T12:00:00Z", "stallAfterHours": 24,
+  "shipments": [
+    { "id": "SHIP-501", "promisedAt": "2026-10-31T18:00:00Z", "events": [
+      { "id": "EV-502", "occurredAt": "2026-10-30T08:00:00Z", "status": "in_transit", "location": "Chicago hub" },
+      { "id": "EV-501", "occurredAt": "2026-10-29T09:00:00Z", "status": "collected", "location": "Madison depot" }
+    ] },
+    { "id": "SHIP-600", "promisedAt": "2026-11-01T18:00:00Z", "events": [ { "id": "EV-600", "occurredAt": "2026-11-01T10:00:00Z", "status": "delivered", "location": "Customer reception" } ] }
+  ]
+}

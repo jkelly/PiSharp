@@ -1,0 +1,8 @@
+{
+  "task": "Inspect pricing and status recorded pages, compare their configured conditions against baselines, and commit the approved local baseline and alert results.",
+  "baselines": { "pricing": "<main>Standard plan costs 20 dollars monthly.</main>", "status": "<p>All systems operational</p>" },
+  "pages": [
+    { "id": "pricing", "html": "<main><h1>Standard plan</h1><p>costs 25 dollars monthly.</p></main>", "status": 200, "requiredText": "Standard plan", "minimumChangedWords": 2 },
+    { "id": "status", "html": "<p> All   systems operational </p><script>clock=1234</script>", "status": 200, "requiredText": "incident", "minimumChangedWords": 1 }
+  ]
+}

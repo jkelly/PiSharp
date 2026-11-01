@@ -1,0 +1,15 @@
+{
+  "task": "Inspect records c1 through c6 for duplicate evidence. Propose and apply only the approved merge-alex and merge-jordan local merges, keep c1 and c3 as survivors, and report why c5/c6 remain ambiguous.",
+  "records": [
+    { "id": "c1", "name": "Alex Rivera", "email": "alex@example.test", "phone": "3125550101", "externalId": "acct-101", "address": "10 Oak St", "notes": ["Newsletter"] },
+    { "id": "c2", "name": " Alex Rivera ", "email": "ALEX@example.test", "phone": "", "externalId": "acct-101", "address": "20 Pine St", "notes": ["Moved to Pine"] },
+    { "id": "c3", "name": "Jordan Lee", "email": "", "phone": "3125550202", "externalId": "acct-202", "address": "30 Elm St", "notes": ["Phone contact"] },
+    { "id": "c4", "name": "Jordan Lee", "email": "jordan@example.test", "phone": "312-555-0202", "externalId": "acct-202", "address": "", "notes": ["Email verified"] },
+    { "id": "c5", "name": "Taylor Kim", "email": "family@example.test", "phone": "3125550303", "externalId": "acct-303", "address": "40 Lake St", "notes": [] },
+    { "id": "c6", "name": "Morgan Kim", "email": "family@example.test", "phone": "3125550404", "externalId": "acct-404", "address": "40 Lake St", "notes": [] }
+  ],
+  "merges": [
+    { "id": "merge-alex", "survivorId": "c1", "duplicateIds": ["c2"], "resolutions": { "address": "20 Pine St" } },
+    { "id": "merge-jordan", "survivorId": "c3", "duplicateIds": ["c4"], "resolutions": {} }
+  ]
+}

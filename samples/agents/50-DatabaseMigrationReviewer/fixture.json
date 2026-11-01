@@ -1,0 +1,5 @@
+{
+ "task":"Simulate rename-display in memory, review rollback, and write the migration review. State explicitly that real database execution, lock behavior and SQL validation remain untested.",
+ "database":{"tables":{"users":{"columns":{"id":{"nullable":false},"display":{"nullable":false}},"rows":[{"id":1,"display":"Ada"},{"id":2,"display":"Lin"}]}}},
+ "migrations":[{"id":"rename-display","operations":[{"kind":"renameColumn","table":"users","column":"display","to":"display_name"}],"rollback":[{"kind":"renameColumn","table":"users","column":"display_name","to":"display"}]}]
+}

@@ -1,0 +1,17 @@
+{
+  "task": "Inspect RFP-ORBIT, match every requirement to approved current evidence, and save the response draft using save_response_draft. Explicitly report missing evidence and unsupported claims with source IDs; do not submit anything.",
+  "asOf": "2026-11-01T00:00:00Z",
+  "rfps": [
+    { "id": "RFP-ORBIT", "requirements": [
+      { "id": "REQ-SSO", "capabilityKey": "saml-sso", "text": "Support SAML single sign-on", "mandatory": true },
+      { "id": "REQ-REGION", "capabilityKey": "eu-residency", "text": "Keep all data in the EU", "mandatory": true },
+      { "id": "REQ-EXPORT", "capabilityKey": "csv-export", "text": "Export records as CSV", "mandatory": false }
+    ], "draftClaims": [ { "requirementId": "REQ-REGION", "sourceId": "SRC-OLD-EU", "text": "All customer data stays in the EU." } ] },
+    { "id": "RFP-TINY", "requirements": [ { "id": "REQ-EXPORT", "capabilityKey": "csv-export", "text": "CSV export", "mandatory": true } ], "draftClaims": [] }
+  ],
+  "evidence": [
+    { "id": "SRC-SSO", "capabilityKey": "saml-sso", "statement": "Enterprise accounts support SAML 2.0 single sign-on.", "approved": true, "validUntil": "2027-01-01T00:00:00Z" },
+    { "id": "SRC-OLD-EU", "capabilityKey": "eu-residency", "statement": "EU storage is available in the preview environment.", "approved": true, "validUntil": "2026-10-01T00:00:00Z" },
+    { "id": "SRC-EXPORT", "capabilityKey": "csv-export", "statement": "Workspace administrators can export records as CSV.", "approved": true, "validUntil": "2027-01-01T00:00:00Z" }
+  ]
+}

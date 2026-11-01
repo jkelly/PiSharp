@@ -1,0 +1,12 @@
+{
+  "task":"Inspect the recovery runbook, execute its approved workspace-only steps, and write the execution report with actual file and SHA-256 evidence.",
+  "runbooks":[
+    {"id":"recovery","steps":[
+      {"id":"seed","action":"write_text","path":"operations/recovery/status.txt","content":"recovery fixture ready\n","dependsOn":[]},
+      {"id":"exists","action":"check_exists","path":"operations/recovery/status.txt","dependsOn":["seed"]},
+      {"id":"contents","action":"check_contains","path":"operations/recovery/status.txt","expected":"fixture ready","dependsOn":["exists"]},
+      {"id":"digest","action":"sha256","path":"operations/recovery/status.txt","dependsOn":["contents"]}
+    ]},
+    {"id":"audit","steps":[{"id":"absent","action":"check_exists","path":"operations/audit/missing.txt","dependsOn":[]},{"id":"later","action":"sha256","path":"operations/audit/missing.txt","dependsOn":["absent"]}]}
+  ]
+}

@@ -1,0 +1,15 @@
+{
+  "task": "For arts-2026, run inspect_requirements, validate_completeness and assemble_review_package. Save a local review manifest and report all missing or expired evidence. Do not submit anything.",
+  "applications": [
+    { "id": "arts-2026", "deadline": "2026-12-01", "requirements": [
+      { "id": "r-budget", "label": "project budget", "minCount": 1, "acceptedKinds": ["budget"] },
+      { "id": "r-status", "label": "organization status", "minCount": 1, "acceptedKinds": ["certificate"] },
+      { "id": "r-letters", "label": "support letters", "minCount": 2, "acceptedKinds": ["letter"] }
+    ], "documents": [
+      { "id": "d-budget", "kind": "budget", "requirementIds": ["r-budget"], "evidence": "Budget revision 3 totals 2500000 cents." },
+      { "id": "d-status", "kind": "certificate", "requirementIds": ["r-status"], "evidence": "Registration certificate", "expires": "2026-11-01" },
+      { "id": "d-letter", "kind": "letter", "requirementIds": ["r-letters"], "evidence": "Signed letter from venue partner" }
+    ] },
+    { "id": "mini-2026", "deadline": "2026-12-01", "requirements": [ { "id": "r1", "label": "budget", "minCount": 1, "acceptedKinds": ["budget"] } ], "documents": [ { "id": "d1", "kind": "budget", "requirementIds": ["r1"], "evidence": "Approved 10000 cent budget" } ] }
+  ]
+}

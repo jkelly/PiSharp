@@ -1,0 +1,8 @@
+{
+  "task": "Inspect SUB-CRM, compare its renewal economics, and save its reviewed action plan with save_renewal_plan. State the evidence IDs, notice deadline and savings; take no external action.",
+  "asOf": "2026-11-01T00:00:00Z",
+  "subscriptions": [
+    { "id": "SUB-CRM", "vendor": "Northstar CRM", "renewalAt": "2026-12-15T00:00:00Z", "noticeDays": 30, "licensedSeats": 20, "activeSeats": 12, "minimumSeats": 5, "currentAnnualCents": 240000, "renewalAnnualSeatCents": 13200, "contractSourceId": "contract-crm-2026", "usageSourceId": "usage-crm-oct" },
+    { "id": "SUB-DESIGN", "vendor": "Canvas Desk", "renewalAt": "2026-11-10T00:00:00Z", "noticeDays": 30, "licensedSeats": 5, "activeSeats": 5, "minimumSeats": 2, "currentAnnualCents": 50000, "renewalAnnualSeatCents": 11000, "contractSourceId": "contract-design-2026", "usageSourceId": "usage-design-oct" }
+  ]
+}
