@@ -20,7 +20,7 @@ Two samples run on scripted models or a real provider:
 
 Documentation is at [pisharp.ai](https://pisharp.ai/docs/). The full-parity work is tracked in [full-parity-v1.1.0.md](docs/plans/full-parity-v1.1.0.md) and [full-parity-progress.json](docs/plans/full-parity-progress.json), and the Pi 1.2.0 sync in [decision 0006](docs/decisions/0006-pi-1.2.0-sync.md).
 
-Explore [32 runnable agent samples](samples/agents/README.md): practical workflows, fixture demos, live model integration, and automated model/pricing and NuGet vulnerability maintainers. Each sample includes inputs, documentation, and focused verification.
+Explore [62 runnable agent samples](samples/agents/README.md): practical workflows, fixture demos, live model integration, and automated model/pricing and NuGet vulnerability maintainers. Each sample includes inputs, documentation, and focused verification.
 
 ## Native validation tooling
 

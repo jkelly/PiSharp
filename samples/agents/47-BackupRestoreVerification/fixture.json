@@ -1,0 +1,7 @@
+{
+  "task":"Plan backup of the orders dataset, create its approved local fixture source files and snapshot, then perform an isolated restore and verify every restored file by SHA-256. Report the actual verification evidence.",
+  "datasets":[
+    {"id":"orders","files":[{"path":"orders.json","content":"[{\"orderId\":\"A1\",\"cents\":1250}]\n"},{"path":"config/settings.txt","content":"currency=USD\nmode=fixture\n"}]},
+    {"id":"inventory","files":[{"path":"stock.csv","content":"sku,quantity\nP1,7\n"}]}
+  ]
+}

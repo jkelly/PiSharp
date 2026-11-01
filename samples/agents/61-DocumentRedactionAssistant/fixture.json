@@ -1,0 +1,7 @@
+{
+  "task": "For letter-1, call detect_sensitive, preview_redaction and save_redaction_review. Save the sanitized preview and detection metadata. If the host grants approval, also call export_redacted with the current expectedHash to export sanitized local text and verify all detected values are absent. Without approval, stop at the saved review.",
+  "documents": [
+    { "id": "letter-1", "format": "text/plain", "text": "Hello Zoë 😀. Contact Zoë at zoë@example.test or 312-555-0199. Reference 123-45-6789. Repeat zoë@example.test. Case Orion remains open.", "sensitiveLiterals": ["Zoë", "zoë@example.test", "Case Orion"] },
+    { "id": "letter-2", "format": "text/plain", "text": "A public meeting is scheduled for Tuesday.", "sensitiveLiterals": [] }
+  ]
+}

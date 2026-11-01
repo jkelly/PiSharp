@@ -1,0 +1,14 @@
+{
+  "task": "Inspect shift S1, rank qualified replacements and assign E2 to S1 in the local roster with approval. Explain why E1, E3 and E4 are excluded.",
+  "shifts": [
+    {"id":"S1","start":"2026-11-02T09:00:00Z","end":"2026-11-02T17:00:00Z","qualification":"first-aid","employeeId":""},
+    {"id":"S2","start":"2026-11-03T09:00:00Z","end":"2026-11-03T17:00:00Z","qualification":"first-aid","employeeId":""},
+    {"id":"busy","start":"2026-11-02T16:00:00Z","end":"2026-11-02T18:00:00Z","qualification":"first-aid","employeeId":"E1"}
+  ],
+  "employees": [
+    {"id":"E1","qualifications":["first-aid"],"availability":[{"start":"2026-11-02T00:00:00Z","end":"2026-11-04T00:00:00Z"}]},
+    {"id":"E2","qualifications":["first-aid"],"availability":[{"start":"2026-11-02T00:00:00Z","end":"2026-11-04T00:00:00Z"}]},
+    {"id":"E3","qualifications":["first-aid"],"availability":[{"start":"2026-11-02T10:00:00Z","end":"2026-11-02T17:00:00Z"}]},
+    {"id":"E4","qualifications":[],"availability":[{"start":"2026-11-02T00:00:00Z","end":"2026-11-04T00:00:00Z"}]}
+  ]
+}

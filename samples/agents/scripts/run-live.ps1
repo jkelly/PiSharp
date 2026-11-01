@@ -6,7 +6,8 @@ param(
     [ValidateRange(1, 8)][int]$Concurrency = 4,
     [ValidateRange(30, 1800)][int]$TimeoutSeconds = 180,
     [string]$OutputDirectory = '',
-    [switch]$SkipBuild
+    [switch]$SkipBuild,
+    [switch]$CompareToolResults
 )
 # This integration run makes paid model requests. Domain tools use supplied fixtures;
 # it never invokes --maintain, image generation, or external publication.
@@ -30,7 +31,11 @@ try {
         if ($LASTEXITCODE -ne 0) { throw 'Sample build failed.' }
     }
     $catalog = @(Get-Content -LiteralPath (Join-Path $sampleRoot 'catalog.json') -Raw | ConvertFrom-Json)
-    if ($Examples.Count) { $catalog = @($catalog | Where-Object { $_.number -in $Examples }) }
+    if ($Examples.Count) {
+        $unknown = @($Examples | Where-Object { $_ -notin $catalog.number } | Sort-Object -Unique)
+        if ($unknown.Count) { throw "Unknown sample numbers: $($unknown -join ', ')." }
+        $catalog = @($catalog | Where-Object { $_.number -in $Examples })
+    }
     if (-not $catalog.Count) { throw 'No selected samples.' }
     $results = @($catalog | ForEach-Object -Parallel {
         $sample = $_
@@ -41,6 +46,7 @@ try {
         $keyEnv = $using:ApiKeyEnvironment
         $timeout = $using:TimeoutSeconds
         $outputRoot = $using:OutputDirectory
+        $compareResults = $using:CompareToolResults
         $project = Join-Path $samples $sample.project
         $liveWorkspace = Join-Path $outputRoot $sample.folder
         $baselineWorkspace = Join-Path (Join-Path $outputRoot 'baseline') $sample.folder
@@ -50,7 +56,7 @@ try {
             number = $sample.number; title = $sample.title; requestedModel = $modelId; api = 'openai-responses'
             success = $false; hostSuccess = $false; expectedTools = @(); executedTools = @(); missingTools = @()
             modelsObserved = @(); inputTokens = 0; outputTokens = 0; failures = @(); durationSeconds = 0
-            report = Join-Path $liveWorkspace 'report.json'
+            report = Join-Path $liveWorkspace 'report.json'; fixtureResultsCompared = [bool]$compareResults
         }
         function RunSample([string[]]$arguments, [string]$workspace, [int]$limit) {
             New-Item -ItemType Directory -Force -Path $workspace | Out-Null
@@ -103,6 +109,10 @@ try {
             if ($liveExit -ne 0) { $result.failures += "Live process exit $liveExit." }
             if (-not $report.success) { $result.failures += 'Host reported an incomplete or failed workflow.' }
             if ($result.missingTools.Count) { $result.failures += ('Missing workflow stages: ' + ($result.missingTools -join ', ')) }
+            if ($compareResults) {
+                Import-Module (Join-Path $samples 'scripts/SampleValidation.psm1') -Force
+                $result.failures += @(Compare-SampleToolResults @($baseline.outputs) @($report.outputs) $baselineWorkspace $liveWorkspace)
+            }
             if ($modelId -notin $result.modelsObserved) { $result.failures += 'Expected model is absent from assistant transcript.' }
             if ($result.inputTokens + $result.outputTokens -le 0) { $result.failures += 'No provider token usage was recorded.' }
             foreach ($output in @($report.outputs | Where-Object error)) { $result.failures += "Tool $($output.tool) failed: $($output.message)" }
@@ -122,7 +132,7 @@ try {
         failed = @($orderedResults | Where-Object { -not $_.success }).Count
         inputTokens = ($orderedResults | Measure-Object inputTokens -Sum).Sum
         outputTokens = ($orderedResults | Measure-Object outputTokens -Sum).Sum
-        domainData = 'fixtures'; externalPublishing = $false; results = $orderedResults
+        domainData = 'fixtures'; externalPublishing = $false; fixtureResultsCompared = [bool]$CompareToolResults; results = $orderedResults
     }
     $summary | ConvertTo-Json -Depth 15 | Set-Content -LiteralPath (Join-Path $OutputDirectory 'summary.json')
     Write-Host "$($summary.passed)/$($summary.samples) live integrations passed. Results: $OutputDirectory"

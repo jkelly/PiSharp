@@ -48,3 +48,9 @@ git diff --check
 Repeat the project/DLL pattern for each affected suite. Report files use create-new semantics; choose a fresh name. Locked restore, if needed, must explicitly use `C:\Users\jksof\.nuget\packages`; do not change the SDK pin or fixture baselines just to run locally. Browser suites require their existing Playwright setup.
 
 Prior milestone evidence: Hosting 72, Server 16, Web 4, Browser 27, CLI 100 passing cases (219 unique). These were not rerun for this documentation-only request. Optional live provider/TypeScript/OS service tests remain qualification work; never label absent credentials or unavailable OSes as passes.
+
+## Agent samples 33–62 (2026-11-01)
+
+Active worktree: `E:/AI/PiSharp/agent-samples-pr`, branch `feat/agent-samples-33-62`, baseline `585a7c61`. This is a separate worktree from the dirty original checkout. The sample solution is `samples/agents/PiSharp.Samples.slnx`; `catalog.json` drives offline and live runners. Every new console project references Shared and provides Program, Workflow, SelfTests, fixture.json and README. Shared uses native PiSharp.Agent/PiSharp.AI transports and validates tools/approval. No new external packages are planned. The pinned SDK is 10.0.401; explicit local executable `E:/AI/PiSharp/PiSharp/artifacts/sample-tools/dotnet/dotnet.exe` is available. Existing OPENAI_API_KEY reuse is explicitly authorized; no plaintext keys or transcripts enter source control.
+
+Validation: build the entire sample solution; `scripts/run-all.ps1 -Dotnet <sdk> -SkipBuild` for all 62; `scripts/run-live.ps1 -Examples (33..62) -Model gpt-6.1-sol -ApiKeyEnvironment OPENAI_API_KEY -Dotnet <sdk> -SkipBuild` for the 30 new live integrations. Tests use fixtures; no external domain actions are authorized by the live run. Main owns manifest/solution/docs/CI/live evidence and commits/PR.

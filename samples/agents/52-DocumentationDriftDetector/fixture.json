@@ -1,0 +1,5 @@
+{
+ "task":"Inspect setup against the repository snapshot, propose precise corrections for all stale file, command and setting references, then write the correction manifest and proposed document artifacts.",
+ "repository":{"files":{"src/App.cs":"class App {}","docs/setup.md":"source snapshot"},"commands":["dotnet run --project src/App.csproj"],"settings":{"APP_REGION":"local"}},
+ "documents":[{"id":"setup","text":"# Setup\nRead src/OldApp.cs.\nRun `dotnet run --project old/App.csproj`.\nConfigure APP_ZONE before starting.\nKeep this sentence unchanged.\n","references":[{"kind":"file","target":"src/OldApp.cs","replacement":"src/App.cs"},{"kind":"command","target":"dotnet run --project old/App.csproj","replacement":"dotnet run --project src/App.csproj"},{"kind":"setting","target":"APP_ZONE","replacement":"APP_REGION"}]}]
+}

@@ -190,5 +190,185 @@
     "title": "NuGet Vulnerability Remediation Agent",
     "folder": "32-NuGetVulnerabilityMaintainer",
     "project": "32-NuGetVulnerabilityMaintainer/PiSharp.Samples.NuGetVulnerabilityMaintainer.csproj"
+  },
+  {
+    "number": 33,
+    "title": "Calendar Scheduling Coordinator",
+    "folder": "33-CalendarSchedulingCoordinator",
+    "project": "33-CalendarSchedulingCoordinator/33-CalendarSchedulingCoordinator.csproj"
+  },
+  {
+    "number": 34,
+    "title": "Employee Onboarding Coordinator",
+    "folder": "34-EmployeeOnboardingCoordinator",
+    "project": "34-EmployeeOnboardingCoordinator/34-EmployeeOnboardingCoordinator.csproj"
+  },
+  {
+    "number": 35,
+    "title": "Employee Offboarding Coordinator",
+    "folder": "35-EmployeeOffboardingCoordinator",
+    "project": "35-EmployeeOffboardingCoordinator/35-EmployeeOffboardingCoordinator.csproj"
+  },
+  {
+    "number": 36,
+    "title": "Access Review Assistant",
+    "folder": "36-AccessReviewAssistant",
+    "project": "36-AccessReviewAssistant/36-AccessReviewAssistant.csproj"
+  },
+  {
+    "number": 37,
+    "title": "Contract Obligation Tracker",
+    "folder": "37-ContractObligationTracker",
+    "project": "37-ContractObligationTracker/37-ContractObligationTracker.csproj"
+  },
+  {
+    "number": 38,
+    "title": "Subscription Renewal Assistant",
+    "folder": "38-SubscriptionRenewalAssistant",
+    "project": "38-SubscriptionRenewalAssistant/38-SubscriptionRenewalAssistant.csproj"
+  },
+  {
+    "number": 39,
+    "title": "RFP Response Builder",
+    "folder": "39-RfpResponseBuilder",
+    "project": "39-RfpResponseBuilder/39-RfpResponseBuilder.csproj"
+  },
+  {
+    "number": 40,
+    "title": "Purchase Request Coordinator",
+    "folder": "40-PurchaseRequestCoordinator",
+    "project": "40-PurchaseRequestCoordinator/40-PurchaseRequestCoordinator.csproj"
+  },
+  {
+    "number": 41,
+    "title": "Shipment Exception Agent",
+    "folder": "41-ShipmentExceptionAgent",
+    "project": "41-ShipmentExceptionAgent/41-ShipmentExceptionAgent.csproj"
+  },
+  {
+    "number": 42,
+    "title": "Field Service Dispatcher",
+    "folder": "42-FieldServiceDispatcher",
+    "project": "42-FieldServiceDispatcher/42-FieldServiceDispatcher.csproj"
+  },
+  {
+    "number": 43,
+    "title": "Shift Coverage Coordinator",
+    "folder": "43-ShiftCoverageCoordinator",
+    "project": "43-ShiftCoverageCoordinator/43-ShiftCoverageCoordinator.csproj"
+  },
+  {
+    "number": 44,
+    "title": "Training Compliance Tracker",
+    "folder": "44-TrainingComplianceTracker",
+    "project": "44-TrainingComplianceTracker/44-TrainingComplianceTracker.csproj"
+  },
+  {
+    "number": 45,
+    "title": "Incident Timeline Builder",
+    "folder": "45-IncidentTimelineBuilder",
+    "project": "45-IncidentTimelineBuilder/45-IncidentTimelineBuilder.csproj"
+  },
+  {
+    "number": 46,
+    "title": "Runbook Execution Assistant",
+    "folder": "46-RunbookExecutionAssistant",
+    "project": "46-RunbookExecutionAssistant/46-RunbookExecutionAssistant.csproj"
+  },
+  {
+    "number": 47,
+    "title": "Backup Restore Verification Agent",
+    "folder": "47-BackupRestoreVerification",
+    "project": "47-BackupRestoreVerification/47-BackupRestoreVerification.csproj"
+  },
+  {
+    "number": 48,
+    "title": "Deployment Readiness Reviewer",
+    "folder": "48-DeploymentReadinessReviewer",
+    "project": "48-DeploymentReadinessReviewer/48-DeploymentReadinessReviewer.csproj"
+  },
+  {
+    "number": 49,
+    "title": "Flaky Test Investigator",
+    "folder": "49-FlakyTestInvestigator",
+    "project": "49-FlakyTestInvestigator/49-FlakyTestInvestigator.csproj"
+  },
+  {
+    "number": 50,
+    "title": "Database Migration Reviewer",
+    "folder": "50-DatabaseMigrationReviewer",
+    "project": "50-DatabaseMigrationReviewer/50-DatabaseMigrationReviewer.csproj"
+  },
+  {
+    "number": 51,
+    "title": "API Deprecation Migration Agent",
+    "folder": "51-ApiDeprecationMigration",
+    "project": "51-ApiDeprecationMigration/51-ApiDeprecationMigration.csproj"
+  },
+  {
+    "number": 52,
+    "title": "Documentation Drift Detector",
+    "folder": "52-DocumentationDriftDetector",
+    "project": "52-DocumentationDriftDetector/52-DocumentationDriftDetector.csproj"
+  },
+  {
+    "number": 53,
+    "title": "Accessibility Audit Assistant",
+    "folder": "53-AccessibilityAuditAssistant",
+    "project": "53-AccessibilityAuditAssistant/53-AccessibilityAuditAssistant.csproj"
+  },
+  {
+    "number": 54,
+    "title": "Website Change Monitor",
+    "folder": "54-WebsiteChangeMonitor",
+    "project": "54-WebsiteChangeMonitor/54-WebsiteChangeMonitor.csproj"
+  },
+  {
+    "number": 55,
+    "title": "Data Pipeline Failure Investigator",
+    "folder": "55-DataPipelineInvestigator",
+    "project": "55-DataPipelineInvestigator/55-DataPipelineInvestigator.csproj"
+  },
+  {
+    "number": 56,
+    "title": "Data Retention Cleanup Agent",
+    "folder": "56-DataRetentionCleanup",
+    "project": "56-DataRetentionCleanup/56-DataRetentionCleanup.csproj"
+  },
+  {
+    "number": 57,
+    "title": "Duplicate Record Resolver",
+    "folder": "57-DuplicateRecordResolver",
+    "project": "57-DuplicateRecordResolver/57-DuplicateRecordResolver.csproj"
+  },
+  {
+    "number": 58,
+    "title": "Knowledge Gap Finder",
+    "folder": "58-KnowledgeGapFinder",
+    "project": "58-KnowledgeGapFinder/58-KnowledgeGapFinder.csproj"
+  },
+  {
+    "number": 59,
+    "title": "Grant Application Organizer",
+    "folder": "59-GrantApplicationOrganizer",
+    "project": "59-GrantApplicationOrganizer/59-GrantApplicationOrganizer.csproj"
+  },
+  {
+    "number": 60,
+    "title": "Travel Disruption Assistant",
+    "folder": "60-TravelDisruptionAssistant",
+    "project": "60-TravelDisruptionAssistant/60-TravelDisruptionAssistant.csproj"
+  },
+  {
+    "number": 61,
+    "title": "Document Redaction Assistant",
+    "folder": "61-DocumentRedactionAssistant",
+    "project": "61-DocumentRedactionAssistant/61-DocumentRedactionAssistant.csproj"
+  },
+  {
+    "number": 62,
+    "title": "Insurance Claim Organizer",
+    "folder": "62-InsuranceClaimOrganizer",
+    "project": "62-InsuranceClaimOrganizer/62-InsuranceClaimOrganizer.csproj"
   }
 ]

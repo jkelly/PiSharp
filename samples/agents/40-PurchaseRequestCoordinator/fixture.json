@@ -1,0 +1,9 @@
+{
+  "task": "Inspect and evaluate PR-100, then submit its workspace-only pending-approval request with operationId purchase-pr100-v1 and expectedTotalCents 75000. Explain the calculated budget and approver route; do not contact procurement or spend funds.",
+  "requests": [
+    { "id": "PR-100", "department": "engineering", "requester": "Casey", "lines": [ { "description": "Test devices", "quantity": 3, "unitPriceCents": 25000 } ] },
+    { "id": "PR-200", "department": "support", "requester": "Riley", "lines": [ { "description": "Headsets", "quantity": 5, "unitPriceCents": 10000 } ] }
+  ],
+  "budgets": [ { "id": "engineering", "allocatedCents": 500000, "spentCents": 350000 }, { "id": "support", "allocatedCents": 100000, "spentCents": 70000 } ],
+  "approvalRules": [ { "maximumCents": 50000, "approvers": [ "department-manager" ] }, { "maximumCents": 250000, "approvers": [ "department-manager", "finance-controller" ] } ]
+}

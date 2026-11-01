@@ -1,0 +1,12 @@
+{
+  "task": "Inspect calendars and find shared slots for request meeting-a, then save its proposal. If approved, book the earliest slot in the local ledger.",
+  "requestId": "meeting-a",
+  "requests": [
+    { "id": "meeting-a", "participants": ["alex", "sam"], "durationMinutes": 30, "windowStartUtc": "2026-11-02T15:00:00Z", "windowEndUtc": "2026-11-02T18:00:00Z" },
+    { "id": "meeting-b", "participants": ["sam"], "durationMinutes": 60, "windowStartUtc": "2026-11-02T15:00:00Z", "windowEndUtc": "2026-11-02T18:00:00Z" }
+  ],
+  "people": [
+    { "id": "alex", "timeZone": "America/Chicago", "available": [{ "start": "2026-11-02T09:00:00", "end": "2026-11-02T12:00:00" }], "busy": [{ "start": "2026-11-02T09:00:00", "end": "2026-11-02T09:30:00" }] },
+    { "id": "sam", "timeZone": "America/New_York", "available": [{ "start": "2026-11-02T10:00:00", "end": "2026-11-02T13:00:00" }], "busy": [{ "start": "2026-11-02T11:00:00", "end": "2026-11-02T11:30:00" }] }
+  ]
+}

@@ -31,7 +31,7 @@ jobs:
         with:
           global-json-file: global.json
 
-      - name: Build and validate all 32 samples
+      - name: Build and validate all 62 samples
         shell: pwsh
         run: |
           # Match the canonical temporary paths used by native macOS processes.

@@ -24,6 +24,7 @@ $outputRoot = Join-Path $repoRoot ('artifacts/sample-validation/' + [Guid]::NewG
 New-Item -ItemType Directory -Path $outputRoot -Force | Out-Null
 Push-Location $repoRoot
 try {
+    & (Join-Path $PSScriptRoot 'test-validation.ps1')
     if (-not $SkipBuild) {
         & $Dotnet build (Join-Path $sampleRoot 'PiSharp.Samples.slnx') --nologo -m:1
         if ($LASTEXITCODE -ne 0) { throw 'Sample solution build failed.' }

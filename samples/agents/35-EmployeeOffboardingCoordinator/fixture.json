@@ -1,0 +1,8 @@
+{
+  "task": "Inspect departure emp-201, compute the ordered offboarding plan and pending obligations, and save it. If approved, revoke its local access records.",
+  "employeeId": "emp-201",
+  "employees": [
+    { "id": "emp-201", "departureDate": "2026-11-06", "access": [{ "id": "email", "active": true }, { "id": "repo", "active": true }], "equipment": [{ "id": "laptop-7", "returned": false }], "handoffs": [{ "id": "release-notes", "owner": "manager-1", "accepted": false }], "obligations": [{ "id": "expenses", "dueDate": "2026-11-13", "owner": "finance", "complete": false }, { "id": "nda-reminder", "dueDate": "2026-11-06", "owner": "hr", "complete": true }] },
+    { "id": "emp-202", "departureDate": "2026-11-09", "access": [{ "id": "crm", "active": false }], "equipment": [], "handoffs": [], "obligations": [] }
+  ]
+}

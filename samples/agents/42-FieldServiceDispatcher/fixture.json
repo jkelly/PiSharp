@@ -1,0 +1,13 @@
+{
+  "task": "Inspect JOB-71 and rank technicians against its skills, shift, appointments and travel time. Assign the best feasible technician TECH-ADA locally with operationId assign-job71-v1 using assign_technician. Do not contact technicians or update an external system.",
+  "asOf": "2026-11-02T09:00:00Z", "travelMinutesPerUnit": 10,
+  "jobs": [
+    { "id": "JOB-71", "startAt": "2026-11-02T10:00:00Z", "durationMinutes": 60, "skills": [ "electrical" ], "location": { "x": 2, "y": 1 } },
+    { "id": "JOB-72", "startAt": "2026-11-02T10:30:00Z", "durationMinutes": 30, "skills": [ "plumbing" ], "location": { "x": 0, "y": 0 } }
+  ],
+  "technicians": [
+    { "id": "TECH-ADA", "skills": [ "electrical" ], "shiftStart": "2026-11-02T09:00:00Z", "shiftEnd": "2026-11-02T17:00:00Z", "location": { "x": 1, "y": 1 }, "appointments": [ { "id": "APPT-A", "startAt": "2026-11-02T12:00:00Z", "endAt": "2026-11-02T13:00:00Z", "location": { "x": 3, "y": 1 } } ] },
+    { "id": "TECH-BEN", "skills": [ "electrical" ], "shiftStart": "2026-11-02T09:00:00Z", "shiftEnd": "2026-11-02T17:00:00Z", "location": { "x": 20, "y": 1 }, "appointments": [] },
+    { "id": "TECH-CAM", "skills": [ "plumbing" ], "shiftStart": "2026-11-02T09:00:00Z", "shiftEnd": "2026-11-02T17:00:00Z", "location": { "x": 0, "y": 0 }, "appointments": [] }
+  ]
+}

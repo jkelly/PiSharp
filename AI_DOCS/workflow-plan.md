@@ -52,3 +52,38 @@ Paths below are relative to the worktree. New directories/types are proposed own
 ## Current result and follow-ups
 
 The planning work D1/D2/P1 is complete. All future packages remain pending; there are no blockers to reviewing this plan. F1 and R1 are intentional future discovery gates, not unresolved reasons to stop the present task. Estimated effort and milestone acceptance are in the roadmap. Before assigning future workers, copy the exact row plus frozen contracts, dependencies and owned paths into their prompt; require status, changed files, commands, blockers and follow-ups in reports. Keep archive/delete and migration changes with one integrator.
+
+## Agent samples 33–62 execution (2026-11-01)
+
+| id | agent_type | complexity | model | reasoning_effort | service_tier | complexity_reason | goal | depends_on | owned_paths | inputs | outputs | verification | status |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| batch-a | worker | hard | gpt-6.1-sol | high | ultrafast | calendar, identity and obligation state | implement33–37 | contracts | samples33–37 | supplied catalog + contracts | runnable projects | focused self-tests | complete |
+| batch-b | worker | hard | gpt-6.1-sol | high | ultrafast | budgets, citations and dispatch rules | implement38–42 | contracts | samples38–42 | supplied catalog + contracts | runnable projects | focused self-tests | complete |
+| batch-c | worker | hard | gpt-6.1-sol | high | ultrafast | operational ordering and local restore | implement43–47 | contracts | samples43–47 | supplied catalog + contracts | runnable projects | focused self-tests | complete |
+| batch-d | worker | hard | gpt-6.1-sol | high | ultrafast | code/schema validation and local edits | implement48–52 | contracts | samples48–52 | supplied catalog + contracts | runnable projects | focused self-tests | complete |
+| batch-e | worker | hard | gpt-6.1-sol | high | ultrafast | baselines, data policies and guarded mutations | implement53–57 | contracts | samples53–57 | supplied catalog + contracts | runnable projects | focused self-tests | complete |
+| batch-f | worker | hard | gpt-6.1-sol | high | ultrafast | evidence and document privacy | implement58–62 | contracts | samples58–62 | supplied catalog + contracts | runnable projects | focused self-tests | complete |
+| integrate | main | very hard | inherited | inherited | unverified | native runtime integration and live validation | verify62, test30 live, commit and PR | batches | manifest, solution, README, scripts, CI, evidence | completed batches | reviewed PR | offline62/live30 | complete |
+
+Requested worker tier is ultrafast; delegation API has no tier parameter, so effective tier is unverified. Models and reasoning follow the workflow skill. No change to main thread model is claimed.
+
+Independent cross-review completed for all 30 additions. Confirmed edge-case findings in33,43,45,46,56,57,61 were fixed with regressions. All 30 initial live tests passed; affected samples were repeated after final implementation changes. Integration remains running until full62 validation, evidence generation, commit and PR publication finish.
+
+Final local verification: full62-project solution build had0 warnings/errors; all62 self-test programs and fixture demos and13 shared checks passed. All30 new live integrations passed gpt-6.1-sol result comparison;13 affected cases were repeated after review fixes. Validation evidence: samples/agents/validation/live-gpt-6.1-sol-33-62.md and .json. Only commit and PR publication remain.
+
+Completion: sources and validation evidence committed as21d4be63; PR https://github.com/jkelly/PiSharp/pull/48 opened against main. All six implementation batches, independent reviews, offline62/live30 qualification and publication are complete. CI results are tracked on the PR; no merge was requested.
+
+## PR 48 review and merge
+
+Current reviewed head: 34f19a66. User authorizes review, fixes, CI validation and merge after all checks pass. Original dirty checkout remains outside scope. Existing sample contracts apply. Reviews are read-only until main authorizes a concrete fix; workers must preserve others' changes. No paid API calls are needed for read-only review. Requested subagent tier is ultrafast; effective tier is unverified because the delegation surface has no tier control.
+
+| id | agent_type | complexity | model | reasoning_effort | service_tier | complexity_reason | goal | depends_on | owned_paths | inputs | outputs | verification | status |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| pr48-people | explorer | hard | gpt-6.1-sol | high | ultrafast | policy and state correctness | review33–42 | existing contracts | own report | code/tests | concrete findings | focused reproduction | complete |
+| pr48-ops | explorer | hard | gpt-6.1-sol | high | ultrafast | execution and artifact correctness | review43–52 | existing contracts | own report | code/tests | concrete findings | focused reproduction | complete |
+| pr48-data | explorer | very hard | gpt-6.1-sol | xhigh | ultrafast | privacy and destructive state | review53–62 | existing contracts | own report | code/tests | concrete findings | focused reproduction | complete |
+| pr48-validation | explorer | hard | gpt-6.1-sol | high | ultrafast | validation can falsely pass | review scripts/manifest/CI | existing contracts | own report | scripts/evidence | concrete findings | focused reproduction | complete |
+| pr48-main | main | very hard | inherited | inherited | unverified | integration and reviewed merge | fix confirmed defects, pass checks, merge | reviews | integration/CI/fixes | findings | validated merged PR | targeted tests + all CI | running |
+PR48 review results: seven confirmed defects fixed in36,40,42,46,51,57,61. Focused regression suites and independent rereview passed. The seven modified workflows also passed fresh gpt-6.1-sol strict tool-result comparisons with the authorized environment key. The main agent owns full-catalog revalidation, commit/push and final CI-gated merge.
+
+PR48 integration verification: sample solution rebuilt with0 warnings/errors; all62 self-test programs and demos and13 shared runtime tests passed. All7 modified workflows passed fresh gpt-6.1-sol comparisons. The additional46 count-boundary test passed. Awaiting final-head CI before the authorized merge.

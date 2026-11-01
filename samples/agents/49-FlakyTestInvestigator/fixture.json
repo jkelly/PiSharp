@@ -1,0 +1,4 @@
+{
+ "task":"Analyze existing cache-isolation runs, draft a bounded repair proposal, and write the investigation artifact. Do not execute tests or apply changes.",
+ "tests":[{"id":"cache-isolation","runs":[{"runId":"r1","outcome":"passed","order":"alone","seed":"17","worker":"a"},{"runId":"r2","outcome":"failed","order":"after-cache-test","seed":"17","worker":"a"},{"runId":"r3","outcome":"passed","order":"alone","seed":"19","worker":"b"},{"runId":"r4","outcome":"failed","order":"after-cache-test","seed":"19","worker":"b"}]}]
+}

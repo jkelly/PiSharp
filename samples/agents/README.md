@@ -1,4 +1,4 @@
-# 32 practical PiSharp agents
+# 62 practical PiSharp agents
 
 Runnable .NET 10 sample projects using **PiSharp.Agent** and **PiSharp.AI**, with explicit tool schemas, meaningful domain operations, fixture inputs, and focused tests. Each project stands alone; Shared contains the common host. The main PiSharp solution and its upstream-pinned catalogs are retained.
 
@@ -13,7 +13,7 @@ dotnet run --project samples/agents/05-PersistentTaskManager -- --demo --approve
 pwsh -File samples/agents/scripts/run-all.ps1
 ```
 
-The script also accepts `-Examples 5,28,31,32`, `-SkipBuild`, and `-Dotnet <absolute-dotnet-path>`. It uses the verified local SDK in `artifacts/sample-tools/dotnet` when available. It runs shared runtime checks, each selected project's self-tests, and every fixture demo, then saves JSON reports under `artifacts/sample-validation`.
+The script also accepts `-Examples 5,28,31,32`, `-SkipBuild`, and `-Dotnet <absolute-dotnet-path>`. It uses the verified local SDK in `artifacts/sample-tools/dotnet` when available. It runs shared runtime checks, each selected project's self-tests, and every fixture demo, then saves JSON reports under `artifacts/sample-validation`. With no selection it validates all 62 projects; unknown sample numbers are rejected.
 
 All demos are deterministic, use authored fixture data, make no provider requests, and create no external tickets, messages, PRs, or purchases. They still execute through the real PiSharp agent loop and tool scheduler. `--approve` allows the demo's guarded effects in its workspace; omit it to exercise denial. Each sample README documents its actual tool behavior, artifacts, and limitations.
 
@@ -34,6 +34,14 @@ pwsh -File samples/agents/scripts/run-live.ps1 -Model gpt-6.1-sol -ApiKeyEnviron
 ```
 
 This makes paid Responses API requests with up to four concurrent samples. It compares each live run's executed tool stages with a fresh fixture baseline, checks the requested model and provider token usage, and saves per-sample transcripts plus an aggregate report under `artifacts/live-samples`. Use `-Examples 1,16,31,32`, `-Concurrency 2`, or `-OutputDirectory` to bound a run. Domain services remain fixtures; this command does not publish GitHub PRs or invoke image generation. GPT-6.1 Sol tool calling requires `--api openai-responses` when invoking individual projects.
+
+To test just the new projects and compare their computed tool results with deterministic fixture expectations:
+
+```powershell
+./samples/agents/scripts/run-live.ps1 -Examples (33..62) -Model gpt-6.1-sol -ApiKeyEnvironment OPENAI_API_KEY -CompareToolResults
+```
+
+`-CompareToolResults` checks structured domain results, ignores JSON property order and workspace-root differences, and preserves meaningful array order. It does not grade the final free-form prose. All raw live reports and transcripts remain under ignored `artifacts/`.
 
 Live chat mode lets the model choose among each sample's actual domain tools; the underlying service data remains the input you supply. It does not silently connect an inbox, CRM, calendar, browser, or expense system. Those integrations have explicit sample-owned tool boundaries. Model 27 has an opt-in image API path; maintainer 31 and 32 use their own documented `--maintain` commands for live repository work.
 
@@ -57,6 +65,8 @@ The native consumer admits complete supported chat entries and unambiguous USD-p
 ## Validation
 
 See the [live test report](validation/live-gpt-6.1-sol.md) and [machine-readable results](validation/live-gpt-6.1-sol.json) for the verified GPT-6.1 Sol runs, fixes discovered during testing, and current-main revalidation. Raw transcripts and build artifacts are not committed.
+
+The [samples 33–62 validation report](validation/live-gpt-6.1-sol-33-62.md) and [portable results](validation/live-gpt-6.1-sol-33-62.json) cover the 30 additional projects, independent-review fixes and strict live tool-result comparisons.
 
 The `Agent samples` GitHub Actions workflow builds this solution and runs every self-test and fixture demo on Windows, Linux, and macOS. It uses no provider credentials or live service writes. The shared host treats turn limits and truncated final answers as incomplete runs.
 
@@ -98,3 +108,33 @@ See [catalog.json](catalog.json) for the machine-readable number, name and proje
 | 30 | [Desktop Workflow Assistant](30-DesktopWorkflowAssistant/README.md) |
 | 31 | [Model Catalog and Pricing Maintainer](31-ModelCatalogMaintainer/README.md) |
 | 32 | [NuGet Vulnerability Remediation Agent](32-NuGetVulnerabilityMaintainer/README.md) |
+| 33 | [Calendar Scheduling Coordinator](33-CalendarSchedulingCoordinator/README.md) |
+| 34 | [Employee Onboarding Coordinator](34-EmployeeOnboardingCoordinator/README.md) |
+| 35 | [Employee Offboarding Coordinator](35-EmployeeOffboardingCoordinator/README.md) |
+| 36 | [Access Review Assistant](36-AccessReviewAssistant/README.md) |
+| 37 | [Contract Obligation Tracker](37-ContractObligationTracker/README.md) |
+| 38 | [Subscription Renewal Assistant](38-SubscriptionRenewalAssistant/README.md) |
+| 39 | [RFP Response Builder](39-RfpResponseBuilder/README.md) |
+| 40 | [Purchase Request Coordinator](40-PurchaseRequestCoordinator/README.md) |
+| 41 | [Shipment Exception Agent](41-ShipmentExceptionAgent/README.md) |
+| 42 | [Field Service Dispatcher](42-FieldServiceDispatcher/README.md) |
+| 43 | [Shift Coverage Coordinator](43-ShiftCoverageCoordinator/README.md) |
+| 44 | [Training Compliance Tracker](44-TrainingComplianceTracker/README.md) |
+| 45 | [Incident Timeline Builder](45-IncidentTimelineBuilder/README.md) |
+| 46 | [Runbook Execution Assistant](46-RunbookExecutionAssistant/README.md) |
+| 47 | [Backup Restore Verification Agent](47-BackupRestoreVerification/README.md) |
+| 48 | [Deployment Readiness Reviewer](48-DeploymentReadinessReviewer/README.md) |
+| 49 | [Flaky Test Investigator](49-FlakyTestInvestigator/README.md) |
+| 50 | [Database Migration Reviewer](50-DatabaseMigrationReviewer/README.md) |
+| 51 | [API Deprecation Migration Agent](51-ApiDeprecationMigration/README.md) |
+| 52 | [Documentation Drift Detector](52-DocumentationDriftDetector/README.md) |
+| 53 | [Accessibility Audit Assistant](53-AccessibilityAuditAssistant/README.md) |
+| 54 | [Website Change Monitor](54-WebsiteChangeMonitor/README.md) |
+| 55 | [Data Pipeline Failure Investigator](55-DataPipelineInvestigator/README.md) |
+| 56 | [Data Retention Cleanup Agent](56-DataRetentionCleanup/README.md) |
+| 57 | [Duplicate Record Resolver](57-DuplicateRecordResolver/README.md) |
+| 58 | [Knowledge Gap Finder](58-KnowledgeGapFinder/README.md) |
+| 59 | [Grant Application Organizer](59-GrantApplicationOrganizer/README.md) |
+| 60 | [Travel Disruption Assistant](60-TravelDisruptionAssistant/README.md) |
+| 61 | [Document Redaction Assistant](61-DocumentRedactionAssistant/README.md) |
+| 62 | [Insurance Claim Organizer](62-InsuranceClaimOrganizer/README.md) |

@@ -1,0 +1,15 @@
+{
+  "task": "Inspect and review access for emp-301 at 2026-11-01, save the evidence-based review, and if approved remove only the recommended local grants.",
+  "employeeId": "emp-301",
+  "asOf": "2026-11-01",
+  "roles": [{ "id": "engineer", "allowedResources": ["repo", "docs"] }, { "id": "sales", "allowedResources": ["crm"] }],
+  "employees": [
+    { "id": "emp-301", "roleId": "engineer", "grants": [
+      { "id": "g-repo", "resource": "repo", "active": true, "expiresOn": "2027-01-01" },
+      { "id": "g-admin", "resource": "admin-console", "active": true, "expiresOn": "2027-01-01" },
+      { "id": "g-payroll", "resource": "payroll", "active": true, "expiresOn": "2027-01-01" },
+      { "id": "g-docs", "resource": "docs", "active": true, "expiresOn": "2026-11-01" }
+    ], "exceptions": [{ "id": "exc-1", "grantId": "g-admin", "approvedBy": "security-lead", "validUntil": "2026-12-01" }] },
+    { "id": "emp-302", "roleId": "sales", "grants": [{ "id": "g-crm", "resource": "crm", "active": true, "expiresOn": "2027-01-01" }], "exceptions": [] }
+  ]
+}

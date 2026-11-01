@@ -1,0 +1,16 @@
+{
+  "task": "For corpus support-q4, run inspect_signals, analyze_coverage and save_article_tasks. Save the grounded backlog and report article tasks and unclassified signals.",
+  "corpora": [
+    { "id": "support-q4", "topics": [
+      { "id": "recovery", "label": "account recovery", "keywords": ["recovery", "backup", "codes"] },
+      { "id": "exports", "label": "data exports", "keywords": ["export", "csv", "download"] }
+    ], "signals": [
+      { "id": "q1", "kind": "question", "answered": false, "text": "How do recovery backup codes work?" },
+      { "id": "s1", "kind": "search", "resultCount": 0, "text": "recovery backup codes" },
+      { "id": "s2", "kind": "search", "resultCount": 0, "text": "export csv download" },
+      { "id": "q2", "kind": "question", "answered": true, "text": "export data" },
+      { "id": "q3", "kind": "question", "answered": false, "text": "Where is the office?" }
+    ], "articles": [ { "id": "a1", "topicIds": ["recovery"], "text": "Start account recovery from the sign-in page." }, { "id": "a2", "topicIds": ["exports"], "text": "Export a CSV and download it." } ] },
+    { "id": "support-empty", "topics": [], "signals": [], "articles": [] }
+  ]
+}

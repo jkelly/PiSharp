@@ -1,0 +1,13 @@
+{
+  "task": "Inspect checkout and contact, propose the supplied fixes, apply approved local fixes, then report the rescan and limitations.",
+  "documents": [
+    { "id": "checkout", "html": "<html id='checkout-root'><body><img id='logo' src='logo.svg'/><input id='email'/><button id='pay'>Pay</button></body></html>" },
+    { "id": "contact", "html": "<html id='contact-root' lang='en'><body><label for='message'>Message</label><textarea id='message'/><button id='send'></button></body></html>" }
+  ],
+  "fixes": [
+    { "documentId": "checkout", "elementId": "checkout-root", "rule": "document-language", "value": "en" },
+    { "documentId": "checkout", "elementId": "logo", "rule": "image-alt", "value": "Sample shop" },
+    { "documentId": "checkout", "elementId": "email", "rule": "control-name", "value": "Email address" },
+    { "documentId": "contact", "elementId": "send", "rule": "control-name", "value": "Send message" }
+  ]
+}

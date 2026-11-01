@@ -1,0 +1,23 @@
+{
+  "task": "Inspect contract contract-a, calculate its sourced obligation deadlines as of 2026-11-01 including lead windows and missing event dates, and save the obligation register.",
+  "contractId": "contract-a",
+  "asOf": "2026-11-01",
+  "contracts": [
+    {
+      "id": "contract-a", "sources": [{ "id": "signed-a", "title": "Example service agreement A", "clauses": [
+        { "id": "4.1", "text": "Deliver the quarterly report by 30 October 2026." },
+        { "id": "5.2", "text": "Give renewal notice by 15 November 2026." },
+        { "id": "6.1", "text": "Provide the acceptance pack ten calendar days after delivery." },
+        { "id": "7.3", "text": "Provide the transition plan five calendar days after termination notice." }
+      ] }],
+      "events": [{ "id": "delivery", "date": "2026-10-25" }],
+      "obligations": [
+        { "id": "quarterly-report", "action": "Deliver quarterly report", "owner": "operations", "sourceId": "signed-a", "clauseId": "4.1", "dueDate": "2026-10-30", "leadDays": 7, "fulfilled": false },
+        { "id": "renewal-notice", "action": "Send renewal notice", "owner": "account-owner", "sourceId": "signed-a", "clauseId": "5.2", "dueDate": "2026-11-15", "leadDays": 14, "fulfilled": false },
+        { "id": "acceptance-pack", "action": "Provide acceptance pack", "owner": "delivery-lead", "sourceId": "signed-a", "clauseId": "6.1", "eventId": "delivery", "offsetDays": 10, "leadDays": 5, "fulfilled": false },
+        { "id": "transition-plan", "action": "Provide transition plan", "owner": "operations", "sourceId": "signed-a", "clauseId": "7.3", "eventId": "termination", "offsetDays": 5, "leadDays": 3, "fulfilled": false }
+      ]
+    },
+    { "id": "contract-b", "sources": [{ "id": "signed-b", "title": "Example service agreement B", "clauses": [{ "id": "2", "text": "Deliver the inventory by 1 November 2026." }] }], "events": [], "obligations": [{ "id": "inventory", "action": "Deliver inventory", "owner": "warehouse", "sourceId": "signed-b", "clauseId": "2", "dueDate": "2026-11-01", "leadDays": 1, "fulfilled": false }] }
+  ]
+}

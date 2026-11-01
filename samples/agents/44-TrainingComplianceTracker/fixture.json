@@ -1,0 +1,9 @@
+{
+  "task":"Inspect training evidence for employee E1, assess compliance as of 2026-11-01, and draft grounded reminders plus manager escalations for overdue courses. Save local drafts only.",
+  "asOf":"2026-11-01",
+  "requirements":[{"role":"operator","courseId":"safety","validDays":365,"initialDueDays":30},{"role":"operator","courseId":"privacy","validDays":365,"initialDueDays":30},{"role":"operator","courseId":"equipment","validDays":365,"initialDueDays":30}],
+  "employees":[
+    {"id":"E1","role":"operator","hireDate":"2025-01-01","managerId":"M1","completions":[{"courseId":"safety","completedOn":"2025-10-01"},{"courseId":"privacy","completedOn":"2025-11-15"}]},
+    {"id":"E2","role":"operator","hireDate":"2026-10-20","managerId":"M2","completions":[{"courseId":"safety","completedOn":"2026-10-22"}]}
+  ]
+}
