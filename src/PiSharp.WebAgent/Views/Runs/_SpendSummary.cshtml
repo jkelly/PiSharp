@@ -1,0 +1,59 @@
+@* Decision 0011 (run W3, S4): the mockups' _SpendSummary: metered spend today and this month (UTC) against the everything-metered daily
+   and monthly caps (a progress bar only when there is such a cap), the other caps above their warning threshold as chips, the prompt cache's
+   savings and waste this month, and what is not counted toward money caps. With filters it shows the matching requests instead. Uncertain
+   spend is included and said so. Model: SpendHistoryPage. *@
+@model SpendHistoryPage
+@{
+    var summary = Model.Summary;
+}
+<section class="ps-card overflow-hidden mb-3" aria-label="Spend summary" data-spend-summary>
+  <div class="d-flex flex-wrap align-items-center gap-2 px-3 py-2 border-bottom">
+    <span class="ps-label">@(summary.Filtered ? "Matching requests" : "Metered spend")</span>
+    <span class="fs-8 text-ps-faint">API keys · UTC day and month</span>
+    <a class="ms-auto fs-8" href="/settings/spend">Caps and billing modes</a>
+  </div>
+  <div class="spend-summary">
+    @foreach (var meter in summary.Meters)
+    {
+      <div class="spend-cell" data-spend-meter="@meter.Label">
+        <div class="ps-label">@meter.Label</div>
+        <div class="spend-amount mt-1">@SpendMoney.Format(meter.Micros) @if (meter.Cap is { } meterCap) {<small>of @SpendMoney.Format(meterCap.Cap.LimitMicros)</small>} else if (meter.Of is not null) {<small>@meter.Of</small>}</div>
+        @if (meter.Cap is not null)
+        {
+          var width = Math.Clamp(meter.Percent, 0, 100);
+          <div class="progress usage-progress my-2" role="progressbar" aria-label="@meter.Label: @meter.Percent% of the cap" aria-valuenow="@width" aria-valuemin="0" aria-valuemax="100"><div class="@("progress-bar" + (meter.Cap.AtLimit ? " bg-danger" : meter.Cap.Warning ? " bg-warning" : ""))" style="width:@(width)%"></div></div>
+          <div class="spend-sub">@meter.Sub</div>
+        }
+        else
+        {
+          <div class="spend-sub mt-2">@meter.Sub</div>
+        }
+        @if (meter.Warnings.Count > 0)
+        {
+          <div class="mt-2 d-flex flex-wrap gap-1">
+            @foreach (var warning in meter.Warnings)
+            {
+              var cap = warning.Cap;
+              var scope = cap.Scope == CapScope.Everything ? "all metered" : cap.Key ?? "";
+              var verb = cap.Action == CapAction.Block ? "blocks" : "asks";
+              var state = warning.AtLimit ? "at the limit" : "above the " + warning.WarnPercent + "% warning threshold";
+              var tip = scope + " " + cap.PeriodLabel.ToLowerInvariant() + " cap: " + SpendMoney.Format(warning.SpentMicros ?? 0) + " of " + SpendMoney.Format(cap.LimitMicros) + " · " + verb + " at the cap · " + state;
+              <span class="ps-chip" data-tone="@(warning.AtLimit ? "danger" : "warn")" title="@tip">@scope @(warning.PercentShown)% of @SpendMoney.Format(cap.LimitMicros)</span>
+            }
+          </div>
+        }
+      </div>
+    }
+    <div class="spend-cell" data-spend-cache>
+      <div class="d-flex align-items-center gap-1"><span class="ps-label">@summary.CacheLabel</span><span class="text-ps-faint ms-1" title="Saved: cache-read tokens × (input rate − cache-read rate). Wasted: the extra paid when a prompt that was cached on the previous turn missed the cache, plus cache-warm requests." aria-label="How cache savings are worked out" role="img"><i class="bi bi-info-circle fs-8" aria-hidden="true"></i></span></div>
+      <div class="d-flex gap-4 mt-1">
+        <div><div class="spend-amount">@SpendMoney.Format(summary.Cache.SavedMicros)</div><div class="spend-sub">saved</div></div>
+        <div><div class="spend-amount">@SpendMoney.Format(summary.Cache.WastedMicros)</div><div class="spend-sub">wasted</div></div>
+      </div>
+    </div>
+  </div>
+  @if (summary.NotCounted is not null)
+  {
+    <div class="px-3 py-2 border-top fs-8 text-ps-faint">@summary.NotCounted</div>
+  }
+</section>

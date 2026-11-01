@@ -1,0 +1,11 @@
+@* Decision 0011 (run W2, WU9): one provider checkbox of the Models page's provider menu (_ModelCatalogToolbar): its name, id and model count.
+   Model: (ProviderEntry Provider, bool Checked). *@
+@model (ProviderEntry Provider, bool Checked)
+@{
+    var id = "pf-" + CatalogText.IdPart(Model.Provider.Id);
+}
+<div class="form-check d-flex gap-2" data-provider-option data-search="@((Model.Provider.Id + " " + Model.Provider.Name).ToLowerInvariant())">
+  <input class="form-check-input" type="checkbox" id="@id" name="provider" value="@Model.Provider.Id" checked="@Model.Checked">
+  <label class="form-check-label flex-grow-1 fs-7 @(Model.Provider.IsConnected ? null : "text-secondary")" for="@id">@Model.Provider.Name <span class="ps-mono fs-8 text-ps-faint">@Model.Provider.Id</span></label>
+  <span class="ps-mono fs-8 text-ps-faint">@Model.Provider.Models.Count</span>
+</div>

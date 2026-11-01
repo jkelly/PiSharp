@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk.Razor">
+  <!-- Decision 0011 (PiSharp Web Agent, run W2 unit WU3; branch feature/web-agent): what PiSharp Durable Web (the hub) and PiSharp Web Agent
+       share, as a Razor class library. Server side: FragmentRenderer (a Razor partial to a string, for Server-Sent Events frames),
+       MarkdownRenderer (Markdig with raw HTML off, then HtmlSanitizer) and HostGuard (loopback Host, same-origin writes, JSON API writes; its
+       hosts and ports come from HostGuardOptions). Browser side, served from _content/PiSharp.Web.Common/: the design system's theme
+       (pisharp-theme.css), the parts of the mockups' app.css both apps use (shell.css), the per-tab stream (stream.js), fragment swapping
+       (swap.js), the theme toggle (theme-boot.js, theme.js), vendored Bootstrap 5.3.3 and Bootstrap Icons 1.11.3, the PiSharp mark and the
+       provider logos. Nothing in it knows about devices, sessions or chats. Not packed. -->
+  <PropertyGroup>
+    <IsPackable>false</IsPackable>
+    <AddRazorSupportForMvc>true</AddRazorSupportForMvc>
+  </PropertyGroup>
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="PiSharp.Durable.Web.Tests" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Markdig" Version="[0.41.3]" />
+    <PackageReference Include="HtmlSanitizer" Version="[9.0.886]" />
+  </ItemGroup>
+</Project>

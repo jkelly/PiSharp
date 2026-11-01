@@ -1,0 +1,26 @@
+@model ArtifactCardModel
+@{ var props = Model.Props; }
+@if (Display.Str(props, "summary") is { } summary)
+{
+  <p class="artifact-summary">@summary</p>
+}
+<ol class="artifact-timeline">
+  @foreach (var item in Display.Objects(props, "events").OrderBy(item => Display.Number(item, "at")))
+  {
+    var at = DateTimeOffset.FromUnixTimeMilliseconds((long)Display.Number(item, "at"));
+    var record = Model.Evidence(Display.Str(item, "evidenceId"));
+    var url = Display.Str(record, "url");
+    <li>
+      <time datetime="@at.ToString("o", System.Globalization.CultureInfo.InvariantCulture)">@at.ToString("yyyy-MM-dd HH:mm 'UTC'", System.Globalization.CultureInfo.InvariantCulture)</time>
+      <strong>@Display.Str(item, "title")</strong>
+      @if (Display.Str(item, "detail") is { } detail)
+      {
+        <div class="text-body-secondary">@detail</div>
+      }
+      @if (ArtifactsModel.IsSafeUrl(url))
+      {
+        <a class="fs-8" href="@url" target="_blank" rel="noopener noreferrer">@Display.Str(record, "title")</a>
+      }
+    </li>
+  }
+</ol>

@@ -1,0 +1,25 @@
+@* Decision 0011 (run W2, WU9): the last two steps of both sign-in modals (_ChatGptSignInModal, _OAuthSignInModal): success, with the
+   account's metadata as the sign-in answered it (name, plan or host, a short account id, when the access token expires; never a token),
+   and error, with the flow's scrubbed message. settings-signin.js sets every value as text. Model: none. *@
+<div data-signin-step="success" hidden>
+  <div class="text-center mb-3">
+    <div class="big-check mb-3"><i class="bi bi-check-lg" aria-hidden="true"></i></div>
+    <h3 class="fs-5 mb-1" data-signin-success-title>Signed in</h3>
+    <p class="fs-7 text-secondary mb-0" data-signin-success-text></p>
+  </div>
+  <div class="ps-panel p-3">
+    <div class="kv"><span class="k">Provider</span><span class="v ps-mono" data-signin-result="provider"></span></div>
+    <div class="kv"><span class="k">Account</span><span class="v text-break" data-signin-result="label"></span></div>
+    <div class="kv" data-signin-result-row="detail"><span class="k" data-signin-result="detail-name">Plan</span><span class="v" data-signin-result="detail"></span></div>
+    <div class="kv" data-signin-result-row="identity"><span class="k">Account ID</span><span class="v ps-mono text-break" data-signin-result="identity"></span></div>
+    <div class="kv" data-signin-result-row="expires"><span class="k">Access token</span><span class="v" data-signin-result="expires"></span></div>
+    <div class="kv"><span class="k">Refresh token</span><span class="v">stored (encrypted)</span></div>
+  </div>
+</div>
+
+<div data-signin-step="error" hidden>
+  <div class="alert alert-danger d-flex gap-2 mb-3" role="alert">
+    <i class="bi bi-x-octagon mt-1" aria-hidden="true"></i>
+    <div><strong data-signin-error-title>Sign-in failed.</strong> <span data-signin-error-text></span> Nothing was stored.</div>
+  </div>
+</div>

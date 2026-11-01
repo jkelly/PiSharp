@@ -1,0 +1,36 @@
+@* Decision 0011 (run W4, unit R9): the mockups' disk usage panel of Settings › Data & storage: the data folder's size with its drive's free
+   space, a meter of what takes it (run history, compare workspaces, chats, keys with credentials and settings, and any other files), and the
+   legend. Every number is measured. Model: DataPage. *@
+@using PiSharp.WebAgent.DataStorage
+@model DataPage
+@{
+    var usage = Model.Usage;
+    var folder = Model.Folder;
+}
+<div class="ps-panel p-3 mb-2" data-usage>
+  <div class="d-flex flex-wrap justify-content-between align-items-baseline gap-2 mb-2">
+    <span class="ps-label">Disk usage</span>
+    <span><span class="ps-mono fs-5" data-usage-total>@DataFolders.Size(usage.Total)</span>
+      @if (folder.Drive.Length > 0)
+      {
+        <span class="ps-mono fs-8 text-ps-faint">on @folder.Drive@(folder.FreeBytes is { } free ? " · " + DataFolders.Size(free) + " free" : "")</span>
+      }
+    </span>
+  </div>
+  <div class="ps-meter mb-2" role="img" aria-label="@usage.Label">
+    @foreach (var segment in usage.Segments)
+    {
+      <span class="@segment.Segment" style="width:@usage.Percent(segment).ToString("0.#", System.Globalization.CultureInfo.InvariantCulture)%@(segment.Segment.Length == 0 ? ";background:var(--ps-border)" : "")"></span>
+    }
+  </div>
+  <div class="d-flex gap-3 fs-8 text-ps-faint ps-mono flex-wrap">
+    @if (usage.Segments.Count == 0)
+    {
+      <span>Nothing is stored yet.</span>
+    }
+    @foreach (var segment in usage.Segments)
+    {
+      <span><i class="bi bi-square-fill @segment.Legend" aria-hidden="true"></i> @if (segment.Href is { } href) { <a class="text-reset" href="@href">@segment.Label</a> } else { @segment.Label } @DataFolders.Size(segment.Bytes)</span>
+    }
+  </div>
+</div>

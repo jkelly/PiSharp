@@ -1,0 +1,87 @@
+@* Decision 0011 (run W5, E6): the mockups' _SuiteRuns: the newest runs (EvalPages.RecentRuns), each with when and how it started, how many
+   answers passed, its metered cost (list price apart) and its drift: the worst signal it raised with that rule's name, "baseline" for a
+   run that is a current baseline, or running. History has no suite-run filter yet, so "All runs in History" opens History as it is.
+   Model: SuitePage. *@
+@model SuitePage
+<section aria-labelledby="runsTitle" data-suite-runs>
+  <div class="d-flex align-items-center gap-2 mb-2">
+    <h3 class="fs-6 fw-semibold mb-0" id="runsTitle">Recent runs</h3>
+    @if (Model.RunTotal > Model.Runs.Count)
+    {
+      <span class="fs-8 text-ps-faint">newest @Model.Runs.Count.ToString(CultureInfo.InvariantCulture) of @Model.RunTotal.ToString("N0", CultureInfo.InvariantCulture)</span>
+    }
+    <a class="fs-8 text-ps-faint ms-auto" href="/history">All calls in History</a>
+  </div>
+  @if (Model.Runs.Count == 0)
+  {
+    <div class="ps-panel p-3 fs-7 text-secondary" data-no-runs>No runs yet. Run now asks every case on every target k times; the first complete run can become the baseline Drift Watch compares later runs with.</div>
+  }
+  else
+  {
+    <div class="ps-table-wrap">
+      <table class="table table-hover align-middle">
+        <thead>
+          <tr>
+            <th scope="col">Run</th>
+            <th scope="col" class="text-end">Passed</th>
+            <th scope="col" class="text-end" title="Metered spend">Cost</th>
+            <th scope="col">Drift</th>
+          </tr>
+        </thead>
+        <tbody>
+          @foreach (var row in Model.Runs)
+          {
+            var line = row.Line;
+            var run = line.Run;
+            <tr data-run-row="@run.Id">
+              <td><a href="@line.Url">@line.Title</a><div class="fs-8 text-ps-faint">@line.When · @EvalText.Trigger(run.Trigger)</div></td>
+              <td class="text-end ps-mono fs-7">
+                @if (run.Active)
+                {
+                  <text>@line.Passed.ToString("N0", CultureInfo.InvariantCulture) of @line.Finished.ToString("N0", CultureInfo.InvariantCulture)</text>
+                }
+                else
+                {
+                  <text>@line.Passed.ToString("N0", CultureInfo.InvariantCulture)/@run.Answers.ToString("N0", CultureInfo.InvariantCulture)</text>
+                }
+              </td>
+              <td class="text-end ps-mono fs-7 text-nowrap">
+                @EvalText.Money(run.CostMicros)
+                @if (run.ListMicros > 0)
+                {
+                  <span class="d-block fs-8 text-ps-faint">@EvalText.ListMoney(run.ListMicros) list</span>
+                }
+              </td>
+              <td>
+                @if (run.Active)
+                {
+                  <span class="ps-chip"><span class="status-dot live" aria-hidden="true"></span>@EvalText.Status(run.Status)</span>
+                }
+                else if (run.Status != SuiteRunStatus.Complete)
+                {
+                  <span class="ps-chip" data-tone="@EvalText.StatusTone(run.Status)" title="@run.Problem">@EvalText.Status(run.Status)</span>
+                }
+                else if (row.Baseline && line.Level == DriftLevel.Ok)
+                {
+                  <span class="ps-chip" data-tone="outline">baseline</span>
+                }
+                else
+                {
+                  <span class="ps-chip" data-tone="@EvalText.Tone(line.Level)" title="@EvalText.LevelTitle(line.Level)">@EvalText.Level(line.Level)</span>
+                  @if (row.Baseline)
+                  {
+                    <span class="ps-chip ms-1" data-tone="outline">baseline</span>
+                  }
+                  @if (row.Note is { } note)
+                  {
+                    <div class="fs-8 text-ps-faint">@note</div>
+                  }
+                }
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  }
+</section>

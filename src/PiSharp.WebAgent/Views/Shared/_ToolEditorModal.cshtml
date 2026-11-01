@@ -1,0 +1,97 @@
+@* Decision 0011 (run W4, R1): the mockups' _ToolEditorModal (#modal-tool-editor; shared: Playground, Compare, Tool Bench): a tool
+   definition { name, description, parameters } from a template (PiSharp's own read and grep declarations, or a common example) or by hand,
+   checked in the page (the name pattern, a JSON Schema object) before it is added; the run engine checks it again. The mock response and
+   isError answer the model's calls in the Playground (never sent to a provider; a tool never runs here). Strict sends the tool's strict
+   flag (RunTool.Strict) where the page sends it (ToolEditorView.Strict); request-tools.js keeps the switch off for a model that takes no
+   strict tools (Anthropic, Google) unless the tool is already strict, so it can be cleared, and says why. A page that does not send the
+   flag shows the switch disabled. request-tools.js opens it for a new tool ([data-tool-add]) or to edit one ([data-tool-edit]).
+   Model: ToolEditorView. *@
+@using PiSharp.WebAgent.Playground
+@model ToolEditorView
+<div class="modal fade" id="modal-tool-editor" tabindex="-1" aria-labelledby="modal-tool-editor-title" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <form class="modal-content" data-tool-editor novalidate>
+      <div class="modal-header">
+        <div>
+          <h2 class="modal-title" id="modal-tool-editor-title">Tool definition</h2>
+          <div class="modal-subtitle ps-mono">{ name, description, parameters (JSON Schema) }</div>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        @if (Model.Templates.Count > 0)
+        {
+          <div class="ps-label mb-2">Start from a template</div>
+          <div class="d-flex flex-wrap gap-2 mb-3" role="group" aria-label="Templates">
+            @foreach (var template in Model.Templates)
+            {
+              <input type="radio" class="btn-check" name="tool-template" id="tpl-@template.Id" data-template="@template.Json"><label class="btn btn-sm btn-outline-secondary" for="tpl-@template.Id"><i class="bi @template.Icon me-1"></i>@template.Label</label>
+            }
+          </div>
+        }
+        <div class="row g-3">
+          <div class="col-md-5">
+            <label class="form-label" for="tool-name">Name</label>
+            <input class="form-control ps-mono" id="tool-name" pattern="[A-Za-z0-9_\-]{1,64}" maxlength="64" required autocomplete="off" data-tool-field="name">
+            <div class="form-text">Letters, digits, _ and -, up to 64 characters.</div>
+          </div>
+          <div class="col-md-7">
+            <label class="form-label" for="tool-description">Description</label>
+            <textarea class="form-control" id="tool-description" rows="2" data-tool-field="description"></textarea>
+          </div>
+        </div>
+        <label class="form-label mt-3" for="tool-schema">Parameters <span class="text-ps-faint fw-normal">(JSON Schema)</span></label>
+        <textarea class="form-control font-monospace" id="tool-schema" rows="12" spellcheck="false" data-tool-field="parameters">{
+  "type": "object",
+  "properties": {}
+}</textarea>
+        <div class="d-flex flex-wrap align-items-center gap-2 px-3 py-2 mt-2 rounded fs-8 ps-mono" role="status" data-tool-check></div>
+        <div class="row g-3 mt-1">
+          <div class="col-md-6">
+            <div class="form-check form-switch mt-2">
+              @if (Model.Strict)
+              {
+                <input class="form-check-input" type="checkbox" role="switch" id="tool-strict" data-tool-field="strict">
+              }
+              else
+              {
+                <input class="form-check-input" type="checkbox" role="switch" id="tool-strict" disabled>
+              }
+              <label class="form-check-label" for="tool-strict">Strict <span class="ps-mono fs-8 text-ps-faint">constrainedSampling</span></label>
+            </div>
+            <div class="form-text" data-tool-strict-note>@Model.StrictNote</div>
+            <div class="form-text text-ps-warn" data-tool-strict-model hidden></div>
+          </div>
+          @if (Model.Mock)
+          {
+            <div class="col-md-6">
+              <div class="form-check form-switch mt-2">
+                <input class="form-check-input" type="checkbox" role="switch" id="tool-mock-on" data-tool-field="mockOn">
+                <label class="form-check-label" for="tool-mock-on">Static mock response <span class="text-ps-faint fs-8">(optional)</span></label>
+              </div>
+              <div class="form-text">Used as the toolResult when you answer a call to this tool here. It stays in this page; nothing runs.</div>
+            </div>
+          }
+        </div>
+        @if (Model.Mock)
+        {
+          <label class="visually-hidden" for="tool-mock">Mock response</label>
+          <textarea class="form-control font-monospace mt-2" id="tool-mock" rows="3" spellcheck="false" data-tool-field="mock"></textarea>
+          <div class="form-check mt-2">
+            <input class="form-check-input" type="checkbox" id="tool-mock-error" data-tool-field="mockError">
+            <label class="form-check-label fs-7" for="tool-mock-error">Return it with <span class="ps-mono">isError: true</span></label>
+          </div>
+        }
+        <div class="alert alert-danger py-2 px-2 fs-8 mt-3 mb-0" role="alert" data-tool-error hidden></div>
+      </div>
+      <div class="modal-footer">
+        @if (Model.BenchUrl is { } bench)
+        {
+          <a class="btn btn-ghost me-auto" href="@bench"><i class="bi bi-tools me-1"></i>Open in Tool Bench</a>
+        }
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="submit" class="btn btn-primary" data-tool-submit><i class="bi bi-plus-lg me-1"></i><span data-tool-submit-text>@Model.Submit</span></button>
+      </div>
+    </form>
+  </div>
+</div>

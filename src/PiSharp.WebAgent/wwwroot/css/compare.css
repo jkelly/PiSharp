@@ -1,0 +1,82 @@
+/* Decision 0011 (run W4, R2): Compare (request mode), after the mockups' app.css "Compare" rules and compare.html's page block: the shared
+   prompt bar, the column grid (2 to 4 model columns side by side plus the narrow Add model column; each column scrolls on its own, the
+   grid scrolls sideways inside itself, never the page), the column head, chips and foot, the Request · Agent switch (.ac-mode, which R6's
+   agent mode shares) and the shared options (inline from sm up, a Settings dropdown below). Below 768px each column is 84vw wide, so one
+   column and a peek of the next fit a phone. The estimate chip's rules are the Playground's. Colours come from the theme's tokens only, so
+   dark (the default) and light both work. */
+
+/* ---------- Page ---------- */
+.cmp-page { display: flex; flex-direction: column; flex: 1 1 0; min-height: 0; min-width: 0; }
+.cmp-views { display: flex; flex-direction: column; flex: 1 1 0; min-height: 0; min-width: 0; }
+.cmp-tab-content { flex: 1 1 0; min-height: 0; display: flex; flex-direction: column; }
+.cmp-tab-content > .cmp-pane { flex: 1 1 0; min-height: 0; }
+.cmp-tab-content > .cmp-pane.active { display: flex; flex-direction: column; }
+.cmp-tab-content > .cmp-pane:not(.active) { display: none; }
+.cmp-metrics-pane { overflow: auto; padding: 1rem; }
+.cmp-empty-text { max-width: 44ch; }
+
+/* ---------- Shared prompt ---------- */
+.compare-prompt { flex: none; border-bottom: 1px solid var(--ps-border); padding: .85rem 1rem; background: var(--ps-bg); }
+.cmp-system-toggle { min-width: 0; max-width: 100%; }
+.cmp-system-toggle .bi-chevron-right { transition: transform .15s ease; }
+.cmp-system-toggle[aria-expanded="true"] .bi-chevron-right { transform: rotate(90deg); }
+.cmp-system-preview { max-width: 26rem; }
+.cmp-num { width: 4.25rem; }
+.cmp-num-wide { width: 5.5rem; }
+.cmp-banner-text { flex: 1 1 16rem; min-width: 0; }
+.compare-prompt .app-banner { flex-wrap: wrap; }
+
+/* The shared options sit in a Settings dropdown at xs and inline from sm up. */
+.cmp-settings-menu { padding: .75rem; }
+.cmp-settings-menu .input-group + .input-group { margin-top: .5rem; }
+@media (min-width: 576px) {
+  .cmp-settings .cmp-settings-menu { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; position: static; min-width: 0; margin: 0; padding: 0; border: 0; background: transparent; box-shadow: none; }
+  .cmp-settings .cmp-settings-menu .input-group + .input-group { margin-top: 0; }
+}
+
+/* Request · Agent (shared with R6's agent mode). */
+.ac-mode { display: inline-flex; align-items: center; gap: 2px; padding: 2px; border: 1px solid var(--ps-border-strong); border-radius: 999px; flex: none; }
+.ac-mode .btn { --bs-btn-padding-x: .65rem; --bs-btn-padding-y: .12rem; --bs-btn-color: var(--ps-faint); --bs-btn-hover-color: var(--ps-text); border-color: transparent; }
+.ac-mode .btn-check:checked + .btn, .ac-mode .btn.active { background: var(--ps-surface-3); color: var(--ps-text); border-color: transparent; }
+.ac-mode .btn-check:disabled + .btn { opacity: .55; }
+
+/* ---------- Columns ---------- */
+.compare-grid { flex: 1; min-height: 0; display: grid; grid-auto-flow: column; grid-auto-columns: minmax(300px, 1fr); overflow-x: auto; }
+.compare-grid.has-add { grid-template-columns: repeat(var(--cmp-cols, 3), minmax(300px, 1fr)) 168px; }
+.compare-col { display: flex; flex-direction: column; min-height: 0; min-width: 0; border-right: 1px solid var(--ps-border); }
+.compare-col:last-child { border-right: 0; }
+.compare-col.is-best .compare-col-head { background: var(--ps-surface-3); }
+.compare-col-head { padding: .55rem .75rem; border-bottom: 1px solid var(--ps-border); display: flex; align-items: center; gap: .4rem; flex-wrap: wrap; min-width: 0; }
+.compare-col-head .model-chip { min-width: 0; max-width: 100%; }
+.compare-col-body { flex: 1; overflow-y: auto; padding: 1rem 1.1rem; font-size: .9rem; line-height: 1.65; min-width: 0; overflow-wrap: anywhere; }
+.compare-col-body .ps-term pre { white-space: pre-wrap; overflow-wrap: anywhere; }
+.compare-col-foot { border-top: 1px solid var(--ps-border); padding: .45rem .75rem; font-size: .75rem; color: var(--ps-faint); display: flex; flex-wrap: wrap; align-items: center; gap: .25rem .8rem; font-variant-numeric: tabular-nums; }
+.compare-col-foot a { text-decoration: none; }
+.compare-add { display: grid; place-items: center; min-height: 100%; border: 1px dashed var(--ps-border-strong); margin: .75rem; border-radius: 14px; color: var(--ps-faint); min-height: 0; }
+.compare-add:hover:not(:disabled), .compare-add:focus-visible { background: var(--ps-hover) !important; color: var(--ps-text); }
+.cmp-add-col { border-right: 0; }
+.cmp-chips { min-width: 0; }
+.compare-col[data-refused="true"] .compare-col-head { box-shadow: inset 0 -2px 0 var(--ps-danger); }
+.cmp-chip-group { display: contents; }
+.cmp-overrides { width: 16rem; max-width: calc(100vw - 2rem); }
+.cmp-col-empty { padding: 1.5rem .25rem; }
+.cmp-pre { white-space: pre-wrap; overflow-wrap: anywhere; }
+.best-cell { color: var(--ps-ok); font-weight: 600; }
+.table > tbody > tr > td.best-cell { --bs-table-color-state: var(--ps-ok); color: var(--ps-ok); }
+/* A disabled icon button keeps the column head quiet (no outline). */
+.compare-col-head .btn-icon { --bs-btn-disabled-border-color: transparent; }
+.cmp-metrics-pane .table th a:hover { text-decoration: underline !important; }
+
+/* ---------- The estimate by Run all (the Playground's chip) ---------- */
+.run-estimate { cursor: help; }
+.ps-tip-left .tooltip-inner { text-align: left; max-width: 20rem; }
+.composer-estimate { background: transparent; border: 0; border-radius: 999px; padding: .2rem .45rem; font-size: .8125rem; color: var(--ps-faint); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.composer-estimate:hover, .composer-estimate:focus-visible { background: var(--ps-hover); color: var(--ps-text); }
+
+/* ---------- Phones ---------- */
+@media (max-width: 767.98px) {
+  .compare-grid { grid-auto-columns: minmax(84vw, 1fr); }
+  .compare-grid.has-add { grid-template-columns: repeat(var(--cmp-cols, 3), 84vw) 52vw; }
+  .compare-prompt { padding: .65rem .75rem; }
+  .composer-estimate { padding: .2rem .3rem; }
+}

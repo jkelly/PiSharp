@@ -1,0 +1,258 @@
+@* Decision 0011 (run W4, R6): compare.html's _AgentColumn: one model of a run. Head: the column letter, the provider's logo, the model's
+   name and provider/model · thinking; Stop while it works, else More (Copy workspace path, Discard workspace x). Body by state:
+   - pending: its workspace is being made, or it waits its turn in the shuffled start order;
+   - running: Running, turn and time, the latest tool call, the files its write and edit calls named so far;
+   - approval (agent-approval): Waiting for you, and the waiting call (web-approval's awaiting card: Allow, Deny; the call runs in its
+     workspace, a copy, not a sandbox; the prompt comes back after a reload and the first answer wins);
+   - budget: its next turn would go over its share of the run cap (Ask): Continue one turn, for the rest of the run, or Stop;
+   - checking: the check command runs in its workspace;
+   - done (agent-done, agent-kept): the check chip, how it ended, Applied / Branch kept / Workspace discarded / continues as a chat, its
+     answer (Markdown through the sanitizing MarkdownRenderer), the files it changed with their deltas, the check's output tail, and
+     View diff, Open as chat and Keep.
+   Foot: turns, time and cost (a subscription's list cost, which caps don't count). Elements that tick ([data-ac-elapsed]) are updated by
+   compare-agent-run.js between server renders. W4 fix 2: once its session exists, Transcript (collapsed) shows the agent's live
+   transcript, read-only, before and after Open as chat: compare-agent-run.js follows the chat stream's session/{session}/1 key
+   ([data-ac-transcript]) while it is open, and keeps what it shows across server renders. Model: AgentColumnView. *@
+@using PiSharp.WebAgent.AgentCompare.Pages
+@using PiSharp.WebAgent.AgentCompare.Runner
+@using PiSharp.WebAgent.AgentCompare.Workspaces
+@using PiSharp.WebAgent.Chat
+@inject MarkdownRenderer Markdown
+@model AgentColumnView
+@{
+    var state = Model.State;
+    var view = Model.View;
+    var key = Model.Key;
+    var letter = Model.Letter;
+    var tool = Model.Tool;
+    var elapsed = Model.ElapsedMs is { } ms ? AgentText.Duration(ms) : null;
+    var label = Model.Spec is { } spec ? $"{letter}: {spec.Provider}/{spec.Model}" : letter;
+    var hasMenu = !Model.Working && (state.WorkspacePath is not null && !state.Discarded || Model.CanDiscard);
+}
+<section class="compare-col" aria-label="@label" data-ac-col data-slot="@Model.Slot" data-view="@view" data-name="@Model.Name" data-key="@key">
+  <div class="compare-col-head">
+    <span class="ac-letter" aria-hidden="true">@letter</span>
+    <partial name="/Views/Settings/_ProviderLogo.cshtml" model='new PiSharp.WebAgent.Settings.LogoModel(Model.ProviderName, Model.LogoUrl)' />
+    <span class="d-flex flex-column ac-col-title">
+      <span class="ac-col-name">@Model.Name</span>
+      <span class="ps-mono fs-8 text-ps-faint text-truncate">@Model.Detail</span>
+    </span>
+    <div class="ms-auto d-flex align-items-center">
+      @if (Model.Working)
+      {
+        <button class="btn btn-icon" type="button" title="Stop @letter" aria-label="Stop @Model.Name" data-ac-stop="@Model.Slot"><i class="bi bi-stop-circle" aria-hidden="true"></i></button>
+      }
+      else if (hasMenu)
+      {
+        <div class="dropdown">
+          <button class="btn btn-icon" type="button" data-bs-toggle="dropdown" aria-expanded="false" title="More" aria-label="More for @Model.Name"><i class="bi bi-three-dots" aria-hidden="true"></i></button>
+          <ul class="dropdown-menu dropdown-menu-end">
+            @if (state.WorkspacePath is { } path && !state.Discarded)
+            {
+              <li><button class="dropdown-item" type="button" data-ac-copy="@path"><i class="bi bi-copy me-2" aria-hidden="true"></i>Copy workspace path</button></li>
+            }
+            @if (Model.CanDiscard)
+            {
+              <li><button class="dropdown-item" type="button" data-ac-discard="@Model.Slot"><i class="bi bi-trash3 me-2" aria-hidden="true"></i>Discard workspace @Model.Slot</button></li>
+            }
+          </ul>
+        </div>
+      }
+    </div>
+  </div>
+  <div class="compare-col-body">
+    @switch (view)
+    {
+      case "pending":
+        <div class="d-flex flex-wrap align-items-center gap-2 fs-7 mb-2">
+          <span class="status-dot live" aria-hidden="true"></span><span>@(state.WorkspacePath is null ? "Making its workspace" : "Waiting to start")</span>
+        </div>
+        <div class="fs-8 text-ps-faint">Models start one after another, in a shuffled order. It works in workspace @Model.Slot.</div>
+        break;
+      case "checking":
+        <div class="d-flex flex-wrap align-items-center gap-2 fs-7 mb-2">
+          <span class="status-dot live" aria-hidden="true"></span><span>Checking</span>
+          @if (elapsed is not null)
+          {
+            <span class="text-ps-faint" title="@Model.LimitsTitle">@(Model.Turns == 1 ? "1 turn" : Model.Turns + " turns") · @elapsed</span>
+          }
+        </div>
+        <div class="ac-tool" title="The check command">@(state.Check?.Command ?? "the check command")</div>
+        <div class="fs-8 text-ps-faint mt-2">Its agent stopped; the check runs in workspace @Model.Slot.</div>
+        break;
+      case "done":
+        var check = Model.CheckChip;
+        var outcome = Model.OutcomeChip;
+        <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+          @if (check is not null)
+          {
+            <span class="ps-chip" data-tone="@check.Tone" title="@check.Title" data-ac-check-chip>@check.Text</span>
+          }
+          @if (outcome is not null)
+          {
+            <span class="ps-chip" data-tone="@outcome.Tone" title="@outcome.Title" data-ac-outcome-chip>@outcome.Text</span>
+          }
+          @if (state.Kept?.Outcome == KeepOutcome.Applied)
+          {
+            <span class="ps-chip" data-tone="accent">Applied to project</span>
+          }
+          else if (state.Kept?.Outcome == KeepOutcome.BranchCreated)
+          {
+            <span class="ps-chip" data-tone="accent" title="@state.Kept.Branch">Branch kept</span>
+          }
+          @if (state.Discarded)
+          {
+            <span class="ps-chip" data-tone="outline">Workspace discarded</span>
+          }
+          @if (state.ChatId is not null)
+          {
+            <span class="ps-chip" data-tone="outline">Continues as a chat</span>
+          }
+          <span class="fs-8 text-ps-faint">@Model.ResultLine</span>
+        </div>
+        @if (state.Message is { Length: > 0 } message && state.Outcome is not null and not AgentModelOutcome.Finished)
+        {
+          <p class="fs-8 text-ps-faint mb-2">@message</p>
+        }
+        @if (state.Error is { Length: > 0 } error)
+        {
+          <div class="alert alert-danger py-2 px-3 fs-7 mb-3" role="alert">@error</div>
+        }
+        @if (state.Answer is { Length: > 0 } answer)
+        {
+          <div class="ac-note md fs-7 mb-3">@Html.Raw(Markdown.Render(answer))</div>
+        }
+        else if (state.Outcome == AgentModelOutcome.Finished)
+        {
+          <p class="fs-8 text-ps-faint mb-3">It finished without a summary.</p>
+        }
+        @if (Model.FilesHeading is { } heading)
+        {
+          <div class="ps-label mb-1">@heading.Heading @if (heading.Delta.Length > 0) {<span class="fw-normal text-ps-faint">· @heading.Delta</span>}</div>
+          <ul class="ac-files">
+            @foreach (var file in state.Diff!.Items)
+            {
+              <li><span class="ac-path">@file.Path</span><span class="ac-delta">@AgentColumnView.Delta(file)</span></li>
+            }
+          </ul>
+          @if (state.Diff.Files > state.Diff.Items.Count)
+          {
+            <div class="fs-8 text-ps-faint">and @(state.Diff.Files - state.Diff.Items.Count) more (View diff lists them all)</div>
+          }
+        }
+        else if (state.Touched.Count > 0)
+        {
+          <div class="ps-label mb-1">Files it wrote or edited</div>
+          <ul class="ac-files">
+            @foreach (var file in state.Touched)
+            {
+              <li><span class="ac-path">@file</span></li>
+            }
+          </ul>
+        }
+        @if (state.Check is { Tail.Length: > 0 } tail)
+        {
+          <details class="ac-tail mt-2" data-ac-detail="tail-@Model.Slot">
+            <summary><i class="bi bi-chevron-right" aria-hidden="true"></i>Output tail</summary>
+            <div class="ps-term"><pre class="wrap"><code>@tail.Tail</code></pre></div>
+          </details>
+        }
+        <div class="ac-col-actions">
+          @if (Model.CanViewDiff)
+          {
+            <button class="btn btn-sm btn-outline-secondary" type="button" data-ac-diff="@Model.Slot"><i class="bi bi-file-diff me-1" aria-hidden="true"></i>View diff</button>
+          }
+          @if (Model.ChatUrl is { } chat)
+          {
+            <a class="btn btn-sm btn-ghost" href="@chat" title="This agent continues as a chat in workspace @Model.Slot">Open chat</a>
+          }
+          else if (Model.CanOpenChat)
+          {
+            <button class="btn btn-sm btn-ghost" type="button" title="Continue this agent as a chat, in workspace @Model.Slot" data-ac-open-chat="@Model.Slot">Open as chat</button>
+          }
+          @if (Model.CanKeep)
+          {
+            <button class="btn btn-sm btn-outline-secondary" type="button" data-ac-keep="@Model.Slot">Keep</button>
+          }
+        </div>
+        break;
+      default:
+        var waiting = view is "approval" or "budget";
+        <div class="d-flex flex-wrap align-items-center gap-2 fs-7 mb-2">
+          <span class="status-dot @(waiting ? "warn" : "live")" aria-hidden="true"></span><span>@(waiting ? "Waiting for you" : "Running")</span>
+          <span class="text-ps-faint" title="@Model.LimitsTitle">@Model.TurnText · <span data-ac-elapsed data-since="@Model.TickSince">@(elapsed ?? "0s")</span></span>
+        </div>
+        @if (tool is { } latest)
+        {
+          <div class="ac-tool" title="@latest.Title">@(latest.Head)@if (latest.Tail is not null) {<text> <span class="text-ps-faint">@latest.Tail</span></text>}</div>
+        }
+        @if (view == "approval")
+        {
+          var call = Model.Approvals[0];
+          var request = call.Request;
+          <div class="awaiting-card p-3 mt-3" role="group" aria-labelledby="ac-@(key)-approval" data-ac-approval>
+            <div class="d-flex align-items-center gap-2 mb-2">
+              <i class="bi @(request.Command is null ? "bi-pencil-square" : "bi-terminal") text-ps-faint" aria-hidden="true"></i>
+              <span class="fw-semibold fs-7" id="ac-@(key)-approval">Run <span class="ps-mono">@request.Tool</span>?</span>
+              <span class="ms-auto fs-8 text-ps-faint">waiting <span data-ac-elapsed data-since="@call.Since.ToUnixTimeMilliseconds()">@AgentText.Duration((long)Math.Max(0, (Model.Now - call.Since).TotalMilliseconds))</span></span>
+            </div>
+            <div class="ps-term"><pre class="wrap"><code>@AgentColumnView.CallText(request)</code></pre></div>
+            <div class="d-flex flex-wrap gap-2 mt-2">
+              <button class="btn btn-sm btn-primary" type="button" data-ac-approve="allow" data-slot="@Model.Slot" data-task-id="@request.TaskId"><i class="bi bi-check2 me-1" aria-hidden="true"></i>Allow</button>
+              <button class="btn btn-sm btn-outline-danger" type="button" data-ac-approve="deny" data-slot="@Model.Slot" data-task-id="@request.TaskId">Deny</button>
+            </div>
+            <div class="fs-8 text-ps-faint mt-2">Runs in workspace @Model.Slot, which is a copy, not a sandbox. This prompt comes back after a reload, and the first answer wins.</div>
+            @if (Model.Approvals.Count > 1)
+            {
+              <div class="fs-8 text-ps-faint mt-1">@(Model.Approvals.Count - 1) more @(Model.Approvals.Count == 2 ? "call waits" : "calls wait") after this one.</div>
+            }
+          </div>
+        }
+        else if (view == "budget" && Model.BudgetText is { } budget)
+        {
+          <div class="awaiting-card p-3 mt-3" role="group" aria-labelledby="ac-@(key)-budget" data-ac-budget>
+            <div class="d-flex align-items-center gap-2 mb-2">
+              <i class="bi bi-cash-coin text-ps-faint" aria-hidden="true"></i>
+              <span class="fw-semibold fs-7" id="ac-@(key)-budget">Go over its share?</span>
+            </div>
+            <p class="fs-7 mb-2">@budget</p>
+            <div class="d-flex flex-wrap gap-2">
+              <button class="btn btn-sm btn-primary" type="button" data-ac-continue="turn" data-slot="@Model.Slot">Continue one turn</button>
+              <button class="btn btn-sm btn-outline-secondary" type="button" data-ac-continue="run" data-slot="@Model.Slot">For the rest of the run</button>
+              <button class="btn btn-sm btn-outline-danger" type="button" data-ac-stop="@Model.Slot">Stop</button>
+            </div>
+            <div class="fs-8 text-ps-faint mt-2">Each turn still reserves its worst case under your Spend Guard caps first.</div>
+          </div>
+        }
+        @if (state.Touched.Count > 0)
+        {
+          <div class="ps-label mt-3 mb-1">Files changed so far</div>
+          <ul class="ac-files">
+            @foreach (var file in state.Touched)
+            {
+              <li><span class="ac-path">@file</span></li>
+            }
+          </ul>
+        }
+        break;
+    }
+    @if (view != "pending" && state.SessionId is { Length: > 0 } session)
+    {
+      <details class="ac-tail ac-transcript mt-3" data-ac-detail="transcript-@Model.Slot" data-ac-transcript="@ChatStreamMux.SessionKey(session, 1)">
+        <summary><i class="bi bi-chevron-right" aria-hidden="true"></i>Transcript</summary>
+        <div class="ac-transcript-body" data-ac-transcript-items="@Model.Slot" aria-label="Transcript of @Model.Name"><p class="fs-8 text-ps-faint mb-0" data-ac-transcript-note>Loading the transcript…</p></div>
+      </details>
+    }
+  </div>
+  <div class="compare-col-foot">
+    @if (view == "done" && state.StartedAt is not null)
+    {
+      <span>@(Model.Turns == 1 ? "1 turn" : Model.Turns + " turns")</span>
+      @if (elapsed is not null)
+      {
+        <span>@elapsed</span>
+      }
+    }
+    <span title="@Model.CostTitle">@Model.CostText</span>
+  </div>
+</section>

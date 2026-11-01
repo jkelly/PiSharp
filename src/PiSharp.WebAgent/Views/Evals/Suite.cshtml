@@ -1,0 +1,55 @@
+@* Decision 0011 (run W5, E6): Evals › Suites › a suite (GET /evals/suites/{id}), after the mockups' evals-suite.html, states default and
+   running (a run is going: the card with its progress, and the page reloads when it ends). The top bar is the breadcrumb Evals › Suites ›
+   name; then _SuiteHeader (Run now, Schedule, Set baseline, Rename, Export, Delete; size, schedule, cap, cost per run, baseline, last
+   run), the running card, _SuiteTargets (Add target, Remove), _SuiteCases (each check opens _CheckEditorModal) and _SuiteRuns. The
+   schedule, baseline and check editor modals are fetched for this suite when opened; _TestCaseModal (E7) serves Add case and Edit case,
+   and the page reloads when it saves one here (pisharp:pin-saved). Model: SuitePage. *@
+@model SuitePage
+@{
+    var suite = Model.Suite;
+    ViewData["Title"] = suite.Name + " · Suites";
+    ViewData[ShellViewData.Nav] = ShellNav.Evals;
+    ViewData[ShellViewData.Page] = "evals-suite";
+}
+@section Styles { <link href="~/css/evals.css" rel="stylesheet" asp-append-version="true" /> }
+@section TopbarStart
+{
+  <nav class="app-breadcrumb" aria-label="Breadcrumb">
+    <a class="d-none d-sm-inline" href="@EvalRoutes.Leaderboard">Evals</a>
+    <span class="d-none d-sm-inline" aria-hidden="true">›</span>
+    <a href="@EvalRoutes.Suites">Suites</a>
+    <span aria-hidden="true">›</span>
+    <h1 class="app-title current fs-7 mb-0 text-truncate">@suite.Name</h1>
+  </nav>
+}
+@section Modals
+{
+  <partial name="_SuiteScheduleModal" model="null" />
+  <partial name="_BaselineModal" model="null" />
+  <partial name="_CheckEditorModal" model="null" />
+  <partial name="/Views/Shared/_SpendConfirmModal.cshtml" model="null" />
+  <partial name="/Views/Shared/_TestCaseModal.cshtml" model="null" />
+}
+@section Scripts { <script type="module" src="~/js/evals.js" asp-append-version="true"></script> }
+<div class="page" data-evals="suite" data-suite-id="@suite.Id" data-state="@Model.State" data-active-run="@Model.Active?.Run.Id">
+  <partial name="_SuiteHeader" model="Model" />
+  @if (Model.Active is { } active)
+  {
+    <div class="ps-card p-3 mb-3" role="status" data-suite-running="@active.Run.Id">
+      <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+        <span class="status-dot live" aria-hidden="true"></span>
+        <span class="fw-medium fs-7">@active.Title is @(active.Run.Status == SuiteRunStatus.Queued ? "queued" : "running")</span>
+        <span class="fs-8 text-ps-faint">@EvalText.Trigger(active.Run.Trigger) · started @EvalText.Stamp(active.Run.Started ?? active.Run.Created) · @active.Finished.ToString("N0", CultureInfo.InvariantCulture) of @active.Run.Answers.ToString("N0", CultureInfo.InvariantCulture) answers</span>
+        <a class="btn btn-sm btn-outline-secondary ms-auto" href="@active.Url">Watch run</a>
+      </div>
+      @{
+          var percent = active.Run.Answers == 0 ? 0 : (int)Math.Round(100.0 * active.Finished / active.Run.Answers);
+      }
+      <div class="progress" role="progressbar" aria-label="Run progress" aria-valuenow="@percent" aria-valuemin="0" aria-valuemax="100"><div class="progress-bar" style="width:@(percent)%"></div></div>
+      <div class="fs-8 text-ps-faint mt-2">Spend Guard reserved up to @EvalText.Money(active.Run.ReservedMicros) before the run started. @EvalText.Money(active.Run.CostMicros) has settled so far.</div>
+    </div>
+  }
+  <partial name="_SuiteTargets" model="Model" />
+  <partial name="_SuiteCases" model="Model" />
+  <partial name="_SuiteRuns" model="Model" />
+</div>

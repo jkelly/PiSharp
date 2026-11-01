@@ -1,0 +1,50 @@
+@* Decision 0011 (run W4, R8): Presets (GET /presets), after the mockups' presets.html, states default and empty: the header with New preset
+   (the shared _SavePresetModal's new pane: a model and a system prompt to start from), Import JSON (a .json file: one preset, a list or an
+   Export all file; checked whole before anything is saved) and Export all (pisharp-presets-YYYY-MM-DD.json, no credentials), then
+   _PresetFilters (search, used in, sort, tags) and _PresetGrid of _PresetCards, or _PresetsEmpty when there is no preset. A card opens its
+   preset in the Playground, Compare or Tool Bench (/{page}?preset={id}; the page loads it), and its menu edits (the save modal's edit
+   pane), duplicates, exports or deletes it (a confirm). Every preset shown is a webagent.db row. presets.js runs the page. Model: PresetsPage. *@
+@model PresetsPage
+@{
+    ViewData["Title"] = "Presets";
+    ViewData[ShellViewData.Nav] = ShellNav.Presets;
+    ViewData[ShellViewData.Page] = "presets";
+}
+@section Styles { <link href="~/css/presets.css" rel="stylesheet" asp-append-version="true" /> }
+@section TopbarStart { <h1 class="app-title">Presets</h1> }
+@section Modals { <partial name="/Views/Shared/_SavePresetModal.cshtml" model="Model.NewPreset" /> }
+@section Scripts { <script type="module" src="~/js/presets.js" asp-append-version="true"></script> }
+<div class="page" data-presets data-state="@(Model.Empty ? "empty" : "default")" data-total="@Model.Total">
+  <div class="page-header">
+    <div class="me-auto">
+      <div class="ps-eyebrow">Records</div>
+      <h2>Presets</h2>
+      <p>Saved bundles of model, parameters, prompts and tools. Load one into the Playground, Compare or Tool Bench, or share it as JSON.</p>
+    </div>
+    <div class="d-flex flex-wrap gap-2">
+      <button class="btn btn-primary" type="button" data-preset-new><i class="bi bi-plus-lg me-1" aria-hidden="true"></i>New preset</button>
+      <label class="btn btn-outline-secondary mb-0" for="importPreset"><i class="bi bi-upload me-1" aria-hidden="true"></i>Import JSON</label>
+      <input class="visually-hidden" type="file" id="importPreset" accept=".json,application/json" data-preset-import>
+      @if (Model.Empty)
+      {
+        <button class="btn btn-outline-secondary" type="button" disabled title="No presets to export yet"><i class="bi bi-download me-1" aria-hidden="true"></i>Export all</button>
+      }
+      else
+      {
+        <a class="btn btn-outline-secondary" href="/api/presets/export" download data-preset-export-all><i class="bi bi-download me-1" aria-hidden="true"></i>Export all</a>
+      }
+    </div>
+  </div>
+
+  @if (Model.Empty)
+  {
+    <partial name="_PresetsEmpty" />
+  }
+  else
+  {
+    <partial name="_PresetFilters" model="Model" />
+    <div data-preset-results aria-live="polite">
+      <partial name="_PresetGrid" model="Model" />
+    </div>
+  }
+</div>

@@ -1,0 +1,126 @@
+@* Decision 0011 (run W4, R6): settings-tools.html's _AgentCompareDefaults (section "agentCompare", R5's AgentCompareSettings): the defaults
+   of Compare's agent mode, which each run may change for itself under Limits. Isolation (Automatic, or Always a temporary copy; Git
+   worktree only shows when it is the stored value), the folders a copy skips on top of WorkspaceManagerOptions.DefaultExcludes, whether a
+   copy also skips .gitignore patterns (W4 fix 2: a switch the runner passes to the workspace manager for new runs), the copy size that
+   asks first, the turn and time limits, the check timeout, and the tool approval for agent runs (Ask,
+   Allow-list, Auto in workspaces), whose description swaps with the choice: Allow-list and Auto say in plain text that workspaces are
+   copies, not sandboxes. Its own form (not a [data-settings-form]: compare-agent-defaults.js saves it through POST
+   /api/settings/agent-compare and Reset to defaults through POST /api/settings/agent-compare/reset) with its own save bar.
+   Model: none (reads ISettingsStore). *@
+@using PiSharp.WebAgent.AgentCompare
+@using PiSharp.WebAgent.AgentCompare.Pages
+@using PiSharp.WebAgent.AgentCompare.Workspaces
+@using PiSharp.WebAgent.Data
+@inject ISettingsStore Store
+@{
+    var settings = Store.Get<AgentCompareSettings>();
+    var approval = AgentText.ApprovalValue(settings.Approval);
+    var isolation = AgentText.IsolationValue(settings.Isolation);
+    var gb = settings.CopyWarnGb.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture);
+}
+<form class="settings-section ac-defaults" id="agent-compare" novalidate autocomplete="off" data-agent-compare-defaults data-endpoint="/api/settings/agent-compare" aria-labelledby="acDefaultsTitle">
+  <h3 class="d-flex align-items-baseline gap-2" id="acDefaultsTitle">Agent compare <button type="button" class="btn btn-link btn-sm p-0 ms-auto fs-8 fw-normal text-decoration-none" data-ac-defaults-reset><i class="bi bi-arrow-counterclockwise me-1" aria-hidden="true"></i>Reset to defaults</button></h3>
+  <p class="section-desc">Defaults for Compare's <a href="/compare?mode=agent">Agent mode</a>, where each model works on the same task in its own workspace, starting from the working directory above. You can change them for one run under Limits.</p>
+  <div class="ps-card">
+    <div class="setting-row">
+      <div>
+        <div class="setting-label">Isolation</div>
+        <div class="setting-desc">Automatic uses a detached git worktree from the base commit (by default the latest commit on the project's current branch) for a git repo. Uncommitted changes aren't copied, and the run setup lists them. Other folders, or Always a temporary copy, get a temporary copy that includes uncommitted changes.</div>
+        <div class="setting-key">agentCompare.isolation · default "automatic"</div>
+      </div>
+      <div class="setting-control">
+        <label class="visually-hidden" for="acDefIsolation">Isolation</label>
+        <select class="form-select form-select-sm" style="width:13rem;max-width:100%" id="acDefIsolation" name="isolation" data-ac-default="isolation">
+          <option value="automatic" selected="@(isolation == "automatic")">Automatic</option>
+          <option value="copy" selected="@(isolation == "copy")">Always a temporary copy</option>
+          @if (isolation == "worktree")
+          {
+            <option value="worktree" selected>Always a git worktree</option>
+          }
+        </select>
+      </div>
+    </div>
+    <div class="setting-row stack">
+      <div>
+        <div class="setting-label">Temporary copies also skip</div>
+        <div class="setting-desc">Folders or patterns left out of each temporary copy, comma-separated, on top of <span class="ps-mono">@string.Join(", ", WorkspaceManagerOptions.DefaultExcludes)</span>, which are always skipped. Git worktrees don't need this: they hold tracked files only.</div>
+        <div class="setting-key">agentCompare.extraExcludes · agentCompare.useGitignore</div>
+      </div>
+      <div class="setting-control d-block">
+        <label class="visually-hidden" for="acDefExcludes">Folders to skip in temporary copies</label>
+        <input class="form-control form-control-sm font-monospace" id="acDefExcludes" name="extraExcludes" value="@string.Join(", ", settings.ExtraExcludes ?? [])" placeholder="e.g. artifacts, *.log" spellcheck="false" maxlength="4000" data-ac-default="extraExcludes">
+        <div class="form-check form-switch mt-2 mb-0">
+          <input class="form-check-input" type="checkbox" role="switch" id="acDefGitignore" name="useGitignore" checked="@settings.UseGitignore" aria-describedby="acDefGitignoreNote" data-ac-default="useGitignore">
+          <label class="form-check-label fs-7" for="acDefGitignore">Also skip <span class="ps-mono">.gitignore</span> patterns</label>
+          <div class="form-text" id="acDefGitignoreNote">On, a copy leaves out what the project's .gitignore lists (build output, logs, local settings). Off, those files are copied too, so each copy is larger; the folders above are skipped either way.</div>
+        </div>
+      </div>
+    </div>
+    <div class="setting-row">
+      <div>
+        <div class="setting-label">Warn when a copy is larger than</div>
+        <div class="setting-desc">The run setup shows the size of a temporary copy and asks before copying more than this for each model.</div>
+        <div class="setting-key">agentCompare.copyWarnGb · default @AgentCompareSettings.DefaultCopyWarnGb</div>
+      </div>
+      <div class="setting-control">
+        <div class="input-group input-group-sm" style="width:8.5rem">
+          <input class="form-control ps-mono" id="acDefCopyWarn" name="copyWarnGb" type="number" min="0.1" max="1000" step="0.1" value="@gb" aria-label="Warn when a temporary copy is larger than, in GB" data-ac-default="copyWarnGb">
+          <span class="input-group-text ps-mono">GB</span>
+        </div>
+      </div>
+    </div>
+    <div class="setting-row">
+      <div>
+        <div class="setting-label">Limits per model</div>
+        <div class="setting-desc">A model that reaches either limit is stopped, and its check still runs. The money cap is set for each run and shared equally by the metered models. Subscription models are limited by turns and time; their list cost isn't counted.</div>
+        <div class="setting-key">agentCompare.maxTurns · default @AgentCompareSettings.DefaultMaxTurns · agentCompare.maxMinutes · default @AgentCompareSettings.DefaultMaxMinutes</div>
+      </div>
+      <div class="setting-control flex-wrap">
+        <div class="input-group input-group-sm" style="width:8.5rem">
+          <input class="form-control ps-mono" id="acDefMaxTurns" name="maxTurns" type="number" min="1" max="@AgentCompareSettings.MaxTurnsLimit" value="@settings.MaxTurns" aria-label="Maximum turns per model" data-ac-default="maxTurns">
+          <span class="input-group-text">turns</span>
+        </div>
+        <div class="input-group input-group-sm" style="width:8.5rem">
+          <input class="form-control ps-mono" id="acDefMaxMinutes" name="maxMinutes" type="number" min="1" max="@AgentCompareSettings.MaxMinutesLimit" value="@settings.MaxMinutes" aria-label="Maximum minutes per model" data-ac-default="maxMinutes">
+          <span class="input-group-text">min</span>
+        </div>
+      </div>
+    </div>
+    <div class="setting-row">
+      <div>
+        <div class="setting-label">Check timeout</div>
+        <div class="setting-desc">How long a run's check command may run in each workspace before it is stopped, with every process it started.</div>
+        <div class="setting-key">agentCompare.checkTimeoutMinutes · default @AgentCompareSettings.DefaultCheckTimeoutMinutes</div>
+      </div>
+      <div class="setting-control">
+        <div class="input-group input-group-sm" style="width:8.5rem">
+          <input class="form-control ps-mono" id="acDefCheckTimeout" name="checkTimeoutMinutes" type="number" min="1" max="@AgentCompareSettings.MaxMinutesLimit" value="@settings.CheckTimeoutMinutes" aria-label="Check timeout in minutes" data-ac-default="checkTimeoutMinutes">
+          <span class="input-group-text">min</span>
+        </div>
+      </div>
+    </div>
+    <div class="setting-row" data-ac-approval-panes>
+      <div>
+        <div class="setting-label">Tool approval for agent runs</div>
+        <div class="setting-desc" data-ac-approval-pane="ask" hidden="@(approval != "ask")">Asks before each bash command; reads and edits inside the workspace don't ask. Each column waits for its own approvals, and you can answer one for all columns at once. Chats keep the Tool approvals setting above.</div>
+        <div class="setting-desc" data-ac-approval-pane="allowList" hidden="@(approval != "allowList")"><span class="ps-chip me-1" data-tone="warn">not a sandbox</span>Like Ask, but bash commands on the allow-list above run without asking too. Anything else asks, per column. Workspaces are copies, not sandboxes: allowed commands run with your rights.</div>
+        <div class="setting-desc" data-ac-approval-pane="auto" hidden="@(approval != "auto")"><span class="ps-chip me-1" data-tone="warn">not a sandbox</span>Workspaces are copies, not sandboxes. Every tool call in an agent compare runs without asking, with your account's rights, so commands can still reach other folders, the network and your credentials. Chats keep the Tool approvals setting above.</div>
+        <div class="setting-key">agentCompare.approval · default "ask"</div>
+      </div>
+      <div class="setting-control">
+        <label class="visually-hidden" for="acDefApproval">Tool approval for agent runs</label>
+        <select class="form-select form-select-sm" style="width:13rem;max-width:100%" id="acDefApproval" name="approval" data-ac-default="approval">
+          <option value="ask" selected="@(approval == "ask")">Ask</option>
+          <option value="allowList" selected="@(approval == "allowList")">Allow-list</option>
+          <option value="auto" selected="@(approval == "auto")">Auto in workspaces</option>
+        </select>
+      </div>
+    </div>
+  </div>
+  <div class="settings-savebar" role="region" aria-label="Unsaved agent compare changes" data-ac-savebar hidden>
+    <button class="btn btn-sm btn-primary" type="submit" data-ac-save><i class="bi bi-check2 me-1" aria-hidden="true"></i>Save changes</button>
+    <button class="btn btn-sm btn-outline-secondary" type="button" data-ac-discard>Discard</button>
+    <span class="d-flex align-items-center gap-2 fs-7"><span class="status-dot warn"></span><strong data-ac-savebar-count>Unsaved changes</strong><span class="text-secondary ps-mono fs-8 d-none d-lg-inline" data-ac-savebar-names></span></span>
+  </div>
+</form>
+<script type="module" src="~/js/compare-agent-defaults.js" asp-append-version="true"></script>

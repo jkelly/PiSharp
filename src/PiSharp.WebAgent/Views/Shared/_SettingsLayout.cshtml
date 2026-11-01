@@ -1,0 +1,30 @@
+@* Decision 0011 (run W2, WU4): the layout of every settings page, inside _Layout: the breadcrumb "Settings › <page>" in the top bar (no
+   shortcuts button, as in the mockups), _SettingsNav on the left (a scrolling row below 992px) and the page in .settings-content. A page
+   sets ViewData["Title"] to its own name (Defaults) and ViewData[ShellViewData.SettingsSection] to its ShellNav id (defaults); it may
+   define Styles, TopbarEnd, Banners, Modals and Scripts as under _Layout (TopbarStart is the breadcrumb), and set
+   ViewData[ShellViewData.ContentClass] (is-wide) for .settings-content. *@
+@{
+    Layout = "_Layout";
+    var name = ViewData["Title"] as string ?? "Settings";
+    ViewData["Title"] = name + " · Settings";
+    ViewData[ShellViewData.Nav] = ShellNav.Settings;
+    ViewData[ShellViewData.ShortcutsButton] = false;
+    ViewData[ShellViewData.Page] ??= "settings-" + ViewData[ShellViewData.SettingsSection];
+    // On a settings page ContentClass widens .settings-content (is-wide on Models), not <main>.
+    var contentClass = ViewData[ShellViewData.ContentClass];
+    ViewData[ShellViewData.ContentClass] = null;
+}
+@section TopbarStart {
+  <nav class="app-breadcrumb" aria-label="Breadcrumb"><a href="@ShellNav.SettingsLink.Href">Settings</a><i class="bi bi-chevron-right fs-8"></i><span class="current">@name</span></nav>
+}
+@section Styles { @await RenderSectionAsync("Styles", required: false) }
+@section TopbarEnd { @await RenderSectionAsync("TopbarEnd", required: false) }
+@section Banners { @await RenderSectionAsync("Banners", required: false) }
+@section Modals { @await RenderSectionAsync("Modals", required: false) }
+@section Scripts { @await RenderSectionAsync("Scripts", required: false) }
+<div class="settings-layout">
+  <partial name="_SettingsNav" model="null" />
+  <div class="settings-content @contentClass">
+    @RenderBody()
+  </div>
+</div>

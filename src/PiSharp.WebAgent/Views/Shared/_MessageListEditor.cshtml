@@ -1,0 +1,155 @@
+@* Decision 0011 (run W4, R1): the mockups' _MessageListEditor (the Playground's centre pane; shared: Compare's shared messages, the Tool
+   Bench's conversation): role-based messages, each [data-msg] with its role select, text, and the parts its role has (images for a user
+   message, tool calls for an assistant message, the call it answers for a tool result). Every editor carries every part and
+   request-messages.js shows the ones its role uses, so changing a role keeps what was typed. The first editor is always the request's system
+   prompt ([data-msg-prompt]); a later system editor is sent as a system message. Images are resized in the page to 2,000 px and kept in the
+   editor (data-image-data) until the run sends them. Token counts come from the server's estimate (POST /api/playground/estimate).
+   Model: MessageListView. *@
+@using PiSharp.WebAgent.Playground
+@using PiSharp.WebAgent.Runs
+@model MessageListView
+@{
+    var p = Model.IdPrefix;
+    var items = Model.Items;
+    var roles = new[] { "system", "user", "assistant", "toolResult" };
+    string Label(string role) => role switch { "system" => "System message", "user" => "User message", "assistant" => "Assistant message", _ => "Tool result content" };
+
+    async Task Editor(MessageEditorItem item, int index, string key)
+    {
+        var message = item.Message;
+        var number = index + 1;
+        var calls = Model.CallsBefore(index);
+        var role = item.Role;
+        <div class="msg-editor @item.RoleClass" data-msg data-role="@role" data-msg-prompt="@(item.Prompt ? "true" : null)" data-key="@key">
+          <div class="msg-editor-head">
+            <button class="btn btn-icon drag-handle p-0" type="button" draggable="true" title="Drag to reorder (or Alt+↑ / Alt+↓)" aria-label="Move message @number" data-msg-drag hidden="@item.Prompt"><i class="bi bi-grip-vertical"></i></button>
+            <label class="visually-hidden" for="@(p)-@(key)-role">Message @number role</label>
+            <select class="form-select form-select-sm" id="@(p)-@(key)-role" data-msg-role disabled="@item.Prompt">
+              @foreach (var option in roles)
+              {
+                <option value="@option" selected="@(option == role)">@option</option>
+              }
+            </select>
+            <span class="fs-8 ps-mono text-ps-faint text-truncate min-w-0" title="@(item.Prompt ? "Sent as the request's systemPrompt" : null)"><span data-msg-kind>@(item.Prompt ? "systemPrompt · " : "")</span><span data-msg-tokens>— tok</span></span>
+            <span class="ms-auto d-flex">
+              <button class="btn btn-icon" type="button" title="Attach image" aria-label="Attach image to message @number" data-msg-attach data-for-role="user" hidden="@(role != "user")" disabled="@(!Model.Images)"><i class="bi bi-image fs-8"></i></button>
+              <button class="btn btn-icon" type="button" title="Duplicate" aria-label="Duplicate message @number" data-msg-duplicate hidden="@item.Prompt"><i class="bi bi-copy fs-8"></i></button>
+              <button class="btn btn-icon" type="button" title="@(item.Prompt ? "Clear" : "Delete")" aria-label="@(item.Prompt ? "Clear the system prompt" : $"Delete message {number}")" data-msg-delete><i class="bi bi-trash3 fs-8"></i></button>
+            </span>
+          </div>
+          <div class="row g-1 px-2 pt-2 align-items-center" data-for-role="toolResult" hidden="@(role != "toolResult")">
+            <div class="col-5"><label class="visually-hidden" for="@(p)-@(key)-call">toolCallId</label>
+              <select class="form-select form-select-sm ps-mono" id="@(p)-@(key)-call" title="toolCallId" data-result-call>
+                @if (calls.Count == 0 && string.IsNullOrEmpty(message.ToolCallId))
+                {
+                  <option value="">no tool call yet</option>
+                }
+                @foreach (var call in calls)
+                {
+                  <option value="@call.Id" data-tool-name="@call.Name" selected="@(call.Id == message.ToolCallId)">@call.Id</option>
+                }
+                @if (!string.IsNullOrEmpty(message.ToolCallId) && calls.All(call => call.Id != message.ToolCallId))
+                {
+                  <option value="@message.ToolCallId" data-tool-name="@message.ToolName" selected>@message.ToolCallId</option>
+                }
+              </select>
+            </div>
+            <div class="col-4"><label class="visually-hidden" for="@(p)-@(key)-tool">toolName</label><input class="form-control form-control-sm ps-mono" id="@(p)-@(key)-tool" value="@message.ToolName" title="toolName" readonly data-result-name></div>
+            <div class="col-3"><div class="form-check form-switch mb-0"><input class="form-check-input" type="checkbox" role="switch" id="@(p)-@(key)-error" checked="@(message.IsError == true)" data-result-error><label class="form-check-label ps-mono fs-8" for="@(p)-@(key)-error">isError</label></div></div>
+          </div>
+          <label class="visually-hidden" for="@(p)-@(key)-text" data-msg-label>@Label(role)</label>
+          <textarea class="form-control@(role == "toolResult" ? " font-monospace" : "")" id="@(p)-@(key)-text" rows="@(item.Prompt ? 3 : 2)" placeholder="@(item.Prompt ? "System prompt (optional)" : "")" data-msg-text>@message.Text</textarea>
+          <div class="d-flex flex-wrap gap-1 px-2 pb-2" data-msg-images data-for-role="user" hidden="@(role != "user" || message.Images is not { Count: > 0 })">
+            @foreach (var (image, imageIndex) in (message.Images ?? []).Select((image, imageIndex) => (image, imageIndex)))
+            {
+              var name = $"image {imageIndex + 1}";
+              <span class="ps-chip" data-tone="info" data-image data-image-mime="@image.MimeType" data-image-data="@image.Data" data-image-name="@name"><i class="bi bi-image"></i><span data-image-label>@name · @image.MimeType</span><button class="btn btn-icon p-0 ms-1" type="button" title="Remove image" aria-label="Remove @name" data-image-remove><i class="bi bi-x fs-8"></i></button></span>
+            }
+          </div>
+          <div class="px-2 pb-2" data-for-role="assistant" hidden="@(role != "assistant")">
+            <div data-msg-calls>
+              @foreach (var call in message.ToolCalls ?? [])
+              {
+                <div class="ps-panel p-2 mb-1" data-tool-call>
+                  <div class="d-flex align-items-center gap-2 mb-1"><span class="ps-label">toolCall</span><span class="ps-mono fs-8 text-ps-faint text-truncate min-w-0">id <span data-call-id>@call.Id</span></span><button class="btn btn-icon ms-auto py-0" type="button" title="Remove tool call" aria-label="Remove tool call @call.Id" data-call-remove><i class="bi bi-x fs-8"></i></button></div>
+                  <div class="row g-1">
+                    <div class="col-4"><label class="visually-hidden" for="@(p)-@(key)-@(call.Id)-name">Tool name</label><input class="form-control form-control-sm ps-mono" id="@(p)-@(key)-@(call.Id)-name" value="@call.Name" list="@(p)-tool-names" data-call-name></div>
+                    <div class="col-8"><label class="visually-hidden" for="@(p)-@(key)-@(call.Id)-args">Arguments (JSON)</label><input class="form-control form-control-sm ps-mono" id="@(p)-@(key)-@(call.Id)-args" value="@(call.Arguments is null ? "{}" : RequestJson.Compact(call.Arguments))" data-call-args></div>
+                  </div>
+                </div>
+              }
+            </div>
+            <button class="btn btn-sm btn-ghost py-0" type="button" data-call-add><i class="bi bi-plus-lg me-1"></i>Add tool call</button>
+          </div>
+        </div>
+    }
+}
+<section class="pane pg-messages" aria-label="Messages" data-message-list data-id-prefix="@p" data-images="@(Model.Images ? "true" : "false")" data-context-window="@Model.ContextWindow">
+  <div class="pane-header">
+    <h2 class="pane-title">Messages</h2>
+    <span class="ps-chip" data-msg-count>@items.Count</span>
+    <div class="ms-auto d-flex align-items-center gap-1">
+      <div class="dropdown">
+        <button class="btn btn-sm btn-ghost" type="button" data-bs-toggle="dropdown" aria-expanded="false"><i class="bi bi-box-arrow-in-down me-1"></i>Import</button>
+        <ul class="dropdown-menu dropdown-menu-end">
+          <li><a class="dropdown-item" href="@Model.HistoryUrl"><i class="bi bi-clock-history me-2"></i>From run history…</a></li>
+          <li><button class="dropdown-item" type="button" data-import-toggle><i class="bi bi-braces me-2"></i>Paste messages JSON…</button></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+  <div class="pane-body p-3">
+    <div class="ps-panel p-2 mb-3" data-import-panel hidden>
+      <label class="form-label fs-8" for="@(p)-import-json">Messages JSON: an array of <span class="ps-mono">{ role, text }</span> (also <span class="ps-mono">content</span>, <span class="ps-mono">toolCalls</span>, <span class="ps-mono">toolCallId</span>), or a run's <span class="ps-mono">{ systemPrompt, messages }</span>.</label>
+      <textarea class="form-control form-control-sm font-monospace" id="@(p)-import-json" rows="4" spellcheck="false" data-import-json></textarea>
+      <div class="d-flex align-items-center gap-2 mt-2">
+        <button class="btn btn-sm btn-primary" type="button" data-import-apply>Replace messages</button>
+        <button class="btn btn-sm btn-ghost" type="button" data-import-toggle>Cancel</button>
+        <span class="fs-8 text-ps-danger" role="alert" data-import-error></span>
+      </div>
+    </div>
+
+    <div data-msg-list>
+      @for (var index = 0; index < items.Count; index++)
+      {
+        await Editor(items[index], index, "m" + (index + 1));
+      }
+    </div>
+    <template data-msg-template>
+      @{ await Editor(new MessageEditorItem("user", new RunMessage { Role = "user" }), items.Count, "mnew"); }
+    </template>
+    <template data-call-template>
+      <div class="ps-panel p-2 mb-1" data-tool-call>
+        <div class="d-flex align-items-center gap-2 mb-1"><span class="ps-label">toolCall</span><span class="ps-mono fs-8 text-ps-faint text-truncate min-w-0">id <span data-call-id></span></span><button class="btn btn-icon ms-auto py-0" type="button" title="Remove tool call" aria-label="Remove tool call" data-call-remove><i class="bi bi-x fs-8"></i></button></div>
+        <div class="row g-1">
+          <div class="col-4"><input class="form-control form-control-sm ps-mono" aria-label="Tool name" list="@(p)-tool-names" data-call-name></div>
+          <div class="col-8"><input class="form-control form-control-sm ps-mono" aria-label="Arguments (JSON)" value="{}" data-call-args></div>
+        </div>
+      </div>
+    </template>
+    <datalist id="@(p)-tool-names" data-tool-names></datalist>
+
+    <div class="d-flex flex-wrap gap-2">
+      <div class="btn-group">
+        <button class="btn btn-sm btn-outline-secondary" type="button" data-msg-add="next"><i class="bi bi-plus-lg me-1"></i>Add message</button>
+        <button class="btn btn-sm btn-outline-secondary dropdown-toggle dropdown-toggle-split" type="button" data-bs-toggle="dropdown" aria-expanded="false"><span class="visually-hidden">Choose the role to add</span></button>
+        <ul class="dropdown-menu">
+          <li><h6 class="dropdown-header">Add as</h6></li>
+          <li><button class="dropdown-item ps-mono fs-7" type="button" data-msg-add="user">user</button></li>
+          <li><button class="dropdown-item ps-mono fs-7" type="button" data-msg-add="assistant">assistant</button></li>
+          <li><button class="dropdown-item ps-mono fs-7" type="button" data-msg-add="assistant-call">assistant + toolCall</button></li>
+          <li><button class="dropdown-item ps-mono fs-7" type="button" data-msg-add="toolResult">toolResult</button></li>
+          <li><button class="dropdown-item ps-mono fs-7" type="button" data-msg-add="system">system</button></li>
+        </ul>
+      </div>
+      <button class="btn btn-sm btn-outline-secondary" type="button" data-msg-attach-last disabled="@(!Model.Images)" title="@(Model.Images ? "Attach an image to the last user message" : "This model takes text only")"><i class="bi bi-image me-1"></i>Attach image</button>
+      <span class="fs-8 text-ps-faint align-self-center d-none d-sm-inline" data-images-note>@(Model.Images ? "PNG, JPEG, GIF or WebP · resized to 2,000 px" : "This model takes text only")</span>
+      <input type="file" class="visually-hidden" accept="image/png,image/jpeg,image/gif,image/webp" multiple tabindex="-1" aria-hidden="true" data-image-input>
+    </div>
+  </div>
+  <div class="pane-footer d-flex align-items-center gap-2 fs-8 ps-mono text-ps-faint text-nowrap">
+    <span data-tokens-total-wrap><i class="bi bi-calculator me-1"></i><span data-tokens-total>≈ — input tokens</span></span>
+    <span class="d-none d-xxl-inline" data-tokens-parts></span>
+    <span class="ms-auto" data-tokens-share hidden="@(Model.ContextWindow is null)"></span>
+  </div>
+</section>

@@ -1,0 +1,22 @@
+@* Decision 0011 (run W5, E6): the part of a suite run's page that changes while it runs: _EvalRunHeader, the drift notices and _RunGrid.
+   Its root carries the state and data-running, so the page knows when to stop polling GET /evals/runs/{id}/live. Model: RunPage. *@
+@model RunPage
+<div data-eval-run-live data-state="@Model.State" data-running="@(Model.Running ? "true" : "false")" data-run-status="@EvalText.Status(Model.Run.Status)">
+  <partial name="_EvalRunHeader" model="Model" />
+  @foreach (var item in Model.Signals.Where(item => item.Signal.Level != DriftLevel.Ok))
+  {
+    var signal = item.Signal;
+    <div class="ps-panel d-flex flex-wrap align-items-start gap-2 p-3 mb-3" data-run-signal="@EvalJson.Wire(signal.Rule)" data-level="@EvalText.Level(signal.Level)">
+      <span class="ps-chip" data-tone="@EvalText.Tone(signal.Level)" title="@EvalText.LevelTitle(signal.Level)">@EvalText.Level(signal.Level)</span>
+      <div class="flex-grow-1 fs-7 eval-notice-text">
+        <span class="ps-mono">@item.Model.Name</span> · @DriftRules.Label(signal.Rule): @(item.Confirmed is { } confirmed ? signal.Message + " " + confirmed : signal.Message)
+        @if (signal.Cleared is not null)
+        {
+          <span class="d-block fs-8 text-ps-faint">Cleared: a new baseline was set for this target.</span>
+        }
+      </div>
+      <a class="btn btn-sm btn-outline-secondary" href="@EvalRoutes.Drift">Open Drift</a>
+    </div>
+  }
+  <partial name="_RunGrid" model="Model" />
+</div>

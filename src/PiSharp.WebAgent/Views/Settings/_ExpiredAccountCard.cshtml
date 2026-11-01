@@ -1,0 +1,49 @@
+@* Decision 0011 (run W2, WU9): the mockups' expired warning card (settings-provider-codex, expired state): why the active account stopped
+   working (its scrubbed reason), what identifies it, and the way back: Sign in again for a sign-in, Replace key for a key, or Disconnect.
+   Requests that use this account fail until the user fixes it or picks another account; nothing switches on its own. Model: AccountCard. *@
+@model AccountCard
+@{
+    var account = Model.Account;
+    var provider = Model.Provider;
+    var oauth = account.Kind == AccountKind.OAuth;
+}
+<section class="settings-section" data-expired-account="@account.Id">
+  <div class="ps-card p-3 p-md-4 expired-card">
+    <div class="d-flex flex-wrap gap-3 align-items-start">
+      <span class="provider-logo lg is-warn" aria-hidden="true"><i class="bi bi-exclamation-triangle"></i></span>
+      <div class="flex-grow-1" style="min-width:0">
+        <h3 class="fs-6 mb-1">@(oauth ? "This sign-in has expired. Sign in again." : "This key was rejected. Replace it.")</h3>
+        <p class="fs-7 text-secondary mb-2">@(account.StatusReason ?? (oauth ? "The automatic refresh failed." : "The provider refused the key."))
+          Requests that use <strong>@account.Label</strong> fail until you @(oauth ? "sign in again" : "replace the key") or choose another account below.</p>
+        @if (account.Identity is not null)
+        {
+          <div class="kv"><span class="k">Account ID</span><span class="v ps-mono text-break">@account.Identity</span></div>
+        }
+        @if (account.Hint.Length > 0)
+        {
+          <div class="kv"><span class="k">Key</span><span class="v ps-mono">@account.Hint</span></div>
+        }
+        @if (account.LastTest is { } test)
+        {
+          <div class="kv"><span class="k">Last test</span><span class="v">@(SettingsText.Ago(test.TestedAt) + (test.StatusCode is { } status ? " · " + status : "") + " · " + test.Message)</span></div>
+        }
+        <div class="kv"><span class="k">@(oauth ? "Signed in" : "Added")</span><span class="v">@SettingsText.Date(account.Created)</span></div>
+      </div>
+    </div>
+    <div class="d-flex flex-wrap gap-2 mt-3">
+      @if (oauth && provider.SignsIn)
+      {
+        <partial name="/Views/Settings/_CredentialButton.cshtml" model='new CredentialButton(provider, "Sign in again", "btn btn-warning btn-sm") { SignIn = true, Account = account, Icon = "bi-box-arrow-in-right me-1" }' />
+      }
+      else if (!oauth && provider.TakesApiKey && !account.ReadOnly)
+      {
+        <partial name="/Views/Settings/_CredentialButton.cshtml" model='new CredentialButton(provider, "Replace key", "btn btn-warning btn-sm") { Account = account, Icon = "bi-pencil me-1" }' />
+      }
+      @if (!account.ReadOnly)
+      {
+        <button class="btn btn-sm btn-ghost" type="button" data-account-action="remove" data-account-id="@account.Id" data-account-label="@account.Label"
+                data-account-kind="@(oauth ? "oauth" : "apiKey")" data-provider-name="@provider.Name">@(oauth ? "Disconnect account" : "Remove key")</button>
+      }
+    </div>
+  </div>
+</section>

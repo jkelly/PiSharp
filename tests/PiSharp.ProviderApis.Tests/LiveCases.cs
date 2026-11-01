@@ -11,6 +11,32 @@ using PiSharp.Contracts;
 
 internal static partial class Program
 {
+    private sealed class StalledUpgrade : HttpMessageHandler
+    {
+        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            if (!request.Headers.Contains("Upgrade")) return Json("""{"error":{"message":"SSE fallback reached"}}""", HttpStatusCode.BadRequest);
+            await Task.Delay(Timeout.Infinite, cancellationToken);
+            throw new InvalidOperationException("The handshake should have been cancelled.");
+        }
+    }
+
+    private static async Task LiveWebSocketTimeout()
+    {
+        var directory = Temp("live-websocket-timeout");
+        var authPath = Path.Combine(directory, "auth.json");
+        await File.WriteAllTextAsync(authPath, $$$"""{"openai-codex":{"type":"oauth","refresh":"r","access":"{{{CodexToken}}}","expires":4000000000000,"accountId":"acct-123"}}""");
+        var runtime = new LiveSessionRuntime(_ => null, () => new StalledUpgrade(), authPath)
+        { HomeDirectory = directory, Transport = () => "websocket", WebSocketConnectTimeout = TimeSpan.FromMilliseconds(150) };
+        var selection = LiveSessionSelection.Parse("openai-codex", "gpt-5.5", "512");
+        await using var connection = selection.Connect(runtime);
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        var events = await Collect(connection.CreateTransport(), Hi(selection.Model), timeout.Token);
+        Check(!timeout.IsCancellationRequested, "configured handshake deadline fires before the outer cancellation");
+        Check(events[^1] is StreamError && Diagnostics(events[^1])?.ToJsonString().Contains("WebSocket connect timeout after 150ms", StringComparison.Ordinal) == true,
+            "the live route forwards the deadline: " + Diagnostics(events[^1]));
+    }
+
     private static async Task LiveRoutes()
     {
         var directory = Temp("live"); var authPath = Path.Combine(directory, "auth.json");

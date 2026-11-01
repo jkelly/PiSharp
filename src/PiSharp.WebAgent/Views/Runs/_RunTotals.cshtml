@@ -1,0 +1,19 @@
+@* Decision 0011 (run W4, R3): the mockups' _RunTotals: "Totals · last 30 days" (no filter) or "Totals · matching runs", the share of each
+   source, and Runs, Tokens in, Tokens out, Est. cost, Avg TTFT and Error rate, summed over the provider calls under the runs (an agent
+   compare run's models' turns included). Nothing is estimated here: a figure runs.db does not hold is a dash. Model: RunTotalsView. *@
+@model RunTotalsView
+<section class="ps-card overflow-hidden mb-3" aria-label="Totals" data-run-totals>
+  <div class="d-flex flex-wrap align-items-center gap-2 px-3 py-2 border-bottom">
+    <span class="ps-label">@Model.Label</span>
+    @if (Model.Share is not null)
+    {
+      <span class="ms-auto fs-8 ps-mono text-ps-faint d-none d-md-inline">@Model.Share</span>
+    }
+  </div>
+  <div class="metric-strip totals-strip">
+    @foreach (var metric in Model.Metrics)
+    {
+      <div class="metric" data-metric="@metric.Label"><div class="metric-label">@metric.Label</div><div class="@("metric-value" + (metric.Tone is null ? "" : " " + metric.Tone))">@metric.Value@if (metric.Unit is not null) {<text> </text><small>@metric.Unit</small>}</div><div class="metric-sub" title="@metric.Title">@metric.Sub</div></div>
+    }
+  </div>
+</section>

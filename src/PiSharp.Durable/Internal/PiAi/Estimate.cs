@@ -11,6 +11,32 @@ internal static class PiAiEstimate
     private const double CharsPerToken = 3.5;
     private const double EstimatedImageChars = 4800;
 
+    /// <summary>Upstream <c>estimateContextTokens</c>: the latest applicable successful usage, plus estimated trailing messages.
+    /// Usage with a timestamp older than preceding input cannot measure that input.</summary>
+    public static double EstimateContextTokens(IReadOnlyList<JsonValue> messages)
+    {
+        var latest = double.NegativeInfinity;
+        var from = 0;
+        double tokens = 0;
+        for (var index = 0; index < messages.Count; index++)
+        {
+            var message = (JsonObjectValue)messages[index];
+            var stamp = message.TryGetValue("timestamp", out var value) && value is JsonNumberValue timestamp ? timestamp.Value : 0;
+            if (Str(message, "role") == "assistant" && Str(message, "stopReason") is not ("aborted" or "error") &&
+                message.TryGetValue("usage", out var usage) && usage is JsonObjectValue counts && stamp >= latest)
+            {
+                // Missing fields count as zero for this wire-level estimate, as in pi-ai's context estimator.
+                double Count(string name) => counts.TryGetValue(name, out var count) && count is JsonNumberValue number ? number.Value : 0;
+                var total = Count("totalTokens");
+                if (total == 0) total = Count("input") + Count("output") + Count("cacheRead") + Count("cacheWrite");
+                if (total > 0) { tokens = total; from = index + 1; }
+            }
+            latest = Math.Max(latest, stamp);
+        }
+        for (var index = from; index < messages.Count; index++) tokens += EstimateMessageTokens(messages[index]);
+        return tokens;
+    }
+
     /// <summary><c>usage.totalTokens || input + output + cacheRead + cacheWrite</c> (upstream <c>calculateContextTokens</c>).</summary>
     public static double CalculateContextTokens(JsonObjectValue usage)
     {

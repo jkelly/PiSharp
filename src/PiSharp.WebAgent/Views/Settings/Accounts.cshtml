@@ -1,0 +1,90 @@
+@* Decision 0011 (run W2, WU9): the mockups' settings-accounts page (route GET /settings/accounts): what subscription sign-ins are (and why
+   Anthropic has none), where tokens are stored, a summary, an _OAuthCard per sign-in provider (WU5 signs in to openai-codex and
+   github-copilot; the mockups' xAI, Kimi, Meta, OpenRouter and Radius cards are later milestones), and Token refresh (how tokens stay valid,
+   and the browser callback host). The credential modals come from _CredentialModals. W3 fix: when a custom provider of models.json keeps
+   its key in the vault (an API key account named "<name> key"), a note says those are managed in Settings › Custom providers. Model:
+   AccountsPage. *@
+@model AccountsPage
+@{
+    Layout = "_SettingsLayout";
+    ViewData["Title"] = "Accounts & sign-ins";
+    ViewData[ShellViewData.SettingsSection] = "accounts";
+}
+@section Styles { <link href="~/css/settings.css" rel="stylesheet" asp-append-version="true"> }
+@section Modals { <partial name="/Views/Settings/_CredentialModals.cshtml" model="Model.Modals" /> }
+@section Scripts { <script type="module" src="~/js/settings.js" asp-append-version="true"></script> }
+<header class="settings-header">
+  <div class="ps-eyebrow">Connections</div>
+  <h2>Accounts &amp; sign-ins</h2>
+  <p>Subscription sign-ins use a plan you already pay for, such as ChatGPT or Copilot, through OAuth. Usage counts against that plan. API keys are billed per token and are managed under <a href="/settings/providers">Providers</a>. When a provider has both, it uses the account you make active. Anthropic doesn't allow Claude Pro or Max sign-in in other apps, so Claude connects with an API key or Amazon Bedrock.</p>
+  <div class="ps-panel p-3 mt-3 d-flex gap-3 align-items-start">
+    <i class="bi bi-safe2 fs-5 text-ps-blue" aria-hidden="true"></i>
+    <div class="fs-7" style="min-width:0">
+      <div><strong>Stored at</strong> <span class="ps-mono fs-8 text-break">@Model.DataDirectory</span></div>
+      <div class="text-secondary">Tokens are encrypted with ASP.NET Data Protection. The key ring lives in <span class="ps-mono">keys</span> under that folder. Tokens are never shown, not even in part, and never reach this page.</div>
+    </div>
+  </div>
+</header>
+
+<partial name="/Views/Settings/_OfflineNote.cshtml" model="Model.Offline" />
+
+@if (Model.CustomKeys.Count > 0)
+{
+  <div class="ps-panel p-3 mb-3 fs-7 text-secondary d-flex gap-2 align-items-start" data-accounts-custom-keys>
+    <i class="bi bi-hdd-network mt-1" aria-hidden="true"></i>
+    <div style="min-width:0">Custom providers keep their key in the same encrypted store, as an API key account named after the provider:
+      @for (var index = 0; index < Model.CustomKeys.Count; index++)
+      {
+        var entry = Model.CustomKeys[index];
+        <span class="ps-mono" data-accounts-custom-key="@entry.Id">@(entry.StoredAccounts.First().Label)</span>@(index < Model.CustomKeys.Count - 1 ? ", " : ".")
+      }
+      They aren't sign-ins; change or remove them with the provider in <a href="@CustomProviderFacts.PageUrl">Settings › Custom providers</a>.</div>
+  </div>
+}
+
+<div class="d-flex flex-wrap gap-2 mb-3" data-accounts-summary>
+  <span class="ps-chip" data-tone="@(Model.ConnectedCount > 0 ? "ok" : "outline")"><span class="status-dot @(Model.ConnectedCount > 0 ? "ok" : null)"></span>@(SettingsText.Plural(Model.ConnectedCount, "connected account") + " · " + SettingsText.Plural(Model.ConnectedProviders, "provider"))</span>
+  @if (Model.ExpiredCount > 0)
+  {
+    <span class="ps-chip" data-tone="warn"><span class="status-dot warn"></span>@Model.ExpiredCount expired</span>
+  }
+  <span class="ps-chip" data-tone="outline">@Model.NotConnected not connected</span>
+</div>
+
+<section class="settings-section">
+  @if (Model.Providers.Count == 0)
+  {
+    <div class="ps-card"><div class="empty-state"><p class="mb-0">No sign-in providers are available.</p></div></div>
+  }
+  else
+  {
+    <div class="row row-cols-1 row-cols-md-2 row-cols-xl-3 g-3">
+      @foreach (var provider in Model.Providers)
+      {
+        <partial name="/Views/Settings/_OAuthCard.cshtml" model="provider" />
+      }
+    </div>
+  }
+</section>
+
+<section class="settings-section">
+  <h3>Token refresh</h3>
+  <p class="section-desc">How stored sign-ins stay valid.</p>
+  <div class="ps-card">
+    <div class="setting-row">
+      <div>
+        <div class="setting-label">Automatic refresh</div>
+        <div class="setting-desc">Before a request, an access token close to expiry is refreshed with its refresh token. Copilot tokens are short-lived and are re-issued through the GitHub token. If a refresh fails, the account shows as expired and you sign in again; nothing switches to another account on its own.</div>
+      </div>
+      <div class="setting-control"><span class="ps-chip" data-tone="outline">automatic</span></div>
+    </div>
+    <div class="setting-row">
+      <div>
+        <div class="setting-label">Callback host</div>
+        <div class="setting-desc">Browser sign-ins listen on this host for the redirect, on port <span class="ps-mono">@Model.CallbackPort</span>. Set the environment variable to change it, for example when the app runs in a container.</div>
+        <div class="setting-key">PI_OAUTH_CALLBACK_HOST</div>
+      </div>
+      <div class="setting-control"><span class="ps-mono fs-7 ps-panel px-2 py-1">@(Model.CallbackHost ?? "127.0.0.1 (default)")</span></div>
+    </div>
+  </div>
+</section>

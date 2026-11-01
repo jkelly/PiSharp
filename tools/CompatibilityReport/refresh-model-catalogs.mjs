@@ -6,7 +6,7 @@
 // every shard matches the SHA256 its providers/data/.manifest.json records and that the manifest lists
 // exactly those shards, then:
 //   - copies the shards (removing embedded shards the package no longer has);
-//   - rewrites the pins in src/PiSharp.Cli/Models/BuiltinModelCatalog.cs (package version, generatedAt,
+//   - rewrites the pins in src/PiSharp.ModelRuntime/Models/BuiltinModelCatalog.cs (package version, generatedAt,
 //     manifest and package SHA256, ShardHashes);
 //   - rewrites the copied manifest, its hashes, generatedAt and the shard and model counts in
 //     tests/PiSharp.Models.Tests/CatalogCases.cs;
@@ -100,7 +100,7 @@ for (const file of readdirSync(resolve(repo, modelsDir)).filter(file => file.end
 }
 
 // BuiltinModelCatalog.cs.
-const catalogPath = `${modelsDir}/BuiltinModelCatalog.cs`;
+const catalogPath = "src/PiSharp.ModelRuntime/Models/BuiltinModelCatalog.cs";
 let catalog = readFileSync(resolve(repo, catalogPath), "utf8");
 const grouped = String(generatedAtMs).replace(/\B(?=(\d{3})+(?!\d))/g, "_");
 catalog = replace(catalog, /@earendil-works\/pi-ai@\d+\.\d+\.\d+/,`@earendil-works/pi-ai@${version}`, catalogPath);

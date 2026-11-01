@@ -1,0 +1,22 @@
+@* Decision 0011 (run W4, R1): the mockups' estimate by Run (the run-estimate chip left of Stop): the Spend Guard's preflight of the request
+   Run would make ("≈ $0.03", "≈ $0.21 list" for a subscription, "price unknown"; nothing for a free model), with the worst case worked out
+   on hover or focus; the amber chips of caps near their limit; and, when the guard would ask or block, the over-cap chip named after the
+   cause instead (Run then opens modal-spend-confirm). The page renders it for the loaded draft and playground.js swaps in the server's
+   answer (POST /api/playground/estimate, debounced). The tooltip is markup built from encoded parts (RunEstimate); Bootstrap's sanitizer
+   keeps only its strong and br. Model: RunEstimateView. *@
+@model RunEstimateView
+@if (Model.Shown)
+{
+  foreach (var warning in Model.Warnings)
+  {
+    <span class="ps-chip d-none d-sm-inline-flex" data-tone="warn" tabindex="0" data-bs-toggle="tooltip" title="@warning.Title" data-spend-warning>@warning.Text</span>
+  }
+  if (Model.Over is { } over)
+  {
+    <button class="ps-chip run-estimate" type="button" data-tone="warn" data-spend-over data-verdict="@Model.Verdict" data-pane="@Model.Pane" aria-label="@Model.Label" data-bs-toggle="tooltip" data-bs-html="true" data-bs-custom-class="ps-tip-left" title="@Model.Tooltip">@over</button>
+  }
+  else if (Model.Chip is { } chip)
+  {
+    <button class="composer-estimate run-estimate" type="button" data-spend-chip data-verdict="@Model.Verdict" aria-label="@Model.Label" data-bs-toggle="tooltip" data-bs-html="true" data-bs-custom-class="ps-tip-left" title="@Model.Tooltip">@chip</button>
+  }
+}

@@ -132,7 +132,7 @@ public static class ErrorThinkingReplayControls
         try { await source.Pending.Task; } catch { }
         if (original.Exception is { } originalFault)
             throw new AggregateException("Held admission and actual original fault.", originalFault, direct);
-        System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(direct).Throw();
+        global::System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(direct).Throw();
     }
 
     public static object BuildFaultGraph(params Exception?[] roots)

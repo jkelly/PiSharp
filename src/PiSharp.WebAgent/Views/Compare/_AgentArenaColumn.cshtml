@@ -1,0 +1,171 @@
+@* Decision 0011 (run W5, E5): compare.html's _AgentArenaColumn, one agent of a blind agent battle (letters are positions, not models).
+   Before the vote the head is only the letter and "Agent B"; while it works the body says so (its progress is held, like a request
+   battle's answers) and shows a tool call waiting for you (Allow, Deny) or a budget Ask (Continue one turn, for the rest of the run), since
+   neither names a model; once every agent is done: the check chip and how it ended ("Finished · 37 passed, 1 failed · exit 1"), its summary (Markdown
+   through the sanitizing MarkdownRenderer), the files it changed, the check's output tail and View diff (modal-agent-diff, names hidden).
+   While the battle is held every column shows the same placeholder (which agent finished first could give a model away), except a call or
+   an Ask that waits for you. An error's text and a budget message wait for the reveal (they can name a provider or a price). The foot says turns, time and cost stay
+   hidden. After the vote (agent-blind-voted) the head shows the logo, name, provider/model · thinking and Your pick, and the foot turns,
+   time and cost. Model: AgentArenaColumnView. *@
+@using PiSharp.WebAgent.AgentCompare.Pages
+@using PiSharp.WebAgent.AgentCompare.Runner
+@using PiSharp.WebAgent.Chat
+@using PiSharp.WebAgent.Evals
+@using PiSharp.WebAgent.Evals.Arena
+@inject MarkdownRenderer Markdown
+@model AgentArenaColumnView
+@{
+    var reveal = Model.Reveal;
+    var column = Model.Column;
+    var state = column?.State;
+    var letter = Model.Letter;
+}
+<section class="compare-col@(Model.Picked ? " is-picked" : "")" aria-label="@Model.Label" data-arena-col="@letter">
+  @if (reveal is null)
+  {
+    <div class="compare-col-head">
+      <span class="arena-letter" aria-hidden="true">@letter</span>
+      <span class="arena-col-name">Agent @letter</span>
+    </div>
+  }
+  else
+  {
+    <div class="compare-col-head@(Model.Picked ? " arena-picked" : "")" data-arena-head="@letter">
+      <span class="arena-letter" aria-hidden="true">@letter</span>
+      <partial name="/Views/Settings/_ProviderLogo.cshtml" model='new PiSharp.WebAgent.Settings.LogoModel(reveal.ProviderName, reveal.LogoUrl)' />
+      <span class="d-flex flex-column arena-col-title">
+        <span class="arena-col-name">@reveal.Name</span>
+        <span class="ps-mono fs-8 text-ps-faint text-truncate">@reveal.Detail</span>
+      </span>
+      @if (Model.Picked)
+      {
+        <span class="ps-chip ms-auto" data-arena-pick-chip>Your pick</span>
+      }
+      @if (Model.Rank is { } rank)
+      {
+        <span class="ps-chip@(Model.Picked ? "" : " ms-auto")" data-arena-rank-chip>@rank</span>
+      }
+    </div>
+  }
+  <div class="compare-col-body">
+    @if (column is null || state is null)
+    {
+      <p class="fs-7 text-ps-faint mb-0">This agent's run is gone.</p>
+    }
+    else if (Model.Status == ArenaStatus.Held)
+    {
+      if (Model.Approvals.Count == 0 && !Model.BudgetAsk)
+      {
+        <div class="arena-held h-100" data-arena-held>
+          <div><span class="spinner-border spinner-border-sm d-block mx-auto mb-2" aria-hidden="true"></span>Held until all agents finish<span class="d-block fs-8">so speed can't give a model away</span></div>
+        </div>
+      }
+      else if (Model.Approvals.Count > 0)
+      {
+        var call = Model.Approvals[0];
+        <div class="awaiting-card p-3 mt-2" role="group" aria-labelledby="arena-@(letter)-approval" data-arena-approval>
+          <div class="d-flex align-items-center gap-2 mb-2">
+            <i class="bi bi-terminal text-ps-faint" aria-hidden="true"></i>
+            <span class="fw-semibold fs-7" id="arena-@(letter)-approval">Run <span class="ps-mono">@call.Tool</span>?</span>
+          </div>
+          <div class="ps-term"><pre class="wrap"><code>@call.Text</code></pre></div>
+          <div class="d-flex flex-wrap gap-2 mt-2">
+            <button class="btn btn-sm btn-primary" type="button" data-arena-approve="allow" data-letter="@letter" data-task-id="@call.TaskId"><i class="bi bi-check2 me-1" aria-hidden="true"></i>Allow</button>
+            <button class="btn btn-sm btn-outline-danger" type="button" data-arena-approve="deny" data-letter="@letter" data-task-id="@call.TaskId">Deny</button>
+          </div>
+          <div class="fs-8 text-ps-faint mt-2">Runs in this agent's own workspace, which is a copy, not a sandbox.</div>
+          @if (Model.Approvals.Count > 1)
+          {
+            <div class="fs-8 text-ps-faint mt-1">@(Model.Approvals.Count - 1) more @(Model.Approvals.Count == 2 ? "call waits" : "calls wait") after this one.</div>
+          }
+        </div>
+      }
+      else if (Model.BudgetAsk)
+      {
+        <div class="awaiting-card p-3 mt-2" role="group" aria-labelledby="arena-@(letter)-budget" data-arena-budget>
+          <div class="fw-semibold fs-7 mb-2" id="arena-@(letter)-budget">Go over its share of the run cap?</div>
+          <p class="fs-8 text-ps-faint mb-2">Its next turn would pass its share. The amounts show after you vote.</p>
+          <div class="d-flex flex-wrap gap-2">
+            <button class="btn btn-sm btn-primary" type="button" data-arena-continue="turn" data-letter="@letter">Continue one turn</button>
+            <button class="btn btn-sm btn-outline-secondary" type="button" data-arena-continue="run" data-letter="@letter">For the rest of the run</button>
+          </div>
+        </div>
+      }
+    }
+    else
+    {
+      var check = column.CheckChip;
+      var outcome = column.OutcomeChip;
+      <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+        @if (check is not null)
+        {
+          <span class="ps-chip" data-tone="@check.Tone" data-arena-check-chip>@check.Text</span>
+        }
+        @if (outcome is not null)
+        {
+          <span class="ps-chip" data-tone="@outcome.Tone">@outcome.Text</span>
+        }
+        <span class="fs-8 text-ps-faint">@column.ResultLine</span>
+      </div>
+      @if (state.Error is { Length: > 0 } error)
+      {
+        if (reveal is null)
+        {
+          <p class="fs-8 text-ps-faint mb-2">It ended with an error; the message shows after you vote.</p>
+        }
+        else
+        {
+          <div class="alert alert-secondary py-2 px-3 fs-7 mb-3" role="status">@error</div>
+        }
+      }
+      @if (state.Answer is { Length: > 0 } answer)
+      {
+        <div class="ac-note md fs-7 mb-3">@Html.Raw(Markdown.Render(answer))</div>
+      }
+      else if (state.Outcome == AgentModelOutcome.Finished)
+      {
+        <p class="fs-8 text-ps-faint mb-3">It finished without a summary.</p>
+      }
+      @if (column.FilesHeading is { } heading)
+      {
+        <div class="ps-label mb-1">@heading.Heading @if (heading.Delta.Length > 0) {<span class="fw-normal text-ps-faint">· @heading.Delta</span>}</div>
+        <ul class="ac-files">
+          @foreach (var file in state.Diff!.Items)
+          {
+            <li><span class="ac-path">@file.Path</span><span class="ac-delta">@AgentColumnView.Delta(file)</span></li>
+          }
+        </ul>
+        @if (state.Diff.Files > state.Diff.Items.Count)
+        {
+          <div class="fs-8 text-ps-faint">and @(state.Diff.Files - state.Diff.Items.Count) more (View diff lists them all)</div>
+        }
+      }
+      @if (state.Check is { Tail.Length: > 0 } tail)
+      {
+        <details class="ac-tail mt-2">
+          <summary><i class="bi bi-chevron-right" aria-hidden="true"></i>Output tail</summary>
+          <div class="ps-term"><pre class="wrap"><code>@tail.Tail</code></pre></div>
+        </details>
+      }
+      @if (Model.CanViewDiff)
+      {
+        <div class="ac-col-actions">
+          <button class="btn btn-sm btn-outline-secondary" type="button" data-arena-diff="@letter"><i class="bi bi-file-diff me-1" aria-hidden="true"></i>View diff</button>
+        </div>
+      }
+    }
+  </div>
+  @if (reveal is null)
+  {
+    <div class="compare-col-foot"><span><i class="bi bi-eye-slash me-1" aria-hidden="true"></i>Turns, time and cost hidden until you vote</span></div>
+  }
+  else
+  {
+    <div class="compare-col-foot" data-arena-foot>
+      @foreach (var item in Model.Foot)
+      {
+        <span>@item</span>
+      }
+    </div>
+  }
+</section>

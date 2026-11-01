@@ -1,0 +1,64 @@
+@* Decision 0011 (run W4, R2): the mockups' Metrics tab of Compare: one column per model that ran, rows TTFT, total time, tokens in and out,
+   tokens/s, cost (a subscription's at list price, marked), stopReason and thinking (the level the run sent; "override" when the column set
+   it). Best per row in green among the completed columns (lower is better, higher for tokens/s). Every figure is the run row's own; a
+   streaming column shows dashes until it ends. The root carries the status line above the columns (data-status-line, data-status-tone),
+   which compare.js shows after each swap. Copy table copies it as tab-separated text. Model: CompareMetricsView. *@
+@model CompareMetricsView
+@{
+    var ran = Model.Ran;
+    var status = Model.Status;
+}
+<div data-compare-metrics data-status-line="@status.Text" data-status-tone="@status.Tone">
+  @if (ran.Count == 0)
+  {
+    <div class="empty-state">
+      <div class="empty-icon"><i class="bi bi-table"></i></div>
+      <h3 class="ps-heading fs-2 mb-2">No metrics <em>yet</em></h3>
+      <p class="fs-7 mx-auto cmp-empty-text">Run all to compare time to first token, total time, tokens and cost side by side.</p>
+    </div>
+  }
+  else
+  {
+    <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+      <span class="fs-8 text-ps-faint">Best per row in green. Lower is better for time, tokens and cost; higher for tokens/s.</span>
+      <button class="btn btn-sm btn-ghost ms-auto" type="button" data-copy-table="#cmpMetricsTable" title="Copy table as text"><i class="bi bi-copy me-1"></i>Copy table</button>
+    </div>
+    <div class="ps-table-wrap">
+      <table class="table mb-0" id="cmpMetricsTable">
+        <thead>
+          <tr>
+            <th scope="col">Metric</th>
+            @foreach (var column in ran)
+            {
+              <th scope="col"><a class="text-reset text-decoration-none" href="@column.Output.InspectorUrl" title="Open @column.Column.Provider/@column.Column.Model's run in the inspector">@column.Name</a>@if (column.Best) {<text> </text><i class="bi bi-star-fill text-ps-accent" title="Marked best"></i>}</th>
+            }
+          </tr>
+        </thead>
+        <tbody class="ps-mono fs-7">
+          @foreach (var row in Model.Rows)
+          {
+            <tr>
+              <th scope="row" class="fw-normal">@row.Label</th>
+              @foreach (var cell in row.Cells)
+              {
+                var classes = string.Join(" ", new[] { cell.Best ? "best-cell" : null, cell.Tone }.Where(part => part is not null));
+                <td class="@(classes.Length > 0 ? classes : null)">@if (cell.Chip is { } tone) {<span class="ps-chip" data-tone="@tone">@cell.Text</span>} else {@cell.Text}@if (cell.Note is { } note) {<text> </text><span class="text-ps-faint">@note</span>}</td>
+              }
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+    <div class="d-flex flex-wrap gap-3 mt-3 fs-8 text-ps-faint">
+      @if (Model.Best is { } best)
+      {
+        <span><i class="bi bi-star-fill text-ps-accent me-1"></i>Marked best by you: @best.Name</span>
+      }
+      <a class="text-ps-faint" href="/history?source=compare">Run history →</a>
+      @if (Model.InspectUrl is { } inspect)
+      {
+        <a class="text-ps-faint" href="@inspect">Inspect a column's request →</a>
+      }
+    </div>
+  }
+</div>

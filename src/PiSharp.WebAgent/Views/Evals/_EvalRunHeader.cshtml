@@ -1,0 +1,105 @@
+@* Decision 0011 (run W5, E6): the mockups' _EvalRunHeader: "Run #21" with its status; the suite, its size and how the run started; Set as
+   baseline (a complete run: _BaselineModal on this run), Run again, or Cancel run while it goes; the more menu (Download results as
+   JSON: the Suites unit's results download; the calls in History). Then the key values: started, duration (elapsed while it runs),
+   passed, cost (metered, list price apart; settled of reserved while it runs) and the baseline it was compared with, and the progress
+   bar while it runs. Model: RunPage. *@
+@model RunPage
+@{
+    var run = Model.Run;
+    var suite = Model.Suite;
+    var how = run.Trigger == SuiteRunTrigger.Schedule
+        ? "scheduled" + (suite.Schedule is { } schedule ? " · " + schedule.Label.ToLowerInvariant() : "")
+        : "run now";
+    if (run.CaseIds.Count == 1 && Model.SuiteCases > 1) how += " · one case";
+}
+<section class="ps-card p-3 p-md-4 mb-3" aria-label="Run summary" data-eval-run-header>
+  <div class="d-flex flex-wrap align-items-start gap-3">
+    <div class="flex-grow-1 eval-min-0">
+      <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+        <h2 class="h4 mb-0">@Model.Title</h2>
+        @if (Model.Running)
+        {
+          <span class="ps-chip" data-run-status-chip><span class="status-dot live" aria-hidden="true"></span>@EvalText.Status(run.Status)</span>
+        }
+        else
+        {
+          <span class="ps-chip" data-tone="@EvalText.StatusTone(run.Status)" data-run-status-chip>@EvalText.Status(run.Status)</span>
+        }
+      </div>
+      <div class="fs-7 text-secondary">@suite.Name · @EvalText.Size(run.CaseIds.Count, run.Targets.Count, run.K) · @how</div>
+      @if (run.Problem is { } problem)
+      {
+        <div class="fs-8 text-ps-faint mt-1">@problem</div>
+      }
+    </div>
+    <div class="d-flex flex-wrap gap-2">
+      @if (Model.Running)
+      {
+        <button class="btn btn-sm btn-outline-danger" type="button" data-cancel-run="@run.Id"><i class="bi bi-stop-circle me-1" aria-hidden="true"></i>Cancel run</button>
+      }
+      else
+      {
+        @if (run.Status == SuiteRunStatus.Complete)
+        {
+          <button class="btn btn-sm btn-outline-secondary" type="button" data-open-baseline="@suite.Id" data-run-id="@run.Id"><i class="bi bi-flag me-1" aria-hidden="true"></i>Set as baseline</button>
+        }
+        <button class="btn btn-sm btn-outline-secondary" type="button" data-run-suite="@suite.Id" disabled="@(suite.Targets.Count == 0)"><i class="bi bi-arrow-repeat me-1" aria-hidden="true"></i>Run again</button>
+      }
+      <div class="dropdown">
+        <button class="btn btn-icon" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="More run actions" title="More"><i class="bi bi-three-dots" aria-hidden="true"></i></button>
+        <ul class="dropdown-menu dropdown-menu-end">
+          <li><a class="dropdown-item" href="@(EvalRoutes.ApiRuns + "/" + Uri.EscapeDataString(run.Id) + "/results")" download><i class="bi bi-filetype-json me-2" aria-hidden="true"></i>Download results (JSON)</a></li>
+          <li><a class="dropdown-item" href="/history"><i class="bi bi-clock-history me-2" aria-hidden="true"></i>Calls in History</a></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+  <hr class="my-3">
+  <div class="row gx-4 gy-1 fs-7">
+    <div class="col-md-6 col-xl-4"><div class="kv"><span class="k">@(run.Started is null ? "Queued" : "Started")</span><span class="v">@Model.Started</span></div></div>
+    @if (Model.Length is { } length)
+    {
+      <div class="col-md-6 col-xl-4"><div class="kv"><span class="k">@(Model.Running ? "Elapsed" : "Duration")</span><span class="v">@length</span></div></div>
+    }
+    <div class="col-md-6 col-xl-4">
+      <div class="kv">
+        <span class="k">Passed</span>
+        <span class="v" data-run-passed>@(Model.Running
+            ? $"{Model.Passed.ToString("N0", CultureInfo.InvariantCulture)} of {Model.Finished.ToString("N0", CultureInfo.InvariantCulture)} so far"
+            : $"{Model.Passed.ToString("N0", CultureInfo.InvariantCulture)} of {run.Answers.ToString("N0", CultureInfo.InvariantCulture)} answers")</span>
+      </div>
+    </div>
+    <div class="col-md-6 col-xl-4">
+      <div class="kv">
+        <span class="k">Cost</span>
+        @if (Model.Running)
+        {
+          <span class="v">@EvalText.Money(run.CostMicros) settled of @EvalText.Money(run.ReservedMicros) reserved</span>
+        }
+        else
+        {
+          <span class="v" title="@(run.ReservedMicros > 0 ? "Reserved up to " + EvalText.Money(run.ReservedMicros) + " before the run; settled at the actual cost" : null)">@(EvalText.Money(run.CostMicros) + " metered" + (run.ListMicros > 0 ? " · " + EvalText.ListMoney(run.ListMicros) + " list" : ""))</span>
+        }
+      </div>
+    </div>
+    <div class="col-md-6 col-xl-4">
+      <div class="kv">
+        <span class="k">Baseline</span>
+        <span class="v">
+          @if (Model.BaselineUrl is { } baseline)
+          {
+            <a href="@baseline">@Model.BaselineText</a>
+          }
+          else
+          {
+            <text>None to compare with</text>
+          }
+        </span>
+      </div>
+    </div>
+  </div>
+  @if (Model.Running)
+  {
+    <div class="progress mt-3" role="progressbar" aria-label="Run progress" aria-valuenow="@Model.Progress" aria-valuemin="0" aria-valuemax="100"><div class="progress-bar" style="width:@(Model.Progress)%"></div></div>
+  }
+</section>

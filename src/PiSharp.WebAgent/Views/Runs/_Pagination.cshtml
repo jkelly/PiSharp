@@ -1,0 +1,49 @@
+@* Decision 0011 (run W4, R3): the mockups' _Pagination: "Showing 1–25 of N runs", rows per page (25, 50, 100; history.js keeps the
+   filters) and the pages (first, last and the ones around this page, with gaps). With a filter set and one page, "Showing N of N
+   matching runs". Model: RunHistoryPage. *@
+@using System.Globalization
+@model RunHistoryPage
+@{
+    var filter = Model.Filter;
+    static string N(long value) => value.ToString("#,0", CultureInfo.InvariantCulture);
+}
+@if (filter.Active && Model.PageCount == 1)
+{
+  <div class="mt-3 fs-8 ps-mono text-ps-faint" data-run-pagination>Showing @N(Model.Rows.Count) of @N(Model.Total) matching runs</div>
+}
+else
+{
+  <div class="d-flex flex-wrap align-items-center gap-2 mt-3" data-run-pagination>
+    <span class="fs-8 ps-mono text-ps-faint me-sm-auto">Showing @N(Model.FirstShown)–@N(Model.LastShown) of @N(Model.Total) runs</span>
+    <div class="d-flex align-items-center gap-2">
+      <label class="fs-8 text-ps-faint text-nowrap" for="pageSize">Rows per page</label>
+      <select class="form-select form-select-sm w-auto" id="pageSize" data-run-size>
+        @foreach (var size in RunHistoryFilter.Sizes)
+        {
+          <option value="@size" selected="@(size == filter.Size)">@size</option>
+        }
+      </select>
+    </div>
+    <nav aria-label="History pages">
+      <ul class="pagination pagination-sm mb-0">
+        <li class="@("page-item" + (filter.Page <= 1 ? " disabled" : ""))"><a class="page-link" href="@filter.Href(Math.Max(1, filter.Page - 1))" aria-label="Previous page"><i class="bi bi-chevron-left" aria-hidden="true"></i></a></li>
+        @foreach (var page in Model.PageLinks)
+        {
+          if (page is not { } number)
+          {
+            <li class="page-item disabled"><span class="page-link">…</span></li>
+          }
+          else if (number == filter.Page)
+          {
+            <li class="page-item active" aria-current="page"><a class="page-link" href="@filter.Href(number)">@N(number)</a></li>
+          }
+          else
+          {
+            <li class="page-item"><a class="page-link" href="@filter.Href(number)">@N(number)</a></li>
+          }
+        }
+        <li class="@("page-item" + (filter.Page >= Model.PageCount ? " disabled" : ""))"><a class="page-link" href="@filter.Href(Math.Min(Model.PageCount, filter.Page + 1))" aria-label="Next page"><i class="bi bi-chevron-right" aria-hidden="true"></i></a></li>
+      </ul>
+    </nav>
+  </div>
+}

@@ -245,6 +245,17 @@ try {
     $files = New-FixtureFiles -Standalone; $files['PiSharp.Cli.runtimeconfig.json'] = [Text.Encoding]::UTF8.GetBytes('{"runtimeOptions":{"tfm":"net10.0","framework":{"name":"Microsoft.NETCore.App","version":"10.0.0"}}}')
     $bad = Write-Fixture -Files $files -Name 'framework-dependent-standalone'
     Test-Case 'standalone requires bundled runtime' { Assert-Rejected { Assert-PiSharpDistribution -Path $bad -Repo $Repo -Kind standalone -Version $version -SourceCommit $commit -Rid win-x64 } 'Self-contained' }
+    # Decision 0008: `pisharp durable serve` also runs the tool on ASP.NET Core's shared framework.
+    $frameworksConfig = { param($second) '{"runtimeOptions":{"tfm":"net10.0","frameworks":[{"name":"Microsoft.NETCore.App","version":"10.0.0"},{"name":"' + $second + '","version":"10.0.0"}]}}' }
+    $files = New-FixtureFiles; $files['tools/net10.0/any/PiSharp.Cli.runtimeconfig.json'] = [Text.Encoding]::UTF8.GetBytes((& $frameworksConfig 'Microsoft.AspNetCore.App'))
+    $aspNetTool = Write-Fixture -Files $files -Name 'tool-aspnetcore'
+    Test-Case 'tool may also run on ASP.NET Core' { Assert-PiSharpDistribution -Path $aspNetTool @argsTool | Out-Null }
+    $files = New-FixtureFiles; $files['tools/net10.0/any/PiSharp.Cli.runtimeconfig.json'] = [Text.Encoding]::UTF8.GetBytes((& $frameworksConfig 'Microsoft.WindowsDesktop.App'))
+    $bad = Write-Fixture -Files $files -Name 'tool-desktop'
+    Test-Case 'tool rejects another shared framework' { Assert-Rejected { Assert-PiSharpDistribution -Path $bad @argsTool } 'Framework-dependent' }
+    $files = New-FixtureFiles; $files['tools/net10.0/any/PiSharp.Cli.runtimeconfig.json'] = [Text.Encoding]::UTF8.GetBytes('{"runtimeOptions":{"tfm":"net10.0","includedFrameworks":[{"name":"Microsoft.NETCore.App","version":"10.0.0"}]}}')
+    $bad = Write-Fixture -Files $files -Name 'tool-bundled-runtime'
+    Test-Case 'tool rejects a bundled runtime' { Assert-Rejected { Assert-PiSharpDistribution -Path $bad @argsTool } 'Framework-dependent' }
     $files = New-FixtureFiles -Standalone; $files.Remove('coreclr.dll') | Out-Null
     $bad = Write-Fixture -Files $files -Name 'missing-coreclr'
     Test-Case 'missing coreclr runtime payload' { Assert-Rejected { Assert-PiSharpDistribution -Path $bad -Repo $Repo -Kind standalone -Version $version -SourceCommit $commit -Rid win-x64 } 'Missing self-contained' }

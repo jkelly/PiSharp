@@ -1,0 +1,11 @@
+@* Decision 0011 (run W2, WU3): the <head> links both apps share, in the order the design system needs: the favicon, the theme set before
+   the first paint (no inline script, so a strict Content-Security-Policy holds), Bootstrap and its icons, the PiSharp tokens, then the
+   shared shell. The app's own stylesheets follow it. The model is the theme's localStorage key (default "pisharp-theme"); theme.js reads
+   the same key from <html data-theme-key>. *@
+@model string?
+<link rel="icon" href="@WebCommonAssets.Favicon" type="image/svg+xml">
+<script src="@WebCommonAssets.ThemeBootJs" data-theme-key="@(string.IsNullOrEmpty(Model) ? "pisharp-theme" : Model)" asp-append-version="true"></script>
+<link href="@WebCommonAssets.BootstrapCss" rel="stylesheet">
+<link href="@WebCommonAssets.BootstrapIconsCss" rel="stylesheet">
+<link href="@WebCommonAssets.ThemeCss" rel="stylesheet" asp-append-version="true">
+<link href="@WebCommonAssets.ShellCss" rel="stylesheet" asp-append-version="true">

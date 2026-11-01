@@ -13,6 +13,36 @@ internal static partial class Program
 {
     private static IEnumerable<(string, Func<Task>)> ModelsCases() =>
     [
+        Case("models.mapping.output-cap-fits-remaining-context", async () =>
+        {
+            var handler = new RecordingHandler(_ => Sse(ResponsesText));
+            using var models = Models(new() { ["OPENAI_API_KEY"] = "test-key" }, handler);
+            var original = models.GetModel("openai", "gpt-4.1")!;
+            var model = original with { ContextWindow = 10_000, Wire = original.Wire!.SetItem("contextWindow", 10_000) };
+            await models.CompleteSimpleAsync(model, UserTurn(new string('x', 14_000)), new DurableStreamOptions { MaxTokens = 8000 }, CancellationToken.None);
+            Equal(1904, handler.Requests[^1].Json.GetProperty("max_output_tokens").GetInt32(), "estimated 4000 input plus 4096 reserve");
+            var assistant = JsonValue.Parse("""{"role":"assistant","content":[{"type":"text","text":"ok"}],"api":"openai-responses","provider":"openai","model":"gpt-4.1","usage":{"input":4000,"output":100,"cacheRead":500,"cacheWrite":400,"totalTokens":5000,"cost":{"input":0,"output":0,"cacheRead":0,"cacheWrite":0,"total":0}},"stopReason":"stop","timestamp":2}""");
+            await models.CompleteSimpleAsync(model, [.. UserTurn("old"), assistant, .. UserTurn(new string('x', 350))], new DurableStreamOptions { MaxTokens = 8000 }, CancellationToken.None);
+            Equal(804, handler.Requests[^1].Json.GetProperty("max_output_tokens").GetInt32(), "measured 5000 input plus 100 trailing tokens");
+            foreach (var unusable in new[] { ((JsonObjectValue)assistant).SetItem("timestamp", 0), ((JsonObjectValue)assistant).SetItem("stopReason", "error") })
+            {
+                await models.CompleteSimpleAsync(model, [.. UserTurn("old"), unusable, .. UserTurn(new string('x', 350))], new DurableStreamOptions { MaxTokens = 8000 }, CancellationToken.None);
+                Equal(5802, handler.Requests[^1].Json.GetProperty("max_output_tokens").GetInt32(), "stale or failed usage is not a context measurement");
+            }
+            await models.CompleteSimpleAsync(model, UserTurn(new string('x', 35_000)), null, CancellationToken.None);
+            Equal(16, handler.Requests[^1].Json.GetProperty("max_output_tokens").GetInt32(), "native Responses route's minimum output cap");
+        }),
+        Case("models.mapping.thinking-budget-fits-remaining-context", async () =>
+        {
+            var handler = new RecordingHandler(_ => Sse(AnthropicText));
+            using var models = Models(new() { ["ANTHROPIC_API_KEY"] = "test-key" }, handler);
+            var original = models.GetModel("anthropic", "claude-sonnet-4-5")!;
+            var model = original with { ContextWindow = 14_000, Wire = original.Wire!.SetItem("contextWindow", 14_000) };
+            await models.CompleteSimpleAsync(model, UserTurn(new string('x', 14_000)), new DurableStreamOptions { MaxTokens = 8000, Reasoning = "medium" }, CancellationToken.None);
+            var body = handler.Requests.Single().Json;
+            Equal(5904, body.GetProperty("max_tokens").GetInt32(), "thinking cannot expand past the remaining room");
+            Equal(4880, body.GetProperty("thinking").GetProperty("budget_tokens").GetInt32(), "reserve 1024 output tokens after thinking");
+        }),
         Case("models.catalog.looks-up-built-in-chat-models-by-provider-and-id", () =>
         {
             using var models = Models(new Dictionary<string, string>());

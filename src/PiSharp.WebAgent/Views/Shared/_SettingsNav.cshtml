@@ -1,0 +1,17 @@
+@* Decision 0011 (run W2, WU4): the mockups' _SettingsNav: Connections (Providers, Accounts & sign-ins, Models, Custom providers), Agent
+   (Defaults, Tools & workspace, Spend) and App (Appearance, Data & storage, About), from ShellNav.SettingsGroups. The active item is
+   ViewData[ShellViewData.SettingsSection]. *@
+@{
+    var active = ViewData[ShellViewData.SettingsSection] as string;
+}
+<nav class="settings-nav" aria-label="Settings sections">
+  @foreach (var group in ShellNav.SettingsGroups)
+  {
+    <div class="settings-nav-label">@group.Label</div>
+    @foreach (var item in group.Items)
+    {
+      var current = item.Id == active;
+      <a class="@(current ? "active" : null)" aria-current="@(current ? "page" : null)" href="@item.Href" data-settings-nav="@item.Id"><i class="bi @item.Icon"></i>@item.Label</a>
+    }
+  }
+</nav>

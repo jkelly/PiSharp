@@ -1,0 +1,11 @@
+@* Decision 0011 (run W4, R2): the mockups' Request · Agent switch (.ac-mode, a radiogroup of two btn-check radios). Request mode sends one
+   request per model and never runs tools; agent mode (R6's _AgentMode) runs each model on a task in its own copy of a project. compare.js
+   opens /compare or /compare?mode=agent when the choice changes (a new comparison in that mode); the switch is disabled while a request-mode
+   column streams. Both modes render it. Model: ComparePage. *@
+@model ComparePage
+<div class="ac-mode" role="radiogroup" aria-label="Compare mode" data-compare-mode>
+  <input type="radio" class="btn-check" name="cmpMode" id="cmpModeRequest" autocomplete="off" value="request" data-ac-mode="request" checked="@(!Model.AgentMode)" disabled="@Model.Running">
+  <label class="btn btn-sm btn-ghost" for="cmpModeRequest" title="One request per model, no tools">Request</label>
+  <input type="radio" class="btn-check" name="cmpMode" id="cmpModeAgent" autocomplete="off" value="agent" data-ac-mode="agent" checked="@Model.AgentMode" disabled="@Model.Running">
+  <label class="btn btn-sm btn-ghost" for="cmpModeAgent" title="Each model works on a task with tools, in its own copy of a project">Agent</label>
+</div>

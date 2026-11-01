@@ -1,0 +1,61 @@
+@* Decision 0011 (run W2, WU9): the mockups' _ProviderModels: the provider's catalog models with an On switch each (hidden models leave the
+   model pickers: POST /api/settings/models/visibility, saved at once), the default model's chip, context, max output, capabilities, thinking
+   range and list price. Long lists show the first 50 rows and link to Settings › Models. The mockup's per-provider default
+   model select is a later milestone (the default model is Settings › Defaults). Model: ProviderPage. *@
+@model ProviderPage
+@{
+    const int shown = 50;
+    var provider = Model.Provider;
+    var hidden = Model.Visibility;
+    var enabled = provider.Models.Count(item => !hidden.IsHidden(provider.Id, item.Id));
+    var subscription = provider.Billing == BillingKind.Subscription;
+    var modelsHref = "/settings/models?f=1&connected=" + (provider.IsConnected ? "1" : "0") + "&provider=" + Uri.EscapeDataString(provider.Id);
+}
+<section class="settings-section" id="models" data-provider-models="@provider.Id" data-model-total="@provider.Models.Count">
+  <h3>Models</h3>
+  <p class="section-desc">Turn a model off to hide it from the model picker. <span data-models-enabled-count>@enabled</span> of @(provider.Models.Count + " enabled" + (provider.Models.Count > shown ? $"; showing the first {shown}" : "")).</p>
+  @if (!provider.IsConnected && !provider.NoCredentials)
+  {
+    <div class="alert alert-warning py-2 fs-7 d-flex gap-2"><i class="bi bi-eye-slash mt-1" aria-hidden="true"></i><div>@(provider.State == ProviderState.Expired ? "Sign in again, replace the key or choose another account to use these models." : "Connect " + provider.Name + " to use these models.")</div></div>
+  }
+  <div class="d-flex flex-wrap align-items-end gap-3 mb-3">
+    <a class="btn btn-sm btn-ghost ms-auto" href="@modelsHref"><i class="bi bi-boxes me-1" aria-hidden="true"></i>All @provider.Models.Count models in Settings › Models</a>
+  </div>
+  <div class="ps-table-wrap">
+    <table class="table table-sm table-hover align-middle">
+      <thead>
+        <tr><th scope="col">On</th><th scope="col">Model</th><th scope="col" class="text-end">Context</th><th scope="col" class="text-end">Max out</th><th scope="col">Caps</th><th scope="col">Thinking</th><th scope="col" class="text-end">@(subscription ? "List $ in / out" : "$ in / out per 1M")</th></tr>
+      </thead>
+      <tbody>
+        @foreach (var row in provider.Models.Take(shown))
+        {
+          var off = hidden.IsHidden(provider.Id, row.Id);
+          var isDefault = Model.Defaults.Provider == provider.Id && Model.Defaults.Model == row.Id;
+          <tr class="@(off ? "is-off" : null)">
+            <td><div class="form-check form-switch m-0"><input class="form-check-input" type="checkbox" role="switch" checked="@(!off)" aria-label="Enable @row.Name" data-model-toggle="@ModelsSettings.Key(provider.Id, row.Id)"></div></td>
+            <td><div class="fw-medium">@row.Name @if (isDefault){<span class="ps-chip" data-tone="accent">default</span>}</div><div class="ps-mono fs-8 text-ps-faint">@row.Id</div></td>
+            <td class="ps-mono fs-7 text-end" title="@SettingsText.Count(row.ContextWindow) tokens">@CatalogText.Tokens(row.ContextWindow)</td>
+            <td class="ps-mono fs-7 text-end" title="@SettingsText.Count(row.MaxTokens) tokens">@(row.MaxTokens > 0 ? CatalogText.Tokens(row.MaxTokens) : "—")</td>
+            <td class="text-nowrap">
+              @if (row.Reasoning)
+              {
+                <span class="cap cap-reasoning"><i class="bi bi-lightbulb" aria-hidden="true"></i>reasoning</span>
+              }
+              @if (row.Input.Contains("image"))
+              {
+                <span class="cap cap-image" title="Image input"><i class="bi bi-image" aria-hidden="true"></i><span class="visually-hidden">image input</span></span>
+              }
+              else
+              {
+                <span class="cap" title="Text input only">text</span>
+              }
+            </td>
+            <td class="ps-mono fs-8 text-nowrap" title="@SettingsText.MissingLevels(row.ThinkingLevels)">@SettingsText.ThinkingRange(row.ThinkingLevels)</td>
+            <td class="ps-mono fs-7 text-end text-nowrap @(subscription ? "text-ps-faint" : null)">@(subscription && row.Cost is { } cost && (cost.Input > 0 || cost.Output > 0) ? CatalogText.Dollars(cost.Input) + " / " + CatalogText.Dollars(cost.Output) : SettingsText.Price(provider.Billing, row))</td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  </div>
+  <div class="fs-8 text-ps-faint mt-2">@("Switches save at once. Prices are list prices from the PiSharp catalog" + (subscription ? "; requests are billed through the subscription." : "."))</div>
+</section>
