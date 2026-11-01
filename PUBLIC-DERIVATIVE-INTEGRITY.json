@@ -10128,8 +10128,8 @@
       "originalSha256": "b9df6a6227b135ece76c86c5f3ce221c65918203352168e87e3115586b5d12f6"
     },
     {
-      "currentSha256": "dcc4d4144eb50903c29c227b42637efc27c03f17cf480b39c4a3dcf10ebbc587",
-      "currentBytes": 8888,
+      "currentSha256": "37ec084c62d80f8e991389fff03e17de8656b476d189052e0a80a3c91e80b58d",
+      "currentBytes": 9294,
       "originalBytes": 8427,
       "path": "src/PiSharp.Tools/Processes/Mcp/McpProcessLease.cs",
       "originalSha256": "3e8969736e08056dfd38bc1957c89034cd82a126f243440371cd965d11b77a1e"
@@ -11437,8 +11437,8 @@
       "originalSha256": "b97568011d519eefe4545caa79fa058c133e2dfb63d15acb283bcfcf82ebcc99"
     },
     {
-      "currentSha256": "933bb23cc6108712cce9f962731f21195f6e1f8b24c4f0b4173b25f0a271501b",
-      "currentBytes": 11164,
+      "currentSha256": "fc7861152ec0f9b558ec4d7eed5ff4c54e58cd4b5a97855dcea753a57443d93c",
+      "currentBytes": 12537,
       "originalBytes": 11164,
       "path": "tests/PiSharp.CodingAgent.Tests/McpProcessLeaseTests.cs",
       "originalSha256": "933bb23cc6108712cce9f962731f21195f6e1f8b24c4f0b4173b25f0a271501b"
