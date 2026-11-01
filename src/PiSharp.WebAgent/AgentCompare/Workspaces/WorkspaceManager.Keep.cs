@@ -1,9 +1,9 @@
 // Decision 0011 (run W4, unit R4): keeping one model's result.
 //  - Apply to project: the slot's diff becomes uncommitted changes in the project. It is refused, with nothing changed, when the project
 //    has uncommitted changes in any of the same files (for a worktree, `git status`; for a copy, the project file no longer matching the
-//    base copy), and when the patch no longer applies (`git apply --check`). A worktree's patch goes through `git apply` (working tree only,
-//    no --index, so nothing is staged or committed); a copy's files are copied over, each target checked to stay inside the project and not
-//    to pass through a link.
+//    base copy, or something of the project's standing where the copy writes a file), and when the patch no longer applies
+//    (`git apply --check`). A worktree's patch goes through `git apply` (working tree only, no --index, so nothing is staged or committed);
+//    a copy's files are copied over, deletions first, each target checked to stay inside the project and not to pass through a link.
 //  - Keep the branch (worktrees only): one commit with exactly the reviewed changes (the slot's private index, written as a tree), whose
 //    parent is the base commit, on the new branch pisharp/compare/<run>-<slot>, created with `git update-ref <ref> <commit> ""` so an
 //    existing branch is never moved. The user's current branch, HEAD, index and working tree are not touched, and nothing is pushed.
@@ -253,12 +253,39 @@ public sealed partial class WorkspaceManager
                 var status = !File.Exists(current) ? "deleted since the copy" : !File.Exists(original) ? "added since the copy" : "changed since the copy";
                 conflicts.Add(new UncommittedChange(file.Path, status));
             }
+            var listed = new HashSet<string>(conflicts.Select(change => change.Path), WorkspaceTree.PathComparer);
+            foreach (var (path, status) in InTheWay(manifest.ProjectPath, files))
+                if (listed.Add(path)) conflicts.Add(new UncommittedChange(path, status));
             return ((IReadOnlyList<UncommittedChange>)conflicts, (IReadOnlyList<UncommittedChange>)[]);
         }, cancellationToken).ConfigureAwait(false);
     }
 
+    // What of the project's stands where a copy's slot writes a file and the slot doesn't delete: inside a folder the agent replaced with a
+    // file, or a file where the agent made a folder. It is the project's own (added since the copy, or an excluded folder's contents), so
+    // Apply refuses rather than remove it. Links are left to NoLinksBetween.
+    private static IEnumerable<(string Path, string Status)> InTheWay(string project, IReadOnlyList<WorkspaceFileDiff> files)
+    {
+        var deleted = new HashSet<string>(files.Where(file => file.Change == WorkspaceFileChange.Deleted).Select(file => file.Path), WorkspaceTree.PathComparer);
+        foreach (var file in files.Where(file => file.Change != WorkspaceFileChange.Deleted))
+        {
+            var parts = file.Path.Split('/');
+            for (var depth = 1; depth < parts.Length; depth++)
+            {
+                var folder = string.Join('/', parts[..depth]);
+                var existing = WorkspaceTree.Join(project, folder);
+                if (File.Exists(existing) && !WorkspaceTree.IsLink(existing) && !deleted.Contains(folder))
+                    yield return (folder, "a file where this workspace has a folder");
+            }
+            var target = WorkspaceTree.Join(project, file.Path);
+            if (!Directory.Exists(target) || WorkspaceTree.IsLink(target)) continue;
+            foreach (var inside in WorkspaceTree.Contents(target).Select(path => file.Path + "/" + path).Where(path => !deleted.Contains(path)))
+                yield return (inside, "in a folder this workspace replaces with a file");
+        }
+    }
+
     // A copy's Apply: the slot's version of each changed file replaces the project's (or the project's is deleted). Every target is checked
-    // first, so a refused path changes nothing.
+    // first, so a refused path changes nothing. Deletions go first, then the folders they emptied where the slot has a file, then the slot's
+    // files, so a folder replaced by a file (or a file by a folder) applies whichever way its paths sort.
     private void CopyIntoProject(WorkspaceManifest manifest, ManifestSlot entry, IReadOnlyList<WorkspaceFileDiff> files)
     {
         var project = manifest.ProjectPath;
@@ -270,18 +297,19 @@ public sealed partial class WorkspaceManager
             var source = WorkspaceTree.Inside(slotPath, WorkspaceTree.Join(slotPath, file.Path));
             return (file.Change, Source: source, Target: target);
         }).ToList();
-        foreach (var (change, source, target) in plan)
+        // ApplyAsync refused these as conflicts a moment ago; checked again before anything changes.
+        foreach (var (path, _) in InTheWay(project, files))
+            throw new WorkspaceException(WorkspaceException.Invalid, $"{path} is in the way of this workspace's changes, so nothing was applied.");
+        foreach (var (_, _, target) in plan.Where(item => item.Change == WorkspaceFileChange.Deleted))
         {
-            if (change == WorkspaceFileChange.Deleted)
-            {
-                if (File.Exists(target))
-                {
-                    var info = new FileInfo(target);
-                    if (info.Attributes.HasFlag(FileAttributes.ReadOnly)) info.Attributes &= ~FileAttributes.ReadOnly;
-                    info.Delete();
-                }
-                continue;
-            }
+            if (!File.Exists(target)) continue;
+            var info = new FileInfo(target);
+            if (info.Attributes.HasFlag(FileAttributes.ReadOnly)) info.Attributes &= ~FileAttributes.ReadOnly;
+            info.Delete();
+        }
+        foreach (var (_, source, target) in plan.Where(item => item.Change != WorkspaceFileChange.Deleted))
+        {
+            if (Directory.Exists(target)) WorkspaceTree.Delete(target);
             Directory.CreateDirectory(Path.GetDirectoryName(target)!);
             File.Copy(source, target, overwrite: true);
         }

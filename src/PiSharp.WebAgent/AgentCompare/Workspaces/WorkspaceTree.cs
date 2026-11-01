@@ -180,6 +180,24 @@ internal static class WorkspaceTree
         return total;
     }
 
+    /// <summary>The files and links below <paramref name="folder"/>, as '/'-separated paths relative to it, without following links (a
+    /// link is listed, not entered). Folders are not listed, so a folder holding only empty folders has none.</summary>
+    public static IEnumerable<string> Contents(string folder)
+    {
+        var pending = new Stack<(string Full, string Relative)>();
+        pending.Push((folder, ""));
+        while (pending.Count > 0)
+        {
+            var (full, relative) = pending.Pop();
+            foreach (var entry in new DirectoryInfo(full).EnumerateFileSystemInfos("*", Entries).ToList())
+            {
+                var path = relative.Length == 0 ? entry.Name : relative + "/" + entry.Name;
+                if (entry is DirectoryInfo && !entry.Attributes.HasFlag(FileAttributes.ReparsePoint)) pending.Push((entry.FullName, path));
+                else yield return path;
+            }
+        }
+    }
+
     /// <summary>Deletes <paramref name="path"/> and everything below it without following links (a link is removed, not its target), and
     /// clears read-only attributes on the way. With <paramref name="keepTopLevel"/>, that one entry of the folder is left (and the folder
     /// with it). Retries briefly when a file is in use.</summary>

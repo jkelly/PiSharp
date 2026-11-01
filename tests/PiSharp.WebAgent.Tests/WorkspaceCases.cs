@@ -346,6 +346,45 @@ internal static partial class Program
             Equal(KeepResult.Refusals.NotGit, (await lab.Manager.KeepBranchAsync("cmp_copy", "a")).Refusal, "Keep the branch needs worktrees");
         }),
 
+        // A copy's agent replaced a folder with a file and a file with a folder (review of PR #40): "foo" sorts before "foo/bar.txt", so
+        // Apply deletes first, removes the folder its deletions emptied, then copies. Anything else of the project's in the way refuses the
+        // apply with nothing changed.
+        Case("workspaces.copy-apply-replaces-a-folder-with-a-file-and-a-file-with-a-folder", async () =>
+        {
+            await using var lab = WsLab.Create("replace");
+            var plain = lab.Folder("plain");
+            WsWrite(plain, ("foo/bar.txt", "bar\n"), ("foo/sub/deep.txt", "deep\n"), ("baz", "a file\n"), ("keep.txt", "keep\n"));
+            var run = await lab.Manager.CreateAsync(new WorkspaceRequest { Run = "cmp_replace", ProjectPath = plain, Slots = WsSlots("a") });
+            Equal(WorkspaceKind.Copy, run.Kind, "a copy");
+            var slot = run.Slots[0].Path;
+            Directory.Delete(Path.Join(slot, "foo"), recursive: true);
+            File.WriteAllText(Path.Join(slot, "foo"), "now a file\n");
+            File.Delete(Path.Join(slot, "baz"));
+            WsWrite(slot, ("baz/inner.txt", "now a folder\n"), ("late/y.txt", "y\n"));
+            Equal("baz,baz/inner.txt,foo,foo/bar.txt,foo/sub/deep.txt,late/y.txt", string.Join(",", (await lab.Manager.PreviewKeepAsync("cmp_replace", "a")).Files),
+                "the slot's files");
+
+            // Since the copy, the project gained a file in the folder the agent replaced and a file where the agent made a folder.
+            WsWrite(plain, ("foo/notes.txt", "mine\n"), ("late", "mine too\n"));
+            var preview = await lab.Manager.PreviewKeepAsync("cmp_replace", "a");
+            Equal("foo/notes.txt,late", string.Join(",", preview.Conflicts.Select(change => change.Path).Order(StringComparer.Ordinal)), "the preview names what is in the way");
+            Check(!preview.CanApply, "Apply is not offered");
+            var refused = await lab.Manager.ApplyAsync("cmp_replace", "a");
+            Equal(KeepResult.Refusals.Conflict, refused.Refusal, "refused: " + refused.Message);
+            Equal("in a folder this workspace replaces with a file", refused.Conflicts.Single(change => change.Path == "foo/notes.txt").Status, "and says why");
+            Check(File.Exists(Path.Join(plain, "foo", "bar.txt")) && File.ReadAllText(Path.Join(plain, "baz")) == "a file\n" && !Directory.Exists(Path.Join(plain, "baz")),
+                "nothing was applied");
+
+            File.Delete(Path.Join(plain, "foo", "notes.txt"));
+            File.Delete(Path.Join(plain, "late"));
+            var applied = await lab.Manager.ApplyAsync("cmp_replace", "a");
+            Equal(KeepOutcome.Applied, applied.Outcome, "applied: " + applied.Message);
+            Equal("now a file\n", File.ReadAllText(Path.Join(plain, "foo")), "the folder (with its emptied sub-folder) became the slot's file");
+            Equal("now a folder\n", File.ReadAllText(Path.Join(plain, "baz", "inner.txt")), "the file became the slot's folder");
+            Equal("y\n", File.ReadAllText(Path.Join(plain, "late", "y.txt")), "the new folder");
+            Equal("keep\n", File.ReadAllText(Path.Join(plain, "keep.txt")), "the rest is left alone");
+        }),
+
         Case("workspaces.keep-branch-creates-the-branch-and-leaves-the-current-one", async () =>
         {
             await using var lab = WsLab.Create("keep");
