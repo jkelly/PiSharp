@@ -1,0 +1,54 @@
+@* Decision 0011 (run W3, unit AP): the mockups' "_ConnectivityCheck" with its three panes. idle: not checked since the server started (and
+   what a check would test); running: a row per provider while the check runs; results: _AboutConnectivityResults. The check runs only when
+   the button is clicked: wwwroot/js/about.js POSTs /api/about/connectivity, which tests each provider's active account through the
+   credentials area's connection tester (a models list or a sign-in check: free, no model output) and answers the results pane. With --faux
+   nothing is sent. Model: AboutConnectivityView. *@
+@using PiSharp.WebAgent.About
+@model AboutConnectivityView
+@{
+    var checkedOnce = Model.Last is not null;
+}
+<div class="ps-card" id="connectivity" data-connectivity data-endpoint="@AboutModule.Prefix/connectivity" data-state="@(checkedOnce ? "results" : "idle")" aria-live="polite">
+  <div class="d-flex flex-wrap align-items-center gap-2 px-3 py-3 border-bottom">
+    <div class="flex-grow-1">
+      <div class="fw-semibold">Provider connectivity</div>
+      <div class="fs-8 text-ps-faint">Tests each provider's active account on a free endpoint: its models list, or a sign-in check. No model output is generated, so a check costs nothing.</div>
+    </div>
+    <button class="btn btn-primary btn-ps btn-sm" type="button" data-connectivity-run><i class="bi bi-activity me-1" aria-hidden="true"></i>Check provider connectivity</button>
+  </div>
+
+  <div data-pane="idle" class="px-3 py-4 text-center fs-7 text-ps-faint" hidden="@checkedOnce">
+    <div><i class="bi bi-broadcast me-1" aria-hidden="true"></i>Not checked since the server started.</div>
+    @if (Model.Offline)
+    {
+      <div class="fs-8 mt-1" data-connectivity-offline>@ConnectivityCheck.OfflineMessage</div>
+    }
+    else if (Model.Targets.Count == 0)
+    {
+      <div class="fs-8 mt-1">No provider is connected yet. Add a key or sign in under <a href="/settings/accounts">Accounts &amp; sign-ins</a>.</div>
+    }
+    else
+    {
+      <div class="fs-8 mt-1 ps-mono text-break">Checks @string.Join(" · ", Model.Targets.Select(target => target.Provider))</div>
+    }
+  </div>
+
+  <div data-pane="running" hidden>
+    @if (Model.Offline || Model.Targets.Count == 0)
+    {
+      <div class="provider-row"><span class="spinner-border spinner-border-sm text-primary" aria-hidden="true"></span><span class="fs-7 flex-grow-1">Checking…</span></div>
+    }
+    @foreach (var target in Model.Targets)
+    {
+      <div class="provider-row" data-connectivity-target="@target.Provider">
+        <span class="spinner-border spinner-border-sm text-primary" aria-hidden="true"></span>
+        <span class="ps-mono fs-7 flex-grow-1">@target.Provider</span>
+        <span class="ps-mono fs-8 text-ps-faint">checking…</span>
+      </div>
+    }
+  </div>
+
+  <div data-pane="results" data-connectivity-results hidden="@(!checkedOnce)">
+    <partial name="~/Views/Settings/_AboutConnectivityResults.cshtml" model="Model" />
+  </div>
+</div>

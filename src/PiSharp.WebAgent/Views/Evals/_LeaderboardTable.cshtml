@@ -1,0 +1,103 @@
+@* Decision 0011 (run W5, E6): the mockups' _LeaderboardTable: rank with its likely range, the model (logo, provider/model, settings),
+   the rating ± half its 95% interval drawn on a ci-track, wins–losses–ties with the votes, and the medians of the answers voted on: cost
+   (list price for a subscription, "≈ ... list"), TTFT p50 and tokens/s in a request tag; cost per run, run time and the latest check in an
+   agent tag. A value the run records do not have shows as a dash. Narrow screens drop the right-hand columns and show the record under
+   the rating. Model: LeaderboardPage. *@
+@model LeaderboardPage
+@{
+    var agent = Model.Mode == ArenaMode.Agent;
+}
+<div class="ps-table-wrap">
+  <table class="table align-middle lb-table" data-leaderboard-table>
+    <thead>
+      <tr>
+        <th scope="col" class="lb-rank-col">Rank</th>
+        <th scope="col">Model</th>
+        <th scope="col" class="text-end" title="Bradley–Terry rating centred on 1000, with its 95% interval">Rating</th>
+        <th scope="col" class="text-end d-none d-sm-table-cell" title="Wins, losses and ties against other models">W–L–T</th>
+        @if (agent)
+        {
+          <th scope="col" class="text-end d-none d-md-table-cell" title="Median cost per agent run">Cost per run</th>
+          <th scope="col" class="text-end d-none d-lg-table-cell" title="Median time for an agent to finish the task">Run time</th>
+          <th scope="col" class="text-end d-none d-lg-table-cell" title="Result of the run's check command in that model's workspace">Check</th>
+        }
+        else
+        {
+          <th scope="col" class="text-end d-none d-md-table-cell" title="Median cost per answer">Median cost</th>
+          <th scope="col" class="text-end d-none d-lg-table-cell" title="Median time to first token">TTFT p50</th>
+          <th scope="col" class="text-end d-none d-lg-table-cell" title="Median output tokens per second">Tokens/s</th>
+        }
+      </tr>
+    </thead>
+    <tbody>
+      @foreach (var row in Model.Rows)
+      {
+        var rated = row.Rated;
+        var metrics = row.Metrics;
+        var costTitle = new List<string>();
+        if (metrics.ListPrice) costTitle.Add(metrics.MixedBilling ? "Some answers are at list price (a subscription), for comparison." : "Subscription: list price, for comparison.");
+        if (agent)
+        {
+          var parts = new List<string>();
+          if (metrics.MedianTurns is { } turns) parts.Add(EvalText.Plural((int)Math.Round(turns), "turn", "turns"));
+          if (metrics.MedianFilesChanged is { } files) parts.Add(EvalText.Plural((int)Math.Round(files), "file changed", "files changed"));
+          if (parts.Count > 0) costTitle.Add("Median run: " + string.Join(", ", parts) + ".");
+        }
+        else if (metrics.MedianInputTokens is { } input && metrics.MedianOutputTokens is { } output)
+        {
+          costTitle.Add($"Median answer {EvalText.Count(input)} input and {EvalText.Count(output)} output tokens.");
+        }
+        <tr data-leaderboard-row data-model="@row.Model.Name">
+          <td><div class="lb-rank">@rated.Rank.ToString(CultureInfo.InvariantCulture)</div><div class="fs-8 text-ps-faint text-nowrap" title="Likely rank range">@rated.RankRange</div></td>
+          <td><partial name="_EvalModel" model="row.Model" /></td>
+          <td class="text-end text-nowrap" title="@($"95% interval {EvalText.Rating(rated.Low)}–{EvalText.Rating(rated.High)}")">
+            <div><span class="fw-semibold ps-mono">@EvalText.Rating(rated.Rating)</span> <span class="fs-8 text-ps-faint">± @EvalText.Rating(rated.HalfWidth)</span></div>
+            <div class="ci-track d-none d-sm-block" aria-hidden="true"><span style="left:@EvalText.CssPercent(row.TrackLeft);width:@EvalText.CssPercent(row.TrackWidth)"></span><i style="left:@EvalText.CssPercent(row.TrackMark)"></i></div>
+            <div class="fs-8 text-ps-faint ps-mono d-sm-none" title="Wins, losses and ties">@rated.Record</div>
+            @if (rated.Provisional)
+            {
+              <div class="fs-8 text-ps-faint" title="Fewer comparisons than the provisional threshold: its rating will still move">provisional</div>
+            }
+          </td>
+          <td class="text-end text-nowrap d-none d-sm-table-cell"><div class="ps-mono">@rated.Record</div><div class="fs-8 text-ps-faint">@EvalText.Plural(rated.Votes, "vote", "votes")</div></td>
+          <td class="text-end text-nowrap ps-mono d-none d-md-table-cell" title="@(costTitle.Count > 0 ? string.Join(" ", costTitle) : null)">
+            @if (metrics.MedianCostMicros is { } cost)
+            {
+              if (metrics.ListPrice)
+              {
+                <text>@EvalText.ListMoney(cost) <span class="fs-8 text-ps-faint">list</span></text>
+              }
+              else
+              {
+                <text>@EvalText.Money(cost)</text>
+              }
+            }
+            else
+            {
+              <span class="text-ps-faint" title="No cost recorded">—</span>
+            }
+          </td>
+          @if (agent)
+          {
+            <td class="text-end ps-mono d-none d-lg-table-cell">@(metrics.MedianDurationMs is { } duration ? EvalText.RunTime(duration) : "—")</td>
+            <td class="text-end d-none d-lg-table-cell">
+              @if (metrics.LatestCheck is { } check)
+              {
+                <span class="ps-chip" data-tone="@(check == "passed" ? "ok" : check == "failed" || check == "error" ? "danger" : "warn")" title="@metrics.LatestCheckSummary">@check</span>
+              }
+              else
+              {
+                <span class="text-ps-faint" title="No check command ran">—</span>
+              }
+            </td>
+          }
+          else
+          {
+            <td class="text-end ps-mono d-none d-lg-table-cell">@(metrics.MedianTtftMs is { } ttft ? EvalText.Duration(ttft) : "—")</td>
+            <td class="text-end ps-mono d-none d-lg-table-cell">@(metrics.MedianTokensPerSecond is { } speed ? EvalText.Speed(speed) : "—")</td>
+          }
+        </tr>
+      }
+    </tbody>
+  </table>
+</div>

@@ -1,0 +1,99 @@
+@* Decision 0011 (run W4, R3): the Run inspector (GET /runs/{id}), after the mockups' inspector.html, states default, error (the failure
+   banner: Show response, Try another model) and tool call (the notice: the run ended with a tool call; Continue in Playground), plus
+   running (it reloads when the run ends) and group (a run that groups others, such as an agent compare run: its models instead of the
+   tabs). The top bar is the breadcrumb History › Run id; then _RunHeader (Re-run, Load into playground, Download HAR / Run JSON, Delete
+   with a confirm, View code), the summary metrics and _RunTabs (Request, Response, Raw SSE, Normalized events, Timing, Usage & cost).
+   View code is _ViewCodeModal rendered from the run's stored request. W5 (E7): ⋯ Pin as test… opens _TestCaseModal (a call that completed).
+   inspector.js runs the page.
+   Model: RunInspectorView. *@
+@model RunInspectorView
+@{
+    ViewData["Title"] = "Run " + Model.Run.Id;
+    ViewData[ShellViewData.Nav] = ShellNav.History;
+    ViewData[ShellViewData.Page] = "inspector";
+}
+@section Styles
+{
+  <link href="~/css/playground.css" rel="stylesheet" asp-append-version="true" />
+  <link href="~/css/history.css" rel="stylesheet" asp-append-version="true" />
+}
+@section TopbarStart
+{
+  <nav class="app-breadcrumb" aria-label="Breadcrumb">
+    <a href="/history">History</a>
+    <span aria-hidden="true">›</span>
+    <h1 class="app-title current fs-7 mb-0 text-truncate">Run @Model.Run.Id</h1>
+  </nav>
+}
+@section Modals
+{
+  @if (Model.Code is not null)
+  {
+    <partial name="/Views/Shared/_ViewCodeModal.cshtml" model="Model.Code" />
+  }
+  <partial name="/Views/Shared/_SpendConfirmModal.cshtml" model="null" />
+  @if (PiSharp.WebAgent.Evals.Pins.PinRules.Offered(Model.Run))
+  {
+    <partial name="/Views/Shared/_TestCaseModal.cshtml" model="null" />
+  }
+}
+@section Scripts { <script type="module" src="~/js/inspector.js" asp-append-version="true"></script> }
+<div class="page" data-run-inspector="@Model.Run.Id" data-state="@Model.State" data-running="@(Model.Running ? "true" : "false")">
+  <partial name="/Views/Runs/_RunHeader.cshtml" model="Model" />
+
+  @if (Model.State == "error")
+  {
+    <div class="msg-error mb-3" role="alert" data-run-error>
+      <div class="d-flex align-items-start gap-2">
+        <i class="bi bi-x-octagon mt-1" aria-hidden="true"></i>
+        <div class="flex-grow-1 min-w-0">
+          <div class="fw-semibold">@Model.ErrorTitle</div>
+          <div class="small text-break">@Model.ErrorText</div>
+          <div class="d-flex flex-wrap gap-2 mt-2">
+            <button class="btn btn-sm btn-outline-danger" type="button" data-show-tab="response">Show response</button>
+            @if (Model.Replayable)
+            {
+              <a class="btn btn-sm btn-outline-secondary" href="@Model.PlaygroundHref"><i class="bi bi-arrow-left-right me-1" aria-hidden="true"></i>Try another model</a>
+            }
+          </div>
+        </div>
+      </div>
+    </div>
+  }
+  @if (Model.State == "toolcall" && Model.ToolCalls.Count > 0)
+  {
+    var call = Model.ToolCalls[0];
+    <div class="alert alert-info d-flex flex-wrap align-items-center gap-2 mb-3" data-run-toolcall>
+      <i class="bi bi-tools" aria-hidden="true"></i>
+      <span>The run ended with @(Model.ToolCalls.Count == 1 ? "a tool call" : Model.ToolCalls.Count + " tool calls"): <span class="ps-mono">@call.Name</span> <span class="ps-mono fs-8">@call.Id</span>@if (Model.ToolCalls.Count > 1) {<text> and @(Model.ToolCalls.Count - 1) more</text>}. PiSharp doesn't run tools here, so no result was sent.</span>
+      @if (Model.Replayable)
+      {
+        <a class="btn btn-sm btn-outline-primary ms-auto" href="@Model.PlaygroundHref">Continue in Playground</a>
+      }
+    </div>
+  }
+  @if (Model.State == "running")
+  {
+    <div class="alert alert-info d-flex flex-wrap align-items-center gap-2 mb-3" role="status" data-run-live>
+      <span class="status-dot live" aria-hidden="true"></span>
+      <span>This run is still streaming. The page reloads when it ends.</span>
+    </div>
+  }
+
+  @if (Model.State == "group")
+  {
+    <partial name="/Views/Runs/_RunChildren.cshtml" model="Model" />
+  }
+  else
+  {
+    <div class="ps-card overflow-hidden mb-3">
+      <div class="metric-strip border-0" data-run-metrics>
+        @foreach (var metric in Model.Metrics)
+        {
+          <div class="metric" data-metric="@metric.Label" title="@metric.Title"><div class="metric-label">@metric.Label</div><div class="@("metric-value" + (metric.Tone is null ? "" : " " + metric.Tone))">@metric.Value@if (metric.Unit is not null) {<text> </text><small>@metric.Unit</small>}</div></div>
+        }
+      </div>
+    </div>
+    <partial name="/Views/Runs/_RunTabs.cshtml" model="Model" />
+  }
+</div>

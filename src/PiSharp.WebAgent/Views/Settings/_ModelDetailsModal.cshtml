@@ -1,0 +1,79 @@
+@* Decision 0011 (run W2, WU9): the mockups' _ModelDetailsModal (#modal-model-details), filled by settings-models.js from the details button's
+   data-model (ModelDetails: the catalog's facts and the provider's credential chip, a masked hint at most) with textContent only. Tabs:
+   Overview, Pricing and Raw JSON (the catalog entry). The footer's Enabled switch saves at once, like the table's. The mockups' Thinking map,
+   Limits & cache and Compat tabs, the per-model default thinking select, "Override in models.json" and "Use in Playground" are later
+   milestones (the catalog contract carries none of that data yet). The chat page's model picker may reuse this partial. Model: none. *@
+<div class="modal fade" id="modal-model-details" tabindex="-1" aria-labelledby="modal-model-details-title" aria-hidden="true" data-model-details>
+  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <div class="d-flex align-items-center gap-3" style="min-width:0">
+          <span class="provider-logo lg" role="img" aria-label="Provider logo" data-md-logo><i class="bi bi-box" aria-hidden="true"></i></span>
+          <div style="min-width:0">
+            <h2 class="modal-title" id="modal-model-details-title" data-md="name">Model</h2>
+            <div class="modal-subtitle ps-mono text-break" data-md="key"></div>
+            <div class="d-flex flex-wrap gap-1 mt-2" data-md-caps></div>
+          </div>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <ul class="nav nav-tabs px-3 pt-1 flex-nowrap flex-shrink-0 overflow-auto" role="tablist" aria-label="Model detail sections">
+        <li class="nav-item" role="presentation"><button class="nav-link text-nowrap active" type="button" role="tab" data-bs-toggle="tab" data-bs-target="#md-overview" aria-controls="md-overview" aria-selected="true">Overview</button></li>
+        <li class="nav-item" role="presentation"><button class="nav-link text-nowrap" type="button" role="tab" data-bs-toggle="tab" data-bs-target="#md-pricing" aria-controls="md-pricing" aria-selected="false">Pricing</button></li>
+        <li class="nav-item" role="presentation"><button class="nav-link text-nowrap" type="button" role="tab" data-bs-toggle="tab" data-bs-target="#md-raw" aria-controls="md-raw" aria-selected="false">Raw JSON</button></li>
+      </ul>
+      <div class="modal-body tab-content">
+        <div class="tab-pane fade show active" id="md-overview" role="tabpanel" tabindex="0">
+          <div class="row g-4">
+            <div class="col-md-6">
+              <div class="ps-label mb-1">Endpoint</div>
+              <div class="kv"><span class="k">Provider</span><span class="v ps-mono" data-md="provider"></span></div>
+              <div class="kv"><span class="k">Credential</span><span class="v" data-md="credential"></span></div>
+              <div class="kv"><span class="k">Billing</span><span class="v" data-md="billing"></span></div>
+            </div>
+            <div class="col-md-6">
+              <div class="ps-label mb-1">Capabilities</div>
+              <div class="kv"><span class="k">Context window</span><span class="v ps-mono" data-md="context"></span></div>
+              <div class="kv"><span class="k">Max output</span><span class="v ps-mono" data-md="maxTokens"></span></div>
+              <div class="kv"><span class="k">Input</span><span class="v" data-md="input"></span></div>
+              <div class="kv"><span class="k">Reasoning</span><span class="v" data-md="reasoning"></span></div>
+              <div class="kv"><span class="k">Thinking levels</span><span class="v" data-md="thinking"></span></div>
+            </div>
+            <div class="col-12">
+              <div class="ps-label mb-1">Your settings</div>
+              <div class="kv"><span class="k">Shown in the model pickers</span><span class="v" data-md="shown"></span></div>
+              <div class="kv"><span class="k">Default model</span><span class="v" data-md="default"></span></div>
+            </div>
+          </div>
+        </div>
+        <div class="tab-pane fade" id="md-pricing" role="tabpanel" tabindex="0">
+          <div class="ps-table-wrap mb-3">
+            <table class="table table-sm align-middle">
+              <thead><tr><th scope="col">Rate</th><th scope="col">Field</th><th scope="col" class="text-end">Per 1M tokens</th></tr></thead>
+              <tbody>
+                <tr><td>Input</td><td class="ps-mono fs-8 text-secondary">cost.input</td><td class="ps-mono text-end" data-md="costInput"></td></tr>
+                <tr><td>Output</td><td class="ps-mono fs-8 text-secondary">cost.output</td><td class="ps-mono text-end" data-md="costOutput"></td></tr>
+                <tr><td>Cache read</td><td class="ps-mono fs-8 text-secondary">cost.cacheRead</td><td class="ps-mono text-end" data-md="costCacheRead"></td></tr>
+                <tr><td>Cache write</td><td class="ps-mono fs-8 text-secondary">cost.cacheWrite</td><td class="ps-mono text-end" data-md="costCacheWrite"></td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p class="fs-8 text-ps-faint mb-0" data-md="pricingNote">List prices from the PiSharp catalog.</p>
+        </div>
+        <div class="tab-pane fade" id="md-raw" role="tabpanel" tabindex="0">
+          <div class="ps-term">
+            <div class="ps-term-bar"><span class="dot"></span><span data-md="rawTitle">catalog</span><button class="btn btn-icon ms-auto" type="button" data-copy="#model-raw-json" title="Copy JSON" aria-label="Copy JSON"><i class="bi bi-copy" aria-hidden="true"></i></button></div>
+            <pre id="model-raw-json"><code class="language-json" data-md="raw"></code></pre>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer flex-wrap gap-2">
+        <div class="form-check form-switch mb-0 me-auto">
+          <input class="form-check-input" type="checkbox" role="switch" id="mdEnabled" data-md-toggle>
+          <label class="form-check-label fs-7" for="mdEnabled">Enabled</label>
+        </div>
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>

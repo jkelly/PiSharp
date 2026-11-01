@@ -1,0 +1,118 @@
+/* Decision 0011 (run W2, WU7, WU8): the chat pages' styles that Web.Common's shell.css and the Web Agent's site.css do not have: the
+   transcript pieces of PiSharp Durable Web's fragments (entry ids, event lines, context notes, nested calls, live output, images), the
+   "Waiting for you" panel above the composer and the hero composer of a new chat; and WU8's chat states (background, reconnecting,
+   partial answers, the live footer, tool-use footers on hover), the session tree's buttons and runs, the approval dialog's badge, the
+   kept-running toast and the 375px rules. Colours are the theme's tokens (status colours only for status), so light and dark both work. */
+
+.msg-plain { white-space: pre-wrap; }
+.msg-image { display: block; max-width: min(100%, 28rem); max-height: 20rem; border-radius: .5rem; border: 1px solid var(--ps-border); margin-top: .5rem; }
+
+.entry-id { font-size: .72rem; color: var(--ps-faint); font-variant-numeric: tabular-nums; }
+.msg-user .entry-hover { display: flex; justify-content: flex-end; align-items: center; gap: .25rem; margin-top: .2rem; opacity: 0; transition: opacity .15s ease; }
+.msg-user:hover .entry-hover, .msg-user:focus-within .entry-hover { opacity: 1; }
+.msg-actions .entry-id { align-self: center; margin-left: .35rem; }
+
+.event-group { display: block; }
+.event-line { display: flex; align-items: center; gap: .55rem; font-size: .8125rem; color: var(--ps-faint); margin: 0 0 1.5rem; }
+.event-line::before, .event-line::after { content: ""; height: 1px; background: var(--ps-border); flex: 1; min-width: 1rem; }
+.event-line .ev-text { display: inline-flex; align-items: center; gap: .45rem; max-width: 80%; text-align: center; }
+.event-line .btn-icon { --bs-btn-padding-y: .1rem; --bs-btn-padding-x: .3rem; }
+.event-block { margin: -1rem 0 1.5rem; }
+.event-block .context-note { max-width: 560px; margin: 0 auto; }
+.context-note > summary { list-style: none; cursor: pointer; text-align: center; font-size: .78rem; color: var(--ps-faint); }
+.context-note > summary::-webkit-details-marker { display: none; }
+.context-note > summary:hover { color: var(--ps-text); }
+.context-note .note-body { margin-top: .5rem; font-size: .8125rem; color: var(--ps-muted); background: var(--ps-surface-3); border-radius: 12px; padding: .6rem .8rem; line-height: 1.6; }
+
+.tool-card .tool-status { font-size: .75rem; color: var(--ps-faint); white-space: nowrap; }
+.tool-card .tool-body .result-head { display: flex; align-items: center; gap: .5rem; margin-bottom: .25rem; }
+.nested-calls { margin-top: .6rem; padding-left: .75rem; border-left: 1px solid var(--ps-border-strong); }
+.nested-calls .tool-card { margin: .35rem 0; }
+.nested-label { font-size: .75rem; color: var(--ps-faint); }
+.live-output { max-height: 220px; overflow-y: auto; }
+
+.pending-panel { max-width: 768px; max-height: 50vh; overflow-y: auto; margin: 0 auto .6rem; border: 1px solid var(--bs-warning-border-subtle); border-radius: 18px; background: var(--ps-surface); }
+[data-bs-theme="dark"] .pending-panel { background: var(--ps-elevated); }
+.pending-head { display: flex; align-items: center; gap: .5rem; padding: .6rem 1rem; font-size: .85rem; font-weight: 500; }
+.pending-body { padding: 0 1rem .85rem; }
+.pending-body fieldset { border: 0; padding: 0; margin: 0; }
+.pending-body legend { font-size: inherit; float: none; width: auto; margin-bottom: .35rem; }
+.pending-body .q-text { font-size: .9rem; font-weight: 500; margin-bottom: .55rem; }
+.pending-body .choice-card { padding: .55rem .8rem; margin-bottom: .4rem; }
+.pending-body .awaiting-card { margin: 0 !important; }
+
+.chat-branch-note { max-width: 768px; margin: 0 auto .5rem; }
+.chat-hero-text { max-width: 520px; }
+.empty-hero .composer { margin-top: 1.25rem; }
+.chat-info .pane-body { overflow-y: auto; }
+
+/* ---------- WU8: chat states ---------- */
+.min-w-0 { min-width: 0; }
+.status-dot.waiting { background: #f59e0b; }
+
+/* background: the "Kept running while you were away" note shows only in a tab that opened during the run (chat.js sets data-background). */
+.run-note[data-run-note] { display: none; }
+.chat-layout[data-background="true"] .run-note[data-run-note] { display: flex; }
+
+/* reconnecting: the live footer says "paused while reconnecting", and the live dot and cursor rest until the stream is back. */
+.msg-live-footer [data-live-status="reconnecting"] { display: none; }
+.chat-layout[data-stream="reconnecting"] .msg-live-footer [data-live-status="live"] { display: none; }
+.chat-layout[data-stream="reconnecting"] .msg-live-footer [data-live-status="reconnecting"] { display: inline; }
+.chat-layout[data-stream="reconnecting"] .msg-role .status-dot.live { animation: none; background: var(--ps-faint); }
+.chat-layout[data-stream="reconnecting"] .stream-cursor::after { animation: none; opacity: .35; }
+
+/* A partial answer (stopped or dropped) stays readable but quieter than a complete one. */
+.msg-partial { color: var(--ps-muted); }
+
+/* An answer that stopped for a tool call is one turn of a run: its numbers show on hover or focus, as the actions do. */
+.msg-assistant[data-stop="toolUse"] > .msg-body > .msg-footer[data-message-metrics] > :not(.msg-actions) { opacity: 0; transition: opacity .15s ease; }
+.msg-assistant[data-stop="toolUse"]:hover > .msg-body > .msg-footer[data-message-metrics] > *,
+.msg-assistant[data-stop="toolUse"]:focus-within > .msg-body > .msg-footer[data-message-metrics] > * { opacity: 1; }
+
+.tool-card > summary .ps-chip { flex: none; }
+.tool-card > summary .tool-status { flex: none; }
+
+/* ---------- WU8: session tree ---------- */
+button.tree-node { width: 100%; border: 0; background: transparent; color: inherit; font: inherit; text-align: left; }
+button.tree-node:focus-visible { outline: 2px solid var(--ps-border-strong); outline-offset: 1px; }
+.tree-node.selected { background: var(--ps-hover); box-shadow: inset 0 0 0 1px var(--ps-border-strong); }
+.tree-node:not(.on-path) .text { color: var(--ps-muted); }
+.tree .tree-run { padding-left: 0; margin-left: 0; border-left: 0; }
+.tree .tree-branch + .tree-branch { margin-top: .15rem; }
+
+/* ---------- WU8: dialogs, panels and the toast ---------- */
+.approval-logo { background: var(--ps-warn-bg); color: var(--ps-warn); border-color: transparent; flex: none; }
+.info-clamp { display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
+[data-panel="notices"] { max-width: 768px; margin: 0 auto; }
+[data-panel="notices"]:empty { display: none; }
+.kept-running-row + .kept-running-row { margin-top: .3rem; }
+.kept-running-row a { color: var(--ps-text); }
+
+/* ---------- WU8: phones (375px) ---------- */
+@media (max-width: 575.98px) {
+  .chat-composer-wrap { padding-left: .75rem; padding-right: .75rem; }
+  .composer-toolbar { flex-wrap: wrap; row-gap: .4rem; }
+  .composer-toolbar .form-select { max-width: 9.5rem; }
+  .msg-footer { gap: .2rem .6rem; }
+  .msg-actions .msg-account { max-width: 45vw; }
+  .tool-card > summary { flex-wrap: wrap; row-gap: .2rem; }
+  .tool-card .tool-args-summary { flex-basis: 40%; }
+  .tree-node .text { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+  .modal-footer > * { margin-top: .25rem; }
+  .app-banner { flex-wrap: wrap; }
+  .app-banner .btn { margin-left: 0 !important; }
+}
+
+/* ---------- W3 (S5): the send estimate, over-cap chip, cost marks and the spend stop ---------- */
+.composer-spend { display: contents; }
+.run-estimate { cursor: help; }
+.ps-tip-left .tooltip-inner { text-align: left; max-width: 20rem; }
+.composer-estimate { background: transparent; border: 0; border-radius: 999px; padding: .2rem .45rem; font-size: .8125rem; color: var(--ps-faint); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.composer-estimate:hover, .composer-estimate:focus-visible { background: var(--ps-hover); color: var(--ps-text); }
+.msg-spend { background: var(--ps-warn-bg); border-color: transparent; color: var(--ps-text); }
+.msg-spend .bi-shield-exclamation { color: var(--ps-warn); }
+[data-spend-mark], [data-spend-resolve] { font-variant-numeric: tabular-nums; }
+@media (max-width: 575.98px) {
+  .composer-estimate { padding: .2rem .3rem; }
+  [data-banner="spend"] > .ms-auto { margin-left: 0 !important; }
+}

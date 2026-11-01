@@ -1,0 +1,61 @@
+@model JobsTabModel
+<div class="ins-section">
+  <h3>Durable jobs <span class="ms-auto fs-8 text-ps-faint">@Model.Definitions.Count on @Model.Device.Id</span></h3>
+  <p class="ins-hint">Repeatable workflows. Every phase is a checkpoint, so a restart resumes the current phase. Agents use <code>list_durable_jobs</code>, <code>run_durable_job</code> and <code>check_durable_job</code>.</p>
+  @foreach (var job in Model.Definitions)
+  {
+    var id = Display.Str(job, "id");
+    var phases = Display.Objects(job, "phases").ToList();
+    var latest = Model.Runs.FirstOrDefault(run => Display.Str(run, "job") == id);
+    var (statusText, _) = Display.JobStatus(Display.Str(latest, "status"));
+    <article class="job-def" data-job="@id">
+      <div class="job-def-head"><i class="bi bi-diagram-3 text-secondary"></i><span class="job-def-title">@Display.Str(job, "title")</span>@if (Display.Bool(job, "needsApproval"))
+        {<span class="ps-chip" data-tone="warn">needs approval</span>}<span class="ps-chip">~@(Display.Long(job, "estimatedSeconds") ?? 10)s</span></div>
+      <p>@Display.Str(job, "summary")</p>
+      <div class="phase-chain">
+        @for (var i = 0; i < phases.Count; i++)
+        {
+          var kind = Display.Str(phases[i], "kind");
+          <span class="phase-pill"><span class="n">@(i + 1)</span>@Display.Str(phases[i], "label")@if (Display.Bool(phases[i], "usesAgent"))
+            {<i class="bi bi-robot" title="Uses a subagent"></i>}@if (kind == "approval")
+            {<i class="bi bi-shield-check" title="Waits for a person"></i>}@if (kind == "repeat")
+            {<i class="bi bi-arrow-repeat" title="Repeats; one checkpoint per check"></i>}</span>
+          if (i < phases.Count - 1)
+          {
+            <i class="bi bi-arrow-right phase-arrow"></i>
+          }
+        }
+      </div>
+      <div class="job-def-meta">
+        @foreach (var input in Display.Objects(job, "inputs"))
+        {
+          <span><code>@Display.Str(input, "name")=@Display.Number(input, "default")</code></span>
+        }
+        @if (Display.Str(job, "resultPath") is { } path)
+        {
+          <span>→ <code>@path</code></span>
+        }
+      </div>
+      <div class="job-def-run">
+        @if (latest is not null)
+        {
+          <span>Run #@(Display.Long(latest, "run") ?? 1): <strong>@statusText</strong>@if (Display.Str(latest, "status") is "running" or "waiting" && Display.Str(latest, "phase") is { } phase)
+            { <span> in @(phases.FirstOrDefault(item => Display.Str(item, "id") == phase) is { } current ? Display.Str(current, "label") : phase)</span> }</span>
+          <a class="fs-7" href="#job-@Display.Long(latest, "id")" data-scroll-to="#job-@Display.Long(latest, "id")">Show in chat</a>
+        }
+        else
+        {
+          <span class="text-ps-faint">Not run yet</span>
+        }
+        @if (latest is not null && Display.Str(latest, "status") == "waiting")
+        {
+          <span class="ms-auto d-flex gap-1"><button class="btn btn-sm btn-outline-secondary" type="button" data-action="approve-job" data-task="@Display.Long(latest, "id")" data-approved="false">Decline</button><button class="btn btn-sm btn-primary" type="button" data-action="approve-job" data-task="@Display.Long(latest, "id")" data-approved="true">Approve</button></span>
+        }
+        else
+        {
+          <button class="btn btn-sm btn-outline-secondary ms-auto" type="button" data-action="run-job" data-job="@id" data-title="@Display.Str(job, "title")"><i class="bi bi-play-fill me-1"></i>Run</button>
+        }
+      </div>
+    </article>
+  }
+</div>

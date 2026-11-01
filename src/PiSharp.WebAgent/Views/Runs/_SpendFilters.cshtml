@@ -1,0 +1,142 @@
+@* Decision 0011 (run W3, S4): the mockups' _SpendFilters (the History filters plus Account): search, a UTC date range, Provider → Model
+   (the model list is the chosen provider's), and under More filters the source, the account (grouped by billing mode) and the status, plus
+   Saved filters; then the active filter chips with "N of M requests". A plain GET form (the filters live in the query string, so every
+   view is a link); spend-history.js applies a change at once. Saved filters (W3 fix, spend-ui) lists the user's named filters (the
+   spend-filters section; the one the page shows is marked), then Save current filters… (only when a filter is set) and Manage saved
+   filters, which open _SaveSpendFilterModal and _ManageSpendFiltersModal. Model: SpendHistoryPage. *@
+@using System.Globalization
+@model SpendHistoryPage
+@{
+    var filter = Model.Filter;
+    var options = Model.Options;
+    var more = filter.Source is not null || filter.Account is not null || filter.Status is not null;
+    static string Day(DateOnly? day) => day?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) ?? "";
+    var statuses = new[] { LedgerStatus.Settled, LedgerStatus.Estimate, LedgerStatus.Uncertain, LedgerStatus.Released, LedgerStatus.Reserved };
+}
+<section class="ps-card p-3 mb-3" aria-label="Filters">
+  <form id="spendFilters" method="get" action="/history/spend" data-spend-filters>
+    <div class="row g-2 align-items-end">
+      <div class="col-12 col-md-6 col-lg-4">
+        <label class="ps-label d-block mb-1" for="sSearch">Search</label>
+        <div class="position-relative">
+          <i class="bi bi-search position-absolute top-50 translate-middle-y ms-2 text-ps-faint fs-8" aria-hidden="true"></i>
+          <input class="form-control form-control-sm ps-4" type="search" id="sSearch" name="q" value="@filter.Search" placeholder="Run id, op, model, note…" maxlength="200">
+        </div>
+      </div>
+      <div class="col-12 col-md-6 col-lg-4">
+        <span class="ps-label d-block mb-1" id="sDateLabel">Date range (UTC)</span>
+        <div class="input-group input-group-sm" role="group" aria-labelledby="sDateLabel">
+          <label class="visually-hidden" for="sFrom">From</label>
+          <input class="form-control" type="date" id="sFrom" name="from" value="@Day(filter.From)" data-spend-auto>
+          <span class="input-group-text"><i class="bi bi-arrow-right" aria-hidden="true"></i></span>
+          <label class="visually-hidden" for="sTo">To</label>
+          <input class="form-control" type="date" id="sTo" name="to" value="@Day(filter.To)" data-spend-auto>
+        </div>
+      </div>
+      <div class="col-6 col-lg-2">
+        <label class="ps-label d-block mb-1" for="sProvider">Provider</label>
+        <select class="form-select form-select-sm" id="sProvider" name="provider" data-spend-auto data-spend-provider>
+          <option value="" selected="@(filter.Provider is null)">All providers</option>
+          @foreach (var option in options.Providers)
+          {
+            <option value="@option.Value" selected="@(option.Value == filter.Provider)">@option.Text</option>
+          }
+        </select>
+      </div>
+      <div class="col-6 col-lg-2">
+        <label class="ps-label d-block mb-1" for="sModel">Model</label>
+        @if (filter.Provider is null)
+        {
+          <select class="form-select form-select-sm" id="sModel" disabled><option>Choose a provider first</option></select>
+        }
+        else
+        {
+          <select class="form-select form-select-sm" id="sModel" name="model" data-spend-auto data-spend-model>
+            <option value="" selected="@(filter.Model is null)">All models</option>
+            @foreach (var option in options.Models)
+            {
+              <option value="@option.Value" selected="@(option.Value == filter.Model)">@option.Text</option>
+            }
+          </select>
+        }
+      </div>
+    </div>
+    <button class="btn btn-sm btn-ghost mt-2" type="button" data-bs-toggle="collapse" data-bs-target="#spendMoreFilters" aria-expanded="@(more ? "true" : "false")" aria-controls="spendMoreFilters"><i class="bi bi-sliders me-1" aria-hidden="true"></i>More filters</button>
+    <div class="@("collapse" + (more ? " show" : ""))" id="spendMoreFilters">
+      <div class="row g-2 align-items-end pt-2">
+        <div class="col-6 col-lg-3">
+          <label class="ps-label d-block mb-1" for="sSource">Source</label>
+          <select class="form-select form-select-sm" id="sSource" name="source" data-spend-auto>
+            <option value="" selected="@(filter.Source is null)">All sources</option>
+            @foreach (var option in SpendSources.All)
+            {
+              <option value="@option.Wire()" selected="@(option == filter.Source)">@option.Label()</option>
+            }
+          </select>
+        </div>
+        <div class="col-6 col-lg-3">
+          <label class="ps-label d-block mb-1" for="sAccount">Account</label>
+          <select class="form-select form-select-sm" id="sAccount" name="account" data-spend-auto>
+            <option value="" selected="@(filter.Account is null)">All accounts</option>
+            @foreach (var group in options.Accounts)
+            {
+              <optgroup label="@group.Label">
+                @foreach (var option in group.Options)
+                {
+                  <option value="@option.Value" selected="@(option.Value == filter.Account)">@option.Text</option>
+                }
+              </optgroup>
+            }
+          </select>
+        </div>
+        <div class="col-6 col-lg-3">
+          <label class="ps-label d-block mb-1" for="sStatus">Status</label>
+          <select class="form-select form-select-sm" id="sStatus" name="status" data-spend-auto>
+            <option value="" selected="@(filter.Status is null)">All statuses</option>
+            @foreach (var option in statuses)
+            {
+              <option value="@SpendHistoryFilter.StatusWire(option)" selected="@(option == filter.Status)">@SpendHistoryFilter.StatusWire(option)</option>
+            }
+          </select>
+        </div>
+        <div class="col-6 col-lg-3">
+          <div class="dropdown">
+            <button class="btn btn-sm btn-outline-secondary dropdown-toggle w-100" type="button" data-bs-toggle="dropdown" aria-expanded="false"><i class="bi bi-bookmark me-1" aria-hidden="true"></i>Saved filters</button>
+            <ul class="dropdown-menu dropdown-menu-end spend-saved-menu" data-saved-filters>
+              <li><h6 class="dropdown-header">Saved filters</h6></li>
+              @foreach (var saved in Model.Saved)
+              {
+                <li><a class="@("dropdown-item text-truncate" + (saved.Current ? " active" : ""))" href="@saved.Href" title="@saved.Description" aria-current="@(saved.Current ? "true" : null)" data-saved-filter="@saved.Name"><i class="bi @saved.Icon me-2" aria-hidden="true"></i>@saved.Name</a></li>
+              }
+              @if (Model.Saved.Count == 0)
+              {
+                <li><span class="dropdown-item-text fs-8 text-ps-faint" data-saved-filters-empty>None saved yet.</span></li>
+              }
+              <li><hr class="dropdown-divider"></li>
+              <li><button class="dropdown-item" type="button" data-bs-toggle="modal" data-bs-target="#modal-save-spend-filter" disabled="@(!filter.Active)" data-save-filter-open><i class="bi bi-plus-lg me-2" aria-hidden="true"></i>Save current filters…</button></li>
+              <li><button class="dropdown-item" type="button" data-bs-toggle="modal" data-bs-target="#modal-manage-spend-filters" disabled="@(Model.Saved.Count == 0)" data-manage-filters-open><i class="bi bi-pencil me-2" aria-hidden="true"></i>Manage saved filters</button></li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+    @if (filter.Size != 25)
+    {
+      <input type="hidden" name="size" value="@filter.Size">
+    }
+    <button class="visually-hidden" type="submit">Apply filters</button>
+  </form>
+</section>
+
+@if (Model.Chips.Count > 0)
+{
+  <div class="d-flex flex-wrap align-items-center gap-2 mb-3" data-spend-chips>
+    <span class="ps-label">Active filters</span>
+    @foreach (var chip in Model.Chips)
+    {
+      <span class="ps-chip" data-tone="accent">@chip.Text <a class="text-reset" href="@chip.Href" aria-label="Remove @chip.Name filter"><i class="bi bi-x-lg" aria-hidden="true"></i></a></span>
+    }
+    <a class="fs-8 ps-mono" href="/history/spend">Clear all</a>
+    <span class="ms-auto fs-8 ps-mono text-ps-faint" data-spend-count>@Model.Ledger.Total.ToString("#,0", CultureInfo.InvariantCulture) of @Model.Ledger.TotalAll.ToString("#,0", CultureInfo.InvariantCulture) requests</span>
+  </div>
+}

@@ -1,0 +1,74 @@
+@* Decision 0011 (run W4, R1): _RequestConfig's Model & auth section: the two linked dropdowns Provider → Model (_ProviderModelSelect with
+   the config's prefix), the model's capability chips, its API (read-only), baseUrl and apiKey (shown, never sent: a run uses the provider's
+   base URL and the bound account, whose credential stays on the server) and the resolved account as a masked hint at most, with how the
+   provider bills. request-config.js refreshes the chips, API and account from GET /api/playground/model when the model changes.
+   W4 fix 2: the account choice ([data-account-choice], "Run on"): the provider's active account (no id sent) or one of its accounts by id
+   (labels only, never a credential). It shows when the provider has two accounts or more, or the draft names one (a preset, a run), so a
+   preset's account loads here instead of being ignored; request-spec.js sends the chosen id as the RunSpec's account, and the run engine
+   refuses an account the provider does not have (never a silent switch). Model: RequestConfigView. *@
+@using PiSharp.WebAgent.Playground
+@model RequestConfigView
+@{
+    var p = Model.IdPrefix;
+    var auth = Model.Auth;
+}
+<div class="accordion-item">
+  <h3 class="accordion-header">
+    <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#@(p)-cfg-model" aria-expanded="true" aria-controls="@(p)-cfg-model"><i class="bi bi-cpu me-2 text-ps-faint"></i><span class="flex-grow-1">Model &amp; auth</span></button>
+  </h3>
+  <div id="@(p)-cfg-model" class="accordion-collapse collapse show" data-section="model">
+    <div class="accordion-body">
+      <div class="param-row" data-config-model>
+        <partial name="_ProviderModelSelect" model="Model.Picker" />
+        <div class="d-flex flex-wrap gap-1 mt-2" data-cap-chips>
+          @foreach (var chip in Model.Chips)
+          {
+            <span class="cap @chip.Kind">@if (chip.Icon is not null){<i class="bi @chip.Icon"></i>}@chip.Text</span>
+          }
+        </div>
+        @if (Model.Capabilities is null)
+        {
+          <div class="form-text text-ps-warn mt-1" data-model-unknown><i class="bi bi-exclamation-triangle me-1"></i>@Model.ModelRef is not a model PiSharp knows. Choose another to run.</div>
+        }
+      </div>
+      <div class="param-row">
+        <div class="param-head">
+          <label class="param-name" for="@(p)-api">api <i class="bi bi-question-circle param-help" tabindex="0" data-bs-toggle="tooltip" title="Wire protocol from the model catalog. Read-only: pick another model to change it."></i></label>
+          <span class="ps-chip">read-only</span>
+        </div>
+        <input class="form-control form-control-sm ps-mono" id="@(p)-api" value="@Model.Api" readonly data-model-api>
+      </div>
+      <div class="param-row param-disabled" data-unsent="baseUrl">
+        <div class="param-head">
+          <label class="param-name" for="@(p)-base-url">baseUrl <i class="bi bi-question-circle param-help" tabindex="0" data-bs-toggle="tooltip" title="Overrides the model's base URL for this request only."></i></label>
+        </div>
+        <input class="form-control form-control-sm ps-mono" id="@(p)-base-url" placeholder="the provider's base URL" disabled>
+        <div class="form-text mt-1">@RequestConfigView.Unsent["baseUrl"].Reason</div>
+      </div>
+      <div class="param-row param-disabled" data-unsent="apiKey">
+        <div class="param-head">
+          <label class="param-name" for="@(p)-api-key">apiKey <i class="bi bi-question-circle param-help" tabindex="0" data-bs-toggle="tooltip" title="A per-request key. Never saved in presets or run history."></i></label>
+        </div>
+        <input type="password" class="form-control form-control-sm ps-mono" id="@(p)-api-key" placeholder="Not set · using the resolved credential" autocomplete="off" disabled>
+        <div class="form-text mt-1">@RequestConfigView.Unsent["apiKey"].Reason</div>
+      </div>
+      <div class="param-row" data-config-auth>
+        <div class="ps-label mb-1">Resolved auth</div>
+        <div class="kv"><span class="k">Source</span><span class="v"><span class="ps-chip" data-tone="@(auth?.Tone ?? "warn")" data-auth-source>@(auth?.Source ?? "Choose a model")</span></span></div>
+        <div class="kv" data-auth-account-row hidden="@(auth?.AccountLabel is null)"><span class="k">Account</span><span class="v text-break" data-auth-account>@auth?.AccountLabel</span></div>
+        <div class="kv"><span class="k">Billing</span><span class="v" data-auth-billing>@(auth?.BillingText ?? "unknown")</span></div>
+        <div class="mt-2" data-account-choice hidden="@(auth?.AccountChoice != true)">
+          <label class="form-label fs-8 mb-1" for="@(p)-account">Run on</label>
+          <select class="form-select form-select-sm" id="@(p)-account" data-account-select>
+            @foreach (var option in auth?.AccountOptions ?? [])
+            {
+              <option value="@option.Value" selected="@option.Selected" disabled="@option.Disabled" data-label="@option.Label">@option.Text</option>
+            }
+          </select>
+          <div class="form-text mt-1">The active account follows Settings › Accounts; a chosen one stays until you change it here.</div>
+        </div>
+        <a class="fs-8" href="@(string.IsNullOrEmpty(Model.Draft.Provider) ? "/settings/providers" : "/settings/providers/" + Uri.EscapeDataString(Model.Draft.Provider))" data-auth-manage>Manage connection →</a>
+      </div>
+    </div>
+  </div>
+</div>

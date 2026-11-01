@@ -1,0 +1,59 @@
+@* Decision 0011 (run W5, E6): the mockups' _PriceChanges: the catalog price changes Price Watch recorded in the last 30 days, newest first:
+   the model, the rate that changed (per million tokens), when it was seen (and which provider's catalog changed), and what it does to each
+   suite that uses the model: its worst case before and after against its cap, with "schedule paused" when it no longer fits. A change no
+   suite uses says so. Model: IReadOnlyList<PriceChangeView>. *@
+@model IReadOnlyList<PriceChangeView>
+<section aria-labelledby="priceTitle" data-price-changes>
+  <div class="d-flex flex-wrap align-items-baseline gap-2 mb-2">
+    <h3 class="fs-6 fw-semibold mb-0" id="priceTitle">Catalog price changes</h3>
+    <span class="fs-8 text-ps-faint">last 30 days · per million tokens</span>
+  </div>
+  @if (Model.Count == 0)
+  {
+    <div class="ps-panel p-3 fs-7 text-secondary" data-no-price-changes>No catalog price change in the last 30 days.</div>
+  }
+  else
+  {
+    <div class="ps-table-wrap">
+      <table class="table align-middle">
+        <thead>
+          <tr>
+            <th scope="col">Model</th>
+            <th scope="col">Change</th>
+            <th scope="col" class="d-none d-md-table-cell">Detected</th>
+            <th scope="col">Effect on suites</th>
+          </tr>
+        </thead>
+        <tbody>
+          @foreach (var item in Model)
+          {
+            var change = item.Row.Change;
+            <tr data-price-change="@item.Row.Id.ToString(CultureInfo.InvariantCulture)">
+              <td class="ps-mono fs-8"><span class="text-ps-faint text-nowrap">@(change.Provider)/</span><wbr><span class="text-nowrap">@change.Model</span></td>
+              <td class="fs-7">@change.Label</td>
+              <td class="d-none d-md-table-cell fs-8 text-ps-faint">@item.Detected</td>
+              <td class="fs-7">
+                @if (item.Effects.Count == 0)
+                {
+                  <span class="text-ps-faint">No suite uses this model.</span>
+                }
+                @for (var index = 0; index < item.Effects.Count; index++)
+                {
+                  var effect = item.Effects[index];
+                  <span class="@(index == 0 ? "d-block" : "d-block fs-8 text-ps-faint")" data-price-effect="@effect.SuiteId">
+                    <a class="text-reset" href="@EvalRoutes.Suite(effect.SuiteId)">@effect.Text</a>
+                    @if (effect.PausesSchedule)
+                    {
+                      <span class="ps-chip ms-1" data-tone="warn">schedule paused</span>
+                    }
+                  </span>
+                }
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  }
+  <div class="fs-8 text-ps-faint mt-2">Prices are snapshotted whenever a provider's catalog changes. A schedule whose worst case no longer fits its cap is paused; it never runs over the cap.</div>
+</section>

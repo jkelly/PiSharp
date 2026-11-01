@@ -1,0 +1,72 @@
+@* Decision 0011 (run W2, WU9): the mockups' _OAuthSignInModal (#modal-oauth-signin), the device code sign-in, here for GitHub Copilot (the
+   only device code sign-in WU5 runs; the mockups' xAI, Kimi, Meta, OpenRouter and Radius panes are later milestones). Steps
+   (data-signin-step): domain (blank for github.com, or a GitHub Enterprise domain), device (the code and the verification page), enabling
+   (GitHub authorized; the Copilot token and model policies are being fetched), success and error. There is no Anthropic sign-in:
+   Anthropic doesn't allow Claude Pro or Max sign-in in other apps, so Claude connects with an API key or through Amazon Bedrock.
+   settings-signin.js runs it on /api/credentials/signin; the page sees the flow's status only, never a token. Model: CredentialModals. *@
+@model CredentialModals
+<div class="modal fade" id="modal-oauth-signin" tabindex="-1" aria-labelledby="modal-oauth-signin-title" aria-hidden="true" data-bs-backdrop="static" data-signin-modal="device">
+  <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <div class="d-flex align-items-center gap-3" style="min-width:0">
+          <span data-signin-logo><partial name="/Views/Settings/_ProviderLogo.cshtml" model='new LogoModel("GitHub Copilot", Model.CopilotLogo, "lg")' /></span>
+          <div style="min-width:0">
+            <h2 class="modal-title" id="modal-oauth-signin-title">Sign in to <span data-signin-name>GitHub Copilot</span></h2>
+            <div class="modal-subtitle"><span class="ps-mono" data-signin-provider-id>github-copilot</span> · device flow · scope <span class="ps-mono">read:user</span><span data-signin-again hidden> · signing in <strong data-signin-account-label></strong> again</span></div>
+          </div>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+
+      <div class="modal-body">
+        <div data-signin-step="domain">
+          <p class="fs-7 text-secondary mb-3">Use the models included in your GitHub Copilot plan. You sign in with GitHub; the short-lived Copilot token is re-issued through the GitHub token and never reaches this page.</p>
+          <label class="form-label" for="ghDomain">GitHub Enterprise URL/domain (blank for github.com)</label>
+          <input class="form-control font-monospace" id="ghDomain" placeholder="company.ghe.com" autocomplete="off" spellcheck="false" maxlength="253" data-signin-domain>
+          <div class="form-text">Leave blank for a github.com account. For GitHub Enterprise, enter the domain only.</div>
+          @if (Model.Offline)
+          {
+            <div class="alert alert-secondary fs-7 py-2 mt-3 mb-0">@ProviderDirectory.OfflineMessage</div>
+          }
+        </div>
+
+        <div data-signin-step="device" hidden>
+          <p class="fs-7 text-secondary text-center mb-3">Open the link, sign in to GitHub, and enter this code. Scope requested: <span class="ps-mono">read:user</span>.</p>
+          <div class="d-flex align-items-center justify-content-center gap-2 mb-3">
+            <span class="device-code" id="ghCode" data-signin-user-code>…</span>
+            <button class="btn btn-icon" type="button" data-copy="#ghCode" aria-label="Copy code" title="Copy code"><i class="bi bi-copy" aria-hidden="true"></i></button>
+          </div>
+          <div class="ps-panel p-3 mb-3">
+            <div class="ps-label mb-1">Verification page</div>
+            <div class="d-flex align-items-center gap-2 flex-wrap">
+              <a class="ps-mono fs-7 text-break flex-grow-1" id="ghVerification" href="#" target="_blank" rel="noopener noreferrer" data-signin-verification></a>
+              <a class="btn btn-sm btn-outline-secondary" href="#" target="_blank" rel="noopener noreferrer" data-signin-verification-button><i class="bi bi-box-arrow-up-right me-1" aria-hidden="true"></i>Open</a>
+            </div>
+          </div>
+          <div class="d-flex align-items-center gap-2 fs-7 flex-wrap">
+            <span class="spinner-border spinner-border-sm text-primary" aria-hidden="true"></span><span>Waiting for authorization…</span>
+            <span class="ms-auto text-ps-faint" data-signin-expiry hidden>Expires in <span class="countdown" data-signin-countdown></span></span>
+          </div>
+        </div>
+
+        <div data-signin-step="enabling" hidden>
+          <ul class="list-unstyled fs-7 mb-0">
+            <li class="d-flex gap-2 mb-2"><i class="bi bi-check-circle text-ps-ok" aria-hidden="true"></i><span>GitHub authorized</span></li>
+            <li class="d-flex gap-2"><span class="spinner-border spinner-border-sm text-primary flex-shrink-0 mt-1" aria-hidden="true"></span><span><strong>Finishing…</strong> <span data-signin-progress>exchanging for a Copilot token and enabling models</span></span></li>
+          </ul>
+        </div>
+
+        <partial name="/Views/Settings/_SignInResult.cshtml" model="null" />
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" class="btn btn-ghost me-auto" data-signin-back data-signin-only="device">Back</button>
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal" data-signin-only="domain device enabling error">Cancel</button>
+        <button type="button" class="btn btn-primary" data-signin-start="deviceCode" data-signin-only="domain" disabled="@Model.Offline">Continue</button>
+        <button type="button" class="btn btn-primary" data-signin-retry data-signin-only="error">Try again</button>
+        <button type="button" class="btn btn-primary" data-signin-done data-signin-only="success">Done</button>
+      </div>
+    </div>
+  </div>
+</div>

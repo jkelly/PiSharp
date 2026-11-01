@@ -1,0 +1,53 @@
+@* Decision 0011 (run W5, E6): Evals › Suites (GET /evals/suites), after the mockups' evals-suites.html, states default (a _SuiteCard per
+   suite), paused (a notice for each suite whose schedule a price change or a refused slot paused, above the cards) and empty
+   (_SuitesEmpty). The header's Pin a run goes to History: a case is pinned from a run (E7's modal-test-case). Run now and Schedule on
+   each card work as on the suite page; the schedule modal is fetched for the card's suite. Model: SuitesPage. *@
+@model SuitesPage
+@{
+    ViewData["Title"] = "Suites · Evals";
+    ViewData[ShellViewData.Nav] = ShellNav.Evals;
+    ViewData[ShellViewData.Page] = "evals-suites";
+}
+@section Styles { <link href="~/css/evals.css" rel="stylesheet" asp-append-version="true" /> }
+@section TopbarStart { <h1 class="app-title">Evals</h1> }
+@section Modals
+{
+  <partial name="_SuiteScheduleModal" model="null" />
+  <partial name="/Views/Shared/_SpendConfirmModal.cshtml" model="null" />
+}
+@section Scripts { <script type="module" src="~/js/evals.js" asp-append-version="true"></script> }
+<div class="page" data-evals="suites" data-state="@Model.State">
+  <div class="page-header">
+    <partial name="_EvalsHeader" />
+    <div class="d-flex flex-wrap gap-2">
+      <a class="btn btn-outline-secondary" href="/history" title="Pin any run as a test case from History, Chat, Playground, Compare or the Run inspector"><i class="bi bi-pin-angle me-1" aria-hidden="true"></i>Pin a run</a>
+    </div>
+  </div>
+  <partial name="_EvalsTabs" model="EvalsTab.Suites" />
+  @if (Model.Empty)
+  {
+    <partial name="_SuitesEmpty" />
+  }
+  else
+  {
+    @foreach (var card in Model.Paused)
+    {
+      <div class="ps-panel d-flex flex-wrap align-items-start gap-2 p-3 mb-3" role="status" data-schedule-paused="@card.Suite.Id">
+        <span class="ps-chip" data-tone="warn">paused</span>
+        <div class="flex-grow-1 fs-7 eval-notice-text">The @card.Suite.Name schedule is paused. @card.Paused!.Reason</div>
+        <div class="d-flex flex-wrap gap-2">
+          @if (card.Paused.Code == SchedulePause.OverCap)
+          {
+            <a class="btn btn-sm btn-outline-secondary" href="@EvalRoutes.Drift">See the price change</a>
+          }
+          <button class="btn btn-sm btn-outline-secondary" type="button" data-open-schedule="@card.Suite.Id">@(card.Paused.Code == SchedulePause.OverCap ? "Raise cap" : "Schedule")</button>
+        </div>
+      </div>
+    }
+    @foreach (var card in Model.Cards)
+    {
+      <partial name="_SuiteCard" model="card" />
+    }
+    <p class="fs-8 text-ps-faint mb-0">Costs are metered spend. Subscription targets show list price and count against their plan's allowance instead. A schedule needs a suite-run cap, and a run whose worst case doesn't fit is skipped, never partly run.</p>
+  }
+</div>

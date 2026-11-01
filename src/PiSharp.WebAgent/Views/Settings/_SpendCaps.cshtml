@@ -1,0 +1,81 @@
+@* Decision 0011 (run W3, S4): the mockups' _SpendCaps: every cap with what it applies to, its spend in the current UTC window against its
+   limit (amber at the warning threshold, red at the limit; "—" for per-request and per-run caps, which are checked per request or run),
+   and what happens at the limit; the empty state when there is none. Each row's edit button opens _SpendCapModal's edit pane with the
+   cap's values (data-cap-*). Model: SpendSettingsPage. *@
+@using System.Globalization
+@using PiSharp.WebAgent.Spend
+@model SpendSettingsPage
+<section class="settings-section" id="caps">
+  <div class="spend-section-head">
+    <h3>Caps</h3>
+    @if (Model.Caps.Count > 0)
+    {
+      <button class="btn btn-sm btn-outline-secondary ms-auto" type="button" data-cap-new><i class="bi bi-plus-lg me-1" aria-hidden="true"></i>Add cap</button>
+    }
+  </div>
+  <p class="section-desc">Checked before every metered request. Block stops the request. Ask lets you send it once or cap its output so it fits; cheaper models are only suggested. The guard never switches model or account. Days and months are UTC.</p>
+  @if (Model.Caps.Count > 0)
+  {
+    <div class="ps-table-wrap spend-caps">
+      <table class="table table-sm align-middle">
+        <thead>
+          <tr><th scope="col">Cap</th><th scope="col" class="text-end">Spent / limit</th><th scope="col" class="d-none d-sm-table-cell">At limit</th><th scope="col" class="text-end"><span class="visually-hidden">Edit</span></th></tr>
+        </thead>
+        <tbody>
+          @foreach (var row in Model.Caps)
+          {
+            var cap = row.Cap;
+            var status = row.Status;
+            var action = cap.Action == CapAction.Block ? "Block" : "Ask";
+            var limit = SpendMoney.Format(cap.LimitMicros);
+            <tr data-cap-row="@cap.Id">
+              <td>
+                <div class="fw-medium">@row.Title @if (!cap.Enabled) {<span class="ps-chip ms-1" data-tone="outline" title="This cap is off: requests are not checked against it">off</span>}</div>
+                <div class="cap-sub">@if (cap.Scope is CapScope.Provider) {<span class="ps-mono">@row.Scope</span>} else {<text>@row.Scope</text>}<span class="d-sm-none"> · @action</span></div>
+              </td>
+              <td class="text-end">
+                @if (row.Windowed && status.SpentMicros is { } spent)
+                {
+                  <div class="cap-num">@SpendMoney.Format(spent) / @limit</div>
+                  @if (status.AtLimit)
+                  {
+                    <div class="mt-1"><span class="ps-chip" data-tone="danger" title="At the limit">@(status.PercentShown)%</span></div>
+                  }
+                  else if (status.Warning)
+                  {
+                    <div class="mt-1"><span class="ps-chip" data-tone="warn" title="Above the @(status.WarnPercent)% warning threshold">@(status.PercentShown)%</span></div>
+                  }
+                  else
+                  {
+                    <div class="cap-sub">@(status.PercentShown)%</div>
+                  }
+                }
+                else
+                {
+                  <div class="cap-num" title="@(cap.Period == CapPeriod.Request ? "Each request's worst case is checked against this limit" : "Each run's spend is checked against this limit")"><span class="text-ps-faint">—</span> / @limit</div>
+                  <div class="cap-sub">@(cap.Period == CapPeriod.Request ? "worst case per request" : "per run")</div>
+                }
+              </td>
+              <td class="d-none d-sm-table-cell fs-7">@action</td>
+              <td class="text-end">
+                <button class="btn btn-icon" type="button" data-cap-edit data-cap-id="@cap.Id" data-cap-title="@row.EditTitle" data-cap-scope="@row.ScopeField"
+                        data-cap-window="@row.WindowField" data-cap-used="@row.UsedField" data-cap-amount="@(SpendMoney.ToUsd(cap.LimitMicros).ToString("0.00####", CultureInfo.InvariantCulture))"
+                        data-cap-behaviour="@(cap.Action == CapAction.Block ? "block" : "ask")" aria-label="Edit @row.EditTitle cap"><i class="bi bi-pencil" aria-hidden="true"></i></button>
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+    <p class="fs-8 text-ps-faint mt-2 mb-0">A request counts toward every cap it falls under, and has to fit all of them.</p>
+  }
+  else
+  {
+    <div class="ps-card p-4 text-center" data-caps-empty>
+      <div class="empty-state p-0"><div class="empty-icon"><i class="bi bi-wallet2" aria-hidden="true"></i></div></div>
+      <div class="fw-medium mt-2">No caps yet</div>
+      <p class="fs-7 text-secondary mx-auto mb-3" style="max-width:46ch">Metered requests are limited only by your providers' own billing limits. Costs are still reserved and recorded in the ledger.</p>
+      <button class="btn btn-primary btn-sm" type="button" data-cap-new><i class="bi bi-plus-lg me-1" aria-hidden="true"></i>Add cap</button>
+    </div>
+  }
+</section>

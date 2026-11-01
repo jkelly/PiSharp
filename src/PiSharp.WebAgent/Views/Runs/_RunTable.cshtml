@@ -1,0 +1,138 @@
+@* Decision 0011 (run W4, R3): the mockups' _RunTable: a checkbox (select all on this page), Time (local, with Today/Yesterday/date),
+   Source, Provider / model (thinking and tools under it), Prompt (with the tools the answer called, then "id · session"), Tokens (in / out),
+   Cost (≈ list for a subscription), Latency (TTFT / total), Stop (the stop reason, or error with the HTTP status) and the actions: Inspect,
+   then Re-run, Load into playground (runs that stored their request), Open chat (a chat's call), Pin, Delete run. An agent compare run is
+   one row ("3 models ▾") whose collapse row lists each model with its outcome; its Open run goes to the inspector, Workspaces to Settings ›
+   Data. W5 (E7): Pin as test… opens _TestCaseModal for a call that completed (PinRules; not an agent compare run). W5 (fix 1, arena): a
+   run of an Arena battle not voted yet (row.Blind) names no model, here or in its collapse row, and its links open the battle. Model:
+   RunHistoryPage. *@
+@model RunHistoryPage
+<div class="ps-table-wrap" data-run-table>
+  <table class="table table-hover align-middle runs-table mb-0">
+    <thead>
+      <tr>
+        <th scope="col" style="width:1%"><input class="form-check-input" type="checkbox" aria-label="Select all runs on this page" data-run-select-all></th>
+        <th scope="col">Time</th>
+        <th scope="col">Source</th>
+        <th scope="col">Provider / model</th>
+        <th scope="col">Prompt</th>
+        <th scope="col" class="text-end d-none d-md-table-cell" title="Input tokens (top) / output tokens (bottom)">Tokens</th>
+        <th scope="col" class="text-end">Cost</th>
+        <th scope="col" class="text-end d-none d-xxl-table-cell" title="Time to first token (top) / total duration (bottom)">Latency</th>
+        <th scope="col">Stop</th>
+        <th scope="col" class="text-end"><span class="visually-hidden">Actions</span></th>
+      </tr>
+    </thead>
+    <tbody>
+      @if (Model.Rows.Count == 0)
+      {
+        <tr><td colspan="10" class="text-center text-ps-faint fs-7 py-4" data-run-none>No runs match these filters. <a href="/history">Clear all filters</a></td></tr>
+      }
+      @foreach (var row in Model.Rows)
+      {
+        var run = row.Run;
+        var label = row.IsGroup ? "agent compare run " + run.Id : "run " + run.Id;
+        <tr id="@("run-" + run.Id)" data-run-row="@run.Id" data-run-kind="@run.Kind" data-run-status="@run.Status">
+          <td><input class="form-check-input" type="checkbox" aria-label="Select @label" data-run-select value="@run.Id"></td>
+          <td class="text-nowrap"><div class="ps-mono fs-8">@row.Time</div><div class="fs-8 text-ps-faint">@row.Day</div></td>
+          <td><span class="ps-chip" title="@row.SourceLabel"><i class="@("bi " + row.SourceIcon)" aria-hidden="true"></i><span class="visually-hidden">@row.SourceLabel</span></span></td>
+          @if (row.IsGroup)
+          {
+            <td>
+              <button class="btn btn-link p-0 fs-8 text-reset text-decoration-none text-nowrap" type="button" data-bs-toggle="collapse" data-bs-target="#@row.ModelsId" aria-expanded="false" aria-controls="@row.ModelsId" title="@(row.Blind is null ? string.Join(" · ", row.Models.Select(item => item.Provider + "/" + item.Model)) : "Names hidden until you vote")">@row.Models.Count @(row.Models.Count == 1 ? "model" : "models")<i class="bi bi-chevron-down ms-1 fs-8" aria-hidden="true"></i></button>
+            </td>
+          }
+          else if (row.Blind is not null)
+          {
+            <td data-run-blind><div class="fs-8 text-ps-faint text-nowrap"><i class="bi bi-eye-slash me-1" aria-hidden="true"></i>@PiSharp.WebAgent.Evals.Arena.ArenaBlindText.Model</div></td>
+          }
+          else
+          {
+            <td><div class="ps-mono fs-8"><span class="text-ps-faint text-nowrap">@(run.Provider)/</span><wbr><span class="text-nowrap">@run.Model</span></div>@if (row.ModelSub.Length > 0) {<div class="fs-8 text-ps-faint">@row.ModelSub</div>}</td>
+          }
+          <td><div class="run-prompt" title="@row.Prompt">@row.Prompt@if (row.ToolCalls is not null) {<text> </text><span class="text-ps-faint">→ @row.ToolCalls</span>}</div><div class="ps-mono fs-8 text-ps-faint run-sub">@row.Sub</div></td>
+          <td class="ps-mono fs-8 text-end text-nowrap d-none d-md-table-cell" title="@row.Tokens.Title">@if (row.IsGroup) {<div>@row.Tokens.Top</div>} else {<div><i class="bi bi-arrow-up me-1" aria-hidden="true"></i>@row.Tokens.Top</div>}@if (row.Tokens.Bottom is not null) {<div class="text-ps-faint">@if (!row.IsGroup) {<i class="bi bi-arrow-down me-1" aria-hidden="true"></i>}@row.Tokens.Bottom</div>}</td>
+          <td class="@("ps-mono fs-8 text-end text-nowrap" + (row.Cost.Faint ? " text-ps-faint" : ""))" title="@row.Cost.Title"><div>@row.Cost.Top</div>@if (row.Cost.Bottom is not null) {<div class="text-ps-faint">@row.Cost.Bottom</div>}</td>
+          <td class="ps-mono fs-8 text-end text-nowrap d-none d-xxl-table-cell" title="@row.Latency.Title"><div>@row.Latency.Top</div><div class="text-ps-faint">@row.Latency.Bottom</div></td>
+          <td>
+            <span class="ps-chip" data-tone="@row.Stop.Tone">@if (row.Stop.Tone == "info" && row.Stop.Text == "running") {<span class="status-dot live" aria-hidden="true"></span>}@row.Stop.Text</span>
+            @if (row.StopSub is not null)
+            {
+              <div class="@("fs-8 mt-1 text-nowrap" + (row.StopSubDanger ? " ps-mono text-ps-danger" : " text-ps-faint"))" title="@(row.StopSubDanger ? run.Error : null)">@row.StopSub</div>
+            }
+          </td>
+          <td class="text-end text-nowrap">
+            @if (row.Blind is not null)
+            {
+              <a class="btn btn-icon" href="@row.InspectHref" title="Open the blind battle" aria-label="Open the blind battle of @label" data-run-blind-battle><i class="bi bi-eye-slash" aria-hidden="true"></i></a>
+            }
+            else if (row.IsGroup)
+            {
+              <a class="btn btn-icon" href="@row.InspectHref" title="Open run" aria-label="Open @label"><i class="bi bi-box-arrow-up-right" aria-hidden="true"></i></a>
+            }
+            else
+            {
+              <a class="btn btn-icon" href="@row.InspectHref" title="Inspect" aria-label="Inspect @label"><i class="bi bi-braces" aria-hidden="true"></i></a>
+            }
+            <div class="dropdown d-inline-block">
+              <button class="btn btn-icon" type="button" data-bs-toggle="dropdown" data-bs-popper-config='{"strategy":"fixed"}' aria-expanded="false" title="More actions" aria-label="More actions for @label"><i class="bi bi-three-dots" aria-hidden="true"></i></button>
+              <ul class="dropdown-menu dropdown-menu-end">
+                @if (row.Replayable)
+                {
+                  <li><button class="dropdown-item" type="button" data-run-rerun="@run.Id"><i class="bi bi-arrow-repeat me-2" aria-hidden="true"></i>Re-run</button></li>
+                  <li><a class="dropdown-item" href="@row.PlaygroundHref"><i class="bi bi-sliders2 me-2" aria-hidden="true"></i>Load into playground</a></li>
+                }
+                @if (row.ChatHref is not null)
+                {
+                  <li><a class="dropdown-item" href="@row.ChatHref"><i class="bi bi-chat-square-text me-2" aria-hidden="true"></i>Open chat</a></li>
+                }
+                @if (row.CompareHref is not null)
+                {
+                  <li><a class="dropdown-item" href="@row.CompareHref" data-run-compare><i class="bi bi-layout-three-columns me-2" aria-hidden="true"></i>Open in Compare</a></li>
+                }
+                @if (row.IsGroup)
+                {
+                  <li><a class="dropdown-item" href="/settings/data#compare-workspaces"><i class="bi bi-folder2-open me-2" aria-hidden="true"></i>Workspaces</a></li>
+                }
+                @if (row.Blind is null && PiSharp.WebAgent.Evals.Pins.PinRules.Offered(run))
+                {
+                  <li><button class="dropdown-item" type="button" data-bs-toggle="modal" data-bs-target="#modal-test-case" data-pin-run="@run.Id" data-pin-source="history"><i class="bi bi-pin-angle me-2" aria-hidden="true"></i>Pin as test…</button></li>
+                }
+                <li><button class="dropdown-item" type="button" data-run-pin="@run.Id" data-pinned="@(run.Pinned ? "true" : "false")"><i class="@("bi me-2 " + (run.Pinned ? "bi-pin-angle-fill" : "bi-pin-angle"))" aria-hidden="true"></i>@(run.Pinned ? "Unpin (expires with retention)" : "Pin (never expires)")</button></li>
+                <li><hr class="dropdown-divider"></li>
+                <li><button class="dropdown-item text-danger" type="button" data-run-delete="@run.Id" data-run-label="@(row.SourceLabel + " · " + (row.Blind is not null ? "blind round" : row.IsGroup ? row.Models.Count + " models" : run.Provider + "/" + run.Model))"><i class="bi bi-trash3 me-2" aria-hidden="true"></i>Delete run</button></li>
+              </ul>
+            </div>
+          </td>
+        </tr>
+        @if (row.IsGroup)
+        {
+          <tr class="collapse run-models-row" id="@row.ModelsId" data-run-models="@run.Id">
+            <td></td>
+            <td colspan="9">
+              @if (row.Models.Count == 0)
+              {
+                <div class="fs-8 text-ps-faint py-1">No model rows were recorded for this run.</div>
+              }
+              @foreach (var entry in row.Models)
+              {
+                <div class="d-flex flex-wrap align-items-center gap-2 py-1">
+                  <span class="arena-letter">@entry.Letter</span>
+                  <div class="flex-grow-1 run-model-line">
+                    <div class="ps-mono fs-8">@if (entry.Provider.Length > 0) {<span class="text-ps-faint">@(entry.Provider)/</span>}@entry.Model@if (entry.Note is not null) {<span class="text-ps-faint"> · @entry.Note</span>}</div>
+                    <div class="fs-8 text-ps-faint">@entry.Line</div>
+                  </div>
+                  @if (entry.Check is not null)
+                  {
+                    <span class="ps-chip" data-tone="@entry.Check.Tone">@entry.Check.Text</span>
+                  }
+                  <a class="btn btn-icon" href="@entry.Href" title="@(row.Blind is null ? "Inspect" : "Open the blind battle")" aria-label="@(row.Blind is null ? "Inspect model " + entry.Letter : "Open the blind battle")"><i class="@("bi " + (row.Blind is null ? "bi-braces" : "bi-eye-slash"))" aria-hidden="true"></i></a>
+                </div>
+              }
+            </td>
+          </tr>
+        }
+      }
+    </tbody>
+  </table>
+</div>

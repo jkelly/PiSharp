@@ -142,8 +142,15 @@ function Assert-PiSharpDistribution {
     }
     $config = Read-PiSharpArchiveText -Path $Path -Entry ($prefix + 'PiSharp.Cli.runtimeconfig.json') | ConvertFrom-Json -AsHashtable
     if ($config.runtimeOptions.tfm -cne 'net10.0') { throw 'Unexpected target framework.' }
-    if ($Kind -eq 'tool' -and (-not $config.runtimeOptions.ContainsKey('framework') -or
-        $config.runtimeOptions.framework.name -cne 'Microsoft.NETCore.App' -or $config.runtimeOptions.ContainsKey('includedFrameworks'))) {
+    # The tool runs on the .NET shared framework and, for `pisharp durable serve` (decision 0008, through PiSharp.Durable.Server), on
+    # ASP.NET Core's: the SDK writes one `framework`, or `frameworks` when there are two. It never bundles a runtime.
+    $sharedFrameworks = @(if ($config.runtimeOptions.ContainsKey('frameworks')) { $config.runtimeOptions.frameworks }
+        elseif ($config.runtimeOptions.ContainsKey('framework')) { $config.runtimeOptions.framework })
+    $sharedNames = @($sharedFrameworks | ForEach-Object { $_.name })
+    if ($Kind -eq 'tool' -and ($config.runtimeOptions.ContainsKey('includedFrameworks') -or
+        ($config.runtimeOptions.ContainsKey('framework') -and $config.runtimeOptions.ContainsKey('frameworks')) -or
+        $sharedNames -cnotcontains 'Microsoft.NETCore.App' -or
+        @($sharedNames | Where-Object { $_ -cnotin @('Microsoft.NETCore.App', 'Microsoft.AspNetCore.App') }).Count)) {
         throw 'Framework-dependent tool runtime configuration required.'
     }
     $deps = Read-PiSharpArchiveText -Path $Path -Entry ($prefix + 'PiSharp.Cli.deps.json') | ConvertFrom-Json -AsHashtable

@@ -1,0 +1,85 @@
+@* Decision 0011 (run W4, unit R9): the mockups' Run history section of Settings › Data & storage (R0's RunHistorySettings, section history):
+   Keep runs for (7, 30 or 90 days, or forever; default 30), Store raw request/response payloads (off by default, kept 7 days at most),
+   Store SSE event streams (on by default), and the redaction of keys, which is always on. States default and dirty: a changed row gets
+   .is-modified and its "modified · was …" chip, _SettingsSaveBar shows what changed, and Reset to defaults sets the fields back without
+   saving. A shorter retention says how many runs saving deletes now (each option carries its count). data.js saves through
+   POST /api/data/history, which applies the retention at once. Model: DataPage. *@
+@using PiSharp.WebAgent.DataStorage
+@using PiSharp.WebAgent.Runs
+@model DataPage
+@{
+    var runs = Model.Runs;
+    var history = runs.Settings;
+    var defaults = RunHistorySettings.CreateDefault();
+    var choices = DataRunFacts.Choices.ToList();
+    if (!choices.Contains(history.RetentionDays)) choices.Insert(choices.Count - 1, history.RetentionDays);
+    string Label(int? days) => days is { } value ? DataStorageService.Plural(value, "day") : "Forever";
+}
+<form novalidate autocomplete="off" data-history-form data-endpoint="@DataEndpoints.Prefix/history">
+  <section class="settings-section" id="run-history">
+    <h3 class="d-flex align-items-baseline gap-2">Run history <button type="button" class="btn btn-link btn-sm p-0 ms-auto fs-8 fw-normal text-decoration-none" data-history-reset
+        data-default-retention="@defaults.RetentionDays" data-default-raw="@(defaults.StoreRawPayloads ? "true" : "false")" data-default-events="@(defaults.StoreSseEvents ? "true" : "false")"><i class="bi bi-arrow-counterclockwise me-1" aria-hidden="true"></i>Reset to defaults</button></h3>
+    <p class="section-desc">Every chat turn, playground run and compare column is recorded for <a href="/history">History</a> and the inspector. An agent compare run is recorded as one entry.</p>
+    <div class="ps-card">
+      <div class="setting-row" data-setting-row="retentionDays">
+        <div>
+          <div class="setting-label d-flex align-items-center gap-2 flex-wrap">Keep runs for <span class="ps-chip" data-tone="warn" data-modified-chip hidden>modified</span></div>
+          <div class="setting-desc">Older runs are deleted when you save, at startup and once a day. Pinned runs are kept.</div>
+          <div class="fs-8 text-ps-warn mt-1" data-retention-note hidden></div>
+          <div class="setting-key">history.retentionDays · default @defaults.RetentionDays</div>
+        </div>
+        <div class="setting-control">
+          <label class="visually-hidden" for="retention">Keep runs for</label>
+          <select class="form-select form-select-sm" id="retention" name="retentionDays" style="width:10rem" data-initial="@(history.RetentionDays?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "")">
+            @foreach (var days in choices)
+            {
+              var past = days is { } value && runs.OlderThan.TryGetValue(value, out var count) ? count : 0;
+              <option value="@(days?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "")" selected="@(days == history.RetentionDays)" data-past="@past" data-label="@Label(days)">@Label(days)</option>
+            }
+          </select>
+        </div>
+      </div>
+      <div class="setting-row" data-setting-row="storeRawPayloads">
+        <div>
+          <div class="setting-label d-flex align-items-center gap-2 flex-wrap">Store raw request/response payloads <span class="ps-chip" data-tone="warn" data-modified-chip hidden>modified</span></div>
+          <div class="setting-desc">Exact HTTP bodies for the inspector's Raw tab, with keys redacted. They are kept @RunHistorySettings.RawRetentionDays days at most, whatever the retention.@(runs.RawRuns > 0 ? $" Now {DataFolders.Size(runs.RawBytes)} for {DataStorageService.Plural(runs.RawRuns, "run")}, about {DataFolders.Size(runs.RawBytes / runs.RawRuns)} per run." : "") Without them the inspector shows parsed messages and usage only.</div>
+          <div class="setting-key">history.storeRawPayloads · default @(defaults.StoreRawPayloads ? "on" : "off")</div>
+        </div>
+        <div class="setting-control">
+          <div class="form-check form-switch mb-0">
+            <input class="form-check-input" type="checkbox" role="switch" id="storeRaw" name="storeRawPayloads" checked="@history.StoreRawPayloads" data-initial="@(history.StoreRawPayloads ? "true" : "false")">
+            <label class="form-check-label visually-hidden" for="storeRaw">Store raw request/response payloads</label>
+          </div>
+        </div>
+      </div>
+      <div class="setting-row" data-setting-row="storeSseEvents">
+        <div>
+          <div class="setting-label d-flex align-items-center gap-2 flex-wrap">Store SSE event streams <span class="ps-chip" data-tone="warn" data-modified-chip hidden>modified</span></div>
+          <div class="setting-desc">Each streamed event with its timestamp, for the inspector's event list and timing waterfall. @(runs.EventBytes > 0 ? "About " + DataFolders.Size(runs.EventBytes) + " so far." : "None stored yet.")</div>
+          <div class="setting-key">history.storeSseEvents · default @(defaults.StoreSseEvents ? "on" : "off")</div>
+        </div>
+        <div class="setting-control">
+          <div class="form-check form-switch mb-0">
+            <input class="form-check-input" type="checkbox" role="switch" id="storeSse" name="storeSseEvents" checked="@history.StoreSseEvents" data-initial="@(history.StoreSseEvents ? "true" : "false")">
+            <label class="form-check-label visually-hidden" for="storeSse">Store SSE event streams</label>
+          </div>
+        </div>
+      </div>
+      <div class="setting-row">
+        <div>
+          <div class="setting-label d-flex align-items-center gap-2 flex-wrap">Redact Authorization headers <span class="ps-chip" data-tone="ok"><i class="bi bi-lock" aria-hidden="true"></i>always on</span></div>
+          <div class="setting-desc">API keys, bearer tokens, <span class="ps-mono">x-api-key</span>, <span class="ps-mono">x-goog-api-key</span>, cookies and key-bearing query parameters are replaced with <span class="ps-mono">@RunRedaction.Redacted</span> before a run is written. This can't be turned off.</div>
+          <div class="setting-key">not configurable</div>
+        </div>
+        <div class="setting-control">
+          <div class="form-check form-switch mb-0">
+            <input class="form-check-input" type="checkbox" role="switch" id="redactAuth" checked disabled>
+            <label class="form-check-label visually-hidden" for="redactAuth">Redact Authorization headers (always on)</label>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <partial name="/Views/Settings/_SettingsSaveBar.cshtml" model="null" />
+</form>

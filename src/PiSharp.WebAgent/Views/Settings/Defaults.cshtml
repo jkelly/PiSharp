@@ -1,0 +1,80 @@
+@* Decision 0011 (run W2, WU9): the mockups' settings-defaults page (route GET /settings/defaults), M0 part: the default model as two linked
+   dropdowns (_ProviderModelSelect, Provider then Model, connected providers only) and the default thinking level, saved together through
+   POST /api/settings/defaults from _SettingsSaveBar, and "Reset all…" (POST /api/settings/defaults/reset, after a confirm). New chats start
+   with these; a chat keeps the model and thinking level it started with. Request defaults, retry, message queue, compaction, images and the
+   system prompt are not in this version (_NotInThisVersion, W5 integration fix 1). Model: DefaultsPage. *@
+@model DefaultsPage
+@{
+    Layout = "_SettingsLayout";
+    ViewData["Title"] = "Defaults";
+    ViewData[ShellViewData.SettingsSection] = "defaults";
+    var defaults = Model.Defaults;
+    var levels = PiSharp.AI.ThinkingLevels.Ordered;
+}
+@section Styles { <link href="~/css/settings.css" rel="stylesheet" asp-append-version="true"> }
+@section Scripts { <script type="module" src="~/js/settings.js" asp-append-version="true"></script> }
+<header class="settings-header d-flex flex-wrap align-items-end gap-3">
+  <div class="flex-grow-1">
+    <div class="ps-eyebrow">Agent</div>
+    <h2>Defaults</h2>
+    <p>What new chats start with. Saved in the app's settings database (the <span class="ps-mono">defaults</span> section).</p>
+  </div>
+  <div class="d-flex gap-2 flex-wrap">
+    <button class="btn btn-outline-danger" type="button" data-defaults-reset><i class="bi bi-arrow-counterclockwise me-1" aria-hidden="true"></i>Reset all…</button>
+  </div>
+</header>
+
+<div class="alert alert-info d-flex gap-2 align-items-start mb-4">
+  <i class="bi bi-layers mt-1" aria-hidden="true"></i>
+  <div class="fs-7"><strong>Only new chats.</strong> A chat keeps the model, account and thinking level it started with; change them from the chat's model chip. Nothing here switches a running chat.</div>
+</div>
+
+@* data-model-unset: no default model is saved, so the dropdowns' first model stays "not set" until the user picks one (settings-forms.js). *@
+<form novalidate autocomplete="off" data-settings-form="defaults" data-endpoint="/api/settings/defaults" data-saved-title="Defaults saved"
+      data-model-unset="@(defaults.Provider is null ? "true" : "false")">
+  <section class="settings-section" id="model-defaults">
+    <h3>Model defaults</h3>
+    <p class="section-desc">Used for new chats. Only connected providers are offered.</p>
+    <div class="ps-card">
+      <div class="setting-row stack" data-setting-row="model">
+        <div>
+          <div class="setting-label d-flex align-items-center gap-2 flex-wrap">Default model <span class="ps-chip" data-tone="warn" data-modified-chip hidden>modified</span></div>
+          <div class="setting-desc">@(defaults.Provider is null ? "Not set yet: new chats start with the first connected provider's first model until you choose one." : "Used for new chats and the first compare column.")</div>
+          <div class="setting-key">@("defaults.provider = " + (defaults.Provider is null ? "null" : "\"" + defaults.Provider + "\"") + " · defaults.model = " + (defaults.Model is null ? "null" : "\"" + defaults.Model + "\""))</div>
+        </div>
+        <div class="setting-control d-block">
+          @if (Model.Providers.Count == 0)
+          {
+            <div class="ps-panel p-3 fs-7 text-secondary">No provider is connected. <a href="/settings/providers">Connect one</a> to choose a default model.</div>
+          }
+          else
+          {
+            <partial name="_ProviderModelSelect" model='new ProviderModelSelect("dm") { Provider = defaults.Provider, Model = defaults.Model, Small = true, Providers = Model.Providers, IncludeHidden = true }' />
+          }
+        </div>
+      </div>
+
+      <div class="setting-row stack" data-setting-row="thinking">
+        <div>
+          <div class="setting-label d-flex align-items-center gap-2 flex-wrap">Default thinking level <span class="ps-chip" data-tone="warn" data-modified-chip hidden>modified</span></div>
+          <div class="setting-desc">Clamped to what each model supports. "Model default" leaves it to the model. Levels the selected model doesn't support are marked.</div>
+          <div class="setting-key">@("defaults.thinking = " + (defaults.Thinking is null ? "null" : "\"" + defaults.Thinking + "\""))</div>
+        </div>
+        <div class="setting-control">
+          <div class="btn-group btn-group-sm flex-wrap" role="group" aria-label="Default thinking level" data-thinking-levels>
+            <input type="radio" class="btn-check" name="thinking" id="think-model" value="" checked="@(defaults.Thinking is null)"><label class="btn btn-outline-secondary" for="think-model">model default</label>
+            @foreach (var level in levels)
+            {
+              <input type="radio" class="btn-check" name="thinking" id="think-@level" value="@level" checked="@(defaults.Thinking == level)" data-thinking-level="@level"><label class="btn btn-outline-secondary ps-mono" for="think-@level">@level</label>
+            }
+          </div>
+          <div class="form-text" data-thinking-note></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <partial name="/Views/Settings/_NotInThisVersion.cshtml" model='new NotInThisVersion("Request defaults, retry and more", "This version has no app-wide request defaults (temperature, max tokens, cache retention), retry, message queue, compaction, image or system prompt settings. The Playground sets the request options per run, and its presets keep them.", "request-defaults")' />
+
+  <partial name="/Views/Settings/_SettingsSaveBar.cshtml" model="null" />
+</form>

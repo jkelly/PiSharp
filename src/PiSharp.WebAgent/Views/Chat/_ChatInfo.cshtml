@@ -1,0 +1,122 @@
+@* Decision 0011 (run W2, WU8): the mockups' _SessionInfoPanel: the context window (the newest request's tokens of the model's window, with
+   auto-compaction), usage this branch, the model, the tools the next request offers and which ask first, the agent's own instructions and the
+   durable session. The page renders it from the stored entries; the stream re-renders it (panel "info") as the run goes on. The context bar
+   is one segment: the system / history / tool-result split isn't measured. W3 (S5): the chat's spend from the spend ledger (what its
+   requests count toward the caps, uncertain spend included until it is resolved, list price for a subscription), how the account is
+   billed, the tightest per-chat cap ("No chat cap" when none) and History › Spend searched for the chat. *@
+@model ChatInfoView
+@{
+    var binding = Model.Binding;
+    var window = Model.Model?.ContextWindow ?? 0;
+    var percent = window > 0 && Model.ContextTokens > 0 ? Math.Min(100, Model.ContextTokens * 100 / window) : 0;
+    var usage = Model.Usage;
+    var billing = Model.Provider?.Billing ?? BillingKind.Unknown;
+    var compaction = Model.Compaction;
+    var ask = Model.AskTools;
+    string Join(IReadOnlyList<string> names) => names.Count switch
+    {
+        0 => "",
+        1 => names[0],
+        _ => string.Join(", ", names.Take(names.Count - 1)) + " and " + names[^1],
+    };
+    var policy = Model.ApprovalMode switch
+    {
+        ToolApprovalMode.Auto => "Tools run without asking",
+        _ when ask.Count == 0 => "No tool asks first",
+        ToolApprovalMode.AllowList => $"Ask before {Join(ask)}, except the allow-list",
+        _ => $"Ask before {Join(ask)}",
+    };
+    string? cost = null;
+    string? costTitle = null;
+    if (usage is { Cost: > 0 } && billing is BillingKind.Subscription or BillingKind.Metered)
+    {
+        cost = billing == BillingKind.Subscription ? "≈ " + ChatDisplay.Money(usage.Cost) + " list" : ChatDisplay.Money(usage.Cost);
+        costTitle = billing == BillingKind.Subscription
+            ? "List price of this branch's answers at catalog rates. Billed through the subscription, so it isn't counted toward money caps."
+            : "This branch's answers at catalog rates.";
+    }
+    var shortId = binding.SessionId.Length > 8 ? binding.SessionId[..8] : binding.SessionId;
+}
+<div class="info-section">
+  <h6>Context window</h6>
+  <div class="d-flex justify-content-between align-items-baseline mb-1">
+    <span class="ps-mono fs-6" data-info="contextTokens">@(Model.ContextTokens > 0 ? ChatDisplay.Count(Model.ContextTokens) : "—")</span>
+    <span class="ps-mono fs-8 text-ps-faint">@(window > 0 ? $"/ {ChatDisplay.Count(window)} · {percent:0}%" : "window unknown")</span>
+  </div>
+  <div class="ps-meter mb-2" role="meter" aria-label="Context used" aria-valuemin="0" aria-valuemax="100" aria-valuenow="@percent.ToString("0", System.Globalization.CultureInfo.InvariantCulture)" title="The newest request's tokens">
+    <span class="seg-accent" style="width:@(percent.ToString("0.#", System.Globalization.CultureInfo.InvariantCulture))%"></span>
+  </div>
+  <div class="kv mt-2"><span class="k">Auto-compaction</span><span class="v" data-info="compaction">@(compaction is null ? "—" : compaction.Enabled ? $"on · reserve {ChatDisplay.Count(compaction.ReserveTokens)}" : "off")</span></div>
+</div>
+<div class="info-section">
+  <h6>Usage this branch</h6>
+  <div class="kv"><span class="k">Input</span><span class="v" data-info="input">@(usage is null ? "—" : ChatDisplay.Count(usage.Input))</span></div>
+  <div class="kv"><span class="k">Output</span><span class="v" data-info="output">@(usage is null ? "—" : ChatDisplay.Count(usage.Output))</span></div>
+  <div class="kv"><span class="k">Cache read</span><span class="v" data-info="cacheRead">@(usage is null ? "—" : ChatDisplay.Count(usage.CacheRead))</span></div>
+  <div class="kv"><span class="k">Cache write</span><span class="v" data-info="cacheWrite">@(usage is null ? "—" : ChatDisplay.Count(usage.CacheWrite))</span></div>
+  @if (cost is not null)
+  {
+    <div class="kv"><span class="k">Cost</span><span class="v" tabindex="0" data-bs-toggle="tooltip" title="@costTitle" data-info="cost">@cost</span></div>
+  }
+  @if (Model.Spend is { } spend)
+  {
+    <div class="kv"><span class="k">Billing</span><span class="v"><span class="ps-chip" tabindex="0" data-bs-toggle="tooltip" title="@spend.BillingTitle" data-info="account">@spend.Billing</span></span></div>
+    <div class="kv"><span class="k">Chat spend</span><span class="v" tabindex="0" data-bs-toggle="tooltip" title="@spend.Title" data-info="chatSpend">@(spend.Text ?? "—")</span></div>
+    @if (spend.Uncertain is { } uncertain)
+    {
+      <div class="kv"><span class="k">Uncertain</span><span class="v"><a href="@spend.UncertainUrl" title="Resolve it in History › Spend" data-info="chatUncertain">@uncertain</a></span></div>
+    }
+    <div class="kv"><span class="k">Chat cap</span><span class="v" tabindex="0" data-bs-toggle="tooltip" title="@spend.CapTitle" data-info="chatCap">@if (spend.CapWarning) {<span class="ps-chip" data-tone="warn">@spend.Cap</span>} else {<text>@spend.Cap</text>}</span></div>
+    <div class="fs-8 mt-1"><a class="text-ps-faint" href="@spend.HistoryUrl" data-info="spendHistory">This chat in History › Spend</a></div>
+  }
+  else if (Model.AccountLabel is { Length: > 0 } label)
+  {
+    <div class="kv"><span class="k">Billing</span><span class="v"><span class="ps-chip" data-info="account">@label</span></span></div>
+  }
+</div>
+<div class="info-section">
+  <h6>Model</h6>
+  <div class="kv"><span class="k">Provider</span><span class="v" data-info="provider">@binding.Provider</span></div>
+  <div class="kv"><span class="k">Model</span><span class="v" data-info="model">@binding.Model</span></div>
+  @if (Model.Api is { Length: > 0 } api)
+  {
+    <div class="kv"><span class="k">API</span><span class="v" data-info="api">@api</span></div>
+  }
+  <div class="kv"><span class="k">Thinking</span><span class="v" data-info="thinking">@binding.Thinking</span></div>
+  <div class="kv"><span class="k">Speed</span><span class="v" data-info="tier">@(binding.Tier ?? "default")</span></div>
+</div>
+<div class="info-section">
+  <h6 class="d-flex">Active tools <a class="ms-auto text-ps-faint" href="/settings/tools">edit</a></h6>
+  @if (Model.Tools.Count > 0)
+  {
+    <div class="d-flex flex-wrap gap-1" data-info="tools">
+      @foreach (var tool in Model.Tools)
+      {
+        <span class="ps-chip" data-tone="accent">@tool</span>
+      }
+    </div>
+  }
+  else
+  {
+    <div class="fs-8 text-ps-faint">No tools</div>
+  }
+  <div class="fs-8 text-ps-faint mt-2" data-info="policy"><i class="bi bi-shield-check me-1"></i>@policy</div>
+</div>
+@if (Model.Instructions is { Length: > 0 } instructions)
+{
+  <div class="info-section">
+    <h6>System prompt</h6>
+    <div class="fs-8 text-secondary info-clamp" title="The branch's own instructions">@ChatDisplay.Cut(instructions, 1200)</div>
+  </div>
+}
+<div class="info-section border-0">
+  <h6>Durable session</h6>
+  @if (Model.SessionPath is { Length: > 0 } path)
+  {
+    <div class="ps-mono fs-8 text-secondary text-break" data-info="path">@path</div>
+  }
+  <div class="kv mt-1"><span class="k">Working in</span><span class="v ps-mono text-break">@Model.Cwd</span></div>
+  <div class="kv"><span class="k">Session id</span><span class="v ps-mono" title="@binding.SessionId">@shortId</span></div>
+  <div class="kv"><span class="k">Branch</span><span class="v" data-info="branch">@Model.AgentName</span></div>
+  <div class="kv"><span class="k">Messages</span><span class="v" data-info="messages">@Model.UserCount user · @Model.AssistantCount assistant · @Model.ToolCount tool</span></div>
+</div>

@@ -109,10 +109,13 @@
           "PiSharp.CodingAgent": "[1.2.0, )",
           "PiSharp.Compatibility.Node": "[1.2.0, )",
           "PiSharp.Durable": "[1.2.0, )",
+          "PiSharp.Durable.Hosting": "[1.2.0, )",
+          "PiSharp.Durable.Server": "[1.2.0, )",
           "PiSharp.Durable.Sqlite": "[1.2.0, )",
           "PiSharp.Durable.Tools": "[1.2.0, )",
           "PiSharp.Extensions.Agent": "[1.2.0, )",
           "PiSharp.Extensions.Runtime": "[1.2.0, )",
+          "PiSharp.ModelRuntime": "[1.2.0, )",
           "PiSharp.PromptTemplates.Yaml": "[1.2.0, )",
           "PiSharp.Rpc": "[1.2.0, )",
           "PiSharp.Tools": "[1.2.0, )",
@@ -154,6 +157,24 @@
           "PiSharp.Contracts": "[1.2.0, )"
         }
       },
+      "pisharp.durable.client": {
+        "type": "Project"
+      },
+      "pisharp.durable.hosting": {
+        "type": "Project",
+        "dependencies": {
+          "PiSharp.Durable": "[1.2.0, )",
+          "PiSharp.Durable.Sqlite": "[1.2.0, )",
+          "PiSharp.Durable.Tools": "[1.2.0, )"
+        }
+      },
+      "pisharp.durable.server": {
+        "type": "Project",
+        "dependencies": {
+          "PiSharp.Durable.Client": "[1.2.0, )",
+          "PiSharp.Durable.Hosting": "[1.2.0, )"
+        }
+      },
       "pisharp.durable.sqlite": {
         "type": "Project",
         "dependencies": {
@@ -168,6 +189,7 @@
       "pisharp.durable.tools": {
         "type": "Project",
         "dependencies": {
+          "PiSharp.Codemode": "[1.2.0, )",
           "PiSharp.Durable": "[1.2.0, )",
           "PiSharp.Tools": "[1.2.0, )"
         }
@@ -195,6 +217,16 @@
         "type": "Project",
         "dependencies": {
           "PiSharp.Extensions.Abstractions": "[1.2.0, )"
+        }
+      },
+      "pisharp.modelruntime": {
+        "type": "Project",
+        "dependencies": {
+          "PiSharp.CodingAgent": "[1.2.0, )",
+          "PiSharp.Extensions.Agent": "[1.2.0, )",
+          "PiSharp.Extensions.Runtime": "[1.2.0, )",
+          "PiSharp.Rpc": "[1.2.0, )",
+          "PiSharp.Tools": "[1.2.0, )"
         }
       },
       "pisharp.prompttemplates.yaml": {

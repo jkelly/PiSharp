@@ -1,0 +1,46 @@
+@model DevicesPage
+@{
+    ViewData["Title"] = "Schedules";
+    ViewData["Page"] = "schedules";
+}
+<div class="dn-shell">
+  <partial name="~/Views/Shared/_Topbar.cshtml" model="Model.Devices" />
+  <main class="dn-content"><div class="page" data-automation="schedules">
+    <div class="page-header"><div><h1>Recurring jobs</h1><p class="text-body-secondary">Jobs run on the device, even when this page is closed. Missed intervals coalesce; overlapping runs are skipped.</p></div><a href="/" class="btn btn-outline-secondary">Back to agents</a></div>
+    <div class="d-flex gap-2 align-items-end mb-3 flex-wrap">
+      <label class="form-label">Device<select class="form-select" data-device aria-label="Device">@foreach (var device in Model.Devices) { <option value="@device.Id">@device.Name</option> }</select></label>
+      <button type="button" class="btn btn-outline-secondary mb-2" data-refresh>Refresh</button>
+      <span class="text-body-secondary mb-2" role="status" data-loading></span>
+    </div>
+    <div class="alert alert-danger" role="alert" data-error hidden></div>
+    <section aria-labelledby="create-schedule-title" class="border-bottom pb-4 mb-4">
+      <h2 class="h5" id="create-schedule-title">Schedule a job</h2>
+      <form data-create-schedule class="row g-3">
+        <div class="col-md-4"><label class="form-label" for="schedule-session">Session</label><select id="schedule-session" data-session class="form-select" required></select></div>
+        <div class="col-md-3"><label class="form-label" for="schedule-agent">Agent</label><select id="schedule-agent" data-agent class="form-select" required></select></div>
+        <div class="col-md-3"><label class="form-label" for="schedule-job">Job</label><select id="schedule-job" data-job class="form-select" required></select></div>
+        <div class="col-md-2"><label class="form-label" for="schedule-interval">Every (minutes)</label><input id="schedule-interval" data-interval type="number" class="form-control" min="1" max="525600" value="60" required /></div>
+        <div class="col-12 row g-2" data-job-inputs></div>
+        <div class="col-12"><button class="btn btn-primary" type="submit" data-create-button disabled>Create schedule</button> <small class="text-body-secondary">The first run starts after one interval.</small></div>
+      </form>
+    </section>
+    <section aria-labelledby="schedules-title" class="mb-5">
+      <h2 class="h5" id="schedules-title">Schedules</h2>
+      <div class="table-responsive"><table class="table align-middle"><thead><tr><th>Job / target</th><th>Interval</th><th>State</th><th>Next run</th><th>Last tick</th><th>Actions</th></tr></thead><tbody data-schedules></tbody></table></div>
+      <p data-schedules-empty class="text-body-secondary" hidden>No schedules on this device.</p>
+    </section>
+    <section aria-labelledby="credentials-title">
+      <h2 class="h5" id="credentials-title">Automation tokens</h2>
+      <p class="text-body-secondary">These tokens can only tick schedules when due. They cannot chat, read history, edit schedules or force a paused job to run.</p>
+      <form class="row g-3 mb-3" data-create-credential>
+        <div class="col-md-4"><label class="form-label" for="trigger-label">Label</label><input id="trigger-label" data-token-label class="form-control" maxlength="100" required placeholder="External scheduler" /></div>
+        <div class="col-md-4"><label class="form-label" for="trigger-schedule">Schedule</label><select id="trigger-schedule" data-token-schedule class="form-select"></select></div>
+        <div class="col-md-2"><label class="form-label" for="trigger-expiry">Expires in (hours)</label><input id="trigger-expiry" data-token-hours class="form-control" type="number" min="1" max="8760" value="720" required /></div>
+        <div class="col-md-2 d-flex align-items-end"><button class="btn btn-outline-primary" type="submit">Issue token</button></div>
+      </form>
+      <div class="alert alert-info" data-issued hidden><p>Copy this token now. It will not be shown again.</p><code data-issued-token class="text-break"></code><button type="button" class="btn btn-sm btn-outline-secondary ms-2" data-dismiss-token>Dismiss</button></div>
+      <div class="table-responsive"><table class="table"><thead><tr><th>Label</th><th>Scope</th><th>Expires</th><th></th></tr></thead><tbody data-credentials></tbody></table></div>
+    </section>
+  </div></main>
+</div>
+@section Scripts { <script type="module" src="/js/automation.js" asp-append-version="true"></script> }

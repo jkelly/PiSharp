@@ -1,0 +1,13 @@
+@* Decision 0011 (run W5, E6): the mockups' _LeaderboardEmpty: no battle is voted yet, so there is no leaderboard. Start a blind vote
+   opens Compare with its Blind switch on. Model: LeaderboardPage. *@
+@model LeaderboardPage
+<div class="ps-card" data-leaderboard-empty>
+  <div class="empty-state">
+    <div class="empty-icon"><i class="bi bi-trophy" aria-hidden="true"></i></div>
+    <h3 class="ps-heading fs-2 text-body mb-2">No votes yet</h3>
+    <p class="fs-7 mx-auto mb-4 eval-empty-text">Turn on Blind mode in Compare, pick the best answer and give it a tag such as coding. A leaderboard for each tag appears here.</p>
+    <div class="d-flex flex-wrap justify-content-center gap-2">
+      <a class="btn btn-primary" href="@Model.BlindUrl"><i class="bi bi-shuffle me-1" aria-hidden="true"></i>Start a blind vote</a>
+    </div>
+  </div>
+</div>

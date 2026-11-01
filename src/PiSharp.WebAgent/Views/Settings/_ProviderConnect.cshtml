@@ -1,0 +1,77 @@
+@* Decision 0011 (run W2, WU9): a provider page's call to action while the provider has no account: the mockups' "Sign in with ChatGPT"
+   card (settings-provider-codex, disconnected state) for a sign-in provider, with a choice card per sign-in method, and the _ApiKeyCard's
+   empty state for a provider that takes a key (Store a key, or set the environment variable). Offline, the sign-in buttons are disabled
+   and say why. Model: ProviderPage. *@
+@model ProviderPage
+@{
+    var provider = Model.Provider;
+    var codex = provider.Id == SignInFlows.CodexProvider;
+}
+@if (provider.SignsIn)
+{
+  <section class="settings-section" id="sign-in">
+    <div class="ps-card p-4 p-md-5">
+      <div class="text-center mb-4">
+        <div class="empty-state p-0"><div class="empty-icon"><i class="bi bi-person-badge" aria-hidden="true"></i></div></div>
+        <h3 class="ps-heading fs-2 mb-2">Sign in with <em>@(codex ? "ChatGPT" : "GitHub")</em></h3>
+        <p class="text-secondary fs-7 mx-auto mb-0" style="max-width:52ch">@(codex
+            ? "Connect a ChatGPT Plus or Pro account to use Codex models. This is optional: usage counts against your plan, and the tokens are encrypted on this machine and refresh automatically."
+            : "Connect a GitHub account with a Copilot plan to use the models it includes. The tokens are encrypted on this machine and refresh automatically.")</p>
+      </div>
+      @if (provider.SignIns.Count > 1)
+      {
+        <div class="row g-3 mx-auto" style="max-width:640px">
+          @foreach (var method in provider.SignIns)
+          {
+            <div class="col-md-6">
+              <button type="button" class="choice-card h-100 w-100 text-start" data-bs-toggle="modal" data-bs-target="@SettingsText.SignInModal(provider.Id)"
+                      data-signin-provider="@provider.Id" data-signin-name="@provider.Name" data-signin-logo="@provider.LogoUrl" data-signin-method="@SettingsText.MethodName(method.Method)"
+                      disabled="@(!method.Available)" title="@(method.Available ? null : ProviderDirectory.OfflineMessage)">
+                <span class="choice-title d-flex align-items-center gap-2 flex-wrap"><i class="bi @(method.Method == SignInMethod.Browser ? "bi-window-stack" : "bi-phone") text-ps-blue" aria-hidden="true"></i>@method.Label
+                  @if (method.Method == SignInMethod.Browser)
+                  {
+                    <span class="ps-chip" data-tone="accent">recommended</span>
+                  }
+                </span>
+                <span class="choice-desc d-block mt-1">@method.Description</span>
+              </button>
+            </div>
+          }
+        </div>
+      }
+      <div class="text-center mt-4 d-flex flex-wrap gap-2 justify-content-center">
+        <partial name="/Views/Settings/_CredentialButton.cshtml" model='new CredentialButton(provider, codex ? "Sign in with ChatGPT" : "Sign in with GitHub", "btn btn-primary btn-ps") { SignIn = true, Icon = "bi-box-arrow-in-right me-1" }' />
+        @if (provider.TakesApiKey)
+        {
+          <partial name="/Views/Settings/_CredentialButton.cshtml" model='new CredentialButton(provider, "Store a key instead", "btn btn-outline-secondary") { Icon = "bi-safe me-1" }' />
+        }
+      </div>
+      @if (Model.Offline)
+      {
+        <p class="fs-8 text-ps-faint text-center mt-3 mb-0">@ProviderDirectory.OfflineMessage</p>
+      }
+    </div>
+  </section>
+}
+else if (provider.TakesApiKey)
+{
+  <section class="settings-section" id="api-key">
+    <h3>API key</h3>
+    <p class="section-desc">Store a key here, or set @(provider.Variables.Count == 0 ? "the provider's environment variable" : string.Join(" or ", provider.Variables)) for the web host. A stored key is used before the variable.</p>
+    <div class="ps-card">
+      <div class="setting-row">
+        <div>
+          <div class="setting-label d-flex align-items-center gap-2 flex-wrap">No key yet <span class="ps-chip" data-tone="outline">not configured</span></div>
+          <div class="setting-desc">Keys are encrypted with ASP.NET Data Protection in the app's data folder and only sent to @provider.Name. The pages show a masked hint, never the key.</div>
+          @if (provider.Variables.Count > 0)
+          {
+            <div class="setting-key">env: @string.Join(", ", provider.Variables)</div>
+          }
+        </div>
+        <div class="setting-control">
+          <partial name="/Views/Settings/_CredentialButton.cshtml" model='new CredentialButton(provider, "Store a key", "btn btn-sm btn-primary") { Icon = "bi-safe me-1" }' />
+        </div>
+      </div>
+    </div>
+  </section>
+}

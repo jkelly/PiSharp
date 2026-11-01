@@ -1,0 +1,84 @@
+@* Decision 0011 (run W2, WU9): the mockups' settings-models page (route GET /settings/models, wide): what the catalog holds and what this
+   page writes (the Models section's hidden list, keyed provider/model), four summary cards, _ModelCatalogToolbar (filters as a GET form),
+   _ModelCatalogTable (this page's rows, 50 a page), paging, "Saved settings" (the section as stored) and _ModelDetailsModal. Model:
+   ModelsPage. *@
+@model ModelsPage
+@{
+    Layout = "_SettingsLayout";
+    ViewData["Title"] = "Models";
+    ViewData[ShellViewData.SettingsSection] = "models";
+    ViewData[ShellViewData.ContentClass] = "is-wide";
+    var hiddenCount = Model.Visibility.Hidden?.Count ?? 0;
+}
+@section Styles { <link href="~/css/settings.css" rel="stylesheet" asp-append-version="true"> }
+@section Modals { <partial name="/Views/Settings/_ModelDetailsModal.cshtml" model="null" /> }
+@section Scripts { <script type="module" src="~/js/settings.js" asp-append-version="true"></script> }
+<header class="settings-header d-flex flex-wrap align-items-end gap-3">
+  <div class="flex-grow-1">
+    <div class="ps-eyebrow">Connections</div>
+    <h2>Models</h2>
+    <p>The model catalog lists <strong>@(SettingsText.Plural(Model.CatalogTotal, "chat model") + " across " + SettingsText.Plural(Model.CatalogProviders.Count, "provider"))</strong>. Only models from providers you've connected are usable. Turning a model off hides it from the model pickers; it's saved in the Models section's hidden list, keyed <span class="ps-mono">"provider/modelId"</span>. Every model from a connected provider is shown unless you hide it.</p>
+  </div>
+  <div class="d-flex gap-2 flex-wrap">
+    <a class="btn btn-primary btn-ps" href="/settings/providers"><i class="bi bi-plug me-1" aria-hidden="true"></i>Connect providers</a>
+  </div>
+</header>
+
+<partial name="/Views/Settings/_OfflineNote.cshtml" model="Model.Offline" />
+
+<div class="row g-2 mb-3" data-models-summary>
+  <div class="col-6 col-lg-3"><div class="ps-card p-3 h-100"><div class="ps-label">Usable models</div><div class="fs-4 ps-mono" data-summary="usable">@Model.Usable</div><div class="fs-8 text-ps-faint">@(Model.ConnectedProviders == 0 ? "no connected providers" : "from connected providers")</div></div></div>
+  <div class="col-6 col-lg-3"><div class="ps-card p-3 h-100"><div class="ps-label">Enabled</div><div class="fs-4 ps-mono" data-summary="enabled">@Model.Enabled</div><div class="fs-8 text-ps-faint">@SettingsText.Plural(hiddenCount, "model") hidden</div></div></div>
+  <div class="col-6 col-lg-3"><div class="ps-card p-3 h-100"><div class="ps-label">Default thinking</div><div class="fs-4 ps-mono">@(Model.DefaultThinking ?? "model")</div><div class="fs-8 text-ps-faint"><a href="/settings/defaults">global</a> · per-model defaults later</div></div></div>
+  <div class="col-6 col-lg-3"><div class="ps-card p-3 h-100"><div class="ps-label">Connected providers</div><div class="fs-4 ps-mono">@Model.ConnectedProviders</div><div class="fs-8 text-ps-faint">of @Model.CatalogProviders.Count in the catalog</div></div></div>
+</div>
+
+<partial name="/Views/Settings/_ModelCatalogToolbar.cshtml" model="Model" />
+
+@if (Model.Shown == 0)
+{
+  <div class="ps-card mb-3" data-models-empty>
+    <div class="empty-state">
+      <div class="empty-icon"><i class="bi bi-boxes" aria-hidden="true"></i></div>
+      @if (Model.ConnectedProviders == 0 && Model.Query.ConnectedOnly)
+      {
+        <h3 class="ps-heading fs-3 text-body">No usable models yet</h3>
+        <p class="mb-3">Connect a provider to see its models here, or turn off "Connected providers only" to browse the catalog.</p>
+        <a class="btn btn-primary btn-ps" href="/settings/providers">Connect a provider</a>
+      }
+      else
+      {
+        <h3 class="ps-heading fs-3 text-body">No models match</h3>
+        <p class="mb-3">Try other filters.</p>
+        <a class="btn btn-outline-secondary" href="/settings/models">Clear all filters</a>
+      }
+    </div>
+  </div>
+}
+else
+{
+  <partial name="/Views/Settings/_ModelCatalogTable.cshtml" model="Model" />
+  <nav class="d-flex flex-wrap align-items-center gap-2 mb-4" aria-label="Model pages">
+    <span class="fs-8 text-ps-faint me-auto">@($"Showing {(Model.Page - 1) * ModelsPage.PageSize + 1}–{(Model.Page - 1) * ModelsPage.PageSize + Model.Shown} of {Model.Matches}")</span>
+    @if (Model.Pages > 1)
+    {
+      <a class="btn btn-sm btn-outline-secondary @(Model.Page <= 1 ? "disabled" : null)" href="@Model.Query.Href(Model.Page - 1)" aria-disabled="@(Model.Page <= 1 ? "true" : null)"><i class="bi bi-chevron-left" aria-hidden="true"></i><span class="visually-hidden">Previous page</span></a>
+      <span class="fs-7 ps-mono">@Model.Page / @Model.Pages</span>
+      <a class="btn btn-sm btn-outline-secondary @(Model.Page >= Model.Pages ? "disabled" : null)" href="@Model.Query.Href(Model.Page + 1)" aria-disabled="@(Model.Page >= Model.Pages ? "true" : null)"><i class="bi bi-chevron-right" aria-hidden="true"></i><span class="visually-hidden">Next page</span></a>
+    }
+  </nav>
+}
+
+<section class="settings-section">
+  <h3>Saved settings</h3>
+  <p class="section-desc">Switches are saved at once to the app's settings database (the <span class="ps-mono">models</span> section).</p>
+  <details class="ps-panel">
+    <summary class="px-3 py-2 fs-7 text-secondary">Preview the <span class="ps-mono">models</span> section</summary>
+    <div class="px-3 pb-3">
+      <div class="ps-term">
+        <div class="ps-term-bar"><span class="dot"></span>models<button class="btn btn-icon ms-auto" type="button" data-copy="#settings-json" title="Copy" aria-label="Copy"><i class="bi bi-copy" aria-hidden="true"></i></button></div>
+        <pre id="settings-json"><code class="language-json" data-models-json>@SettingsText.PrettyJson(Model.Visibility)</code></pre>
+      </div>
+    </div>
+  </details>
+</section>

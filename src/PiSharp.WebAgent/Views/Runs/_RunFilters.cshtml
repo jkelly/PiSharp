@@ -1,0 +1,119 @@
+@* Decision 0011 (run W4, R3): the mockups' _RunFilters: search (prompt text, run id, session id), a date range (local days), Saved filters
+   (the user's named filters, the "history-filters" section, then Save current filters… and Manage saved filters), the source, Provider →
+   Model (the model list is the chosen provider's; providers and models are the ones runs.db has) and the status (stop reasons, then
+   outcomes). A plain GET form: the filters live in the query string, so every view is a link; history.js applies a change at once. Then
+   the active filter chips with "N of M runs". Model: RunHistoryPage. *@
+@using System.Globalization
+@model RunHistoryPage
+@{
+    var filter = Model.Filter;
+    static string Day(DateOnly? day) => day?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) ?? "";
+    var cleared = filter with { Search = null, From = null, To = null, Source = null, Provider = null, Model = null, Status = null, Page = 1 };
+}
+<section class="ps-card p-3 mb-3" aria-label="Filters">
+  <form id="runFilters" method="get" action="/history" data-run-filters>
+    <div class="row g-2 align-items-end">
+      <div class="col-12 col-md-6 col-lg-4">
+        <label class="ps-label d-block mb-1" for="fSearch">Search</label>
+        <div class="position-relative">
+          <i class="bi bi-search position-absolute top-50 translate-middle-y ms-2 text-ps-faint fs-8" aria-hidden="true"></i>
+          <input class="form-control form-control-sm ps-4" type="search" id="fSearch" name="q" value="@filter.Search" placeholder="Prompt text, run id, session id…" maxlength="@RunHistoryFilter.MaxSearch">
+        </div>
+      </div>
+      <div class="col-12 col-md-6 col-lg-5">
+        <span class="ps-label d-block mb-1" id="fDateLabel">Date range</span>
+        <div class="input-group input-group-sm" role="group" aria-labelledby="fDateLabel">
+          <label class="visually-hidden" for="fFrom">From</label>
+          <input class="form-control" type="date" id="fFrom" name="from" value="@Day(filter.From)" data-run-auto>
+          <span class="input-group-text"><i class="bi bi-arrow-right" aria-hidden="true"></i></span>
+          <label class="visually-hidden" for="fTo">To</label>
+          <input class="form-control" type="date" id="fTo" name="to" value="@Day(filter.To)" data-run-auto>
+        </div>
+      </div>
+      <div class="col-12 col-lg-3">
+        <div class="dropdown">
+          <button class="btn btn-sm btn-outline-secondary dropdown-toggle w-100" type="button" data-bs-toggle="dropdown" aria-expanded="false"><i class="bi bi-bookmark me-1" aria-hidden="true"></i>Saved filters</button>
+          <ul class="dropdown-menu dropdown-menu-end history-saved-menu" data-saved-filters>
+            <li><h6 class="dropdown-header">Saved filters</h6></li>
+            @foreach (var saved in Model.Saved)
+            {
+              <li><a class="@("dropdown-item text-truncate" + (saved.Current ? " active" : ""))" href="@saved.Href" title="@saved.Description" aria-current="@(saved.Current ? "true" : null)" data-saved-filter="@saved.Name"><i class="@("bi " + saved.Icon + " me-2")" aria-hidden="true"></i>@saved.Name</a></li>
+            }
+            @if (Model.Saved.Count == 0)
+            {
+              <li><span class="dropdown-item-text fs-8 text-ps-faint">None saved yet.</span></li>
+            }
+            <li><hr class="dropdown-divider"></li>
+            <li><button class="dropdown-item" type="button" data-bs-toggle="modal" data-bs-target="#modal-save-run-filter" disabled="@(!filter.Active)"><i class="bi bi-plus-lg me-2" aria-hidden="true"></i>Save current filters…</button></li>
+            <li><button class="dropdown-item" type="button" data-bs-toggle="modal" data-bs-target="#modal-manage-run-filters" disabled="@(Model.Saved.Count == 0)"><i class="bi bi-pencil me-2" aria-hidden="true"></i>Manage saved filters</button></li>
+          </ul>
+        </div>
+      </div>
+      <div class="col-6 col-lg-3">
+        <label class="ps-label d-block mb-1" for="fSource">Source</label>
+        <select class="form-select form-select-sm" id="fSource" name="source" data-run-auto>
+          <option value="" selected="@(filter.Source is null)">All sources</option>
+          @foreach (var source in RunHistoryFilter.Sources)
+          {
+            <option value="@source.Wire()" selected="@(source.Wire() == filter.Source)">@source.Label()</option>
+          }
+        </select>
+      </div>
+      <div class="col-6 col-lg-3">
+        <label class="ps-label d-block mb-1" for="fProvider">Provider</label>
+        <select class="form-select form-select-sm" id="fProvider" name="provider" data-run-auto data-run-provider>
+          <option value="" selected="@(filter.Provider is null)">All providers</option>
+          @foreach (var option in Model.Providers)
+          {
+            <option value="@option.Value" selected="@(option.Value == filter.Provider)">@option.Text</option>
+          }
+        </select>
+      </div>
+      <div class="col-6 col-lg-3">
+        <label class="ps-label d-block mb-1" for="fModel">Model</label>
+        @if (filter.Provider is null)
+        {
+          <select class="form-select form-select-sm" id="fModel" disabled><option>Choose a provider first</option></select>
+        }
+        else
+        {
+          <select class="form-select form-select-sm" id="fModel" name="model" data-run-auto data-run-model>
+            <option value="" selected="@(filter.Model is null)">All models</option>
+            @foreach (var option in Model.Models)
+            {
+              <option value="@option.Value" selected="@(option.Value == filter.Model)">@option.Text</option>
+            }
+          </select>
+        }
+      </div>
+      <div class="col-6 col-lg-3">
+        <label class="ps-label d-block mb-1" for="fStatus">Status</label>
+        <select class="form-select form-select-sm" id="fStatus" name="status" data-run-auto>
+          <option value="" selected="@(filter.Status is null)">All statuses</option>
+          @foreach (var status in RunHistoryFilter.Statuses)
+          {
+            <option value="@status" selected="@(status == filter.Status)">@status</option>
+          }
+        </select>
+      </div>
+    </div>
+    @if (filter.Size != 25)
+    {
+      <input type="hidden" name="size" value="@filter.Size">
+    }
+    <button class="visually-hidden" type="submit">Apply filters</button>
+  </form>
+</section>
+
+@if (filter.Active)
+{
+  <div class="d-flex flex-wrap align-items-center gap-2 mb-3" data-run-chips>
+    <span class="ps-label">Active filters</span>
+    @foreach (var chip in filter.Chips)
+    {
+      <span class="ps-chip" data-tone="accent">@chip.Text <a class="text-reset" href="@chip.Href" aria-label="Remove @chip.Name filter"><i class="bi bi-x-lg" aria-hidden="true"></i></a></span>
+    }
+    <a class="fs-8 ps-mono" href="@cleared.Href()">Clear all</a>
+    <span class="ms-auto fs-8 ps-mono text-ps-faint" data-run-count>@Model.Total.ToString("#,0", CultureInfo.InvariantCulture) of @Model.TotalAll.ToString("#,0", CultureInfo.InvariantCulture) runs</span>
+  </div>
+}

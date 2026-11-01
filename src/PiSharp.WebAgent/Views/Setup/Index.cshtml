@@ -1,0 +1,24 @@
+@* Decision 0011 (run W3, SU): the mockups' setup.html (route GET /setup): the first-run wizard, Welcome → Connect → Default model → Done,
+   in _SetupLayout (no sidebar). _SetupTopbar, then _SetupWizard (the four steps and the footer), then the address and versions. The API key
+   and ChatGPT sign-in modals are the Settings area's own partials (_ApiKeyModal, _ChatGptSignInModal) run by its own scripts
+   (settings-keys.js, settings-signin.js) on /api/credentials, not copies. States: default (something connected) and nothing connected.
+   Model: SetupPage. *@
+@model SetupPage
+@{
+    Layout = "/Views/Setup/_SetupLayout.cshtml";
+    ViewData["Title"] = "Setup";
+}
+@section Styles {
+  <link href="~/css/settings.css" rel="stylesheet" asp-append-version="true" />
+  <link href="~/css/setup.css" rel="stylesheet" asp-append-version="true" />
+}
+@section Modals {
+  <partial name="/Views/Settings/_ApiKeyModal.cshtml" model="Model.Offline" />
+  <partial name="/Views/Settings/_ChatGptSignInModal.cshtml" model="Model.Modals" />
+}
+@section Scripts { <script type="module" src="~/js/setup.js" asp-append-version="true"></script> }
+<div class="setup-shell">
+  <partial name="/Views/Setup/_SetupTopbar.cshtml" model="Model" />
+  <partial name="/Views/Setup/_SetupWizard.cshtml" model="Model" />
+  <div class="fs-8 text-ps-faint mt-3 ps-mono text-center text-break" data-setup-versions>@Model.Origin · PiSharp @Model.Versions.PiSharp · .NET @Model.Versions.DotNet</div>
+</div>

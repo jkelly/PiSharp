@@ -24,6 +24,8 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../PiSharp.CodingAgent/PiSharp.CodingAgent.csproj" />
+    <!-- Web Agent W2 (WU2): the registry, catalog and live provider routes (moved from this project, namespaces kept). -->
+    <ProjectReference Include="../PiSharp.ModelRuntime/PiSharp.ModelRuntime.csproj" />
     <ProjectReference Include="../PiSharp.PromptTemplates.Yaml/PiSharp.PromptTemplates.Yaml.csproj" Condition="'$(EnablePromptTemplateYaml)' == 'true'" />
     <ProjectReference Include="../PiSharp.Tools/PiSharp.Tools.csproj" />
     <ProjectReference Include="../PiSharp.Tools.Skia/PiSharp.Tools.Skia.csproj" />
@@ -37,6 +39,9 @@
     <ProjectReference Include="../PiSharp.Durable/PiSharp.Durable.csproj" />
     <ProjectReference Include="../PiSharp.Durable.Sqlite/PiSharp.Durable.Sqlite.csproj" />
     <ProjectReference Include="../PiSharp.Durable.Tools/PiSharp.Durable.Tools.csproj" />
+    <!-- Decision 0008: `pisharp durable serve` hosts a durable device (ASP.NET Core, through the server's framework reference). -->
+    <ProjectReference Include="../PiSharp.Durable.Hosting/PiSharp.Durable.Hosting.csproj" />
+    <ProjectReference Include="../PiSharp.Durable.Server/PiSharp.Durable.Server.csproj" />
   </ItemGroup>
   <ItemGroup>
     <!-- The Node extension host (IMPL-E): TypeScript/JavaScript extensions run in the user's Node with these scripts. -->
@@ -44,8 +49,8 @@
           Link="node-bridge/pi-host/%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" Pack="false" />
   </ItemGroup>
   <ItemGroup>
-    <EmbeddedResource Include="Models/*.json" LogicalName="PiSharp.Cli.Models.%(Filename)%(Extension)" />
-    <None Include="../../catalog-maintained/models.overlay.json" Link="catalog-maintained/models.overlay.json" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <!-- Web Agent W2 (WU2): the Models/*.json catalog shards are embedded, and catalog-maintained/models.overlay.json is copied to the
+         output, by PiSharp.ModelRuntime, with the registry (by link, same resource names and output path). -->
     <!-- The highlight.js 10.7.3 grammars (tools/HljsGrammars/extract-grammars.mjs), read by HljsGrammarData. -->
     <EmbeddedResource Include="Interactive/Mode/Theme/Highlight/hljs-grammars.json.gz" LogicalName="PiSharp.Cli.Hljs.grammars.json.gz" />
   </ItemGroup>

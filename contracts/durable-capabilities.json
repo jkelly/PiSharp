@@ -1,0 +1,246 @@
+{
+  "schemaVersion": 1,
+  "decision": "docs/decisions/0010-durable-application-contracts.md",
+  "features": [
+    {
+      "id": "capabilities",
+      "version": 1,
+      "title": "Capability manifest",
+      "routes": ["GET /v1/capabilities"],
+      "scopes": ["device-admin"],
+      "client": ["CapabilitiesAsync"],
+      "cli": ["pisharp durable capabilities"],
+      "web": [],
+      "unsupported": {
+        "web": "The hub reads features from GET /v1/device; it has no manifest page."
+      }
+    },
+    {
+      "id": "typed-inputs",
+      "version": 1,
+      "title": "Typed job inputs and idempotent execution starts",
+      "routes": [],
+      "scopes": ["device-admin"],
+      "client": [],
+      "cli": ["pisharp durable schedules create", "pisharp durable judgments start", "pisharp durable research start"],
+      "web": [],
+      "unsupported": {
+        "routes": "Typed inputs ride on the existing job routes (inputSchema in job definitions).",
+        "client": "Job definitions are read through DeviceAsync and the job routes.",
+        "web": "The job card renders inputSchema fields."
+      }
+    },
+    {
+      "id": "budgets",
+      "version": 1,
+      "title": "Budgets, reservations and run usage",
+      "routes": [
+        "GET /v1/budgets",
+        "PATCH /v1/budgets",
+        "POST /v1/budgets/reservations/{id}/resolve",
+        "GET /v1/sessions/{s}/executions/{taskId}/usage"
+      ],
+      "scopes": ["device-admin"],
+      "client": ["BudgetsAsync", "UpdateBudgetsAsync", "ResolveReservationAsync", "ExecutionUsageAsync"],
+      "cli": [
+        "pisharp durable executions usage",
+        "pisharp durable budgets show",
+        "pisharp durable budgets set",
+        "pisharp durable budgets resolve"
+      ],
+      "web": ["/Budgets"]
+    },
+    {
+      "id": "policies",
+      "version": 1,
+      "title": "Judgment policies",
+      "routes": [
+        "GET /v1/policies",
+        "GET /v1/policies/{id}",
+        "GET /v1/policies/{id}/versions/{version}",
+        "POST /v1/policies/{id}/versions",
+        "PUT /v1/policies/{id}/active"
+      ],
+      "scopes": ["device-admin"],
+      "client": ["PoliciesAsync", "PolicyAsync", "PolicyVersionAsync", "PublishPolicyAsync", "ActivatePolicyAsync"],
+      "cli": [
+        "pisharp durable policies list",
+        "pisharp durable policies show",
+        "pisharp durable policies publish",
+        "pisharp durable policies activate"
+      ],
+      "web": ["/Policies"]
+    },
+    {
+      "id": "judgments",
+      "version": 1,
+      "title": "Judgments with confidence routing and review",
+      "routes": [
+        "POST /v1/sessions/{s}/judgments",
+        "GET /v1/sessions/{s}/judgments",
+        "GET /v1/sessions/{s}/judgments/{id}",
+        "POST /v1/sessions/{s}/judgments/{id}/decision"
+      ],
+      "scopes": ["device-admin"],
+      "client": ["StartJudgmentAsync", "JudgmentsAsync", "JudgmentAsync", "DecideJudgmentAsync"],
+      "cli": [
+        "pisharp durable judgments list",
+        "pisharp durable judgments show",
+        "pisharp durable judgments start",
+        "pisharp durable judgments decide"
+      ],
+      "web": ["/Policies"]
+    },
+    {
+      "id": "artifacts",
+      "version": 1,
+      "title": "Structured artifacts and confirmed actions",
+      "routes": [
+        "GET /v1/sessions/{s}/executions/{taskId}/artifacts",
+        "GET /v1/sessions/{s}/artifacts",
+        "GET /v1/sessions/{s}/artifacts/{id}",
+        "GET /v1/sessions/{s}/artifacts/{id}/export",
+        "POST /v1/sessions/{s}/artifacts/{id}/actions/{action}"
+      ],
+      "scopes": ["device-admin"],
+      "client": [
+        "ExecutionArtifactsAsync",
+        "ArtifactsAsync",
+        "ArtifactAsync",
+        "ExportArtifactAsync",
+        "ArtifactTextAsync",
+        "InvokeArtifactActionAsync"
+      ],
+      "cli": [
+        "pisharp durable executions artifacts",
+        "pisharp durable artifacts list",
+        "pisharp durable artifacts show",
+        "pisharp durable artifacts text",
+        "pisharp durable artifacts export",
+        "pisharp durable artifacts action"
+      ],
+      "web": ["/Executions"]
+    },
+    {
+      "id": "evidence",
+      "version": 1,
+      "title": "Evidence records",
+      "routes": [
+        "GET /v1/sessions/{s}/evidence",
+        "POST /v1/sessions/{s}/evidence",
+        "GET /v1/sessions/{s}/evidence/{id}",
+        "GET /v1/sessions/{s}/evidence/{id}/text"
+      ],
+      "scopes": ["device-admin"],
+      "client": ["EvidenceListAsync", "AddEvidenceAsync", "EvidenceAsync", "EvidenceTextAsync"],
+      "cli": [
+        "pisharp durable evidence list",
+        "pisharp durable evidence show",
+        "pisharp durable evidence text",
+        "pisharp durable evidence add"
+      ],
+      "web": ["/Executions"]
+    },
+    {
+      "id": "sources",
+      "version": 1,
+      "title": "Monitored sources, safe retrieval and source checks",
+      "routes": [
+        "GET /v1/sources",
+        "POST /v1/sources",
+        "GET /v1/sources/{id}",
+        "PATCH /v1/sources/{id}",
+        "DELETE /v1/sources/{id}",
+        "GET /v1/sources/{id}/items",
+        "GET /v1/retrieval/health",
+        "POST /v1/sessions/{s}/source-checks"
+      ],
+      "scopes": ["device-admin"],
+      "client": [
+        "SourcesAsync",
+        "CreateSourceAsync",
+        "SourceAsync",
+        "UpdateSourceAsync",
+        "DeleteSourceAsync",
+        "SourceItemsAsync",
+        "RetrievalHealthAsync",
+        "StartSourceCheckAsync"
+      ],
+      "cli": [
+        "pisharp durable sources list",
+        "pisharp durable sources show",
+        "pisharp durable sources create",
+        "pisharp durable sources update",
+        "pisharp durable sources delete",
+        "pisharp durable sources items",
+        "pisharp durable sources health",
+        "pisharp durable sources check"
+      ],
+      "web": ["/Sources"]
+    },
+    {
+      "id": "research",
+      "version": 1,
+      "title": "Supervised research with bounded parallel angles",
+      "routes": ["POST /v1/sessions/{s}/research"],
+      "scopes": ["device-admin"],
+      "client": ["StartResearchAsync"],
+      "cli": ["pisharp durable research start"],
+      "web": ["/Research"]
+    },
+    {
+      "id": "feedback",
+      "version": 1,
+      "title": "Feedback on artifacts: more, less, dismiss, label and undo",
+      "routes": ["POST /v1/sessions/{s}/artifacts/{id}/feedback", "GET /v1/sessions/{s}/artifacts/{id}/feedback"],
+      "scopes": ["device-admin"],
+      "client": ["SendFeedbackAsync", "ArtifactFeedbackAsync"],
+      "cli": ["pisharp durable feedback send", "pisharp durable feedback show"],
+      "web": ["/Executions"]
+    },
+    {
+      "id": "preferences",
+      "version": 1,
+      "title": "Preference profiles with revisions, examples, reset, export and delete",
+      "routes": [
+        "GET /v1/preferences",
+        "GET /v1/preferences/{id}",
+        "PATCH /v1/preferences/{id}",
+        "POST /v1/preferences/{id}/reset",
+        "GET /v1/preferences/{id}/export",
+        "DELETE /v1/preferences/{id}"
+      ],
+      "scopes": ["device-admin"],
+      "client": [
+        "PreferencesAsync",
+        "PreferenceAsync",
+        "UpdatePreferenceAsync",
+        "ResetPreferenceAsync",
+        "ExportPreferenceAsync",
+        "DeletePreferenceAsync"
+      ],
+      "cli": [
+        "pisharp durable preferences list",
+        "pisharp durable preferences show",
+        "pisharp durable preferences set",
+        "pisharp durable preferences reset",
+        "pisharp durable preferences export",
+        "pisharp durable preferences delete"
+      ],
+      "web": ["/Preferences"]
+    },
+    {
+      "id": "retention",
+      "version": 1,
+      "title": "Catalog retention: dry run and batched purge of settled records and unreferenced blobs",
+      "routes": ["GET /v1/retention", "POST /v1/retention"],
+      "scopes": ["device-admin"],
+      "client": ["RetentionAsync", "PurgeRetentionAsync"],
+      "cli": ["pisharp durable retention show", "pisharp durable retention purge"],
+      "web": [],
+      "unsupported": {
+        "web": "Retention is an operator task run from the CLI (pisharp durable retention); the hub does not offer it."
+      }
+    }
+  ]
+}

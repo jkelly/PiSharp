@@ -1,0 +1,37 @@
+@* Decision 0011 (run W2, WU8): the mockups' "kept running while you were away" toast (#toast-kept-running), rendered by the layout as a
+   template: the chats whose run is still going (IRecentChats), each with a live dot and a link (the chat this page shows has none).
+   chat-kept-running.js shows it once per tab, and only when the browser had no page of the app open for a while: the runs went on while
+   you were away. Titles are text, never HTML. Model: ChatKeptRunningView, or null to read the running chats here. *@
+@inject IRecentChats RecentChats
+@model ChatKeptRunningView?
+@{
+    var view = Model ?? new ChatKeptRunningView(
+        (await RecentChats.ListAsync(ShellNav.RecentChatLimit, Context.RequestAborted)).Where(chat => chat.Running).ToList(),
+        ViewData[ShellViewData.ActiveChat] as string);
+    var count = view.Chats.Count;
+}
+@if (count > 0)
+{
+  <template id="toast-kept-running-template" data-kept-running="@string.Join(",", view.Chats.Select(chat => chat.Id))">
+    <div class="toast" id="toast-kept-running" role="status" aria-live="polite" aria-atomic="true">
+      <div class="toast-header"><span class="status-dot live me-2" aria-hidden="true"></span><strong class="me-auto">@count chat@(count == 1 ? "" : "s") kept running while you were away</strong><small>now</small><button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Close"></button></div>
+      <div class="toast-body">
+        @foreach (var chat in view.Chats)
+        {
+          <div class="d-flex align-items-center gap-2 kept-running-row">
+            <span class="status-dot live" aria-hidden="true"></span>
+            @if (chat.Id == view.ActiveChat)
+            {
+              <span class="flex-grow-1 text-truncate">@chat.Title</span>
+            }
+            else
+            {
+              <a class="flex-grow-1 text-truncate" href="/chat/@Uri.EscapeDataString(chat.Id)">@chat.Title</a>
+            }
+            <span class="text-ps-faint text-nowrap">still running</span>
+          </div>
+        }
+      </div>
+    </div>
+  </template>
+}

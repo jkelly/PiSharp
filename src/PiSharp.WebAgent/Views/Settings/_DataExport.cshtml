@@ -1,0 +1,58 @@
+@* Decision 0011 (run W4, unit R9): the mockups' Export & import section of Settings › Data & storage. Export settings downloads one JSON file
+   (GET /api/data/export) with every IDataExportPart that has something to export: the settings you changed, the custom providers and, when
+   Presets registers its part, the presets. Credentials are never in it, not even encrypted, and the row says so. Import settings reads a
+   file in the browser and shows every change it would make in _DataImportModal before anything is saved. Export all chats downloads a zip
+   with a Markdown transcript of each chat (GET /api/data/export/chats). Model: DataPage. *@
+@using PiSharp.WebAgent.DataStorage
+@model DataPage
+@{
+    var export = Model.Export;
+    string Join(IReadOnlyList<string> names) => names.Count <= 1 ? string.Join("", names) : string.Join(", ", names.Take(names.Count - 1)) + " and " + names[^1];
+}
+<section class="settings-section" id="export-import">
+  <h3>Export &amp; import</h3>
+  <p class="section-desc">Move your setup to another machine, or keep a readable copy of your chats.</p>
+  <div class="ps-card">
+    <div class="setting-row" data-export-settings>
+      <div>
+        <div class="setting-label">Export settings</div>
+        <div class="setting-desc">One JSON file with @(export.Parts.Count > 0 ? Join(export.Parts) : "your settings (all at their defaults now)"). <strong>Credentials are always excluded</strong>: no API key, token or sign-in is in the file, not even encrypted. Connect providers again on the new machine.</div>
+        @foreach (var note in export.Notes)
+        {
+          <div class="fs-8 text-ps-warn mt-1"><i class="bi bi-exclamation-triangle me-1" aria-hidden="true"></i>@note</div>
+        }
+        <div class="setting-key">@export.FileName · ≈ @DataFolders.Size(export.Bytes)</div>
+      </div>
+      <div class="setting-control">
+        <a class="btn btn-sm btn-outline-secondary" href="@DataEndpoints.Prefix/export" download="@export.FileName" data-export-link><i class="bi bi-download me-1" aria-hidden="true"></i>Export JSON</a>
+      </div>
+    </div>
+    <div class="setting-row" data-import-settings>
+      <div>
+        <div class="setting-label">Import settings</div>
+        <div class="setting-desc">Merges into your current settings. You review every changed key before anything is saved. A file with keys in it is never needed: an import adds no credential, except a key written into a custom provider by hand, which goes into the encrypted vault.</div>
+      </div>
+      <div class="setting-control">
+        <label class="visually-hidden" for="importSettings">Settings file to import</label>
+        <input class="form-control form-control-sm" id="importSettings" type="file" accept=".json,application/json" style="max-width:15rem" data-import-file data-max-bytes="@DataStorageOptions.MaxImportBytes">
+      </div>
+    </div>
+    <div class="setting-row" data-export-chats>
+      <div>
+        <div class="setting-label">Export all chats</div>
+        <div class="setting-desc">@(export.Chats == 0 ? "There are no chats to export yet." : $"A zip with a Markdown transcript of each of the {DataStorageService.Plural(export.Chats, "chat")}.") Deleted chats in the archive are not included.</div>
+        <div class="setting-key">@export.ChatsFileName · @DataStorageService.Plural(export.Chats, "chat")</div>
+      </div>
+      <div class="setting-control">
+        @if (export.Chats > 0)
+        {
+          <a class="btn btn-sm btn-outline-secondary" href="@DataEndpoints.Prefix/export/chats" download="@export.ChatsFileName" data-export-link><i class="bi bi-file-earmark-zip me-1" aria-hidden="true"></i>Export .zip</a>
+        }
+        else
+        {
+          <button class="btn btn-sm btn-outline-secondary" type="button" disabled><i class="bi bi-file-earmark-zip me-1" aria-hidden="true"></i>Export .zip</button>
+        }
+      </div>
+    </div>
+  </div>
+</section>

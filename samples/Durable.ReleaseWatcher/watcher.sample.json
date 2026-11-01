@@ -1,0 +1,38 @@
+{
+  "session": "release-watcher",
+  "cwd": "C:/work/release-watcher",
+  "everyMinutes": 60,
+  "profile": "default",
+  "sources": [
+    { "id": "dotnet-runtime", "kind": "github-releases", "repository": "dotnet/runtime", "title": ".NET runtime releases", "credentialRef": "github" },
+    { "id": "widget-feed", "kind": "feed", "url": "https://example.com/widget/releases.xml", "title": "Widget releases" }
+  ],
+  "policy": {
+    "id": "release-relevance",
+    "spec": {
+      "title": "Release relevance",
+      "kind": "classifier",
+      "model": { "provider": "anthropic", "id": "claude-haiku-5-5" },
+      "instructions": "Classify a release of a dependency we use. breaking: it removes or changes behavior we may rely on. relevant: worth a look, such as a security fix or a deprecation. ignore: nothing for us to do.",
+      "inputSchema": {
+        "type": "object", "additionalProperties": false, "required": ["title", "summary"],
+        "properties": {
+          "title": { "type": "string", "maxLength": 200 },
+          "summary": { "type": "string", "maxLength": 4000 },
+          "url": { "type": "string", "maxLength": 2000 }
+        }
+      },
+      "labels": [
+        { "id": "breaking", "description": "Removes or changes behavior we may rely on" },
+        { "id": "relevant", "description": "Worth a look: a security fix, a deprecation or a notable change" },
+        { "id": "ignore", "description": "Nothing for us to do" }
+      ],
+      "preferenceProfile": "default"
+    }
+  },
+  "research": {
+    "labels": ["breaking"],
+    "angles": [ { "title": "Migration steps" }, { "title": "Affected code" } ],
+    "requests": 10
+  }
+}

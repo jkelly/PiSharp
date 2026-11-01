@@ -1,0 +1,29 @@
+@* Decision 0011 (run W3, SU): the mockups' _SetupWizard (steps: welcome · connect · model · done). The stepper, one section per step
+   (data-setup-step; only the current one is shown) and the footer (_SetupFooter). The server renders the step ?step= asked for; setup.js
+   switches steps in the page and keeps ?step= in the address. data-setup-state is the mockup's state: default (something connected) or
+   nothing (nothing connected yet). Model: SetupPage. *@
+@model SetupPage
+@{
+    var steps = new[] { (Step: SetupStep.Welcome, Label: "Welcome"), (Step: SetupStep.Connect, Label: "Connect"), (Step: SetupStep.Model, Label: "Default model"), (Step: SetupStep.Done, Label: "Done") };
+    var current = Model.Step;
+}
+<div class="setup-card" id="setupWizard" data-setup-wizard data-setup-current="@SetupPage.StepName(current)" data-setup-state="@(Model.NothingConnected ? "nothing" : "default")"
+     data-setup-connected="@Model.Connected.Count" data-setup-finished="@(Model.Setup.Finished ? "true" : "false")">
+  <div class="px-3 px-sm-4 py-3 border-bottom">
+    <ol class="ps-stepper" aria-label="Setup steps">
+      @foreach (var item in steps)
+      {
+        <li class="@(item.Step == current ? "active" : item.Step < current ? "done" : null)" data-setup-indicator="@SetupPage.StepName(item.Step)" aria-current="@(item.Step == current ? "step" : null)"><span class="step-num">@((int)item.Step + 1)</span>@item.Label</li>
+      }
+    </ol>
+  </div>
+
+  <div class="p-3 p-sm-4 p-md-5">
+    <partial name="/Views/Setup/_SetupWelcome.cshtml" model="Model" />
+    <partial name="/Views/Setup/_SetupConnect.cshtml" model="Model" />
+    <partial name="/Views/Setup/_SetupModel.cshtml" model="Model" />
+    <partial name="/Views/Setup/_SetupDone.cshtml" model="Model" />
+  </div>
+
+  <partial name="/Views/Setup/_SetupFooter.cshtml" model="Model" />
+</div>

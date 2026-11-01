@@ -1,0 +1,12 @@
+@model (JsonArray Terminal, JsonObject Inspection)
+<div class="mt-2 fs-8 text-ps-faint">Last terminal outcomes, newest first</div>
+@if (Model.Terminal.Count == 0)
+{
+  <div class="fs-7 text-ps-faint">None yet.</div>
+}
+@foreach (var task in Model.Terminal.OfType<JsonObject>())
+{
+  var outcome = (task["state"] as JsonObject)?["outcome"] as JsonObject;
+  <details class="mt-1"><summary class="fs-7"><code>@Display.Str(task, "kind") #@Display.Long(task, "id")</code> · @(Display.Str(outcome, "status") ?? Display.Str(task["state"] as JsonObject, "status"))</summary><pre class="signature mt-1">@Display.Pretty(task["state"])</pre></details>
+}
+<details class="mt-2"><summary class="fs-7">Recovery inspection</summary><pre class="signature mt-1">@Display.Pretty(Model.Inspection)</pre></details>

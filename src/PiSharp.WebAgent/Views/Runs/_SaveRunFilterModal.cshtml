@@ -1,0 +1,30 @@
+@* Decision 0011 (run W4, R3): Save current filters… of History › Runs (#modal-save-run-filter): a name for the filters the page shows
+   (listed under it), posted with the page's query to /api/history/filters; a name already saved is replaced. history.js runs it.
+   Model: RunHistoryPage. *@
+@model RunHistoryPage
+@{
+    var query = Model.Filter.QueryString(paging: false).TrimStart('?');
+}
+<div class="modal fade" id="modal-save-run-filter" tabindex="-1" aria-labelledby="modal-save-run-filter-title" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <form class="modal-content" novalidate autocomplete="off" data-run-save-filter data-query="@query">
+      <div class="modal-header">
+        <div>
+          <h2 class="modal-title" id="modal-save-run-filter-title">Save current filters</h2>
+          <div class="modal-subtitle">They appear under Saved filters.</div>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <label class="form-label fs-7" for="rsfName">Name</label>
+        <input class="form-control" id="rsfName" maxlength="@RunSavedFilters.MaxNameLength" required placeholder="Anthropic errors" data-rsf-name>
+        <div class="fs-8 ps-mono text-ps-faint mt-2 text-break">@(query.Length == 0 ? "No filter is set." : RunSavedFilters.Describe(query))</div>
+        <div class="text-ps-danger fs-7 mt-2" role="alert" data-rsf-error hidden></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="submit" class="btn btn-primary" disabled="@(query.Length == 0)">Save filter</button>
+      </div>
+    </form>
+  </div>
+</div>

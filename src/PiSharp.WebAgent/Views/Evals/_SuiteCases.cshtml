@@ -1,0 +1,96 @@
+@* Decision 0011 (run W5, E6): the mockups' _SuiteCases: a row per case: its name, tags and maxTokens; its checks, each a link that opens
+   _CheckEditorModal on that check (and "add check" for a new one); how many answers passed every check in the newest run that asked it
+   ("9/9", or queued / running while that run goes); and its actions: Run this case, Edit case, Open reference run (the run it was pinned
+   from, in the inspector) and Remove from suite (asks first). Add case and Edit case open E7's _TestCaseModal (#modal-test-case, hosted by
+   Suite.cshtml) in its suite modes (data-pin-suite, data-pin-case); a run can also be pinned into the suite from anywhere it ran.
+   Model: SuitePage. *@
+@model SuitePage
+@{
+    var suite = Model.Suite;
+}
+<section class="mb-4" aria-labelledby="casesTitle" data-suite-cases>
+  <div class="d-flex align-items-center gap-2 mb-2">
+    <h3 class="fs-6 fw-semibold mb-0" id="casesTitle">Test cases</h3>
+    <span class="fs-8 text-ps-faint">@Model.Cases.Count.ToString(CultureInfo.InvariantCulture)</span>
+    <button class="btn btn-sm btn-outline-secondary ms-auto" type="button" data-bs-toggle="modal" data-bs-target="#modal-test-case" data-pin-source="suite" data-pin-suite="@suite.Id" title="Write a test case for this suite, or pin a run from History, Chat, Playground, Compare or the Run inspector"><i class="bi bi-plus-lg me-1" aria-hidden="true"></i>Add case</button>
+  </div>
+  @if (Model.Cases.Count == 0)
+  {
+    <div class="ps-panel p-3 fs-7 text-secondary" data-no-cases>No test case yet. Add one here, or pin a run from History, Chat, Playground, Compare or the Run inspector and choose this suite.</div>
+  }
+  else
+  {
+    <div class="ps-table-wrap">
+      <table class="table align-middle case-table">
+        <thead>
+          <tr>
+            <th scope="col">Case</th>
+            <th scope="col">Checks</th>
+            <th scope="col" class="text-end">Latest run</th>
+            <th scope="col" class="text-end"><span class="visually-hidden">Actions</span></th>
+          </tr>
+        </thead>
+        <tbody>
+          @foreach (var row in Model.Cases)
+          {
+            var testCase = row.Case;
+            <tr data-case-row="@testCase.Id">
+              <td><div class="fs-7 case-name text-break">@testCase.Name</div><div class="fs-8 text-ps-faint">@row.Meta</div></td>
+              <td>
+                <div class="d-flex flex-wrap align-items-center gap-1">
+                  @for (var index = 0; index < testCase.Checks.Count; index++)
+                  {
+                    var check = testCase.Checks[index];
+                    if (index > 0)
+                    {
+                      <span class="text-ps-faint" aria-hidden="true">·</span>
+                    }
+                    <button type="button" class="check-link" data-edit-check data-case-id="@testCase.Id" data-check-id="@check.Id" title="@PiSharp.WebAgent.Evals.Checks.CheckText.Summary(check)" aria-label="Edit @check.Label.ToLowerInvariant() check: @testCase.Name">@check.Label</button>
+                  }
+                  @if (testCase.Checks.Count < TestCase.MaxChecks)
+                  {
+                    if (testCase.Checks.Count > 0)
+                    {
+                      <span class="text-ps-faint" aria-hidden="true">·</span>
+                    }
+                    <button type="button" class="check-link" data-edit-check data-case-id="@testCase.Id" aria-label="Add a check: @testCase.Name">@(testCase.Checks.Count == 0 ? "Add a check" : "add")</button>
+                  }
+                </div>
+              </td>
+              <td class="text-end text-nowrap ps-mono fs-7" title="@row.LatestTitle">
+                @if (row.Latest is null)
+                {
+                  <span class="text-ps-faint" title="Not in a run yet">—</span>
+                }
+                else if (row.Pending)
+                {
+                  <span class="text-ps-faint">@row.Latest</span>
+                }
+                else
+                {
+                  <text>@row.Latest</text>
+                }
+              </td>
+              <td class="text-end">
+                <div class="dropdown">
+                  <button class="btn btn-icon" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Actions for @testCase.Name"><i class="bi bi-three-dots" aria-hidden="true"></i></button>
+                  <ul class="dropdown-menu dropdown-menu-end">
+                    <li><button class="dropdown-item" type="button" data-run-suite="@suite.Id" data-case-id="@testCase.Id" disabled="@(Model.Active is not null || suite.Targets.Count == 0)"><i class="bi bi-play me-2" aria-hidden="true"></i>Run this case</button></li>
+                    <li><button class="dropdown-item" type="button" data-bs-toggle="modal" data-bs-target="#modal-test-case" data-pin-source="suite" data-pin-case="@testCase.Id"><i class="bi bi-pencil me-2" aria-hidden="true"></i>Edit case</button></li>
+                    @if (row.ReferenceUrl is { } reference)
+                    {
+                      <li><a class="dropdown-item" href="@reference"><i class="bi bi-braces me-2" aria-hidden="true"></i>Open reference run</a></li>
+                    }
+                    <li><hr class="dropdown-divider"></li>
+                    <li><button class="dropdown-item" type="button" data-delete-case="@testCase.Id" data-case-name="@testCase.Name"><i class="bi bi-trash3 me-2" aria-hidden="true"></i>Remove from suite</button></li>
+                  </ul>
+                </div>
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+    <div class="fs-8 text-ps-faint mt-2">Select a check to edit it. Regex checks stop after 100 ms and count as failed.</div>
+  }
+</section>

@@ -1,0 +1,49 @@
+@model DevicesPage
+@{
+    ViewData["Title"] = "Policies";
+    ViewData["Page"] = "policies";
+}
+<div class="dn-shell">
+  <partial name="~/Views/Shared/_Topbar.cshtml" model="Model.Devices" />
+  <main class="dn-content"><div class="page" data-automation="policies">
+    <div class="page-header"><div><h1>Judgment policies</h1><p class="text-body-secondary">Versioned rules a model applies to items. Confidence routes each result: recorded automatically, confirmed by a person, or decided by a person. Published versions never change.</p></div><a href="/" class="btn btn-outline-secondary">Back to agents</a></div>
+    <div class="d-flex gap-2 align-items-end mb-3 flex-wrap">
+      <label class="form-label">Device<select class="form-select" data-device aria-label="Device">@foreach (var device in Model.Devices) { <option value="@device.Id">@device.Name</option> }</select></label>
+      <button type="button" class="btn btn-outline-secondary mb-2" data-refresh>Refresh</button>
+      <span class="text-body-secondary mb-2" role="status" data-loading></span>
+    </div>
+    <div class="alert alert-danger" role="alert" data-error hidden></div>
+    <div class="alert alert-secondary" role="status" data-unsupported hidden>This device does not offer judgment policies. Update its PiSharp Durable host to use this page.</div>
+    <div data-supported hidden>
+      <section aria-labelledby="policies-title" class="mb-4">
+        <h2 class="h5" id="policies-title">Policies</h2>
+        <div class="table-responsive"><table class="table align-middle"><thead><tr><th>Policy</th><th>Kind</th><th>Active</th><th>Latest</th><th>Updated</th></tr></thead><tbody data-policies></tbody></table></div>
+        <p data-policies-empty class="text-body-secondary" hidden>No policies on this device yet. Publish one below.</p>
+      </section>
+      <section aria-labelledby="policy-detail-title" class="border-top pt-4 mb-4" data-policy-detail aria-live="polite" hidden></section>
+      <section aria-labelledby="publish-title" class="border-top pt-4 mb-4">
+        <h2 class="h5" id="publish-title">Publish a version</h2>
+        <form data-publish class="row g-3">
+          <div class="col-md-4"><label class="form-label" for="policy-id">Policy ID</label><input id="policy-id" data-policy-id class="form-control" pattern="[a-z0-9][a-z0-9_\-]{0,39}" maxlength="40" required placeholder="release-relevance" /></div>
+          <div class="col-12"><label class="form-label" for="policy-spec">Specification (JSON)</label><textarea id="policy-spec" data-spec class="form-control spec-editor" spellcheck="false" required></textarea>
+            <div class="form-text">A new policy's first version becomes active. Publishing a spec identical to the latest version changes nothing.</div></div>
+          <div class="col-12"><button class="btn btn-primary" type="submit">Publish version</button> <span class="ms-2" role="status" data-published></span></div>
+        </form>
+      </section>
+      <section aria-labelledby="judgments-title" class="border-top pt-4">
+        <h2 class="h5" id="judgments-title">Judgments</h2>
+        <div class="row g-2 align-items-end mb-3"><div class="col-md-4"><label class="form-label" for="judgment-session">Session</label><select id="judgment-session" data-session class="form-select"></select></div></div>
+        <div class="table-responsive"><table class="table align-middle"><thead><tr><th>Item</th><th>Result</th><th>Route</th><th>Decision</th><th>Review</th></tr></thead><tbody data-judgments></tbody></table></div>
+        <p data-judgments-empty class="text-body-secondary" hidden>No judgments in this session.</p>
+        <h3 class="h6 mt-3" id="evaluate-title">Evaluate an item</h3>
+        <form data-evaluate class="row g-3" aria-labelledby="evaluate-title">
+          <div class="col-md-4"><label class="form-label" for="evaluate-policy">Policy</label><select id="evaluate-policy" data-evaluate-policy class="form-select" required></select></div>
+          <div class="col-md-8"><label class="form-label" for="evaluate-name">Title</label><input id="evaluate-name" data-evaluate-title class="form-control" maxlength="200" placeholder="Shown on the result card" /></div>
+          <div class="col-12"><label class="form-label" for="evaluate-input">Item (JSON, checked against the policy's input schema)</label><textarea id="evaluate-input" data-evaluate-input class="form-control spec-editor" style="min-height:6rem" spellcheck="false">{}</textarea></div>
+          <div class="col-12"><button class="btn btn-primary" type="submit">Evaluate</button> <span class="ms-2" data-evaluated></span></div>
+        </form>
+      </section>
+    </div>
+  </div></main>
+</div>
+@section Scripts { <script type="module" src="/js/policies.js" asp-append-version="true"></script> }
