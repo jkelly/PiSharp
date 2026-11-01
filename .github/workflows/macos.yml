@@ -1,6 +1,6 @@
 name: macOS
 
-# Runs the release workflow's offline test suites on Apple Silicon (macos-14, arm64), then packs every package and smoke-tests
+# Runs the release workflow's offline test suites on Apple Silicon (macos-15, arm64), then packs every package and smoke-tests
 # the installed PiSharp.Cli tool. It leaves out PiSharp.Durable.Tests and PiSharp.DurableCli.Tests, which durable.yml runs on macOS,
 # Windows and Linux; custom-agents.yml does the same for PiSharp.CustomAgents.Tests. PiSharp.Tools.Tests is not a release suite, and its
 # process and shell fixtures are Windows-only. Releases still build on Linux (release.yml); this checks that what they ship works on a Mac.
@@ -22,7 +22,7 @@ concurrency:
 jobs:
   test:
     name: ${{ matrix.suite }}
-    runs-on: macos-14
+    runs-on: macos-15
     timeout-minutes: 60
     strategy:
       fail-fast: false
@@ -76,7 +76,7 @@ jobs:
 
   package:
     name: Pack and smoke-test the tool
-    runs-on: macos-14
+    runs-on: macos-15
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
