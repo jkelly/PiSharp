@@ -34,7 +34,8 @@ internal static partial class Program
             Check((await chat.TextAsync(binding.SessionId)).Contains("Echo: second", StringComparison.Ordinal), "the second answer");
             var recent = await chat.Chats.ListAsync(10);
             Equal(binding.SessionId, recent.Single().Id, "the sidebar lists it");
-            Check(!recent[0].Running, "idle");
+            // The sidebar's running flag is the device's as last seen (its change feed, in 250 ms batches): it turns idle just after the agents.
+            await WaitUntilAsync(async () => !(await chat.Chats.ListAsync(10)).Single().Running, "the sidebar shows it idle");
             await ThrowsAsync<ChatException>(() => chat.Chats.SendAsync(binding.SessionId, new ChatSendRequest("s2", "  ")), "an empty message");
             await ThrowsAsync<ChatException>(() => chat.Chats.CreateAsync(new ChatCreateRequest("c9", "x") { Provider = "faux", Model = "nope" }), "an unknown model");
             Equal(404, (await ThrowsAsync<ChatException>(() => chat.Chats.SendAsync("nope", new ChatSendRequest("s3", "x")), "an unknown chat")).Status, "404");

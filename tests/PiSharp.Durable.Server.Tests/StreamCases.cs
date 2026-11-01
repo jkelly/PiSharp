@@ -95,8 +95,10 @@ internal static partial class Program
             Check(Activity().Any(item => item["type"]!.GetValue<string>() == "agent.started"), "a started agent");
             await server.Post(main + "/state", new JsonObject { ["increment"] = true });
             await WaitUntilAsync(() => deviceFrames.Any(frame => Type(frame) == "doc" && frame["revision"]?.GetValue<long>() == 1), "the App State change");
+            // SendIfChanged drops a tree equal to the one sent last; the tree may come back to an earlier state (idle, running, idle), as it
+            // did on macOS, so only neighbours have to differ.
             var trees = deviceFrames.Frames.Where(frame => Type(frame) == "tree").Select(frame => frame.ToJsonString()).ToList();
-            Equal(trees.Count, trees.Distinct().Count(), "tree frames are deduplicated");
+            Equal(0, trees.Zip(trees.Skip(1)).Count(pair => pair.First == pair.Second), "tree frames are deduplicated");
         }),
 
         Case("streams.errors-before-the-stream-starts", async () =>

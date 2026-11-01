@@ -216,7 +216,9 @@ public static class OfflineDemo
             return new DemoReport
             {
                 FirstTickJudged = first.Judged,
-                FirstTickResearched = researched.Researched,
+                // The first pass may already find 1.1.0's judgment approved (the faux classifier is quick) and start its research; the
+                // second pass then replays it. Either way the tick researches it once.
+                FirstTickResearched = first.Researched + researched.Researched,
                 SecondTickJudged = second.Judged,
                 SecondTickReplayed = second.Replayed,
                 ReviewedRelease = reviewedTitle,
