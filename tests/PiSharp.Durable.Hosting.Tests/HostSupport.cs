@@ -166,6 +166,15 @@ internal sealed class JumpClock : TimeProvider
         foreach (var timer in current) timer.Check();
     }
 
+    /// <summary>Whether a timer is armed to fire at <paramref name="at"/>, within a second. A caller that reads the clock, then arms a
+    /// relative timer, arms it from the new time if <see cref="Advance"/> runs in between; wait for this before advancing past it.</summary>
+    public bool Armed(DateTimeOffset at)
+    {
+        JumpTimer[] current;
+        lock (gate) current = [.. timers];
+        return current.Any(timer => timer.Due is { } due && (due - at).Duration() <= TimeSpan.FromSeconds(1));
+    }
+
     public override ITimer CreateTimer(TimerCallback callback, object? state, TimeSpan dueTime, TimeSpan period)
     {
         var timer = new JumpTimer(this, callback, state);
@@ -182,6 +191,8 @@ internal sealed class JumpClock : TimeProvider
         private Timer? real;
         private DateTimeOffset? due;
         private TimeSpan period = Timeout.InfiniteTimeSpan;
+
+        public DateTimeOffset? Due { get { lock (gate) return due; } }
 
         public bool Change(TimeSpan dueTime, TimeSpan period)
         {

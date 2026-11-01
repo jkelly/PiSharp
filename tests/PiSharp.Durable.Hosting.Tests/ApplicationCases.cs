@@ -351,7 +351,10 @@ internal static partial class Program
             Equal(0, (await session.ExecutionArtifactsAsync(start.TaskId.Value)).Count, "no finding for a rejected item");
 
             var timed = await session.StartExecutionAsync(1, "pisharp-judge", JudgeInput(0.6).SetItem("policyId", "timed"), null, null);
-            await WaitForRunAsync(session, timed.TaskId.Value, "waiting");
+            var waiting = await WaitForRunAsync(session, timed.TaskId.Value, "waiting");
+            // The run shows "waiting" before the approval task arms its deadline timer; advancing in between would arm it 2 h past the new time.
+            var deadline = DateTimeOffset.FromUnixTimeMilliseconds(Jobs.Long((JsonObjectValue)waiting["approval"], "deadline")!.Value);
+            await WaitUntilAsync(() => Task.FromResult(clock.Armed(deadline)), "the review deadline's timer is armed");
             clock.Advance(TimeSpan.FromHours(3));
             run = await WaitForRunAsync(session, timed.TaskId.Value, "declined");
             Equal("expired", Jobs.String((JsonObjectValue)run["approval"], "status"), "the review expired");
