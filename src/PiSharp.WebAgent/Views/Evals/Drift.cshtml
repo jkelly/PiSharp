@@ -29,7 +29,9 @@
   }
   else
   {
-    <p class="fs-7 text-secondary mb-3">After every run, each target is compared with its accepted baseline. A changed response model is drift at once; any other suspect result becomes drift only when the next run confirms it.</p>
+    <p class="fs-7 text-secondary mb-3">After every run, each target is compared with its accepted baseline. A changed response model is drift at once; any other suspect result becomes drift only when the next run confirms it.
+      Rules wait for enough answers: a broken case needs @DriftThresholds.Default.MinBrokenCaseRepeats repeats or more on each side, and latency,
+      tokens/s and cost need @DriftThresholds.Default.MinSamples answers or more on each side.</p>
     @foreach (var suite in Model.Suites)
     {
       <partial name="_DriftSuite" model="suite" />

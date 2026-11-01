@@ -4,7 +4,7 @@
    other open signals folded away, and the row's actions: Compare answers (the run that raised it) and Accept as baseline for drift, Run now
    to confirm for suspect. A target whose worst open signal is info (latency or tokens/s) has no actions, as the mockup's info row has none:
    a speed change never replaces the answer baseline (fix W5 drift 2). A target with no open signal says how it compares with its baseline.
-   Model: DriftSuiteView. *@
+   A suite below k 3 says its broken-case rule never fires (DriftThresholds, adopted into the plan after W5). Model: DriftSuiteView. *@
 @model DriftSuiteView
 @{
     var suite = Model.Suite;
@@ -30,6 +30,10 @@
         <button class="btn btn-sm btn-outline-secondary" type="button" data-open-schedule="@suite.Id">@(pause.Code == SchedulePause.OverCap ? "Raise cap" : "Schedule")</button>
       </div>
     </div>
+  }
+  @if (suite.K < DriftThresholds.Default.MinBrokenCaseRepeats)
+  {
+    <div class="px-3 pt-2 fs-8 text-ps-faint" data-drift-k-note>At k = @suite.K, a case that stops passing is never flagged as broken: that rule needs k of @DriftThresholds.Default.MinBrokenCaseRepeats or more.</div>
   }
   @if (Model.Targets.Count == 0)
   {

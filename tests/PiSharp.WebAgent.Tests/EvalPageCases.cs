@@ -352,6 +352,11 @@ internal static partial class Program
                 Check(drift.Contains("No run since the baseline yet.", StringComparison.Ordinal) && drift.Contains("baseline run #1 (", StringComparison.Ordinal),
                     "its baseline, and nothing compared with it yet: " + Cut(Regex.Match(drift, $"data-drift-suite=\"{suiteId}\".{{0,900}}", RegexOptions.Singleline).Value));
                 Check(drift.Contains("data-price-changes", StringComparison.Ordinal), "the price changes list");
+                // After W5 the drift minimums are the plan's, and the page names them; at k 2 the broken-case rule never fires, and the suite says so.
+                Check(Regex.IsMatch(drift, @"Rules wait for enough answers: a broken case needs 3 repeats or more on each side, and latency,\s+tokens/s and cost need 3 answers or more on each side\."),
+                    "the page names the minimums");
+                Check(Regex.IsMatch(WebUtility.HtmlDecode(drift), $"data-drift-suite=\"{suiteId}\".*?data-drift-k-note>At k = 2, a case that stops passing is never flagged as broken: that rule needs k of 3 or more\\.<",
+                    RegexOptions.Singleline), "the k 2 suite says its broken-case rule never fires");
 
                 var after = await EvPageAsync(app, suitePath, null);
                 Check(after.Contains("data-state=\"default\"", StringComparison.Ordinal) && after.Contains($"<a href=\"{runPath}\">Run #1", StringComparison.Ordinal), "the baseline is run #1");
@@ -402,6 +407,7 @@ internal static partial class Program
 
                 var watched = await EvPageAsync(app, EvalRoutes.Drift, "Drift");
                 Equal(2, Regex.Matches(watched, "data-drift-target=\"t[0-9a-f]{12}\" data-level=\"suspect\"").Count, "both targets suspect");
+                Check(!watched.Contains("data-drift-k-note", StringComparison.Ordinal), "a k 3 suite has no note about the broken-case rule");
                 Check(watched.Contains($"data-run-suite=\"{suiteId}\">Run now to confirm", StringComparison.Ordinal) &&
                     watched.Contains("The suite has no schedule, so run it to confirm or clear this.", StringComparison.Ordinal), "Run now to confirm, with no schedule to do it");
                 Check(watched.Contains($"href=\"{EvalRoutes.Run(second)}\">Compare answers", StringComparison.Ordinal), "Compare answers opens the run that saw it");

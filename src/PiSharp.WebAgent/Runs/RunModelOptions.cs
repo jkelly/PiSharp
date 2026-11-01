@@ -20,8 +20,9 @@
 // no output cap at all, so max tokens is refused there and the Spend Guard does not offer to cap its output. Anthropic takes tool choice
 // auto or none only while the model thinks. Provider options never set the output's length or count (max_tokens, max_output_tokens,
 // generationConfig.maxOutputTokens, n, candidateCount and the like): Max tokens and the Spend Guard's worst case decide those.
-// W4 fix 2 (the options the Playground listed as "not sent"; they ride R0's body patch, which stays until the owner decides between it and
-// extending PiSharp.AI's ChatRequest, see decision 0011): cache retention reaches the body as a cache edit (RunCacheEdit: Anthropic's cache_control breakpoints, set,
+// W4 fix 2 (the options the Playground listed as "not sent"; they ride R0's body patch, which stays: decided after W5, PiSharp.AI keeps the
+// request types of the Pi version it tracks, see decision 0011): cache retention reaches the body as a cache edit (RunCacheEdit:
+// Anthropic's cache_control breakpoints, set,
 // given an hour or removed; OpenRouter's Anthropic models on Chat Completions the same; prompt_cache_key and prompt_cache_retention on the
 // OpenAI APIs), and a capped send gets the same breakpoints back, so max tokens no longer turns prompt caching off on a patched API (the
 // router sends a capped request through its summary route, which sends none). Retries and their longest delay are the capture hook's

@@ -24,9 +24,10 @@
 // own. Closed signals keep their row with Cleared set and Detail's "closedAs" (confirmed, seen-again, not-confirmed, superseded, baseline)
 // and "closedBy" (the run or baseline that closed it), so the history stays readable.
 //
-// Choices the plan leaves open, all in DriftThresholds: the minimum effect sizes (0.10 of pass rate, 0.5 judge points), at least 3 samples
-// per side before the speed and cost rules compare medians or means, at least 3 repeats per side for a broken case, at least 3 baseline
-// answers for a case's fingerprint spread, and a floor of 3 bits on that spread. The last two were measured: with 16 cases, a flaky one
+// Choices the plan left open, all in DriftThresholds and part of the plan since W5 (decision 0011; the Drift page shows the minimums): the
+// minimum effect sizes (0.10 of pass rate, 0.5 judge points), at least 3 samples per side before the speed and cost rules compare medians
+// or means, at least 3 repeats per side for a broken case, at least 3 baseline answers for a case's fingerprint spread, and a floor of 3
+// bits on that spread. The last two were measured: with 16 cases, a flaky one
 // (passing 60% of the time) passes 2 of 2 and fails 2 of 2 often enough that k 2 gave false drift in about 3% of stable trials, and a spread
 // from a single pair of answers is too narrow; at k 3 a mixed suite gives false drift in about 0.55% of trials (6,000 seeded trials of a
 // fresh baseline and two runs) and a fall from 0.9 to 0.5 is drift by the second run in about 97%.
@@ -39,7 +40,8 @@ using PiSharp.WebAgent.Contracts;
 
 namespace PiSharp.WebAgent.Evals.Drift;
 
-/// <summary>The thresholds Drift Watch uses beyond the plan's table (<see cref="DriftRules"/> holds the table's own).</summary>
+/// <summary>The thresholds Drift Watch uses beyond the plan's table (<see cref="DriftRules"/> holds the table's own); measured, and part of
+/// the plan since W5. The Drift page shows the minimums.</summary>
 public sealed record DriftThresholds
 {
     /// <summary>The thresholds Drift Watch runs with.</summary>

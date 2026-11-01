@@ -11,7 +11,8 @@ using System.Text.RegularExpressions;
 // and memory; the group preflight; the bench's strict note; the settings rows and the footer padding; most of the browser coverage).
 // W5 L4 (W4 leftovers): the Playground's controls for the options the run engine carries, presets that keep the newer options and a tool's
 // strict flag, and the Tool Bench's Reset, removing a message and Export as JSON (W4BenchResetCases) are closed, so their gaps and lines
-// are gone.
+// are gone. After W5 the owner's question on R0's body patch was decided (the patch stays), so it is no longer a gap: a case holds the
+// decision to the source instead, while RunModelOptions.SendPatch exists.
 internal static partial class Program
 {
     /// <summary>A W4 gap that decision 0011's "Not done" lists until <paramref name="Closed"/> says why it no longer holds.</summary>
@@ -31,10 +32,6 @@ internal static partial class Program
 
     private static readonly W4Gap[] W4Gaps =
     [
-        // Run engine (R0): the owner has not chosen between the body patch and extending PiSharp.AI's request types.
-        new("the owner decision on R0's body patch", "An owner decision is open",
-            root => SourceHas(root, "src/PiSharp.WebAgent/Runs/RunModelOptions.cs", "SendPatch(")
-                ? null : "the run's extra options no longer travel as a body patch (RunModelOptions.SendPatch is gone): say what the owner chose instead"),
         // Agent compare (R6): the delete API (fix 2, agent-runner) has no button on the run page.
         new("agent compare's run page has no Delete button", "its run page has no Delete button",
             root => AppFilesMatching(root, "compare-agent*.js", @"/delete\b") is { Count: > 0 } files
@@ -110,6 +107,19 @@ internal static partial class Program
                     problems.Add($"the line \"{W4CoverageLineStart}\" still says \"{gap.Phrase}\", but a browser case now uses {string.Join(", ", used)}: drop it (and this gap), or revise both");
             }
             Check(problems.Count == 0, string.Join("; ", problems));
+            return Task.CompletedTask;
+        }),
+
+        Case("browser.w4.docs.the-body-patch-decision-holds-while-the-patch-does", () =>
+        {
+            var root = RepositoryRoot();
+            var w4 = DecisionSection(root, "Runs, Playground, Compare, History, Presets and agent compare (W4, R0–R9 and L3)");
+            Check(w4.Contains("**How a run's options reach the provider (decided after W5).**", StringComparison.Ordinal),
+                "the W4 section records how a run's options reach the provider");
+            Check(SourceHas(root, "src/PiSharp.WebAgent/Runs/RunModelOptions.cs", "SendPatch("),
+                "the run's options no longer travel as a body patch (RunModelOptions.SendPatch is gone): revise the decision it records");
+            Check(!DecisionSection(root, "Not done").Contains("An owner decision is open", StringComparison.Ordinal),
+                "Not done no longer calls the body patch an open owner decision");
             return Task.CompletedTask;
         }),
     ];
