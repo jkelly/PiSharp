@@ -423,7 +423,7 @@ internal static class InteractiveSessionCommandTests
             try
             {
                 Directory.CreateDirectory(files.Root); if (!plugin) return files;
-                Check(File.Exists(Path.Combine(published, "PublishedFixture.CliUi.dll")), "Root must publish the existing real native UI fixture.");
+                PublishedFixtures.Require(published, "PublishedFixture.CliUi.dll");
                 foreach (var directory in new[] { files.Package, files.Snapshots, files.Markers }) Directory.CreateDirectory(directory);
                 foreach (var source in Directory.GetFiles(published, "*", SearchOption.AllDirectories))
                 { var target = Path.Combine(files.Package, Path.GetRelativePath(published, source)); Directory.CreateDirectory(Path.GetDirectoryName(target)!); File.Copy(source, target); }

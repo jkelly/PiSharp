@@ -362,7 +362,7 @@ internal static class InteractiveSessionRetirementTests
         public string[] RpcArgs => new[] { "session", "rpc", "--session", Session, "--workspace", Root, "--offline-script", Script, "--offline-api", "openai-completions", "--allow-write", Effect }.Concat(ExtensionArgs).ToArray();
         public static async Task<HostFiles> Create(string published)
         {
-            Check(File.Exists(Path.Combine(published, "PublishedFixture.CliUi.dll")), "Root must publish the existing native UI fixture before this test.");
+            PublishedFixtures.Require(published, "PublishedFixture.CliUi.dll");
             var files = new HostFiles();
             try
             {

@@ -485,7 +485,7 @@ internal static partial class NativeExtensionSessionCommandTests
             {
                 var published = Path.Combine(Path.GetDirectoryName(_published)!, packageKind);
                 var assembly = packageKind == "checkpoint" ? "SessionCheckpoint.dll" : packageKind == "todo" ? "StatefulTodo.dll" : "PublishedFixture.Cli.dll";
-                Check(File.Exists(Path.Combine(published, assembly)), "Root must publish the owned sample before running cases.");
+                PublishedFixtures.Require(published, assembly);
                 foreach (var path in new[] { files.Root, files.Package, files.Markers, files.Gates, files.Snapshots }) Directory.CreateDirectory(path);
                 foreach (var source in Directory.GetFiles(published, "*", SearchOption.AllDirectories))
                 {

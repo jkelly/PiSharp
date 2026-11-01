@@ -112,10 +112,11 @@ internal static class NativeStringSchemaTests
         var padding = 16_384 - HelloParameters.Length;
         _ = NativeStringObjectSchema.Read(JsonData.Parse(HelloParameters.Insert(1, new string(' ', padding))));
         Reject(HelloParameters.Insert(1, new string(' ', padding + 1)));
-        var malformedPropertyRejected = false;
-        try { _ = JsonData.Parse("{\"type\":\"object\",\"properties\":{\"\\ud800\":{\"type\":\"string\"}}}"); }
-        catch (InvalidOperationException) { malformedPropertyRejected = true; }
-        Check(malformedPropertyRejected, "Strict JsonData admitted an unpaired-surrogate property name before profile validation.");
+        // 37394eb9: JsonData keeps an unpaired-surrogate name exactly, as JSON.parse does; the string profile still refuses it.
+        const string LoneName = "{\"type\":\"object\",\"properties\":{\"\\ud800\":{\"type\":\"string\"}}}";
+        var loneName = JsonData.Parse(LoneName); Equal(LoneName, loneName.ToString());
+        Equal("\uD800", JsonUtf16.GetName(loneName.Value.GetProperty("properties").EnumerateObject().Single()));
+        Reject(LoneName);
         Reject("{\"type\":\"object\",\"properties\":{},\"description\":\"\\ud800\"}");
         var malformedValue = JsonData.Parse("{\"name\":\"\\ud800\"}"); var malformedValueRejected = false;
         try { _ = malformedValue.Value.GetProperty("name").GetString(); }
