@@ -1028,6 +1028,11 @@ public sealed partial class RpcSessionDispatcher : IAsyncDisposable
                 new InputAdmission(this, selected, token), limits, _stopInputToken);
             // Started coordinator submissions finish after the run. Its actual first event is the admission witness.
             await Task.WhenAny(candidate.Entered.Task, processing).ConfigureAwait(false);
+            // A command's handler can return before the run its sendMessage({ triggerTurn }) started has begun. An input processed
+            // before any run started has none of its own, so it stops claiming the next start here and a later one is the session's
+            // (ObserveAsync adopts it). Claimed until the finally, a start while the response is written waited for a monitor this
+            // input never started, and shutdown waited for that run.
+            if (!candidate.Entered.Task.IsCompleted) lock (_gate) if (ReferenceEquals(_startingInput, candidate)) _startingInput = null;
             if (candidate.Entered.Task.IsCompleted && originating.TakeInputTriggeredRun() is { } triggered)
             {
                 // agent-session.ts sendCustomMessage: a command's sendMessage({ triggerTurn }) runs its turn while the handler still runs;
