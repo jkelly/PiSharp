@@ -17,8 +17,13 @@ internal static partial class Program
         // The child process of the crash.* cases (Crash/CrashScenarios.cs); it never runs the case groups.
         if (args is ["--crash-child", var scenario, var backend, var storagePath, var checkpoint])
             return await CrashScenarios.RunChildAsync(scenario, backend, storagePath, checkpoint);
-        if (args.Length != 0 && (args.Length != 2 || args[0] is not ("--report" or "--only")))
-            throw new ArgumentException("Use [--report <fresh path>] or [--only <case prefix>] (or --crash-child <scenario> <backend> <storage path> <checkpoint>).");
+        string? reportPath = null, only = null;
+        for (var index = 0; index < args.Length; index += 2)
+        {
+            if (index + 1 >= args.Length || args[index] is not ("--report" or "--only"))
+                throw new ArgumentException("Use [--report <fresh path>] [--only <case prefix>[,<case prefix>...]] (or --crash-child <scenario> <backend> <storage path> <checkpoint>).");
+            if (args[index] == "--report") reportPath = args[index + 1]; else only = args[index + 1];
+        }
         var cases = new List<(string Id, Func<Task> Run)>();
         foreach (var method in typeof(Program).GetMethods(BindingFlags.Static | BindingFlags.NonPublic | BindingFlags.Public)
             .Where(method => method.Name.EndsWith("Cases", StringComparison.Ordinal) && method.GetParameters().Length == 0 &&
@@ -26,7 +31,7 @@ internal static partial class Program
             cases.AddRange((IEnumerable<(string, Func<Task>)>)method.Invoke(null, null)!);
         if (cases.GroupBy(test => test.Id, StringComparer.Ordinal).Where(group => group.Count() > 1).Select(group => group.Key).ToList() is { Count: > 0 } duplicates)
             throw new InvalidOperationException("Duplicate case ids: " + string.Join(", ", duplicates));
-        if (args is ["--only", var prefix]) cases = [.. cases.Where(test => test.Id.StartsWith(prefix, StringComparison.Ordinal))];
+        if (only?.Split(',') is { } prefixes) cases = [.. cases.Where(test => prefixes.Any(prefix => test.Id.StartsWith(prefix, StringComparison.Ordinal)))];
         var results = new List<object>(); var failures = 0; var authored = 0; var captured = 0; var skipped = 0;
         foreach (var test in cases)
         {
@@ -44,13 +49,15 @@ internal static partial class Program
             catch (CaseSkippedException skip) { skipped++; results.Add(new { test.Id, status = "SKIPPED_NO_UPSTREAM", reason = skip.Message }); }
             catch (Exception error) { failures++; results.Add(new { test.Id, status = "FAIL", failure = error.ToString() }); }
         }
+        // The storage.mssql.* groups' database (Storage/SqlServerStorageCases.cs).
+        await MssqlServer.DropAsync();
         var report = new { sourceSha = Upstream, status = captured == 0 ? "AUTHORED NATIVE; NO UPSTREAM CAPTURE" : "AUTHORED NATIVE; UPSTREAM CAPTURE (compat.*)",
             documentRetentionMs = SetupDocumentRetention.DefaultForRun, cases = cases.Count, failures, authoredCases = authored, upstreamCaptureCases = captured, skipped,
             genuineSourceCasesCaptured = captured, results };
         var json = JsonSerializer.Serialize(report, new JsonSerializerOptions { WriteIndented = true });
-        if (args is ["--report", var path])
+        if (reportPath is not null)
         {
-            await using var file = new FileStream(path, FileMode.CreateNew, FileAccess.Write, FileShare.Read);
+            await using var file = new FileStream(reportPath, FileMode.CreateNew, FileAccess.Write, FileShare.Read);
             await file.WriteAsync(Encoding.UTF8.GetBytes(json));
         }
         Console.WriteLine(json);

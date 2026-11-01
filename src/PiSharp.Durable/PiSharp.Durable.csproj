@@ -3,6 +3,7 @@
        every public type stays [Experimental("PISHARP_DURABLE001")]. -->
   <ItemGroup>
     <InternalsVisibleTo Include="PiSharp.Durable.Sqlite" />
+    <InternalsVisibleTo Include="PiSharp.Durable.MSSQL" />
     <InternalsVisibleTo Include="PiSharp.Durable.Tools" />
     <InternalsVisibleTo Include="PiSharp.Durable.Tests" />
     <InternalsVisibleTo Include="PiSharp.Cli" />

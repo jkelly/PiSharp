@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Decision 0007: SQL Server storage for PiSharp.Durable, a PiSharp-only backend with no upstream counterpart. -->
+  <PropertyGroup>
+    <IsPackable>false</IsPackable>
+    <NoWarn>$(NoWarn);PISHARP_DURABLE001</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="PiSharp.Durable.Tests" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="../PiSharp.Durable/PiSharp.Durable.csproj" />
+    <!-- Decision 0007: PiSharp's fifth external runtime dependency, scoped to this project. Exact pins. The SNI runtime package (the
+         native network layer SqlClient loads on Windows) is pinned directly so that a later SqlClient servicing release cannot move it
+         silently. -->
+    <PackageReference Include="Microsoft.Data.SqlClient" Version="[7.1.1]" />
+    <PackageReference Include="Microsoft.Data.SqlClient.SNI.runtime" Version="[7.1.0]" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="../../third-party/Microsoft.Data.SqlClient.LICENSE.txt" Pack="true" PackagePath="licenses/" />
+    <None Include="../../third-party/Microsoft.Data.SqlClient.SNI.LICENSE.txt" Pack="true" PackagePath="licenses/" />
+  </ItemGroup>
+</Project>
