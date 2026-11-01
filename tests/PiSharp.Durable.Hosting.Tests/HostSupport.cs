@@ -145,6 +145,16 @@ internal static partial class Program
             await Task.Delay(20);
         }
     }
+
+    /// <summary>Waits until a timer is armed on <paramref name="clock"/> for <paramref name="at"/> (Unix milliseconds), so that an
+    /// <see cref="JumpClock.Advance"/> past it fires it. See <see cref="JumpClock.Armed"/>.</summary>
+    internal static Task WaitUntilArmedAsync(JumpClock clock, Func<Task<double?>> at, string what) =>
+        WaitUntilAsync(async () => await at() is { } due && clock.Armed(due), what);
+
+    /// <summary>The deadline of a fan-out branch row's latest attempt (Unix milliseconds), or null before its first attempt.</summary>
+    internal static double? AttemptDeadline(JsonObjectValue row) =>
+        Jobs.Items(row, "attempts").OfType<JsonObjectValue>().LastOrDefault() is { } attempt && attempt.TryGetValue("deadlineAt", out var at) &&
+        at is JsonNumberValue due ? due.Value : null;
 }
 
 /// <summary>A clock that runs in real time and can jump forward: timers fire when their due time passes on this clock, so durable sleeps
@@ -166,13 +176,13 @@ internal sealed class JumpClock : TimeProvider
         foreach (var timer in current) timer.Check();
     }
 
-    /// <summary>Whether a timer is armed to fire at <paramref name="at"/>, within a second. A caller that reads the clock, then arms a
-    /// relative timer, arms it from the new time if <see cref="Advance"/> runs in between; wait for this before advancing past it.</summary>
-    public bool Armed(DateTimeOffset at)
+    /// <summary>Whether a timer is armed to fire at <paramref name="at"/> (Unix milliseconds), within 5 s. A caller that reads the clock, then
+    /// arms a relative timer, arms it from the new time if <see cref="Advance"/> runs in between; wait for this before advancing past it.</summary>
+    public bool Armed(double at)
     {
         JumpTimer[] current;
         lock (gate) current = [.. timers];
-        return current.Any(timer => timer.Due is { } due && (due - at).Duration() <= TimeSpan.FromSeconds(1));
+        return current.Any(timer => timer.Due is { } due && Math.Abs(due.ToUnixTimeMilliseconds() - at) <= 5_000);
     }
 
     public override ITimer CreateTimer(TimerCallback callback, object? state, TimeSpan dueTime, TimeSpan period)
