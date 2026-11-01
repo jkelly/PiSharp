@@ -1,0 +1,27 @@
+{
+  "request": {
+    "sku": "CHAIR",
+    "quantity": 20,
+    "max_lead_days": 14
+  },
+  "quotes": [
+    {
+      "vendor": "Oakline",
+      "unit_price": 82.0,
+      "shipping": 120.0,
+      "lead_days": 10
+    },
+    {
+      "vendor": "Steelworks",
+      "unit_price": 78.0,
+      "shipping": 200.0,
+      "lead_days": 18
+    },
+    {
+      "vendor": "Deskly",
+      "unit_price": 86.0,
+      "shipping": 0.0,
+      "lead_days": 7
+    }
+  ]
+}

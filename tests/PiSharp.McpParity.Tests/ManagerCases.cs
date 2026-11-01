@@ -118,6 +118,41 @@ internal static partial class Program
         Equal(3, fixture.Servers.Count(server => server.Name == "docs"), "connected again after enable and reconnect, not after exposure changes");
     });
 
+    // Closing one server does not fail `/mcp` actions on others: reconnect (then ensureDiscoveryActive) and setExposure of failed
+    // servers, which leave the session's catalog alone, wait for the close that holds the session (closing `late`, unregistered while
+    // it connects) instead of being refused.
+    private static Task ManagerActionsWhileAnotherServerCloses() => WithRoot("manager-close",
+        """{"mcpServers":{"broken":{"command":"broken-server"},"flaky":{"command":"flaky-server"}}}""", async fixture =>
+    {
+        fixture.Behaviors["broken"] = (["x"], null, false, new IOException("initialize refused"));
+        fixture.Behaviors["flaky"] = (["y"], null, false, new IOException("initialize refused"));
+        var host = fixture.Host();
+        var (connecting, release) = RegisterLate(fixture, host);
+        var provider = new Endpoint();
+        await using (var rpc = new Rpc(Args(fixture.Root, "new-memory"), provider, host))
+            try
+            {
+                await Settled(fixture, rpc, 2);
+                await HoldLateCloseAsync(fixture, host, rpc, connecting);
+                var manager = await fixture.Manager.Task;
+                var reconnect = manager.ReconnectAsync("broken");
+                var exposure = manager.SetExposureAsync("flaky", McpExposure.Deferred);
+                // An action the held session refuses fails at once: give them the time to before the close ends.
+                await Task.Delay(250);
+                static string State(Task action) => action.IsCompleted ? action.Exception?.InnerException?.Message ?? "completed" : "waiting";
+                Check(!reconnect.IsCompleted && !exposure.IsCompleted, $"the actions wait for the close; reconnect: {State(reconnect)}, exposure: {State(exposure)}");
+                release.TrySetResult();
+                Equal("MCP server \"broken\" failed to connect: initialize refused", await reconnect, "reconnect");
+                Equal(null, await exposure, "exposure");
+                await rpc.Prompt("p1", "after the close");
+                Equal(0, await rpc.Finish(), "exit code; " + rpc.Error);
+            }
+            // The held close would hold the session's shutdown too.
+            finally { release.TrySetResult(); }
+        var declared = ToolNames(provider.Snapshot().Single());
+        Check(declared.Contains("tool_search"), "the deferred server activated tool_search: " + string.Join(",", declared));
+    });
+
     // In a trusted project, "Disable in this project" adds a project override for a global server; later changes go to the override.
     private static Task ManagerProjectOverride() => WithRoot("manager-project", """{"mcpServers":{"docs":{"command":"docs-server","exposure":"direct"}}}""", async fixture =>
     {

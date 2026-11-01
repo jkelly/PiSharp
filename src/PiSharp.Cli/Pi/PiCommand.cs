@@ -396,6 +396,8 @@ internal static class PiCommand
         catch (InvalidDataException error) { await Error(error.Message).ConfigureAwait(false); return 1; }
         // sdk.ts transport: settingsManager.getTransport() ("auto" by default); /settings changes it for the running session.
         PiTransportSetting.Start(settings.String("transport"));
+        // PiSharp-only (decision 0007): the service tier from --tier, else the serviceTier setting; /tier changes it.
+        PiServiceTierSetting.Start(parsed.Tier ?? settings.String("serviceTier"));
         var runtime = host.LiveRuntime with { CreateHttpHandler = PiHttpIdleTimeout.Wrap(host.LiveRuntime.CreateHttpHandler, idleTimeout),
             WebSocketConnectTimeout = websocketConnectTimeout,
             Transport = host.LiveRuntime.Transport ?? (() => PiTransportSetting.Current()),

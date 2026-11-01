@@ -1,0 +1,8 @@
+{
+  "commits": [
+    "feat: add CSV export",
+    "fix: preserve timezone in report",
+    "docs: update setup guide",
+    "chore: refresh build cache"
+  ]
+}

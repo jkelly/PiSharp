@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Decision 0012: custom agents end to end: the orders workflow (code, model, JavaScript, C# script and agent actions) and a team demo
+       (typed, JavaScript and C# script tools, a subagent, a workflow tool), web search through a scout subagent, on scripted models by
+       default or a real provider, on SQLite. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <AssemblyName>CustomAgents.Examples</AssemblyName>
+    <RootNamespace>PiSharp.CustomAgents.Examples</RootNamespace>
+    <IsPackable>false</IsPackable>
+    <NoWarn>$(NoWarn);PISHARP_DURABLE001;PISHARP_AGENTS001</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../src/PiSharp.CustomAgents/PiSharp.CustomAgents.csproj" />
+    <ProjectReference Include="../../src/PiSharp.CustomAgents.JavaScript/PiSharp.CustomAgents.JavaScript.csproj" />
+    <ProjectReference Include="../../src/PiSharp.CustomAgents.Scripting/PiSharp.CustomAgents.Scripting.csproj" />
+    <ProjectReference Include="../../src/PiSharp.Durable.Sqlite/PiSharp.Durable.Sqlite.csproj" />
+  </ItemGroup>
+</Project>

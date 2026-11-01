@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Decision 0012: version 1 of the plugin the PiSharp.CustomAgents tests load, reload and unload. The host's assemblies are not copied:
+       a plugin implements the host's contract types. -->
+  <PropertyGroup>
+    <AssemblyName>AgentsPluginFixture.V1</AssemblyName>
+    <RootNamespace>AgentsPluginFixture</RootNamespace>
+    <IsPackable>false</IsPackable>
+    <NoWarn>$(NoWarn);PISHARP_DURABLE001;PISHARP_AGENTS001</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../src/PiSharp.CustomAgents/PiSharp.CustomAgents.csproj" Private="false" />
+    <None Include="pisharp-agents-plugin.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>

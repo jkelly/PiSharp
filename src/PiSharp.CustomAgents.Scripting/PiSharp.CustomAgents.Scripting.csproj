@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Decision 0012: C# scripts for custom agents: tools, workflow actions and a folder of *.tool.csx files, compiled with Roslyn into
+       collectible load contexts and unloaded when replaced. Microsoft.CodeAnalysis.CSharp, not .Scripting: the scripting package loads its
+       assemblies into contexts that never unload. 5.6.0 is the newest 5.x with a net10.0 target whose dependencies are all stable (it pins
+       Microsoft.CodeAnalysis.Common exactly and excludes its analyzers' build assets). MIT (third-party/Roslyn.LICENSE.txt). Scripts are
+       full trust; they are never model-written. Experimental (PISHARP_AGENTS001). -->
+  <PropertyGroup>
+    <NoWarn>$(NoWarn);PISHARP_DURABLE001;PISHARP_AGENTS001</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="PiSharp.CustomAgents.Tests" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="../PiSharp.CustomAgents/PiSharp.CustomAgents.csproj" />
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="[5.6.0]" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="../../third-party/Roslyn.LICENSE.txt" Pack="true" PackagePath="licenses/" />
+  </ItemGroup>
+</Project>

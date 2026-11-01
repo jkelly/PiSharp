@@ -1,0 +1,32 @@
+{
+  "as_of": "2026-10-29",
+  "policy": {
+    "window_days": 30,
+    "excluded_categories": [
+      "final_sale"
+    ],
+    "restocking_percent": 10
+  },
+  "orders": [
+    {
+      "id": "ORD-220",
+      "item": "Headphones",
+      "category": "electronics",
+      "delivered": "2026-10-10",
+      "price": 129.99,
+      "tax": 10.4,
+      "shipping": 8.0,
+      "opened": true
+    },
+    {
+      "id": "ORD-221",
+      "item": "Clearance scarf",
+      "category": "final_sale",
+      "delivered": "2026-10-20",
+      "price": 19.99,
+      "tax": 1.6,
+      "shipping": 4.0,
+      "opened": false
+    }
+  ]
+}

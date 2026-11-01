@@ -1,0 +1,7 @@
+{
+  "id": "ext",
+  "contract": "pisharp.agents/1",
+  "assembly": "AgentsExtensionFixture.dll",
+  "entryType": "AgentsExtensionFixture.Extension",
+  "replaySafe": ["ext_upper"]
+}

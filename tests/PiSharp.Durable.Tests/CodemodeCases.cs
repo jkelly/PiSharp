@@ -11,6 +11,10 @@
 // - toMatchObject of the details' calls checks the listed fields; `harness.close(context).catch(() => {})` ignores the close's failure.
 // - The journal and run documents (CodemodeJournalDoc, CodemodeRunDoc) are DurableCodemode.JournalDoc and RunDoc; a test's
 //   `journal.entries[0]!.issuedAfter = 7` and the like are draft writes in a Harness commit.
+// - journals-results-that-finish-together-in-one-commit checks how many results each journal commit adds (1, then 49) instead of upstream's
+//   count of all journal commits (fewer than 10). The other commits only record acknowledged counts, and their number is timing: a commit
+//   here runs off the call's scheduler, so the VM acknowledges results while it is in flight, and those make one more commit after it (5 to
+//   54 journal commits in all, by VM and storage speed; 10 on a macOS runner).
 using System.Collections.Concurrent;
 using System.Text.RegularExpressions;
 using PiSharp.Codemode;
@@ -840,16 +844,31 @@ internal static partial class CodemodeTests
             chat.Holds.Block = false;
             chat.Setup.Faux.SetResponses(Script("return (await Promise.all(Array.from({ length: 50 }, () => wait()))).length"), Done);
             var (harness, root) = await OpenChat(await SqliteStorage.OpenAsync(SqlitePath()), chat.Setup);
-            var journalCommits = 0;
+            // After each journal commit: its entries, and the acknowledged counts it holds (firstIssued and each issuedAfter).
+            var journals = new ConcurrentQueue<(int Entries, int Counts)>();
             harness.SubscribeCommits((publication, _) =>
             {
                 foreach (var change in publication.Changes)
-                    if (change is DocumentCommitChange document && document.Record.Kind == "pi.codemode.journal") Interlocked.Increment(ref journalCommits);
+                    if (change is DocumentCommitChange { Record.Kind: "pi.codemode.journal", Value: { } journal })
+                    {
+                        var entries = ((JsonArrayValue)journal["entries"]).Cast<JsonObjectValue>().ToList();
+                        journals.Enqueue((entries.Count, (journal.ContainsKey("firstIssued") ? 1 : 0) + entries.Count(entry => entry.ContainsKey("issuedAfter"))));
+                    }
             });
             await (await root.SubmitAsync(SubmissionDraft.Input("go"), Context)).WaitAsync(Context);
             SameText(new("50", false), await ResultOf(root), "result");
-            // The journal's creation and a few groups, not one commit per result (51).
-            Check(Volatile.Read(ref journalCommits) < 10, $"journal commits: {journalCommits}");
+            var commits = journals.ToList();
+            Equal((0, 0), commits[0], "the journal's creation");
+            var groups = new List<int>();
+            for (var index = 1; index < commits.Count; index++)
+            {
+                if (commits[index].Entries > commits[index - 1].Entries) groups.Add(commits[index].Entries - commits[index - 1].Entries);
+                else Check(commits[index].Counts > commits[index - 1].Counts, $"journal commit {index} records nothing");
+            }
+            // The first result to finish starts a commit, and the other 49 finish while it is in flight and join the next one: two groups, not
+            // one commit per result. The commits that only record acknowledged counts are not counted: how many there are depends on how
+            // many results the VM processes while each is in flight.
+            Equal("1,49", string.Join(",", groups), "results per journal commit");
             await harness.CloseAsync(Context);
         });
 

@@ -134,6 +134,7 @@ public static class Agents
             : JsonValue.Object(Fields(("remove", selection.Remove?.Select(tool => tool.Name)), ("add", selection.Add?.Select(tool => tool.Name)))));
         Set("instructions", change.Instructions, text => text);
         Set("cwd", change.Cwd, text => text);
+        Set("serviceTier", change.ServiceTier, text => text);
     }
 
     private static JsonArrayValue Names(IEnumerable<string> names) => JsonValue.Array(names.Select(name => (JsonValue)name));
@@ -214,6 +215,7 @@ public static class Agents
             Sections = [.. agentSections],
             Instructions = instructions,
             Cwd = (Field(state, "cwd") as JsonStringValue)?.Value,
+            ServiceTier = (Field(state, "serviceTier") as JsonStringValue)?.Value,
         };
     }
 

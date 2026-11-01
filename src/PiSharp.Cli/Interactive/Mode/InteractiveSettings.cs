@@ -211,6 +211,8 @@ internal sealed class InteractiveSettings
     }
     public string Transport => Str(Get("transport")) ?? "auto";
     public void SetTransport(string transport) { Set("transport", transport); PiSharp.Cli.Pi.PiTransportSetting.Set(transport); }
+    /// <summary>PiSharp-only (decision 0007): the default service tier; null removes it.</summary>
+    public void SetServiceTier(string? tier) => Set("serviceTier", tier is null ? null : JsonValue.Create(tier));
     public bool CompactionEnabled => Bool(Get("compaction", "enabled")) ?? true;
     public void SetCompactionEnabled(bool enabled) => SetNested("compaction", "enabled", enabled);
 

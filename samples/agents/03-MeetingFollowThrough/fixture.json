@@ -1,0 +1,25 @@
+{
+  "meetings": [
+    {
+      "id": "mtg-301",
+      "title": "Release readiness",
+      "attendees": [
+        "Mira",
+        "Owen"
+      ],
+      "notes": "Mira will verify migration by Friday. Owen will update the rollout checklist by Monday.",
+      "actions": [
+        {
+          "owner": "Mira",
+          "task": "Verify migration",
+          "due": "2026-10-30"
+        },
+        {
+          "owner": "Owen",
+          "task": "Update rollout checklist",
+          "due": "2026-11-02"
+        }
+      ]
+    }
+  ]
+}

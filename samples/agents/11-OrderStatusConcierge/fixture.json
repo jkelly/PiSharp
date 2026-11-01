@@ -1,0 +1,39 @@
+{
+  "as_of": "2026-10-29",
+  "orders": [
+    {
+      "id": "ORD-1042",
+      "customer": "Maya Chen",
+      "items": [
+        "Travel mug",
+        "Filter set"
+      ],
+      "status": "in_transit",
+      "carrier": "ParcelNorth",
+      "shipped": "2026-10-27",
+      "transit_days": 4,
+      "events": [
+        {
+          "date": "2026-10-27",
+          "kind": "picked_up"
+        },
+        {
+          "date": "2026-10-29",
+          "kind": "regional_hub"
+        }
+      ]
+    },
+    {
+      "id": "ORD-1043",
+      "customer": "Omar Bell",
+      "items": [
+        "Desk lamp"
+      ],
+      "status": "processing",
+      "carrier": "",
+      "shipped": "",
+      "transit_days": 3,
+      "events": []
+    }
+  ]
+}

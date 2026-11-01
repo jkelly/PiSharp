@@ -40,5 +40,8 @@
     <!-- The built-in catalog shards stay in src/PiSharp.Cli/Models (PiSharp.Durable and the catalog tests read them there); embedded by
          link under the CLI's resource names, which BuiltinModelCatalog and CopilotCatalog read. -->
     <EmbeddedResource Include="../PiSharp.Cli/Models/*.json" Link="Models/%(Filename)%(Extension)" LogicalName="PiSharp.Cli.Models.%(Filename)%(Extension)" />
+    <!-- The maintained catalog overlay (catalog-maintained/README.md), which the registry reads from the app's folder: it goes to the
+         output of every app that runs the registry (the CLI and the Web Agent), at the path the CLI copied it to before. -->
+    <None Include="../../catalog-maintained/models.overlay.json" Link="catalog-maintained/models.overlay.json" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

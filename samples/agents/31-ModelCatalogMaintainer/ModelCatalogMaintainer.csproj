@@ -1,0 +1,5 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><OutputType>Exe</OutputType></PropertyGroup>
+  <ItemGroup><ProjectReference Include="../Shared/PiSharp.Samples.Common.csproj" /></ItemGroup>
+  <ItemGroup><None Update="fixture.json;fixtures/**/*;config.example.json;workflows/**/*" CopyToOutputDirectory="PreserveNewest" /></ItemGroup>
+</Project>

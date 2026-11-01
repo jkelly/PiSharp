@@ -269,12 +269,15 @@ internal sealed partial class OfflineSessionProfile : IAsyncDisposable, IRpcExte
         var registrations = defaults.Select(tool => new SessionRegisteredTool(tool.Declaration, tool.Adapter)).ToImmutableArray();
         registrations = registrations.AddRange(tools.Registered.Where(tool => !defaults.Any(active => active.Name == tool.Name))
             .Select(tool => new SessionRegisteredTool(tool.Declaration, tool.Adapter) { DefaultActive = false }));
-        // Tool results follow Pi's budgets (owner decision 0004): a read image of up to 4.5MB of base64 plus its note.
+        // Tool results follow Pi's budgets (owner decision 0004): a read image of up to 4.5MB of base64 plus its note. Arguments admit a
+        // whole-file write (WriteArgumentCharacters) and its prepared action, which adds the resolved and display paths.
         var invokerOptions = (bash is null
-            ? new ToolInvokerOptions(MaximumArgumentCharacters: 65_536, MaximumActionCharacters: 131_072, MaximumResultCharacters: PiPayloadBudget.ToolResultCharacters)
-            : new ToolInvokerOptions(MaximumArgumentCharacters: 96_000, MaximumActionCharacters: 192_000,
-                MaximumResultCharacters: PiPayloadBudget.ToolResultCharacters, MaximumActionEntries: 1026)) with
-            { MaximumStructuredContentCharacters = PiPayloadBudget.ToolResultCharacters + 65_536 };
+            ? new ToolInvokerOptions(MaximumResultCharacters: PiPayloadBudget.ToolResultCharacters)
+            : new ToolInvokerOptions(MaximumResultCharacters: PiPayloadBudget.ToolResultCharacters, MaximumActionEntries: 1026)) with
+            {
+                MaximumArgumentCharacters = WriteArgumentCharacters + 16_384, MaximumActionCharacters = WriteArgumentCharacters + 32_768,
+                MaximumStructuredContentCharacters = PiPayloadBudget.ToolResultCharacters + 65_536
+            };
         // The Pi entry declares and calls every registered tool and keeps every content block (agent.ts/agent-loop.ts have no count bound).
         if (piEntry) invokerOptions = PiPayloadBudget.PiInvoker(invokerOptions);
         _profileInvokerOptions = invokerOptions;
@@ -345,6 +348,7 @@ internal sealed partial class OfflineSessionProfile : IAsyncDisposable, IRpcExte
             Hooks: extension?.Binding.ContextHooks))], registrations, policy,
             new SessionRuntimeRegistryOptions(MaximumModels: piEntry ? int.MaxValue : 4096, MaximumTools: piEntry ? int.MaxValue : 128,
                 MaximumMessages: piEntry ? int.MaxValue : PiRequestBudget.RequestMessages, MaximumDeclarations: piEntry ? int.MaxValue : PiRequestBudget.RequestItems, MaximumCharacters: piEntry ? PiPayloadBudget.PiSessionFileBytes : PiPayloadBudget.SessionFileBytes, ToolInvokerOptions: invokerOptions) { PreparedToolHooks = NormalizedToolHooks(extension?.Binding.PreparedHooks), BlockImages = () => ImageSettings.BlockImages,
+                ServiceTier = PiSharp.Cli.Pi.PiServiceTierSetting.Current,
                 LifetimeToolSelection = lifetimeSelection, InitialActiveToolNames = _initialActiveTools,
                 BindNestedCallsToSessionOwner = true, ReportLoadoutDiagnostic = extension is null ? null : extension.CaptureLoadoutDiagnostic,
                 DrainLoadoutDiagnostics = extension is null ? null : extension.DrainLoadoutDiagnosticsAsync,
@@ -878,10 +882,15 @@ internal sealed partial class OfflineSessionProfile : IAsyncDisposable, IRpcExte
         }
     }
 
-    /// <summary>Pi's read limits behind the profile bounds: any file size, and images through the SkiaSharp codec
-    /// (Photon upstream) with Pi's 2000x2000 / 4.5MB resize profile.</summary>
+    /// <summary>The arguments of one <c>write</c> call: the most <see cref="ReadWriteTools"/> admits. write.ts writes content of any
+    /// size; the former 65,536 kept the bounded profile's argument cap.</summary>
+    internal const int WriteArgumentCharacters = 8 * 1024 * 1024;
+
+    /// <summary>Pi's read and write limits behind the profile bounds: reads and writes of files of up to 64 MiB (a write's content
+    /// within <see cref="WriteArgumentCharacters"/>), and images through the SkiaSharp codec (Photon upstream) with Pi's 2000x2000 /
+    /// 4.5MB resize profile.</summary>
     private static ReadWriteToolOptions ReadOptions(BuiltinToolSettings settings, bool modelSupportsImages) =>
-        new(MaximumReadBytes: 64 * 1024 * 1024, MaximumWriteBytes: 65_536, MaximumArgumentCharacters: 65_536)
+        new(MaximumReadBytes: 64 * 1024 * 1024, MaximumWriteBytes: 64 * 1024 * 1024, MaximumArgumentCharacters: WriteArgumentCharacters)
         {
             AutoResizeImages = settings.AutoResizeImages, ImageCodec = PiSharp.Tools.Skia.SkiaImageCodec.Instance,
             CurrentModelSupportsImages = () => modelSupportsImages

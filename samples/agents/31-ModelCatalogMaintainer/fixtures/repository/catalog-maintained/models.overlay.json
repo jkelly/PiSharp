@@ -1,0 +1,222 @@
+{
+  "providers": {
+    "disabled-provider": {
+      "saved": {
+        "metadata": {
+          "id": "saved",
+          "name": "Preserved disabled model",
+          "provider": "disabled-provider"
+        },
+        "prices": []
+      }
+    },
+    "example-lab": {
+      "future-protocol": {
+        "metadata": {
+          "api": "future-protocol-v9",
+          "baseUrl": "https://models.example.test/v9",
+          "contextWindow": 200000,
+          "id": "future-protocol",
+          "input": [
+            "text"
+          ],
+          "name": "Future protocol metadata",
+          "output": [
+            "text"
+          ],
+          "provider": "example-lab",
+          "runtimeCandidate": false,
+          "type": "chat"
+        },
+        "prices": [
+          {
+            "amount": 1.4,
+            "conditions": {},
+            "currency": "EUR",
+            "kind": "input",
+            "provenance": {
+              "adapter": "structured-json",
+              "pointer": "/data/0",
+              "sha256": "b638196c75251701642e5080b7e8fb8bfd979eaa81671416fc9179930bc4d21d",
+              "url": "https://models.example.test/catalog"
+            },
+            "region": "eu-west",
+            "tier": "batch",
+            "unit": "million-tokens"
+          },
+          {
+            "amount": 1.5,
+            "conditions": {},
+            "currency": "USD",
+            "kind": "input",
+            "provenance": {
+              "adapter": "structured-json",
+              "pointer": "/data/0",
+              "sha256": "b638196c75251701642e5080b7e8fb8bfd979eaa81671416fc9179930bc4d21d",
+              "url": "https://models.example.test/catalog"
+            },
+            "region": "us-east",
+            "tier": "standard",
+            "unit": "million-tokens"
+          }
+        ],
+        "provenance": {
+          "adapter": "structured-json",
+          "pointer": "/data/0",
+          "sha256": "b638196c75251701642e5080b7e8fb8bfd979eaa81671416fc9179930bc4d21d",
+          "url": "https://models.example.test/catalog"
+        }
+      }
+    },
+    "excluded-provider": {
+      "saved": {
+        "metadata": {
+          "id": "saved",
+          "name": "Preserved excluded model",
+          "provider": "excluded-provider"
+        },
+        "prices": []
+      }
+    },
+    "openrouter": {
+      "example/atlas": {
+        "metadata": {
+          "api": "openai-completions",
+          "baseUrl": "https://openrouter.ai/api/v1",
+          "contextWindow": 128000,
+          "id": "example/atlas",
+          "input": [
+            "image",
+            "text"
+          ],
+          "maxTokens": 16000,
+          "name": "Example Atlas",
+          "output": [
+            "text"
+          ],
+          "provider": "openrouter",
+          "runtimeCandidate": true,
+          "supportedParameters": [
+            "reasoning",
+            "tools"
+          ],
+          "type": "chat"
+        },
+        "prices": [
+          {
+            "amount": 4,
+            "conditions": {
+              "min_prompt_tokens": 100000,
+              "precedence": 0
+            },
+            "currency": "USD",
+            "kind": "input",
+            "provenance": {
+              "adapter": "openrouter",
+              "pointer": "/data/0",
+              "sha256": "1e6e032b777132ab1b78bf0fb68fdced40b582573dcef5b1b8606a37c14c42ea",
+              "url": "https://openrouter.ai/api/v1/models"
+            },
+            "region": "unspecified",
+            "tier": "catalog-override",
+            "unit": "million-tokens"
+          },
+          {
+            "amount": 0.2,
+            "conditions": {},
+            "currency": "USD",
+            "kind": "cache-read",
+            "region": "unspecified",
+            "tier": "catalog-default",
+            "unit": "million-tokens"
+          },
+          {
+            "amount": 2.5,
+            "conditions": {},
+            "currency": "USD",
+            "kind": "cache-write-5m",
+            "provenance": {
+              "adapter": "openrouter",
+              "pointer": "/data/0",
+              "sha256": "1e6e032b777132ab1b78bf0fb68fdced40b582573dcef5b1b8606a37c14c42ea",
+              "url": "https://openrouter.ai/api/v1/models"
+            },
+            "region": "unspecified",
+            "tier": "catalog-default",
+            "unit": "million-tokens"
+          },
+          {
+            "amount": 2,
+            "conditions": {},
+            "currency": "USD",
+            "kind": "input",
+            "provenance": {
+              "adapter": "openrouter",
+              "pointer": "/data/0",
+              "sha256": "1e6e032b777132ab1b78bf0fb68fdced40b582573dcef5b1b8606a37c14c42ea",
+              "url": "https://openrouter.ai/api/v1/models"
+            },
+            "region": "unspecified",
+            "tier": "catalog-default",
+            "unit": "million-tokens"
+          },
+          {
+            "amount": 2,
+            "conditions": {},
+            "currency": "USD",
+            "kind": "output",
+            "provenance": {
+              "adapter": "openrouter",
+              "pointer": "/data/0",
+              "sha256": "1e6e032b777132ab1b78bf0fb68fdced40b582573dcef5b1b8606a37c14c42ea",
+              "url": "https://openrouter.ai/api/v1/models"
+            },
+            "region": "unspecified",
+            "tier": "catalog-default",
+            "unit": "million-tokens"
+          }
+        ],
+        "provenance": {
+          "adapter": "openrouter",
+          "pointer": "/data/0",
+          "sha256": "1e6e032b777132ab1b78bf0fb68fdced40b582573dcef5b1b8606a37c14c42ea",
+          "url": "https://openrouter.ai/api/v1/models"
+        }
+      },
+      "example/legacy": {
+        "metadata": {
+          "id": "example/legacy",
+          "name": "Retained missing model",
+          "provider": "openrouter"
+        },
+        "prices": []
+      },
+      "example/new-unpriced": {
+        "metadata": {
+          "api": "openai-completions",
+          "baseUrl": "https://openrouter.ai/api/v1",
+          "contextWindow": 32000,
+          "id": "example/new-unpriced",
+          "input": [
+            "text"
+          ],
+          "name": "Unpriced model",
+          "output": [
+            "text"
+          ],
+          "provider": "openrouter",
+          "runtimeCandidate": true,
+          "type": "chat"
+        },
+        "prices": [],
+        "provenance": {
+          "adapter": "openrouter",
+          "pointer": "/data/1",
+          "sha256": "1e6e032b777132ab1b78bf0fb68fdced40b582573dcef5b1b8606a37c14c42ea",
+          "url": "https://openrouter.ai/api/v1/models"
+        }
+      }
+    }
+  },
+  "schemaVersion": 1
+}

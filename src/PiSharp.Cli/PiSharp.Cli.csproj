@@ -3,7 +3,7 @@
     <OutputType>Exe</OutputType>
     <EnablePromptTemplateYaml Condition="'$(EnablePromptTemplateYaml)' == ''">true</EnablePromptTemplateYaml>
     <!-- Decision 0005: the experimental `pisharp durable` mode uses the [Experimental] durable packages. -->
-    <NoWarn>$(NoWarn);PISHARP_DURABLE001</NoWarn>
+    <NoWarn>$(NoWarn);PISHARP_DURABLE001;PISHARP_MEDIA001;PISHARP_TIERS001</NoWarn>
     <!-- The disabled CLI graph has its own coordinator-generated lock; normal locks stay intact. -->
     <NuGetLockFilePath Condition="'$(EnablePromptTemplateYaml)' == 'false'">$(MSBuildProjectDirectory)/packages.prompt-yaml-disabled.lock.json</NuGetLockFilePath>
     <DefineConstants Condition="'$(EnablePromptTemplateYaml)' == 'true'">$(DefineConstants);PISHARP_PROMPT_YAML</DefineConstants>
@@ -49,7 +49,8 @@
           Link="node-bridge/pi-host/%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" Pack="false" />
   </ItemGroup>
   <ItemGroup>
-    <!-- Web Agent W2 (WU2): the Models/*.json catalog shards are embedded by PiSharp.ModelRuntime (by link, same resource names). -->
+    <!-- Web Agent W2 (WU2): the Models/*.json catalog shards are embedded, and catalog-maintained/models.overlay.json is copied to the
+         output, by PiSharp.ModelRuntime, with the registry (by link, same resource names and output path). -->
     <!-- The highlight.js 10.7.3 grammars (tools/HljsGrammars/extract-grammars.mjs), read by HljsGrammarData. -->
     <EmbeddedResource Include="Interactive/Mode/Theme/Highlight/hljs-grammars.json.gz" LogicalName="PiSharp.Cli.Hljs.grammars.json.gz" />
   </ItemGroup>

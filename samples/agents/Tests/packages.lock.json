@@ -1,0 +1,36 @@
+{
+  "version": 1,
+  "dependencies": {
+    "net10.0": {
+      "pisharp.agent": {
+        "type": "Project",
+        "dependencies": {
+          "PiSharp.AI": "[1.2.0.1, )",
+          "PiSharp.Contracts": "[1.2.0.1, )"
+        }
+      },
+      "pisharp.ai": {
+        "type": "Project",
+        "dependencies": {
+          "PiSharp.Contracts": "[1.2.0.1, )"
+        }
+      },
+      "pisharp.contracts": {
+        "type": "Project"
+      },
+      "pisharp.samples.common": {
+        "type": "Project",
+        "dependencies": {
+          "PiSharp.Agent": "[1.2.0.1, )",
+          "PiSharp.Sessions": "[1.2.0.1, )"
+        }
+      },
+      "pisharp.sessions": {
+        "type": "Project",
+        "dependencies": {
+          "PiSharp.Contracts": "[1.2.0.1, )"
+        }
+      }
+    }
+  }
+}

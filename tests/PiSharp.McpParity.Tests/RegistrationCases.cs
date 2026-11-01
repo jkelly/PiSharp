@@ -102,6 +102,36 @@ internal static partial class Program
         Equal(1, fixture.Servers.Single(server => server.Name == "web").Closes, "unregistered server closed");
     });
 
+    // getAllTools and a tool's reachesTools answer while a server closes, as the original's registry does: here while closing `late`
+    // (unregistered while it connects) holds the session.
+    private static Task ExtensionReadsToolsWhileAServerCloses() => WithRoot("reads-close", DirectDocs, async fixture =>
+    {
+        var host = fixture.Host();
+        var (connecting, release) = RegisterLate(fixture, host);
+        await using var rpc = new Rpc(Args(fixture.Root, "new-memory"), new Endpoint(), host);
+        try
+        {
+            await Settled(fixture, rpc, 1);
+            var session = await HoldLateCloseAsync(fixture, host, rpc, connecting);
+            await using var extensions = PiSharp.Cli.Extensions.Pi.PiExtensionHost.CreateWithoutNode(new(fixture.Project, fixture.Agent, "rpc", false));
+            extensions.AttachSession(session.Owner);
+            static PiSharp.Compatibility.Node.Pi.PiNodeHostRequest Request(string method, string parameters) =>
+                new(method, JsonDocument.Parse(parameters).RootElement, true, _ => ValueTask.CompletedTask);
+            var tools = (await extensions.RequestAsync(Request("pi.read", """{"op":"getAllTools"}"""), CancellationToken.None))!.AsArray()
+                .ToDictionary(tool => tool!["name"]!.GetValue<string>(), tool => tool!.AsObject());
+            Check(tools.ContainsKey("mcp__docs__search"), "getAllTools lists docs: " + string.Join(",", tools.Keys));
+            Equal(true, tools.GetValueOrDefault("tool_search")?["reachesTools"]?.GetValue<bool>(), "tool_search reaches tools");
+            Equal("all", (await extensions.RequestAsync(Request("tool.reachesTools", """{"name":"tool_search","input":{"query":"docs"}}"""),
+                CancellationToken.None))!.GetValue<string>(), "tool_search reaches every tool");
+            Check(Reserved(session.Attachment.Session), "read while the close held the session");
+            release.TrySetResult();
+            await rpc.Prompt("p1", "after the close");
+            Equal(0, await rpc.Finish(), "exit code; " + rpc.Error);
+        }
+        // The held close would hold the session's shutdown too.
+        finally { release.TrySetResult(); }
+    });
+
     private static T Throws<T>(Action run) where T : Exception
     {
         try { run(); } catch (T error) { return error; }

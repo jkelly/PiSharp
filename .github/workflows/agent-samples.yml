@@ -1,0 +1,50 @@
+name: Agent samples
+
+# Fixtures exercise all sample tools without provider keys or external service writes.
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: agent-samples-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Agent samples (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest, macos-14]
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-dotnet@v5
+        with:
+          global-json-file: global.json
+
+      - name: Build and validate all 32 samples
+        shell: pwsh
+        run: |
+          # Match the canonical temporary paths used by native macOS processes.
+          if ($env:RUNNER_OS -eq 'macOS') {
+            $env:TMPDIR = ((& /bin/sh -c 'cd "$TMPDIR" && pwd -P') + '/')
+          }
+          dotnet build samples/agents/PiSharp.Samples.slnx --nologo -m:1
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          ./samples/agents/scripts/run-all.ps1 -Dotnet (Get-Command dotnet).Source -SkipBuild
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: agent-samples-${{ matrix.os }}
+          path: artifacts/sample-validation/
+          if-no-files-found: ignore

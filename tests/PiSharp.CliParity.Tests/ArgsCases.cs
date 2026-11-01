@@ -174,11 +174,25 @@ internal static partial class Program
             Check(code == 0 && stdout.StartsWith("pisharp - AI coding assistant with read, bash, edit, write tools\n\nUsage:\n  pisharp [options] [--] [@files...] [messages...]\n", StringComparison.Ordinal) &&
                 stdout.EndsWith("  ls         - List directory contents (read-only, off by default)\n\n", StringComparison.Ordinal) && stderr == "", "--help text");
             Check(stdout.Contains("  --tool-policy <policy>         Tool gate: pi (default; any path and command) or explicit (exact grants only)\n", StringComparison.Ordinal), "--tool-policy help line");
-            // PiSharp-only commands (decisions 0004 and 0005): Pi's printHelp has neither line, and its "<command> --help" line is unchanged.
+            // PiSharp-only commands (decisions 0004 and 0005): Pi's printHelp has neither line; both take --help.
             Check(stdout.Contains("  pisharp session <verb>            PiSharp explicit-path session commands (create, prompt, resume, rpc, terminal, ...)\n" +
-                "  pisharp durable [--continue]      EXPERIMENTAL: PiSharp's crash-safe durable agent (-c continues the newest session)\n" +
-                "  pisharp <command> --help          Show help for install/remove/uninstall/update/list/config/auth/mcp\n", StringComparison.Ordinal),
+                "  pisharp durable [options]         EXPERIMENTAL: PiSharp's crash-safe durable agent (--continue, --tier <tier>)\n" +
+                "  pisharp <command> --help          Show help for install/remove/uninstall/update/list/config/auth/mcp/session/durable\n", StringComparison.Ordinal),
                 "PiSharp-only session and experimental durable command lines");
+            Check(stdout.Contains("  --tier <tier>                  Set service tier: auto, normal, economy, priority, fast, ultrafast\n" +
+                "  --service-tier <tier>          Alias for --tier\n", StringComparison.Ordinal), "--service-tier alias line");
+            // The CLI registers no powershell tool (the name is only reserved), so the tool list leaves it out.
+            Check(!stdout.Contains("powershell", StringComparison.Ordinal) && stdout.Contains("  bash       - Execute bash commands\n  edit       - Edit files", StringComparison.Ordinal),
+                "no powershell tool listed");
+            // session --help lists the verbs; session <verb> --help prints that verb's usage; a command still runs.
+            Check(PiSharp.Cli.Commands.SessionHelp.For(["session", "--help"]) is { } sessionHelp && sessionHelp.StartsWith("Usage:\n  pisharp session <verb> [options]\n", StringComparison.Ordinal) &&
+                sessionHelp.Contains("\n  compact, branch-summary      Compact a session or summarize a branch\n", StringComparison.Ordinal), "session --help");
+            Equal(PiSharp.Cli.Commands.SessionHelp.For(["session"]), PiSharp.Cli.Commands.SessionHelp.For(["session", "-h"]), "bare session and -h");
+            Check(PiSharp.Cli.Commands.SessionHelp.For(["session", "list", "--help"]) == "Usage:\n  pisharp " + PiSharp.Cli.Commands.SessionCatalogCommand.Usage + "\n", "session list --help");
+            Check(PiSharp.Cli.Commands.SessionHelp.For(["session", "branch-summary", "-h"]) is { } summaryHelp &&
+                summaryHelp.EndsWith("\n    branch-summary requires --target <id|root>\n", StringComparison.Ordinal), "a verb's notes are indented: " + PiSharp.Cli.Commands.SessionHelp.For(["session", "compact", "-h"]));
+            Check(PiSharp.Cli.Commands.SessionHelp.For(["session", "list", "--session-store", "a=b"]) is null && PiSharp.Cli.Commands.SessionHelp.For(["session", "bogus", "--help"]) is null,
+                "commands and unknown verbs are not help");
             Check(stdout.Contains("  PI_CODING_AGENT_DIR              - Config directory (default: ~/.pi/agent)\n", StringComparison.Ordinal), "env var padding");
             (code, stdout, stderr) = await sandbox.Run("--mode", "yaml", "--thinking", "huge");
             Equal(1, code, "invalid mode exits 1");

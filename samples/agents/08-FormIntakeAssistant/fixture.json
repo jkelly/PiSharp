@@ -1,0 +1,23 @@
+{
+  "forms": [
+    {
+      "id": "form-801",
+      "type": "access",
+      "requester": "lee@example.test",
+      "system": "Analytics",
+      "reason": "New analyst onboarding",
+      "manager": "Nora"
+    },
+    {
+      "id": "form-802",
+      "type": "access",
+      "requester": "sam@example.test",
+      "system": "",
+      "reason": "Need access",
+      "manager": ""
+    }
+  ],
+  "routing": {
+    "access": "identity-team"
+  }
+}

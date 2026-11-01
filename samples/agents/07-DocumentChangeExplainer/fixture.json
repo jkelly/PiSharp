@@ -1,0 +1,22 @@
+{
+  "documents": [
+    {
+      "id": "policy-701",
+      "old": {
+        "version": "1.0",
+        "sections": {
+          "Eligibility": "All employees.",
+          "Deadline": "Submit within 30 days."
+        }
+      },
+      "new": {
+        "version": "1.1",
+        "sections": {
+          "Eligibility": "All full-time employees.",
+          "Deadline": "Submit within 45 days.",
+          "Receipts": "Receipts are required over $25."
+        }
+      }
+    }
+  ]
+}

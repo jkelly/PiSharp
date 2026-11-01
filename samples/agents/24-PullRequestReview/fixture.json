@@ -1,0 +1,4 @@
+{
+  "diff": "+const string ApiKey = \"sk_live_demo_only\";\n+return user.Name.ToUpperInvariant();\n",
+  "changedFile": "src/UserFormatter.cs"
+}

@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Decision 0012: a PiSharp native extension (IPiSharpExtension) the tests load as an agent plugin through the extension adapter. -->
+  <PropertyGroup>
+    <AssemblyName>AgentsExtensionFixture</AssemblyName>
+    <RootNamespace>AgentsExtensionFixture</RootNamespace>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../src/PiSharp.Extensions.Abstractions/PiSharp.Extensions.Abstractions.csproj" Private="false" />
+    <None Include="pisharp-agents-plugin.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>

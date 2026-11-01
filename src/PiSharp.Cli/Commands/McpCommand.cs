@@ -52,7 +52,8 @@ internal sealed record McpCommandOptions(string Cwd, string AgentDirectory)
 /// browser. Running sessions pick up new credentials on their next turn.</summary>
 internal static class McpCommand
 {
-    internal const string AppName = "PiSharp.Cli";
+    /// <summary>The command name the help, hints and sign-in messages print: the installed tool's, whatever binary runs.</summary>
+    internal const string AppName = PiSharp.Cli.Pi.PiConfig.DisplayName;
     public const string Usage = "mcp add <server> [options] (--url <url> | -- <command> [args...]); mcp remove <server> [-l]; mcp list [--json]; mcp login <server> [--timeout <seconds>]; mcp logout <server>; mcp --help";
     internal const int DefaultLoginTimeoutSeconds = 300;
     internal static readonly string Help = string.Join('\n',

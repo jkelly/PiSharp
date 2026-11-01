@@ -287,12 +287,14 @@
       "version": "1.2.0.1",
       "kind": "patch",
       "baseline": "v1.2.0",
-      "status": "release-candidate",
+      "status": "published",
       "branch": "release/1.2.0.1",
       "ships": "experimental durable port (decision 0005): pisharp durable and PiSharp.Durable, PiSharp.Durable.Tools, PiSharp.Durable.Sqlite packages",
       "decision": "docs/decisions/0005-pi-durable-experimental.md",
       "notes": "docs/release-notes/1.2.0.1.md",
       "changelog": "website/src/content/changelog/1.2.0.1.md (date 2026-10-16)",
+      "tag": "v1.2.0.1 (b2a558a, merge of PR #22), release run 38993151457",
+      "publishedOn": "2026-10-17",
       "blockers": []
     }
   },
