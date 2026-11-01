@@ -146,7 +146,10 @@ public static class FolderBrowser
     /// once, and one of those that has not answered within <paramref name="wait"/> is left out.</summary>
     internal static IReadOnlyList<string> ReadyDrives(IReadOnlyList<(string Name, bool Fixed, Func<bool> Ready)> drives, TimeSpan wait)
     {
-        var checks = drives.Select(drive => drive.Fixed ? Task.FromResult(drive.Ready()) : Task.Run(drive.Ready)).ToArray();
+        // Each on a thread of its own (LongRunning), not the pool's: a check that does not answer holds its thread, and on a busy pool a drive
+        // that answers at once could still be queued when the wait ends.
+        var checks = drives.Select(drive => drive.Fixed ? Task.FromResult(drive.Ready())
+            : Task.Factory.StartNew(drive.Ready, CancellationToken.None, TaskCreationOptions.LongRunning, TaskScheduler.Default)).ToArray();
         try { Task.WaitAll(checks, wait); }
         catch (AggregateException) { /* A drive whose check failed is left out below. */ }
         return [.. drives.Where((_, index) => checks[index].IsCompletedSuccessfully && checks[index].Result).Select(drive => drive.Name)];

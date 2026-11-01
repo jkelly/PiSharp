@@ -76,18 +76,31 @@ internal static partial class Program
                 hold.Wait();
                 return true;
             }
+            // Every pool thread busy, as on a loaded 3-core runner where the silent drives hold two of them: a drive that answers at once is
+            // still listed, since no check waits for a pool thread.
+            ThreadPool.GetMinThreads(out var workers, out _);
+            var busy = Enumerable.Range(0, Math.Max(workers, ThreadPool.ThreadCount)).Select(_ => Task.Run(() => hold.Wait())).ToArray();
             var watch = System.Diagnostics.Stopwatch.StartNew();
-            var ready = FolderBrowser.ReadyDrives(
-            [
-                (@"C:\", true, () => true),
-                (@"D:\", true, () => false),
-                (@"Y:\", false, Silent),
-                (@"Z:\", false, Silent),
-                (@"F:\", false, () => true),
-                (@"G:\", false, () => throw new InvalidOperationException("device error")),
-            ], TimeSpan.FromMilliseconds(500));
-            var took = watch.Elapsed;
-            hold.Set();
+            IReadOnlyList<string> ready;
+            TimeSpan took;
+            try
+            {
+                ready = FolderBrowser.ReadyDrives(
+                [
+                    (@"C:\", true, () => true),
+                    (@"D:\", true, () => false),
+                    (@"Y:\", false, Silent),
+                    (@"Z:\", false, Silent),
+                    (@"F:\", false, () => true),
+                    (@"G:\", false, () => throw new InvalidOperationException("device error")),
+                ], TimeSpan.FromMilliseconds(500));
+                took = watch.Elapsed;
+            }
+            finally
+            {
+                hold.Set();
+            }
+            Task.WaitAll(busy);
             Equal(@"C:\|F:\", string.Join("|", ready), "the drives that said they are ready in time, in order");
             Check(took < TimeSpan.FromSeconds(3), $"the list waited {took} for two drives that never answered");
             Equal(2, Volatile.Read(ref asked), "both silent drives were asked, at once");
