@@ -63,10 +63,12 @@ The planning work D1/D2/P1 is complete. All future packages remain pending; ther
 | batch-d | worker | hard | gpt-6.1-sol | high | ultrafast | code/schema validation and local edits | implement48–52 | contracts | samples48–52 | supplied catalog + contracts | runnable projects | focused self-tests | running |
 | batch-e | worker | hard | gpt-6.1-sol | high | ultrafast | baselines, data policies and guarded mutations | implement53–57 | contracts | samples53–57 | supplied catalog + contracts | runnable projects | focused self-tests | running |
 | batch-f | worker | hard | gpt-6.1-sol | high | ultrafast | evidence and document privacy | implement58–62 | contracts | samples58–62 | supplied catalog + contracts | runnable projects | focused self-tests | running |
-| integrate | main | very hard | inherited | inherited | unverified | native runtime integration and live validation | verify62, test30 live, commit and PR | batches | manifest, solution, README, scripts, CI, evidence | completed batches | reviewed PR | offline62/live30 | running |
+| integrate | main | very hard | inherited | inherited | unverified | native runtime integration and live validation | verify62, test30 live, commit and PR | batches | manifest, solution, README, scripts, CI, evidence | completed batches | reviewed PR | offline62/live30 | complete |
 
 Requested worker tier is ultrafast; delegation API has no tier parameter, so effective tier is unverified. Models and reasoning follow the workflow skill. No change to main thread model is claimed.
 
 Independent cross-review completed for all 30 additions. Confirmed edge-case findings in33,43,45,46,56,57,61 were fixed with regressions. All 30 initial live tests passed; affected samples were repeated after final implementation changes. Integration remains running until full62 validation, evidence generation, commit and PR publication finish.
 
 Final local verification: full62-project solution build had0 warnings/errors; all62 self-test programs and fixture demos and13 shared checks passed. All30 new live integrations passed gpt-6.1-sol result comparison;13 affected cases were repeated after review fixes. Validation evidence: samples/agents/validation/live-gpt-6.1-sol-33-62.md and .json. Only commit and PR publication remain.
+
+Completion: sources and validation evidence committed as21d4be63; PR https://github.com/jkelly/PiSharp/pull/48 opened against main. All six implementation batches, independent reviews, offline62/live30 qualification and publication are complete. CI results are tracked on the PR; no merge was requested.
