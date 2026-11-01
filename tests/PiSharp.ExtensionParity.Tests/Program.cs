@@ -65,7 +65,14 @@ internal static partial class Program
     /// <summary>A case that cannot run on this machine (no Node.js, no npm, no git): reported, never counted as a failure.</summary>
     internal sealed class SkipException(string reason, string message) : Exception(message) { public string Reason { get; } = reason; }
     private static readonly Lazy<string?> NodeVersion = new(() => Tool("node", "--version"));
-    private static readonly Lazy<string?> NpmVersion = new(() => Tool(OperatingSystem.IsWindows() ? "npm.cmd" : "npm", "--version"));
+    // npm through the CLI's own launcher, as PiNodeRuntime runs it (cross-spawn: PATH/PATHEXT resolution, shims through cmd.exe). Started
+    // by its bare name instead, a Windows npm.cmd shim resolves %~dp0 against the working directory and cannot find npm-cli.js.
+    private static readonly Lazy<string?> NpmVersion = new(() =>
+    {
+        try { return new PiSharp.Cli.Packages.PiPackageProcesses().RunSync(OperatingSystem.IsWindows() ? "npm.cmd" : "npm", ["--version"]); }
+        catch (Exception error) when (error is PiSharp.Cli.Packages.PiPackageException or System.ComponentModel.Win32Exception or InvalidOperationException)
+        { return null; }
+    });
     private static readonly Lazy<string?> GitVersion = new(() => Tool("git", "--version"));
     private static string? Tool(string name, string argument)
     {

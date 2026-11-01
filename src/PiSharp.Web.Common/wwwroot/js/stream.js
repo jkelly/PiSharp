@@ -1,7 +1,8 @@
 // PiSharp.Web.Common (decision 0011), from PiSharp Durable Web's hub stream (PLAN.md Appendix B, hub mux): a tab's one Server-Sent Events
 // stream. The server sends {sub, frame}; the first frame, sub "hello", names the stream, and the tab then PUTs the subscription keys it
 // wants as JSON {subs}. EventSource reconnects by itself, and every new hello resubscribes; a PUT the server answers 404 (the stream is
-// gone) reopens the stream.
+// gone) reopens the stream. Each PUT replaces the whole set, so only one is in flight at a time: two could reach the server in either
+// order and leave the older set in place (a deep link's hello PUTs no keys just before the first network frame subscribes its agent).
 
 export class MuxStream {
   /** `url` is the stream (default /api/stream); subscriptions go to `${url}/${streamId}`. */
@@ -10,6 +11,8 @@ export class MuxStream {
     this.handlers = new Map();
     this.keys = [];
     this.streamId = null;
+    this.pushing = null;
+    this.stale = false;
     /** Called with 'connected' or 'reconnecting'. */
     this.status = () => {};
   }
@@ -52,7 +55,26 @@ export class MuxStream {
     return this.push();
   }
 
-  async push() {
+  /** PUTs the current keys; a change while a PUT is in flight is sent when it returns. */
+  push() {
+    if (this.pushing) {
+      this.stale = true;
+      return this.pushing;
+    }
+    this.pushing = (async () => {
+      try {
+        do {
+          this.stale = false;
+          await this.put();
+        } while (this.stale);
+      } finally {
+        this.pushing = null;
+      }
+    })();
+    return this.pushing;
+  }
+
+  async put() {
     if (!this.streamId) return;
     const id = this.streamId;
     let response;

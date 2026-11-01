@@ -9694,8 +9694,8 @@
       "originalSha256": "9c8f5640ad018ac7e67cb13a46a9d3ecb9833a8c9af8d06b5ad7bd65a45f96c2"
     },
     {
-      "currentSha256": "c53a8eef0b9938fb8cedb20e6b6537717b909165290e943425c4a7d4fe6c2a48",
-      "currentBytes": 99061,
+      "currentSha256": "c831838fbbe2125eeb13ab84d5061484841af65d2bccbcb30b535f99bb54afc0",
+      "currentBytes": 99665,
       "originalBytes": 88195,
       "path": "src/PiSharp.Rpc/Protocol/RpcSessionDispatcher.cs",
       "originalSha256": "5806aaf5a9d730d0135afb2e43ad926b6094b7df02cffee96f51cbe5502e6602"

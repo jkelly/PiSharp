@@ -100,5 +100,35 @@ internal static partial class Program
             await Expect(page.Locator("html")).ToHaveAttributeAsync("data-bs-theme", "dark");
             Equal("dark", await page.EvaluateAsync<string>("() => localStorage.getItem('pisharp-durable-theme')"), "the stored theme, back to dark");
         }),
+
+        // stream.js: each PUT replaces the tab's whole subscription set, so one is in flight at a time. A deep link's hello PUTs no keys
+        // just before the first network frame subscribes the agent; held back, it must still reach the hub first, or the hub ends up with
+        // no keys and the agent's frames stop.
+        Browse("browser.web-common-stream-puts-in-order", async (hub, window) =>
+        {
+            var page = window.Page;
+            var session = await hub.SessionAsync("order");
+            var puts = new List<string>();
+            var held = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            await page.RouteAsync(url => new Uri(url).AbsolutePath.StartsWith("/api/stream/", StringComparison.Ordinal), async route =>
+            {
+                bool first;
+                lock (puts)
+                {
+                    first = puts.Count == 0;
+                    puts.Add(route.Request.PostData ?? "");
+                }
+                if (first) await Task.Delay(1_000);
+                var response = await route.FetchAsync();
+                await route.FulfillAsync(new() { Response = response });
+                if (first) held.TrySetResult();
+            });
+            await page.OpenAgentAsync(session);
+            await held.Task.WaitAsync(TimeSpan.FromSeconds(15));
+            lock (puts) Check(puts.Count >= 2 && !puts[0].Contains("/agent/", StringComparison.Ordinal),
+                "the hello's PUT, without the agent, came first: " + string.Join(" | ", puts));
+            await page.SendAsync("still subscribed");
+            await Expect(page.Thread()).ToContainTextAsync("Echo: still subscribed");
+        }),
     ];
 }

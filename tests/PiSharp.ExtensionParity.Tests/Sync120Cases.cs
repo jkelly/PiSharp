@@ -15,6 +15,7 @@ internal static partial class Program
         ("bridge.reaches-tools-and-namespace-aliases-in-getAllTools-and-loadouts", ReachesToolsInfo),
         ("bridge.reaches-tools-of-a-typescript-tool-reaches-all", ReachesToolsDescriptor),
         ("bridge.print-mode-exits-while-a-command-triggered-run-starts", TriggeredRunAtPrintModeExit),
+        ("bridge.a-run-starting-while-the-command-response-is-written-settles", TriggeredRunStartsWhileTheResponseIsWritten),
     ];
 
     private const string TriggerExtension = """
@@ -147,17 +148,7 @@ internal static partial class Program
         using var sandbox = NodeSandbox("triggered-run-at-print-exit");
         // A late answer: a run that reached the model before print mode read the last message still has no assistant text there.
         sandbox.Respond = (_, _) => { Thread.Sleep(2000); return AnthropicText("late answer"); };
-        var extension = sandbox.Write(Path.Combine(sandbox.Cwd, "kick.ts"), """
-            import { appendFileSync } from "node:fs";
-            const log = (...items: unknown[]) => appendFileSync(process.cwd() + "/probe.log", JSON.stringify(items) + "\n");
-            export default function (pi: any) {
-              pi.on("session_shutdown", () => log("session_shutdown"));
-              pi.registerCommand("kick", { description: "Kick", handler: async () => {
-                pi.sendMessage({ customType: "kick", content: "go now", display: true }, { triggerTurn: true });
-                log("handler_end");
-              } });
-            }
-            """);
+        var extension = sandbox.Write(Path.Combine(sandbox.Cwd, "kick.ts"), LateTriggerExtension);
         var (code, stdout, stderr) = await sandbox.Run([.. new[] { "-p" }, .. Model, "-e", extension, "/kick"]);
         Equal(0, code, "text mode exit; " + stderr);
         Equal("", stdout, "text mode prints nothing of the run");
@@ -178,4 +169,35 @@ internal static partial class Program
                 "nothing is written after the prompt resolved: " + stdout);
         }
     }
+
+    // A command whose handler does not await ctx.waitForIdle() returns before its triggered run has begun, so the run can start while
+    // the host writes the command's "handled" response. That start is the session's own run, and the host settles it when the input
+    // closes. PiSharp once credited it to the command, which never monitored it, and shutdown waited for that run forever (seen as a
+    // hung print-mode exit on CI). The client holds the response line for a second, keeping that window open.
+    private static async Task TriggeredRunStartsWhileTheResponseIsWritten()
+    {
+        using var sandbox = NodeSandbox("triggered-run-during-response");
+        var extension = sandbox.Write(Path.Combine(sandbox.Cwd, "kick.ts"), LateTriggerExtension);
+        var run = RunRpc(sandbox, [.. Model, "-e", extension], ["""{"id":"k","type":"prompt","message":"/kick"}"""],
+            (record, _) => IsResponse(record, "k"), react: (record, _) => { if (IsResponse(record, "k")) Thread.Sleep(1000); });
+        Check(await Task.WhenAny(run, Task.Delay(TimeSpan.FromSeconds(60))) == run, "the host exits once the input closes");
+        var (code, records, stderr) = await run;
+        Equal(0, code, "exit; " + stderr);
+        Check(records.Any(record => IsResponse(record, "k") && record["data"]?["disposition"]?.GetValue<string>() == "handled"),
+            "the command was handled: " + string.Join("\n", records));
+        var lines = LogLines(sandbox);
+        Check(lines.Contains("""["handler_end"]""") && lines.Contains("""["session_shutdown"]"""), "handler and shutdown ran: " + string.Join(" | ", lines));
+    }
+
+    private const string LateTriggerExtension = """
+        import { appendFileSync } from "node:fs";
+        const log = (...items: unknown[]) => appendFileSync(process.cwd() + "/probe.log", JSON.stringify(items) + "\n");
+        export default function (pi: any) {
+          pi.on("session_shutdown", () => log("session_shutdown"));
+          pi.registerCommand("kick", { description: "Kick", handler: async () => {
+            pi.sendMessage({ customType: "kick", content: "go now", display: true }, { triggerTurn: true });
+            log("handler_end");
+          } });
+        }
+        """;
 }
