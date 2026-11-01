@@ -6236,8 +6236,8 @@
       "originalSha256": "8cad779d44c97098c2dee23881907a1c694338c8fa07e8049132a0391f6ae32b"
     },
     {
-      "currentSha256": "c8ed4be08d841a245945abdb2f91477152b8faf2411d230390cf6f937fc8c466",
-      "currentBytes": 53300,
+      "currentSha256": "1d903299849f30a028fc2d4f2bdda32c52bcfcf2e111f54b9a513d68578a814e",
+      "currentBytes": 53621,
       "originalBytes": 47530,
       "path": "src/PiSharp.AI/Protocols/AnthropicMessages/AnthropicMessagesRequestProjector.cs",
       "originalSha256": "05c0b00876a896f2177fdcce15972aa1c08c948e0c71e92cc4b96745e2b79fa5"
