@@ -2,6 +2,7 @@ using System.Collections.Immutable;
 using System.Net;
 using System.Text;
 using System.Text.Json;
+using PiSharp.Agent;
 using PiSharp.AI;
 using PiSharp.AI.Protocols.MistralConversations;
 using PiSharp.Contracts;
@@ -16,6 +17,8 @@ internal static partial class Program
     [
         Case("diagnostics.projector.records-and-reads-every-declared-adapter", DiagnosticAdapters),
         Case("catalog.mid-run-publication-retries-without-an-idle-fallback", MidRunPublicationRetries),
+        Case("catalog.idle-fallback-yields-to-a-run-that-starts", IdleFallbackYieldsToAStartingRun),
+        Case("catalog.idle-fallback-yields-to-a-run-that-continues", IdleFallbackYieldsToAContinuingRun),
         Case("requests.carry-the-session-id", RequestsCarrySessionId),
         Case("diagnostics.rpc-host.mistral-failure-is-recorded-and-the-host-survives", MistralFailureThroughRpc),
         Case("mistral.replay-ignores-extra-system-and-user-fields", MistralExtraFields),
@@ -58,6 +61,61 @@ internal static partial class Program
         f.StartRpc(); await f.PromptAsync();
         Check(receipt is not null, "The publication fell back to the idle boundary.");
         Equal(21, prepares, "prepared again after each concurrent change");
+    }
+
+    // A catalog publication that finds no run in its provider phase falls back to the idle boundary. A run that enters that phase
+    // first takes the catalog instead: its tool_search may wait for the MCP server publishing it, and the publication waiting for that
+    // run's end deadlocked both (the 1.2.0.2 release run: a deferred server connected while the prompt's run was starting).
+    private static async Task IdleFallbackYieldsToAStartingRun()
+    {
+        await using var f = await CreateAsync(Response(text: "done"));
+        Task<PiSharp.CodingAgent.SessionToolCatalogReceipt>? publication = null; var published = false;
+        f.Transport.DuringStream = async () => published = await PublishedWithin(publication!);
+        // The publication comes while the prompt is admitted, before its run starts.
+        var submitted = await f.Session.SubmitInputAsync(new PromptInput("go"), new HeldAdmission(async () => publication = await WaitingPublication(f)))
+            .WaitAsync(TimeSpan.FromSeconds(60));
+        Equal(SubmittedInputDisposition.Started, submitted.Disposition, "disposition");
+        Check(published, "The publication did not reach the run that started after it fell back to the idle boundary: " + publication!.Status);
+        await publication;
+    }
+
+    // The run enters its provider phase again (here a follow-up queued at its before-settlement boundary; also a retry or a recovery).
+    private static async Task IdleFallbackYieldsToAContinuingRun()
+    {
+        await using var f = await CreateAsync(Response(text: "first"), Response(text: "done"));
+        Task<PiSharp.CodingAgent.SessionToolCatalogReceipt>? publication = null; var published = false;
+        f.Session.ConfigureAutomaticRecovery(null, async _ =>
+        {
+            if (publication is not null) return;
+            publication = await WaitingPublication(f);
+            f.Session.FollowUp(new("user", JsonData.Parse("""{"role":"user","content":"next","timestamp":11}""")));
+        });
+        f.Transport.DuringStream = async () => { if (publication is not null) published = await PublishedWithin(publication); };
+        f.StartRpc(); await f.PromptAsync();
+        Equal(2, f.Transport.Calls, "provider requests");
+        Check(published, "The publication waited for the end of the run that entered its provider phase again.");
+        await publication!;
+    }
+
+    /// <summary>As a background MCP connection publishes (outside the caller's flow): returned once the publication found no run in its
+    /// provider phase and waits at the idle boundary, which it reaches synchronously.</summary>
+    private static async Task<Task<PiSharp.CodingAgent.SessionToolCatalogReceipt>> WaitingPublication(EventFixture f)
+    {
+        var started = new TaskCompletionSource<Task<PiSharp.CodingAgent.SessionToolCatalogReceipt>>(TaskCreationOptions.RunContinuationsAsynchronously);
+        using (ExecutionContext.SuppressFlow())
+            _ = Task.Run(() => started.SetResult(f.Owner.PrepareAndPublishToolCatalogAsync(f.Owner.Current, (expected, _) => ValueTask.FromResult(
+                new PiSharp.CodingAgent.PreparedSessionToolCatalog(expected.WithToolCatalog(expected.RegisteredTools, null), f.Session.GetActiveTools(), () => { })))));
+        var publication = await started.Task;
+        Check(!publication.IsCompleted, "The publication did not wait for the idle boundary.");
+        return publication;
+    }
+    // A tool of the run waiting for the catalog (tool_search waiting for its servers), bounded so a deadlock fails the case.
+    private static async Task<bool> PublishedWithin(Task publication) =>
+        await Task.WhenAny(publication, Task.Delay(TimeSpan.FromSeconds(10))) == publication && publication.IsCompletedSuccessfully;
+    private sealed class HeldAdmission(Func<Task> hold) : IPromptInputAdmission
+    {
+        public async ValueTask<PromptInputDecision> ReduceAsync(PromptInput input, CancellationToken cancellationToken)
+        { await hold(); return new(PromptInputAction.Continue); }
     }
 
     // agent-session.ts: agent.sessionId = sessionManager.getSessionId(), and every provider request gets it (StreamOptions.sessionId).

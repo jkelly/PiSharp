@@ -9,8 +9,10 @@ public sealed partial class ReplaceableAgentSession
 {
     /// <summary>Serializes catalog preparation across every server attached to this actual owner.
     /// A run in its provider phase takes the catalog at once (<see cref="PersistentAgentSession.TryPublishToolCatalogDuringRunAsync"/>);
-    /// otherwise this joins admitted session work before capturing its current registry; no canceled-await wrapper
-    /// can leave that run or the preparation behind. The caller cannot recursively mutate this owner.</summary>
+    /// otherwise this joins admitted session work before capturing its current registry, unless a run enters its provider phase
+    /// first, which then takes it: that run may wait for this catalog (tool_search waiting for its MCP servers), so waiting for its end
+    /// deadlocked both. No canceled-await wrapper can leave that run or the preparation behind. The caller cannot recursively
+    /// mutate this owner.</summary>
     public async Task<SessionToolCatalogReceipt> PrepareAndPublishToolCatalogAsync(AgentSessionAttachment attachment,
         Func<SessionRuntimeRegistry, CancellationToken, ValueTask<PreparedSessionToolCatalog>> prepare,
         CancellationToken token = default)
@@ -21,12 +23,15 @@ public sealed partial class ReplaceableAgentSession
         var prior = inMutation.Value; inMutation.Value = true;
         try
         {
-            ValidateAttachment(attachment);
-            // Source _refreshToolRegistry: a catalog change during a run reaches the run at its next request boundary.
-            if (await attachment.Session.TryPublishToolCatalogDuringRunAsync((expected, _, cancellation) => prepare(expected, cancellation), linked.Token)
-                    .ConfigureAwait(false) is { } during) return during;
-            ValidateAttachment(attachment);
-            await attachment.Session.WaitForIdleAsync().ConfigureAwait(false);
+            while (true)
+            {
+                ValidateAttachment(attachment);
+                // Source _refreshToolRegistry: a catalog change during a run reaches the run at its next request boundary.
+                if (await attachment.Session.TryPublishToolCatalogDuringRunAsync((expected, _, cancellation) => prepare(expected, cancellation), linked.Token)
+                        .ConfigureAwait(false) is { } during) return during;
+                ValidateAttachment(attachment);
+                if (!await attachment.Session.WaitForIdleOrRunCatalogAsync().ConfigureAwait(false)) break;
+            }
             ValidateAttachment(attachment); linked.Token.ThrowIfCancellationRequested();
             var expected = attachment.Session.CaptureToolCatalogRegistry();
             var prepared = await prepare(expected, linked.Token).ConfigureAwait(false);
