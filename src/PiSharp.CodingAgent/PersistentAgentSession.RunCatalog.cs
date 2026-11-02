@@ -16,7 +16,7 @@ public sealed partial class PersistentAgentSession
     /// reconfigured and recorded (with replaced declarations) at the next request boundary of the run, or when the run settles if
     /// it makes no further request. Until it is recorded, the transcript and the agent
     /// keep the loadout of the previous registry, which validates them. Returns null when no run is in that phase; the caller
-    /// then publishes at the idle boundary.
+    /// then publishes at the idle boundary, unless a run enters that phase first (<see cref="WaitForIdleOrRunCatalogAsync"/>).
     /// <paramref name="prepare"/> receives the current registry and the current logical selection (a pending activation's names
     /// included) and must only prepare: its commit runs under the session gate once the swap is admitted.
     /// </summary>
@@ -84,6 +84,38 @@ public sealed partial class PersistentAgentSession
             return new(Snapshot, replacement);
         }
     }
+
+    /// <summary>
+    /// The idle boundary a catalog publication falls back to once <see cref="TryPublishToolCatalogDuringRunAsync"/> returned null:
+    /// false once the session is idle, true as soon as a run is in its provider phase (the caller then publishes during it). A run
+    /// that started after that refusal, or that enters its provider phase again (a retry, a recovery, a queued follow-up), may call a
+    /// tool that waits for this catalog (tool_search waits for the MCP servers it reaches), so its end is never awaited here.
+    /// Decided under the session gate, which every entry into the provider phase takes (<see cref="RunCatalogOpenedLocked"/>).
+    /// </summary>
+    internal async Task<bool> WaitForIdleOrRunCatalogAsync()
+    {
+        // These flows never publish during a run.
+        if (_activationPreparation.Value || _inLoadoutDiagnosticDrain.Value) { await WaitForIdleAsync().ConfigureAwait(false); return false; }
+        ThrowConfigurationSelfWait();
+        var agentIdle = _agent.WaitForIdleAsync();
+        Task[] pending; Task opened;
+        lock (_gate)
+        {
+            if (RunCatalogBusyLocked() || RunCatalogAdmissibleLocked()) return true;
+            pending = IdleTasksLocked(agentIdle);
+            opened = (_runCatalogOpened ??= new(TaskCreationOptions.RunContinuationsAsynchronously)).Task;
+        }
+        var idle = Task.WhenAll(pending);
+        await Task.WhenAny(idle, opened).ConfigureAwait(false);
+        // A run that started after the capture opens before its input is released, which the idle tasks may include.
+        if (opened.IsCompleted) return true;
+        await idle.ConfigureAwait(false);
+        return false;
+    }
+
+    private TaskCompletionSource? _runCatalogOpened;
+    /// <summary>A run entered its provider phase: a publication waiting in <see cref="WaitForIdleOrRunCatalogAsync"/> publishes during it.</summary>
+    private void RunCatalogOpenedLocked() { _runCatalogOpened?.TrySetResult(); _runCatalogOpened = null; }
 
     private ToolInvoker? _lateNestedInvoker;
     /// <summary>The registry the recorded loadout and the agent's configuration were resolved with, while a catalog published

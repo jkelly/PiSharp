@@ -1160,6 +1160,7 @@ public sealed partial class PersistentAgentSession : IAsyncDisposable
                     generation = new(TaskCreationOptions.RunContinuationsAsynchronously);
                     _operationGeneration = operation; _runCancellation = runCancellation;
                     _operationPhase = SessionOperationPhase.Provider; _active = generation; reservation.RunStarted = true;
+                    RunCatalogOpenedLocked();
                     break;
                 }
             }
@@ -1221,6 +1222,7 @@ public sealed partial class PersistentAgentSession : IAsyncDisposable
             _pendingToolNames = [];
             _runCancellation = new(); _operationPhase = SessionOperationPhase.Provider;
             idle = new(TaskCreationOptions.RunContinuationsAsynchronously); _active = idle;
+            RunCatalogOpenedLocked();
         }
         return ExecuteAsync(injectNextTurnCustom ? current => _agent.PromptAsync(inputs, current) : start, token, idle, inputs);
     }
@@ -1396,11 +1398,13 @@ public sealed partial class PersistentAgentSession : IAsyncDisposable
         ThrowConfigurationSelfWait();
         // Agent detects callback self-waits before this coordinator's additional admission lease is awaited.
         var agentIdle = _agent.WaitForIdleAsync();
-        Task idle; Task input; Task diagnostics; Task settings; Task[] bash;
-        lock (_gate) { idle = _active?.Task ?? Task.CompletedTask; input = _inputSubmission?.Idle.Task ?? Task.CompletedTask; diagnostics = LoadoutDiagnosticIdleLocked(); settings = RetrySettingsIdleLocked(); bash = CaptureUserBashCompletionsLocked(); }
-        var settled = Task.WhenAll(new[] { agentIdle, idle, input, diagnostics, settings }.Concat(bash));
+        Task[] pending; lock (_gate) pending = IdleTasksLocked(agentIdle);
+        var settled = Task.WhenAll(pending);
         return cancellationToken.CanBeCanceled ? settled.WaitAsync(cancellationToken) : settled;
     }
+    private Task[] IdleTasksLocked(Task agentIdle) =>
+        [agentIdle, _active?.Task ?? Task.CompletedTask, _inputSubmission?.Idle.Task ?? Task.CompletedTask, LoadoutDiagnosticIdleLocked(),
+            RetrySettingsIdleLocked(), .. CaptureUserBashCompletionsLocked()];
 
     /// <summary>Source <c>ctx.waitForIdle()</c> (agent-session.ts <c>waitForIdle</c>: no agent run and no compaction): called from the
     /// admitted input's own callback (an extension command's handler), the command's input does not count, so the handler waits for the

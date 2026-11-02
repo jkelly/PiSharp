@@ -139,7 +139,7 @@ public sealed partial class PersistentAgentSession
         if (_active is not null && _operationPhase == SessionOperationPhase.Settlement)
             throw new InvalidOperationException("The session operation has closed input admission for final settlement.");
     }
-    private void SetOperationPhase(SessionOperationPhase phase){lock(_gate)_operationPhase=phase;}
+    private void SetOperationPhase(SessionOperationPhase phase){lock(_gate){_operationPhase=phase;if(phase==SessionOperationPhase.Provider)RunCatalogOpenedLocked();}}
     private async Task<RecoveryDecision> TryRecoveryAsync(AgentLoopResult result,TaskCompletionSource idle,CancellationToken token,long operation,bool attempted)
     {
         AutomaticCompaction? configured;double? desired;SessionContextProjection context;
