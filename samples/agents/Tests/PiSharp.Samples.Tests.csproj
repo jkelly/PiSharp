@@ -1,4 +1,8 @@
 <Project Sdk="Microsoft.NET.Sdk">
-  <PropertyGroup><OutputType>Exe</OutputType></PropertyGroup>
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <!-- The catalog checks call PiSharp.AI's [Experimental] MaintainedCatalogOverlay. -->
+    <NoWarn>$(NoWarn);PISHARP_CATALOG001</NoWarn>
+  </PropertyGroup>
   <ItemGroup><ProjectReference Include="../Shared/PiSharp.Samples.Common.csproj" /></ItemGroup>
 </Project>

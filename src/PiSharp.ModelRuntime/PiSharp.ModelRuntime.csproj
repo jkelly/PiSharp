@@ -6,6 +6,8 @@
        DurableModels and the TUI stay in the CLI. -->
   <PropertyGroup>
     <IsPackable>false</IsPackable>
+    <!-- The registry applies the optional maintained catalog through PiSharp.AI's [Experimental] MaintainedCatalogOverlay. -->
+    <NoWarn>$(NoWarn);PISHARP_CATALOG001</NoWarn>
   </PropertyGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="PiSharp.Cli" />

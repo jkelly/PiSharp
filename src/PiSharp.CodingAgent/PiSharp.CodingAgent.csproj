@@ -12,6 +12,10 @@
     <InternalsVisibleTo Include="PiSharp.ToolSearch.Tests" />
     <InternalsVisibleTo Include="PiSharp.Codemode.Tests" />
     <InternalsVisibleTo Include="PiSharp.SessionParity.Tests" />
+    <!-- The session coordination the CLI's MCP and extension hosts use (ReplaceableAgentSession.CaptureToolCatalogRegistryAsync,
+         AccessSessionAsync, JoinReservationAsync, PersistentAgentSession.ReadToolCatalogRegistry) is internal, not public API. -->
+    <InternalsVisibleTo Include="PiSharp.Cli" />
+    <InternalsVisibleTo Include="PiSharp.CodingAgent.Tests" />
   </ItemGroup>
   <ItemGroup>
     <!-- Pi v1.1.0 export-html template, application script, vendored libraries and built-in themes, byte-for-byte. -->
