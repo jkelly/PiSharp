@@ -1,17 +1,17 @@
 ---
 title: Media tools
-description: Generate images, video, speech and music, embed and rerank text, and ask decision models from pisharp durable. Experimental and unreleased.
+description: Generate images, video, speech and music, embed and rerank text, and ask decision models from pisharp durable. Experimental since PiSharp 1.2.0.2.
 sidebar:
   badge:
-    text: Unreleased
+    text: Experimental
     variant: caution
 ---
 
-:::caution[Experimental and unreleased]
-The media tools are on PiSharp's `main` branch but not in any release or NuGet package yet. To use them, build PiSharp from source and reference the projects directly (see [Build from source](/docs/contribute/build/)). Their API is marked `[Experimental("PISHARP_MEDIA001")]`, so suppress `PISHARP_MEDIA001` in your project to compile it, and it may change or be removed without notice.
+:::caution[Experimental]
+The media tools ship as experimental in PiSharp 1.2.0.2, in `pisharp durable` and the `PiSharp.Durable.Tools` package. Their API is marked `[Experimental("PISHARP_MEDIA001")]`, so suppress `PISHARP_MEDIA001` in your project to compile it. They may change or be removed in any release, without notice or a deprecation period.
 :::
 
-[`pisharp durable`](/docs/guides/durable/) can give the model ten media tools: image, video, speech and music generation, transcription, embeddings, reranking, decision models, and two tools to list models and set defaults. They are not in any release of the CLI yet. To try them, run a CLI built from source (see [Run the CLI from source](/docs/contribute/build/#run-the-cli-from-source)). Pi has no media tools; this is a PiSharp addition ([decision 0007](https://github.com/jkelly/PiSharp/blob/main/docs/decisions/0007-media-generation.md)). To use the same tools in your own app, see [Media library](/docs/embed/media/).
+[`pisharp durable`](/docs/guides/durable/) can give the model ten media tools: image, video, speech and music generation, transcription, embeddings, reranking, decision models, and two tools to list models and set defaults. They are in `pisharp` from 1.2.0.2. Pi has no media tools; this is a PiSharp addition ([decision 0007](https://github.com/jkelly/PiSharp/blob/main/docs/decisions/0007-media-generation.md)). To use the same tools in your own app, see [Media library](/docs/embed/media/).
 
 ## Turn them on
 

@@ -30,7 +30,7 @@ Type `/` to search the commands of the current session. PiSharp has all of Pi's 
 | `/model [provider/model]` | Opens the model selector, or switches to the model you name. |
 | `/scoped-models` | Chooses the models `Ctrl+P` cycles through, saved as `enabledModels`. |
 | `/thinking [level]` | Opens the thinking selector, or sets the level for this session. |
-| `/tier [tier [default]]` | Shows or sets the service tier (experimental, unreleased). See below. |
+| `/tier [tier [default]]` | Shows or sets the service tier (experimental). See below. |
 | `/login [provider]` | Signs in to a provider, or saves its API key. |
 | `/logout` | Removes a sign-in. |
 | `/new` | Starts a new session. |
@@ -58,8 +58,8 @@ Extensions, prompt templates and skills add their own commands, as in Pi. Skills
 
 PiSharp also keeps Pi's hidden commands. `/debug` writes the rendered screen lines and the context messages to `pi-debug.log` in the agent folder, for bug reports.
 
-:::caution[/tier is unreleased]
-`/tier` is not in any release yet and needs a CLI built from source. Without an argument it shows the current tier and the choices: `auto`, `normal`, `economy`, `priority`, `fast` and `ultrafast`. `/tier <tier>` applies from the next request. `/tier <tier> default` also saves it as the `serviceTier` setting, and `/tier none` or `/tier clear` removes the tier. See [Service tiers](/docs/guides/service-tiers/).
+:::caution[/tier is experimental]
+`/tier` is experimental, from PiSharp 1.2.0.2. Without an argument it shows the current tier and the choices: `auto`, `normal`, `economy`, `priority`, `fast` and `ultrafast`. `/tier <tier>` applies from the next request. `/tier <tier> default` also saves it as the `serviceTier` setting, and `/tier none` or `/tier clear` removes the tier. See [Service tiers](/docs/guides/service-tiers/).
 :::
 
 :::note[/bug]

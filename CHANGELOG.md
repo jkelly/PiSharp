@@ -1,5 +1,26 @@
 # Changelog
 
+## [1.2.0.2] - 2026-11-01
+
+A C#-only release on the Pi v1.2.0 baseline. It releases PiSharp's media tools, service tiers and custom agents as experimental, and fixes bugs in `pisharp`. Update the CLI with `dotnet tool update -g PiSharp.Cli`. Full notes are in the [release notes](https://github.com/jkelly/PiSharp/blob/main/docs/release-notes/1.2.0.2.md).
+
+### New (experimental)
+
+- Media: generate images, video, speech and music, transcribe audio, embed and rerank text, and ask decision models. The library is `PiSharp.AI.Media` (`PISHARP_MEDIA001`), and the tools are in `pisharp durable`. Paid results are saved, so a crash never pays twice
+- Service tiers: `--tier`, `/tier` and the `serviceTier` setting choose `auto`, `normal`, `economy`, `priority`, `fast` or `ultrafast` capacity on OpenAI, OpenRouter, Anthropic, Codex and Google (`PISHARP_TIERS001`). Without a tier, nothing changes
+- Custom agents: three new packages, `PiSharp.CustomAgents`, `PiSharp.CustomAgents.JavaScript` and `PiSharp.CustomAgents.Scripting`, for typed workflows, agent teams, subagents and dynamic tools on the durable harness (`PISHARP_AGENTS001`)
+- `pisharp durable`: the `ask_user_question` tool, plan mode (`/plan`), `--help`, and `pisharp durable serve`, which runs this machine as a durable device on `127.0.0.1:4780`, with device commands listed by `pisharp durable help`
+- The tool now needs the ASP.NET Core runtime, which the .NET SDK includes
+- Everything here may change in any release
+
+### Fixed
+
+- `write` is no longer capped at 64 KiB
+- Codemode scripts no longer see model `headers`, which can hold API keys
+- Closing an MCP server no longer fails another server, a prompt or an `/mcp` action at the same moment, and a session that ends while a stdio server starts exits cleanly
+- The first key after `/new` reaches the editor, and print and RPC mode no longer hang at exit when an extension command starts a run
+- `pisharp session --help`, `pisharp durable --help` and `--service-tier` in the help
+
 ## [1.2.0.1] - 2026-10-16
 
 A C#-only release on the Pi v1.2.0 baseline that adds the experimental durable port. Update the CLI with `dotnet tool update -g PiSharp.Cli`. Full notes are in the [release notes](https://github.com/jkelly/PiSharp/blob/main/docs/release-notes/1.2.0.1.md).

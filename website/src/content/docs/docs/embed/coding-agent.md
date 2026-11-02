@@ -8,8 +8,8 @@ description: "Embed the full coding agent: persistent sessions, settings, prompt
 ## Install
 
 ```powershell
-dotnet add package PiSharp.CodingAgent --version 1.2.0.1
-dotnet add package PiSharp.Tools --version 1.2.0.1
+dotnet add package PiSharp.CodingAgent --version 1.2.0.2
+dotnet add package PiSharp.Tools --version 1.2.0.2
 ```
 
 `PiSharp.CodingAgent` references `PiSharp.Agent` and `PiSharp.Sessions`, but not `PiSharp.Tools`. Add `PiSharp.Tools` yourself to get the built-in tools. Your project targets `net10.0`.
@@ -282,7 +282,7 @@ Each tool is a `SessionRegisteredTool(Declaration, Adapter, ExecutionMode)`. The
 | `InitialActiveToolNames` (`init`) | `null` | The tools a new session starts with. |
 | `BlockImages` (`init`) | `null` | Returns `true` to keep every image away from the provider, like the `images.blockImages` setting. |
 | `RestoreFallbackModel` (`init`) | `null` | Picks a model when a file records one the registry doesn't bind. |
-| `ServiceTier` (`init`) | `null` | The service tier for requests (experimental, unreleased; see [Service tiers](/docs/guides/service-tiers/)). |
+| `ServiceTier` (`init`) | `null` | The service tier for requests (experimental; see [Service tiers](/docs/guides/service-tiers/)). |
 
 `GetSupportedThinkingLevels(model)` and `GetDefaultThinkingLevel(model)` tell you what a model accepts.
 

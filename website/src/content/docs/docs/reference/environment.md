@@ -27,6 +27,8 @@ Boolean variables differ in what they accept. Where a row says `1`, only `1` tur
 | `PI_SHARE_VIEWER_URL` | Base URL of the link `/share` prints. The gist id is added after `#`. | `https://pi.dev/session/` |
 | `PI_CACHE_RETENTION` | `long` asks for long prompt cache retention where the API supports it (Bedrock, OpenAI Responses, Radius). | short |
 | `PI_TELEMETRY` | Accepted and ignored. PiSharp sends no install telemetry. | unset |
+| `PISHARP_MAINTAINED_CATALOG` | A maintained catalog file of model metadata and prices to apply on top of Pi's catalogs, after remote refreshes and before `models.json` and extensions. It can update prices and limits and add chat models, but never selects a model. PiSharp only, experimental, from 1.2.0.2. | `catalog-maintained/models.overlay.json` next to the tool, which ships empty |
+| `PISHARP_DEVICE_TOKEN` | The token of the device that a `pisharp durable` device command names with `--device <url>`, unless `--token-file` is given. A token is never a command-line argument. See [Device server](/docs/guides/durable/#device-server). PiSharp only, experimental, from 1.2.0.2. | unset |
 
 ## Diagnostics
 

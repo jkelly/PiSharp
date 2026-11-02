@@ -1,16 +1,16 @@
 ---
 title: Workflows
-description: "Typed workflows: a series of actions over one shared data class, run on the durable harness. Experimental and unreleased."
+description: "Typed workflows: a series of actions over one shared data class, run on the durable harness. Experimental since PiSharp 1.2.0.2."
 sidebar:
   badge:
-    text: Unreleased
+    text: Experimental
     variant: caution
 ---
 
-:::caution[Experimental and unreleased]
-The custom agents library is on PiSharp's `main` branch but not in any release or NuGet package yet. To use it, build PiSharp from
-source and reference the projects directly (see [Build from source](/docs/contribute/build/)). Its API is marked
-`[Experimental("PISHARP_AGENTS001")]` and builds on durable APIs marked `[Experimental("PISHARP_DURABLE001")]`, so suppress `PISHARP_AGENTS001` and `PISHARP_DURABLE001` in your project to compile it, and it may change or be removed without notice.
+:::caution[Experimental]
+The custom agents library ships as experimental in PiSharp 1.2.0.2, as the `PiSharp.CustomAgents`, `PiSharp.CustomAgents.JavaScript` and
+`PiSharp.CustomAgents.Scripting` packages. Its API is marked `[Experimental("PISHARP_AGENTS001")]` and builds on durable APIs marked
+`[Experimental("PISHARP_DURABLE001")]`, so suppress `PISHARP_AGENTS001` and `PISHARP_DURABLE001` in your project to compile it. It may change or be removed in any release, without notice or a deprecation period.
 :::
 
 A workflow is a named series of actions over one data class. Every action receives the same data object, reads it and changes it. After each action the engine commits the data and the next action to storage in one step, so a crash loses at most the action that was running. The types are in `PiSharp.CustomAgents.Workflows` and, for hosting, `PiSharp.CustomAgents.Workflows.Hosting`.

@@ -10,21 +10,22 @@ PiSharp is built as layered libraries, one job each. Every library references on
 | Area | Libraries |
 | --- | --- |
 | Contracts | `PiSharp.Contracts` |
-| Providers | `PiSharp.AI`, which also holds the media library in `PiSharp.AI.Media` ([experimental, unreleased](/docs/embed/media/)) |
+| Providers | `PiSharp.AI`, which also holds the media library in `PiSharp.AI.Media` ([experimental](/docs/embed/media/)) |
 | Agent | `PiSharp.Agent`, `PiSharp.Tools`, `PiSharp.Tools.Skia`, `PiSharp.Sessions` |
 | Coding agent | `PiSharp.CodingAgent`, `PiSharp.Codemode`, `PiSharp.PromptTemplates.Yaml` |
 | Durable agents | `PiSharp.Durable`, `PiSharp.Durable.Sqlite`, `PiSharp.Durable.Tools` (released as experimental) |
-| Custom agents | `PiSharp.CustomAgents`, `PiSharp.CustomAgents.JavaScript`, `PiSharp.CustomAgents.Scripting` ([experimental, unreleased](/docs/custom-agents/overview/)) |
+| Durable device | `PiSharp.Durable.Hosting`, `PiSharp.Durable.Server`, `PiSharp.Durable.Client` (experimental, inside the CLI tool) |
+| Custom agents | `PiSharp.CustomAgents`, `PiSharp.CustomAgents.JavaScript`, `PiSharp.CustomAgents.Scripting` ([experimental](/docs/custom-agents/overview/)) |
 | Extensions | `PiSharp.Extensions.Abstractions`, `PiSharp.Extensions.Runtime`, `PiSharp.Extensions.Agent`, `PiSharp.ExtensionHost`, `PiSharp.Compatibility.Node` (the Node bridge) |
 | Terminal UI | `PiSharp.Tui` |
-| Frontends | `PiSharp.Rpc`, `PiSharp.Cli` |
+| Frontends | `PiSharp.Rpc`, `PiSharp.ModelRuntime`, `PiSharp.Cli` |
 
 ## What each library holds
 
 | Library | Holds |
 | --- | --- |
 | `PiSharp.Contracts` | The shared message, streaming and JSON types every other library uses. |
-| `PiSharp.AI` | The provider transports for every Pi chat API, the model catalogs, authentication and logins, and model operations such as classifiers and image generation. Its `Media` folder is the media library: images, video, audio, embeddings and ranking (experimental, unreleased). |
+| `PiSharp.AI` | The provider transports for every Pi chat API, the model catalogs, authentication and logins, and model operations such as classifiers and image generation. Its `Media` folder is the media library: images, video, audio, embeddings and ranking (experimental). |
 | `PiSharp.Agent` | The agent loop: turns, tool calls and their batching, steering and follow-up queues. |
 | `PiSharp.Tools` | The built-in tools: file tools, process and shell tools, and the image seam the `read` tool uses. |
 | `PiSharp.Tools.Skia` | The SkiaSharp image codec behind that seam: decoding, resizing and re-encoding images as Pi does. |
@@ -34,7 +35,10 @@ PiSharp is built as layered libraries, one job each. Every library references on
 | `PiSharp.PromptTemplates.Yaml` | YAML frontmatter for prompt templates. The CLI can be built without it. |
 | `PiSharp.Durable` | The [durable harness](/docs/embed/durable/), ported from Pi's pi-durable: sessions and tasks that commit every step before showing it and resume after a crash, with in-memory and JSONL storage. |
 | `PiSharp.Durable.Sqlite` | SQLite storage for durable sessions. |
-| `PiSharp.Durable.Tools` | The durable execution environment, coding tools, `tool_search`, code mode, and the media tools of `pisharp durable` (experimental, unreleased). |
+| `PiSharp.Durable.Tools` | The durable execution environment, coding tools, `tool_search`, code mode, and the media tools of `pisharp durable` (experimental). |
+| `PiSharp.Durable.Hosting` | Many durable sessions in one process, for `pisharp durable serve`: the device catalog, locks, jobs, schedules and the other device services. Not a package; it ships inside the CLI tool. |
+| `PiSharp.Durable.Server` | The device's authenticated HTTP and server-sent-events API, an ASP.NET Core library hosted by `pisharp durable serve`. Not a package; it ships inside the CLI tool. |
+| `PiSharp.Durable.Client` | The device API's wire types and a client for one device, used by the CLI's device commands. Not a package; it ships inside the CLI tool. |
 | `PiSharp.CustomAgents` | Typed workflows, agents, teams, subagents, tools and plugins on the durable harness. |
 | `PiSharp.CustomAgents.JavaScript` | JavaScript tools and workflow actions for custom agents, on the code mode sandbox. |
 | `PiSharp.CustomAgents.Scripting` | C# script tools and workflow actions for custom agents, compiled with Roslyn. |
@@ -45,6 +49,7 @@ PiSharp is built as layered libraries, one job each. Every library references on
 | `PiSharp.Compatibility.Node` | The optional [Node bridge](/docs/extensions/node-bridge/) for Pi's TypeScript extensions. It needs Node.js. |
 | `PiSharp.Tui` | Terminal UI building blocks: components, input, rendering, and the Windows console terminal. It depends on no other PiSharp library. |
 | `PiSharp.Rpc` | Pi's JSONL RPC protocol over stdin and stdout, including extension UI requests. |
+| `PiSharp.ModelRuntime` | The CLI's model registry: the built-in catalog, `models.json`, the provider auth catalog, the live provider routes and the maintained catalog layer. Not a package; it ships inside the CLI tool. |
 | `PiSharp.Cli` | The `pisharp` command: interactive mode, print and JSON modes, RPC mode, the commands, settings, MCP, packages and `pisharp durable`. |
 
 ## Dependency order
@@ -75,7 +80,11 @@ These are each project's direct references, from the bottom up. The test is the 
 | `PiSharp.Durable.Tools` | Durable, Tools, Codemode | none |
 | `PiSharp.CustomAgents.Scripting` | CustomAgents | Microsoft.CodeAnalysis.CSharp 5.6.0 |
 | `PiSharp.CustomAgents.JavaScript` | CustomAgents, Codemode, Durable.Tools | none |
-| `PiSharp.Cli` | CodingAgent, PromptTemplates.Yaml, Tools, Tools.Skia, Rpc, Tui, Extensions.Runtime, Extensions.Agent, Codemode, Compatibility.Node, Durable, Durable.Sqlite, Durable.Tools | none |
+| `PiSharp.Durable.Client` | none | none |
+| `PiSharp.Durable.Hosting` | Durable, Durable.Sqlite, Durable.Tools | none |
+| `PiSharp.Durable.Server` | Durable.Hosting, Durable.Client | the ASP.NET Core shared framework |
+| `PiSharp.ModelRuntime` | CodingAgent, Tools, Rpc, Extensions.Runtime, Extensions.Agent | none |
+| `PiSharp.Cli` | CodingAgent, ModelRuntime, PromptTemplates.Yaml, Tools, Tools.Skia, Rpc, Tui, Extensions.Runtime, Extensions.Agent, Codemode, Compatibility.Node, Durable, Durable.Sqlite, Durable.Tools, Durable.Hosting, Durable.Server | none |
 
 A few things the table shows:
 
@@ -90,13 +99,15 @@ The third-party packages are pinned exactly, and their licenses are in [`third-p
 
 | Part | Status | Where |
 | --- | --- | --- |
-| The 19 libraries other than custom agents, and the `PiSharp.Cli` tool | Released on NuGet, 1.2.0.1 | [SDK](/sdk/) |
-| Durable libraries and `pisharp durable` | Released as experimental. Every durable API carries `[Experimental("PISHARP_DURABLE001")]`. | [Pi Durable](/docs/guides/durable/) |
-| Media library (`PiSharp.AI.Media`) and the media tools | On `main`, in no release. `[Experimental("PISHARP_MEDIA001")]`. | [Media](/docs/embed/media/) |
-| Service tiers | On `main`, in no release. `[Experimental("PISHARP_TIERS001")]`. | [Service tiers](/docs/guides/service-tiers/) |
-| Custom agents | On `main`, source only: no package is built for them. `[Experimental("PISHARP_AGENTS001")]` on the whole assembly. | [Custom agents](/docs/custom-agents/overview/) |
+| The 22 libraries listed on the SDK page, and the `PiSharp.Cli` tool | Released on NuGet, 1.2.0.2 | [SDK](/sdk/) |
+| Durable libraries and `pisharp durable` | Released as experimental in 1.2.0.1. Every durable API carries `[Experimental("PISHARP_DURABLE001")]`. | [Pi Durable](/docs/guides/durable/) |
+| Media library (`PiSharp.AI.Media`) and the media tools | Released as experimental in 1.2.0.2. `[Experimental("PISHARP_MEDIA001")]`. | [Media](/docs/embed/media/) |
+| Service tiers | Released as experimental in 1.2.0.2. `[Experimental("PISHARP_TIERS001")]`. | [Service tiers](/docs/guides/service-tiers/) |
+| Custom agents | Released as experimental in 1.2.0.2, as three packages. `[Experimental("PISHARP_AGENTS001")]` on every public type. | [Custom agents](/docs/custom-agents/overview/) |
+| Durable device server (`pisharp durable serve`) | Released as experimental in 1.2.0.2, inside the CLI tool. `PiSharp.Durable.Hosting`, `PiSharp.Durable.Server` and `PiSharp.Durable.Client` are not packages. | [Device server](/docs/guides/durable/#device-server) |
+| `PiSharp.ModelRuntime` | Inside the CLI tool, not a package. | |
 
-The `PiSharp.AI` 1.2.0.1 package doesn't contain the media library or the service tiers. To use an unreleased part, reference the projects from source: see [Build from source](/docs/contribute/build/#reference-the-projects-from-your-app).
+The repository also holds projects that are not released at all: a local web chat app (`PiSharp.WebAgent`), a web UI for durable devices (`PiSharp.Durable.Web`), SQL Server storage for durable sessions (`PiSharp.Durable.MSSQL`) and `PiSharp.Web.Common`. To use them, build PiSharp from source: see [Build from source](/docs/contribute/build/).
 
 ## Design principles
 

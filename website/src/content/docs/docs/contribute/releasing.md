@@ -11,7 +11,7 @@ No tag, release or package is published without the project owner's explicit go-
 
 ## Versioning
 
-PiSharp's version is the Pi version it matches, and a fourth number marks a C#-only patch on the same baseline: 1.2.0 is the Pi v1.2.0 sync, and 1.2.0.1 adds C# work on top of it. See [Versioning](/docs/versioning/).
+PiSharp's version is the Pi version it matches, and a fourth number marks a C#-only patch on the same baseline: 1.2.0 is the Pi v1.2.0 sync, and 1.2.0.1 and 1.2.0.2 add C# work on top of it. See [Versioning](/docs/versioning/).
 
 The release scripts enforce this:
 
@@ -23,7 +23,7 @@ Every assembly gets the release version, except `PiSharp.ExtensionHost`, which k
 
 ## Prepare the release
 
-Releases are prepared on a `release/<version>` branch, such as `release/1.2.0.1`, and merged into `main` with a pull request. The preparation commit touches these files:
+Releases are prepared on a `release/<version>` branch, such as `release/1.2.0.2`, and merged into `main` with a pull request. The preparation commit touches these files:
 
 | File | Change |
 | --- | --- |
@@ -73,7 +73,7 @@ Run the release workflow by hand from the Actions tab to build and check a versi
 
 | Input | Default | Effect |
 | --- | --- | --- |
-| `version` | `1.2.0.1` | The version to build and validate. |
+| `version` | `1.2.0.2` | The version to build and validate. |
 | `skip_tests` | `false` | Skip the offline test suites. Only a dry run can skip them. |
 
 A dry run runs only the build job. The publish and GitHub release jobs run only for a pushed tag.
@@ -85,8 +85,8 @@ You can also build the packages locally. See [Install your build as a tool](/doc
 Once the release branch is merged, tag the merge commit and push the tag:
 
 ```sh
-git tag v1.2.0.1 <merge commit>
-git push origin v1.2.0.1
+git tag v1.2.0.2 <merge commit>
+git push origin v1.2.0.2
 ```
 
 ## The release workflow
@@ -97,7 +97,7 @@ git push origin v1.2.0.1
 
 The build job runs on Ubuntu with the SDK from `global.json` and Node.js 22. It takes the version from the tag, without the `v`, and then:
 
-1. Runs the 19 offline release suites with `dotnet run`: the 17 suites the macOS workflow runs, plus `Durable` and `DurableCli`. A tag push always runs them. See [Tests](/docs/contribute/testing/#release-suites).
+1. Runs the 20 offline release suites with `dotnet run`: the 17 suites the macOS workflow runs, plus `Durable`, `DurableCli` and `CustomAgents`. A tag push always runs them. See [Tests](/docs/contribute/testing/#release-suites).
 2. Runs `build-release-packages.ps1` with the version and the commit. See [Build the packages](#build-the-packages).
 3. Checks the CLI tool's durable payload: the durable and SQLite assemblies and their license files must be in the package, and the `e_sqlite3` native library for `win-x64`, `linux-x64`, `linux-musl-x64` and `osx-arm64` must match the SQLitePCLRaw package byte for byte.
 4. Uploads the packages and the validation reports as the `packages` artifact.
@@ -129,10 +129,10 @@ After the publish job succeeds, the release job creates the GitHub release for t
 
 It writes provenance files to `artifacts/release-inputs/`, recording the commit, version, Pi baseline and SDK. Then it packs:
 
-- The 19 libraries, with `tools/release/PiSharp.NativeSdk.targets`. The targets file sets the package id, version, description, license, readme and notices, embeds the provenance, and fails without a version, a commit, the provenance file or `net10.0`. Each package is checked by `Assert-PiSharpNativeSdkPackage`: its members, its dependencies (PiSharp siblings at the release version, third-party packages at their pinned versions) and its assembly.
+- The 22 libraries, with `tools/release/PiSharp.NativeSdk.targets`. The targets file sets the package id, version, description, license, readme and notices, embeds the provenance, and fails without a version, a commit, the provenance file or `net10.0`. Each package is checked by `Assert-PiSharpNativeSdkPackage`: its members, its dependencies (PiSharp siblings at the release version, third-party packages at their pinned versions) and its assembly.
 - The CLI, as the `PiSharp.Cli` tool with the command `pisharp`, with `tools/packaging/PiSharp.Distribution.targets`, checked by `tools/packaging/validate-distribution.ps1`.
 
-The reports go to `artifacts/validation/`. The script fails unless it ends with exactly 20 packages.
+The reports go to `artifacts/validation/`. The script fails unless it ends with exactly 23 packages.
 
 ## After the release
 

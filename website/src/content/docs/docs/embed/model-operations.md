@@ -8,13 +8,13 @@ Some catalog models don't chat. Classifier models answer typed questions about a
 The coding agent uses the same registry. Extensions reach it as `ctx.modelRegistry`, and code mode scripts as the `models` global. Chat models stay with the chat transports on [Chat and providers](/docs/embed/chat/).
 
 :::note[The media library]
-Embeddings, image editing, video, speech, transcription, music and reranking live in the `PiSharp.AI.Media` namespace (experimental, unreleased), on the [Media library](/docs/embed/media/) page. It is in `PiSharp.AI` on `main` but not in any release, and its API is marked `[Experimental("PISHARP_MEDIA001")]`. Its OpenAI and Google image APIs implement the same `IImagesApi` interface this page describes.
+Embeddings, image editing, video, speech, transcription, music and reranking live in the `PiSharp.AI.Media` namespace (experimental), on the [Media library](/docs/embed/media/) page. It is in the `PiSharp.AI` package from 1.2.0.2, and its API is marked `[Experimental("PISHARP_MEDIA001")]`. Its OpenAI and Google image APIs implement the same `IImagesApi` interface this page describes.
 :::
 
 ## Install
 
 ```powershell
-dotnet add package PiSharp.AI --version 1.2.0.1
+dotnet add package PiSharp.AI --version 1.2.0.2
 ```
 
 `PiSharp.AI` brings `PiSharp.Contracts`. Add these namespaces:

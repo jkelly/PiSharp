@@ -3,7 +3,7 @@ title: Build from source
 description: Clone, build and run PiSharp and its samples.
 ---
 
-You build PiSharp from source to work on it, to run its tests, or to use a feature that is on the `main` branch but in no release yet. Custom agents, the media tools and library, and service tiers are such features: to use them, you [reference the projects from your app](#reference-the-projects-from-your-app).
+You build PiSharp from source to work on it, to run its tests, or to use a feature that is on the `main` branch but in no release yet: to use one, you [reference the projects from your app](#reference-the-projects-from-your-app).
 
 ## Prerequisites
 
@@ -24,7 +24,7 @@ git clone https://github.com/jkelly/PiSharp.git
 cd PiSharp
 ```
 
-`main` holds the latest work, including unreleased features. Each release has a tag, such as `v1.2.0.1`. Check out the tag to build exactly what shipped.
+`main` holds the latest work, including unreleased features. Each release has a tag, such as `v1.2.0.2`. Check out the tag to build exactly what shipped.
 
 ## Repository layout
 
@@ -64,7 +64,7 @@ Every project gets these settings from `Directory.Build.props`:
 
 | Setting | Value | Effect |
 | --- | --- | --- |
-| `VersionPrefix` | `1.2.0.1` | The version a build reports, unless you pass `-p:VersionPrefix`. A build of `main` reports it even when it holds unreleased features. |
+| `VersionPrefix` | `1.2.0.2` | The version a build reports, unless you pass `-p:VersionPrefix`. A build of `main` reports it even when it holds unreleased features. |
 | `TargetFramework` | `net10.0` | |
 | `Nullable`, `ImplicitUsings` | `enable` | |
 | `TreatWarningsAsErrors` | `true` | Any compiler warning fails the build. |
@@ -106,7 +106,7 @@ dotnet run --project src/PiSharp.Cli -- -p "Summarize this repository"
 dotnet run --project src/PiSharp.Cli -- durable
 ```
 
-Once the packages are in your cache, you can leave out `-p:RestoreSources`. The CLI built this way includes everything on `main`, including the CLI features that are in no release yet: `--tier` and `/tier`, and the media tools in `pisharp durable`. See [Command line](/docs/reference/cli/).
+Once the packages are in your cache, you can leave out `-p:RestoreSources`. The CLI built this way includes everything on `main`, including CLI features that are in no release yet. See [Command line](/docs/reference/cli/).
 
 `dotnet run` starts in Debug. Add `-c Release` for the build the packages use. The build copies `CHANGELOG.md` next to the executable, where What's New and `/changelog` read it.
 
@@ -115,16 +115,16 @@ Once the packages are in your cache, you can leave out `-p:RestoreSources`. The 
 To run your build as `pisharp`, pack it the way a release does and install it from the output folder. The macOS CI job does exactly this.
 
 ```powershell
-pwsh ./tools/release/build-release-packages.ps1 -Version 1.2.0.1 -SourceCommit (git rev-parse HEAD)
+pwsh ./tools/release/build-release-packages.ps1 -Version 1.2.0.2 -SourceCommit (git rev-parse HEAD)
 ```
 
-The script packs every library and the CLI into `artifacts/packages/`, and checks each package. It expects exactly 20 packages there when it ends, so empty the folder before you run it again. The version's first three numbers must match the Pi baseline in `compatibility/target.lock.json` (1.2.0 today), and `-SourceCommit` must be a full 40-character commit id. See [Releasing](/docs/contribute/releasing/#build-the-packages) for what it checks.
+The script packs every library and the CLI into `artifacts/packages/`, and checks each package. It expects exactly 23 packages there when it ends, so empty the folder before you run it again. The version's first three numbers must match the Pi baseline in `compatibility/target.lock.json` (1.2.0 today), and `-SourceCommit` must be a full 40-character commit id. See [Releasing](/docs/contribute/releasing/#build-the-packages) for what it checks.
 
 Then install the tool from a folder outside the repository, because the repository's `NuGet.Config` would hide nuget.org, where the tool's dependencies come from:
 
 ```powershell
 cd ..
-dotnet tool install PiSharp.Cli --tool-path ./pisharp-dev --add-source PiSharp/artifacts/packages --version 1.2.0.1
+dotnet tool install PiSharp.Cli --tool-path ./pisharp-dev --add-source PiSharp/artifacts/packages --version 1.2.0.2
 ./pisharp-dev/pisharp --version
 ```
 
@@ -156,10 +156,10 @@ Experimental APIs carry `[Experimental]`, and using one is a compiler error unti
 
 | Feature | Projects | Suppress |
 | --- | --- | --- |
-| [Durable agents](/docs/embed/durable/) (released, experimental) | `PiSharp.Durable`, `PiSharp.Durable.Sqlite`, `PiSharp.Durable.Tools` | `PISHARP_DURABLE001` |
-| [Custom agents](/docs/custom-agents/overview/) (experimental, unreleased) | `PiSharp.CustomAgents`, `PiSharp.CustomAgents.JavaScript`, `PiSharp.CustomAgents.Scripting` | `PISHARP_AGENTS001` and `PISHARP_DURABLE001` |
-| [Media library](/docs/embed/media/) (experimental, unreleased) | `PiSharp.AI`, namespace `PiSharp.AI.Media` | `PISHARP_MEDIA001` |
-| [Service tiers](/docs/guides/service-tiers/) (experimental, unreleased) | `ServiceTiers` in `PiSharp.AI`, and the tier members in `PiSharp.AI`, `PiSharp.Agent` and `PiSharp.CodingAgent` | `PISHARP_TIERS001` |
+| [Durable agents](/docs/embed/durable/) (experimental) | `PiSharp.Durable`, `PiSharp.Durable.Sqlite`, `PiSharp.Durable.Tools` | `PISHARP_DURABLE001` |
+| [Custom agents](/docs/custom-agents/overview/) (experimental) | `PiSharp.CustomAgents`, `PiSharp.CustomAgents.JavaScript`, `PiSharp.CustomAgents.Scripting` | `PISHARP_AGENTS001` and `PISHARP_DURABLE001` |
+| [Media library](/docs/embed/media/) (experimental) | `PiSharp.AI`, namespace `PiSharp.AI.Media` | `PISHARP_MEDIA001` |
+| [Service tiers](/docs/guides/service-tiers/) (experimental) | `ServiceTiers` in `PiSharp.AI`, and the tier members in `PiSharp.AI`, `PiSharp.Agent` and `PiSharp.CodingAgent` | `PISHARP_TIERS001` |
 
 The durable and custom agents projects mark the whole assembly, so every type in them needs the suppression. The media and tier attributes sit on single types and members. An app inside the PiSharp folder, like the samples, also inherits `Directory.Build.props`, so its warnings are errors and restore writes a lock file for it.
 
@@ -171,8 +171,8 @@ The samples reference the `src/` projects, so they always build against the code
 | --- | --- | --- |
 | [`Durable.Chat`](https://github.com/jkelly/PiSharp/tree/main/samples/Durable.Chat) | One prompt answered by a real provider through a durable session, on SQLite by default, with optional coding tools. | `dotnet run --project samples/Durable.Chat -- --provider anthropic --model <id> "<prompt>"` |
 | [`Durable.Examples`](https://github.com/jkelly/PiSharp/tree/main/samples/Durable.Examples) | Ports of upstream's durable examples on scripted models. Name examples by number or file name, or run them all. | `dotnet run --project samples/Durable.Examples -- [--storage memory\|jsonl\|sqlite] [example ...]` |
-| [`CustomAgents.Examples`](https://github.com/jkelly/PiSharp/tree/main/samples/CustomAgents.Examples) (experimental, unreleased) | An orders workflow, a team, and web search, on scripted models unless you pass `--provider` and `--model`. | `dotnet run --project samples/CustomAgents.Examples -- [orders\|team\|web\|all]` |
-| [`CustomAgents.Research`](https://github.com/jkelly/PiSharp/tree/main/samples/CustomAgents.Research) (experimental, unreleased) | A research workflow that writes a report. See its README. | `dotnet run --project samples/CustomAgents.Research -c Release -- "<question>"` |
+| [`CustomAgents.Examples`](https://github.com/jkelly/PiSharp/tree/main/samples/CustomAgents.Examples) (experimental) | An orders workflow, a team, and web search, on scripted models unless you pass `--provider` and `--model`. | `dotnet run --project samples/CustomAgents.Examples -- [orders\|team\|web\|all]` |
+| [`CustomAgents.Research`](https://github.com/jkelly/PiSharp/tree/main/samples/CustomAgents.Research) (experimental) | A research workflow that writes a report. See its README. | `dotnet run --project samples/CustomAgents.Research -c Release -- "<question>"` |
 | [`extensions/StatefulTodo`](https://github.com/jkelly/PiSharp/tree/main/samples/extensions/StatefulTodo) | A native extension with a `todo` tool whose state lives in the session. | See below. |
 | [`extensions/SessionCheckpoint`](https://github.com/jkelly/PiSharp/tree/main/samples/extensions/SessionCheckpoint) | A native extension with a `/checkpoint` command that switches sessions. | See below. |
 

@@ -1,6 +1,6 @@
 ---
 title: Pi Durable
-description: PiSharp's experimental port of Pi's durable agent harness, whose sessions survive a crash and resume where they stopped. Ships as experimental in PiSharp 1.2.0.1.
+description: PiSharp's experimental port of Pi's durable agent harness, whose sessions survive a crash and resume where they stopped. Experimental since PiSharp 1.2.0.1.
 sidebar:
   badge:
     text: Experimental
@@ -8,7 +8,7 @@ sidebar:
 ---
 
 :::caution[Experimental]
-Pi Durable ships as experimental in PiSharp 1.2.0.1: the `pisharp durable` command and the `PiSharp.Durable`, `PiSharp.Durable.Tools` and `PiSharp.Durable.Sqlite` packages. Its command, session format and library API may change or be removed in any release, without notice or a deprecation period.
+Pi Durable ships as experimental from PiSharp 1.2.0.1: the `pisharp durable` command and the `PiSharp.Durable`, `PiSharp.Durable.Tools` and `PiSharp.Durable.Sqlite` packages. PiSharp 1.2.0.2 adds questions, plan mode, service tiers, the media tools and the [device server](#device-server). Its command, session format and library API may change or be removed in any release, without notice or a deprecation period.
 :::
 
 Pi includes `pi-durable`, an experimental agent harness that saves every step of a conversation before it shows it. PiSharp ports it as a set of .NET libraries and as an interactive mode, `pisharp durable`.
@@ -35,11 +35,9 @@ pisharp durable --continue             # reopen the newest durable session for t
 | Option | What it does |
 | --- | --- |
 | `--continue`, `-c` | Reopens the newest session for the current folder. Without it, each run starts a new session. |
-| `--tier <tier>`, `--service-tier <tier>` | (experimental, unreleased) Sets the main conversation's [service tier](/docs/guides/service-tiers/): `auto`, `normal`, `economy`, `priority`, `fast` or `ultrafast`. It applies when the run creates the session; a session that `--continue` reopens keeps its stored tier, which you change with `/tier`. |
+| `--tier <tier>`, `--service-tier <tier>` | (from 1.2.0.2) Sets the main conversation's [service tier](/docs/guides/service-tiers/): `auto`, `normal`, `economy`, `priority`, `fast` or `ultrafast`. It applies when the run creates the session; a session that `--continue` reopens keeps its stored tier, which you change with `/tier`. |
 
-Any other argument fails with `Unknown argument: <argument>`, a tier name it doesn't know fails with `Invalid service tier`, and `--tier` without a value fails with `--tier needs a tier`. Each exits with 1. The command is listed in `pisharp --help` as experimental, though its help line shows only `[--continue]`, and it prints a one-line experimental notice when it starts.
-
-`--tier`, `/tier`, the `subagent` tool's `tier` argument and the media tools are on PiSharp's `main` branch but not in any release yet. To try them, run a CLI built from source (see [Run the CLI from source](/docs/contribute/build/#run-the-cli-from-source)).
+`--help` or `-h` prints the options and exits without opening a session (from 1.2.0.2). Any other argument fails with `Unknown argument: <argument>`, a tier name it doesn't know fails with `Invalid service tier`, and `--tier` without a value fails with `--tier needs a tier`. Each exits with 1. The command is listed in `pisharp --help` as experimental, and it prints a one-line experimental notice when it starts. The [device server](#device-server) commands, such as `pisharp durable serve`, are separate.
 
 It reads the same settings, credentials and models as `pisharp`, so providers you have signed in to work here too. A new session starts on your `defaultProvider`, `defaultModel` and `defaultThinkingLevel`.
 
@@ -48,8 +46,8 @@ It reads the same settings, credentials and models as `pisharp`, so providers yo
 | Tool | What it does |
 | --- | --- |
 | `read`, `write`, `edit`, `bash` | The coding tools. `read` returns images too. A call that a crash interrupts is not run again: the model gets an "interrupted" result. |
-| `subagent` | Hands a self-contained task to a child conversation with the same tools, except `subagent`, `ask_user_question` and `exit_plan_mode`, and returns its answer. Arguments: `task` (required) and `tier` (experimental, unreleased), the child's service tier; without it the child uses this conversation's. Replay-safe: after a crash, the rerun finds the child and the message it already sent. |
-| Media tools | (experimental, unreleased) `generate_image`, `generate_video`, `embed`, `list_media_models` and `set_media_defaults`, plus `generate_speech`, `transcribe_audio`, `generate_music`, `rerank` and `decide`, which are deferred. Installed only when the `media.enabled` setting isn't `false` and a provider with a media model is configured. See [Media tools](/docs/guides/media/). |
+| `subagent` | Hands a self-contained task to a child conversation with the same tools, except `subagent`, `ask_user_question` and `exit_plan_mode`, and returns its answer. Arguments: `task` (required) and `tier` (from 1.2.0.2), the child's service tier; without it the child uses this conversation's. Replay-safe: after a crash, the rerun finds the child and the message it already sent. |
+| Media tools | (from 1.2.0.2) `generate_image`, `generate_video`, `embed`, `list_media_models` and `set_media_defaults`, plus `generate_speech`, `transcribe_audio`, `generate_music`, `rerank` and `decide`, which are deferred. Installed only when the `media.enabled` setting isn't `false` and a provider with a media model is configured. See [Media tools](/docs/guides/media/). |
 | `ask_user_question`, `exit_plan_mode` | PiSharp-only tools that wait for you: see [Questions from the agent](#questions-from-the-agent) and [Plan mode](#plan-mode). Only the conversation you are looking at has them. |
 | `tool_search` | Finds deferred tools and loads them. Offered only while an installed tool is deferred, which today means the media tools. |
 
@@ -60,7 +58,7 @@ It reads the same settings, credentials and models as `pisharp`, so providers yo
 | A message | Sends it. While the agent is working, it steers the current turn. |
 | The follow-up key | Queues the message until the agent finishes. |
 | `/model` | Picks the model. |
-| `/tier [tier]` | (experimental, unreleased) Without a tier, shows the shown conversation's service tier and the choices. With one, sets it for that conversation from its next request; `/tier none` (or `clear`) removes it. The tier is saved in the session. See [Service tiers](/docs/guides/service-tiers/#in-pisharp-durable). |
+| `/tier [tier]` | (from 1.2.0.2) Without a tier, shows the shown conversation's service tier and the choices. With one, sets it for that conversation from its next request; `/tier none` (or `clear`) removes it. The tier is saved in the session. See [Service tiers](/docs/guides/service-tiers/#in-pisharp-durable). |
 | `/tasks` | Shows or hides running tasks. |
 | `/agents` | Switches between the main conversation and its subagents. |
 | `/compact [instructions]` | Compacts the conversation. |
@@ -80,9 +78,9 @@ Your [key bindings](/docs/guides/interactive/#key-bindings) apply, including the
 | `retry.provider.timeoutMs`, `retry.provider.maxRetries`, `retry.provider.maxRetryDelayMs`, `httpIdleTimeoutMs` | Request timeouts and retries inside one request. The timeout falls back to `httpIdleTimeoutMs`. |
 | `compaction.enabled`, `compaction.reserveTokens`, `compaction.keepRecentTokens` | Automatic compaction. Defaults: on, 16384, 20000. |
 | `steeringMode`, `followUpMode` | `all` places every queued message at once; anything else, one at a time. |
-| `serviceTier` | (experimental, unreleased) The tier of a new session when you don't pass `--tier`. |
+| `serviceTier` | (from 1.2.0.2) The tier of a new session when you don't pass `--tier`. |
 | `planMode.directory` | Where [plan mode](#plan-mode) keeps plans. By default each conversation gets `plans/<conversation id>` in the session's folder. |
-| `media` | (experimental, unreleased) The media tools. See [Media tools](/docs/guides/media/#settings). |
+| `media` | (from 1.2.0.2) The media tools. See [Media tools](/docs/guides/media/#settings). |
 
 See [Settings](/docs/reference/settings/) for where settings files live.
 
@@ -131,6 +129,38 @@ A session is locked while it is open, so two processes cannot write to it at onc
 
 The layout and the lock are those of Pi v1.1.0's experimental durable agent, so each finds the other's newest session with `--continue` and respects the other's lock. Pi v1.1.0 cannot resume the records PiSharp's v1.2.0 library writes, though, so don't continue a PiSharp session with it.
 
+## Device server
+
+From 1.2.0.2, `pisharp durable serve` runs this machine as a durable device: many durable sessions in one process, behind an authenticated HTTP and server-sent-events API. Pi has no device server, and neither does `pi-durable`; this is a PiSharp addition ([decision 0008](https://github.com/jkelly/PiSharp/blob/main/docs/decisions/0008-durable-network-host-and-web.md)) that follows the wire format of the MIT-licensed durable-pi project. These commands are not in `pisharp --help`; `pisharp durable help` lists them all, and `pisharp durable help <command>` shows one.
+
+```sh
+pisharp durable serve                 # listen on 127.0.0.1:4780
+pisharp durable token                 # print the device token
+pisharp durable sessions list         # a device command, on the local device
+```
+
+:::danger[The device token is a shell]
+Anyone who has the token can run commands on this machine as you, in any of the device's start directories. The start directories are not a sandbox. The server listens on `127.0.0.1` unless you pass `--host`, and then it warns you. The API is plain HTTP, so to reach a device from another machine, use an SSH tunnel or a TLS proxy rather than `--host`.
+:::
+
+| `serve` option | What it does |
+| --- | --- |
+| `--port <n>` | The port. The default is 4780. |
+| `--host <address>` | The address to listen on. The default is `127.0.0.1`. |
+| `--name <name>` | The device's name. |
+| `--start-dirs <dir>[,<dir>...]` | The folders where sessions may be created. The default is your home folder. |
+| `--data-dir <dir>` | The device's folder. The default is `~/.pi/agent/experimental/durable-device`, which holds `device.json`, the token file, the catalog and the sessions. |
+| `--model <provider>/<id>` | The default model. Models come from your Pi configuration, as in `pisharp`. |
+| `--provider faux` | Uses a scripted model instead, for trying the device without a provider. |
+| `--log <file>` | Writes the device's output to a size-rotated log file, for service managers that keep no journal. |
+| `--save` | Saves these options in `device.json`. |
+
+`pisharp durable token` prints the token, and `--rotate` replaces it. The token is kept in a file only you can read. It never goes on a command line: a command that works on another device reads it from the `PISHARP_DEVICE_TOKEN` environment variable or from `--token-file <path>`.
+
+The device commands cover the device and its capabilities, sessions, executions, schedules, trigger credentials, budgets, retention, policies, judgments, artifacts, evidence, sources, research, feedback and preferences. Each takes `--json` for machine-readable output. Without `--device <url>`, a command uses the local device. Four commands work on the local device's folder: `attach` (a line-mode terminal on a session's agent), `doctor` (checks the device), `service` (writes a per-user systemd, launchd or Windows service definition, and installs nothing) and `backup create`, `backup verify` and `backup restore`.
+
+The device server needs the ASP.NET Core runtime. The .NET SDK includes it; with the .NET runtime alone, install the ASP.NET Core runtime too.
+
 ## How it differs from Pi
 
 - **The command is PiSharp's.** Pi v1.1.0 ran its durable agent from source, not from the `pi` command, and Pi v1.2.0 removed that agent. PiSharp keeps it as a PiSharp-only mode, ported from Pi v1.1.0's agent.
@@ -149,7 +179,7 @@ Three NuGet packages, versioned with the rest of PiSharp:
 | --- | --- |
 | `PiSharp.Durable` | The harness, sessions, conversations, tasks, and in-memory and JSONL storage |
 | `PiSharp.Durable.Sqlite` | SQLite storage, through `Microsoft.Data.Sqlite` and SQLitePCLRaw's e_sqlite3 native library |
-| `PiSharp.Durable.Tools` | The local execution environment, the coding tools, `tool_search`, durable code mode, and on `main` the media tools (experimental, unreleased) |
+| `PiSharp.Durable.Tools` | The local execution environment, the coding tools, `tool_search`, durable code mode, and, from 1.2.0.2, the media tools |
 
 Every public type is marked `[Experimental("PISHARP_DURABLE001")]`, so the compiler reports an error until you opt in by suppressing that diagnostic:
 
@@ -158,9 +188,9 @@ Every public type is marked `[Experimental("PISHARP_DURABLE001")]`, so the compi
   <NoWarn>$(NoWarn);PISHARP_DURABLE001</NoWarn>
 </PropertyGroup>
 <ItemGroup>
-  <PackageReference Include="PiSharp.Durable" Version="1.2.0.1" />
-  <PackageReference Include="PiSharp.Durable.Sqlite" Version="1.2.0.1" />
-  <PackageReference Include="PiSharp.Durable.Tools" Version="1.2.0.1" />
+  <PackageReference Include="PiSharp.Durable" Version="1.2.0.2" />
+  <PackageReference Include="PiSharp.Durable.Sqlite" Version="1.2.0.2" />
+  <PackageReference Include="PiSharp.Durable.Tools" Version="1.2.0.2" />
 </ItemGroup>
 ```
 
@@ -176,6 +206,6 @@ Every public type is marked `[Experimental("PISHARP_DURABLE001")]`, so the compi
 
 ## Status
 
-[Decision 0005](https://github.com/jkelly/PiSharp/blob/main/docs/decisions/0005-pi-durable-experimental.md) records the scope, the differences from Pi, the port status and the decision to release it as experimental. [`durable-port-map.json`](https://github.com/jkelly/PiSharp/blob/main/compatibility/durable-port-map.json) maps every upstream file to its C# counterpart. The [1.2.0.1 release notes](https://github.com/jkelly/PiSharp/blob/main/docs/release-notes/1.2.0.1.md) cover what shipped. Upstream's [`pi-durable` README](https://github.com/earendil-works/pi/blob/v1.2.0/packages/durable/README.md) and [specification](https://github.com/earendil-works/pi/blob/v1.2.0/packages/durable/docs/spec.md) describe the design.
+[Decision 0005](https://github.com/jkelly/PiSharp/blob/main/docs/decisions/0005-pi-durable-experimental.md) records the scope, the differences from Pi, the port status and the decision to release it as experimental. [`durable-port-map.json`](https://github.com/jkelly/PiSharp/blob/main/compatibility/durable-port-map.json) maps every upstream file to its C# counterpart. The [1.2.0.1](https://github.com/jkelly/PiSharp/blob/main/docs/release-notes/1.2.0.1.md) and [1.2.0.2](https://github.com/jkelly/PiSharp/blob/main/docs/release-notes/1.2.0.2.md) release notes cover what shipped. Upstream's [`pi-durable` README](https://github.com/earendil-works/pi/blob/v1.2.0/packages/durable/README.md) and [specification](https://github.com/earendil-works/pi/blob/v1.2.0/packages/durable/docs/spec.md) describe the design.
 
 Feedback is welcome in [GitHub issues](https://github.com/jkelly/PiSharp/issues).
