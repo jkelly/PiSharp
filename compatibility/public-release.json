@@ -21,7 +21,7 @@
     "versionSpecificPackageConsumptionQualified": false,
     "fullProviderParity": false,
     "completeNativeGateReady": false,
-    "status": "Release candidate on release/1.2.0.2: a C#-only release on the Pi v1.2.0 baseline that releases the PiSharp-only media library and tools (decision 0007, PISHARP_MEDIA001), service tiers (PISHARP_TIERS001), custom agents as three new [Experimental] packages (decision 0012, PISHARP_AGENTS001), questions and plan mode in pisharp durable and the durable device server commands (decisions 0008-0010), plus pisharp fixes. The Web Agent, Durable Web, Durable.MSSQL and Web.Common are not packed; Durable.Hosting, Durable.Server, Durable.Client and ModelRuntime ship inside the PiSharp.Cli tool but not as packages. Nothing is tagged or published. Fresh versioned lock, build, package and consumer evidence is required at release, with the owner's go-ahead."
+    "status": "Released 2026-11-02: a C#-only release on the Pi v1.2.0 baseline that releases the PiSharp-only media library and tools (decision 0007, PISHARP_MEDIA001), service tiers (PISHARP_TIERS001), custom agents as three new [Experimental] packages (decision 0012, PISHARP_AGENTS001), questions and plan mode in pisharp durable and the durable device server commands (decisions 0008-0010), plus pisharp fixes. The Web Agent, Durable Web, Durable.MSSQL and Web.Common are not packed; Durable.Hosting, Durable.Server, Durable.Client and ModelRuntime ship inside the PiSharp.Cli tool but not as packages."
   },
   "releaseCandidate": {
     "branch": "release/1.2.0.2",
@@ -32,9 +32,12 @@
     "changelog": "website/src/content/changelog/1.2.0.2.md"
   },
   "publication": {
-    "tagCreated": false,
-    "binaryReleasePublished": false,
-    "nugetPackagesPublished": false
+    "tagCreated": true,
+    "binaryReleasePublished": true,
+    "nugetPackagesPublished": true,
+    "publishedOn": "2026-11-02",
+    "tagCommit": "92e2f8b42223e275cde2b03eea880529ee81f464",
+    "releaseRun": "41376026307"
   },
   "previousReleases": [
     {
