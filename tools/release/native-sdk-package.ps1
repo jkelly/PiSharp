@@ -6,7 +6,8 @@ function Assert-PiSharpNativeSdkPackage {
     param([Parameter(Mandatory)][string]$Package,
         [Parameter(Mandatory)][ValidateSet('PiSharp.Contracts','PiSharp.AI','PiSharp.Agent','PiSharp.Sessions','PiSharp.Tools','PiSharp.Tools.Skia','PiSharp.CodingAgent',
             'PiSharp.PromptTemplates.Yaml','PiSharp.Rpc','PiSharp.Tui','PiSharp.Extensions.Abstractions','PiSharp.Extensions.Runtime',
-            'PiSharp.Extensions.Agent','PiSharp.ExtensionHost','PiSharp.Compatibility.Node','PiSharp.Codemode','PiSharp.Durable','PiSharp.Durable.Tools','PiSharp.Durable.Sqlite')][string]$PackageId,
+            'PiSharp.Extensions.Agent','PiSharp.ExtensionHost','PiSharp.Compatibility.Node','PiSharp.Codemode','PiSharp.Durable','PiSharp.Durable.Tools','PiSharp.Durable.Sqlite',
+            'PiSharp.CustomAgents','PiSharp.CustomAgents.JavaScript','PiSharp.CustomAgents.Scripting')][string]$PackageId,
         [Parameter(Mandatory)][string]$Version,
         [Parameter(Mandatory)][ValidatePattern('^[0-9a-f]{40}$')][string]$SourceCommit,
         [Parameter(Mandatory)][string]$Repo,
@@ -24,6 +25,8 @@ function Assert-PiSharpNativeSdkPackage {
     if($PackageId-ceq'PiSharp.Durable'){$required+='licenses/ripgrep-ignore.LICENSE-MIT.txt'}
     if($PackageId-ceq'PiSharp.Durable.Tools'){$required+='licenses/jsdiff.LICENSE.txt'}
     if($PackageId-ceq'PiSharp.Durable.Sqlite'){$required+=@('licenses/Microsoft.Data.Sqlite.LICENSE.txt','licenses/SQLitePCLRaw.LICENSE.txt','licenses/SQLitePCLRaw.NOTICE.txt','licenses/SQLite.NOTICE.txt')}
+    # Decision 0012 (experimental, released from 1.2.0.2): the C# script support carries Roslyn's license.
+    if($PackageId-ceq'PiSharp.CustomAgents.Scripting'){$required+='licenses/Roslyn.LICENSE.txt'}
     foreach($name in $required){if(-not$files.ContainsKey($name)){throw 'Required native SDK package member absent.'}}
     # SDK 10 deterministic pack names the core-properties part nuget.psmdcp; older packs use a random hex name.
     foreach($name in $files.Keys){if($name-cnotin$required-and$name-cnotmatch'^package/services/metadata/core-properties/(?:[0-9a-f]+|nuget)\.psmdcp$'){throw 'Unexpected SDK package member.'}}
@@ -67,6 +70,9 @@ function Assert-PiSharpNativeSdkPackage {
         'PiSharp.Codemode'=@('PiSharp.Contracts','PiSharp.Extensions.Abstractions')
         'PiSharp.Durable'=@('PiSharp.Contracts','PiSharp.AI');'PiSharp.Durable.Tools'=@('PiSharp.Durable','PiSharp.Tools','PiSharp.Codemode')
         'PiSharp.Durable.Sqlite'=@('PiSharp.Durable')
+        'PiSharp.CustomAgents'=@('PiSharp.Durable','PiSharp.Extensions.Abstractions')
+        'PiSharp.CustomAgents.JavaScript'=@('PiSharp.CustomAgents','PiSharp.Codemode','PiSharp.Durable.Tools')
+        'PiSharp.CustomAgents.Scripting'=@('PiSharp.CustomAgents')
     }
     $external=@{}
     if($PackageId-ceq'PiSharp.PromptTemplates.Yaml'){$external['YamlDotNet']='16.3.0'}
@@ -81,6 +87,8 @@ function Assert-PiSharpNativeSdkPackage {
         $external['Microsoft.Data.Sqlite']='10.0.12'
         foreach($id in @('SQLitePCLRaw.bundle_e_sqlite3','SQLitePCLRaw.core','SQLitePCLRaw.lib.e_sqlite3','SQLitePCLRaw.provider.e_sqlite3')){$external[$id]='2.1.12'}
     }
+    # Decision 0012: Roslyn (Microsoft.CodeAnalysis.CSharp, which pins Microsoft.CodeAnalysis.Common) is pinned exactly.
+    if($PackageId-ceq'PiSharp.CustomAgents.Scripting'){$external['Microsoft.CodeAnalysis.CSharp']='5.6.0'}
     $expected=[Collections.Generic.HashSet[string]]::new([string[]]@($siblings[$PackageId]+@($external.Keys)),[StringComparer]::Ordinal)
     if($dependencies.Count-ne$expected.Count){throw 'SDK dependency identity/version differs.'}
     foreach($dependency in $dependencies){
