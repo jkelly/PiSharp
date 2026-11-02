@@ -1,16 +1,16 @@
 ---
 title: Custom agent samples
-description: The Examples and Research samples, what they show and how to run them. Experimental and unreleased.
+description: The Examples and Research samples, what they show and how to run them. Experimental since PiSharp 1.2.0.2.
 sidebar:
   badge:
-    text: Unreleased
+    text: Experimental
     variant: caution
 ---
 
-:::caution[Experimental and unreleased]
-The custom agents library is on PiSharp's `main` branch but not in any release or NuGet package yet. To use it, build PiSharp from
-source and reference the projects directly (see [Build from source](/docs/contribute/build/)). Its API is marked
-`[Experimental("PISHARP_AGENTS001")]` and builds on durable APIs marked `[Experimental("PISHARP_DURABLE001")]`, so suppress `PISHARP_AGENTS001` and `PISHARP_DURABLE001` in your project to compile it, and it may change or be removed without notice.
+:::caution[Experimental]
+The custom agents library ships as experimental in PiSharp 1.2.0.2, as the `PiSharp.CustomAgents`, `PiSharp.CustomAgents.JavaScript` and
+`PiSharp.CustomAgents.Scripting` packages. Its API is marked `[Experimental("PISHARP_AGENTS001")]` and builds on durable APIs marked
+`[Experimental("PISHARP_DURABLE001")]`, so suppress `PISHARP_AGENTS001` and `PISHARP_DURABLE001` in your project to compile it. It may change or be removed in any release, without notice or a deprecation period.
 :::
 
 The repository has two sample programs for the custom agents library. [CustomAgents.Examples](https://github.com/jkelly/PiSharp/tree/main/samples/CustomAgents.Examples) runs the library's features one by one: a workflow, a team with every kind of tool, and web search. [CustomAgents.Research](https://github.com/jkelly/PiSharp/tree/main/samples/CustomAgents.Research) is a research team that writes a Markdown report.

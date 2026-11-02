@@ -88,15 +88,16 @@ The release and the macOS workflow run these. Each covers one area of Pi, with e
 | `PiSharp.InteractiveParity.Tests` | Interactive mode, slash commands, and the `CHANGELOG.md` sync. |
 | `PiSharp.ExtensionParity.Tests` | Extensions, the Node bridge and packages. It builds and loads the sample extensions, and needs Node.js 22.13 or later and npm. The first run installs the Pi 1.2.0 npm packages once. |
 | `PiSharp.Durable.Tests` | The [durable](/docs/guides/durable/) port, with cases ported from upstream's tests. The `compat.*` cases read sessions upstream wrote. |
-| `PiSharp.DurableCli.Tests` | `pisharp durable`. |
+| `PiSharp.DurableCli.Tests` | `pisharp durable`, including the device server commands. |
+| `PiSharp.CustomAgents.Tests` | [Custom agents](/docs/custom-agents/overview/), from 1.2.0.2. See [Custom agents](#custom-agents). |
 
-The macOS workflow runs all of them except `Durable` and `DurableCli`, which the durable workflow runs on every OS.
+The macOS workflow runs all of them except `Durable` and `DurableCli`, which the durable workflow runs on every OS, and `CustomAgents`, which the custom agents workflow runs on every OS.
 
 ### Custom agents
 
 | Project | Purpose |
 | --- | --- |
-| `PiSharp.CustomAgents.Tests` | Case tables for [custom agents](/docs/custom-agents/overview/) (experimental, unreleased). |
+| `PiSharp.CustomAgents.Tests` | Case tables for [custom agents](/docs/custom-agents/overview/) (experimental). |
 | `PiSharp.CustomAgents.PluginFixture.V1`, `.V2` | Two versions of a plugin the tests load, reload and unload. V2 answers differently and adds a tool. |
 | `PiSharp.CustomAgents.ExtensionFixture` | A native extension the tests load as an agent plugin. |
 
@@ -226,7 +227,7 @@ The workflows live in [`.github/workflows`](https://github.com/jkelly/PiSharp/tr
 | [`macos.yml`](https://github.com/jkelly/PiSharp/blob/main/.github/workflows/macos.yml) | Pull requests and pushes to `main`; manual | `macos-15` (Apple Silicon) | The 17 release suites other than `Durable` and `DurableCli`, one job each with Node.js 22. Then it packs every package, installs the `PiSharp.Cli` tool from them, and checks `pisharp --version` and `--help`. |
 | [`durable.yml`](https://github.com/jkelly/PiSharp/blob/main/.github/workflows/durable.yml) | Pushes and pull requests to `main` and `feature/pi-durable`; manual | Windows, Ubuntu and `macos-15` | `Durable`, `Durable` again with `PI_DURABLE_DOCUMENT_RETENTION_MS=0`, and `DurableCli`. A second job publishes `Durable.Tests` for `win-x64`, `linux-x64`, `linux-musl-x64` and `osx-arm64` and checks that each carries its SQLite native library, byte for byte. A third fetches Pi and checks that `compatibility/durable-port-map.json` matches it. |
 | [`custom-agents.yml`](https://github.com/jkelly/PiSharp/blob/main/.github/workflows/custom-agents.yml) | Pushes and pull requests to `main` and `feature/custom-agents`; manual | Windows, Ubuntu and `macos-15` | `CustomAgents`, then the research sample on scripted models, checking that it writes a report. |
-| [`release.yml`](https://github.com/jkelly/PiSharp/blob/main/.github/workflows/release.yml) | A pushed `v*` tag; manual dry run | Ubuntu | All 19 release suites, then packing and publishing. See [Releasing](/docs/contribute/releasing/#the-release-workflow). |
+| [`release.yml`](https://github.com/jkelly/PiSharp/blob/main/.github/workflows/release.yml) | A pushed `v*` tag; manual dry run | Ubuntu | All 20 release suites, then packing and publishing. See [Releasing](/docs/contribute/releasing/#the-release-workflow). |
 | [`website.yml`](https://github.com/jkelly/PiSharp/blob/main/.github/workflows/website.yml) | Pushes to `main` that touch `website/**` or `compatibility/**`; manual | Ubuntu | Builds and deploys the site. See [The website](/docs/contribute/website/#deployment). |
 
 The reports of the macOS, durable and custom agents runs are uploaded as workflow artifacts. Their matrices set `fail-fast: false`, so one failing OS or suite doesn't cancel the others.

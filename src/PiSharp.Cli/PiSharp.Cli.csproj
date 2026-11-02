@@ -72,6 +72,9 @@
     <!-- The interactive Mermaid renderer ports grok-mermaid 0.2.3 (Apache-2.0). -->
     <None Include="../../third-party/google-auth-library.LICENSE.txt" Link="licenses/google-auth-library.LICENSE.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" Pack="false" />
     <None Include="../../third-party/grok-mermaid.LICENSE.txt" Link="licenses/grok-mermaid.LICENSE.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" Pack="false" />
+    <!-- Decision 0008 (experimental, released from 1.2.0.2): `pisharp durable serve` hosts PiSharp.Durable.Hosting, which adapts designs of
+         durable-pi (MIT). -->
+    <None Include="../../third-party/durable-pi.LICENSE.txt" Link="licenses/durable-pi.LICENSE.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" Pack="false" />
   </ItemGroup>
   <ItemGroup Condition="'$(EnablePromptTemplateYaml)' == 'true'">
     <None Include="../../third-party/YamlDotNet.LICENSE.txt" Link="licenses/YamlDotNet.LICENSE.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" Pack="false" />

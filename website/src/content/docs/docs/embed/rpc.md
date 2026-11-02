@@ -8,8 +8,8 @@ description: Serve Pi's JSONL RPC protocol from your own process with PiSharp.Rp
 ## Packages
 
 ```powershell
-dotnet add package PiSharp.Rpc --version 1.2.0.1
-dotnet add package PiSharp.CodingAgent --version 1.2.0.1
+dotnet add package PiSharp.Rpc --version 1.2.0.2
+dotnet add package PiSharp.CodingAgent --version 1.2.0.2
 ```
 
 `PiSharp.Rpc` holds the dispatcher, the JSONL reader and writer, the extension UI coordinator and the event projectors. `PiSharp.CodingAgent` holds `PersistentAgentSession`; see [Coding agent](/docs/embed/coding-agent/) and [Sessions](/docs/embed/sessions/).

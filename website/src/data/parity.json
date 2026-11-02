@@ -207,7 +207,8 @@
         { "title": "/bug opens a GitHub issue", "notes": "/bug builds Pi's report and zip but never uploads them to Pi's developers. It opens a prefilled issue at github.com/jkelly/PiSharp for you to attach the zip to." },
         { "title": "Version check on NuGet", "notes": "The update check looks up the latest PiSharp.Cli on NuGet and suggests dotnet tool update -g PiSharp.Cli. It never asks pi.dev." },
         { "title": "No self-update", "notes": "pisharp update updates packages and catalogs. Update PiSharp itself with dotnet tool update -g PiSharp.Cli." },
-        { "title": "pisharp durable", "notes": "An experimental, PiSharp-only command (decision 0005), listed in pisharp --help with pisharp session. Pi v1.1.0 ran its durable agent from source and Pi v1.2.0 removed it, so Pi's help has neither line." }
+        { "title": "pisharp durable", "notes": "An experimental, PiSharp-only command (decision 0005), listed in pisharp --help with pisharp session. Pi v1.1.0 ran its durable agent from source and Pi v1.2.0 removed it, so Pi's help has neither line. From 1.2.0.2 it also has --help, questions, plan mode and the media tools, and pisharp durable serve, token and the device commands (decision 0008), which pisharp durable help lists and pisharp --help doesn't." },
+        { "title": "Service tiers", "notes": "--tier (alias --service-tier), /tier, the tier in the footer and the serviceTier setting are PiSharp's, experimental from 1.2.0.2 (decision 0007). Pi has no service tiers. Without a tier, requests and the footer are as in Pi." }
       ]
     },
     {
@@ -219,6 +220,7 @@
         { "title": "Built-in replacement", "notes": "A built-in extension yields only to a TypeScript extension that registers codemode, tool_search or /mcp. A C# extension that registers one doesn't replace the built-in." },
         { "title": "JSON depth 1,000", "notes": "Session records, RPC input and other JSON values hold 1,000 levels of nesting. Pi's JSON.parse has no limit, though V8's JSON.stringify gives up at about 1,700 levels, so Pi can't store deeper values either." },
         { "title": "Explicit session verbs", "notes": "The pisharp session … and rpc verbs keep their byte bounds (64 MiB session lines and files, 32 MiB RPC records, 8 MiB tool results) and refuse lone surrogates. The Pi command line has neither limit. Provider request bodies stay limited to 64 MiB, and single request entries to 16 MiB, everywhere." },
+        { "title": "write size", "notes": "One write call's arguments hold up to 8 MiB of JSON, so a call writes a little under 8 MiB of plain text. Pi has no limit. Write a larger file in parts. PiSharp 1.2.0.1 and earlier stop at 64 KiB." },
         { "title": "Non-finite usage", "notes": "get_session_stats fails when a session holds non-finite usage numbers, where Pi reports null." },
         { "title": "TypeScript tool reach", "notes": "A TypeScript tool that declares reachesTools reaches every tool, so its calls wait for every MCP server. Pi asks the tool which servers a call may reach." },
         { "title": "Codemode row clock", "notes": "The plain codemode row that native renderer hosts get shows the total time once a script finished, but no live elapsed time. The interactive mode shows both." },
@@ -276,12 +278,12 @@
     {
       "title": "Pi 1.2.0 sync",
       "status": "partial",
-      "notes": "Every Pi 1.2.0 change in scope is ported with tests (sync-1.2.0-applicability.json), except per-input reach for TypeScript tools and the live clock of the plain codemode row. 1.2.0.1 adds the experimental durable port."
+      "notes": "Every Pi 1.2.0 change in scope is ported with tests (sync-1.2.0-applicability.json), except per-input reach for TypeScript tools and the live clock of the plain codemode row. 1.2.0.1 adds the experimental durable port, and 1.2.0.2 PiSharp-only experimental media, service tiers, custom agents and the durable device server on the same baseline."
     },
     {
       "title": "Experimental durable port",
       "status": "partial",
-      "notes": "1.2.0.1 ships pisharp durable and the PiSharp.Durable, PiSharp.Durable.Tools and PiSharp.Durable.Sqlite packages as experimental: a port of pi-durable v1.2.0 whose every upstream file is ported or recorded as excluded (decision 0005, durable-port-map.json). Open: JSONL storage keeps its records in memory, and code mode scripts interrupted under Pi or PiSharp don't resume in the other."
+      "notes": "1.2.0.1 ships pisharp durable and the PiSharp.Durable, PiSharp.Durable.Tools and PiSharp.Durable.Sqlite packages as experimental: a port of pi-durable v1.2.0 whose every upstream file is ported or recorded as excluded (decision 0005, durable-port-map.json). Open: JSONL storage keeps its records in memory, and code mode scripts interrupted under Pi or PiSharp don't resume in the other. 1.2.0.2 adds PiSharp-only questions, plan mode, media tools and a device server (decisions 0005, 0007 and 0008), which pi-durable doesn't have."
     }
   ]
 }

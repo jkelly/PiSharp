@@ -1,16 +1,16 @@
 ---
 title: Custom agents
-description: Build your own crash-safe agents, workflows and subagent teams in C#. Experimental and unreleased.
+description: Build your own crash-safe agents, workflows and subagent teams in C#. Experimental since PiSharp 1.2.0.2.
 sidebar:
   badge:
-    text: Unreleased
+    text: Experimental
     variant: caution
 ---
 
-:::caution[Experimental and unreleased]
-The custom agents library is on PiSharp's `main` branch but not in any release or NuGet package yet. To use it, build PiSharp from
-source and reference the projects directly (see [Build from source](/docs/contribute/build/)). Its API is marked
-`[Experimental("PISHARP_AGENTS001")]` and builds on durable APIs marked `[Experimental("PISHARP_DURABLE001")]`, so suppress `PISHARP_AGENTS001` and `PISHARP_DURABLE001` in your project to compile it, and it may change or be removed without notice.
+:::caution[Experimental]
+The custom agents library ships as experimental in PiSharp 1.2.0.2, as the `PiSharp.CustomAgents`, `PiSharp.CustomAgents.JavaScript` and
+`PiSharp.CustomAgents.Scripting` packages. Its API is marked `[Experimental("PISHARP_AGENTS001")]` and builds on durable APIs marked
+`[Experimental("PISHARP_DURABLE001")]`, so suppress `PISHARP_AGENTS001` and `PISHARP_DURABLE001` in your project to compile it. It may change or be removed in any release, without notice or a deprecation period.
 :::
 
 `PiSharp.CustomAgents` is a C# library for building your own agents on [Pi Durable](/docs/guides/durable/), PiSharp's port of Pi's crash-safe agent harness. You define agents, their tools and multi-step workflows in code. The durable harness runs them and commits every step to storage, so a run that a crash or restart interrupts resumes where it stopped.
@@ -83,7 +83,7 @@ See [Limits and errors](/docs/custom-agents/workflows/#limits-and-errors) for ho
 
 ## Project setup
 
-Clone PiSharp and build it (see [Build from source](/docs/contribute/build/)). Then reference the projects you need from your own `net10.0` project and suppress both experimental IDs. This is how the samples reference them:
+Reference the packages you need from your own `net10.0` project and suppress both experimental IDs:
 
 ```xml
 <Project Sdk="Microsoft.NET.Sdk">
@@ -93,15 +93,15 @@ Clone PiSharp and build it (see [Build from source](/docs/contribute/build/)). T
     <NoWarn>$(NoWarn);PISHARP_DURABLE001;PISHARP_AGENTS001</NoWarn>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="../PiSharp/src/PiSharp.CustomAgents/PiSharp.CustomAgents.csproj" />
-    <ProjectReference Include="../PiSharp/src/PiSharp.CustomAgents.JavaScript/PiSharp.CustomAgents.JavaScript.csproj" />
-    <ProjectReference Include="../PiSharp/src/PiSharp.CustomAgents.Scripting/PiSharp.CustomAgents.Scripting.csproj" />
-    <ProjectReference Include="../PiSharp/src/PiSharp.Durable.Sqlite/PiSharp.Durable.Sqlite.csproj" />
+    <PackageReference Include="PiSharp.CustomAgents" Version="1.2.0.2" />
+    <PackageReference Include="PiSharp.CustomAgents.JavaScript" Version="1.2.0.2" />
+    <PackageReference Include="PiSharp.CustomAgents.Scripting" Version="1.2.0.2" />
+    <PackageReference Include="PiSharp.Durable.Sqlite" Version="1.2.0.2" />
   </ItemGroup>
 </Project>
 ```
 
-Adjust the paths to where your PiSharp clone is. Leave out the JavaScript and Scripting projects if you don't use them. `PiSharp.Durable` and `PiSharp.Extensions.Abstractions` come in through `PiSharp.CustomAgents`.
+Leave out the JavaScript and Scripting packages if you don't use them. `PiSharp.Durable` and `PiSharp.Extensions.Abstractions` come in through `PiSharp.CustomAgents`. `PiSharp.CustomAgents.Scripting` brings Microsoft.CodeAnalysis.CSharp 5.6.0. The samples in the repository reference the projects from source instead (see [Build from source](/docs/contribute/build/)).
 
 ## A minimal example
 

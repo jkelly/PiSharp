@@ -39,7 +39,7 @@ The agent folder is `~/.pi/agent`. Set `PI_CODING_AGENT_DIR` to move it. Every p
 | `.pi/SYSTEM.md`, `.pi/APPEND_SYSTEM.md` | Project system prompt. These win over the agent folder's files. |
 | `.pi/extensions/`, `.pi/skills/`, `.pi/prompts/`, `.pi/themes/` | Project resources. |
 | `.pi/npm/`, `.pi/git/` | Packages installed with `pisharp install -l`. |
-| `.pi/media/` | Default output folder of the media tools in `pisharp durable` (experimental, unreleased; see [Media](/docs/guides/media/)). |
+| `.pi/media/` | Default output folder of the media tools in `pisharp durable` (experimental; see [Media](/docs/guides/media/)). |
 
 Everything in `.pi` loads only when you trust the project.
 

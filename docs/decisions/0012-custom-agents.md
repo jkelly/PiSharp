@@ -1,6 +1,6 @@
 # Custom agents, workflows and subagents on the durable harness
 
-Status: approved by the project owner on 2026-10-27, on branch `feature/custom-agents` only. Not released: the projects are not packable, and every public type carries `[Experimental("PISHARP_AGENTS001")]`.
+Status: approved by the project owner on 2026-10-27, on branch `feature/custom-agents`, merged to `main` on 2026-10-29. Released as experimental in PiSharp 1.2.0.2 by owner decision on 2026-11-01: `PiSharp.CustomAgents`, `PiSharp.CustomAgents.JavaScript` and `PiSharp.CustomAgents.Scripting` are packed as NuGet libraries whose descriptions start with "EXPERIMENTAL", and every public type carries `[Experimental("PISHARP_AGENTS001")]` (see item 11).
 
 ## Context
 
@@ -135,7 +135,7 @@ The owner chose (2026-10-27):
     - Messages between agents are untrusted input. The default messaging scope is the agent's family.
     - Web search results are untrusted content too, and the `web_search` result tells the model so.
     - Depth, children per agent, total agents and timeouts cap the cost.
-11. **Packaging is deferred.** The projects stay out of `tools/release/PiSharp.NativeSdk.targets` and `build-release-packages.ps1`, and `CHANGELOG.md` gets no entry, until the owner decides to release them. `CHANGELOG.md` is generated from the website's release entries.
+11. **Packaging.** Deferred until the owner decided on 2026-11-01 to release the three projects as experimental in 1.2.0.2. `tools/release/build-release-packages.ps1` packs them after the durable packages, through `tools/release/PiSharp.NativeSdk.targets`, and `tools/release/native-sdk-package.ps1` validates them: `PiSharp.CustomAgents` depends on `PiSharp.Durable` and `PiSharp.Extensions.Abstractions`; `PiSharp.CustomAgents.JavaScript` on it, `PiSharp.Codemode` and `PiSharp.Durable.Tools`; `PiSharp.CustomAgents.Scripting` on it and Microsoft.CodeAnalysis.CSharp 5.6.0, pinned exactly, and carries Roslyn's license. The release workflow runs `PiSharp.CustomAgents.Tests` with its offline suites. `CHANGELOG.md` is generated from the website's release entries.
 
 ## Not done yet
 

@@ -1,6 +1,6 @@
 # Durable network: device host, device server and web UI
 
-Status: approved by the project owner on 2026-10-17 (every recommended option of the plan below), on branch `feature/durable-network` only. Nothing here is released. The plan, the HTML mockups the owner approved, and the analysis of durable-pi live outside the repository, in `E:\AI\Pi Sharp Planning\PiSharp Durable Web\` (`PLAN.md`, `Mockups/`). Phases 2 to 8 are built on the branch and described below, from [Hosting library](#hosting-library) to [Verification](#verification); [Not done](#not-done) lists what is left.
+Status: approved by the project owner on 2026-10-17 (every recommended option of the plan below), on branch `feature/durable-network`, merged to `main` on 2026-11-01. Released in part as experimental in PiSharp 1.2.0.2 by owner decision on 2026-11-01: `pisharp durable serve`, `pisharp durable token` and the device commands ship in the CLI tool, which carries `PiSharp.Durable.Hosting`, `PiSharp.Durable.Server` and `PiSharp.Durable.Client` without packing them, with durable-pi's license under `licenses/`. The web app, `PiSharp.Durable.Web`, is neither packed nor shipped. The plan, the HTML mockups the owner approved, and the analysis of durable-pi live outside the repository, in `E:\AI\Pi Sharp Planning\PiSharp Durable Web\` (`PLAN.md`, `Mockups/`). Phases 2 to 8 are built on the branch and described below, from [Hosting library](#hosting-library) to [Verification](#verification); [Not done](#not-done) lists what is left.
 
 ## Context
 
@@ -136,7 +136,7 @@ Each runs through a bounded channel whose writer waits, so a slow reader pushes 
 - after a tool result it answers `Tool finished: <tool>: <output>`;
 - anything else is answered `Echo: <text>`.
 
-**Packaging.** `IsPackable` is false. Every public type is `[Experimental("PISHARP_DURABLE001")]`. Packing it is part of a release decision.
+**Packaging.** `IsPackable` is false. Every public type is `[Experimental("PISHARP_DURABLE001")]`. Packing it is part of a release decision. PiSharp 1.2.0.2 ships it inside the CLI tool for `pisharp durable serve` and does not pack it.
 
 **Tests.** `tests/PiSharp.Durable.Hosting.Tests` uses the repository's `*Cases()` runner:
 - catalog persistence;
@@ -175,7 +175,7 @@ Phase 3 lives in `src/PiSharp.Durable.Hosting/Apps`, not in the released `PiShar
 - **Idempotency.** `Idempotency-Key` makes session, agent and fork creation exactly once. Sessions use the catalog's spawn keys and persist the parsed creation request identity independently of subsequent renames or configuration changes; agents and forks record the key in a session document family (`pisharp.creation-key`) inside the commit that creates the conversation, so a retry after a crash finds the first one. A key reused for another request is `invalid`. HTTP keys from catalogs older than version 3 have no recorded request identity and are refused rather than silently accepting an unverifiable retry. Tool spawn keys retain their key-only replay behavior.
 - **Streams.** `id`/`event`/`data` frames, `hello` first, a `: ping` after 15 s idle, a 2 MB backlog cut-off, coalescing at 250 ms (device, session) and 150 ms (agent documents), and validation before the headers. Agent events are PiSharp.Durable's own JSON, so 1.2.0's nested tool fields pass through.
 - **PiSharp additions** (in `capabilities`): `/state` and `/jobs` aliases of `/demo/*`, `GET .../jobs`, `GET/POST .../interactions` (question forms and plan reviews), `GET/PATCH .../plan-mode`, tool effects and deferral in the agent detail, Main's provider in session summaries. Agent documents are `pisharp.job-runs` and `pisharp.system-prompts`; durable-pi's `demo.job-runs` shape is not reproduced.
-- **CLI.** `pisharp durable serve [--port --host --name --start-dirs --data-dir --provider faux --model --save]` uses the CLI's own models (auth.json, models.json, the environment) through a catalog adapter, or the faux model. The device directory defaults to `~/.pi/agent/experimental/durable-device` (`device.json`, `token`, the catalog and sessions). It binds `127.0.0.1` unless `--host` says otherwise, and warns when it does not. The two commands are not listed in `--help` yet: the released help text (pinned by `PiSharp.DurableCli.Tests`) changes with a release.
+- **CLI.** `pisharp durable serve [--port --host --name --start-dirs --data-dir --provider faux --model --save]` uses the CLI's own models (auth.json, models.json, the environment) through a catalog adapter, or the faux model. The device directory defaults to `~/.pi/agent/experimental/durable-device` (`device.json`, `token`, the catalog and sessions). It binds `127.0.0.1` unless `--host` says otherwise, and warns when it does not. The two commands are not listed in `pisharp --help` (pinned by `PiSharp.DurableCli.Tests`); `pisharp durable help` lists them and the device commands.
 
 ## Client
 

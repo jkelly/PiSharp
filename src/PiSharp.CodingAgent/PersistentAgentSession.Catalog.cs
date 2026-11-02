@@ -20,7 +20,7 @@ public sealed partial class PersistentAgentSession
     /// <summary>The registry as it is, for a read that only lists the session's tools (an extension's getAllTools): unlike
     /// <see cref="CaptureToolCatalogRegistry"/>, a session that an owner operation holds (a resource close, reload or switch) answers
     /// with the registry it has until that operation replaces it, as the original's registry answers while a server closes.</summary>
-    public SessionRuntimeRegistry ReadToolCatalogRegistry()
+    internal SessionRuntimeRegistry ReadToolCatalogRegistry()
     {
         lock (_gate) { ThrowBindable(); return _registry ?? throw Error(PersistentAgentSessionFailure.InvalidConfiguration); }
     }

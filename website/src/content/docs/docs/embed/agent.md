@@ -8,7 +8,7 @@ description: Run PiSharp.Agent's tool-calling loop with your own tools, hooks an
 ## Install
 
 ```powershell
-dotnet add package PiSharp.Agent --version 1.2.0.1
+dotnet add package PiSharp.Agent --version 1.2.0.2
 ```
 
 `PiSharp.Agent` brings `PiSharp.AI` and `PiSharp.Contracts`. Everything on this page is in the `PiSharp.Agent` namespace. [Chat and providers](/docs/embed/chat/) explains transports, models and transcript entries.
@@ -191,7 +191,7 @@ The built-in tools use a stricter path. An `IPreparedToolAdapter` turns a call i
 | `Hooks` | null | `AgentHooks` for the loop itself (below). |
 | `ThinkingLevel` | `off` | Sent with every request. It must be a level the transport supports for the model. |
 | `SessionId` | null | Sent with every request as `ChatRequest.SessionId`. |
-| `ServiceTier` | null | A `Func<string?>` read for each request. Experimental and unreleased (`PISHARP_TIERS001`); see [Service tiers](/docs/guides/service-tiers/). |
+| `ServiceTier` | null | A `Func<string?>` read for each request. Experimental (`PISHARP_TIERS001`); see [Service tiers](/docs/guides/service-tiers/). |
 
 `AgentHooks` lets you change requests and turn boundaries:
 

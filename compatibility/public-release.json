@@ -1,17 +1,17 @@
 {
   "schemaVersion": 1,
   "product": "PiSharp",
-  "version": "1.2.0.1",
-  "proposedReleaseTag": "v1.2.0.1",
+  "version": "1.2.0.2",
+  "proposedReleaseTag": "v1.2.0.2",
   "upstream": {
     "repository": "https://github.com/earendil-works/pi",
     "tag": "v1.2.0",
     "commit": "06a466935536f8c9bcacb2d5efc0fc021be1bdff"
   },
   "versionMeaning": "Upstream porting baseline, not a claim of complete behavioral parity.",
-  "productAndPackageVersion": "1.2.0.1",
+  "productAndPackageVersion": "1.2.0.2",
   "assemblyIdentityPolicy": {
-    "defaultSdkDerivedVersion": "1.2.0.1",
+    "defaultSdkDerivedVersion": "1.2.0.2",
     "fixedSupervisorAssembly": "PiSharp.ExtensionHost",
     "fixedSupervisorAssemblyVersion": "1.0.0.0",
     "fixedSupervisorReason": "Retain the exact existing approved system-import identity; no loader guard is relaxed."
@@ -21,22 +21,20 @@
     "versionSpecificPackageConsumptionQualified": false,
     "fullProviderParity": false,
     "completeNativeGateReady": false,
-    "status": "Released 2026-10-17: a C#-only release on the Pi v1.2.0 baseline that adds the experimental durable port (decision 0005) as pisharp durable and three [Experimental] packages."
+    "status": "Release candidate on release/1.2.0.2: a C#-only release on the Pi v1.2.0 baseline that releases the PiSharp-only media library and tools (decision 0007, PISHARP_MEDIA001), service tiers (PISHARP_TIERS001), custom agents as three new [Experimental] packages (decision 0012, PISHARP_AGENTS001), questions and plan mode in pisharp durable and the durable device server commands (decisions 0008-0010), plus pisharp fixes. The Web Agent, Durable Web, Durable.MSSQL and Web.Common are not packed; Durable.Hosting, Durable.Server, Durable.Client and ModelRuntime ship inside the PiSharp.Cli tool but not as packages. Nothing is tagged or published. Fresh versioned lock, build, package and consumer evidence is required at release, with the owner's go-ahead."
   },
   "releaseCandidate": {
-    "branch": "release/1.2.0.1",
-    "decision": "docs/decisions/0005-pi-durable-experimental.md",
-    "experimental": ["pisharp durable", "PiSharp.Durable", "PiSharp.Durable.Tools", "PiSharp.Durable.Sqlite"],
-    "notes": "docs/release-notes/1.2.0.1.md",
-    "changelog": "website/src/content/changelog/1.2.0.1.md"
+    "branch": "release/1.2.0.2",
+    "decisions": ["docs/decisions/0007-media-generation.md", "docs/decisions/0012-custom-agents.md", "docs/decisions/0008-durable-network-host-and-web.md"],
+    "experimental": ["PiSharp.AI.Media (PISHARP_MEDIA001)", "service tiers (PISHARP_TIERS001)", "PiSharp.CustomAgents", "PiSharp.CustomAgents.JavaScript", "PiSharp.CustomAgents.Scripting", "MaintainedCatalogOverlay (PISHARP_CATALOG001)", "pisharp durable ask_user_question and plan mode", "pisharp durable serve, token and device commands"],
+    "sourceOnly": ["PiSharp.WebAgent", "PiSharp.Durable.Web", "PiSharp.Durable.MSSQL", "PiSharp.Durable.Hosting", "PiSharp.Durable.Server", "PiSharp.Durable.Client", "PiSharp.ModelRuntime", "PiSharp.Web.Common"],
+    "notes": "docs/release-notes/1.2.0.2.md",
+    "changelog": "website/src/content/changelog/1.2.0.2.md"
   },
   "publication": {
-    "tagCreated": true,
-    "binaryReleasePublished": true,
-    "nugetPackagesPublished": true,
-    "publishedOn": "2026-10-17",
-    "tagCommit": "b2a558a5e3f2480a7443789d08af88f76197df00",
-    "releaseRun": "38993151457"
+    "tagCreated": false,
+    "binaryReleasePublished": false,
+    "nugetPackagesPublished": false
   },
   "previousReleases": [
     {
@@ -142,6 +140,18 @@
       "publishedOn": "2026-10-15",
       "tagCommit": "849cfe7107be1f8b116f1bcb97cfb4dfba433577",
       "releaseRun": "38827782975"
+    },
+    {
+      "version": "1.2.0.1",
+      "tag": "v1.2.0.1",
+      "upstreamTag": "v1.2.0",
+      "upstreamCommit": "06a466935536f8c9bcacb2d5efc0fc021be1bdff",
+      "tagCreated": true,
+      "githubReleasePublished": true,
+      "nugetPackagesPublished": true,
+      "publishedOn": "2026-10-17",
+      "tagCommit": "b2a558a5e3f2480a7443789d08af88f76197df00",
+      "releaseRun": "38993151457"
     }
   ],
   "historicalArtifacts": "Earlier private versions and their qualification receipts retain their original identities; no artifact is renamed or relabeled."

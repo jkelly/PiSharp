@@ -16,6 +16,8 @@ pisharp auth <print-api-key|print-bearer-token|check> [options]
 pisharp mcp <add|remove|list|login|logout> [options]
 pisharp session <verb> [options]               # PiSharp only
 pisharp durable [--continue] [--tier <tier>]   # PiSharp only, experimental
+pisharp durable serve [options]                # PiSharp only, experimental: see durable below
+pisharp durable help [command]                 # lists the device server commands
 ```
 
 `pisharp <command> --help` prints the help of `install`, `remove`, `uninstall`, `update`, `list`, `config`, `auth`, `mcp`, `session` and `durable`.
@@ -44,11 +46,11 @@ Piped stdin is added in front of the first prompt. `@path` arguments add a text 
 | `--models <patterns>` | Comma-separated model patterns for `Ctrl+P` cycling. Globs (`anthropic/*`, `*sonnet*`), fuzzy matches and `:<thinking>` suffixes work. |
 | `--thinking <level>` | `off`, `minimal`, `low`, `medium`, `high`, `xhigh` or `max`. An unknown level is a warning, not an error. |
 | `--api-key <key>` | API key for this run, instead of the environment or `auth.json`. Requires a model from `--model` or `--models`. |
-| `--tier <tier>`, `--service-tier <tier>` | Service tier: `auto`, `normal`, `economy`, `priority`, `fast` or `ultrafast` (experimental, unreleased). See below. |
+| `--tier <tier>`, `--service-tier <tier>` | Service tier: `auto`, `normal`, `economy`, `priority`, `fast` or `ultrafast` (experimental). See below. |
 | `--list-models [search]` | Lists the models you can use, with an optional fuzzy search, then exits. The search can't start with `-` or `@`. |
 
-:::caution[Service tiers are unreleased]
-`--tier` is not in any release yet and needs a CLI built from source. It sets the session's tier for every request; `/tier` changes it later and `serviceTier` in settings sets a default. Names are case-insensitive and some aliases work: `default`, `standard`, `off` and `none` mean `normal`; `flex`, `cheap` and `eco` mean `economy`; `prio` means `priority`; `speed` means `fast`; `ultra`, `super`, `superspeed`, `super-speed` and `turbo` mean `ultrafast`. An unknown tier is a warning. See [Service tiers](/docs/guides/service-tiers/).
+:::caution[Service tiers are experimental]
+`--tier` is experimental, from PiSharp 1.2.0.2. It sets the session's tier for every request; `/tier` changes it later and `serviceTier` in settings sets a default. Names are case-insensitive and some aliases work: `default`, `standard`, `off` and `none` mean `normal`; `flex`, `cheap` and `eco` mean `economy`; `prio` means `priority`; `speed` means `fast`; `ultra`, `super`, `superspeed`, `super-speed` and `turbo` mean `ultrafast`. An unknown tier is a warning. See [Service tiers](/docs/guides/service-tiers/).
 :::
 
 ## Prompt and input
@@ -151,7 +153,7 @@ The help text and the parser agree, with these exceptions:
 
 **Built-in Tool Names** in the help leaves out Pi's `powershell`, which the CLI doesn't register; see [Built-in tools](/docs/reference/tools/#powershell).
 
-:::note[Released builds]
+:::note[Older releases]
 In PiSharp 1.2.0.1 and earlier, the help doesn't list `--service-tier`, lists `powershell` under **Built-in Tool Names**, and shows only `--continue` on the `durable` line. There `session --help` and `durable --help` print an error instead of help, and the `mcp` help and messages name the command `PiSharp.Cli`.
 :::
 
@@ -312,10 +314,23 @@ Reports go to stdout. Failures go to stderr as one JSON line such as `{"schemaVe
 | Option | Meaning |
 | --- | --- |
 | `-c`, `--continue` | Continues the newest durable session. |
-| `--tier <tier>`, `--service-tier <tier>` | Service tier for a new session (experimental, unreleased). Without it, a new session takes the `serviceTier` setting. A session that `--continue` reopens keeps its stored tier; change it with `/tier`. |
+| `--tier <tier>`, `--service-tier <tier>` | Service tier for a new session (experimental). Without it, a new session takes the `serviceTier` setting. A session that `--continue` reopens keeps its stored tier; change it with `/tier`. |
 | `-h`, `--help` | Prints the durable help and exits without opening a session. |
 
-Any other argument is an error, `Unknown argument: <arg>`. The command prints a notice on stderr that it is experimental. Inside it, `/plan` turns [plan mode](/docs/guides/durable/#plan-mode) on or off, and `/plan <message>` turns it on and sends the message. `--tier` and the media tools in `pisharp durable` are not in any release yet and need a CLI built from source.
+Any other argument is an error, `Unknown argument: <arg>`. The command prints a notice on stderr that it is experimental. Inside it, `/plan` turns [plan mode](/docs/guides/durable/#plan-mode) on or off, and `/plan <message>` turns it on and sends the message. `--tier`, `--help` and the media tools in `pisharp durable` are new in 1.2.0.2.
+
+### Device server commands
+
+From 1.2.0.2, `pisharp durable` also runs this machine as a durable device and drives devices, all experimental. These commands are not in `pisharp --help`. `pisharp durable help` lists them, and `pisharp durable help <command>` shows one. See [Device server](/docs/guides/durable/#device-server).
+
+| Command | What it does |
+| --- | --- |
+| `pisharp durable serve [--port <n>] [--host <address>] [--name <name>] [--start-dirs <dir>[,<dir>...]] [--data-dir <dir>] [--provider faux] [--model <provider>/<id>] [--log <file>] [--save]` | Runs the device on `127.0.0.1:4780` by default. |
+| `pisharp durable token [--rotate] [--data-dir <dir>]` | Prints the device token, or replaces it. |
+| `pisharp durable <group> <verb> ... [--json] [--device <url> [--token-file <path>] \| --data-dir <dir>]` | A device command, for `device`, `capabilities`, `sessions`, `executions`, `schedules`, `credentials`, `budgets`, `retention`, `policies`, `judgments`, `artifacts`, `evidence`, `sources`, `research`, `feedback` or `preferences`. With `--device`, the token comes from `PISHARP_DEVICE_TOKEN` or `--token-file`. |
+| `pisharp durable attach`, `doctor`, `service`, `backup create\|verify\|restore` | Commands on the local device's folder: a line-mode terminal on a session's agent, a check, a per-user service definition, and backups. |
+
+The device commands exit with 0 on success, 1 when they fail, 2 on a usage error, 3 when something is not found, 4 on a conflict, 5 when unauthorized, 6 when unsupported, 7 when the device is offline (retryable), 8 when invalid, 9 when limited and 130 when cancelled.
 
 ## Exit codes
 

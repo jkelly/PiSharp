@@ -54,8 +54,8 @@ Creates or replaces a file, and creates missing parent folders.
 
 Pi has no size limit. In the CLI, one `write` call's arguments can hold up to 8 MiB (8,388,608 characters) of JSON, so one call writes a little under 8 MiB of plain text. Characters that JSON escapes, such as `<`, `&` or accented letters, count up to six characters each. Write a larger file in parts, for example with `bash`.
 
-:::caution[64 KiB in released builds]
-PiSharp 1.2.0.1 and earlier limit `write` to 65,536 UTF-8 bytes of content and 65,536 characters of arguments; larger content fails with `File content exceeds the supported input limit.` The larger limit is not in any release yet and needs a CLI built from source.
+:::note[64 KiB in older releases]
+PiSharp 1.2.0.1 and earlier limit `write` to 65,536 UTF-8 bytes of content and 65,536 characters of arguments; larger content fails with `File content exceeds the supported input limit.` The larger limit is in PiSharp 1.2.0.2 and later.
 :::
 
 ## edit

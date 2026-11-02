@@ -114,11 +114,14 @@ Some durable files read `// PiSharp-only since pi-durable 1.2.0 (...)`, for code
 | [0004](https://github.com/jkelly/PiSharp/blob/main/docs/decisions/0004-full-parity-owner-decisions.md) | Owner decisions for full Pi v1.1.0 parity. |
 | [0005](https://github.com/jkelly/PiSharp/blob/main/docs/decisions/0005-pi-durable-experimental.md) | The experimental pi-durable port, released as experimental in 1.2.0.1. |
 | [0006](https://github.com/jkelly/PiSharp/blob/main/docs/decisions/0006-pi-1.2.0-sync.md) | The sync to Pi v1.2.0. |
-| [0007](https://github.com/jkelly/PiSharp/blob/main/docs/decisions/0007-media-generation.md) | Media generation, embeddings, model operations and service tiers: PiSharp-only, experimental and unreleased. |
-| [0012](https://github.com/jkelly/PiSharp/blob/main/docs/decisions/0012-custom-agents.md) | Custom agents, workflows and subagents on the durable harness: experimental and unreleased. |
+| [0007](https://github.com/jkelly/PiSharp/blob/main/docs/decisions/0007-media-generation.md) | Media generation, embeddings, model operations and service tiers: PiSharp-only, released as experimental in 1.2.0.2. |
+| [0007 (SQL Server)](https://github.com/jkelly/PiSharp/blob/main/docs/decisions/0007-durable-sql-server-storage.md) | SQL Server storage for durable sessions: PiSharp-only, experimental, source only. |
+| [0008](https://github.com/jkelly/PiSharp/blob/main/docs/decisions/0008-durable-network-host-and-web.md) | The durable device host, device server and web UI: PiSharp-only. The device server ships as experimental inside the 1.2.0.2 CLI tool; the web UI is source only. |
+| [0009](https://github.com/jkelly/PiSharp/blob/main/docs/decisions/0009-recurring-jobs-and-execution-history.md) | Recurring jobs, scoped triggers, execution history and audits on the device server. |
+| [0010](https://github.com/jkelly/PiSharp/blob/main/docs/decisions/0010-durable-application-contracts.md) | The device server's application contracts: budgets, policies, judgments, evidence, sources, research and retention. |
+| [0011](https://github.com/jkelly/PiSharp/blob/main/docs/decisions/0011-web-agent.md) | PiSharp Web Agent, a local chat app on durable sessions: PiSharp-only, source only. |
+| [0012](https://github.com/jkelly/PiSharp/blob/main/docs/decisions/0012-custom-agents.md) | Custom agents, workflows and subagents on the durable harness: released as experimental in 1.2.0.2. |
 | [ecmascript-json-boundary](https://github.com/jkelly/PiSharp/blob/main/docs/decisions/ecmascript-json-boundary.md) | `EcmaScriptJsonProjection`: where native JSON values are turned into the text JavaScript's `JSON.stringify(JSON.parse(text))` would produce. |
-
-There are no records 0008 to 0011.
 
 ## Intentional differences
 

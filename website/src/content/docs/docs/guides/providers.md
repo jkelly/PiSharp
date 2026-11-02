@@ -115,7 +115,7 @@ Pi's classifier APIs (OpenAI decisions, TypeSafe and Cloudflare system-one, llam
 
 ## Service tiers
 
-Some providers sell faster or cheaper capacity. `--tier` and `/tier` (experimental, unreleased) choose it for a session. See [Service tiers](/docs/guides/service-tiers/).
+Some providers sell faster or cheaper capacity. `--tier` and `/tier` (experimental) choose it for a session. See [Service tiers](/docs/guides/service-tiers/).
 
 ## OpenAI Codex transport
 

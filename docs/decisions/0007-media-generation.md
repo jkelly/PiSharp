@@ -1,6 +1,6 @@
 # Media generation, embeddings and model operations (PiSharp-only)
 
-Status: requested by the project owner on 2026-10-17, on branch `feature/media-generation`. Experimental and unreleased.
+Status: requested by the project owner on 2026-10-17, on branch `feature/media-generation`, merged to `main` on 2026-10-29. Released as experimental in PiSharp 1.2.0.2 by owner decision on 2026-11-01: the media library in `PiSharp.AI` (`PISHARP_MEDIA001`), its `pisharp durable` tools, and service tiers (`PISHARP_TIERS001`) ship in the 1.2.0.2 packages and CLI tool, and may change in any release.
 
 ## Context
 

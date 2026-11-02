@@ -1,16 +1,16 @@
 ---
 title: Agent teams
-description: "An orchestrator and its subagents: definitions, delegation, messaging and the agent directory. Experimental and unreleased."
+description: "An orchestrator and its subagents: definitions, delegation, messaging and the agent directory. Experimental since PiSharp 1.2.0.2."
 sidebar:
   badge:
-    text: Unreleased
+    text: Experimental
     variant: caution
 ---
 
-:::caution[Experimental and unreleased]
-The custom agents library is on PiSharp's `main` branch but not in any release or NuGet package yet. To use it, build PiSharp from
-source and reference the projects directly (see [Build from source](/docs/contribute/build/)). Its API is marked
-`[Experimental("PISHARP_AGENTS001")]` and builds on durable APIs marked `[Experimental("PISHARP_DURABLE001")]`, so suppress `PISHARP_AGENTS001` and `PISHARP_DURABLE001` in your project to compile it, and it may change or be removed without notice.
+:::caution[Experimental]
+The custom agents library ships as experimental in PiSharp 1.2.0.2, as the `PiSharp.CustomAgents`, `PiSharp.CustomAgents.JavaScript` and
+`PiSharp.CustomAgents.Scripting` packages. Its API is marked `[Experimental("PISHARP_AGENTS001")]` and builds on durable APIs marked
+`[Experimental("PISHARP_DURABLE001")]`, so suppress `PISHARP_AGENTS001` and `PISHARP_DURABLE001` in your project to compile it. It may change or be removed in any release, without notice or a deprecation period.
 :::
 
 An agent team is a set of agent definitions, tool sources and workflows that open together over one storage. One definition can be the orchestrator, the root conversation you talk to. It delegates work to subagents, which are durable child conversations, and agents message each other through mailboxes. The types are in `PiSharp.CustomAgents.Teams`.

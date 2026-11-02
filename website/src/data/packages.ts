@@ -1,8 +1,8 @@
-export type Package = { id: string; description: string; group: 'Core' | 'Frontends' | 'Extensions'; nuget?: boolean; tool?: boolean; optional?: boolean; experimental?: boolean };
+export type Package = { id: string; description: string; group: 'Core' | 'Frontends' | 'Extensions'; nuget?: boolean; tool?: boolean; optional?: boolean; experimental?: boolean; docs?: string };
 
 export const packages: Package[] = [
 	{ id: 'PiSharp.Contracts', group: 'Core', nuget: true, description: 'Shared message, streaming and JSON contracts used by every other package.' },
-	{ id: 'PiSharp.AI', group: 'Core', nuget: true, description: "Streaming LLM transports for every Pi chat API, Pi's model catalogs, provider logins, and the classifier and image APIs." },
+	{ id: 'PiSharp.AI', group: 'Core', nuget: true, description: "Streaming LLM transports for every Pi chat API, Pi's model catalogs, provider logins, and the classifier and image APIs. Also the experimental media library and service tiers." },
 	{ id: 'PiSharp.Agent', group: 'Core', nuget: true, description: 'The agent loop: turns, tool invocation and batching, steering and follow-up queues.' },
 	{ id: 'PiSharp.Tools', group: 'Core', nuget: true, description: 'Built-in file and process tools with output truncation and safe file mutation.' },
 	{ id: 'PiSharp.Tools.Skia', group: 'Core', nuget: true, description: "Image decoding, resizing and JPEG re-encoding for the read tool, on SkiaSharp." },
@@ -14,8 +14,11 @@ export const packages: Package[] = [
 	{ id: 'PiSharp.Cli', group: 'Frontends', tool: true, description: 'The command-line app itself, installed as a .NET tool and run as pisharp.' },
 	{ id: 'PiSharp.Codemode', group: 'Core', nuget: true, description: 'Codemode: model-written JavaScript in a Jint sandbox that calls the session tools.' },
 	{ id: 'PiSharp.Durable', group: 'Core', nuget: true, experimental: true, description: "A port of Pi's durable agent harness. Sessions commit every step before showing it and resume after a crash." },
-	{ id: 'PiSharp.Durable.Tools', group: 'Core', nuget: true, experimental: true, description: 'The execution environment, coding tools, tool_search and code mode for durable sessions.' },
+	{ id: 'PiSharp.Durable.Tools', group: 'Core', nuget: true, experimental: true, description: 'The execution environment, coding tools, tool_search, code mode and media tools for durable sessions.' },
 	{ id: 'PiSharp.Durable.Sqlite', group: 'Core', nuget: true, experimental: true, description: 'SQLite storage for durable sessions, on Microsoft.Data.Sqlite.' },
+	{ id: 'PiSharp.CustomAgents', group: 'Core', nuget: true, experimental: true, docs: '/docs/custom-agents/overview/', description: 'Typed workflows, agent teams, subagents, messaging, and typed and dynamic tools, on the durable harness.' },
+	{ id: 'PiSharp.CustomAgents.JavaScript', group: 'Core', nuget: true, experimental: true, docs: '/docs/custom-agents/tools/', description: "JavaScript tools and workflow actions for custom agents, in code mode's Jint sandbox." },
+	{ id: 'PiSharp.CustomAgents.Scripting', group: 'Core', nuget: true, experimental: true, docs: '/docs/custom-agents/tools/', description: 'C# script tools and workflow actions for custom agents, compiled with Roslyn.' },
 	{ id: 'PiSharp.Extensions.Abstractions', group: 'Extensions', nuget: true, description: 'The interfaces you implement to write an extension.' },
 	{ id: 'PiSharp.Extensions.Runtime', group: 'Extensions', nuget: true, description: 'Discovery, loading, registration and dispatch for hosts.' },
 	{ id: 'PiSharp.Extensions.Agent', group: 'Extensions', nuget: true, description: 'Connects extension hooks to the agent loop.' },

@@ -7,10 +7,10 @@ PiSharp is a set of .NET libraries, and the `pisharp` CLI is built from them. Yo
 
 ## Install
 
-Every library is a NuGet package that targets `net10.0`. The current release is 1.2.0.1:
+Every library is a NuGet package that targets `net10.0`. The current release is 1.2.0.2:
 
 ```powershell
-dotnet add package PiSharp.CodingAgent --version 1.2.0.1
+dotnet add package PiSharp.CodingAgent --version 1.2.0.2
 ```
 
 A package brings the packages it is built on, so `PiSharp.CodingAgent` also gives you `PiSharp.Agent`, `PiSharp.AI`, `PiSharp.Sessions` and `PiSharp.Contracts`. All PiSharp packages share one version number. Use the same version for every PiSharp package you reference. [Versioning](/docs/versioning/) explains how the number relates to the Pi release it ports.
@@ -38,8 +38,8 @@ dotnet tool install -g PiSharp.Cli
 | Write an extension | `PiSharp.Extensions.Abstractions` | [Build an extension](/docs/extensions/build-an-extension/) |
 | Load and run extensions in your app | `PiSharp.Extensions.Runtime`, `PiSharp.Extensions.Agent`, `PiSharp.ExtensionHost` | [Host extensions](/docs/embed/extension-host/) |
 | Run Pi's TypeScript extensions | `PiSharp.Compatibility.Node` (needs Node) | [Node bridge](/docs/extensions/node-bridge/) |
-| Build typed workflows, subagent teams and dynamic tools | `PiSharp.CustomAgents` (experimental, unreleased) | [Custom agents](/docs/custom-agents/overview/) |
-| Embeddings, speech, video, music and rerank | `PiSharp.AI.Media` namespace (experimental, unreleased) | [Media library](/docs/embed/media/) |
+| Build typed workflows, subagent teams and dynamic tools | `PiSharp.CustomAgents`, with `PiSharp.CustomAgents.JavaScript` and `PiSharp.CustomAgents.Scripting` for script tools (experimental) | [Custom agents](/docs/custom-agents/overview/) |
+| Embeddings, speech, video, music and rerank | `PiSharp.AI`, namespace `PiSharp.AI.Media` (experimental) | [Media library](/docs/embed/media/) |
 
 `PiSharp.Sessions` is the Pi session file: an append-only JSONL tree that you can branch and compact. It is not crash-safe execution. For sessions that survive a crash mid-step, use `PiSharp.Durable`.
 
@@ -47,12 +47,12 @@ dotnet tool install -g PiSharp.Cli
 
 ## Packages
 
-These are the 20 packages of the 1.2.0.1 release. The [SDK page](/sdk/) lists the same set.
+These are the 23 packages of the 1.2.0.2 release. The [SDK page](/sdk/) lists the same set.
 
 | Package | Group | Purpose | Docs |
 | --- | --- | --- | --- |
 | `PiSharp.Contracts` | Core | Messages, stream events, transcript entries and the JSON types every other package shares. | [Chat and providers](/docs/embed/chat/#messages-and-stream-events) |
-| `PiSharp.AI` | Core | Streaming transports for every Pi chat API, the model catalog reader, provider auth and logins, and the classifier and image APIs. | [Chat and providers](/docs/embed/chat/), [Classifiers and images](/docs/embed/model-operations/) |
+| `PiSharp.AI` | Core | Streaming transports for every Pi chat API, the model catalog reader, provider auth and logins, and the classifier and image APIs. Also the media library and service tiers (experimental). | [Chat and providers](/docs/embed/chat/), [Classifiers and images](/docs/embed/model-operations/) |
 | `PiSharp.Agent` | Core | The agent loop: turns, tool invocation and batching, hooks, steering and follow-up queues. | [Agent loop](/docs/embed/agent/) |
 | `PiSharp.Tools` | Core | Pi's built-in file and process tools, with output truncation and a shared write queue. | [Built-in tools](/docs/embed/coding-agent/#built-in-tools) |
 | `PiSharp.Tools.Skia` | Core | An image codec on SkiaSharp that lets the read tool decode and resize PNG, JPEG, GIF, WebP and BMP. | [Images](/docs/embed/coding-agent/#images) |
@@ -61,8 +61,11 @@ These are the 20 packages of the 1.2.0.1 release. The [SDK page](/sdk/) lists th
 | `PiSharp.PromptTemplates.Yaml` | Core | YAML frontmatter decoders for prompt templates and skills, on YamlDotNet. | [YAML frontmatter](/docs/embed/coding-agent/#yaml-frontmatter) |
 | `PiSharp.Codemode` | Core | Model-written JavaScript in a Jint sandbox that calls the session's tools. | [Code mode library](/docs/embed/codemode/) |
 | `PiSharp.Durable` | Core, experimental | The durable agent harness. Sessions commit every step before showing it and resume after a crash. | [Durable library](/docs/embed/durable/) |
-| `PiSharp.Durable.Tools` | Core, experimental | The execution environment, coding tools, `tool_search` and code mode for durable sessions. | [Durable library](/docs/embed/durable/#built-in-tools) |
+| `PiSharp.Durable.Tools` | Core, experimental | The execution environment, coding tools, `tool_search`, code mode and the media tools for durable sessions. | [Durable library](/docs/embed/durable/#built-in-tools) |
 | `PiSharp.Durable.Sqlite` | Core, experimental | SQLite storage for durable sessions, on Microsoft.Data.Sqlite. | [Durable library](/docs/embed/durable/#storage) |
+| `PiSharp.CustomAgents` | Core, experimental | Typed workflows, agent teams, subagents, messaging, typed and dynamic tools, and plugins on the durable harness. | [Custom agents](/docs/custom-agents/overview/) |
+| `PiSharp.CustomAgents.JavaScript` | Core, experimental | JavaScript tools and workflow actions for custom agents, in code mode's Jint sandbox. | [Agent tools](/docs/custom-agents/tools/) |
+| `PiSharp.CustomAgents.Scripting` | Core, experimental | C# script tools and workflow actions for custom agents, compiled with Roslyn. | [Agent tools](/docs/custom-agents/tools/) |
 | `PiSharp.Rpc` | Frontends | Pi's JSONL RPC protocol over stdin and stdout, including extension UI requests. | [RPC host](/docs/embed/rpc/) |
 | `PiSharp.Tui` | Frontends | Terminal UI components, layout, overlays and terminals. | [Terminal UI](/docs/embed/tui/) |
 | `PiSharp.Cli` | Frontends, .NET tool | The `pisharp` command-line app. | [CLI reference](/docs/reference/cli/) |
@@ -90,6 +93,9 @@ Each package references only the layers below it. `PiSharp.Contracts` is at the 
 | `PiSharp.Durable` | Contracts, AI | none |
 | `PiSharp.Durable.Tools` | Durable, Tools, Codemode | none |
 | `PiSharp.Durable.Sqlite` | Durable | Microsoft.Data.Sqlite 10.0.12, SQLitePCLRaw 2.1.12 |
+| `PiSharp.CustomAgents` | Durable, Extensions.Abstractions | none |
+| `PiSharp.CustomAgents.JavaScript` | CustomAgents, Codemode, Durable.Tools | none |
+| `PiSharp.CustomAgents.Scripting` | CustomAgents | Microsoft.CodeAnalysis.CSharp 5.6.0 |
 | `PiSharp.Rpc` | Contracts, CodingAgent, Extensions.Abstractions | none |
 | `PiSharp.Tui` | nothing | none |
 | `PiSharp.Extensions.Abstractions` | Contracts | none |
@@ -100,19 +106,19 @@ Each package references only the layers below it. `PiSharp.Contracts` is at the 
 
 Read the table from the top. The chat layer (`PiSharp.AI`) knows nothing about tools. The agent layer (`PiSharp.Agent`) runs tools but does not know about files or session storage. The coding agent (`PiSharp.CodingAgent`) joins the agent loop to `PiSharp.Sessions`. The durable harness is a separate stack on `PiSharp.AI`; it does not use `PiSharp.Agent` or `PiSharp.Sessions`.
 
-The CLI references almost everything: CodingAgent, PromptTemplates.Yaml, Tools, Tools.Skia, Rpc, Tui, Extensions.Runtime, Extensions.Agent, Codemode, Compatibility.Node, Durable, Durable.Sqlite and Durable.Tools. [Architecture](/docs/reference/architecture/) describes how the CLI wires them together.
+The CLI references almost everything: CodingAgent, PromptTemplates.Yaml, Tools, Tools.Skia, Rpc, Tui, Extensions.Runtime, Extensions.Agent, Codemode, Compatibility.Node, Durable, Durable.Sqlite and Durable.Tools, and three projects that ship only inside the tool: ModelRuntime, Durable.Hosting and Durable.Server (which brings Durable.Client). Durable.Server needs the ASP.NET Core runtime, so the tool does too. [Architecture](/docs/reference/architecture/) describes how the CLI wires them together.
 
 ## Custom agents
 
-Three more projects are on PiSharp's `main` branch but are not packaged or released:
+The three custom agents packages build crash-safe agents in C# on the durable harness:
 
-| Project | Purpose | Builds on |
+| Package | Purpose | Builds on |
 | --- | --- | --- |
-| `src/PiSharp.CustomAgents` | Typed workflows over a shared data class, agents and teams, typed and dynamic tools, messaging and subagents, on the durable harness. | Durable, Extensions.Abstractions |
-| `src/PiSharp.CustomAgents.JavaScript` | JavaScript tools and workflow actions on code mode's Jint sandbox, with durable replay for tools that call other tools. | CustomAgents, Codemode, Durable.Tools |
-| `src/PiSharp.CustomAgents.Scripting` | C# script tools and workflow actions (`*.tool.csx`), compiled with Roslyn and unloaded when replaced. | CustomAgents, Microsoft.CodeAnalysis.CSharp 5.6.0 |
+| `PiSharp.CustomAgents` | Typed workflows over a shared data class, agents and teams, typed and dynamic tools, messaging and subagents, on the durable harness. | Durable, Extensions.Abstractions |
+| `PiSharp.CustomAgents.JavaScript` | JavaScript tools and workflow actions on code mode's Jint sandbox, with durable replay for tools that call other tools. | CustomAgents, Codemode, Durable.Tools |
+| `PiSharp.CustomAgents.Scripting` | C# script tools and workflow actions (`*.tool.csx`), compiled with Roslyn and unloaded when replaced. | CustomAgents, Microsoft.CodeAnalysis.CSharp 5.6.0 |
 
-They are experimental and unreleased. To use them, build PiSharp from source and reference the projects directly (see [Build from source](/docs/contribute/build/)). [Custom agents](/docs/custom-agents/overview/) covers the API.
+They are experimental, from 1.2.0.2. [Custom agents](/docs/custom-agents/overview/) covers the API.
 
 ## Experimental APIs
 
@@ -121,9 +127,10 @@ Some APIs carry `[Experimental("<ID>")]`. The compiler reports an error when you
 | ID | Covers | Status |
 | --- | --- | --- |
 | `PISHARP_DURABLE001` | Every public type in `PiSharp.Durable`, `PiSharp.Durable.Tools` and `PiSharp.Durable.Sqlite`. | Released as experimental in 1.2.0.1. |
-| `PISHARP_MEDIA001` | The `PiSharp.AI.Media` namespace of `PiSharp.AI`: embeddings, images, video, speech, transcription, music, rerank and decisions. | Unreleased: on `main` only. |
-| `PISHARP_TIERS001` | Service tiers: `ChatRequest.ServiceTier`, `AgentConfiguration.ServiceTier`, `SessionRuntimeRegistryOptions.ServiceTier`, the protocol request options' `ServiceTier` and the `ServiceTiers` class. See [Service tiers](/docs/guides/service-tiers/). | Unreleased: on `main` only. |
-| `PISHARP_AGENTS001` | Every public type in the custom agents projects. These also use durable types, so suppress `PISHARP_DURABLE001` too. | Unreleased: source only. |
+| `PISHARP_MEDIA001` | The `PiSharp.AI.Media` namespace of `PiSharp.AI`: embeddings, images, video, speech, transcription, music, rerank and decisions. | Released as experimental in 1.2.0.2. |
+| `PISHARP_TIERS001` | Service tiers: `ChatRequest.ServiceTier`, `AgentConfiguration.ServiceTier`, `SessionRuntimeRegistryOptions.ServiceTier`, the protocol request options' `ServiceTier` and the `ServiceTiers` class. See [Service tiers](/docs/guides/service-tiers/). | Released as experimental in 1.2.0.2. |
+| `PISHARP_AGENTS001` | Every public type in the custom agents packages. These also use durable types, so suppress `PISHARP_DURABLE001` too. | Released as experimental in 1.2.0.2. |
+| `PISHARP_CATALOG001` | `MaintainedCatalogOverlay` and `MaintainedCatalogResult` in `PiSharp.AI`, which apply PiSharp's maintained model catalog layer. | Released as experimental in 1.2.0.2. |
 
 Suppress the IDs you use in your project file:
 
@@ -149,7 +156,7 @@ The libraries do not read your environment on their own. You pass in the things 
 
 ## Runnable agent examples
 
-The repository includes [32 sample projects](https://github.com/jkelly/PiSharp/tree/main/samples/agents), each with a fixture demo, input data, README and focused self-tests. They cover everyday workflows, native session branching, concurrent agents, a model/pricing catalog maintainer and a NuGet vulnerability maintainer.
+The repository includes [62 sample projects](https://github.com/jkelly/PiSharp/tree/main/samples/agents), each with a fixture demo, input data, README and focused self-tests. They cover everyday workflows, native session branching, concurrent agents, a model/pricing catalog maintainer, a NuGet vulnerability maintainer, and operations, IT, HR, finance and documentation workflows.
 
 ```powershell
 dotnet build samples/agents/PiSharp.Samples.slnx -m:1

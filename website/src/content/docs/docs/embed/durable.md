@@ -6,7 +6,7 @@ description: "Build crash-safe agents on PiSharp.Durable: the harness, storage, 
 `PiSharp.Durable` is the library behind [`pisharp durable`](/docs/guides/durable/). It is a port of Pi's `pi-durable` v1.2.0 package: an agent harness that commits every model turn, streamed partial, tool call and queued message to storage before anything sees it. Open the same storage after a crash and the harness finishes what was running. This page shows how to build your own agent on it.
 
 :::caution[Experimental]
-The durable libraries ship as experimental in PiSharp 1.2.0.1. Every public type carries `[Experimental("PISHARP_DURABLE001")]`, and the API may change or be removed in any release without notice. A few members described here are on `main` only and marked "(experimental, unreleased)".
+The durable libraries ship as experimental from PiSharp 1.2.0.1, and the members marked "(from 1.2.0.2)" from 1.2.0.2. Every public type carries `[Experimental("PISHARP_DURABLE001")]`, and the API may change or be removed in any release without notice.
 :::
 
 ## Install
@@ -19,9 +19,9 @@ Add the packages and suppress the experimental diagnostic:
   <NoWarn>$(NoWarn);PISHARP_DURABLE001</NoWarn>
 </PropertyGroup>
 <ItemGroup>
-  <PackageReference Include="PiSharp.Durable" Version="1.2.0.1" />
-  <PackageReference Include="PiSharp.Durable.Sqlite" Version="1.2.0.1" />
-  <PackageReference Include="PiSharp.Durable.Tools" Version="1.2.0.1" />
+  <PackageReference Include="PiSharp.Durable" Version="1.2.0.2" />
+  <PackageReference Include="PiSharp.Durable.Sqlite" Version="1.2.0.2" />
+  <PackageReference Include="PiSharp.Durable.Tools" Version="1.2.0.2" />
 </ItemGroup>
 ```
 
@@ -29,7 +29,7 @@ Add the packages and suppress the experimental diagnostic:
 | --- | --- | --- |
 | `PiSharp.Durable` | `PiSharp.Durable`, `PiSharp.Durable.Chord`, `PiSharp.Durable.Storage`, `PiSharp.Durable.Storage.Jsonl`, `PiSharp.Durable.Env`, `PiSharp.Durable.Testing` | Sessions, the harness, tasks, JSON values, memory and JSONL storage, the execution environment contract, conformance kits |
 | `PiSharp.Durable.Sqlite` | `PiSharp.Durable.Sqlite` | SQLite storage over `Microsoft.Data.Sqlite` |
-| `PiSharp.Durable.Tools` | `PiSharp.Durable.Tools`, `PiSharp.Durable.Tools.Env` | The local execution environment, the coding tools, `tool_search`, durable code mode, and the media tools (experimental, unreleased) |
+| `PiSharp.Durable.Tools` | `PiSharp.Durable.Tools`, `PiSharp.Durable.Tools.Env` | The local execution environment, the coding tools, `tool_search`, durable code mode, and, from 1.2.0.2, the media tools |
 
 ## How it fits together
 
@@ -180,7 +180,7 @@ public sealed class ScriptedModels(params ScriptedReply[] replies) : IDurableMod
 ```
 
 :::tip
-The custom agents library has a ready-made scripted model, `FauxAgentModels` in `PiSharp.CustomAgents.Testing` (experimental, unreleased). See [Custom agents](/docs/custom-agents/overview/).
+The custom agents library has a ready-made scripted model, `FauxAgentModels` in `PiSharp.CustomAgents.Testing` (experimental). See [Custom agents](/docs/custom-agents/overview/).
 :::
 
 ## Real models
@@ -294,7 +294,7 @@ From `ISession` it has `CommitAsync` (four overloads over an `ITx`), `SnapshotAs
 | `ModelTools` | `ModelToolSelection.Only(...)` or `ModelToolSelection.Edit(remove, add)`: the tools offered to the model, including deferred ones it loaded |
 | `Instructions` | Text rendered after every extension section |
 | `Cwd` | Working directory, passed to `HarnessOptions.Env` |
-| `ServiceTier` | (experimental, unreleased) `auto`, `normal`, `economy`, `priority`, `fast` or `ultrafast`. A child conversation starts with its owner's. See [Service tiers](/docs/guides/service-tiers/). |
+| `ServiceTier` | (from 1.2.0.2) `auto`, `normal`, `economy`, `priority`, `fast` or `ultrafast`. A child conversation starts with its owner's. See [Service tiers](/docs/guides/service-tiers/). |
 
 `SubmissionDraft.Input(content, whenBusy, requestId, entry)` makes an input. `whenBusy` decides what happens while the conversation is working: `WhenBusy.Steer` places it at the next boundary of the running turn, `WhenBusy.FollowUp` waits until the turn ends, and `WhenBusy.Reject` throws `ConversationBusyException`. A `requestId` deduplicates within the conversation, so a retried submit after a crash doesn't queue twice. `SubmissionDraft.Write(entry, requestId)` appends an entry without starting a turn.
 
@@ -478,7 +478,7 @@ Here `options` is your `HarnessOptions`. Keep one writer per storage: the storag
 | `LocalExecutionEnv` | An `IExecutionEnv` over the local file system and shell: `new LocalExecutionEnv(cwd)`, or `LocalExecutionEnvOptions` with `Cwd`, `ShellPath`, `ShellEnv` and `Watch`. On Windows the shell is Git Bash. |
 | `ToolSearch` | `ToolSearch.CreateExtension()` (named `tool-search`) adds `tool_search`, which searches the conversation's deferred tools and loads the matches. Replay-safe. |
 | `DurableCodemode` | `DurableCodemode.CreateExtension(new CodemodeToolOptions { Sandbox = ... })` adds the `codemode` tool, which runs JavaScript that calls tools. It replays deterministically after a crash, and refuses when the engine, module version or script changed. See [Code mode](/docs/embed/codemode/) for the sandbox. |
-| `MediaTools` | (experimental, unreleased) Image, video, speech, transcription, music, embedding, rerank and decision tools. See [Media library](/docs/embed/media/#media-tools-in-your-own-harness). |
+| `MediaTools` | (from 1.2.0.2) Image, video, speech, transcription, music, embedding, rerank and decision tools. See [Media library](/docs/embed/media/#media-tools-in-your-own-harness). |
 
 A coding agent in a few lines:
 

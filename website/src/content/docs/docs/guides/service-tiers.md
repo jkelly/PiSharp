@@ -1,19 +1,19 @@
 ---
 title: Service tiers
-description: Choose normal, economy, priority, fast or ultrafast capacity for each request. Experimental and unreleased.
+description: Choose normal, economy, priority, fast or ultrafast capacity for each request. Experimental since PiSharp 1.2.0.2.
 sidebar:
   badge:
-    text: Unreleased
+    text: Experimental
     variant: caution
 ---
 
-:::caution[Experimental and unreleased]
-Service tiers are on PiSharp's `main` branch but not in any release or NuGet package yet. To use them, build PiSharp from source and reference the projects directly (see [Build from source](/docs/contribute/build/)). Their API is marked `[Experimental("PISHARP_TIERS001")]`, so suppress `PISHARP_TIERS001` in your project to compile it, and it may change or be removed without notice.
+:::caution[Experimental]
+Service tiers ship as experimental in PiSharp 1.2.0.2, in the CLI and the `PiSharp.AI`, `PiSharp.Agent` and `PiSharp.CodingAgent` packages. Their API is marked `[Experimental("PISHARP_TIERS001")]`, so suppress `PISHARP_TIERS001` in your project to compile it. They may change or be removed in any release, without notice or a deprecation period.
 :::
 
 A service tier asks the provider for a class of capacity: cheaper and slower, steadier at a higher price, or the fastest output a model has. Providers name these differently. PiSharp gives them one set of names and maps each to the field the provider's API expects. Pi has no service tiers; this is a PiSharp addition ([decision 0007](https://github.com/jkelly/PiSharp/blob/main/docs/decisions/0007-media-generation.md)).
 
-The `--tier` option and the `/tier` command are not in any release yet. To use them, run a CLI built from source (see [Run the CLI from source](/docs/contribute/build/#run-the-cli-from-source)).
+The `--tier` option and the `/tier` command are in `pisharp` from 1.2.0.2.
 
 ## Tiers
 

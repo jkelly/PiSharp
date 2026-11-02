@@ -296,6 +296,18 @@
       "tag": "v1.2.0.1 (b2a558a, merge of PR #22), release run 38993151457",
       "publishedOn": "2026-10-17",
       "blockers": []
+    },
+    "1.2.0.2": {
+      "version": "1.2.0.2",
+      "kind": "patch",
+      "baseline": "v1.2.0",
+      "status": "release-candidate",
+      "branch": "release/1.2.0.2",
+      "ships": "PiSharp-only, experimental: the media library and tools and service tiers (decision 0007, PRs #26, #29), custom agents as three new packages (decision 0012, PRs #25, #31), ask_user_question and plan mode in pisharp durable (PR #24), the durable device server and its commands in the CLI (decisions 0008-0010, PR #40), the maintained catalog layer (PR #36). pisharp fixes: write cap (PR #30), codemode model headers (PR #30), MCP close races (PRs #32, #34, #39), session switch, shutdown and JSON cancel (PR #37), RPC exit hang (PR #43). Source only: Web Agent, Durable Web, Durable.MSSQL (PRs #23, #40)",
+      "decisions": ["docs/decisions/0007-media-generation.md", "docs/decisions/0012-custom-agents.md", "docs/decisions/0008-durable-network-host-and-web.md"],
+      "notes": "docs/release-notes/1.2.0.2.md",
+      "changelog": "website/src/content/changelog/1.2.0.2.md (date 2026-11-01)",
+      "blockers": []
     }
   },
   "messageCaps": {

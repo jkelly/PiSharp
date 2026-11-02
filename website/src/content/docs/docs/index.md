@@ -20,13 +20,14 @@ PiSharp's version is the Pi version it matches. The current baseline is **Pi v1.
 
 Every layer is a separate library. See the [SDK](/sdk/) for the full list.
 
-## New on main
+## New in 1.2.0.2
 
-These features are on the `main` branch but in no release yet. Their pages are marked **Unreleased**. To use them, build PiSharp from source.
+These features are new in PiSharp 1.2.0.2. They are PiSharp's own, not Pi's, and experimental: their pages are marked **Experimental**, and they may change in any release.
 
-- [Custom agents](/docs/custom-agents/overview/): typed workflows, agent teams, and typed, scripted and dynamic tools, built on the durable runtime.
+- [Custom agents](/docs/custom-agents/overview/): typed workflows, agent teams, and typed, scripted and dynamic tools, built on the durable runtime, in three new packages.
 - [Media tools](/docs/guides/media/): image, video, speech, music, transcription, embeddings and reranking, for durable sessions and from the [SDK](/docs/embed/media/).
 - [Service tiers](/docs/guides/service-tiers/): ask a provider for economy, priority or fast capacity with `--tier` and `/tier`.
+- [Durable device server](/docs/guides/durable/#device-server): `pisharp durable serve` runs many durable sessions behind an authenticated local API, with questions and plan mode in `pisharp durable`.
 
 ## Where to go next
 

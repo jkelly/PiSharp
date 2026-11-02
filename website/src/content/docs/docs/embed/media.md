@@ -1,21 +1,21 @@
 ---
 title: Media library
-description: Embeddings, images, video, speech, transcription, music, rerank and decisions through PiSharp.AI.Media. Experimental and unreleased.
+description: Embeddings, images, video, speech, transcription, music, rerank and decisions through PiSharp.AI.Media. Experimental since PiSharp 1.2.0.2.
 sidebar:
   badge:
-    text: Unreleased
+    text: Experimental
     variant: caution
 ---
 
-:::caution[Experimental and unreleased]
-The media library is on PiSharp's `main` branch but not in any release or NuGet package yet. To use it, build PiSharp from source and reference the projects directly (see [Build from source](/docs/contribute/build/)). Its API is marked `[Experimental("PISHARP_MEDIA001")]`, so suppress `PISHARP_MEDIA001` in your project to compile it, and it may change or be removed without notice.
+:::caution[Experimental]
+The media library ships as experimental in PiSharp 1.2.0.2, in the `PiSharp.AI` package, and its tools in `PiSharp.Durable.Tools` and `pisharp durable`. Its API is marked `[Experimental("PISHARP_MEDIA001")]`, so suppress `PISHARP_MEDIA001` in your project to compile it. It may change or be removed in any release, without notice or a deprecation period.
 :::
 
-The `PiSharp.AI.Media` namespace, in the `PiSharp.AI` project, gives you one registry for eight kinds of model: embeddings, images, video, speech, transcription, music, rerank and decisions. You name a model as `provider/model`, the registry finds its API, credentials and base URL, and you get a result back. It builds on [model operations](/docs/embed/model-operations/): the same auth resolver, request options and image contract. The [media tools](/docs/guides/media/) of `pisharp durable` are built on it. Pi has no media library; this is a PiSharp addition ([decision 0007](https://github.com/jkelly/PiSharp/blob/main/docs/decisions/0007-media-generation.md)).
+The `PiSharp.AI.Media` namespace, in the `PiSharp.AI` package, gives you one registry for eight kinds of model: embeddings, images, video, speech, transcription, music, rerank and decisions. You name a model as `provider/model`, the registry finds its API, credentials and base URL, and you get a result back. It builds on [model operations](/docs/embed/model-operations/): the same auth resolver, request options and image contract. The [media tools](/docs/guides/media/) of `pisharp durable` are built on it. Pi has no media library; this is a PiSharp addition ([decision 0007](https://github.com/jkelly/PiSharp/blob/main/docs/decisions/0007-media-generation.md)).
 
 ## Install
 
-Reference `PiSharp.AI` from your clone and suppress the diagnostic (see [Reference the projects from your app](/docs/contribute/build/#reference-the-projects-from-your-app)):
+Add the `PiSharp.AI` package and suppress the diagnostic:
 
 ```xml
 <PropertyGroup>
@@ -23,7 +23,7 @@ Reference `PiSharp.AI` from your clone and suppress the diagnostic (see [Referen
   <NoWarn>$(NoWarn);PISHARP_MEDIA001</NoWarn>
 </PropertyGroup>
 <ItemGroup>
-  <ProjectReference Include="../PiSharp/src/PiSharp.AI/PiSharp.AI.csproj" />
+  <PackageReference Include="PiSharp.AI" Version="1.2.0.2" />
 </ItemGroup>
 ```
 
@@ -330,7 +330,7 @@ OpenAI has no video API. To add your own, implement `IEmbeddingsApi`, `IImagesAp
 
 ## Media tools in your own harness
 
-`PiSharp.Durable.Tools` turns the registry into the ten durable tools of `pisharp durable` ([Media tools](/docs/guides/media/)). The media tools are on `main` only, so reference `src/PiSharp.Durable.Tools/PiSharp.Durable.Tools.csproj` from your clone too, and suppress `PISHARP_DURABLE001` as well (see [Durable library](/docs/embed/durable/)):
+`PiSharp.Durable.Tools` turns the registry into the ten durable tools of `pisharp durable` ([Media tools](/docs/guides/media/)). Add the `PiSharp.Durable.Tools` package too, and suppress `PISHARP_DURABLE001` as well (see [Durable library](/docs/embed/durable/)):
 
 ```csharp
 using PiSharp.AI.Media;

@@ -40,7 +40,7 @@ public sealed partial class ReplaceableAgentSession
     /// <summary>The attachment's catalog registry, captured between owner mutations. A resource close, reload or switch holds the
     /// session's replacement reservation only inside one, and the session refuses a capture meanwhile ("Session replacement is in
     /// progress"); this joins them instead, so binding a resource is not refused because another one is closing.</summary>
-    public async Task<SessionRuntimeRegistry> CaptureToolCatalogRegistryAsync(AgentSessionAttachment attachment, CancellationToken token = default)
+    internal async Task<SessionRuntimeRegistry> CaptureToolCatalogRegistryAsync(AgentSessionAttachment attachment, CancellationToken token = default)
     {
         RejectTransitionReentrancy(); ValidateAttachment(attachment);
         using var linked = CancellationTokenSource.CreateLinkedTokenSource(token, closing.Token, attachment.LifetimeToken);
@@ -54,7 +54,7 @@ public sealed partial class ReplaceableAgentSession
     /// between owner mutations once that operation ended. Access the session admits never waits, so a tool call or an input callback
     /// (which a pending catalog publication may be waiting for) is not held here; within this owner's own operations the access gets
     /// the session's refusal.</summary>
-    public async Task AccessSessionAsync(AgentSessionAttachment attachment, Action<PersistentAgentSession> access, CancellationToken token = default)
+    internal async Task AccessSessionAsync(AgentSessionAttachment attachment, Action<PersistentAgentSession> access, CancellationToken token = default)
     {
         ArgumentNullException.ThrowIfNull(access); ValidateAttachment(attachment);
         try { access(attachment.Session); return; }
@@ -68,7 +68,7 @@ public sealed partial class ReplaceableAgentSession
     /// <summary>Joins the owner operation that holds the attachment's session, if one does, so input the session refuses meanwhile
     /// ("Session replacement is in progress") is admitted once it ended. Returns at once when none does, when the attachment is no
     /// longer current, and within this owner's own operations.</summary>
-    public async Task JoinReservationAsync(AgentSessionAttachment attachment, CancellationToken token = default)
+    internal async Task JoinReservationAsync(AgentSessionAttachment attachment, CancellationToken token = default)
     {
         ArgumentNullException.ThrowIfNull(attachment);
         lock (gate) if (closed || !ReferenceEquals(current, attachment)) return;

@@ -20,7 +20,9 @@ $libraries = @(
     'PiSharp.PromptTemplates.Yaml', 'PiSharp.Rpc', 'PiSharp.Tui', 'PiSharp.Extensions.Abstractions',
     'PiSharp.Extensions.Runtime', 'PiSharp.Extensions.Agent', 'PiSharp.ExtensionHost', 'PiSharp.Compatibility.Node', 'PiSharp.Codemode',
     # Decision 0005: the experimental durable port (1.2.0.1), in dependency order.
-    'PiSharp.Durable', 'PiSharp.Durable.Tools', 'PiSharp.Durable.Sqlite'
+    'PiSharp.Durable', 'PiSharp.Durable.Tools', 'PiSharp.Durable.Sqlite',
+    # Decision 0012: the experimental custom agents (1.2.0.2), after the durable packages they build on.
+    'PiSharp.CustomAgents', 'PiSharp.CustomAgents.JavaScript', 'PiSharp.CustomAgents.Scripting'
 )
 
 if ($Version -cnotmatch '^([0-9]+\.[0-9]+\.[0-9]+(?:\.[0-9]+)?)(?:-([0-9A-Za-z]+(?:[.-][0-9A-Za-z]+)*))?$') {

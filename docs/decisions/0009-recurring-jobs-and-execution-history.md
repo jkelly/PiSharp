@@ -1,6 +1,6 @@
 # Recurring jobs, scoped triggers, execution history and audits
 
-Status: implementation requested by the owner on 2026-10-20, on `feature/durable-network`.
+Status: implementation requested by the owner on 2026-10-20, on `feature/durable-network`. Released as experimental in PiSharp 1.2.0.2, in the CLI tool's device server (`pisharp durable serve` and its device commands); nothing here is packed.
 
 The reference is disler/pi-durable-news-agent at `273b79bb8d3d8907cae9fbd6abd3da163ee2a343`. This milestone adds reusable hosting features; it does not add the news application or a dependency on jev.
 

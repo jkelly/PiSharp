@@ -1,16 +1,16 @@
 ---
 title: Agent tools
-description: Typed tools, dynamic tool sources, JavaScript and C# script tools, plugins, and web and X search. Experimental and unreleased.
+description: Typed tools, dynamic tool sources, JavaScript and C# script tools, plugins, and web and X search. Experimental since PiSharp 1.2.0.2.
 sidebar:
   badge:
-    text: Unreleased
+    text: Experimental
     variant: caution
 ---
 
-:::caution[Experimental and unreleased]
-The custom agents library is on PiSharp's `main` branch but not in any release or NuGet package yet. To use it, build PiSharp from
-source and reference the projects directly (see [Build from source](/docs/contribute/build/)). Its API is marked
-`[Experimental("PISHARP_AGENTS001")]` and builds on durable APIs marked `[Experimental("PISHARP_DURABLE001")]`, so suppress `PISHARP_AGENTS001` and `PISHARP_DURABLE001` in your project to compile it, and it may change or be removed without notice.
+:::caution[Experimental]
+The custom agents library ships as experimental in PiSharp 1.2.0.2, as the `PiSharp.CustomAgents`, `PiSharp.CustomAgents.JavaScript` and
+`PiSharp.CustomAgents.Scripting` packages. Its API is marked `[Experimental("PISHARP_AGENTS001")]` and builds on durable APIs marked
+`[Experimental("PISHARP_DURABLE001")]`, so suppress `PISHARP_AGENTS001` and `PISHARP_DURABLE001` in your project to compile it. It may change or be removed in any release, without notice or a deprecation period.
 :::
 
 Every tool an agent calls is a durable `ToolRegistration`. The custom agents library builds them for you from typed C# handlers, JavaScript, C# scripts, plugin DLLs and native PiSharp extensions, and keeps changing sets of them in tool sources. It also ships a ready-made `web_search` tool. You give tools to an agent through its [definition](/docs/custom-agents/teams/#agent-definitions): `Tools` for its own tools, `ToolSources` for shared sets.
@@ -331,7 +331,7 @@ The plugin project references `PiSharp.CustomAgents` without copying it, because
     <NoWarn>$(NoWarn);PISHARP_DURABLE001;PISHARP_AGENTS001</NoWarn>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="../PiSharp/src/PiSharp.CustomAgents/PiSharp.CustomAgents.csproj" Private="false" />
+    <PackageReference Include="PiSharp.CustomAgents" Version="1.2.0.2" ExcludeAssets="runtime" />
     <None Include="pisharp-agents-plugin.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

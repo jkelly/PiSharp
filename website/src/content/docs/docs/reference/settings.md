@@ -46,7 +46,7 @@ Before merging, PiSharp migrates old keys in each file, as Pi does: `queueMode` 
 | `modelThinkingLevels` | object | none | Thinking level per model, keyed by `"provider/modelId"`. Wins over `defaultThinkingLevel`. |
 | `enabledModels` | string array | none | Model patterns for `Ctrl+P` cycling, in the `--models` format. `/scoped-models` writes it. |
 | `thinkingBudgets` | object: `minimal`, `low`, `medium`, `high` (numbers) | none | Pi's custom token budgets per thinking level. PiSharp parses it but ignores it. |
-| `serviceTier` | string | none | PiSharp only (experimental, unreleased): the default [service tier](/docs/guides/service-tiers/). See [PiSharp keys](#pisharp-keys). |
+| `serviceTier` | string | none | PiSharp only (experimental): the default [service tier](/docs/guides/service-tiers/). See [PiSharp keys](#pisharp-keys). |
 
 ## Sessions, queue and compaction
 
@@ -157,11 +157,11 @@ Pi doesn't have these keys. Pi ignores them, so a shared `settings.json` keeps w
 | Key | Type | Default | Effect |
 | --- | --- | --- | --- |
 | `toolPolicy` | `pi`, `explicit` | `pi` | `pi` lets the file tools take any path and `bash` run any command, as in Pi. `explicit` limits them to granted paths and commands; the main entry passes no grants, so file tools refuse every path and `bash`, `grep` and `find` are left out. `--tool-policy` wins. See [Tool policy](/docs/reference/configuration/#tool-policy). |
-| `serviceTier` | `auto`, `normal`, `economy`, `priority`, `fast`, `ultrafast` | none | The session's service tier when `--tier` isn't given. `/tier <tier> default` writes it. Experimental and unreleased; see below. |
-| `media` | object | none | Defaults for the media tools of `pisharp durable`. Experimental and unreleased; see below. |
+| `serviceTier` | `auto`, `normal`, `economy`, `priority`, `fast`, `ultrafast` | none | The session's service tier when `--tier` isn't given. `/tier <tier> default` writes it. Experimental; see below. |
+| `media` | object | none | Defaults for the media tools of `pisharp durable`. Experimental; see below. |
 
-:::caution[Experimental and unreleased]
-`serviceTier` and `media` are on PiSharp's `main` branch but not in any release yet, and need a CLI built from source. They may change or be removed without notice. See [Service tiers](/docs/guides/service-tiers/) and [Media](/docs/guides/media/).
+:::caution[Experimental]
+`serviceTier` and `media` are experimental, from PiSharp 1.2.0.2. They may change or be removed in any release, without notice. See [Service tiers](/docs/guides/service-tiers/) and [Media](/docs/guides/media/).
 :::
 
 `media` holds these keys:

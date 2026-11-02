@@ -2,8 +2,9 @@
 
 Status: accepted for implementation by the owner's request of 2026-10-20 ("implement the plan"), on `feature/durable-network`. This record
 freezes the contracts the roadmap in [plans/09](../plans/09-durable-remaining-features.md) left to F1. It supersedes the proposals in
-`AI_DOCS/contracts.md` wherever they differ. Everything here is PiSharp-only and experimental (`PISHARP_DURABLE001`); nothing is packed or
-published.
+`AI_DOCS/contracts.md` wherever they differ. Everything here is PiSharp-only and experimental (`PISHARP_DURABLE001`); nothing is packed.
+Since 1.2.0.2 the device server that implements them ships, experimental, inside the CLI tool (`pisharp durable serve`; see
+[0008](0008-durable-network-host-and-web.md)).
 
 ## B0 baseline
 

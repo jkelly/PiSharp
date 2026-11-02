@@ -6,9 +6,11 @@ using PiSharp.Contracts;
 
 namespace PiSharp.AI.Catalogs;
 
+[System.Diagnostics.CodeAnalysis.Experimental("PISHARP_CATALOG001")]
 public sealed record MaintainedCatalogResult(ImmutableArray<JsonData> Models, ImmutableArray<string> Warnings);
 
 /// <summary>Applies separately maintained, evidence-backed chat metadata without altering pinned source catalogs.</summary>
+[System.Diagnostics.CodeAnalysis.Experimental("PISHARP_CATALOG001")]
 public static class MaintainedCatalogOverlay
 {
     public static MaintainedCatalogResult Apply(string provider, IEnumerable<JsonData> baseline, JsonData overlay,
