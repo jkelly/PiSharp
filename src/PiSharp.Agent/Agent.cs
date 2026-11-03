@@ -28,6 +28,15 @@ public sealed record AgentConfiguration(ModelDescriptor Model, IChatTransport Tr
     /// a session can switch tiers between requests. Null sends none.</summary>
     [System.Diagnostics.CodeAnalysis.Experimental("PISHARP_TIERS001")]
     public Func<string?>? ServiceTier { get; init; }
+    /// <summary>Source AgentOptions.identity / agent.identity: how every request identifies the calling app
+    /// (<see cref="ChatRequest.Identity"/>), merged field by field over <see cref="DefaultIdentity"/>. Null leaves requests as they are.</summary>
+    [System.Diagnostics.CodeAnalysis.Experimental("PISHARP_IDENTITY001")]
+    public ClientIdentity? Identity { get; init; }
+    /// <summary>Source agent-loop.ts DEFAULT_AGENT_IDENTITY, under every agent identity. Upstream's attributes requests to Pi
+    /// (<c>{ attribution: PI_ATTRIBUTION }</c>); PiSharp's is empty, so the agent adds no attribution (the default attribution is the
+    /// owner's decision, core.client-identity-attribution).</summary>
+    [System.Diagnostics.CodeAnalysis.Experimental("PISHARP_IDENTITY001")]
+    public static ClientIdentity DefaultIdentity { get; } = new();
 }
 public enum AgentCancellationBehavior { Propagate, SettleAborted }
 public sealed record AgentOptions(AgentLoopOptions? Loop = null, AgentPendingInputQueueOptions? Queue = null,
@@ -345,7 +354,7 @@ public sealed class Agent : IAsyncDisposable
             }
             var turn = new TurnRunner(new ChatClient(config.Transport, _options.StreamCapacity) { TimeProvider = _options.TimeProvider },
                 new ToolBatchScheduler(config.Tools, config.ToolHooks, config.ExecutionMode, _progressOptions, _options.ResultValues)
-                { TimeProvider = _options.TimeProvider }, config.ThinkingLevel, config.SessionId) { ServiceTier = config.ServiceTier };
+                { TimeProvider = _options.TimeProvider }, config.ThinkingLevel, config.SessionId) { ServiceTier = config.ServiceTier, Identity = config.Identity };
             async ValueTask<AgentLoopRequestPreparation?> PrepareBoundary(AgentRequestBoundary boundary, CancellationToken cancellation, int attempt = 0)
             {
                 if (attempt >= 16) throw new InvalidOperationException("Request boundary revision retry limit exceeded.");
@@ -371,7 +380,7 @@ public sealed class Agent : IAsyncDisposable
                     throw new ArgumentException("Invalid boundary system update.");
                 var nextRunner = new TurnRunner(new ChatClient(admitted.Transport, _options.StreamCapacity) { TimeProvider = _options.TimeProvider },
                     new ToolBatchScheduler(admitted.Tools, admitted.ToolHooks, admitted.ExecutionMode, _progressOptions, _options.ResultValues)
-                    { TimeProvider = _options.TimeProvider }, admitted.ThinkingLevel, admitted.SessionId) { ServiceTier = admitted.ServiceTier };
+                    { TimeProvider = _options.TimeProvider }, admitted.ThinkingLevel, admitted.SessionId) { ServiceTier = admitted.ServiceTier, Identity = admitted.Identity };
                 cancellation.ThrowIfCancellationRequested();
                 var published = false;
                 try { await InCallbackAsync(run, () => update.PublishAsync(() =>

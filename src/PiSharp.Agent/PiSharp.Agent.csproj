@@ -4,6 +4,8 @@
     <NoWarn>$(NoWarn);PISHARP_TIERS001;PISHARP_AI001</NoWarn>
     <!-- Pi v1.5.0 sync: tool arguments are validated with the [Experimental] pi-schema port in PiSharp.Contracts.Schema. -->
     <NoWarn>$(NoWarn);PISHARP_SCHEMA001</NoWarn>
+    <!-- Pi v1.5.0 sync: the agent stamps its [Experimental] client identity on each request (core.agent-identity). -->
+    <NoWarn>$(NoWarn);PISHARP_IDENTITY001</NoWarn>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../PiSharp.Contracts/PiSharp.Contracts.csproj" />
