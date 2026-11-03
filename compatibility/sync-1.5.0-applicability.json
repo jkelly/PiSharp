@@ -56,11 +56,11 @@
     "changelogBullets": 477,
     "repeatedBullets": 23,
     "byStatus": {
-      "ported": 120,
-      "ported-with-deferral": 15,
+      "ported": 151,
+      "ported-with-deferral": 12,
       "already-ported": 13,
       "no-op": 25,
-      "port": 153
+      "port": 125
     },
     "byArea": {
       "ai": 58,
@@ -3375,7 +3375,7 @@
       "id": "ai.openrouter-reported-cost",
       "area": "ai",
       "phase": 2,
-      "status": "ported-with-deferral",
+      "status": "ported",
       "changelog": [
         "ai@1.5.0/Fixed#14",
         "coding-agent@1.5.0/Fixed#51"
@@ -3400,13 +3400,14 @@
       "notes": "PiSharp has no is_byok handling and always uses the catalog estimate. Depends on group C's ai.usage-total-from-provider (ai@1.5.0/Added#4). The template.js change also changes the asset hashes in SessionHtmlExport.cs (lines 37-39); coordinate with cli.export-html-deep-sessions and cli.export-html-system-messages.",
       "evidence": {
         "commits": [
-          "48a3c1a9"
+          "48a3c1a9",
+          "35230496"
         ],
         "tests": [
-          "tests/PiSharp.ProviderSync.Tests/Sync150StreamCases.cs: sync150.openrouter-reported-cost-completions-and-anthropic"
+          "tests/PiSharp.ProviderSync.Tests/Sync150StreamCases.cs: sync150.openrouter-reported-cost-completions-and-anthropic",
+          "tests/PiSharp.SessionParity.Tests/Sync150CliCases.cs: sync150.html-export-cost-total-prefers-the-recorded-total"
         ]
-      },
-      "deferred": "export-html template.js cost sums (cli.export-html owner)"
+      }
     },
     {
       "id": "ai.opencode-protocol-endpoints",
@@ -4302,7 +4303,7 @@
       "id": "core.custom-ui-blocked-status",
       "area": "coding-agent-core",
       "phase": 2,
-      "status": "ported-with-deferral",
+      "status": "ported",
       "changelog": [
         "coding-agent@1.5.0/Added#7"
       ],
@@ -4324,14 +4325,15 @@
       "notes": "Built-in extension dialogs already report blocked (InteractiveMode.ExtensionUi.cs:136 programStatus.SetBlocked(\"extension-dialog\", ...)); custom components do not. The bridge's ui.custom request (runtime.mjs:567) forwards overlay and overlayOptions only, so add blocked there and in the native custom-component contract ([Experimental]).",
       "evidence": {
         "commits": [
-          "b6f26b0c"
+          "b6f26b0c",
+          "42d9497a"
         ],
         "tests": [
           "tests/PiSharp.InteractiveParity.Tests/Sync150SessionCases.cs: sync150.custom-component-blocked-option-is-inline-only",
-          "tests/PiSharp.InteractiveParity.Tests/Sync150SessionCases.cs: sync150.inline-custom-component-reports-blocked-status"
+          "tests/PiSharp.InteractiveParity.Tests/Sync150SessionCases.cs: sync150.inline-custom-component-reports-blocked-status",
+          "tests/PiSharp.InteractiveParity.Tests/Sync150CliCases.cs: sync150.blocked-status-follows-the-top-custom-component"
         ]
-      },
-      "deferred": "Clearing the status when a plain custom component is stacked on top and restoring it when that one closes: PiSharp shows one inline component at a time and has no dialog stack yet, so this waits for cli.concurrent-extension-dialogs (cli package)."
+      }
     },
     {
       "id": "core.glob-amplification",
@@ -4836,7 +4838,7 @@
       "id": "cli.session-share-destination",
       "area": "coding-agent-cli",
       "phase": 2,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "coding-agent@1.3.0/New Features#1",
         "coding-agent@1.3.0/Added#2"
@@ -4868,7 +4870,17 @@
         "website/src/content/docs/docs/reference/settings.md"
       ],
       "release": "1.5.0",
-      "notes": "SessionShare.cs already tries Radius and falls back to a gist, which is the auto behaviour, but has no setting; the /share description still says \"Share session as a secret GitHub gist\" (InteractiveMode.Resources.cs:32). Add the setting to PiSettings, InteractiveSettings (Transport-style accessor at :212-213), the selector and settings.schema.json, and document it."
+      "notes": "SessionShare.cs already tries Radius and falls back to a gist, which is the auto behaviour, but has no setting; the /share description still says \"Share session as a secret GitHub gist\" (InteractiveMode.Resources.cs:32). Add the setting to PiSettings, InteractiveSettings (Transport-style accessor at :212-213), the selector and settings.schema.json, and document it.",
+      "evidence": {
+        "commits": [
+          "d74a941d",
+          "31d67ba2"
+        ],
+        "tests": [
+          "tests/PiSharp.SessionParity.Tests/Sync150CliCases.cs: sync150.share-destination-chooses-radius-or-gist",
+          "tests/PiSharp.InteractiveParity.Tests/Sync150CliCases.cs: sync150.settings-session-share-destination"
+        ]
+      }
     },
     {
       "id": "cli.pinned-internal-dependencies",
@@ -4896,7 +4908,7 @@
       "id": "cli.model-reference-resolution",
       "area": "coding-agent-cli",
       "phase": 2,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "coding-agent@1.3.0/Fixed#5"
       ],
@@ -4915,7 +4927,17 @@
         "website/src/content/docs/docs/reference/cli.md"
       ],
       "release": "1.5.0",
-      "notes": "PiSharp's ModelResolver handles ambiguity only for exact matches (ModelResolver.cs:170-215) and otherwise follows catalog order; PiAuthCommand.cs:145, :212 and :223 resolve through ResolveCliModel and follow whatever it decides. The warning texts and the credential test must match upstream."
+      "notes": "PiSharp's ModelResolver handles ambiguity only for exact matches (ModelResolver.cs:170-215) and otherwise follows catalog order; PiAuthCommand.cs:145, :212 and :223 resolve through ResolveCliModel and follow whatever it decides. The warning texts and the credential test must match upstream.",
+      "evidence": {
+        "commits": [
+          "e36096fb"
+        ],
+        "tests": [
+          "tests/PiSharp.CliParity.Tests/Sync150CliCases.cs: sync150.model-references-choose-providers-by-prefix-and-credentials",
+          "tests/PiSharp.Models.Tests/Sync150CliCases.cs: sync150.model-references-never-follow-catalog-order",
+          "tests/PiSharp.Models.Tests/Sync150CliCases.cs: sync150.model-scope-adds-every-provider-of-an-ambiguous-pattern"
+        ]
+      }
     },
     {
       "id": "cli.nix-catalog-pin",
@@ -4982,7 +5004,7 @@
       "id": "cli.custom-overlay-own-handle",
       "area": "coding-agent-cli",
       "phase": 2,
-      "status": "port",
+      "status": "ported-with-deferral",
       "changelog": [
         "coding-agent@1.3.0/Fixed#23"
       ],
@@ -4996,13 +5018,23 @@
         "tools/NodeBridge/pi-host/runtime.mjs"
       ],
       "release": "1.5.0",
-      "notes": "PiSharp has no overlay mode for extension custom components. The bridge sends overlay and overlayOptions (tools/NodeBridge/pi-host/runtime.mjs:566-567), but OpenComponentAsync ignores them (PiExtensionHost.Requests.cs:793-808). ShowExtensionCustomComponentAsync puts the component in the editor slot and refuses a second one (InteractiveMode.ExtensionHost.cs:211). Decision 0013 puts the gap in scope: port overlay mode (stacked overlays, overlayOptions), where done() hides the overlay its own handle opened."
+      "notes": "PiSharp has no overlay mode for extension custom components. The bridge sends overlay and overlayOptions (tools/NodeBridge/pi-host/runtime.mjs:566-567), but OpenComponentAsync ignores them (PiExtensionHost.Requests.cs:793-808). ShowExtensionCustomComponentAsync puts the component in the editor slot and refuses a second one (InteractiveMode.ExtensionHost.cs:211). Decision 0013 puts the gap in scope: port overlay mode (stacked overlays, overlayOptions), where done() hides the overlay its own handle opened.",
+      "evidence": {
+        "commits": [
+          "42d9497a"
+        ],
+        "tests": [
+          "tests/PiSharp.InteractiveParity.Tests/Sync150CliCases.cs: sync150.overlay-custom-component-done-hides-its-own-overlay",
+          "tests/PiSharp.InteractiveParity.Tests/Sync150CliCases.cs: sync150.custom-overlay-options-from-the-bridge"
+        ]
+      },
+      "deferred": "onHandle (the overlay handle Pi hands the extension for setHidden/focus/unfocus/getBounds) and overlayOptions.visible are functions in the Node realm. Forwarding them needs a remote handle object and a synchronous bridge call per render, which is new bridge protocol, not a small additive edit."
     },
     {
       "id": "cli.concurrent-extension-dialogs",
       "area": "coding-agent-cli",
       "phase": 2,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "coding-agent@1.4.0/Fixed#6"
       ],
@@ -5015,13 +5047,25 @@
         "src/PiSharp.Cli/Interactive/Mode/InteractiveCustomComponentUi.cs"
       ],
       "release": "1.5.0",
-      "notes": "PiSharp keeps one field per dialog kind (extensionSelector, extensionInput, extensionEditor) and closes the active one before showing another (InteractiveMode.ExtensionUi.cs:109-143). The blocked program status must follow the visible dialog, as showTopExtensionDialog does."
+      "notes": "PiSharp keeps one field per dialog kind (extensionSelector, extensionInput, extensionEditor) and closes the active one before showing another (InteractiveMode.ExtensionUi.cs:109-143). The blocked program status must follow the visible dialog, as showTopExtensionDialog does.",
+      "evidence": {
+        "commits": [
+          "42d9497a"
+        ],
+        "tests": [
+          "tests/PiSharp.InteractiveParity.Tests/Sync150CliCases.cs: sync150.extension-dialogs-stack-in-the-editor-slot",
+          "tests/PiSharp.InteractiveParity.Tests/Sync150CliCases.cs: sync150.blocked-status-follows-the-top-custom-component",
+          "tests/PiSharp.ExtensionParity.Tests/Sync150CliCases.cs: sync150.bridge-component-captures-viewport-input",
+          "tests/PiSharp.ExtensionParity.Tests/Sync150CliCases.cs: sync150.bridge-key-hints-survive-reload-and-a-late-node-start",
+          "tests/PiSharp.InteractiveParity.Tests/Sync150CliCases.cs: sync150.extension-component-proxy-forwards-captures-viewport-input"
+        ]
+      }
     },
     {
       "id": "cli.clipboard-helper-process-group",
       "area": "coding-agent-cli",
       "phase": 2,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "coding-agent@1.4.0/Fixed#7"
       ],
@@ -5034,7 +5078,15 @@
         "src/PiSharp.Tools/Processes/Unix/PosixSpawnProcessAdmission.cs"
       ],
       "release": "1.5.0",
-      "notes": "ClipboardCommand.cs:27-41 uses Process.Start, which keeps the child in PiSharp's process group, and ProcessStartInfo has no detach option. PiSharp.Tools already spawns into a new process group with posix_spawn and POSIX_SPAWN_SETPGROUP (PosixSpawnProcessAdmission.cs:121-122); reuse it or setsid. Windows is unchanged."
+      "notes": "ClipboardCommand.cs:27-41 uses Process.Start, which keeps the child in PiSharp's process group, and ProcessStartInfo has no detach option. PiSharp.Tools already spawns into a new process group with posix_spawn and POSIX_SPAWN_SETPGROUP (PosixSpawnProcessAdmission.cs:121-122); reuse it or setsid. Windows is unchanged.",
+      "evidence": {
+        "commits": [
+          "934549a5"
+        ],
+        "tests": [
+          "tests/PiSharp.InteractiveParity.Tests/Sync150CliCases.cs: sync150.clipboard-helpers-start-from-the-root-in-their-own-group"
+        ]
+      }
     },
     {
       "id": "cli.managed-install-marker-bom",
@@ -5057,7 +5109,7 @@
       "id": "cli.extension-changelogs",
       "area": "coding-agent-cli",
       "phase": 2,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "coding-agent@1.5.0/New Features#1",
         "coding-agent@1.5.0/Added#1"
@@ -5084,13 +5136,24 @@
         "src/PiSharp.CodingAgent/Schemas/settings.schema.json"
       ],
       "release": "1.5.0",
-      "notes": "Decision 0013 scope 'the update UX'. PiSharp shows its own changelog the same way (InteractiveMode.cs:522-540 GetChangelogForDisplay with lastChangelogVersion; collapseChangelog in InteractiveSettings.cs), so reuse that parser. Applies to the npm and git packages PiPackageManager installs; decide what native extension packages report. settings.schema.json gains extensionChangelogVersions (refresh it with the other settings-schema rows)."
+      "notes": "Decision 0013 scope 'the update UX'. PiSharp shows its own changelog the same way (InteractiveMode.cs:522-540 GetChangelogForDisplay with lastChangelogVersion; collapseChangelog in InteractiveSettings.cs), so reuse that parser. Applies to the npm and git packages PiPackageManager installs; decide what native extension packages report. settings.schema.json gains extensionChangelogVersions (refresh it with the other settings-schema rows).",
+      "evidence": {
+        "commits": [
+          "be1d60d5",
+          "31d67ba2"
+        ],
+        "tests": [
+          "tests/PiSharp.ExtensionParity.Tests/Sync150CliCases.cs: sync150.package-changelog-path-stays-inside-the-package",
+          "tests/PiSharp.InteractiveParity.Tests/Sync150CliCases.cs: sync150.extension-changelog-updates",
+          "tests/PiSharp.InteractiveParity.Tests/Sync150CliCases.cs: sync150.extension-changelog-startup-notice"
+        ]
+      }
     },
     {
       "id": "cli.self-update-command",
       "area": "coding-agent-cli",
       "phase": 2,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "coding-agent@1.5.0/New Features#3",
         "coding-agent@1.5.0/Added#4"
@@ -5114,7 +5177,16 @@
         "src/PiSharp.CodingAgent/Schemas/settings.schema.json"
       ],
       "release": "1.5.0",
-      "notes": "Today the self target always fails with \"cannot self-update this installation\" (PiPackageCommands.cs:410-414). Decision 0013 'Self-update': the check asks NuGet for PiSharp.Cli (VersionCheck.cs), never pi.dev, and the command runs when NuGet reports a newer PiSharp.Cli, so {packageName} is PiSharp.Cli and {installSpec} PiSharp.Cli@<version>; record this as an intentional difference. The command comes from the environment or global settings only, never a project file; spawn it without a shell. PiCommand.cs carries the --help environment list."
+      "notes": "Today the self target always fails with \"cannot self-update this installation\" (PiPackageCommands.cs:410-414). Decision 0013 'Self-update': the check asks NuGet for PiSharp.Cli (VersionCheck.cs), never pi.dev, and the command runs when NuGet reports a newer PiSharp.Cli, so {packageName} is PiSharp.Cli and {installSpec} PiSharp.Cli@<version>; record this as an intentional difference. The command comes from the environment or global settings only, never a project file; spawn it without a shell. PiCommand.cs carries the --help environment list.",
+      "evidence": {
+        "commits": [
+          "80d475e2",
+          "31d67ba2"
+        ],
+        "tests": [
+          "tests/PiSharp.ExtensionParity.Tests/Sync150CliCases.cs: sync150.self-update-runs-the-configured-command"
+        ]
+      }
     },
     {
       "id": "cli.managed-npm-ci-age-gate",
@@ -5138,7 +5210,7 @@
       "id": "cli.model-selector-distinct-names",
       "area": "coding-agent-cli",
       "phase": 2,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "coding-agent@1.5.0/Changed#4"
       ],
@@ -5154,13 +5226,21 @@
         "src/PiSharp.Cli/Interactive/Mode/Components/ScopedModelsSelector.cs"
       ],
       "release": "1.5.0",
-      "notes": "Split with Unicode letter/number classes (\\p{L}\\p{N}) as the upstream regex does. The page-key changes to the same selectors are D1's coding-agent@1.5.0/Fixed#19."
+      "notes": "Split with Unicode letter/number classes (\\p{L}\\p{N}) as the upstream regex does. The page-key changes to the same selectors are D1's coding-agent@1.5.0/Fixed#19.",
+      "evidence": {
+        "commits": [
+          "0921e32f"
+        ],
+        "tests": [
+          "tests/PiSharp.InteractiveParity.Tests/Sync150CliCases.cs: sync150.model-rows-show-distinct-names"
+        ]
+      }
     },
     {
       "id": "cli.login-device-code-actions",
       "area": "coding-agent-cli",
       "phase": 2,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "ai@1.5.0/Added#1",
         "coding-agent@1.5.0/Added#3"
@@ -5175,13 +5255,21 @@
         "src/PiSharp.Cli/Interactive/InteractiveSessionFrontend.ProviderLogin.cs"
       ],
       "release": "1.5.0",
-      "notes": "LoginDialog.ShowDeviceCode(userCode, verificationUri) (LoginDialog.cs:120) only shows the code; the dialog already has OpenBrowser and CopyToClipboard hooks for the auth URL, which tests can replace. Depends on ai.device-code-confirm-options. The http(s)-only check matches D1's login-dialog hardening (coding-agent@1.5.0/Fixed#18)."
+      "notes": "LoginDialog.ShowDeviceCode(userCode, verificationUri) (LoginDialog.cs:120) only shows the code; the dialog already has OpenBrowser and CopyToClipboard hooks for the auth URL, which tests can replace. Depends on ai.device-code-confirm-options. The http(s)-only check matches D1's login-dialog hardening (coding-agent@1.5.0/Fixed#18).",
+      "evidence": {
+        "commits": [
+          "0921e32f"
+        ],
+        "tests": [
+          "tests/PiSharp.InteractiveParity.Tests/Sync150CliCases.cs: sync150.login-dialog-device-code-actions"
+        ]
+      }
     },
     {
       "id": "cli.resume-search-fields",
       "area": "coding-agent-cli",
       "phase": 2,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "coding-agent@1.5.0/Fixed#13"
       ],
@@ -5193,13 +5281,21 @@
         "src/PiSharp.Cli/Interactive/Mode/Components/SessionSelectorSearch.cs"
       ],
       "release": "1.5.0",
-      "notes": "PiSharp matches one joined text. Depends on tui.fuzzy-contiguous-match (same commit)."
+      "notes": "PiSharp matches one joined text. Depends on tui.fuzzy-contiguous-match (same commit).",
+      "evidence": {
+        "commits": [
+          "0921e32f"
+        ],
+        "tests": [
+          "tests/PiSharp.InteractiveParity.Tests/Sync150CliCases.cs: sync150.resume-search-matches-fields-in-tiers"
+        ]
+      }
     },
     {
       "id": "cli.export-html-deep-sessions",
       "area": "coding-agent-cli",
       "phase": 2,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "coding-agent@1.5.0/Fixed#14"
       ],
@@ -5212,13 +5308,21 @@
         "src/PiSharp.CodingAgent/Export/SessionHtmlExport.cs"
       ],
       "release": "1.5.0",
-      "notes": "PiSharp copies upstream's template.js; take the v1.5.0 file and update the asset hashes (SessionHtmlExport.cs:37-39). Land with cli.export-html-system-messages and the template part of ai.openrouter-reported-cost."
+      "notes": "PiSharp copies upstream's template.js; take the v1.5.0 file and update the asset hashes (SessionHtmlExport.cs:37-39). Land with cli.export-html-system-messages and the template part of ai.openrouter-reported-cost.",
+      "evidence": {
+        "commits": [
+          "35230496"
+        ],
+        "tests": [
+          "tests/PiSharp.SessionParity.Tests/Sync150CliCases.cs: sync150.html-export-walks-a-deep-session-tree-without-recursion"
+        ]
+      }
     },
     {
       "id": "cli.export-html-system-messages",
       "area": "coding-agent-cli",
       "phase": 2,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "coding-agent@1.5.0/Fixed#15"
       ],
@@ -5233,13 +5337,23 @@
         "src/PiSharp.CodingAgent/Export/SessionHtmlExport.cs"
       ],
       "release": "1.5.0",
-      "notes": "Take the v1.5.0 template files and update the asset hashes in SessionHtmlExport.cs. Check that the exporter passes system entries through to the template."
+      "notes": "Take the v1.5.0 template files and update the asset hashes in SessionHtmlExport.cs. Check that the exporter passes system entries through to the template.",
+      "evidence": {
+        "commits": [
+          "35230496",
+          "32960ab0"
+        ],
+        "tests": [
+          "tests/PiSharp.SessionParity.Tests/Sync150CliCases.cs: sync150.html-export-renders-system-messages",
+          "tests/PiSharp.InteractiveParity.Tests/Sync150CliCases.cs: sync150.html-export-pre-renders-tools-with-transcript-renderers"
+        ]
+      }
     },
     {
       "id": "cli.tool-args-render-per-frame",
       "area": "coding-agent-cli",
       "phase": 2,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "coding-agent@1.5.0/Fixed#17"
       ],
@@ -5252,13 +5366,21 @@
         "src/PiSharp.Cli/Interactive/Mode/InteractiveMode.Events.cs"
       ],
       "release": "1.5.0",
-      "notes": "ToolExecution.cs:134-137 (UpdateArgs) calls UpdateDisplay at once, driven per delta from InteractiveMode.Events.cs:212. Defer to the next render."
+      "notes": "ToolExecution.cs:134-137 (UpdateArgs) calls UpdateDisplay at once, driven per delta from InteractiveMode.Events.cs:212. Defer to the next render.",
+      "evidence": {
+        "commits": [
+          "ff6d6d0a"
+        ],
+        "tests": [
+          "tests/PiSharp.InteractiveParity.Tests/Sync150CliCases.cs: sync150.tool-args-apply-once-per-frame"
+        ]
+      }
     },
     {
       "id": "cli.login-dialog-web-urls",
       "area": "coding-agent-cli",
       "phase": 2,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "coding-agent@1.5.0/Fixed#18"
       ],
@@ -5270,13 +5392,21 @@
         "src/PiSharp.Cli/Interactive/Mode/Components/LoginDialog.cs"
       ],
       "release": "1.5.0",
-      "notes": "LoginDialog.cs:115, :125, :129 and :198 open and link the raw URL. Depends on group C's tui.replace-control-characters (tui@1.5.0/Added#1)."
+      "notes": "LoginDialog.cs:115, :125, :129 and :198 open and link the raw URL. Depends on group C's tui.replace-control-characters (tui@1.5.0/Added#1).",
+      "evidence": {
+        "commits": [
+          "0921e32f"
+        ],
+        "tests": [
+          "tests/PiSharp.InteractiveParity.Tests/Sync150CliCases.cs: sync150.login-dialog-opens-and-links-only-web-urls"
+        ]
+      }
     },
     {
       "id": "cli.selector-page-keys",
       "area": "coding-agent-cli",
       "phase": 2,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "coding-agent@1.5.0/Fixed#19"
       ],
@@ -5306,13 +5436,21 @@
         "src/PiSharp.Cli/Interactive/Mode/InteractiveMode.Mcp.cs"
       ],
       "release": "1.5.0",
-      "notes": "Depends on tui.select-page-keys and group C's tui.select-page-index (tui@1.5.0/Added#3) and tui.captures-viewport-input (tui@1.5.0/Added#2)."
+      "notes": "Depends on tui.select-page-keys and group C's tui.select-page-index (tui@1.5.0/Added#3) and tui.captures-viewport-input (tui@1.5.0/Added#2).",
+      "evidence": {
+        "commits": [
+          "0921e32f"
+        ],
+        "tests": [
+          "tests/PiSharp.InteractiveParity.Tests/Sync150CliCases.cs: sync150.selectors-page-with-selection-page-keys"
+        ]
+      }
     },
     {
       "id": "cli.home-tilde-anchored",
       "area": "coding-agent-cli",
       "phase": 2,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "coding-agent@1.5.0/Fixed#23"
       ],
@@ -5334,13 +5472,21 @@
         "src/PiSharp.Cli/Pi/PiPaths.cs"
       ],
       "release": "1.5.0",
-      "notes": "PiSharp uses an unanchored StartsWith(home) at ConfigSelector.cs:112, SessionSelector.cs:418, RenderUtils.cs:94, TreeSelector.cs:909 and InteractiveMode.Resources.cs:193. Replace them with one ShortenHomePath helper that also uses the Windows comparison from core.windows-path-casing."
+      "notes": "PiSharp uses an unanchored StartsWith(home) at ConfigSelector.cs:112, SessionSelector.cs:418, RenderUtils.cs:94, TreeSelector.cs:909 and InteractiveMode.Resources.cs:193. Replace them with one ShortenHomePath helper that also uses the Windows comparison from core.windows-path-casing.",
+      "evidence": {
+        "commits": [
+          "934549a5"
+        ],
+        "tests": [
+          "tests/PiSharp.InteractiveParity.Tests/Sync150CliCases.cs: sync150.home-tilde-only-at-a-segment-boundary"
+        ]
+      }
     },
     {
       "id": "cli.mcp-login-local-flag",
       "area": "coding-agent-cli",
       "phase": 2,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "coding-agent@1.5.0/Fixed#24"
       ],
@@ -5353,7 +5499,15 @@
         "src/PiSharp.Cli/Commands/McpCommand.cs"
       ],
       "release": "1.5.0",
-      "notes": "McpCommand.cs:201 parses the login and logout options. docs/cli.md changes with the docs rows."
+      "notes": "McpCommand.cs:201 parses the login and logout options. docs/cli.md changes with the docs rows.",
+      "evidence": {
+        "commits": [
+          "3b04a93b"
+        ],
+        "tests": [
+          "tests/PiSharp.McpSync.Tests/Sync150CliCases.cs: sync150.mcp-login-logout-local-flag-and-suggestions"
+        ]
+      }
     },
     {
       "id": "cli.update-pnpm-ownership",
@@ -5376,7 +5530,7 @@
       "id": "cli.wsl-helpers-from-root",
       "area": "coding-agent-cli",
       "phase": 2,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "coding-agent@1.5.0/Fixed#26"
       ],
@@ -5393,13 +5547,22 @@
         "src/PiSharp.Cli/Commands/McpCommand.cs"
       ],
       "release": "1.5.0",
-      "notes": "McpCommand.cs:537 has a second browser opener; route it through OpenBrowser or give it the same working directory."
+      "notes": "McpCommand.cs:537 has a second browser opener; route it through OpenBrowser or give it the same working directory.",
+      "evidence": {
+        "commits": [
+          "934549a5",
+          "3b04a93b"
+        ],
+        "tests": [
+          "tests/PiSharp.InteractiveParity.Tests/Sync150CliCases.cs: sync150.clipboard-helpers-start-from-the-root-in-their-own-group"
+        ]
+      }
     },
     {
       "id": "cli.external-editor-failures",
       "area": "coding-agent-cli",
       "phase": 2,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "coding-agent@1.5.0/Fixed#27"
       ],
@@ -5414,13 +5577,22 @@
         "src/PiSharp.Cli/Interactive/Mode/Components/ExtensionEditor.cs"
       ],
       "release": "1.5.0",
-      "notes": "PiSharp shows no failure message today. Take upstream's texts."
+      "notes": "PiSharp shows no failure message today. Take upstream's texts.",
+      "evidence": {
+        "commits": [
+          "ff6d6d0a"
+        ],
+        "tests": [
+          "tests/PiSharp.InteractiveParity.Tests/Sync150CliCases.cs: sync150.external-editor-failures-say-why-the-prompt-is-unchanged",
+          "tests/PiSharp.InteractiveParity.Tests/Sync150CliCases.cs: sync150.main-editor-reports-external-editor-failure"
+        ]
+      }
     },
     {
       "id": "cli.highlight-reuse",
       "area": "coding-agent-cli",
       "phase": 2,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "coding-agent@1.5.0/Fixed#31"
       ],
@@ -5443,13 +5615,24 @@
         "src/PiSharp.Cli/Interactive/Mode/Theme/SyntaxHighlight.cs"
       ],
       "release": "1.5.0",
-      "notes": "Depends on tui.markdown-block-reuse and tui.text-settext-unchanged (same commit)."
+      "notes": "Depends on tui.markdown-block-reuse and tui.text-settext-unchanged (same commit).",
+      "evidence": {
+        "commits": [
+          "ff6d6d0a"
+        ],
+        "tests": [
+          "tests/PiSharp.InteractiveParity.Tests/Sync150CliCases.cs: sync150.assistant-message-reuses-markdown-across-streaming-and-its-end",
+          "tests/PiSharp.InteractiveParity.Tests/Sync150CliCases.cs: sync150.code-highlighter-reuses-until-code-theme-or-grammars-change",
+          "tests/PiSharp.InteractiveParity.Tests/Sync150CliCases.cs: sync150.codemode-row-highlights-its-script-once",
+          "tests/PiSharp.InteractiveParity.Tests/Sync150CliCases.cs: sync150.write-row-highlights-unchanged-lines-and-a-complete-file-once"
+        ]
+      }
     },
     {
       "id": "cli.skill-warnings-label",
       "area": "coding-agent-cli",
       "phase": 2,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "coding-agent@1.5.0/Fixed#34"
       ],
@@ -5461,13 +5644,21 @@
         "src/PiSharp.Cli/Interactive/Mode/InteractiveMode.Resources.cs"
       ],
       "release": "1.5.0",
-      "notes": "InteractiveMode.Resources.cs:483 prints \"Skill conflicts\"."
+      "notes": "InteractiveMode.Resources.cs:483 prints \"Skill conflicts\".",
+      "evidence": {
+        "commits": [
+          "ff6d6d0a"
+        ],
+        "tests": [
+          "tests/PiSharp.InteractiveParity.Tests/Sync150CliCases.cs: sync150.startup-skill-diagnostics-are-skill-warnings"
+        ]
+      }
     },
     {
       "id": "cli.model-scope-fullscreen-header",
       "area": "coding-agent-cli",
       "phase": 2,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "coding-agent@1.5.0/Fixed#36"
       ],
@@ -5479,13 +5670,21 @@
         "src/PiSharp.Cli/Interactive/Mode/InteractiveMode.cs"
       ],
       "release": "1.5.0",
-      "notes": "InteractiveMode.cs:299 writes the notice with ConsoleLog in every mode."
+      "notes": "InteractiveMode.cs:299 writes the notice with ConsoleLog in every mode.",
+      "evidence": {
+        "commits": [
+          "934549a5"
+        ],
+        "tests": [
+          "tests/PiSharp.InteractiveParity.Tests/Sync150CliCases.cs: sync150.fullscreen-model-scope-notice-is-in-the-header"
+        ]
+      }
     },
     {
       "id": "cli.deleted-cwd-startup",
       "area": "coding-agent-cli",
       "phase": 2,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "coding-agent@1.5.0/Fixed#37"
       ],
@@ -5497,13 +5696,21 @@
         "src/PiSharp.Cli/Program.cs"
       ],
       "release": "1.5.0",
-      "notes": "Program.RunPiAsync reads Directory.GetCurrentDirectory() unguarded for PiHost.Cwd (Program.cs:82), before PiCommand.RunAsync parses any flag, and the crash handlers read Environment.CurrentDirectory (Program.cs:22, :121). On Linux and macOS getcwd fails with ENOENT for a deleted directory and .NET throws, so startup ends with an unhandled exception; Windows does not let a process's cwd be deleted. Catch the not-found case at that first read, print upstream's line and return 1. Decide whether the `session ...` subcommands get the same guard. Test with an injected cwd reader rather than a deleted directory."
+      "notes": "Program.RunPiAsync reads Directory.GetCurrentDirectory() unguarded for PiHost.Cwd (Program.cs:82), before PiCommand.RunAsync parses any flag, and the crash handlers read Environment.CurrentDirectory (Program.cs:22, :121). On Linux and macOS getcwd fails with ENOENT for a deleted directory and .NET throws, so startup ends with an unhandled exception; Windows does not let a process's cwd be deleted. Catch the not-found case at that first read, print upstream's line and return 1. Decide whether the `session ...` subcommands get the same guard. Test with an injected cwd reader rather than a deleted directory.",
+      "evidence": {
+        "commits": [
+          "03e17845"
+        ],
+        "tests": [
+          "tests/PiSharp.CliParity.Tests/Sync150CliCases.cs: sync150.deleted-cwd-ends-every-command-with-one-red-line"
+        ]
+      }
     },
     {
       "id": "cli.hidden-thinking-empty-label",
       "area": "coding-agent-cli",
       "phase": 2,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "coding-agent@1.5.0/Fixed#40"
       ],
@@ -5515,13 +5722,21 @@
         "src/PiSharp.Cli/Interactive/Mode/Components/AssistantMessage.cs"
       ],
       "release": "1.5.0",
-      "notes": "AssistantMessage.cs still has the 1.2.0 logic: a leading spacer when any text or thinking is non-blank (AssistantMessage.cs:97-99), the label Text always added for a hidden run (AssistantMessage.cs:135), and a trailing spacer from hasVisibleContentAfter (AssistantMessage.cs:130, :150). SetHiddenThinkingLabel exists (AssistantMessage.cs:64). Port the lazy spacer and the empty-label skip, with render tests for thinking plus a tool call (no rows) and thinking plus text (blank row, then the text)."
+      "notes": "AssistantMessage.cs still has the 1.2.0 logic: a leading spacer when any text or thinking is non-blank (AssistantMessage.cs:97-99), the label Text always added for a hidden run (AssistantMessage.cs:135), and a trailing spacer from hasVisibleContentAfter (AssistantMessage.cs:130, :150). SetHiddenThinkingLabel exists (AssistantMessage.cs:64). Port the lazy spacer and the empty-label skip, with render tests for thinking plus a tool call (no rows) and thinking plus text (blank row, then the text).",
+      "evidence": {
+        "commits": [
+          "ff6d6d0a"
+        ],
+        "tests": [
+          "tests/PiSharp.InteractiveParity.Tests/Sync150CliCases.cs: sync150.hidden-thinking-with-an-empty-label-renders-nothing"
+        ]
+      }
     },
     {
       "id": "cli.package-npm-no-audit-fund",
       "area": "coding-agent-cli",
       "phase": 2,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "coding-agent@1.5.0/Fixed#41"
       ],
@@ -5533,13 +5748,21 @@
         "src/PiSharp.Cli/Packages/PiPackageManager.cs"
       ],
       "release": "1.5.0",
-      "notes": "PiPackageManager has the 1.2.0 arrays: GetGitDependencyInstallArgs npm (PiPackageManager.cs:590), GetNpmInstallArgs default (PiPackageManager.cs:605) and UninstallNpm (PiPackageManager.cs:622). Append the two flags there and update the expected argument arrays in the package-manager tests, which run against a fake process runner. The managed self-update path is not involved."
+      "notes": "PiPackageManager has the 1.2.0 arrays: GetGitDependencyInstallArgs npm (PiPackageManager.cs:590), GetNpmInstallArgs default (PiPackageManager.cs:605) and UninstallNpm (PiPackageManager.cs:622). Append the two flags there and update the expected argument arrays in the package-manager tests, which run against a fake process runner. The managed self-update path is not involved.",
+      "evidence": {
+        "commits": [
+          "adceb077"
+        ],
+        "tests": [
+          "tests/PiSharp.ExtensionParity.Tests/Sync150CliCases.cs: sync150.package-npm-skips-audit-and-fund-advice"
+        ]
+      }
     },
     {
       "id": "cli.editor-swap-keeps-dialog",
       "area": "coding-agent-cli",
       "phase": 2,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "coding-agent@1.5.0/Fixed#42"
       ],
@@ -5552,13 +5775,21 @@
         "src/PiSharp.Cli/Interactive/Mode/InteractiveMode.ExtensionHost.cs"
       ],
       "release": "1.5.0",
-      "notes": "SetCustomEditorComponent always disposes the active selector, clears the editor container, adds the new editor and focuses it (InteractiveMode.ExtensionUi.cs:363-403). Node extensions reach it through InteractiveMode.ExtensionHost.cs:173-176. PiSharp has no extension dialog stack yet: extensionDialogs and showTopExtensionDialog came with the 1.4.0 concurrent-dialogs fix (coding-agent@1.4.0/Fixed#6, group B). Port that first and gate this change on its stack."
+      "notes": "SetCustomEditorComponent always disposes the active selector, clears the editor container, adds the new editor and focuses it (InteractiveMode.ExtensionUi.cs:363-403). Node extensions reach it through InteractiveMode.ExtensionHost.cs:173-176. PiSharp has no extension dialog stack yet: extensionDialogs and showTopExtensionDialog came with the 1.4.0 concurrent-dialogs fix (coding-agent@1.4.0/Fixed#6, group B). Port that first and gate this change on its stack.",
+      "evidence": {
+        "commits": [
+          "42d9497a"
+        ],
+        "tests": [
+          "tests/PiSharp.InteractiveParity.Tests/Sync150CliCases.cs: sync150.editor-swap-keeps-the-open-dialog"
+        ]
+      }
     },
     {
       "id": "cli.model-provider-id-slash",
       "area": "coding-agent-cli",
       "phase": 2,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "coding-agent@1.5.0/Fixed#44"
       ],
@@ -5570,7 +5801,16 @@
         "src/PiSharp.ModelRuntime/Models/ModelResolver.cs"
       ],
       "release": "1.5.0",
-      "notes": "ModelResolver splits at the first slash in FindExactModelReferenceMatch (ModelResolver.cs:81) and in the --model provider inference (ModelResolver.cs:184). Replace both with a longest-known-provider-prefix match. Upstream's splitProviderPrefix sits on top of the 1.3.0 model-reference rewrite (d7f7e0dfe, \"one provider selection policy\", coding-agent@1.3.0/Fixed#5), which this table maps elsewhere. Port that first, or apply the same prefix rule to both PiSharp call sites. Test with a slash-containing llama.cpp provider id."
+      "notes": "ModelResolver splits at the first slash in FindExactModelReferenceMatch (ModelResolver.cs:81) and in the --model provider inference (ModelResolver.cs:184). Replace both with a longest-known-provider-prefix match. Upstream's splitProviderPrefix sits on top of the 1.3.0 model-reference rewrite (d7f7e0dfe, \"one provider selection policy\", coding-agent@1.3.0/Fixed#5), which this table maps elsewhere. Port that first, or apply the same prefix rule to both PiSharp call sites. Test with a slash-containing llama.cpp provider id.",
+      "evidence": {
+        "commits": [
+          "e36096fb"
+        ],
+        "tests": [
+          "tests/PiSharp.Models.Tests/Sync150CliCases.cs: sync150.model-references-never-follow-catalog-order",
+          "tests/PiSharp.Models.Tests/Sync150CliCases.cs: sync150.cli-model-duplicate-raw-ids-behind-a-provider-prefix"
+        ]
+      }
     },
     {
       "id": "tui.rex-terminal",
@@ -5772,7 +6012,7 @@
       "id": "tui.captures-viewport-input",
       "area": "tui",
       "phase": 2,
-      "status": "ported-with-deferral",
+      "status": "ported",
       "changelog": [
         "tui@1.5.0/Added#2"
       ],
@@ -5797,16 +6037,18 @@
       "evidence": {
         "commits": [
           "0c77f68b",
-          "6b8a88ed"
+          "6b8a88ed",
+          "42d9497a"
         ],
         "tests": [
           "tests/PiSharp.InteractiveParity.Tests/Sync150Cases.cs: sync150.captures-viewport-input.editor-autocomplete-pages",
           "tests/PiSharp.InteractiveParity.Tests/Sync150Cases.cs: sync150.captures-viewport-input.focused-list-keeps-viewport",
           "tests/PiSharp.InteractiveParity.Tests/Sync150Cases.cs: sync150.captures-viewport-input.editor-menu-releases-viewport",
-          "tests/PiSharp.InteractiveParity.Tests/Sync150Cases.cs: sync150.captures-viewport-input.component-defaults"
+          "tests/PiSharp.InteractiveParity.Tests/Sync150Cases.cs: sync150.captures-viewport-input.component-defaults",
+          "tests/PiSharp.ExtensionParity.Tests/Sync150CliCases.cs: sync150.bridge-component-captures-viewport-input",
+          "tests/PiSharp.InteractiveParity.Tests/Sync150CliCases.cs: sync150.extension-component-proxy-forwards-captures-viewport-input"
         ]
-      },
-      "deferred": "A Node extension component's capturesViewportInput is not forwarded: PiSharp.Cli's extension component proxy and the bridge protocol would need to carry the flag (cli/bridge area)."
+      }
     },
     {
       "id": "tui.select-page-index",
@@ -6597,7 +6839,7 @@
       "id": "tools.read-line-range-labels",
       "area": "tools",
       "phase": 2,
-      "status": "ported-with-deferral",
+      "status": "ported",
       "changelog": [
         "coding-agent@1.3.0/Fixed#6"
       ],
@@ -6620,18 +6862,19 @@
         "tools/NodeBridge/pi-host/virtual/upstream-exports.json"
       ],
       "release": "1.5.0",
-      "notes": "PiSharp formats the range separately in Read.cs:23-31, TreeSelector.cs:915-925 and template.js:578 and :968, each with the old handling of string and null offsets. Port the helper once in RenderUtils and add formatReadLineRange to the bridge's coding-agent exports.",
+      "notes": "PiSharp formats the range separately in Read.cs:23-31, TreeSelector.cs:915-925 and template.js:578 and :968, each with the old handling of string and null offsets. Port the helper once in RenderUtils and add formatReadLineRange to the bridge's coding-agent exports. Upstream examples (minimal-mode.ts, subagent) have no PiSharp copy.",
       "evidence": {
         "commits": [
-          "795448e3"
+          "795448e3",
+          "35230496"
         ],
         "tests": [
           "tests/PiSharp.InteractiveParity.Tests/Sync150ToolCases.cs: sync150.read-line-range-labels.format",
           "tests/PiSharp.InteractiveParity.Tests/Sync150ToolCases.cs: sync150.read-line-range-labels.session-tree",
-          "tests/PiSharp.InteractiveParity.Tests/Sync150ToolCases.cs: sync150.read-line-range-labels.tool-renderer"
+          "tests/PiSharp.InteractiveParity.Tests/Sync150ToolCases.cs: sync150.read-line-range-labels.tool-renderer",
+          "tests/PiSharp.SessionParity.Tests/Sync150CliCases.cs: sync150.html-export-read-rows-show-line-ranges"
         ]
-      },
-      "deferred": "HTML export template.js keeps the pinned Pi 1.2.0 copy (SessionParity pins its sha256); it moves with the export template re-sync. Upstream examples (minimal-mode.ts, subagent) have no PiSharp copy."
+      }
     },
     {
       "id": "tools.grep-no-config",
@@ -7202,7 +7445,7 @@
       "id": "docs.llama-cpp-setup",
       "area": "docs",
       "phase": 2,
-      "status": "port",
+      "status": "ported",
       "changelog": [],
       "upstream": [
         "packages/coding-agent/docs/llama-cpp.md"
@@ -7213,7 +7456,16 @@
         "tests/PiSharp.CliParity.Tests/LlamaCases.cs"
       ],
       "release": "1.5.0",
-      "notes": "PiSharp ships a copy of the guide (src/PiSharp.Cli/docs/llama-cpp.md), and LlamaCases.cs cites it. Refresh the copy from v1.5.0, keeping PiSharp's command names."
+      "notes": "PiSharp ships a copy of the guide (src/PiSharp.Cli/docs/llama-cpp.md), and LlamaCases.cs cites it. Refresh the copy from v1.5.0, keeping PiSharp's command names.",
+      "evidence": {
+        "commits": [
+          "3905e80b"
+        ],
+        "docs": [
+          "website/src/content/docs/docs/guides/llama-cpp.md",
+          "src/PiSharp.Cli/docs/llama-cpp.md"
+        ]
+      }
     },
     {
       "id": "telemetry.request-option-span",
