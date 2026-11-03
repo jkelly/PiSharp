@@ -12,42 +12,42 @@
   },
   "rule": "A citation moves to the new commit only when every upstream path it names has the same git object id at both tags. The rest stay on the old commit until their area is re-ported, then move with the port.",
   "summary": {
-    "filesWithOldCommit": 700,
+    "filesWithOldCommit": 623,
     "citations": {
       "repinned": 250,
-      "pending": 633,
-      "unparsed": 19,
+      "pending": 557,
+      "unparsed": 17,
       "nonHeader": 22,
-      "excludedHistorical": 1814,
+      "excludedHistorical": 1815,
       "releaseDocs": 5
     },
     "files": {
       "repinned": 250,
-      "pending": 630,
-      "historical": 31,
+      "pending": 554,
+      "historical": 32,
       "releaseDocs": 2,
       "nonHeader": 21
     },
     "pendingByArea": {
       "ai": {
-        "files": 101,
-        "changeSize": 22699
+        "files": 92,
+        "changeSize": 22406
       },
       "chord": {
         "files": 8,
         "changeSize": 683
       },
       "codemode": {
-        "files": 11,
-        "changeSize": 7012
+        "files": 4,
+        "changeSize": 6709
       },
       "coding-agent-cli": {
         "files": 61,
         "changeSize": 4577
       },
       "coding-agent-core": {
-        "files": 133,
-        "changeSize": 13917
+        "files": 121,
+        "changeSize": 12815
       },
       "docs": {
         "files": 2,
@@ -62,8 +62,8 @@
         "changeSize": 34
       },
       "mcp": {
-        "files": 28,
-        "changeSize": 1474
+        "files": 27,
+        "changeSize": 1238
       },
       "node-bridge": {
         "files": 23,
@@ -78,12 +78,12 @@
         "changeSize": 30
       },
       "tools": {
-        "files": 18,
-        "changeSize": 1793
+        "files": 9,
+        "changeSize": 1235
       },
       "tui": {
-        "files": 76,
-        "changeSize": 15927
+        "files": 38,
+        "changeSize": 14324
       }
     }
   },
@@ -1782,45 +1782,6 @@
       ]
     },
     {
-      "file": "src/PiSharp.AI/ModelOperations/SystemOneClassifier.cs",
-      "area": "ai",
-      "citations": [
-        {
-          "line": 1,
-          "changed": [
-            "packages/ai/src/api/system-one-shared.ts",
-            "packages/ai/src/api/typesafe-system-one.ts",
-            "packages/ai/src/api/cloudflare-workers-ai-system-one.ts"
-          ],
-          "unchanged": [
-            "packages/ai/src/providers/cloudflare-stream.ts"
-          ]
-        }
-      ],
-      "upstream": [
-        {
-          "path": "packages/ai/src/api/system-one-shared.ts",
-          "status": "changed",
-          "linesChanged": 110
-        },
-        {
-          "path": "packages/ai/src/api/typesafe-system-one.ts",
-          "status": "changed",
-          "linesChanged": 11
-        },
-        {
-          "path": "packages/ai/src/api/cloudflare-workers-ai-system-one.ts",
-          "status": "changed",
-          "linesChanged": 8
-        }
-      ],
-      "changeSize": 129,
-      "applicabilityRows": [
-        "ai.classifier-image-input",
-        "ai.system-one-compat"
-      ]
-    },
-    {
       "file": "src/PiSharp.AI/ModelOperations/OperationModels.cs",
       "area": "ai",
       "areas": [
@@ -2276,7 +2237,7 @@
       "area": "ai",
       "citations": [
         {
-          "line": 205,
+          "line": 246,
           "changed": [
             "packages/ai/src/api/openai-responses.ts"
           ]
@@ -2826,114 +2787,6 @@
       ]
     },
     {
-      "file": "src/PiSharp.CodingAgent/Configuration/AgentRetryPolicy.cs",
-      "area": "ai",
-      "citations": [
-        {
-          "line": 1,
-          "changed": [
-            "packages/ai/src/utils/retry.ts"
-          ]
-        }
-      ],
-      "upstream": [
-        {
-          "path": "packages/ai/src/utils/retry.ts",
-          "status": "changed",
-          "linesChanged": 33
-        }
-      ],
-      "changeSize": 33,
-      "applicabilityRows": [
-        "ai.retry-unable-to-forward-upstream",
-        "ai.retry-service-temporarily-unavailable",
-        "ai.retry-more-transient-errors",
-        "ai.retry-standalone-status-codes",
-        "ai.chatgpt-workspace-usage-limit",
-        "ai.zhipu-1308-not-retryable"
-      ]
-    },
-    {
-      "file": "src/PiSharp.Durable/Internal/PiAi/Retry.cs",
-      "area": "ai",
-      "citations": [
-        {
-          "line": 1,
-          "changed": [
-            "packages/ai/src/utils/retry.ts"
-          ]
-        }
-      ],
-      "upstream": [
-        {
-          "path": "packages/ai/src/utils/retry.ts",
-          "status": "changed",
-          "linesChanged": 33
-        }
-      ],
-      "changeSize": 33,
-      "applicabilityRows": [
-        "ai.retry-unable-to-forward-upstream",
-        "ai.retry-service-temporarily-unavailable",
-        "ai.retry-more-transient-errors",
-        "ai.retry-standalone-status-codes",
-        "ai.chatgpt-workspace-usage-limit",
-        "ai.zhipu-1308-not-retryable"
-      ]
-    },
-    {
-      "file": "tools/NodeBridge/pi-host/virtual/ai/utils/retry.mjs",
-      "area": "ai",
-      "citations": [
-        {
-          "line": 1,
-          "changed": [
-            "packages/ai/src/utils/retry.ts"
-          ]
-        }
-      ],
-      "upstream": [
-        {
-          "path": "packages/ai/src/utils/retry.ts",
-          "status": "changed",
-          "linesChanged": 33
-        }
-      ],
-      "changeSize": 33,
-      "applicabilityRows": [
-        "ai.retry-unable-to-forward-upstream",
-        "ai.retry-service-temporarily-unavailable",
-        "ai.retry-more-transient-errors",
-        "ai.retry-standalone-status-codes",
-        "ai.chatgpt-workspace-usage-limit",
-        "ai.zhipu-1308-not-retryable"
-      ]
-    },
-    {
-      "file": "src/PiSharp.AI/ToolArguments/StreamingJson.cs",
-      "area": "ai",
-      "citations": [
-        {
-          "line": 1,
-          "changed": [
-            "packages/ai/src/utils/json-parse.ts"
-          ]
-        }
-      ],
-      "upstream": [
-        {
-          "path": "packages/ai/src/utils/json-parse.ts",
-          "status": "changed",
-          "linesChanged": 27
-        }
-      ],
-      "changeSize": 27,
-      "applicabilityRows": [
-        "ai.invalid-unicode-escape-repair",
-        "ai.malformed-final-tool-arguments"
-      ]
-    },
-    {
       "file": "tests/PiSharp.ProviderSync.Tests/StreamingJsonCases.cs",
       "area": "ai",
       "citations": [
@@ -3217,29 +3070,6 @@
       ]
     },
     {
-      "file": "src/PiSharp.ModelRuntime/Models/ModelProviderComposer.cs",
-      "area": "ai",
-      "citations": [
-        {
-          "line": 1,
-          "changed": [
-            "packages/coding-agent/src/core/provider-composer.ts"
-          ]
-        }
-      ],
-      "upstream": [
-        {
-          "path": "packages/coding-agent/src/core/provider-composer.ts",
-          "status": "changed",
-          "linesChanged": 11
-        }
-      ],
-      "changeSize": 11,
-      "applicabilityRows": [
-        "ai.system-one-compat"
-      ]
-    },
-    {
       "file": "src/PiSharp.AI/Protocols/AnthropicMessages/AnthropicMessagesSimpleContextEstimator.cs",
       "area": "ai",
       "citations": [
@@ -3397,78 +3227,6 @@
         "ai.models-dev-v2-catalog",
         "ai.tool-call-args-incremental",
         "bridge.faux-cache-write-tokens"
-      ]
-    },
-    {
-      "file": "src/PiSharp.CodingAgent/SessionRecoveryClassifier.cs",
-      "area": "ai",
-      "citations": [
-        {
-          "line": 1,
-          "changed": [
-            "packages/ai/src/utils/overflow.ts"
-          ]
-        }
-      ],
-      "upstream": [
-        {
-          "path": "packages/ai/src/utils/overflow.ts",
-          "status": "changed",
-          "linesChanged": 9
-        }
-      ],
-      "changeSize": 9,
-      "applicabilityRows": [
-        "ai.copilot-413-overflow",
-        "ai.litellm-context-overflow"
-      ]
-    },
-    {
-      "file": "src/PiSharp.Durable/Internal/PiAi/Overflow.cs",
-      "area": "ai",
-      "citations": [
-        {
-          "line": 1,
-          "changed": [
-            "packages/ai/src/utils/overflow.ts"
-          ]
-        }
-      ],
-      "upstream": [
-        {
-          "path": "packages/ai/src/utils/overflow.ts",
-          "status": "changed",
-          "linesChanged": 9
-        }
-      ],
-      "changeSize": 9,
-      "applicabilityRows": [
-        "ai.copilot-413-overflow",
-        "ai.litellm-context-overflow"
-      ]
-    },
-    {
-      "file": "tools/NodeBridge/pi-host/virtual/ai/utils/overflow.mjs",
-      "area": "ai",
-      "citations": [
-        {
-          "line": 1,
-          "changed": [
-            "packages/ai/src/utils/overflow.ts"
-          ]
-        }
-      ],
-      "upstream": [
-        {
-          "path": "packages/ai/src/utils/overflow.ts",
-          "status": "changed",
-          "linesChanged": 9
-        }
-      ],
-      "changeSize": 9,
-      "applicabilityRows": [
-        "ai.copilot-413-overflow",
-        "ai.litellm-context-overflow"
       ]
     },
     {
@@ -4096,123 +3854,6 @@
       ]
     },
     {
-      "file": "src/PiSharp.Codemode/Tool/CodemodeExecutor.cs",
-      "area": "codemode",
-      "citations": [
-        {
-          "line": 1,
-          "changed": [
-            "packages/coding-agent/src/extensions/codemode/execute.ts"
-          ]
-        }
-      ],
-      "upstream": [
-        {
-          "path": "packages/coding-agent/src/extensions/codemode/execute.ts",
-          "status": "changed",
-          "linesChanged": 120
-        }
-      ],
-      "changeSize": 120,
-      "applicabilityRows": [
-        "codemode.worker-admission-limit",
-        "codemode.wait-for-free-worker"
-      ]
-    },
-    {
-      "file": "src/PiSharp.Codemode/Runtime/CodemodeSandbox.cs",
-      "area": "codemode",
-      "citations": [
-        {
-          "line": 1,
-          "changed": [
-            "packages/codemode/src/runtime/execution.ts",
-            "packages/codemode/src/runtime/host.ts"
-          ],
-          "unchanged": [
-            "packages/codemode/src/runtime/worker.ts",
-            "packages/codemode/src/runtime/protocol.ts"
-          ]
-        }
-      ],
-      "upstream": [
-        {
-          "path": "packages/codemode/src/runtime/execution.ts",
-          "status": "changed",
-          "linesChanged": 6
-        },
-        {
-          "path": "packages/codemode/src/runtime/host.ts",
-          "status": "changed",
-          "linesChanged": 37
-        }
-      ],
-      "changeSize": 43,
-      "applicabilityRows": [
-        "codemode.stop-without-exit-wait",
-        "codemode.worker-lifetime-hooks"
-      ]
-    },
-    {
-      "file": "src/PiSharp.Codemode/Runtime/CodemodeWorkers.cs",
-      "area": "codemode",
-      "citations": [
-        {
-          "line": 1,
-          "changed": [
-            "packages/codemode/src/runtime/host.ts",
-            "packages/codemode/src/runtime/execution.ts"
-          ],
-          "unchanged": [
-            "packages/codemode/src/runtime/worker.ts"
-          ]
-        }
-      ],
-      "upstream": [
-        {
-          "path": "packages/codemode/src/runtime/host.ts",
-          "status": "changed",
-          "linesChanged": 37
-        },
-        {
-          "path": "packages/codemode/src/runtime/execution.ts",
-          "status": "changed",
-          "linesChanged": 6
-        }
-      ],
-      "changeSize": 43,
-      "applicabilityRows": [
-        "codemode.stop-without-exit-wait",
-        "codemode.worker-lifetime-hooks"
-      ]
-    },
-    {
-      "file": "src/PiSharp.Codemode/Tool/CodemodeToolDefinition.cs",
-      "area": "codemode",
-      "citations": [
-        {
-          "line": 1,
-          "changed": [
-            "packages/coding-agent/src/extensions/codemode/tool.ts"
-          ],
-          "unchanged": [
-            "packages/coding-agent/src/extensions/codemode/index.ts"
-          ]
-        }
-      ],
-      "upstream": [
-        {
-          "path": "packages/coding-agent/src/extensions/codemode/tool.ts",
-          "status": "changed",
-          "linesChanged": 43
-        }
-      ],
-      "changeSize": 43,
-      "applicabilityRows": [
-        "codemode.output-type-summaries"
-      ]
-    },
-    {
       "file": "src/PiSharp.Codemode/Tool/CodemodeRenderer.cs",
       "area": "codemode",
       "areas": [
@@ -4245,84 +3886,6 @@
         "cli.highlight-reuse",
         "cli.home-tilde-anchored",
         "tools.read-line-range-labels"
-      ]
-    },
-    {
-      "file": "src/PiSharp.Codemode/Runtime/CodemodeRun.cs",
-      "area": "codemode",
-      "citations": [
-        {
-          "line": 1,
-          "changed": [
-            "packages/codemode/src/types.ts",
-            "packages/codemode/src/runtime/execution.ts"
-          ]
-        }
-      ],
-      "upstream": [
-        {
-          "path": "packages/codemode/src/types.ts",
-          "status": "changed",
-          "linesChanged": 22
-        },
-        {
-          "path": "packages/codemode/src/runtime/execution.ts",
-          "status": "changed",
-          "linesChanged": 6
-        }
-      ],
-      "changeSize": 28,
-      "applicabilityRows": [
-        "codemode.stop-without-exit-wait",
-        "codemode.worker-lifetime-hooks"
-      ]
-    },
-    {
-      "file": "src/PiSharp.Codemode/CodemodeTypes.cs",
-      "area": "codemode",
-      "citations": [
-        {
-          "line": 1,
-          "changed": [
-            "packages/codemode/src/types.ts"
-          ]
-        }
-      ],
-      "upstream": [
-        {
-          "path": "packages/codemode/src/types.ts",
-          "status": "changed",
-          "linesChanged": 22
-        }
-      ],
-      "changeSize": 22,
-      "applicabilityRows": [
-        "codemode.stop-without-exit-wait",
-        "codemode.worker-lifetime-hooks"
-      ]
-    },
-    {
-      "file": "src/PiSharp.Cli/docs/codemode.md",
-      "area": "codemode",
-      "citations": [
-        {
-          "line": 1,
-          "changed": [
-            "packages/coding-agent/docs/codemode.md"
-          ]
-        }
-      ],
-      "upstream": [
-        {
-          "path": "packages/coding-agent/docs/codemode.md",
-          "status": "changed",
-          "linesChanged": 4
-        }
-      ],
-      "changeSize": 4,
-      "applicabilityRows": [
-        "codemode.worker-admission-limit",
-        "codemode.wait-for-free-worker"
       ]
     },
     {
@@ -6047,7 +5610,7 @@
           ]
         },
         {
-          "line": 144,
+          "line": 154,
           "changed": [
             "packages/durable/src/storage/sqlite/database.ts",
             "packages/durable/src/storage/sqlite/migrations.ts",
@@ -6548,112 +6111,7 @@
       ]
     },
     {
-      "file": "src/PiSharp.Cli/Packages/PiGlob.cs",
-      "area": "coding-agent-core",
-      "areas": [
-        "coding-agent-core",
-        "coding-agent-cli"
-      ],
-      "citations": [
-        {
-          "line": 1,
-          "changed": [
-            "packages/coding-agent/src/core/package-manager.ts"
-          ]
-        }
-      ],
-      "upstream": [
-        {
-          "path": "packages/coding-agent/src/core/package-manager.ts",
-          "status": "changed",
-          "linesChanged": 236
-        }
-      ],
-      "changeSize": 236,
-      "applicabilityRows": [
-        "core.npm-prefix-realpath",
-        "core.temporary-extension-refresh",
-        "core.windows-path-casing",
-        "core.git-clean-failure-continues",
-        "core.npm-update-unchanged-warning",
-        "core.package-install-failure-startup",
-        "cli.extension-changelogs",
-        "cli.package-npm-no-audit-fund"
-      ]
-    },
-    {
       "file": "src/PiSharp.Cli/Packages/PiPackageManager.cs",
-      "area": "coding-agent-core",
-      "areas": [
-        "coding-agent-core",
-        "coding-agent-cli"
-      ],
-      "citations": [
-        {
-          "line": 1,
-          "changed": [
-            "packages/coding-agent/src/core/package-manager.ts"
-          ]
-        }
-      ],
-      "upstream": [
-        {
-          "path": "packages/coding-agent/src/core/package-manager.ts",
-          "status": "changed",
-          "linesChanged": 236
-        }
-      ],
-      "changeSize": 236,
-      "applicabilityRows": [
-        "core.npm-prefix-realpath",
-        "core.temporary-extension-refresh",
-        "core.windows-path-casing",
-        "core.git-clean-failure-continues",
-        "core.npm-update-unchanged-warning",
-        "core.package-install-failure-startup",
-        "cli.extension-changelogs",
-        "cli.package-npm-no-audit-fund"
-      ]
-    },
-    {
-      "file": "src/PiSharp.Cli/Packages/PiPackageProcesses.cs",
-      "area": "coding-agent-core",
-      "areas": [
-        "coding-agent-core",
-        "coding-agent-cli"
-      ],
-      "citations": [
-        {
-          "line": 1,
-          "changed": [
-            "packages/coding-agent/src/core/package-manager.ts"
-          ],
-          "unchanged": [
-            "packages/coding-agent/src/utils/child-process.ts"
-          ]
-        }
-      ],
-      "upstream": [
-        {
-          "path": "packages/coding-agent/src/core/package-manager.ts",
-          "status": "changed",
-          "linesChanged": 236
-        }
-      ],
-      "changeSize": 236,
-      "applicabilityRows": [
-        "core.npm-prefix-realpath",
-        "core.temporary-extension-refresh",
-        "core.windows-path-casing",
-        "core.git-clean-failure-continues",
-        "core.npm-update-unchanged-warning",
-        "core.package-install-failure-startup",
-        "cli.extension-changelogs",
-        "cli.package-npm-no-audit-fund"
-      ]
-    },
-    {
-      "file": "src/PiSharp.Cli/Packages/PiSemver.cs",
       "area": "coding-agent-core",
       "areas": [
         "coding-agent-core",
@@ -7307,52 +6765,6 @@
         "core.session-write-failure-rollback",
         "core.fork-single-file-handle",
         "core.branch-summary-context-edits"
-      ]
-    },
-    {
-      "file": "src/PiSharp.CodingAgent/Export/SessionHtmlExport.cs",
-      "area": "coding-agent-core",
-      "areas": [
-        "coding-agent-core",
-        "coding-agent-cli"
-      ],
-      "citations": [
-        {
-          "line": 1,
-          "changed": [
-            "packages/coding-agent/src/core/export-html/index.ts",
-            "packages/coding-agent/src/config.ts",
-            "packages/coding-agent/src/core/agent-session.ts"
-          ]
-        }
-      ],
-      "upstream": [
-        {
-          "path": "packages/coding-agent/src/core/export-html/index.ts",
-          "status": "changed",
-          "linesChanged": 2
-        },
-        {
-          "path": "packages/coding-agent/src/config.ts",
-          "status": "changed",
-          "linesChanged": 35
-        },
-        {
-          "path": "packages/coding-agent/src/core/agent-session.ts",
-          "status": "changed",
-          "linesChanged": 98
-        }
-      ],
-      "changeSize": 135,
-      "applicabilityRows": [
-        "core.html-export-cjk-emphasis",
-        "cli.self-update-command",
-        "cli.update-pnpm-ownership",
-        "core.resume-active-tools",
-        "core.extension-tools-active-on-resume",
-        "core.recovery-omits-tool-results",
-        "core.summary-auth-runtime",
-        "core.active-tools-keep-order"
       ]
     },
     {
@@ -8461,33 +7873,6 @@
       ]
     },
     {
-      "file": "src/PiSharp.Cli/Extensions/Pi/PiExtensionRun.cs",
-      "area": "coding-agent-core",
-      "citations": [
-        {
-          "line": 1,
-          "changed": [
-            "packages/coding-agent/src/core/resource-loader.ts"
-          ],
-          "unchanged": [
-            "packages/coding-agent/src/core/agent-session-services.ts"
-          ]
-        }
-      ],
-      "upstream": [
-        {
-          "path": "packages/coding-agent/src/core/resource-loader.ts",
-          "status": "changed",
-          "linesChanged": 86
-        }
-      ],
-      "changeSize": 86,
-      "applicabilityRows": [
-        "core.windows-path-casing",
-        "core.package-install-failure-startup"
-      ]
-    },
-    {
       "file": "src/PiSharp.Cli/Interactive/Mode/Components/CustomEntry.cs",
       "area": "coding-agent-core",
       "citations": [
@@ -8724,30 +8109,6 @@
         "core.session-write-failure-rollback",
         "core.fork-single-file-handle",
         "core.branch-summary-context-edits"
-      ]
-    },
-    {
-      "file": "tools/NodeBridge/pi-host/virtual/coding-agent/core/compaction/compaction.mjs",
-      "area": "coding-agent-core",
-      "citations": [
-        {
-          "line": 1,
-          "changed": [
-            "packages/coding-agent/src/core/compaction/compaction.ts"
-          ]
-        }
-      ],
-      "upstream": [
-        {
-          "path": "packages/coding-agent/src/core/compaction/compaction.ts",
-          "status": "changed",
-          "linesChanged": 47
-        }
-      ],
-      "changeSize": 47,
-      "applicabilityRows": [
-        "core.summaries-model-output-limit",
-        "core.compact-instructions-split-turn"
       ]
     },
     {
@@ -9118,91 +8479,6 @@
         "core.extension-keybinding-hints",
         "core.markdown-transform-entry-meta",
         "core.custom-ui-blocked-status"
-      ]
-    },
-    {
-      "file": "src/PiSharp.Cli/Prompts/OriginalSystemPromptBuilder.cs",
-      "area": "coding-agent-core",
-      "citations": [
-        {
-          "line": 1,
-          "changed": [
-            "packages/coding-agent/src/core/system-prompt.ts",
-            "packages/coding-agent/src/core/skills.ts"
-          ]
-        }
-      ],
-      "upstream": [
-        {
-          "path": "packages/coding-agent/src/core/system-prompt.ts",
-          "status": "changed",
-          "linesChanged": 11
-        },
-        {
-          "path": "packages/coding-agent/src/core/skills.ts",
-          "status": "changed",
-          "linesChanged": 21
-        }
-      ],
-      "changeSize": 32,
-      "applicabilityRows": [
-        "core.system-prompt-tightened",
-        "core.windows-path-casing"
-      ]
-    },
-    {
-      "file": "tests/PiSharp.CliSync.Tests/PromptCases.cs",
-      "area": "coding-agent-core",
-      "citations": [
-        {
-          "line": 8,
-          "changed": [
-            "packages/coding-agent/src/core/system-prompt.ts",
-            "packages/coding-agent/src/core/skills.ts"
-          ]
-        }
-      ],
-      "upstream": [
-        {
-          "path": "packages/coding-agent/src/core/system-prompt.ts",
-          "status": "changed",
-          "linesChanged": 11
-        },
-        {
-          "path": "packages/coding-agent/src/core/skills.ts",
-          "status": "changed",
-          "linesChanged": 21
-        }
-      ],
-      "changeSize": 32,
-      "applicabilityRows": [
-        "core.system-prompt-tightened",
-        "core.windows-path-casing"
-      ]
-    },
-    {
-      "file": "tools/NodeBridge/pi-host/virtual/coding-agent/core/compaction/branch-summarization.mjs",
-      "area": "coding-agent-core",
-      "citations": [
-        {
-          "line": 1,
-          "changed": [
-            "packages/coding-agent/src/core/compaction/branch-summarization.ts"
-          ]
-        }
-      ],
-      "upstream": [
-        {
-          "path": "packages/coding-agent/src/core/compaction/branch-summarization.ts",
-          "status": "changed",
-          "linesChanged": 32
-        }
-      ],
-      "changeSize": 32,
-      "applicabilityRows": [
-        "core.summaries-model-output-limit",
-        "core.branch-summary-thinking-level",
-        "core.branch-summary-context-edits"
       ]
     },
     {
@@ -9759,36 +9035,6 @@
         "core.extension-keybinding-hints",
         "core.markdown-transform-entry-meta",
         "core.custom-ui-blocked-status"
-      ]
-    },
-    {
-      "file": "src/PiSharp.Cli/Pi/PiProjectTrust.cs",
-      "area": "coding-agent-core",
-      "citations": [
-        {
-          "line": 1,
-          "changed": [
-            "packages/coding-agent/src/core/trust-manager.ts",
-            "packages/coding-agent/src/core/project-trust.ts"
-          ]
-        }
-      ],
-      "upstream": [
-        {
-          "path": "packages/coding-agent/src/core/trust-manager.ts",
-          "status": "changed",
-          "linesChanged": 24
-        },
-        {
-          "path": "packages/coding-agent/src/core/project-trust.ts",
-          "status": "changed",
-          "linesChanged": 2
-        }
-      ],
-      "changeSize": 26,
-      "applicabilityRows": [
-        "core.windows-path-casing",
-        "core.saved-trust-precedence"
       ]
     },
     {
@@ -10382,52 +9628,6 @@
       "changeSize": 5,
       "applicabilityRows": [
         "core.agent-tool-json-schema"
-      ]
-    },
-    {
-      "file": "src/PiSharp.Cli/Interactive/Mode/Utilities/Git.cs",
-      "area": "coding-agent-core",
-      "citations": [
-        {
-          "line": 1,
-          "changed": [
-            "packages/coding-agent/src/utils/git.ts"
-          ]
-        }
-      ],
-      "upstream": [
-        {
-          "path": "packages/coding-agent/src/utils/git.ts",
-          "status": "changed",
-          "linesChanged": 2
-        }
-      ],
-      "changeSize": 2,
-      "applicabilityRows": [
-        "core.temporary-extension-refresh"
-      ]
-    },
-    {
-      "file": "src/PiSharp.Cli/Packages/PiGitSource.cs",
-      "area": "coding-agent-core",
-      "citations": [
-        {
-          "line": 1,
-          "changed": [
-            "packages/coding-agent/src/utils/git.ts"
-          ]
-        }
-      ],
-      "upstream": [
-        {
-          "path": "packages/coding-agent/src/utils/git.ts",
-          "status": "changed",
-          "linesChanged": 2
-        }
-      ],
-      "changeSize": 2,
-      "applicabilityRows": [
-        "core.temporary-extension-refresh"
       ]
     },
     {
@@ -15559,43 +14759,6 @@
       ]
     },
     {
-      "file": "src/PiSharp.Cli/Mcp/McpToolCallHooks.cs",
-      "area": "mcp",
-      "areas": [
-        "coding-agent-core",
-        "coding-agent-cli"
-      ],
-      "citations": [
-        {
-          "line": 1,
-          "changed": [
-            "packages/coding-agent/src/core/package-manager.ts"
-          ],
-          "unchanged": [
-            "packages/coding-agent/src/extensions/mcp/index.ts"
-          ]
-        }
-      ],
-      "upstream": [
-        {
-          "path": "packages/coding-agent/src/core/package-manager.ts",
-          "status": "changed",
-          "linesChanged": 236
-        }
-      ],
-      "changeSize": 236,
-      "applicabilityRows": [
-        "core.npm-prefix-realpath",
-        "core.temporary-extension-refresh",
-        "core.windows-path-casing",
-        "core.git-clean-failure-continues",
-        "core.npm-update-unchanged-warning",
-        "core.package-install-failure-startup",
-        "cli.extension-changelogs",
-        "cli.package-npm-no-audit-fund"
-      ]
-    },
-    {
       "file": "src/PiSharp.Extensions.Abstractions/Mcp/Discovery/McpDiscoveryToolIdentity.cs",
       "area": "mcp",
       "areas": [
@@ -17349,57 +16512,6 @@
       ]
     },
     {
-      "file": "src/PiSharp.Cli/Mcp/McpToolSearch.cs",
-      "area": "tools",
-      "citations": [
-        {
-          "line": 1,
-          "changed": [
-            "packages/coding-agent/src/extensions/tool-search/tool.ts"
-          ],
-          "unchanged": [
-            "packages/coding-agent/src/extensions/tool-search/index.ts"
-          ]
-        }
-      ],
-      "upstream": [
-        {
-          "path": "packages/coding-agent/src/extensions/tool-search/tool.ts",
-          "status": "changed",
-          "linesChanged": 161
-        }
-      ],
-      "changeSize": 161,
-      "applicabilityRows": [
-        "tools.tool-search-name-weight",
-        "tools.tool-search-unicode-words"
-      ]
-    },
-    {
-      "file": "src/PiSharp.Extensions.Abstractions/Mcp/Discovery/ToolSearchRanker.cs",
-      "area": "tools",
-      "citations": [
-        {
-          "line": 1,
-          "changed": [
-            "packages/coding-agent/src/extensions/tool-search/tool.ts"
-          ]
-        }
-      ],
-      "upstream": [
-        {
-          "path": "packages/coding-agent/src/extensions/tool-search/tool.ts",
-          "status": "changed",
-          "linesChanged": 161
-        }
-      ],
-      "changeSize": 161,
-      "applicabilityRows": [
-        "tools.tool-search-name-weight",
-        "tools.tool-search-unicode-words"
-      ]
-    },
-    {
       "file": "src/PiSharp.Tools/Processes/ShellDiscovery.cs",
       "area": "tools",
       "areas": [
@@ -17508,69 +16620,6 @@
       ]
     },
     {
-      "file": "src/PiSharp.Tools/Processes/ShellAnsiText.cs",
-      "area": "tools",
-      "citations": [
-        {
-          "line": 1,
-          "changed": [
-            "packages/coding-agent/src/utils/ansi.ts",
-            "packages/coding-agent/src/utils/shell.ts"
-          ],
-          "unchanged": [
-            "packages/coding-agent/src/core/bash-executor.ts"
-          ]
-        }
-      ],
-      "upstream": [
-        {
-          "path": "packages/coding-agent/src/utils/ansi.ts",
-          "status": "changed",
-          "linesChanged": 7
-        },
-        {
-          "path": "packages/coding-agent/src/utils/shell.ts",
-          "status": "changed",
-          "linesChanged": 72
-        }
-      ],
-      "changeSize": 79,
-      "applicabilityRows": [
-        "tools.strip-ansi-private-csi",
-        "tools.windows-store-shell-aliases",
-        "tools.windows-shell-install-dirs",
-        "tools.macos-stop-group-before-kill"
-      ]
-    },
-    {
-      "file": "src/PiSharp.Tools/Processes/Unix/PosixSpawnProcessAdmission.cs",
-      "area": "tools",
-      "citations": [
-        {
-          "line": 1,
-          "changed": [
-            "packages/coding-agent/src/utils/shell.ts"
-          ],
-          "unchanged": [
-            "packages/coding-agent/src/core/bash-executor.ts"
-          ]
-        }
-      ],
-      "upstream": [
-        {
-          "path": "packages/coding-agent/src/utils/shell.ts",
-          "status": "changed",
-          "linesChanged": 72
-        }
-      ],
-      "changeSize": 72,
-      "applicabilityRows": [
-        "tools.windows-store-shell-aliases",
-        "tools.windows-shell-install-dirs",
-        "tools.macos-stop-group-before-kill"
-      ]
-    },
-    {
       "file": "tools/NodeBridge/pi-host/virtual/coding-agent/utils/shell.mjs",
       "area": "tools",
       "citations": [
@@ -17593,72 +16642,6 @@
         "tools.windows-store-shell-aliases",
         "tools.windows-shell-install-dirs",
         "tools.macos-stop-group-before-kill"
-      ]
-    },
-    {
-      "file": "src/PiSharp.Tools/BuiltinToolPrompts.cs",
-      "area": "tools",
-      "areas": [
-        "coding-agent-core",
-        "tools"
-      ],
-      "citations": [
-        {
-          "line": 1,
-          "changed": [
-            "packages/coding-agent/src/core/tools/read.ts",
-            "packages/coding-agent/src/core/tools/bash.ts",
-            "packages/coding-agent/src/core/tools/edit.ts",
-            "packages/coding-agent/src/core/tools/write.ts",
-            "packages/coding-agent/src/core/tools/grep.ts",
-            "packages/coding-agent/src/core/tools/find.ts",
-            "packages/coding-agent/src/core/tools/ls.ts"
-          ]
-        }
-      ],
-      "upstream": [
-        {
-          "path": "packages/coding-agent/src/core/tools/read.ts",
-          "status": "changed",
-          "linesChanged": 5
-        },
-        {
-          "path": "packages/coding-agent/src/core/tools/bash.ts",
-          "status": "changed",
-          "linesChanged": 5
-        },
-        {
-          "path": "packages/coding-agent/src/core/tools/edit.ts",
-          "status": "changed",
-          "linesChanged": 11
-        },
-        {
-          "path": "packages/coding-agent/src/core/tools/write.ts",
-          "status": "changed",
-          "linesChanged": 5
-        },
-        {
-          "path": "packages/coding-agent/src/core/tools/grep.ts",
-          "status": "changed",
-          "linesChanged": 11
-        },
-        {
-          "path": "packages/coding-agent/src/core/tools/find.ts",
-          "status": "changed",
-          "linesChanged": 5
-        },
-        {
-          "path": "packages/coding-agent/src/core/tools/ls.ts",
-          "status": "changed",
-          "linesChanged": 5
-        }
-      ],
-      "changeSize": 47,
-      "applicabilityRows": [
-        "core.agent-tool-json-schema",
-        "core.system-prompt-tightened",
-        "tools.grep-no-config",
-        "tools.grep-lone-cr-context"
       ]
     },
     {
@@ -17757,54 +16740,6 @@
       ]
     },
     {
-      "file": "src/PiSharp.Tools/Files/GrepTool.cs",
-      "area": "tools",
-      "citations": [
-        {
-          "line": 1,
-          "changed": [
-            "packages/coding-agent/src/core/tools/grep.ts"
-          ]
-        }
-      ],
-      "upstream": [
-        {
-          "path": "packages/coding-agent/src/core/tools/grep.ts",
-          "status": "changed",
-          "linesChanged": 11
-        }
-      ],
-      "changeSize": 11,
-      "applicabilityRows": [
-        "tools.grep-no-config",
-        "tools.grep-lone-cr-context"
-      ]
-    },
-    {
-      "file": "src/PiSharp.Tools/Files/PiGrepTool.cs",
-      "area": "tools",
-      "citations": [
-        {
-          "line": 1,
-          "changed": [
-            "packages/coding-agent/src/core/tools/grep.ts"
-          ]
-        }
-      ],
-      "upstream": [
-        {
-          "path": "packages/coding-agent/src/core/tools/grep.ts",
-          "status": "changed",
-          "linesChanged": 11
-        }
-      ],
-      "changeSize": 11,
-      "applicabilityRows": [
-        "tools.grep-no-config",
-        "tools.grep-lone-cr-context"
-      ]
-    },
-    {
       "file": "src/PiSharp.ModelRuntime/Commands/PiPayloadBudget.cs",
       "area": "tools",
       "citations": [
@@ -17812,62 +16747,6 @@
           "line": 1,
           "changed": [
             "packages/coding-agent/src/utils/image-resize-core.ts"
-          ]
-        }
-      ],
-      "upstream": [
-        {
-          "path": "packages/coding-agent/src/utils/image-resize-core.ts",
-          "status": "changed",
-          "linesChanged": 8
-        }
-      ],
-      "changeSize": 8,
-      "applicabilityRows": [
-        "tools.image-resize-smaller-encoding"
-      ]
-    },
-    {
-      "file": "src/PiSharp.Tools.Skia/SkiaImageCodec.cs",
-      "area": "tools",
-      "citations": [
-        {
-          "line": 1,
-          "changed": [
-            "packages/coding-agent/src/utils/image-resize-core.ts"
-          ],
-          "unchanged": [
-            "packages/coding-agent/src/utils/image-convert.ts",
-            "packages/coding-agent/src/utils/exif-orientation.ts"
-          ]
-        }
-      ],
-      "upstream": [
-        {
-          "path": "packages/coding-agent/src/utils/image-resize-core.ts",
-          "status": "changed",
-          "linesChanged": 8
-        }
-      ],
-      "changeSize": 8,
-      "applicabilityRows": [
-        "tools.image-resize-smaller-encoding"
-      ]
-    },
-    {
-      "file": "src/PiSharp.Tools/Images/ImageProcessing.cs",
-      "area": "tools",
-      "citations": [
-        {
-          "line": 1,
-          "changed": [
-            "packages/coding-agent/src/utils/image-resize-core.ts"
-          ],
-          "unchanged": [
-            "packages/coding-agent/src/utils/image-process.ts",
-            "packages/coding-agent/src/utils/image-resize.ts",
-            "packages/coding-agent/src/utils/image-convert.ts",
-            "packages/coding-agent/src/utils/tool-result-images.ts"
           ]
         }
       ],
@@ -18965,62 +17844,6 @@
       ]
     },
     {
-      "file": "src/PiSharp.Tui/Pi/Markdown.cs",
-      "area": "tui",
-      "citations": [
-        {
-          "line": 1,
-          "changed": [
-            "packages/tui/src/components/markdown.ts"
-          ]
-        }
-      ],
-      "upstream": [
-        {
-          "path": "packages/tui/src/components/markdown.ts",
-          "status": "changed",
-          "linesChanged": 219
-        }
-      ],
-      "changeSize": 219,
-      "applicabilityRows": [
-        "tui.unclosed-display-math",
-        "tui.cjk-emphasis",
-        "tui.display-math-raw-fallback",
-        "tui.markdown-block-reuse",
-        "tui.bare-url-cjk-punctuation",
-        "tui.nested-blockquote-linear"
-      ]
-    },
-    {
-      "file": "src/PiSharp.Tui/Pi/MarkdownLexer.cs",
-      "area": "tui",
-      "citations": [
-        {
-          "line": 2,
-          "changed": [
-            "packages/tui/src/components/markdown.ts"
-          ]
-        }
-      ],
-      "upstream": [
-        {
-          "path": "packages/tui/src/components/markdown.ts",
-          "status": "changed",
-          "linesChanged": 219
-        }
-      ],
-      "changeSize": 219,
-      "applicabilityRows": [
-        "tui.unclosed-display-math",
-        "tui.cjk-emphasis",
-        "tui.display-math-raw-fallback",
-        "tui.markdown-block-reuse",
-        "tui.bare-url-cjk-punctuation",
-        "tui.nested-blockquote-linear"
-      ]
-    },
-    {
       "file": "tools/NodeBridge/pi-host/virtual/tui/components/markdown.mjs",
       "area": "tui",
       "citations": [
@@ -19133,84 +17956,6 @@
       ]
     },
     {
-      "file": "src/PiSharp.Cli/Models/ModelListing.cs",
-      "area": "tui",
-      "citations": [
-        {
-          "line": 1,
-          "changed": [
-            "packages/tui/src/fuzzy.ts"
-          ],
-          "unchanged": [
-            "packages/coding-agent/src/cli/list-models.ts",
-            "packages/coding-agent/src/core/auth-guidance.ts"
-          ]
-        }
-      ],
-      "upstream": [
-        {
-          "path": "packages/tui/src/fuzzy.ts",
-          "status": "changed",
-          "linesChanged": 113
-        }
-      ],
-      "changeSize": 113,
-      "applicabilityRows": [
-        "tui.fuzzy-contiguous-match"
-      ]
-    },
-    {
-      "file": "src/PiSharp.Tui/Pi/TextSupport.cs",
-      "area": "tui",
-      "citations": [
-        {
-          "line": 1,
-          "changed": [
-            "packages/tui/src/fuzzy.ts"
-          ],
-          "unchanged": [
-            "packages/tui/src/kill-ring.ts",
-            "packages/tui/src/undo-stack.ts",
-            "packages/tui/src/word-navigation.ts"
-          ]
-        }
-      ],
-      "upstream": [
-        {
-          "path": "packages/tui/src/fuzzy.ts",
-          "status": "changed",
-          "linesChanged": 113
-        }
-      ],
-      "changeSize": 113,
-      "applicabilityRows": [
-        "tui.fuzzy-contiguous-match"
-      ]
-    },
-    {
-      "file": "tools/NodeBridge/pi-host/virtual/tui/fuzzy.mjs",
-      "area": "tui",
-      "citations": [
-        {
-          "line": 1,
-          "changed": [
-            "packages/tui/src/fuzzy.ts"
-          ]
-        }
-      ],
-      "upstream": [
-        {
-          "path": "packages/tui/src/fuzzy.ts",
-          "status": "changed",
-          "linesChanged": 113
-        }
-      ],
-      "changeSize": 113,
-      "applicabilityRows": [
-        "tui.fuzzy-contiguous-match"
-      ]
-    },
-    {
       "file": "src/PiSharp.Cli/Interactive/Mode/Components/ModelSelector.cs",
       "area": "tui",
       "areas": [
@@ -19295,58 +18040,6 @@
       ]
     },
     {
-      "file": "src/PiSharp.Tui/Pi/TextUtils.cs",
-      "area": "tui",
-      "citations": [
-        {
-          "line": 1,
-          "changed": [
-            "packages/tui/src/utils.ts"
-          ]
-        }
-      ],
-      "upstream": [
-        {
-          "path": "packages/tui/src/utils.ts",
-          "status": "changed",
-          "linesChanged": 75
-        }
-      ],
-      "changeSize": 75,
-      "applicabilityRows": [
-        "tui.replace-control-characters",
-        "tui.set-title-control-chars",
-        "tui.wrap-styled-word-boundary",
-        "tui.bare-url-cjk-punctuation"
-      ]
-    },
-    {
-      "file": "tools/NodeBridge/pi-host/virtual/tui/utils.mjs",
-      "area": "tui",
-      "citations": [
-        {
-          "line": 1,
-          "changed": [
-            "packages/tui/src/utils.ts"
-          ]
-        }
-      ],
-      "upstream": [
-        {
-          "path": "packages/tui/src/utils.ts",
-          "status": "changed",
-          "linesChanged": 75
-        }
-      ],
-      "changeSize": 75,
-      "applicabilityRows": [
-        "tui.replace-control-characters",
-        "tui.set-title-control-chars",
-        "tui.wrap-styled-word-boundary",
-        "tui.bare-url-cjk-punctuation"
-      ]
-    },
-    {
       "file": "src/PiSharp.Cli/Interactive/Mode/Components/ToolRenderers/RenderUtils.cs",
       "area": "tui",
       "areas": [
@@ -19384,52 +18077,6 @@
         "cli.home-tilde-anchored",
         "tools.read-line-range-labels",
         "core.windows-path-casing"
-      ]
-    },
-    {
-      "file": "src/PiSharp.Tui/Pi/Keys.cs",
-      "area": "tui",
-      "citations": [
-        {
-          "line": 1,
-          "changed": [
-            "packages/tui/src/keys.ts"
-          ]
-        }
-      ],
-      "upstream": [
-        {
-          "path": "packages/tui/src/keys.ts",
-          "status": "changed",
-          "linesChanged": 68
-        }
-      ],
-      "changeSize": 68,
-      "applicabilityRows": [
-        "tui.kitty-function-keys"
-      ]
-    },
-    {
-      "file": "tools/NodeBridge/pi-host/virtual/tui/keys.mjs",
-      "area": "tui",
-      "citations": [
-        {
-          "line": 1,
-          "changed": [
-            "packages/tui/src/keys.ts"
-          ]
-        }
-      ],
-      "upstream": [
-        {
-          "path": "packages/tui/src/keys.ts",
-          "status": "changed",
-          "linesChanged": 68
-        }
-      ],
-      "changeSize": 68,
-      "applicabilityRows": [
-        "tui.kitty-function-keys"
       ]
     },
     {
@@ -19516,41 +18163,6 @@
       ]
     },
     {
-      "file": "src/PiSharp.Cli/Interactive/Mode/Components/ToolRenderers/Read.cs",
-      "area": "tui",
-      "areas": [
-        "coding-agent-cli",
-        "tools"
-      ],
-      "citations": [
-        {
-          "line": 1,
-          "changed": [
-            "packages/coding-agent/src/core/tools/renderers/read.ts",
-            "packages/coding-agent/src/config.ts"
-          ]
-        }
-      ],
-      "upstream": [
-        {
-          "path": "packages/coding-agent/src/core/tools/renderers/read.ts",
-          "status": "changed",
-          "linesChanged": 19
-        },
-        {
-          "path": "packages/coding-agent/src/config.ts",
-          "status": "changed",
-          "linesChanged": 35
-        }
-      ],
-      "changeSize": 54,
-      "applicabilityRows": [
-        "tools.read-line-range-labels",
-        "cli.self-update-command",
-        "cli.update-pnpm-ownership"
-      ]
-    },
-    {
       "file": "src/PiSharp.Cli/Interactive/Mode/Utilities/Paths.cs",
       "area": "tui",
       "areas": [
@@ -19576,73 +18188,6 @@
       "applicabilityRows": [
         "core.windows-path-casing",
         "cli.home-tilde-anchored"
-      ]
-    },
-    {
-      "file": "src/PiSharp.Tui/Pi/Terminal.cs",
-      "area": "tui",
-      "citations": [
-        {
-          "line": 1,
-          "changed": [
-            "packages/tui/src/terminal.ts",
-            "packages/tui/src/program-status.ts"
-          ],
-          "unchanged": [
-            "packages/tui/src/native-modifiers.ts"
-          ]
-        }
-      ],
-      "upstream": [
-        {
-          "path": "packages/tui/src/terminal.ts",
-          "status": "changed",
-          "linesChanged": 38
-        },
-        {
-          "path": "packages/tui/src/program-status.ts",
-          "status": "changed",
-          "linesChanged": 5
-        }
-      ],
-      "changeSize": 43,
-      "applicabilityRows": [
-        "tui.exit-restore-terminal-modes",
-        "tui.native-shift-enter-esc-return",
-        "tui.set-title-control-chars",
-        "tui.replace-control-characters"
-      ]
-    },
-    {
-      "file": "src/PiSharp.Tui/Rendering/TerminalProgramStatus.cs",
-      "area": "tui",
-      "citations": [
-        {
-          "line": 1,
-          "changed": [
-            "packages/tui/src/program-status.ts",
-            "packages/tui/src/terminal.ts"
-          ]
-        }
-      ],
-      "upstream": [
-        {
-          "path": "packages/tui/src/program-status.ts",
-          "status": "changed",
-          "linesChanged": 5
-        },
-        {
-          "path": "packages/tui/src/terminal.ts",
-          "status": "changed",
-          "linesChanged": 38
-        }
-      ],
-      "changeSize": 43,
-      "applicabilityRows": [
-        "tui.replace-control-characters",
-        "tui.set-title-control-chars",
-        "tui.exit-restore-terminal-modes",
-        "tui.native-shift-enter-esc-return"
       ]
     },
     {
@@ -19679,81 +18224,6 @@
         "cli.highlight-reuse",
         "core.extension-keybinding-hints",
         "core.custom-ui-blocked-status"
-      ]
-    },
-    {
-      "file": "tools/NodeBridge/pi-host/virtual/tui/terminal.mjs",
-      "area": "tui",
-      "citations": [
-        {
-          "line": 1,
-          "changed": [
-            "packages/tui/src/terminal.ts"
-          ]
-        }
-      ],
-      "upstream": [
-        {
-          "path": "packages/tui/src/terminal.ts",
-          "status": "changed",
-          "linesChanged": 38
-        }
-      ],
-      "changeSize": 38,
-      "applicabilityRows": [
-        "tui.exit-restore-terminal-modes",
-        "tui.native-shift-enter-esc-return",
-        "tui.set-title-control-chars"
-      ]
-    },
-    {
-      "file": "src/PiSharp.Tui/Pi/Tui.cs",
-      "area": "tui",
-      "citations": [
-        {
-          "line": 1,
-          "changed": [
-            "packages/tui/src/tui.ts"
-          ]
-        }
-      ],
-      "upstream": [
-        {
-          "path": "packages/tui/src/tui.ts",
-          "status": "changed",
-          "linesChanged": 32
-        }
-      ],
-      "changeSize": 32,
-      "applicabilityRows": [
-        "tui.exit-restore-terminal-modes",
-        "tui.captures-viewport-input",
-        "tui.select-page-keys"
-      ]
-    },
-    {
-      "file": "tools/NodeBridge/pi-host/virtual/tui/tui.mjs",
-      "area": "tui",
-      "citations": [
-        {
-          "line": 1,
-          "changed": [
-            "packages/tui/src/tui.ts"
-          ]
-        }
-      ],
-      "upstream": [
-        {
-          "path": "packages/tui/src/tui.ts",
-          "status": "changed",
-          "linesChanged": 32
-        }
-      ],
-      "changeSize": 32,
-      "applicabilityRows": [
-        "tui.exit-restore-terminal-modes",
-        "tui.captures-viewport-input",
-        "tui.select-page-keys"
       ]
     },
     {
@@ -19858,239 +18328,6 @@
       ]
     },
     {
-      "file": "src/PiSharp.Tui/Pi/Layout.cs",
-      "area": "tui",
-      "citations": [
-        {
-          "line": 1,
-          "changed": [
-            "packages/tui/src/layout.ts"
-          ],
-          "unchanged": [
-            "packages/tui/src/layout-node.ts",
-            "packages/tui/src/components/stack.ts",
-            "packages/tui/src/components/v-stack.ts",
-            "packages/tui/src/components/h-stack.ts",
-            "packages/tui/src/components/scroll-view.ts",
-            "packages/tui/src/components/mouse-region.ts",
-            "packages/tui/src/components/alt-screen-flash.ts",
-            "packages/tui/src/wheel-scroll.ts"
-          ]
-        }
-      ],
-      "upstream": [
-        {
-          "path": "packages/tui/src/layout.ts",
-          "status": "changed",
-          "linesChanged": 26
-        }
-      ],
-      "changeSize": 26,
-      "applicabilityRows": [
-        "tui.kitty-image-crop-boxed"
-      ]
-    },
-    {
-      "file": "tools/NodeBridge/pi-host/virtual/tui/layout.mjs",
-      "area": "tui",
-      "citations": [
-        {
-          "line": 1,
-          "changed": [
-            "packages/tui/src/layout.ts"
-          ]
-        }
-      ],
-      "upstream": [
-        {
-          "path": "packages/tui/src/layout.ts",
-          "status": "changed",
-          "linesChanged": 26
-        }
-      ],
-      "changeSize": 26,
-      "applicabilityRows": [
-        "tui.kitty-image-crop-boxed"
-      ]
-    },
-    {
-      "file": "src/PiSharp.Tui/Pi/TuiAltScreen.cs",
-      "area": "tui",
-      "citations": [
-        {
-          "line": 1,
-          "changed": [
-            "packages/tui/src/tui-alt-screen.ts"
-          ]
-        }
-      ],
-      "upstream": [
-        {
-          "path": "packages/tui/src/tui-alt-screen.ts",
-          "status": "changed",
-          "linesChanged": 22
-        }
-      ],
-      "changeSize": 22,
-      "applicabilityRows": [
-        "tui.exit-restore-terminal-modes",
-        "tui.captures-viewport-input",
-        "tui.double-click-word-chars",
-        "tui.select-page-keys"
-      ]
-    },
-    {
-      "file": "tools/NodeBridge/pi-host/virtual/tui/tui-alt-screen.mjs",
-      "area": "tui",
-      "citations": [
-        {
-          "line": 1,
-          "changed": [
-            "packages/tui/src/tui-alt-screen.ts"
-          ]
-        }
-      ],
-      "upstream": [
-        {
-          "path": "packages/tui/src/tui-alt-screen.ts",
-          "status": "changed",
-          "linesChanged": 22
-        }
-      ],
-      "changeSize": 22,
-      "applicabilityRows": [
-        "tui.exit-restore-terminal-modes",
-        "tui.captures-viewport-input",
-        "tui.double-click-word-chars",
-        "tui.select-page-keys"
-      ]
-    },
-    {
-      "file": "src/PiSharp.Tui/Pi/TerminalImage.cs",
-      "area": "tui",
-      "citations": [
-        {
-          "line": 1,
-          "changed": [
-            "packages/tui/src/terminal-image.ts"
-          ],
-          "unchanged": [
-            "packages/tui/src/terminal-colors.ts"
-          ]
-        }
-      ],
-      "upstream": [
-        {
-          "path": "packages/tui/src/terminal-image.ts",
-          "status": "changed",
-          "linesChanged": 20
-        }
-      ],
-      "changeSize": 20,
-      "applicabilityRows": [
-        "tui.rex-terminal",
-        "tui.orca-kitty-images",
-        "tui.kitty-image-crop-boxed"
-      ]
-    },
-    {
-      "file": "tools/NodeBridge/pi-host/virtual/tui/terminal-image.mjs",
-      "area": "tui",
-      "citations": [
-        {
-          "line": 1,
-          "changed": [
-            "packages/tui/src/terminal-image.ts"
-          ]
-        }
-      ],
-      "upstream": [
-        {
-          "path": "packages/tui/src/terminal-image.ts",
-          "status": "changed",
-          "linesChanged": 20
-        }
-      ],
-      "changeSize": 20,
-      "applicabilityRows": [
-        "tui.rex-terminal",
-        "tui.orca-kitty-images",
-        "tui.kitty-image-crop-boxed"
-      ]
-    },
-    {
-      "file": "src/PiSharp.Tui/Input/TerminalKeybindingDefinitions.cs",
-      "area": "tui",
-      "citations": [
-        {
-          "line": 1,
-          "changed": [
-            "packages/tui/src/keybindings.ts"
-          ]
-        }
-      ],
-      "upstream": [
-        {
-          "path": "packages/tui/src/keybindings.ts",
-          "status": "changed",
-          "linesChanged": 19
-        }
-      ],
-      "changeSize": 19,
-      "applicabilityRows": [
-        "tui.select-page-index",
-        "tui.select-page-keys"
-      ]
-    },
-    {
-      "file": "src/PiSharp.Tui/Pi/KeybindingsManager.cs",
-      "area": "tui",
-      "citations": [
-        {
-          "line": 1,
-          "changed": [
-            "packages/tui/src/keybindings.ts"
-          ]
-        }
-      ],
-      "upstream": [
-        {
-          "path": "packages/tui/src/keybindings.ts",
-          "status": "changed",
-          "linesChanged": 19
-        }
-      ],
-      "changeSize": 19,
-      "applicabilityRows": [
-        "tui.select-page-index",
-        "tui.select-page-keys"
-      ]
-    },
-    {
-      "file": "tools/NodeBridge/pi-host/virtual/tui/keybindings.mjs",
-      "area": "tui",
-      "citations": [
-        {
-          "line": 1,
-          "changed": [
-            "packages/tui/src/keybindings.ts"
-          ]
-        }
-      ],
-      "upstream": [
-        {
-          "path": "packages/tui/src/keybindings.ts",
-          "status": "changed",
-          "linesChanged": 19
-        }
-      ],
-      "changeSize": 19,
-      "applicabilityRows": [
-        "tui.select-page-index",
-        "tui.select-page-keys"
-      ]
-    },
-    {
       "file": "src/PiSharp.Cli/Interactive/Mode/Components/ToolExecution.cs",
       "area": "tui",
       "areas": [
@@ -20120,362 +18357,6 @@
         "core.extension-keybinding-hints",
         "cli.tool-args-render-per-frame"
       ]
-    },
-    {
-      "file": "src/PiSharp.Cli/Interactive/Mode/Components/UserMessage.cs",
-      "area": "tui",
-      "areas": [
-        "coding-agent-core",
-        "coding-agent-cli"
-      ],
-      "citations": [
-        {
-          "line": 1,
-          "changed": [
-            "packages/coding-agent/src/modes/interactive/components/user-message.ts"
-          ]
-        }
-      ],
-      "upstream": [
-        {
-          "path": "packages/coding-agent/src/modes/interactive/components/user-message.ts",
-          "status": "changed",
-          "linesChanged": 14
-        }
-      ],
-      "changeSize": 14,
-      "applicabilityRows": [
-        "core.markdown-transform-entry-meta",
-        "cli.highlight-reuse"
-      ]
-    },
-    {
-      "file": "src/PiSharp.Tui/Pi/Components.cs",
-      "area": "tui",
-      "citations": [
-        {
-          "line": 1,
-          "changed": [
-            "packages/tui/src/components/text.ts",
-            "packages/tui/src/components/select-list.ts"
-          ],
-          "unchanged": [
-            "packages/tui/src/components/truncated-text.ts",
-            "packages/tui/src/components/box.ts",
-            "packages/tui/src/components/spacer.ts",
-            "packages/tui/src/components/loader.ts",
-            "packages/tui/src/components/cancellable-loader.ts",
-            "packages/tui/src/components/input.ts"
-          ]
-        }
-      ],
-      "upstream": [
-        {
-          "path": "packages/tui/src/components/text.ts",
-          "status": "changed",
-          "linesChanged": 2
-        },
-        {
-          "path": "packages/tui/src/components/select-list.ts",
-          "status": "changed",
-          "linesChanged": 10
-        }
-      ],
-      "changeSize": 12,
-      "applicabilityRows": [
-        "tui.text-settext-unchanged",
-        "tui.captures-viewport-input",
-        "tui.select-page-keys"
-      ]
-    },
-    {
-      "file": "src/PiSharp.Tui/Pi/Editor.cs",
-      "area": "tui",
-      "citations": [
-        {
-          "line": 1,
-          "changed": [
-            "packages/tui/src/components/editor.ts"
-          ],
-          "unchanged": [
-            "packages/tui/src/editor-component.ts"
-          ]
-        }
-      ],
-      "upstream": [
-        {
-          "path": "packages/tui/src/components/editor.ts",
-          "status": "changed",
-          "linesChanged": 12
-        }
-      ],
-      "changeSize": 12,
-      "applicabilityRows": [
-        "tui.captures-viewport-input",
-        "tui.select-page-keys"
-      ]
-    },
-    {
-      "file": "tools/NodeBridge/pi-host/virtual/tui/components/editor.mjs",
-      "area": "tui",
-      "citations": [
-        {
-          "line": 1,
-          "changed": [
-            "packages/tui/src/components/editor.ts"
-          ]
-        }
-      ],
-      "upstream": [
-        {
-          "path": "packages/tui/src/components/editor.ts",
-          "status": "changed",
-          "linesChanged": 12
-        }
-      ],
-      "changeSize": 12,
-      "applicabilityRows": [
-        "tui.captures-viewport-input",
-        "tui.select-page-keys"
-      ]
-    },
-    {
-      "file": "tools/NodeBridge/pi-host/virtual/tui/components/select-list.mjs",
-      "area": "tui",
-      "citations": [
-        {
-          "line": 1,
-          "changed": [
-            "packages/tui/src/components/select-list.ts"
-          ]
-        }
-      ],
-      "upstream": [
-        {
-          "path": "packages/tui/src/components/select-list.ts",
-          "status": "changed",
-          "linesChanged": 10
-        }
-      ],
-      "changeSize": 10,
-      "applicabilityRows": [
-        "tui.captures-viewport-input",
-        "tui.select-page-keys"
-      ]
-    },
-    {
-      "file": "src/PiSharp.Tui/Pi/SettingsListAndImage.cs",
-      "area": "tui",
-      "citations": [
-        {
-          "line": 1,
-          "changed": [
-            "packages/tui/src/components/settings-list.ts"
-          ],
-          "unchanged": [
-            "packages/tui/src/components/image.ts"
-          ]
-        }
-      ],
-      "upstream": [
-        {
-          "path": "packages/tui/src/components/settings-list.ts",
-          "status": "changed",
-          "linesChanged": 7
-        }
-      ],
-      "changeSize": 7,
-      "applicabilityRows": [
-        "tui.captures-viewport-input",
-        "tui.select-page-keys"
-      ]
-    },
-    {
-      "file": "tools/NodeBridge/pi-host/virtual/tui/components/settings-list.mjs",
-      "area": "tui",
-      "citations": [
-        {
-          "line": 1,
-          "changed": [
-            "packages/tui/src/components/settings-list.ts"
-          ]
-        }
-      ],
-      "upstream": [
-        {
-          "path": "packages/tui/src/components/settings-list.ts",
-          "status": "changed",
-          "linesChanged": 7
-        }
-      ],
-      "changeSize": 7,
-      "applicabilityRows": [
-        "tui.captures-viewport-input",
-        "tui.select-page-keys"
-      ]
-    },
-    {
-      "file": "src/PiSharp.Tui/Pi/TuiMainScreen.cs",
-      "area": "tui",
-      "citations": [
-        {
-          "line": 1,
-          "changed": [
-            "packages/tui/src/tui-main-screen.ts"
-          ]
-        }
-      ],
-      "upstream": [
-        {
-          "path": "packages/tui/src/tui-main-screen.ts",
-          "status": "changed",
-          "linesChanged": 6
-        }
-      ],
-      "changeSize": 6,
-      "applicabilityRows": [
-        "tui.regular-mode-strip-osc133"
-      ]
-    },
-    {
-      "file": "tools/NodeBridge/pi-host/virtual/tui/tui-main-screen.mjs",
-      "area": "tui",
-      "citations": [
-        {
-          "line": 1,
-          "changed": [
-            "packages/tui/src/tui-main-screen.ts"
-          ]
-        }
-      ],
-      "upstream": [
-        {
-          "path": "packages/tui/src/tui-main-screen.ts",
-          "status": "changed",
-          "linesChanged": 6
-        }
-      ],
-      "changeSize": 6,
-      "applicabilityRows": [
-        "tui.regular-mode-strip-osc133"
-      ]
-    },
-    {
-      "file": "src/PiSharp.Tui/Pi/Autocomplete.cs",
-      "area": "tui",
-      "citations": [
-        {
-          "line": 1,
-          "changed": [
-            "packages/tui/src/autocomplete.ts"
-          ]
-        }
-      ],
-      "upstream": [
-        {
-          "path": "packages/tui/src/autocomplete.ts",
-          "status": "changed",
-          "linesChanged": 5
-        }
-      ],
-      "changeSize": 5,
-      "applicabilityRows": [
-        "tui.autocomplete-regex-metachar"
-      ]
-    },
-    {
-      "file": "tools/NodeBridge/pi-host/virtual/tui/autocomplete.mjs",
-      "area": "tui",
-      "citations": [
-        {
-          "line": 1,
-          "changed": [
-            "packages/tui/src/autocomplete.ts"
-          ]
-        }
-      ],
-      "upstream": [
-        {
-          "path": "packages/tui/src/autocomplete.ts",
-          "status": "changed",
-          "linesChanged": 5
-        }
-      ],
-      "changeSize": 5,
-      "applicabilityRows": [
-        "tui.autocomplete-regex-metachar"
-      ]
-    },
-    {
-      "file": "tools/NodeBridge/pi-host/virtual/tui/program-status.mjs",
-      "area": "tui",
-      "citations": [
-        {
-          "line": 1,
-          "changed": [
-            "packages/tui/src/program-status.ts"
-          ]
-        }
-      ],
-      "upstream": [
-        {
-          "path": "packages/tui/src/program-status.ts",
-          "status": "changed",
-          "linesChanged": 5
-        }
-      ],
-      "changeSize": 5,
-      "applicabilityRows": [
-        "tui.replace-control-characters",
-        "tui.set-title-control-chars"
-      ]
-    },
-    {
-      "file": "tools/NodeBridge/pi-host/virtual/pi-tui.mjs",
-      "area": "tui",
-      "citations": [
-        {
-          "line": 1,
-          "changed": [
-            "packages/tui/src/index.ts"
-          ]
-        }
-      ],
-      "upstream": [
-        {
-          "path": "packages/tui/src/index.ts",
-          "status": "changed",
-          "linesChanged": 2
-        }
-      ],
-      "changeSize": 2,
-      "applicabilityRows": [
-        "tui.replace-control-characters",
-        "tui.select-page-index"
-      ]
-    },
-    {
-      "file": "tools/NodeBridge/pi-host/virtual/tui/components/text.mjs",
-      "area": "tui",
-      "citations": [
-        {
-          "line": 1,
-          "changed": [
-            "packages/tui/src/components/text.ts"
-          ]
-        }
-      ],
-      "upstream": [
-        {
-          "path": "packages/tui/src/components/text.ts",
-          "status": "changed",
-          "linesChanged": 2
-        }
-      ],
-      "changeSize": 2,
-      "applicabilityRows": [
-        "tui.text-settext-unchanged"
-      ]
     }
   ],
   "unparsed": [
@@ -20485,30 +18366,12 @@
       "text": "public const string Commit = \"06a466935536f8c9bcacb2d5efc0fc021be1bdff\";"
     },
     {
-      "file": "src/PiSharp.Durable/Models/BuiltinCatalog.cs",
-      "line": 1,
-      "text": "// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/ai/src/providers/all.ts (getBuiltinModels over the providers/data/*.json",
-      "note": "unresolved: providers/data/*.json",
-      "unchanged": [
-        "packages/ai/src/providers/all.ts"
-      ]
-    },
-    {
       "file": "src/PiSharp.Durable/Storage/Jsonl/Local/JsonlStorage.Local.cs",
       "line": 1,
       "text": "// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/src/storage/jsonl/node.ts. The local runtime side of the JSONL",
       "note": "unresolved: env/node.ts",
       "unchanged": [
         "packages/durable/src/storage/jsonl/node.ts"
-      ]
-    },
-    {
-      "file": "src/PiSharp.ModelRuntime/Models/BuiltinModelCatalog.cs",
-      "line": 1,
-      "text": "// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/ai/src/providers/all.ts (getBuiltinModels,",
-      "note": "unresolved: providers/data/*.json",
-      "unchanged": [
-        "packages/ai/src/providers/all.ts"
       ]
     },
     {
@@ -20961,6 +18824,11 @@
       "file": "compatibility/sync-1.2.0-worklist.json",
       "occurrences": 1,
       "reason": "the v1.2.0 sync record"
+    },
+    {
+      "file": "compatibility/sync-1.5.0-applicability.json",
+      "occurrences": 1,
+      "reason": "names the commit the v1.5.0 sync starts from"
     },
     {
       "file": "compatibility/sync-1.5.0-worklist.json",
