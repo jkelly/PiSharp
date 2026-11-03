@@ -629,7 +629,7 @@ internal sealed class PiPackageManager
     {
         "bun" => ["install", "--omit=dev", "--omit=peer"],
         "pnpm" => ["install", "--prod", "--config.auto-install-peers=false", "--config.strict-peer-dependencies=false", "--config.strict-dep-builds=false"],
-        "npm" => ["install", "--omit=dev", "--legacy-peer-deps"],
+        "npm" => ["install", "--omit=dev", "--legacy-peer-deps", "--no-audit", "--no-fund"],
         _ => ["install"]
     };
 
@@ -639,14 +639,15 @@ internal sealed class PiPackageManager
         return processes.RunSync(command, [.. prefix, .. args]);
     }
 
-    /// <summary>Source getNpmInstallArgs: peer resolution disabled for managed installs.</summary>
+    /// <summary>Source getNpmInstallArgs: peer resolution disabled for managed installs, and npm audit and fund advice skipped (npm audit
+    /// fix would run without --legacy-peer-deps and install pi peers).</summary>
     // npm writes broken nested package-lock.json paths when --prefix goes through a symlink, so an existing root is resolved first.
     internal ImmutableArray<string> GetNpmInstallArgs(IReadOnlyList<string> specs, string root) => NpmInstallArgs(specs, PiPaths.Canonicalize(root));
     private ImmutableArray<string> NpmInstallArgs(IReadOnlyList<string> specs, string installRoot) => GetPackageManagerName() switch
     {
         "bun" => ["install", .. specs, "--cwd", installRoot, "--omit=peer"],
         "pnpm" => ["install", .. specs, "--prefix", installRoot, "--config.auto-install-peers=false", "--config.strict-peer-dependencies=false", "--config.strict-dep-builds=false"],
-        _ => ["install", .. specs, "--prefix", installRoot, "--legacy-peer-deps"]
+        _ => ["install", .. specs, "--prefix", installRoot, "--legacy-peer-deps", "--no-audit", "--no-fund"]
     };
 
     private async Task InstallNpm(PiNpmSource source, string scope, bool temporary, CancellationToken cancellationToken)
@@ -664,7 +665,7 @@ internal sealed class PiPackageManager
         var name = GetPackageManagerName();
         if (name == "bun") { await RunNpmCommand(["uninstall", source.Name, "--cwd", installRoot], null, cancellationToken).ConfigureAwait(false); return; }
         List<string> args = ["uninstall", source.Name, "--prefix", installRoot];
-        if (name != "pnpm") args.Add("--legacy-peer-deps");
+        if (name != "pnpm") args.AddRange(["--legacy-peer-deps", "--no-audit", "--no-fund"]); // npm audit fix would run without --legacy-peer-deps and install pi peers.
         await RunNpmCommand(args, null, cancellationToken).ConfigureAwait(false);
     }
 

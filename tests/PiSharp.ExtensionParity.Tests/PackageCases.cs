@@ -726,13 +726,13 @@ internal static partial class Program
         var npmRoot = Path.Combine(sandbox.AgentDir, "npm");
         var processes = new FakeProcesses();
         await Manager(sandbox, J("""{"npmCommand":["mise","exec","node@20","--","npm"]}"""), processes: processes).InstallAsync("npm:@scope/pkg");
-        Check(processes.Ran("mise", ["exec", "node@20", "--", "npm", "install", "@scope/pkg", "--prefix", npmRoot, "--legacy-peer-deps"]), "npmCommand argv install");
+        Check(processes.Ran("mise", ["exec", "node@20", "--", "npm", "install", "@scope/pkg", "--prefix", npmRoot, "--legacy-peer-deps", "--no-audit", "--no-fund"]), "npmCommand argv install");
         Equal("{\n  \"name\": \"pi-extensions\",\n  \"private\": true\n}", File.ReadAllText(Path.Combine(npmRoot, "package.json")), "managed npm project");
         Equal("*\n!.gitignore\n", File.ReadAllText(Path.Combine(npmRoot, ".gitignore")), "managed npm root ignored by git");
 
         processes = new FakeProcesses();
         await Manager(sandbox, processes: processes).RemoveAsync("npm:@scope/pkg");
-        Check(processes.Ran("npm", ["uninstall", "@scope/pkg", "--prefix", npmRoot, "--legacy-peer-deps"]), "uninstall with legacy peer deps");
+        Check(processes.Ran("npm", ["uninstall", "@scope/pkg", "--prefix", npmRoot, "--legacy-peer-deps", "--no-audit", "--no-fund"]), "uninstall with legacy peer deps");
         processes = new FakeProcesses();
         await Manager(sandbox, J("""{"npmCommand":["mise","exec","bun@1","--","bun"]}"""), processes: processes).InstallAsync("npm:@scope/pkg");
         Check(processes.Ran("mise", ["exec", "bun@1", "--", "bun", "install", "@scope/pkg", "--cwd", npmRoot, "--omit=peer"]), "bun --cwd");
@@ -811,7 +811,7 @@ internal static partial class Program
         var processes = Cloning();
         await Manager(sandbox, processes: processes).InstallAsync(source);
         Check(processes.Ran("git", ["clone", "https://github.com/user/repo", target]), "clone");
-        Check(processes.Ran("npm", ["install", "--omit=dev", "--legacy-peer-deps"], target), "git dependencies without peers");
+        Check(processes.Ran("npm", ["install", "--omit=dev", "--legacy-peer-deps", "--no-audit", "--no-fund"], target), "git dependencies without peers");
         Equal("*\n!.gitignore\n", File.ReadAllText(Path.Combine(sandbox.AgentDir, "git", ".gitignore")), "git root ignored");
         PiPackageManager.DeleteTree(Path.Combine(sandbox.AgentDir, "git"));
 
@@ -836,7 +836,7 @@ internal static partial class Program
         processes = new FakeProcesses { OnCapture = (_, args, _) => args is ["rev-parse", "HEAD"] ? "old-head" : args is ["rev-parse", "FETCH_HEAD^{commit}"] ? "new-head" : null };
         await Manager(sandbox, processes: processes).InstallAsync(source + "@v2");
         Check(processes.Ran("git", ["fetch", "origin", "v2"], target) && processes.Ran("git", ["reset", "--hard", "FETCH_HEAD^{commit}"], target) &&
-            processes.Ran("git", ["clean", "-fdx"], target) && processes.Ran("npm", ["install", "--omit=dev", "--legacy-peer-deps"], target), "pinned ref reconciled");
+            processes.Ran("git", ["clean", "-fdx"], target) && processes.Ran("npm", ["install", "--omit=dev", "--legacy-peer-deps", "--no-audit", "--no-fund"], target), "pinned ref reconciled");
         Check(!File.Exists(Path.Combine(sandbox.AgentDir, "git", "github.com", "user", ".repo.pi-update-incomplete")), "update marker cleared");
 
         // Without a ref the update target is the upstream branch.
@@ -866,11 +866,11 @@ internal static partial class Program
         sandbox.Write(Path.Combine(target, "package.json"), Jstr(new { name = "repo", version = "1.0.0", dependencies = new { dependency = "1.0.0" } }));
         processes = new FakeProcesses { OnCapture = (_, args, _) => UpstreamCapture(args, "current-head", "current-head") };
         await Manager(sandbox, J("""{"packages":["git:github.com/user/repo"]}"""), processes: processes).UpdateAsync(source);
-        Check(processes.Ran("npm", ["install", "--omit=dev", "--legacy-peer-deps"], target) && !processes.Ran("git", ["clean", "-fdx"], target), "repair without clean");
+        Check(processes.Ran("npm", ["install", "--omit=dev", "--legacy-peer-deps", "--no-audit", "--no-fund"], target) && !processes.Ran("git", ["clean", "-fdx"], target), "repair without clean");
         processes = new FakeProcesses { OnCapture = (_, args, _) => UpstreamCapture(args, "old-head", "new-head"), OnRun = (_, args, _) => args[0] == "clean" ? throw new PiPackageException("simulated clean failure") : Task.CompletedTask };
         // Pi 1.5.0: a failed clean no longer fails the update (sync150.package-git-clean-failure-installs-and-keeps-the-marker).
         await Manager(sandbox, J("""{"packages":["git:github.com/user/repo"]}"""), processes: processes).UpdateAsync(source);
-        Check(processes.Ran("npm", ["install", "--omit=dev", "--legacy-peer-deps"], target), "dependencies installed after a failed clean");
+        Check(processes.Ran("npm", ["install", "--omit=dev", "--legacy-peer-deps", "--no-audit", "--no-fund"], target), "dependencies installed after a failed clean");
 
         // Project scope with a wrapped pnpm.
         var projectTarget = Path.Combine(sandbox.Cwd, ".pi", "git", "github.com", "user", "repo");
@@ -933,7 +933,7 @@ internal static partial class Program
         processes = new FakeProcesses { OnCapture = (_, args, _) => args[1] == "range-pkg@^1.0.0" ? """["1.0.0","1.2.0","2.0.0"]""" : null };
         await Manager(sandbox, J("""{"packages":["npm:range-pkg@^1.0.0"]}"""), processes: processes).UpdateAsync();
         Names(["view", "range-pkg@^1.0.0", "version", "--json"], processes.Captures[0].Args, "npm view with the configured spec");
-        Check(processes.Ran("npm", ["install", "range-pkg@^1.0.0", "--prefix", userRoot, "--legacy-peer-deps"]), "update installs the configured spec");
+        Check(processes.Ran("npm", ["install", "range-pkg@^1.0.0", "--prefix", userRoot, "--legacy-peer-deps", "--no-audit", "--no-fund"]), "update installs the configured spec");
 
         Installed(projectRoot, "current-pkg", "1.0.0");
         processes = new FakeProcesses { OnCapture = (_, _, _) => "\"1.0.0\"" };
@@ -957,8 +957,8 @@ internal static partial class Program
         var batch = Manager(sandbox, J("""{"packages":["npm:a","npm:b","npm:pinned@1.0.0","git:github.com/user/tool"]}"""), J("""{"packages":["npm:c"]}"""), processes: processes);
         batch.SetProgressCallback(progress.Add);
         await batch.UpdateAsync();
-        Check(processes.Ran("npm", ["install", "a@latest", "b@latest", "--prefix", userRoot, "--legacy-peer-deps"]), "user batch");
-        Check(processes.Ran("npm", ["install", "c@latest", "--prefix", projectRoot, "--legacy-peer-deps"]), "project batch");
+        Check(processes.Ran("npm", ["install", "a@latest", "b@latest", "--prefix", userRoot, "--legacy-peer-deps", "--no-audit", "--no-fund"]), "user batch");
+        Check(processes.Ran("npm", ["install", "c@latest", "--prefix", projectRoot, "--legacy-peer-deps", "--no-audit", "--no-fund"]), "project batch");
         Check(!processes.Runs.Any(run => run.Args.Contains("pinned@1.0.0")) && !processes.Captures.Any(run => run.Args.Contains("pinned")), "pinned npm skipped");
         Check(processes.Ran("git", ["fetch", "--prune", "--no-tags", "origin", "+refs/heads/main:refs/remotes/origin/main"], gitTarget), "git fetched");
         Check(progress.Any(e => e is { Type: "start", Action: "update", Source: "user npm packages", Message: "Updating user npm packages..." }) &&
@@ -972,7 +972,7 @@ internal static partial class Program
         Equal(0, processes.Captures.Count + processes.Runs.Count, "no npm view during resolve");
         processes = new FakeProcesses();
         await Manager(sandbox, J("""{"packages":["npm:used-pkg@2.0.0"]}"""), processes: processes).ResolveAsync();
-        Check(processes.Ran("npm", ["install", "used-pkg@2.0.0", "--prefix", userRoot, "--legacy-peer-deps"]), "pinned mismatch reinstalled");
+        Check(processes.Ran("npm", ["install", "used-pkg@2.0.0", "--prefix", userRoot, "--legacy-peer-deps", "--no-audit", "--no-fund"]), "pinned mismatch reinstalled");
         var skipped = new List<string>();
         processes = new FakeProcesses();
         await Manager(sandbox, J("""{"packages":["npm:used-pkg@2.0.0"]}"""), processes: processes).ResolveAsync(source => { skipped.Add(source); return Task.FromResult(PiMissingSourceAction.Skip); });
@@ -1150,7 +1150,7 @@ internal static partial class Program
         new ProjectTrustStore(sandbox.AgentDir, sandbox.Home).Set(sandbox.Cwd, true);
         (code, stdout, stderr) = await RunPackages(sandbox, (_, _) => processes, "update", "--extensions");
         Equal(0, code, "trusted update; " + stderr);
-        Check(processes.Ran("fake-npm", ["--flag", "install", "fake-package@latest", "--prefix", Path.Combine(sandbox.Cwd, ".pi", "npm"), "--legacy-peer-deps"]), "project npmCommand used");
+        Check(processes.Ran("fake-npm", ["--flag", "install", "fake-package@latest", "--prefix", Path.Combine(sandbox.Cwd, ".pi", "npm"), "--legacy-peer-deps", "--no-audit", "--no-fund"]), "project npmCommand used");
         Equal("Updating npm:fake-package...\nUpdated packages\n", stdout, "progress line");
         (code, _, stderr) = await RunPackages(sandbox, (_, _) => new FakeProcesses { OnRun = (_, _, _) => throw new PiPackageException("npm install fake-package@latest failed with code 1") }, "update", "npm:fake-package");
         Equal(1, code, "failure exit"); Equal("Error: npm install fake-package@latest failed with code 1\n", stderr, "failure message");
