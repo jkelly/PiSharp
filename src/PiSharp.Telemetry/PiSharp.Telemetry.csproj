@@ -1,0 +1,5 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Decision 0013 (Pi 1.5.0 sync, phase 3): a port of Pi's pi-telemetry (packages/telemetry). Like upstream it has no package
+       dependencies and ships only the no-op and in-memory adapters: nothing here exports or sends telemetry anywhere. Experimental: every
+       public type is [Experimental("PISHARP_TELEMETRY001")]. Packed as an EXPERIMENTAL NuGet library from 1.5.0. -->
+</Project>
