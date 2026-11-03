@@ -2,6 +2,7 @@
 // (f9a26365568127461c47a07a37dcb42c140a3ac5). Expectations are authored from reading the v1.5.0 sources and tests; nothing is captured
 // from an upstream run.
 using System.Text.Json.Nodes;
+using PiSharp.AI.Authentication.OAuth;
 using PiSharp.Cli.Interactive.Mode;
 using PiSharp.Cli.Interactive.Mode.Components;
 using PiSharp.Tui.Pi;
@@ -290,6 +291,336 @@ internal static class Sync150CliCases
             Equal(2L, SyntaxHighlight.HighlightCalls - before, "complete file highlighted once");
         }));
 
+        // 3bae85274 (#7629): the coding-agent selectors handle tui.select.pageUp/pageDown through getSelectPageIndex, and capture
+        // fullscreen viewport keys while focused. model-selector.test.ts "moves by one page with remapped selection page keys",
+        // settings-selector.test.ts "pages a searchable submenu with selection page keys" and custom-editor-keybindings.test.ts
+        // "pages an open autocomplete menu before pasting an image with the same key"; the auth, scoped models and user message
+        // lists are authored the same way.
+        yield return ("sync150.selectors-page-with-selection-page-keys", Sync(() =>
+        {
+            const string CtrlV = "\u0016", AltV = "\u001bv", Enter = "\r";
+            var remapped = new KeybindingsManager(AppKeybindings.Definitions(_ => null), new Dictionary<string, IReadOnlyList<string>?>
+            {
+                ["tui.select.pageUp"] = ["alt+v"], ["tui.select.pageDown"] = ["ctrl+v"], ["app.clipboard.pasteImage"] = ["ctrl+v"]
+            });
+            var previous = KeybindingsManager.Global;
+            KeybindingsManager.SetGlobal(remapped);
+            try
+            {
+                var (tui, loop) = NewTui();
+                static JsonObject Model(string id) => new()
+                {
+                    ["id"] = id, ["name"] = id, ["provider"] = "faux", ["api"] = "faux", ["reasoning"] = false, ["input"] = new JsonArray("text"),
+                    ["contextWindow"] = 128000, ["maxTokens"] = 16384
+                };
+                var models = Enumerable.Range(0, 12).Select(index => Model($"model-{index:00}")).ToList();
+
+                JsonObject? chosen = null;
+                var modelSelector = new ModelSelectorComponent(tui, null, new FixedModels(models), [], model => chosen = model, () => { });
+                Equal(true, ((IComponent)modelSelector).CapturesViewportInput, "model selector captures viewport keys");
+                modelSelector.HandleInput(CtrlV);
+                modelSelector.HandleInput(CtrlV);
+                modelSelector.HandleInput(AltV);
+                modelSelector.HandleInput(Enter);
+                Equal("model-01", chosen?["id"]?.GetValue<string>(), "model selector: two pages down (clamped), one page up");
+                modelSelector.Dispose();
+                loop.RunPending();
+
+                var providers = Enumerable.Range(0, 10).Select(index => new AuthSelectorProvider($"p{index}", $"Provider {index}", "api_key",
+                    new AuthMethodInfo($"Provider {index} API key"))).ToList();
+                string? provider = null;
+                var auth = new OAuthSelectorComponent("login", providers, (id, _) => provider = id, () => { });
+                Equal(true, ((IComponent)auth).CapturesViewportInput, "auth selector captures viewport keys");
+                auth.HandleInput(CtrlV);
+                auth.HandleInput(Enter);
+                Equal("p8", provider, "auth selector pages by its eight visible rows");
+
+                IReadOnlyList<string>? enabled = null;
+                var scoped = new ScopedModelsSelectorComponent(new ModelsConfig(models, ["faux/model-00"]), new ModelsCallbacks(ids => enabled = ids, _ => { }, () => { }));
+                Equal(true, ((IComponent)scoped).CapturesViewportInput, "scoped models selector captures viewport keys");
+                scoped.HandleInput(CtrlV);
+                scoped.HandleInput(Enter);
+                Check(enabled?.Contains("faux/model-08") == true, "scoped models selector pages by eight: " + string.Join(", ", enabled ?? []));
+
+                var messages = new UserMessageList(Enumerable.Range(0, 15).Select(index => new UserMessageItem($"m{index}", $"message {index}")).ToList());
+                string? message = null;
+                messages.OnSelect = id => message = id;
+                Equal(true, ((IComponent)messages).CapturesViewportInput, "user message list captures viewport keys");
+                messages.HandleInput(AltV);
+                messages.HandleInput(Enter);
+                Equal("m4", message, "user message list pages up by ten from the newest");
+
+                // The editor pages its open autocomplete menu before the paste-image action bound to the same key.
+                var editor = new CustomEditor(tui, Themes.GetEditorTheme(), remapped);
+                var pastes = 0;
+                editor.OnPasteImage = () => pastes++;
+                var submitted = "";
+                editor.OnSubmit = text => submitted = text;
+                editor.SetAutocompleteProvider(new CommandProvider());
+                editor.HandleInput("/");
+                Check(editor.IsShowingAutocomplete(), "autocomplete open");
+                editor.HandleInput(CtrlV);
+                editor.HandleInput(Enter);
+                Equal(0, pastes, "no paste while the menu is open");
+                Equal("/command-5", submitted, "the menu paged by its visible rows");
+                editor.HandleInput(CtrlV);
+                Equal(1, pastes, "a closed menu pastes again");
+            }
+            finally { KeybindingsManager.SetGlobal(previous); }
+
+            // A searchable submenu passes the default PageDown to its list.
+            string? theme = null;
+            var submenu = new SelectSubmenu("Theme", "", [.. Enumerable.Range(0, 20).Select(index => new SelectItem($"theme-{index}", $"theme-{index}"))],
+                "theme-0", value => theme = value, () => { }, null, new SelectSubmenuOptions(Searchable: true));
+            submenu.HandleInput("\u001b[6~");
+            submenu.HandleInput(Enter);
+            Equal("theme-10", theme, "searchable submenu pages");
+
+            // Session and tree selectors capture viewport keys except while their rename or label input is open.
+            Equal(true, typeof(SessionSelectorComponent).GetProperty("CapturesViewportInput") is not null, "session selector declares the capture");
+            Equal(true, typeof(TreeSelectorComponent).GetProperty("CapturesViewportInput") is not null, "tree selector declares the capture");
+        }));
+
+        // model-search.test.ts "getDistinctModelName" (#5916), and the /model and /scoped-models rows that show such a name.
+        yield return ("sync150.model-rows-show-distinct-names", Sync(() =>
+        {
+            Equal(null, ModelSearch.GetDistinctModelName("claude-sonnet-4-5", "Claude Sonnet 4.5"), "restates the id");
+            Equal(null, ModelSearch.GetDistinctModelName("openai/gpt-oss-120b", "OpenAI: gpt-oss-120b"), "namespace and separators");
+            Equal(null, ModelSearch.GetDistinctModelName("eu.anthropic.claude-sonnet-4-5-20250929-v1:0", "Claude Sonnet 4.5 (EU)"), "dropped suffix");
+            Equal(null, ModelSearch.GetDistinctModelName("gpt-5", ""), "empty name");
+            Equal(null, ModelSearch.GetDistinctModelName("gpt-5", null), "no name");
+            const string Renamed = "MiniMax M3 [rasmus@openrouter, parasail]";
+            Equal(Renamed, ModelSearch.GetDistinctModelName("minimax/minimax-m3", Renamed), "renamed override");
+            Equal("Nano Banana 2 Lite", ModelSearch.GetDistinctModelName("gemini-3.1-flash-lite-image", "Nano Banana 2 Lite"), "marketing name");
+            Equal("Mistral Small 4", ModelSearch.GetDistinctModelName("mistral-small-2603", "Mistral Small 4"), "single characters match whole tokens");
+            Equal(null, ModelSearch.GetDistinctModelName("modèle-größe", "Modèle Größe"), "letters outside ASCII are word characters");
+
+            var (tui, loop) = NewTui();
+            JsonObject Model(string id, string name) => new()
+            {
+                ["id"] = id, ["name"] = name, ["provider"] = "faux", ["api"] = "faux", ["reasoning"] = false, ["input"] = new JsonArray("text"),
+                ["contextWindow"] = 128000, ["maxTokens"] = 16384
+            };
+            var models = new List<JsonObject> { Model("minimax/minimax-m3", Renamed), Model("claude-sonnet-4-5", "Claude Sonnet 4.5") };
+            var selector = new ModelSelectorComponent(tui, null, new FixedModels(models), [], _ => { }, () => { });
+            var rows = Strip(selector.Render(120));
+            Check(rows.Any(row => row.Contains($"minimax/minimax-m3 ({Renamed}) [faux]", StringComparison.Ordinal)), "model row shows the name:\n" + string.Join("\n", rows));
+            Check(rows.Any(row => row.TrimEnd().EndsWith("claude-sonnet-4-5 [faux]", StringComparison.Ordinal)), "restated name hidden:\n" + string.Join("\n", rows));
+            selector.Dispose();
+            loop.RunPending();
+            var scoped = new ScopedModelsSelectorComponent(new ModelsConfig(models, null), new ModelsCallbacks(_ => { }, _ => { }, () => { }));
+            var scopedRows = Strip(scoped.Render(140));
+            Check(scopedRows.Any(row => row.Contains($"minimax/minimax-m3 ({Renamed}) [faux]", StringComparison.Ordinal)), "scoped row shows the name:\n" + string.Join("\n", scopedRows));
+            Check(scopedRows.Any(row => row.TrimEnd().EndsWith("claude-sonnet-4-5 [faux]", StringComparison.Ordinal)), "scoped restated name hidden");
+        }));
+
+        // session-selector-search.test.ts (8c03fef4d): fields match separately, in tiers (name text, then id/message/cwd text, then
+        // scattered name or cwd characters); ids and messages match only as exact substrings.
+        yield return ("sync150.resume-search-matches-fields-in-tiers", Sync(() =>
+        {
+            static PiSharp.Cli.Pi.PiSessionInfo Session(string id, string modified, string text, string? name = null) =>
+                new($"/tmp/{id}.jsonl", id, "", name, null, DateTimeOffset.UnixEpoch, DateTimeOffset.Parse(modified, System.Globalization.CultureInfo.InvariantCulture),
+                    1, "(no messages)", text);
+            static string Ids(IEnumerable<PiSharp.Cli.Pi.PiSessionInfo> sessions) => string.Join(",", sessions.Select(session => session.Id));
+            static List<PiSharp.Cli.Pi.PiSessionInfo> Find(IReadOnlyList<PiSharp.Cli.Pi.PiSessionInfo> sessions, string query) =>
+                SessionSelectorSearch.FilterAndSortSessions(sessions, query, SortMode.Relevance);
+
+            // #11220 "ignores the position of a match in message text"
+            var filler = string.Concat(Enumerable.Repeat("lorem ipsum dolor sit amet ", 400));
+            Equal("deep,early", Ids(Find([Session("early", "2026-01-01T00:00:00.000Z", $"opus {filler}"),
+                Session("deep", "2026-01-02T00:00:00.000Z", $"{filler} we discussed the opus model"),
+                Session("scattered", "2026-01-03T00:00:00.000Z", filler)], "opus")), "message position ignored, scattered letters rejected");
+
+            // #11024 "does not match scattered characters in session ids"
+            var ids = new[]
+            {
+                Session("019e9024-aaaa-7bbb-8ccc-dddddddddddd", "2026-01-03T00:00:00.000Z", "unrelated"),
+                Session("01a1ffff-aaaa-7bbb-8ccc-dddddddddddd", "2026-01-01T00:00:00.000Z", "unrelated", "#1024 TDD bare env"),
+            };
+            Equal("#1024 TDD bare env", string.Join(",", Find(ids, "1024").Select(session => session.Name)), "id scatter rejected");
+            Equal("019e9024-aaaa-7bbb-8ccc-dddddddddddd", Ids(Find(ids, "9024-aa")), "id substring");
+
+            // "ranks name text, then message text, then scattered name matches"
+            Equal("name,message,scattered-name", Ids(Find([
+                Session("scattered-name", "2026-01-04T00:00:00.000Z", "unrelated", "c-a-c-h-e notes"),
+                Session("message", "2026-01-03T00:00:00.000Z", "A discussion mentioning the cache.", "Other work"),
+                Session("name", "2026-01-01T00:00:00.000Z", "Summary", "Cache work")], "cache")), "tiers");
+
+            // "matches each token within a single field"
+            var split = new[] { Session("split", "2026-01-01T00:00:00.000Z", "search ranking", "Fuzzy") };
+            Equal("split", Ids(Find(split, "fuzzy ranking")), "tokens may match different fields");
+            Equal("", Ids(Find(split, "zzysea")), "a token never spans fields");
+            Equal("", Ids(Find(split, "re:fuzzy search")), "a regex never spans fields");
+
+            // "ranks regex name matches first"
+            Equal("name,message", Ids(Find([Session("message", "2026-01-02T00:00:00.000Z", "brave"),
+                Session("name", "2026-01-01T00:00:00.000Z", "xxxx", "Brave")], @"re:\bbrave\b")), "regex tiers");
+        }));
+
+        // login-dialog-device-code.test.ts "device-code login" (#9282): the convenience actions need an explicit confirm, run once,
+        // follow the provider's overrides, are cleared by the next view, and never interrupt login when they fail.
+        yield return ("sync150.login-dialog-device-code-actions", async () =>
+        {
+            const string Code = "ABCD-EFGH", Verification = "https://example.com/device", Enter = "\r", CtrlX = "\u0018", Escape = "\u001b";
+            var (tui, loop) = NewTui();
+            var opened = new List<string>();
+            var copied = new List<string>();
+            (LoginDialogComponent Dialog, List<string?> Completed) Create(Action<string>? open = null, Func<string, Task>? copy = null)
+            {
+                var completed = new List<string?>();
+                var dialog = new LoginDialogComponent(tui, "custom-provider", (success, message) => completed.Add($"{success}:{message}"))
+                {
+                    OpenBrowser = open ?? opened.Add,
+                    CopyToClipboard = copy ?? (text => { copied.Add(text); return Task.CompletedTask; })
+                };
+                dialog.Focused = true;
+                return (dialog, completed);
+            }
+            string Render(LoginDialogComponent dialog) => string.Join("\n", Strip(dialog.Render(120)));
+            void Reset() { opened.Clear(); copied.Clear(); }
+
+            // "opens the verification page and copies the code once after confirmation"
+            var (first, _) = Create();
+            var domain = first.ShowPrompt("GitHub Enterprise URL/domain (blank for github.com)");
+            first.HandleInput(Enter);
+            Equal("", await domain.WaitAsync(TimeSpan.FromSeconds(5)), "prompt answered");
+            first.ShowDeviceCode(Code, Verification);
+            first.ShowWaiting("Waiting for authentication...");
+            Contains(Render(first), "to open browser and copy code", "hint row");
+            Equal(0, opened.Count + copied.Count, "nothing before confirmation");
+            first.HandleInput(Enter);
+            first.HandleInput(Enter);
+            for (var i = 0; i < 100 && !Render(first).Contains("Code copied to clipboard", StringComparison.Ordinal); i++) { await Task.Delay(10); loop.RunPending(); }
+            Equal(Verification, string.Join(",", opened), "opened once");
+            Equal(Code, string.Join(",", copied), "copied once");
+            var screen = Render(first);
+            Contains(screen, "Code copied to clipboard", "status in the hint row");
+            Contains(screen, $"Enter code: {Code}", "code still shown");
+            Contains(screen, "Waiting for authentication...", "waiting still shown");
+            Check(!screen.Contains("to open browser and copy code", StringComparison.Ordinal), "hint replaced");
+
+            // "honors browser / clipboard provider overrides"
+            foreach (var (browser, clipboard) in new[] { (false, false), (true, false), (false, true) })
+            {
+                Reset();
+                var (dialog, _) = Create();
+                dialog.ShowDeviceCode(Code, Verification, browser, clipboard);
+                var label = browser ? "to open browser" : clipboard ? "to copy code" : null;
+                if (label is null) Check(!Render(dialog).Contains("(Enter", StringComparison.Ordinal), "no hint without actions");
+                else Contains(Render(dialog), label, $"hint {browser}/{clipboard}");
+                dialog.HandleInput(Enter);
+                loop.RunPending();
+                Equal(browser ? 1 : 0, opened.Count, $"browser {browser}/{clipboard}");
+                Equal(clipboard ? 1 : 0, copied.Count, $"clipboard {browser}/{clipboard}");
+                Equal(false, dialog.Signal.IsCancellationRequested, "not cancelled");
+            }
+
+            // "clears the previous auth URL copy action when showing a device code"
+            Reset();
+            var (auth, _) = Create();
+            auth.ShowAuth("https://example.com/authorize");
+            opened.Clear();
+            auth.ShowDeviceCode(Code, Verification);
+            auth.HandleInput(CtrlX);
+            Equal(0, opened.Count + copied.Count, "no URL copy after the device code");
+            auth.HandleInput(Enter);
+            Equal(Code, string.Join(",", copied), "the code is copied");
+
+            // "clears device actions when switching to browser authentication"
+            Reset();
+            var (toBrowser, _) = Create();
+            toBrowser.ShowDeviceCode(Code, Verification);
+            toBrowser.ShowAuth("https://example.com/authorize");
+            opened.Clear();
+            toBrowser.HandleInput(Enter);
+            Equal(0, opened.Count + copied.Count, "no device action after showAuth");
+            toBrowser.HandleInput(CtrlX);
+            Equal("https://example.com/authorize", string.Join(",", copied), "URL copy is back");
+
+            // "clears both action types when showing details"
+            Reset();
+            var (details, _) = Create();
+            details.ShowAuth("https://example.com/authorize");
+            details.ShowDetails(["Choose a login method"]);
+            details.HandleInput(CtrlX);
+            Equal(0, copied.Count, "no URL copy after details");
+            details.ShowDeviceCode(Code, Verification);
+            details.ShowDetails(["Choose a login method"]);
+            opened.Clear();
+            details.HandleInput(Enter);
+            Equal(0, opened.Count + copied.Count, "no device action after details");
+
+            // "cancels without opening a browser or changing the clipboard"
+            Reset();
+            var (cancelled, completedOnCancel) = Create();
+            cancelled.ShowDeviceCode(Code, Verification);
+            cancelled.HandleInput(Escape);
+            cancelled.HandleInput(Enter);
+            Equal(true, cancelled.Signal.IsCancellationRequested, "cancelled");
+            Equal("False:Login cancelled", string.Join(",", completedOnCancel), "completed once as cancelled");
+            Equal(0, opened.Count + copied.Count, "no actions after cancel");
+
+            // "keeps manual login available when browser and clipboard access fail"
+            Reset();
+            var attempts = new List<string>();
+            var (failing, completedOnFailure) = Create(url => { attempts.Add(url); throw new InvalidOperationException("Browser unavailable"); },
+                text => { attempts.Add(text); return Task.FromException(new InvalidOperationException("Clipboard unavailable")); });
+            failing.ShowDeviceCode(Code, Verification);
+            failing.ShowWaiting("Waiting for authentication...");
+            failing.HandleInput(Enter);
+            for (var i = 0; i < 100 && !Render(failing).Contains("Copy code manually", StringComparison.Ordinal); i++) { await Task.Delay(10); loop.RunPending(); }
+            Equal($"{Code},{Verification}", string.Join(",", attempts), "both attempted once");
+            screen = Render(failing);
+            Contains(screen, Verification, "URL still shown");
+            Contains(screen, $"Enter code: {Code}", "code still shown");
+            Contains(screen, "Copy code manually", "manual copy hint");
+            Contains(screen, "Waiting for authentication...", "still waiting");
+            Equal(false, failing.Signal.IsCancellationRequested, "not cancelled");
+            Equal(0, completedOnFailure.Count, "not completed");
+        });
+
+        // login-dialog-device-code.test.ts "login URLs" (89c921d8b): only http(s) URLs are opened or linked, and control characters in
+        // sign-in, device-code and info URLs never reach the terminal.
+        yield return ("sync150.login-dialog-opens-and-links-only-web-urls", Sync(() =>
+        {
+            var (tui, _) = NewTui();
+            var opened = new List<string>();
+            LoginDialogComponent Create() => new(tui, "custom-provider", (_, _) => { }) { OpenBrowser = opened.Add, CopyToClipboard = _ => Task.CompletedTask };
+            string Raw(LoginDialogComponent dialog) => string.Join("\n", dialog.Render(120));
+
+            var dialog = Create();
+            dialog.ShowAuth("file:///Users/victim/Downloads/payload.app");
+            Equal(0, opened.Count, "a file URL is not opened");
+            dialog.ShowAuth("https://example.com/authorize");
+            Equal("https://example.com/authorize", string.Join(",", opened), "a web URL is opened");
+
+            const string Injection = "\u0007\u001b]52;c;Zm9v\u0007";
+            dialog = Create();
+            dialog.ShowDeviceCode("ABCD-EFGH", "https://example.com/device" + Injection);
+            dialog.ShowInfo("Docs", [new AuthInfoLink("https://example.com/help" + Injection, "Help")]);
+            Check(!Raw(dialog).Contains("\u001b]52", StringComparison.Ordinal), "web URLs carry no escape sequences:\n" + Raw(dialog));
+            var shown = string.Join("\n", Strip(dialog.Render(120)));
+            Contains(shown, "https://example.com/device%07%1B", "device URL percent-encoded");
+            Contains(shown, "Help: https://example.com/help%07%1B", "info link percent-encoded");
+            Equal("https://example.com/device%07%1B%5D52;c;Zm9v", LoginDialogComponent.WebUrl("https://example.com/device" + Injection)?.Replace("]", "%5D"),
+                "normalized like the URL serializer (a ] may stay literal)");
+
+            var injected = "x" + Injection;
+            opened.Clear();
+            dialog = Create();
+            dialog.ShowAuth($"file:///tmp/{injected}");
+            Check(!Raw(dialog).Contains("\u001b]52", StringComparison.Ordinal), "a file URL is shown without escape sequences");
+            dialog.ShowDeviceCode("ABCD-EFGH", injected);
+            Check(!Raw(dialog).Contains("\u001b]52", StringComparison.Ordinal), "a non-URL device link is shown without escape sequences");
+            Contains(string.Join("\n", Strip(dialog.Render(120))), "x ]52;c;Zm9v", "control characters replaced");
+            dialog.ShowInfo("Docs", [new AuthInfoLink(injected, "Help")]);
+            Check(!Raw(dialog).Contains("\u001b]52", StringComparison.Ordinal), "a non-URL info link is shown without escape sequences");
+            Contains(string.Join("\n", Strip(dialog.Render(120))), "Help: x ]52;c;Zm9v", "info control characters replaced");
+            Equal(0, opened.Count, "nothing opened");
+            Equal(null, LoginDialogComponent.WebUrl("javascript:alert(1)"), "scripts are not web URLs");
+            Equal("https://example.com/", LoginDialogComponent.WebUrl("  HTTPS://Example.COM  "), "trimmed and normalized");
+        }));
+
         // interactive-mode-model-scope.test.ts (7391dbb0f, #11508): fullscreen shows "Model scope: ..." in the header and logs nothing
         // to the shell; regular mode still logs it before the TUI starts; hidden startup details show it nowhere.
         yield return ("sync150.fullscreen-model-scope-notice-is-in-the-header", async () =>
@@ -378,6 +709,25 @@ internal static class Sync150CliCases
             var written = await PiSharp.Cli.Interactive.Mode.Utilities.ClipboardCommand.RunClipboardCommand("sh", ["-c", "cat > /dev/null"], new("copied"));
             Equal(0, written?.Length ?? -1, "writer result");
         });
+    }
+
+    /// <summary>A model runtime with a fixed available snapshot and no refresh errors.</summary>
+    private sealed class FixedModels(IReadOnlyList<JsonObject> models) : IModelSelectorRuntime
+    {
+        public IReadOnlyList<JsonObject> GetAvailableSnapshot() => models;
+        public JsonObject? GetModel(string provider, string modelId) =>
+            models.FirstOrDefault(model => (string?)model["provider"] == provider && (string?)model["id"] == modelId);
+        public string? GetError() => null;
+        public Task<ModelsRefreshResult> RefreshAsync(CancellationToken cancellationToken) => Task.FromResult(new ModelsRefreshResult(false, []));
+    }
+
+    /// <summary>Twelve slash commands, applied by replacing the line (custom-editor-keybindings.test.ts).</summary>
+    private sealed class CommandProvider : IAutocompleteProvider
+    {
+        public Task<AutocompleteSuggestions?> GetSuggestionsAsync(IReadOnlyList<string> lines, int cursorLine, int cursorCol, bool force, CancellationToken cancellationToken) =>
+            Task.FromResult<AutocompleteSuggestions?>(new([.. Enumerable.Range(0, 12).Select(index => new AutocompleteItem($"/command-{index}", $"command-{index}"))], "/"));
+        public CompletionResult ApplyCompletion(IReadOnlyList<string> lines, int cursorLine, int cursorCol, AutocompleteItem item, string prefix) =>
+            new([.. lines.Select((line, index) => index == cursorLine ? item.Value : line)], cursorLine, item.Value.Length);
     }
 
     private static JsonObject Block(string type, string key, string value) => new() { ["type"] = type, [key] = value };

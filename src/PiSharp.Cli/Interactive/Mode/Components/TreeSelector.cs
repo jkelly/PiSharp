@@ -1100,7 +1100,7 @@ internal sealed class TreeList : IComponent, IInputHandler
 }
 
 /// <summary>Component that renders a session tree selector for navigation.</summary>
-internal sealed class TreeSelectorComponent : Container, IFocusable, IInputHandler
+internal sealed class TreeSelectorComponent : Container, IComponent, IFocusable, IInputHandler
 {
     /// <summary>Source DynamicBorder (dynamic-border.ts), kept local to this file.</summary>
     private sealed class DynamicBorder(Func<string, string>? color = null) : IComponent
@@ -1343,6 +1343,9 @@ internal sealed class TreeSelectorComponent : Container, IFocusable, IInputHandl
         treeContainer.Clear();
         treeContainer.AddChild(treeList);
     }
+
+    /// <summary>The tree receives fullscreen viewport keys (PageUp/PageDown); the label input does not.</summary>
+    public bool CapturesViewportInput => labelInput is null;
 
     public void HandleInput(string keyData)
     {

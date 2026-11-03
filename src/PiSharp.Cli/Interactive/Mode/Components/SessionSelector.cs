@@ -534,7 +534,7 @@ internal sealed class SessionList : IComponent, IFocusable, IInputHandler
 }
 
 /// <summary>Component that renders a session selector.</summary>
-internal sealed class SessionSelectorComponent : Container, IFocusable, IInputHandler
+internal sealed class SessionSelectorComponent : Container, IComponent, IFocusable, IInputHandler
 {
     /// <summary>Source DynamicBorder (dynamic-border.ts), kept local to this file.</summary>
     private sealed class DynamicBorder(Func<string, string>? color = null) : IComponent
@@ -657,6 +657,9 @@ internal sealed class SessionSelectorComponent : Container, IFocusable, IInputHa
             return [left + new string(' ', spacing) + rightText, hintLine1, hintLine2];
         }
     }
+
+    /// <summary>The list receives fullscreen viewport keys (PageUp/PageDown); the rename input does not.</summary>
+    public bool CapturesViewportInput => mode != "rename";
 
     public void HandleInput(string data)
     {

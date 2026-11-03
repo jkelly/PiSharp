@@ -679,12 +679,13 @@ internal static class SettingsLoginFooterCases
             dialog.ShowDeviceCode("ABCD-1234", "https://github.test/device");
             dialog.ShowWaiting("Waiting for authentication...");
             var clickHint = OperatingSystem.IsMacOS() ? "Cmd+click to open" : "Ctrl+click to open";
-            Lines([new string('─', 50), " Copilot setup", "", " https://github.test/device", $" {clickHint}", "", " Enter code: ABCD-1234", "",
+            Lines([new string('─', 50), " Copilot setup", "", " https://github.test/device", $" {clickHint}", "", " Enter code: ABCD-1234",
+                " (enter to open browser and copy code)", "", // Pi 1.5.0: the device-code confirm hint
                 " Waiting for authentication...", " (escape/ctrl+c to cancel)", new string('─', 50)], dialog.Render(50), "device code");
             dialog.ShowDetails(["line one"]);
             dialog.ShowInfo("Configured outside pi.", [new PiSharp.AI.Authentication.OAuth.AuthInfoLink("https://docs.test", "Docs")], showCloseHint: true);
             dialog.ShowProgress("Working...");
-            Lines([new string('─', 50), " Copilot setup", "", " line one", "", " Configured outside pi.", " Docs: https://docs.test", "",
+            Lines([new string('─', 50), " Copilot setup", "", " line one", "", " Configured outside pi.", " Docs: https://docs.test/", "", // Pi 1.5.0: shown normalized (webUrl)
                 " (escape/ctrl+c to close)", " Working...", new string('─', 50)], dialog.Render(50), "details and info");
         }));
 

@@ -190,9 +190,10 @@ internal static class SelectorCases
                 "Only showing models from configured providers. Use /login to",
                 "add providers.", "",
                 "> ", "",
-                "→ ✓ gamma [acme]",
-                "    beta [zeta] · default",
-                "    alpha [acme]", "",
+                // Pi 1.5.0 (getDistinctModelName): a name with words the id lacks follows the id.
+                "→ ✓ gamma (Gamma Model) [acme]",
+                "    beta (Beta Model) [zeta] · default",
+                "    alpha (Alpha Model) [acme]", "",
                 "  Model Name: Gamma Model", "",
                 "  Refreshing model catalogs…", "",
                 "  Enter to select · Ctrl+S to set as default · Escape/Ctrl+C",
@@ -203,7 +204,7 @@ internal static class SelectorCases
             Contains(Joined(selector, 60), "  Model catalogs refreshed.", "refreshed status");
             // A query moves the selection to the best match; "def" ranks the default model first.
             foreach (var ch in "def") selector.HandleInput(ch.ToString());
-            Equal("→   beta [zeta] · default", Row(selector, 60, "beta ["), "default search");
+            Equal("→   beta (Beta Model) [zeta] · default", Row(selector, 60, "beta ("), "default search");
             selector.Dispose();
         });
         yield return ("sel.model.scoped-scope-toggle", async () =>
