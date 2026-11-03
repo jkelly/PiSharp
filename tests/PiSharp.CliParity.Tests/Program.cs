@@ -54,6 +54,7 @@ internal static partial class Program
         cases.AddRange(JsonFidelityCases());
         cases.AddRange(BuiltinExtensionCases());
         cases.AddRange(Sync150Cases());
+        cases.AddRange(Sync150SchemaCases());
         var filter = Environment.GetEnvironmentVariable("CLIPARITY_FILTER");
         if (!string.IsNullOrEmpty(filter)) cases = [.. cases.Where(test => test.Id.Contains(filter, StringComparison.Ordinal))];
         var results = new List<object>(); var failures = 0;

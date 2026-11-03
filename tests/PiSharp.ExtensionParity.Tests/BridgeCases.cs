@@ -142,9 +142,10 @@ internal static partial class Program
         Check(text.StartsWith("Hello, Ada! entries=", StringComparison.Ordinal) && text.EndsWith("id=toolu_01", StringComparison.Ordinal), "tool text: " + text);
     }
 
-    // agent-loop prepareToolCall + validation.ts validateToolArguments for extension tools: a Type.* schema (TypeBox's hidden "~kind"
-    // markers reach PiSharp through the bridge) is also converted by Value.Convert ("a" -> ["a"]); a raw-object schema gets the
-    // JSON-schema coercion only, so the same value fails. Expected texts were captured from the real pi-ai 1.1.0 / typebox 1.3.27.
+    // agent-loop prepareToolCall + validation.ts validateToolArguments for extension tools. Since Pi v1.5.0 a Type.* schema and a
+    // raw-object schema are both checked and coerced by pi-schema ("5" -> 5, "true" -> true, "a" -> ["a"]), so the raw tool now
+    // accepts the value it used to refuse. Expected texts are authored from Pi v1.5.0's pi-schema rules and messages
+    // (packages/schema/README.md, src/explain.ts), not captured from Pi.
     private static async Task ValidatedToolArguments()
     {
         using var sandbox = NodeSandbox("validated-args");
@@ -177,11 +178,11 @@ internal static partial class Program
         };
         var (code, _, stderr) = await sandbox.Run([.. new[] { "-p" }, .. Model, "-e", extension, "Validate"]);
         Equal(0, code, "exit; " + stderr);
-        Equal("""[["typed",{"n":5,"when":true,"tags":["a"]}],["raw",{"n":7}],["prepared",{"n":3}]]""",
+        Equal("""[["typed",{"n":5,"when":true,"tags":["a"]}],["raw",{"n":7,"tags":["a"]}],["raw",{"n":7}],["prepared",{"n":3}]]""",
             new JsonArray([.. LogLines(sandbox).Select(line => JsonNode.Parse(line))]).ToJsonString(), "the tools received the coerced arguments");
         Equal("typed ok", ToolResultText(sandbox.Requests[1]), "typed result");
-        Equal("Validation failed for tool \"typed\":\n  - n: must be number\n\nReceived arguments:\n{\n  \"n\": \"x\"\n}", ToolResultText(sandbox.Requests[2]), "typed failure");
-        Equal("Validation failed for tool \"raw\":\n  - tags: must be array\n\nReceived arguments:\n{\n  \"n\": \"7\",\n  \"tags\": \"a\"\n}", ToolResultText(sandbox.Requests[3]), "raw failure");
+        Equal("Validation failed for tool \"typed\":\n  - n: expected number, got string\n\nReceived arguments:\n{\n  \"n\": \"x\"\n}", ToolResultText(sandbox.Requests[2]), "typed failure");
+        Equal("raw ok", ToolResultText(sandbox.Requests[3]), "raw result for a value the schema coerces");
         Equal("raw ok", ToolResultText(sandbox.Requests[4]), "raw result");
         // prepareToolCall runs prepareArguments before the schema check, and an error it throws is the result's text.
         Equal("prepared ok", ToolResultText(sandbox.Requests[5]), "prepared result");

@@ -518,7 +518,7 @@ internal static class SessionCommandTests
                 var call = turnMessages[1].GetProperty("content").EnumerateArray().Single();
                 Equal("bad-arguments", call.GetProperty("id").GetString()); Equal("{}", call.GetProperty("arguments").GetRawText());
                 Equal("bad-arguments", turnMessages[2].GetProperty("toolCallId").GetString()); Check(turnMessages[2].GetProperty("isError").GetBoolean(), "Malformed arguments acquired a successful tool result.");
-                Equal("Validation failed for tool \"write\":\n  - path: must have required properties path, content\n\nReceived arguments:\n{}",
+                Equal("Validation failed for tool \"write\":\n  - path: missing\n  - content: missing\n\nReceived arguments:\n{}",
                     turnMessages[2].GetProperty("content").EnumerateArray().Single().GetProperty("text").GetString());
                 Equal("error", turnMessages[3].GetProperty("stopReason").GetString());
             }
