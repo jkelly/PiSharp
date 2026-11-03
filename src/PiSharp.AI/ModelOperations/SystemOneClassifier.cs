@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/ai/src/api/system-one-shared.ts,
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/ai/src/api/system-one-shared.ts,
 // api/typesafe-system-one.ts, api/cloudflare-workers-ai-system-one.ts and providers/cloudflare-stream.ts.
 using System.Collections.Immutable;
 using System.Text.Json;
@@ -9,7 +9,8 @@ namespace PiSharp.AI.ModelOperations;
 
 /// <summary>The TypeSafe System One protocol over one service: the request URL, the request envelope and the response
 /// envelope differ; questions, answers and usage are shared. Public <c>bool</c> questions travel as wire-level
-/// <c>noul</c>. System One has no temperature and takes no images.</summary>
+/// <c>noul</c>. System One has no temperature. Images go out in the service's form (<c>compat.imageInput</c>, else
+/// <c>DetectCompat</c>): <c>assets</c>, <c>images</c> data URLs or <c>state-image-urls</c> parts.</summary>
 public abstract class SystemOneClassifier : IClassifierApi
 {
     public abstract string Api { get; }
@@ -20,6 +21,14 @@ public abstract class SystemOneClassifier : IClassifierApi
     protected abstract JsonNode Payload(ClassifierModel model, JsonObject request);
     /// <summary>Extracts the System One output (<c>{ answers, usage }</c>) from the service's response envelope.</summary>
     protected abstract JsonElement Output(JsonElement body);
+    /// <summary>Compatibility settings for models that do not set them in <c>compat</c> (upstream <c>detectCompat</c>). Not public
+    /// surface: other subclasses keep System One <c>assets</c> without the opt-in header.</summary>
+    private protected virtual (string ImageInput, bool SendImageOptInHeader) DetectCompat(ClassifierModel model) => ("assets", false);
+
+    private static readonly Dictionary<string, string> AssetFormats = new(StringComparer.Ordinal) { ["image/png"] = "png", ["image/jpeg"] = "jpeg" };
+    private static readonly HashSet<string> DataUrlTypes = new(StringComparer.Ordinal) { "image/png", "image/jpeg", "image/webp" };
+    /// <summary>Clef accepts at most this many images per request.</summary>
+    private const int MaxDataUrlImages = 4;
 
     public async Task<ClassifierResult> ClassifyAsync(ClassifierModel model, ClassifierContext context, ClassifierOptions? options = null,
         CancellationToken cancellationToken = default)
@@ -29,8 +38,22 @@ public abstract class SystemOneClassifier : IClassifierApi
         try
         {
             if (model.Api != Api) throw new InvalidOperationException($"Unsupported classifier API: {model.Api}");
-            if (context.ImageList.Length != 0) throw new InvalidOperationException($"{Label} does not support image input");
-            var body = await ClassifierShared.PostAsync(Label, Url(model), model, Payload(model, WireRequest(context)), options,
+            var request = WireRequest(context);
+            var requestOptions = options;
+            if (context.ImageList.Length != 0)
+            {
+                if (!model.AcceptsImages) throw new InvalidOperationException($"{Label} does not support image input for {model.Id}");
+                var detected = DetectCompat(model);
+                var compat = model.Metadata?.Value is { ValueKind: JsonValueKind.Object } json && json.TryGetProperty("compat", out var value) &&
+                    value.ValueKind == JsonValueKind.Object ? value : (JsonElement?)null;
+                var imageInput = compat is { } c && c.TryGetProperty("imageInput", out var input) && input.ValueKind == JsonValueKind.String
+                    ? input.GetString()! : detected.ImageInput;
+                AddImages(model, imageInput, context.ImageList, request);
+                if (compat is { } h && h.TryGetProperty("sendImageOptInHeader", out var header) && header.ValueKind is JsonValueKind.True or JsonValueKind.False
+                    ? header.ValueKind == JsonValueKind.True : detected.SendImageOptInHeader)
+                    requestOptions = (options ?? new()) with { Headers = [new("TypeSafe-Danger-Zone-Images", "true"), .. options?.Headers ?? []] };
+            }
+            var body = await ClassifierShared.PostAsync(Label, Url(model), model, Payload(model, request), requestOptions,
                 cancellationToken).ConfigureAwait(false);
             var result = Output(body);
             // Set before parsing answers: a request with malformed answers was still billed.
@@ -44,6 +67,42 @@ public abstract class SystemOneClassifier : IClassifierApi
     }
 
     protected static string TrimmedBase(ClassifierModel model) => model.BaseUrl.TrimEnd('/') + "/";
+
+    /// <summary>Source addImages: <c>images</c> (Clef's data URL list), <c>state-image-urls</c> (OpenRouter's
+    /// <c>image_url</c> parts before the state) or System One <c>assets</c> whose names go before the state.</summary>
+    private void AddImages(ClassifierModel model, string input, ImmutableArray<ImageContent> images, JsonObject request)
+    {
+        if (input == "images")
+        {
+            if (images.Length > MaxDataUrlImages)
+                throw new InvalidOperationException($"{Label} accepts at most {MaxDataUrlImages} images for {model.Id}, got {images.Length}");
+            request["images"] = new JsonArray([.. images.Select(image => (JsonNode)(DataUrlTypes.Contains(image.MimeType)
+                ? $"data:{image.MimeType};base64,{image.Data}"
+                : throw new InvalidOperationException($"{Label} accepts PNG, JPEG, and WebP images for {model.Id}, got {image.MimeType}")))]);
+            return;
+        }
+        var state = request["state"]?.DeepClone();
+        if (input == "state-image-urls")
+        {
+            // OpenRouter validates the images against the model that serves the request.
+            request["state"] = new JsonArray([.. images.Select(image => (JsonNode)new JsonObject
+            {
+                ["type"] = "image_url", ["image_url"] = new JsonObject { ["url"] = $"data:{image.MimeType};base64,{image.Data}" },
+            }), state]);
+            return;
+        }
+        var assets = new JsonObject();
+        for (var index = 0; index < images.Length; index++)
+        {
+            var image = images[index];
+            if (!AssetFormats.TryGetValue(image.MimeType, out var format))
+                throw new InvalidOperationException($"{Label} accepts PNG and JPEG images for {model.Id}, got {image.MimeType}");
+            assets[$"<image-{index + 1}>"] = new JsonObject { ["type"] = "image", ["format"] = format, ["data_base64"] = image.Data };
+        }
+        request["assets"] = assets;
+        // Every asset must be referenced from the request. The names go before the state, where Clef also places its images.
+        request["state"] = new JsonArray([.. assets.Select(asset => (JsonNode)asset.Key), state]);
+    }
 
     /// <summary>Maps public <c>bool</c> questions to TypeSafe's wire-level <c>noul</c> type.</summary>
     private static JsonObject WireRequest(ClassifierContext context)
@@ -98,7 +157,9 @@ public abstract class SystemOneClassifier : IClassifierApi
 
 /// <summary>typesafe-system-one.ts: TypeSafe's native System One protocol, <c>POST {baseUrl}/systemone</c> with
 /// <c>{ model, state, questions }</c>. OpenRouter, OpenCode Zen, Vercel AI Gateway and llama.cpp decision models serve
-/// the same protocol at their own base URLs.</summary>
+/// the same protocol at their own base URLs. TypeSafe takes images as <c>assets</c> behind the
+/// <c>TypeSafe-Danger-Zone-Images</c> opt-in header; OpenRouter drops <c>assets</c> silently and takes <c>image_url</c> parts in
+/// the state. Models behind a proxy that hides both the provider ID and the OpenRouter host must set <c>compat.imageInput</c>.</summary>
 public sealed class TypeSafeSystemOneClassifier : SystemOneClassifier
 {
     public const string ApiId = "typesafe-system-one";
@@ -106,6 +167,9 @@ public sealed class TypeSafeSystemOneClassifier : SystemOneClassifier
     public override string Api => ApiId;
     protected override string Label => "System One API";
     protected override Uri Url(ClassifierModel model) => new(new Uri(TrimmedBase(model)), "systemone");
+    // OpenRouter by provider ID, which survives baseUrl overrides, or by host, which covers regional endpoints.
+    private protected override (string ImageInput, bool SendImageOptInHeader) DetectCompat(ClassifierModel model) =>
+        model.Provider == "openrouter" || model.BaseUrl.Contains("openrouter.ai", StringComparison.Ordinal) ? ("state-image-urls", false) : ("assets", true);
     protected override JsonNode Payload(ClassifierModel model, JsonObject request)
     {
         var payload = new JsonObject { ["model"] = model.Id };
@@ -119,7 +183,9 @@ public sealed class TypeSafeSystemOneClassifier : SystemOneClassifier
 /// <summary>cloudflare-workers-ai-system-one.ts: System One models on the Workers AI REST endpoint,
 /// <c>POST {baseUrl}/run</c> with <c>{ model, input }</c>. Third-party models such as <c>typesafe/jev</c> answer with a
 /// run record (<c>{ success, result: { state: "Completed", result: { answers, usage } } }</c>); Cloudflare-hosted models
-/// such as <c>@cf/cloudflare/clef</c> answer with the output directly (<c>{ success, result: { answers, usage } }</c>).</summary>
+/// such as <c>@cf/cloudflare/clef</c> answer with the output directly (<c>{ success, result: { answers, usage } }</c>).
+/// Clef models take images as an <c>images</c> list of data URLs, TypeSafe's models as System One <c>assets</c> without the
+/// opt-in header. The catalog sets <c>compat.imageInput</c>; the model ID check only covers models without it.</summary>
 public sealed class CloudflareWorkersAISystemOneClassifier : SystemOneClassifier
 {
     public const string ApiId = "cloudflare-workers-ai-system-one";
@@ -128,6 +194,8 @@ public sealed class CloudflareWorkersAISystemOneClassifier : SystemOneClassifier
     public override string Api => ApiId;
     protected override string Label => Name;
     protected override Uri Url(ClassifierModel model) => new(new Uri(TrimmedBase(model)), "run");
+    private protected override (string ImageInput, bool SendImageOptInHeader) DetectCompat(ClassifierModel model) =>
+        (model.Id.StartsWith("@cf/cloudflare/clef", StringComparison.Ordinal) ? "images" : "assets", false);
     protected override JsonNode Payload(ClassifierModel model, JsonObject request) => new JsonObject { ["model"] = model.Id, ["input"] = request };
     protected override JsonElement Output(JsonElement body)
     {

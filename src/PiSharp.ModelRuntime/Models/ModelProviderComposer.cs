@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/src/core/provider-composer.ts (applyModelsJson,
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/coding-agent/src/core/provider-composer.ts (applyModelsJson,
 // modelFromJson, findModelDefaults, applyModelOverride, mergeCompat, mergeInputLimits, mergeSamplingParamsByThinkingLevel,
 // rawModelHeaders, resolveCompatibilityRequestConfig, configuredRequestAuthStatus, withConfiguredAuth).
 using System.Collections.Immutable;
@@ -136,11 +136,14 @@ internal static class ModelProviderComposer
         {
             var url = oauth == "radius" ? model.BaseUrl : baseUrl ?? model.BaseUrl;
             var chatCompat = model.Type == CatalogModelType.Chat && compat is not null;
-            if (url == model.BaseUrl && !chatCompat) return model;
+            // Classifier APIs read their own compat fields, such as how a System One service takes images.
+            var classifierCompat = model.Type == CatalogModelType.Classifier && compat is not null;
+            if (url == model.BaseUrl && !chatCompat && !classifierCompat) return model;
             return model.With(json =>
             {
                 json["baseUrl"] = url;
                 if (chatCompat) SetOrRemove(json, "compat", MergeCompat(Get(json, "compat") as JsonObject, compat));
+                else if (classifierCompat) json["compat"] = JsonTree.Spread(Get(json, "compat") as JsonObject, compat!);
             });
         }).ToList();
         foreach (var node in definitions ?? [])
