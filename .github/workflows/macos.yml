@@ -39,6 +39,7 @@ jobs:
           - PiSharp.Classifiers.Tests
           - PiSharp.Models.Tests
           - PiSharp.Schema.Tests
+          - PiSharp.Telemetry.Tests
           - PiSharp.Codemode.Tests
           - PiSharp.ProviderApis.Tests
           - PiSharp.CliParity.Tests
