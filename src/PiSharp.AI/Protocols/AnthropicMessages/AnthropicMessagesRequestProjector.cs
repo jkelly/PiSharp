@@ -45,8 +45,14 @@ public sealed record AnthropicMessagesRequestOptions(
     int MaximumOutputCharacters = PiRequestBudget.RequestPayloadBytes, int MaximumOutputBytes = PiRequestBudget.RequestPayloadBytes,
     bool SupportsMidConversationToolChanges = false, bool SupportsMidConversationEffort = false)
 {
-    /// <summary>Upstream stream(): the effort a managed (compat.supportsMidConvoEffort) response records as providerThinkingLevel.</summary>
-    public string? ProviderThinkingLevel => SupportsMidConversationEffort ? Effort ?? "high" : null;
+    /// <summary>Upstream buildParams providerThinkingLevel: the effort a managed (compat.supportsMidConvoEffort) response records,
+    /// none while thinking is disabled.</summary>
+    public string? ProviderThinkingLevel => EffortMessages ? Effort ?? "high" : null;
+    /// <summary>Upstream buildParams thinkingDisabled (Pi 1.5.0 dc939913f): thinking off on a reasoning model whose map allows it.</summary>
+    internal bool ThinkingDisabled => ModelReasoning && ThinkingEnabled == false && SupportsThinkingOff;
+    /// <summary>Upstream buildParams effortMessages: effort cannot change between messages while thinking is disabled, so "off"
+    /// sends no effort markers.</summary>
+    internal bool EffortMessages => SupportsMidConversationEffort && !ThinkingDisabled;
     /// <summary>Pi 1.2.0 buildParams(disablePreferredStrictTools): strict "prefer" tools are sent non-strict (the one fallback
     /// request after Anthropic rejects the strict tool set); strict "require" tools stay strict.</summary>
     public bool DisablePreferredStrictTools { get; init; }
@@ -199,7 +205,7 @@ public sealed class AnthropicMessagesRequestProjector
                     if (blocks.Count == 0) continue;
                     var at = _messages.Count; AddMessage("assistant", blocks);
                     // convertMessages: only exact Anthropic Messages responses of this provider replay their recorded effort.
-                    if (options.SupportsMidConversationEffort && assistant.Api == "anthropic-messages" && assistant.Provider == request.Model.Provider &&
+                    if (options.EffortMessages && assistant.Api == "anthropic-messages" && assistant.Provider == request.Model.Provider &&
                         assistant.ExtraProperties?.TryGet("providerThinkingLevel", out var recorded) == true && recorded!.Value.ValueKind == JsonValueKind.String &&
                         recorded.Value.GetString() is "low" or "medium" or "high" or "xhigh" or "max") _assistantLevels[at] = recorded.Value.GetString()!;
                 }
@@ -215,7 +221,7 @@ public sealed class AnthropicMessagesRequestProjector
                 }
             }
             CloseCalls(); FlushSystems(); AttachLastCache();
-            if (options.SupportsMidConversationEffort) InsertEffortMessages();
+            if (options.EffortMessages) InsertEffortMessages();
             var root = new JsonObject { ["model"] = request.Model.Id, ["messages"] = _messages, ["max_tokens"] = options.MaximumTokens, ["stream"] = true };
             var system = options.SupportsMidConversationSystemMessages ? InitialSystem() : FoldedSystem();
             var systemBlocks = new JsonArray();
@@ -225,8 +231,10 @@ public sealed class AnthropicMessagesRequestProjector
             if (options.Temperature is { } temperature && options.ThinkingEnabled != true && !options.SupportsMidConversationEffort && options.SupportsTemperature) root["temperature"] = JsonNode.Parse(Number((double)temperature), documentOptions: PiSharp.Contracts.JsonData.DocumentOptions);
             var tools = ConvertTools(); if (tools.Count > 0) root["tools"] = tools;
             var betas = Betas(); if (betas.Count > 0) root["betas"] = betas;
-            // Managed effort models always use adaptive thinking so prefix mismatches are dropped; per-turn effort rides the markers.
-            if (options.SupportsMidConversationEffort)
+            // No effort is sent while thinking is disabled, so the model default applies; Anthropic rejects block_binding with it.
+            if (options.ThinkingDisabled) root["thinking"] = new JsonObject { ["type"] = "disabled" };
+            // Managed effort models use adaptive thinking so prefix mismatches are dropped; per-turn effort rides the markers.
+            else if (options.EffortMessages)
             {
                 root["thinking"] = new JsonObject { ["type"] = "adaptive", ["display"] = options.ThinkingDisplay,
                     ["block_binding"] = new JsonObject { ["prefix_mismatch_behavior"] = "drop_block" } };
@@ -239,7 +247,6 @@ public sealed class AnthropicMessagesRequestProjector
                     : new JsonObject { ["type"] = "enabled", ["budget_tokens"] = JsonNumber.Node(options.ThinkingBudgetTokens == 0 ? 1024 : options.ThinkingBudgetTokens), ["display"] = options.ThinkingDisplay };
                 if (options.ForceAdaptiveThinking && options.Effort is not null) root["output_config"] = new JsonObject { ["effort"] = options.Effort };
             }
-            else if (options.ModelReasoning && options.ThinkingEnabled == false && options.SupportsThinkingOff) root["thinking"] = new JsonObject { ["type"] = "disabled" };
             if (options.UserId is not null) { Unicode(options.UserId); root["metadata"] = new JsonObject { ["user_id"] = options.UserId }; }
             if (options.ToolChoice is { } choice)
             {

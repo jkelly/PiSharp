@@ -82,6 +82,7 @@ internal static partial class Program
             ("wire.agent-settled.native-extension-observation-and-reported-failure", ExtensionAgentSettled),
             ("wire.rpc-bash.interactive-bang-commands-abort-and-bounded-deltas", InteractiveUserBash)
         };
+        cases = [.. cases, .. Sync150Cases()];
         var results = new List<object>(); var failures = 0;
         // The MCP stdio process layer is Windows-only (McpProcessLease), so its cross-spawn resolution case runs on Windows only.
         cases = [.. cases.Where(test => OperatingSystem.IsWindows() || test.Id != "mcp.session.windows-command-resolution-and-cmd-escaping")];

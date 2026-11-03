@@ -91,6 +91,7 @@ internal static partial class Program
             ("errors.in-stream-error-texts-google-and-vertex", GoogleStreamErrorTexts),
             ("google.wire-body-matches-genai-for-gemini-and-vertex", GoogleWireBodies)
         };
+        cases = [.. cases, .. Sync150Cases()];
         var results = new List<object>(); var failures = 0;
         foreach (var test in cases)
         {
