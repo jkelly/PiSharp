@@ -122,8 +122,11 @@ public sealed partial class PersistentAgentSession
             if (_registry is { } registry)
             {
                 var current = GetToolActivationSelection().Names;
-                var keepCurrent = !current.IsEmpty && !prospective.LlmMessages.Any(message => message.Role == "system");
-                var (restoredLoadout, keptPresentation) = await PrepareAndDrainLoadoutAsync(() => (registry.ResolveRestored(prospective, kept.Model, work, selectedModel: kept.Model, thinkingLevel: kept.ThinkingLevel),
+                // Pi 1.5.0: every system message on the branch counts, including those before a compaction.
+                var keepCurrent = !current.IsEmpty && !prospective.Ancestry.Any(entry => entry.Kind == SessionEntryKind.Message &&
+                    entry.WireBody.Value.GetProperty("message").GetProperty("role").GetString() == "system");
+                var (restoredLoadout, keptPresentation) = await PrepareAndDrainLoadoutAsync(() => (registry.ResolveRestored(prospective, kept.Model, work, selectedModel: kept.Model, thinkingLevel: kept.ThinkingLevel,
+                    currentTools: current),
                     keepCurrent ? registry.PrepareActiveLoadout(registry.NormalizeActiveTools(current, work), work) : null), work).ConfigureAwait(false);
                 configuration = restoredLoadout.Selection.Configuration;
                 if (keepCurrent) keptTools = new(0, registry.NormalizeActiveTools(current, work), keptPresentation);

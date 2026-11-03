@@ -96,7 +96,9 @@ internal sealed partial class OfflineSessionProfile : IAsyncDisposable, IRpcExte
     { await AttachOwnerAsync(session).ConfigureAwait(false); await StartLifecycleAsync(reason, token).ConfigureAwait(false); }
     private readonly ImmutableArray<string>? _initialActiveTools;
     /// <summary>sdk.ts createAgentSession initialActiveToolNames. For a resumed session (<paramref name="resumed"/>) the names are applied
-    /// in memory, as the AgentSession constructor applies them, and the next prompt records the loadout: opening a session writes nothing.</summary>
+    /// in memory, as the AgentSession constructor applies them, and the next prompt records the loadout: opening a session writes nothing.
+    /// Pi 1.5.0: with the default tools (no --tools, or only +name/-name entries) a resumed branch that records a loadout keeps it
+    /// (_restoreToolsFromTranscript) instead of taking the initial names.</summary>
     internal async Task ApplyInitialToolSelectionAsync(PersistentAgentSession session, CancellationToken token, bool resumed = false)
     {
         ImmutableArray<string>? initial = null;
@@ -110,7 +112,7 @@ internal sealed partial class OfflineSessionProfile : IAsyncDisposable, IRpcExte
         else if (_initialActiveTools is { } names) initial = names;
         if (initial is { } selected)
         {
-            if (resumed) await session.ApplyInitialToolsAsync(selected, token).ConfigureAwait(false);
+            if (resumed) await session.ApplyInitialToolsAsync(session.ResumedBranchTools(token) ?? selected, token).ConfigureAwait(false);
             else await session.SetActiveToolsAsync(selected, token).ConfigureAwait(false);
         }
         await DrainLoadoutDiagnosticsAsync(token).ConfigureAwait(false);
@@ -349,7 +351,7 @@ internal sealed partial class OfflineSessionProfile : IAsyncDisposable, IRpcExte
             new SessionRuntimeRegistryOptions(MaximumModels: piEntry ? int.MaxValue : 4096, MaximumTools: piEntry ? int.MaxValue : 128,
                 MaximumMessages: piEntry ? int.MaxValue : PiRequestBudget.RequestMessages, MaximumDeclarations: piEntry ? int.MaxValue : PiRequestBudget.RequestItems, MaximumCharacters: piEntry ? PiPayloadBudget.PiSessionFileBytes : PiPayloadBudget.SessionFileBytes, ToolInvokerOptions: invokerOptions) { PreparedToolHooks = NormalizedToolHooks(extension?.Binding.PreparedHooks), BlockImages = () => ImageSettings.BlockImages,
                 ServiceTier = PiSharp.Cli.Pi.PiServiceTierSetting.Current,
-                LifetimeToolSelection = lifetimeSelection, InitialActiveToolNames = _initialActiveTools,
+                LifetimeToolSelection = lifetimeSelection, InitialActiveToolNames = _initialActiveTools, UsesDefaultTools = lifetimeSelection?.UsesDefaultTools ?? true,
                 BindNestedCallsToSessionOwner = true, ReportLoadoutDiagnostic = extension is null ? null : extension.CaptureLoadoutDiagnostic,
                 DrainLoadoutDiagnostics = extension is null ? null : extension.DrainLoadoutDiagnosticsAsync,
                 PreparePromptSections = PrepareDurablePromptSections, RestoreFallbackModel = (saved, fallback) => RestoreFallback?.Invoke(saved, fallback) });

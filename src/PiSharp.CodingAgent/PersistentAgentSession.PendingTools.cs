@@ -38,6 +38,22 @@ public sealed partial class PersistentAgentSession
         lock (_gate) { _unrecordedLoadout = unrecorded; _pendingToolNames = pending; }
     }
 
+    /// <summary>Source constructor with usesDefaultTools (Pi 1.5.0 _restoreToolsFromTranscript): the branch's loadout that a resumed
+    /// session keeps over the initial names, resolved against the current catalog (tools registered since the session opened
+    /// included) and ordered after the current tools; null when the session takes the initial names (an explicit selection, or a
+    /// branch that records no loadout).</summary>
+    internal ImmutableArray<string>? ResumedBranchTools(CancellationToken cancellationToken = default)
+    {
+        SessionRuntimeRegistry registry; SessionContextProjection context; ImmutableArray<string> current;
+        lock (_gate)
+        {
+            ThrowAvailable();
+            registry = _registry ?? throw Error(PersistentAgentSessionFailure.InvalidConfiguration);
+            context = _context; current = _pendingActivation?.Names ?? _configuration.Tools.Select(tool => tool.Name).ToImmutableArray();
+        }
+        return registry.UsesDefaultTools ? registry.RestoreBranchTools(context.Ancestry, current, applyModifiers: true, cancellationToken) : null;
+    }
+
     /// <summary>
     /// Source createAgentSession for an existing session (sdk.ts initialActiveToolNames: the selected or default tool names) and the
     /// constructor's _buildRuntime: the names become the agent's loadout in memory and the session file is not written; the next

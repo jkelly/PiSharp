@@ -205,6 +205,7 @@ Rules:
 - An allowlist keeps MCP tools unless it is empty or one of its entries starts with `mcp__`. MCP tools it keeps without naming are only for `codemode` and `tool_search`.
 - Unknown tool names are ignored, as in Pi.
 - `/reload` turns on tools newly added to `defaultTools`. Tools removed from it stay on until the next session.
+- A resumed session, and `/tree`, keep the tools the branch last had on. `--tools +a,-b` changes them. Plain `--tools` names, `--no-tools` and `--no-builtin-tools` replace them. Extension tools registered since the branch recorded its tools turn on, unless they are off by default.
 
 ```sh
 pisharp --tools read,grep,find,ls -p "Review the code in src/"   # read-only
