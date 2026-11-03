@@ -34,6 +34,8 @@ If the install can't run (offline, no npm, or a failed install), extensions stil
 
 The whole `ExtensionAPI`: tools, commands, shortcuts, flags, message and tool renderers, providers (chat, classifier and image), virtual models, MCP servers, the event bus, and every extension event. [Extension events](/docs/extensions/events/) lists the events and when each one fires. `ctx.ui` dialogs, widgets and custom components show in the terminal UI and over RPC.
 
+Pi 1.5.0's additions work too. Tool, message and entry renderers get `keyText()` and `keyHint()`, which read the terminal UI's current keybindings. An inline `ctx.ui.custom()` component with a `blocked: { kind, message }` option reports pi as blocked in its OSC 7501 program status while it is open (overlays ignore the option). Markdown transformers see `messageId` and `timestamp` for messages restored from the session file.
+
 `ctx.ui.setTheme()` switches the theme in the terminal UI and saves it, as in Pi. `pi.sendMessage(…, { triggerTurn: true })` starts its turn at once, also from inside a command's handler. Packages loaded with `-e` add their skills, prompt templates and themes as well as their extensions.
 
 Pi's built-in extensions (`mcp`, `llama.cpp`, `codemode` and `tool-search`) are extensions here too, and an extension that registers its own `codemode` or `tool_search` tool or `/mcp` command replaces the built-in one. See [Built-in extensions](/docs/reference/configuration/#built-in-extensions).
