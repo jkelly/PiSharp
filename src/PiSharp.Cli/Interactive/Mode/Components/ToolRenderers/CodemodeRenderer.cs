@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): coding-agent/src/extensions/codemode/renderer.ts.
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): coding-agent/src/extensions/codemode/renderer.ts.
 // The themed presentation of the codemode tool (PiSharp.Codemode.CodemodeRenderer is the unthemed row version for the native
 // extension renderer contract). Details are CodemodeToolDetails: {calls: [{id, name, args, status, durationMs?, cost?, error?}],
 // fullOutputPath?}.
@@ -23,6 +23,8 @@ internal static partial class CodemodeRenderers
     private const int CallPreviewCount = 8;
     private const int OutputPreviewLines = 5;
     private const int CollapsedArgsChars = 80;
+    /// <summary>CodemodeRenderState.scriptHighlighter: the row's renderer state keeps the script's highlighting.</summary>
+    private const string ScriptHighlighterKey = "scriptHighlighter";
 
     // ECMAScript: \d is ASCII and $ (without the m flag) is the end of input.
     [GeneratedRegex(@"^Script (completed|failed)\nWall time [0-9.]+ seconds\nOutput:\n\z", RegexOptions.CultureInvariant)]
@@ -94,7 +96,10 @@ internal static partial class CodemodeRenderers
             component.AddChild(new Text(title, 0, 0));
             if (code.Length > 0)
             {
-                var highlighted = string.Join("\n", Themes.HighlightCode(RenderUtils.ReplaceTabs(TextUtils.JsTrimEnd(code.Replace("\r", "", StringComparison.Ordinal))), "javascript"));
+                // Progress, timer ticks and expanding redraw the call, so the row keeps the script's highlighting (CodemodeRenderState).
+                if (context.State.GetValueOrDefault(ScriptHighlighterKey) is not CodeHighlighter scriptHighlighter)
+                    context.State[ScriptHighlighterKey] = scriptHighlighter = new CodeHighlighter();
+                var highlighted = string.Join("\n", scriptHighlighter.Highlight(RenderUtils.ReplaceTabs(TextUtils.JsTrimEnd(code.Replace("\r", "", StringComparison.Ordinal))), "javascript"));
                 component.AddChild(context.Expanded
                     ? new Text(highlighted, 0, 0)
                     : new VisualLinePreview(new VisualLinePreviewOptions(highlighted, CodePreviewLines, VisualTruncateKeep.Start, hidden => ExpandHint(theme, hidden, "lines"))));

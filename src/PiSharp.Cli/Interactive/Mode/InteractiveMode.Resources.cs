@@ -480,7 +480,7 @@ internal sealed partial class InteractiveMode
                 loadedResourcesContainer.AddChild(new ThemedText(() => $"{theme.Fg("warning", $"[{title}]")}\n{FormatDiagnostics(list, sourceInfos)}", 0, 0));
                 loadedResourcesContainer.AddChild(new Spacer(1));
             }
-            AddDiagnostics("Skill conflicts", diagnostics.Skills);
+            AddDiagnostics("Skill warnings", diagnostics.Skills);
             AddDiagnostics("Prompt conflicts", diagnostics.Prompts);
             var extensionDiagnostics = diagnostics.Extensions.ToList();
             var builtinNames = new HashSet<string>(SlashCommands.Builtin.Select(command => command.Name), StringComparer.Ordinal);

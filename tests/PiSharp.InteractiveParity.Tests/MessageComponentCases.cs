@@ -614,7 +614,7 @@ internal static class MessageComponentCases
         yield return ("msg.markdown-transform.chain", Sync(() =>
         {
             var contexts = new List<MarkdownTransformContext>();
-            var transform = MarkdownTransform.CreateMarkdownTransform(MarkdownMessageType.AssistantThinking, true,
+            var transform = MarkdownTransform.CreateMarkdownTransform(MarkdownMessageType.AssistantThinking, () => true,
             [
                 (markdown, context) => { contexts.Add(context); return null; },
                 (markdown, _) => markdown + "!",
@@ -623,7 +623,7 @@ internal static class MessageComponentCases
             ]);
             Equal("hi!?", transform("hi", 42), "null keeps the Markdown, throws are skipped");
             Equal(new MarkdownTransformContext("assistant-thinking", true, 42), contexts.Single(), "context");
-            Equal("same", MarkdownTransform.CreateMarkdownTransform("user", false, [])("same", 1), "no transformers");
+            Equal("same", MarkdownTransform.CreateMarkdownTransform("user", () => false, [])("same", 1), "no transformers");
         }));
 
         // ---------------------------------------------------------------- earendil-announcement.ts

@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): coding-agent/src/modes/interactive/components/extension-editor.ts.
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): coding-agent/src/modes/interactive/components/extension-editor.ts.
 using PiSharp.Tui.Pi;
 using static PiSharp.Cli.Interactive.Mode.ThemeGlobals;
 
@@ -18,6 +18,8 @@ internal sealed class ExtensionEditorComponent : Container, IFocusable, IInputHa
     private readonly string externalEditorCommand;
     private readonly ExternalEditorProcessRunner? processRunner;
     private readonly TextWriter? externalEditorOutput;
+    /// <summary>Shows external editor failures; renders nothing while empty.</summary>
+    private readonly Text externalEditorStatus = new("", 1, 0);
 
     private bool focused;
     public bool Focused
@@ -74,6 +76,7 @@ internal sealed class ExtensionEditorComponent : Container, IFocusable, IInputHa
         // Wire up Enter to submit (Shift+Enter for newlines, like the main editor)
         editor.OnSubmit = text => onSubmitCallback(text);
         AddChild(editor);
+        AddChild(externalEditorStatus);
 
         AddChild(new Spacer(1));
 
@@ -127,6 +130,7 @@ internal sealed class ExtensionEditorComponent : Container, IFocusable, IInputHa
         try
         {
             var result = await ExternalEditor.EditInExternalEditorAsync(new ExternalEditorOptions(externalEditorCommand, content), processRunner, externalEditorOutput);
+            externalEditorStatus.SetText(result.Status == "failed" ? theme.Fg("warning", result.Message ?? "") : "");
             if (result.Status == "complete") editor.SetText(result.Content ?? "");
         }
         finally

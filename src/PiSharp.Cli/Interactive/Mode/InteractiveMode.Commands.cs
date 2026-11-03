@@ -430,6 +430,7 @@ internal sealed partial class InteractiveMode
         {
             var result = await ExternalEditor.EditInExternalEditorAsync(editorCommand, content);
             if (result.Status == "complete") editor.SetText(result.Content ?? "");
+            else ShowStatus(result.Message ?? "");
         }
         finally
         {
