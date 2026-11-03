@@ -12,6 +12,9 @@ public sealed record NativeExtensionExecInvocation(string OwnerId, long OwnerGen
 /// This host neither creates a runner nor resolves a command through an ambient PATH.</summary>
 public sealed class NativeExtensionExecHost : IExtensionExecFacade, IAsyncDisposable
 {
+    // Source exec.ts execCommand: DEFAULT_EXEC_MAX_BUFFER is 256 MiB capped by the runtime's longest string (here .NET's).
+    private const long MaxStringLength = 0x3FFFFFDF;
+    private const long DefaultMaxBuffer = 256L * 1024 * 1024;
     private sealed record SupplierFrame(NativeExtensionExecHost Host, SupplierFrame? LogicalParent, SupplierFrame? PhysicalParent);
     private static readonly AsyncLocal<SupplierFrame?> InSupplier = new();
     [ThreadStatic] private static SupplierFrame? physicalSupplier;
@@ -55,6 +58,9 @@ public sealed class NativeExtensionExecHost : IExtensionExecFacade, IAsyncDispos
         options ??= new();
         if (options.TimeoutMilliseconds is { } timeout && (!double.IsFinite(timeout) || timeout > int.MaxValue))
             throw new ArgumentOutOfRangeException(nameof(options));
+        var maxBuffer = options.MaxBuffer ?? DefaultMaxBuffer;
+        if (maxBuffer is < 0 or > MaxStringLength)
+            throw new ArgumentOutOfRangeException(nameof(options), $"maxBuffer must be an integer between 0 and {MaxStringLength} bytes");
         var cwd = options.Cwd ?? workingDirectory;
         if (!Path.IsPathFullyQualified(cwd)) throw new ArgumentException("Explicit absolute working directory required.");
         var seconds = options.TimeoutMilliseconds is > 0 ? options.TimeoutMilliseconds / 1000 : null;
@@ -64,13 +70,14 @@ public sealed class NativeExtensionExecHost : IExtensionExecFacade, IAsyncDispos
             if (operations.Count >= 1024) throw new InvalidOperationException("Exec owner operation limit reached.");
             var slot = new TaskCompletionSource<Task>(TaskCreationOptions.RunContinuationsAsynchronously);
             operations.Add(new(slot, options.Signal)); // reserve before any supplied callback can run
-            var mapped = ExecuteAsync(new(OwnerId, OwnerGeneration, command, arguments, cwd, seconds), options.Signal, validateOrigin);
+            var mapped = ExecuteAsync(new(OwnerId, OwnerGeneration, command, arguments, cwd, seconds), options.Signal, validateOrigin, maxBuffer);
             slot.SetResult(mapped); // reservation is not a fabricated process original
             return mapped;
         }
     }
 
-    private async Task<ExtensionExecResult> ExecuteAsync(NativeExtensionExecInvocation invocation, CancellationToken signal, Action? validateOrigin)
+    private async Task<ExtensionExecResult> ExecuteAsync(NativeExtensionExecInvocation invocation, CancellationToken signal, Action? validateOrigin,
+        long maxBuffer)
     {
         using var linked = CancellationTokenSource.CreateLinkedTokenSource(stop.Token, signal);
         linked.Token.ThrowIfCancellationRequested();
@@ -98,6 +105,7 @@ public sealed class NativeExtensionExecHost : IExtensionExecFacade, IAsyncDispos
             !StringComparer.Ordinal.Equals(request.WorkingDirectory, invocation.WorkingDirectory) ||
             !request.Arguments.SequenceEqual(invocation.Arguments) || request.TimeoutSeconds != invocation.TimeoutSeconds)
             throw new InvalidOperationException("Admission changed ordered arguments, cwd or timeout, or omitted absolute resource authority.");
+        request = request with { CaptureLimitBytes = maxBuffer };
         lock (gate)
         {
             if (closing || stop.IsCancellationRequested) throw new ObjectDisposedException(nameof(NativeExtensionExecHost));
@@ -124,18 +132,31 @@ public sealed class NativeExtensionExecHost : IExtensionExecFacade, IAsyncDispos
         finally { InSupplier.Value = previous; }
         validateOrigin?.Invoke();
         var receipt = result.Process;
-        if (!receipt.CleanupConfirmed || !receipt.CapturedOutputComplete || result.StandardOutput.Truncated ||
-            result.StandardError.Truncated || receipt.Status == ProcessRunStatus.Failed || receipt.Diagnostics.Length != 0)
+        // A child that could not start is a failed execution with its error in stderr and code 1, not a host failure.
+        if (!receipt.ProcessStarted && receipt.CleanupConfirmed && receipt.Status == ProcessRunStatus.Failed && receipt.Diagnostics is [var launch and
+            (ProcessDiagnostic.ExecutableUnavailable or ProcessDiagnostic.WorkingDirectoryUnavailable or ProcessDiagnostic.SpawnFailed)])
+            return new("", SpawnError(invocation, request, launch, receipt.LaunchError), 1, false);
+        // Output over maxBuffer stopped the command: the result is truncated, killed and never a success.
+        var truncated = result.CaptureLimitReached;
+        if (!receipt.CleanupConfirmed || !receipt.CapturedOutputComplete || !truncated && (result.StandardOutput.Truncated ||
+            result.StandardError.Truncated) || receipt.Status == ProcessRunStatus.Failed || receipt.Diagnostics.Length != 0)
             throw new IOException("Exec output or process cleanup is not complete; no successful result is admitted.");
-        var killed = receipt.ProcessStarted && receipt.Status is ProcessRunStatus.Canceled or ProcessRunStatus.TimedOut;
+        var killed = receipt.ProcessStarted && (truncated || receipt.Status is ProcessRunStatus.Canceled or ProcessRunStatus.TimedOut);
         if (!receipt.ProcessStarted && receipt.Status == ProcessRunStatus.Canceled)
             throw new OperationCanceledException(linked.Token);
         if (!killed && receipt.ExitCode is null) throw new IOException("A naturally exited process requires its actual exit code.");
         if (receipt.Status == ProcessRunStatus.Exited && receipt.ExitCode != 0 ||
             receipt.Status == ProcessRunStatus.NonZeroExit && receipt.ExitCode == 0)
             throw new IOException("Actual process status and exit code disagree.");
-        return new(result.StandardOutput.Content, result.StandardError.Content, receipt.ExitCode ?? 0, killed);
+        var code = receipt.ExitCode ?? 0;
+        return new(result.StandardOutput.Content, result.StandardError.Content, truncated && code == 0 ? 1 : code, killed) { Truncated = truncated };
     }
+    // The message names the command as Node's spawn error does; a missing executable or cwd reads ENOENT on every platform.
+    private static string SpawnError(NativeExtensionExecInvocation invocation, ProcessRequest request, ProcessDiagnostic launch, int? error) =>
+        launch == ProcessDiagnostic.ExecutableUnavailable || !File.Exists(request.Executable) ? $"spawn {invocation.Command} ENOENT"
+        : launch == ProcessDiagnostic.WorkingDirectoryUnavailable || !Directory.Exists(request.WorkingDirectory)
+            ? $"spawn {invocation.Command} ENOENT (working directory {invocation.WorkingDirectory} is unavailable)"
+        : error is { } code ? $"spawn {invocation.Command} failed (error {code})" : $"spawn {invocation.Command} failed";
 
     public ValueTask DisposeAsync()
     {

@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/src/core/package-manager.ts (spawnCommand,
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/coding-agent/src/core/package-manager.ts (spawnCommand,
 // spawnCaptureCommand, runCommandCapture, runCommand, runCommandSync) and packages/coding-agent/src/utils/child-process.ts
 // (spawnProcess, spawnProcessSync over cross-spawn 7 on Windows: PATH/PATHEXT resolution and cmd.exe argument escaping).
 using System.Diagnostics;

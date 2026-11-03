@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/src/core/package-manager.ts (the minimatch,
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/coding-agent/src/core/package-manager.ts (the minimatch,
 // fs.globSync and ignore calls of matchesAnyPattern, expandPackageGlob, addIgnoreRules and collect*Entries).
 using System.Text;
 using System.Text.RegularExpressions;
@@ -7,7 +7,8 @@ namespace PiSharp.Cli.Packages;
 
 /// <summary>The minimatch 10 subset the package manager uses (default options): <c>*</c>, <c>**</c>, <c>?</c>, character classes,
 /// brace expansion, leading <c>!</c> negation and <c>#</c> comments. Dot segments only match patterns that spell the dot; extglobs are
-/// matched literally.</summary>
+/// matched literally. Like minimatch 11 (with brace-expansion 5 and nonrecursive-glob-match), amplified patterns stay bounded: brace
+/// expansion is capped, a portion is matched without backtracking and <c>**</c> without a recursive walk per split.</summary>
 internal static class PiMinimatch
 {
     private sealed class Segment
@@ -15,10 +16,44 @@ internal static class PiMinimatch
         internal bool GlobStar;
         internal string? Literal;
         internal Regex? Pattern;
-        internal bool Test(string file) => Literal is not null ? file == Literal : Pattern!.IsMatch(file);
+        internal Token[]? Tokens;
+        internal bool ExplicitDot, IgnoreCase;
+        internal bool Test(string file) =>
+            Literal is not null ? file == Literal : Tokens is not null ? (ExplicitDot || !file.StartsWith('.')) && Wildcard(file) : Pattern!.IsMatch(file);
+
+        // A portion is one chain of single-character tokens and stars, so a greedy scan that returns to the last star on a mismatch
+        // decides it in pattern x name steps (nonrecursive-glob-match's linear chain), where a backtracking regex takes exponential
+        // time on "*a*a*a*b". A portion never holds a '/'.
+        private bool Wildcard(string file)
+        {
+            var tokens = Tokens!;
+            int fi = 0, ti = 0, star = -1, resume = 0;
+            while (fi < file.Length)
+            {
+                if (ti < tokens.Length && tokens[ti].Kind == '*') { star = ti++; resume = fi; continue; }
+                if (ti < tokens.Length && Accepts(tokens[ti], file, fi)) { ti++; fi++; continue; }
+                if (star < 0) return false;
+                ti = star + 1; fi = ++resume;
+            }
+            while (ti < tokens.Length && tokens[ti].Kind == '*') ti++;
+            return ti == tokens.Length;
+        }
+
+        private bool Accepts(Token token, string file, int index) => token.Kind switch
+        {
+            '?' => true,
+            '[' => token.Class!.IsMatch(file.AsSpan(index, 1)),
+            _ => token.Char == file[index] || IgnoreCase && (char.ToLowerInvariant(token.Char) == char.ToLowerInvariant(file[index]) ||
+                char.ToUpperInvariant(token.Char) == char.ToUpperInvariant(file[index]))
+        };
     }
 
+    /// <summary>A portion token: a literal character, <c>?</c>, a <c>[...]</c> class (one-character regex) or <c>*</c>.</summary>
+    private readonly record struct Token(char Kind, char Char, Regex? Class);
+
     private static readonly Dictionary<string, List<Segment[]>> Cache = new(StringComparer.Ordinal);
+    // Class regexes by source, shared by the portions of one brace expansion (filled under the Cache lock).
+    private static readonly Dictionary<string, Regex> ClassCache = new(StringComparer.Ordinal);
 
     /// <summary>minimatch(path, pattern).</summary>
     internal static bool Match(string path, string pattern, bool ignoreCase = false)
@@ -30,7 +65,7 @@ internal static class PiMinimatch
         if (body.Length == 0) return (path.Length == 0) != negate;
         var file = Split(path.Replace('\\', '/'));
         foreach (var compiled in Compile(body, ignoreCase))
-            if (MatchOne(file, 0, compiled, 0)) return !negate;
+            if (MatchOne(file, compiled)) return !negate;
         return negate;
     }
 
@@ -71,6 +106,7 @@ internal static class PiMinimatch
     {
         if (part == "**") return new() { GlobStar = true };
         var regex = new StringBuilder();
+        var tokens = new List<Token>();
         var magic = false;
         for (var index = 0; index < part.Length; index++)
         {
@@ -78,23 +114,23 @@ internal static class PiMinimatch
             switch (c)
             {
                 case '\\' when index + 1 < part.Length:
-                    regex.Append(Regex.Escape(part[++index].ToString()));
+                    regex.Append(Regex.Escape(part[++index].ToString())); tokens.Add(new('c', part[index], null));
                     break;
                 case '*':
                     magic = true;
                     while (index + 1 < part.Length && part[index + 1] == '*') index++;
-                    regex.Append("[^/]*?");
+                    tokens.Add(new('*', c, null));
                     break;
                 case '?':
-                    magic = true; regex.Append("[^/]");
+                    magic = true; tokens.Add(new('?', c, null));
                     break;
                 case '[':
                     var end = ClassEnd(part, index);
-                    if (end < 0) { regex.Append(@"\["); break; }
-                    magic = true; regex.Append(ClassRegex(part[(index + 1)..end])); index = end;
+                    if (end < 0) { regex.Append(@"\["); tokens.Add(new('c', c, null)); break; }
+                    magic = true; tokens.Add(new('[', c, ClassPattern(ClassRegex(part[(index + 1)..end]), ignoreCase))); index = end;
                     break;
                 default:
-                    regex.Append(Regex.Escape(c.ToString()));
+                    regex.Append(Regex.Escape(c.ToString())); tokens.Add(new('c', c, null));
                     break;
             }
         }
@@ -102,8 +138,15 @@ internal static class PiMinimatch
             return ignoreCase ? new() { Pattern = new Regex("^" + regex + "$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant) } : new() { Literal = Unescape(part) };
         // A leading wildcard never matches a leading dot; a pattern that spells the dot (".x", "[.]x") may.
         var explicitDot = part.StartsWith('.') || part.StartsWith('[') && ClassEnd(part, 0) is var close && close > 0 && part[1..close].Contains('.') && part[1] is not ('!' or '^');
-        var prefix = explicitDot ? "" : @"(?!\.)";
-        return new() { Pattern = new Regex("^" + prefix + regex + "$", RegexOptions.CultureInvariant | (ignoreCase ? RegexOptions.IgnoreCase : RegexOptions.None)) };
+        return new() { Tokens = [.. tokens], ExplicitDot = explicitDot, IgnoreCase = ignoreCase };
+    }
+
+    private static Regex ClassPattern(string source, bool ignoreCase)
+    {
+        var key = (ignoreCase ? "i:" : "s:") + source;
+        if (!ClassCache.TryGetValue(key, out var regex))
+            ClassCache[key] = regex = new Regex(@"\A" + source + @"\z", RegexOptions.CultureInvariant | (ignoreCase ? RegexOptions.IgnoreCase : RegexOptions.None));
+        return regex;
     }
 
     private static string Unescape(string part)
@@ -160,37 +203,69 @@ internal static class PiMinimatch
         return builder.Append(']').ToString();
     }
 
-    private static bool MatchOne(string[] file, int fi, Segment[] pattern, int pi)
+    private static bool MatchOne(string[] file, Segment[] pattern)
     {
-        for (; fi < file.Length && pi < pattern.Length; fi++, pi++)
-        {
-            var p = pattern[pi]; var f = file[fi];
-            if (p.GlobStar)
+        // match[fi, pi]: file[fi..] matches pattern[pi..], filled from the end, so a pattern with many ** costs file x pattern steps
+        // instead of a recursive walk over every split of the path (minimatch 11 bounds the same walk). A ** never swallows a dot
+        // segment; a trailing empty part (a directory's slash) matches the end of the pattern.
+        int files = file.Length, width = pattern.Length + 1;
+        var match = new bool[(files + 1) * width];
+        for (var fi = files; fi >= 0; fi--)
+            for (var pi = pattern.Length; pi >= 0; pi--)
             {
-                var next = pi + 1;
-                if (next == pattern.Length)
-                {
-                    for (; fi < file.Length; fi++)
-                        if (file[fi] is "." or ".." || file[fi].StartsWith('.')) return false;
-                    return true;
-                }
-                for (var fr = fi; fr < file.Length; fr++)
-                {
-                    if (MatchOne(file, fr, pattern, next)) return true;
-                    var swallowed = file[fr];
-                    if (swallowed is "." or ".." || swallowed.StartsWith('.')) break;
-                }
-                return false;
+                bool value;
+                if (fi == files) value = pi == pattern.Length;
+                else if (pi == pattern.Length) value = fi == files - 1 && file[fi].Length == 0;
+                else if (pattern[pi].GlobStar)
+                    value = pi + 1 == pattern.Length
+                        ? !file[fi].StartsWith('.') && (fi + 1 == files || match[(fi + 1) * width + pi])
+                        : match[fi * width + pi + 1] || !file[fi].StartsWith('.') && match[(fi + 1) * width + pi];
+                else value = match[(fi + 1) * width + pi + 1] && pattern[pi].Test(file[fi]);
+                match[fi * width + pi] = value;
             }
-            if (!p.Test(f)) return false;
-        }
-        if (fi == file.Length && pi == pattern.Length) return true;
-        if (fi == file.Length) return false;
-        return fi == file.Length - 1 && file[fi].Length == 0;
+        return match[0];
     }
 
+    // brace-expansion 5 (minimatch 11) bounds an expansion: EXPANSION_MAX results and EXPANSION_MAX_LENGTH characters at any point
+    // (truncated, not thrown), chained sets combined iteratively, and nesting followed EXPANSION_MAX_DEPTH levels (deeper stays literal).
+    private const int ExpansionMax = 100_000, ExpansionMaxLength = 4_000_000, ExpansionMaxDepth = 1_000;
+
     /// <summary>brace-expansion: comma lists and numeric or letter sequences, nested; unbalanced braces stay literal.</summary>
-    internal static List<string> BraceExpand(string pattern)
+    internal static List<string> BraceExpand(string pattern) => BraceExpand(pattern, 0);
+
+    private static List<string> BraceExpand(string pattern, int depth)
+    {
+        if (depth > ExpansionMaxDepth) return [pattern];
+        List<string> expansions = [""];
+        var rest = pattern;
+        while (FindBraceSet(rest) is (var open, var close))
+        {
+            var pre = rest[..open]; var body = rest[(open + 1)..close];
+            rest = rest[(close + 1)..];
+            var options = SplitTopLevel(body);
+            List<string> alternatives;
+            if (options.Count > 1)
+            {
+                alternatives = [];
+                var length = 0L; var full = false;
+                foreach (var option in options)
+                {
+                    foreach (var alternative in BraceExpand(option, depth + 1))
+                    {
+                        if (full = alternatives.Count >= ExpansionMax || length + alternative.Length > ExpansionMaxLength) break;
+                        alternatives.Add(alternative); length += alternative.Length;
+                    }
+                    if (full) break;
+                }
+            }
+            // A brace set without a comma or sequence stays literal; expansion continues after it.
+            else alternatives = Sequence(body) ?? ["{" + body + "}"];
+            expansions = Combine(expansions, pre, alternatives);
+        }
+        return Combine(expansions, rest, [""]);
+    }
+
+    private static (int Open, int Close)? FindBraceSet(string pattern)
     {
         var open = -1; var depth = 0;
         for (var index = 0; index < pattern.Length; index++)
@@ -201,21 +276,22 @@ internal static class PiMinimatch
             if (c == '{') { if (depth == 0) open = index; depth++; continue; }
             if (c != '}' || depth == 0) continue;
             depth--;
-            if (depth != 0 || open < 0) continue;
-            var pre = pattern[..open]; var body = pattern[(open + 1)..index]; var post = pattern[(index + 1)..];
-            var options = SplitTopLevel(body);
-            List<string> alternatives;
-            if (options.Count > 1) alternatives = [.. options.SelectMany(BraceExpand)];
-            else if (Sequence(body) is { } sequence) alternatives = sequence;
-            else
-            {
-                // A brace set without a comma or sequence stays literal; expansion continues after it.
-                return [.. BraceExpand(post).Select(rest => pre + "{" + body + "}" + rest)];
-            }
-            var tails = BraceExpand(post);
-            return [.. alternatives.SelectMany(alternative => tails.Select(tail => pre + alternative + tail))];
+            if (depth == 0 && open >= 0) return (open, index);
         }
-        return [pattern];
+        return null;
+    }
+
+    private static List<string> Combine(List<string> prefixes, string pre, List<string> alternatives)
+    {
+        var result = new List<string>(); var length = 0L;
+        foreach (var prefix in prefixes)
+            foreach (var alternative in alternatives)
+            {
+                var size = prefix.Length + pre.Length + alternative.Length;
+                if (result.Count >= ExpansionMax || length + size > ExpansionMaxLength) return result;
+                result.Add(prefix + pre + alternative); length += size;
+            }
+        return result;
     }
 
     private static List<string> SplitTopLevel(string body)
@@ -237,7 +313,10 @@ internal static class PiMinimatch
     {
         var match = Regex.Match(body, @"^(-?\d+|[a-zA-Z])\.\.(-?\d+|[a-zA-Z])(?:\.\.(-?\d+))?$", RegexOptions.CultureInvariant);
         if (!match.Success) return null;
-        var step = match.Groups[3].Success ? Math.Max(1, Math.Abs(int.Parse(match.Groups[3].Value, System.Globalization.CultureInfo.InvariantCulture))) : 1;
+        // The step is at most the widest range, so the counter cannot overflow.
+        var step = !match.Groups[3].Success ? 1L
+            : long.TryParse(match.Groups[3].Value, System.Globalization.CultureInfo.InvariantCulture, out var parsed) && parsed > long.MinValue
+                ? Math.Clamp(Math.Abs(parsed), 1L, 1L << 33) : 1L << 33;
         string a = match.Groups[1].Value, b = match.Groups[2].Value;
         var numeric = int.TryParse(a, out var from) & int.TryParse(b, out var to);
         if (!numeric)
@@ -247,13 +326,19 @@ internal static class PiMinimatch
         }
         var width = numeric && (a.StartsWith('0') && a.Length > 1 || b.StartsWith('0') && b.Length > 1 || a.StartsWith("-0", StringComparison.Ordinal) || b.StartsWith("-0", StringComparison.Ordinal))
             ? Math.Max(a.Length, b.Length) : 0;
-        var result = new List<string>();
-        for (var value = from; from <= to ? value <= to : value >= to; value += from <= to ? step : -step)
+        var result = new List<string>(); var length = 0L;
+        for (long value = from; from <= to ? value <= to : value >= to; value += from <= to ? step : -step)
         {
-            if (!numeric) { result.Add(((char)value).ToString()); continue; }
-            var text = Math.Abs(value).ToString(System.Globalization.CultureInfo.InvariantCulture);
-            if (width > 0) text = text.PadLeft(width - (value < 0 ? 1 : 0), '0');
-            result.Add(value < 0 ? "-" + text : text);
+            string item;
+            if (!numeric) item = ((char)value).ToString();
+            else
+            {
+                var text = Math.Abs(value).ToString(System.Globalization.CultureInfo.InvariantCulture);
+                if (width > 0) text = text.PadLeft(width - (value < 0 ? 1 : 0), '0');
+                item = value < 0 ? "-" + text : text;
+            }
+            if (result.Count >= ExpansionMax || length + item.Length > ExpansionMaxLength) break;
+            result.Add(item); length += item.Length;
         }
         return result;
     }

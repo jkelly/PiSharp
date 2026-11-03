@@ -12,7 +12,8 @@ internal sealed class PiExtensionLoading
 {
     internal const string LoadFailureHint = "Hint: Start without extensions using \"" + PiConfig.DisplayName + " -ne\".";
 
-    private readonly HashSet<string> _requested = new(PiPaths.Comparer);
+    // Keyed by getResourcePathKey, as loadFinalExtensionSet keys the preloaded and failed paths.
+    private readonly HashSet<string> _requested = new(StringComparer.Ordinal);
     private readonly List<PiDiagnostic> _diagnostics = [];
     internal PiExtensionHost? Host { get; private set; }
     internal IReadOnlyList<PiDiagnostic> Diagnostics => _diagnostics;
@@ -21,7 +22,7 @@ internal sealed class PiExtensionLoading
     /// <summary>Loads the sources not loaded yet (in order), starting the Node host on first need. Load failures become diagnostics.</summary>
     internal async Task LoadAsync(IReadOnlyList<PiExtensionSource> sources, Func<PiExtensionHostOptions> options, CancellationToken token)
     {
-        var fresh = sources.Where(source => _requested.Add(Path.GetFullPath(source.Path))).ToList();
+        var fresh = sources.Where(source => _requested.Add(PiSourceInfo.ResourcePathKey(source.Path))).ToList();
         var missing = fresh.Where(source => !File.Exists(source.Path)).ToList();
         foreach (var source in missing) _diagnostics.Add(new("error", $"Failed to load extension \"{source.Path}\": Extension path does not exist: {source.Path}"));
         var paths = fresh.Except(missing).Select(source => source.Path).ToList();

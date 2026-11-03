@@ -45,7 +45,7 @@ internal sealed partial class PiExtensionHost
         lock (_extensions)
         {
             var order = _order;
-            int Rank(string path) { var index = order.IndexOf(Path.GetFullPath(path), PiSharp.Cli.Pi.PiPaths.Comparer); return index < 0 ? int.MaxValue : index; }
+            int Rank(string path) { var index = order.IndexOf(PiSourceInfo.ResourcePathKey(path)); return index < 0 ? int.MaxValue : index; }
             return [.. _extensions.Select((extension, position) => (Item: ((PiLoadedExtension?)extension, (PiNativeExtension?)null), Rank: Rank(extension.ResolvedPath), Position: position))
                 .Concat(_natives.Select((native, position) => (Item: ((PiLoadedExtension?)null, (PiNativeExtension?)native), Rank: Rank(native.Path), Position: _extensions.Count + position)))
                 .OrderBy(item => item.Rank).ThenBy(item => item.Position).Select(item => item.Item)];

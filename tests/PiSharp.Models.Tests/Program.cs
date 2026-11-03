@@ -37,6 +37,7 @@ internal static partial class Program
         cases.AddRange(ConfigSchemaCases());
         cases.AddRange(LiveRouteCases());
         cases.AddRange(Sync150Cases());
+        cases.AddRange(Sync150PackageCases());
         var results = new List<object>(); var failures = 0;
         foreach (var test in cases)
         {

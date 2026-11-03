@@ -810,7 +810,7 @@ internal sealed partial class ConfigSelectorComponent
 
         private static string GetPatternEntryTarget(string entry) => StripPatternPrefix(entry);
 
-        private static string GetResourceItemKey(ResourceItem item) => $"{item.ResourceType}:{PiPaths.Canonicalize(item.Path)}";
+        private static string GetResourceItemKey(ResourceItem item) => $"{item.ResourceType}:{PiSharp.Cli.Extensions.Pi.PiSourceInfo.ResourcePathKey(item.Path)}";
 
         private static string GetItemScope(ResourceItem item) => item.Metadata.Scope == "project" ? "project" : "user";
 

@@ -64,12 +64,17 @@ internal sealed record PiResolvedPaths(ImmutableArray<PiResolvedResource> Extens
     ImmutableArray<PiResolvedResource> Prompts, ImmutableArray<PiResolvedResource> Themes)
 {
     internal static PiResolvedPaths Empty { get; } = new([], [], [], []);
+    /// <summary>Source installFailures: configured packages that were skipped because installing them failed.</summary>
+    internal ImmutableArray<PiPackageInstallFailure> InstallFailures { get; init; } = [];
     internal ImmutableArray<PiResolvedResource> Get(string resourceType) => resourceType switch
     {
         "extensions" => Extensions, "skills" => Skills, "prompts" => Prompts, "themes" => Themes,
         _ => throw new ArgumentOutOfRangeException(nameof(resourceType))
     };
 }
+
+/// <summary>Source PackageInstallFailure: a configured package that could not be installed while resolving resources.</summary>
+internal sealed record PiPackageInstallFailure(string Source, string Scope, string Message);
 
 /// <summary>Source MissingSourceAction.</summary>
 internal enum PiMissingSourceAction { Install, Skip, Error }

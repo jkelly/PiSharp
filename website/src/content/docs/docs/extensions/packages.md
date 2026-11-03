@@ -24,6 +24,8 @@ pisharp install ./local-package
 
 PiSharp uses your `npm` (or the `npmCommand` setting) and `git`.
 
+If a configured package fails to install at startup, for example because npm cannot reach the registry, PiSharp warns about it, skips that package's resources, and keeps running. It tries to install the package again on the next start or `/reload`. `pisharp install` and `pisharp update --extensions` still report the failure and exit non-zero.
+
 ## Manage
 
 | Command | What it does |

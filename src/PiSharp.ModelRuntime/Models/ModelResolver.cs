@@ -309,18 +309,62 @@ internal sealed class ModelSelectionException(string message, string code = "Unk
 { internal string Code { get; } = code; }
 
 /// <summary>The minimatch subset model scoping uses: <c>*</c>, <c>?</c>, <c>[...]</c> classes, <c>**</c> segments, <c>{a,b}</c> braces,
-/// leading <c>!</c> negation and the dot-file rule, matched per <c>/</c> segment; optionally case-insensitive.</summary>
+/// leading <c>!</c> negation and the dot-file rule, matched per <c>/</c> segment; optionally case-insensitive. Like minimatch 11 (with
+/// brace-expansion 5 and nonrecursive-glob-match), amplified patterns stay bounded: brace expansion is capped, a segment is matched
+/// without backtracking and <c>**</c> without a recursive walk per split.</summary>
 internal static class Minimatch
 {
+    // brace-expansion 5: EXPANSION_MAX results and EXPANSION_MAX_LENGTH characters at any point (truncated, not thrown), chained sets
+    // combined iteratively, and nesting followed EXPANSION_MAX_DEPTH levels (deeper stays literal).
+    private const int ExpansionMax = 100_000, ExpansionMaxLength = 4_000_000, ExpansionMaxDepth = 1_000;
+    // One scope pattern is matched against every model, so its expansion is kept (minimatch's cache holds 256 patterns).
+    private static readonly Dictionary<string, string[][]> Expanded = new(StringComparer.Ordinal);
+
     internal static bool IsMatch(string path, string pattern, bool noCase)
     {
         var negated = false;
         while (pattern.StartsWith('!')) { negated = !negated; pattern = pattern[1..]; }
-        var result = ExpandBraces(pattern).Any(expanded => MatchSegments(path.Split('/'), 0, expanded.Split('/'), 0, noCase));
+        var segments = path.Split('/');
+        var result = Rows(pattern).Any(row => MatchSegments(segments, row, noCase));
         return negated ? !result : result;
     }
 
-    private static IEnumerable<string> ExpandBraces(string pattern)
+    private static string[][] Rows(string pattern)
+    {
+        lock (Expanded)
+        {
+            if (Expanded.TryGetValue(pattern, out var rows)) return rows;
+            if (Expanded.Count >= 256) Expanded.Clear();
+            return Expanded[pattern] = [.. ExpandBraces(pattern, 0).Select(expanded => expanded.Split('/'))];
+        }
+    }
+
+    private static List<string> ExpandBraces(string pattern, int depth)
+    {
+        if (depth > ExpansionMaxDepth) return [pattern];
+        List<string> expansions = [""];
+        var rest = pattern;
+        while (FindBraceSet(rest) is (var open, var close, var options))
+        {
+            var head = rest[..open];
+            rest = rest[(close + 1)..];
+            var alternatives = new List<string>(); var length = 0L; var full = false;
+            foreach (var option in options)
+            {
+                foreach (var alternative in ExpandBraces(option, depth + 1))
+                {
+                    if (full = alternatives.Count >= ExpansionMax || length + alternative.Length > ExpansionMaxLength) break;
+                    alternatives.Add(alternative); length += alternative.Length;
+                }
+                if (full) break;
+            }
+            expansions = Combine(expansions, head, alternatives);
+        }
+        return Combine(expansions, rest, [""]);
+    }
+
+    // The first top-level brace set with a comma; sets without one stay literal and the scan goes on.
+    private static (int Open, int Close, List<string> Options)? FindBraceSet(string pattern)
     {
         var depth = 0; var open = -1;
         for (var index = 0; index < pattern.Length; index++)
@@ -329,14 +373,24 @@ internal static class Minimatch
             if (pattern[index] == '{') { if (depth++ == 0) open = index; }
             else if (pattern[index] == '}' && depth > 0 && --depth == 0)
             {
-                var body = pattern[(open + 1)..index];
-                var options = SplitTop(body);
-                if (options.Count < 2) continue;
-                var head = pattern[..open]; var tail = pattern[(index + 1)..];
-                return options.SelectMany(option => ExpandBraces(head + option + tail));
+                var options = SplitTop(pattern[(open + 1)..index]);
+                if (options.Count >= 2) return (open, index, options);
             }
         }
-        return [pattern];
+        return null;
+    }
+
+    private static List<string> Combine(List<string> prefixes, string head, List<string> alternatives)
+    {
+        var result = new List<string>(); var length = 0L;
+        foreach (var prefix in prefixes)
+            foreach (var alternative in alternatives)
+            {
+                var size = prefix.Length + head.Length + alternative.Length;
+                if (result.Count >= ExpansionMax || length + size > ExpansionMaxLength) return result;
+                result.Add(prefix + head + alternative); length += size;
+            }
+        return result;
     }
 
     private static List<string> SplitTop(string body)
@@ -353,31 +407,30 @@ internal static class Minimatch
         return parts;
     }
 
-    private static bool MatchSegments(string[] path, int p, string[] pattern, int q, bool noCase)
+    private static bool MatchSegments(string[] path, string[] pattern, bool noCase)
     {
-        if (q == pattern.Length) return p == path.Length;
-        if (pattern[q] == "**")
-        {
-            for (var skip = p; skip <= path.Length; skip++)
-            {
-                if (MatchSegments(path, skip, pattern, q + 1, noCase)) return true;
-                if (skip < path.Length && path[skip].StartsWith('.')) return false;
-            }
-            return false;
-        }
-        return p < path.Length && MatchSegment(path[p], pattern[q], noCase) && MatchSegments(path, p + 1, pattern, q + 1, noCase);
+        // match[p, q]: path[p..] matches pattern[q..], filled from the end, so a pattern with many ** costs path x pattern steps instead
+        // of a recursive walk over every split; a ** never swallows a dot segment.
+        var width = pattern.Length + 1;
+        var match = new bool[(path.Length + 1) * width];
+        for (var p = path.Length; p >= 0; p--)
+            for (var q = pattern.Length; q >= 0; q--)
+                match[p * width + q] = q == pattern.Length ? p == path.Length
+                    : pattern[q] == "**" ? match[p * width + q + 1] || p < path.Length && !path[p].StartsWith('.') && match[(p + 1) * width + q]
+                    : p < path.Length && match[(p + 1) * width + q + 1] && MatchSegment(path[p], pattern[q], noCase);
+        return match[0];
     }
 
     private static bool MatchSegment(string segment, string pattern, bool noCase)
     {
         if (segment.StartsWith('.') && !pattern.StartsWith('.') && pattern.Length > 0 && pattern[0] is '*' or '?' or '[') return false;
-        var regex = new StringBuilder("^");
+        // Tokens: a literal, '?' (any character), a class (a one-character regex) or '*' (any run).
+        var tokens = new List<(char Kind, char Char, string? Class)>();
         for (var index = 0; index < pattern.Length; index++)
         {
             var current = pattern[index];
-            if (current == '\\' && index + 1 < pattern.Length) { regex.Append(Regex.Escape(pattern[++index].ToString())); continue; }
-            if (current == '*') { regex.Append(".*"); continue; }
-            if (current == '?') { regex.Append('.'); continue; }
+            if (current == '\\' && index + 1 < pattern.Length) { tokens.Add(('c', pattern[++index], null)); continue; }
+            if (current is '*' or '?') { tokens.Add((current, current, null)); continue; }
             if (current == '[')
             {
                 var close = pattern.IndexOf(']', index + 2 <= pattern.Length ? index + 2 : pattern.Length);
@@ -386,13 +439,30 @@ internal static class Minimatch
                     var body = pattern[(index + 1)..close];
                     var negate = body.StartsWith('!') || body.StartsWith('^');
                     if (negate) body = body[1..];
-                    regex.Append('[').Append(negate ? "^" : "").Append(body.Replace("\\", "\\\\", StringComparison.Ordinal).Replace("[", "\\[", StringComparison.Ordinal)).Append(']');
+                    tokens.Add(('[', current, "^[" + (negate ? "^" : "") + body.Replace("\\", "\\\\", StringComparison.Ordinal).Replace("[", "\\[", StringComparison.Ordinal) + "]$"));
                     index = close; continue;
                 }
             }
-            regex.Append(Regex.Escape(current.ToString()));
+            tokens.Add(('c', current, null));
         }
-        regex.Append('$');
-        return Regex.IsMatch(segment, regex.ToString(), (noCase ? RegexOptions.IgnoreCase : RegexOptions.None) | RegexOptions.CultureInvariant | RegexOptions.Singleline);
+        var options = (noCase ? RegexOptions.IgnoreCase : RegexOptions.None) | RegexOptions.CultureInvariant | RegexOptions.Singleline;
+        bool Accepts((char Kind, char Char, string? Class) token, char c) => token.Kind switch
+        {
+            '?' => true,
+            '[' => Regex.IsMatch(c.ToString(), token.Class!, options),
+            _ => token.Char == c || noCase && (char.ToLowerInvariant(token.Char) == char.ToLowerInvariant(c) || char.ToUpperInvariant(token.Char) == char.ToUpperInvariant(c))
+        };
+        // A greedy scan that returns to the last star on a mismatch (nonrecursive-glob-match's linear chain) decides the segment in
+        // pattern x segment steps, where a backtracking regex takes exponential time on "*a*a*a*b".
+        int si = 0, ti = 0, star = -1, resume = 0;
+        while (si < segment.Length)
+        {
+            if (ti < tokens.Count && tokens[ti].Kind == '*') { star = ti++; resume = si; continue; }
+            if (ti < tokens.Count && Accepts(tokens[ti], segment[si])) { ti++; si++; continue; }
+            if (star < 0) return false;
+            ti = star + 1; si = ++resume;
+        }
+        while (ti < tokens.Count && tokens[ti].Kind == '*') ti++;
+        return ti == tokens.Count;
     }
 }
