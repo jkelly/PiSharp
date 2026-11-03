@@ -117,6 +117,8 @@ The CLI ships Pi v1.1.0 `packages/coding-agent/docs/llama-cpp.md` unchanged as `
 
 `src/PiSharp.Contracts/Schema/` ports Pi v1.5.0 `packages/schema` (pi-schema, commit `f9a26365568127461c47a07a37dcb42c140a3ac5`), which validates and coerces tool arguments, under the Pi MIT notice above. Its format checks (`SchemaFormats.cs`) are adapted, through pi-schema's `src/formats/typebox/`, from TypeBox 1.3.27, MIT License, Copyright (c) 2017-2026 Haydn Paterson (pi-schema ships the license as `LICENSES/typebox-LICENSE`); the TypeBox 1.3.27 Compile port that `src/PiSharp.Agent/TypeBoxJsonSchema.cs` uses for the configuration files is under the same license. Both MIT licenses grant the same permissions, under the same conditions, as the Pi MIT notice above.
 
+The Node extension bridge carries the same pi-schema package mechanically ported to ESM by `tools/NodeBridge/pi-host/virtual/port-upstream.mjs` (`tools/NodeBridge/pi-host/virtual/schema/`, TypeScript types stripped), with the TypeBox license headers kept in `schema/formats/typebox/`.
+
 The pi-schema suite (`tests/PiSharp.Schema.Tests`, a test project, never packed or shipped) vendors pi-schema's test fixtures unmodified: the JSON-Schema-Test-Suite at commit `3f05891cac5d51ffa068d7076d1372130e00c829` (MIT, Copyright (c) 2012 Julian Berman; `fixtures/json-schema-test-suite/LICENSE`) and the official JSON Schema meta-schemas (`fixtures/meta-schemas/`, published by the JSON Schema organization under AFL-3.0 or BSD-3-Clause).
 
 ## Anthropic SDK reviewed development oracle
@@ -140,6 +142,8 @@ Interactive mode highlights code with a C# port of highlight.js 10.7.3 (`src/PiS
 ## HTML export scripts (marked, marked-cjk-friendly, highlight.js)
 
 The HTML session export embeds Pi v1.5.0 `packages/coding-agent/src/core/export-html/vendor/*.min.js` byte-for-byte (`src/PiSharp.CodingAgent/Export/Assets/vendor`, commit `f9a26365568127461c47a07a37dcb42c140a3ac5`): marked v18.0.11 (MIT, Copyright (c) 2018-2026, MarkedJS; Copyright (c) 2011-2018, Christopher Jeffrey; git blob `9b8644b8c2f708da81365ff387d805dedeafd77d`), marked-cjk-friendly v0.1.2 (MIT, Copyright (c) 2024 Tatsunori Uchino, and authors and contributors of original packages; git blob `1931333ed83a86bde59356f4328afe7a450ab096`) and Highlight.js v11.9.0 (BSD-3-Clause, (c) 2006-2023 its contributors). Each file keeps its license header. Both MIT licenses grant the same permissions, under the same conditions, as the Pi MIT notice above.
+
+The Node extension bridge carries marked-cjk-friendly v0.1.2's emphasis tokenizer and CJK character class, de-minified from that file with its copyright and license notice, in `tools/NodeBridge/pi-host/virtual/vendor/marked-cjk-friendly.mjs`.
 
 ## Mermaid diagrams (grok-mermaid)
 

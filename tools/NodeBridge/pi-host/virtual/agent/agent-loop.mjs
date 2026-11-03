@@ -1,7 +1,8 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/agent/src/agent-loop.ts.
-// Ported to plain ESM for the PiSharp Node extension bridge (TypeScript types stripped mechanically; behaviour unchanged).
-import { EventStream, getCurrentTools, getToolStateChanges, normalizeContext, toToolDeclaration, validateToolArguments } from "../pi-ai.mjs";
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/agent/src/agent-loop.ts.
+// Ported to plain ESM for the PiSharp Node extension bridge (TypeScript types stripped mechanically; behaviour unchanged except for the marked PiSharp adaptations).
+import { EventStream, getCurrentTools, getToolStateChanges, mergeClientIdentity, normalizeContext, PI_ATTRIBUTION, toToolDeclaration, validateToolArguments } from "../pi-ai.mjs";
 import { getDefaultStreamFn } from "./stream-fn.mjs";
+export const DEFAULT_AGENT_IDENTITY = {};
 export function agentLoop(prompts, context, config, signal, streamFn) {
     const stream = createAgentStream();
     void runAgentLoop(prompts, context, config, async (event)=>{
@@ -274,6 +275,7 @@ async function streamAssistantResponse(context, config, signal, emit, streamFunc
     const response = await streamFunction(config.model, llmContext, {
         ...config,
         apiKey: resolvedApiKey,
+        identity: mergeClientIdentity(DEFAULT_AGENT_IDENTITY, config.identity),
         signal
     });
     const result = async ()=>Object.assign(await response.result(), {
@@ -694,3 +696,6 @@ async function emitToolResultMessage(toolResultMessage, emit) {
         message: toolResultMessage
     });
 }
+
+// PiSharp adaptation: DEFAULT_AGENT_IDENTITY sends no attribution (upstream: { attribution: PI_ATTRIBUTION }). PiSharp must
+// not report as Pi, and the owner has not chosen an attribution (core.client-identity-attribution).

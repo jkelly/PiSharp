@@ -1,14 +1,17 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/ai/src/models.ts.
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/ai/src/models.ts.
 // Ported to plain ESM for the PiSharp Node extension bridge (TypeScript types stripped mechanically; behaviour unchanged).
 import { lazyStream } from "./api/lazy.mjs";
 import { defaultProviderAuthContext as defaultAuthContext } from "./auth/context.mjs";
 import { InMemoryCredentialStore } from "./auth/credential-store.mjs";
 import { ModelsError, refreshStoredOAuthCredential, resolveProviderAuth } from "./auth/resolve.mjs";
 import { InMemoryModelsStore } from "./models-store.mjs";
+import { observeModelRequest } from "./telemetry.mjs";
 import { operationSignal, raceWithAbortSignal } from "./utils/abort.mjs";
+import { getOpenCodeSessionHeaders, mergeClientIdentity } from "./utils/identity.mjs";
 import { assertChatModel, assertClassifierInputSupported, assertClassifierModel, assertImageModel, classifierErrorResult, getModelType, imageErrorResult, isModelType } from "./utils/model-operations.mjs";
 import { normalizeContext } from "./utils/transcript.mjs";
 export { ModelsError } from "./auth/resolve.mjs";
+export { AI_TELEMETRY_SCHEMA } from "./telemetry.mjs";
 export { getModelType, isModelType } from "./utils/model-operations.mjs";
 const KNOWN_MODEL_TYPES = {
     chat: true,
@@ -43,6 +46,7 @@ class ModelsImpl {
     credentials;
     modelsStore;
     authContext;
+    identity;
     refreshGenerations = new Map();
     refreshControllers = new Map();
     publicationChains = new Map();
@@ -50,6 +54,7 @@ class ModelsImpl {
         this.credentials = options?.credentials ?? new InMemoryCredentialStore();
         this.modelsStore = options?.modelsStore ?? new InMemoryModelsStore();
         this.authContext = options?.authContext ?? defaultAuthContext();
+        this.identity = options?.identity;
     }
     setProvider(provider) {
         this.supersedeProviderRefresh(provider.id);
@@ -460,22 +465,27 @@ class ModelsImpl {
         }
         const auth = resolution.auth;
         const apiKey = options?.apiKey ?? auth.apiKey;
-        let headers = mergeHeaders(auth.headers, options?.headers);
+        const requestModel = auth.baseUrl ? {
+            ...model,
+            baseUrl: auth.baseUrl
+        } : model;
+        const sessionId = options && "sessionId" in options && typeof options.sessionId === "string" ? options.sessionId : undefined;
+        let headers = mergeHeaders(mergeHeaders(getOpenCodeSessionHeaders(requestModel, sessionId), auth.headers), options?.headers);
         if (options?.transformHeaders) headers = await options.transformHeaders(headers ?? {});
         const env = resolution.env || options?.env ? {
             ...resolution.env ?? {},
             ...options?.env ?? {}
         } : undefined;
-        const requestModel = auth.baseUrl ? {
-            ...model,
-            baseUrl: auth.baseUrl
-        } : model;
+        const identity = mergeClientIdentity(this.identity, options?.identity);
         const { transformHeaders: _transformHeaders, ...providerOptions } = options ?? {};
         const requestOptions = {
             ...providerOptions,
             apiKey,
             headers,
-            env
+            env,
+            ...identity === undefined ? {} : {
+                identity
+            }
         };
         return {
             requestModel,
@@ -488,7 +498,7 @@ class ModelsImpl {
             const provider = this.requireChatProvider(model);
             const { requestModel, requestOptions } = await this.applyAuth(model, options);
             return provider.stream(requestModel, transcript, requestOptions);
-        });
+        }, observeModelRequest(model, options, false));
     }
     async complete(model, context, options) {
         return this.stream(model, context, options).result();
@@ -499,7 +509,7 @@ class ModelsImpl {
             const provider = this.requireChatProvider(model);
             const { requestModel, requestOptions } = await this.applyAuth(model, options);
             return provider.streamSimple(requestModel, transcript, requestOptions);
-        });
+        }, observeModelRequest(model, options, false));
     }
     async completeSimple(model, context, options) {
         return this.streamSimple(model, context, options).result();
@@ -512,7 +522,7 @@ class ModelsImpl {
             }
             const { requestModel, requestOptions } = await this.applyAuth(model, options);
             return provider.fetchDeferred(requestModel, handle, requestOptions);
-        });
+        }, observeModelRequest(model, options, true));
     }
     async fetchDeferred(model, handle, options) {
         return this.streamDeferred(model, handle, options).result();
@@ -689,6 +699,7 @@ export function calculateCost(model, usage) {
     usage.cost.cacheRead = rates.cacheRead / 1000000 * usage.cacheRead;
     usage.cost.cacheWrite = (rates.cacheWrite * shortWrite + rates.input * 2 * longWrite) / 1000000;
     usage.cost.total = usage.cost.input + usage.cost.output + usage.cost.cacheRead + usage.cost.cacheWrite;
+    usage.cost.totalFromProvider = false;
     return usage.cost;
 }
 const EXTENDED_THINKING_LEVELS = [

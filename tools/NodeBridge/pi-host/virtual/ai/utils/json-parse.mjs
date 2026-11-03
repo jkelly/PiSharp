@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/ai/src/utils/json-parse.ts.
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/ai/src/utils/json-parse.ts.
 // Ported to plain ESM for the PiSharp Node extension bridge (TypeScript types stripped mechanically; behaviour unchanged).
 import { parse as partialParse } from "../../vendor/partial-json.mjs";
 const VALID_JSON_ESCAPES = new Set([
@@ -9,8 +9,7 @@ const VALID_JSON_ESCAPES = new Set([
     "f",
     "n",
     "r",
-    "t",
-    "u"
+    "t"
 ]);
 function isControlCharacter(char) {
     const codePoint = char.codePointAt(0);
@@ -84,6 +83,25 @@ export function parseJsonWithRepair(json) {
             return JSON.parse(repairedJson);
         }
         throw error;
+    }
+}
+export function parseToolCallArguments(json) {
+    if (!json?.trim()) return {
+        arguments: {}
+    };
+    try {
+        const parsed = parseJsonWithRepair(json);
+        if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+            throw new Error("Tool arguments must be a JSON object");
+        }
+        return {
+            arguments: parsed
+        };
+    } catch (error) {
+        return {
+            arguments: {},
+            argumentsError: `${error instanceof Error ? error.message : String(error)}\n\nReceived arguments:\n${json}`
+        };
     }
 }
 export function parseStreamingJson(partialJson) {

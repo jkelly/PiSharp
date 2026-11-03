@@ -1,5 +1,20 @@
 // Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/tui/src/oklab.ts.
 // Ported to plain ESM for the PiSharp Node extension bridge (TypeScript types stripped mechanically; behaviour unchanged).
+/**
+ * Oklab and OKHSL <-> sRGB conversion. `colors.ts` builds its OKLCH, OKHSL, and color mixing on it.
+ *
+ * Oklab and OKHSL are Björn Ottosson's color spaces; OKHSL's saturation is relative to the sRGB gamut at
+ * each hue and lightness. This is a port of his reference implementation (https://bottosson.github.io/posts/colorpicker/),
+ * Copyright (c) 2021 Björn Ottosson, used under the MIT license:
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy of this software and
+ * associated documentation files (the "Software"), to deal in the Software without restriction, including
+ * without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the
+ * following conditions: The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software. THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY
+ * KIND, EXPRESS OR IMPLIED.
+ */
 const multiply = (m, [x, y, z])=>m.map((row)=>row[0] * x + row[1] * y + row[2] * z);
 const LINEAR_SRGB_TO_LMS = [
     [

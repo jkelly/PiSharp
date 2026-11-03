@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/src/modes/interactive/components/custom-editor.ts.
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/coding-agent/src/modes/interactive/components/custom-editor.ts.
 // Ported to plain ESM for the PiSharp Node extension bridge (TypeScript types stripped mechanically; behaviour unchanged).
 import { Editor, visibleWidth } from "../../../../pi-tui.mjs";
 export class CustomEditor extends Editor {
@@ -50,6 +50,10 @@ export class CustomEditor extends Editor {
     }
     handleInput(data) {
         if (this.onExtensionShortcut?.(data)) {
+            return;
+        }
+        if (this.isShowingAutocomplete() && (this.keybindings.matches(data, "tui.select.pageUp") || this.keybindings.matches(data, "tui.select.pageDown"))) {
+            super.handleInput(data);
             return;
         }
         if (this.keybindings.matches(data, "app.clipboard.pasteImage")) {

@@ -1,7 +1,8 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/ai/src/providers/faux.ts.
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/ai/src/providers/faux.ts.
 // Ported to plain ESM for the PiSharp Node extension bridge (TypeScript types stripped mechanically; behaviour unchanged).
 import { createProvider } from "../models.mjs";
 import { createAssistantMessageEventStream } from "../utils/event-stream.mjs";
+import { ToolCallArgumentsStream } from "../utils/streaming-json.mjs";
 import { getSystemMessageText } from "../utils/text.mjs";
 const DEFAULT_API = "faux";
 const DEFAULT_PROVIDER = "faux";
@@ -160,11 +161,11 @@ function withUsageEstimate(message, context, options, promptCache) {
         if (previousPrompt) {
             const cachedChars = commonPromptPrefixLength(previousPrompt, prompt);
             cacheRead = Math.ceil(cachedChars / 4);
-            cacheWrite = Math.ceil((promptLength - cachedChars) / 4);
-            input = Math.max(0, promptTokens - cacheRead);
+            cacheWrite = Math.max(0, promptTokens - cacheRead);
         } else {
             cacheWrite = promptTokens;
         }
+        input = 0;
         promptCache.set(sessionId, prompt);
     }
     return {
@@ -394,6 +395,7 @@ async function streamWithDeltas(stream, message, minTokenSize, maxTokenSize, tok
                 ...partial
             }
         });
+        const toolArguments = new ToolCallArgumentsStream();
         for (const chunk of splitStringByTokenSize(JSON.stringify(block.arguments), minTokenSize, maxTokenSize)){
             await scheduleChunk(chunk, tokensPerSecond);
             if (signal?.aborted) {
@@ -406,6 +408,7 @@ async function streamWithDeltas(stream, message, minTokenSize, maxTokenSize, tok
                 stream.end(aborted);
                 return;
             }
+            partial.content[index].arguments = toolArguments.append(chunk);
             stream.push({
                 type: "toolcall_delta",
                 contentIndex: index,

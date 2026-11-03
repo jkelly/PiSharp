@@ -24,3 +24,8 @@ export function highlight(code, _options = {}) {
 export function supportsLanguage(_name) {
 	return false;
 }
+
+// Pi 1.5.0: the number of registered grammars (theme.ts CodeHighlighter re-highlights when it grows). None are registered here.
+export function getHighlightLanguageCount() {
+	return 0;
+}

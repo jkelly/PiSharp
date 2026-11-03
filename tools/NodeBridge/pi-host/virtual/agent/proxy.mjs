@@ -1,6 +1,6 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/agent/src/proxy.ts.
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/agent/src/proxy.ts.
 // Ported to plain ESM for the PiSharp Node extension bridge (TypeScript types stripped mechanically; behaviour unchanged).
-import { createAssistantMessageEventStream, parseStreamingJson } from "../pi-ai.mjs";
+import { createAssistantMessageEventStream, ToolCallArgumentsStream } from "../pi-ai.mjs";
 function buildProxyRequestOptions(options) {
     return {
         temperature: options.temperature,
@@ -79,12 +79,13 @@ export function streamProxy(model, context, options) {
             const decoder = new TextDecoder();
             let buffer = "";
             let sawTerminalEvent = false;
+            const toolArguments = new Map();
             const processLine = (line)=>{
                 if (!line.startsWith("data: ")) return;
                 const data = line.slice(6).trim();
                 if (!data) return;
                 const proxyEvent = JSON.parse(data);
-                const event = processProxyEvent(proxyEvent, partial);
+                const event = processProxyEvent(proxyEvent, partial, toolArguments);
                 if (event) {
                     if (event.type === "done" || event.type === "error") sawTerminalEvent = true;
                     stream.push(event);
@@ -141,7 +142,7 @@ export function streamProxy(model, context, options) {
     })();
     return stream;
 }
-function processProxyEvent(proxyEvent, partial) {
+function processProxyEvent(proxyEvent, partial, toolArguments) {
     switch(proxyEvent.type){
         case "start":
             return {
@@ -229,9 +230,9 @@ function processProxyEvent(proxyEvent, partial) {
                 type: "toolCall",
                 id: proxyEvent.id,
                 name: proxyEvent.toolName,
-                arguments: {},
-                partialJson: ""
+                arguments: {}
             };
+            toolArguments.set(proxyEvent.contentIndex, new ToolCallArgumentsStream());
             return {
                 type: "toolcall_start",
                 contentIndex: proxyEvent.contentIndex,
@@ -240,11 +241,11 @@ function processProxyEvent(proxyEvent, partial) {
         case "toolcall_delta":
             {
                 const content = partial.content[proxyEvent.contentIndex];
-                if (content?.type === "toolCall") {
-                    content.partialJson += proxyEvent.delta;
-                    content.arguments = parseStreamingJson(content.partialJson) || {};
+                const args = toolArguments.get(proxyEvent.contentIndex);
+                if (content?.type === "toolCall" && args !== undefined) {
                     partial.content[proxyEvent.contentIndex] = {
-                        ...content
+                        ...content,
+                        arguments: args.append(proxyEvent.delta)
                     };
                     return {
                         type: "toolcall_delta",
@@ -260,7 +261,7 @@ function processProxyEvent(proxyEvent, partial) {
                 const content = partial.content[proxyEvent.contentIndex];
                 if (content?.type === "toolCall") {
                     Object.assign(content, proxyEvent.toolCall);
-                    delete content.partialJson;
+                    toolArguments.delete(proxyEvent.contentIndex);
                     return {
                         type: "toolcall_end",
                         contentIndex: proxyEvent.contentIndex,

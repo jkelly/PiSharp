@@ -395,7 +395,6 @@ export async function completeSummarization(model, context, options, streamFn, r
     const produce = async ()=>streamFn ? (await streamFn(model, context, requestOptions)).result() : completeSimple(model, context, requestOptions);
     return retryAssistantCall(produce, retry, requestOptions.signal, callbacks);
 }
-// _reserveTokens is unused. Kept for existing callers; summaries use the model's output limit (#9512).
 export async function generateSummary(currentMessages, model, _reserveTokens, apiKey, headers, signal, customInstructions, previousSummary, thinkingLevel, streamFn, env, retry, callbacks, sessionId) {
     return (await generateSummaryWithUsage(currentMessages, model, _reserveTokens, apiKey, headers, signal, customInstructions, previousSummary, thinkingLevel, streamFn, env, retry, callbacks, sessionId)).text;
 }
@@ -416,7 +415,6 @@ function buildSummarizationContext(promptText) {
         ]
     });
 }
-// _reserveTokens is unused. Kept for existing callers; summaries use the model's output limit (#9512).
 export async function generateSummaryWithUsage(currentMessages, model, _reserveTokens, apiKey, headers, signal, customInstructions, previousSummary, thinkingLevel, streamFn, env, retry, callbacks, sessionId) {
     let basePrompt = previousSummary ? UPDATE_SUMMARIZATION_PROMPT : SUMMARIZATION_PROMPT;
     if (customInstructions) {

@@ -80,8 +80,12 @@ public static class BugReport
         "## Relevant details\nTool calls involved, files touched, model behavior, anything else that helps a developer reproduce or locate the problem.\n\n" +
         "Do not include file contents, secrets, or credentials from the transcript; refer to files by path only. Keep the report factual and concise.";
 
-    /// <summary>pi-user-agent.ts <c>getPiUserAgent</c> with the runtime field naming .NET: <c>pi/1.2.0 (win32; dotnet/10.0.0; x64)</c>.</summary>
-    public static string PiUserAgent(string version) => $"pi/{version} ({Platform}; {Runtime}; {Arch})";
+    /// <summary>pi-user-agent.ts <c>getPiUserAgent</c>: pi-ai's detailed <c>formatUserAgent</c> for <paramref name="version"/>
+    /// (<see cref="PiSharp.AI.ClientIdentities.FormatUserAgent"/>, the runtime field naming .NET): <c>pi/1.5.0 (win32; dotnet/10.0.0; x64)</c>.</summary>
+#pragma warning disable PISHARP_IDENTITY001
+    public static string PiUserAgent(string version) =>
+        PiSharp.AI.ClientIdentities.FormatUserAgent(new PiSharp.AI.ClientIdentity { Version = version });
+#pragma warning restore PISHARP_IDENTITY001
 
     /// <summary>Node <c>process.platform</c> for this OS.</summary>
     public static string Platform => OperatingSystem.IsWindows() ? "win32" : OperatingSystem.IsMacOS() ? "darwin" : OperatingSystem.IsLinux() ? "linux"

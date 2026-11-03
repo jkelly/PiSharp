@@ -1,5 +1,23 @@
 // Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/tui/src/stdin-buffer.ts.
 // Ported to plain ESM for the PiSharp Node extension bridge (TypeScript types stripped mechanically; behaviour unchanged).
+/**
+ * StdinBuffer buffers input and emits complete sequences.
+ *
+ * This is necessary because stdin data events can arrive in partial chunks,
+ * especially for escape sequences like mouse events. Without buffering,
+ * partial sequences can be misinterpreted as regular keypresses.
+ *
+ * For example, the mouse SGR sequence `\x1b[<35;20;5m` might arrive as:
+ * - Event 1: `\x1b`
+ * - Event 2: `[<35`
+ * - Event 3: `;20;5m`
+ *
+ * The buffer accumulates these until a complete sequence is detected.
+ * Call the `process()` method to feed input data.
+ *
+ * Based on code from OpenTUI (https://github.com/anomalyco/opentui)
+ * MIT License - Copyright (c) 2025 opentui
+ */
 import { EventEmitter } from "events";
 const ESC = "\x1b";
 const DEFAULT_SEQUENCE_TIMEOUT_MS = 50;

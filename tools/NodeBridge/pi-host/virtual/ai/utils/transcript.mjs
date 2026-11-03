@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/ai/src/utils/transcript.ts.
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/ai/src/utils/transcript.ts.
 // Ported to plain ESM for the PiSharp Node extension bridge (TypeScript types stripped mechanically; behaviour unchanged).
 import { contentText, getSystemMessageText } from "./text.mjs";
 export function createInitialSystemMessage(systemPrompt, tools) {
@@ -148,21 +148,36 @@ export function hasToolRedefinitions(messages) {
     return false;
 }
 export function hasNonAdditiveToolChanges(messages) {
+    return findLastNonAdditiveToolChange(messages.filter(isSystemMessage)) >= 0;
+}
+function findLastNonAdditiveToolChange(systemMessages) {
     const declared = new Set();
-    for (const message of messages){
-        if (!isSystemMessage(message)) continue;
-        if ((message.toolsRemoved?.length ?? 0) > 0) return true;
+    let last = -1;
+    for(let index = 0; index < systemMessages.length; index++){
+        const message = systemMessages[index];
+        if ((message.toolsRemoved?.length ?? 0) > 0) last = index;
         for (const tool of message.toolsAdded ?? []){
-            if (declared.has(tool.name)) return true;
+            if (declared.has(tool.name)) last = index;
             declared.add(tool.name);
         }
     }
-    return false;
+    return last;
 }
-export function resolveTranscriptTools(messages, supportsToolAdditions) {
-    const anchorsAdditions = supportsToolAdditions && !hasNonAdditiveToolChanges(messages);
+export function resolveTranscriptTools(messages, support) {
+    const systemMessages = messages.filter(isSystemMessage);
+    if (support === "none") {
+        return {
+            requestTools: getCurrentTools(systemMessages),
+            foldedSystemMessages: systemMessages.length
+        };
+    }
+    if (support === "changes") return {
+        requestTools: [],
+        foldedSystemMessages: 0
+    };
+    const folded = Math.max(getInitialSystemMessage(messages) ? 1 : 0, findLastNonAdditiveToolChange(systemMessages) + 1);
     return {
-        requestTools: anchorsAdditions ? getInitialSystemMessage(messages)?.toolsAdded ?? [] : getCurrentTools(messages),
-        anchorsAdditions
+        requestTools: getCurrentTools(systemMessages.slice(0, folded)),
+        foldedSystemMessages: folded
     };
 }
