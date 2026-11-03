@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <!-- Decision 0007: the PiSharp-only service tiers are [Experimental]; the protocols here map them to each API's fields. -->
-    <NoWarn>$(NoWarn);PISHARP_TIERS001</NoWarn>
+    <NoWarn>$(NoWarn);PISHARP_TIERS001;PISHARP_AI001</NoWarn>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../PiSharp.Contracts/PiSharp.Contracts.csproj" />
