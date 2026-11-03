@@ -197,6 +197,12 @@ internal sealed class PiToolsManager
 
     /// <summary>Source fetchWithRetry with its defaults: two retries after the first attempt for transport failures and the
     /// retryable statuses, within one overall timeout. Redirects are followed here when asked (GitHub asset downloads redirect).</summary>
+    /// <summary>Pi 1.5.0 tools-manager.ts: downloads send getPiUserAgent(VERSION), pi-ai's detailed formatUserAgent with the Pi version
+    /// PiSharp tracks (<see cref="PiSharp.AI.ClientIdentities.FormatUserAgent"/>).</summary>
+#pragma warning disable PISHARP_IDENTITY001
+    internal static string ToolsUserAgent { get; } = PiSharp.AI.ClientIdentities.FormatUserAgent(null);
+#pragma warning restore PISHARP_IDENTITY001
+
     private async Task<HttpResponseMessage> SendAsync(string url, int timeoutMs, bool followRedirects, CancellationToken cancellationToken)
     {
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
@@ -210,7 +216,7 @@ internal sealed class PiToolsManager
                 for (var hops = 0; ; hops++)
                 {
                     using var request = new HttpRequestMessage(HttpMethod.Get, target);
-                    request.Headers.TryAddWithoutValidation("User-Agent", $"{PiConfig.AppName}-coding-agent");
+                    request.Headers.TryAddWithoutValidation("User-Agent", ToolsUserAgent);
                     var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, timeout.Token).ConfigureAwait(false);
                     var status = (int)response.StatusCode;
                     if (followRedirects && status is >= 300 and < 400 && response.Headers.Location is { } next && hops < 10)
