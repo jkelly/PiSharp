@@ -54,7 +54,7 @@ internal static class McpCommand
 {
     /// <summary>The command name the help, hints and sign-in messages print: the installed tool's, whatever binary runs.</summary>
     internal const string AppName = PiSharp.Cli.Pi.PiConfig.DisplayName;
-    public const string Usage = "mcp add <server> [options] (--url <url> | -- <command> [args...]); mcp remove <server> [-l]; mcp list [--json]; mcp login <server> [--timeout <seconds>]; mcp logout <server>; mcp --help";
+    public const string Usage = "mcp add <server> [options] (--url <url> | -- <command> [args...]); mcp remove <server> [-l]; mcp list [--json]; mcp login <server> [-l] [--timeout <seconds>]; mcp logout <server> [-l]; mcp --help";
     internal const int DefaultLoginTimeoutSeconds = 300;
     internal static readonly string Help = string.Join('\n',
         "Usage:",
@@ -62,8 +62,8 @@ internal static class McpCommand
         $"  {AppName} mcp add <server> [options] --url <url>",
         $"  {AppName} mcp remove <server> [-l]",
         $"  {AppName} mcp list [--json]",
-        $"  {AppName} mcp login <server> [--timeout <seconds>]",
-        $"  {AppName} mcp logout <server>",
+        $"  {AppName} mcp login <server> [-l] [--timeout <seconds>]",
+        $"  {AppName} mcp logout <server> [-l]",
         "",
         "Configure and check MCP servers and sign in to OAuth servers without starting a session.",
         "Reads ~/.pi/agent/mcp.json and, in trusted projects, .pi/mcp.json.",
@@ -75,7 +75,7 @@ internal static class McpCommand
         "  login <server>          Sign in through the browser",
         "  logout <server>         Delete the stored OAuth credentials",
         "",
-        "Options for add and remove:",
+        "Options for add, remove, login, and logout:",
         "  -l, --local             Use .pi/mcp.json in the current project instead of the global file",
         "",
         "Options for add:",
@@ -151,15 +151,24 @@ internal static class McpCommand
             if (listed.Positional.Count > 0) { Error($"Usage: {AppName} mcp list [--json]\n{HelpHint}"); return 1; }
             return await ListAsync(loaded, listed.Values.ContainsKey("json"), untrustedNote, options, Log, token).ConfigureAwait(false);
         }
-        var parsed = ParseOptions(args[1..], command == "login" ? new() { ["timeout"] = OptionKind.Value } : [], Error);
+        var parsed = ParseOptions(args[1..], command == "login" ? new() { ["local"] = OptionKind.Flag, ["timeout"] = OptionKind.Value }
+            : new() { ["local"] = OptionKind.Flag }, Error);
         if (parsed is null) return 1;
-        if (parsed.Positional.Count != 1) { Error($"Usage: {AppName} mcp {command} <server>\n{HelpHint}"); return 1; }
+        if (parsed.Positional.Count != 1) { Error($"Usage: {AppName} mcp {command} <server> [-l]\n{HelpHint}"); return 1; }
         var name = parsed.Positional[0];
         var entry = loaded.Servers.FirstOrDefault(server => server.Name == name);
         if (entry is null)
         {
-            var configured = loaded.Servers.IsEmpty ? "none" : string.Join(", ", loaded.Servers.Select(server => server.Name));
-            Error($"No MCP server named \"{name}\".{(untrustedNote is null ? "" : " " + untrustedNote)} Configured: {configured}.");
+            var names = loaded.Servers.Select(server => server.Name).ToList();
+            var suggestion = names.FirstOrDefault(candidate => EditDistance(candidate, name) <= 2);
+            var configured = names.Count == 0 ? "none" : string.Join(", ", names);
+            Error($"No MCP server named \"{name}\".{(suggestion is null ? "" : $" Did you mean \"{suggestion}\"?")}{(untrustedNote is null ? "" : " " + untrustedNote)} Configured: {configured}.");
+            return 1;
+        }
+        // -l requires the server to be a project server (Pi 1.5.0, like add and remove).
+        if (parsed.Values.ContainsKey("local") && entry.Scope != McpConfigurationScope.Project)
+        {
+            Error($"MCP server \"{name}\" is defined in {entry.Source}, not in the project; omit --local.");
             return 1;
         }
         if (!McpConfigurationReader.UsesOAuth(entry.Config) || !entry.Config.Raw.Value.TryGetProperty("url", out var configuredUrl) ||
@@ -194,11 +203,12 @@ internal static class McpCommand
         var parsed = new ParsedOptions([], new(StringComparer.Ordinal), new(StringComparer.Ordinal));
         for (var index = 0; index < args.Length; index++)
         {
-            var arg = args[index] == "-l" ? "--local" : args[index];
+            var typed = args[index];
+            var arg = typed == "-l" ? "--local" : typed;
             if (arg == "--" || parsed.Positional.Count >= maxPositionals) { parsed.Positional.AddRange(args[(arg == "--" ? index + 1 : index)..]); break; }
             if (!arg.StartsWith("--", StringComparison.Ordinal)) { parsed.Positional.Add(arg); continue; }
             var name = arg[2..];
-            if (!known.TryGetValue(name, out var kind)) { error($"Unknown option {arg}.\n{HelpHint}"); return null; }
+            if (!known.TryGetValue(name, out var kind)) { error($"Unknown option {typed}.\n{HelpHint}"); return null; }
             if (kind == OptionKind.Flag) { parsed.Values[name] = null; continue; }
             if (index + 1 >= args.Length) { error($"{arg} needs a value."); return null; }
             var value = args[++index];
@@ -206,6 +216,21 @@ internal static class McpCommand
             else parsed.Values[name] = value;
         }
         return parsed;
+    }
+
+    /// <summary>Levenshtein distance, to suggest a configured server name for a mistyped one.</summary>
+    internal static int EditDistance(string a, string b)
+    {
+        var previous = Enumerable.Range(0, b.Length + 1).ToArray();
+        for (var i = 1; i <= a.Length; i++)
+        {
+            var current = new int[b.Length + 1];
+            current[0] = i;
+            for (var j = 1; j <= b.Length; j++)
+                current[j] = Math.Min(Math.Min(previous[j] + 1, current[j - 1] + 1), previous[j - 1] + (a[i - 1] == b[j - 1] ? 0 : 1));
+            previous = current;
+        }
+        return previous[b.Length];
     }
 
     /// <summary>`KEY=VALUE` pairs of a repeatable option; null after reporting a malformed one.</summary>
@@ -534,13 +559,10 @@ internal static class McpCommand
         catch (OperationCanceledException) { return null; }
     }
 
+    /// <summary>mcp/cli.ts openUrl: open-browser.ts openBrowser (best effort; the URL is printed, so the user can open it).</summary>
     internal static void OpenBrowser(string url)
     {
-        try
-        {
-            using var _ = OperatingSystem.IsWindows() ? Process.Start(new ProcessStartInfo(url) { UseShellExecute = true })
-                : Process.Start(new ProcessStartInfo(OperatingSystem.IsMacOS() ? "open" : "xdg-open", url) { UseShellExecute = false });
-        }
+        try { PiSharp.Cli.Interactive.Mode.Utilities.BrowserOpener.OpenBrowser(url); }
         catch (Exception) { /* The URL is printed; the user can open it. */ }
     }
 

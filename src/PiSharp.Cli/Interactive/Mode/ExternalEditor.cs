@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): coding-agent/src/modes/interactive/external-editor.ts.
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): coding-agent/src/modes/interactive/external-editor.ts.
 using System.Diagnostics;
 using System.Text;
 
@@ -7,16 +7,18 @@ namespace PiSharp.Cli.Interactive.Mode;
 /// <summary>Source ExternalEditorOptions: the editor command (split on spaces, as upstream does) and the text to edit.</summary>
 internal sealed record ExternalEditorOptions(string Command, string Content);
 
-/// <summary>Source ExternalEditorResult: <c>{ status: "complete", content }</c> or <c>{ status: "failed" }</c>.</summary>
-internal sealed record ExternalEditorResult(string Status, string? Content = null)
+/// <summary>Source ExternalEditorResult: <c>{ status: "complete", content }</c> or <c>{ status: "failed", message }</c>, the message
+/// telling the user why the prompt is unchanged.</summary>
+internal sealed record ExternalEditorResult(string Status, string? Content = null, string? Message = null)
 {
     public static ExternalEditorResult Complete(string content) => new("complete", content);
-    public static ExternalEditorResult Failed { get; } = new("failed");
+    public static ExternalEditorResult Failed(string message) => new("failed", Message: message);
 }
 
 /// <summary>Runs the editor with the terminal handed over (stdio inherited) and returns its exit code, or null when it could not
-/// be started or ended without one (Node's <c>"error"</c> event, a signal). <paramref name="useShell"/> mirrors
-/// <c>spawn(..., { shell: process.platform === "win32" })</c>.</summary>
+/// be started (Node's <c>"error"</c> event). <paramref name="useShell"/> mirrors <c>spawn(..., { shell: process.platform === "win32" })</c>.
+/// .NET has no signal for a killed child (it reports 128 + the signal number on Unix), so where upstream reports the signal's name
+/// PiSharp reports that code.</summary>
 internal delegate Task<int?> ExternalEditorProcessRunner(string editor, IReadOnlyList<string> arguments, bool useShell);
 
 internal static class ExternalEditor
@@ -28,7 +30,8 @@ internal static class ExternalEditor
 
     /// <summary>Source editInExternalEditor: writes the content to <c>prompt.md</c> in a private <c>pi-editor-*</c> temporary
     /// directory, runs the editor on it, and reads it back (BOM stripped, one trailing newline removed) when the editor exits 0.
-    /// The directory is always removed. <paramref name="output"/> receives the launch notice (default: standard output).</summary>
+    /// An editor that cannot be launched or exits otherwise fails with a message for the user. The directory is always removed.
+    /// <paramref name="output"/> receives the launch notice (default: standard output).</summary>
     public static async Task<ExternalEditorResult> EditInExternalEditorAsync(ExternalEditorOptions options,
         ExternalEditorProcessRunner? processRunner = null, TextWriter? output = null)
     {
@@ -46,12 +49,15 @@ internal static class ExternalEditor
             writer.Flush();
 
             // Upstream avoids spawnSync on Windows so libuv's console read does not race the editor for console input; the
-            // default runner waits for the child asynchronously the same way.
+            // default runner waits for the child asynchronously the same way. The editor inherits pi's cwd so project-relative paths
+            // and editor features keep working; a cwd Windows rejects (over MAX_PATH, or WSL's \\wsl.localhost\... path for a Windows
+            // editor) is not worked around: the failure is reported instead (#11592).
             int? exitCode;
             try { exitCode = await (processRunner ?? RunProcess)(editor, [.. editorArgs, filePath], OperatingSystem.IsWindows()).ConfigureAwait(false); }
             catch (Exception) { exitCode = null; }
 
-            if (exitCode != 0) return ExternalEditorResult.Failed;
+            if (exitCode is not { } code) return ExternalEditorResult.Failed($"Failed to launch external editor: {options.Command}");
+            if (code != 0) return ExternalEditorResult.Failed($"External editor exited with code {code}; prompt unchanged");
 
             var content = StripBom(await File.ReadAllTextAsync(filePath, new UTF8Encoding(false)).ConfigureAwait(false));
             return ExternalEditorResult.Complete(content.EndsWith('\n') ? content[..^1] : content);
@@ -97,7 +103,7 @@ internal static class ExternalEditor
         using (process)
         {
             await process.WaitForExitAsync().ConfigureAwait(false);
-            // A child killed by a signal has no exit code in Node (code null); .NET reports 128 + signal on Unix.
+            // A child killed by a signal has no exit code in Node (its signal is reported); .NET reports 128 + signal on Unix.
             return process.ExitCode;
         }
     }

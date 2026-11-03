@@ -3,17 +3,28 @@ title: Local models with llama.cpp
 description: Run local GGUF models through a llama.cpp router server, load and unload them with /llama, and use them as classifiers.
 ---
 
-PiSharp has Pi's built-in llama.cpp provider. It talks to a [llama.cpp](https://github.com/ggml-org/llama.cpp) router server, which finds the GGUF models in a folder and loads or unloads them on demand. Pi's [llama.cpp guide](https://github.com/earendil-works/pi/blob/v1.2.0/packages/coding-agent/docs/llama-cpp.md) applies unchanged, and ships with PiSharp as `docs/llama-cpp.md` next to the tool.
+PiSharp has Pi's built-in llama.cpp provider. It talks to a [llama.cpp](https://llama.app) router server, which finds GGUF models and loads or unloads them on demand. Pi's [llama.cpp guide](https://github.com/earendil-works/pi/blob/v1.5.0/packages/coding-agent/docs/llama-cpp.md) applies unchanged, and ships with PiSharp as `docs/llama-cpp.md` next to the tool.
+
+## Install llama.cpp
+
+Install llama.cpp with its [official installer](https://llama.app/docs/installation), then check that it runs:
+
+```sh
+curl -LsSf https://llama.app/install.sh | sh
+llama cli --version
+```
+
+[llama.app](https://llama.app) lists other ways to install it, such as package managers or building from source.
 
 ## Start the router
 
-Start `llama-server` without `--model` or `-m`, so it runs in router mode:
+Start `llama serve` without `--model`, `-m` or `-hf`, so it runs in router mode:
 
 ```sh
-llama-server --models-dir ~/models --no-models-autoload --jinja --host 127.0.0.1 --port 8080 -ngl 999 -c 32768
+llama serve --no-models-autoload --host 127.0.0.1 --port 8080 -ngl all -c 32768
 ```
 
-`--models-dir` is where your GGUF files are. Put multimodal and multi-shard models in their own subfolders. `--jinja` turns on chat templates and tool calling.
+`-ngl all` puts every layer on the GPU; leave it out to let llama.cpp decide. `-c 32768` sets the context size in tokens, shared across the server's parallel slots, and `-c 0` uses the model's full context window, which can take much more memory. Put multimodal and multi-shard models in their own subfolders of the model directory, and restart the router after you add files by hand. The router also serves cached models and preset files (`--models-preset`); see the [llama.cpp server guide](https://llama.app/docs/serve#serving-multiple-models-router-mode).
 
 ## Connect PiSharp
 

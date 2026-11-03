@@ -22,6 +22,7 @@ Boolean variables differ in what they accept. Where a row says `1`, only `1` tur
 | --- | --- | --- |
 | `PI_OFFLINE` | `1`, `true` or `yes` turns off startup network use: the model catalog refresh, the version check and the `rg`/`fd` download. `--offline` sets it. | unset |
 | `PI_SKIP_VERSION_CHECK` | Any value skips the check for a newer `PiSharp.Cli` on NuGet. `--offline` sets it. | unset |
+| `PI_SELF_UPDATE_COMMAND` | The command `pisharp update` runs to update PiSharp itself, split on whitespace, with `{packageName}`, `{version}` and `{installSpec}` placeholders. It wins over the `selfUpdateCommand` setting. See [Custom update command](/docs/reference/cli/#custom-update-command). | unset |
 | `HTTP_PROXY`, `HTTPS_PROXY`, `NO_PROXY` | Proxy for provider requests, read by .NET's HTTP stack. The `httpProxy` setting fills the first two when they're unset. | unset |
 | `PI_OAUTH_CALLBACK_HOST` | Host of the local callback server that browser sign-ins redirect to. | `127.0.0.1` |
 | `PI_SHARE_VIEWER_URL` | Base URL of the link `/share` prints. The gist id is added after `#`. | `https://pi.dev/session/` |

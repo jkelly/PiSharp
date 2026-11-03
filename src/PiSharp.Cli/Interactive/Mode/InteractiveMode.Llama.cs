@@ -281,6 +281,10 @@ internal sealed partial class InteractiveMode
             set { focused = value; if (inputTarget is not null) inputTarget.Focused = value; }
         }
 
+        /// <summary>Fullscreen viewport keys (PageUp/PageDown) reach the current screen when its input handler takes them (a select
+        /// list or the search), not the transcript.</summary>
+        public bool CapturesViewportInput => (inputHandler as IComponent)?.CapturesViewportInput == true;
+
         private UiLoop Loop => mode.context.Loop;
 
         internal void Close() { search?.Close(null); progressPromise = null; }
@@ -469,8 +473,11 @@ internal sealed partial class InteractiveMode
 
     /// <summary>ui.ts HuggingFaceSearch: an input with debounced Hugging Face search (cached per query), fuzzy-filtered results, and an
     /// exact <c>owner/repository[:quant]</c> accepted as typed.</summary>
-    internal sealed partial class HuggingFaceSearch : Container, IInputHandler, IFocusable
+    internal sealed partial class HuggingFaceSearch : Container, IComponent, IInputHandler, IFocusable
     {
+        private const int SearchMaxVisible = 10;
+        /// <summary>Fullscreen viewport keys (PageUp/PageDown) page the results, not the transcript.</summary>
+        public bool CapturesViewportInput => true;
         private readonly InteractiveMode mode;
         private readonly Func<string, CancellationToken, Task<IReadOnlyList<HuggingFaceModel>>> searchModels;
         private readonly Dictionary<string, IReadOnlyList<HuggingFaceModel>> cache;
@@ -514,9 +521,8 @@ internal sealed partial class InteractiveMode
         private void UpdateResults()
         {
             resultsContainer.Clear();
-            const int maxVisible = 10;
-            var start = Math.Max(0, Math.Min(selectedIndex - maxVisible / 2, filteredResults.Count - maxVisible));
-            var end = Math.Min(start + maxVisible, filteredResults.Count);
+            var start = Math.Max(0, Math.Min(selectedIndex - SearchMaxVisible / 2, filteredResults.Count - SearchMaxVisible));
+            var end = Math.Min(start + SearchMaxVisible, filteredResults.Count);
             for (var index = start; index < end; index++)
             {
                 var model = filteredResults[index];
@@ -613,6 +619,11 @@ internal sealed partial class InteractiveMode
             if (keys.Matches(data, "tui.select.down"))
             {
                 if (filteredResults.Count > 0) { selectedIndex = selectedIndex == filteredResults.Count - 1 ? 0 : selectedIndex + 1; UpdateResults(); }
+                return;
+            }
+            if (KeybindingsManager.GetSelectPageIndex(keys, data, selectedIndex, filteredResults.Count, SearchMaxVisible) is { } pageIndex)
+            {
+                if (filteredResults.Count > 0) { selectedIndex = pageIndex; UpdateResults(); }
                 return;
             }
             if (keys.Matches(data, "tui.select.confirm"))

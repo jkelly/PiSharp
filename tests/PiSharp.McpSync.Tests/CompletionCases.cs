@@ -380,13 +380,13 @@ internal static partial class Program
             var help = (0, McpCommand.Help + "\n", "");
             Equal(help, await Mcp(options)); Equal(help, await Mcp(options, "--help")); Equal(help, await Mcp(options, "login", "docs", "-h"));
             Check(McpCommand.Help.StartsWith("Usage:\n  pisharp mcp add <server> [options] -- <command> [args...]\n  pisharp mcp add <server> [options] --url <url>\n" +
-                "  pisharp mcp remove <server> [-l]\n  pisharp mcp list [--json]\n  pisharp mcp login <server> [--timeout <seconds>]\n  pisharp mcp logout <server>\n", StringComparison.Ordinal));
+                "  pisharp mcp remove <server> [-l]\n  pisharp mcp list [--json]\n  pisharp mcp login <server> [-l] [--timeout <seconds>]\n  pisharp mcp logout <server> [-l]\n", StringComparison.Ordinal));
             // Pi 1.2.0 mcp/cli.ts (#10636): --timeout limits the whole sign-in.
             Check(McpCommand.Help.EndsWith("  --timeout <seconds>     Time limit for the whole sign-in (default: 300)", StringComparison.Ordinal));
             const string Hint = "Use \"pisharp mcp --help\" for usage.\n";
             Equal((1, "", "Unknown mcp command \"bogus\".\n" + Hint), await Mcp(options, "bogus"));
-            Equal((1, "", "Usage: pisharp mcp login <server>\n" + Hint), await Mcp(options, "login"));
-            Equal((1, "", "Usage: pisharp mcp logout <server>\n" + Hint), await Mcp(options, "logout", "docs", "extra"));
+            Equal((1, "", "Usage: pisharp mcp login <server> [-l]\n" + Hint), await Mcp(options, "login"));
+            Equal((1, "", "Usage: pisharp mcp logout <server> [-l]\n" + Hint), await Mcp(options, "logout", "docs", "extra"));
             Equal((1, "", "Unknown option --bogus.\n" + Hint), await Mcp(options, "login", "docs", "--bogus"));
             Equal((1, "", "Unknown option --timeout.\n" + Hint), await Mcp(options, "logout", "docs", "--timeout", "5"));
             Equal((1, "", "--timeout needs a value.\n"), await Mcp(options, "login", "docs", "--timeout"));

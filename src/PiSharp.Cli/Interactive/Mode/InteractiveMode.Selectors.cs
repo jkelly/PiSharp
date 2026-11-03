@@ -36,6 +36,7 @@ internal sealed partial class InteractiveMode
                 SteeringMode = state.SteeringMode,
                 FollowUpMode = state.FollowUpMode,
                 Transport = settings.Transport,
+                SessionShareDestination = settings.SessionShareDestination,
                 HttpIdleTimeoutMs = settings.HttpIdleTimeoutMs,
                 CacheWarmingMode = settings.CacheWarmingMode,
                 ThinkingLevel = settings.DefaultThinkingLevel ?? DefaultThinkingLevel,
@@ -101,6 +102,7 @@ internal sealed partial class InteractiveMode
                     rpc.Post(new JsonObject { ["type"] = "set_follow_up_mode", ["mode"] = mode });
                 },
                 OnTransportChange = settings.SetTransport,
+                OnSessionShareDestinationChange = settings.SetSessionShareDestination,
                 OnHttpIdleTimeoutMsChange = timeoutMs =>
                 {
                     settings.SetHttpIdleTimeoutMs(timeoutMs);

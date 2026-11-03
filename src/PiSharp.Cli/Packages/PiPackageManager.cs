@@ -629,7 +629,7 @@ internal sealed class PiPackageManager
     {
         "bun" => ["install", "--omit=dev", "--omit=peer"],
         "pnpm" => ["install", "--prod", "--config.auto-install-peers=false", "--config.strict-peer-dependencies=false", "--config.strict-dep-builds=false"],
-        "npm" => ["install", "--omit=dev", "--legacy-peer-deps"],
+        "npm" => ["install", "--omit=dev", "--legacy-peer-deps", "--no-audit", "--no-fund"],
         _ => ["install"]
     };
 
@@ -639,14 +639,15 @@ internal sealed class PiPackageManager
         return processes.RunSync(command, [.. prefix, .. args]);
     }
 
-    /// <summary>Source getNpmInstallArgs: peer resolution disabled for managed installs.</summary>
+    /// <summary>Source getNpmInstallArgs: peer resolution disabled for managed installs, and npm audit and fund advice skipped (npm audit
+    /// fix would run without --legacy-peer-deps and install pi peers).</summary>
     // npm writes broken nested package-lock.json paths when --prefix goes through a symlink, so an existing root is resolved first.
     internal ImmutableArray<string> GetNpmInstallArgs(IReadOnlyList<string> specs, string root) => NpmInstallArgs(specs, PiPaths.Canonicalize(root));
     private ImmutableArray<string> NpmInstallArgs(IReadOnlyList<string> specs, string installRoot) => GetPackageManagerName() switch
     {
         "bun" => ["install", .. specs, "--cwd", installRoot, "--omit=peer"],
         "pnpm" => ["install", .. specs, "--prefix", installRoot, "--config.auto-install-peers=false", "--config.strict-peer-dependencies=false", "--config.strict-dep-builds=false"],
-        _ => ["install", .. specs, "--prefix", installRoot, "--legacy-peer-deps"]
+        _ => ["install", .. specs, "--prefix", installRoot, "--legacy-peer-deps", "--no-audit", "--no-fund"]
     };
 
     private async Task InstallNpm(PiNpmSource source, string scope, bool temporary, CancellationToken cancellationToken)
@@ -664,7 +665,7 @@ internal sealed class PiPackageManager
         var name = GetPackageManagerName();
         if (name == "bun") { await RunNpmCommand(["uninstall", source.Name, "--cwd", installRoot], null, cancellationToken).ConfigureAwait(false); return; }
         List<string> args = ["uninstall", source.Name, "--prefix", installRoot];
-        if (name != "pnpm") args.Add("--legacy-peer-deps");
+        if (name != "pnpm") args.AddRange(["--legacy-peer-deps", "--no-audit", "--no-fund"]); // npm audit fix would run without --legacy-peer-deps and install pi peers.
         await RunNpmCommand(args, null, cancellationToken).ConfigureAwait(false);
     }
 
@@ -1108,6 +1109,8 @@ internal sealed class PiPackageManager
 
     private bool CollectPackageResources(string packageRoot, Accumulator accumulator, PiPackageEntry? filter, PiPathMetadata metadata)
     {
+        var manifest = PiManifest.Read(Path.Join(packageRoot, "package.json"));
+        metadata.ChangelogPath = ResolvePackageChangelogPath(packageRoot, manifest);
         if (filter is not null)
         {
             foreach (var resourceType in ResourceTypes)
@@ -1120,8 +1123,7 @@ internal sealed class PiPackageManager
             }
             return true;
         }
-        var manifest = PiManifest.Read(Path.Join(packageRoot, "package.json"));
-        if (manifest is not null)
+        if (manifest is { HasResourceFields: true })
         {
             foreach (var resourceType in ResourceTypes) AddManifestEntries(manifest.Get(resourceType), packageRoot, resourceType, accumulator.Maps[resourceType], metadata);
             return true;
@@ -1135,6 +1137,27 @@ internal sealed class PiPackageManager
             hasAnyDir = true;
         }
         return hasAnyDir;
+    }
+
+    /// <summary>Pi 1.5.0 resolvePackageChangelogPath: <c>pi.changelogPath</c>, else <c>CHANGELOG.md</c>, resolved against the package root;
+    /// only an existing file whose real path is inside the package's real root counts. An empty <c>changelogPath</c> turns it off.</summary>
+    internal static string? ResolvePackageChangelogPath(string packageRoot, PiManifest? manifest)
+    {
+        var changelogPath = manifest?.ChangelogPath ?? "CHANGELOG.md";
+        if (changelogPath.Length == 0) return null;
+        var resolvedPath = NodeResolve(packageRoot, changelogPath);
+        if (!Path.Exists(resolvedPath)) return null;
+        if (!IsPathInside(PiPaths.Canonicalize(packageRoot), PiPaths.Canonicalize(resolvedPath))) return null;
+        try { return IsFile(resolvedPath) ? resolvedPath : null; }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException) { return null; }
+    }
+
+    /// <summary>Pi 1.5.0 isPathInside: <paramref name="child"/> lies below <paramref name="parent"/> (node path.relative).</summary>
+    private static bool IsPathInside(string parent, string child)
+    {
+        var relativePath = Path.GetRelativePath(parent, child);
+        return relativePath != "." && relativePath != ".." && !relativePath.StartsWith(".." + Path.DirectorySeparatorChar, StringComparison.Ordinal) &&
+            !Path.IsPathRooted(relativePath);
     }
 
     private void CollectDefaultResources(string packageRoot, string resourceType, OrderedDictionary<string, (PiPathMetadata, bool)> target, PiPathMetadata metadata)

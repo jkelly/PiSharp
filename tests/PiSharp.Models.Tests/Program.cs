@@ -39,6 +39,7 @@ internal static partial class Program
         cases.AddRange(Sync150Cases());
         cases.AddRange(Sync150PackageCases());
         cases.AddRange(Sync150CatalogCases());
+        cases.AddRange(Sync150CliCases());
         var results = new List<object>(); var failures = 0;
         foreach (var test in cases)
         {

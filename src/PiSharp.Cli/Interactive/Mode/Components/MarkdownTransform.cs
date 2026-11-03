@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): coding-agent/src/modes/interactive/components/markdown-transform.ts.
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): coding-agent/src/modes/interactive/components/markdown-transform.ts.
 // MarkdownTransformContext and MarkdownTransformer are declared in core/extensions/types.ts; they live here until the extension
 // runner port declares them. The Mermaid transformer (MermaidTransformer.cs, over the grok-mermaid port) is a MarkdownTransformer
 // like any other.
@@ -25,9 +25,11 @@ internal delegate string? MarkdownTransformer(string markdown, MarkdownTransform
 
 internal static class MarkdownTransform
 {
-    public static Func<string, int, string> CreateMarkdownTransform(string messageType, bool isStreaming, IReadOnlyList<MarkdownTransformer> transformers,
+    /// <summary>Applies extension Markdown transformers. <paramref name="isStreaming"/> is read per transform, so a reused component sees a
+    /// stream end.</summary>
+    public static Func<string, int, string> CreateMarkdownTransform(string messageType, Func<bool> isStreaming, IReadOnlyList<MarkdownTransformer> transformers,
         string? messageId = null, string? timestamp = null) =>
-        (markdown, availableWidth) => ApplyMarkdownTransformers(markdown, new MarkdownTransformContext(messageType, isStreaming, availableWidth, messageId, timestamp),
+        (markdown, availableWidth) => ApplyMarkdownTransformers(markdown, new MarkdownTransformContext(messageType, isStreaming(), availableWidth, messageId, timestamp),
             transformers);
 
     private static string ApplyMarkdownTransformers(string markdown, MarkdownTransformContext context, IReadOnlyList<MarkdownTransformer> transformers)

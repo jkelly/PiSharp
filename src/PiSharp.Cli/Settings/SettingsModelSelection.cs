@@ -18,6 +18,9 @@ internal sealed record SettingsModelSelection(string? Provider, string? Model, s
     internal ImmutableArray<string>? ModelPatterns { get; init; }
     /// <summary>The explicit <c>--thinking</c> level (it keeps a <c>:level</c> suffix in a fallback id).</summary>
     internal string? CliThinking { get; init; }
+    /// <summary>Pi 1.5.0 main.ts inlineApiKey: <c>--api-key</c> was given, so the key goes to whichever provider <c>--model</c> selects and
+    /// stored credentials do not choose between providers offering the same model.</summary>
+    internal bool InlineApiKey { get; init; }
     /// <summary>Pi-style entries: without <c>MaximumTokens</c>, requests ask for the model's own <c>maxTokens</c> (simple-options.ts
     /// buildBaseOptions) instead of the explicit verbs' bounded default.</summary>
     internal bool UseModelMaximumTokens { get; init; }
@@ -68,7 +71,7 @@ internal sealed record SettingsModelSelection(string? Provider, string? Model, s
         }
         if (Model is not null)
         {
-            var resolved = ModelResolver.ResolveCliModel(Provider, Model, CliThinking, registry.GetAll(), registry.HasConfiguredAuth);
+            var resolved = ModelResolver.ResolveCliModel(Provider, Model, CliThinking, registry.GetAll(), registry.HasConfiguredAuth, InlineApiKey);
             if (resolved.Warning is not null) warnings.Add(resolved.Warning);
             if (resolved.Error is not null || resolved.Model is null)
                 throw new LiveSessionException("UnknownLiveModel", resolved.Error ?? "Select a chat model for the supported live API.");
@@ -95,7 +98,7 @@ internal sealed record SettingsModelSelection(string? Provider, string? Model, s
         }
         // model-resolver.ts findInitialModel: the saved default when it exists and its provider has configured auth, else the first
         // available model (a known provider's default first).
-        var initial = ModelResolver.FindInitialModel(null, null, [], continuing, defaultProvider, defaultModel, null, null, registry);
+        var initial = ModelResolver.FindInitialModel([], continuing, defaultProvider, defaultModel, null, null, registry);
         if (initial.Model is null) throw new LiveSessionException("NoLiveModel", ModelListing.NoModelsAvailableMessage());
         var selection = Annotate(Entry(initial.Model, registry), null, scoped, warnings);
         if (fallbackMessage is not null) selection.FallbackMessage = fallbackMessage + $". Using {initial.Model.Provider}/{initial.Model.Id}";
@@ -155,7 +158,7 @@ internal sealed record SettingsModelSelection(string? Provider, string? Model, s
     /// <summary>sdk.ts restore fallback for a session switched to (/resume): findInitialModel over the run's current registry as a
     /// continued session (the saved default with configured auth, else the first available model).</summary>
     internal static RegistryModel? ContinuingInitialModel(ModelRegistry registry, StartupSettingsSnapshot? settings) =>
-        ModelResolver.FindInitialModel(null, null, [], true, Read(settings, "defaultProvider"), Read(settings, "defaultModel"), null, null, registry).Model;
+        ModelResolver.FindInitialModel([], true, Read(settings, "defaultProvider"), Read(settings, "defaultModel"), null, null, registry).Model;
 
     private static string? Read(StartupSettingsSnapshot? settings, string name)
     {

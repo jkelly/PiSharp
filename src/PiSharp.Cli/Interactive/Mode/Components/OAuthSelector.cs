@@ -83,8 +83,11 @@ internal static partial class AuthSelectorFormatting
 }
 
 /// <summary>Component that renders an auth provider selector.</summary>
-internal sealed class OAuthSelectorComponent : Container, IFocusable, IInputHandler
+internal sealed class OAuthSelectorComponent : Container, IComponent, IFocusable, IInputHandler
 {
+    private const int MaxVisible = 8;
+    /// <summary>Fullscreen viewport keys (PageUp/PageDown) reach the selector, not the transcript.</summary>
+    public bool CapturesViewportInput => true;
     private readonly Input searchInput;
 
     // Focusable implementation - propagate to search input for IME cursor positioning
@@ -161,9 +164,8 @@ internal sealed class OAuthSelectorComponent : Container, IFocusable, IInputHand
     {
         listContainer.Clear();
 
-        const int maxVisible = 8;
-        var startIndex = Math.Max(0, Math.Min(selectedIndex - maxVisible / 2, filteredProviders.Count - maxVisible));
-        var endIndex = Math.Min(startIndex + maxVisible, filteredProviders.Count);
+        var startIndex = Math.Max(0, Math.Min(selectedIndex - MaxVisible / 2, filteredProviders.Count - MaxVisible));
+        var endIndex = Math.Min(startIndex + MaxVisible, filteredProviders.Count);
 
         for (var i = startIndex; i < endIndex; i++)
         {
@@ -209,6 +211,7 @@ internal sealed class OAuthSelectorComponent : Container, IFocusable, IInputHand
     public void HandleInput(string keyData)
     {
         var kb = KeybindingsManager.Global;
+        var pageIndex = KeybindingsManager.GetSelectPageIndex(kb, keyData, selectedIndex, filteredProviders.Count, MaxVisible);
         // Up arrow
         if (kb.Matches(keyData, "tui.select.up"))
         {
@@ -221,6 +224,13 @@ internal sealed class OAuthSelectorComponent : Container, IFocusable, IInputHand
         {
             if (filteredProviders.Count == 0) return;
             selectedIndex = Math.Min(filteredProviders.Count - 1, selectedIndex + 1);
+            UpdateList();
+        }
+        // Page up/down
+        else if (pageIndex is { } page)
+        {
+            if (filteredProviders.Count == 0) return;
+            selectedIndex = page;
             UpdateList();
         }
         // Enter

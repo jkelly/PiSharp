@@ -35,7 +35,7 @@ PiSharp opens Pi's current (v3) session files directly. For v1 and v2 files, or 
 
 ## What's different
 
-- **It's a .NET tool.** Install and update it with `dotnet tool install|update -g PiSharp.Cli`. `pisharp update` updates packages and model catalogs, but not PiSharp itself.
+- **It's a .NET tool.** Install and update it with `dotnet tool install|update -g PiSharp.Cli`. `pisharp update` updates packages and model catalogs. It updates PiSharp itself only through a [custom update command](/docs/reference/cli/#custom-update-command), which runs when NuGet, not pi.dev, has a newer `PiSharp.Cli`.
 - **Node is optional.** The agent runs on .NET alone. Node is needed only to run TypeScript extensions.
 - **C# extensions.** Besides Pi's TypeScript extensions, PiSharp loads native C# extensions from the same extension folders. See [Build an extension](/docs/extensions/build-an-extension/).
 - **Tool policy.** A PiSharp option, `--tool-policy explicit`, limits the built-in tools to paths and commands you grant. The default, `pi`, behaves as Pi does. See [Tool policy](/docs/reference/configuration/#tool-policy).

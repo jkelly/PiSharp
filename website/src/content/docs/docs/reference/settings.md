@@ -53,6 +53,7 @@ Before merging, PiSharp migrates old keys in each file, as Pi does: `queueMode` 
 | Key | Type | Default | Effect |
 | --- | --- | --- | --- |
 | `sessionDir` | string | none | Session folder, in the `--session-dir` format. `--session-dir` and `PI_CODING_AGENT_SESSION_DIR` win over it. |
+| `sessionShareDestination` | `auto`, `gist`, `radius` | `auto` | Where `/share` uploads. `auto` uses Radius when you're signed in to it, otherwise a GitHub gist. `gist` always uses a gist. `radius` needs Radius sign-in and never falls back to a gist. Any other value reads as `auto`. `/settings` writes it to global settings. |
 | `steeringMode` | `all`, `one-at-a-time` | `one-at-a-time` | How messages you send while the agent works are delivered: all at once, or one per turn. |
 | `followUpMode` | `all`, `one-at-a-time` | `one-at-a-time` | The same for follow-up messages, which wait until the agent stops. |
 | `doubleEscapeAction` | `tree`, `fork`, `none` | `tree` | What pressing `Esc` twice in an empty editor opens: `/tree`, the `/fork` picker, or nothing. |
@@ -108,6 +109,7 @@ See [Sessions](/docs/guides/sessions/) for compaction and branch summaries.
 | `themes` | string array | none | Theme files or folders. |
 | `enableSkillCommands` | boolean | `true` | Registers each skill as a `/skill:name` command. |
 | `npmCommand` | string array | none | The npm command in argv form, such as `["mise", "exec", "node@20", "--", "npm"]`, for package lookup and installs. |
+| `selfUpdateCommand` | string array | none | The command `pisharp update` runs to update PiSharp itself, with `{packageName}`, `{version}` and `{installSpec}` placeholders. `PI_SELF_UPDATE_COMMAND` wins over it. Global settings only. See [Custom update command](/docs/reference/cli/#custom-update-command). |
 
 ## Terminal UI
 
@@ -120,8 +122,9 @@ See [Sessions](/docs/guides/sessions/) for compaction and branch summaries.
 | `fullscreenCopyOnSelect` | boolean | `true` | Copies a mouse selection in fullscreen mode. |
 | `fullscreenWheelScrollLines` | number 1 to 100, or `auto` | `auto` | Lines per mouse wheel step in fullscreen mode. |
 | `quietStartup` | boolean or `"header"` | `false` | `true` hides the startup output; `"header"` keeps only the header. `--verbose` wins. |
-| `collapseChangelog` | boolean | `false` | Shows a short changelog after an update. `/changelog` shows the whole one. |
+| `collapseChangelog` | boolean | `false` | Shows a short changelog after an update. `/changelog` shows the whole one. It also shortens extension package changelogs to one line per package. |
 | `lastChangelogVersion` | string | none | Written by PiSharp: the last version whose changelog you saw. |
+| `extensionChangelogVersions` | object | none | Written by PiSharp: the last changelog version you saw of each extension package. See [Packages](/docs/extensions/packages/#show-a-changelog). |
 | `hideThinkingBlock` | boolean | `false` | Hides thinking blocks. `Ctrl+T` toggles them. |
 | `showCacheMissNotices` | boolean | `false` | Shows prompt cache cost and provider recovery notices. |
 | `externalEditor` | string | none | Command `Ctrl+G` opens. Wins over `VISUAL` and `EDITOR`. Without any of them PiSharp uses `notepad` on Windows and `nano` elsewhere. |

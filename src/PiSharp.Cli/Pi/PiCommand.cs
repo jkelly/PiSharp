@@ -24,6 +24,9 @@ internal delegate Task<string?> PiSessionSelector(ImmutableArray<PiSessionInfo> 
 internal sealed record PiHost
 {
     internal required string Cwd { get; init; }
+    /// <summary>The process's working directory no longer exists (<see cref="PiCommand.ReadCwd"/> found none); <see cref="Cwd"/> is
+    /// empty and every command but <c>auth</c> ends with main.ts's error.</summary>
+    internal bool CwdMissing { get; init; }
     internal required string Home { get; init; }
     internal required Func<string, string?> GetEnvironment { get; init; }
     internal Action<string, string?> SetEnvironment { get; init; } = (_, _) => { };
@@ -68,6 +71,10 @@ internal sealed record PiHost
     internal Func<TextWriter, TextWriter, PiSharp.Cli.Packages.PiPackageProcesses>? PackageProcesses { get; init; }
     /// <summary>Adjusts the <c>mcp</c> command's collaborators (tests: fake channels and stores); null keeps the defaults.</summary>
     internal Func<McpCommandOptions, McpCommandOptions>? ConfigureMcp { get; init; }
+    /// <summary>The release check of <c>pisharp update</c> with a configured self-update command (tests: a fake NuGet); null uses the
+    /// shared client and <see cref="PiSharp.Cli.Interactive.Mode.Utilities.VersionCheck.DefaultNuGetBaseUrl"/>.</summary>
+    internal HttpMessageInvoker? VersionCheckHttp { get; init; }
+    internal string? NuGetBaseUrl { get; init; }
 }
 
 /// <summary>An exit decided by the entry after its messages were written.</summary>
@@ -88,6 +95,17 @@ internal static class PiCommand
         if (global["httpProxy"] is JsonValue proxyValue && proxyValue.TryGetValue<string>(out var proxy) && PiArgs.JsTrim(proxy) is { Length: > 0 } trimmedProxy)
             foreach (var name in new[] { "HTTP_PROXY", "HTTPS_PROXY" })
                 if (host.GetEnvironment(name) is null) host.SetEnvironment(name, trimmedProxy);
+    }
+
+    internal const string DeletedCwdMessage = "Error: The current working directory no longer exists. Change to an existing directory and try again.";
+
+    /// <summary>Source main.ts (Pi 1.5.0): the first <c>process.cwd()</c>, null when the directory no longer exists (ENOENT, which .NET
+    /// reports as a missing file or directory on Linux and macOS; Windows does not let a process's directory be deleted). Other errors
+    /// propagate.</summary>
+    internal static string? ReadCwd(Func<string> read)
+    {
+        try { return read(); }
+        catch (Exception error) when (error is FileNotFoundException or DirectoryNotFoundException) { return null; }
     }
 
     internal static async Task<int> RunAsync(string[] args, PiHost host, CancellationToken cancellationToken)
@@ -115,6 +133,7 @@ internal static class PiCommand
         var offline = args.Contains("--offline") || IsTruthyEnvFlag(host.GetEnvironment("PI_OFFLINE"));
         if (offline) { host.SetEnvironment("PI_OFFLINE", "1"); host.SetEnvironment("PI_SKIP_VERSION_CHECK", "1"); }
         if (args.Length > 0 && args[0] == "auth") return await PiAuthCommand.RunAsync(args, host, token).ConfigureAwait(false);
+        if (host.CwdMissing) { await Line(err, Paint(Red, DeletedCwdMessage)).ConfigureAwait(false); return 1; }
         // main.ts: the bootstrap settings (project untrusted) apply the global httpProxy before the package, config and mcp commands.
         ApplyHttpProxy(host, PiSettings.Load(host.Cwd, PiPaths.AgentDirectory(host.GetEnvironment, host.Home), projectTrusted: false).Global);
         if (args.Length > 0 && PackageCommands.Contains(args[0]))
@@ -672,6 +691,7 @@ internal static class PiCommand
         var request = new SettingsModelSelection(parsed.Provider, parsed.Model, null)
         {
             ModelPatterns = parsed.Models is { } models ? [.. models] : null, CliThinking = parsed.Thinking, UseModelMaximumTokens = true,
+            InlineApiKey = parsed.ApiKey is not null,
             SessionBranch = sessionPath is null ? null : PiSessions.ReadBranch(sessionPath)
         };
         using var warnings = new StringWriter();

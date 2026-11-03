@@ -139,8 +139,11 @@ internal static class ModelCatalogRefresh
 }
 
 /// <summary>Component that renders a model selector with search.</summary>
-internal sealed class ModelSelectorComponent : Container, IFocusable, IInputHandler
+internal sealed class ModelSelectorComponent : Container, IComponent, IFocusable, IInputHandler
 {
+    private const int MaxVisible = 10;
+    /// <summary>Fullscreen viewport keys (PageUp/PageDown) reach the selector, not the transcript.</summary>
+    public bool CapturesViewportInput => true;
     private sealed record ModelItem(string Provider, string Id, JsonObject Model);
 
     private enum ModelScope { All, Scoped }
@@ -414,9 +417,8 @@ internal sealed class ModelSelectorComponent : Container, IFocusable, IInputHand
     {
         listContainer.Clear();
 
-        const int maxVisible = 10;
-        var startIndex = Math.Max(0, Math.Min(selectedIndex - maxVisible / 2, filteredModels.Count - maxVisible));
-        var endIndex = Math.Min(startIndex + maxVisible, filteredModels.Count);
+        var startIndex = Math.Max(0, Math.Min(selectedIndex - MaxVisible / 2, filteredModels.Count - MaxVisible));
+        var endIndex = Math.Min(startIndex + MaxVisible, filteredModels.Count);
 
         // Show visible slice of filtered models
         for (var i = startIndex; i < endIndex; i++)
@@ -430,8 +432,10 @@ internal sealed class ModelSelectorComponent : Container, IFocusable, IInputHand
             var cursor = isSelected ? theme.Fg("accent", "→ ") : "  ";
             var currentMarker = isCurrent ? theme.Fg("accent", "✓ ") : "  ";
             var modelText = isSelected ? theme.Fg("accent", item.Id) : item.Id;
+            var name = ModelSearch.GetDistinctModelName(item.Id, ModelJson.Name(item.Model));
+            var nameText = name is not null ? theme.Fg("muted", $" ({name})") : "";
             var providerBadge = theme.Fg("muted", $"[{item.Provider}]");
-            var line = $"{cursor}{currentMarker}{modelText} {providerBadge}{defaultBadge}";
+            var line = $"{cursor}{currentMarker}{modelText}{nameText} {providerBadge}{defaultBadge}";
 
             listContainer.AddChild(new Text(line, 0, 0));
         }
@@ -477,6 +481,7 @@ internal sealed class ModelSelectorComponent : Container, IFocusable, IInputHand
     public void HandleInput(string keyData)
     {
         var kb = KeybindingsManager.Global;
+        var pageIndex = KeybindingsManager.GetSelectPageIndex(kb, keyData, selectedIndex, filteredModels.Count, MaxVisible);
         if (kb.Matches(keyData, "tui.input.tab"))
         {
             if (scopedModelItems.Count > 0)
@@ -498,6 +503,13 @@ internal sealed class ModelSelectorComponent : Container, IFocusable, IInputHand
         {
             if (filteredModels.Count == 0) return;
             selectedIndex = selectedIndex == filteredModels.Count - 1 ? 0 : selectedIndex + 1;
+            UpdateList();
+        }
+        // Page up/down
+        else if (pageIndex is { } page)
+        {
+            if (filteredModels.Count == 0) return;
+            selectedIndex = page;
             UpdateList();
         }
         // Enter

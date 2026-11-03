@@ -479,18 +479,18 @@ internal static partial class Program
     }
 
     // packages/coding-agent/docs/llama-cpp.md ships with the CLI as docs/llama-cpp.md (as docs/codemode.md does): the attribution comment,
-    // then upstream's file byte for byte (its git blob ea51675e00cf54323dde894ab4cfbb7b25cabce2 at v1.1.0).
+    // then upstream's file byte for byte (its git blob 6684bb4df996feabc0fb28a78bf9f9d2638bf7ef at v1.5.0: the llama.app setup).
     private static void LlamaGuide()
     {
         var path = Path.Combine(AppContext.BaseDirectory, "docs", "llama-cpp.md");
         Check(File.Exists(path), "docs/llama-cpp.md next to the CLI: " + path);
         var bytes = File.ReadAllBytes(path);
         var newline = Array.IndexOf(bytes, (byte)'\n');
-        Equal("<!-- Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT, Copyright (c) 2025 Mario Zechner): packages/coding-agent/docs/llama-cpp.md, unchanged except this comment. -->",
+        Equal("<!-- Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT, Copyright (c) 2025 Mario Zechner): packages/coding-agent/docs/llama-cpp.md, unchanged except this comment. -->",
             System.Text.Encoding.UTF8.GetString(bytes, 0, newline), "attribution line");
         var upstream = bytes[(newline + 1)..];
         var blob = Convert.ToHexStringLower(System.Security.Cryptography.SHA1.HashData([.. System.Text.Encoding.ASCII.GetBytes($"blob {upstream.Length}\0"), .. upstream]));
-        Equal("ea51675e00cf54323dde894ab4cfbb7b25cabce2", blob, "the rest is upstream's v1.1.0 blob");
+        Equal("6684bb4df996feabc0fb28a78bf9f9d2638bf7ef", blob, "the rest is upstream's v1.5.0 blob");
         Check(File.Exists(Path.Combine(AppContext.BaseDirectory, "docs", "codemode.md")), "next to docs/codemode.md");
     }
 

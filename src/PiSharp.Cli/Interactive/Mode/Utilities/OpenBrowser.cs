@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): coding-agent/src/utils/open-browser.ts.
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): coding-agent/src/utils/open-browser.ts.
 using System.ComponentModel;
 using System.Diagnostics;
 
@@ -35,14 +35,17 @@ internal static class BrowserOpener
         (spawn ?? SpawnDetached)(command, args);
     }
 
-    /// <summary><c>spawn(cmd, args, { stdio: "ignore", detached: true }).on("error", () =&gt; {}).unref()</c>: the child's output is
-    /// drained and discarded so it cannot write over the TUI, and nothing waits for it.</summary>
+    /// <summary><c>spawn(cmd, args, { stdio: "ignore", detached: true, cwd: "/" }).on("error", () =&gt; {}).unref()</c>: the child's output
+    /// is drained and discarded so it cannot write over the TUI, and nothing waits for it. It starts from the root: on WSL, xdg-open
+    /// launches explorer.exe, which fails when the cwd's \\wsl.localhost\... path exceeds MAX_PATH (#11592), and the target is a URL, so
+    /// no launcher needs pi's cwd.</summary>
     private static void SpawnDetached(string command, IReadOnlyList<string> args)
     {
         var info = new ProcessStartInfo(command)
         {
             UseShellExecute = false,
             CreateNoWindow = true,
+            WorkingDirectory = ClipboardCommand.HelperWorkingDirectory(),
             RedirectStandardInput = true,
             RedirectStandardOutput = true,
             RedirectStandardError = true,

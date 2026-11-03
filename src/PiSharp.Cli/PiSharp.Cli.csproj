@@ -9,6 +9,8 @@
     <DefineConstants Condition="'$(EnablePromptTemplateYaml)' == 'true'">$(DefineConstants);PISHARP_PROMPT_YAML</DefineConstants>
     <!-- Pi 1.5.0: extension keybinding hints and the custom component blocked status are [Experimental]. -->
     <NoWarn>$(NoWarn);PISHARP_EXTUI001</NoWarn>
+    <!-- Pi 1.5.0: TUI control-character replacement, select page keys and viewport input capture are [Experimental]. -->
+    <NoWarn>$(NoWarn);PISHARP_TUI001</NoWarn>
   </PropertyGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="PiSharp.CodingAgent.Tests" />

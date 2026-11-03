@@ -36,6 +36,8 @@ internal static class InteractiveModeHost
         var trustStore = new ProjectTrustStore(startup.AgentDir, startup.Home);
         var crashLogPath = PiSharp.Cli.Diagnostics.CrashReporting.DefaultCrashLogPath();
         var login = TryCreateLogin();
+        // exportToHtml's tool renderer comes from the mode once it exists (the transcript's renderers and theme).
+        Func<PiSharp.CodingAgent.Export.IToolHtmlRenderer?>? createExportToolRenderer = null;
         var context = new InteractiveModeContext
         {
             Rpc = client, Settings = settings, Startup = startup, Terminal = terminal, Loop = loop,
@@ -56,13 +58,13 @@ internal static class InteractiveModeHost
             ExportToHtml = (rpc, path, themeName) => Task.Run(() => PiSharp.CodingAgent.Export.AgentSessionExport.ExportToHtmlAsync(
                 startup.Host.CurrentSession ?? throw new InvalidOperationException("The session is not ready."),
                 new PiSharp.CodingAgent.Export.SessionHtmlExportHost(new PiSharp.CodingAgent.Export.PiThemeHost { AgentDirectory = startup.AgentDir },
-                    settings.ThemeSetting, startup.Cwd), path, themeName)),
+                    settings.ThemeSetting, startup.Cwd, () => createExportToolRenderer?.Invoke()), path, themeName)),
             ShareSession = (ui, themeName, abort) =>
             {
                 var session = startup.Host.CurrentSession ?? throw new InvalidOperationException("The session is not ready.");
                 var share = PiSharp.CodingAgent.Export.AgentSessionExport.ShareSession(session,
                     new PiSharp.CodingAgent.Export.SessionHtmlExportHost(new PiSharp.CodingAgent.Export.PiThemeHost { AgentDirectory = startup.AgentDir },
-                        settings.ThemeSetting, startup.Cwd), themeName);
+                        settings.ThemeSetting, startup.Cwd, () => createExportToolRenderer?.Invoke()), themeName) with { Destination = settings.SessionShareDestination };
                 return new PiSharp.CodingAgent.Export.SessionShare().ShareSessionAsync(share, ui, abort);
             },
             ImportSessionFile = path => ImportSessionFile(path, startup),
@@ -97,6 +99,7 @@ internal static class InteractiveModeHost
                 // sdk.ts modelFallbackMessage: a model a continued session could not restore, or formatNoModelsAvailableMessage.
                 ModelFallbackMessage = options.Selection.FallbackMessage
             }));
+            createExportToolRenderer = mode.CreateExportToolRenderer;
             observeMode?.Invoke(mode);
             host = Task.Run(() => RpcSessionCommand.RunWithPresentationAsync(rpcArgs, connection.Input, connection.Output, hostDiagnostics, mode,
                 hostCancellation.Token, userShutdown: () => Volatile.Read(ref userQuit) != 0 && !token.IsCancellationRequested, mcpHost: mcpHost,

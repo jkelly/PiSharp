@@ -164,21 +164,24 @@ internal sealed partial class InteractiveSessionFrontend
                 switch (authEvent.Kind)
                 {
                     case AuthEventKind.AuthUrl:
-                        owner.QueueLoginRenderLocked(authEvent.Url ?? "");
+                        owner.QueueLoginRenderLocked(Mode.Components.LoginDialogComponent.DisplayUrl(authEvent.Url ?? ""));
                         if (!string.IsNullOrEmpty(authEvent.Instructions)) owner.QueueLoginRenderLocked(authEvent.Instructions);
                         break;
                     case AuthEventKind.DeviceCode:
-                        owner.QueueLoginRenderLocked(authEvent.VerificationUri ?? "");
+                        owner.QueueLoginRenderLocked(Mode.Components.LoginDialogComponent.DisplayUrl(authEvent.VerificationUri ?? ""));
                         owner.QueueLoginRenderLocked("Enter code: " + authEvent.UserCode);
                         owner.QueueLoginRenderLocked("Waiting for authentication...\n(/cancel to cancel)");
                         break;
                     case AuthEventKind.Info:
                         owner.QueueLoginRenderLocked(string.Join('\n', new[] { authEvent.Message ?? "" }.Concat((authEvent.Links ?? [])
+                            .Select(link => (link.Label, Url: Mode.Components.LoginDialogComponent.DisplayUrl(link.Url)))
                             .Select(link => link.Label is { Length: > 0 } label ? $"{label}: {link.Url}" : link.Url))));
                         break;
                     default: owner.QueueLoginRenderLocked(authEvent.Message ?? ""); break;
                 }
-            if (authEvent.Kind == AuthEventKind.AuthUrl && authEvent.Url is { } url) host.OpenBrowser(url);
+            // Pi 1.5.0 login-dialog.ts: only web (http, https) URLs are opened, and printed URLs carry no control characters.
+            if (authEvent.Kind == AuthEventKind.AuthUrl && authEvent.Url is { } url && Mode.Components.LoginDialogComponent.WebUrl(url) is { } target)
+                host.OpenBrowser(target);
         }
     }
 }

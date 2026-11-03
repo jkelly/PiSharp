@@ -39,6 +39,8 @@ internal sealed class ToolExecutionComponent : Container
     private readonly string cwd;
     private bool executionStarted;
     private bool argsComplete;
+    /// <summary><see cref="UpdateArgs"/> ran since the last display update; the next render applies it.</summary>
+    private bool argsPending;
     /// <summary>{content, isError, details?, durationMs?}.</summary>
     private JsonObject? result;
     /// <summary>The {content, details} object handed to renderResult for the current result.</summary>
@@ -131,10 +133,13 @@ internal sealed class ToolExecutionComponent : Container
         return new TuiMouseEventResult(Handled: true);
     });
 
+    /// <summary>Shows new partial arguments. Applied at the next render, so a call streaming many argument deltas between two frames
+    /// runs its renderer once per frame, not once per delta (#9265).</summary>
     public void UpdateArgs(JsonNode? args)
     {
         this.args = args;
-        UpdateDisplay();
+        argsPending = true;
+        ui.RequestRender();
     }
 
     public void MarkExecutionStarted()
@@ -199,6 +204,7 @@ internal sealed class ToolExecutionComponent : Container
 
     public override List<string> Render(int width)
     {
+        if (argsPending) UpdateDisplay();
         if (hideComponent) return [];
 
         if (HasRendererDefinition() && GetRenderShell() == ToolRenderShell.Self)
@@ -233,6 +239,7 @@ internal sealed class ToolExecutionComponent : Container
 
     private void UpdateDisplay()
     {
+        argsPending = false;
         Func<string, string> bgFn = isPartial
             ? text => theme.Bg("toolPendingBg", text)
             : result is not null && ToolJson.Truthy(result["isError"])

@@ -36,6 +36,12 @@ The whole `ExtensionAPI`: tools, commands, shortcuts, flags, message and tool re
 
 Pi 1.5.0's additions work too. Tool, message and entry renderers get `keyText()` and `keyHint()`, which read the terminal UI's current keybindings. An inline `ctx.ui.custom()` component with a `blocked: { kind, message }` option reports pi as blocked in its OSC 7501 program status while it is open (overlays ignore the option). Markdown transformers see `messageId` and `timestamp` for messages restored from the session file.
 
+Dialogs and inline custom components stack in the editor slot, as in Pi 1.4.0. A `select`, `confirm`, `input` or `editor` dialog, or an inline `ctx.ui.custom()` component, hides the one that is showing. When it closes, the one below shows again. Every dialog still settles when it is answered, times out or is aborted, and the blocked program status follows the dialog that is showing. If an extension calls `ctx.ui.setEditorComponent()` while a dialog is open, the dialog keeps its place and focus. The new editor shows when the last dialog closes.
+
+`ctx.ui.custom(factory, { overlay: true, overlayOptions })` opens the component as an overlay on top of the screen, as in Pi 1.3.0. Its `done()` hides the overlay it opened, even when another overlay opened above it. The overlay options are `width`, `minWidth`, `maxHeight`, `anchor`, `offsetX`, `offsetY`, `row`, `col`, `margin` and `nonCapturing`. Without `overlayOptions` the overlay takes the component's `width`. A function `overlayOptions` is called once, when the overlay opens. Two parts don't cross the bridge: the `visible` callback and `onHandle`, the handle Pi passes back for showing and hiding the overlay.
+
+A component's `capturesViewportInput` (Pi 1.5.0) reaches the full-screen viewport, so a custom component or an extension editor with a menu open gets the scroll keys. PiSharp reads the value after each render and each key. The key hints keep the terminal UI's keybindings after `/reload`.
+
 `ctx.ui.setTheme()` switches the theme in the terminal UI and saves it, as in Pi. `pi.sendMessage(…, { triggerTurn: true })` starts its turn at once, also from inside a command's handler. Packages loaded with `-e` add their skills, prompt templates and themes as well as their extensions.
 
 Pi's built-in extensions (`mcp`, `llama.cpp`, `codemode` and `tool-search`) are extensions here too, and an extension that registers its own `codemode` or `tool_search` tool or `/mcp` command replaces the built-in one. See [Built-in extensions](/docs/reference/configuration/#built-in-extensions).

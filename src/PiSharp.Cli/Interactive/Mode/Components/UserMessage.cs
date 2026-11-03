@@ -50,7 +50,7 @@ internal sealed class UserMessageComponent : Container
             new MarkdownOptions(
                 PreserveOrderedListMarkers: true,
                 PreserveBackslashEscapes: true,
-                Transform: MarkdownTransform.CreateMarkdownTransform(MarkdownMessageType.User, false, markdownTransformers, messageId, timestamp))));
+                Transform: MarkdownTransform.CreateMarkdownTransform(MarkdownMessageType.User, () => false, markdownTransformers, messageId, timestamp))));
     }
 
     public override List<string> Render(int width)

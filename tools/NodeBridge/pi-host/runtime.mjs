@@ -587,7 +587,9 @@ export class ExtensionRuntime {
         const done = (result) => { bridge.notify('component.done', { id }); runtime.disposeComponent(id); resolve(result); };
         try { id = runtime.createComponent((tui, theme, keybindings) => factory(tui, theme, keybindings, done)); }
         catch (error) { reject(error); return; }
-        const overlayOptions = typeof options?.overlayOptions === 'function' ? options.overlayOptions() : options?.overlayOptions;
+        // Pi 1.3.0: without overlayOptions an overlay takes the component's width property, if it has one.
+        const width = runtime.components.get(id)?.component?.width;
+        const overlayOptions = (typeof options?.overlayOptions === 'function' ? options.overlayOptions() : options?.overlayOptions) ?? (width ? { width } : undefined);
         // Pi 1.5.0: blocked reports program status while the inline component is visible (overlays ignore it).
         bridge.call('ui.custom', { ctx, component: id, overlay: options?.overlay === true, overlayOptions: overlayOptions ?? null, blocked: options?.blocked ?? null })
           .catch((error) => { runtime.disposeComponent(id); reject(error); });
@@ -756,9 +758,19 @@ export class ExtensionRuntime {
   renderComponent(id, width) {
     const record = this.components.get(id);
     if (!record?.component) return [];
-    return (record.component.render(width) ?? []).map(String);
+    const lines = (record.component.render(width) ?? []).map(String);
+    this.reportCaptures(record);
+    return lines;
   }
-  inputComponent(id, data) { const component = this.components.get(id)?.component; component?.handleInput?.(data); }
+  inputComponent(id, data) { const record = this.components.get(id); record?.component?.handleInput?.(data); if (record) this.reportCaptures(record); }
+  /** Pi 1.5.0 Component.capturesViewportInput: the host keeps the last value (component.captures) for its viewport scroll keys. */
+  reportCaptures(record) {
+    let captures = false;
+    try { captures = record.component?.capturesViewportInput === true; } catch { /* a throwing getter reports false */ }
+    if (captures === (record.captures === true)) return;
+    record.captures = captures;
+    this.bridge.notify('component.captures', { id: record.id, value: captures });
+  }
   disposeComponent(id) { const record = this.components.get(id); if (!record) return; this.components.delete(id); try { record.component?.dispose?.(); } catch { /* ignore */ } }
 
   // ---------------------------------------------------------------------------------------------------------------- dispatch

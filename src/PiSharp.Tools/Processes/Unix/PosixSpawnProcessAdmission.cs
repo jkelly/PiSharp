@@ -61,6 +61,52 @@ public sealed class PosixSpawnProcessAdmission : IUnixProcessAdmission
         }
     }
 
+    /// <summary>Pi 1.5.0 clipboard-command.ts (<c>spawn(command, args, { detached: true, cwd: "/" })</c>): starts a helper that leaves this
+    /// process's group, so a daemon it leaves behind (a clipboard owner) is not stopped by the terminal's Ctrl+Z (SIGTSTP to the
+    /// foreground group). The command leads a new process group, starts in <paramref name="workingDirectory"/> (a <c>/bin/sh</c>
+    /// <c>cd</c> before <c>exec</c>, so a command that cannot start exits 127) with this process's environment; its stdin is a pipe,
+    /// its stdout a pipe when <paramref name="captureOutput"/> is set (else <c>/dev/null</c>), its stderr <c>/dev/null</c>. Nothing kills
+    /// the group: <see cref="DetachedHelper.Kill"/> signals only the command.</summary>
+    internal static DetachedHelper SpawnDetachedHelper(string executable, IReadOnlyList<string> arguments, string workingDirectory, bool captureOutput)
+    {
+        if (!OperatingSystem.IsLinux() && !OperatingSystem.IsMacOS()) throw new PlatformNotSupportedException();
+        if (NodeArgumentErrors.SpawnNullBytes(executable, arguments, workingDirectory, null) is { } nulError)
+            throw new ArgumentException(nulError, nameof(arguments));
+        var environment = System.Environment.GetEnvironmentVariables().Cast<System.Collections.DictionaryEntry>()
+            .Select(entry => entry.Key + "=" + entry.Value).ToArray();
+        int[] stdout = [-1, -1], stdin = [-1, -1];
+        try
+        {
+            Pipe(stdin);
+            if (captureOutput) Pipe(stdout);
+            int pid;
+            try
+            {
+                pid = Spawn(Shell, [Shell, "-c", LaunchScript, workingDirectory, executable, .. arguments], environment,
+                    processGroup: 0, stdout: stdout[1], stderr: -1, stdin: stdin[0]);
+            }
+            finally { Close(ref stdout[1]); Close(ref stdin[0]); }
+            var exit = Task.Factory.StartNew(() => Reap(pid), CancellationToken.None, TaskCreationOptions.LongRunning, TaskScheduler.Default);
+            return new DetachedHelper(pid, Writer(ref stdin[1]), captureOutput ? Stream(ref stdout[0]) : null, exit);
+        }
+        catch
+        {
+            Close(ref stdout[0]); Close(ref stdout[1]); Close(ref stdin[0]); Close(ref stdin[1]);
+            throw;
+        }
+    }
+
+    /// <summary>A helper started by <see cref="SpawnDetachedHelper"/>: its pipes and its exit status (or 128 + the terminating signal).</summary>
+    internal sealed class DetachedHelper(int processId, Stream standardInput, Stream? standardOutput, Task<int> exit)
+    {
+        public int ProcessId { get; } = processId;
+        public Stream StandardInput { get; } = standardInput;
+        public Stream? StandardOutput { get; } = standardOutput;
+        public Task<int> Exit { get; } = exit;
+        /// <summary>SIGKILL to the command only (its group, which may hold a daemon, is left alone); nothing once it was reaped.</summary>
+        public void Kill() { if (!Exit.IsCompleted) _ = Native.kill(ProcessId, Native.SIGKILL); }
+    }
+
     private static FileStream Stream(ref int fd)
     {
         var handle = new SafeFileHandle((IntPtr)fd, ownsHandle: true); fd = -1;

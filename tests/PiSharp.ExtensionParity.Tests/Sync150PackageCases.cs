@@ -318,12 +318,12 @@ internal static partial class Program
             new(sandbox.Cwd, linked, sandbox.Home, PiSettings.FromObjects([], [], true), _ => null, processes);
         var processes = new FakeProcesses();
         await Linked(processes).InstallAsync("npm:real-pkg");
-        Check(processes.Ran("npm", ["install", "real-pkg", "--prefix", realRoot, "--legacy-peer-deps"]), "install prefix: " + string.Join(" | ", processes.Runs.Select(run => string.Join(' ', run.Args))));
+        Check(processes.Ran("npm", ["install", "real-pkg", "--prefix", realRoot, "--legacy-peer-deps", "--no-audit", "--no-fund"]), "install prefix: " + string.Join(" | ", processes.Runs.Select(run => string.Join(' ', run.Args))));
         processes = new FakeProcesses();
         await Linked(processes).RemoveAsync("npm:real-pkg");
-        Check(processes.Ran("npm", ["uninstall", "real-pkg", "--prefix", realRoot, "--legacy-peer-deps"]), "uninstall prefix: " + string.Join(" | ", processes.Runs.Select(run => string.Join(' ', run.Args))));
+        Check(processes.Ran("npm", ["uninstall", "real-pkg", "--prefix", realRoot, "--legacy-peer-deps", "--no-audit", "--no-fund"]), "uninstall prefix: " + string.Join(" | ", processes.Runs.Select(run => string.Join(' ', run.Args))));
         // A root that does not exist yet is passed as it is.
-        Names(["install", "x", "--prefix", Path.Combine(linked, "absent"), "--legacy-peer-deps"], Linked(new()).GetNpmInstallArgs(["x"], Path.Combine(linked, "absent")), "missing root");
+        Names(["install", "x", "--prefix", Path.Combine(linked, "absent"), "--legacy-peer-deps", "--no-audit", "--no-fund"], Linked(new()).GetNpmInstallArgs(["x"], Path.Combine(linked, "absent")), "missing root");
     }
 
     // resolvePackageSources: an installed unpinned temporary (-e) npm source with a newer registry version installs name@latest (a bare
@@ -338,7 +338,7 @@ internal static partial class Program
         var processes = new FakeProcesses { OnCapture = (_, args, _) => args[0] == "view" ? "\"2.0.0\"" : null };
         var resolved = await Manager(sandbox, processes: processes).ResolveExtensionSourcesAsync(["npm:tmp-pkg"], temporary: true);
         Names(["view", "tmp-pkg", "version", "--json"], processes.Captures.Single().Args, "registry lookup");
-        Check(processes.Ran("npm", ["install", "tmp-pkg@latest", "--prefix", root, "--legacy-peer-deps"]), "refresh to latest: " + string.Join(" | ", processes.Runs.Select(run => string.Join(' ', run.Args))));
+        Check(processes.Ran("npm", ["install", "tmp-pkg@latest", "--prefix", root, "--legacy-peer-deps", "--no-audit", "--no-fund"]), "refresh to latest: " + string.Join(" | ", processes.Runs.Select(run => string.Join(' ', run.Args))));
         Check(Enabled(resolved.Extensions, "tmp-pkg/extensions/index.ts"), "refreshed extension resolved");
 
         processes = new FakeProcesses { OnCapture = (_, _, _) => "\"2.0.0\"", OnRun = (_, _, _) => throw new PiPackageException("registry down") };
@@ -399,7 +399,7 @@ internal static partial class Program
         var manager = Manager(sandbox, J("""{"packages":["git:github.com/user/repo"]}"""), processes: processes);
         manager.SetProgressCallback(progress.Add);
         await manager.UpdateAsync("git:github.com/user/repo");
-        Check(processes.Ran("git", ["reset", "--hard", "@{upstream}^{commit}"], target) && processes.Ran("npm", ["install", "--omit=dev", "--legacy-peer-deps"], target),
+        Check(processes.Ran("git", ["reset", "--hard", "@{upstream}^{commit}"], target) && processes.Ran("npm", ["install", "--omit=dev", "--legacy-peer-deps", "--no-audit", "--no-fund"], target),
             "dependencies installed after a failed clean");
         Check(File.Exists(marker), "the update marker stays for the next update");
         var warning = progress.Single(e => e.Type == "progress");
@@ -430,7 +430,7 @@ internal static partial class Program
         var manager = Manager(sandbox, J("""{"packages":["npm:stale","npm:fresh","npm:unknown"]}"""), processes: processes);
         manager.SetProgressCallback(progress.Add);
         await manager.UpdateAsync();
-        Check(processes.Ran("npm", ["install", "stale@latest", "fresh@latest", "unknown@latest", "--prefix", userRoot, "--legacy-peer-deps"]), "one batch");
+        Check(processes.Ran("npm", ["install", "stale@latest", "fresh@latest", "unknown@latest", "--prefix", userRoot, "--legacy-peer-deps", "--no-audit", "--no-fund"]), "one batch");
         var expected = "npm:stale is still 1.0.0 (registry reports 2.0.0); npm registry metadata may be stale, try again in a few minutes";
         Names([expected], progress.Where(e => e.Type == "progress").Select(e => e.Message!), "unchanged warnings");
         Check(progress.Single(e => e.Type == "progress") is { Action: "update", Source: "npm:stale" }, "warning source");

@@ -10,6 +10,8 @@ internal sealed record UserMessageItem(string Id, string Text, string? Timestamp
 /// <summary>Custom user message list component with selection.</summary>
 internal sealed class UserMessageList : IComponent, IInputHandler
 {
+    /// <summary>Fullscreen viewport keys (PageUp/PageDown) reach the list, not the transcript.</summary>
+    public bool CapturesViewportInput => true;
     private readonly List<UserMessageItem> messages;
     private int selectedIndex;
     public Action<string>? OnSelect { get; set; }
@@ -78,12 +80,19 @@ internal sealed class UserMessageList : IComponent, IInputHandler
     public void HandleInput(string keyData)
     {
         var kb = KeybindingsManager.Global;
+        var pageIndex = KeybindingsManager.GetSelectPageIndex(kb, keyData, selectedIndex, messages.Count, maxVisible);
         // Up arrow - go to previous (older) message, wrap to bottom when at top
         if (kb.Matches(keyData, "tui.select.up"))
             selectedIndex = selectedIndex == 0 ? messages.Count - 1 : selectedIndex - 1;
         // Down arrow - go to next (newer) message, wrap to top when at bottom
         else if (kb.Matches(keyData, "tui.select.down"))
             selectedIndex = selectedIndex == messages.Count - 1 ? 0 : selectedIndex + 1;
+        // Page up/down
+        else if (pageIndex is { } page)
+        {
+            if (messages.Count == 0) return;
+            selectedIndex = page;
+        }
         // Enter - select message and branch
         else if (kb.Matches(keyData, "tui.select.confirm"))
         {

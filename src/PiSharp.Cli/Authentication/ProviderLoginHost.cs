@@ -147,7 +147,7 @@ internal sealed class ProviderLoginHost(AuthJsonCredentialStore store, Func<Http
     private static void OpenSystemBrowser(string url)
     {
         if (!Uri.TryCreate(url, UriKind.Absolute, out var uri) || uri.Scheme != Uri.UriSchemeHttps) return;
-        using var _ = Process.Start(new ProcessStartInfo(uri.AbsoluteUri) { UseShellExecute = true });
+        PiSharp.Cli.Interactive.Mode.Utilities.BrowserOpener.OpenBrowser(uri.AbsoluteUri); // open-browser.ts, from the root (#11592)
     }
 }
 

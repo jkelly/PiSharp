@@ -178,6 +178,10 @@ internal sealed class InteractiveSettings
     // ---------------------------------------------------------------- settings
     public string? LastChangelogVersion => Str(Get("lastChangelogVersion"));
     public void SetLastChangelogVersion(string version) => Set("lastChangelogVersion", version);
+    /// <summary>Pi 1.5.0 getExtensionChangelogVersion: the last seen changelog version of an extension package (getSourcePackageKey).</summary>
+    public string? GetExtensionChangelogVersion(string key) => Str(Get("extensionChangelogVersions", key));
+    /// <summary>Pi 1.5.0 setExtensionChangelogVersion (global settings, the one key marked modified).</summary>
+    public void SetExtensionChangelogVersion(string key, string version) => SetNested("extensionChangelogVersions", key, version);
     public string? DefaultProvider => Str(Get("defaultProvider"));
     public string? DefaultModel => Str(Get("defaultModel"));
     public void SetDefaultModelAndProvider(string provider, string modelId)
@@ -211,6 +215,10 @@ internal sealed class InteractiveSettings
     }
     public string Transport => Str(Get("transport")) ?? "auto";
     public void SetTransport(string transport) { Set("transport", transport); PiSharp.Cli.Pi.PiTransportSetting.Set(transport); }
+    /// <summary>Pi 1.5.0 getSessionShareDestination: "auto", "gist" or "radius"; any other value reads as "auto".</summary>
+    public string SessionShareDestination => Str(Get("sessionShareDestination")) is var destination && destination is "gist" or "radius" ? destination : "auto";
+    /// <summary>Pi 1.5.0 setSessionShareDestination (global settings).</summary>
+    public void SetSessionShareDestination(string destination) => Set("sessionShareDestination", destination);
     /// <summary>PiSharp-only (decision 0007): the default service tier; null removes it.</summary>
     public void SetServiceTier(string? tier) => Set("serviceTier", tier is null ? null : JsonValue.Create(tier));
     public bool CompactionEnabled => Bool(Get("compaction", "enabled")) ?? true;

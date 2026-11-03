@@ -1,8 +1,9 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/src/modes/interactive/session-share.ts (UI-free), with
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/coding-agent/src/modes/interactive/session-share.ts (UI-free), with
 // src/config.ts (getShareViewerUrl), core/radius.ts and packages/ai/src/providers/radius-config.ts (DEFAULT_RADIUS_GATEWAY),
 // cli/auth-command.ts (getAuthCredential) and packages/tui/src/terminal-image.ts (hyperlink).
 using System.ComponentModel;
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.Net.Http.Headers;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -32,7 +33,13 @@ public interface IShareProcessRunner
 
 /// <summary>The session being shared (AgentSession): its session manager view, agent state and HTML export.</summary>
 public sealed record SessionShareSession(Func<SessionExportSource> Source, Func<SessionExportAgentState> State,
-    Func<string, CancellationToken, Task> ExportToHtmlAsync, IRadiusShareAuthentication? Radius = null);
+    Func<string, CancellationToken, Task> ExportToHtmlAsync, IRadiusShareAuthentication? Radius = null)
+{
+    /// <summary>Pi 1.5.0 sessionShareDestination: <c>auto</c> uses Radius when signed in and otherwise a GitHub gist, <c>gist</c> always
+    /// uses a gist, and <c>radius</c> fails when Radius is not signed in. Any other value reads as <c>auto</c>.</summary>
+    [Experimental("PISHARP_EXTUI001")]
+    public string Destination { get; init; } = "auto";
+}
 
 /// <summary>
 /// The /share command's UI seam (SessionShareContext without TUI): status and error lines, and the bordered loader that
@@ -121,7 +128,12 @@ public sealed class SessionShare
         {
             try { ExportSessionForShare(jsonlFile, session); }
             catch (Exception error) { ui.ShowError("Failed to export session: " + error.Message); return; }
-            if (await TryShareViaRadiusAsync(jsonlFile, session, ui, abort).ConfigureAwait(false)) return;
+            var destination = session.Destination is "gist" or "radius" ? session.Destination : "auto";
+            if (destination != "gist")
+            {
+                if (await TryShareViaRadiusAsync(jsonlFile, session, ui, abort).ConfigureAwait(false)) return;
+                if (destination == "radius") { ui.ShowError("Radius authentication is not configured. Run '/login radius' first."); return; }
+            }
             try
             {
                 var auth = await Processes.RunAsync("gh", ["auth", "status"], CancellationToken.None).ConfigureAwait(false);
