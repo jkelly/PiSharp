@@ -284,6 +284,11 @@
       "title": "Experimental durable port",
       "status": "partial",
       "notes": "1.2.0.1 ships pisharp durable and the PiSharp.Durable, PiSharp.Durable.Tools and PiSharp.Durable.Sqlite packages as experimental: a port of pi-durable v1.2.0 whose every upstream file is ported or recorded as excluded (decision 0005, durable-port-map.json). Open: JSONL storage keeps its records in memory, and code mode scripts interrupted under Pi or PiSharp don't resume in the other. 1.2.0.2 adds PiSharp-only questions, plan mode, media tools and a device server (decisions 0005, 0007 and 0008), which pi-durable doesn't have."
+    },
+    {
+      "title": "Pi 1.5.0 sync",
+      "status": "planned",
+      "notes": "Pi 1.3.0, 1.4.0 and 1.5.0 are synced in one step, straight to Pi 1.5.0, and ship as PiSharp 1.5.0. The sync started on 2026-11-02 on the sync/pi-1.5.0 branch. Until it ships, PiSharp tracks Pi 1.2.0."
     }
   ]
 }
