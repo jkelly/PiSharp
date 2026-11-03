@@ -8,8 +8,9 @@ using PiSharp.CodingAgent.Export;
 // generateHtml/generateThemeVars, theme.ts, system-theme.ts, pi-tui colors.ts/oklab.ts, session-export.ts serializeSessionBranch)
 // under Node 22 against the same authored fixture bytes; only module imports were redirected to local stubs (paths, config dirs).
 // Exception: the five whole-page digests (default, dark, light, COLORFGBG and light-with-state pages) and the page length were
-// recomputed from PiSharp's own output after the Pi 1.5.0 CJK emphasis change (new marked, marked-cjk-friendly, template hunk).
-// They are authored regression pins, not upstream captures; the per-asset digests and the session-data digests are unchanged.
+// recomputed from PiSharp's own output with the Pi 1.5.0 export assets (template.html, template.css, template.js, marked and
+// marked-cjk-friendly). They are authored regression pins, not upstream captures; the per-asset digests are the sha256 of the
+// upstream blobs and the session-data digests are unchanged.
 internal static partial class Program
 {
     // Authored fixture session (tricky JSON: replacement patterns, escapes, lone surrogate, number forms, index keys, duplicates,
@@ -68,8 +69,8 @@ internal static partial class Program
             var sha256 = new Dictionary<string, string>
             {
                 ["template.html"] = "47d208235b066c856dae69c60281a3b99d164b99be9b81153d880375c9327105", // v1.5.0
-                ["template.css"] = "8ee19851f8e583277ed396cbb76496687aa556707fdfc1f78d1118bff87c740a",
-                ["template.js"] = "c9832f46ed65560099e05f522110fb9a5d3f3c115cc488fa97fbcb379115e51d", // v1.2.0 plus the 1.5.0 emStrong hunk
+                ["template.css"] = "c9d26cc314336192021d604c0f1a4a63115172b24d03500571379f9172c06fc9", // v1.5.0
+                ["template.js"] = "14fbe96123a82ee0f3efdd9f9634dd316c59810509fdbd8c5a5f41f3918c07a4", // v1.5.0
                 ["vendor/marked.min.js"] = "438eedfcf932a414d0d0bfeea32dc365c063563b8ca713b4687fc8f8b501e5e4", // v1.5.0 (marked v18.0.11)
                 ["vendor/marked-cjk-friendly.min.js"] = "93d2c938754cb24eef5b9ffecc268a98ef6beeb75dad614b0e874176aeeba565", // v1.5.0 (v0.1.2)
                 ["vendor/highlight.min.js"] = "837a6fa5b0c736b52bbde2b2b6190f305da3fc9ed41681db5321507057b5c846",
@@ -90,8 +91,8 @@ internal static partial class Program
             var root = Temp("html-file"); var fixture = WriteFixture(root); var output = Path.Combine(root, "out.html");
             Equal(output, await SessionHtmlExport.ExportFromFileAsync(fixture, new(OutputPath: output), Themes()), "returned path");
             var bytes = await File.ReadAllBytesAsync(output);
-            Equal(280750, bytes.Length, "page length"); Check(bytes[0] == (byte)'<', "no BOM");
-            Equal("a63c59d6dbe353a881caa38114a84aff1881f19dc732f079966cf79fb8fd2bae", Sha256(bytes), "default (system) page");
+            Equal(287261, bytes.Length, "page length"); Check(bytes[0] == (byte)'<', "no BOM");
+            Equal("700510e2515e11bf8cdacb0326e8bceca6038d03cf20387d165f341ddeb80b93", Sha256(bytes), "default (system) page");
             var html = Encoding.UTF8.GetString(bytes);
             Equal("f7a21bcebf3adf8f40c1487ee13801ad329ad48d911c1538f53e0745e9908a58", Sha256(SessionDataJson(html)), "decoded session data");
             var template = SessionHtmlExport.ReadAsset("template.html");
@@ -110,8 +111,8 @@ internal static partial class Program
         Case("export-share.html.builtin-and-colorfgbg-themes-match-upstream-bytes", async () =>
         {
             var root = Temp("html-themes"); var fixture = WriteFixture(root);
-            foreach (var (theme, expected) in new[] { ("dark", "e82fd5599cf25be89d2752043254954b07854945e4706a81908b808474c34439"),
-                ("light", "af76f5002c3f1e31d375422dc4c16c9aef29f86c84d7d82ec40365ab093498d7") })
+            foreach (var (theme, expected) in new[] { ("dark", "6975e79023d732c70ec5dc27f9d4374abde66b43dbdbd1a609715f3b48d77074"),
+                ("light", "59efb84b61c8f5cee3d81c64a3149a50933db336e34411fa3ae34a9f731e80d8") })
             {
                 var output = Path.Combine(root, theme + ".html");
                 await SessionHtmlExport.ExportFromFileAsync(fixture, new(OutputPath: output, ThemeName: theme), Themes());
@@ -119,7 +120,7 @@ internal static partial class Program
             }
             var light = Path.Combine(root, "colorfgbg.html");
             await SessionHtmlExport.ExportFromFileAsync(fixture, new(OutputPath: light), Themes(environment: name => name == "COLORFGBG" ? "0;15" : null));
-            Equal("cf74972f03b2c2568df0a66f506d94658ae1de146ebd9887fea211693a00d5bc", Sha256(await File.ReadAllBytesAsync(light)), "COLORFGBG light system page");
+            Equal("57fee6a8cd8f28ac86305aa5f328193aee654f657c67965055e77487f439e65a", Sha256(await File.ReadAllBytesAsync(light)), "COLORFGBG light system page");
         }),
 
         Case("export-share.html.state-tools-and-pre-rendered-custom-tools-match-upstream", () =>
@@ -135,7 +136,7 @@ internal static partial class Program
             Equal("8ee1043c2f8ea6d1b116f2a74cf9927940bac07bb44e6140e5ff9be63f01dabc", Sha256(Js.Stringify(data)), "session data with state");
             Check(Js.Stringify(data).EndsWith("\"renderedTools\":{\"call_1\":{\"callHtml\":\"<b>call</b>\",\"resultHtmlExpanded\":\"<i>e</i>\"}}}", StringComparison.Ordinal),
                 "rendered tools shape");
-            Equal("1305153ba7758e270137cb01b2a089cf1824ed9db013508269499bd189d03495", Sha256(SessionHtmlExport.GenerateHtml(data, Themes(), "light")), "light page with state");
+            Equal("a020c5400cb8feec2ffd16d743f8de39f87ef6179a2c24c565f001fa0d48f7a8", Sha256(SessionHtmlExport.GenerateHtml(data, Themes(), "light")), "light page with state");
             var none = SessionHtmlExport.BuildSessionData(source, state, new NoToolRenderer());
             Check(!none.Has("renderedTools") || Js.IsUndefined(none["renderedTools"]), "empty pre-render is omitted");
         }),
