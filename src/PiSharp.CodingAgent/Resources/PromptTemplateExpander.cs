@@ -15,7 +15,8 @@ public static class PromptTemplateExpander
     {
         ArgumentNullException.ThrowIfNull(argsString);
         var args = ImmutableArray.CreateBuilder<string>();
-        var current = new StringBuilder(); char? quote = null;
+        // Pi 1.5.0 parseCommandArgs hasToken: a started token is kept even when empty, so "" and '' stay positional arguments.
+        var current = new StringBuilder(); char? quote = null; var hasToken = false;
         foreach (var value in argsString)
         {
             if (quote is not null)
@@ -23,15 +24,15 @@ public static class PromptTemplateExpander
                 if (value == quote) quote = null;
                 else current.Append(value);
             }
-            else if (value is '\'' or '"') quote = value;
+            else if (value is '\'' or '"') { quote = value; hasToken = true; }
             else if (PromptTemplateParser.IsEcmaWhitespace(value))
             {
-                if (current.Length == 0) continue;
-                args.Add(current.ToString()); current.Clear();
+                if (!hasToken) continue;
+                args.Add(current.ToString()); current.Clear(); hasToken = false;
             }
-            else current.Append(value);
+            else { current.Append(value); hasToken = true; }
         }
-        if (current.Length != 0) args.Add(current.ToString());
+        if (hasToken) args.Add(current.ToString());
         return args.ToImmutable();
     }
 
