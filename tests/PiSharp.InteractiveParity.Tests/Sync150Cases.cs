@@ -1,8 +1,10 @@
 // Pi 1.5.0 sync, core-session rows: markdown transformer entry identity (user-message.test.ts "passes persisted entry identity in
-// transformer context; live leaves it undefined", interactive-mode.ts renderSessionEntries messageMeta) and extension keybinding
-// hints (extension-keybinding-hints.test.ts). Expectations are authored from reading the v1.5.0 sources and tests; nothing is
-// captured from an upstream run.
-#pragma warning disable PISHARP_EXTUI001 // Pi 1.5.0 keybinding hints are [Experimental].
+// transformer context; live leaves it undefined", interactive-mode.ts renderSessionEntries messageMeta), extension keybinding hints
+// (extension-keybinding-hints.test.ts) and the blocked status of inline custom components (interactive-mode-extension-dialogs.test.ts
+// "reports blocked status for an inline custom component that opts in", without the dialog stack). Expectations are authored from
+// reading the v1.5.0 sources and tests; nothing is captured from an upstream run.
+#pragma warning disable PISHARP_EXTUI001 // Pi 1.5.0 keybinding hints and blocked status are [Experimental].
+using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using PiSharp.Cli.Interactive.Mode;
@@ -111,6 +113,40 @@ internal static class Sync150Cases
             var component = renderers.RenderCall!(new JsonObject(), Themes.Current, new ToolRenderContext { ToolName = "custom_tool", ToolCallId = "tool-1", Cwd = "/" });
             component.Render(80);
             Equal(Expected, await seen.Task.WaitAsync(TimeSpan.FromSeconds(10)), "tool render context");
+        });
+
+        // The bridge's ui.custom request: blocked applies to inline components only.
+        yield return ("sync150.custom-component-blocked-option-is-inline-only", Sync(() =>
+        {
+            static ExtensionCustomComponentBlocked? Parse(string json) =>
+                PiSharp.Cli.Extensions.Pi.PiExtensionHost.CustomComponentBlocked(JsonDocument.Parse(json).RootElement);
+            Equal(new ExtensionCustomComponentBlocked("permission", "Approve?"),
+                Parse("""{"component":"c1","overlay":false,"overlayOptions":null,"blocked":{"kind":"permission","message":"Approve?"}}"""), "inline");
+            Equal(null, Parse("""{"component":"c1","overlay":true,"overlayOptions":null,"blocked":{"kind":"permission","message":"Approve?"}}"""), "overlay");
+            Equal(null, Parse("""{"component":"c1","overlay":false,"overlayOptions":null,"blocked":null}"""), "no option");
+        }));
+
+        yield return ("sync150.inline-custom-component-reports-blocked-status", async () =>
+        {
+            await using var pi = new InteractiveHarness("sync150-blocked");
+            pi.Vars["PI_PROGRAM_STATUS"] = "1";
+            pi.Start("--provider", "anthropic", "--model", "claude-sonnet-4-5", "--tui-mode", "regular");
+            await pi.WaitFor("escape interrupt");
+            var identity = new ExtensionCustomComponentIdentity("owner", 1, 1, "c1");
+            var callbacks = new ExtensionCustomComponentCallbacks(identity,
+                (_, _, _) => Task.FromResult(new ExtensionCustomComponentRows(["approval"], [8])), (_, _, _) => Task.CompletedTask, _ => Task.CompletedTask)
+            { Blocked = new("permission", "Approve?") };
+            var blocked = "]7501;state=blocked:app=pi:kind=permission:msg=" + Convert.ToBase64String(Encoding.UTF8.GetBytes("Approve?"));
+            var shown = pi.Mode!.ShowExtensionCustomComponentAsync(callbacks, null!, CancellationToken.None);
+            await pi.WaitFor("approval");
+            await pi.WaitUntil(_ => pi.Terminal.RawOutput.Contains(blocked, StringComparison.Ordinal), "blocked status reported");
+            var before = pi.Terminal.RawOutput.Length;
+            pi.Mode.SignalExtensionCustomComponent(identity, done: true);
+            await shown.WaitAsync(TimeSpan.FromSeconds(10));
+            await pi.WaitUntil(_ => pi.Terminal.RawOutput[before..].Contains("]7501;state=", StringComparison.Ordinal), "status after close");
+            var after = pi.Terminal.RawOutput[before..];
+            Check(!after.Contains("state=blocked", StringComparison.Ordinal), "closing the component clears the blocked status: " + after.Replace("\u001b", "\\e"));
+            Equal(0, await pi.Quit(), "exit code");
         });
     }
 }

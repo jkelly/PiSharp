@@ -213,6 +213,8 @@ internal sealed partial class InteractiveMode
             editorContainer.Clear();
             editorContainer.AddChild(component);
             ui.SetFocus(component);
+            // Pi 1.5.0: an inline component that opts in reports pi as blocked while it is visible.
+            if (BlockedStatusOf(callbacks.Blocked) is { } blocked) programStatus.SetBlocked("extension-dialog", blocked);
             ui.RequestRender();
         });
         try { await done.Task.WaitAsync(token); }
@@ -221,6 +223,7 @@ internal sealed partial class InteractiveMode
             await context.Loop.InvokeAsync(() =>
             {
                 if (ReferenceEquals(activeCustomComponent, active)) activeCustomComponent = null;
+                if (callbacks.Blocked is not null) programStatus.SetBlocked("extension-dialog", null);
                 editorContainer.Clear();
                 editorContainer.AddChild(editor);
                 ui.SetFocus(editor);
@@ -229,6 +232,16 @@ internal sealed partial class InteractiveMode
             await callbacks.Dispose(extensionContext);
         }
     }
+
+    /// <summary>The program status kind of a custom component's <c>blocked</c> option (OSC 7501 "permission", "question" or
+    /// "auth"); an unknown kind reports nothing.</summary>
+    private static BlockedStatus? BlockedStatusOf(PiSharp.Extensions.ExtensionCustomComponentBlocked? blocked) => blocked?.Kind switch
+    {
+        "permission" => new(ProgramBlockedKind.Permission, blocked.Message),
+        "question" => new(ProgramBlockedKind.Question, blocked.Message),
+        "auth" => new(ProgramBlockedKind.Auth, blocked.Message),
+        _ => null
+    };
 
     /// <summary>The open custom component called done() (or asked to be redrawn).</summary>
     internal void SignalExtensionCustomComponent(PiSharp.Extensions.ExtensionCustomComponentIdentity identity, bool done) => context.Loop.Post(() =>

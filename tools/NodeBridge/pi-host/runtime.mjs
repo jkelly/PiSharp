@@ -564,7 +564,8 @@ export class ExtensionRuntime {
         try { id = runtime.createComponent((tui, theme, keybindings) => factory(tui, theme, keybindings, done)); }
         catch (error) { reject(error); return; }
         const overlayOptions = typeof options?.overlayOptions === 'function' ? options.overlayOptions() : options?.overlayOptions;
-        bridge.call('ui.custom', { ctx, component: id, overlay: options?.overlay === true, overlayOptions: overlayOptions ?? null })
+        // Pi 1.5.0: blocked reports program status while the inline component is visible (overlays ignore it).
+        bridge.call('ui.custom', { ctx, component: id, overlay: options?.overlay === true, overlayOptions: overlayOptions ?? null, blocked: options?.blocked ?? null })
           .catch((error) => { runtime.disposeComponent(id); reject(error); });
       })),
       pasteToEditor: (text) => bridge.notify('ui.publish', { ctx, op: 'pasteToEditor', args: [text] }),
