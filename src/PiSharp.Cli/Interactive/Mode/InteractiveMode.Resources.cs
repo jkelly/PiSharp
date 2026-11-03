@@ -189,8 +189,7 @@ internal sealed partial class InteractiveMode
 
     private string FormatDisplayPath(string p)
     {
-        var home = context.Startup.Home;
-        return p.StartsWith(home, StringComparison.Ordinal) ? "~" + p[home.Length..] : p;
+        return PiSharp.Cli.Pi.PiPaths.ShortenHomePath(p, context.Startup.Home);
     }
 
     private string FormatExtensionDisplayPath(string path) =>

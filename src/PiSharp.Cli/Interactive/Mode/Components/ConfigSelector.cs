@@ -80,6 +80,9 @@ internal sealed partial class ConfigSelectorComponent
     /// <summary>Source FlatEntry: a group header, a subgroup header or an item.</summary>
     private sealed record FlatEntry(string Type, ResourceGroup? Group = null, ResourceSubgroup? Subgroup = null, ResourceItem? Item = null);
 
+    /// <summary>Test seam for the source formatBaseDir (the group label's base directory).</summary>
+    internal static string FormatBaseDirForTests(string baseDir, string homeDir) => ConfigResources.FormatBaseDir(baseDir, homeDir);
+
     private static class ConfigResources
     {
         public const string BuiltinPathPrefix = "builtin:";
@@ -106,16 +109,8 @@ internal sealed partial class ConfigSelectorComponent
 
         public static string FormatBaseDir(string baseDir, string homeDir)
         {
-            string displayPath;
-
-            if (baseDir == homeDir) displayPath = "~";
-            else if (baseDir.StartsWith(homeDir, StringComparison.Ordinal))
-            {
-                // Replace home prefix with ~, normalize separators for display
-                var rest = baseDir[homeDir.Length..];
-                displayPath = $"~{rest.Replace('\\', '/')}";
-            }
-            else displayPath = baseDir.Replace('\\', '/');
+            // Replace a leading home directory with ~ (whole segments only), normalize separators for display.
+            var displayPath = PiSharp.Cli.Pi.PiPaths.ShortenHomePath(baseDir, homeDir).Replace('\\', '/');
 
             return displayPath.EndsWith('/') ? displayPath : $"{displayPath}/";
         }

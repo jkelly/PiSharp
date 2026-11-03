@@ -142,6 +142,23 @@ internal static partial class PiPaths
         return childKey.StartsWith(parentKey.EndsWith(Path.DirectorySeparatorChar) ? parentKey : parentKey + Path.DirectorySeparatorChar, StringComparison.Ordinal);
     }
 
+    /// <summary>Source shortenHomePath (Pi 1.5.0, 1be312b46): replaces a leading home directory with <c>~</c> only when
+    /// <paramref name="path"/> is the home directory or inside it by whole segments (<see cref="IsPathWithin"/>, case-insensitive on
+    /// Windows), so a home of <c>/home/al</c> leaves <c>/home/alice</c> alone. A relative path, or an empty home, is returned
+    /// unchanged. The rest is <c>path.relative(home, path)</c> after <c>~</c> and the platform separator.</summary>
+    internal static string ShortenHomePath(string path, string? homeDir)
+    {
+        if (string.IsNullOrEmpty(homeDir) || string.IsNullOrEmpty(path) || !IsAbsolute(path) || !IsPathWithin(homeDir, path)) return path;
+        string relative;
+        try { relative = Path.GetRelativePath(homeDir, path); }
+        catch (Exception error) when (error is ArgumentException or NotSupportedException or PathTooLongException) { return path; }
+        return relative == "." ? "~" : $"~{Path.DirectorySeparatorChar}{relative}";
+    }
+
+    /// <summary>Node's <c>path.isAbsolute</c>: a leading separator, or (Windows) a drive letter followed by one.</summary>
+    private static bool IsAbsolute(string path) =>
+        path[0] == '/' || (Windows && (path[0] == '\\' || Path.IsPathFullyQualified(path)));
+
     /// <summary>Strips one leading UTF-8 byte order mark (source stripBom).</summary>
     internal static string StripBom(string text) => text.Length > 0 && text[0] == '\ufeff' ? text[1..] : text;
 

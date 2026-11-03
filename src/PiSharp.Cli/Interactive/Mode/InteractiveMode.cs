@@ -291,13 +291,9 @@ internal sealed partial class InteractiveMode
     {
         if (isInitialized) return;
         changelogMarkdown = GetChangelogForDisplay();
-        if (state.ScopedModels.Count > 0 && ShouldShowStartupDetails())
-        {
-            var modelList = string.Join(", ", state.ScopedModels.Select(scoped => SessionEntries.Str(scoped.Model["id"]) + (scoped.ThinkingLevel is { } level ? ":" + level : "")));
-            var cycleKeys = keybindings.GetKeys("app.model.cycleForward");
-            var cycleHint = cycleKeys.Count > 0 ? theme.Fg("muted", $" ({KeybindingHints.FormatKeyText(string.Join("/", cycleKeys), capitalize: true)} to cycle)") : "";
-            context.ConsoleLog(theme.Fg("dim", $"Model scope: {modelList}{cycleHint}"));
-        }
+        // Fullscreen renders on the alternate screen, so text printed to stdout here would stay in the shell after exit. Fullscreen
+        // shows the notice in the header instead (Pi 1.5.0, #11508).
+        if (renderer.Mode != TuiMode.Fullscreen && GetModelScopeNotice() is { } modelScopeNotice) context.ConsoleLog(modelScopeNotice);
 
         RenderWidgets();
         var viewport = InteractiveTui.CreateChatViewport(documentContainer, pendingMessagesContainer, statusContainer, widgetContainerAbove,
@@ -372,6 +368,7 @@ internal sealed partial class InteractiveMode
             builtInHeader = new Text("", 0, 0);
             headerContainer.AddChild(builtInHeader);
         }
+        if (renderer.Mode == TuiMode.Fullscreen) ShowFullscreenModelScopeNotice();
         ui.RequestRender();
 
         // The tools manager reports from its download threads: statuses join the loop in order.
@@ -548,6 +545,25 @@ internal sealed partial class InteractiveMode
     private bool ShouldShowStartupHeader() => options.Verbose || settings.QuietStartup is not true;
 
     /// <summary>Startup details (model scope, loaded resources). Hidden by quietStartup: true or "header".</summary>
+    /// <summary>Source getModelScopeNotice: <c>Model scope: id[:thinking], ... (keys to cycle)</c>, or null without scoped models or when
+    /// startup details are hidden.</summary>
+    private string? GetModelScopeNotice()
+    {
+        if (state.ScopedModels.Count == 0 || !ShouldShowStartupDetails()) return null;
+        var modelList = string.Join(", ", state.ScopedModels.Select(scoped => SessionEntries.Str(scoped.Model["id"]) + (scoped.ThinkingLevel is { } level ? ":" + level : "")));
+        var cycleKeys = keybindings.GetKeys("app.model.cycleForward");
+        var cycleHint = cycleKeys.Count > 0 ? theme.Fg("muted", $" ({KeybindingHints.FormatKeyText(string.Join("/", cycleKeys), capitalize: true)} to cycle)") : "";
+        return theme.Fg("dim", $"Model scope: {modelList}{cycleHint}");
+    }
+
+    /// <summary>Source showFullscreenModelScopeNotice: the notice below the built-in header, rebuilt per render so it follows the theme.</summary>
+    private void ShowFullscreenModelScopeNotice()
+    {
+        if (GetModelScopeNotice() is null) return;
+        headerContainer.AddChild(new ThemedText(() => GetModelScopeNotice() ?? "", 1, 0));
+        headerContainer.AddChild(new Spacer(1));
+    }
+
     private bool ShouldShowStartupDetails() => options.Verbose || settings.QuietStartup is false;
 
     // =========================================================================

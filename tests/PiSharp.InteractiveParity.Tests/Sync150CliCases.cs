@@ -289,6 +289,95 @@ internal static class Sync150CliCases
             row.Render(80);
             Equal(2L, SyntaxHighlight.HighlightCalls - before, "complete file highlighted once");
         }));
+
+        // interactive-mode-model-scope.test.ts (7391dbb0f, #11508): fullscreen shows "Model scope: ..." in the header and logs nothing
+        // to the shell; regular mode still logs it before the TUI starts; hidden startup details show it nowhere.
+        yield return ("sync150.fullscreen-model-scope-notice-is-in-the-header", async () =>
+        {
+            const string Notice = "Model scope: claude-sonnet-4-5, claude-haiku-4-5 (Ctrl+P to cycle)";
+            foreach (var (mode, quiet) in new[] { ("fullscreen", false), ("regular", false), ("fullscreen", true) })
+            {
+                await using var pi = new InteractiveHarness($"sync150-model-scope-{mode}{(quiet ? "-quiet" : "")}");
+                pi.Write(Path.Combine(pi.AgentDir, "settings.json"), $"{{\"quietStartup\":{(quiet ? "true" : "false")}}}");
+                var logged = new List<string>();
+                pi.Configure = context => context with { ConsoleLog = line => { lock (logged) logged.Add(Strip(line)); } };
+                pi.Start("--models", "claude-sonnet-4-5,claude-haiku-4-5", "--tui-mode", mode);
+                var screen = await pi.WaitFor("claude-sonnet-4-5");
+                if (mode == "fullscreen" && !quiet) screen = await pi.WaitFor(Notice);
+                List<string> lines; lock (logged) lines = [.. logged];
+                var inHeader = screen.Contains("Model scope:", StringComparison.Ordinal);
+                var inLog = lines.Any(line => line.Contains("Model scope:", StringComparison.Ordinal));
+                Equal(mode == "fullscreen" && !quiet, inHeader, $"{mode} quiet={quiet}: in the header\n{screen}");
+                Equal(mode == "regular", inLog, $"{mode} quiet={quiet}: logged to the shell ({string.Join(" | ", lines)})");
+                if (inLog) Check(lines.Contains(Notice), "logged text: " + string.Join(" | ", lines));
+                Equal(0, await pi.Quit(), "exit code");
+            }
+        });
+
+        // paths.test.ts "shortenHomePath replaces only a leading home directory" and "... ignores casing and keeps separators on
+        // Windows" (this platform's half only: the source simulates the other platform), and the five display sites that now use it.
+        yield return ("sync150.home-tilde-only-at-a-segment-boundary", Sync(() =>
+        {
+            static string Short(string path, string? home) => PiSharp.Cli.Pi.PiPaths.ShortenHomePath(path, home);
+            var sep = Path.DirectorySeparatorChar;
+            if (OperatingSystem.IsWindows())
+            {
+                Equal(@"~\project", Short(@"c:\users\me\project", @"C:\Users\Me"), "casing ignored");
+                Equal(@"~\folder", Short(@"\\server\share\folder", @"\\server\share"), "UNC home");
+                Equal(@"C:\Users\me2\project", Short(@"C:\Users\me2\project", @"C:\Users\me"), "a longer name is not inside home");
+                Equal("~", Short(@"C:\Users\me\", @"C:\Users\me"), "home itself");
+                Equal(@"~\Windows\x", Short(@"C:\Windows\x", @"C:\"), "a root home");
+            }
+            else
+            {
+                Equal("~", Short("/home/me", "/home/me"), "home itself");
+                Equal("~/project", Short("/home/me/project", "/home/me"), "inside home");
+                Equal("/home/me2/project", Short("/home/me2/project", "/home/me"), "a longer name is not inside home");
+                Equal("/home/Me/project", Short("/home/Me/project", "/home/me"), "case-sensitive");
+                Equal("~/etc/passwd", Short("/etc/passwd", "/"), "a root home");
+            }
+            Equal("home/me/project", Short("home/me/project", "/home/me"), "relative unchanged");
+            Equal("/home/me/project", Short("/home/me/project", ""), "no home");
+            Equal("", Short("", "/home/me"), "empty");
+
+            var root = Path.Combine(Path.GetTempPath(), "pisharp-sync150-home");
+            var home = Path.Combine(root, "al");
+            var sibling = Path.Combine(root, "alice", "notes.md");
+            var inside = Path.Combine(home, "notes.md");
+            var previous = RenderUtils.HomeDirectory;
+            RenderUtils.HomeDirectory = () => home;
+            try
+            {
+                Equal(sibling, RenderUtils.ShortenPath(sibling), "tool rows keep a sibling home");
+                Equal($"~{sep}notes.md", RenderUtils.ShortenPath(inside), "tool rows shorten inside home");
+            }
+            finally { RenderUtils.HomeDirectory = previous; }
+            Equal($"{sibling.Replace('\\', '/')}/", ConfigSelectorComponent.FormatBaseDirForTests(sibling, home), "config selector keeps a sibling home");
+            Equal("~/notes.md/", ConfigSelectorComponent.FormatBaseDirForTests(inside, home), "config selector shortens inside home");
+            Equal("~/", ConfigSelectorComponent.FormatBaseDirForTests(home, home), "config selector home itself");
+        }));
+
+        // clipboard-command.test.ts "runs commands from the filesystem root" (#11592) and "runs commands outside pi's process group"
+        // (#11179, skipped on Windows like the source).
+        yield return ("sync150.clipboard-helpers-start-from-the-root-in-their-own-group", async () =>
+        {
+            static async Task<string?> Run(string command, params string[] args) =>
+                await PiSharp.Cli.Interactive.Mode.Utilities.ClipboardCommand.RunClipboardCommand(command, args) is { } bytes
+                    ? System.Text.Encoding.UTF8.GetString(bytes).Trim() : null;
+            var root = Path.GetPathRoot(Path.GetFullPath("/"));
+            Equal(root, PiSharp.Cli.Interactive.Mode.Utilities.ClipboardCommand.HelperWorkingDirectory(), "helper cwd");
+            Equal(root, OperatingSystem.IsWindows() ? await Run("cmd.exe", "/d", "/c", "cd") : await Run("/bin/sh", "-c", "pwd"), "child cwd");
+            Equal(null, await Run("pisharp-no-such-clipboard-tool"), "a command that cannot start is a failure");
+            if (OperatingSystem.IsWindows()) return;
+            var childPgid = await Run("sh", "-c", "ps -o pgid= -p $$");
+            var ownPgid = await Run("ps", "-o", "pgid=", "-p", Environment.ProcessId.ToString(System.Globalization.CultureInfo.InvariantCulture));
+            Check(childPgid is { Length: > 0 } && childPgid.All(char.IsAsciiDigit), $"child pgid {childPgid}");
+            Check(ownPgid is { Length: > 0 } && ownPgid.All(char.IsAsciiDigit), $"own pgid {ownPgid}");
+            Check(childPgid != ownPgid, "the helper leads its own group");
+            // A writer gets no output pipe; it still succeeds with an empty result.
+            var written = await PiSharp.Cli.Interactive.Mode.Utilities.ClipboardCommand.RunClipboardCommand("sh", ["-c", "cat > /dev/null"], new("copied"));
+            Equal(0, written?.Length ?? -1, "writer result");
+        });
     }
 
     private static JsonObject Block(string type, string key, string value) => new() { ["type"] = type, [key] = value };

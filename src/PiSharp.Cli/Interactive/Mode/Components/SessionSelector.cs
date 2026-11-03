@@ -415,9 +415,7 @@ internal sealed class SessionList : IComponent, IFocusable, IInputHandler
     {
         var home = Environment.GetEnvironmentVariable(OperatingSystem.IsWindows() ? "USERPROFILE" : "HOME") is { Length: > 0 } fromEnv
             ? fromEnv : Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
-        if (string.IsNullOrEmpty(path)) return path;
-        if (path.StartsWith(home, StringComparison.Ordinal)) return "~" + path[home.Length..];
-        return path;
+        return PiSharp.Cli.Pi.PiPaths.ShortenHomePath(path, home);
     }
 
     internal static string FormatSessionDate(DateTimeOffset date, DateTimeOffset? now = null)

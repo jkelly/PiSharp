@@ -906,8 +906,7 @@ internal sealed class TreeList : IComponent, IInputHandler
         static string ShortenPath(string p)
         {
             var home = Environment.GetEnvironmentVariable("HOME") is { Length: > 0 } h ? h : Environment.GetEnvironmentVariable("USERPROFILE") ?? "";
-            if (home.Length > 0 && p.StartsWith(home, StringComparison.Ordinal)) return "~" + p[home.Length..];
-            return p;
+            return PiSharp.Cli.Pi.PiPaths.ShortenHomePath(p, home);
         }
 
         switch (name)

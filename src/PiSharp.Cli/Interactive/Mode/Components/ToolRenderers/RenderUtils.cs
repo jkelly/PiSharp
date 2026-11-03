@@ -90,9 +90,7 @@ internal static partial class RenderUtils
 
     public static string ShortenPath(string path)
     {
-        var home = HomeDirectory();
-        if (path.StartsWith(home, StringComparison.Ordinal)) return "~" + path[home.Length..];
-        return path;
+        return PiSharp.Cli.Pi.PiPaths.ShortenHomePath(path, HomeDirectory());
     }
 
     public static string LinkPath(string styledText, string rawPath, string cwd)
