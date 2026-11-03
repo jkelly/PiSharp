@@ -1,6 +1,8 @@
 // Pi 1.5.0 sync, core-session rows: markdown transformer entry identity (user-message.test.ts "passes persisted entry identity in
-// transformer context; live leaves it undefined", interactive-mode.ts renderSessionEntries messageMeta). Expectations are authored
-// from reading the v1.5.0 sources and tests; nothing is captured from an upstream run.
+// transformer context; live leaves it undefined", interactive-mode.ts renderSessionEntries messageMeta) and extension keybinding
+// hints (extension-keybinding-hints.test.ts). Expectations are authored from reading the v1.5.0 sources and tests; nothing is
+// captured from an upstream run.
+#pragma warning disable PISHARP_EXTUI001 // Pi 1.5.0 keybinding hints are [Experimental].
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using PiSharp.Cli.Interactive.Mode;
@@ -12,6 +14,15 @@ using static Expect;
 
 internal static class Sync150Cases
 {
+    private const string Expected = "ctrl+e | ctrl+e to expand";
+
+    /// <summary>A user override proves the hints read the host's configured keybindings, not the defaults.</summary>
+    private static void UseExpandOverride() => KeybindingsManager.SetGlobal(new KeybindingsManager(AppKeybindings.Definitions(_ => null),
+        new Dictionary<string, IReadOnlyList<string>?>(StringComparer.Ordinal) { ["app.tools.expand"] = ["ctrl+e"] }));
+
+    private static string HintText(Func<string, string> keyText, Func<string, string, string> keyHint) =>
+        $"{keyText("app.tools.expand")} | {Strip(keyHint("app.tools.expand", "to expand"))}";
+
     private static JsonObject Assistant(string text) => new()
     {
         ["role"] = "assistant", ["content"] = new JsonArray(new JsonObject { ["type"] = "text", ["text"] = text }), ["api"] = "openai-responses",
@@ -75,6 +86,31 @@ internal static class Sync150Cases
             Equal("@", Of("live question"), "live user message");
             Equal("@", Of("Hello from the fake model."), "live assistant message");
             Equal(0, await pi.Quit(), "exit code");
+        });
+
+        yield return ("sync150.message-and-entry-render-options-carry-host-key-hints", Sync(() =>
+        {
+            UseExpandOverride();
+            var seen = new List<string>();
+            var message = new JsonObject { ["role"] = "custom", ["customType"] = "test", ["content"] = "custom", ["display"] = true, ["timestamp"] = 0 };
+            new CustomMessageComponent(message, (_, options, _) => { seen.Add("message " + HintText(options.KeyText, options.KeyHint)); return new Text("custom", 0, 0); });
+            var entry = new JsonObject { ["type"] = "custom", ["id"] = "entry-1", ["parentId"] = null, ["timestamp"] = "2026-10-09T10:00:00.000Z", ["customType"] = "test" };
+            new CustomEntryComponent(entry, (_, options, _) => { seen.Add("entry " + HintText(options.KeyText, options.KeyHint)); return new Text("custom", 0, 0); });
+            Equal("message " + Expected + ";entry " + Expected, string.Join(";", seen), "render options");
+        }));
+
+        yield return ("sync150.extension-tool-render-context-carries-host-key-hints", async () =>
+        {
+            UseExpandOverride();
+            var seen = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
+            var renderers = ExtensionToolRendererAdapter.ToToolRenderers(new ExtensionToolRenderers(null, (context, _, _) =>
+            {
+                seen.TrySetResult(context.Keybindings is { } hints ? HintText(hints.KeyText, hints.KeyHint) : "no hints");
+                return Task.FromResult(new ExtensionCustomComponentRows(["call"], [4]));
+            }));
+            var component = renderers.RenderCall!(new JsonObject(), Themes.Current, new ToolRenderContext { ToolName = "custom_tool", ToolCallId = "tool-1", Cwd = "/" });
+            component.Render(80);
+            Equal(Expected, await seen.Task.WaitAsync(TimeSpan.FromSeconds(10)), "tool render context");
         });
     }
 }

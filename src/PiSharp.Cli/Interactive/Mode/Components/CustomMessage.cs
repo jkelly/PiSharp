@@ -11,7 +11,13 @@ namespace PiSharp.Cli.Interactive.Mode.Components;
 
 /// <param name="Expanded">Whether the message is expanded.</param>
 /// <param name="OutputPad">Horizontal padding configured by the outputPad setting.</param>
-internal sealed record MessageRenderOptions(bool Expanded, int OutputPad);
+internal sealed record MessageRenderOptions(bool Expanded, int OutputPad)
+{
+    /// <summary>Pi 1.5.0 KeybindingHints keyText: the host's configured keys for a keybinding id.</summary>
+    public Func<string, string> KeyText { get; init; } = KeybindingHints.KeyText;
+    /// <summary>Pi 1.5.0 KeybindingHints keyHint: the configured keys and a description, styled as a hint.</summary>
+    public Func<string, string, string> KeyHint { get; init; } = KeybindingHints.KeyHint;
+}
 
 /// <summary>An extension's renderer for a custom message type (registerMessageRenderer); null falls back to the default rendering.</summary>
 internal delegate IComponent? MessageRenderer(JsonObject message, MessageRenderOptions options, Theme theme);

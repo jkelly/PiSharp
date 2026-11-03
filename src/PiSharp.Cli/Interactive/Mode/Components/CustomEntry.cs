@@ -8,7 +8,13 @@ using static PiSharp.Cli.Interactive.Mode.ThemeGlobals;
 
 namespace PiSharp.Cli.Interactive.Mode.Components;
 
-internal sealed record EntryRenderOptions(bool Expanded);
+internal sealed record EntryRenderOptions(bool Expanded)
+{
+    /// <summary>Pi 1.5.0 KeybindingHints keyText: the host's configured keys for a keybinding id.</summary>
+    public Func<string, string> KeyText { get; init; } = KeybindingHints.KeyText;
+    /// <summary>Pi 1.5.0 KeybindingHints keyHint: the configured keys and a description, styled as a hint.</summary>
+    public Func<string, string, string> KeyHint { get; init; } = KeybindingHints.KeyHint;
+}
 
 /// <summary>An extension's renderer for a custom session entry type; null renders nothing.</summary>
 internal delegate IComponent? EntryRenderer(JsonObject entry, EntryRenderOptions options, Theme theme);

@@ -2,6 +2,8 @@
   <PropertyGroup>
     <!-- Decision 0007: the PiSharp-only service tiers are [Experimental]; this project carries them to each request. -->
     <NoWarn>$(NoWarn);PISHARP_TIERS001</NoWarn>
+    <!-- Pi 1.5.0: the HTML export's keybinding hints for tool renderers are [Experimental]. -->
+    <NoWarn>$(NoWarn);PISHARP_EXTUI001</NoWarn>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../PiSharp.Agent/PiSharp.Agent.csproj" />

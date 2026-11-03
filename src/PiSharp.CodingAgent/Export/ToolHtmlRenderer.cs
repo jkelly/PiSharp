@@ -1,5 +1,6 @@
 // Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/src/core/export-html/tool-renderer.ts and the ToolHtmlRenderer
 // interface of core/export-html/index.ts.
+using System.Diagnostics.CodeAnalysis;
 using System.Text.RegularExpressions;
 
 namespace PiSharp.CodingAgent.Export;
@@ -25,7 +26,15 @@ public interface IToolRenderComponent
 
 /// <summary>ToolRenderContext as the HTML export builds it.</summary>
 public sealed record ToolRenderContext(object? Args, string ToolCallId, IToolRenderComponent? LastComponent, Dictionary<string, object?> State,
-    string Cwd, bool ExecutionStarted, bool ArgsComplete, bool IsPartial, bool Expanded, bool ShowImages, bool IsError, double? DurationMs, int OutputPad);
+    string Cwd, bool ExecutionStarted, bool ArgsComplete, bool IsPartial, bool Expanded, bool ShowImages, bool IsError, double? DurationMs, int OutputPad)
+{
+    /// <summary>Pi 1.5.0 keyText: the configured keys for a keybinding id, or empty when it has none.</summary>
+    [Experimental("PISHARP_EXTUI001")]
+    public Func<string, string> KeyText { get; init; } = static _ => "";
+    /// <summary>Pi 1.5.0 keyHint: the configured keys followed by a description, styled as a hint.</summary>
+    [Experimental("PISHARP_EXTUI001")]
+    public Func<string, string, string> KeyHint { get; init; } = static (_, description) => " " + description;
+}
 
 /// <summary>The AgentToolResult handed to renderResult.</summary>
 public sealed record ToolRenderResultValue(object? Content, object? Details, bool IsError);
@@ -36,7 +45,15 @@ public sealed record ToolRenderers(
     Func<ToolRenderResultValue, (bool Expanded, bool IsPartial), object?, ToolRenderContext, IToolRenderComponent>? RenderResult);
 
 /// <summary>createToolHtmlRenderer dependencies; IMPL-I supplies TUI renderers and the active theme.</summary>
-public sealed record ToolHtmlRendererDependencies(Func<string?, ToolRenderers?> GetToolRenderers, object? Theme, string Cwd, int Width = 100);
+public sealed record ToolHtmlRendererDependencies(Func<string?, ToolRenderers?> GetToolRenderers, object? Theme, string Cwd, int Width = 100)
+{
+    /// <summary>Pi 1.5.0 keyText: the configured keys for a keybinding id in the host's keybindings, passed to every render context, or empty when it has none.</summary>
+    [Experimental("PISHARP_EXTUI001")]
+    public Func<string, string> KeyText { get; init; } = static _ => "";
+    /// <summary>Pi 1.5.0 keyHint: the configured keys followed by a description, styled as a hint.</summary>
+    [Experimental("PISHARP_EXTUI001")]
+    public Func<string, string, string> KeyHint { get; init; } = static (_, description) => " " + description;
+}
 
 /// <summary>createToolHtmlRenderer: runs a tool's TUI renderers and converts their ANSI lines to HTML.</summary>
 public sealed class TuiToolHtmlRenderer : IToolHtmlRenderer
@@ -68,7 +85,7 @@ public sealed class TuiToolHtmlRenderer : IToolHtmlRenderer
 
     private ToolRenderContext Context(string toolCallId, IToolRenderComponent? last, bool expanded, bool isPartial, bool isError) =>
         new(args.TryGetValue(toolCallId, out var value) ? value : Js.Undefined, toolCallId, last, State(toolCallId), deps.Cwd, true, true, isPartial, expanded,
-            false, isError, null, 1);
+            false, isError, null, 1) { KeyText = deps.KeyText, KeyHint = deps.KeyHint };
 
     public string? RenderCall(string toolCallId, string? toolName, object? arguments)
     {

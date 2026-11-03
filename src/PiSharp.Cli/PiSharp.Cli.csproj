@@ -7,6 +7,8 @@
     <!-- The disabled CLI graph has its own coordinator-generated lock; normal locks stay intact. -->
     <NuGetLockFilePath Condition="'$(EnablePromptTemplateYaml)' == 'false'">$(MSBuildProjectDirectory)/packages.prompt-yaml-disabled.lock.json</NuGetLockFilePath>
     <DefineConstants Condition="'$(EnablePromptTemplateYaml)' == 'true'">$(DefineConstants);PISHARP_PROMPT_YAML</DefineConstants>
+    <!-- Pi 1.5.0: extension keybinding hints and the custom component blocked status are [Experimental]. -->
+    <NoWarn>$(NoWarn);PISHARP_EXTUI001</NoWarn>
   </PropertyGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="PiSharp.CodingAgent.Tests" />

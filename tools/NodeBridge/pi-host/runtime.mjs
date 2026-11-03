@@ -638,6 +638,24 @@ export class ExtensionRuntime {
     this.editorActions = actions ?? [];
     for (const id of this.editorIds ?? []) { const editor = this.components.get(id)?.component; if (editor) this.wireEditor(id, editor); }
   }
+  /**
+   * Pi 1.5.0 KeybindingHints for render contexts and options: keybinding-hints.ts keyText/keyHint over the mode's effective
+   * keybindings (editor.configure), so renderers show the user's keys whichever pi-coding-agent copy they import.
+   */
+  keybindingHints() {
+    const runtime = this;
+    const part = (value) => (process.platform === 'darwin' && value.toLowerCase() === 'alt' ? 'option' : value);
+    const keyText = (keybinding) => {
+      const value = runtime.keybindingsConfig?.[keybinding];
+      const keys = value === undefined ? [] : Array.isArray(value) ? value : [value];
+      return keys.length === 0 ? '' : keys.join('/').split('/').map((key) => key.split('+').map(part).join('+')).join('/');
+    };
+    const keyHint = (keybinding, description) => {
+      const theme = runtime.theme();
+      return theme ? theme.fg('dim', keyText(keybinding)) + theme.fg('muted', ` ${description}`) : `${keyText(keybinding)} ${description}`;
+    };
+    return { keyText, keyHint };
+  }
   editorKeybindings() {
     const runtime = this;
     const keys = (action) => { const value = runtime.keybindingsConfig?.[action]; return value === undefined ? [] : Array.isArray(value) ? value : [value]; };
@@ -962,7 +980,7 @@ export class ExtensionRuntime {
       args: params.args, toolCallId: key, invalidate: () => this.bridge.notify('render.invalidate', { toolCallId: key }), state: state.state, cwd: this.cwd,
       executionStarted: params.executionStarted === true, argsComplete: params.argsComplete !== false, isPartial: params.isPartial === true,
       expanded: params.expanded === true, showImages: params.showImages === true, isError: params.isError === true, durationMs: params.durationMs ?? undefined,
-      outputPad: params.outputPad ?? 0,
+      outputPad: params.outputPad ?? 0, ...this.keybindingHints(),
     };
     const out = { handled: true, renderShell: renderers.renderShell ?? 'default' };
     if (params.slot === 'call') {
@@ -981,7 +999,7 @@ export class ExtensionRuntime {
     for (const ext of this.extensions) {
       const renderer = ext.messageRenderers.get(params.customType);
       if (!renderer) continue;
-      const component = renderer(params.message, { expanded: params.expanded === true }, this.theme());
+      const component = renderer(params.message, { expanded: params.expanded === true, ...this.keybindingHints() }, this.theme());
       return { handled: true, lines: component ? component.render(params.width) : [] };
     }
     return { handled: false };
@@ -991,7 +1009,7 @@ export class ExtensionRuntime {
     for (const ext of this.extensions) {
       const renderer = ext.entryRenderers.get(params.customType);
       if (!renderer) continue;
-      const component = renderer(params.entry, { expanded: params.expanded === true }, this.theme());
+      const component = renderer(params.entry, { expanded: params.expanded === true, ...this.keybindingHints() }, this.theme());
       return { handled: true, lines: component ? component.render(params.width) : [] };
     }
     return { handled: false };
