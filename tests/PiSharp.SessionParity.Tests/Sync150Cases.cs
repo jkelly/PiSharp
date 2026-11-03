@@ -2,13 +2,15 @@
 // (createSummarizationOptions sets no maxTokens, #9512; generateTurnPrefixSummary appends the /compact instructions, #11058),
 // core/compaction/branch-summarization.ts (generateBranchSummary thinkingLevel; prepareBranchEntries applies the latest context edit
 // per target through projectContextEntry) and core/agent-session.ts (navigateTree; _omitRecoveryAttempt omits the tool results that
-// answer the omitted message). The cases are modeled on the upstream tests branch-summarization.test.ts,
-// compaction-summary-reasoning.test.ts and regressions/11227-recovery-omits-tool-results.test.ts; their expectations are authored,
-// never captured from an upstream run.
+// answer the omitted message) and core/export-html (marked-cjk-friendly's emStrong tokenizer). The cases are modeled on the upstream
+// tests branch-summarization.test.ts, compaction-summary-reasoning.test.ts, regressions/11227-recovery-omits-tool-results.test.ts and
+// export-html-cjk.test.ts; their expectations are authored, never captured from an upstream run.
 using System.Collections.Immutable;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using PiSharp.AI;
 using PiSharp.CodingAgent;
+using PiSharp.CodingAgent.Export;
 using PiSharp.Contracts;
 using PiSharp.Sessions.Compaction;
 using PiSharp.Sessions.Serialization;
@@ -18,6 +20,7 @@ internal static partial class Program
 {
     private static IEnumerable<(string, Func<Task>)> Sync150Cases() =>
     [
+        Case("sync150.html-export-renders-emphasis-next-to-cjk-punctuation", HtmlExportCjkEmphasis),
         Case("sync150.summaries-send-no-output-cap-and-focus-the-split-turn-prefix", SummariesUseModelLimitAndFocusPrefix),
         Case("sync150.branch-summary-thinking-level-follows-model-reasoning", BranchSummaryThinkingLevel),
         Case("sync150.branch-entries-apply-context-edits", BranchEntriesApplyContextEdits),
@@ -124,5 +127,38 @@ internal static partial class Program
         Check(!retried.Any(message => message.Role == "toolResult"), "the truncated call's result reached the retried request");
         Check(!retried.Where(message => message.Role == "assistant").Any(message => PiWireJson.ReadMessage(message.WireBody.Value).StopReason == StopReason.Length),
             "the length-stopped attempt reached the retried request");
+    }
+
+    // export-html-cjk.test.ts (#10154): the exported page's own scripts (marked, marked-cjk-friendly and the viewer's marked.use
+    // configuration) run in Jint with the same stubs the upstream test gives node:vm, and the viewer's safeMarkedParse renders.
+    private static async Task HtmlExportCjkEmphasis()
+    {
+        var root = Temp("export-cjk"); var session = Path.Combine(root, "session.jsonl");
+        await File.WriteAllTextAsync(session, JsonSerializer.Serialize(new { type = "session", version = 3, id = "cjk-test",
+            timestamp = "1970-01-01T00:00:00.000Z", cwd = root }) + "\n");
+        var html = await File.ReadAllTextAsync(await SessionHtmlExport.ExportFromFileAsync(session, new(OutputPath: Path.Combine(root, "out.html")), Themes()));
+        var data = Regex.Match(html, "<script id=\"session-data\" type=\"application/json\">([^<]+)</script>").Groups[1].Value;
+        var scripts = Regex.Matches(html, "<script>([\\s\\S]*?)</script>").Select(match => match.Groups[1].Value).ToList();
+        Check(data.Length > 0 && scripts.Count > 1, "the page has no session data or viewer script");
+        var viewer = scripts[^1]; scripts.RemoveAt(scripts.Count - 1);
+        var engine = new Jint.Engine();
+        engine.SetValue("__data", data);
+        engine.SetValue("atob", new Func<string, string>(text => System.Text.Encoding.Latin1.GetString(Convert.FromBase64String(text))));
+        engine.Execute("""
+            var document = { getElementById: function () { return { textContent: __data }; }, querySelector: function () { return null; } };
+            var window = { location: { search: "" } };
+            class TextDecoder { decode(bytes) { let text = ""; for (const b of bytes) text += String.fromCharCode(b); return decodeURIComponent(escape(text)); } }
+            class URLSearchParams { constructor() {} get() { return null; } }
+            """);
+        foreach (var script in scripts) engine.Execute(script);
+        var parse = engine.Evaluate(viewer.Replace("function safeMarkedParse(", "return safeMarkedParse; function safeMarkedParse(", StringComparison.Ordinal));
+        string Parse(string text) => engine.Invoke(parse, text).ToString();
+        Equal("<p><strong>这是测试。</strong>后面</p>\n", Parse("**这是测试。**后面"), "full stop");
+        Equal("<p><strong>一句话说清：</strong>一台机器</p>\n", Parse("**一句话说清：**一台机器"), "colon");
+        Equal("<p><strong>要点到此为止。</strong>20 小时</p>\n", Parse("**要点到此为止。**20 小时"), "digits after");
+        Equal("<p>字<strong>「引用」</strong>字</p>\n", Parse("字**「引用」**字"), "corner brackets");
+        Equal("<p><em>斜体。</em>后面</p>\n", Parse("*斜体。*后面"), "italic");
+        // CommonMark flanking rules still apply to non-CJK text.
+        Equal("<p>**end.**Then next</p>\n", Parse("**end.**Then next"), "non-CJK");
     }
 }

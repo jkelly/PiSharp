@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/src/core/export-html/index.ts, with src/config.ts (APP_NAME,
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/coding-agent/src/core/export-html/index.ts, with src/config.ts (APP_NAME,
 // getExportTemplateDir) and core/agent-session.ts (exportToHtml theme selection).
 
 using System.Text;
@@ -31,13 +31,15 @@ public static class SessionHtmlExport
     /// <summary>config.ts APP_NAME (package.json piConfig has no name).</summary>
     public const string AppName = "pi";
 
-    /// <summary>Upstream asset blobs at v1.2.0 (git blob SHA-1; the export-html files are unchanged since v1.1.0), embedded byte-for-byte under Export/Assets.</summary>
+    /// <summary>Asset blobs (git blob SHA-1), embedded byte-for-byte under Export/Assets: upstream v1.2.0 blobs, except template.html and the
+    /// marked scripts, which are the v1.5.0 blobs, and template.js, the v1.2.0 blob plus Pi 1.5.0's CJK emStrong tokenizer (26293e74f).</summary>
     public static readonly IReadOnlyDictionary<string, string> AssetBlobs = new Dictionary<string, string>(StringComparer.Ordinal)
     {
-        ["template.html"] = "c1d678a0a2fc7df8a37dc952e270dde4b9ecba6a", // packages/coding-agent/src/core/export-html/template.html
+        ["template.html"] = "eea85b9350f9af51e813d21ba6e695fa478de791", // v1.5.0 packages/coding-agent/src/core/export-html/template.html
         ["template.css"] = "1de5bf46bce9bce1cbbfc6988f75754e74a18721", // packages/coding-agent/src/core/export-html/template.css
-        ["template.js"] = "71f121a6687018db62114c9aa3dd713a028630df", // packages/coding-agent/src/core/export-html/template.js
-        ["vendor/marked.min.js"] = "9d79575e45d0f6b88158097f5f4622ab938d76d9", // export-html/vendor/marked.min.js (marked v18.0.5, MIT)
+        ["template.js"] = "bab1f882766b786c7cc13c35a825789e478a42d8", // v1.2.0 export-html/template.js plus the 1.5.0 emStrong hunk (not an upstream blob)
+        ["vendor/marked.min.js"] = "9b8644b8c2f708da81365ff387d805dedeafd77d", // v1.5.0 export-html/vendor/marked.min.js (marked v18.0.11, MIT)
+        ["vendor/marked-cjk-friendly.min.js"] = "1931333ed83a86bde59356f4328afe7a450ab096", // v1.5.0 export-html/vendor/marked-cjk-friendly.min.js (v0.1.2, MIT)
         ["vendor/highlight.min.js"] = "5d699ae6a4cfc9544a22a9ac394b01db2e5abd4f", // export-html/vendor/highlight.min.js (highlight.js v11.9.0, BSD-3-Clause)
         ["dark.json"] = "0a82c289d3e6a7234cf5b738662427cf9b7cced4", // v1.2.0 packages/coding-agent/src/modes/interactive/theme/dark.json
         ["light.json"] = "3d870c051d13ad464b777cd04cc404bfb7779914" // v1.2.0 packages/coding-agent/src/modes/interactive/theme/light.json
@@ -116,7 +118,8 @@ public static class SessionHtmlExport
     {
         ArgumentNullException.ThrowIfNull(sessionData); ArgumentNullException.ThrowIfNull(themes);
         var template = ReadAsset("template.html"); var templateCss = ReadAsset("template.css"); var templateJs = ReadAsset("template.js");
-        var markedJs = ReadAsset("vendor/marked.min.js"); var hljsJs = ReadAsset("vendor/highlight.min.js");
+        var markedJs = ReadAsset("vendor/marked.min.js"); var markedCjkFriendlyJs = ReadAsset("vendor/marked-cjk-friendly.min.js");
+        var hljsJs = ReadAsset("vendor/highlight.min.js");
         var themeVars = GenerateThemeVars(themes, themeName);
         var colors = themes.GetResolvedThemeColors(themeName);
         var themeExport = themes.GetThemeExportColors(themeName);
@@ -129,6 +132,8 @@ public static class SessionHtmlExport
         html = Js.ReplaceFirst(html, "{{JS}}", templateJs);
         html = Js.ReplaceFirst(html, "{{SESSION_DATA}}", sessionDataBase64);
         html = Js.ReplaceFirst(html, "{{MARKED_JS}}", markedJs);
+        // Pi 1.5.0: marked-cjk-friendly's emStrong tokenizer renders bold and italic next to CJK punctuation.
+        html = Js.ReplaceFirst(html, "{{MARKED_CJK_FRIENDLY_JS}}", markedCjkFriendlyJs);
         return Js.ReplaceFirst(html, "{{HIGHLIGHT_JS}}", hljsJs);
     }
 
