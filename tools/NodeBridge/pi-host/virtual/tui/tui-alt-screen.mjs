@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/tui/src/tui-alt-screen.ts.
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/tui/src/tui-alt-screen.ts.
 // Ported to plain ESM for the PiSharp Node extension bridge (TypeScript types stripped mechanically; behaviour unchanged).
 import { AltScreenSearchComponent, AltScreenSearchIndex, getAltScreenSearchMatchKey } from "./alt-screen-search.mjs";
 import { AltScreenFlashContainer } from "./components/alt-screen-flash.mjs";
@@ -33,7 +33,12 @@ const DOUBLE_CLICK_INTERVAL_MS = 500;
 const COPY_ERROR_FLASH_DURATION_MS = 5000;
 const TERMINAL_WORD_SELECTION_JOINERS = new Set([
     "/",
-    "-"
+    "-",
+    "+",
+    "\\",
+    "~",
+    "_",
+    "."
 ]);
 const wordSegmenter = getWordSegmenter();
 export class TuiAltScreen extends TuiBase {
@@ -223,6 +228,14 @@ export class TuiAltScreen extends TuiBase {
             setCapabilities(this.savedCapabilities);
             this.savedCapabilities = undefined;
         }
+    }
+    getExitRestorePrefix() {
+        const prefix = super.getExitRestorePrefix();
+        if (!this.altScreenActive) return prefix;
+        return `${END_SYNCHRONIZED_OUTPUT}${this.mouseEnabled ? DISABLE_MOUSE : ""}${ENABLE_AUTOWRAP}${prefix}`;
+    }
+    getExitRestoreSuffix() {
+        return `${super.getExitRestoreSuffix()}${this.altScreenActive ? `${EXIT_ALT_SCREEN}\x1b[?25h` : ""}`;
     }
     deleteKittyImages() {
         return this.imageProtocol === "kitty" ? deleteAllKittyImages() : "";
@@ -429,7 +442,8 @@ export class TuiAltScreen extends TuiBase {
     flash(message, durationMs) {
         this.flashes.flash(message, durationMs);
     }
-    shouldDeferViewportInputToOverlay() {
+    shouldDeferViewportInput() {
+        if (this.getFocusedComponent()?.capturesViewportInput) return true;
         return this.isOverlayFocused() && this.activeSearch?.overlay?.isFocused() !== true;
     }
     clearComponentMouseGesture() {
@@ -524,7 +538,7 @@ export class TuiAltScreen extends TuiBase {
                 };
             }
         }
-        if (this.shouldDeferViewportInputToOverlay()) return undefined;
+        if (this.shouldDeferViewportInput()) return undefined;
         if (keybindings.matches(data, "tui.altScreen.pageUp")) {
             if (!isRelease) {
                 this.scrollBy(-Math.max(1, this.getPrimaryScrollView().viewportHeight - PAGE_SCROLL_OVERLAP));

@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/tui/src/utils.ts.
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/tui/src/utils.ts.
 // Ported to plain ESM for the PiSharp Node extension bridge (TypeScript types stripped mechanically; behaviour unchanged).
 import { eastAsianWidth } from "../vendor/east-asian-width.mjs";
 const graphemeSegmenter = new Intl.Segmenter(undefined, {
@@ -244,6 +244,44 @@ export function stripTerminalSequences(str) {
         i++;
     }
     return result;
+}
+function extractAnsiCodes(str) {
+    let result = "";
+    let i = str.indexOf("\x1b");
+    while(i !== -1){
+        const length = ansiCodeLength(str, i);
+        if (length > 0) {
+            result += str.substring(i, i + length);
+            i += length;
+        } else {
+            i++;
+        }
+        i = str.indexOf("\x1b", i);
+    }
+    return result;
+}
+const WHITESPACE_REGEX = /\s/;
+function isWhitespaceToken(token) {
+    let i = 0;
+    while(i < token.length){
+        const code = token.charCodeAt(i);
+        if (code === 0x1b) {
+            const length = ansiCodeLength(token, i);
+            if (length === 0) return false;
+            i += length;
+        } else if (code === 0x20 || code >= 0x09 && code <= 0x0d) {
+            i++;
+        } else if (code < 0x80 || !WHITESPACE_REGEX.test(token[i])) {
+            return false;
+        } else {
+            i++;
+        }
+    }
+    return true;
+}
+const CONTROL_CHARACTERS = /[\u0000-\u001f\u007f-\u009f]+/g;
+export function replaceControlCharacters(str) {
+    return str.replace(CONTROL_CHARACTERS, " ");
 }
 export function getGraphemeCellRange(line, column) {
     let currentCol = 0;
@@ -578,6 +616,9 @@ class AnsiCodeTracker {
         if (this.underline) {
             result += "\x1b[24m";
         }
+        if (this.strikethrough) {
+            result += "\x1b[29m";
+        }
         if (this.activeHyperlink) {
             result += formatOsc8Close(this.activeHyperlink.terminator);
         }
@@ -712,9 +753,10 @@ function wrapSingleLine(line, width) {
     let currentVisibleLength = 0;
     for (const token of tokens){
         const tokenVisibleLength = visibleWidth(token);
-        const isWhitespace = token.trim() === "";
+        const isWhitespace = isWhitespaceToken(token);
         if (tokenVisibleLength > width && !isWhitespace) {
             if (currentLine) {
+                currentLine = currentLine.trimEnd();
                 const lineEndReset = tracker.getLineEndReset();
                 if (lineEndReset) {
                     currentLine += lineEndReset;
@@ -734,6 +776,10 @@ function wrapSingleLine(line, width) {
         const totalNeeded = currentVisibleLength + tokenVisibleLength;
         if (totalNeeded > width && currentVisibleLength > 0) {
             let lineToWrap = currentLine.trimEnd();
+            if (isWhitespace) {
+                lineToWrap += extractAnsiCodes(token);
+                updateTrackerFromText(token, tracker);
+            }
             const lineEndReset = tracker.getLineEndReset();
             if (lineEndReset) {
                 lineToWrap += lineEndReset;
@@ -742,10 +788,12 @@ function wrapSingleLine(line, width) {
             if (isWhitespace) {
                 currentLine = tracker.getActiveCodes();
                 currentVisibleLength = 0;
-            } else {
-                currentLine = tracker.getActiveCodes() + token;
-                currentVisibleLength = tokenVisibleLength;
+                continue;
             }
+            currentLine = tracker.getActiveCodes() + token;
+            currentVisibleLength = tokenVisibleLength;
+        } else if (isWhitespace && totalNeeded > width && token.includes("\x1b")) {
+            currentLine += extractAnsiCodes(token);
         } else {
             currentLine += token;
             currentVisibleLength += tokenVisibleLength;

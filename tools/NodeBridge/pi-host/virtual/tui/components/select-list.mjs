@@ -1,6 +1,6 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/tui/src/components/select-list.ts.
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/tui/src/components/select-list.ts.
 // Ported to plain ESM for the PiSharp Node extension bridge (TypeScript types stripped mechanically; behaviour unchanged).
-import { getKeybindings } from "../keybindings.mjs";
+import { getKeybindings, getSelectPageIndex } from "../keybindings.mjs";
 import { truncateToWidth, visibleWidth } from "../utils.mjs";
 const DEFAULT_PRIMARY_COLUMN_WIDTH = 32;
 const PRIMARY_COLUMN_GAP = 2;
@@ -8,6 +8,7 @@ const MIN_DESCRIPTION_WIDTH = 10;
 const normalizeToSingleLine = (text)=>text.replace(/[\r\n]+/g, " ").trim();
 const clamp = (value, min, max)=>Math.max(min, Math.min(value, max));
 export class SelectList {
+    capturesViewportInput = true;
     items = [];
     filteredItems = [];
     selectedIndex = 0;
@@ -97,11 +98,16 @@ export class SelectList {
     }
     handleInput(keyData) {
         const kb = getKeybindings();
+        const pageIndex = getSelectPageIndex(kb, keyData, this.selectedIndex, this.filteredItems.length, this.maxVisible);
         if (kb.matches(keyData, "tui.select.up")) {
             this.selectedIndex = this.selectedIndex === 0 ? this.filteredItems.length - 1 : this.selectedIndex - 1;
             this.notifySelectionChange();
         } else if (kb.matches(keyData, "tui.select.down")) {
             this.selectedIndex = this.selectedIndex === this.filteredItems.length - 1 ? 0 : this.selectedIndex + 1;
+            this.notifySelectionChange();
+        } else if (pageIndex !== undefined) {
+            if (this.filteredItems.length === 0 || pageIndex === this.selectedIndex) return;
+            this.selectedIndex = pageIndex;
             this.notifySelectionChange();
         } else if (kb.matches(keyData, "tui.select.confirm")) {
             const selectedItem = this.filteredItems[this.selectedIndex];

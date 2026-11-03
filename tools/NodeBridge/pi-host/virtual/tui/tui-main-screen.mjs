@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/tui/src/tui-main-screen.ts.
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/tui/src/tui-main-screen.ts.
 // Ported to plain ESM for the PiSharp Node extension bridge (TypeScript types stripped mechanically; behaviour unchanged).
 import * as fs from "node:fs";
 import * as os from "node:os";
@@ -6,6 +6,7 @@ import * as path from "node:path";
 import { deleteKittyImage, isImageLine } from "./terminal-image.mjs";
 import { TuiBase } from "./tui.mjs";
 import { visibleWidth } from "./utils.mjs";
+const OSC133_ZONE_PREFIX = /^(?:\x1b\]133;[ABC](?:\x07|\x1b\\))+/;
 const KITTY_SEQUENCE_PREFIX = "\x1b_G";
 const MAX_RENDER_WRITE_CHARS = 1024 * 1024;
 class BoundedTerminalWriter {
@@ -203,7 +204,7 @@ export class TuiMainScreen extends TuiBase {
             const targetScreenRow = targetRow - viewportTop;
             return targetScreenRow - currentScreenRow;
         };
-        let newLines = this.resolveFakeCursors(this.render(width));
+        let newLines = this.resolveFakeCursors(this.render(width).map((line)=>line.replace(OSC133_ZONE_PREFIX, "")));
         if (this.hasOverlayEntries) {
             newLines = this.compositeOverlays(newLines, width, height);
         }

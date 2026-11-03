@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/tui/src/components/editor.ts.
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/tui/src/components/editor.ts.
 // Ported to plain ESM for the PiSharp Node extension bridge (TypeScript types stripped mechanically; behaviour unchanged).
 import { getKeybindings } from "../keybindings.mjs";
 import { decodePrintableKey, matchesKey } from "../keys.mjs";
@@ -190,6 +190,9 @@ export class Editor {
         cursorCol: 0
     };
     focused = false;
+    get capturesViewportInput() {
+        return this.autocompleteState !== null;
+    }
     tui;
     theme;
     paddingX = 0;
@@ -521,7 +524,7 @@ export class Editor {
                 this.cancelAutocomplete();
                 return;
             }
-            if (kb.matches(data, "tui.select.up") || kb.matches(data, "tui.select.down")) {
+            if (kb.matches(data, "tui.select.up") || kb.matches(data, "tui.select.down") || kb.matches(data, "tui.select.pageUp") || kb.matches(data, "tui.select.pageDown")) {
                 this.autocompleteList.handleInput(data);
                 return;
             }
