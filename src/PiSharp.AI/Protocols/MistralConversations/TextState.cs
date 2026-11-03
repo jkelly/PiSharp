@@ -1,6 +1,7 @@
 using System.Collections.Immutable;
 using System.Text;
 using System.Text.Json;
+using PiSharp.AI.Protocols.ProviderShared;
 using PiSharp.Contracts;
 using static PiSharp.AI.Protocols.MistralConversations.MistralTextHttpSseTransport;
 
@@ -228,7 +229,7 @@ internal sealed class TextState(ChatRequest request, MistralTextOptions options)
         var wireCost = binary.Value;
         usage = new(input, output, cache, 0, total, new(wireCost.GetProperty("input").GetDecimal(),
             wireCost.GetProperty("output").GetDecimal(), wireCost.GetProperty("cacheRead").GetDecimal(),
-            wireCost.GetProperty("cacheWrite").GetDecimal(), wireCost.GetProperty("total").GetDecimal(), SourceBinary64Cost: binary));
+            wireCost.GetProperty("cacheWrite").GetDecimal(), wireCost.GetProperty("total").GetDecimal(), ProviderCost.TotalFromProvider(false), binary));
     }
     // mistral-conversations.ts keeps each count as the JavaScript number the chunk reports (a fraction included).
     private static double Count(JsonElement value, string name)

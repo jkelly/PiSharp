@@ -98,7 +98,8 @@ internal static class ClassifierShared
         var hasOutput = usage.TryGetProperty("output_tokens", out var outputTokens);
         if (!hasInput && !hasOutput) return null;
         var input = TokenCount(hasInput ? inputTokens : null); var output = TokenCount(hasOutput ? outputTokens : null);
-        return ProviderRequest.Usage(input, output, 0, 0, input + output, model.Cost.Calculate(input, output, 0, 0));
+        // Pi f9a26365 models.ts calculateCost records totalFromProvider false.
+        return ProviderRequest.Usage(input, output, 0, 0, input + output, model.Cost.Calculate(input, output, 0, 0), totalFromProvider: false);
     }
 
     internal static JsonElement? Field(JsonElement value, string name) =>

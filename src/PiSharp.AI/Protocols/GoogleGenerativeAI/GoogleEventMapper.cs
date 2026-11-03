@@ -2,6 +2,7 @@
 using System.Collections.Immutable;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using PiSharp.AI.Protocols.ProviderShared;
 using PiSharp.Contracts;
 using PiSharp.Contracts.Compatibility;
 
@@ -160,7 +161,7 @@ internal sealed class GoogleEventMapper
             _usage = new(inputTokens, outputTokens, cached, 0, total,
                 new(binary64.Value.GetProperty("input").GetDecimal(), binary64.Value.GetProperty("output").GetDecimal(),
                     binary64.Value.GetProperty("cacheRead").GetDecimal(), binary64.Value.GetProperty("cacheWrite").GetDecimal(),
-                    binary64.Value.GetProperty("total").GetDecimal(), SourceBinary64Cost: binary64),
+                    binary64.Value.GetProperty("total").GetDecimal(), ProviderCost.TotalFromProvider(false), binary64),
                 JsonFields.Empty.Set("reasoning", JsonData.Parse(JsonNumber.Text(thought)))) { ExtrasBeforeTotal = true };
         }
         return frames;

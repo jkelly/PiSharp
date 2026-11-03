@@ -484,7 +484,10 @@ public sealed partial class PersistentAgentSession
         var data = JsonData.Parse(JsonSerializer.Serialize(costs)); decimal D(string name) => data.Value.GetProperty(name).GetDecimal();
         try { return new(checked(left.Input + right.Input), checked(left.Output + right.Output), checked(left.CacheRead + right.CacheRead),
             checked(left.CacheWrite + right.CacheWrite), checked(left.TotalTokens + right.TotalTokens),
-            new(D("input"), D("output"), D("cacheRead"), D("cacheWrite"), D("total"), SourceBinary64Cost: data), extras) { ExtrasBeforeTotal = true }; }
+            new(D("input"), D("output"), D("cacheRead"), D("cacheWrite"), D("total"), JsonFields.Empty.Set("totalFromProvider",
+                // Pi f9a26365 usage-totals.ts combineUsage: a sum is provider-reported only when every part is.
+                JsonData.Parse(leftWire.TryGetProperty("totalFromProvider", out var a) && a.ValueKind == JsonValueKind.True &&
+                    rightWire.TryGetProperty("totalFromProvider", out var b) && b.ValueKind == JsonValueKind.True ? "true" : "false")), data), extras) { ExtrasBeforeTotal = true }; }
         catch (OverflowException) { throw new SessionCompactionException(SessionCompactionFailure.UnsupportedNumber); }
     }
 }

@@ -1,12 +1,14 @@
 using System.Collections.Immutable;
 using System.Globalization;
 using System.Runtime.CompilerServices;
+using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using PiSharp.Contracts;
 using PiSharp.Contracts.Compatibility;
 using PiSharp.AI.Protocols;
 using PiSharp.AI.Protocols.OpenAICompletions;
+using PiSharp.AI.Protocols.ProviderShared;
 
 namespace PiSharp.AI.Providers;
 
@@ -22,6 +24,8 @@ public sealed record OpenAICompletionsWireOptions(int MaximumChunks = 4096, int 
     /// <summary>Explicit bounded source-view capture; ordinary native progress remains compact.</summary>
     public bool CaptureSourceEmissionSnapshots { get; init; }
     public bool SupportsOpenAIGrammarTools { get; init; }
+    // openai-completions.ts parseChunkUsage: isOpenRouterModel(model) applies OpenRouter's billed total. Set by the request factory.
+    internal bool OpenRouterReportedCost { get; init; }
     // Factory-resolved admission is immutable and survives ordinary record clones.
     // Mapping must retain its strict capability and configured history/output limits.
     internal CompletionsToolDeclarationProjectionOptions? ToolDeclarations { get; init; }
@@ -697,6 +701,9 @@ public sealed class OpenAICompletionsWireSource : IChatTransport
             var costWrite = (double)rates.CacheWrite * write / 1_000_000d;
             var total = ((costInput + costOutput) + costRead) + costWrite;
             if (!double.IsFinite(total)) throw Protocol();
+            // parseChunkUsage: calculateCost, then applyOpenRouterReportedCost for an OpenRouter model.
+            var reported = _options.OpenRouterReportedCost ? ProviderCost.OpenRouterReportedTotal(usage) : null;
+            total = reported ?? total;
             var sourceCost = JsonData.Parse(EcmaScriptJsonProjection.Project(JsonSerializer.Serialize(new
             { input = costInput, output = costOutput, cacheRead = costRead, cacheWrite = costWrite, total }),
                 new(MaximumInputCharacters: 4096, MaximumInputBytes: 16384, MaximumOutputCharacters: 4096,
@@ -709,7 +716,7 @@ public sealed class OpenAICompletionsWireSource : IChatTransport
             _usage = new(input, output, cacheRead, write, input + output + cacheRead + write,
                 new(source.GetProperty("input").GetDecimal(), source.GetProperty("output").GetDecimal(),
                     source.GetProperty("cacheRead").GetDecimal(), source.GetProperty("cacheWrite").GetDecimal(),
-                    source.GetProperty("total").GetDecimal(), SourceBinary64Cost: sourceCost), extras) { ExtrasBeforeTotal = true };
+                    source.GetProperty("total").GetDecimal(), ProviderCost.TotalFromProvider(reported is not null), sourceCost), extras) { ExtrasBeforeTotal = true };
         }
         private void Set(string name, string text)
         {

@@ -77,8 +77,14 @@ public sealed partial class AnthropicMessagesTransport
             var cacheWrite1h = usage.ExtraProperties is { } properties && properties.TryGet("cacheWrite1h", out var count)
                 ? count!.Value.GetInt64() : 0;
             var node = JsonNode.Parse(sourceEvent.ToString(), documentOptions: PiSharp.Contracts.JsonData.DocumentOptions)!;
-            node[messageField]!["usage"]!["cost"] = JsonNode.Parse(
-                OriginalAnthropicUsageCostProjection.Create(_rates, usage, cacheWrite1h).ToString(), documentOptions: PiSharp.Contracts.JsonData.DocumentOptions);
+            var written = node[messageField]!["usage"]!["cost"]!.AsObject();
+            var cost = JsonNode.Parse(
+                OriginalAnthropicUsageCostProjection.Create(_rates, usage, cacheWrite1h).ToString(), documentOptions: PiSharp.Contracts.JsonData.DocumentOptions)!.AsObject();
+            // openrouter-cost.ts: a billed total replaces the catalog one. totalFromProvider follows the five cost fields.
+            if (written["totalFromProvider"] is JsonValue flag && flag.GetValueKind() == JsonValueKind.True) cost["total"] = written["total"]!.DeepClone();
+            foreach (var item in written)
+                if (!cost.ContainsKey(item.Key)) cost[item.Key] = item.Value?.DeepClone();
+            node[messageField]!["usage"]!["cost"] = cost;
             return JsonData.Parse(node.ToJsonString());
         }
     }

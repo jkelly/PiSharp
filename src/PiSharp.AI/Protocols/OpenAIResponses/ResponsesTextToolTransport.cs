@@ -5,6 +5,7 @@ using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using PiSharp.Contracts.Compatibility;
+using PiSharp.AI.Protocols.ProviderShared;
 using PiSharp.Contracts;
 
 namespace PiSharp.AI.Protocols.OpenAIResponses;
@@ -457,7 +458,9 @@ public sealed class ResponsesTextToolTransport : IChatTransport
                     if (_stopReason == StopReason.Error)
                         _properties = _properties.Set("errorMessage", StringData(!string.IsNullOrEmpty(incompleteReason) ?
                             "Response incomplete: " + incompleteReason : "Response incomplete without a provider reason"));
-                    if (response.TryGetProperty("usage", out var usage)) _usage = Usage(Object(usage));
+                    // openai-responses-shared.ts: calculateCost runs on response.completed with or without usage, so a usage-less
+                    // completion still records its zero catalog cost (totalFromProvider false).
+                    _usage = response.TryGetProperty("usage", out var usage) ? Usage(Object(usage)) : _usage with { Cost = Binary64Cost(0, 0, 0, 0, 0) };
                     ApplyServiceTier(OptionalStringOrNull(response, "service_tier") ?? _options.ServiceTier);
                     foreach (var finished in _content.Where(s => s.Kind == "reasoning" && s.Ended && !s.ThinkingEnded))
                         EndThinking(finished, Emit);
@@ -671,7 +674,7 @@ public sealed class ResponsesTextToolTransport : IChatTransport
             var data = JsonData.Parse(Contracts.Compatibility.EcmaScriptJsonProjection.Project(JsonSerializer.Serialize(new { input, output, cacheRead = read, cacheWrite = write, total })));
             var value = data.Value;
             return new(value.GetProperty("input").GetDecimal(), value.GetProperty("output").GetDecimal(), value.GetProperty("cacheRead").GetDecimal(),
-                value.GetProperty("cacheWrite").GetDecimal(), value.GetProperty("total").GetDecimal(), SourceBinary64Cost: data);
+                value.GetProperty("cacheWrite").GetDecimal(), value.GetProperty("total").GetDecimal(), ProviderCost.TotalFromProvider(false), data);
         }
 
         private void CheckJson(JsonElement value, int depth)

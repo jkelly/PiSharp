@@ -6,6 +6,7 @@ using System.Globalization;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using PiSharp.AI.Protocols.ProviderShared;
 using PiSharp.Contracts;
 
 namespace PiSharp.AI.Protocols.Bedrock;
@@ -217,7 +218,7 @@ internal sealed class BedrockEventState
             ? JsonFields.Empty.Set("cacheWrite1h", JsonData.Parse(JsonNumber.Text(longWrite))) : null;
         _usage = new(input, output, read, write, total, new(costs.GetProperty("input").GetDecimal(), costs.GetProperty("output").GetDecimal(),
             costs.GetProperty("cacheRead").GetDecimal(), costs.GetProperty("cacheWrite").GetDecimal(), costs.GetProperty("total").GetDecimal(),
-            SourceBinary64Cost: binary64), extras);
+            ProviderCost.TotalFromProvider(false), binary64), extras);
     }
 
     /// <summary>The successful settlement: a stop reason is required and every open block is finalized.</summary>
