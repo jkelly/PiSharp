@@ -31,9 +31,12 @@ public sealed partial class PersistentAgentSession
                     budget.ContextWindow - budget.ReserveTokens, preview.CommonAncestorId, token);
                 if (!plan.Messages.IsEmpty)
                 {
-                    // generateBranchSummary passes no sessionId: completeSummarization routes it with a fresh uuidv7.
+                    // generateBranchSummary passes no sessionId: completeSummarization routes it with a fresh uuidv7. Pi 1.5.0 passes the
+                    // session's thinking level (reasoning when the model reasons and the level is not "off"; the summary route applies
+                    // model.reasoning).
                     var request = SessionSummaryRequestBuilder.Branch(plan, revision.Configuration.Model,
-                        Guid.CreateVersion7().ToString(), new(CustomInstructions: options.CustomInstructions, ReplaceBranchInstructions: options.ReplaceInstructions));
+                        Guid.CreateVersion7().ToString(), new(ModelSupportsReasoning: true, ThinkingLevel: revision.Configuration.ThinkingLevel,
+                            CustomInstructions: options.CustomInstructions, ReplaceBranchInstructions: options.ReplaceInstructions));
                     var actual = RetrySummaryAsync(() => generator.GenerateAsync(request, token), token, "branchSummary", null).AsTask();
                     var generated = await originals.Join(actual, "tree-summary-generator").ConfigureAwait(false);
                     ValidateGenerated(generated);

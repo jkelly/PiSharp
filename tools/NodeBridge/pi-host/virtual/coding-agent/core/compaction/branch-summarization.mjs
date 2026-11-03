@@ -1,7 +1,8 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/src/core/compaction/branch-summarization.ts.
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/coding-agent/src/core/compaction/branch-summarization.ts.
 // Ported to plain ESM for the PiSharp Node extension bridge (TypeScript types stripped mechanically; behaviour unchanged).
 import { contentText, normalizeContext } from "../../../pi-ai.mjs";
 import { convertToLlm, createBranchSummaryMessage, createCompactionSummaryMessage, createCustomMessage } from "../messages.mjs";
+import { projectContextEntry } from "../session-manager.mjs";
 import { completeSummarization, estimateTokens, getSummarizationFailure } from "./compaction.mjs";
 import { computeFileLists, createFileOps, extractFileOpsFromMessage, formatFileOperations, SUMMARIZATION_SYSTEM_PROMPT, serializeConversation } from "./utils.mjs";
 export function collectEntriesForBranchSummary(session, oldLeafId, targetId) {
@@ -34,12 +35,13 @@ export function collectEntriesForBranchSummary(session, oldLeafId, targetId) {
         commonAncestorId
     };
 }
-function getMessageFromEntry(entry) {
+function getMessageFromEntry(entry, edit) {
     switch(entry.type){
         case "message":
             if (entry.message.role === "toolResult") return undefined;
-            return entry.message;
+            return edit ? projectContextEntry(entry, edit)[0] : entry.message;
         case "custom_message":
+            if (edit) return projectContextEntry(entry, edit)[0];
             return createCustomMessage(entry.customType, entry.content, entry.display, entry.details, entry.timestamp);
         case "branch_summary":
             return createBranchSummaryMessage(entry.summary, entry.fromId, entry.timestamp);
@@ -70,9 +72,14 @@ export function prepareBranchEntries(entries, tokenBudget = 0) {
             }
         }
     }
+    // Context edits hide or replace earlier entries in model context; honor the latest edit per target.
+    const edits = new Map();
+    for (const entry of entries){
+        if (entry.type === "context_edit") edits.set(entry.targetId, entry);
+    }
     for(let i = entries.length - 1; i >= 0; i--){
         const entry = entries[i];
-        const message = getMessageFromEntry(entry);
+        const message = getMessageFromEntry(entry, edits.get(entry.id));
         if (!message) continue;
         extractFileOpsFromMessage(message, fileOps);
         const tokens = estimateTokens(message);
@@ -127,7 +134,7 @@ Use this EXACT format:
 
 Keep each section concise. Preserve exact file paths, function names, and error messages.`;
 export async function generateBranchSummary(entries, options) {
-    const { model, apiKey, headers, env, signal, customInstructions, replaceInstructions, reserveTokens = 16384, streamFn, retry, callbacks } = options;
+    const { model, apiKey, headers, env, signal, thinkingLevel, customInstructions, replaceInstructions, reserveTokens = 16384, streamFn, retry, callbacks } = options;
     const contextWindow = model.contextWindow || 128000;
     const tokenBudget = contextWindow - reserveTokens;
     const { messages, fileOps } = prepareBranchEntries(entries, tokenBudget);
@@ -159,7 +166,6 @@ export async function generateBranchSummary(entries, options) {
             timestamp: Date.now()
         }
     ];
-    const maxTokens = Math.min(4096, model.maxTokens > 0 ? model.maxTokens : Number.POSITIVE_INFINITY);
     const context = normalizeContext({
         systemPrompt: SUMMARIZATION_SYSTEM_PROMPT,
         messages: summarizationMessages
@@ -168,9 +174,11 @@ export async function generateBranchSummary(entries, options) {
         apiKey,
         headers,
         env,
-        signal,
-        maxTokens
+        signal
     };
+    if (model.reasoning && thinkingLevel && thinkingLevel !== "off") {
+        requestOptions.reasoning = thinkingLevel;
+    }
     const response = await completeSummarization(model, context, requestOptions, streamFn, retry, callbacks);
     if (response.stopReason === "aborted") {
         return {

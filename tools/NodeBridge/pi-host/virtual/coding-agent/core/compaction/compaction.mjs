@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/src/core/compaction/compaction.ts.
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/coding-agent/src/core/compaction/compaction.ts.
 // Ported to plain ESM for the PiSharp Node extension bridge (TypeScript types stripped mechanically; behaviour unchanged).
 import { contentText, getCurrentSystemMessage, normalizeContext, retryAssistantCall, uuidv7 } from "../../../pi-ai.mjs";
 import { completeSimple } from "../../../pi-ai.mjs";
@@ -373,9 +373,8 @@ export function getSummarizationFailure(response, label) {
     }
     return undefined;
 }
-function createSummarizationOptions(model, maxTokens, apiKey, headers, env, signal, thinkingLevel, sessionId) {
+function createSummarizationOptions(model, apiKey, headers, env, signal, thinkingLevel, sessionId) {
     const options = {
-        maxTokens,
         signal,
         apiKey,
         headers,
@@ -396,8 +395,9 @@ export async function completeSummarization(model, context, options, streamFn, r
     const produce = async ()=>streamFn ? (await streamFn(model, context, requestOptions)).result() : completeSimple(model, context, requestOptions);
     return retryAssistantCall(produce, retry, requestOptions.signal, callbacks);
 }
-export async function generateSummary(currentMessages, model, reserveTokens, apiKey, headers, signal, customInstructions, previousSummary, thinkingLevel, streamFn, env, retry, callbacks, sessionId) {
-    return (await generateSummaryWithUsage(currentMessages, model, reserveTokens, apiKey, headers, signal, customInstructions, previousSummary, thinkingLevel, streamFn, env, retry, callbacks, sessionId)).text;
+// _reserveTokens is unused. Kept for existing callers; summaries use the model's output limit (#9512).
+export async function generateSummary(currentMessages, model, _reserveTokens, apiKey, headers, signal, customInstructions, previousSummary, thinkingLevel, streamFn, env, retry, callbacks, sessionId) {
+    return (await generateSummaryWithUsage(currentMessages, model, _reserveTokens, apiKey, headers, signal, customInstructions, previousSummary, thinkingLevel, streamFn, env, retry, callbacks, sessionId)).text;
 }
 function buildSummarizationContext(promptText) {
     return normalizeContext({
@@ -416,8 +416,8 @@ function buildSummarizationContext(promptText) {
         ]
     });
 }
-export async function generateSummaryWithUsage(currentMessages, model, reserveTokens, apiKey, headers, signal, customInstructions, previousSummary, thinkingLevel, streamFn, env, retry, callbacks, sessionId) {
-    const maxTokens = Math.min(Math.floor(0.8 * reserveTokens), model.maxTokens > 0 ? model.maxTokens : Number.POSITIVE_INFINITY);
+// _reserveTokens is unused. Kept for existing callers; summaries use the model's output limit (#9512).
+export async function generateSummaryWithUsage(currentMessages, model, _reserveTokens, apiKey, headers, signal, customInstructions, previousSummary, thinkingLevel, streamFn, env, retry, callbacks, sessionId) {
     let basePrompt = previousSummary ? UPDATE_SUMMARIZATION_PROMPT : SUMMARIZATION_PROMPT;
     if (customInstructions) {
         basePrompt = `${basePrompt}\n\nAdditional focus: ${customInstructions}`;
@@ -429,7 +429,7 @@ export async function generateSummaryWithUsage(currentMessages, model, reserveTo
         promptText += `<previous-summary>\n${previousSummary}\n</previous-summary>\n\n`;
     }
     promptText += basePrompt;
-    const completionOptions = createSummarizationOptions(model, maxTokens, apiKey, headers, env, signal, thinkingLevel, sessionId);
+    const completionOptions = createSummarizationOptions(model, apiKey, headers, env, signal, thinkingLevel, sessionId);
     const response = await completeSummarization(model, buildSummarizationContext(promptText), completionOptions, streamFn, retry, callbacks);
     const failure = getSummarizationFailure(response, "Summarization");
     if (failure) {
@@ -556,22 +556,22 @@ Create a concise checkpoint of the user's request and the progress shown above. 
 
 Only summarize information explicitly present above. Do not infer or recreate later messages.`;
 export async function compact(preparation, model, apiKey, headers, customInstructions, signal, thinkingLevel, streamFn, env, retry, callbacks, sessionId) {
-    const { firstKeptEntryId, messagesToSummarize, turnPrefixMessages, isSplitTurn, tokensBefore, previousSummary, fileOps, settings } = preparation;
+    const { firstKeptEntryId, messagesToSummarize, turnPrefixMessages, isSplitTurn, tokensBefore, previousSummary, fileOps } = preparation;
     let summary;
     let summaryUsage;
     if (isSplitTurn && turnPrefixMessages.length > 0) {
         let historyText = previousSummary ?? "No prior history.";
         let historyUsage;
         if (messagesToSummarize.length > 0) {
-            const historyResult = await generateSummaryWithUsage(messagesToSummarize, model, settings.reserveTokens, apiKey, headers, signal, customInstructions, previousSummary, thinkingLevel, streamFn, env, retry, callbacks, sessionId);
+            const historyResult = await generateSummaryWithUsage(messagesToSummarize, model, undefined, apiKey, headers, signal, customInstructions, previousSummary, thinkingLevel, streamFn, env, retry, callbacks, sessionId);
             historyText = historyResult.text;
             historyUsage = historyResult.usage;
         }
-        const turnPrefixResult = await generateTurnPrefixSummary(turnPrefixMessages, model, settings.reserveTokens, apiKey, headers, env, signal, thinkingLevel, streamFn, retry, callbacks, sessionId);
+        const turnPrefixResult = await generateTurnPrefixSummary(turnPrefixMessages, model, apiKey, headers, env, signal, thinkingLevel, streamFn, retry, callbacks, sessionId, customInstructions);
         summary = `${historyText}\n\n---\n\n**Turn Context (split turn):**\n\n${turnPrefixResult.text}`;
         summaryUsage = historyUsage ? combineUsage(historyUsage, turnPrefixResult.usage) : turnPrefixResult.usage;
     } else {
-        const result = await generateSummaryWithUsage(messagesToSummarize, model, settings.reserveTokens, apiKey, headers, signal, customInstructions, previousSummary, thinkingLevel, streamFn, env, retry, callbacks, sessionId);
+        const result = await generateSummaryWithUsage(messagesToSummarize, model, undefined, apiKey, headers, signal, customInstructions, previousSummary, thinkingLevel, streamFn, env, retry, callbacks, sessionId);
         summary = result.text;
         summaryUsage = result.usage;
     }
@@ -591,12 +591,14 @@ export async function compact(preparation, model, apiKey, headers, customInstruc
         }
     };
 }
-async function generateTurnPrefixSummary(messages, model, reserveTokens, apiKey, headers, env, signal, thinkingLevel, streamFn, retry, callbacks, sessionId) {
-    const maxTokens = Math.min(Math.floor(0.5 * reserveTokens), model.maxTokens > 0 ? model.maxTokens : Number.POSITIVE_INFINITY);
+async function generateTurnPrefixSummary(messages, model, apiKey, headers, env, signal, thinkingLevel, streamFn, retry, callbacks, sessionId, customInstructions) {
     const llmMessages = convertToLlm(messages);
     const conversationText = serializeConversation(llmMessages);
-    const promptText = `# Conversation\n${conversationText}\n\n# Instructions\n${TURN_PREFIX_SUMMARIZATION_PROMPT}`;
-    const response = await completeSummarization(model, buildSummarizationContext(promptText), createSummarizationOptions(model, maxTokens, apiKey, headers, env, signal, thinkingLevel, sessionId), streamFn, retry, callbacks);
+    let promptText = `# Conversation\n${conversationText}\n\n# Instructions\n${TURN_PREFIX_SUMMARIZATION_PROMPT}`;
+    if (customInstructions) {
+        promptText = `${promptText}\n\nAdditional focus: ${customInstructions}`;
+    }
+    const response = await completeSummarization(model, buildSummarizationContext(promptText), createSummarizationOptions(model, apiKey, headers, env, signal, thinkingLevel, sessionId), streamFn, retry, callbacks);
     const failure = getSummarizationFailure(response, "Turn prefix summarization");
     if (failure) {
         throw new Error(failure);

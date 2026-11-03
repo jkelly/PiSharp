@@ -70,6 +70,8 @@ When you move to another point, PiSharp asks **Summarize branch?**:
 
 `Esc` cancels a running summary. Set `branchSummary.skipPrompt` to `true` to skip the question and never summarize. `branchSummary.reserveTokens` (default 16384) keeps room for the summary prompt and answer.
 
+On a model that reasons, the summary uses the session's thinking level. Messages that a context edit removed or replaced reach the summary as the model last saw them.
+
 ## Fork and clone
 
 | Command | What it does |
@@ -87,6 +89,8 @@ Long sessions outgrow the model's context window. Compaction replaces older mess
 - **Automatically**, when the context passes the model's context window minus `compaction.reserveTokens` (default 16384).
 - **After an overflow**: when a provider rejects a prompt as too long, PiSharp compacts and retries.
 - **By hand**, with `/compact`, optionally followed by instructions for the summary, such as `/compact keep the API decisions`.
+
+Summaries may use the model's full output limit. When the cut falls inside a turn, PiSharp also summarizes the start of that turn, and your `/compact` instructions apply to that summary too.
 
 `compaction.keepRecentTokens` (default 20000) is how much recent conversation stays verbatim. `compaction.modelOverrides` sets both values for single models. `compaction.enabled` turns automatic compaction off; `/settings` and the RPC `set_auto_compaction` command change it. The full history stays in the file: compaction only changes what the model sees. See [Settings](/docs/reference/settings/#sessions-queue-and-compaction).
 
