@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/ai/src/types.ts (ProviderRequestOptions, ClassifierOptions,
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/ai/src/types.ts (ProviderRequestOptions, ClassifierOptions,
 // ImagesOptions, ProviderResponse).
 using System.Collections.Immutable;
 using System.Text.Json.Nodes;
@@ -45,6 +45,10 @@ public record ModelRequestOptions
     /// model and request headers. Null: a detailed <c>User-Agent</c> and no attribution.</summary>
     [System.Diagnostics.CodeAnalysis.Experimental("PISHARP_IDENTITY001")]
     public ClientIdentity? Identity { get; init; }
+    /// <summary>types.ts <c>ProviderRequestOptions.telemetry</c>: the explicit parent span for telemetry produced by this logical
+    /// request. Registry calls forward it with the options; as upstream, classifier and image requests record no spans of their own.</summary>
+    [System.Diagnostics.CodeAnalysis.Experimental("PISHARP_TELEMETRY001")]
+    public PiSharp.Telemetry.ITelemetrySpan? Telemetry { get; init; }
 }
 
 /// <summary>types.ts <c>ClassifierOptions</c>.</summary>

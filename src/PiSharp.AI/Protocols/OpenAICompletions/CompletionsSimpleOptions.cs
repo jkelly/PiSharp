@@ -10,8 +10,11 @@ public sealed record CompletionsSimpleOptions(JsonData ModelMetadata, string? Re
     public CompletionsKeyAuthRequestOptions DirectOptions { get; init; } = new();
     public CompletionsHttpSseOptions HttpOptions { get; init; } = new();
     public string? TransportPreference { get; init; }
-    /// <summary>Bounded opaque data retained by Simple; the Completions SSE provider does not serialize it.</summary>
-    public JsonData? TelemetryContext { get; init; }
+    /// <summary>Source SimpleStreamOptions.telemetry (the renamed telemetryContext, with no alias): the explicit parent span of the
+    /// request's telemetry. Retained by Simple as buildBaseOptions forwards it; the Completions SSE provider never serializes it.
+    /// Tracing is recorded by a <see cref="ChatRun"/> from <see cref="ChatRequest.Telemetry"/>.</summary>
+    [System.Diagnostics.CodeAnalysis.Experimental("PISHARP_TELEMETRY001")]
+    public PiSharp.Telemetry.ITelemetrySpan? Telemetry { get; init; }
     /// <summary>Bounded caller metadata. Pi's Completions provider forwards it without adding request fields.</summary>
     public JsonData? Metadata { get; init; }
     /// <summary>Scoped environment data. Explicit DirectOptions.CacheRetention takes precedence; the borrowed client is not reconfigured.</summary>

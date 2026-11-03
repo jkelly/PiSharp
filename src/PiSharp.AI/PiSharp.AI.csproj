@@ -2,10 +2,13 @@
   <PropertyGroup>
     <!-- Decision 0007: the PiSharp-only service tiers are [Experimental]; the protocols here map them to each API's fields. -->
     <!-- Pi 1.5.0 client identity (identity.ts) is [Experimental("PISHARP_IDENTITY001")]; every protocol here sends its headers. -->
-    <NoWarn>$(NoWarn);PISHARP_TIERS001;PISHARP_IDENTITY001;PISHARP_AI001</NoWarn>
+    <!-- Pi 1.5.0 telemetry (pi-telemetry, ai telemetry.ts) is [Experimental("PISHARP_TELEMETRY001")]; chat runs trace a request's span. -->
+    <NoWarn>$(NoWarn);PISHARP_TIERS001;PISHARP_IDENTITY001;PISHARP_AI001;PISHARP_TELEMETRY001</NoWarn>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../PiSharp.Contracts/PiSharp.Contracts.csproj" />
+    <!-- pi-ai depends on pi-telemetry: the request option's span type and the pi.ai.request / pi.ai.poll schema. -->
+    <ProjectReference Include="../PiSharp.Telemetry/PiSharp.Telemetry.csproj" />
   </ItemGroup>
   <ItemGroup>
     <!-- WhatwgUrl: bug-report redaction re-serializes URLs with the same WHATWG subset as the Azure endpoint. -->

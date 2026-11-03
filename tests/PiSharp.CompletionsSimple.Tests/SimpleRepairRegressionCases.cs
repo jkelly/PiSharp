@@ -187,19 +187,19 @@ internal static class SimpleRepairRegressionCases
         using var client = new HttpClient(handler);
         var options = Options(metadata) with
         {
-            TelemetryContext = JsonData.Parse("{\"authored\":true}"), Metadata = JsonData.Parse("{\"retained\":null}"),
+            Telemetry = PiSharp.Telemetry.NoopTelemetry.Context, Metadata = JsonData.Parse("{\"retained\":null}"),
             TransportPreference = "websocket", WebsocketConnectTimeoutMilliseconds = 4321,
             Environment = JsonData.Parse("{\"PI_CACHE_RETENTION\":\"long\",\"HTTP_PROXY\":\"\",\"HTTPS_PROXY\":\"\"}")
         };
         var observed = await Execute(new(client, EndpointFor(metadata), request.Model, options), request, deadline, evidence);
         Require(observed.Cleanup.Succeeded, "opaque options admitted and joined");
         using var parsed = JsonDocument.Parse(body);
-        foreach (var name in new[] { "telemetryContext", "metadata", "transport", "websocketConnectTimeoutMs", "env", "prompt_cache_key", "prompt_cache_retention" })
+        foreach (var name in new[] { "telemetry", "telemetryContext", "metadata", "transport", "websocketConnectTimeoutMs", "env", "prompt_cache_key", "prompt_cache_retention" })
             Require(!parsed.RootElement.TryGetProperty(name, out _), "inert option or explicit no-cache priority");
         try
         {
             _ = new CompletionsSimpleRequestFactory(client, EndpointFor(metadata), request.Model, options with
-            { TelemetryContext = JsonData.Parse("{\"oversized\":\"" + new string('x', 1024) + "\"}"), DirectOptions = new(MaximumPayloadBytes: 64) });
+            { Metadata = JsonData.Parse("{\"oversized\":\"" + new string('x', 1024) + "\"}"), DirectOptions = new(MaximumPayloadBytes: 64) });
             throw new Exception("Unbounded opaque option admitted.");
         }
         catch (CompletionsRequestException error) when (error.Failure == CompletionsRequestFailure.ResourceLimit)
