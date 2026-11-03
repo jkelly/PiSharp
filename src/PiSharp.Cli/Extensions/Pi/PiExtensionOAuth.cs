@@ -25,8 +25,10 @@ internal sealed class PiExtensionOAuth(PiExtensionHost host, string provider, st
         host.BeginOAuthLogin(loginId, interaction);
         try
         {
-            var result = await host.CallAsync("provider.oauth", new JsonObject { ["provider"] = provider, ["op"] = "login", ["loginId"] = loginId }, cancellationToken)
-                .ConfigureAwait(false);
+            // The login's own events (onAuth/onDeviceCode/onProgress, sent as notifications) reach the interaction before the login
+            // returns and its id is retired, as upstream's in-process callbacks do.
+            var result = await host.CallAsync("provider.oauth", new JsonObject { ["provider"] = provider, ["op"] = "login", ["loginId"] = loginId }, cancellationToken,
+                afterPrecedingFrames: true).ConfigureAwait(false);
             return FromJson(result) ?? throw new InvalidOperationException($"{name} login returned no credentials");
         }
         catch (PiSharp.Compatibility.Node.Pi.PiNodeHostException) when (cancellationToken.IsCancellationRequested) { throw OAuthFlows.Cancelled(cancellationToken); }
@@ -146,13 +148,16 @@ internal sealed partial class PiExtensionHost
         var value = parameters.GetProperty("event");
         string? Text(string name) => value.TryGetProperty(name, out var item) && item.ValueKind == JsonValueKind.String ? item.GetString() : null;
         double? Number(string name) => value.TryGetProperty(name, out var item) && item.ValueKind == JsonValueKind.Number ? item.GetDouble() : null;
+        bool? Flag(string name) => value.TryGetProperty(name, out var item) && item.ValueKind is JsonValueKind.True or JsonValueKind.False ? item.GetBoolean() : null;
         var kind = Text("type") switch { "auth_url" => AuthEventKind.AuthUrl, "device_code" => AuthEventKind.DeviceCode, "progress" => AuthEventKind.Progress, _ => AuthEventKind.Info };
         try
         {
             interaction.Notify(new(kind)
             {
                 Url = Text("url"), Instructions = Text("instructions"), Message = Text("message"), UserCode = Text("userCode"),
-                VerificationUri = Text("verificationUri") ?? Text("verificationUrl"), IntervalSeconds = Number("intervalSeconds"), ExpiresInSeconds = Number("expiresInSeconds")
+                VerificationUri = Text("verificationUri") ?? Text("verificationUrl"), IntervalSeconds = Number("intervalSeconds"), ExpiresInSeconds = Number("expiresInSeconds"),
+                // Pi 1.5.0: a device_code event (or onDeviceCode info) may turn off the confirm actions; absent means true.
+                OpenBrowserOnConfirm = Flag("openBrowserOnConfirm"), CopyCodeOnConfirm = Flag("copyCodeOnConfirm")
             });
         }
         catch (Exception) { /* A UI failure must not end the login. */ }
