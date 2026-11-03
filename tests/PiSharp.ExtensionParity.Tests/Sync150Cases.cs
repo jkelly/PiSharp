@@ -33,7 +33,34 @@ internal static partial class Program
         ("sync150.package-install-failure-warnings-follow-reload", PackageInstallFailureOnReload),
         ("sync150.glob-brace-expansion-is-bounded", Sync(GlobBraceAmplification)),
         ("sync150.glob-amplified-wildcards-and-globstars-answer-at-once", Sync(GlobWildcardAmplification)),
+        ("sync150.trust-saved-decision-reaches-extensions", SavedTrustReachesExtensions),
     ];
+
+    // main.ts createRuntime and project-trust.ts (31ade0e0d, test/project-trust-saved-decision.test.ts): for a project without
+    // trust-requiring resources, ctx.isProjectTrusted() reports a saved "Do not trust", and auto-trust when nothing is saved.
+    private static async Task SavedTrustReachesExtensions()
+    {
+        using var sandbox = NodeSandbox("trust-saved", trusted: false);
+        sandbox.Write(Path.Combine(sandbox.Cwd, "AGENTS.md"), "# untrusted\n");
+        if (ProjectTrustStore.HasTrustRequiringProjectResources(sandbox.Cwd, sandbox.Home))
+            throw new SkipException("ANCESTOR_SKILLS", "An ancestor of the temporary directory holds .agents/skills, so the project requires trust here.");
+        var extension = sandbox.Write("trust-probe.ts", """
+            import { appendFileSync } from "node:fs";
+            export default function (pi: any) {
+              pi.on("session_start", (_event: any, ctx: any) => appendFileSync(process.cwd() + "/probe.log", JSON.stringify(["trusted", ctx.isProjectTrusted()]) + "\n"));
+            }
+            """);
+        async Task<bool> Probe()
+        {
+            File.Delete(Path.Combine(sandbox.Cwd, "probe.log"));
+            var (code, _, stderr) = await sandbox.Run([.. new[] { "-p", "--no-session", "-e", extension }, .. Model, "hi"]);
+            Equal(0, code, "exit; " + stderr);
+            return LogRecords(sandbox, "trusted").Single()[1]!.GetValue<bool>();
+        }
+        Equal(true, await Probe(), "no decision: auto-trusted");
+        new ProjectTrustStore(sandbox.AgentDir, sandbox.Home).Set(sandbox.Cwd, false);
+        Equal(false, await Probe(), "a saved Do not trust reaches the extension");
+    }
 
     // brace-expansion 5 (minimatch 11): an amplified brace pattern is truncated instead of expanded without bound: at most 100,000
     // results and 4,000,000 characters, chained sets combined without recursion, nesting followed 1,000 levels deep.

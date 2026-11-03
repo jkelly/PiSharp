@@ -146,7 +146,8 @@ internal delegate Task<ProjectTrustOption?> PiProjectTrustPrompt(string title, I
 /// <summary>Source resolveProjectTrusted for a cwd, and the trust seam other packages consume.</summary>
 internal static class PiProjectTrust
 {
-    /// <summary>Source resolveProjectTrusted: the CLI override, then "no trust-requiring resources", then the project_trust extension
+    /// <summary>Source resolveProjectTrusted: the CLI override, then "no trust-requiring resources" (the stored decision, else trusted:
+    /// a saved "Do not trust" wins over auto-trust), then the project_trust extension
     /// handlers (<paramref name="extensionDecision"/>; a remembered decision is saved), then the stored decision, then
     /// <c>defaultProjectTrust</c>, then the prompt when a UI exists.</summary>
     internal static async Task<bool> ResolveAsync(string cwd, string home, ProjectTrustStore store, bool? trustOverride, string defaultProjectTrust,
@@ -154,7 +155,7 @@ internal static class PiProjectTrust
         Func<string, CancellationToken, Task<PiProjectTrustDecision?>>? extensionDecision = null)
     {
         if (trustOverride is { } forced) return forced;
-        if (!ProjectTrustStore.HasTrustRequiringProjectResources(cwd, home)) return true;
+        if (!ProjectTrustStore.HasTrustRequiringProjectResources(cwd, home)) return store.Get(cwd) ?? true;
         if (extensionDecision is not null && await extensionDecision(cwd, cancellationToken).ConfigureAwait(false) is { } decided)
         {
             if (decided.Remember) store.Set(cwd, decided.Trusted);

@@ -176,7 +176,8 @@ internal static class PiCommand
             PiDiagnostic[] helpDiagnostics = [];
             if (host.LoadExtensions is null)
             {
-                var helpTrusted = parsed.ProjectTrustOverride ?? (!ProjectTrustStore.HasTrustRequiringProjectResources(cwd, home) || new ProjectTrustStore(agentDir, home).Get(cwd) == true);
+                // main.ts createRuntime: the saved decision comes before auto-trust.
+                var helpTrusted = parsed.ProjectTrustOverride ?? new ProjectTrustStore(agentDir, home).Get(cwd) ?? !ProjectTrustStore.HasTrustRequiringProjectResources(cwd, home);
                 await using var helpRun = await PiExtensionRun.LoadAsync(host, parsed, cwd, agentDir, home, helpTrusted, "print", false, null, token).ConfigureAwait(false);
                 helpFlags = helpRun.Host?.Flags; helpDiagnostics = [.. helpRun.Diagnostics];
             }
@@ -193,7 +194,7 @@ internal static class PiCommand
             PiExtensionRun? listRun = null;
             if (host.LoadExtensions is null)
             {
-                var listTrusted = parsed.ProjectTrustOverride ?? (!ProjectTrustStore.HasTrustRequiringProjectResources(cwd, home) || new ProjectTrustStore(agentDir, home).Get(cwd) == true);
+                var listTrusted = parsed.ProjectTrustOverride ?? new ProjectTrustStore(agentDir, home).Get(cwd) ?? !ProjectTrustStore.HasTrustRequiringProjectResources(cwd, home);
                 listRun = await PiExtensionRun.LoadAsync(host, parsed, cwd, agentDir, home, listTrusted, "print", false, null, token).ConfigureAwait(false);
                 PiSharp.Cli.Packages.PiResolvedPaths listPackages;
                 try
