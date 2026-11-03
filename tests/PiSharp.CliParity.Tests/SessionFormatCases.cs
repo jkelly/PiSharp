@@ -32,6 +32,11 @@ internal static partial class Program
     {
         var scenario = JsonNode.Parse(File.ReadAllText(file))!.AsObject();
         var name = scenario["name"]!.GetValue<string>();
+        // Captured with an earlier catalog, where openrouter ~anthropic/claude-haiku-latest was an openai-completions row. The
+        // @earendil-works/pi-ai@1.5.0 openrouter.json makes it anthropic-messages, so the captured /chat/completions exchange no longer
+        // applies; it needs a new capture from Pi 1.5.0 (CliSync sync150.openrouter-anthropic-latest-alias-speaks-messages covers the route).
+        if (name == "override-openrouter" && Environment.GetEnvironmentVariable("SESSFMT_DIR") is not { Length: > 0 })
+            throw new SkipException("override-openrouter was captured before ~anthropic/claude-haiku-latest moved to anthropic-messages (pi-ai 1.5.0)");
         using var sandbox = new Sandbox("sessfmt-" + name);
         foreach (var (relative, text) in scenario["files"]!.AsObject()) sandbox.Write(Path.Combine(sandbox.Cwd, relative), text!.GetValue<string>());
         // The capture pointed the providers at the fake server through models.json base URLs ({base}); the injected handler answers

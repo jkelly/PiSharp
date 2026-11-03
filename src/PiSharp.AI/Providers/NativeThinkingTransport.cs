@@ -82,9 +82,10 @@ internal sealed class NativeThinkingProfile
             {
                 if (cap <= 0 || cap > ModelMaxTokens) throw new ArgumentException();
                 if (!Adaptive && cap < 2048) Levels = Levels.Where(level => level == "off").ToImmutableArray();
+                // "off" is never sent as an effort (mapThinkingLevelToEffort runs only with thinking on), so OpenRouter's "off": "none" is allowed.
                 if (map.ValueKind == JsonValueKind.Object)
                     foreach (var entry in map.EnumerateObject())
-                        if (entry.Value.ValueKind == JsonValueKind.String && entry.Value.GetString() is not ("low" or "medium" or "high" or "xhigh" or "max"))
+                        if (entry.Name != "off" && entry.Value.ValueKind == JsonValueKind.String && entry.Value.GetString() is not ("low" or "medium" or "high" or "xhigh" or "max"))
                             throw new ArgumentException();
             }
             if (Levels.IsDefaultOrEmpty) throw new ArgumentException();
