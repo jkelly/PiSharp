@@ -57,7 +57,10 @@ public static partial class NativeProviderFactory
                 SessionAffinityFormat = compat.ValueKind == JsonValueKind.Object && compat.TryGetProperty("sessionAffinityFormat", out var affinity) && affinity.ValueKind != JsonValueKind.Null
                     ? affinity.GetString() ?? "openai" : "openai",
                 SupportsLongCacheRetention = Flag("supportsLongCacheRetention", true),
-                SupportsExplicitPromptCacheMode = Flag("supportsExplicitPromptCacheMode", false)
+                SupportsExplicitPromptCacheMode = Flag("supportsExplicitPromptCacheMode", false),
+                // Pi 1.5.0 getCompat: supportsMidConvoEffort defaults to false.
+                SupportsMidConversationEffort = Flag("supportsMidConvoEffort", false),
+                ModelBaseUrl = metadata.Value.TryGetProperty("baseUrl", out var baseUrl) && baseUrl.ValueKind == JsonValueKind.String ? baseUrl.GetString() : null
             };
         }
         catch (InvalidOperationException)

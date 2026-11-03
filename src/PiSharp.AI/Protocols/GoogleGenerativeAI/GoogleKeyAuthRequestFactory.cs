@@ -42,9 +42,10 @@ public sealed class GoogleKeyAuthRequestFactory(ModelDescriptor model, GoogleGen
         if (Encoding.UTF8.GetByteCount(projected) > options.MaximumPayloadBytes) throw GoogleData.Fail(GoogleFailure.ResourceLimit);
         var headers = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase)
         {
-            ["x-goog-api-key"] = options.ApiKey, ["content-type"] = "application/json", ["accept"] = "text/event-stream",
-            ["user-agent"] = "pi/1.2.0"
+            ["x-goog-api-key"] = options.ApiKey, ["content-type"] = "application/json", ["accept"] = "text/event-stream"
         };
+        // Pi 1.5.0 google.ts: providerHeadersToRecord(getIdentityHeaders(model, identity), model.headers, options.headers).
+        foreach (var (header, value) in ClientIdentities.HeadersFor(model.Provider, baseUrl, options.Identity, request.Identity)) headers[header] = value;
         void Merge(JsonElement value)
         {
             if (value.ValueKind != JsonValueKind.Object) throw GoogleData.Fail(GoogleFailure.UnsupportedValue);

@@ -48,6 +48,10 @@ public sealed record BedrockConverseOptions
     public int MaximumContentBlocks { get; init; } = int.MaxValue;
     /// <summary>The accumulated response, bounded like every other provider's (the SDK has no bound of its own).</summary>
     public int MaximumResponseCharacters { get; init; } = PiRequestBudget.StreamCharacters;
+    /// <summary>Source StreamOptions.identity (Pi 1.5.0 identity.ts): the User-Agent (bedrockUserAgent); a request's own identity
+    /// merges over it. Null: pi/&lt;version&gt;.</summary>
+    [System.Diagnostics.CodeAnalysis.Experimental("PISHARP_IDENTITY001")]
+    public ClientIdentity? Identity { get; init; }
 }
 
 /// <summary>The catalog model fields the Bedrock stream reads.</summary>
@@ -117,9 +121,11 @@ internal static partial class BedrockConverseRequest
         return Math.Min(maxTokens, Math.Max(1, available));
     }
 
-    /// <summary>The ConverseStream body for one request.</summary>
+    /// <summary>The ConverseStream body for one request. With <paramref name="disablePreferredStrictTools"/>, strict "prefer" tools are sent
+    /// non-strict (the one retry after Bedrock rejects the strict tool set); <paramref name="hasPreferredStrictTools"/> says whether any
+    /// "prefer" tool was sent strict.</summary>
     internal static JsonObject Build(BedrockModel model, ChatRequest request, BedrockConverseOptions options, BedrockStreamOptions stream,
-        Func<string, string?> env, string? configuredRegion)
+        Func<string, string?> env, string? configuredRegion, bool disablePreferredStrictTools, out bool hasPreferredStrictTools)
     {
         // Bedrock has no mid-conversation system messages; fold them into the leading prompt.
         var collapsed = ProviderTranscript.CollapseSystemMessages(ProviderTranscript.Parse(request.Messages));
@@ -134,7 +140,8 @@ internal static partial class BedrockConverseRequest
         if (inferenceMaxTokens is { } tokens) inference["maxTokens"] = (long)tokens;
         if (options.Temperature is { } temperature) inference["temperature"] = temperature;
         body["inferenceConfig"] = inference;
-        if (ConvertToolConfig(ProviderTranscript.CurrentTools(collapsed), options.ToolChoice, model.SupportsStrictMode) is { } tools) body["toolConfig"] = tools;
+        if (ConvertToolConfig(ProviderTranscript.CurrentTools(collapsed), options.ToolChoice, model.SupportsStrictMode, disablePreferredStrictTools,
+                out hasPreferredStrictTools) is { } tools) body["toolConfig"] = tools;
         if (BuildAdditionalModelRequestFields(model, options, stream, configuredRegion) is { } additional) body["additionalModelRequestFields"] = additional;
         if (options.RequestMetadata is { } metadata)
         {
@@ -257,21 +264,30 @@ internal static partial class BedrockConverseRequest
                 }
                 case "toolResult":
                 {
-                    // Consecutive tool results share one user message.
+                    // Consecutive tool results share one user message. Claude rejects error tool results that contain anything but text,
+                    // so for Claude their images follow all tool results of the turn (#10794); other models keep them in place.
                     var results = new JsonArray();
+                    var errorImages = new List<JsonObject>();
                     var next = index;
                     while (next < messages.Count && ProviderTranscript.Role(messages[next]) == "toolResult")
                     {
                         var toolResult = messages[next];
                         var isError = toolResult["isError"] is JsonValue error && error.TryGetValue<bool>(out var failed) && failed;
+                        var split = IsAnthropicClaude(model) ? ProviderTranscript.SplitErrorToolResultImages(toolResult) : null;
                         results.Add(new JsonObject { ["toolResult"] = new JsonObject
                         {
                             ["toolUseId"] = ProviderTranscript.Text(toolResult, "toolCallId"),
-                            ["content"] = ToolResultContent(toolResult["content"] as JsonArray), ["status"] = isError ? "error" : "success"
+                            ["content"] = ToolResultContent(split?.Content ?? toolResult["content"] as JsonArray), ["status"] = isError ? "error" : "success"
                         } });
+                        if (split is { } parts)
+                        {
+                            errorImages.Add(new JsonObject { ["text"] = parts.Caption });
+                            errorImages.AddRange(parts.Images.Select(image => new JsonObject { ["image"] = ImageBlock(image) }));
+                        }
                         next++;
                     }
                     index = next - 1;
+                    foreach (var image in errorImages) results.Add(image);
                     result.Add(new JsonObject { ["role"] = "user", ["content"] = results });
                     break;
                 }
@@ -327,15 +343,19 @@ internal static partial class BedrockConverseRequest
         }
     }
 
-    private static JsonObject? ConvertToolConfig(List<JsonObject> tools, JsonData? toolChoice, bool supportsStrictMode)
+    private static JsonObject? ConvertToolConfig(List<JsonObject> tools, JsonData? toolChoice, bool supportsStrictMode, bool disablePreferredStrictTools,
+        out bool hasPreferredStrictTools)
     {
+        hasPreferredStrictTools = false;
         if (tools.Count == 0) return null;
         var choice = toolChoice?.Value;
         if (choice is { ValueKind: JsonValueKind.String } none && none.GetString() == "none") return null;
         var specs = new JsonArray();
         foreach (var tool in tools)
         {
-            var strict = ProviderTranscript.ResolveStrict(tool, supportsStrictMode);
+            var preferred = ProviderTranscript.PrefersStrict(tool);
+            var strict = disablePreferredStrictTools && preferred ? null : ProviderTranscript.ResolveStrict(tool, supportsStrictMode);
+            if (strict == true && preferred) hasPreferredStrictTools = true;
             var spec = new JsonObject
             {
                 ["name"] = ProviderTranscript.Text(tool, "name"),

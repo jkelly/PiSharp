@@ -174,7 +174,9 @@ public sealed class LlamaCppClassifier : IClassifierApi
         if (observe && options?.OnPayload is { } onPayload && await onPayload(body.DeepClone(), model, signal).ConfigureAwait(false) is { } replaced)
             payload = replaced;
         var text = ProviderRequest.Stringify(payload);
-        var defaults = new List<KeyValuePair<string, string?>> { new("content-type", "application/json") };
+        // Pi 1.5.0 llama-cpp-classify.ts: getIdentityHeaders(model, identity) below the defaults, model and option headers.
+        var defaults = new List<KeyValuePair<string, string?>>(ProviderRequest.Nullable(ClientIdentities.GetIdentityHeaders(model.Provider, model.BaseUrl, options?.Identity)))
+            { new("content-type", "application/json") };
         if (!string.IsNullOrEmpty(options?.ApiKey)) defaults.Add(new("authorization", "Bearer " + options.ApiKey));
         var headers = ProviderRequest.MergeHeaders(defaults, ProviderRequest.Nullable(model.Headers), options?.Headers ?? []);
         var http = ProviderRequest.Http(options);

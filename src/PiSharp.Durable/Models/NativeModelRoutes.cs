@@ -123,7 +123,7 @@ internal static class NativeModelRoutes
                 var endpoint = new Uri(baseUrl);
                 var costs = raw.GetProperty("cost");
                 var options = new MistralTextOptions(endpoint, SupportsText: true, new(costs.GetProperty("input").GetDouble(),
-                    costs.GetProperty("output").GetDouble(), costs.GetProperty("cacheRead").GetDouble(), costs.GetProperty("cacheWrite").GetDouble()), "PiSharp")
+                    costs.GetProperty("output").GetDouble(), costs.GetProperty("cacheRead").GetDouble(), costs.GetProperty("cacheWrite").GetDouble()))
                 {
                     MaxTokens = maximum, Reasoning = reasoning, CachePrompt = retention != "none", SupportsImages = images,
                     Headers = settings.Headers?.ToImmutableDictionary(pair => pair.Key, pair => (string?)pair.Value, StringComparer.Ordinal),

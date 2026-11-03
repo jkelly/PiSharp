@@ -38,8 +38,10 @@ public sealed class GoogleVertexRequestFactory
             // Node and number counts grow with the message count; the payload budget bounds them.
             MaximumNodes: budget, MaximumNumbers: budget, MaximumTotalNumberCharacters: budget)));
         if (bytes.Length > projection.MaximumPayloadBytes) throw GoogleData.Fail(GoogleFailure.ResourceLimit);
-        var headers = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
-        { ["User-Agent"] = "pi/1.2.0", ["Accept"] = "text/event-stream" };
+        var headers = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase) { ["Accept"] = "text/event-stream" };
+        // Pi 1.5.0 google-vertex.ts: providerHeadersToRecord(getIdentityHeaders(model, identity), model.headers, options.headers).
+        foreach (var (header, value) in ClientIdentities.HeadersFor(model.Provider, options.Endpoint.AbsoluteUri, projection.Identity, request.Identity))
+            headers[header] = value;
         void Merge(JsonElement value)
         {
             if (value.ValueKind != JsonValueKind.Object) throw GoogleData.Fail(GoogleFailure.UnsupportedValue);

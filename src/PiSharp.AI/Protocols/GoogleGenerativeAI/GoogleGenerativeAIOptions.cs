@@ -15,6 +15,10 @@ public sealed record GoogleGenerativeAIOptions(JsonData ModelMetadata, string? A
     /// <summary>PiSharp-only: <c>serviceTier</c> (standard, flex or priority); a request's own tier wins. Null omits it.</summary>
     [System.Diagnostics.CodeAnalysis.Experimental("PISHARP_TIERS001")]
     public string? ServiceTier { get; init; }
+    /// <summary>Source StreamOptions.identity (Pi 1.5.0 identity.ts): the User-Agent and attribution headers, below the model and
+    /// request headers; a request's own identity merges over it. Null: a detailed User-Agent and no attribution.</summary>
+    [System.Diagnostics.CodeAnalysis.Experimental("PISHARP_IDENTITY001")]
+    public ClientIdentity? Identity { get; init; }
     public int MaxRetries { get; init; }
     public int MaxRetryDelayMilliseconds { get; init; } = 60_000;
     /// <summary>Native timing seams. They do not enter SDK parameters or Pi wire JSON.</summary>

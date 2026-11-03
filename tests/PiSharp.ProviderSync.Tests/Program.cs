@@ -91,6 +91,7 @@ internal static partial class Program
             ("errors.in-stream-error-texts-google-and-vertex", GoogleStreamErrorTexts),
             ("google.wire-body-matches-genai-for-gemini-and-vertex", GoogleWireBodies)
         };
+        cases = [.. cases, .. Sync150Cases];
         var results = new List<object>(); var failures = 0;
         foreach (var test in cases)
         {
@@ -325,7 +326,7 @@ internal static partial class Program
         using var handler = new Handler(async request =>
         {
             seen.Add((request.RequestUri!.AbsoluteUri, string.Join("|", request.Headers.Concat(request.Content!.Headers)
-                .Select(header => header.Key.ToLowerInvariant() + "=" + string.Join(",", header.Value)).Order(StringComparer.Ordinal)),
+                .Select(header => header.Key.ToLowerInvariant() + "=" + string.Join(UserAgentSeparator(header.Key, ","), header.Value)).Order(StringComparer.Ordinal)),
                 await request.Content.ReadAsStringAsync()));
             return Sse("""{"id":"c","object":"chat.completion.chunk","created":0,"model":"m","choices":[{"index":0,"delta":{"content":"ok"},"finish_reason":"stop"}]}""");
         });
@@ -344,7 +345,7 @@ internal static partial class Program
             await foreach (var _ in provider.Transport.StreamAsync(new(selected, [system, Ask], 1))) { }
             return seen[^1];
         }
-        const string headers = "accept=application/json|authorization=Bearer inert-provider-sync-key|content-type=application/json|user-agent=PiSharp|x-stainless-retry-count=0";
+        var headers = "accept=application/json|authorization=Bearer inert-provider-sync-key|content-type=application/json|user-agent=" + ClientIdentities.FormatUserAgent(null) + "|x-stainless-retry-count=0";
         var metadata = JsonData.Parse(DeepSeekV4Pro);
         // Resource name + deployment map; the model's compat sends the system prompt as "system" and reasoning_effort for openai thinking.
         var catalog = await Send(new() { Environment = environment }, new(MaxTokens: 4096, ReasoningEffort: "high") { ModelMetadata = metadata }, metadata);
@@ -604,15 +605,15 @@ internal static partial class Program
 
     private static async Task GoogleUserAgent()
     {
-        // Decision: keep the pinned product token. Upstream's getPiUserAgent() (unchanged blob 93b23dd at both refs) reports the
-        // host OS ("pi (<platform> <release>; <arch>)"); model and caller headers override it in both implementations.
+        // Pi 1.5.0 google.ts: getIdentityHeaders' detailed user agent, pi/1.5.0 (<platform>; dotnet/<version>; <arch>) with the runtime
+        // naming .NET (decision 0013); model and caller headers override it.
         async Task<string> Agent(JsonData metadata, string? headers = null)
         {
             var options = new GoogleGenerativeAIOptions(metadata, Key) { Headers = headers is null ? null : JsonData.Parse(headers) };
             using var request = await new GoogleKeyAuthRequestFactory(Gemini, options).CreateAsync(new(Gemini, [Ask], 1));
             return string.Join(" ", request.Headers.GetValues("User-Agent"));
         }
-        Equal("pi/1.2.0", await Agent(GoogleMetadata()));
+        Equal(ClientIdentities.FormatUserAgent(null), await Agent(GoogleMetadata()));
         Equal("model-agent", await Agent(GoogleMetadata(headers: ""","headers":{"User-Agent":"model-agent"}""")));
         Equal("caller-agent", await Agent(GoogleMetadata(headers: ""","headers":{"User-Agent":"model-agent"}"""), """{"user-agent":"caller-agent"}"""));
     }

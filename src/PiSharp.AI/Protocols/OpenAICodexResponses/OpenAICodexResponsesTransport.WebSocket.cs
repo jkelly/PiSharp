@@ -181,7 +181,7 @@ public sealed partial class OpenAICodexResponsesTransport
         string transport, Invocation invocation, CancellationToken cancellation)
     {
         var requestId = ClampCacheKey(cacheSessionId) ?? Guid.CreateVersion7().ToString("D");
-        var headers = BuildWebSocketHeaders(token, requestId);
+        var headers = BuildWebSocketHeaders(token, requestId, invocation.Identity);
         var url = ResolveWebSocketUrl(_metadata.TryGetProperty("baseUrl", out var baseUrl) && baseUrl.ValueKind == JsonValueKind.String ? baseUrl.GetString() : null);
         var retriedConnectionLimit = false;
         while (true)
