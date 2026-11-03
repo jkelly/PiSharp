@@ -4,7 +4,9 @@
 // The real Pi packages: PiSharp installs the exact Pi 1.2.0 packages into the agent dir (PiNodeRuntime) and names their node_modules
 // here. Extensions are then loaded as upstream's unbundled Node build loads them: jiti from Pi's own dependencies, created for the
 // installed coding agent's loader.js, `moduleCache: false`, and getAliases (the coding agent's dist index, pi-agent-core, pi-tui, the
-// pi-ai compat/oauth/providers entries, typebox, and the @mariozechner/* and @sinclair/typebox names).
+// pi-ai compat/oauth/providers entries, typebox, and the @mariozechner/* and @sinclair/typebox names). Pi 1.5.0's getAliases also
+// resolves the pi-ai root and compat entry to the coding agent's pi-ai extension view (dist/core/extensions/pi-ai-extension-view.js)
+// and adds pi-ai/models; an installed Pi that predates the view keeps its compat entry, and one without pi-ai/models gets no alias.
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -34,6 +36,10 @@ export async function loadPiModules(nodeModules, themeName) {
   const piAgentCoreEntry = resolve('@earendil-works/pi-agent-core');
   const piTuiEntry = resolve('@earendil-works/pi-tui');
   const piAiCompatEntry = resolve('@earendil-works/pi-ai/compat');
+  const piAiExtensionView = path.join(path.dirname(loaderFile), 'pi-ai-extension-view.js');
+  const piAiExtensionEntry = fs.existsSync(piAiExtensionView) ? piAiExtensionView : piAiCompatEntry;
+  let piAiModelsEntry;
+  try { piAiModelsEntry = resolve('@earendil-works/pi-ai/models'); } catch { /* pi-ai without a ./models entry point */ }
   const piAiOauthEntry = resolve('@earendil-works/pi-ai/oauth');
   const piAiProvidersEntry = resolve('@earendil-works/pi-ai/providers/all');
   const alias = {
@@ -41,16 +47,18 @@ export async function loadPiModules(nodeModules, themeName) {
     '@earendil-works/pi-agent-core': piAgentCoreEntry,
     '@earendil-works/pi-tui': piTuiEntry,
     '@earendil-works/pi-ai/providers/all': piAiProvidersEntry,
-    '@earendil-works/pi-ai/compat': piAiCompatEntry,
+    '@earendil-works/pi-ai/compat': piAiExtensionEntry,
+    ...(piAiModelsEntry ? { '@earendil-works/pi-ai/models': piAiModelsEntry } : {}),
     '@earendil-works/pi-ai/oauth': piAiOauthEntry,
-    '@earendil-works/pi-ai': piAiCompatEntry,
+    '@earendil-works/pi-ai': piAiExtensionEntry,
     '@mariozechner/pi-coding-agent': packageIndex,
     '@mariozechner/pi-agent-core': piAgentCoreEntry,
     '@mariozechner/pi-tui': piTuiEntry,
     '@mariozechner/pi-ai/providers/all': piAiProvidersEntry,
-    '@mariozechner/pi-ai/compat': piAiCompatEntry,
+    '@mariozechner/pi-ai/compat': piAiExtensionEntry,
+    ...(piAiModelsEntry ? { '@mariozechner/pi-ai/models': piAiModelsEntry } : {}),
     '@mariozechner/pi-ai/oauth': piAiOauthEntry,
-    '@mariozechner/pi-ai': piAiCompatEntry,
+    '@mariozechner/pi-ai': piAiExtensionEntry,
     typebox: typeboxEntry,
     'typebox/compile': typeboxCompileEntry,
     'typebox/value': typeboxValueEntry,

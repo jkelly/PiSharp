@@ -5,7 +5,8 @@
 // module does not export is undefined rather than a link error), `require`, `__dirname` and `__filename` work in every file, and
 // Pi's own packages resolve to the running Pi (aliases or virtual modules). The PiSharp bridge does the same with the user's Node:
 // module.stripTypeScriptTypes in transform mode for TypeScript, an import rewrite for jiti's interop, and the virtual modules of
-// ./virtual (or a real Pi installation named by PISHARP_PI_NODE_MODULES, resolved as upstream's getAliases does).
+// ./virtual (or a real Pi installation named by PISHARP_PI_NODE_MODULES, resolved as upstream's getAliases does). As in Pi 1.5.0, the
+// pi-ai root and compat entry are the coding agent's pi-ai extension view when the installation has one, and pi-ai/models is mapped.
 import fs from 'node:fs';
 import path from 'node:path';
 import module from 'node:module';
@@ -27,10 +28,12 @@ export function virtualModuleTable() {
       '@sinclair/typebox': 'typebox', '@sinclair/typebox/compile': 'typebox/compile', '@sinclair/typebox/value': 'typebox/value',
       '@earendil-works/pi-coding-agent': '@earendil-works/pi-coding-agent', '@earendil-works/pi-agent-core': '@earendil-works/pi-agent-core',
       '@earendil-works/pi-tui': '@earendil-works/pi-tui', '@earendil-works/pi-ai': '@earendil-works/pi-ai/compat',
-      '@earendil-works/pi-ai/compat': '@earendil-works/pi-ai/compat', '@earendil-works/pi-ai/oauth': '@earendil-works/pi-ai/oauth',
+      '@earendil-works/pi-ai/compat': '@earendil-works/pi-ai/compat', '@earendil-works/pi-ai/models': '@earendil-works/pi-ai/models',
+      '@earendil-works/pi-ai/oauth': '@earendil-works/pi-ai/oauth',
       '@earendil-works/pi-ai/providers/all': '@earendil-works/pi-ai/providers/all',
     })) {
-      const resolved = tryResolve(target);
+      const view = path.join(realRoot, '@earendil-works', 'pi-coding-agent', 'dist', 'core', 'extensions', 'pi-ai-extension-view.js');
+      const resolved = target === '@earendil-works/pi-ai/compat' && exists(view) ? view : tryResolve(target);
       if (resolved) { table.set(spec, resolved); if (spec.startsWith('@earendil-works/')) table.set(spec.replace('@earendil-works/', '@mariozechner/'), resolved); }
     }
     if (table.size > 0) return table;
