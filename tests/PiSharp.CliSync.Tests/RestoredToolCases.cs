@@ -322,7 +322,8 @@ internal static partial class Program
             var earlier = reopened.Snapshot.Context.Ancestry.Last(entry => entry.WireBody.Value.TryGetProperty("message", out var message) &&
                 message.GetProperty("role").GetString() == "system").ParentId!;
             await NavigateTo(owner, earlier);
-            Names(["read"], reopened.GetActiveTools(), "the earlier branch's loadout");
+            // Pi 1.5.0: grep, an extension tool the earlier branch never mentions, activates as a newly registered one.
+            Names(["read", "grep"], reopened.GetActiveTools(), "the earlier branch's loadout");
             await NavigateTo(owner, leaf);
             Names(["read", "grep"], reopened.GetActiveTools(), "the navigation back restored the loadout");
             Names([DocsTool], reopened.PendingToolNames, "the navigation back restored the pending tool");
@@ -413,7 +414,8 @@ internal static partial class Program
     }
 
     // agent-session.ts setActiveToolsByName and _refreshToolRegistry apply at idle in memory; the next prompt records the
-    // difference (captured with the installed Pi: a selection writes nothing, a reorder records no tool change).
+    // difference (captured with the installed Pi: a selection writes nothing, a reorder records no tool change). Pi 1.5.0
+    // _applyToolLoadout keeps the order of tools that stay active, so the reorder no longer changes the loadout (authored).
     private static async Task IdleSelectionAndCatalogRecordedAtNextPrompt()
     {
         var (session, directory) = await PendingSession([Tool("read"), Tool("grep"), Tool("ls")]);
@@ -423,14 +425,14 @@ internal static partial class Program
             await Recorded(session, ["read", "grep"]);
             var before = FileBytes(path);
             await session.SetActiveToolsAsync(["grep", "read"]);
-            Names(["grep", "read"], session.GetActiveTools(), "the selection's order");
-            Names(["grep", "read"], session.Snapshot.Agent.Tools.Select(tool => tool.Name), "the agent runs the selection");
+            Names(["read", "grep"], session.GetActiveTools(), "the selection keeps the order");
+            Names(["read", "grep"], session.Snapshot.Agent.Tools.Select(tool => tool.Name), "the agent runs the selection");
             Check(FileBytes(path).SequenceEqual(before), "an idle selection wrote to the session file");
             var count = session.Snapshot.Log.Entries.Length;
             await session.PromptAsync(SettledUser("reordered")); await session.WaitForIdleAsync();
             Check(session.Snapshot.Log.Entries.Skip(count).All(entry => !entry.WireBody.Value.TryGetProperty("message", out var message) ||
                 message.GetProperty("role").GetString() != "system"), "a reorder recorded a tool change");
-            Names(["grep", "read"], session.GetActiveTools(), "the prompt kept the selection's order");
+            Names(["read", "grep"], session.GetActiveTools(), "the prompt kept the order");
 
             before = FileBytes(path);
             await session.SetActiveToolsAsync(["ls"]);
@@ -473,14 +475,15 @@ internal static partial class Program
             await Recorded(session, ["read"]);
             Equal("<tools>read</tools>", started.Single(), "before_agent_start of the recorded selection");
             Equal("<tools>read</tools>", session.GetSystemPrompt(), "prompt after the run");
+            // Pi 1.5.0 _applyToolLoadout: read keeps its place and grep is appended.
             await session.SetActiveToolsAsync(["grep", "read"]);
             // The transcript still declares the recorded prompt; the in-memory prompt is the selection's.
             Equal("<tools>read</tools>", new PiSharp.Sessions.Context.SessionSystemReplay().Replay(session.Snapshot.Context.Messages).Prompt, "transcript prompt");
-            Equal("<tools>grep,read</tools>", session.GetSystemPrompt(), "getSystemPrompt after an idle selection");
-            Names(["grep", "read"], session.GetActiveToolDeclarations().Select(tool => tool.Value.GetProperty("name").GetString()!), "exported tools");
+            Equal("<tools>read,grep</tools>", session.GetSystemPrompt(), "getSystemPrompt after an idle selection");
+            Names(["read", "grep"], session.GetActiveToolDeclarations().Select(tool => tool.Value.GetProperty("name").GetString()!), "exported tools");
             await session.PromptAsync(SettledUser("go")); await session.WaitForIdleAsync();
-            Equal("<tools>grep,read</tools>", started[^1], "before_agent_start sees the in-memory prompt");
-            Equal("<tools>grep,read</tools>", new PiSharp.Sessions.Context.SessionSystemReplay().Replay(session.Snapshot.Context.Messages).Prompt, "recorded by the prompt");
+            Equal("<tools>read,grep</tools>", started[^1], "before_agent_start sees the in-memory prompt");
+            Equal("<tools>read,grep</tools>", new PiSharp.Sessions.Context.SessionSystemReplay().Replay(session.Snapshot.Context.Messages).Prompt, "recorded by the prompt");
         }
         finally { await session.DisposeAsync(); Directory.Delete(directory, recursive: true); }
     }

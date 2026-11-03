@@ -35,7 +35,7 @@ internal sealed class VirtualModelRoutingTransport(ModelRegistry registry, Regis
     /// agent-session.ts _getSummarizationRequestAuth for a virtual selection: one routing per summary with reason "direct", the
     /// session's messages and thinking level and no router state (model-runtime.ts resolveModel); the summary then goes to the routed
     /// physical model's summary route at <paramref name="maximum"/> (clamped there to its own cap) with the routed thinking level when
-    /// the summary carries one (compaction and bug reports, not branch summaries). The router's new state is not recorded.
+    /// the summary carries one (compaction, bug reports and, since Pi 1.5.0, branch summaries). The router's new state is not recorded.
     /// </summary>
     internal IChatTransport Summary(int maximum, bool carriesLevel) => new SummaryRoute(this, maximum, carriesLevel);
 

@@ -138,7 +138,7 @@ internal static partial class Program
             var context = $"Project-specific instructions and guidelines:\n\n<project_instructions path=\"{Path.Combine(sandbox.Cwd, "AGENTS.md")}\">\nUse tabs.\n</project_instructions>";
             var expected = ExpectedDefaultPrompt(sandbox, DefaultTools, context, "Extra rule.");
             var skills = "<skills>\nThe following skills provide specialized instructions for specific tasks.\nUse the read tool to load a skill's file when the task matches its description.\n" +
-                "When a skill file references a relative path, resolve it against the skill directory (parent of SKILL.md / dirname of the path) and use that absolute path in tool commands.\n\n" +
+                "Resolve relative paths against the skill's directory (parent of SKILL.md). Use absolute paths in tool calls.\n\n" +
                 $"<available_skills>\n  <skill>\n    <name>deploy</name>\n    <description>Deploy the app &lt;safely&gt;</description>\n    <location>{skill}</location>\n  </skill>\n</available_skills>\n</skills>";
             expected = expected.Replace("\n\n<cwd>\n", "\n\n" + skills + "\n\n<cwd>\n", StringComparison.Ordinal);
             Equal(expected, system, "prompt with context, addendum and skills");

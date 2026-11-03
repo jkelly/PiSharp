@@ -207,7 +207,7 @@ public sealed partial class PersistentAgentSession
     }
     private Task OmitRetryAssistantAsync(AssistantMessage assistant, TaskCompletionSource idle, CancellationToken token)
     {
-        string target;
+        List<string> targets;
         lock (_gate)
         {
             if (!ReferenceEquals(_active, idle)) throw Error(PersistentAgentSessionFailure.StaleSession);
@@ -215,10 +215,11 @@ public sealed partial class PersistentAgentSession
             var acknowledged = _context.ContextEntries.LastOrDefault(entry => entry.SourceEntry.Id == _lastAcknowledgedAssistantId &&
                 entry.Messages.Any(message => message.Role == "assistant" && JsonUtf16.DeepEquals(message.WireBody.Value, wire)));
             if (acknowledged is null) throw Error(PersistentAgentSessionFailure.InvalidCommit);
-            target = acknowledged.SourceEntry.Id;
+            // Pi 1.5.0 _omitRecoveryAttempt keeps the message and the results that answer its calls together.
+            targets = RecoveryTargets(_context, acknowledged, assistant);
         }
         SetOperationPhase(SessionOperationPhase.RecoveryOmission);
-        return OmitRecoveryAttemptAsync([target], token, idle);
+        return OmitRecoveryAttemptAsync(targets, token, idle);
     }
     private static string? RetryErrorMessage(AssistantMessage assistant)
     {

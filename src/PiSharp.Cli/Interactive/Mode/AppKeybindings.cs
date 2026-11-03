@@ -176,3 +176,11 @@ internal static class KeybindingHints
     public static string KeyHint(string keybinding, string description) => Themes.Current.Fg("dim", KeyText(keybinding)) + Themes.Current.Fg("muted", " " + description);
     public static string RawKeyHint(string key, string description) => Themes.Current.Fg("dim", FormatKeyText(key)) + Themes.Current.Fg("muted", " " + description);
 }
+
+/// <summary>Pi 1.5.0 KeybindingHints for extension renderers: keyText and keyHint over the host's keybindings.</summary>
+internal sealed class HostKeybindingHints : PiSharp.Extensions.IExtensionKeybindingHints
+{
+    public static HostKeybindingHints Instance { get; } = new();
+    public string KeyText(string keybinding) => KeybindingHints.KeyText(keybinding);
+    public string KeyHint(string keybinding, string description) => KeybindingHints.KeyHint(keybinding, description);
+}

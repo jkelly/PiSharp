@@ -96,7 +96,9 @@ internal sealed partial class OfflineSessionProfile : IAsyncDisposable, IRpcExte
     { await AttachOwnerAsync(session).ConfigureAwait(false); await StartLifecycleAsync(reason, token).ConfigureAwait(false); }
     private readonly ImmutableArray<string>? _initialActiveTools;
     /// <summary>sdk.ts createAgentSession initialActiveToolNames. For a resumed session (<paramref name="resumed"/>) the names are applied
-    /// in memory, as the AgentSession constructor applies them, and the next prompt records the loadout: opening a session writes nothing.</summary>
+    /// in memory, as the AgentSession constructor applies them, and the next prompt records the loadout: opening a session writes nothing.
+    /// Pi 1.5.0: with the default tools (no --tools, or only +name/-name entries) a resumed branch that records a loadout keeps it
+    /// (_restoreToolsFromTranscript) instead of taking the initial names.</summary>
     internal async Task ApplyInitialToolSelectionAsync(PersistentAgentSession session, CancellationToken token, bool resumed = false)
     {
         ImmutableArray<string>? initial = null;
@@ -110,7 +112,7 @@ internal sealed partial class OfflineSessionProfile : IAsyncDisposable, IRpcExte
         else if (_initialActiveTools is { } names) initial = names;
         if (initial is { } selected)
         {
-            if (resumed) await session.ApplyInitialToolsAsync(selected, token).ConfigureAwait(false);
+            if (resumed) await session.ApplyInitialToolsAsync(session.ResumedBranchTools(token) ?? selected, token).ConfigureAwait(false);
             else await session.SetActiveToolsAsync(selected, token).ConfigureAwait(false);
         }
         await DrainLoadoutDiagnosticsAsync(token).ConfigureAwait(false);
@@ -176,30 +178,35 @@ internal sealed partial class OfflineSessionProfile : IAsyncDisposable, IRpcExte
     private IChatTransport SummaryTransport(SessionSummaryRequest summary)
     {
         // A model the session switched to summarizes through its own live route.
+        // Pi 1.5.0: compaction and branch summaries both carry the session's thinking level (generateBranchSummary thinkingLevel).
         if (summary.Model != SelectedModel && _liveModels?.Transport(summary.Model) is { } switched &&
-            summary.CacheRetention == "none" && summary.MaximumOutputTokens is > 0 and <= 1_000_000 && summary.MaximumOutputTokens == Math.Floor(summary.MaximumOutputTokens))
-            return switched.Summary((int)summary.MaximumOutputTokens, summary.ThinkingLevel, summary.Kind != SessionSummaryKind.Branch);
-        if (summary.Model != SelectedModel || summary.CacheRetention != "none" ||
-            summary.MaximumOutputTokens is <= 0 or > 1_000_000 || summary.MaximumOutputTokens != Math.Floor(summary.MaximumOutputTokens))
+            summary.CacheRetention == "none" && ValidSummaryMaximum(summary.MaximumOutputTokens))
+            return switched.Summary(SummaryMaximum(summary, int.MaxValue), summary.ThinkingLevel);
+        if (summary.Model != SelectedModel || summary.CacheRetention != "none" || !ValidSummaryMaximum(summary.MaximumOutputTokens))
             throw new SessionCompactionException(SessionCompactionFailure.InvalidSettings);
-        // compaction.ts: maxTokens = min(budget, model.maxTokens); the live route's cap is the model's (a virtual selection's
-        // routed physical model applies its own).
+        // Pi 1.5.0 summaries send no maxTokens, so the provider uses model.maxTokens; the live route's cap is the model's (a virtual
+        // selection's routed physical model applies its own).
         if (_live is not null)
-            return _live.CreateSummaryTransport(_live.IsVirtual ? (int)summary.MaximumOutputTokens : Math.Min((int)summary.MaximumOutputTokens, _live.MaximumOutputTokens),
-                summary.ThinkingLevel, summary.Kind != SessionSummaryKind.Branch);
+            return _live.CreateSummaryTransport(_live.IsVirtual ? SummaryMaximum(summary, int.MaxValue) : Math.Min(SummaryMaximum(summary, int.MaxValue), _live.MaximumOutputTokens),
+                summary.ThinkingLevel);
         // The offline profile's own requests never reason (its transports project reasoning off), so its summaries do not either.
         return new LiveSessionConnection.SummaryLevelTransport(OfflineSummaryTransport(summary), null, offWhenOffered: false);
     }
+    private static bool ValidSummaryMaximum(double? maximum) =>
+        maximum is not { } value || value is > 0 and <= 1_000_000 && value == Math.Floor(value);
+    /// <summary>The summary's output cap, or the route's own limit when the request sets none (the offline profile's is 8192).</summary>
+    private static int SummaryMaximum(SessionSummaryRequest summary, int routeMaximum = 8192) =>
+        summary.MaximumOutputTokens is { } maximum ? (int)maximum : routeMaximum;
 
     private IChatTransport OfflineSummaryTransport(SessionSummaryRequest summary)
     {
         if (SelectedModel.Api == "anthropic-messages")
         {
             var factory = new AnthropicMessagesKeyAuthRequestFactory(AnthropicBase, SelectedModel,
-                new(MaximumTokens: (int)summary.MaximumOutputTokens, ModelReasoning: false,
+                new(MaximumTokens: SummaryMaximum(summary), ModelReasoning: false,
                     ModelSupportsImages: SelectedModelDefinition.DeclaresImageInput, CacheRetention: AnthropicCacheRetention.None,
                     MaximumMessages: PiRequestBudget.RequestMessages, MaximumEntryCharacters: PiPayloadBudget.RequestEntryCharacters, MaximumInputCharacters: PiPayloadBudget.RequestPayloadBytes, MaximumOutputCharacters: PiPayloadBudget.RequestPayloadBytes, MaximumOutputBytes: PiPayloadBudget.RequestPayloadBytes),
-                new(MaxTokens: summary.MaximumOutputTokens, SessionId: summary.SessionId, MaximumPayloadBytes: PiPayloadBudget.RequestPayloadBytes));
+                new(MaxTokens: SummaryMaximum(summary), SessionId: summary.SessionId, MaximumPayloadBytes: PiPayloadBudget.RequestPayloadBytes));
             return new AnthropicMessagesHttpSseTransport(_client!, (request, token) => MarkSummary(factory.Create(request, InertKey, token), summary),
                 new(MaximumDataEvents: 256, MaximumTotalDataCharacters: PiSharp.AI.PiRequestBudget.StreamTotalCharacters));
         }
@@ -209,7 +216,7 @@ internal sealed partial class OfflineSessionProfile : IAsyncDisposable, IRpcExte
                 new(Reasoning: false, MaximumMessages: PiRequestBudget.RequestMessages, MaximumEntryCharacters: PiPayloadBudget.RequestEntryCharacters, MaximumInputCharacters: PiPayloadBudget.RequestPayloadBytes, MaximumOutputCharacters: PiPayloadBudget.RequestPayloadBytes, MaximumOutputBytes: PiPayloadBudget.RequestPayloadBytes,
                     ToolDeclarations: new(MaximumMessages: PiRequestBudget.RequestMessages, MaximumEntryCharacters: PiPayloadBudget.RequestEntryCharacters, MaximumInputCharacters: PiPayloadBudget.RequestPayloadBytes, MaximumOutputCharacters: PiPayloadBudget.RequestPayloadBytes, MaximumOutputBytes: PiPayloadBudget.RequestPayloadBytes))
                     { ModelSupportsImages = SelectedModelDefinition.DeclaresImageInput },
-                new(MaxTokens: summary.MaximumOutputTokens, SupportsReasoningEffort: false, CacheRetention: CompletionsCacheRetention.None,
+                new(MaxTokens: SummaryMaximum(summary), SupportsReasoningEffort: false, CacheRetention: CompletionsCacheRetention.None,
                     SessionId: summary.SessionId, MaximumPayloadBytes: PiPayloadBudget.RequestPayloadBytes));
             return new CompletionsHttpSseTransport(_client!, (request, token) => MarkSummary(factory.Create(request, InertKey, token), summary),
                 new(MaximumDataEvents: 256, MaximumTotalDataCharacters: PiSharp.AI.PiRequestBudget.StreamTotalCharacters));
@@ -217,7 +224,7 @@ internal sealed partial class OfflineSessionProfile : IAsyncDisposable, IRpcExte
         var responses = new ResponsesKeyAuthRequestFactory(Endpoint, SelectedModel,
             new(Reasoning: false, MaximumMessages: PiRequestBudget.RequestMessages, MaximumEntryCharacters: PiPayloadBudget.RequestEntryCharacters, MaximumInputCharacters: PiPayloadBudget.RequestPayloadBytes, MaximumOutputCharacters: PiPayloadBudget.RequestPayloadBytes)
                 { ModelSupportsImages = SelectedModelDefinition.DeclaresImageInput },
-            new(SupportsMaxOutputTokens: true, MaxOutputTokens: (int)summary.MaximumOutputTokens, SessionId: summary.SessionId,
+            new(SupportsMaxOutputTokens: true, MaxOutputTokens: SummaryMaximum(summary), SessionId: summary.SessionId,
                 MaximumPayloadBytes: PiPayloadBudget.RequestPayloadBytes));
         return new ResponsesHttpSseTransport(_client!, request => MarkSummary(responses.Create(request, InertKey), summary),
             new(MaximumDataEvents: 256, MaximumTotalDataCharacters: PiSharp.AI.PiRequestBudget.StreamTotalCharacters));
@@ -349,7 +356,7 @@ internal sealed partial class OfflineSessionProfile : IAsyncDisposable, IRpcExte
             new SessionRuntimeRegistryOptions(MaximumModels: piEntry ? int.MaxValue : 4096, MaximumTools: piEntry ? int.MaxValue : 128,
                 MaximumMessages: piEntry ? int.MaxValue : PiRequestBudget.RequestMessages, MaximumDeclarations: piEntry ? int.MaxValue : PiRequestBudget.RequestItems, MaximumCharacters: piEntry ? PiPayloadBudget.PiSessionFileBytes : PiPayloadBudget.SessionFileBytes, ToolInvokerOptions: invokerOptions) { PreparedToolHooks = NormalizedToolHooks(extension?.Binding.PreparedHooks), BlockImages = () => ImageSettings.BlockImages,
                 ServiceTier = PiSharp.Cli.Pi.PiServiceTierSetting.Current,
-                LifetimeToolSelection = lifetimeSelection, InitialActiveToolNames = _initialActiveTools,
+                LifetimeToolSelection = lifetimeSelection, InitialActiveToolNames = _initialActiveTools, UsesDefaultTools = lifetimeSelection?.UsesDefaultTools ?? true,
                 BindNestedCallsToSessionOwner = true, ReportLoadoutDiagnostic = extension is null ? null : extension.CaptureLoadoutDiagnostic,
                 DrainLoadoutDiagnostics = extension is null ? null : extension.DrainLoadoutDiagnosticsAsync,
                 PreparePromptSections = PrepareDurablePromptSections, RestoreFallbackModel = (saved, fallback) => RestoreFallback?.Invoke(saved, fallback) });
@@ -985,7 +992,7 @@ internal sealed partial class OfflineSessionProfile : IAsyncDisposable, IRpcExte
             var root = body.RootElement;
             var input = root.GetProperty(anthropic || completions ? "messages" : "input");
             request.Options.TryGetValue(SummaryRequestKey, out var summary);
-            var outputBudget = summary is null ? 8192 : (int)summary.MaximumOutputTokens;
+            var outputBudget = summary is null ? 8192 : SummaryMaximum(summary);
             if (summary is not null && (summary.Model != model || summary.CacheRetention != "none" ||
                 summary.ThinkingLevel is not null || outputBudget <= 0 || outputBudget > 1_000_000 ||
                 root.TryGetProperty("tools", out _) || !anthropic && !completions &&

@@ -275,8 +275,12 @@ public sealed partial class PersistentAgentSession
                         if (branchPlan.Messages.IsEmpty) generated = new("No content to summarize", TokenUsage.Zero);
                         else
                         {
+                            // Pi 1.5.0 navigateTree: generateBranchSummary gets the session's thinking level, as compaction does.
+                            var branchOptions = branchRequest.SummaryOptions ?? new();
+                            if (branchOptions.ThinkingLevel is null)
+                                branchOptions = branchOptions with { ThinkingLevel = configuration.ThinkingLevel, ModelSupportsReasoning = true };
                             var result = await GenerateRetryingSummaryAsync(generator, SessionSummaryRequestBuilder.Branch(branchPlan, configuration.Model,
-                                Guid.CreateVersion7().ToString(), branchRequest.SummaryOptions), work, "branchSummary", null).ConfigureAwait(false);
+                                Guid.CreateVersion7().ToString(), branchOptions), work, "branchSummary", null).ConfigureAwait(false);
                             ValidateGenerated(result); generated = result with { Text = SessionSummaryRequestBuilder.BranchPreamble + result.Text };
                         }
                     }

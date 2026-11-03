@@ -805,8 +805,17 @@ internal sealed partial class PiExtensionHost
         await ui.OpenCustomComponentAsync(new ExtensionCustomComponentCallbacks(identity,
             async (width, _, cancellation) => PiNodeOwner.Rows(await Node.RequestAsync("component.render", new JsonObject { ["id"] = componentId, ["width"] = width }, cancellation).ConfigureAwait(false)),
             async (data, _, cancellation) => await Node.RequestAsync("component.input", new JsonObject { ["id"] = componentId, ["data"] = data }, cancellation).ConfigureAwait(false),
-            async _ => { _components.TryRemove(componentId, out var _); await Node.RequestAsync("component.dispose", new JsonObject { ["id"] = componentId }).ConfigureAwait(false); }), token).ConfigureAwait(false);
+            async _ => { _components.TryRemove(componentId, out var _); await Node.RequestAsync("component.dispose", new JsonObject { ["id"] = componentId }).ConfigureAwait(false); })
+        { Blocked = CustomComponentBlocked(p) }, token).ConfigureAwait(false);
     }
+
+    /// <summary>Pi 1.5.0 ctx.ui.custom() <c>blocked: { kind, message }</c>; overlays ignore it.</summary>
+    internal static ExtensionCustomComponentBlocked? CustomComponentBlocked(JsonElement p) =>
+        !(p.TryGetProperty("overlay", out var overlay) && overlay.ValueKind == JsonValueKind.True) &&
+        p.TryGetProperty("blocked", out var blocked) && blocked.ValueKind == JsonValueKind.Object &&
+        blocked.TryGetProperty("kind", out var kind) && kind.ValueKind == JsonValueKind.String &&
+        blocked.TryGetProperty("message", out var message) && message.ValueKind == JsonValueKind.String
+            ? new(kind.GetString()!, message.GetString()!) : null;
 
     // ----------------------------------------------------------------------------------------------------------------- tools and commands
 

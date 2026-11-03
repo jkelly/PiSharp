@@ -84,7 +84,7 @@ internal static partial class Program
             { Content = new StringContent("""{"error":{"message":"capture"}}""", Encoding.UTF8, "application/json") });
             var selection = LiveSessionSelection.Parse(test.Provider, test.Model, "8192");
             using var connection = selection.Connect(new(Env((test.KeyName, "test-key")), () => endpoint));
-            var generator = new TransportSessionSummaryGenerator(request => connection.CreateSummaryTransport((int)request.MaximumOutputTokens, request.ThinkingLevel));
+            var generator = new TransportSessionSummaryGenerator(request => connection.CreateSummaryTransport((int)request.MaximumOutputTokens!.Value, request.ThinkingLevel));
             var request = new SessionSummaryRequest(test.Level is null ? SessionSummaryKind.Branch : SessionSummaryKind.History, selection.Model,
                 "SYS", "PROMPT", test.Maximum, test.Level, sessionId);
             try { await generator.GenerateAsync(request); throw new InvalidOperationException(label + " summary succeeded against a rejecting endpoint"); }
@@ -104,7 +104,7 @@ internal static partial class Program
             var selection = LiveSessionSelection.Parse("azure", "gpt-5.4", "8192");
             using (var connection = selection.Connect(new(Env(("AZURE_OPENAI_API_KEY", "azure-key"), ("AZURE_OPENAI_RESOURCE_NAME", "pisharp-res")), () => azure)))
             {
-                try { await new TransportSessionSummaryGenerator(request => connection.CreateSummaryTransport((int)request.MaximumOutputTokens, request.ThinkingLevel))
+                try { await new TransportSessionSummaryGenerator(request => connection.CreateSummaryTransport((int)request.MaximumOutputTokens!.Value, request.ThinkingLevel))
                     .GenerateAsync(new(SessionSummaryKind.History, selection.Model, "SYS", "PROMPT", maximum, level, sessionId)); }
                 catch (PiSharp.Sessions.Compaction.SessionCompactionException) { }
             }
@@ -129,7 +129,7 @@ internal static partial class Program
             var selection = LiveSessionSelection.Parse("amazon-bedrock", id, "8192");
             using (var connection = selection.Connect(new(Env(("AWS_ACCESS_KEY_ID", "AKIDEXAMPLE"), ("AWS_SECRET_ACCESS_KEY", "secret-example"), ("AWS_REGION", "us-east-1")), () => bedrock)))
             {
-                try { await new TransportSessionSummaryGenerator(request => connection.CreateSummaryTransport((int)request.MaximumOutputTokens, request.ThinkingLevel))
+                try { await new TransportSessionSummaryGenerator(request => connection.CreateSummaryTransport((int)request.MaximumOutputTokens!.Value, request.ThinkingLevel))
                     .GenerateAsync(new(level is null ? SessionSummaryKind.Branch : SessionSummaryKind.History, selection.Model, "SYS", "PROMPT", maximum, level, sessionId)); }
                 catch (PiSharp.Sessions.Compaction.SessionCompactionException) { }
             }

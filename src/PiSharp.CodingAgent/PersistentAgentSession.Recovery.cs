@@ -163,18 +163,11 @@ public sealed partial class PersistentAgentSession
         var retry=assistant.StopReason!=StopReason.Stop;
         if(retry&&attempted){await EmitOperationAsync(new SessionRecoveryEnded(operation,"retry-exhausted",false)).ConfigureAwait(false);return new(true,false,false);}
         await EmitOperationAsync(new SessionRecoveryStarted(operation,overflow?"overflow":"length",retry)).ConfigureAwait(false);
-        // Only synthetic truncated results from this final attempt are omitted. Completed effects
+        // The final attempt and the tool results answering its calls are omitted. Completed effects
         // from earlier turns remain in raw history and canonical context, and are never replayed.
         if(retry)
         {
-            var syntheticIds=turn.Result.Tools.Outcomes.Where(o=>o.Result.Failure?.Kind==ToolFailureKind.Truncated).Select(o=>o.Invocation.Call.Id).ToHashSet(StringComparer.Ordinal);
-            var targets=new List<string>{selected.SourceEntry.Id};
-            foreach(var tool in turn.ToolResults.Where(m=>syntheticIds.Contains(m.WireBody.Value.GetProperty("toolCallId").GetString()!)))
-            {
-                var target=context.ContextEntries.LastOrDefault(e=>e.Messages.Any(m=>m.Role=="toolResult"&&JsonUtf16.DeepEquals(m.WireBody.Value,PersistedWire(tool.WireBody).Value)));
-                if(target is null)throw Error(PersistentAgentSessionFailure.InvalidCommit);targets.Add(target.SourceEntry.Id);
-            }
-            SetOperationPhase(SessionOperationPhase.RecoveryOmission);await OmitRecoveryAttemptAsync(targets,token,idle).ConfigureAwait(false);
+            SetOperationPhase(SessionOperationPhase.RecoveryOmission);await OmitRecoveryAttemptAsync(RecoveryTargets(context,selected,assistant),token,idle).ConfigureAwait(false);
         }
         ContextEditCancellation abort;lock(_gate){abort=new();_contextEditCancellation=abort;_compacting=true;}
         SetOperationPhase(SessionOperationPhase.Compaction);
@@ -189,6 +182,24 @@ public sealed partial class PersistentAgentSession
         {lock(_gate)_lastAutomaticCompaction=new("failed",Failure:error.Failure);await EmitOperationAsync(new SessionRecoveryEnded(operation,"failed",false)).ConfigureAwait(false);return new(true,false,retry);}
         catch(OperationCanceledException)when(token.IsCancellationRequested||abort.Abort.IsCancellationRequested)
         {lock(_gate)_lastAutomaticCompaction=new("cancelled");await EmitOperationAsync(new SessionRecoveryEnded(operation,"cancelled",false)).ConfigureAwait(false);return new(true,false,retry);}
+    }
+    // Pi 1.5.0 _omitRecoveryAttempt: the tool results that answer the omitted message's calls (those after it in the projected
+    // context, up to the next assistant message) are omitted with it, so no orphaned result reaches a later request.
+    private static List<string> RecoveryTargets(SessionContextProjection context,SessionContextContribution selected,AssistantMessage assistant)
+    {
+        var calls=assistant.Content.OfType<ToolCallContent>().Select(call=>call.Id).ToHashSet(StringComparer.Ordinal);
+        var targets=new List<string>{selected.SourceEntry.Id};var after=false;
+        foreach(var entry in context.ContextEntries)
+        {
+            if(!after){after=ReferenceEquals(entry,selected);continue;}
+            foreach(var message in entry.Messages)
+            {
+                if(message.Role=="assistant")return targets;
+                if(message.Role=="toolResult"&&calls.Contains(message.WireBody.Value.GetProperty("toolCallId").GetString()!)&&!targets.Contains(entry.SourceEntry.Id))
+                    targets.Add(entry.SourceEntry.Id);
+            }
+        }
+        return targets;
     }
     private async Task OmitRecoveryAttemptAsync(List<string> targets,CancellationToken token,TaskCompletionSource idle)
     {

@@ -464,7 +464,9 @@ internal static class SessionCompactionIntegrationTests
         Equal(messages[0].GetProperty("content").GetString(), request.SystemPrompt);
         Check(messages[1].GetProperty("content")[0].GetProperty("text").GetString() == request.Prompt, "Complete source/native request differs at prompt.");
         var options = source.GetProperty("options");
-        Check(options.GetProperty("maxTokens").GetDouble() == request.MaximumOutputTokens, "Complete source/native request differs at maxTokens.");
+        // The pinned reference capture predates Pi 1.5.0, whose summaries send no maxTokens (the model's output limit applies, #9512):
+        // the native request names no cap of its own unless the options carry the model's maximum.
+        Check(options.TryGetProperty("maxTokens", out _) && request.MaximumOutputTokens is null or > 0, "Complete source/native request differs at maxTokens.");
         Equal(options.GetProperty("cacheRetention").GetString(), request.CacheRetention);
         var sourceRoute = options.GetProperty("sessionId").GetString()!;
         if (request.Kind == SessionSummaryKind.Branch)
@@ -811,8 +813,10 @@ internal static class SessionCompactionIntegrationTests
             collected.Entries.All(entry => entry.Id != "old-user" && entry.Id != "sibling"), "Raw abandoned ancestry/common ancestor was wrong.");
         var prepared = planner.Prepare(collected.Entries, 0, collected.CommonAncestorId);
         Check(prepared.Messages.All(message => message.Role != "toolResult"), "Source branch preparation includes tool results.");
-        Check(prepared.Messages.Any(message => HasCall(message, "authored-call")), "Raw branch preparation silently applied active context edits.");
-        Check(prepared.FileOps.Read.Contains("read-only.txt"), "Raw abandoned call was not tracked.");
+        // Pi 1.5.0 prepareBranchEntries applies the latest context edit per target (projectContextEntry), as live context does.
+        Check(!prepared.Messages.Any(message => HasCall(message, "authored-call")) &&
+            prepared.Messages.Any(message => message.WireBody.ToString().Contains("edited branch call", StringComparison.Ordinal)), "Branch preparation ignored the active context edit.");
+        Check(!prepared.FileOps.Read.Contains("read-only.txt"), "Edited abandoned call was still tracked.");
         var active = new SessionCompactionPlanner().Prepare(session.Snapshot.Context, new(true, 128, 0))!;
         Check(!active.FileOps.Read.Contains("read-only.txt"), "Edited compaction input accidentally shared raw branch preparation.");
         Check(planner.Collect(entries, null, "sibling").Entries.IsEmpty, "Absent previous leaf manufactured abandoned entries.");
@@ -873,10 +877,12 @@ internal static class SessionCompactionIntegrationTests
         Check(request.Prompt.StartsWith("<conversation>\n", StringComparison.Ordinal) && request.Prompt.EndsWith("\n\nAdditional focus: " + instructions, StringComparison.Ordinal), "History instructions escaped the declared prompt-data envelope.");
         Check(request.SystemPrompt.Contains("Do NOT continue the conversation", StringComparison.Ordinal), "Summary request lost its separate system instructions.");
         var prefix = SessionSummaryRequestBuilder.TurnPrefix(plan, Model, "source", options with { ModelMaximumTokens = 0 });
-        Equal(64d, prefix.MaximumOutputTokens); Check(prefix.Prompt.StartsWith("# Conversation\n", StringComparison.Ordinal), "Turn-prefix request lost source framing.");
+        Equal<double?>(null, prefix.MaximumOutputTokens); Check(prefix.Prompt.StartsWith("# Conversation\n", StringComparison.Ordinal), "Turn-prefix request lost source framing.");
+        // Pi 1.5.0 generateTurnPrefixSummary: the /compact instructions focus the split turn's prefix too.
+        Check(prefix.Prompt.EndsWith("\n\nAdditional focus: " + instructions, StringComparison.Ordinal), "Turn-prefix request dropped the compact instructions.");
         var branch = new SessionBranchSummaryPlanner().Prepare(session.Snapshot.Log.Entries.Where(entry => entry.Id is "old-user" or "old-answer").ToImmutableArray());
         var branchRequest = SessionSummaryRequestBuilder.Branch(branch, Model, "authored-routing-id", options with { ReplaceBranchInstructions = true });
-        Equal<string?>(null, branchRequest.ThinkingLevel); Equal(50d, branchRequest.MaximumOutputTokens);
+        Equal<string?>("high", branchRequest.ThinkingLevel); Equal(50d, branchRequest.MaximumOutputTokens);
         Check(branchRequest.Prompt.EndsWith("</conversation>\n\n" + instructions, StringComparison.Ordinal), "Replace-branch instructions silently retained the default branch prompt.");
         Check(SessionSummaryRequestBuilder.History(plan, Model, "source", new(CustomInstructions: new string('a', 65_536))).Prompt.Length > 65_536, "Exact custom-instruction bound was not exercised.");
         Equal(SessionCompactionFailure.ResourceLimit, ThrowsSync<SessionCompactionException>(() => SessionSummaryRequestBuilder.History(plan, Model, "source", new(CustomInstructions: new string('a', 65_537)))).Failure);

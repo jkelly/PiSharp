@@ -13,7 +13,7 @@ internal static partial class Program
     private static IEnumerable<(string, Func<Task>)> SummaryOptionCases() =>
     [
         Case("summary.compaction-uses-session-thinking-level-and-fresh-uuidv7-route", CompactionSummaryOptions),
-        Case("summary.branch-summary-has-no-thinking-and-a-fresh-uuidv7-route", BranchSummaryOptions),
+        Case("summary.branch-summary-uses-session-thinking-level-and-a-fresh-uuidv7-route", BranchSummaryOptions),
         Case("summary.transport-generator-forwards-level-and-route-to-the-request", GeneratorForwardsOptions),
         Case("summary.serialize-conversation-omits-thinking-blocks", SerializeOmitsThinking),
     ];
@@ -62,7 +62,8 @@ internal static partial class Program
                 // agent-session.ts passes no sessionId, so each completeSummarization call routes with a fresh uuidv7.
                 Check(IsUuidV7(request.SessionId) && request.SessionId != sessionId, "compaction route is not a fresh uuidv7: " + request.SessionId);
                 Equal("none", request.CacheRetention, "cache retention");
-                Equal(Math.Floor((request.Kind == SessionSummaryKind.History ? 0.8 : 0.5) * 16_384), request.MaximumOutputTokens, request.Kind + " maxTokens");
+                // Pi 1.5.0 createSummarizationOptions sets no maxTokens: the route uses the model's output limit.
+                Equal<double?>(null, request.MaximumOutputTokens, request.Kind + " maxTokens");
             }
             Check(generator.Requests[0].SessionId != generator.Requests[1].SessionId, "history and turn prefix shared a route");
         }
@@ -79,10 +80,11 @@ internal static partial class Program
         await f.Session.SummarizeBranchAsync(sessionId, new(anchor), generator);
         var request = generator.Requests.Single();
         Equal(SessionSummaryKind.Branch, request.Kind, "kind");
-        // generateBranchSummary builds { apiKey, headers, env, signal, maxTokens }: no reasoning and no session id.
-        Equal<string?>(null, request.ThinkingLevel, "branch thinking level");
+        // Pi 1.5.0 generateBranchSummary builds { apiKey, headers, env, signal } plus reasoning = thinkingLevel unless "off" (the
+        // route applies model.reasoning): no maxTokens and no session id.
+        Equal<string?>("high", request.ThinkingLevel, "branch thinking level");
         Check(IsUuidV7(request.SessionId) && request.SessionId != sessionId, "branch route is not a fresh uuidv7: " + request.SessionId);
-        Equal(4096d, request.MaximumOutputTokens, "branch maxTokens");
+        Equal<double?>(null, request.MaximumOutputTokens, "branch maxTokens");
         Equal("none", request.CacheRetention, "cache retention");
     }
 

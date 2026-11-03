@@ -570,12 +570,12 @@ internal sealed class LiveSessionConnection(LiveSessionSelection selection, Http
     /// <summary>
     /// The summarization route (compaction, branch and bug report summaries) at <paramref name="maximum"/> output tokens, as
     /// compaction.ts completeSummarization sends it: cache retention "none", the request's routing session id, and
-    /// <c>reasoning = level</c> only when <c>model.reasoning &amp;&amp; level &amp;&amp; level !== "off"</c> (createSummarizationOptions; branch
-    /// summaries pass none). The request is the model's own request (its level metadata bound) at that level, or with reasoning
+    /// <c>reasoning = level</c> only when <c>model.reasoning &amp;&amp; level &amp;&amp; level !== "off"</c> (createSummarizationOptions; Pi 1.5.0
+    /// generateBranchSummary applies the same rule). The request is the model's own request (its level metadata bound) at that level, or with reasoning
     /// undefined when there is none.
     /// </summary>
-    /// <param name="carriesLevel">The summary sends the session's thinking level (compaction and bug reports; branch summaries
-    /// do not). A virtual selection then uses its router's level instead.</param>
+    /// <param name="carriesLevel">The summary sends the session's thinking level (compaction, bug report and, since Pi 1.5.0,
+    /// branch summaries all do). A virtual selection then uses its router's level instead.</param>
     internal IChatTransport CreateSummaryTransport(int maximum, string? level, bool carriesLevel = true)
     {
         // agent-session.ts _getSummarizationRequestAuth: a virtual selection summarizes through the physical model its router picks.

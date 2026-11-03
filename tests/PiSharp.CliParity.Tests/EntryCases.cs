@@ -295,10 +295,8 @@ internal static partial class Program
         {
             ["read"] = ["Use read to examine files instead of cat or sed."],
             ["bash"] = ["You can inspect PI_* environment variables for current model and session details."],
-            ["edit"] = ["Use edit for precise changes (edits[].oldText must match exactly)",
-                "When changing multiple separate locations in one file, use one edit call with multiple entries in edits[] instead of multiple edit calls",
-                "Each edits[].oldText is matched against the original file, not after earlier edits are applied. Do not emit overlapping or nested edits. Merge nearby changes into one edit.",
-                "Keep edits[].oldText as small as possible while still being unique in the file. Do not pad with large unchanged regions."],
+            ["edit"] = ["Use edit for targeted changes. Batch changes to one file in a single call.",
+                "Each edits[].oldText must exactly and uniquely match the original file. Keep matches short and non-overlapping; merge nearby changes without including large unchanged regions."],
             ["write"] = ["Use write only for new files or complete rewrites."]
         };
         var rules = new List<string>();
@@ -307,10 +305,10 @@ internal static partial class Program
         rules.Add("Be concise in your responses"); rules.Add("Show file paths clearly when working with files");
         var parts = new List<string>
         {
-            "You are an expert coding assistant operating inside pi, a coding agent harness. You help users by reading files, executing commands, editing code, and writing new files.",
-            "<tools>\n" + string.Join("\n", tools.Select(tool => $"- {tool}: {snippets[tool]}")) + "\n\nIn addition to the tools above, you may have access to other custom tools depending on the project.\n</tools>",
+            "You are a coding assistant running inside pi, a coding agent harness. Help users inspect files, run commands, and modify code.",
+            "<tools>\n" + string.Join("\n", tools.Select(tool => $"- {tool}: {snippets[tool]}")) + "\n\nAdditional tools may be available.\n</tools>",
             "<rules>\n" + string.Join("\n", rules.Select(rule => "- " + rule)) + "\n</rules>",
-            $"<docs>\nPi documentation (read only when the user asks about pi itself, its SDK, extensions, themes, skills, or TUI):\n- Main documentation: {Path.Join(app, "README.md")}\n- Additional docs: {Path.Join(app, "docs")}\n- Examples: {Path.Join(app, "examples")} (extensions, custom tools, SDK)\n- When reading pi docs or examples, resolve docs/... under Additional docs and examples/... under Examples, not the current working directory\n- When asked about: extensions (docs/extensions.md, examples/extensions/), themes (docs/themes.md), skills (docs/skills.md), prompt templates (docs/prompt-templates.md), TUI components (docs/tui.md), keybindings (docs/keybindings.md), SDK integrations (docs/sdk.md), custom providers (docs/custom-provider.md), adding models (docs/models.md), pi packages (docs/packages.md), environment variables (docs/environment-variables.md), MCP servers (docs/mcp.md), codemode scripts and non-LLM models such as classifiers and image models (docs/codemode.md)\n- When working on pi topics, read the docs and examples, and follow .md cross-references before implementing\n- Always read pi .md files completely and follow links to related docs (e.g., tui.md for TUI API details)\n</docs>"
+            $"<docs>\nPi documentation (read only when the user asks about the harness itself, its SDK, extensions, themes, skills, or TUI):\n- Main documentation: {Path.Join(app, "README.md")}\n- Additional docs: {Path.Join(app, "docs")}\n- Examples: {Path.Join(app, "examples")} (extensions, custom tools, SDK)\n- When reading pi docs or examples, resolve docs/... under Additional docs and examples/... under Examples, not the current working directory\n- When asked about: extensions (docs/extensions.md, examples/extensions/), themes (docs/themes.md), skills (docs/skills.md), prompt templates (docs/prompt-templates.md), TUI components (docs/tui.md), keybindings (docs/keybindings.md), SDK integrations (docs/sdk.md), custom providers (docs/custom-provider.md), adding models (docs/models.md), packages (docs/packages.md), environment variables (docs/environment-variables.md), MCP servers (docs/mcp.md), codemode scripts and non-LLM models such as classifiers and image models (docs/codemode.md)\n- Before implementing harness changes, read the relevant docs and examples in full, following related cross-references.\n</docs>"
         };
         if (append is not null) parts.Add($"<addendum>\n{append}\n</addendum>");
         if (projectContext is not null) parts.Add($"<project_context>\n{projectContext}\n</project_context>");

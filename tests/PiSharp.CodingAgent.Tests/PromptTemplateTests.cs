@@ -38,8 +38,9 @@ internal static class PromptTemplateTests
 
     private static Task EmptyAndBackslash()
     {
-        Args([], "'' \"\"   ");
-        Args([" "], "\"\" \" \"");
+        // Pi 1.5.0 parseCommandArgs keeps empty quoted arguments in their position.
+        Args(["", ""], "'' \"\"   ");
+        Args(["", " "], "\"\" \" \"");
         Args(["quoted \\text\\"], "\"quoted \\\"text\\\"\"");
         Args(["a\\", "b"], "a\\ b");
         Equal("Price: \\", PromptTemplateExpander.SubstituteArgs("Price: \\$100", []));

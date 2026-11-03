@@ -282,7 +282,7 @@ export function formatSkillsForPrompt(skills, fileReadTool = "read") {
     const lines = [
         "\n\nThe following skills provide specialized instructions for specific tasks.",
         fileReadTool === "read" ? "Use the read tool to load a skill's file when the task matches its description." : fileReadTool === "bash" ? "Use bash to load a skill's file when the task matches its description." : "Load a skill's file when the task matches its description.",
-        "When a skill file references a relative path, resolve it against the skill directory (parent of SKILL.md / dirname of the path) and use that absolute path in tool commands.",
+        "Resolve relative paths against the skill's directory (parent of SKILL.md). Use absolute paths in tool calls.",
         "",
         "<available_skills>"
     ];

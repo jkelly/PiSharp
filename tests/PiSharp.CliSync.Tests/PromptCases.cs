@@ -5,18 +5,17 @@ using PiSharp.CodingAgent;
 using PiSharp.Contracts;
 
 // Upstream: packages/coding-agent/src/core/system-prompt.ts and core/skills.ts:formatSkillsForPrompt at
-// 06a466935536f8c9bcacb2d5efc0fc021be1bdff. Expected sections are typed from that source text.
+// f9a26365568127461c47a07a37dcb42c140a3ac5 (Pi 1.5.0). Expected sections are typed from that source text.
 internal static partial class Program
 {
-    private const string Preamble = "You are an expert coding assistant operating inside pi, a coding agent harness. You help users by reading files, executing commands, editing code, and writing new files.";
-    private const string ToolsTail = "\n\nIn addition to the tools above, you may have access to other custom tools depending on the project.";
-    private const string Docs = "Pi documentation (read only when the user asks about pi itself, its SDK, extensions, themes, skills, or TUI):\n" +
+    private const string Preamble = "You are a coding assistant running inside pi, a coding agent harness. Help users inspect files, run commands, and modify code.";
+    private const string ToolsTail = "\n\nAdditional tools may be available.";
+    private const string Docs = "Pi documentation (read only when the user asks about the harness itself, its SDK, extensions, themes, skills, or TUI):\n" +
         "- Main documentation: /pi/README.md\n- Additional docs: /pi/docs\n- Examples: /pi/examples (extensions, custom tools, SDK)\n" +
         "- When reading pi docs or examples, resolve docs/... under Additional docs and examples/... under Examples, not the current working directory\n" +
-        "- When asked about: extensions (docs/extensions.md, examples/extensions/), themes (docs/themes.md), skills (docs/skills.md), prompt templates (docs/prompt-templates.md), TUI components (docs/tui.md), keybindings (docs/keybindings.md), SDK integrations (docs/sdk.md), custom providers (docs/custom-provider.md), adding models (docs/models.md), pi packages (docs/packages.md), environment variables (docs/environment-variables.md), MCP servers (docs/mcp.md), codemode scripts and non-LLM models such as classifiers and image models (docs/codemode.md)\n" +
-        "- When working on pi topics, read the docs and examples, and follow .md cross-references before implementing\n" +
-        "- Always read pi .md files completely and follow links to related docs (e.g., tui.md for TUI API details)";
-    private const string SkillsBody = "When a skill file references a relative path, resolve it against the skill directory (parent of SKILL.md / dirname of the path) and use that absolute path in tool commands.\n\n" +
+        "- When asked about: extensions (docs/extensions.md, examples/extensions/), themes (docs/themes.md), skills (docs/skills.md), prompt templates (docs/prompt-templates.md), TUI components (docs/tui.md), keybindings (docs/keybindings.md), SDK integrations (docs/sdk.md), custom providers (docs/custom-provider.md), adding models (docs/models.md), packages (docs/packages.md), environment variables (docs/environment-variables.md), MCP servers (docs/mcp.md), codemode scripts and non-LLM models such as classifiers and image models (docs/codemode.md)\n" +
+        "- Before implementing harness changes, read the relevant docs and examples in full, following related cross-references.";
+    private const string SkillsBody = "Resolve relative paths against the skill's directory (parent of SKILL.md). Use absolute paths in tool calls.\n\n" +
         "<available_skills>\n  <skill>\n    <name>lint &amp; fix</name>\n    <description>Lint &lt;code&gt;</description>\n    <location>/skills/lint/SKILL.md</location>\n  </skill>\n</available_skills>";
 
     private static readonly string Cwd = Path.GetFullPath(Path.Combine(Path.GetTempPath(), "pisharp-cli-sync", "cwd"));

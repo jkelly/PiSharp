@@ -21,6 +21,8 @@ internal sealed class AssistantMessageComponent : Container
     private string hiddenThinkingLabel;
     private int outputPad;
     private readonly IReadOnlyList<MarkdownTransformer> markdownTransformers;
+    private readonly string? messageId;
+    private readonly string? timestamp;
     private JsonObject? lastMessage;
     private bool hasToolCalls;
     private bool isStreaming;
@@ -33,8 +35,12 @@ internal sealed class AssistantMessageComponent : Container
         MarkdownTheme? markdownTheme = null,
         string hiddenThinkingLabel = "Thinking...",
         int outputPad = 1,
-        IReadOnlyList<MarkdownTransformer>? markdownTransformers = null)
+        IReadOnlyList<MarkdownTransformer>? markdownTransformers = null,
+        string? messageId = null,
+        string? timestamp = null)
     {
+        this.messageId = messageId;
+        this.timestamp = timestamp;
         this.hideThinkingBlock = hideThinkingBlock;
         this.markdownTheme = markdownTheme ?? Themes.GetMarkdownTheme();
         this.hiddenThinkingLabel = hiddenThinkingLabel;
@@ -109,7 +115,7 @@ internal sealed class AssistantMessageComponent : Container
                 // Assistant text messages with no background - trim the text
                 // Set paddingY=0 to avoid extra spacing before tool executions
                 contentContainer.AddChild(new Markdown(TextUtils.JsTrim(Str(block, "text") ?? ""), outputPad, 0, markdownTheme, null,
-                    new MarkdownOptions(Transform: MarkdownTransform.CreateMarkdownTransform(MarkdownMessageType.Assistant, this.isStreaming, markdownTransformers))));
+                    new MarkdownOptions(Transform: MarkdownTransform.CreateMarkdownTransform(MarkdownMessageType.Assistant, this.isStreaming, markdownTransformers, messageId, timestamp))));
             }
             else if (type == "thinking")
             {
@@ -139,7 +145,7 @@ internal sealed class AssistantMessageComponent : Container
                         0,
                         markdownTheme,
                         new DefaultTextStyle(Color: text => theme.Fg("thinkingText", text), Italic: true),
-                        new MarkdownOptions(Transform: MarkdownTransform.CreateMarkdownTransform(MarkdownMessageType.AssistantThinking, this.isStreaming, markdownTransformers)));
+                        new MarkdownOptions(Transform: MarkdownTransform.CreateMarkdownTransform(MarkdownMessageType.AssistantThinking, this.isStreaming, markdownTransformers, messageId, timestamp)));
                 contentContainer.AddChild(new MouseRegion(thinkingComponent, mouseEvent =>
                 {
                     if (mouseEvent.Type != TuiMouseEventType.Click || mouseEvent.Button != TuiMouseButton.Left) return null;

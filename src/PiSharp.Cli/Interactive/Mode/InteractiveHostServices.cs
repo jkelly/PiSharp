@@ -39,8 +39,7 @@ internal static class InteractiveHostServices
             {
                 Extensions = extensions,
                 MarkdownTransformers = () => extensions.HasMarkdownTransformers
-                    ? [(markdown, transform) => extensions.TransformMarkdown(markdown, new JsonObject
-                        { ["messageType"] = transform.MessageType, ["isStreaming"] = transform.IsStreaming, ["availableWidth"] = transform.AvailableWidth })]
+                    ? [(markdown, transform) => extensions.TransformMarkdown(markdown, MarkdownContextJson(transform))]
                     : [],
                 GetMessageRenderer = customType => extensions.RendersMessage(customType)
                     ? (message, renderOptions, _) => new ExtensionRowsComponent(width => extensions.RenderMessage(customType, message, width, renderOptions.Expanded) ?? [])
@@ -231,6 +230,16 @@ internal static class InteractiveHostServices
                 PiSharp.CodingAgent.Export.AgentSessionExport.State(session), parentId, timestamp));
         public void AppendCustomEntry(string customType, PiSharp.Contracts.JsonData data) =>
             session.AppendCustomEntryAsync(customType, data).GetAwaiter().GetResult();
+    }
+
+    /// <summary>The MarkdownTransformContext the extensions' transformers receive. messageId and timestamp stay undefined for live
+    /// messages (Pi 1.5.0).</summary>
+    internal static JsonObject MarkdownContextJson(MarkdownTransformContext transform)
+    {
+        var context = new JsonObject { ["messageType"] = transform.MessageType, ["isStreaming"] = transform.IsStreaming, ["availableWidth"] = transform.AvailableWidth };
+        if (transform.MessageId is { } id) context["messageId"] = id;
+        if (transform.Timestamp is { } timestamp) context["timestamp"] = timestamp;
+        return context;
     }
 
     private static string KeyOf(SessionEntry entry)
