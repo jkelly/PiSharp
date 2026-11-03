@@ -156,6 +156,8 @@ internal sealed partial class PiExtensionHost : IPiNodeHostPeer, IAsyncDisposabl
         }, token).ConfigureAwait(false);
         host.Modules = init is { ValueKind: JsonValueKind.Object } value && value.TryGetProperty("modules", out var modules) && modules.ValueKind == JsonValueKind.String
             ? modules.GetString()! : "compatibility";
+        // A Node host that starts after the mode configured the editor (the first TypeScript extension of a reload) gets the keybindings.
+        await host.ResendEditorConfigurationAsync(token).ConfigureAwait(false);
     }
 
     private PiNodeHost Node => _node ?? throw new InvalidOperationException("The Node extension host is not running.");

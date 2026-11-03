@@ -21,13 +21,26 @@ internal sealed partial class PiExtensionHost
     private readonly ConcurrentDictionary<string, IAutocompleteProvider> _autocompleteBases = new(StringComparer.Ordinal);
     private long _nextAutocomplete;
 
-    /// <summary>The mode's effective keybindings and its editor's app actions, for editors extending CustomEditor.</summary>
-    internal Task ConfigureEditorAsync(IReadOnlyDictionary<string, IReadOnlyList<string>> keybindings, IEnumerable<string> actions, CancellationToken token) =>
-        IsRunning ? Node.RequestAsync("editor.configure", new JsonObject
+    /// <summary>The last editor.configure parameters: a Node host that starts later (the first TypeScript extension of a reload) gets them.</summary>
+    private JsonObject? _editorConfiguration;
+
+    /// <summary>The mode's effective keybindings and its editor's app actions, for editors extending CustomEditor and for the key hints
+    /// (keyText/keyHint) the bridge gives renderers.</summary>
+    internal Task ConfigureEditorAsync(IReadOnlyDictionary<string, IReadOnlyList<string>> keybindings, IEnumerable<string> actions, CancellationToken token)
+    {
+        var configuration = new JsonObject
         {
             ["keybindings"] = new JsonObject([.. keybindings.Select(pair => KeyValuePair.Create(pair.Key, (JsonNode?)new JsonArray([.. pair.Value.Select(key => (JsonNode)key)])))]),
             ["actions"] = new JsonArray([.. actions.Select(action => (JsonNode)action)])
-        }, token) : Task.CompletedTask;
+        };
+        Volatile.Write(ref _editorConfiguration, configuration);
+        return IsRunning ? Node.RequestAsync("editor.configure", (JsonObject)configuration.DeepClone(), token) : Task.CompletedTask;
+    }
+
+    /// <summary>Sends the remembered editor configuration to a Node host that just started.</summary>
+    private Task ResendEditorConfigurationAsync(CancellationToken token) =>
+        Volatile.Read(ref _editorConfiguration) is { } configuration && IsRunning
+            ? Node.RequestAsync("editor.configure", (JsonObject)configuration.DeepClone(), token) : Task.CompletedTask;
 
     /// <summary>Calls a method of a Node component (an editor's getText, setText, addToHistory...).</summary>
     internal Task<JsonElement?> CallComponentAsync(string id, string method, JsonArray? args, CancellationToken token) =>

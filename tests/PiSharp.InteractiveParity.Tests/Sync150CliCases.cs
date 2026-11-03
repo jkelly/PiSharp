@@ -1,10 +1,12 @@
 // Pi 1.5.0 sync, cli rows: interactive-mode.ts and the interactive components, as changed between v1.2.0 and v1.5.0
 // (f9a26365568127461c47a07a37dcb42c140a3ac5). Expectations are authored from reading the v1.5.0 sources and tests; nothing is captured
 // from an upstream run.
+#pragma warning disable PISHARP_EXTUI001 // Pi 1.3.0-1.5.0 custom component overlay, blocked status and capturesViewportInput are [Experimental].
 using System.Text.Json.Nodes;
 using PiSharp.AI.Authentication.OAuth;
 using PiSharp.Cli.Interactive.Mode;
 using PiSharp.Cli.Interactive.Mode.Components;
+using PiSharp.Extensions;
 using PiSharp.Tui.Pi;
 using static Expect;
 using ExtensionChangelog = PiSharp.Cli.Interactive.Mode.Utilities.ExtensionChangelog;
@@ -878,6 +880,173 @@ internal static class Sync150CliCases
                 Equal("1.2.0", (string?)saved["extensionChangelogVersions"]?[key], "recorded version");
             }
         });
+
+        // interactive-mode.ts pushExtensionDialog/removeExtensionDialog/showTopExtensionDialog (1.4.0): a new dialog hides the visible
+        // one, closing the visible one shows the previous one again, a dialog opened from inside another works, aborting a hidden
+        // dialog settles it, and the blocked program status follows the visible dialog.
+        yield return ("sync150.extension-dialogs-stack-in-the-editor-slot", async () =>
+        {
+            await using var pi = new InteractiveHarness("sync150-dialog-stack");
+            pi.Vars["PI_PROGRAM_STATUS"] = "1";
+            UiLoop? loop = null;
+            pi.Configure = context => { loop = context.Loop; return context; };
+            pi.Start("--provider", "anthropic", "--model", "claude-sonnet-4-5", "--tui-mode", "regular");
+            await pi.WaitFor("escape interrupt");
+            var mode = pi.Mode!;
+            Task<T> OnLoop<T>(Func<Task<T>> open) => loop!.InvokeAsync(open).Unwrap();
+            using var abortFirst = new CancellationTokenSource();
+            var first = OnLoop(() => mode.ShowExtensionSelectorAsync("Pick a fruit", ["apple", "pear"], signal: abortFirst.Token));
+            await pi.WaitFor("Pick a fruit");
+            await WaitStatus(pi, Blocked("question", "Pick a fruit"));
+            var second = OnLoop(() => mode.ShowExtensionInputAsync("Name the basket", "basket name"));
+            var screen = await pi.WaitFor("Name the basket");
+            Check(!screen.Contains("Pick a fruit", StringComparison.Ordinal), "the new dialog hides the visible one: " + screen);
+            await WaitStatus(pi, Blocked("question", "Name the basket"));
+            var third = OnLoop(() => mode.ShowExtensionConfirmAsync("Replace basket?", "The old basket goes away"));
+            await pi.WaitFor("Replace basket?");
+            await WaitStatus(pi, Blocked("permission", "Replace basket?"));
+            pi.Type("\r");
+            Equal(true, await third.WaitAsync(TimeSpan.FromSeconds(10)), "the confirm on top settles");
+            screen = await pi.WaitFor("Name the basket");
+            Check(!screen.Contains("Replace basket?", StringComparison.Ordinal), "closing the visible dialog shows the previous one: " + screen);
+            await WaitStatus(pi, Blocked("question", "Name the basket"));
+            abortFirst.Cancel();
+            Equal<string?>(null, await first.WaitAsync(TimeSpan.FromSeconds(10)), "aborting the hidden selector settles it");
+            screen = await pi.WaitFor("Name the basket");
+            Check(!screen.Contains("Pick a fruit", StringComparison.Ordinal), "the aborted hidden dialog does not show: " + screen);
+            await pi.Submit("wicker");
+            Equal<string?>("wicker", await second.WaitAsync(TimeSpan.FromSeconds(10)), "the input settles with its value");
+            screen = await pi.WaitUntil(text => !text.Contains("Name the basket", StringComparison.Ordinal), "the editor again");
+            Check(!screen.Contains("Pick a fruit", StringComparison.Ordinal), "no dialog left: " + screen);
+            await pi.WaitUntil(_ => LastStatus(pi).Length > 0 && !LastStatus(pi).Contains("state=blocked", StringComparison.Ordinal), "status no longer blocked");
+            Equal(0, await pi.Quit(), "exit code");
+        });
+
+        // interactive-mode.ts setCustomEditorComponent (1.5.0): with a dialog open the new editor is made and wired but the dialog keeps the
+        // editor slot and focus; the new editor shows when the last dialog closes.
+        yield return ("sync150.editor-swap-keeps-the-open-dialog", async () =>
+        {
+            await using var pi = new InteractiveHarness("sync150-editor-swap");
+            UiLoop? loop = null;
+            pi.Configure = context => { loop = context.Loop; return context; };
+            pi.Start("--provider", "anthropic", "--model", "claude-sonnet-4-5", "--tui-mode", "regular");
+            await pi.WaitFor("escape interrupt");
+            var mode = pi.Mode!;
+            var choice = loop!.InvokeAsync(() => mode.ShowExtensionSelectorAsync("Pick a color", ["red", "blue"])).Unwrap();
+            await pi.WaitFor("Pick a color");
+            CustomEditor? swapped = null;
+            await loop.InvokeAsync(() => mode.SetCustomEditorComponent((tui, theme, keybindings) => swapped = new CustomEditor(tui, theme, keybindings)));
+            Check(swapped is not null, "the new editor is created while the dialog is open");
+            await Task.Delay(100);
+            Contains(pi.Terminal.Text, "Pick a color", "the dialog keeps the editor slot");
+            pi.Type("\u001b[B");
+            await Task.Delay(50);
+            pi.Type("\r");
+            Equal<string?>("blue", await choice.WaitAsync(TimeSpan.FromSeconds(10)), "the dialog keeps focus");
+            await pi.WaitUntil(text => !text.Contains("Pick a color", StringComparison.Ordinal), "the dialog closes");
+            pi.Type("xyz");
+            await pi.WaitFor("xyz");
+            Equal("xyz", await loop.InvokeAsync(() => swapped!.GetText()), "the new editor shows and has focus when the dialog closes");
+            await loop.InvokeAsync(() => swapped!.SetText(""));
+            Equal(0, await pi.Quit(), "exit code");
+        });
+
+        // core.custom-ui-blocked-status with the dialog stack: an inline custom component's blocked status clears while a plain component is
+        // stacked on top and comes back when that one closes.
+        yield return ("sync150.blocked-status-follows-the-top-custom-component", async () =>
+        {
+            await using var pi = new InteractiveHarness("sync150-blocked-stack");
+            pi.Vars["PI_PROGRAM_STATUS"] = "1";
+            pi.Start("--provider", "anthropic", "--model", "claude-sonnet-4-5", "--tui-mode", "regular");
+            await pi.WaitFor("escape interrupt");
+            var (approvalId, approval) = CustomComponent("c-approval", "deploy approval panel");
+            var (plainId, plain) = CustomComponent("c-plain", "plain info panel");
+            var shownApproval = pi.Mode!.ShowExtensionCustomComponentAsync(approval with { Blocked = new("permission", "Approve deploy?") }, null!, CancellationToken.None);
+            await pi.WaitFor("deploy approval panel");
+            await WaitStatus(pi, Blocked("permission", "Approve deploy?"));
+            var shownPlain = pi.Mode.ShowExtensionCustomComponentAsync(plain, null!, CancellationToken.None);
+            var screen = await pi.WaitFor("plain info panel");
+            Check(!screen.Contains("deploy approval panel", StringComparison.Ordinal), "the plain component hides the approval: " + screen);
+            await pi.WaitUntil(_ => !LastStatus(pi).Contains("state=blocked", StringComparison.Ordinal), "status cleared under a plain component");
+            pi.Mode.SignalExtensionCustomComponent(plainId, done: true);
+            await shownPlain.WaitAsync(TimeSpan.FromSeconds(10));
+            await pi.WaitFor("deploy approval panel");
+            await WaitStatus(pi, Blocked("permission", "Approve deploy?"));
+            pi.Mode.SignalExtensionCustomComponent(approvalId, done: true);
+            await shownApproval.WaitAsync(TimeSpan.FromSeconds(10));
+            await pi.WaitUntil(text => !text.Contains("deploy approval panel", StringComparison.Ordinal), "the approval closes");
+            await pi.WaitUntil(_ => !LastStatus(pi).Contains("state=blocked", StringComparison.Ordinal), "status cleared after the last component");
+            Equal(0, await pi.Quit(), "exit code");
+        });
+
+        // interactive-mode.ts showExtensionCustom (1.3.0): an overlay component opens with its overlayOptions and done() hides the overlay its
+        // own handle opened, not the topmost one.
+        yield return ("sync150.overlay-custom-component-done-hides-its-own-overlay", async () =>
+        {
+            await using var pi = new InteractiveHarness("sync150-overlay-own-handle");
+            pi.Start("--provider", "anthropic", "--model", "claude-sonnet-4-5", "--tui-mode", "regular");
+            await pi.WaitFor("escape interrupt");
+            static ExtensionCustomComponentOverlay At(string anchor) =>
+                new(System.Text.Json.JsonDocument.Parse("{\"anchor\":\"" + anchor + "\",\"width\":24}").RootElement.Clone());
+            var (lowerId, lower) = CustomComponent("c-lower", "lower overlay text");
+            var (upperId, upper) = CustomComponent("c-upper", "upper overlay text");
+            var shownLower = pi.Mode!.ShowExtensionCustomComponentAsync(lower with { Overlay = At("top-left") }, null!, CancellationToken.None);
+            await pi.WaitFor("lower overlay text");
+            var shownUpper = pi.Mode.ShowExtensionCustomComponentAsync(upper with { Overlay = At("bottom-right") }, null!, CancellationToken.None);
+            await pi.WaitUntil(text => text.Contains("lower overlay text", StringComparison.Ordinal) && text.Contains("upper overlay text", StringComparison.Ordinal),
+                "both overlays");
+            pi.Mode.SignalExtensionCustomComponent(lowerId, done: true);
+            await shownLower.WaitAsync(TimeSpan.FromSeconds(10));
+            var screen = await pi.WaitUntil(text => !text.Contains("lower overlay text", StringComparison.Ordinal), "the lower overlay hides");
+            Contains(screen, "upper overlay text", "the overlay opened later stays");
+            pi.Mode.SignalExtensionCustomComponent(upperId, done: true);
+            await shownUpper.WaitAsync(TimeSpan.FromSeconds(10));
+            await pi.WaitUntil(text => !text.Contains("upper overlay text", StringComparison.Ordinal), "the upper overlay hides");
+            Equal(0, await pi.Quit(), "exit code");
+        });
+
+        // tui.ts OverlayOptions from the bridge's ui.custom request (overlay, overlayOptions resolved once in Node).
+        yield return ("sync150.custom-overlay-options-from-the-bridge", Sync(() =>
+        {
+            static System.Text.Json.JsonElement Json(string text) => System.Text.Json.JsonDocument.Parse(text).RootElement.Clone();
+            var options = InteractiveMode.OverlayOptionsOf(Json("""
+                {"width":"50%","minWidth":30,"maxHeight":12,"anchor":"bottom-right","offsetX":-2,"offsetY":1,"row":"25%","col":4,
+                 "margin":{"top":1,"left":2},"nonCapturing":true}
+                """))!;
+            Equal<SizeValue?>(SizeValue.Pct(50), options.Width, "width percentage");
+            Equal<int?>(30, options.MinWidth, "minWidth");
+            Equal<SizeValue?>(new SizeValue(12, false), options.MaxHeight, "maxHeight cells");
+            Equal<OverlayAnchor?>(OverlayAnchor.BottomRight, options.Anchor, "anchor");
+            Equal<int?>(-2, options.OffsetX, "offsetX");
+            Equal<int?>(1, options.OffsetY, "offsetY");
+            Equal<SizeValue?>(SizeValue.Pct(25), options.Row, "row percentage");
+            Equal<SizeValue?>(new SizeValue(4, false), options.Col, "col cells");
+            Equal(new OverlayMargin(1, 0, 0, 2), options.Margin, "margin sides");
+            Check(options.NonCapturing, "nonCapturing");
+            Equal(OverlayMargin.All(3), InteractiveMode.OverlayOptionsOf(Json("""{"margin":3}"""))!.Margin, "margin number");
+            var loose = InteractiveMode.OverlayOptionsOf(Json("""{"width":"wide","anchor":"middle","minWidth":"30"}"""))!;
+            Check(loose.Width is null && loose.Anchor is null && loose.MinWidth is null && !loose.NonCapturing, "mistyped fields keep their defaults");
+            Equal(null, InteractiveMode.OverlayOptionsOf(null), "no options");
+            Equal(null, PiSharp.Cli.Extensions.Pi.PiExtensionHost.CustomComponentOverlay(Json("""{"component":"c1","overlay":false,"overlayOptions":{"width":10}}""")),
+                "an inline component");
+            var overlay = PiSharp.Cli.Extensions.Pi.PiExtensionHost.CustomComponentOverlay(Json("""{"component":"c1","overlay":true,"overlayOptions":{"width":10}}"""));
+            Equal(10, overlay!.Options!.Value.GetProperty("width").GetInt32(), "overlay options");
+            Equal(null, PiSharp.Cli.Extensions.Pi.PiExtensionHost.CustomComponentOverlay(Json("""{"component":"c1","overlay":true,"overlayOptions":null}"""))!.Options,
+                "an overlay without options");
+        }));
+
+        // Pi 1.5.0 capturesViewportInput of an extension component reaches the TUI through the component proxy.
+        yield return ("sync150.extension-component-proxy-forwards-captures-viewport-input", Sync(() =>
+        {
+            var captures = false;
+            var component = new PiSharp.Cli.Interactive.Mode.ExtensionRowsComponent(_ => ["rows"], null, () => captures);
+            Check(!component.CapturesViewportInput, "false while the extension reports false");
+            captures = true;
+            Check(component.CapturesViewportInput, "true while the extension reports true");
+            Check(!new PiSharp.Cli.Interactive.Mode.ExtensionRowsComponent(_ => ["rows"]).CapturesViewportInput, "false without a report");
+            var (_, callbacks) = CustomComponent("c-captures", "rows");
+            Equal(null, callbacks.CapturesViewportInput, "a component that reports nothing");
+        }));
     }
 
     /// <summary>A model runtime with a fixed available snapshot and no refresh errors.</summary>
@@ -908,4 +1077,28 @@ internal static class Sync150CliCases
     };
 
     private static string Trimmed(IComponent component) => string.Join("|", Strip(component.Render(80)).Select(line => line.Trim()));
+
+    /// <summary>A custom component that renders one row (the identity's component id is <paramref name="id"/>).</summary>
+    private static (ExtensionCustomComponentIdentity Identity, ExtensionCustomComponentCallbacks Callbacks) CustomComponent(string id, string row)
+    {
+        var identity = new ExtensionCustomComponentIdentity("owner", 1, 1, id);
+        return (identity, new ExtensionCustomComponentCallbacks(identity,
+            (_, _, _) => Task.FromResult(new ExtensionCustomComponentRows([row], [row.Length])), (_, _, _) => Task.CompletedTask, _ => Task.CompletedTask));
+    }
+
+    /// <summary>The last OSC 7501 program status the mode wrote (without the terminator), or "".</summary>
+    private static string LastStatus(InteractiveHarness pi)
+    {
+        var raw = pi.Terminal.RawOutput;
+        var start = raw.LastIndexOf("]7501;state=", StringComparison.Ordinal);
+        if (start < 0) return "";
+        var end = raw.IndexOf("\u001b\\", start, StringComparison.Ordinal);
+        return end < 0 ? raw[start..] : raw[start..end];
+    }
+
+    private static string Blocked(string kind, string message) =>
+        "]7501;state=blocked:app=pi:kind=" + kind + ":msg=" + Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(message));
+
+    private static Task<string> WaitStatus(InteractiveHarness pi, string status) =>
+        pi.WaitUntil(_ => LastStatus(pi) == status, "program status " + status);
 }

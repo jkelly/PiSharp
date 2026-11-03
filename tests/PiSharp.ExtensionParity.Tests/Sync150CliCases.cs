@@ -7,7 +7,8 @@ using PiSharp.Cli.Pi;
 // getGitDependencyInstallArgs and uninstallNpm add --no-audit --no-fund wherever npm gets --legacy-peer-deps), config.ts and
 // package-manager-cli.ts (the configured self-update command: getConfiguredSelfUpdateArgv, makeConfiguredSelfUpdateCommand,
 // getSelfUpdatePlan, runConfiguredSelfUpdate, readVersionOnPath, printSelfUpdateUnavailable), and package-manager.ts with pi-manifest.ts
-// and source-info.ts for package changelogs (resolvePackageChangelogPath, hasManifestResourceFields, changelogPath).
+// and source-info.ts for package changelogs (resolvePackageChangelogPath, hasManifestResourceFields, changelogPath); the bridge's
+// editor.configure keybindings (keybinding-hints.ts) and Component.capturesViewportInput for the cli wave-2 bridge items.
 // Expectations are written from the sources by reading, never captured from an upstream run.
 internal static partial class Program
 {
@@ -16,6 +17,8 @@ internal static partial class Program
         ("sync150.package-npm-skips-audit-and-fund-advice", PackageNpmNoAuditFund),
         ("sync150.self-update-runs-the-configured-command", SelfUpdateConfiguredCommand),
         ("sync150.package-changelog-path-stays-inside-the-package", PackageChangelogPath),
+        ("sync150.bridge-key-hints-survive-reload-and-a-late-node-start", BridgeKeyHintsSurviveReloadAndLateStart),
+        ("sync150.bridge-component-captures-viewport-input", BridgeComponentCapturesViewportInput),
     ];
 
     // npm audit fix would run without --legacy-peer-deps and install a second copy of pi's peers into the package directory, so every npm
@@ -95,6 +98,78 @@ internal static partial class Program
             Extension("custom").Metadata.ChangelogPath);
         Equal(Path.Combine(roots["custom"], "docs", "CHANGELOG.md"), (string?)source.SourceInfo()["changelogPath"], "sourceInfo changelogPath");
         Check(!new PiSharp.Cli.Extensions.Pi.PiExtensionSource("x.ts", "user", "local").SourceInfo().ContainsKey("changelogPath"), "no changelogPath key");
+    }
+
+    private const string KeyHintRenderer = """
+        import { Text } from "@earendil-works/pi-tui";
+        const strip = (text: string) => text.replace(/\x1b\[[0-9;]*m/g, "");
+        export default function (pi: any) {
+          pi.registerMessageRenderer("note", (_message: any, options: any) =>
+            new Text(`${options.keyText("app.tools.expand")} | ${strip(options.keyHint("app.tools.expand", "to expand"))}`, 0, 0));
+        }
+        """;
+
+    private static async Task<string> RenderNote(PiSharp.Cli.Extensions.Pi.PiExtensionHost host) =>
+        (await host.RenderMessageAsync("note", new JsonObject { ["role"] = "custom", ["customType"] = "note", ["content"] = "x" }, 60, false,
+            CancellationToken.None))!.Value.Single().TrimEnd();
+
+    // keybinding-hints.ts keyText/keyHint read the mode's keybindings: the bridge keeps the editor.configure keybindings across a
+    // reload (agent-session.ts reload builds a fresh runtime), and a Node host that starts after the mode configured the editor gets them.
+    private static async Task BridgeKeyHintsSurviveReloadAndLateStart()
+    {
+        using var sandbox = NodeSandbox("sync150-key-hints-reload");
+        var extension = sandbox.Write(Path.Combine(sandbox.Cwd, "hints.ts"), KeyHintRenderer);
+        var keybindings = new Dictionary<string, IReadOnlyList<string>> { ["app.tools.expand"] = ["ctrl+e"] };
+        await using (var host = await StartHost(sandbox, extension))
+        {
+            await host.ConfigureEditorAsync(keybindings, [], CancellationToken.None);
+            Equal("ctrl+e | ctrl+e to expand", await RenderNote(host), "configured");
+            await host.ReloadExtensionsAsync(CancellationToken.None);
+            Check(host.Errors.IsEmpty, "reload errors: " + string.Join("; ", host.Errors.Select(error => error.Error)));
+            Equal("ctrl+e | ctrl+e to expand", await RenderNote(host), "after a reload");
+        }
+        await using var late = PiSharp.Cli.Extensions.Pi.PiExtensionHost.CreateWithoutNode(new(sandbox.Cwd, sandbox.AgentDir, "tui", true)
+            { GetEnvironment = name => sandbox.Vars.GetValueOrDefault(name) });
+        await late.ConfigureEditorAsync(keybindings, [], CancellationToken.None);
+        await late.LoadAsync([extension], CancellationToken.None);
+        Check(late.Errors.IsEmpty, "load errors: " + string.Join("; ", late.Errors.Select(error => error.Error)));
+        Equal("ctrl+e | ctrl+e to expand", await RenderNote(late), "a Node host that starts later");
+    }
+
+    // Pi 1.5.0 Component.capturesViewportInput of a Node component (here a getter over its state) reaches the host after a render or an
+    // input (component.captures), for the alternate-screen viewport keys.
+    private static async Task BridgeComponentCapturesViewportInput()
+    {
+        using var sandbox = NodeSandbox("sync150-captures");
+        var extension = sandbox.Write(Path.Combine(sandbox.Cwd, "menu.ts"), """
+            export default function (pi: any) {
+              pi.registerShortcut("ctrl+shift+w", { description: "Menu", handler: async (ctx: any) => {
+                ctx.ui.setWidget("menu", () => ({
+                  open: false,
+                  get capturesViewportInput() { return this.open; },
+                  render(_width: number) { return [this.open ? "menu open" : "menu closed"]; },
+                  handleInput(data: string) { this.open = data === "o"; },
+                  invalidate() {},
+                }));
+              } });
+            }
+            """);
+        await using var host = await StartHost(sandbox, extension);
+        var publications = new List<(string Op, System.Text.Json.JsonElement Args)>();
+        host.InteractiveUi = (op, args) => { lock (publications) publications.Add((op, args.ValueKind == System.Text.Json.JsonValueKind.Undefined ? default : args.Clone())); };
+        var (shortcuts, _) = host.ResolveShortcuts(new Dictionary<string, IReadOnlyList<string>>());
+        await host.RunShortcutAsync(shortcuts.Single().Extension, shortcuts.Single().Shortcut, CancellationToken.None);
+        await WaitUntil(() => { lock (publications) return publications.Any(item => item.Op == "setWidget"); });
+        string id;
+        lock (publications) id = publications.First(item => item.Op == "setWidget").Args[1].GetProperty("component").GetString()!;
+        Equal("menu closed", (await host.RenderComponentAsync(id, 40, CancellationToken.None)).Single().TrimEnd(), "closed menu");
+        Check(!host.ComponentCapturesViewportInput(id), "a closed menu leaves the viewport keys");
+        await host.InputComponentAsync(id, "o", CancellationToken.None);
+        await WaitUntil(() => host.ComponentCapturesViewportInput(id));
+        Equal("menu open", (await host.RenderComponentAsync(id, 40, CancellationToken.None)).Single().TrimEnd(), "open menu");
+        Check(host.ComponentCapturesViewportInput(id), "an open menu captures the viewport keys");
+        await host.InputComponentAsync(id, "x", CancellationToken.None);
+        await WaitUntil(() => !host.ComponentCapturesViewportInput(id));
     }
 
     // getConfiguredSelfUpdateArgv: PI_SELF_UPDATE_COMMAND (split on whitespace) wins over the global selfUpdateCommand argv; a project

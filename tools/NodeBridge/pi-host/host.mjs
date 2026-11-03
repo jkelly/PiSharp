@@ -136,6 +136,8 @@ async function handle(method, params, id, progressWindow = 0) {
       previous.invalidate();
       runtime = new ExtensionRuntime(bridge, { ...previous.options, flagValues: Object.fromEntries(previous.flagValues), generation: previous.generation + 1 });
       runtime.themeName = previous.themeName;
+      // The mode's keybindings and editor actions (editor.configure) stay: key hints and CustomEditor actions keep working.
+      runtime.keybindingsConfig = previous.keybindingsConfig; runtime.editorActions = previous.editorActions;
       const results = [];
       for (const entry of params.paths) {
         const loaded = await runtime.load(entry);

@@ -149,8 +149,11 @@ internal sealed class PiInteractiveExtensionHost(PiExtensionHost host) : IIntera
 }
 
 /// <summary>A component that lives in the extension host: its rows are fetched per width until it asks to be redrawn.</summary>
-internal sealed class ExtensionRowsComponent(Func<int, IReadOnlyList<string>> render, Action<string>? input = null) : IComponent, IInputHandler
+internal sealed class ExtensionRowsComponent(Func<int, IReadOnlyList<string>> render, Action<string>? input = null, Func<bool>? captures = null)
+    : IComponent, IInputHandler
 {
+    /// <summary>Pi 1.5.0: the extension component's capturesViewportInput (false when the extension reports none).</summary>
+    public bool CapturesViewportInput => captures?.Invoke() == true;
     private readonly Dictionary<int, List<string>> cache = [];
     public List<string> Render(int width)
     {

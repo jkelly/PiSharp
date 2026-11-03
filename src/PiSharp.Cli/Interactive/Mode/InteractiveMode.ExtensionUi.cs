@@ -54,30 +54,32 @@ internal sealed partial class InteractiveMode : IRpcExtensionUiPresentationObser
                 if (openRpcDialogs.ContainsKey(id)) return;
                 var title = S(request["title"]) ?? "";
                 var answered = false;
+                // Pi 1.4.0: each dialog closes on its own (the stack shows the one below); a retired request closes only its dialog.
+                var close = new CancellationTokenSource();
                 void Answer(JsonObject body) { if (answered) return; answered = true; openRpcDialogs.Remove(id); RespondExtensionUi(id, body); }
-                openRpcDialogs[id] = () => { answered = true; CloseActiveExtensionDialog(); };
+                openRpcDialogs[id] = () => { answered = true; close.Cancel(); };
                 switch (method)
                 {
                     case "select":
                     {
                         var options = request["options"] is JsonArray array ? array.Select(S).OfType<string>().ToList() : [];
-                        _ = ShowExtensionSelectorAsync(title, options, timeout).ContinueWith(task =>
+                        _ = ShowExtensionSelectorAsync(title, options, timeout, signal: close.Token).ContinueWith(task =>
                             context.Loop.Post(() => Answer(task.Result is { } value ? new JsonObject { ["value"] = value } : new JsonObject { ["cancelled"] = true })),
                             TaskScheduler.Default);
                         break;
                     }
                     case "confirm":
-                        _ = ShowExtensionSelectorAsync($"{title}\n{S(request["message"])}", ["Yes", "No"], timeout, new BlockedStatus(ProgramBlockedKind.Permission, title))
+                        _ = ShowExtensionSelectorAsync($"{title}\n{S(request["message"])}", ["Yes", "No"], timeout, new BlockedStatus(ProgramBlockedKind.Permission, title), close.Token)
                             .ContinueWith(task => context.Loop.Post(() => Answer(task.Result is null ? new JsonObject { ["cancelled"] = true } : new JsonObject { ["confirmed"] = task.Result == "Yes" })),
                                 TaskScheduler.Default);
                         break;
                     case "input":
-                        _ = ShowExtensionInputAsync(title, S(request["placeholder"]), timeout).ContinueWith(task =>
+                        _ = ShowExtensionInputAsync(title, S(request["placeholder"]), timeout, close.Token).ContinueWith(task =>
                             context.Loop.Post(() => Answer(task.Result is { } value ? new JsonObject { ["value"] = value } : new JsonObject { ["cancelled"] = true })),
                             TaskScheduler.Default);
                         break;
                     default:
-                        _ = ShowExtensionEditorAsync(title, S(request["prefill"])).ContinueWith(task =>
+                        _ = ShowExtensionEditorAsync(title, S(request["prefill"]), signal: close.Token).ContinueWith(task =>
                             context.Loop.Post(() => Answer(task.Result is { } value ? new JsonObject { ["value"] = value } : new JsonObject { ["cancelled"] = true })),
                             TaskScheduler.Default);
                         break;
@@ -106,47 +108,65 @@ internal sealed partial class InteractiveMode : IRpcExtensionUiPresentationObser
         }
     }
 
-    private void CloseActiveExtensionDialog()
-    {
-        if (extensionSelector is not null) HideExtensionSelector();
-        if (extensionInput is not null) HideExtensionInput();
-        if (extensionEditor is not null) HideExtensionEditor();
-    }
-
     // =========================================================================
     // Dialogs
     // =========================================================================
 
-    /// <summary>A selector for extensions; resolves with the chosen option or null when cancelled or timed out.</summary>
+    /// <summary>Pi 1.4.0 pushExtensionDialog: shows an extension dialog in the editor slot. Dialogs form a stack: a new dialog hides the
+    /// visible one and closing the visible dialog shows the previous one again, so every dialog stays answerable and dialogs opened
+    /// from inside another dialog (a confirm from a custom component) work.</summary>
+    private void PushExtensionDialog(IComponent component, BlockedStatus? blocked, Action? dispose = null)
+    {
+        DisposeActiveSelector();
+        extensionDialogs.Add((component, blocked, dispose));
+        ShowTopExtensionDialog();
+    }
+
+    /// <summary>Removes an extension dialog; if it was visible, the previous dialog or the editor shows. False when it was not open.</summary>
+    private bool RemoveExtensionDialog(IComponent component)
+    {
+        var index = extensionDialogs.FindIndex(dialog => ReferenceEquals(dialog.Component, component));
+        if (index == -1) return false;
+        extensionDialogs.RemoveAt(index);
+        if (index == extensionDialogs.Count) ShowTopExtensionDialog();
+        return true;
+    }
+
+    /// <summary>The top dialog (or the editor) takes the editor slot and focus; the blocked program status follows it.</summary>
+    private void ShowTopExtensionDialog()
+    {
+        var top = extensionDialogs.Count > 0 ? extensionDialogs[^1] : default;
+        var component = top.Component ?? editor;
+        editorContainer.Clear();
+        editorContainer.AddChild(component);
+        ui.SetFocus(component);
+        programStatus.SetBlocked("extension-dialog", top.Blocked);
+        ui.RequestRender();
+    }
+
+    /// <summary>A selector for extensions; resolves with the chosen option or null when cancelled, timed out or aborted.</summary>
     internal Task<string?> ShowExtensionSelectorAsync(string title, IReadOnlyList<string> options, double? timeout = null, BlockedStatus? blocked = null,
         CancellationToken signal = default, string? description = null)
     {
         var result = new TaskCompletionSource<string?>(TaskCreationOptions.RunContinuationsAsynchronously);
         if (signal.IsCancellationRequested) { result.TrySetResult(null); return result.Task; }
+        ExtensionSelectorComponent? selector = null;
         CancellationTokenRegistration registration = default;
-        registration = signal.Register(() => context.Loop.Post(() => { HideExtensionSelector(); result.TrySetResult(null); }));
-        extensionSelector = new ExtensionSelectorComponent(title, options,
-            option => { registration.Dispose(); HideExtensionSelector(); result.TrySetResult(option); },
-            () => { registration.Dispose(); HideExtensionSelector(); result.TrySetResult(null); },
+        var finished = false;
+        void Finish(string? option)
+        {
+            if (finished) return;
+            finished = true;
+            registration.Dispose();
+            selector!.Dispose();
+            RemoveExtensionDialog(selector);
+            result.TrySetResult(option);
+        }
+        selector = new ExtensionSelectorComponent(title, options, option => Finish(option), () => Finish(null),
             new ExtensionSelectorOptions(ui, timeout, ToggleToolOutputExpansion, description));
-        DisposeActiveSelector();
-        editorContainer.Clear();
-        editorContainer.AddChild(extensionSelector);
-        ui.SetFocus(extensionSelector);
-        programStatus.SetBlocked("extension-dialog", blocked ?? new BlockedStatus(ProgramBlockedKind.Question, title));
-        ui.RequestRender();
+        PushExtensionDialog(selector, blocked ?? new BlockedStatus(ProgramBlockedKind.Question, title), selector.Dispose);
+        registration = signal.Register(() => context.Loop.Post(() => Finish(null)));
         return result.Task;
-    }
-
-    private void HideExtensionSelector()
-    {
-        extensionSelector?.Dispose();
-        editorContainer.Clear();
-        editorContainer.AddChild(editor);
-        extensionSelector = null;
-        programStatus.SetBlocked("extension-dialog", null);
-        ui.SetFocus(editor);
-        ui.RequestRender();
     }
 
     internal async Task<bool> ShowExtensionConfirmAsync(string title, string message, double? timeout = null)
@@ -155,58 +175,51 @@ internal sealed partial class InteractiveMode : IRpcExtensionUiPresentationObser
         return result == "Yes";
     }
 
-    internal Task<string?> ShowExtensionInputAsync(string title, string? placeholder, double? timeout = null)
+    /// <summary>A text input for extensions; resolves with the value or null when cancelled, timed out or aborted.</summary>
+    internal Task<string?> ShowExtensionInputAsync(string title, string? placeholder, double? timeout = null, CancellationToken signal = default)
     {
         var result = new TaskCompletionSource<string?>(TaskCreationOptions.RunContinuationsAsynchronously);
-        extensionInput = new ExtensionInputComponent(title, placeholder,
-            value => { HideExtensionInput(); result.TrySetResult(value); },
-            () => { HideExtensionInput(); result.TrySetResult(null); },
-            new ExtensionInputOptions(ui, timeout));
-        DisposeActiveSelector();
-        editorContainer.Clear();
-        editorContainer.AddChild(extensionInput);
-        ui.SetFocus(extensionInput);
-        programStatus.SetBlocked("extension-dialog", new BlockedStatus(ProgramBlockedKind.Question, title));
-        ui.RequestRender();
+        if (signal.IsCancellationRequested) { result.TrySetResult(null); return result.Task; }
+        ExtensionInputComponent? input = null;
+        CancellationTokenRegistration registration = default;
+        var finished = false;
+        void Finish(string? value)
+        {
+            if (finished) return;
+            finished = true;
+            registration.Dispose();
+            input!.Dispose();
+            RemoveExtensionDialog(input);
+            result.TrySetResult(value);
+        }
+        input = new ExtensionInputComponent(title, placeholder, value => Finish(value), () => Finish(null), new ExtensionInputOptions(ui, timeout));
+        PushExtensionDialog(input, new BlockedStatus(ProgramBlockedKind.Question, title), input.Dispose);
+        registration = signal.Register(() => context.Loop.Post(() => Finish(null)));
         return result.Task;
     }
 
-    private void HideExtensionInput()
-    {
-        extensionInput?.Dispose();
-        editorContainer.Clear();
-        editorContainer.AddChild(editor);
-        extensionInput = null;
-        programStatus.SetBlocked("extension-dialog", null);
-        ui.SetFocus(editor);
-        ui.RequestRender();
-    }
-
-    /// <summary>A multi-line editor for extensions (with the external editor shortcut).</summary>
-    internal Task<string?> ShowExtensionEditorAsync(string title, string? prefill, string? description = null)
+    /// <summary>A multi-line editor for extensions (with the external editor shortcut). <paramref name="signal"/> closes it unanswered
+    /// (a retired RPC request).</summary>
+    internal Task<string?> ShowExtensionEditorAsync(string title, string? prefill, string? description = null, CancellationToken signal = default)
     {
         var result = new TaskCompletionSource<string?>(TaskCreationOptions.RunContinuationsAsynchronously);
-        extensionEditor = new ExtensionEditorComponent(ui, keybindings.Manager, title, prefill,
-            value => { HideExtensionEditor(); result.TrySetResult(value); },
-            () => { HideExtensionEditor(); result.TrySetResult(null); },
+        if (signal.IsCancellationRequested) { result.TrySetResult(null); return result.Task; }
+        ExtensionEditorComponent? dialog = null;
+        CancellationTokenRegistration registration = default;
+        var finished = false;
+        void Finish(string? value)
+        {
+            if (finished) return;
+            finished = true;
+            registration.Dispose();
+            RemoveExtensionDialog(dialog!);
+            result.TrySetResult(value);
+        }
+        dialog = new ExtensionEditorComponent(ui, keybindings.Manager, title, prefill, value => Finish(value), () => Finish(null),
             description is null ? null : new ExtensionEditorOptions(Description: description), settings.ExternalEditorCommand);
-        DisposeActiveSelector();
-        editorContainer.Clear();
-        editorContainer.AddChild(extensionEditor);
-        ui.SetFocus(extensionEditor);
-        programStatus.SetBlocked("extension-dialog", new BlockedStatus(ProgramBlockedKind.Question, title));
-        ui.RequestRender();
+        PushExtensionDialog(dialog, new BlockedStatus(ProgramBlockedKind.Question, title));
+        registration = signal.Register(() => context.Loop.Post(() => Finish(null)));
         return result.Task;
-    }
-
-    private void HideExtensionEditor()
-    {
-        editorContainer.Clear();
-        editorContainer.AddChild(editor);
-        extensionEditor = null;
-        programStatus.SetBlocked("extension-dialog", null);
-        ui.SetFocus(editor);
-        ui.RequestRender();
     }
 
     private void ShowExtensionNotify(string message, string? type)
@@ -364,8 +377,13 @@ internal sealed partial class InteractiveMode : IRpcExtensionUiPresentationObser
     {
         editorComponentFactory = factory;
         var currentText = editor.GetText();
-        DisposeActiveSelector();
-        editorContainer.Clear();
+        // Pi 1.5.0: an open extension dialog keeps the editor slot; the new editor shows when the last dialog closes.
+        var dialogOpen = extensionDialogs.Count > 0;
+        if (!dialogOpen)
+        {
+            DisposeActiveSelector();
+            editorContainer.Clear();
+        }
         if (factory is not null)
         {
             var newEditor = factory(ui, Themes.GetEditorTheme(), keybindings.Manager);
@@ -391,22 +409,25 @@ internal sealed partial class InteractiveMode : IRpcExtensionUiPresentationObser
             defaultEditor.SetText(currentText);
             editor = defaultEditor;
         }
-        editorContainer.AddChild(editor);
+        if (!dialogOpen) editorContainer.AddChild(editor);
         if (activeStatusIndicator is not null)
         {
             statusContainer.Clear();
             activeWorkingIndicatorEmbedded = SetEditorWorkingStatusIndicator(activeStatusIndicator);
             if (!activeWorkingIndicatorEmbedded) statusContainer.AddChild(activeStatusIndicator);
         }
-        ui.SetFocus(editor);
+        if (!dialogOpen) ui.SetFocus(editor);
         ui.RequestRender();
     }
 
     private void ResetExtensionUI()
     {
-        if (extensionSelector is not null) HideExtensionSelector();
-        if (extensionInput is not null) HideExtensionInput();
-        if (extensionEditor is not null) HideExtensionEditor();
+        if (extensionDialogs.Count > 0)
+        {
+            foreach (var dialog in extensionDialogs) dialog.Dispose?.Invoke();
+            extensionDialogs.Clear();
+            ShowTopExtensionDialog();
+        }
         openRpcDialogs.Clear();
         ui.HideOverlay();
         ClearExtensionTerminalInputListeners();

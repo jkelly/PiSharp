@@ -135,9 +135,9 @@ internal sealed partial class InteractiveMode
     private bool bugReportHintShown, installChangeWarningShown;
 
     // Extension UI state
-    private ExtensionSelectorComponent? extensionSelector;
-    private ExtensionInputComponent? extensionInput;
-    private ExtensionEditorComponent? extensionEditor;
+    /// <summary>Pi 1.4.0: extension dialogs and inline custom() components stacked in the editor slot; the last one is visible (see
+    /// PushExtensionDialog). Dispose settles the dialog when the extension UI resets.</summary>
+    private readonly List<(IComponent Component, BlockedStatus? Blocked, Action? Dispose)> extensionDialogs = [];
     private readonly List<ExtensionTerminalInputSubscription> extensionTerminalInputSubscriptions = [];
     private readonly Dictionary<string, IComponent> extensionWidgetsAbove = new(StringComparer.Ordinal), extensionWidgetsBelow = new(StringComparer.Ordinal);
     private IComponent? customFooter, builtInHeader, customHeader;

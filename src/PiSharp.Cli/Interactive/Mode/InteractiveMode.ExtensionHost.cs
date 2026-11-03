@@ -84,11 +84,15 @@ internal sealed partial class InteractiveMode
         terminalSizeSnapshot = (ui.Terminal.Columns, ui.Terminal.Rows);
         List<(string Op, JsonElement Args)> pending;
         lock (pendingExtensionPublications) { extensionPublicationsReady = true; pending = [.. pendingExtensionPublications]; pendingExtensionPublications.Clear(); }
-        // CustomEditor-based extension editors match the mode's keybindings, run its app actions and its extension shortcuts.
-        extensions.ConfigureEditor(keybindings.GetEffectiveConfig(), [.. defaultEditor.ActionHandlers.Keys,
-            "app.interrupt", "app.exit", "app.clipboard.pasteImage"], data => defaultEditor.OnExtensionShortcut?.Invoke(data) ?? false);
+        ConfigureExtensionEditor();
         foreach (var (op, args) in pending) HandleExtensionPublication(extensions, op, args);
     }
+
+    /// <summary>CustomEditor-based extension editors match the mode's keybindings, run its app actions and its extension shortcuts, and
+    /// the bridge's keyText/keyHint read the same keybindings. Sent again when /reload reloads the keybindings.</summary>
+    private void ConfigureExtensionEditor() =>
+        context.Extensions?.ConfigureEditor(keybindings.GetEffectiveConfig(), [.. defaultEditor.ActionHandlers.Keys,
+            "app.interrupt", "app.exit", "app.clipboard.pasteImage"], data => defaultEditor.OnExtensionShortcut?.Invoke(data) ?? false);
 
     /// <summary>An app action of the mode's editor by name (custom-editor.ts: onEscape, onCtrlD, onPasteImage, actionHandlers).</summary>
     private Action? EditorAction(string action) => action switch
@@ -191,9 +195,12 @@ internal sealed partial class InteractiveMode
 
     private sealed record ActiveCustomComponent(PiSharp.Extensions.ExtensionCustomComponentIdentity Identity, TaskCompletionSource Done,
         ExtensionRowsComponent Component);
-    private ActiveCustomComponent? activeCustomComponent;
+    /// <summary>The open ctx.ui.custom() components (inline ones are on the dialog stack, overlays on the TUI's overlay stack).</summary>
+    private readonly Dictionary<PiSharp.Extensions.ExtensionCustomComponentIdentity, ActiveCustomComponent> activeCustomComponents = [];
 
-    /// <summary>ctx.ui.custom(): the component replaces the editor and takes focus; done() (or cancellation) restores the editor.</summary>
+    /// <summary>ctx.ui.custom(): an inline component joins the extension dialog stack in the editor slot (Pi 1.4.0) and done() (or
+    /// cancellation) removes it and restores the editor text; an overlay component (Pi 1.3.0) opens on top of the screen with its
+    /// overlay options and done() hides that overlay through its own handle, not the topmost one.</summary>
     internal async Task ShowExtensionCustomComponentAsync(PiSharp.Extensions.ExtensionCustomComponentCallbacks callbacks,
         PiSharp.Extensions.IExtensionContext extensionContext, CancellationToken token)
     {
@@ -204,33 +211,70 @@ internal sealed partial class InteractiveMode
             try { return callbacks.Render(width, extensionContext, timeout.Token).WaitAsync(timeout.Token).GetAwaiter().GetResult().Rows; }
             catch (Exception error) when (error is OperationCanceledException or TimeoutException or InvalidOperationException or IOException) { return []; }
         }, data => _ = callbacks.Input(data, extensionContext, CancellationToken.None)
-            .ContinueWith(static task => _ = task.Exception, TaskScheduler.Default));
+            .ContinueWith(static task => _ = task.Exception, TaskScheduler.Default), callbacks.CapturesViewportInput);
         var active = new ActiveCustomComponent(callbacks.Identity, done, component);
+        IOverlayHandle? overlay = null;
+        var savedText = "";
         await context.Loop.InvokeAsync(() =>
         {
-            if (activeCustomComponent is not null) throw new InvalidOperationException("Another extension component is open.");
-            activeCustomComponent = active;
-            editorContainer.Clear();
-            editorContainer.AddChild(component);
-            ui.SetFocus(component);
-            // Pi 1.5.0: an inline component that opts in reports pi as blocked while it is visible.
-            if (BlockedStatusOf(callbacks.Blocked) is { } blocked) programStatus.SetBlocked("extension-dialog", blocked);
-            ui.RequestRender();
+            if (!activeCustomComponents.TryAdd(callbacks.Identity, active)) throw new InvalidOperationException("This extension component is already open.");
+            savedText = editor.GetText();
+            if (callbacks.Overlay is { } options) overlay = ui.ShowOverlay(component, OverlayOptionsOf(options.Options));
+            // Pi 1.5.0: an inline component that opts in reports pi as blocked while it is the visible dialog.
+            else PushExtensionDialog(component, BlockedStatusOf(callbacks.Blocked), () => done.TrySetResult());
         });
         try { await done.Task.WaitAsync(token); }
         finally
         {
             await context.Loop.InvokeAsync(() =>
             {
-                if (ReferenceEquals(activeCustomComponent, active)) activeCustomComponent = null;
-                if (callbacks.Blocked is not null) programStatus.SetBlocked("extension-dialog", null);
-                editorContainer.Clear();
-                editorContainer.AddChild(editor);
-                ui.SetFocus(editor);
+                if (activeCustomComponents.TryGetValue(callbacks.Identity, out var current) && ReferenceEquals(current, active))
+                    activeCustomComponents.Remove(callbacks.Identity);
+                // Remove this overlay, not the topmost one: another overlay may have opened above it.
+                if (overlay is not null) overlay.Hide();
+                else if (RemoveExtensionDialog(component)) editor.SetText(savedText);
                 ui.RequestRender();
             });
             await callbacks.Dispose(extensionContext);
         }
+    }
+
+    /// <summary>tui.ts OverlayOptions from ctx.ui.custom()'s overlayOptions (resolved once by the extension host): sizes are a number of
+    /// cells or a "N%" percentage, margin a number or { top, right, bottom, left }. Unknown or mistyped fields are left at their
+    /// defaults; null options use the overlay defaults.</summary>
+    internal static OverlayOptions? OverlayOptionsOf(JsonElement? options)
+    {
+        if (options is not { ValueKind: JsonValueKind.Object } value) return null;
+        JsonElement? Field(string name) => value.TryGetProperty(name, out var field) ? field : null;
+        int? Int(string name) => Field(name) is { ValueKind: JsonValueKind.Number } number ? (int)Math.Floor(number.GetDouble()) : null;
+        SizeValue? Size(string name) => Field(name) switch
+        {
+            { ValueKind: JsonValueKind.Number } number => new SizeValue(number.GetDouble(), false),
+            { ValueKind: JsonValueKind.String } text when text.GetString() is { } raw && raw.EndsWith('%') &&
+                double.TryParse(raw[..^1], System.Globalization.NumberStyles.AllowDecimalPoint, System.Globalization.CultureInfo.InvariantCulture, out var percent)
+                => SizeValue.Pct(percent),
+            _ => null
+        };
+        OverlayAnchor? anchor = Field("anchor") is { ValueKind: JsonValueKind.String } a ? a.GetString() switch
+        {
+            "center" => OverlayAnchor.Center, "top-left" => OverlayAnchor.TopLeft, "top-right" => OverlayAnchor.TopRight,
+            "bottom-left" => OverlayAnchor.BottomLeft, "bottom-right" => OverlayAnchor.BottomRight, "top-center" => OverlayAnchor.TopCenter,
+            "bottom-center" => OverlayAnchor.BottomCenter, "left-center" => OverlayAnchor.LeftCenter, "right-center" => OverlayAnchor.RightCenter,
+            _ => null
+        } : null;
+        OverlayMargin? margin = Field("margin") switch
+        {
+            { ValueKind: JsonValueKind.Number } all => OverlayMargin.All((int)Math.Floor(all.GetDouble())),
+            { ValueKind: JsonValueKind.Object } sides => new OverlayMargin(Side(sides, "top"), Side(sides, "right"), Side(sides, "bottom"), Side(sides, "left")),
+            _ => null
+        };
+        return new OverlayOptions
+        {
+            Width = Size("width"), MinWidth = Int("minWidth"), MaxHeight = Size("maxHeight"), Anchor = anchor, OffsetX = Int("offsetX"),
+            OffsetY = Int("offsetY"), Row = Size("row"), Col = Size("col"), Margin = margin, NonCapturing = Field("nonCapturing")?.ValueKind == JsonValueKind.True
+        };
+        static int Side(JsonElement sides, string name) =>
+            sides.TryGetProperty(name, out var side) && side.ValueKind == JsonValueKind.Number ? (int)Math.Floor(side.GetDouble()) : 0;
     }
 
     /// <summary>The program status kind of a custom component's <c>blocked</c> option (OSC 7501 "permission", "question" or
@@ -246,7 +290,7 @@ internal sealed partial class InteractiveMode
     /// <summary>The open custom component called done() (or asked to be redrawn).</summary>
     internal void SignalExtensionCustomComponent(PiSharp.Extensions.ExtensionCustomComponentIdentity identity, bool done) => context.Loop.Post(() =>
     {
-        if (activeCustomComponent is not { } active || active.Identity != identity) return;
+        if (!activeCustomComponents.TryGetValue(identity, out var active)) return;
         if (done) { active.Done.TrySetResult(); return; }
         active.Component.Invalidate();
         ui.RequestRender();
