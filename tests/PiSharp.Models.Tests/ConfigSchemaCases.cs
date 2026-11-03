@@ -30,7 +30,7 @@ internal static partial class Program
         // git ls-tree v1.2.0 packages/coding-agent/schemas
         var blobs = new Dictionary<string, string>
         {
-            [PiConfigurationSchemas.ModelsFileName] = "40e27fa3ebee59118b0db6373435479d5fc1baeb",
+            [PiConfigurationSchemas.ModelsFileName] = "c51a82c358ef1d92d4b2a2481be1e9d37258057e", // v1.5.0
             [PiConfigurationSchemas.SettingsFileName] = "81cfc5fb198d0e1bb7dd3fd782dd9553c023f97d",
             [PiConfigurationSchemas.KeybindingsFileName] = "aa3b3e9be501475ce465855ee676abe32b8b9c2e",
             [PiConfigurationSchemas.ThemeFileName] = "95350a58db931d116d982d3212dbfd2c5c946760",
