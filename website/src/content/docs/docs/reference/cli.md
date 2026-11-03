@@ -41,11 +41,11 @@ Piped stdin is added in front of the first prompt. `@path` arguments add a text 
 
 | Option | Meaning |
 | --- | --- |
-| `--model <pattern>` | Model by id, `provider/id` or fuzzy match, with an optional `:<thinking>` suffix, such as `sonnet:high`. |
+| `--model <pattern>` | Model by id, `provider/id` or fuzzy match, with an optional `:<thinking>` suffix, such as `sonnet:high`. If several providers offer the match, PiSharp takes the one with credentials; otherwise it asks for `--provider`. A provider id that contains `/` works in `provider/id`. |
 | `--provider <name>` | Provider to search for `--model`. Requires `--model`. |
-| `--models <patterns>` | Comma-separated model patterns for `Ctrl+P` cycling. Globs (`anthropic/*`, `*sonnet*`), fuzzy matches and `:<thinking>` suffixes work. |
+| `--models <patterns>` | Comma-separated model patterns for `Ctrl+P` cycling. Globs (`anthropic/*`, `*sonnet*`), fuzzy matches and `:<thinking>` suffixes work. A model that several providers offer is added once for each, with a warning. |
 | `--thinking <level>` | `off`, `minimal`, `low`, `medium`, `high`, `xhigh` or `max`. An unknown level is a warning, not an error. |
-| `--api-key <key>` | API key for this run, instead of the environment or `auth.json`. Requires a model from `--model` or `--models`. |
+| `--api-key <key>` | API key for this run, instead of the environment or `auth.json`. Requires a model from `--model` or `--models`. It doesn't choose between providers that offer the same model. |
 | `--tier <tier>`, `--service-tier <tier>` | Service tier: `auto`, `normal`, `economy`, `priority`, `fast` or `ultrafast` (experimental). See below. |
 | `--list-models [search]` | Lists the models you can use, with an optional fuzzy search, then exits. The search can't start with `-` or `@`. |
 

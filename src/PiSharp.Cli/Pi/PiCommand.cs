@@ -687,6 +687,7 @@ internal static class PiCommand
         var request = new SettingsModelSelection(parsed.Provider, parsed.Model, null)
         {
             ModelPatterns = parsed.Models is { } models ? [.. models] : null, CliThinking = parsed.Thinking, UseModelMaximumTokens = true,
+            InlineApiKey = parsed.ApiKey is not null,
             SessionBranch = sessionPath is null ? null : PiSessions.ReadBranch(sessionPath)
         };
         using var warnings = new StringWriter();

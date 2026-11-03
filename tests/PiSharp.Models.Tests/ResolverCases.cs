@@ -1,7 +1,9 @@
 using PiSharp.AI.Catalogs;
 using PiSharp.Cli.Models;
 
-// Ported from packages/coding-agent/test/model-resolver.test.ts (v1.1.0): the same mock models and expectations.
+// Ported from packages/coding-agent/test/model-resolver.test.ts (v1.1.0): the same mock models and expectations. Pi 1.5.0 replaced
+// parseModelPattern with resolveModelReference; the parse cases run through it with a lenient thinking suffix and fuzzy matching (what
+// parseModelPattern did), and an empty pattern now matches nothing.
 internal static partial class Program
 {
     private static readonly RegistryModel[] MockModels =
@@ -33,63 +35,69 @@ internal static partial class Program
         ("resolver.restore-model-from-session", Sync(RestoreModel)),
     ];
 
+    private static (RegistryModel? Model, string? ThinkingLevel, string? Warning) Parse(string pattern, IReadOnlyList<RegistryModel> models)
+    {
+        var result = ModelResolver.ResolveModelReference(new(pattern, null, ThinkingSuffixMode.Lenient, true), models, _ => true);
+        return (result.Status == ModelReferenceStatus.Resolved ? result.Model : null, result.ThinkingLevel, result.Warning);
+    }
+
     private static void ParseSimple()
     {
-        var exact = ModelResolver.ParseModelPattern("claude-sonnet-4-5", AllModels);
+        var exact = Parse("claude-sonnet-4-5", AllModels);
         Equal("claude-sonnet-4-5", exact.Model?.Id, "exact"); Equal<string?>(null, exact.ThinkingLevel, "exact level"); Equal<string?>(null, exact.Warning, "exact warning");
-        Equal("claude-sonnet-4-5", ModelResolver.ParseModelPattern("sonnet", AllModels).Model?.Id, "partial");
-        var none = ModelResolver.ParseModelPattern("nonexistent", AllModels);
+        Equal("claude-sonnet-4-5", Parse("sonnet", AllModels).Model?.Id, "partial");
+        var none = Parse("nonexistent", AllModels);
         Check(none.Model is null && none.ThinkingLevel is null && none.Warning is null, "no match");
     }
 
     private static void ParseThinking()
     {
-        var high = ModelResolver.ParseModelPattern("sonnet:high", AllModels);
+        var high = Parse("sonnet:high", AllModels);
         Equal("claude-sonnet-4-5", high.Model?.Id, "sonnet:high"); Equal("high", high.ThinkingLevel, "high");
-        Equal("medium", ModelResolver.ParseModelPattern("gpt-4o:medium", AllModels).ThinkingLevel, "gpt-4o:medium");
+        Equal("medium", Parse("gpt-4o:medium", AllModels).ThinkingLevel, "gpt-4o:medium");
         foreach (var level in new[] { "off", "minimal", "low", "medium", "high", "xhigh", "max" })
         {
-            var parsed = ModelResolver.ParseModelPattern("sonnet:" + level, AllModels);
+            var parsed = Parse("sonnet:" + level, AllModels);
             Equal(level, parsed.ThinkingLevel, level); Equal<string?>(null, parsed.Warning, level + " warning");
         }
-        var random = ModelResolver.ParseModelPattern("sonnet:random", AllModels);
+        var random = Parse("sonnet:random", AllModels);
         Equal("claude-sonnet-4-5", random.Model?.Id, "random model"); Equal<string?>(null, random.ThinkingLevel, "random level");
         Equal("Invalid thinking level \"random\" in pattern \"sonnet:random\". Using default instead.", random.Warning, "random warning");
-        var invalid = ModelResolver.ParseModelPattern("gpt-4o:invalid", AllModels);
+        var invalid = Parse("gpt-4o:invalid", AllModels);
         Equal("gpt-4o", invalid.Model?.Id, "invalid model"); Check(invalid.Warning!.Contains("Invalid thinking level", StringComparison.Ordinal), "invalid warning");
     }
 
     private static void ParseColons()
     {
-        Equal("qwen/qwen3-coder:exacto", ModelResolver.ParseModelPattern("qwen/qwen3-coder:exacto", AllModels).Model?.Id, "exacto");
-        var prefixed = ModelResolver.ParseModelPattern("openrouter/qwen/qwen3-coder:exacto", AllModels);
+        Equal("qwen/qwen3-coder:exacto", Parse("qwen/qwen3-coder:exacto", AllModels).Model?.Id, "exacto");
+        var prefixed = Parse("openrouter/qwen/qwen3-coder:exacto", AllModels);
         Equal("openrouter", prefixed.Model?.Provider, "prefixed provider"); Equal<string?>(null, prefixed.ThinkingLevel, "prefixed level");
-        var high = ModelResolver.ParseModelPattern("qwen/qwen3-coder:exacto:high", AllModels);
+        var high = Parse("qwen/qwen3-coder:exacto:high", AllModels);
         Equal("qwen/qwen3-coder:exacto", high.Model?.Id, "exacto:high"); Equal("high", high.ThinkingLevel, "exacto:high level");
-        var both = ModelResolver.ParseModelPattern("openrouter/qwen/qwen3-coder:exacto:high", AllModels);
+        var both = Parse("openrouter/qwen/qwen3-coder:exacto:high", AllModels);
         Equal("openrouter", both.Model?.Provider, "both provider"); Equal("high", both.ThinkingLevel, "both level");
-        Equal("openai/gpt-4o:extended", ModelResolver.ParseModelPattern("openai/gpt-4o:extended", AllModels).Model?.Id, "extended");
-        var random = ModelResolver.ParseModelPattern("qwen/qwen3-coder:exacto:random", AllModels);
+        Equal("openai/gpt-4o:extended", Parse("openai/gpt-4o:extended", AllModels).Model?.Id, "extended");
+        var random = Parse("qwen/qwen3-coder:exacto:random", AllModels);
         Check(random.Model?.Id == "qwen/qwen3-coder:exacto" && random.ThinkingLevel is null && random.Warning!.Contains("random", StringComparison.Ordinal), "exacto:random");
-        var chained = ModelResolver.ParseModelPattern("qwen/qwen3-coder:exacto:high:random", AllModels);
+        var chained = Parse("qwen/qwen3-coder:exacto:high:random", AllModels);
         Check(chained.Model?.Id == "qwen/qwen3-coder:exacto" && chained.ThinkingLevel is null && chained.Warning!.Contains("random", StringComparison.Ordinal), "exacto:high:random");
     }
 
     private static void ParseEdges()
     {
-        var empty = ModelResolver.ParseModelPattern("", AllModels);
-        Check(empty.Model is not null && empty.ThinkingLevel is null, "empty pattern matches via partial matching");
-        var colon = ModelResolver.ParseModelPattern("sonnet:", AllModels);
+        var empty = Parse("", AllModels);
+        Check(empty.Model is null && empty.ThinkingLevel is null, "an empty pattern matches nothing");
+        var colon = Parse("sonnet:", AllModels);
         Equal("claude-sonnet-4-5", colon.Model?.Id, "trailing colon"); Check(colon.Warning!.Contains("Invalid thinking level", StringComparison.Ordinal), "trailing colon warning");
     }
 
     private static void AliasPreference()
     {
         RegistryModel[] models = [M("anthropic", "claude-sonnet-4-5-20250929"), M("anthropic", "claude-sonnet-4-5-20240101"), M("anthropic", "claude-sonnet-4-5")];
-        Equal("claude-sonnet-4-5", ModelResolver.ParseModelPattern("sonnet-4", models).Model?.Id, "alias over dated");
-        Equal("claude-sonnet-4-5-20250929", ModelResolver.ParseModelPattern("sonnet-4", models[..2]).Model?.Id, "latest dated");
+        Equal("claude-sonnet-4-5", Parse("sonnet-4", models).Model?.Id, "alias over dated");
+        Equal("claude-sonnet-4-5-20250929", Parse("sonnet-4", models[..2]).Model?.Id, "latest dated");
         RegistryModel[] aliases = [M("x", "a-model"), M("x", "b-model-latest")];
-        Equal("b-model-latest", ModelResolver.ParseModelPattern("model", aliases).Model?.Id, "highest-sorting alias");
+        Equal("b-model-latest", Parse("model", aliases).Model?.Id, "highest-sorting alias");
     }
 
     private static void Scope()
@@ -203,26 +211,21 @@ internal static partial class Program
 
     private static void InitialModel()
     {
-        var ghost = ModelResolver.FindInitialModel("openrouter", "openrouter/openai/ghost-model", [], false, null, null, null, null,
-            () => AllModels, (_, _) => null, NoAuth, () => []);
-        Check(ghost.Model?.Provider == "openrouter" && ghost.Model.Id == "openai/ghost-model", "explicit provider custom id");
         var gateway = M("vercel-ai-gateway", "anthropic/claude-opus-4-6", "Claude Opus 4.6", reasoning: true);
-        var available = ModelResolver.FindInitialModel(null, null, [], false, null, null, null, null, () => [], (_, _) => null, NoAuth, () => [gateway]);
+        var available = ModelResolver.FindInitialModel([], false, null, null, null, null, (_, _) => null, NoAuth, () => [gateway]);
         Equal("vercel-ai-gateway/anthropic/claude-opus-4-6", available.Model?.Reference, "first available"); Equal("medium", available.ThinkingLevel, "default level");
         var saved = M("deepseek", "deepseek-v4-flash", reasoning: true); var local = M("spark-two", "deepseek-v4-flash", reasoning: true);
-        var unauthenticated = ModelResolver.FindInitialModel(null, null, [], false, "deepseek", "deepseek-v4-flash", null, null, () => [],
+        var unauthenticated = ModelResolver.FindInitialModel([], false, "deepseek", "deepseek-v4-flash", null, null,
             (provider, id) => provider == "deepseek" && id == "deepseek-v4-flash" ? saved : null, provider => provider == "spark-two", () => [local]);
         Equal("spark-two/deepseek-v4-flash", unauthenticated.Model?.Reference, "unauthenticated saved default ignored");
-        var defaults = ModelResolver.FindInitialModel(null, null, [], false, null, null, null, null, () => [], (_, _) => null, NoAuth,
+        var defaults = ModelResolver.FindInitialModel([], false, null, null, null, null, (_, _) => null, NoAuth,
             () => [M("groq", "zzz"), M("anthropic", "claude-opus-4-8"), M("groq", "openai/gpt-oss-120b")]);
         Equal("anthropic/claude-opus-4-8", defaults.Model?.Reference, "provider defaults in declaration order");
-        var scoped = ModelResolver.FindInitialModel(null, null, [new(AllModels[1], null)], false, null, null, "low",
-            new Dictionary<string, string> { ["openai/gpt-4o"] = "high" }, () => [], (_, _) => null, NoAuth, () => []);
+        var scoped = ModelResolver.FindInitialModel([new(AllModels[1], null)], false, null, null, "low",
+            new Dictionary<string, string> { ["openai/gpt-4o"] = "high" }, (_, _) => null, NoAuth, () => []);
         Check(scoped.Model?.Reference == "openai/gpt-4o" && scoped.ThinkingLevel == "high", "scoped first with per-model level");
-        var continuing = ModelResolver.FindInitialModel(null, null, [new(AllModels[1], "low")], true, null, null, null, null, () => [], (_, _) => null, NoAuth, () => []);
+        var continuing = ModelResolver.FindInitialModel([new(AllModels[1], "low")], true, null, null, null, null, (_, _) => null, NoAuth, () => []);
         Check(continuing.Model is null, "scoped models skipped when continuing");
-        Throws<ModelSelectionException>(() => ModelResolver.FindInitialModel("nope", "x", [], false, null, null, null, null, () => AllModels, (_, _) => null, NoAuth, () => []),
-            "CLI error");
     }
 
     private static void RestoreModel()

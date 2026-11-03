@@ -220,7 +220,7 @@ internal static class DurableHarnessSetup
             if (resolved.Error is not null || resolved.Model is null) throw new InvalidOperationException($"Could not resolve model: {resolved.Error ?? explicitModel.Model}");
             return new(new ModelRef(resolved.Model.Provider, resolved.Model.Id), resolved.ThinkingLevel);
         }
-        var initial = ModelResolver.FindInitialModel(null, null, [], isContinuing: false, settings.String("defaultProvider"), settings.String("defaultModel"),
+        var initial = ModelResolver.FindInitialModel([], isContinuing: false, settings.String("defaultProvider"), settings.String("defaultModel"),
             settings.String("defaultThinkingLevel"), null, registry);
         return initial.Model is null
             ? new(FallbackMessage: initial.FallbackMessage)

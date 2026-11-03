@@ -217,12 +217,13 @@ internal static partial class PiAuthCommand
         }
         else
         {
+            // Pi 1.5.0: only the configured providers' catalog models count; an uncatalogued id is not a match.
+            var models = registry.GetAll();
             foreach (var id in registry.GetProviderIds())
             {
                 if (!types.ContainsKey(id)) continue;
-                var resolved = ModelResolver.ResolveCliModel(id, cliModel, null, registry.GetAll(), registry.HasConfiguredAuth);
-                if (resolved.Model is not null && resolved.Error is null && resolved.Warning?.Contains("Using custom model id", StringComparison.Ordinal) != true)
-                    providers.Add((id, resolved.Model));
+                var resolved = ModelResolver.ResolveModelReference(new(cliModel!, id, ThinkingSuffixMode.Strict, true), models, static _ => true);
+                if (resolved is { Status: ModelReferenceStatus.Resolved, Model: { } model }) providers.Add((id, model));
             }
             if (providers.Count == 0) throw new AuthCommandError($"Model \"{cliModel}\" not found. Use --list-models to see available models.");
         }

@@ -310,8 +310,8 @@ internal static partial class Program
         }
         Check(Absent("xiaomi", "mimo-v2.5-pro") && Absent("github-copilot", "gpt-5.4"), "the old defaults left the catalog");
         Registry(out var registry, Env(("XIAOMI_API_KEY", "k")));
-        Equal("xiaomi/mimo-v2.6-pro", ModelResolver.FindInitialModel(null, null, [], false, null, null, null, null, registry).Model?.Reference, "new default without a selection");
-        Equal("xiaomi/mimo-v2.6-flash", ModelResolver.FindInitialModel(null, null, [], false, "xiaomi", "mimo-v2.6-flash", null, null, registry).Model?.Reference,
+        Equal("xiaomi/mimo-v2.6-pro", ModelResolver.FindInitialModel([], false, null, null, null, null, registry).Model?.Reference, "new default without a selection");
+        Equal("xiaomi/mimo-v2.6-flash", ModelResolver.FindInitialModel([], false, "xiaomi", "mimo-v2.6-flash", null, null, registry).Model?.Reference,
             "a saved selection is kept");
     }
 
@@ -319,10 +319,10 @@ internal static partial class Program
     {
         Equal("gpt-6.1-sol", ModelResolver.DefaultModelFor("openai"), "openai default");
         Registry(out var registry, Env(("OPENAI_API_KEY", "k")));
-        Equal("openai/gpt-6.1-sol", ModelResolver.FindInitialModel(null, null, [], false, null, null, null, null, registry).Model?.Reference, "startup fallback");
-        Equal("openai/gpt-5.5", ModelResolver.FindInitialModel(null, null, [], false, "openai", "gpt-5.5", null, null, registry).Model?.Reference,
+        Equal("openai/gpt-6.1-sol", ModelResolver.FindInitialModel([], false, null, null, null, null, registry).Model?.Reference, "startup fallback");
+        Equal("openai/gpt-5.5", ModelResolver.FindInitialModel([], false, "openai", "gpt-5.5", null, null, registry).Model?.Reference,
             "the saved gpt-5.5 selection is never replaced");
-        Equal("openai/gpt-5.5", ModelResolver.FindInitialModel("openai", "gpt-5.5", [], false, null, null, null, null, registry).Model?.Reference, "--model gpt-5.5 kept");
+        Equal("openai/gpt-5.5", ModelResolver.ResolveCliModel("openai", "gpt-5.5", null, registry.GetAll(), registry.HasConfiguredAuth).Model?.Reference, "--model gpt-5.5 kept");
     }
 
     private static void Sync150ModelsSchema()
