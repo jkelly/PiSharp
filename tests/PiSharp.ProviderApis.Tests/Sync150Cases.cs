@@ -39,7 +39,7 @@ internal static partial class Program
         const string error = """{"message":"failed to parse request","code":""}""";
         foreach (var (status, nested, overflow) in new[] { (413, true, true), (413, false, true), (400, true, false) })
         {
-            var row = CatalogRow("github-copilot", "gpt-5.5"); var http = new FakeHttp();
+            var row = CatalogRow("github-copilot", "gpt-5.6-sol"); var http = new FakeHttp();
             http.OnUrl("https://", _ => Json(nested ? "{\"error\":" + error + "}" : error, (HttpStatusCode)status));
             using var route = NativeProviderFactory.CreateProviderRoute(Descriptor(row), row.Raw, new(_ => ValueTask.FromResult(new ProviderRequestAuth(CopilotToken,
                 ProviderHeaderPolicies.CopilotBaseUrl(CopilotToken, null)))) { MaxTokens = 512 }, http);

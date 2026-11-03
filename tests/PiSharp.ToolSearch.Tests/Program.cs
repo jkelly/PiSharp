@@ -25,7 +25,7 @@ internal static partial class Program
             ("session.loaded-tools-persist-across-turns-and-transcript-reopen", LoadedToolsPersist),
             ("mcp.deferred-server-connects-and-tool-search-loads-its-tools", DeferredServerProductionSession),
             ("mcp.mcp-servers-section-lists-deferred-servers", ServersSectionForDeferredServers),
-            ("mcp.cli-reopen-applies-the-initial-selection", CliReopenAppliesInitialSelection),
+            ("mcp.cli-reopen-restores-the-loaded-tool", CliReopenRestoresLoadedTool),
             ("selection.tools-and-exclude-tools-gate-tool-search", ToolSelectionGatesToolSearch),
             ("mcp.codemode-servers-connect-with-codemode", CodemodeServersConnect),
             ("calls.direct-server-tool-call-succeeds", DirectServerCallSucceeds),
