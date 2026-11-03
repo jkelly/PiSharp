@@ -1,18 +1,19 @@
 // Regenerates the mechanically ported upstream Pi modules in this folder (tui/, ai/, agent/,
-// coding-agent/ except the hand-written files, pi-tui.mjs, pi-ai.mjs, pi-agent-core.mjs, theme.mjs).
+// coding-agent/ except the hand-written files, schema/, telemetry/, pi-tui.mjs, pi-ai.mjs, pi-ai-extension-view.mjs,
+// pi-agent-core.mjs, theme.mjs).
 // TypeScript types are stripped with Node's built-in stripTypeScriptTypes (transform mode), import
 // specifiers are rewritten to the virtual modules / vendor replacements, and the PiSharp adaptations
 // below (redirects, patches, appends) are applied. Requires Node 22.13+.
 //
 //   node port-upstream.mjs <path-to-upstream-pi>/packages
 //
-// The upstream checkout must be Pi commit 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT).
+// The upstream checkout must be Pi commit f9a26365568127461c47a07a37dcb42c140a3ac5 (v1.5.0, MIT).
 import fs from "node:fs";
 import path from "node:path";
 import { stripTypeScriptTypes } from "node:module";
 import { fileURLToPath } from "node:url";
 
-const COMMIT = "06a466935536f8c9bcacb2d5efc0fc021be1bdff";
+const COMMIT = "f9a26365568127461c47a07a37dcb42c140a3ac5";
 const UP = path.resolve(process.argv[2] ?? process.env.PI_UPSTREAM_PACKAGES ?? "");
 if (!process.argv[2] && !process.env.PI_UPSTREAM_PACKAGES) {
 	console.error("usage: node port-upstream.mjs <upstream pi packages dir>");
@@ -27,6 +28,7 @@ const redirects = new Map();
 const bare = {
 	"get-east-asian-width": "vendor/east-asian-width.mjs",
 	marked: "vendor/marked.mjs",
+	"marked-cjk-friendly": "vendor/marked-cjk-friendly.mjs",
 	"partial-json": "vendor/partial-json.mjs",
 	chalk: "vendor/chalk.mjs",
 	yaml: "vendor/yaml.mjs",
@@ -39,6 +41,11 @@ const bare = {
 	"@earendil-works/pi-ai/compat": "pi-ai.mjs",
 	"@earendil-works/pi-tui": "pi-tui.mjs",
 	"@earendil-works/pi-agent-core": "pi-agent-core.mjs",
+	// pi-schema and pi-telemetry are ported from their own packages (MIT); extensions do not get them as virtual modules,
+	// as upstream's getAliases does not alias them.
+	"@earendil-works/pi-schema": "schema/index.mjs",
+	"@earendil-works/pi-schema/formats": "schema/formats/index.mjs",
+	"@earendil-works/pi-telemetry": "telemetry/index.mjs",
 };
 const builtins = new Set(["fs", "os", "path", "url", "module", "events", "child_process", "crypto", "util", "stream", "readline", "process", "buffer", "tty", "worker_threads", "perf_hooks", "fs/promises", "assert", "string_decoder", "timers", "timers/promises"]);
 
@@ -96,6 +103,8 @@ function run(entries, options = {}) {
 			if (!src.includes(from)) throw new Error(`patch not found in ${rel}: ${from.slice(0, 80)}`);
 			src = src.split(from).join(to);
 		}
+		// The transform drops comments; a leading license block (pi-schema's TypeBox-derived formats) is kept.
+		const license = /^\/\*[\s\S]*?\*\//.exec(src)?.[0];
 		let code = stripTypeScriptTypes(src, { mode: "transform", sourceMap: false });
 		code = code.replace(/(^(?:import|export)\b[^;'"]*?\bfrom\s*|^import\s*|\bimport\(\s*)(["'])([^"'\n]+)\2/gm, (whole, pre, q, spec) => {
 			let target;
@@ -129,7 +138,7 @@ function run(entries, options = {}) {
 		const header = `// Pi ${COMMIT} (MIT): packages/${rel}.\n// Ported to plain ESM for the PiSharp Node extension bridge (TypeScript types stripped mechanically; behaviour unchanged${patches.has(rel) || appends.has(rel) ? " except for the marked PiSharp adaptations" : ""}).\n`;
 		const dest = path.join(OUT, out);
 		fs.mkdirSync(path.dirname(dest), { recursive: true });
-		fs.writeFileSync(dest, header + code);
+		fs.writeFileSync(dest, header + (license && /\bLicen[cs]e\b/i.test(license) ? `${license}\n` : "") + code);
 		written.push(out);
 	}
 	return { written, unresolved };
@@ -190,11 +199,17 @@ const patchConfig = {
 	"ai/src/api/bedrock-converse-stream.lazy.ts": [
 		['(await importNodeOnlyApi("./bedrock-converse-stream.ts"))', '(await import("./bedrock-converse-stream.ts"))'],
 	],
+	"agent/src/agent-loop.ts": [
+		[
+			"export const DEFAULT_AGENT_IDENTITY: ClientIdentity = { attribution: PI_ATTRIBUTION };",
+			"// PiSharp: no default attribution. Upstream attributes agent requests to pi ({ attribution: PI_ATTRIBUTION }); PiSharp\n// must not report as Pi, and the owner has not chosen an attribution (core.client-identity-attribution).\nexport const DEFAULT_AGENT_IDENTITY: ClientIdentity = {};",
+		],
+	],
 	"coding-agent/src/config.ts": [
-		["let pkg: PackageJson = {};", 'let pkg: PackageJson = { name: "@earendil-works/pi-coding-agent", version: "1.2.0" };'],
+		["let pkg: PackageJson = {};", 'let pkg: PackageJson = { name: "@earendil-works/pi-coding-agent", version: "1.5.0" };'],
 		[
 			'try {\n\tconst packageJsonPath = getPackageJsonPath();\n\tpkg = JSON.parse(stripBom(readFileSync(packageJsonPath, "utf-8"))) as PackageJson;\n\tstartupPackageJsonPath = packageJsonPath;\n} catch (e: unknown) {\n\tconst err = e as NodeJS.ErrnoException;\n\tif (err.code !== "ENOENT") throw e;\n}',
-			"// PiSharp: the Node bridge ships no Pi package.json; it identifies as the ported Pi 1.2.0.\nstartupPackageJsonPath = undefined;",
+			"// PiSharp: the Node bridge ships no Pi package.json; it identifies as the ported Pi 1.5.0.\nstartupPackageJsonPath = undefined;",
 		],
 	],
 	"coding-agent/src/modes/interactive/theme/theme.ts": [
@@ -223,6 +238,8 @@ const patchConfig = {
 };
 
 const appendConfig = {
+	"agent/src/agent-loop.ts": `// PiSharp adaptation: DEFAULT_AGENT_IDENTITY sends no attribution (upstream: { attribution: PI_ATTRIBUTION }). PiSharp must
+// not report as Pi, and the owner has not chosen an attribution (core.client-identity-attribution).`,
 	"ai/src/compat.ts": `// ---------------------------------------------------------------------------------------------
 // PiSharp adaptations: builtin API providers are host-backed. Calling stream/complete for them without
 // the host bridge hook throws "<name> is not available in the PiSharp Node bridge".
@@ -269,6 +286,10 @@ const result = run(
 		["tui/src/index.ts", "pi-tui.mjs"],
 		["ai/src/index.ts", "ai/index.mjs"],
 		["ai/src/compat.ts", "pi-ai.mjs"],
+		["coding-agent/src/core/extensions/pi-ai-extension-view.ts", "pi-ai-extension-view.mjs"],
+		["schema/src/index.ts"],
+		["schema/src/formats/index.ts"],
+		["telemetry/src/index.ts"],
 		["agent/src/index.ts", "pi-agent-core.mjs"],
 		["coding-agent/src/modes/interactive/theme/theme.ts", "theme.mjs"],
 		["coding-agent/src/modes/interactive/theme/theme-schema.ts"],

@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/src/core/session-manager.ts.
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/coding-agent/src/core/session-manager.ts.
 // Ported to plain ESM for the PiSharp Node extension bridge (TypeScript types stripped mechanically; behaviour unchanged).
 import { getCurrentSystemMessage, uuidv7 } from "../../pi-ai.mjs";
 import { randomUUID } from "crypto";
@@ -220,8 +220,6 @@ export function buildContextEntries(entries, leafId, byId) {
     contextEntries.push(...path.slice(compactionIdx + 1));
     return contextEntries;
 }
-/** Project one entry into model-visible messages, applying its latest context edit if any. */
-// Pi 1.5.0 exports it for branch summarization (prepareBranchEntries).
 export function projectContextEntry(entry, edit) {
     const messages = sessionEntryToContextMessages(entry);
     if (!edit) return messages;
@@ -722,7 +720,6 @@ export class SessionManager {
         }
     }
     _appendEntry(entry) {
-        // Pi 1.5.0: a failed write (ENOSPC, EBUSY, ETIMEDOUT) rolls the entry back.
         const previousLeafId = this.leafId;
         this.fileEntries.push(entry);
         this.byId.set(entry.id, entry);
@@ -730,8 +727,6 @@ export class SessionManager {
         try {
             this._persist(entry);
         } catch (error) {
-            // Keep memory in line with the file: an entry that was not written must not become the
-            // parent of later entries, or the file would hold entries pointing to a missing parent.
             this.fileEntries.pop();
             this.byId.delete(entry.id);
             this.leafId = previousLeafId;
@@ -1213,8 +1208,6 @@ export class SessionManager {
             cwd: resolvedTargetCwd,
             parentSession: resolvedSourcePath
         };
-        // Pi 1.5.0: write the header and all non-header entries through one fd.
-        // Reopening the file per entry is slow where open/close is expensive (e.g. filesystem security monitors).
         const fd = openSync(newSessionFile, "wx");
         try {
             writeFileSync(fd, `${JSON.stringify(newHeader)}\n`);
@@ -1223,7 +1216,7 @@ export class SessionManager {
                     writeFileSync(fd, `${JSON.stringify(entry)}\n`);
                 }
             }
-        } finally {
+        } finally{
             closeSync(fd);
         }
         return new SessionManager(resolvedTargetCwd, dir, newSessionFile, true);

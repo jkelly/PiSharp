@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/agent/src/agent.ts.
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/agent/src/agent.ts.
 // Ported to plain ESM for the PiSharp Node extension bridge (TypeScript types stripped mechanically; behaviour unchanged).
 import { createInitialSystemMessage, getCurrentSystemMessage, getCurrentSystemPrompt, toToolDeclaration } from "../pi-ai.mjs";
 import { runAgentLoop, runAgentLoopContinue } from "./agent-loop.mjs";
@@ -118,6 +118,7 @@ export class Agent {
     transport;
     maxRetryDelayMs;
     toolExecution;
+    identity;
     constructor(options){
         const runtimeOptions = options ?? {};
         this._state = createMutableAgentState(runtimeOptions.initialState);
@@ -141,6 +142,7 @@ export class Agent {
         this.transport = runtimeOptions.transport ?? "auto";
         this.maxRetryDelayMs = runtimeOptions.maxRetryDelayMs;
         this.toolExecution = runtimeOptions.toolExecution ?? "parallel";
+        this.identity = runtimeOptions.identity;
     }
     subscribe(listener) {
         this.listeners.add(listener);
@@ -294,6 +296,7 @@ export class Agent {
             transport: this.transport,
             thinkingBudgets: this.thinkingBudgets,
             maxRetryDelayMs: this.maxRetryDelayMs,
+            identity: this.identity,
             toolExecution: this.toolExecution,
             beforeToolCall: this.beforeToolCall,
             afterToolCall: this.afterToolCall,

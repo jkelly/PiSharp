@@ -1,8 +1,7 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/ai/src/utils/typebox-helpers.ts.
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/ai/src/utils/string-enum.ts.
 // Ported to plain ESM for the PiSharp Node extension bridge (TypeScript types stripped mechanically; behaviour unchanged).
-import { Type } from "../../typebox.mjs";
 export function StringEnum(values, options) {
-    return Type.Unsafe({
+    return {
         type: "string",
         enum: values,
         ...options?.description && {
@@ -11,5 +10,5 @@ export function StringEnum(values, options) {
         ...options?.default && {
             default: options.default
         }
-    });
+    };
 }

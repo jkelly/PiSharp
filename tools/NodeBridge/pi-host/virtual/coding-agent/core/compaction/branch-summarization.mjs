@@ -72,7 +72,6 @@ export function prepareBranchEntries(entries, tokenBudget = 0) {
             }
         }
     }
-    // Context edits hide or replace earlier entries in model context; honor the latest edit per target.
     const edits = new Map();
     for (const entry of entries){
         if (entry.type === "context_edit") edits.set(entry.targetId, entry);

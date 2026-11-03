@@ -32,6 +32,29 @@ const RE = {
 	text: /^([`~]+|[^`~])(?:(?= {2,}\n)|(?=[a-zA-Z0-9.!#$%&'*+/=?_`{|}~-]+@)|[\s\S]*?(?:(?=[\\<![`*_~]|\b_|https?:\/\/|ftp:\/\/|www\.|$)|[^ ](?= {2,}\n)|[^a-zA-Z0-9.!#$%&'*+/=?_`{|}~-](?=[a-zA-Z0-9.!#$%&'*+/=?_`{|}~-]+@)))/,
 };
 
+// marked 18's GFM inline rules for emphasis, which tokenizer overrides read as `this.rules` (marked-cjk-friendly's emStrong
+// does), and the masks its lexer applies to the inline source it passes them as `maskedSrc`.
+const EM_STRONG_R_DELIM_AST =
+	"^[^_*]*?__[^_*]*?\\*[^_*]*?(?=__)|[^*]+(?=[^*])|(?!\\*)punct(\\*+)(?=[\\s]|$)|notPunctSpace(\\*+)(?!\\*)(?=punctSpace|$)|(?!\\*)punctSpace(\\*+)(?=notPunctSpace)|[\\s](\\*+)(?!\\*)(?=punct)|(?!\\*)punct(\\*+)(?!\\*)(?=punct)|notPunctSpace(\\*+)(?=notPunctSpace)";
+const EM_STRONG_R_DELIM_UND =
+	"^[^_*]*?\\*\\*[^_*]*?_[^_*]*?(?=\\*\\*)|[^_]+(?=[^_])|(?!_)punct(_+)(?=[\\s]|$)|notPunctSpace(_+)(?!_)(?=punctSpace|$)|(?!_)punctSpace(_+)(?=notPunctSpace)|[\\s](_+)(?!_)(?=punct)|(?!_)punct(_+)(?!_)(?=punct)";
+const delimiterRule = (source, punct, punctSpace, notPunctSpace) =>
+	new RegExp(source.replace(/notPunctSpace/g, notPunctSpace).replace(/punctSpace/g, punctSpace).replace(/punct/g, punct), "gu");
+const RULES = {
+	inline: {
+		emStrongLDelim: /^(?:\*+(?:((?!\*)(?!~)[\p{P}\p{S}])|([^\s*]))?)|^_+(?:((?!_)(?!~)[\p{P}\p{S}])|([^\s_]))?/u,
+		emStrongRDelimAst: delimiterRule(EM_STRONG_R_DELIM_AST, "(?!~)[\\p{P}\\p{S}]", "(?!~)[\\s\\p{P}\\p{S}]", "(?:[^\\s\\p{P}\\p{S}]|~)"),
+		emStrongRDelimUnd: delimiterRule(EM_STRONG_R_DELIM_UND, "[\\p{P}\\p{S}]", "[\\s\\p{P}\\p{S}]", "[^\\s\\p{P}\\p{S}]"),
+		punctuation: /^((?![*_])[\s\p{P}\p{S}])/u,
+	},
+	other: { unicodeAlphaNumeric: /[\p{L}\p{N}]/u },
+};
+const MASK_ESCAPE = /\\([\p{P}\p{S}])/gu;
+const MASK_BLOCK_SKIP =
+	/\[(?:[^[\]`]|(?<a>`+)[^`]+\k<a>(?!`))*?\]\((?:\\[\s\S]|[^\\()]|\((?:\\[\s\S]|[^\\()])*\))*\)|(?<!`)(?<b>`+)[^`]+\k<b>(?!`)|<(?! )[^<>]*?>/g;
+const MASK_REFLINK =
+	/!?\[(?:\[(?:\\[\s\S]|[^[\]\\])*\]|\\[\s\S]|`[^`]*?`|[^[\]\\`])*?\]\[(?!\s*\])(?:\\[\s\S]|[^[\]\\])+\]|!?\[(?!\s*\])(?:\\[\s\S]|[^[\]\\])+\](?:\[\])?(?!\()/g;
+
 function leadingIndent(line) {
 	let width = 0;
 	for (const ch of line) {
@@ -100,6 +123,7 @@ function interruptsParagraph(line) {
 export class Tokenizer {
 	constructor(options) {
 		this.options = options || {};
+		this.rules = RULES;
 		this.lexer = undefined;
 	}
 
@@ -805,10 +829,30 @@ export class Lexer {
 		return tokens;
 	}
 
+	/** marked's masked inline source: escapes, links, code spans, HTML tags and known reference links cannot hold delimiters. */
+	maskInline(src) {
+		let masked = src;
+		const links = this.tokens.links;
+		if (links && masked.includes("[")) {
+			masked = masked.replace(MASK_REFLINK, (match) => {
+				const label = match.slice(match.lastIndexOf("[") + 1, -1);
+				return Object.hasOwn(links, label) ? `[${"a".repeat(match.length - 2)}]` : match;
+			});
+		}
+		masked = masked.replace(MASK_ESCAPE, (match) => "+".repeat(match.length));
+		return masked.replace(MASK_BLOCK_SKIP, (match) => `[${"a".repeat(match.length - 2)}]`);
+	}
+
 	inlineTokens(src, tokens = []) {
+		this.tokenizer.lexer = this;
 		const extensions = this.options.extensions;
+		const maskedSrc = this.maskInline(src);
+		// As in marked, the previous character is known only after text; it skips "_" so a run of them keeps the one before.
 		let prevChar = "";
+		let keepPrevChar = false;
 		while (src) {
+			if (!keepPrevChar) prevChar = "";
+			keepPrevChar = false;
 			let token;
 			if (
 				extensions?.inline?.some((extTokenizer) => {
@@ -821,7 +865,6 @@ export class Lexer {
 					return false;
 				})
 			) {
-				prevChar = token.raw.slice(-1);
 				continue;
 			}
 
@@ -830,7 +873,7 @@ export class Lexer {
 				this.tokenizer.tag(src) ||
 				this.tokenizer.link(src) ||
 				this.tokenizer.reflink(src, this.tokens.links) ||
-				this.tokenizer.emStrong(src, src, prevChar) ||
+				this.tokenizer.emStrong(src, maskedSrc, prevChar) ||
 				this.tokenizer.codespan(src) ||
 				this.tokenizer.br(src) ||
 				this.tokenizer.del(src) ||
@@ -845,7 +888,6 @@ export class Lexer {
 				} else {
 					tokens.push(token);
 				}
-				prevChar = token.raw.slice(-1);
 				continue;
 			}
 
@@ -861,7 +903,8 @@ export class Lexer {
 			}
 			token = this.tokenizer.inlineText(cutSrc) ?? { type: "text", raw: src[0], text: src[0], escaped: false };
 			src = src.substring(token.raw.length);
-			prevChar = token.raw.slice(-1);
+			if (token.raw.slice(-1) !== "_") prevChar = token.raw.slice(-1);
+			keepPrevChar = true;
 			const lastToken = tokens.at(-1);
 			if (lastToken?.type === "text") {
 				lastToken.raw += token.raw;
@@ -906,7 +949,23 @@ export class Marked {
 				}
 				if (ext.renderer) extensions.renderers[ext.name] = ext.renderer;
 			}
-			const { extensions: _ignored, ...rest } = pack;
+			const { extensions: _ignored, tokenizer: overrides, ...rest } = pack;
+			if (overrides) {
+				// As in marked: each method overrides the tokenizer's own, which still runs when the override returns false.
+				const tokenizer = this.defaults.tokenizer || new Tokenizer(this.defaults);
+				for (const prop in overrides) {
+					if (!(prop in tokenizer)) throw new Error(`tokenizer '${prop}' does not exist`);
+					if (["options", "rules", "lexer"].includes(prop)) continue;
+					const override = overrides[prop];
+					const previous = tokenizer[prop];
+					tokenizer[prop] = (...params) => {
+						let ret = override.apply(tokenizer, params);
+						if (ret === false) ret = previous.apply(tokenizer, params);
+						return ret;
+					};
+				}
+				rest.tokenizer = tokenizer;
+			}
 			this.defaults = { ...this.defaults, ...rest };
 		}
 		this.defaults.extensions = extensions;

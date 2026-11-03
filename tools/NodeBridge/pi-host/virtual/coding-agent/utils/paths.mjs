@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/src/utils/paths.ts.
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/coding-agent/src/utils/paths.ts.
 // Ported to plain ESM for the PiSharp Node extension bridge (TypeScript types stripped mechanically; behaviour unchanged).
 import { realpathSync, statSync } from "node:fs";
 import { homedir } from "node:os";
@@ -30,6 +30,12 @@ export function isPathWithin(parent, child) {
     if (childKey === parentKey) return true;
     const pathSep = getPlatformPathApi().sep;
     return childKey.startsWith(parentKey.endsWith(pathSep) ? parentKey : `${parentKey}${pathSep}`);
+}
+export function shortenHomePath(path, homeDir = homedir()) {
+    const pathApi = getPlatformPathApi();
+    if (!homeDir || !pathApi.isAbsolute(path) || !isPathWithin(homeDir, path)) return path;
+    const relativePath = pathApi.relative(homeDir, path);
+    return relativePath ? `~${pathApi.sep}${relativePath}` : "~";
 }
 export function getFileRevision(path) {
     try {
