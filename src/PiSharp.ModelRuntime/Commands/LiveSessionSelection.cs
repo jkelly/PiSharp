@@ -642,7 +642,8 @@ internal sealed class LiveSessionConnection(LiveSessionSelection selection, Http
         // A thinking-off summary binds without level metadata; a summary with a level keeps the main route's thinking binding.
         var plain = summary && !thinking;
         if (ProviderRoute is { } route) return Own(route.Create(handler, maximum, summary, thinking));
-        if (model.Provider is not ("azure" or "anthropic") && !(selection.FixedRoute && RequestHeaders is null))
+        // The fixed Anthropic factory serves only provider anthropic; OpenRouter's anthropic-messages rows (pi-ai 1.5.0) take the catalog route.
+        if (model.Provider is not ("azure" or "anthropic") && !(selection.FixedRoute && RequestHeaders is null && model.Api != "anthropic-messages"))
             return Own(CreateCatalogProvider(maximum, reasoning, summary, thinking));
         if (model.Api == "mistral-conversations")
         {

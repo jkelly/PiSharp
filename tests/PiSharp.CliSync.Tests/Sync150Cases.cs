@@ -7,6 +7,7 @@ using PiSharp.Contracts;
 
 // The production live route over the @earendil-works/pi-ai@1.5.0 catalog shards, authored from Pi v1.5.0
 // (f9a26365568127461c47a07a37dcb42c140a3ac5) by reading: packages/ai/src/providers/kimi-coding.ts (openai-completions at /coding/v1),
+// providers/openrouter.ts (anthropic-messages for the openrouter.json Anthropic rows),
 // providers/opencode-go.ts (google-generative-ai, wrapped by withOpenCodeSessionHeader), api/anthropic-messages.ts (buildParams
 // thinkingDisabled/effortMessages, dc939913f) and the minimax.json effort map. Fake endpoints only; nothing is an upstream capture.
 internal static partial class Program
@@ -17,6 +18,7 @@ internal static partial class Program
         ("sync150.opencode-go-google-route-carries-x-opencode-session", Sync150OpenCodeGoGoogleLive),
         ("sync150.minimax-m3.1-flash-sends-output-config-effort", Sync150MiniMaxFlashLive),
         ("sync150.claude-opus-5-off-sends-disabled-thinking-live", Sync150OpusOffLive),
+        ("sync150.openrouter-anthropic-latest-alias-speaks-messages", Sync150OpenRouterLatestLive),
     ];
 
     private static HttpResponseMessage Sync150Capture() => new(HttpStatusCode.BadRequest)
@@ -89,6 +91,20 @@ internal static partial class Program
         var body = JsonDocument.Parse(sent.Body!).RootElement;
         Equal("""{"type":"adaptive","display":"summarized"}""", body.GetProperty("thinking").GetRawText(), "adaptive thinking");
         Equal("""{"effort":"xhigh"}""", body.GetProperty("output_config").GetRawText(), "effort");
+    });
+
+    // ~anthropic/claude-haiku-latest is an anthropic-messages row at https://openrouter.ai/api in the 1.5.0 openrouter.json; its map's
+    // "off": "none" is never sent as an effort, so the route opens and a level goes out as adaptive thinking with output_config.effort.
+    private static Task Sync150OpenRouterLatestLive() => WithLiveRoot("live-openrouter-latest", async root =>
+    {
+        var endpoint = new LiveEndpoint(_ => Sync150Capture());
+        var requests = await Sync150Prompt(root, "router", "openrouter", "~anthropic/claude-haiku-latest", new(Env(("OPENROUTER_API_KEY", "router-key")), () => endpoint),
+            async rpc => await rpc.Command("high", new { type = "set_thinking_level", level = "high" }));
+        Equal("https://openrouter.ai/api/v1/messages?beta=true", requests[0].Url, "Messages URL");
+        var body = JsonDocument.Parse(requests[0].Body!).RootElement;
+        Equal("~anthropic/claude-haiku-latest", body.GetProperty("model").GetString(), "model");
+        Equal("adaptive", body.GetProperty("thinking").GetProperty("type").GetString(), "adaptive thinking");
+        Equal("""{"effort":"high"}""", body.GetProperty("output_config").GetRawText(), "effort");
     });
 
     // claude-opus-5 offers off at pi-ai 1.5.0: "off" sends disabled thinking without effort or markers and records no level, the summary
