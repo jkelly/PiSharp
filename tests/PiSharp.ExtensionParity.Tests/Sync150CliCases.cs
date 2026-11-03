@@ -6,7 +6,8 @@ using PiSharp.Cli.Pi;
 // Pi 1.5.0 (authored from the v1.5.0 sources, f9a26365568127461c47a07a37dcb42c140a3ac5): core/package-manager.ts (getNpmInstallArgs,
 // getGitDependencyInstallArgs and uninstallNpm add --no-audit --no-fund wherever npm gets --legacy-peer-deps), config.ts and
 // package-manager-cli.ts (the configured self-update command: getConfiguredSelfUpdateArgv, makeConfiguredSelfUpdateCommand,
-// getSelfUpdatePlan, runConfiguredSelfUpdate, readVersionOnPath, printSelfUpdateUnavailable).
+// getSelfUpdatePlan, runConfiguredSelfUpdate, readVersionOnPath, printSelfUpdateUnavailable), and package-manager.ts with pi-manifest.ts
+// and source-info.ts for package changelogs (resolvePackageChangelogPath, hasManifestResourceFields, changelogPath).
 // Expectations are written from the sources by reading, never captured from an upstream run.
 internal static partial class Program
 {
@@ -14,6 +15,7 @@ internal static partial class Program
     [
         ("sync150.package-npm-skips-audit-and-fund-advice", PackageNpmNoAuditFund),
         ("sync150.self-update-runs-the-configured-command", SelfUpdateConfiguredCommand),
+        ("sync150.package-changelog-path-stays-inside-the-package", PackageChangelogPath),
     ];
 
     // npm audit fix would run without --legacy-peer-deps and install a second copy of pi's peers into the package directory, so every npm
@@ -43,6 +45,56 @@ internal static partial class Program
         processes = new FakeProcesses();
         await Manager(sandbox, J("""{"npmCommand":["pnpm"]}"""), processes: processes).RemoveAsync("npm:audit-pkg");
         Check(processes.Ran("pnpm", ["uninstall", "audit-pkg", "--prefix", npmRoot]), "pnpm uninstall: " + string.Join(" | ", processes.Runs.Select(run => string.Join(' ', run.Args))));
+    }
+
+    // package-manager.ts resolvePackageChangelogPath and hasManifestResourceFields (#8790), pi-manifest.ts changelogPath, source-info.ts
+    // createSourceInfo: pi.changelogPath (a string), else CHANGELOG.md, counts only as an existing file inside the package; an empty
+    // value turns it off. A pi object with only metadata keeps directory auto-discovery.
+    private static async Task PackageChangelogPath()
+    {
+        using var sandbox = new Sandbox("pkg-changelog-path");
+        string Package(string name, string? manifest, params string[] files)
+        {
+            var root = Path.Combine(sandbox.Root, "packages", name);
+            sandbox.Write(Path.Combine(root, "extensions", "index.ts"), "export default function() {}");
+            sandbox.Write(Path.Combine(root, "package.json"), "{\"name\":\"" + name + "\",\"version\":\"1.0.0\"" + (manifest is null ? "" : ",\"pi\":" + manifest) + "}");
+            foreach (var file in files) sandbox.Write(Path.Combine(root, file), "## [1.0.0]\n\n- first\n");
+            return root;
+        }
+        var outside = sandbox.Write(Path.Combine(sandbox.Root, "packages", "outside.md"), "## [1.0.0]\n");
+        var roots = new Dictionary<string, string>
+        {
+            ["default"] = Package("default", null, "CHANGELOG.md"),
+            ["custom"] = Package("custom", """{"changelogPath":"./docs/CHANGELOG.md"}""", "docs/CHANGELOG.md", "CHANGELOG.md"),
+            ["escape"] = Package("escape", """{"changelogPath":"../outside.md"}""", "CHANGELOG.md"),
+            ["off"] = Package("off", """{"changelogPath":""}""", "CHANGELOG.md"),
+            ["directory"] = Package("directory", """{"changelogPath":"docs"}""", "docs/notes.md"),
+            ["missing"] = Package("missing", """{"changelogPath":"missing.md"}""", "CHANGELOG.md"),
+            ["number"] = Package("number", """{"changelogPath":7}""", "CHANGELOG.md"),
+            ["none"] = Package("none", null),
+        };
+        var settings = new JsonObject { ["packages"] = new JsonArray([.. roots.Values.Select(root => (JsonNode)root)]) };
+        var resolved = await Manager(sandbox, settings).ResolveAsync();
+        PiResolvedResource Extension(string name) => resolved.Extensions.Single(resource =>
+            resource.Path == Path.Combine(roots[name], "extensions", "index.ts"));
+        Equal(Path.Combine(roots["default"], "CHANGELOG.md"), Extension("default").Metadata.ChangelogPath, "CHANGELOG.md by default");
+        Equal("package", Extension("default").Metadata.Origin, "package origin");
+        Equal(Path.Combine(roots["custom"], "docs", "CHANGELOG.md"), Extension("custom").Metadata.ChangelogPath, "pi.changelogPath");
+        Equal(null, Extension("escape").Metadata.ChangelogPath, "outside the package");
+        Equal(null, Extension("off").Metadata.ChangelogPath, "empty turns it off");
+        Equal(null, Extension("directory").Metadata.ChangelogPath, "a directory");
+        Equal(null, Extension("missing").Metadata.ChangelogPath, "a missing file has no CHANGELOG.md fallback");
+        Equal(Path.Combine(roots["number"], "CHANGELOG.md"), Extension("number").Metadata.ChangelogPath, "a non-string changelogPath is ignored");
+        Equal(null, Extension("none").Metadata.ChangelogPath, "no changelog");
+        Check(File.Exists(outside), "the outside file exists");
+        // The metadata-only pi object still auto-discovers extensions/ (every package above loaded its index.ts).
+        Equal(roots.Count, resolved.Extensions.Count(resource => resource.Path.EndsWith(Path.Combine("extensions", "index.ts"), StringComparison.Ordinal)),
+            "auto-discovered extensions");
+
+        var source = new PiSharp.Cli.Extensions.Pi.PiExtensionSource(Extension("custom").Path, "user", roots["custom"], "package", roots["custom"],
+            Extension("custom").Metadata.ChangelogPath);
+        Equal(Path.Combine(roots["custom"], "docs", "CHANGELOG.md"), (string?)source.SourceInfo()["changelogPath"], "sourceInfo changelogPath");
+        Check(!new PiSharp.Cli.Extensions.Pi.PiExtensionSource("x.ts", "user", "local").SourceInfo().ContainsKey("changelogPath"), "no changelogPath key");
     }
 
     // getConfiguredSelfUpdateArgv: PI_SELF_UPDATE_COMMAND (split on whitespace) wins over the global selfUpdateCommand argv; a project

@@ -84,6 +84,8 @@ internal sealed record InteractiveModeContext
     public Func<string, MessageRenderer?>? GetMessageRenderer { get; init; }
     public Func<IReadOnlyDictionary<string, IReadOnlyList<string>>, IReadOnlyList<ExtensionShortcut>>? GetExtensionShortcuts { get; init; }
     public Func<IReadOnlyList<LoadedResource>>? GetLoadedExtensions { get; init; }
+    /// <summary>Pi 1.5.0: the loaded extensions' sourceInfo, for the extension package changelogs shown at startup.</summary>
+    public Func<IReadOnlyList<JsonObject>>? GetExtensionSourceInfos { get; init; }
     public Func<ResourceDiagnostics>? GetResourceDiagnostics { get; init; }
 
     // Cache statistics

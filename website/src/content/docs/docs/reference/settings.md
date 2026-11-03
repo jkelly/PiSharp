@@ -122,8 +122,9 @@ See [Sessions](/docs/guides/sessions/) for compaction and branch summaries.
 | `fullscreenCopyOnSelect` | boolean | `true` | Copies a mouse selection in fullscreen mode. |
 | `fullscreenWheelScrollLines` | number 1 to 100, or `auto` | `auto` | Lines per mouse wheel step in fullscreen mode. |
 | `quietStartup` | boolean or `"header"` | `false` | `true` hides the startup output; `"header"` keeps only the header. `--verbose` wins. |
-| `collapseChangelog` | boolean | `false` | Shows a short changelog after an update. `/changelog` shows the whole one. |
+| `collapseChangelog` | boolean | `false` | Shows a short changelog after an update. `/changelog` shows the whole one. It also shortens extension package changelogs to one line per package. |
 | `lastChangelogVersion` | string | none | Written by PiSharp: the last version whose changelog you saw. |
+| `extensionChangelogVersions` | object | none | Written by PiSharp: the last changelog version you saw of each extension package. See [Packages](/docs/extensions/packages/#show-a-changelog). |
 | `hideThinkingBlock` | boolean | `false` | Hides thinking blocks. `Ctrl+T` toggles them. |
 | `showCacheMissNotices` | boolean | `false` | Shows prompt cache cost and provider recovery notices. |
 | `externalEditor` | string | none | Command `Ctrl+G` opens. Wins over `VISUAL` and `EDITOR`. Without any of them PiSharp uses `notepad` on Windows and `nano` elsewhere. |

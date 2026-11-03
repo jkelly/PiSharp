@@ -28,6 +28,8 @@ internal interface IInteractiveExtensionHost
     bool HasMarkdownTransformers { get; }
     string TransformMarkdown(string markdown, JsonObject context);
     IReadOnlyList<LoadedResource> LoadedExtensions();
+    /// <summary>Each loaded extension's sourceInfo (path, source, scope, origin, baseDir, changelogPath), in load order.</summary>
+    IReadOnlyList<JsonObject> ExtensionSourceInfos() => [];
     IReadOnlyList<ResourceDiagnostic> Diagnostics();
     /// <summary>ctx.ui.setEditorComponent: the extension editor with this component id (null when the host has none). Its events run
     /// through <paramref name="post"/> on the mode's loop; <paramref name="action"/> resolves the mode's app actions by name.</summary>
@@ -121,6 +123,8 @@ internal sealed class PiInteractiveExtensionHost(PiExtensionHost host) : IIntera
     }
 
     public IReadOnlyList<LoadedResource> LoadedExtensions() => [.. host.Extensions.Select(extension => new LoadedResource(extension.Path, null))];
+
+    public IReadOnlyList<JsonObject> ExtensionSourceInfos() => [.. host.Extensions.Select(host.SourceInfoOf)];
 
     public IReadOnlyList<ResourceDiagnostic> Diagnostics() => [.. host.Errors.Select(error => new ResourceDiagnostic("error", error.Error, error.Path)),
         .. host.PackageWarnings.Select(warning => new ResourceDiagnostic("warning", warning.Warning, warning.Path))];

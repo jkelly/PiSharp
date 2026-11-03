@@ -7,6 +7,8 @@ using PiSharp.Cli.Interactive.Mode;
 using PiSharp.Cli.Interactive.Mode.Components;
 using PiSharp.Tui.Pi;
 using static Expect;
+using ExtensionChangelog = PiSharp.Cli.Interactive.Mode.Utilities.ExtensionChangelog;
+using ExtensionChangelogUpdate = PiSharp.Cli.Interactive.Mode.Utilities.ExtensionChangelogUpdate;
 
 internal static class Sync150CliCases
 {
@@ -787,6 +789,95 @@ internal static class Sync150CliCases
             Equal("radius", settings.SessionShareDestination, "saved value");
             Equal("auto", new InteractiveSettings(new JsonObject()).SessionShareDestination, "default");
         }));
+        // interactive-mode.ts getExtensionChangelogUpdates (#8790), as interactive-mode-extension-changelog.test.ts drives it: the first
+        // launch records the package version, a later one shows the newer entries headed by the package name once per package, resumed
+        // sessions and packages without a changelog show nothing.
+        yield return ("sync150.extension-changelog-updates", Sync(() =>
+        {
+            var root = Path.Combine(Path.GetTempPath(), "pisharp-ext-changelog-" + Guid.NewGuid().ToString("N")[..8]);
+            var packageRoot = Path.Combine(root, "pkg");
+            Directory.CreateDirectory(packageRoot);
+            try
+            {
+                File.WriteAllText(Path.Combine(packageRoot, "CHANGELOG.md"),
+                    "# Changelog\n\n## [Unreleased]\n\n- Not released yet\n\n## [1.2.0]\n\n- Added feature B\n\n## [1.1.0]\n\n- Added feature A\n\n## [1.0.0]\n\n- Initial release\n");
+                void WritePackage(string version) => File.WriteAllText(Path.Combine(packageRoot, "package.json"),
+                    "{\"name\":\"pi-demo-extension\",\"version\":\"" + version + "\"}");
+                JsonObject Info(string origin = "package", bool changelog = true, string file = "a.ts")
+                {
+                    var info = new JsonObject { ["path"] = Path.Combine(packageRoot, file), ["source"] = "npm:pi-demo-extension", ["scope"] = "user",
+                        ["origin"] = origin, ["baseDir"] = packageRoot };
+                    if (changelog) info["changelogPath"] = Path.Combine(packageRoot, "CHANGELOG.md");
+                    return info;
+                }
+                var key = PiSharp.Cli.Extensions.Pi.PiSourceInfo.PackageKey("npm:pi-demo-extension", "user");
+                Equal("{\"source\":\"npm:pi-demo-extension\",\"scope\":\"user\"}", key, "getSourcePackageKey");
+                var settings = new InteractiveSettings(new JsonObject());
+                // Two extensions from the same package produce one section.
+                IReadOnlyList<ExtensionChangelogUpdate> Display(int messages = 0) => ExtensionChangelog.GetUpdates(messages, [Info(), Info(file: "b.ts")], settings);
+
+                WritePackage("1.0.0");
+                Equal(0, Display().Count, "first launch shows nothing");
+                Equal("1.0.0", settings.GetExtensionChangelogVersion(key), "first launch records the version");
+
+                WritePackage("1.2.0");
+                Equal(0, Display(messages: 1).Count, "resumed session");
+                Equal("1.0.0", settings.GetExtensionChangelogVersion(key), "resumed session records nothing");
+                var update = Display().Single();
+                Equal(new ExtensionChangelogUpdate("pi-demo-extension", "1.2.0",
+                    "## pi-demo-extension [1.2.0]\n\n- Added feature B\n\n## pi-demo-extension [1.1.0]\n\n- Added feature A"), update, "update");
+                Equal("1.2.0", settings.GetExtensionChangelogVersion(key), "version recorded");
+                Equal(0, Display().Count, "shown once");
+                var stored = settings.Snapshot["extensionChangelogVersions"]!.AsObject();
+                Check(stored.Count == 1 && (string?)stored[key] == "1.2.0", "global setting: " + stored.ToJsonString());
+
+                var fresh = new InteractiveSettings(new JsonObject());
+                Equal(0, ExtensionChangelog.GetUpdates(0, [Info(origin: "top-level")], fresh).Count, "not a package");
+                Equal(0, ExtensionChangelog.GetUpdates(0, [Info(changelog: false)], fresh).Count, "no changelog");
+                Equal<string?>(null, fresh.GetExtensionChangelogVersion(key), "nothing recorded");
+                // A nameless package is named by its source.
+                File.WriteAllText(Path.Combine(packageRoot, "package.json"), "﻿{\"version\":\"1.2.0\"}");
+                fresh.SetExtensionChangelogVersion(key, "1.1.0");
+                Equal("npm:pi-demo-extension", ExtensionChangelog.GetUpdates(0, [Info()], fresh).Single().Name, "source as the name");
+            }
+            finally { Directory.Delete(root, true); }
+        }));
+
+        // interactive-mode.ts showStartupNoticesIfNeeded: "Extension Updates" after What's New, one line per package when collapsed.
+        yield return ("sync150.extension-changelog-startup-notice", async () =>
+        {
+            foreach (var collapse in new[] { false, true })
+            {
+                await using var pi = new InteractiveHarness("sync150-extension-changelog-" + (collapse ? "collapsed" : "full"), rows: 40);
+                var packageRoot = Path.Combine(pi.Root, "pkg");
+                pi.Write(Path.Combine(packageRoot, "package.json"), "{\"name\":\"pi-demo-extension\",\"version\":\"1.2.0\"}");
+                var changelog = pi.Write(Path.Combine(packageRoot, "CHANGELOG.md"), "# Changelog\n\n## [1.2.0]\n\n- Added feature B\n\n## [1.0.0]\n\n- Initial release\n");
+                var key = PiSharp.Cli.Extensions.Pi.PiSourceInfo.PackageKey("npm:pi-demo-extension", "user");
+                pi.Write(Path.Combine(pi.AgentDir, "settings.json"), new JsonObject
+                {
+                    ["lastChangelogVersion"] = "1.1.0.2", ["collapseChangelog"] = collapse, ["extensionChangelogVersions"] = new JsonObject { [key] = "1.0.0" }
+                }.ToJsonString());
+                var info = new JsonObject { ["path"] = Path.Combine(packageRoot, "index.ts"), ["source"] = "npm:pi-demo-extension", ["scope"] = "user",
+                    ["origin"] = "package", ["baseDir"] = packageRoot, ["changelogPath"] = changelog };
+                pi.Configure = context => context with { GetExtensionSourceInfos = () => [info] };
+                pi.Start("--provider", "anthropic", "--model", "claude-sonnet-4-5", "--tui-mode", "regular");
+                if (collapse)
+                {
+                    var screen = await pi.WaitFor("Updated pi-demo-extension to v1.2.0.");
+                    Check(!screen.Contains("Extension Updates", StringComparison.Ordinal), "collapsed has no heading: " + screen);
+                }
+                else
+                {
+                    var screen = await pi.WaitFor("Extension Updates");
+                    Contains(screen, "pi-demo-extension [1.2.0]", "package heading");
+                    Contains(screen, "Added feature B", "new entry");
+                    Check(!screen.Contains("Initial release", StringComparison.Ordinal), "old entry hidden: " + screen);
+                }
+                Equal(0, await pi.Quit(), "exit code");
+                var saved = JsonNode.Parse(File.ReadAllText(Path.Combine(pi.AgentDir, "settings.json")))!;
+                Equal("1.2.0", (string?)saved["extensionChangelogVersions"]?[key], "recorded version");
+            }
+        });
     }
 
     /// <summary>A model runtime with a fixed available snapshot and no refresh errors.</summary>

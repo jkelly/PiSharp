@@ -178,6 +178,10 @@ internal sealed class InteractiveSettings
     // ---------------------------------------------------------------- settings
     public string? LastChangelogVersion => Str(Get("lastChangelogVersion"));
     public void SetLastChangelogVersion(string version) => Set("lastChangelogVersion", version);
+    /// <summary>Pi 1.5.0 getExtensionChangelogVersion: the last seen changelog version of an extension package (getSourcePackageKey).</summary>
+    public string? GetExtensionChangelogVersion(string key) => Str(Get("extensionChangelogVersions", key));
+    /// <summary>Pi 1.5.0 setExtensionChangelogVersion (global settings, the one key marked modified).</summary>
+    public void SetExtensionChangelogVersion(string key, string version) => SetNested("extensionChangelogVersions", key, version);
     public string? DefaultProvider => Str(Get("defaultProvider"));
     public string? DefaultModel => Str(Get("defaultModel"));
     public void SetDefaultModelAndProvider(string provider, string modelId)

@@ -107,6 +107,7 @@ internal sealed partial class InteractiveMode
 
     private long lastSigintTime, lastEscapeTime;
     private string? changelogMarkdown;
+    private IReadOnlyList<ExtensionChangelogUpdate> extensionChangelogUpdates = [];
     private bool startupNoticesShown, anthropicSubscriptionWarningShown;
 
     private Spacer? lastStatusSpacer;
@@ -213,22 +214,41 @@ internal sealed partial class InteractiveMode
     {
         if (startupNoticesShown) return;
         startupNoticesShown = true;
-        if (changelogMarkdown is null) return;
+        if (changelogMarkdown is null && extensionChangelogUpdates.Count == 0) return;
         if (chatContainer.Children.Count > 0) chatContainer.AddChild(new Spacer(1));
         chatContainer.AddChild(new DynamicBorder());
-        if (settings.CollapseChangelog)
+        if (changelogMarkdown is not null)
         {
-            var match = System.Text.RegularExpressions.Regex.Match(changelogMarkdown, @"##\s+\[?(\d+\.\d+\.\d+)\]?");
-            var latestVersion = match.Success ? match.Groups[1].Value : version;
-            var condensedText = $"Updated to v{latestVersion}. Use {theme.Bold("/changelog")} to view full changelog.";
-            chatContainer.AddChild(new Text(condensedText, 1, 0));
+            if (settings.CollapseChangelog)
+            {
+                var match = System.Text.RegularExpressions.Regex.Match(changelogMarkdown, @"##\s+\[?(\d+\.\d+\.\d+)\]?");
+                var latestVersion = match.Success ? match.Groups[1].Value : version;
+                var condensedText = $"Updated to v{latestVersion}. Use {theme.Bold("/changelog")} to view full changelog.";
+                chatContainer.AddChild(new Text(condensedText, 1, 0));
+            }
+            else
+            {
+                chatContainer.AddChild(new ThemedText(() => theme.Bold(theme.Fg("accent", "What's New")), 1, 0));
+                chatContainer.AddChild(new Spacer(1));
+                chatContainer.AddChild(new Markdown(TextUtils.JsTrim(changelogMarkdown), 1, 0, GetMarkdownThemeWithSettings()));
+                chatContainer.AddChild(new Spacer(1));
+            }
         }
-        else
+        // Pi 1.5.0: extension package changelogs after PiSharp's own, one line per package when collapsed.
+        if (extensionChangelogUpdates.Count > 0)
         {
-            chatContainer.AddChild(new ThemedText(() => theme.Bold(theme.Fg("accent", "What's New")), 1, 0));
-            chatContainer.AddChild(new Spacer(1));
-            chatContainer.AddChild(new Markdown(TextUtils.JsTrim(changelogMarkdown), 1, 0, GetMarkdownThemeWithSettings()));
-            chatContainer.AddChild(new Spacer(1));
+            if (changelogMarkdown is not null) chatContainer.AddChild(new Spacer(1));
+            if (settings.CollapseChangelog)
+            {
+                chatContainer.AddChild(new Text(string.Join("\n", extensionChangelogUpdates.Select(update => $"Updated {update.Name} to v{update.Version}.")), 1, 0));
+            }
+            else
+            {
+                chatContainer.AddChild(new ThemedText(() => theme.Bold(theme.Fg("accent", "Extension Updates")), 1, 0));
+                chatContainer.AddChild(new Spacer(1));
+                chatContainer.AddChild(new Markdown(string.Join("\n\n", extensionChangelogUpdates.Select(update => update.Markdown)), 1, 0, GetMarkdownThemeWithSettings()));
+                chatContainer.AddChild(new Spacer(1));
+            }
         }
         chatContainer.AddChild(new DynamicBorder());
     }
@@ -290,7 +310,9 @@ internal sealed partial class InteractiveMode
     public async Task InitAsync()
     {
         if (isInitialized) return;
+        // Load changelogs (only new entries, skipped for resumed sessions).
         changelogMarkdown = GetChangelogForDisplay();
+        extensionChangelogUpdates = ExtensionChangelog.GetUpdates(state.MessageCount, context.GetExtensionSourceInfos?.Invoke() ?? [], settings);
         // Fullscreen renders on the alternate screen, so text printed to stdout here would stay in the shell after exit. Fullscreen
         // shows the notice in the header instead (Pi 1.5.0, #11508).
         if (renderer.Mode != TuiMode.Fullscreen && GetModelScopeNotice() is { } modelScopeNotice) context.ConsoleLog(modelScopeNotice);

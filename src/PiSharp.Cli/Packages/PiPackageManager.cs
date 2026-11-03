@@ -1109,6 +1109,8 @@ internal sealed class PiPackageManager
 
     private bool CollectPackageResources(string packageRoot, Accumulator accumulator, PiPackageEntry? filter, PiPathMetadata metadata)
     {
+        var manifest = PiManifest.Read(Path.Join(packageRoot, "package.json"));
+        metadata.ChangelogPath = ResolvePackageChangelogPath(packageRoot, manifest);
         if (filter is not null)
         {
             foreach (var resourceType in ResourceTypes)
@@ -1121,8 +1123,7 @@ internal sealed class PiPackageManager
             }
             return true;
         }
-        var manifest = PiManifest.Read(Path.Join(packageRoot, "package.json"));
-        if (manifest is not null)
+        if (manifest is { HasResourceFields: true })
         {
             foreach (var resourceType in ResourceTypes) AddManifestEntries(manifest.Get(resourceType), packageRoot, resourceType, accumulator.Maps[resourceType], metadata);
             return true;
@@ -1136,6 +1137,27 @@ internal sealed class PiPackageManager
             hasAnyDir = true;
         }
         return hasAnyDir;
+    }
+
+    /// <summary>Pi 1.5.0 resolvePackageChangelogPath: <c>pi.changelogPath</c>, else <c>CHANGELOG.md</c>, resolved against the package root;
+    /// only an existing file whose real path is inside the package's real root counts. An empty <c>changelogPath</c> turns it off.</summary>
+    internal static string? ResolvePackageChangelogPath(string packageRoot, PiManifest? manifest)
+    {
+        var changelogPath = manifest?.ChangelogPath ?? "CHANGELOG.md";
+        if (changelogPath.Length == 0) return null;
+        var resolvedPath = NodeResolve(packageRoot, changelogPath);
+        if (!Path.Exists(resolvedPath)) return null;
+        if (!IsPathInside(PiPaths.Canonicalize(packageRoot), PiPaths.Canonicalize(resolvedPath))) return null;
+        try { return IsFile(resolvedPath) ? resolvedPath : null; }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException) { return null; }
+    }
+
+    /// <summary>Pi 1.5.0 isPathInside: <paramref name="child"/> lies below <paramref name="parent"/> (node path.relative).</summary>
+    private static bool IsPathInside(string parent, string child)
+    {
+        var relativePath = Path.GetRelativePath(parent, child);
+        return relativePath != "." && relativePath != ".." && !relativePath.StartsWith(".." + Path.DirectorySeparatorChar, StringComparison.Ordinal) &&
+            !Path.IsPathRooted(relativePath);
     }
 
     private void CollectDefaultResources(string packageRoot, string resourceType, OrderedDictionary<string, (PiPathMetadata, bool)> target, PiPathMetadata metadata)
