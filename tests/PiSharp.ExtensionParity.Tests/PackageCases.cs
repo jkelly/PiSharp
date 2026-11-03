@@ -238,9 +238,10 @@ internal static partial class Program
             "git:git@github.com:user/repo", "ssh://git@github.com/user/repo" })
             Equal("git:github.com/user/repo", manager.GetPackageIdentity(source), "identity " + source);
         Equal("npm:@scope/pkg", manager.GetPackageIdentity("npm:@scope/pkg@1.0.0"), "npm identity");
-        Equal("local:" + Path.Join(sandbox.Cwd, "pkg"), manager.GetPackageIdentity("./pkg"), "local identity from cwd");
-        Equal("local:" + Path.Join(sandbox.AgentDir, "pkg"), manager.GetPackageIdentity("./pkg", "user"), "local identity in user scope");
-        Equal("local:" + Path.Join(sandbox.Cwd, ".pi", "pkg"), manager.GetPackageIdentity("./pkg", "project"), "local identity in project scope");
+        // Pi 1.5.0 (1be312b46): local identities are path comparison keys, lowercased on Windows.
+        Equal("local:" + PiPaths.ComparisonKey(Path.Join(sandbox.Cwd, "pkg")), manager.GetPackageIdentity("./pkg"), "local identity from cwd");
+        Equal("local:" + PiPaths.ComparisonKey(Path.Join(sandbox.AgentDir, "pkg")), manager.GetPackageIdentity("./pkg", "user"), "local identity in user scope");
+        Equal("local:" + PiPaths.ComparisonKey(Path.Join(sandbox.Cwd, ".pi", "pkg")), manager.GetPackageIdentity("./pkg", "project"), "local identity in project scope");
         Check(manager.GetPackageIdentity("git:github.com/user/repo") != manager.GetPackageIdentity("git:github.com/user/other"), "different repositories");
     }
 

@@ -1,5 +1,6 @@
 // Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/src/core/source-info.ts.
 // Ported to plain ESM for the PiSharp Node extension bridge (TypeScript types stripped mechanically; behaviour unchanged).
+import { canonicalizePath, getPathComparisonKey } from "../utils/paths.mjs";
 export const BUILTIN_PATH_PREFIX = "builtin:";
 export function getSyntheticPathSource(path) {
     if (path.startsWith(BUILTIN_PATH_PREFIX)) return "builtin";
@@ -8,6 +9,9 @@ export function getSyntheticPathSource(path) {
 }
 export function isSyntheticPath(path) {
     return path.startsWith(BUILTIN_PATH_PREFIX) || path.startsWith("<");
+}
+export function getResourcePathKey(path) {
+    return isSyntheticPath(path) ? path : getPathComparisonKey(canonicalizePath(path));
 }
 export function createSourceInfo(path, metadata) {
     return {

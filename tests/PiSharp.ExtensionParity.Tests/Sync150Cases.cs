@@ -35,6 +35,7 @@ internal static partial class Program
         ("sync150.glob-amplified-wildcards-and-globstars-answer-at-once", Sync(GlobWildcardAmplification)),
         ("sync150.trust-saved-decision-reaches-extensions", SavedTrustReachesExtensions),
         ("sync150.package-local-identity-ignores-case-on-windows", PackageLocalIdentityCasing),
+        ("sync150.bridge-skills-match-other-casing-on-windows", BridgeSkillsCasing),
     ];
 
     // package-manager.ts getSourceMatchKeyForInput, getSourceMatchKeyForSettings and getPackageIdentity (1be312b46): a local package
@@ -55,6 +56,36 @@ internal static partial class Program
         var (code, _, stderr) = await sandbox.Run("remove", Path.Combine(sandbox.Root, "localpkg"));
         Equal(windows ? 0 : 1, code, "remove with other casing; " + stderr);
         Equal(windows ? 0 : 1, JsonNode.Parse(File.ReadAllText(settingsPath))!["packages"]!.AsArray().Count, "the configured package is removed on Windows only");
+    }
+
+    // skills.ts loadSkills with source-info.ts getResourcePathKey and utils/paths.ts isPathWithin (1be312b46), through the bridge's
+    // pi-coding-agent module: with defaults off, a skill directory under the agent's skills folder written with other casing is still
+    // the user's on Windows, and the same skill listed under two casings loads once, without a name collision.
+    private static async Task BridgeSkillsCasing()
+    {
+        using var sandbox = NodeSandbox("skills-casing");
+        // The built-in compatibility modules (the bridge's ESM copies); the installed Pi runtime is the Pi 1.2.0 release.
+        sandbox.Vars["PI_OFFLINE"] = "1";
+        sandbox.Vars["PISHARP_PI_RUNTIME_DIR"] = Path.Combine(sandbox.Root, "no-runtime");
+        var skill = Path.Combine(sandbox.AgentDir, "skills", "probe");
+        sandbox.Write(Path.Combine(skill, "SKILL.md"), "---\nname: probe\ndescription: Casing probe.\n---\nBody\n");
+        var other = Path.Combine(sandbox.AgentDir.ToUpperInvariant(), "SKILLS", "probe");
+        var extension = sandbox.Write("skills-probe.ts", $$"""
+            import { appendFileSync } from "node:fs";
+            import { loadSkills } from "@earendil-works/pi-coding-agent";
+            export default function (pi: any) {
+              pi.on("session_start", () => {
+                const result = loadSkills({ cwd: process.cwd(), agentDir: {{Jstr(sandbox.AgentDir)}}, skillPaths: [{{Jstr(other)}}, {{Jstr(skill)}}], includeDefaults: false });
+                const collisions = result.diagnostics.filter((d: any) => d.type === "collision").length;
+                appendFileSync(process.cwd() + "/probe.log", JSON.stringify(["skills", result.skills.length, result.skills[0]?.sourceInfo?.scope, collisions]) + "\n");
+              });
+            }
+            """);
+        var (code, _, stderr) = await sandbox.Run([.. new[] { "-p", "--no-session", "-e", extension }, .. Model, "hi"]);
+        Equal(0, code, "exit; " + stderr);
+        var record = LogRecords(sandbox, "skills").Single().ToJsonString();
+        // Elsewhere the result depends on the filesystem's own case sensitivity.
+        if (OperatingSystem.IsWindows()) Equal("""["skills",1,"user",0]""", record, "one user skill under two casings");
     }
 
     // main.ts createRuntime and project-trust.ts (31ade0e0d, test/project-trust-saved-decision.test.ts): for a project without

@@ -5,8 +5,8 @@ import ignore from "../../vendor/ignore.mjs";
 import { basename, dirname, join, relative, resolve, sep } from "path";
 import { CONFIG_DIR_NAME, getAgentDir } from "../config.mjs";
 import { parseFrontmatter } from "../utils/frontmatter.mjs";
-import { canonicalizePath, resolvePath } from "../utils/paths.mjs";
-import { createSyntheticSourceInfo } from "./source-info.mjs";
+import { isPathWithin, resolvePath } from "../utils/paths.mjs";
+import { createSyntheticSourceInfo, getResourcePathKey } from "./source-info.mjs";
 const MAX_NAME_LENGTH = 64;
 const MAX_DESCRIPTION_LENGTH = 1024;
 const IGNORE_FILE_NAMES = [
@@ -310,7 +310,7 @@ export function loadSkills(options) {
     function addSkills(result) {
         allDiagnostics.push(...result.diagnostics);
         for (const skill of result.skills){
-            const realPath = canonicalizePath(skill.filePath);
+            const realPath = getResourcePathKey(skill.filePath);
             if (realPathSet.has(realPath)) {
                 continue;
             }
@@ -339,18 +339,10 @@ export function loadSkills(options) {
     }
     const userSkillsDir = join(resolvedAgentDir, "skills");
     const projectSkillsDir = resolve(resolvedCwd, CONFIG_DIR_NAME, "skills");
-    const isUnderPath = (target, root)=>{
-        const normalizedRoot = resolve(root);
-        if (target === normalizedRoot) {
-            return true;
-        }
-        const prefix = normalizedRoot.endsWith(sep) ? normalizedRoot : `${normalizedRoot}${sep}`;
-        return target.startsWith(prefix);
-    };
     const getSource = (resolvedPath)=>{
         if (!includeDefaults) {
-            if (isUnderPath(resolvedPath, userSkillsDir)) return "user";
-            if (isUnderPath(resolvedPath, projectSkillsDir)) return "project";
+            if (isPathWithin(userSkillsDir, resolvedPath)) return "user";
+            if (isPathWithin(projectSkillsDir, resolvedPath)) return "project";
         }
         return "path";
     };
