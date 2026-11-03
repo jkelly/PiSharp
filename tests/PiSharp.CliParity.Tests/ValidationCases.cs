@@ -77,7 +77,8 @@ internal static partial class Program
             Equal(0, code, "exit; " + stderr);
             var (text, isError) = ToolResultBlock(sandbox.Requests[1]);
             Equal(true, isError, "validation failure is an error result");
-            Equal("Validation failed for tool \"read\":\n  - path: must have required properties path\n  - limit: must be number\n\nReceived arguments:\n{\n  \"limit\": \"ten\"\n}",
+            // Pi v1.5.0: pi-schema's messages.
+            Equal("Validation failed for tool \"read\":\n  - path: missing\n  - limit: expected number, got string\n\nReceived arguments:\n{\n  \"limit\": \"ten\"\n}",
                 text, "upstream validation message");
         }),
         ("validation.mcp-tool-plain-json-schema-coerces-and-rejects-before-calling-the-server", async () =>
@@ -99,13 +100,13 @@ internal static partial class Program
             };
             var code = await PiCommand.RunAsync(["-p", "--provider", "anthropic", "--model", "claude-sonnet-4-5", "count"], host, CancellationToken.None);
             Equal(0, code, "exit; " + stderr);
-            // coerceWithJsonSchema: "5" -> 5 and "true" -> true; the unknown null property is kept (no Value.Convert for plain schemas).
+            // pi-schema coercion: "5" -> 5 and "true" -> true; the unknown null property is kept (only declared optional nulls are dropped).
             Equal("{\"n\":5,\"flag\":true,\"extra\":null}", channel.Calls.Single(), "the server received the coerced arguments");
             var (text, isError) = ToolResultBlock(sandbox.Requests[1]);
             Equal(false, isError, "coerced call succeeded: " + text);
             (text, isError) = ToolResultBlock(sandbox.Requests[2]);
             Equal(true, isError, "invalid MCP arguments are an error result");
-            Equal("Validation failed for tool \"mcp__proj__count\":\n  - n: must be integer\n\nReceived arguments:\n{\n  \"n\": \"five\"\n}", text, "upstream validation message");
+            Equal("Validation failed for tool \"mcp__proj__count\":\n  - n: expected integer, got string\n\nReceived arguments:\n{\n  \"n\": \"five\"\n}", text, "upstream validation message");
         }),
         // rpc-mode.ts "bash" -> executeBash: no command length limit of its own (the native cap was 12,000 characters); the operating
         // system's spawn limit fails as Node's spawn error, which the response carries.

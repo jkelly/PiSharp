@@ -218,12 +218,13 @@ internal static class EditDifferentialTests
         Equal(1, policy.Actions.Count); Equal(0, probe.Calls); Equal(0, operations.ReadCalls); Equal(0, operations.WriteCalls); Equal(0, queue.Snapshot.RegisteredOperations);
         try { _ = EditPlan.Create("original\n", [], "file"); throw new InvalidOperationException("Empty pure plan should reject no change."); }
         catch (EditPlanException error) { Equal(EditPlanFailure.NoChange, error.Failure); Equal("No changes made to file. The replacements produced identical content.", error.Message); }
-        // Source validateToolArguments (after prepareEditArguments) rejects these before the tool runs, with its own message.
+        // Source validateToolArguments (after prepareEditArguments) rejects these before the tool runs, with its own message (pi-schema's
+        // since Pi v1.5.0; a single edit is wrapped into an array first).
         foreach (var (text, message) in new[]
         {
-            ("{}", "Validation failed for tool \"edit\":\n  - path: must have required properties path, edits\n\nReceived arguments:\n{}"),
-            ("{\"path\":\"file\"}", "Validation failed for tool \"edit\":\n  - edits: must have required properties edits\n\nReceived arguments:\n{\n  \"path\": \"file\"\n}"),
-            ("{\"path\":\"file\",\"edits\":1}", "Validation failed for tool \"edit\":\n  - edits.0: must be object\n\nReceived arguments:\n{\n  \"path\": \"file\",\n  \"edits\": 1\n}"),
+            ("{}", "Validation failed for tool \"edit\":\n  - path: missing\n  - edits: missing\n\nReceived arguments:\n{}"),
+            ("{\"path\":\"file\"}", "Validation failed for tool \"edit\":\n  - edits: missing\n\nReceived arguments:\n{\n  \"path\": \"file\"\n}"),
+            ("{\"path\":\"file\",\"edits\":1}", "Validation failed for tool \"edit\":\n  - edits.0: expected object, got integer\n\nReceived arguments:\n{\n  \"path\": \"file\",\n  \"edits\": 1\n}"),
         })
         {
             var malformedPolicy = new Policy(target); var malformed = await Invoke(tool, JsonData.Parse(text), malformedPolicy);

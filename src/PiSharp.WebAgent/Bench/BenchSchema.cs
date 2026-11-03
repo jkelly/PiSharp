@@ -88,7 +88,10 @@ public static partial class BenchSchema
             try
             {
                 // Compiles the schema the way Pi's agent would before it runs the tool (an empty call; a missing required argument is fine).
-                _ = ToolArgumentValidation.Validate(trimmed, schema, new JsonObject());
+                // Since Pi v1.5.0 a schema pi-schema cannot compile fails every call with the compile error instead of a validation message.
+                var probe = ToolArgumentValidation.Validate(trimmed, schema, new JsonObject());
+                if (probe.ErrorMessage is { } message && !message.StartsWith("Validation failed for tool ", StringComparison.Ordinal))
+                    errors.Add("Pi's argument check cannot use this schema: " + message);
             }
             catch (Exception error) when (error is not OutOfMemoryException)
             {

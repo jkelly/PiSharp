@@ -351,14 +351,18 @@ public sealed class ToolInvoker : IFinalizedToolExecutor
                     initialView.Call.Arguments.ToString(), schema.Origin);
                 cancellationToken.ThrowIfCancellationRequested();
                 if (!validated.IsValid) return CompleteResult(ToolResult.Error(ToolFailureKind.InvalidArguments, validated.ErrorMessage!));
-                if (validated.ArgumentsJson is not { } coercedJson) return CompleteResult(Error(ToolFailureKind.InvalidArguments));
-                var coerced = JsonData.Parse(coercedJson);
-                if (!ValidArguments(coerced, cancellationToken)) return CompleteResult(Error(ToolFailureKind.InvalidArguments));
-                if (!JsonUtf16.DeepEquals(coerced.Value, initialView.Call.Arguments.Value))
+                // Arguments that coercion did not change stand as the model sent them (pi-schema returns the value it was given).
+                if (validated.Coerced)
                 {
-                    var call = initialView.Call with { Arguments = coerced };
-                    initialView = initialView with { AssistantMessage = initialView.AssistantMessage with
-                        { Content = initialView.AssistantMessage.Content.SetItem(invocation.SourceIndex, call) }, Call = call };
+                    if (validated.ArgumentsJson is not { } coercedJson) return CompleteResult(Error(ToolFailureKind.InvalidArguments));
+                    var coerced = JsonData.Parse(coercedJson);
+                    if (!ValidArguments(coerced, cancellationToken)) return CompleteResult(Error(ToolFailureKind.InvalidArguments));
+                    if (!JsonUtf16.DeepEquals(coerced.Value, initialView.Call.Arguments.Value))
+                    {
+                        var call = initialView.Call with { Arguments = coerced };
+                        initialView = initialView with { AssistantMessage = initialView.AssistantMessage with
+                            { Content = initialView.AssistantMessage.Content.SetItem(invocation.SourceIndex, call) }, Call = call };
+                    }
                 }
             }
             PreparedToolAction action;

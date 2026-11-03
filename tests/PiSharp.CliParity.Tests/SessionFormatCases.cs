@@ -162,9 +162,17 @@ internal static partial class Program
             "and rejects with an Error on failure. A tool whose declaration returns an object resolves on failure too when it returned that object; check its fields. Calls still running when the script ends are cancelled."),
     ];
 
+    /// <summary>Authored, not captured: the Pi 1.5.0 texts that replace texts of the captures, applied after the 1.2.0 ones.</summary>
+    private static readonly (string Old, string New)[] Pi150TextChanges =
+    [
+        // ai/src/utils/validation.ts: validateToolArguments reports pi-schema's errors, a missing property at its own path.
+        ("  - path: must have required properties path", "  - path: missing"),
+    ];
+
     private static string FollowPi120(string line)
     {
         foreach (var (old, replacement) in Pi120TextChanges) line = line.Replace(old, replacement, StringComparison.Ordinal);
+        foreach (var (old, replacement) in Pi150TextChanges) line = line.Replace(old, replacement, StringComparison.Ordinal);
         return line;
     }
 

@@ -460,8 +460,8 @@ internal sealed class PiNodeOwner(PiExtensionHost host, PiLoadedExtension initia
                 ? hints.Where(hint => hint.Value is JsonValue value && value.GetValueKind() is JsonValueKind.True or JsonValueKind.False)
                     .ToImmutableDictionary(hint => hint.Key, hint => hint.Value!.GetValue<bool>(), StringComparer.Ordinal) : null,
             // agent-loop prepareToolCall: the tool's prepareArguments (when it has one), then validateToolArguments against its
-            // parameters. JSON drops TypeBox 1.x's hidden "~kind" markers, so the bridge reports them in validationParameters; a
-            // schema carrying TypeBox 0.x's Kind symbol skips the JSON-schema coercion.
+            // parameters. JSON drops TypeBox 1.x's hidden "~kind" markers, so the bridge reports them in validationParameters, and
+            // the origin of a schema carrying TypeBox 0.x's Kind symbol. Since Pi v1.5.0 (pi-schema) neither changes the result.
             ValidationParameters = tool["validationParameters"] is JsonObject validation ? JsonData.Parse(validation.ToJsonString()) : null,
             ParametersOrigin = tool["parametersOrigin"]?.GetValue<string>() == "legacy-typebox-kind" ? ToolSchemaOrigin.LegacyTypeBoxKindSymbol : ToolSchemaOrigin.JsonSchema,
             PrepareInitialArgumentsAsync = tool["hasPrepareArguments"]?.GetValue<bool>() != true ? null : async (arguments, token) =>
