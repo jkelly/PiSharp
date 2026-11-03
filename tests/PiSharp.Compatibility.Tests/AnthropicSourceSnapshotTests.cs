@@ -29,12 +29,13 @@ internal static class AnthropicSourceSnapshotTests
         var text = Snapshot(captured.OfType<TextStarted>().Single()).GetProperty("partial");
         Check(text.GetProperty("timestamp").GetInt64() == 123 && text.GetProperty("responseId").GetString() == "response-1", "Owned timestamp and response properties");
         Check(text.GetProperty("responseModel").GetString() == "actual-model" && text.GetProperty("usage").GetProperty("input").GetInt32() == 11, "Actual usage and response model at emission");
-        Check(text.GetProperty("content")[0].GetProperty("index").GetInt32() == 9, "Wire index differs from content index");
+        // Pi f9a26365 anthropic-messages.ts keeps the wire index in its openBlocks map, never on the content block.
+        Check(!text.GetProperty("content")[0].TryGetProperty("index", out _), "Stream state stays off the blocks");
         var before = Snapshot(captured.OfType<ThinkingStarted>().Single()).GetProperty("partial").GetProperty("content")[1];
         var after = Snapshot(captured.OfType<TextDelta>().Single()).GetProperty("partial").GetProperty("content")[1];
         Check(before.GetProperty("thinkingSignature").GetString() == "a" && after.GetProperty("thinkingSignature").GetString() == "ab", "Signature-only state visible on next push without mutating earlier snapshot");
         var ended = Snapshot(captured.OfType<TextEnded>().Single()).GetProperty("partial").GetProperty("content");
-        Check(!ended[0].TryGetProperty("index", out _) && ended[1].GetProperty("index").GetInt32() == 3, "Only ended block loses scratch index");
+        Check(!ended[0].TryGetProperty("index", out _) && !ended[1].TryGetProperty("index", out _), "No block carries the wire index");
         var final = Snapshot(captured[^1]).GetProperty("message");
         Check(final.GetProperty("usage").GetProperty("output").GetInt32() == 7 && text.GetProperty("usage").GetProperty("output").GetInt32() == 2, "Final usage does not rewrite earlier snapshot");
     }
@@ -47,12 +48,13 @@ internal static class AnthropicSourceSnapshotTests
         var captured = await Collect(input, true);
         Equivalent(await Collect(input, false), captured);
         var started = Snapshot(captured.OfType<ToolCallStarted>().Single()).GetProperty("partial").GetProperty("content")[0];
-        Check(started.GetProperty("arguments").GetProperty("initial").GetBoolean() && started.GetProperty("partialJson").GetString() == "", "Initial input retained before any delta");
+        // Pi f9a26365: the argument text lives in a ToolCallArgumentsStream in openBlocks, so no block carries partialJson.
+        Check(started.GetProperty("arguments").GetProperty("initial").GetBoolean() && !started.TryGetProperty("partialJson", out _), "Initial input retained before any delta");
         var deltas = captured.OfType<ToolCallDelta>().ToArray();
         var empty = Snapshot(deltas[0]).GetProperty("partial").GetProperty("content")[0];
         Check(!empty.GetProperty("arguments").EnumerateObject().Any(), "First empty delta replaces initial input");
         var partial = Snapshot(deltas[1]).GetProperty("partial").GetProperty("content")[0];
-        Check(partial.GetProperty("arguments").GetProperty("name").GetString() == "hel" && partial.GetProperty("partialJson").GetString() == "{\"name\":\"hel", "Source-derived partial parse and raw scratch coexist");
+        Check(partial.GetProperty("arguments").GetProperty("name").GetString() == "hel" && !partial.TryGetProperty("partialJson", out _), "Source-derived partial parse without raw scratch");
         var ended = Snapshot(captured.OfType<ToolCallEnded>().Single());
         Check(ended.GetProperty("toolCall").GetProperty("arguments").GetProperty("name").GetString() == "hello", "Nested finalized tool");
         Check(!ended.GetProperty("toolCall").TryGetProperty("index", out _) && !ended.GetProperty("toolCall").TryGetProperty("partialJson", out _), "Final source tool strips scratch");
@@ -61,18 +63,22 @@ internal static class AnthropicSourceSnapshotTests
 
     internal static async Task NonObjectPreviewIsObservedAndFinal()
     {
-        // Pi abe508 anthropic-messages.ts:767 sets block.arguments = parseStreamingJson(block.partialJson) on every input_json_delta and
-        // :803 again at content_block_stop; json-parse.ts:104-124 returns the JSON.parse result of any kind, so "[]" is the preview
-        // and the final arguments, and the turn completes.
+        // Pi f9a26365 anthropic-messages.ts sets block.arguments = arguments.append(partial_json) on every input_json_delta, and a
+        // partial whose root is not an object shows as {}; content_block_stop assigns arguments.finish(), parseToolCallArguments of the
+        // complete text, so "[]" ends as {} with an argumentsError, and the turn completes. Authored from that source.
         var input = new[] { Start, Tool, Delta(8, "input_json_delta", "partial_json", "[]"), BlockStop(8), End, Stop };
         var captured = await Collect(input, true);
         Equivalent(await Collect(input, false), captured);
         var preview = Snapshot(captured.OfType<ToolCallDelta>().Single()).GetProperty("partial").GetProperty("content")[0];
-        Check(preview.GetProperty("arguments").ValueKind == JsonValueKind.Array && preview.GetProperty("arguments").GetArrayLength() == 0 &&
-            preview.GetProperty("partialJson").GetString() == "[]", "Nonobject preview is observed as parseStreamingJson returns it");
-        var ended = Snapshot(captured.OfType<ToolCallEnded>().Single()).GetProperty("toolCall").GetProperty("arguments");
-        Check(ended.ValueKind == JsonValueKind.Array && ended.GetArrayLength() == 0, "Nonobject final observation");
-        Check(captured[^1] is StreamDone done && ((ToolCallContent)done.Message.Content[0]).Arguments.ToString() == "[]",
+        Check(preview.GetProperty("arguments").ValueKind == JsonValueKind.Object && !preview.GetProperty("arguments").EnumerateObject().Any() &&
+            !preview.TryGetProperty("partialJson", out _), "Nonobject preview is observed as no arguments yet");
+        var endedCall = Snapshot(captured.OfType<ToolCallEnded>().Single()).GetProperty("toolCall");
+        var ended = endedCall.GetProperty("arguments");
+        Check(ended.ValueKind == JsonValueKind.Object && !ended.EnumerateObject().Any(), "Nonobject final observation");
+        const string error = "Tool arguments must be a JSON object\n\nReceived arguments:\n[]";
+        Check(endedCall.GetProperty("argumentsError").GetString() == error, "Nonobject final observation reports argumentsError");
+        Check(captured[^1] is StreamDone done && ((ToolCallContent)done.Message.Content[0]).Arguments.ToString() == "{}" &&
+            done.Message.Content[0].ExtraProperties!.TryGet("argumentsError", out var reported) && reported!.Value.GetString() == error,
             "Nonobject final arguments complete the turn");
     }
 

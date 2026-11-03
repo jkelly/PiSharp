@@ -266,9 +266,10 @@ internal static partial class Program
             Check(events.Take(events.Count - 1).All(value => value is not StreamTerminalEvent), "one terminal, last");
             Equal(StopReason.Stop, done.Reason, "stop");
             // The exact pi-ai wire message durable stores (generation appends it as the pi.assistant entry), and its round trip.
+            // Pi f9a26365 calculateCost records cost.totalFromProvider false.
             var wire = PiWireJson.WriteMessage(done.Message);
             var stored = (JsonObjectValue)JsonValue.FromData(wire);
-            Equal("""{"role":"assistant","content":[{"type":"text","text":"Hello world","textSignature":"{\"v\":1,\"id\":\"msg_1\"}"}],"api":"openai-responses","provider":"openai","model":"gpt-4.1","usage":{"input":12,"output":3,"cacheRead":0,"cacheWrite":0,"reasoning":0,"totalTokens":15,"cost":{"input":0.000024,"output":0.000024,"cacheRead":0,"cacheWrite":0,"total":0.000048}},"stopReason":"stop","timestamp":1800000000000,"responseId":"resp_1","rawStopReason":"completed","durationMs":0}""",
+            Equal("""{"role":"assistant","content":[{"type":"text","text":"Hello world","textSignature":"{\"v\":1,\"id\":\"msg_1\"}"}],"api":"openai-responses","provider":"openai","model":"gpt-4.1","usage":{"input":12,"output":3,"cacheRead":0,"cacheWrite":0,"reasoning":0,"totalTokens":15,"cost":{"input":0.000024,"output":0.000024,"cacheRead":0,"cacheWrite":0,"total":0.000048,"totalFromProvider":false}},"stopReason":"stop","timestamp":1800000000000,"responseId":"resp_1","rawStopReason":"completed","durationMs":0}""",
                 stored.ToJson(), "stored message");
             var reread = PiWireJson.ReadMessage(wire.Value);
             Equal(wire.ToString(), PiWireJson.WriteMessage(reread).ToString(), "round trip");

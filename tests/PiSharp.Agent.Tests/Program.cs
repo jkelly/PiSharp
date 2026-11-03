@@ -64,7 +64,7 @@ internal static class Program
             .Concat(SourceProgressDifferentialTests.Cases()).Concat(SourceProgressOwnershipTests.Cases())
             .Concat(SourceToolResultValueTests.Cases()).Concat(BoundedToolProgressDeliveryTests.Cases())
             .Concat(CompletionsHttpTurnTests.Cases()).Concat(CompletionsImageProducingToolTests.Cases()).Concat(ToolImageContentValueTests.Cases()).Concat(ToolImageResumeTests.Cases()).Concat(FailedAssistantSettlementTests.Cases())
-            .Concat(PiMessagesAgentIntegrationTests.Cases()).Concat(OriginalPiMessagesToolContinuationTests.Cases()).Concat(NestedToolInvocationTests.Cases())
+            .Concat(PiMessagesAgentIntegrationTests.Cases()).Concat(OriginalPiMessagesToolContinuationTests.Cases()).Concat(NestedToolInvocationTests.Cases()).Concat(Sync150Cases.Cases())
             .Select(test => (Id: $"agent.case.{test.Name}", test.Name, test.Run)).ToArray();
         // Registration names include parameter values; method names can be shared by distinct cases.
         // Validate the entire inventory before admitting any case, using exact ordinal identity.

@@ -10,42 +10,55 @@ using PiSharp.AI.Protocols.PiMessages;
 using PiSharp.AI.Providers;
 using PiSharp.Contracts;
 
-// Expected arguments were captured by running @earendil-works/pi-ai@1.1.0 stream() for each API against a local HTTP server that
-// returned these SSE bodies, recording JSON.stringify(toolCall.arguments) at toolcall_end. Malformed arguments never fail the turn:
-// each API finalizes with parseStreamingJson (or, for Google and pi-messages, takes the JSON value the chunk carried).
+// The Google and pi-messages expectations were captured by running @earendil-works/pi-ai@1.1.0 stream() against a local HTTP server
+// that returned these SSE bodies, recording JSON.stringify(toolCall.arguments) at toolcall_end. Those APIs take the JSON value the
+// chunk carried. The other APIs' finals changed in Pi f9a26365 (json-parse.ts parseToolCallArguments, reached through
+// ToolCallArgumentsStream.finish()), so their 1.1.0 captures no longer apply: the expected arguments and argumentsError below are
+// authored from f9a26365, with the messages Node's V8 JSON.parse gives for these texts. Malformed arguments still never fail the
+// turn: they finalize as {} with an argumentsError, which the agent loop reports instead of running the tool.
 internal static partial class Program
 {
-    // (name, first fragment, second fragment, final arguments as JSON.stringify writes them)
-    private static readonly (string Name, string First, string Second, string Expected)[] FinalArgumentScenarios =
+    private const string NotAnObject = "Tool arguments must be a JSON object";
+
+    // (name, first fragment, second fragment, final arguments as JSON.stringify writes them, argumentsError message or null)
+    private static readonly (string Name, string First, string Second, string Expected, string? Error)[] FinalArgumentScenarios =
     [
-        ("duplicates", "{\"path\":\"a.txt\",\"limit\":1.0,", "\"path\":\"b.txt\",\"2\":0,\"1\":1}", "{\"1\":1,\"2\":0,\"path\":\"b.txt\",\"limit\":1}"),
-        ("bad-escape-truncated", "{\"path\":\"C:\\Users\\x\",", "\"n\":5", "{}"),
-        ("array", "[1,", "2", "[1,2]"),
-        ("string", "\"just ", "text\"", "\"just text\""),
-        ("garbage", "not ", "json", "{}"),
-        ("null-literal", "nu", "ll", "null"),
-        ("partial-null", "nu", "l", "{}"),
-        ("control-character", "{\"a\":\"x\ny", "\"}", "{\"a\":\"x\\ny\"}"),
-        ("number", "4", "2", "42"),
-        ("proto-assignment", "{\"__proto__\":{\"x\":1},", "\"b\":2", "{\"b\":2}"),
-        ("empty", "", "", "{}"),
-        ("nan", "Na", "N", "null"),
+        ("duplicates", "{\"path\":\"a.txt\",\"limit\":1.0,", "\"path\":\"b.txt\",\"2\":0,\"1\":1}", "{\"1\":1,\"2\":0,\"path\":\"b.txt\",\"limit\":1}", null),
+        // The repaired text is parsed last, so its message is the one reported.
+        ("bad-escape-truncated", "{\"path\":\"C:\\Users\\x\",", "\"n\":5", "{}", "Expected ',' or '}' after property value in JSON at position 28 (line 1 column 29)"),
+        ("array", "[1,", "2", "{}", "Expected ',' or ']' after array element in JSON at position 4 (line 1 column 5)"),
+        ("string", "\"just ", "text\"", "{}", NotAnObject),
+        ("garbage", "not ", "json", "{}", "Unexpected token 'o', \"not json\" is not valid JSON"),
+        ("null-literal", "nu", "ll", "{}", NotAnObject),
+        ("partial-null", "nu", "l", "{}", "Unexpected end of JSON input"),
+        ("control-character", "{\"a\":\"x\ny", "\"}", "{\"a\":\"x\\ny\"}", null),
+        ("number", "4", "2", "{}", NotAnObject),
+        ("proto-assignment", "{\"__proto__\":{\"x\":1},", "\"b\":2", "{}", "Expected ',' or '}' after property value in JSON at position 26 (line 1 column 27)"),
+        ("empty", "", "", "{}", null),
+        ("nan", "Na", "N", "{}", "\"NaN\" is not valid JSON"),
     ];
+
+    // parseToolCallArguments: `${message}\n\nReceived arguments:\n${json}`.
+    private static string? ArgumentsError(string? message, string text) => message is null ? null : message + "\n\nReceived arguments:\n" + text;
 
     private static HttpResponseMessage EventStream(string body) => new(HttpStatusCode.OK) { Content = new StringContent(body, Encoding.UTF8, "text/event-stream") };
     private static string Data(object value) => "data: " + JsonSerializer.Serialize(value) + "\n\n";
 
-    private static void ToolArguments(ChatResult result, string expected, string label)
+    private static void ToolArguments(ChatResult result, string expected, string label, string? expectedError = null)
     {
         if (result.Message.StopReason != StopReason.ToolUse)
             throw new InvalidOperationException($"{label}: stop {result.Message.StopReason} " + (result.Message.ExtraProperties?.TryGet("errorMessage", out var error) == true ? error!.ToString() : ""));
-        var actual = result.Message.Content.OfType<ToolCallContent>().Single().Arguments.ToString();
+        var call = result.Message.Content.OfType<ToolCallContent>().Single();
+        var actual = call.Arguments.ToString();
         if (actual != expected) throw new InvalidOperationException($"{label}{Environment.NewLine}Expected {expected}{Environment.NewLine}Actual   {actual}");
+        var actualError = ToolCallArgumentsResult.ErrorOf(call);
+        if (actualError != expectedError)
+            throw new InvalidOperationException($"{label} argumentsError{Environment.NewLine}Expected {JsonSerializer.Serialize(expectedError)}{Environment.NewLine}Actual   {JsonSerializer.Serialize(actualError)}");
     }
 
     private static async Task AnthropicFinalArguments()
     {
-        foreach (var (name, first, second, expected) in FinalArgumentScenarios)
+        foreach (var (name, first, second, expected, error) in FinalArgumentScenarios)
         {
             var body = new StringBuilder();
             void Event(string type, object value) => body.Append("event: ").Append(type).Append('\n').Append(Data(value));
@@ -58,14 +71,14 @@ internal static partial class Program
             Event("message_stop", new { type = "message_stop" });
             using var handler = new Handler(_ => Task.FromResult(EventStream(body.ToString())));
             using var provider = NativeProviderFactory.CreateAnthropic(Haiku, new("https://api.anthropic.com/"), Key, new(MaximumTokens: 4096, ModelReasoning: false), null, handler);
-            ToolArguments(await new ChatClient(provider).CompleteAsync(new(Haiku, [Ask], 1)).WaitAsync(Deadline), expected, "anthropic " + name);
+            ToolArguments(await new ChatClient(provider).CompleteAsync(new(Haiku, [Ask], 1)).WaitAsync(Deadline), expected, "anthropic " + name, ArgumentsError(error, first + second));
         }
     }
 
     private static async Task CompletionsFinalArguments()
     {
         var model = new ModelDescriptor("fixture", "openai-completions", "openrouter");
-        foreach (var (name, first, second, expected) in FinalArgumentScenarios)
+        foreach (var (name, first, second, expected, error) in FinalArgumentScenarios)
         {
             static object Chunk(object delta, string? finish = null) => new { id = "c1", @object = "chat.completion.chunk", created = 1, model = "fixture", choices = new[] { new { index = 0, delta, finish_reason = finish } } };
             var body = Data(Chunk(new { role = "assistant", tool_calls = new[] { new { index = 0, id = "call_1", type = "function", function = new { name = "read", arguments = first } } } })) +
@@ -73,16 +86,16 @@ internal static partial class Program
             using var handler = new Handler(_ => Task.FromResult(EventStream(body)));
             using var provider = NativeProviderFactory.CreateCompletions(model, new("https://openrouter.ai/api/v1/chat/completions"), Key, new(Reasoning: false),
                 new(MaxTokensField: "max_tokens", SupportsStore: false), handler);
-            ToolArguments(await new ChatClient(provider).CompleteAsync(new(model, [Ask], 1)).WaitAsync(Deadline), expected, "completions " + name);
+            ToolArguments(await new ChatClient(provider).CompleteAsync(new(model, [Ask], 1)).WaitAsync(Deadline), expected, "completions " + name, ArgumentsError(error, first + second));
         }
     }
 
     private static async Task ResponsesFinalArguments()
     {
         var model = new ModelDescriptor("gpt-fixture", "openai-responses", "openai");
-        // output_item.done: parseStreamingJson(item.arguments || partialJson || "{}"), with the full text and with "".
+        // output_item.done: a non-empty item.arguments replaces the streamed text, then finish(); with the full text and with "".
         foreach (var itemArguments in new[] { true, false })
-            foreach (var (name, first, second, expected) in FinalArgumentScenarios)
+            foreach (var (name, first, second, expected, error) in FinalArgumentScenarios)
             {
                 var body = Data(new { type = "response.created", response = new { id = "r1" } }) +
                     Data(new { type = "response.output_item.added", output_index = 0, item = new { type = "function_call", id = "fc1", call_id = "call_1", name = "read", arguments = "" } }) +
@@ -92,7 +105,8 @@ internal static partial class Program
                     Data(new { type = "response.completed", response = new { id = "r1", status = "completed", output = Array.Empty<object>(), usage = new { input_tokens = 1, output_tokens = 1, total_tokens = 2 } } });
                 using var handler = new Handler(_ => Task.FromResult(EventStream(body)));
                 using var provider = NativeProviderFactory.CreateResponses(model, new("https://api.openai.com/v1/responses"), Key, new(false), null, handler);
-                ToolArguments(await new ChatClient(provider).CompleteAsync(new(model, [Ask], 1)).WaitAsync(Deadline), expected, $"responses {(itemArguments ? "item" : "partial")} {name}");
+                ToolArguments(await new ChatClient(provider).CompleteAsync(new(model, [Ask], 1)).WaitAsync(Deadline), expected, $"responses {(itemArguments ? "item" : "partial")} {name}",
+                    ArgumentsError(error, first + second));
             }
     }
 
@@ -103,21 +117,23 @@ internal static partial class Program
         static string Body(params string[] functions) =>
             string.Concat(functions.Select(function => "data: {\"id\":\"x\",\"choices\":[{\"index\":0,\"delta\":{\"role\":\"assistant\",\"tool_calls\":[{\"id\":\"abcdefghi\",\"index\":0,\"function\":" + function + "}]},\"finish_reason\":null}]}\n\n")) +
             "data: {\"id\":\"x\",\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"tool_calls\"}]}\n\ndata: [DONE]\n\n";
-        async Task Run(string body, string expected, string label)
+        async Task Run(string body, string expected, string label, string? error = null)
         {
             using var handler = new Handler(_ => Task.FromResult(EventStream(body)));
             using var provider = NativeProviderFactory.CreateMistral(model, endpoint, Key, new MistralTextOptions(endpoint, true, new(0, 0, 0, 0), "offline-fixture"), handler);
-            ToolArguments(await new ChatClient(provider).CompleteAsync(new(model, [Ask], 1)).WaitAsync(Deadline), expected, "mistral " + label);
+            ToolArguments(await new ChatClient(provider).CompleteAsync(new(model, [Ask], 1)).WaitAsync(Deadline), expected, "mistral " + label, error);
         }
-        foreach (var (name, first, second, expected) in FinalArgumentScenarios)
-            await Run(Body("{\"name\":\"read\",\"arguments\":" + JsonSerializer.Serialize(first) + "}", "{\"name\":\"read\",\"arguments\":" + JsonSerializer.Serialize(second) + "}"), expected, name);
-        // typeof arguments === "string" ? arguments : JSON.stringify(arguments || {})
-        foreach (var (name, value, expected) in new[]
+        foreach (var (name, first, second, expected, error) in FinalArgumentScenarios)
+            await Run(Body("{\"name\":\"read\",\"arguments\":" + JsonSerializer.Serialize(first) + "}", "{\"name\":\"read\",\"arguments\":" + JsonSerializer.Serialize(second) + "}"), expected, name,
+                ArgumentsError(error, first + second));
+        // typeof arguments === "string" ? arguments : JSON.stringify(arguments || {}), then finish(): a non-object value is reported.
+        foreach (var (name, value, expected, error) in new (string, string, string, string?)[]
         {
-            ("number", "5", "5"), ("array", "[1,\"a\"]", "[1,\"a\"]"), ("false", "false", "{}"), ("zero", "0", "{}"), ("null", "null", "{}"),
-            ("object", "{\"b\":1,\"a\":[2],\"1\":3}", "{\"1\":3,\"b\":1,\"a\":[2]}"), ("json-string", "\"{\\\"q\\\":1}\"", "{\"q\":1}"),
+            ("number", "5", "{}", ArgumentsError(NotAnObject, "5")), ("array", "[1,\"a\"]", "{}", ArgumentsError(NotAnObject, "[1,\"a\"]")),
+            ("false", "false", "{}", null), ("zero", "0", "{}", null), ("null", "null", "{}", null),
+            ("object", "{\"b\":1,\"a\":[2],\"1\":3}", "{\"1\":3,\"b\":1,\"a\":[2]}", null), ("json-string", "\"{\\\"q\\\":1}\"", "{\"q\":1}", null),
         })
-            await Run(Body("{\"name\":\"read\",\"arguments\":" + value + "}"), expected, "value " + name);
+            await Run(Body("{\"name\":\"read\",\"arguments\":" + value + "}"), expected, "value " + name, error);
         await Run(Body("{\"name\":\"read\"}"), "{}", "value missing");
     }
 

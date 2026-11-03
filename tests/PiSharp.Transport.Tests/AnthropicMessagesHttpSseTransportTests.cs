@@ -515,7 +515,7 @@ internal static class AnthropicMessagesHttpSseTransportTests
                     .CompleteAsync(new(model, messages, input.RootElement.GetProperty("clock").GetProperty("unixMilliseconds").GetInt64()));
                 if (defaultObservationFailure is not null) System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(defaultObservationFailure).Throw();
                 Check(plain.Failure is null, "Default native genuine-wire replay failed."); Equal(1, defaultObserved);
-                Check(Same(captured[ordinal].GetProperty("finalResult"), PiWireJson.WriteMessage(plain.Message).Value), "Default native final message differs from captured public stream.");
+                Check(Same(WithCalculatedCostFlag(captured[ordinal].GetProperty("finalResult")), PiWireJson.WriteMessage(plain.Message).Value), "Default native final message differs from captured public stream.");
             }
             // Authored replay inputs represent the frozen JS SDK environment, never discovered or emitted by the default native profile.
             var authoredHeaders = JsonNode.Parse(optionHeaders?.ToString() ?? "{}")!.AsObject(); authoredHeaders["user-agent"] = "pi (win32 10.0.26200; x64)";
@@ -548,7 +548,7 @@ internal static class AnthropicMessagesHttpSseTransportTests
                 .CompleteAsync(new(model, messages, input.RootElement.GetProperty("clock").GetProperty("unixMilliseconds").GetInt64()));
             if (observationFailure is not null) System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(observationFailure).Throw();
             Check(result.Failure is null, "Native genuine-wire text replay failed."); Equal(1, observed);
-            Check(Same(captured[ordinal].GetProperty("finalResult"), PiWireJson.WriteMessage(result.Message).Value), "Complete native final message differs from captured public stream.");
+            Check(Same(WithCalculatedCostFlag(captured[ordinal].GetProperty("finalResult")), PiWireJson.WriteMessage(result.Message).Value), "Complete native final message differs from captured public stream.");
             for (var index = 0; index < messages.Length; index++) Equal(unchanged[index], messages[index].WireBody.ToString());
             ordinal++;
         }
@@ -651,6 +651,14 @@ internal static class AnthropicMessagesHttpSseTransportTests
     private static async Task Drain(IAsyncEnumerable<StreamEvent> stream, List<StreamEvent> values) { await foreach (var value in stream) values.Add(value); }
     private static void Failed(ChatResult value, string category)
     { Check(value.Failure is not null && value.Message.StopReason is StopReason.Error or StopReason.Aborted, "Failed stream succeeded."); Equal(category, Metadata(value.Message, "anthropicFailure")); }
+    // Authored, not captured: Pi f9a26365 models.ts calculateCost (run at message_start and every message_delta) ends with
+    // usage.cost.totalFromProvider = false, after total. The captures predate the field, so it is added before the comparison.
+    private static JsonElement WithCalculatedCostFlag(JsonElement message)
+    {
+        var node = JsonNode.Parse(message.GetRawText())!;
+        if (node["usage"]?["cost"] is JsonObject cost) cost["totalFromProvider"] = false;
+        return JsonDocument.Parse(node.ToJsonString()).RootElement.Clone();
+    }
     private static bool Same(JsonElement left, JsonElement right)
     {
         if (left.ValueKind != right.ValueKind) return false;

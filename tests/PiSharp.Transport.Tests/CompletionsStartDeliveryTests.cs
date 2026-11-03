@@ -304,7 +304,8 @@ internal static class CompletionsStartDeliveryTests
         {
             Check(await events.MoveNextAsync().AsTask().WaitAsync(Deadline) && events.Current is StreamStarted && fixture.Body.Reads == 0,
                 "Canonical demand did not hold actual Start before its body read.");
-            var kinds = new[] { typeof(TextStarted), typeof(TextDelta), typeof(ThinkingStarted), typeof(ThinkingDelta),
+            // Pi f9a26365 openai-completions.ts (63035734f) reads a chunk's reasoning before its content, so the thinking block opens first.
+            var kinds = new[] { typeof(ThinkingStarted), typeof(ThinkingDelta), typeof(TextStarted), typeof(TextDelta),
                 typeof(ToolCallStarted), typeof(ToolCallDelta) };
             var frames = new List<StreamEvent>();
             var eventBytes = Wire(MultiFinish).Length;
@@ -350,7 +351,7 @@ internal static class CompletionsStartDeliveryTests
                     Check(!frames.Any(IsSuccessfulEnd) && frames.OfType<StreamError>().Single().Reason == StopReason.Error &&
                         !frames.OfType<StreamDone>().Any(), "Fatal physical cleanup released successful final blocks or terminal authority.");
                 else
-                    Check(frames.OfType<TextEnded>().Single().ContentIndex == 0 && frames.OfType<ThinkingEnded>().Single().ContentIndex == 1 &&
+                    Check(frames.OfType<ThinkingEnded>().Single().ContentIndex == 0 && frames.OfType<TextEnded>().Single().ContentIndex == 1 &&
                         frames.OfType<ToolCallEnded>().Single().ContentIndex == 2 && frames.OfType<StreamDone>().Single().Reason == StopReason.ToolUse,
                         "The cleanup join deadlocked or dropped a multi-block capacity-one final batch.");
                 PrivateAbsent(frames);
@@ -370,7 +371,7 @@ internal static class CompletionsStartDeliveryTests
             try
             {
                 Check(await events.MoveNextAsync().AsTask().WaitAsync(Deadline) && events.Current is StreamStarted &&
-                    await events.MoveNextAsync().AsTask().WaitAsync(Deadline) && events.Current is TextStarted && fixture.Body.AsyncCloses == 0,
+                    await events.MoveNextAsync().AsTask().WaitAsync(Deadline) && events.Current is ThinkingStarted && fixture.Body.AsyncCloses == 0,
                     "The close/cancellation control did not hold an actual immutable progress handoff.");
                 if (cancel) { caller.Cancel(); closing = RestInto(events, frames); }
                 else closing = events.DisposeAsync().AsTask();

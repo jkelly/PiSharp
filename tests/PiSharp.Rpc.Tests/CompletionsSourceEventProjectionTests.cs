@@ -66,7 +66,10 @@ internal static class CompletionsSourceEventProjectionTests
         var final = records.Where(record => Type(record) == "message_update").Select(record => record.Value.GetProperty("assistantMessageEvent"))
             .Single(value => value.GetProperty("type").GetString() == "toolcall_end").GetProperty("toolCall");
         Equal("", final.GetProperty("id").GetString()); Equal("", final.GetProperty("name").GetString());
-        Equal("{\"value\":null}", final.GetProperty("arguments").GetRawText());
+        // Pi f9a26365 finishBlock: ToolCallArgumentsStream.finish() parses the complete text once, so cut-off arguments end as {} with
+        // argumentsError (authored from json-parse.ts parseToolCallArguments and V8's JSON.parse message).
+        Equal("{}", final.GetProperty("arguments").GetRawText());
+        Equal("Unexpected end of JSON input\n\nReceived arguments:\n{\"value\":null,\"n\":", final.GetProperty("argumentsError").GetString());
         var end = records.Single(record => Type(record) == "tool_execution_end").Value;
         Check(end.GetProperty("isError").GetBoolean(), "A nameless call did not fail.");
         Equal("", end.GetProperty("toolName").GetString()); Equal("", end.GetProperty("toolCallId").GetString());
@@ -107,17 +110,26 @@ internal static class CompletionsSourceEventProjectionTests
         }
     }
 
-    // openai-completions.ts finalizes block.arguments = parseStreamingJson(block.partialArgs): the unterminated {"value":null,"n":1
-    // becomes {"value":null,"n":1} and the tool call ends normally, reaching the final tool policy like a complete one.
+    // The unterminated {"value":null,"n":1 still ends the tool call normally, but its final arguments are {} with an argumentsError,
+    // and the tool fails without being prepared or run.
     private static async Task TruncatedFinalProjection()
     {
         await using var fixture = await Fixture.Create([First,
             """{"choices":[{"delta":{"tool_calls":[{"index":9,"id":"real-call","function":{"name":"read","arguments":"1"}}]},"finish_reason":"tool_calls"}]}"""]);
         await fixture.Run();
-        Equal(1, fixture.Probe.Ended); Equal(1, fixture.Adapter.Preparations);
-        var prepared = fixture.Adapter.Prepared ?? throw new InvalidOperationException("Final invocation was not prepared.");
-        Equal("{\"value\":null,\"n\":1}", prepared.Call.Arguments.ToString());
-        Check(!fixture.Dispatcher.Completion.IsCompleted, "A repaired final argument failed the default RPC session.");
+        // Pi f9a26365: the final arguments are parseToolCallArguments of the complete text, which keeps no recovered prefix, and
+        // validation.ts validateToolArguments reports the argumentsError instead of running the tool (authored expectations).
+        Equal(1, fixture.Probe.Ended); Equal(0, fixture.Adapter.Preparations); Equal(0, fixture.Adapter.Executions);
+        var records = fixture.Output.Records();
+        var final = records.Where(record => Type(record) == "message_update").Select(record => record.Value.GetProperty("assistantMessageEvent"))
+            .Single(value => value.GetProperty("type").GetString() == "toolcall_end").GetProperty("toolCall");
+        Equal("{}", final.GetProperty("arguments").GetRawText());
+        const string error = "Expected ',' or '}' after property value in JSON at position 19 (line 1 column 20)\n\nReceived arguments:\n{\"value\":null,\"n\":1";
+        Equal(error, final.GetProperty("argumentsError").GetString());
+        var end = records.Single(record => Type(record) == "tool_execution_end").Value;
+        Check(end.GetProperty("isError").GetBoolean(), "Malformed final arguments ran the tool.");
+        Equal("Invalid arguments for tool \"read\": " + error, end.GetProperty("result").GetProperty("content")[0].GetProperty("text").GetString());
+        Check(!fixture.Dispatcher.Completion.IsCompleted, "Malformed final arguments failed the default RPC session.");
     }
 
     private sealed class Fixture : IAsyncDisposable
