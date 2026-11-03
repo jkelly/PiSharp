@@ -33,6 +33,7 @@ internal static partial class Program
             ("calls.skipped-server-and-unloaded-tools-are-not-callable", SkippedServerCallsFail),
             ("calls.grant-rule-exact-name-target-and-admitted-scope", CallGrantRule)
         };
+        cases.AddRange(Sync150Cases());
         var results = new List<object>(); var failures = 0;
         foreach (var test in cases)
         {

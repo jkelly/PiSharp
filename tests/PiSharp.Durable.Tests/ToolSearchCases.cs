@@ -89,6 +89,15 @@ internal static class ToolSearchTests
             string.Concat(((JsonArrayValue)((JsonObjectValue)entry.Model![0])["content"]).Select(item =>
                 ((JsonObjectValue)item).TryGetValue("text", out var text) ? S(text) : "")))];
 
+    // Main's ranker follows Pi 1.5.0 (tools.tool-search-name-weight and tools.tool-search-unicode-words, phase 2), while Search.cs keeps
+    // Pi 1.2.0's rules until the phase 4 durable re-sync (durable.tool-search-ranking, durable.tool-search-unicode). The differential
+    // waits for that re-sync, which sets this to false.
+    private static readonly bool RankersDiffer = true;
+    private static void AwaitDurableResync()
+    {
+        if (RankersDiffer) throw new CaseSkippedException("main's ranker follows Pi 1.5.0; Search.cs moves with the phase 4 durable re-sync");
+    }
+
     internal static IEnumerable<(string, Func<Task>)> Cases(string prefix)
     {
         yield return Case(prefix + "offers-a-deferred-tool-only-once-tool-search-loads-it-by-appending-its-declaration", async () =>
@@ -274,6 +283,7 @@ internal static class ToolSearchTests
 
         yield return Case(prefix + "ranking-differential.tokenize", () =>
         {
+            AwaitDurableResync();
             var next = Random(1);
             for (var trial = 0; trial < 2000; trial++)
             {
@@ -284,6 +294,7 @@ internal static class ToolSearchTests
 
         yield return Case(prefix + "ranking-differential.rank", () =>
         {
+            AwaitDurableResync();
             var next = Random(2);
             for (var trial = 0; trial < 500; trial++)
             {
@@ -302,6 +313,7 @@ internal static class ToolSearchTests
 
         yield return Case(prefix + "ranking-differential.search-text", () =>
         {
+            AwaitDurableResync();
             var next = Random(3);
             for (var trial = 0; trial < 500; trial++)
             {
