@@ -113,6 +113,12 @@ The CLI ships Pi v1.1.0 `packages/coding-agent/docs/llama-cpp.md` unchanged as `
 
 `src/PiSharp.CodingAgent/Schemas/{models,settings,keybindings,theme}.schema.json` are byte-for-byte copies of Pi v1.2.0 `packages/coding-agent/schemas/*.schema.json` (commit `06a466935536f8c9bcacb2d5efc0fc021be1bdff`; git blobs `40e27fa3ebee59118b0db6373435479d5fc1baeb`, `81cfc5fb198d0e1bb7dd3fd782dd9553c023f97d`, `aa3b3e9be501475ce465855ee676abe32b8b9c2e` and `95350a58db931d116d982d3212dbfd2c5c946760`), embedded to validate models.json, keybindings and themes, under the Pi MIT notice above. The built-in `dark.json` and `light.json` themes are the v1.2.0 files.
 
+## Pi v1.5.0 JSON Schema validation (pi-schema)
+
+`src/PiSharp.Contracts/Schema/` ports Pi v1.5.0 `packages/schema` (pi-schema, commit `f9a26365568127461c47a07a37dcb42c140a3ac5`), which validates and coerces tool arguments, under the Pi MIT notice above. Its format checks (`SchemaFormats.cs`) are adapted, through pi-schema's `src/formats/typebox/`, from TypeBox 1.3.27, MIT License, Copyright (c) 2017-2026 Haydn Paterson (pi-schema ships the license as `LICENSES/typebox-LICENSE`); the TypeBox 1.3.27 Compile port that `src/PiSharp.Agent/TypeBoxJsonSchema.cs` uses for the configuration files is under the same license. Both MIT licenses grant the same permissions, under the same conditions, as the Pi MIT notice above.
+
+The pi-schema suite (`tests/PiSharp.Schema.Tests`, a test project, never packed or shipped) vendors pi-schema's test fixtures unmodified: the JSON-Schema-Test-Suite at commit `3f05891cac5d51ffa068d7076d1372130e00c829` (MIT, Copyright (c) 2012 Julian Berman; `fixtures/json-schema-test-suite/LICENSE`) and the official JSON Schema meta-schemas (`fixtures/meta-schemas/`, published by the JSON Schema organization under AFL-3.0 or BSD-3-Clause).
+
 ## Anthropic SDK reviewed development oracle
 
 The eight exact upstream-locked packages in [the actual scoped restore receipt](compatibility/anthropic-oracle-setup.json) are development-oracle dependencies only. The receipt retains every observed packaged LICENSE/NOTICE text verbatim and its byte hash, including the SDK's root MIT license and internal qs BSD-3-Clause notice. Packages are @anthropic-ai/sdk0.124.0, @babel/runtime7.29.2, @stablelib/base641.0.1, fast-sha2561.3.0, json-schema-to-ts3.1.1, partial-json0.1.7, standardwebhooks1.1.1 and ts-algebra2.0.0. No package is bundled into the native product.
