@@ -70,6 +70,9 @@ public sealed class UnixProcessGroupLease : IUnixProcessLease
     {
         if (_process.HasExited) return false; // Admission identity anchor was lost: never signal a possibly reused group.
         // Negative PID addresses a process group. Never signal PID 0 or the caller's group.
+        // Source killProcessTree: macOS signals members one at a time, so the group is stopped first (SIGSTOP is 17 there) and a killed
+        // child cannot wake its shell into the next command; best effort, a failed stop is ignored, and SIGKILL kills stopped processes.
+        if (OperatingSystem.IsMacOS()) _ = kill(-_groupId, 17);
         if (kill(-_groupId, 9) != 0 && Marshal.GetLastPInvokeError() != 3) return false; // ESRCH
         // A zombie can retain the group until its parent reaps it; our original Exit task performs that reap.
         // macOS answers EPERM (1) for a group whose remaining members are zombies awaiting their new parent's reap (launchd adopts

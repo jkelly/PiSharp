@@ -10,7 +10,7 @@ namespace PiSharp.Cli.Pi;
 internal sealed record PiToolStatus(string Type, string Message);
 
 /// <summary>Source tools-manager.ts: fd and ripgrep from <c>&lt;agentDir&gt;/bin</c>, then PATH, else the latest GitHub release asset
-/// for this platform downloaded into the bin directory on first use (never with <c>PI_OFFLINE</c>). As upstream, a download is
+/// for this platform downloaded into the bin directory on first use (never with <c>PI_OFFLINE</c>, and only for x64 and arm64). As upstream, a download is
 /// checked by its HTTP status and by finding the binary in the archive; GitHub publishes no checksums the source verifies.</summary>
 internal sealed class PiToolsManager
 {
@@ -18,28 +18,25 @@ internal sealed class PiToolsManager
     private static readonly HashSet<int> RetryableStatusCodes = [408, 425, 429, 500, 502, 503, 504];
 
     internal sealed record ToolConfig(string Name, string Repo, string BinaryName, string[] SystemBinaryNames, string TagPrefix,
-        Func<string, string, string, string?> AssetName);
+        Func<string, string, string> AssetName);
+
+    /// <summary>Source getReleaseTarget: the release asset suffix fd and ripgrep share. Only x64 and arm64 are mapped; other
+    /// architectures (32-bit ARM, ia32, ...) have no download rather than an x86-64 binary that cannot run. Null when unsupported.</summary>
+    internal static string? ReleaseTarget(string platform, string architecture)
+    {
+        var arch = architecture switch { "arm64" => "aarch64", "x64" => "x86_64", _ => null };
+        if (arch is null) return null;
+        return platform switch
+        {
+            "darwin" => $"{arch}-apple-darwin.tar.gz", "linux" => $"{arch}-unknown-linux-musl.tar.gz", "win32" => $"{arch}-pc-windows-msvc.zip",
+            _ => null
+        };
+    }
 
     internal static readonly IReadOnlyDictionary<string, ToolConfig> Tools = new Dictionary<string, ToolConfig>(StringComparer.Ordinal)
     {
-        ["fd"] = new("fd", "sharkdp/fd", "fd", ["fd", "fdfind"], "v", (version, platform, architecture) =>
-        {
-            var arch = architecture == "arm64" ? "aarch64" : "x86_64";
-            return platform switch
-            {
-                "darwin" => $"fd-v{version}-{arch}-apple-darwin.tar.gz", "linux" => $"fd-v{version}-{arch}-unknown-linux-musl.tar.gz",
-                "win32" => $"fd-v{version}-{arch}-pc-windows-msvc.zip", _ => null
-            };
-        }),
-        ["rg"] = new("ripgrep", "BurntSushi/ripgrep", "rg", ["rg"], "", (version, platform, architecture) =>
-        {
-            var arch = architecture == "arm64" ? "aarch64" : "x86_64";
-            return platform switch
-            {
-                "darwin" => $"ripgrep-{version}-{arch}-apple-darwin.tar.gz", "linux" => $"ripgrep-{version}-{arch}-unknown-linux-musl.tar.gz",
-                "win32" => $"ripgrep-{version}-{arch}-pc-windows-msvc.zip", _ => null
-            };
-        })
+        ["fd"] = new("fd", "sharkdp/fd", "fd", ["fd", "fdfind"], "v", (version, target) => $"fd-v{version}-{target}"),
+        ["rg"] = new("ripgrep", "BurntSushi/ripgrep", "rg", ["rg"], "", (version, target) => $"ripgrep-{version}-{target}")
     };
 
     private readonly string binDirectory;
@@ -48,7 +45,15 @@ internal sealed class PiToolsManager
     private readonly string githubBase;
     private readonly SemaphoreSlim gate = new(1, 1);
     internal string Platform { get; init; } = OperatingSystem.IsWindows() ? "win32" : OperatingSystem.IsMacOS() ? "darwin" : OperatingSystem.IsLinux() ? "linux" : "unknown";
-    internal string Architecture { get; init; } = RuntimeInformation.OSArchitecture switch { System.Runtime.InteropServices.Architecture.Arm64 => "arm64", System.Runtime.InteropServices.Architecture.X64 => "x64", var other => other.ToString().ToLowerInvariant() };
+    /// <summary>Node <c>arch()</c> names (<c>x64</c>, <c>arm64</c>, <c>ia32</c>, <c>arm</c>, ...) for the OS architecture.</summary>
+    internal string Architecture { get; init; } = RuntimeInformation.OSArchitecture switch
+    {
+        System.Runtime.InteropServices.Architecture.Arm64 => "arm64", System.Runtime.InteropServices.Architecture.X64 => "x64",
+        System.Runtime.InteropServices.Architecture.X86 => "ia32",
+        System.Runtime.InteropServices.Architecture.Arm or System.Runtime.InteropServices.Architecture.Armv6 => "arm",
+        System.Runtime.InteropServices.Architecture.LoongArch64 => "loong64", System.Runtime.InteropServices.Architecture.Ppc64le => "ppc64",
+        var other => other.ToString().ToLowerInvariant()
+    };
 
     /// <param name="createHandler">The HTTP handler downloads use (a fake release server in tests); redirects are handled here.</param>
     internal PiToolsManager(string binDirectory, Func<string, string?> environment, Func<HttpMessageHandler>? createHandler = null, string githubBase = "https://github.com")
@@ -85,6 +90,13 @@ internal sealed class PiToolsManager
         if (PiCommand.IsTruthyEnvFlag(environment("PI_OFFLINE")))
         {
             onStatus?.Invoke(new("warning", $"{config.Name} not found. Offline mode enabled, skipping download."));
+            return null;
+        }
+        // Prebuilt downloads exist only for the targets ReleaseTarget maps.
+        if (ReleaseTarget(Platform, Architecture) is null)
+        {
+            onStatus?.Invoke(new("warning", $"{config.Name} not found. Automatic download is not supported on {Platform}/{Architecture}. " +
+                $"Install {config.Name} with your system package manager."));
             return null;
         }
         await gate.WaitAsync(cancellationToken).ConfigureAwait(false);
@@ -129,9 +141,10 @@ internal sealed class PiToolsManager
     /// moved into place (made executable off Windows), the archive and extraction directory removed.</summary>
     private async Task<string> DownloadToolAsync(ToolConfig config, CancellationToken cancellationToken)
     {
+        var target = ReleaseTarget(Platform, Architecture) ?? throw new IOException($"Unsupported platform: {Platform}/{Architecture}");
         var version = config.BinaryName == "fd" && Platform == "darwin" && Architecture == "x64" ? "10.3.0"
             : await GetLatestVersionAsync(config.Repo, cancellationToken).ConfigureAwait(false);
-        var assetName = config.AssetName(version, Platform, Architecture) ?? throw new IOException($"Unsupported platform: {Platform}/{Architecture}");
+        var assetName = config.AssetName(version, target);
         Directory.CreateDirectory(binDirectory);
         var url = $"{githubBase}/{config.Repo}/releases/download/{config.TagPrefix}{version}/{assetName}";
         var archive = Path.Join(binDirectory, assetName);

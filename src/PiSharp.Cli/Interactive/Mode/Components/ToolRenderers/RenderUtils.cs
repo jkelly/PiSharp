@@ -112,6 +112,31 @@ internal static partial class RenderUtils
         return value.GetValueKind() == JsonValueKind.String ? value.GetValue<string>() : null;
     }
 
+    /// <summary>parseLineNumber: a finite number, or a non-blank string <c>Number()</c> turns into one; otherwise null.</summary>
+    private static double? ParseLineNumber(JsonNode value)
+    {
+        var number = value.GetValueKind() switch
+        {
+            JsonValueKind.Number => ToolJson.AsNumber(value),
+            JsonValueKind.String when ToolJson.JsTrim(value.GetValue<string>()) is { Length: > 0 } text => ToolJson.StringToNumber(text),
+            _ => null
+        };
+        return number is { } finite && double.IsFinite(finite) ? finite : null;
+    }
+
+    /// <summary>formatReadLineRange: the read tool's <c>:start-end</c> label from finite numbers or numeric strings. JSON null (strict
+    /// schemas send it for omitted arguments) counts as absent; a malformed offset or limit gives no label.</summary>
+    public static string FormatReadLineRange(JsonNode? offset, JsonNode? limit)
+    {
+        if (offset is null && limit is null) return "";
+        var start = offset is null ? 1 : ParseLineNumber(offset);
+        if (start is null) return "";
+        if (limit is null) return $":{ToolJson.JsNumber(start.Value)}";
+        if (ParseLineNumber(limit) is not { } count) return "";
+        var end = start.Value + count - 1;
+        return $":{ToolJson.JsNumber(start.Value)}{(end != 0 && !double.IsNaN(end) ? "-" + ToolJson.JsNumber(end) : "")}";
+    }
+
     public static string ReplaceTabs(string text) => text.Replace("\t", "   ", StringComparison.Ordinal);
 
     public static string NormalizeDisplayText(string text) => text.Replace("\r", "", StringComparison.Ordinal);
@@ -262,6 +287,43 @@ internal static class ToolJson
         ? double.Parse(value.ToJsonString(), NumberStyles.Float, CultureInfo.InvariantCulture) : null;
 
     public static double? GetNumber(JsonNode? node, string name) => AsNumber(Get(node, name));
+
+    private static bool IsJsWhitespace(char c) => c is '\t' or '\n' or '\v' or '\f' or '\r' or ' ' or '\u00a0' or '\u1680'
+        or (>= '\u2000' and <= '\u200a') or '\u2028' or '\u2029' or '\u202f' or '\u205f' or '\u3000' or '\ufeff';
+
+    /// <summary>String.prototype.trim().</summary>
+    public static string JsTrim(string text)
+    {
+        int start = 0, end = text.Length;
+        while (start < end && IsJsWhitespace(text[start])) start++;
+        while (end > start && IsJsWhitespace(text[end - 1])) end--;
+        return text[start..end];
+    }
+
+    private static readonly Regex DecimalLiteral = new(@"^[+-]?(?:[0-9]+\.?[0-9]*|\.[0-9]+)(?:[eE][+-]?[0-9]+)?\z", RegexOptions.CultureInvariant);
+
+    /// <summary><c>Number(string)</c>: trimmed; empty is 0; <c>0x</c>/<c>0o</c>/<c>0b</c> integers; signed Infinity; a decimal
+    /// literal; anything else NaN.</summary>
+    public static double StringToNumber(string input)
+    {
+        var text = JsTrim(input);
+        if (text.Length == 0) return 0;
+        if (text is "Infinity" or "+Infinity") return double.PositiveInfinity;
+        if (text == "-Infinity") return double.NegativeInfinity;
+        var radix = text.Length > 2 && text[0] == '0' ? text[1] switch { 'x' or 'X' => 16, 'o' or 'O' => 8, 'b' or 'B' => 2, _ => 0 } : 0;
+        if (radix != 0)
+        {
+            double value = 0;
+            foreach (var c in text.AsSpan(2))
+            {
+                var digit = char.IsAsciiDigit(c) ? c - '0' : char.IsAsciiLetter(c) ? (c | 0x20) - 'a' + 10 : 99;
+                if (digit >= radix) return double.NaN;
+                value = value * radix + digit;
+            }
+            return value;
+        }
+        return DecimalLiteral.IsMatch(text) ? double.Parse(text, NumberStyles.Float, CultureInfo.InvariantCulture) : double.NaN;
+    }
 
     /// <summary><c>value || ""</c> for a value expected to be a string.</summary>
     public static string TruthyString(JsonNode? value) => Truthy(value) ? Template(value) : "";

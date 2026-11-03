@@ -114,7 +114,8 @@ public sealed class RipgrepExecutor : IGrepExecutor
     internal static ImmutableArray<string> BuildArguments(GrepExecutionRequest request)
     {
         var args = ImmutableArray.CreateBuilder<string>();
-        args.Add("--json"); args.Add("--line-number"); args.Add("--color=never"); args.Add("--hidden");
+        // grep.ts --no-config: the tool's literal, glob and limit semantics must not depend on RIPGREP_CONFIG_PATH.
+        args.Add("--no-config"); args.Add("--json"); args.Add("--line-number"); args.Add("--color=never"); args.Add("--hidden");
         if (request.IgnoreCase) args.Add("--ignore-case");
         if (request.Literal) args.Add("--fixed-strings");
         if (!string.IsNullOrEmpty(request.Glob)) { args.Add("--glob"); args.Add(request.Glob); }

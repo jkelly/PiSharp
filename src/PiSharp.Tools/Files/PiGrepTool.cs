@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/src/core/tools/grep.ts.
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/coding-agent/src/core/tools/grep.ts.
 using System.Collections.Immutable;
 using System.Globalization;
 using System.Text;
@@ -120,13 +120,15 @@ public sealed class PiGrepTool : IToolArgumentSchemaAdapter
                 if (_authorizeRead is not null && !await _authorizeRead(filePath, token).ConfigureAwait(false)) throw new UnauthorizedAccessException();
                 // Source fs.readFile(path, "utf-8"): the whole file, undecodable bytes as U+FFFD.
                 var content = EditTool.DecodeText(await File.ReadAllBytesAsync(filePath, token).ConfigureAwait(false));
-                lines = content.Replace("\r\n", "\n", StringComparison.Ordinal).Replace('\r', '\n').Split('\n');
+                // Only CRLF: ripgrep counts no line end at a lone CR, so its line numbers keep matching these lines.
+                lines = content.Replace("\r\n", "\n", StringComparison.Ordinal).Split('\n');
             }
             catch (Exception error) when (error is IOException or UnauthorizedAccessException or ArgumentException or OutOfMemoryException) { lines = []; }
             fileCache[filePath] = lines;
             return lines;
         }
-        var args = new List<string> { "--json", "--line-number", "--color=never", "--hidden" };
+        // --no-config: the tool's literal, glob and limit semantics must not depend on RIPGREP_CONFIG_PATH.
+        var args = new List<string> { "--no-config", "--json", "--line-number", "--color=never", "--hidden" };
         if (input.IgnoreCase) args.Add("--ignore-case");
         if (input.Literal) args.Add("--fixed-strings");
         if (!string.IsNullOrEmpty(input.Glob)) { args.Add("--glob"); args.Add(input.Glob); }

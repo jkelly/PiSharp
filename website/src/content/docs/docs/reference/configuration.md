@@ -106,7 +106,7 @@ A built-in that is off registers nothing: no `codemode` or `tool_search` tool, n
 
 `bash` finds its shell as Pi does: Git Bash (or `bash.exe` on your `PATH`) on Windows, and `/bin/bash`, then `bash`, then `sh` on Linux and macOS. Set `shellPath` to choose another. `shellCommandPrefix` runs before every command, for the model's `bash` and for your `!` commands.
 
-`grep` and `find` use `rg` and `fd` from `~/.pi/agent/bin` or your `PATH`. If one is missing, PiSharp downloads it from its GitHub releases the first time it's needed, as Pi does. `PI_OFFLINE=1` stops the download. See [Built-in tools](/docs/reference/tools/).
+`grep` and `find` use `rg` and `fd` from `~/.pi/agent/bin` or your `PATH`. If one is missing, PiSharp downloads it from its GitHub releases the first time it's needed, as Pi does, on x64 and arm64 only. `PI_OFFLINE=1` stops the download. See [Built-in tools](/docs/reference/tools/).
 
 ## Config values that run commands
 

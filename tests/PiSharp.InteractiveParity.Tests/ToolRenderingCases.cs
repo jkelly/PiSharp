@@ -14,7 +14,7 @@ using static Expect;
 /// codemode-renderer.test.ts, tool-renderer-examples.test.ts (edit shell), edit-tool-no-full-redraw.test.ts and output-pad.test.ts,
 /// plus render snapshots of every built-in renderer written from the sources.
 /// </summary>
-internal static class ToolRenderingCases
+internal static partial class ToolRenderingCases
 {
     // Small 2x2 blue JPEG image
     private const string TinyJpeg =

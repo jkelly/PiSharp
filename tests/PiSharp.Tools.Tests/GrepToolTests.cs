@@ -8,7 +8,7 @@ using PiSharp.Contracts;
 using PiSharp.Tools.Files;
 using PiSharp.Tools.Processes;
 
-internal static class GrepToolTests
+internal static partial class GrepToolTests
 {
     public static (string Name, Func<Task> Run)[] Cases() =>
     [
@@ -36,10 +36,10 @@ internal static class GrepToolTests
         using var f = new Fixture(); var executor = f.Executor();
         await executor.GrepAsync(new("--leading (a|b)", f.Root, "*.cs", true, true, 7), default);
         var request = f.Runner.Last!;
-        Check(request.Arguments.SequenceEqual(["--json", "--line-number", "--color=never", "--hidden", "--ignore-case", "--fixed-strings", "--glob", "*.cs", "--", "--leading (a|b)", f.Root]), "Pinned grep argv or '--' separation changed.");
+        Check(request.Arguments.SequenceEqual(["--no-config", "--json", "--line-number", "--color=never", "--hidden", "--ignore-case", "--fixed-strings", "--glob", "*.cs", "--", "--leading (a|b)", f.Root]), "Pinned grep argv or '--' separation changed.");
         Check(request.Executable == f.Binary.Executable && request.WorkingDirectory == f.Root && request.Environment.Count == 0 && request.TimeoutSeconds is null && f.Spills.Last!.Disposed, "Explicit launch or spill ownership changed.");
         await executor.GrepAsync(new("", f.Root, "", false, false, 100), default);
-        Check(f.Runner.Last!.Arguments.SequenceEqual(["--json", "--line-number", "--color=never", "--hidden", "--", "", f.Root]), "Source empty pattern/glob argv changed.");
+        Check(f.Runner.Last!.Arguments.SequenceEqual(["--no-config", "--json", "--line-number", "--color=never", "--hidden", "--", "", f.Root]), "Source empty pattern/glob argv changed.");
     }
     private static async Task Formatting()
     {
@@ -195,7 +195,8 @@ internal static class GrepToolTests
         f.Runner.Result = Receipt(Event(f.File, 2, "receipt differs\n") + Event(f.File, 3, "receipt differs\n") + Event(other, 2, "match\n"), "", 0);
         var tool = new GrepTool(f.Root, f.Root, f.Executor(), contextReader: reader);
         var result = await Invoke(tool, new { pattern = "hit", context = 1 });
-        const string expected = "a.cs-1- one\na.cs:2: α hit\na.cs-3- three\na.cs-2- α hit\na.cs:3: three\na.cs-4- four\nnested/b.cs-1- 前\nnested/b.cs:2: match\nnested/b.cs-3- 後";
+        // Pi 1.5.0: a bare CR ends no line (ripgrep numbers lines at LF only) and is dropped from the displayed line.
+        const string expected = "a.cs-1- one\na.cs:2: α hit\na.cs-3- threefour\na.cs-2- α hit\na.cs:3: threefour\na.cs-4- \nnested/b.cs-1- 前\nnested/b.cs:2: match\nnested/b.cs-3- 後";
         Check(!result.IsError && Text(result) == expected && !result.HasProperty("details") && reader.Calls == 2 &&
             reader.Bounds.All(bound => bound == GrepTool.MaximumContextFileBytes) && f.Spills.Last!.Disposed,
             "Positive context overlap/order/source read/cache/normalization changed.");
@@ -204,7 +205,7 @@ internal static class GrepToolTests
         f.Runner.Result = Receipt(Event(f.File, 1, "receipt\n"), "", 0);
         Check(Text(await Invoke(tool, new { pattern = "x", path = f.File, context = 1 })) == "a.cs:1: one\na.cs-2- α hit", "File target/first-line clipping changed.");
         f.Runner.Result = Receipt(Event(f.File, 4, "receipt\n"), "", 0);
-        Check(Text(await Invoke(tool, new { pattern = "x", context = 1 })) == "a.cs-3- three\na.cs:4: four\na.cs-5- ", "Trailing LF context split changed.");
+        Check(Text(await Invoke(tool, new { pattern = "x", context = 1 })) == "a.cs-3- threefour\na.cs:4: ", "Trailing LF context split changed.");
         var beforeZero = reader.Calls;
         Check(Text(await Invoke(tool, new { pattern = "x", context = 0 })) == "a.cs:4: receipt" && reader.Calls == beforeZero, "Zero context started using file reads.");
         f.Runner.Result = Receipt("", "", 1);

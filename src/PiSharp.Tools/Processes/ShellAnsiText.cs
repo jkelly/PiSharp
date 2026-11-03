@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/src/utils/ansi.ts,
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/coding-agent/src/utils/ansi.ts,
 // packages/coding-agent/src/core/bash-executor.ts and packages/coding-agent/src/utils/shell.ts (sanitizeBinaryOutput).
 // Patterns: ansi-regex and strip-ansi, MIT Copyright Sindre Sorhus <sindresorhus@gmail.com> (https://sindresorhus.com).
 using System.Text;
@@ -10,10 +10,12 @@ namespace PiSharp.Tools.Processes;
 public static class ShellAnsiText
 {
     // ST is BEL, ESC \ or 0x9c. OSC runs non-greedily to the first ST; CSI and related sequences take
-    // optional intermediates and parameters, then a final byte. ECMAScript \d is ASCII, so digits are explicit.
+    // optional intermediates and parameters, then a final byte. ECMAScript \d is ASCII, so digits are explicit. A private prefix
+    // (<, = or >) is accepted only right after a real CSI introducer (ESC [ or 0x9B), so an SGR mouse report such as ESC[<35;59;1M is
+    // stripped whole; after a bare ESC these bytes stay final bytes, so ESC = and ESC > keep the digits of the text that follows.
     private const string St = @"(?:\u0007|\u001B\|\u009C)";
     private const string OscStart = @"\u001B\]";
-    private const string CsiStart = @"[\u001B\u009B][[\]()#;?]*(?:[0-9]{1,4}(?:[;:][0-9]{0,4})*)?";
+    private const string CsiStart = @"(?:(?:\u001B\[|\u009B)[<=>]|[\u001B\u009B][[\]()#;?]*)(?:[0-9]{1,4}(?:[;:][0-9]{0,4})*)?";
     private const string CsiFinal = @"[0-9A-PR-TZcf-nq-uy=><~]";
     private static readonly Regex Complete = new($"(?:{OscStart}[\\s\\S]*?{St})|{CsiStart}{CsiFinal}", RegexOptions.CultureInvariant);
     // Unfinished at the end: OSC without its ST (a trailing ESC may start ESC \), or CSI without its final byte.

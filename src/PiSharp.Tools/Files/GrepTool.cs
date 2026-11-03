@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/src/core/tools/grep.ts.
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/coding-agent/src/core/tools/grep.ts.
 using System.Collections.Immutable;
 using System.Text;
 using System.Text.Json;
@@ -180,7 +180,8 @@ public sealed class GrepTool
                         try { content = StrictUtf8.GetString(bytes.Span); }
                         catch (DecoderFallbackException) { throw new FileToolException(FileToolFailure.UnsupportedContent); }
                         if (content.Contains('\0')) throw new FileToolException(FileToolFailure.UnsupportedContent);
-                        content = content.Replace("\r\n", "\n", StringComparison.Ordinal).Replace("\r", "\n", StringComparison.Ordinal);
+                        // Only CRLF: ripgrep counts no line end at a lone CR, so its match line numbers keep pointing at these lines.
+                        content = content.Replace("\r\n", "\n", StringComparison.Ordinal);
                         if (content.Count(character => character == '\n') >= MaximumContextFileLines)
                             throw new FileToolException(FileToolFailure.ResourceLimit);
                         lines = content.Split('\n');
@@ -198,7 +199,8 @@ public sealed class GrepTool
                 for (var current = start; current <= end; current++)
                 {
                     token.ThrowIfCancellationRequested();
-                    var text = Compact(lines[(int)current - 1]);
+                    // A lone CR stays inside its line and is dropped from the display, as from match lines.
+                    var text = Compact(lines[(int)current - 1].Replace("\r", "", StringComparison.Ordinal));
                     output.Add(current == item.Match.LineNumber
                         ? $"{item.Relative}:{current}: {text}"
                         : $"{item.Relative}-{current}- {text}");

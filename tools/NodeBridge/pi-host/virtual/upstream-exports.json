@@ -342,6 +342,7 @@
 			"findCutPoint",
 			"findTurnStartIndex",
 			"formatDimensionNote",
+			"formatReadLineRange",
 			"formatSize",
 			"formatSkillsForPrompt",
 			"generateBranchSummary",

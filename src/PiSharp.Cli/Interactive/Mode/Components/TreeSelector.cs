@@ -915,16 +915,7 @@ internal sealed class TreeList : IComponent, IInputHandler
             case "read":
             {
                 var path = ShortenPath(Or(args, "", "path", "file_path"));
-                var offset = SessionEntryJson.Number(args["offset"]);
-                var limit = SessionEntryJson.Number(args["limit"]);
-                var display = path;
-                if (offset is not null || limit is not null)
-                {
-                    var start = offset ?? 1;
-                    var end = limit is not null ? SessionEntryJson.JsNumber(start + limit.Value - 1) : "";
-                    display += $":{SessionEntryJson.JsNumber(start)}{(end.Length > 0 && end != "0" && end != "NaN" ? $"-{end}" : "")}";
-                }
-                return $"[read: {display}]";
+                return $"[read: {path}{RenderUtils.FormatReadLineRange(args["offset"], args["limit"])}]";
             }
             case "write":
                 return $"[write: {ShortenPath(Or(args, "", "path", "file_path"))}]";

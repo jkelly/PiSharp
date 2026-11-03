@@ -38,7 +38,7 @@ Reads a text file or an image.
 
 1. It applies the EXIF orientation.
 2. An image within 2000x2000 whose base64 data is under 4.5 MB goes to the model unchanged.
-3. Otherwise, with `images.autoResize` on (the default), it fits the image in 2000x2000 and tries PNG, then JPEG at quality 80, 85, 70, 55 and 40, and keeps the first result under 4.5 MB.
+3. Otherwise, with `images.autoResize` on (the default), it fits the image in 2000x2000 and tries the smaller of PNG and JPEG at quality 80, then the other, then JPEG at 85, 70, 55 and 40, and keeps the first result under 4.5 MB.
 4. If none fits, it shrinks the image by a quarter and tries again.
 
 The result carries the image and a note about any resize. An image that can't fit is left out with `[Image omitted: could not be resized below the inline image size limit.]`. If the model doesn't take images, the note is `[Current model does not support images. The image will be omitted from this request.]`. `images.blockImages` keeps every image away from the provider. See [Settings](/docs/reference/settings/#tools-and-shell).
@@ -129,7 +129,7 @@ Searches file contents with ripgrep (`rg`). Off by default.
 | `context` | number | no | Lines to show before and after each match. Default `0`. |
 | `limit` | number | no | Most matches. Default `100`. |
 
-PiSharp runs `rg --json --line-number --color=never --hidden`, adding `--ignore-case`, `--fixed-strings` and `--glob` as asked. It respects `.gitignore`. Lines longer than 500 characters are cut, with a notice to use `read` for the full line.
+PiSharp runs `rg --no-config --json --line-number --color=never --hidden`, adding `--ignore-case`, `--fixed-strings` and `--glob` as asked, so a `RIPGREP_CONFIG_PATH` file can't change how the tool searches. It respects `.gitignore`. Lines longer than 500 characters are cut, with a notice to use `read` for the full line.
 
 ## find
 
@@ -156,7 +156,7 @@ Entries are sorted, folders end with `/`, and dot files are included.
 
 ## ripgrep and fd
 
-`grep` and `find` use `rg` and `fd` from `<agentDir>/bin` or your `PATH`. If one is missing, PiSharp downloads it from its GitHub releases into `<agentDir>/bin` the first time it's needed, as Pi does. `PI_OFFLINE=1` or `--offline` stops the download.
+`grep` and `find` use `rg` and `fd` from `<agentDir>/bin` or your `PATH`. If one is missing, PiSharp downloads it from its GitHub releases into `<agentDir>/bin` the first time it's needed, as Pi does. `PI_OFFLINE=1` or `--offline` stops the download. Downloads exist only for x64 and arm64; on other architectures, such as 32-bit ARM, PiSharp warns and you install `rg` and `fd` with your package manager.
 
 ## tool_search
 
@@ -167,7 +167,7 @@ Finds tools the model can't see yet and turns them on. It comes from the `builti
 | `query` | string | yes | What to look for. Must not be empty. |
 | `limit` | number | no | Most tools to load. A positive integer, default `8`. |
 
-It ranks registered tools that are hidden from the model, such as MCP tools with `deferred` or `codemode` exposure, with BM25, and activates the matches for the next model call. It is registered off. It turns on when an MCP server has `deferred` tools, or when you select it with `--tools` or `defaultTools`. See [MCP](/docs/guides/mcp/).
+It ranks registered tools that are hidden from the model, such as MCP tools with `deferred` or `codemode` exposure, with BM25, and activates the matches for the next model call. A tool whose name is the query comes first, then tools matching more of the query's words; a word in the tool name counts for more than any number of mentions in its description. Words in any script match, and text written without spaces, such as Chinese or Thai, is split with the system's ICU word rules, as Pi does with `Intl.Segmenter`. It is registered off. It turns on when an MCP server has `deferred` tools, or when you select it with `--tools` or `defaultTools`. See [MCP](/docs/guides/mcp/).
 
 ## codemode
 
