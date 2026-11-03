@@ -1,5 +1,6 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/codemode/src/types.ts.
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/codemode/src/types.ts.
 using System.Collections.Immutable;
+using System.Diagnostics.CodeAnalysis;
 using PiSharp.Contracts;
 
 namespace PiSharp.Codemode;
@@ -36,8 +37,9 @@ public enum CodemodeCallStatus { Ok, Error, Cancelled }
 
 public sealed record CodemodeCall(string Name, CodemodeCallStatus Status, double DurationMs);
 
-/// <summary>Script: the script threw or failed to parse. Timeout: the deadline expired. Aborted: the caller's token fired or the
-/// sandbox closed. Sandbox: the engine failed outside the script's control.</summary>
+/// <summary>Script: the script threw or failed to parse. Timeout: the deadline expired or the interrupt budget ran out. Aborted: the
+/// caller's token fired or the sandbox closed. After a timeout or an abort the execution has ended and its worker was asked to stop; it
+/// may still be computing. Sandbox: the engine failed outside the script's control.</summary>
 public enum CodemodeErrorKind { Script, Timeout, Aborted, Sandbox }
 
 public sealed record CodemodeError(CodemodeErrorKind Kind, string Message, string? Name = null, string? Stack = null);
@@ -154,6 +156,20 @@ public sealed record CodemodeSandboxOptions
     public CodemodeWorkerLauncher? Worker { get; init; } = CodemodeWorker.Default;
     /// <summary>Replaces the engine with another worker (tests).</summary>
     internal Func<ICodemodeWorker>? WorkerFactory { get; init; }
+    /// <summary>types.ts <c>acquireWorker</c>: called synchronously immediately before each script's worker (process or engine thread)
+    /// starts. Throw to deny admission without starting a worker; the execution fails as a sandbox error with the exception's message.
+    /// Otherwise return a release callback, called once when the worker actually exits or at once if it fails to start, not when the
+    /// result settles. The callback must not throw. Reservations can be shared across sandbox instances. A spare worker process kept
+    /// ready for the next script is not counted until a script takes it.</summary>
+    [Experimental("PISHARP_CODEMODE001")]
+    public Func<Action>? AcquireWorker { get; init; }
+    /// <summary>types.ts <c>onWorkerStarted</c>: called once for each worker started by <see cref="CodemodeSandbox.ExecuteAsync"/> or
+    /// <see cref="CodemodeSandbox.Start"/>. The task completes when that worker actually exits, which may be after the result and
+    /// <see cref="CodemodeSandbox.CloseAsync"/> settle, for example while a built-in that does not observe cancellation returns. Use
+    /// it to keep the worker counted against host concurrency limits until it exits. A thrown exception fails the execution (unless it
+    /// already has its outcome) and requests the worker's termination.</summary>
+    [Experimental("PISHARP_CODEMODE001")]
+    public Action<Task>? OnWorkerStarted { get; init; }
     /// <summary>Maximum JavaScript call depth. Default 10000.</summary>
     public int RecursionLimit { get; init; } = CodemodeLimits.DefaultRecursionLimit;
     /// <summary>inline.ts <c>interruptBudget</c>: Jint statements one execution may run in total before it fails with

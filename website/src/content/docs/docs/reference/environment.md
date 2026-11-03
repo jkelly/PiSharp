@@ -65,6 +65,7 @@ PiSharp also reads these to detect the terminal, as Pi does, and never changes t
 | --- | --- | --- |
 | `PISHARP_NODE` | The Node executable for TypeScript and JavaScript extensions. | `node` on `PATH` |
 | `PISHARP_NODE_BRIDGE` | A folder holding `host.mjs`, to use instead of the bundled Node bridge host. | the bundled `node-bridge/pi-host` |
+| `PI_CODEMODE_MAX_WORKERS` | Code mode workers alive at once across all sessions in the process, as a positive integer. Each worker's script may use up to 256 MiB. Raise it when one process runs several sessions. Further scripts wait for a free worker. Read for each script. | `2` |
 | `PISHARP_CODEMODE_WORKER_STACK_BYTES` | Stack size of the code mode engine thread, in bytes. Values under 1 MiB are ignored. | 256 MiB (64 MiB in a 32-bit process) |
 
 See [Node bridge](/docs/extensions/node-bridge/) and [Code mode](/docs/guides/codemode/#limits).

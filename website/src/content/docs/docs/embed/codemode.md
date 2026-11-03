@@ -51,7 +51,7 @@ The PiSharp CLI does exactly this.
 When `CodemodeWorker.Default` is null and no `Worker` is set, the engine runs on a thread of your own process. Most scripts work, but one that nests values hundreds of thousands of levels deep can overflow the stack, and .NET cannot recover from that: your process ends.
 :::
 
-One worker runs one script. The library starts the next worker ahead, with the engine already compiled, so a script waits about 100 to 300 ms for its process. A finished, timed-out or aborted script's worker is killed and reaped before the result is returned. A worker exits when its standard input closes, so it ends with its host. A worker that does not start within 60 seconds fails the script as a sandbox error.
+One worker runs one script. The library starts the next worker ahead, with the engine already compiled, so a script waits about 100 to 300 ms for its process. A finished, timed-out or aborted script's worker is killed when its outcome is decided. As in Pi 1.3.0 and later, the result doesn't wait for the worker to exit; [Worker lifetime](#worker-lifetime) shows how to track the exit. A worker exits when its standard input closes, so it ends with its host. A worker that does not start within 60 seconds fails the script as a sandbox error.
 
 ## Run a script
 
@@ -125,10 +125,41 @@ There are no timers, `fetch`, file system, modules or `require`, and no way to r
 | `RecursionLimit` | 10000 | Maximum JavaScript call depth. |
 | `InterruptBudget` | none | Jint statements one execution may run before it fails as a timeout. It doesn't depend on the machine's speed. |
 | `Worker` | `CodemodeWorker.Default` | The worker launcher. Null runs the engine on a thread of this process. |
+| `AcquireWorker` | none | Experimental. Reserves capacity before each worker starts. See [Worker lifetime](#worker-lifetime). |
+| `OnWorkerStarted` | none | Experimental. Receives a task that completes when each worker actually exits. |
 
 `CodemodeExecuteOptions` sets `TimeoutMs` for one execution (`double.PositiveInfinity` disables it), the `Store` values `load()` reads, and the `AbortMessage` of an execution your token cancels. The default message is `This operation was aborted`.
 
-`CloseAsync()`, or disposing the sandbox, aborts the executions in flight and refuses new ones.
+`CloseAsync()`, or disposing the sandbox, aborts the executions in flight and refuses new ones. It doesn't wait for their workers to exit.
+
+### Worker lifetime
+
+:::caution[Experimental]
+`AcquireWorker` and `OnWorkerStarted` are marked `[Experimental("PISHARP_CODEMODE001")]`, so suppress `PISHARP_CODEMODE001` in your project to set them. They may change or be removed in any release, without notice or a deprecation period.
+:::
+
+An aborted or timed-out execution settles once its worker has been told to stop. The worker can exit later, for example while a built-in that doesn't check for cancellation returns. A host that limits how many workers run at once counts each one until it has exited:
+
+- `OnWorkerStarted(exited)` is called once for each worker that `ExecuteAsync` or `Start` starts. `exited` completes when that worker has exited, which can be after the result and `CloseAsync()`. If the callback throws, the execution fails as a sandbox error with the exception's message, and the worker is stopped.
+- `AcquireWorker()` runs synchronously just before each worker starts. Throw to refuse the execution without starting a worker: it fails as a sandbox error with the exception's message. Otherwise return a release callback, which must not throw. The library calls it once, when the worker has exited, or at once if the worker fails to start. Share the count across sandboxes, and don't release it when the result settles.
+
+```csharp
+var live = 0;
+var options = new CodemodeSandboxOptions
+{
+    AcquireWorker = () =>
+    {
+        if (Interlocked.Increment(ref live) > 2)
+        {
+            Interlocked.Decrement(ref live);
+            throw new InvalidOperationException("Two code mode workers are still running.");
+        }
+        return () => Interlocked.Decrement(ref live);
+    },
+};
+```
+
+Both hooks apply to worker processes and to engine threads. The spare worker the library keeps ready isn't counted until a script takes it.
 
 ### Results
 
@@ -144,8 +175,8 @@ There are no timers, `fetch`, file system, modules or `require`, and no way to r
 | `CodemodeErrorKind` | When |
 | --- | --- |
 | `Script` | The script threw or did not parse. |
-| `Timeout` | The deadline or the interrupt budget ran out. |
-| `Aborted` | Your token fired or the sandbox closed. |
+| `Timeout` | The deadline or the interrupt budget ran out. The worker was told to stop and may still be exiting. |
+| `Aborted` | Your token fired or the sandbox closed. The worker was told to stop and may still be exiting. |
 | `Sandbox` | The engine failed outside the script's control, for example a worker that exited. |
 
 ### Limits
@@ -263,7 +294,9 @@ Console.WriteLine(result);
 - `usage` totals the token usage of `models` calls.
 - `onUpdate` receives `{ content: [], details }` as calls start and finish, for a live view.
 
-The input's optional first line, `// @options: {"max_output_tokens": 10000, "timeout_ms": 60000}`, sets the output budget and the deadline. The executor sets no deadline otherwise. Output beyond `max_output_tokens`, 10000 by default (`CodemodeExecutor.DefaultMaxOutputTokens`), keeps its start and end, and the full text goes to a temp file named in the result. Images the script shows are saved to temp files too, and the result names each path. An invalid options line throws `CodemodeSourceException`. `CodemodeSource.Parse` checks it on its own.
+The input's optional first line, `// @options: {"max_output_tokens": 10000, "timeout_ms": 60000}`, sets the output budget and the deadline. The executor sets no deadline otherwise.
+
+As in Pi, the executor runs at most two scripts' workers at once across the whole process, counting a stopped worker until it has exited. `PI_CODEMODE_MAX_WORKERS`, read for each call, changes the limit. At the limit a script waits for a free worker in arrival order. The wait counts toward `timeout_ms` and ends after 60 seconds or when your token fires; the result then says the script did not start. Output beyond `max_output_tokens`, 10000 by default (`CodemodeExecutor.DefaultMaxOutputTokens`), keeps its start and end, and the full text goes to a temp file named in the result. Images the script shows are saved to temp files too, and the result names each path. An invalid options line throws `CodemodeSourceException`. `CodemodeSource.Parse` checks it on its own.
 
 `CodemodeRenderer` renders a call and its result as plain text rows, and `CodemodeRenderer.Renderers` hands them to an extension host.
 

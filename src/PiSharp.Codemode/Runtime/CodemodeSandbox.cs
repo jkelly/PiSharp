@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/codemode/src/runtime/execution.ts (CodemodeSandboxBase.execute and start, Execution),
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/codemode/src/runtime/execution.ts (CodemodeSandboxBase.execute and start, Execution),
 // packages/codemode/src/runtime/host.ts, packages/codemode/src/runtime/worker.ts and packages/codemode/src/runtime/protocol.ts. The QuickJS worker is replaced by a Jint engine in a child process (or a thread)
 // (decision 0003); docs/compatibility/codemode-engine.md lists the differences.
 using System.Collections.Immutable;
@@ -13,7 +13,8 @@ namespace PiSharp.Codemode;
 /// registered tool, <c>ALL_TOOLS</c>, the output helpers <c>text</c>, <c>image</c>, <c>exit</c> and <c>console.*</c>,
 /// <c>store</c>/<c>load</c> and the configured globals; nothing else (no timers, network, file system, modules or CLR
 /// access). Each execution gets its own engine and worker; the sandbox only holds the tool table and defaults.
-/// <see cref="CloseAsync"/> aborts in-flight executions.
+/// <see cref="CloseAsync"/> aborts in-flight executions. Aborts, timeouts and <see cref="CloseAsync"/> request the worker's termination
+/// without waiting for it to exit; <see cref="CodemodeSandboxOptions.OnWorkerStarted"/> reports the actual exit.
 /// </summary>
 public sealed class CodemodeSandbox : IAsyncDisposable
 {
@@ -154,7 +155,7 @@ public sealed class CodemodeSandbox : IAsyncDisposable
     private static string GlobalsJson(IEnumerable<(string Name, bool Spread)> globals) =>
         Js.Serialize(globals.Select(global => new { name = global.Name, spread = global.Spread }));
 
-    /// <summary>Aborts in-flight executions (they resolve as aborted) and rejects new ones.</summary>
+    /// <summary>Aborts in-flight executions (they resolve as aborted) and rejects new ones. Does not wait for their workers to exit.</summary>
     public async Task CloseAsync()
     {
         Execution[] executions;
@@ -163,10 +164,6 @@ public sealed class CodemodeSandbox : IAsyncDisposable
     }
 
     public ValueTask DisposeAsync() => new(CloseAsync());
-
-
-    /// <summary>How long a finished execution waits for its engine to stop before it settles anyway (tests shorten it).</summary>
-    internal static TimeSpan TerminationLimit { get; set; } = TimeSpan.FromSeconds(10);
 
     /// <summary>Message of an aborted execution, as an AbortSignal without a reason reports it.</summary>
     internal const string AbortedMessage = "This operation was aborted";
@@ -199,7 +196,8 @@ public sealed class CodemodeSandbox : IAsyncDisposable
     }
 
     /// <summary>host.ts Execution: one script in its own engine (a child process, or a thread without a launcher). The first of
-    /// done, timeout, abort and failure finishes it; the engine is then terminated and the result resolves once it is gone.</summary>
+    /// done, timeout, abort and failure finishes it; the engine's termination is then requested and the result resolves without
+    /// waiting for it to be gone.</summary>
     internal sealed class Execution
     {
         private readonly ExecutionPlan plan;
@@ -268,6 +266,13 @@ public sealed class CodemodeSandbox : IAsyncDisposable
             timer = new Timer(_ => Finish(new(CodemodeErrorKind.Sandbox, $"Worker did not start within {StartupLimit.TotalMilliseconds} ms")), null, StartupLimit, Timeout.InfiniteTimeSpan);
             if (cancellationToken.IsCancellationRequested) { Finish(new(CodemodeErrorKind.Aborted, plan.AbortMessage)); return; }
             abortRegistration = cancellationToken.Register(() => Finish(new(CodemodeErrorKind.Aborted, plan.AbortMessage)));
+            // host.ts: reserve capacity immediately before the worker starts; a denial starts no worker.
+            Action? release;
+            try { release = options.AcquireWorker?.Invoke(); }
+            catch (Exception error) { Finish(new(CodemodeErrorKind.Sandbox, error.Message)); return; }
+            // Released once, when the worker actually exits (at once if it fails to start), not when the result settles.
+            if (release is not null)
+                _ = worker.Exited.ContinueWith(_ => { try { release(); } catch (Exception) { } }, CancellationToken.None, TaskContinuationOptions.None, TaskScheduler.Default);
             try
             {
                 worker.Start(new(plan.Code, plan.ToolsJson, plan.GlobalsJson, StoreJson(), options.MemoryLimitBytes, options.TotalAllocationLimitBytes, options.RecursionLimit)
@@ -275,7 +280,10 @@ public sealed class CodemodeSandbox : IAsyncDisposable
                     Received, code => Finish(new(CodemodeErrorKind.Sandbox, $"Worker exited with code {code?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "null"} before the script settled")),
                     error => Finish(error is FormatException format ? Bridge(format.Message) : new(CodemodeErrorKind.Sandbox, $"Sandbox host failed: {error.Message}")));
             }
-            catch (Exception error) { Finish(new(CodemodeErrorKind.Sandbox, "Failed to start worker: " + error.Message)); }
+            catch (Exception error) { Finish(new(CodemodeErrorKind.Sandbox, "Failed to start worker: " + error.Message)); return; }
+            // A failing lifetime hook fails the execution, which requests the worker's termination.
+            try { options.OnWorkerStarted?.Invoke(worker.Exited); }
+            catch (Exception error) { Finish(new(CodemodeErrorKind.Sandbox, error.Message)); }
         }
 
         private static readonly TimeSpan StartupLimit = TimeSpan.FromSeconds(60);
@@ -441,10 +449,12 @@ public sealed class CodemodeSandbox : IAsyncDisposable
             }
             timer?.Dispose();
             abortRegistration.Dispose();
-            _ = Task.Run(async () =>
+            _ = Task.Run(() =>
             {
-                // The outcome is decided: a termination that stalls must not keep it from the caller.
-                try { await worker.TerminateAsync().WaitAsync(TerminationLimit).ConfigureAwait(false); } catch (Exception) { }
+                // execution.ts finish: request the stop, then settle without waiting for the engine to be gone. A worker stuck in a
+                // built-in that does not observe cancellation may exit later; OnWorkerStarted and AcquireWorker's release report it.
+                try { _ = worker.TerminateAsync().ContinueWith(stopped => _ = stopped.Exception, CancellationToken.None, TaskContinuationOptions.OnlyOnFaulted, TaskScheduler.Default); }
+                catch (Exception) { }
                 result.TrySetResult(outcome);
             });
         }

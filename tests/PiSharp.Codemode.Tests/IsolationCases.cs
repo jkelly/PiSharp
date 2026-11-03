@@ -68,8 +68,9 @@ internal static partial class Program
         // is kept ready for the next script).
         Case("isolation.worker-processes-do-not-outlive-scripts", async () =>
         {
-            // A script's result is delivered only after its worker has been killed and reaped, so once the spares are discarded no
-            // worker may be left. Spares started ahead in the background may still be landing, so discard until none is.
+            // A script's worker is killed when its result is decided and reaped soon after (the result does not wait for that), so
+            // once the spares are discarded no worker may be left. Spares started ahead in the background may still be landing, and
+            // killed workers may still be exiting, so discard until none is.
             await CodemodeProcessWorker.DiscardSparesAsync();
             for (var i = 0; i < 6; i++) Failed(await RunIn(CodemodeWorker.Default, "while (true) {}", 300), CodemodeErrorKind.Timeout, "timeout " + i);
             for (var i = 0; i < 6; i++) Ok(await RunIn(CodemodeWorker.Default, "return 1"), "1", "run " + i);
@@ -79,19 +80,14 @@ internal static partial class Program
             Check(CodemodeProcessWorker.Running == 0, "worker processes left: " + CodemodeProcessWorker.Running);
         }),
         // A decided outcome reaches the caller even when stopping its engine stalls: a worker exit wait that never completed once
-        // kept a finished script from settling at all (Linux CI, two concurrent WaitForExitAsync calls on one process).
+        // kept a finished script from settling at all (Linux CI, two concurrent WaitForExitAsync calls on one process). Since Pi 1.3.0
+        // the result settles once termination is requested, without waiting for the exit at all.
         Case("isolation.settles-when-termination-stalls", async () =>
         {
-            var previous = CodemodeSandbox.TerminationLimit;
-            CodemodeSandbox.TerminationLimit = TimeSpan.FromMilliseconds(200);
-            try
-            {
-                await using var sandbox = new CodemodeSandbox(new() { WorkerFactory = () => new StalledWorker() });
-                var started = System.Diagnostics.Stopwatch.StartNew();
-                Ok(await sandbox.ExecuteAsync("return 1").WaitAsync(TimeSpan.FromSeconds(20)), "1", "value despite a stalled termination");
-                Check(started.Elapsed < TimeSpan.FromSeconds(10), "settled soon after the termination limit: " + started.Elapsed);
-            }
-            finally { CodemodeSandbox.TerminationLimit = previous; }
+            await using var sandbox = new CodemodeSandbox(new() { WorkerFactory = () => new StalledWorker() });
+            var started = System.Diagnostics.Stopwatch.StartNew();
+            Ok(await sandbox.ExecuteAsync("return 1").WaitAsync(TimeSpan.FromSeconds(20)), "1", "value despite a stalled termination");
+            Check(started.Elapsed < TimeSpan.FromSeconds(5), "settled without waiting for the termination: " + started.Elapsed);
         }),
         // A host that dies without terminating its workers (killed, crashed) closes their standard input: a worker that sees end
         // of file exits even while its script spins, so it cannot outlive the host. Idle spares do the same.
@@ -171,5 +167,6 @@ internal static partial class Program
         }
         public void Send(CodemodeResultMessage result) { }
         public Task TerminateAsync() => new TaskCompletionSource().Task;
+        public Task Exited { get; } = new TaskCompletionSource().Task;
     }
 }
