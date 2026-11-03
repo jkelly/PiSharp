@@ -57,11 +57,21 @@ test('every bullet maps to rows and every row agrees with the coverage map', () 
 });
 
 test('statuses, phases, releases and PiSharp paths', () => {
-  assert.deepEqual(Object.keys(table.statusMeaning).sort(), ['already-ported', 'no-op', 'port']);
+  assert.deepEqual(Object.keys(table.statusMeaning).sort(), ['already-ported', 'no-op', 'port', 'ported', 'ported-with-deferral']);
   assert.deepEqual(table.areas, Object.keys(PHASES));
   for (const row of table.rows) {
     assert(row.status in table.statusMeaning, row.id + ' status');
-    if (row.status !== 'port') assert.equal(typeof row.evidence, 'string', row.id + ' needs evidence');
+    if (row.status === 'ported' || row.status === 'ported-with-deferral') {
+      // A ported row names its commits and its authored tests, each test as <file>: <case id> in a file that holds it.
+      assert(row.evidence.commits.length > 0 && row.evidence.commits.every(sha => /^[0-9a-f]{7,40}$/.test(sha)), row.id + ' commits');
+      assert(row.evidence.tests.length > 0, row.id + ' needs tests');
+      for (const entry of row.evidence.tests) {
+        const [path, caseId] = entry.split(/: (.*)/s);
+        assert(existsSync(resolve(repo, path)), row.id + ' names a missing test file ' + path);
+        if (caseId) assert(readFileSync(resolve(repo, path), 'utf8').includes(caseId), row.id + ' names a missing case ' + entry);
+      }
+    } else if (row.status !== 'port') assert.equal(typeof row.evidence, 'string', row.id + ' needs evidence');
+    assert.equal(typeof row.deferred === 'string', row.status === 'ported-with-deferral', row.id + ' deferred');
     // A row another area cannot be ported without takes that area's earlier phase (pulledInBy).
     if (row.pulledInBy) {
       for (const id of row.pulledInBy) assert(rowById.has(id), row.id + ' is pulled in by unknown row ' + id);

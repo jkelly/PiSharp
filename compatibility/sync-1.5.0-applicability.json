@@ -14,7 +14,9 @@
   "statusMeaning": {
     "port": "Required change; implemented with authored tests in the phase the row names, before the release the row names.",
     "already-ported": "PiSharp already has the behaviour; the evidence field cites the file.",
-    "no-op": "Nothing to change in PiSharp; the evidence field says why."
+    "no-op": "Nothing to change in PiSharp; the evidence field says why.",
+    "ported": "Ported in this sync; the evidence field lists the commits and the authored tests, each test as `<file>: <case id>`.",
+    "ported-with-deferral": "Ported except for what the deferred field names, with the reason; the evidence field is as for ported."
   },
   "notesMeaning": "A row's notes are planning notes written before its port and describe the code as it was then.",
   "phaseMeaning": {
