@@ -56,6 +56,8 @@ public sealed class PiMessagesEventMapper
             _partial["stopReason"] = PiWireJson.StopReasonName(reason); _partial["usage"] = Node(value.GetProperty("usage"));
             Optional(_partial, value, "responseId", "responseId", "/responseId");
             if (type == "error") Optional(_partial, value, "errorMessage", "errorMessage", "/errorMessage");
+            // The concrete model the provider used (for example a virtual model's), when the event carries it.
+            if (value.TryGetProperty("responseModel", out var responseModel)) _partial["responseModel"] = Node(responseModel);
             if (value.TryGetProperty("providerThinkingLevel", out var thinking)) _partial["providerThinkingLevel"] = Node(thinking);
             if (value.TryGetProperty("rewrite", out var rewrite) && rewrite.ValueKind != JsonValueKind.Null)
                 Diagnostic(new JsonObject { ["type"] = "pi_messages_rewrite", ["timestamp"] = _request.Timestamp, ["details"] = Node(rewrite) });
