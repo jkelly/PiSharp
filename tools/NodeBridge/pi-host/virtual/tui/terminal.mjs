@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/tui/src/terminal.ts.
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/tui/src/terminal.ts.
 // Ported to plain ESM for the PiSharp Node extension bridge (TypeScript types stripped mechanically; behaviour unchanged).
 import * as fs from "node:fs";
 import * as path from "node:path";
@@ -7,6 +7,7 @@ import { isNativeModifierPressed } from "./native-modifiers.mjs";
 import { getNativePlatformHelper } from "./native-platform.mjs";
 import { formatProgramStatus, isProgramStatusReply, PROGRAM_STATUS_QUERY } from "./program-status.mjs";
 import { StdinBuffer } from "./stdin-buffer.mjs";
+import { replaceControlCharacters } from "./utils.mjs";
 const TERMINAL_PROGRESS_KEEPALIVE_MS = 1000;
 const TERMINAL_PROGRESS_ACTIVE_SEQUENCE = "\x1b]9;4;3\x07";
 const TERMINAL_PROGRESS_CLEAR_SEQUENCE = "\x1b]9;4;0\x07";
@@ -42,8 +43,13 @@ export function refreshTerminalDimensions() {
         process.kill(process.pid, "SIGWINCH");
     } catch  {}
 }
+function isNativeShiftEnterCandidate(data) {
+    return data === "\r" || data === "\x1b\r";
+}
 export function normalizeNativeShiftEnterInput(data, shouldDetectNativeShiftEnter, isShiftPressed) {
-    if (shouldDetectNativeShiftEnter && data === "\r" && isShiftPressed) return NATIVE_SHIFT_ENTER_SEQUENCE;
+    if (shouldDetectNativeShiftEnter && isNativeShiftEnterCandidate(data) && isShiftPressed) {
+        return NATIVE_SHIFT_ENTER_SEQUENCE;
+    }
     return data;
 }
 export function normalizeAppleTerminalInput(data, isAppleTerminal, isShiftPressed) {
@@ -235,7 +241,7 @@ export class ProcessTerminal {
     }
     forwardInputSequence(sequence) {
         if (!this.inputHandler) return;
-        const shouldDetectNativeShiftEnter = sequence === "\r" && (isAppleTerminalSession() || process.platform === "win32");
+        const shouldDetectNativeShiftEnter = isNativeShiftEnterCandidate(sequence) && (isAppleTerminalSession() || process.platform === "win32");
         const input = normalizeNativeShiftEnterInput(sequence, shouldDetectNativeShiftEnter, shouldDetectNativeShiftEnter && isNativeModifierPressed("shift"));
         this.inputHandler(input);
     }
@@ -325,6 +331,17 @@ export class ProcessTerminal {
             process.stdin.setRawMode(this.wasRaw);
         }
     }
+    restoreOnExit(before, after) {
+        let sequence = before;
+        if (this.progressInterval) sequence += TERMINAL_PROGRESS_CLEAR_SEQUENCE;
+        sequence += "\x1b[?2004l";
+        if (this.keyboardProtocolPushed || this._kittyProtocolActive) sequence += "\x1b[<u";
+        if (this._modifyOtherKeysActive) sequence += "\x1b[>4;0m";
+        sequence += after;
+        try {
+            fs.writeSync(process.stdout.fd, sequence);
+        } catch  {}
+    }
     write(data) {
         process.stdout.write(data);
         if (this.writeLogPath) {
@@ -364,7 +381,7 @@ export class ProcessTerminal {
         process.stdout.write("\x1b[2J\x1b[H");
     }
     setTitle(title) {
-        process.stdout.write(`\x1b]0;${title}\x07`);
+        process.stdout.write(`\x1b]0;${replaceControlCharacters(title)}\x07`);
     }
     setProgramStatus(status) {
         this.programStatus = status.state === "clear" ? undefined : status;

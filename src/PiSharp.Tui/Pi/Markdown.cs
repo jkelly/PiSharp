@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/tui/src/components/markdown.ts.
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/tui/src/components/markdown.ts.
 using System.Text.RegularExpressions;
 
 namespace PiSharp.Tui.Pi;
@@ -42,14 +42,41 @@ public sealed partial class Markdown : IComponent
     private string? cachedText;
     private int? cachedWidth;
     private List<string>? cachedLines;
-    private sealed record TokenCache(string Source, List<MarkdownToken> Tokens);
+    private sealed record TokenCache(string Source, List<MarkdownToken> Tokens, int LinkCount);
+    // Parsed tokens depend only on the source, so they survive theme and width invalidation; held weakly.
     private WeakReference<TokenCache>? cachedTokens;
+
+    /// <summary>A top-level block of the last render, keyed by its source, reused by the next render.</summary>
+    private sealed class RenderedBlock
+    {
+        /// <summary>Width and type of the following block (which decides the spacing) that the lines were rendered for.</summary>
+        public int Width = -1;
+        public string? NextTokenType;
+        public List<string> Lines = [];
+        /// <summary>Highlighted lines of the block's code, keyed by language and source; they survive a resize or new spacing.</summary>
+        public readonly Dictionary<string, List<string>> HighlightedCode = new(StringComparer.Ordinal);
+    }
+
+    // The last render's top-level blocks. While a message streams only its last block changes, so a render styles and wraps only
+    // that block. Each render keeps only the blocks it used. Held weakly like the tokens: only a burst of renders needs them.
+    private WeakReference<Dictionary<string, RenderedBlock>>? blocks;
+    // Highlighted code of the block being rendered, only set while RenderBlock runs.
+    private Dictionary<string, List<string>>? blockHighlightedCode;
 
     public Markdown(string text, int paddingX, int paddingY, MarkdownTheme theme, DefaultTextStyle? defaultStyle = null, MarkdownOptions? options = null)
     { this.text = text; this.paddingX = paddingX; this.paddingY = paddingY; this.theme = theme; this.defaultStyle = defaultStyle; this.options = options ?? new(); }
 
-    public void SetText(string value) { text = value; Invalidate(); }
-    public void Invalidate() { cachedText = null; cachedWidth = null; cachedLines = null; }
+    public void SetText(string value) { text = value; ClearRenderCache(); }
+
+    public void Invalidate()
+    {
+        ClearRenderCache();
+        // The theme may have changed, which changes every styled line and the default style's prefix.
+        blocks = null;
+        defaultStylePrefix = null;
+    }
+
+    private void ClearRenderCache() { cachedText = null; cachedWidth = null; cachedLines = null; }
 
     [GeneratedRegex(@"\x1b\[0m")] private static partial Regex ResetCode();
 
@@ -58,38 +85,63 @@ public sealed partial class Markdown : IComponent
         if (cachedLines is not null && cachedText == text && cachedWidth == width) return cachedLines;
         var contentWidth = Math.Max(1, width - paddingX * 2);
         var source = options.Transform?.Invoke(text, contentWidth) ?? text;
-        if (string.IsNullOrEmpty(source) || TextUtils.JsTrim(source).Length == 0) { cachedText = text; cachedWidth = width; cachedLines = []; return []; }
+        if (string.IsNullOrEmpty(source) || TextUtils.JsTrim(source).Length == 0) { blocks = null; cachedText = text; cachedWidth = width; cachedLines = []; return []; }
         var normalized = source.Replace("\t", "   ", StringComparison.Ordinal);
-        List<MarkdownToken>? tokens = null;
-        if (cachedTokens is not null && cachedTokens.TryGetTarget(out var cached) && cached.Source == normalized) tokens = cached.Tokens;
-        if (tokens is null)
+        TokenCache? tokenCache = null;
+        if (cachedTokens is not null && cachedTokens.TryGetTarget(out var cached) && cached.Source == normalized) tokenCache = cached;
+        if (tokenCache is null)
         {
-            tokens = MarkdownLexer.Lex(normalized);
-            MarkdownLexer.TrimPartialClosingFences(tokens);
-            cachedTokens = new(new TokenCache(normalized, tokens));
+            var lexed = MarkdownLexer.Lex(normalized, out var linkCount);
+            MarkdownLexer.TrimPartialClosingFences(lexed);
+            tokenCache = new TokenCache(normalized, lexed, linkCount);
+            cachedTokens = new(tokenCache);
         }
-        var rendered = new List<string>();
-        for (var i = 0; i < tokens.Count; i++) rendered.AddRange(RenderToken(tokens[i], contentWidth, i + 1 < tokens.Count ? tokens[i + 1].Type : null));
-        var wrapped = new List<string>();
-        foreach (var line in rendered)
-        {
-            if (TerminalImage.IsImageLine(line)) wrapped.Add(line);
-            else wrapped.AddRange(TextUtils.WrapTextWithAnsi(line, contentWidth));
-        }
-        var margin = new string(' ', paddingX);
-        var bg = defaultStyle?.BgColor;
+        var tokens = tokenCache.Tokens;
+        // A reference link resolves through a definition anywhere in the text, so blocks with the same source can render
+        // differently; such texts are rare in practice and render without reusing blocks.
+        var reuseBlocks = tokenCache.LinkCount == 0;
+        Dictionary<string, RenderedBlock>? previousBlocks = null;
+        if (blocks is not null && blocks.TryGetTarget(out var previous)) previousBlocks = previous;
+        var currentBlocks = new Dictionary<string, RenderedBlock>(StringComparer.Ordinal);
+        blocks = new(currentBlocks);
         var content = new List<string>();
-        foreach (var line in wrapped)
+        for (var i = 0; i < tokens.Count; i++)
         {
-            if (TerminalImage.IsImageLine(line)) { content.Add(line); continue; }
-            var withMargins = margin + line + margin;
-            content.Add(bg is not null ? TextUtils.ApplyBackgroundToLine(withMargins, width, bg) : withMargins + new string(' ', Math.Max(0, width - TextUtils.VisibleWidth(withMargins))));
+            var token = tokens[i];
+            var nextTokenType = i + 1 < tokens.Count ? tokens[i + 1].Type : null;
+            RenderedBlock? reused = null;
+            if (reuseBlocks && !currentBlocks.TryGetValue(token.Raw, out reused)) previousBlocks?.TryGetValue(token.Raw, out reused);
+            var block = reused ?? new RenderedBlock { NextTokenType = nextTokenType };
+            if (block.Width != width || block.NextTokenType != nextTokenType) RenderBlock(block, token, nextTokenType, width, contentWidth);
+            if (reuseBlocks) currentBlocks[token.Raw] = block;
+            content.AddRange(block.Lines);
         }
+        var bg = defaultStyle?.BgColor;
         var empty = new string(' ', width);
         var padding = Enumerable.Range(0, paddingY).Select(_ => bg is not null ? TextUtils.ApplyBackgroundToLine(empty, width, bg) : empty).ToList();
         var result = new List<string>(padding); result.AddRange(content); result.AddRange(padding);
         cachedText = text; cachedWidth = width; cachedLines = result;
         return result.Count > 0 ? result : [""];
+    }
+
+    /// <summary>Renders one top-level block to output lines: wrapped, with margins, and padded or backgrounded to the width.</summary>
+    private void RenderBlock(RenderedBlock block, MarkdownToken token, string? nextTokenType, int width, int contentWidth)
+    {
+        blockHighlightedCode = block.HighlightedCode;
+        var margin = new string(' ', paddingX);
+        var bg = defaultStyle?.BgColor;
+        var lines = new List<string>();
+        foreach (var line in RenderToken(token, contentWidth, nextTokenType))
+        {
+            if (TerminalImage.IsImageLine(line)) { lines.Add(line); continue; }
+            foreach (var wrapped in TextUtils.WrapTextWithAnsi(line, contentWidth))
+            {
+                var withMargins = margin + wrapped + margin;
+                lines.Add(bg is not null ? TextUtils.ApplyBackgroundToLine(withMargins, width, bg) : withMargins + new string(' ', Math.Max(0, width - TextUtils.VisibleWidth(withMargins))));
+            }
+        }
+        blockHighlightedCode = null;
+        block.Lines = lines; block.Width = width; block.NextTokenType = nextTokenType;
     }
 
     private string ApplyDefaultStyle(string value)
@@ -144,7 +196,9 @@ public sealed partial class Markdown : IComponent
             case "text": lines.Add(RenderInline([token], context)); break;
             case "latexBlock":
             {
-                var rendered = !token.Pending && options.RenderLatex ? Latex.Render(token.Text, display: true) ?? token.Raw.Trim() : token.Raw.Trim();
+                var rendered = !token.Pending && options.RenderLatex ? Latex.Render(token.Text, display: true) : null;
+                // A 2D layout cannot be wrapped row by row; fall back to the raw source when it does not fit.
+                if (rendered is null || rendered.Split('\n').Any(line => TextUtils.VisibleWidth(line) > width)) rendered = token.Raw.Trim();
                 foreach (var line in rendered.Split('\n')) lines.Add(ApplyDefaultStyle(line));
                 if (nextType is not null && nextType != "space") lines.Add("");
                 break;
@@ -153,7 +207,17 @@ public sealed partial class Markdown : IComponent
             {
                 var indent = theme.CodeBlockIndent ?? "  ";
                 lines.Add(theme.CodeBlockBorder("```" + (token.Lang ?? "")));
-                if (theme.HighlightCode is { } highlight) foreach (var line in highlight(token.Text, token.Lang)) lines.Add(indent + line);
+                if (theme.HighlightCode is { } highlight)
+                {
+                    var key = (token.Lang ?? "") + "\0" + token.Text;
+                    List<string>? highlighted = null;
+                    if (blockHighlightedCode is null || !blockHighlightedCode.TryGetValue(key, out highlighted))
+                    {
+                        highlighted = highlight(token.Text, token.Lang);
+                        blockHighlightedCode?.TryAdd(key, highlighted);
+                    }
+                    foreach (var line in highlighted) lines.Add(indent + line);
+                }
                 else foreach (var line in token.Text.Split('\n')) lines.Add(indent + theme.CodeBlock(line));
                 lines.Add(theme.CodeBlockBorder("```"));
                 if (nextType is not null && nextType != "space") lines.Add("");
@@ -166,9 +230,17 @@ public sealed partial class Markdown : IComponent
                 Func<string, string> quoteStyle = value => theme.Quote(theme.Italic(value));
                 var prefix = StylePrefix(quoteStyle);
                 string ApplyQuote(string line) => prefix.Length == 0 ? quoteStyle(line) : quoteStyle(ResetCode().Replace(line, "\u001b[0m" + prefix));
-                var quoteWidth = Math.Max(1, width - 2);
-                var quoteContext = new StyleContext(value => value, prefix);
                 var quoteTokens = token.Tokens ?? [];
+                // With no room for another border ("│ " plus at least one content column), render the nested content without one.
+                // Otherwise each extra level re-wraps every child line at width 1 and the output grows exponentially with depth.
+                if (width < 3)
+                {
+                    for (var i = 0; i < quoteTokens.Count; i++)
+                        lines.AddRange(RenderToken(quoteTokens[i], width, i + 1 < quoteTokens.Count ? quoteTokens[i + 1].Type : null, context));
+                    break;
+                }
+                var quoteWidth = width - 2;
+                var quoteContext = new StyleContext(value => value, prefix);
                 var quoteLines = new List<string>();
                 for (var i = 0; i < quoteTokens.Count; i++)
                     quoteLines.AddRange(RenderToken(quoteTokens[i], quoteWidth, i + 1 < quoteTokens.Count ? quoteTokens[i + 1].Type : null, quoteContext));

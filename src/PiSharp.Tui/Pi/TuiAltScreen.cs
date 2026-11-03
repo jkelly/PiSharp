@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/tui/src/tui-alt-screen.ts.
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/tui/src/tui-alt-screen.ts.
 using System.Diagnostics;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -32,6 +32,9 @@ public sealed partial class TuiAltScreen : TuiBase, IViewportTui
     private const int PageOverlap = 4, AltWheelMultiplier = 5, DoubleClickMs = 500, CopyErrorFlashMs = 5000;
     private const int MaxOffscreenImages = 16;
     private const long MaxOffscreenTransmission = 32L * 1024 * 1024, MaxOffscreenDecoded = 64L * 1024 * 1024;
+    // Regular mode delegates double-click selection to the terminal emulator. Fullscreen owns mouse selection, so it uses iTerm2's
+    // default "characters considered part of a word" set.
+    private static readonly HashSet<string> WordSelectionJoiners = new(["/", "-", "+", "\\", "~", "_", "."], StringComparer.Ordinal);
     [GeneratedRegex(@"^\x1b\]133;A(?:\x07|\x1b\\)")] private static partial Regex PromptStart();
     [GeneratedRegex(@"^\x1b\[<(\d+);(\d+);(\d+)([Mm])$")] private static partial Regex SgrMouse();
 
@@ -162,6 +165,15 @@ public sealed partial class TuiAltScreen : TuiBase, IViewportTui
         Terminal.Write(BeginSync + (imageProtocol == ImageProtocol.Kitty ? TerminalImage.DeleteAllKittyImages() : "") + (mouseEnabled ? DisableMouse : "") + EnableAutowrap + EndSync);
         uploadedKitty.Clear();
     }
+
+    protected override string GetExitRestorePrefix()
+    {
+        var prefix = base.GetExitRestorePrefix();
+        return altScreenActive ? EndSync + (mouseEnabled ? DisableMouse : "") + EnableAutowrap + prefix : prefix;
+    }
+
+    // Kitty keyboard flags are per screen, so the terminal pops them before the alternate screen is left.
+    protected override string GetExitRestoreSuffix() => base.GetExitRestoreSuffix() + (altScreenActive ? ExitAltScreen + "\u001b[?25h" : "");
 
     protected override void AfterTerminalStop(bool preserveScreen)
     {
@@ -312,7 +324,8 @@ public sealed partial class TuiAltScreen : TuiBase, IViewportTui
     /// <summary>Shows a transient message in the flash stack.</summary>
     public void Flash(string message, int durationMs = 1000) => flashes.Flash(message, durationMs);
 
-    private bool DeferToOverlay() => IsOverlayFocused() && activeSearch?.Overlay?.IsFocused != true;
+    /// <summary>Focused overlays and components that capture viewport input receive viewport keys instead of the transcript.</summary>
+    private bool DeferViewportInput() => FocusedComponent?.CapturesViewportInput == true || IsOverlayFocused() && activeSearch?.Overlay?.IsFocused != true;
     private void ClearComponentMouseGesture() { mouseCapture = null; mousePressTarget = null; mousePressPoint = null; mousePressMoved = false; }
 
     private TuiInputListenerResult? HandleViewportInput(string data)
@@ -353,7 +366,7 @@ public sealed partial class TuiAltScreen : TuiBase, IViewportTui
             if (kb.Matches(data, "tui.altScreen.searchPrevious")) { if (!release) NavigateSearch(-1); return new(Consume: true); }
             if (kb.Matches(data, "tui.altScreen.searchClose")) { if (!release) CloseSearch(); return new(Consume: true); }
         }
-        if (DeferToOverlay()) return null;
+        if (DeferViewportInput()) return null;
         var height = PrimaryScrollView.ViewportHeight;
         (string Binding, Action Run)[] bindings =
         [
@@ -596,7 +609,7 @@ public sealed partial class TuiAltScreen : TuiBase, IViewportTui
         foreach (var segment in WordSegmenter.Segment(line))
         {
             var end = start + TextUtils.VisibleWidth(segment.Segment);
-            var joiner = segment.Segment is "/" or "-";
+            var joiner = WordSelectionJoiners.Contains(segment.Segment);
             segments.Add((start, end, segment.IsWordLike || joiner, joiner)); start = end;
         }
         var clicked = segments.FindIndex(segment => point.Col >= segment.Start && point.Col < segment.End);

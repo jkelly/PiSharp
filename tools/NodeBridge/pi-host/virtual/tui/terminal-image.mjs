@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/tui/src/terminal-image.ts.
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/tui/src/terminal-image.ts.
 // Ported to plain ESM for the PiSharp Node extension bridge (TypeScript types stripped mechanically; behaviour unchanged).
 import { execSync } from "node:child_process";
 import { homedir } from "node:os";
@@ -57,6 +57,20 @@ function detectCapabilitiesFromEnvironment(tmuxForwardsHyperlink) {
         return {
             images: "kitty",
             trueColor: hasTrueColorHint,
+            hyperlinks: true
+        };
+    }
+    if (termProgram === "rex") {
+        return {
+            images: "kitty",
+            trueColor: true,
+            hyperlinks: true
+        };
+    }
+    if (termProgram === "orca" && process.env.ORCA_IMAGE_PROTOCOL === "kitty") {
+        return {
+            images: "kitty",
+            trueColor: true,
             hyperlinks: true
         };
     }
@@ -249,8 +263,10 @@ export function encodeITerm2(base64Data, options = {}) {
 }
 const kittyImageMetadata = new Map();
 let kittyTransmissionGeneration = 0;
+let maxKittyImageRows = 0;
 export function registerKittyImageMetadata(metadata) {
     kittyTransmissionGeneration += 1;
+    maxKittyImageRows = Math.max(maxKittyImageRows, metadata.rows);
     kittyImageMetadata.delete(metadata.imageId);
     kittyImageMetadata.set(metadata.imageId, {
         ...metadata,
@@ -260,6 +276,9 @@ export function registerKittyImageMetadata(metadata) {
         const oldestImageId = kittyImageMetadata.keys().next().value;
         if (oldestImageId !== undefined) kittyImageMetadata.delete(oldestImageId);
     }
+}
+export function getMaxKittyImageRows() {
+    return maxKittyImageRows;
 }
 function getRegisteredKittyImageMetadataFromControls(controls) {
     const imageId = /(?:^|,)i=(\d+)(?:,|$)/.exec(controls)?.[1];

@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/tui/src/keybindings.ts.
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/tui/src/keybindings.ts.
 // Ported to plain ESM for the PiSharp Node extension bridge (TypeScript types stripped mechanically; behaviour unchanged).
 import { matchesKey } from "./keys.mjs";
 export const TUI_KEYBINDINGS = {
@@ -349,4 +349,11 @@ export function getKeybindings() {
         globalKeybindings = new KeybindingsManager(TUI_KEYBINDINGS);
     }
     return globalKeybindings;
+}
+export function getSelectPageIndex(keybindings, data, selectedIndex, itemCount, pageSize) {
+    let direction;
+    if (keybindings.matches(data, "tui.select.pageUp")) direction = -1;
+    else if (keybindings.matches(data, "tui.select.pageDown")) direction = 1;
+    else return undefined;
+    return Math.max(0, Math.min(itemCount - 1, selectedIndex + direction * pageSize));
 }

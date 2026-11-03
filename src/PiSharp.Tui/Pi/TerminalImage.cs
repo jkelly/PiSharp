@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/tui/src/terminal-image.ts and packages/tui/src/terminal-colors.ts.
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/tui/src/terminal-image.ts and packages/tui/src/terminal-colors.ts.
 using System.Buffers.Binary;
 using System.Diagnostics;
 using System.Globalization;
@@ -53,6 +53,10 @@ public static partial class TerminalImage
         // Herdr forwards OSC 8 hyperlinks and supports the Kitty graphics protocol. Check it before outer-terminal detection because
         // variables like KITTY_WINDOW_ID can leak into its panes.
         if (termProgram == "herdr") return new(ImageProtocol.Kitty, trueColorHint, true);
+        if (termProgram == "rex") return new(ImageProtocol.Kitty, true, true);
+        // Orca supports Kitty graphics but only advertises it through ORCA_IMAGE_PROTOCOL. Require both signals so Orca releases
+        // predating that advertisement keep the text fallback instead of reserving image rows that nothing renders.
+        if (termProgram == "orca" && Environment("ORCA_IMAGE_PROTOCOL") == "kitty") return new(ImageProtocol.Kitty, true, true);
         if (Has("KITTY_WINDOW_ID") || termProgram == "kitty") return new(ImageProtocol.Kitty, true, true);
         if (termProgram == "ghostty" || term.Contains("ghostty", StringComparison.Ordinal) || Has("GHOSTTY_RESOURCES_DIR")) return new(ImageProtocol.Kitty, true, true);
         if (Has("WEZTERM_PANE") || termProgram == "wezterm") return new(ImageProtocol.Kitty, true, true);
@@ -146,17 +150,24 @@ public static partial class TerminalImage
     private static readonly Dictionary<long, RegisteredKitty> KittyMetadata = new();
     private static readonly LinkedList<long> KittyOrder = new();
     private static long kittyGeneration;
+    // Tallest registered image. Bounds backward searches for image lines above a viewport: no image line further up than this can
+    // reach into it.
+    private static int maxKittyImageRows;
 
     public static void RegisterKittyImageMetadata(KittyImageMetadata metadata)
     {
         lock (Gate)
         {
             kittyGeneration++;
+            maxKittyImageRows = Math.Max(maxKittyImageRows, metadata.Rows);
             if (KittyMetadata.Remove(metadata.ImageId)) KittyOrder.Remove(metadata.ImageId);
             KittyMetadata[metadata.ImageId] = new(metadata, kittyGeneration); KittyOrder.AddLast(metadata.ImageId);
             if (KittyMetadata.Count > 1000 && KittyOrder.First is { } oldest) { KittyMetadata.Remove(oldest.Value); KittyOrder.RemoveFirst(); }
         }
     }
+
+    /// <summary>The row height of the tallest Kitty image registered so far.</summary>
+    internal static int GetMaxKittyImageRows() { lock (Gate) return maxKittyImageRows; }
 
     [GeneratedRegex(@"(?:^|,)i=(\d+)(?:,|$)")] private static partial Regex KittyIdControl();
     [GeneratedRegex(@"(?:^|,)r=(\d+)(?:,|$)")] private static partial Regex KittyRowsControl();

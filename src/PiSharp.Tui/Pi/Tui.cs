@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/tui/src/tui.ts.
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/tui/src/tui.ts.
 using System.Diagnostics;
 using System.Globalization;
 using System.Text.RegularExpressions;
@@ -23,6 +23,10 @@ public interface IComponent
 {
     List<string> Render(int width);
     void Invalidate();
+    /// <summary>While focused, fullscreen viewport keys (<c>tui.altScreen.*</c> scrolling and prompt jumps) go to this component
+    /// instead of scrolling the transcript, as they do for a focused overlay. Default is false.</summary>
+    [System.Diagnostics.CodeAnalysis.Experimental("PISHARP_TUI001")]
+    bool CapturesViewportInput => false;
 }
 /// <summary>Keyboard input for the focused component.</summary>
 public interface IInputHandler
@@ -244,6 +248,21 @@ public abstract partial class TuiBase : Container, ITui
     protected virtual void AfterTerminalStart() { }
     protected virtual void BeforeTerminalStop(bool preserveScreen) { }
     protected virtual void AfterTerminalStop(bool preserveScreen) { }
+
+    /// <summary>Mode resets written before the terminal's own resets when the process exits without <see cref="Stop"/>.</summary>
+    protected virtual string GetExitRestorePrefix() => (schemeNotifications ? "\u001b[?2031l" : "") + "\u001b[?25h";
+    /// <summary>Mode resets written after the terminal's own resets when the process exits without <see cref="Stop"/>.</summary>
+    protected virtual string GetExitRestoreSuffix() => "";
+
+    // Last-resort restore for exit paths that skip Stop(), e.g. a direct Environment.Exit(). ProcessExit, like Node's "exit" event,
+    // does not run on a hard kill or Environment.FailFast, which cannot be covered.
+    private void RestoreTerminalOnExit(object? sender, EventArgs e)
+    {
+        if (stopped) return;
+        try { Terminal.RestoreOnExit(GetExitRestorePrefix(), GetExitRestoreSuffix()); }
+        catch { /* Never throw from an exit handler. */ }
+    }
+
     public int FullRedraws => fullRedrawCount;
 
     public bool ShowHardwareCursor
@@ -435,6 +454,8 @@ public abstract partial class TuiBase : Container, ITui
     public void Start()
     {
         stopped = false;
+        AppDomain.CurrentDomain.ProcessExit -= RestoreTerminalOnExit;
+        AppDomain.CurrentDomain.ProcessExit += RestoreTerminalOnExit;
         BeforeTerminalStart();
         Terminal.Start(data => HandleTerminalInput(data), () => RequestRender());
         AfterTerminalStart();
@@ -466,6 +487,7 @@ public abstract partial class TuiBase : Container, ITui
     public void Stop(bool preserveScreen = false)
     {
         stopped = true;
+        AppDomain.CurrentDomain.ProcessExit -= RestoreTerminalOnExit;
         CancelRenderTimer();
         if (schemeNotifications) Terminal.Write("\u001b[?2031l");
         BeforeTerminalStop(preserveScreen);

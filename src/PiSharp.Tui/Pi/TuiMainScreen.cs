@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/tui/src/tui-main-screen.ts.
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/tui/src/tui-main-screen.ts.
 using System.Globalization;
 using System.Text;
 
@@ -149,7 +149,8 @@ public sealed class TuiMainScreen : TuiBase
         int LineDiff(int targetRow) => targetRow - viewportTop - (hwRow - prevViewportTop);
 
         // Resolve fake cursors before compositing so overlays and line slicing see plain SGR codes
-        var newLines = ResolveFakeCursors(Render(width));
+        // Drop OSC 133 markers: the terminal reads 133;A as a new shell prompt, which ends program status (OSC 7501)
+        var newLines = ResolveFakeCursors(Render(width).Select(line => LayoutEngine.Osc133ZonePrefix().Replace(line, "")).ToList());
         if (HasOverlayEntries) newLines = CompositeOverlays(newLines, width, height);
         var cursorPos = ExtractCursorPosition(newLines, height);
         newLines = ApplyLineResets(newLines);
