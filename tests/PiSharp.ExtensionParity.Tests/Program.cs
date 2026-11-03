@@ -44,6 +44,7 @@ internal static partial class Program
         cases.AddRange(Sync150Cases());
         cases.AddRange(Sync150PackageCases());
         cases.AddRange(Sync150ProviderCases());
+        cases.AddRange(Sync150BridgeCases());
         var filter = Environment.GetEnvironmentVariable("EXTPARITY_FILTER");
         if (!string.IsNullOrEmpty(filter)) cases = [.. cases.Where(test => test.Id.Contains(filter, StringComparison.Ordinal))];
         var results = new List<object>(); var failures = 0; var skipped = 0;
