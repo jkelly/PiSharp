@@ -709,6 +709,62 @@ internal static class Sync150CliCases
             var written = await PiSharp.Cli.Interactive.Mode.Utilities.ClipboardCommand.RunClipboardCommand("sh", ["-c", "cat > /dev/null"], new("copied"));
             Equal(0, written?.Length ?? -1, "writer result");
         });
+
+        // agent-session.ts exportToHtml with export-html/tool-renderer.ts: the HTML export pre-renders the tools the page template does
+        // not draw (grep, a custom tool) with the transcript's renderers, the theme and the configured keys (keyText and keyHint read
+        // the configured keybindings); template tools (bash) are left to the page. Authored from the v1.5.0 sources.
+        yield return ("sync150.html-export-pre-renders-tools-with-transcript-renderers", Sync(() =>
+        {
+            Themes.InitTheme("dark");
+            var previous = KeybindingsManager.Global;
+            KeybindingsManager.SetGlobal(new KeybindingsManager(AppKeybindings.Definitions(_ => null),
+                new Dictionary<string, IReadOnlyList<string>?> { ["app.tools.expand"] = ["ctrl+y"] }));
+            try
+            {
+                var lookup = new ToolRenderers(
+                    RenderCall: (args, _, context) => new Text($"lookup {(string?)args?["q"]} ({KeybindingHints.KeyText("app.tools.expand")} to expand) in {context.Cwd}", 0, 0),
+                    RenderResult: (result, options, _, context) => new Text(
+                        $"{(options.Expanded ? "all" : "some")} of {(string?)result["content"]?[0]?["text"]} {(string?)result["details"]?["k"]} {(string?)context.Args?["q"]}", 0, 0));
+                var cwd = Path.Combine(Path.GetTempPath(), "pisharp-export-tools");
+                var renderer = ExportToolHtmlRenderer.Create(name => name == "lookup" ? lookup : BuiltInToolRenderers.Resolve(name), Themes.Current, cwd);
+                var root = Directory.CreateTempSubdirectory("pisharp-export-tools-").FullName;
+                try
+                {
+                    var session = Path.Combine(root, "session.jsonl");
+                    static string Line(JsonObject value) => value.ToJsonString();
+                    File.WriteAllText(session, string.Join("\n",
+                        Line(new() { ["type"] = "session", ["version"] = 3, ["id"] = "export-tools", ["timestamp"] = "1970-01-01T00:00:00.000Z", ["cwd"] = root }),
+                        Line(new()
+                        {
+                            ["type"] = "message", ["id"] = "a1", ["parentId"] = null, ["timestamp"] = "1970-01-01T00:00:01.000Z",
+                            ["message"] = Assistant(new JsonArray(
+                                new JsonObject { ["type"] = "toolCall", ["id"] = "call_grep", ["name"] = "grep", ["arguments"] = new JsonObject { ["pattern"] = "needle", ["path"] = "src" } },
+                                new JsonObject { ["type"] = "toolCall", ["id"] = "call_lookup", ["name"] = "lookup", ["arguments"] = new JsonObject { ["q"] = "term" } },
+                                new JsonObject { ["type"] = "toolCall", ["id"] = "call_bash", ["name"] = "bash", ["arguments"] = new JsonObject { ["command"] = "ls" } }), "toolUse")
+                        }),
+                        Line(new()
+                        {
+                            ["type"] = "message", ["id"] = "r1", ["parentId"] = "a1", ["timestamp"] = "1970-01-01T00:00:02.000Z",
+                            ["message"] = new JsonObject
+                            {
+                                ["role"] = "toolResult", ["toolCallId"] = "call_lookup", ["toolName"] = "lookup", ["isError"] = false, ["timestamp"] = 2,
+                                ["content"] = new JsonArray(new JsonObject { ["type"] = "text", ["text"] = "rows" }), ["details"] = new JsonObject { ["k"] = "v" }
+                            }
+                        })) + "\n");
+                    var data = PiSharp.CodingAgent.Export.SessionHtmlExport.BuildSessionData(PiSharp.CodingAgent.Export.SessionExportSource.Open(session), null, renderer);
+                    var rendered = JsonNode.Parse(PiSharp.CodingAgent.Export.Js.Stringify(data["renderedTools"]))!.AsObject();
+                    Equal("call_grep,call_lookup", string.Join(",", rendered.Select(pair => pair.Key)), "pre-rendered tools");
+                    var grep = (string?)rendered["call_grep"]?["callHtml"] ?? "";
+                    Contains(grep, "grep", "grep call");
+                    Contains(grep, "needle", "grep pattern");
+                    Contains((string?)rendered["call_lookup"]?["callHtml"] ?? "", "lookup term (ctrl+y to expand) in " + System.Net.WebUtility.HtmlEncode(cwd), "custom call");
+                    Contains((string?)rendered["call_lookup"]?["resultHtmlCollapsed"] ?? "", "some of rows v term", "collapsed result");
+                    Contains((string?)rendered["call_lookup"]?["resultHtmlExpanded"] ?? "", "all of rows v term", "expanded result");
+                }
+                finally { Directory.Delete(root, true); }
+            }
+            finally { KeybindingsManager.SetGlobal(previous); }
+        }));
     }
 
     /// <summary>A model runtime with a fixed available snapshot and no refresh errors.</summary>

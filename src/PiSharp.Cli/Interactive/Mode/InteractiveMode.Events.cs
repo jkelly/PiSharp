@@ -456,6 +456,11 @@ internal sealed partial class InteractiveMode
     private ToolRenderers? GetRegisteredToolDefinition(string toolName) =>
         context.ResolveToolRenderers?.Invoke(toolName) ?? BuiltInToolRenderers.Resolve(toolName);
 
+    /// <summary>agent-session.ts exportToHtml's createToolHtmlRenderer: the HTML export pre-renders tools with the transcript's renderers,
+    /// the current theme and the session cwd.</summary>
+    internal PiSharp.CodingAgent.Export.IToolHtmlRenderer CreateExportToolRenderer() =>
+        ExportToolHtmlRenderer.Create(GetRegisteredToolDefinition, Themes.Current, Cwd);
+
     /// <summary>A `{ truncated: true }` truncation result for bash output (interactive-mode.ts).</summary>
     private static PiSharp.Agent.Tools.ToolOutputTruncationResult TruncatedOutput(string? content) => new(content ?? "", true, null, 0, 0, 0, 0, false, false, 0, 0);
 
