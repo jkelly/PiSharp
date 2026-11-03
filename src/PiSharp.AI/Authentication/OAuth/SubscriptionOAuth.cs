@@ -348,7 +348,8 @@ public sealed class RadiusOAuth(HttpMessageInvoker http, string name, string gat
         if (method != "browser") throw new InvalidOperationException($"Unknown {name} sign-in method: {method}");
         var discovery = await OAuthFlows.SendAsync(http, HttpMethod.Get, Url("/v1/oauth"), cancellationToken, headers: [new("accept", "application/json")], time: _time).ConfigureAwait(false);
         if (!discovery.Ok) throw new InvalidOperationException($"Could not load Radius OAuth config from {_gateway}: {discovery.Status} {discovery.Body}");
-        if (OAuthFlows.OptionalText(discovery.Json(), "authorizationEndpoint") is not { } endpoint) throw new InvalidOperationException($"Invalid Radius OAuth config from {_gateway}");
+        // The authorization endpoint is opened with the platform URL handler: only a normalized http(s) URL is trusted (Pi 1.5.0 trustedHttpUrl).
+        if (OAuthFlows.TrustedHttpUrl(OAuthFlows.OptionalText(discovery.Json(), "authorizationEndpoint")) is not { } endpoint) throw new InvalidOperationException($"Invalid Radius OAuth config from {_gateway}");
         var (verifier, challenge) = OAuthFlows.GeneratePkce();
         var state = Guid.NewGuid().ToString();
         var url = new UriBuilder(endpoint) { Query = OAuthFlows.Form(("response_type", "code"), ("client_id", ClientId), ("redirect_uri", RedirectUri),
@@ -403,8 +404,9 @@ public sealed class RadiusOAuth(HttpMessageInvoker http, string name, string gat
         var verification = OAuthFlows.OptionalText(data, "verification_uri"); var expires = OAuthFlows.Number(data, "expires_in");
         if (string.IsNullOrEmpty(deviceCode) || string.IsNullOrEmpty(userCode) || string.IsNullOrEmpty(verification) || expires is null or 0)
             throw new InvalidOperationException("Radius OAuth device authorization response is missing required fields");
+        var trusted = OAuthFlows.TrustedHttpUrl(verification) ?? throw new InvalidOperationException("Untrusted verification_uri in Radius OAuth device authorization response");
         var interval = OAuthFlows.Number(data, "interval");
-        interaction.Notify(new(AuthEventKind.DeviceCode) { UserCode = userCode, VerificationUri = verification, IntervalSeconds = interval, ExpiresInSeconds = expires });
+        interaction.Notify(new(AuthEventKind.DeviceCode) { UserCode = userCode, VerificationUri = trusted, IntervalSeconds = interval, ExpiresInSeconds = expires });
         return await OAuthFlows.PollDeviceCodeAsync<OAuthCredentialSnapshot>(async pollToken =>
         {
             try

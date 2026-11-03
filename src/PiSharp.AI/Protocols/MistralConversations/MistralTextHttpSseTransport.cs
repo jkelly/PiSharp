@@ -73,7 +73,11 @@ public sealed partial class MistralTextHttpSseTransport : IChatTransport, IModel
                 send = new(HttpMethod.Post, new Uri(baseUri, "v1/chat/completions")) { Content = new ByteArrayContent(bytes) };
                 var key = options.ApiKey!;
                 if (key.Contains('\r') || key.Contains('\n') || key.Length + 7 > options.MaximumHeaderCharacters) throw Fail(NativeChatFailureCode.ResourceLimit, "Mistral credential/header limit.");
-                send.Headers.TryAddWithoutValidation("Authorization", "Bearer " + key); send.Headers.TryAddWithoutValidation("User-Agent", options.UserAgent);
+                // Pi 1.5.0 buildMistralHeaders: getIdentityHeaders(model, options.identity) (the request's merged over the configured
+                // one), then accept and authorization, below the model and request headers.
+                foreach (var (name, value) in ClientIdentities.HeadersFor(model.Provider, options.BaseUrl.AbsoluteUri, options.Identity, request.Identity))
+                    send.Headers.TryAddWithoutValidation(name, name == "User-Agent" && options.UserAgent is { } explicitAgent ? explicitAgent : value);
+                send.Headers.TryAddWithoutValidation("Authorization", "Bearer " + key);
                 send.Headers.TryAddWithoutValidation("Accept", "text/event-stream"); send.Content.Headers.ContentType = new("application/json");
                 ApplyHeaders(send, options.ModelHeaders); ApplyHeaders(send, options.Headers);
                 var explicitAffinity = new[] { options.ModelHeaders, options.Headers }.Any(headers =>

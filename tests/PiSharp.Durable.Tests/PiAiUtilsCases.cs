@@ -32,6 +32,23 @@ internal static class PiAiUtilsTests
 
     private static bool Bool(JsonValue value) => ((JsonBooleanValue)value).Value;
 
+    // Authored, by reading Pi v1.5.0's overflow.ts and retry.ts (the fixture is not recaptured): the captured v1.2.0 inputs whose result
+    // changed. Any error starting with 413 is an overflow on every provider, and a status inside a longer number ("5000") is not retryable.
+    private static readonly Dictionary<string, bool> OverflowV150 = new(StringComparer.Ordinal) { ["openai\n413 (no body)"] = true };
+    private static readonly Dictionary<string, bool> RetryV150 = new(StringComparer.Ordinal)
+    {
+        ["This endpoint's maximum context length is 4096 tokens. However, you requested about 5000 tokens"] = false,
+    };
+
+    private static bool Expected(JsonObjectValue row, string key, Dictionary<string, bool> changed)
+    {
+        var message = (JsonObjectValue)row["message"];
+        var error = message.TryGetValue("errorMessage", out var text) && text is JsonStringValue value ? value.Value : null;
+        var provider = message.TryGetValue("provider", out var name) && name is JsonStringValue named ? named.Value : "";
+        var lookup = key == "overflow" ? provider + "\n" + error : error;
+        return lookup is not null && changed.TryGetValue(lookup, out var result) ? result : Bool(row["result"]);
+    }
+
     private static double? Window(JsonValue value) => value switch
     {
         JsonNumberValue number => number.Value,
@@ -47,7 +64,8 @@ internal static class PiAiUtilsTests
             foreach (var row in Rows("overflow"))
             {
                 var message = (JsonObjectValue)row["message"];
-                Program.Equal(Bool(row["result"]), PiAiOverflow.IsContextOverflow(message, Window(row["contextWindow"])), $"isContextOverflow({row.ToJson()})");
+                Program.Equal(Expected(row, "overflow", OverflowV150), PiAiOverflow.IsContextOverflow(message, Window(row["contextWindow"])),
+                    $"isContextOverflow({row.ToJson()})");
                 count++;
             }
             Program.Check(count > 100, "overflow rows");
@@ -68,7 +86,8 @@ internal static class PiAiUtilsTests
         yield return Program.Case(prefix + "retry.matches-upstream", () =>
         {
             foreach (var row in Rows("retry"))
-                Program.Equal(Bool(row["result"]), PiAiRetry.IsRetryableAssistantError((JsonObjectValue)row["message"]), $"isRetryableAssistantError({row.ToJson()})");
+                Program.Equal(Expected(row, "retry", RetryV150), PiAiRetry.IsRetryableAssistantError((JsonObjectValue)row["message"]),
+                    $"isRetryableAssistantError({row.ToJson()})");
         });
 
         yield return Program.Case(prefix + "retry.matches-codingagent-agent-retry-policy", () =>

@@ -55,7 +55,7 @@ internal static partial class Program
             ("live.long-transcript-2000-messages-with-loadout-records-every-family", LongTranscriptEveryFamily),
             ("login.every-provider-cli-flow-api-key-and-oauth", CliLogin),
         };
-        cases = [.. cases, .. GoogleAdcCases, .. CodexWebSocketCases, .. ZstdCases, .. JsonLeftoverCases];
+        cases = [.. cases, .. GoogleAdcCases, .. CodexWebSocketCases, .. ZstdCases, .. JsonLeftoverCases, .. Sync150Cases];
         if (Environment.GetEnvironmentVariable("PROVIDERAPIS_FILTER") is { Length: > 0 } filter) cases = [.. cases.Where(test => test.Id.Contains(filter, StringComparison.Ordinal))];
         var results = new List<object>(); var failures = 0;
         foreach (var test in cases)
@@ -136,7 +136,9 @@ internal static partial class Program
         {
             var bytes = request.Content is null ? [] : await request.Content.ReadAsByteArrayAsync(cancellationToken);
             var headers = request.Headers.Concat(request.Content?.Headers ?? Enumerable.Empty<KeyValuePair<string, IEnumerable<string>>>())
-                .GroupBy(pair => pair.Key.ToLowerInvariant()).ToImmutableDictionary(group => group.Key, group => string.Join(", ", group.SelectMany(pair => pair.Value)));
+                .GroupBy(pair => pair.Key.ToLowerInvariant()).ToImmutableDictionary(group => group.Key,
+                    // HttpHeaders parses a User-Agent into product and comment tokens; the wire separates them with spaces.
+                    group => string.Join(group.Key == "user-agent" ? " " : ", ", group.SelectMany(pair => pair.Value)));
             // A zstd body (the Codex SSE request) is recorded decoded; BodyBytes keeps the wire bytes.
             var text = headers.GetValueOrDefault("content-encoding") == "zstd" ? Encoding.UTF8.GetString(PiSharp.AI.Compression.ZstdDecoder.Decompress(bytes)) : Encoding.UTF8.GetString(bytes);
             var recorded = new Recorded(request.Method.Method, request.RequestUri!.AbsoluteUri, headers, text, bytes);

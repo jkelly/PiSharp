@@ -112,10 +112,5 @@ public sealed class GoogleVertexSimpleTransport : IChatTransport
         if (_model.Id.Contains("2.5-flash", StringComparison.Ordinal)) return level switch { "minimal" => 128, "low" => 2048, "medium" => 8192, _ => 24576 };
         return -1;
     }
-    private static bool UsesThinkingLevel(string id)
-    {
-        var normalized = id.ToLowerInvariant();
-        return Regex.IsMatch(normalized, @"gemini-3(?:\.[0-9]+)?-(?:pro|flash)|gemma-?4") ||
-            normalized is "gemini-flash-latest" or "gemini-flash-lite-latest";
-    }
+    private static bool UsesThinkingLevel(string id) => GoogleGenerativeAI.GoogleRequestProjector.UsesLevel(id);
 }

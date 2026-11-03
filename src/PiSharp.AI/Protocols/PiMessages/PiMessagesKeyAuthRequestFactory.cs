@@ -63,7 +63,11 @@ public sealed class PiMessagesKeyAuthRequestFactory
         try
         {
             owned = new(HttpMethod.Post, _endpoint) { Content = new ByteArrayContent(bytes) };
-            var headers = new Dictionary<string, string>(StringComparer.Ordinal) { ["authorization"] = "Bearer " + _options.ApiKey, ["accept"] = "text/event-stream", ["content-type"] = "application/json" };
+            // Pi 1.5.0 pi-messages.ts: providerHeadersToRecord(getIdentityHeaders(model, identity), { authorization, accept, content-type },
+            // options.headers); the request's identity merges over the configured one.
+            var headers = new Dictionary<string, string>(StringComparer.Ordinal);
+            foreach (var (name, value) in ClientIdentities.HeadersFor(_model.Provider, _endpoint.AbsoluteUri, _options.Identity, request.Identity)) headers[name] = value;
+            headers["authorization"] = "Bearer " + _options.ApiKey; headers["accept"] = "text/event-stream"; headers["content-type"] = "application/json";
             if (_options.Headers is { } configured)
             {
                 var source = PiMessagesData.Admit(configured, _options).Value;
@@ -76,7 +80,18 @@ public sealed class PiMessagesKeyAuthRequestFactory
                     if (field.Value.ValueKind != JsonValueKind.String) throw PiMessagesData.Fail(PiMessagesFailure.UnsupportedContent);
                     normalized.Add(field.Name, (field.Name, field.Value.GetString()!));
                 }
-                foreach (var field in normalized.Values) headers[field.Name] = field.Value;
+                foreach (var field in normalized.Values)
+                {
+                    // A configured name replaces an identity header of any case (providerHeadersToRecord merges case-insensitively).
+                    foreach (var name in headers.Keys.Where(name => name.Equals(field.Name, StringComparison.OrdinalIgnoreCase) && name != field.Name).ToArray())
+                        if (ClientIdentities.IsIdentityHeader(name)) headers.Remove(name);
+                    headers[field.Name] = field.Value;
+                }
+                // A null configured value removes an identity header, as upstream.
+                foreach (var field in source.EnumerateObject())
+                    if (field.Value.ValueKind == JsonValueKind.Null && !normalized.ContainsKey(field.Name))
+                        foreach (var name in headers.Keys.Where(name => name.Equals(field.Name, StringComparison.OrdinalIgnoreCase) && ClientIdentities.IsIdentityHeader(name)).ToArray())
+                            headers.Remove(name);
             }
             if (headers.Count > _options.MaximumHeaders) throw PiMessagesData.Fail(PiMessagesFailure.ResourceLimit);
             foreach (var (name, value) in headers)

@@ -108,6 +108,7 @@ public sealed class AnthropicMessagesRequestProjector
         private bool _nativeToolChanges;
         internal bool HasPreferredStrictTools { get; private set; }
         private bool _lastWasToolResults;
+        private int _resultBlocks;
         private long _retainedCharacters;
         private long _retainedBytes;
         private long _inputCharacters;
@@ -162,7 +163,7 @@ public sealed class AnthropicMessagesRequestProjector
                 {
                     CloseCalls();
                     if (assistant.StopReason is StopReason.Error or StopReason.Aborted) continue;
-                    FlushSystems(); var blocks = new JsonArray(); var same = SameModel(assistant);
+                    var blocks = new JsonArray(); var same = SameModel(assistant);
                     foreach (var block in assistant.Content)
                     {
                         token.ThrowIfCancellationRequested();
@@ -172,9 +173,9 @@ public sealed class AnthropicMessagesRequestProjector
                         {
                             var redacted = Boolean(thinking.ExtraProperties, "redacted");
                             var signature = OptionalString(thinking.ExtraProperties, "thinkingSignature");
-                            if (redacted) { if (same) blocks.Add(new JsonObject { ["type"] = "redacted_thinking", ["data"] = signature ?? throw Fail(AnthropicRequestFailure.UnsupportedContent) }); }
-                            else if (!same)
-                            { if (Trim(thinking.Thinking).Length > 0) blocks.Add(TextBlock(thinking.Thinking)); }
+                            // transformMessages drops thinking from another model instead of replaying it as text.
+                            if (!same) continue;
+                            if (redacted) blocks.Add(new JsonObject { ["type"] = "redacted_thinking", ["data"] = signature ?? throw Fail(AnthropicRequestFailure.UnsupportedContent) });
                             else
                             {
                                 var signed = signature is not null && Trim(signature).Length > 0;
@@ -196,7 +197,10 @@ public sealed class AnthropicMessagesRequestProjector
                         }
                         else throw Fail(AnthropicRequestFailure.UnsupportedContent);
                     }
+                    // Held system updates go out before the next assistant message that is sent: one that converts to no blocks is dropped,
+                    // and flushing before it would put an update before a user message (#11091).
                     if (blocks.Count == 0) continue;
+                    FlushSystems();
                     var at = _messages.Count; AddMessage("assistant", blocks);
                     // convertMessages: only exact Anthropic Messages responses of this provider replay their recorded effort.
                     if (options.SupportsMidConversationEffort && assistant.Api == "anthropic-messages" && assistant.Provider == request.Model.Provider &&
@@ -211,7 +215,16 @@ public sealed class AnthropicMessagesRequestProjector
                     var isError = body.GetProperty("isError");
                     if (isError.ValueKind is not (JsonValueKind.True or JsonValueKind.False)) throw Fail(AnthropicRequestFailure.InvalidTranscript);
                     var content = body.TryGetProperty("content", out var supplied) ? supplied : default;
-                    AddResult(id, ResultContent(content), isError.GetBoolean());
+                    var blocks = ContentBlocks(content, user: false);
+                    // splitErrorToolResultImages: Anthropic rejects error tool results that contain anything but text, so their images
+                    // follow all tool results of the turn, after a caption naming the call (#10794).
+                    if (isError.GetBoolean() && blocks.Any(IsImage))
+                    {
+                        var name = body.TryGetProperty("toolName", out var toolName) && toolName.ValueKind == JsonValueKind.String ? Text(toolName) : null;
+                        AddResult(id, ErrorResultText(blocks), true,
+                            [TextBlock(ProviderShared.ProviderTranscript.ErrorToolImagesCaption(id, name)), .. blocks.Where(IsImage)]);
+                    }
+                    else AddResult(id, ResultContent(blocks), isError.GetBoolean());
                 }
             }
             CloseCalls(); FlushSystems(); AttachLastCache();
@@ -230,7 +243,9 @@ public sealed class AnthropicMessagesRequestProjector
             {
                 root["thinking"] = new JsonObject { ["type"] = "adaptive", ["display"] = options.ThinkingDisplay,
                     ["block_binding"] = new JsonObject { ["prefix_mismatch_behavior"] = "drop_block" } };
-                root["output_config"] = new JsonObject { ["effort"] = "high" };
+                // The top-level effort is part of the cached prompt, so it stays fixed; "low" because organizations can cap effort and
+                // reject a request containing any level above the cap.
+                root["output_config"] = new JsonObject { ["effort"] = "low" };
             }
             else if (options.ModelReasoning && options.ThinkingEnabled == true)
             {
@@ -424,28 +439,47 @@ public sealed class AnthropicMessagesRequestProjector
             }
             return result;
         }
-        private JsonNode ResultContent(JsonElement content)
+        private static JsonNode ResultContent(List<JsonObject> blocks)
         {
-            var blocks = ContentBlocks(content, user: false);
             if (blocks.All(block => block["type"]!.GetValue<string>() == "text")) return JsonValue.Create(string.Join("\n", blocks.Select(block => block["text"]!.GetValue<string>())))!;
             if (blocks.All(block => block["type"]!.GetValue<string>() != "text")) blocks.Insert(0, TextBlock("(see attached image)"));
             return new JsonArray(blocks.Select(block => (JsonNode?)block).ToArray());
+        }
+        private static bool IsImage(JsonObject block) => block["type"]!.GetValue<string>() == "image";
+        // The error result's text with each run of images replaced by one placeholder (transform-messages.ts replaceImagesWithPlaceholder).
+        private static JsonNode ErrorResultText(List<JsonObject> blocks)
+        {
+            var text = new List<string>(); var previousPlaceholder = false;
+            foreach (var block in blocks)
+            {
+                if (IsImage(block)) { if (!previousPlaceholder) text.Add(ProviderShared.ProviderTranscript.ErrorToolImagePlaceholder); previousPlaceholder = true; continue; }
+                var value = block["text"]!.GetValue<string>(); text.Add(value); previousPlaceholder = value == ProviderShared.ProviderTranscript.ErrorToolImagePlaceholder;
+            }
+            return JsonValue.Create(string.Join("\n", text))!;
         }
         private void CloseCalls()
         {
             foreach (var call in _pendingCalls) if (!_answered.Contains(call.Id)) AddResult(call.Id, JsonValue.Create("No result provided")!, true);
             _pendingCalls.Clear(); _answered.Clear();
         }
-        private void AddResult(string id, JsonNode content, bool isError)
+        // Tool results come first in their user message; split error images (caption, then images) follow them all.
+        private void AddResult(string id, JsonNode content, bool isError, List<JsonObject>? trailing = null)
         {
             var block = new JsonObject { ["type"] = "tool_result", ["tool_use_id"] = id, ["content"] = content, ["is_error"] = isError };
             Charge(block);
             if (_lastWasToolResults)
             {
                 if (++_projectedBlocks > options.MaximumContentBlocks) throw Fail(AnthropicRequestFailure.ResourceLimit);
-                _messages[^1]!["content"]!.AsArray().Add(block);
+                _messages[^1]!["content"]!.AsArray().Insert(_resultBlocks++, block);
             }
-            else { AddMessage("user", new JsonArray(block), charge: false); _lastWasToolResults = true; }
+            else { AddMessage("user", new JsonArray(block), charge: false); _lastWasToolResults = true; _resultBlocks = 1; }
+            if (trailing is null) return;
+            var message = _messages[^1]!["content"]!.AsArray();
+            foreach (var extra in trailing)
+            {
+                Charge(extra); if (++_projectedBlocks > options.MaximumContentBlocks) throw Fail(AnthropicRequestFailure.ResourceLimit);
+                message.Add(extra);
+            }
         }
         // insertThinkingLevelMessages: a marker before each recorded assistant turn, then the active effort last (after the cache breakpoint).
         private void InsertEffortMessages()

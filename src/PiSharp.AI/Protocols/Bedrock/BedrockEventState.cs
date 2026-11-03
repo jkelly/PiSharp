@@ -34,6 +34,12 @@ internal sealed class BedrockEventState
     private StopReason _stopReason = StopReason.Pending;
     private string? _rawStopReason, _stopError;
     private TokenUsage _usage = TokenUsage.Zero;
+    // appendAssistantMessageDiagnostic before the response (the strict tools fallback): the message's diagnostics key comes first.
+    private readonly JsonArray _diagnostics = [];
+
+    internal void AddDiagnostic(JsonObject diagnostic) => _diagnostics.Add(diagnostic);
+    private JsonFields InitialProperties() =>
+        _diagnostics.Count == 0 ? JsonFields.Empty : JsonFields.Empty.Set("diagnostics", JsonData.Parse(_diagnostics.ToJsonString()));
 
     internal BedrockEventState(BedrockModel model, ChatRequest request, BedrockConverseOptions options)
     {
@@ -240,7 +246,7 @@ internal sealed class BedrockEventState
                 _ => new ToolCallContent(block.Id, block.Name, Arguments(block))
             }), output);
         }
-        var properties = JsonFields.Empty;
+        var properties = InitialProperties();
         if (_rawStopReason is not null) properties = properties.Set("rawStopReason", JsonData.Parse(JsonSerializer.Serialize(_rawStopReason)));
         var message = _reducer.Snapshot() with { Usage = _usage, StopReason = _stopReason, ExtraProperties = properties };
         var done = new StreamDone(_stopReason, message);
@@ -262,12 +268,15 @@ internal sealed class BedrockEventState
                 _ => new ToolCallContent(block.Id, block.Name, Arguments(block))
             });
         }
-        var properties = JsonFields.Empty;
+        var properties = InitialProperties();
         if (_rawStopReason is not null) properties = properties.Set("rawStopReason", JsonData.Parse(JsonSerializer.Serialize(_rawStopReason)));
         properties = properties.Set("errorMessage", JsonData.Parse(JsonSerializer.Serialize(errorMessage)));
         if (diagnostic is not null)
-            properties = properties.Set("diagnostics", JsonData.Parse(new JsonArray(new JsonObject
-            { ["type"] = "bedrock_response_failure", ["timestamp"] = _request.Timestamp, ["details"] = diagnostic }).ToJsonString()));
+        {
+            var diagnostics = (JsonArray)_diagnostics.DeepClone();
+            diagnostics.Add(new JsonObject { ["type"] = "bedrock_response_failure", ["timestamp"] = _request.Timestamp, ["details"] = diagnostic });
+            properties = properties.Set("diagnostics", JsonData.Parse(diagnostics.ToJsonString()));
+        }
         var message = Initial() with { Content = content.ToImmutable(), Usage = _usage, StopReason = reason, ExtraProperties = properties };
         return new StreamError(reason, message)
         { NativeSourceException = error };

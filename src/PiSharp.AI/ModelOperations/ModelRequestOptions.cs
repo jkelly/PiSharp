@@ -41,6 +41,10 @@ public record ModelRequestOptions
     /// <summary>Registry calls only (models.ts <c>transformHeaders</c>): rewrites the merged auth, model and request
     /// headers last, before the API adds its defaults.</summary>
     public Func<ImmutableArray<KeyValuePair<string, string?>>, CancellationToken, ValueTask<ImmutableArray<KeyValuePair<string, string?>>>>? TransformHeaders { get; init; }
+    /// <summary>types.ts <c>ProviderRequestOptions.identity</c>: the <c>User-Agent</c> and attribution headers, applied below the
+    /// model and request headers. Null: a detailed <c>User-Agent</c> and no attribution.</summary>
+    [System.Diagnostics.CodeAnalysis.Experimental("PISHARP_IDENTITY001")]
+    public ClientIdentity? Identity { get; init; }
 }
 
 /// <summary>types.ts <c>ClassifierOptions</c>.</summary>

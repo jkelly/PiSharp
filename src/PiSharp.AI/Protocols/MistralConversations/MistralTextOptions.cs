@@ -7,8 +7,13 @@ namespace PiSharp.AI.Protocols.MistralConversations;
 public sealed record MistralTokenCostTier(double InputTokensAbove, double Input, double Output, double CacheRead, double CacheWrite);
 public sealed record MistralTokenCosts(double Input, double Output, double CacheRead, double CacheWrite)
 { public ImmutableArray<MistralTokenCostTier> Tiers { get; init; } = []; }
-public sealed record MistralTextOptions(Uri BaseUrl, bool SupportsText, MistralTokenCosts Costs, string UserAgent)
+/// <param name="UserAgent">An explicit User-Agent over the identity's; null sends the identity's (Pi 1.5.0 getIdentityHeaders).</param>
+public sealed record MistralTextOptions(Uri BaseUrl, bool SupportsText, MistralTokenCosts Costs, string? UserAgent = null)
 {
+    /// <summary>Source MistralOptions.identity (Pi 1.5.0 identity.ts): the User-Agent and attribution headers, below the model and
+    /// request headers; a request's own identity merges over it. Null: a detailed User-Agent and no attribution.</summary>
+    [System.Diagnostics.CodeAnalysis.Experimental("PISHARP_IDENTITY001")]
+    public ClientIdentity? Identity { get; init; }
     [JsonIgnore] public string? ApiKey { get; init; }
     public double? Temperature { get; init; }
     public double? MaxTokens { get; init; }
@@ -61,7 +66,7 @@ public sealed record MistralTextOptions(Uri BaseUrl, bool SupportsText, MistralT
         if (BaseUrl is null || !BaseUrl.IsAbsoluteUri || BaseUrl.Scheme is not ("http" or "https") || BaseUrl.UserInfo.Length != 0 || BaseUrl.Query.Length != 0 || BaseUrl.Fragment.Length != 0 ||
             BaseUrl.AbsoluteUri.Length > 8192 || !SupportsText || Costs is null || new[] { Costs.Input, Costs.Output, Costs.CacheRead, Costs.CacheWrite }.Any(x => !double.IsFinite(x) || x < 0) ||
             Costs.Tiers.IsDefault || Costs.Tiers.Any(tier => tier is null || double.IsNaN(tier.InputTokensAbove) || new[] { tier.Input, tier.Output, tier.CacheRead, tier.CacheWrite }.Any(x => !double.IsFinite(x) || x < 0)) ||
-            string.IsNullOrWhiteSpace(UserAgent) || UserAgent.Length > MaximumHeaderCharacters || UserAgent.Contains('\r') || UserAgent.Contains('\n') ||
+            UserAgent is { } agent && (string.IsNullOrWhiteSpace(agent) || agent.Length > MaximumHeaderCharacters || agent.Contains('\r') || agent.Contains('\n')) ||
             Temperature is { } t && !double.IsFinite(t) || MaxTokens is { } m && !double.IsFinite(m) ||
             TimeoutMilliseconds is < 1 or > 3_600_000 || MaximumPayloadBytes is < 1 or > PiRequestBudget.MaximumBound || MaximumFrameCharacters is < 1 or > PiRequestBudget.MaximumBound ||
             MaximumTotalCharacters is < 1 or > PiRequestBudget.MaximumBound || MaximumContentCharacters is < 1 or > PiRequestBudget.MaximumBound || MaximumContentBlocks < 1 || MaximumResponseContentBlocks < 1 || MaximumErrorBytes is < 1 or > 8_388_608 ||

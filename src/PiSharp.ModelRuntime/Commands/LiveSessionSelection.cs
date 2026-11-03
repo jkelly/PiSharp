@@ -648,7 +648,7 @@ internal sealed class LiveSessionConnection(LiveSessionSelection selection, Http
             var costs = definition.Raw.Value.GetProperty("cost");
             var options = new MistralTextOptions(endpoint, SupportsText: true,
                 new(costs.GetProperty("input").GetDouble(), costs.GetProperty("output").GetDouble(),
-                    costs.GetProperty("cacheRead").GetDouble(), costs.GetProperty("cacheWrite").GetDouble()), "PiSharp")
+                    costs.GetProperty("cacheRead").GetDouble(), costs.GetProperty("cacheWrite").GetDouble()))
                 { MaxTokens = maximum, Reasoning = !plain && reasoning, CachePrompt = !summary,
                     SupportsImages = definition.DeclaresImageInput };
             var provider = plain
@@ -745,7 +745,7 @@ internal sealed class LiveSessionConnection(LiveSessionSelection selection, Http
                 var costs = definition.Raw.Value.GetProperty("cost");
                 var options = new MistralTextOptions(endpoint, SupportsText: true,
                     new(costs.GetProperty("input").GetDouble(), costs.GetProperty("output").GetDouble(),
-                        costs.GetProperty("cacheRead").GetDouble(), costs.GetProperty("cacheWrite").GetDouble()), "PiSharp")
+                        costs.GetProperty("cacheRead").GetDouble(), costs.GetProperty("cacheWrite").GetDouble()))
                     { MaxTokens = maximum, Reasoning = !plain && reasoning, CachePrompt = !summary, SupportsImages = definition.DeclaresImageInput,
                       Headers = RequestHeaders?.ToImmutableDictionary(pair => pair.Key, pair => (string?)pair.Value, StringComparer.Ordinal) };
                 return NativeProviderFactory.CreateCatalogMistral(model, definition.BaseUrl, credential, definition.Raw, options, simple: !plain, handler);

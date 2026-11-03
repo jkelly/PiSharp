@@ -334,7 +334,7 @@ internal static class Program
     private static void CompareRequest(JsonElement expected, HeldOwnershipHarnessR2.RequestObservation actual, HeldOwnershipHarnessR2 h)
     {
         Require(Text(expected, "uri") == actual.Uri && Text(expected, "method") == actual.Method, "Whole physical URI/method differs.");
-        var sourceHeaders = expected.GetProperty("headers");
+        var sourceHeaders = Pi150IdentityHeaders(expected.GetProperty("headers"));
         Compare(sourceHeaders, JsonSerializer.SerializeToElement(actual.BeforeBodyReadHeaders), h, "request/source-boundary-headers");
         // ByteArrayContent materialization adds a native Content-Length. Derive its
         // exact expected value from frozen source body bytes; retain every other header.
@@ -349,6 +349,20 @@ internal static class Program
         Require(expectedBodyUtf8Base64 == actual.BodyUtf8Base64, "Whole physical body UTF-8 bytes differ.");
         using var body = JsonDocument.Parse(actual.RawBody); Compare(expected.GetProperty("body"), body.RootElement, h, "request/body");
     }
+    // Pi 1.5.0 pi-messages.ts sends getIdentityHeaders(model, identity) below every other header. The frozen fixture predates it, so
+    // this authored v1.5.0 delta (not a Source capture) adds the detailed pi/<version> User-Agent first when no case header sets one,
+    // tokenized as HttpHeaders records it. The fixture itself stays unchanged and SHA-pinned.
+#pragma warning disable PISHARP_IDENTITY001
+    private static JsonElement Pi150IdentityHeaders(JsonElement headers)
+    {
+        if (headers.EnumerateObject().Any(field => field.Name.Equals("user-agent", StringComparison.OrdinalIgnoreCase))) return headers;
+        using var probe = new HttpRequestMessage();
+        probe.Headers.TryAddWithoutValidation("user-agent", ClientIdentities.FormatUserAgent(null));
+        var node = new JsonObject { ["user-agent"] = new JsonArray([.. probe.Headers.GetValues("user-agent").Select(value => (JsonNode?)JsonValue.Create(value))]) };
+        foreach (var field in headers.EnumerateObject()) node[field.Name] = JsonNode.Parse(field.Value.GetRawText());
+        return JsonSerializer.SerializeToElement(node);
+    }
+#pragma warning restore PISHARP_IDENTITY001
     private static void CompareFrames(JsonElement[] expected, List<HeldOwnershipHarnessR2.FrameObservation> actual,
         JsonElement caseExpected, HeldOwnershipHarnessR2 h, string label)
     {

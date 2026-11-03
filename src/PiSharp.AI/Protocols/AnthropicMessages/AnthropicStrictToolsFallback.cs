@@ -14,17 +14,11 @@ internal static class AnthropicStrictToolsFallback
     /// <summary>Set by the request factories on a request that sent a "prefer" tool strict: builds the downgraded request.</summary>
     internal static readonly HttpRequestOptionsKey<Func<CancellationToken, HttpRequestMessage>> RequestKey = new("PiSharp.Anthropic.PreferredStrictToolsFallback");
 
-    private static readonly string[] Rejections =
-    [
-        "The compiled grammar is too large",
-        "Too many strict tools (",
-        "Schemas contains too many parameters with union types (",
-    ];
-
-    /// <summary>Upstream: an Anthropic.APIError with status 400 and type invalid_request_error whose message names a strict-tool limit.</summary>
+    /// <summary>Upstream: an Anthropic.APIError with status 400 and type invalid_request_error whose message names a strict-tool limit
+    /// (isStrictToolLimitErrorMessage, shared with Bedrock).</summary>
     internal static bool IsStrictToolLimitRejection(Exception error) =>
         error is ProviderDisplayException { InStream: false, Status: 400, ErrorType: "invalid_request_error" } rejected &&
-        Rejections.Any(text => rejected.Message.Contains(text, StringComparison.Ordinal));
+        ProviderTranscript.IsStrictToolLimitErrorMessage(rejected.Message);
 
     internal static Func<CancellationToken, HttpRequestMessage>? FallbackOf(HttpRequestMessage request) =>
         request.Options.TryGetValue(RequestKey, out var fallback) ? fallback : null;

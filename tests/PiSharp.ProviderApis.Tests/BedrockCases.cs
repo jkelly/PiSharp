@@ -67,14 +67,15 @@ internal static partial class Program
         Check(expected.CanonicalRequest.Contains("/model/anthropic.claude-sonnet-4-5-20250929-v1%253A0/converse-stream\n", StringComparison.Ordinal) &&
             expected.Authorization.Contains("SignedHeaders=content-type;host;x-amz-content-sha256;x-amz-date,", StringComparison.Ordinal), "canonical path and signed headers");
 
-        // Long retention: 1h cache points; cross-model tool ids are normalized; "none" tool choice drops the tools.
+        // Long retention: 1h cache points; cross-model tool ids are normalized and (Pi 1.5.0) cross-model thinking is dropped; "none" tool
+        // choice drops the tools.
         var crossModel = ImmutableArray.Create(
             Entry("""{"role":"user","content":"Go","timestamp":1}"""),
             Entry("""{"role":"assistant","content":[{"type":"thinking","thinking":"plan"},{"type":"toolCall","id":"call|id.with:bad chars","name":"read","arguments":{"":1,"path":"x"},"thoughtSignature":"t"}],"api":"openai-responses","provider":"openai","model":"gpt-5","usage":{"input":0,"output":0,"cacheRead":0,"cacheWrite":0,"totalTokens":0,"cost":{"input":0,"output":0,"cacheRead":0,"cacheWrite":0,"total":0}},"stopReason":"toolUse","timestamp":2}"""),
             Entry("""{"role":"user","content":"   ","timestamp":3}"""));
         var longFixture = Bedrock(SonnetRow, options: new() { CacheRetention = "long", ToolChoice = JsonData.Parse("\"none\""), Temperature = 0.5, RequestMetadata = ImmutableDictionary<string, string>.Empty.Add("team", "a") });
         using var longRequest = await longFixture.Transport.CreateRequestAsync(new(longFixture.Model, crossModel, 10));
-        JsonEqual("""{"messages":[{"role":"user","content":[{"text":"Go"}]},{"role":"assistant","content":[{"text":"plan"},{"toolUse":{"toolUseId":"call_id_with_bad_chars","name":"read","input":{"path":"x"}}}]},{"role":"user","content":[{"toolResult":{"toolUseId":"call_id_with_bad_chars","content":[{"text":"No result provided"}],"status":"error"}}]},{"role":"user","content":[{"text":"<empty>"},{"cachePoint":{"type":"default","ttl":"1h"}}]}],"inferenceConfig":{"maxTokens":64000,"temperature":0.5},"requestMetadata":{"team":"a"}}""", await longRequest.Content!.ReadAsStringAsync(), "long retention cross-model request");
+        JsonEqual("""{"messages":[{"role":"user","content":[{"text":"Go"}]},{"role":"assistant","content":[{"toolUse":{"toolUseId":"call_id_with_bad_chars","name":"read","input":{"path":"x"}}}]},{"role":"user","content":[{"toolResult":{"toolUseId":"call_id_with_bad_chars","content":[{"text":"No result provided"}],"status":"error"}}]},{"role":"user","content":[{"text":"<empty>"},{"cachePoint":{"type":"default","ttl":"1h"}}]}],"inferenceConfig":{"maxTokens":64000,"temperature":0.5},"requestMetadata":{"team":"a"}}""", await longRequest.Content!.ReadAsStringAsync(), "long retention cross-model request");
         // Nova: no thinking fields, no cache points, the model cap clamped to the context.
         var nova = Bedrock(NovaRow);
         using var novaRequest = await nova.Transport.CreateRequestAsync(new(nova.Model, [Entry("""{"role":"user","content":"Hi","timestamp":1}""")], 1));

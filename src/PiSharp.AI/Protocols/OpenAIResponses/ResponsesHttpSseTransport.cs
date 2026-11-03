@@ -35,7 +35,7 @@ public sealed class ResponsesHttpSseTransport : IChatTransport
     /// <summary>Binds request creation and pricing fallback to the factory's immutable options. Borrows client.</summary>
     public ResponsesHttpSseTransport(HttpClient client, ResponsesKeyAuthRequestFactory requestFactory, string explicitApiKey,
         ResponsesHttpSseOptions? options = null, ResponsesTextToolOptions? responsesOptions = null)
-        : this(client, BindFactory(requestFactory, explicitApiKey), options, BindOptions(requestFactory, responsesOptions)) { _factory = requestFactory; }
+        : this(client, BindFactory(requestFactory, explicitApiKey), options, BindOptions(requestFactory, responsesOptions, explicitApiKey)) { _factory = requestFactory; }
 
     private static Func<ChatRequest, HttpRequestMessage> BindFactory(ResponsesKeyAuthRequestFactory factory, string key)
     {
@@ -44,12 +44,15 @@ public sealed class ResponsesHttpSseTransport : IChatTransport
         return request => factory.Create(request, key);
     }
 
-    private static ResponsesTextToolOptions BindOptions(ResponsesKeyAuthRequestFactory factory, ResponsesTextToolOptions? options)
+    private static ResponsesTextToolOptions BindOptions(ResponsesKeyAuthRequestFactory factory, ResponsesTextToolOptions? options, string key)
     {
         ArgumentNullException.ThrowIfNull(factory);
         if (options?.ServiceTier is { } supplied && supplied != factory.RequestedServiceTier)
             throw new ResponsesKeyAuthRequestException(ResponsesKeyAuthRequestFailure.InvalidConfiguration);
-        return (options ?? new()) with { ServiceTier = factory.RequestedServiceTier };
+        return (options ?? new()) with
+        {
+            ServiceTier = factory.RequestedServiceTier, ProviderThinkingLevel = key is null ? null : factory.ConfigurationUpdateEffort(key)
+        };
     }
     public ResponsesHttpSseTransport(HttpClient client, Func<ChatRequest, HttpRequestMessage> requestFactory,
         ResponsesHttpSseOptions? options = null, ResponsesTextToolOptions? responsesOptions = null)

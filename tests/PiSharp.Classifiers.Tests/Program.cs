@@ -115,7 +115,9 @@ internal sealed class FakeHttp(Func<Recorded, int, CancellationToken, Task<HttpR
         var body = request.Content is null ? "" : await request.Content.ReadAsStringAsync(token);
         var headers = request.Headers.Concat(request.Content?.Headers ?? Enumerable.Empty<KeyValuePair<string, IEnumerable<string>>>())
             .Where(pair => !pair.Key.Equals("content-length", StringComparison.OrdinalIgnoreCase))
-            .ToImmutableDictionary(pair => pair.Key.ToLowerInvariant(), pair => string.Join(", ", pair.Value));
+            .ToImmutableDictionary(pair => pair.Key.ToLowerInvariant(),
+                // HttpHeaders splits a User-Agent into product and comment tokens; the wire joins them with spaces.
+                pair => string.Join(pair.Key.Equals("user-agent", StringComparison.OrdinalIgnoreCase) ? " " : ", ", pair.Value));
         var recorded = new Recorded(request.RequestUri!.AbsoluteUri, headers, body);
         int count;
         lock (gate) { Requests.Add(recorded); count = Requests.Count; }

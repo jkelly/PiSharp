@@ -368,7 +368,7 @@ internal static class Program
         foreach (var (seen, text) in new[] { (fake.Requests[1], "first"), (fake.Requests[2], "second") })
         {
             Require(seen.Method == "POST" && seen.Url == "https://api.anthropic.com/v1/messages?beta=true" && seen.ContentType == "application/json");
-            Equal("Accept=application/json|anthropic-beta=oauth-2025-04-20|anthropic-dangerous-direct-browser-access=true|anthropic-version=2023-06-01|Authorization=Bearer federated-1|User-Agent=PiSharp",
+            Equal("Accept=application/json|anthropic-beta=oauth-2025-04-20|anthropic-dangerous-direct-browser-access=true|anthropic-version=2023-06-01|Authorization=Bearer federated-1|User-Agent=" + PiSharp.AI.ClientIdentities.FormatUserAgent(null),
                 string.Join("|", seen.Headers.OrderBy(header => header.Key, StringComparer.OrdinalIgnoreCase).Select(header => header.Key + "=" + header.Value)));
             BodyEqual($$$"""{"model":"claude-federated","messages":[{"role":"user","content":[{"type":"text","text":"{{{text}}}","cache_control":{"type":"ephemeral"}}]}],"max_tokens":1024,"stream":true,"system":[{"type":"text","text":"Authored system","cache_control":{"type":"ephemeral"}}]}""", seen.Body);
         }

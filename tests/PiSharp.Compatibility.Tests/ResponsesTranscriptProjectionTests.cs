@@ -32,7 +32,7 @@ static class ResponsesTranscriptProjectionTests
         using var input = JsonDocument.Parse(inputBytes); using var golden = JsonDocument.Parse(goldenBytes);
         var cases = input.RootElement.GetProperty("cases"); var expected = golden.RootElement.GetProperty("observations").GetProperty("cases");
         Equal(3, cases.GetArrayLength()); Equal(3, expected.GetArrayLength());
-        var results = new JsonArray(); var counts = new[] { 6, 5, 7 };
+        var results = new JsonArray(); var counts = new[] { 6, 5, 6 };
         for (var index = 0; index < cases.GetArrayLength(); index++)
         {
             var item = cases[index]; var oracle = expected[index]; var id = item.GetProperty("caseId").GetString()!;
@@ -46,31 +46,35 @@ static class ResponsesTranscriptProjectionTests
                 SupportsMidConversationSystemMessages: item.GetProperty("options").GetProperty("supportsMidConvoSystemMessages").GetBoolean(),
                 AllowedToolCallProviders: item.GetProperty("allowedToolCallProviders").EnumerateArray().Select(value => value.GetString()!).ToImmutableHashSet(StringComparer.Ordinal));
             var projector = new ResponsesTranscriptProjector(options); var actual = projector.Project(request);
-            Assert(Same(oracle.GetProperty("requestInput"), actual.Value), $"Captured request array differs: {id}");
+            var (expectedInput, removed) = WithoutForeignThinking(id, oracle.GetProperty("requestInput"));
+            Assert(Same(expectedInput, actual.Value), $"Captured request array differs: {id}");
             Equal(counts[index], actual.Value.GetArrayLength());
             Assert(Same(actual.Value, projector.Project(request).Value), "Projection is not deterministic.");
             for (var entryIndex = 0; entryIndex < original.Length; entryIndex++) Equal(original[entryIndex], transcript[entryIndex].WireBody.ToString());
             foreach (var pointer in oracle.GetProperty("undefinedProjectionProperties").EnumerateArray())
             {
                 var parts = pointer.GetString()!.Split('/');
-                Assert(!actual.Value[int.Parse(parts[1], System.Globalization.CultureInfo.InvariantCulture)].TryGetProperty(parts[2], out _), "Source undefined property became native null/present data.");
+                var position = int.Parse(parts[1], System.Globalization.CultureInfo.InvariantCulture);
+                if (position == removed) continue;
+                if (position > removed) position--;
+                Assert(!actual.Value[position].TryGetProperty(parts[2], out _), "Source undefined property became native null/present data.");
             }
             var mutation = JsonNode.Parse(actual.ToString())!.AsArray();
             if (index == 0)
             {
-                mutation[2]!.AsObject().Remove("future"); Assert(!Same(oracle.GetProperty("requestInput"), JsonSerializer.SerializeToElement(mutation)), "Reasoning explicit null loss hidden.");
+                mutation[2]!.AsObject().Remove("future"); Assert(!Same(expectedInput, JsonSerializer.SerializeToElement(mutation)), "Reasoning explicit null loss hidden.");
                 mutation = JsonNode.Parse(actual.ToString())!.AsArray(); mutation[3]!["phase"] = "final_answer";
-                Assert(!Same(oracle.GetProperty("requestInput"), JsonSerializer.SerializeToElement(mutation)), "Text phase mutation hidden.");
+                Assert(!Same(expectedInput, JsonSerializer.SerializeToElement(mutation)), "Text phase mutation hidden.");
                 mutation = JsonNode.Parse(actual.ToString())!.AsArray(); mutation[4]!.AsObject().Remove("namespace");
-                Assert(!Same(oracle.GetProperty("requestInput"), JsonSerializer.SerializeToElement(mutation)), "Namespace removal hidden.");
+                Assert(!Same(expectedInput, JsonSerializer.SerializeToElement(mutation)), "Namespace removal hidden.");
             }
             mutation = JsonNode.Parse(actual.ToString())!.AsArray();
             var output = mutation.OfType<JsonObject>().Single(value => value["type"]?.GetValue<string>() == "function_call_output"); output["call_id"] = "different-call";
-            Assert(!Same(oracle.GetProperty("requestInput"), JsonSerializer.SerializeToElement(mutation)), "Call/result link mutation hidden.");
+            Assert(!Same(expectedInput, JsonSerializer.SerializeToElement(mutation)), "Call/result link mutation hidden.");
             var call = actual.Value.EnumerateArray().Single(value => value.TryGetProperty("type", out var type) && type.GetString() == "function_call");
             using var reordered = JsonDocument.Parse("{\"arguments\":\"{\\\"keep\\\":null,\\\"path\\\":\\\"changed\\\"}\"}");
             Assert(!Same(call.GetProperty("arguments"), reordered.RootElement.GetProperty("arguments")), "Opaque argument string was normalized.");
-            results.Add(new JsonObject { ["caseId"] = id, ["status"] = "matched", ["requestInput"] = JsonNode.Parse(actual.ToString()),
+            results.Add(new JsonObject { ["caseId"] = id, ["status"] = removed is null ? "matched" : "matched-capture-with-authored-pi-1.5.0-delta", ["requestInput"] = JsonNode.Parse(actual.ToString()),
                 ["sourceUndefinedPointers"] = JsonNode.Parse(oracle.GetProperty("undefinedProjectionProperties").GetRawText()), ["inputUnchanged"] = true });
         }
         using var one = JsonDocument.Parse("{\"a\":1,\"b\":null}"); using var reorderedKeys = JsonDocument.Parse("{\"b\":null,\"a\":1}"); using var decimalScale = JsonDocument.Parse("{\"a\":1.0,\"b\":null}");
@@ -79,6 +83,20 @@ static class ResponsesTranscriptProjectionTests
         await File.WriteAllTextAsync(artifact, new JsonObject { ["schemaVersion"] = 1, ["captureCommit"] = "560d1fad202019748fbd3e9fe9b1aae7d03d7e0a",
             ["sourceSha"] = "d86654abb8862e201933517d6f1fce9f88dd117f", ["scope"] = "serialized-responses-input-array-subset", ["undefinedParity"] = "not-claimed-native-omission",
             ["argumentNumbers"] = "canonical-safe-integers-only", ["effects"] = new JsonArray(), ["cases"] = results }.ToJsonString(new JsonSerializerOptions { WriteIndented = true }));
+    }
+
+    // Pi 1.5.0 transformMessages drops every thinking block from another model; the v0.99.1 capture still turns the foreign model's
+    // readable thinking into an assistant text message. The foreign case expects the capture without that message, the next text
+    // renumbered (textBlockIndex 0 gives msg_pi_1, not msg_pi_1_1): an authored delta from the Pi 1.5.0 source, not a capture.
+    internal static (JsonElement Expected, int? Removed) WithoutForeignThinking(string caseId, JsonElement captured)
+    {
+        if (caseId != "foreign-provider-system-fold") return (captured, null);
+        var items = JsonNode.Parse(captured.GetRawText())!.AsArray();
+        var reasoning = items.OfType<JsonObject>().Single(item => item["content"] is JsonArray { Count: 1 } parts &&
+            parts[0]?["text"]?.GetValue<string>() == "Visible foreign reasoning π");
+        var removed = items.IndexOf(reasoning); items.RemoveAt(removed);
+        items.OfType<JsonObject>().Single(item => item["id"]?.GetValue<string>() == "msg_pi_1_1")["id"] = "msg_pi_1";
+        return (JsonSerializer.SerializeToElement(items), removed);
     }
 
     public static Task PairingAndCollisions()

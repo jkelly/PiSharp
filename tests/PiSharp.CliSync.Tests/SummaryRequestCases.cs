@@ -33,10 +33,10 @@ internal static partial class Program
         new("anthropic", "claude-opus-4-6", "ANTHROPIC_API_KEY", "https://api.anthropic.com/v1/messages?beta=true", 4096, null,
             """{"model":"claude-opus-4-6","messages":[{"role":"user","content":[{"type":"text","text":"PROMPT"}]}],"max_tokens":4096,"stream":true,"system":[{"type":"text","text":"SYS"}],"thinking":{"type":"disabled"}}""",
             null),
-        // Without reasoning the model's metadata still applies: managed effort sends "high" with its marker, and claude-fable-5
+        // Without reasoning the model's metadata still applies: managed effort sends a "high" marker under the fixed top-level "low" (Pi 1.5.0), and claude-fable-5
         // (thinkingLevelMap.off null) sends no thinking but keeps its server-side fallbacks.
         new("anthropic", "claude-sonnet-5-5", "ANTHROPIC_API_KEY", "https://api.anthropic.com/v1/messages?beta=true", 4096, null,
-            """{"model":"claude-sonnet-5-5","messages":[{"role":"user","content":[{"type":"text","text":"PROMPT"}]},{"role":"system","content":[],"output_config":{"effort":"high"}}],"max_tokens":4096,"stream":true,"system":[{"type":"text","text":"SYS"}],"thinking":{"type":"adaptive","display":"summarized","block_binding":{"prefix_mismatch_behavior":"drop_block"}},"output_config":{"effort":"high"}}""",
+            """{"model":"claude-sonnet-5-5","messages":[{"role":"user","content":[{"type":"text","text":"PROMPT"}]},{"role":"system","content":[],"output_config":{"effort":"high"}}],"max_tokens":4096,"stream":true,"system":[{"type":"text","text":"SYS"}],"thinking":{"type":"adaptive","display":"summarized","block_binding":{"prefix_mismatch_behavior":"drop_block"}},"output_config":{"effort":"low"}}""",
             "mid-conversation-output-config-2026-07-01,thinking-binding-controls-2026-08-01"),
         new("anthropic", "claude-fable-5", "ANTHROPIC_API_KEY", "https://api.anthropic.com/v1/messages?beta=true", 4096, null,
             """{"model":"claude-fable-5","messages":[{"role":"user","content":[{"type":"text","text":"PROMPT"}]}],"max_tokens":4096,"stream":true,"system":[{"type":"text","text":"SYS"}],"fallbacks":[{"model":"claude-opus-4-8"},{"model":"claude-opus-5"}]}""",

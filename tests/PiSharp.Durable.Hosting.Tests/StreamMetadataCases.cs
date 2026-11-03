@@ -177,7 +177,7 @@ internal static partial class Program
             foreach (var request in sent)
             {
                 var wire = request.Uri + "\n" + string.Join("\n", request.Headers.Select(pair => pair.Key + ": " + pair.Value)) + "\n" + request.Body;
-                // The client's own User-Agent is "PiSharp"; the metadata would be a "pisharp" key or a header named after it.
+                // The metadata would be a "pisharp" key or a header named after it.
                 Check(!request.Body.Contains("\"pisharp\"", StringComparison.OrdinalIgnoreCase), "no pisharp key in the body: " + request.Uri);
                 Check(!request.Headers.Keys.Any(name => name.Contains("pisharp", StringComparison.OrdinalIgnoreCase)), "no pisharp header: " + request.Uri);
                 Check(!wire.Contains("acct-secret-route", StringComparison.Ordinal), "no account: " + request.Uri);

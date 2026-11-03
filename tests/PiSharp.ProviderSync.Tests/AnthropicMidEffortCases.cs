@@ -16,7 +16,8 @@ internal static partial class Program
 {
     private static readonly Uri AnthropicEndpoint = new("https://api.anthropic.com/");
     private const string MidBetas = "mid-conversation-output-config-2026-07-01,thinking-binding-controls-2026-08-01";
-    private const string Managed = "\"thinking\":{\"type\":\"adaptive\",\"display\":\"summarized\",\"block_binding\":{\"prefix_mismatch_behavior\":\"drop_block\"}},\"output_config\":{\"effort\":\"high\"}";
+    // Pi 1.5.0 fixes the top-level effort at "low" (it was "high" in 1.2.0); the markers carry the level.
+    private const string Managed = "\"thinking\":{\"type\":\"adaptive\",\"display\":\"summarized\",\"block_binding\":{\"prefix_mismatch_behavior\":\"drop_block\"}},\"output_config\":{\"effort\":\"low\"}";
     private const string Ephemeral = ",\"cache_control\":{\"type\":\"ephemeral\"}";
     // models.ts getSupportedThinkingLevels over each row's thinkingLevelMap: off is null for all five.
     private static readonly (string Id, string[] Levels)[] MidEffortModels =
@@ -33,7 +34,7 @@ internal static partial class Program
     private static string MidBody(string id, int maximum, string? system, params string[] messages) => "{\"model\":\"" + id + "\",\"messages\":[" +
         string.Join(",", messages) + "],\"max_tokens\":" + maximum + ",\"stream\":true," + (system is null ? "" : "\"system\":[" + system + "],") + Managed + "}";
     private static string KeyHeaders(string? beta) => string.Join("\n", new[] { "accept: application/json", beta is null ? null : "anthropic-beta: " + beta,
-        "anthropic-dangerous-direct-browser-access: true", "anthropic-version: 2023-06-01", "content-type: application/json", "user-agent: PiSharp",
+        "anthropic-dangerous-direct-browser-access: true", "anthropic-version: 2023-06-01", "content-type: application/json", "user-agent: " + ClientIdentities.FormatUserAgent(null),
         "x-api-key: " + Key }.Where(line => line is not null));
 
     private sealed record Sent(string Headers, string Body);
@@ -43,7 +44,7 @@ internal static partial class Program
         public List<Sent> Requests { get; } = [];
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken token)
         {
-            var headers = request.Headers.Concat(request.Content!.Headers).Select(pair => pair.Key.ToLowerInvariant() + ": " + string.Join(", ", pair.Value))
+            var headers = request.Headers.Concat(request.Content!.Headers).Select(pair => pair.Key.ToLowerInvariant() + ": " + string.Join(UserAgentSeparator(pair.Key), pair.Value))
                 .Order(StringComparer.Ordinal);
             Requests.Add(new(string.Join("\n", headers), await request.Content.ReadAsStringAsync(token)));
             return new(HttpStatusCode.OK) { Content = new StringContent(stream(Requests.Count - 1), Encoding.UTF8, "text/event-stream") };

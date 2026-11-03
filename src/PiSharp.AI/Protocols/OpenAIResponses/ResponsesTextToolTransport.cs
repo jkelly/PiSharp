@@ -53,6 +53,8 @@ public sealed record ResponsesTextToolOptions(
 {
     /// <summary>Model compat <c>supportsOpenAIGrammarTools</c>: selects each custom tool call's grammar input property.</summary>
     public bool SupportsOpenAIGrammarTools { get; init; }
+    /// <summary>Pi 1.5.0 openai-responses.ts: the configuration_update effort, recorded on the output as <c>providerThinkingLevel</c>.</summary>
+    internal string? ProviderThinkingLevel { get; init; }
 }
 
 /// <summary>A bounded parsed-DTO adapter. Owns the returned source enumerator, never performs HTTP or executes tools.</summary>
@@ -168,8 +170,13 @@ public sealed class ResponsesTextToolTransport : IChatTransport
             ? $"{(request.Model.Provider == "openai" ? "OpenAI" : request.Model.Provider)} API error ({(int)status}): {failure.Message}" : failure.Message);
         return DisplayError(message);
     }
+    // Sign in with ChatGPT shares the subscription's usage limit with other apps; on ChatGPT Business plans the workspace admin also sets a
+    // per-user limit.
     private static string DisplayError(string message) => message.Contains("subscription_sharing_usage_limit_exceeded", StringComparison.Ordinal)
-        ? message + "\nCheck your ChatGPT usage: https://chatgpt.com/settings/usage" : message;
+        ? message + "\nCheck your ChatGPT usage: https://chatgpt.com/settings/usage"
+        : message.Contains("subscription_sharing_workplace_individual_usage_limit_exceeded", StringComparison.Ordinal)
+            ? message + "\nYou've reached your ChatGPT workspace's usage limit. Ask your workspace admin to increase it at admin.openai.com → Workspace → Usage limits."
+            : message;
 
     private static StreamProtocolException Protocol() => new("Invalid or unsupported Responses text/tool stream.");
     private static StreamLimitException Limit() => new("Responses text/tool stream exceeds configured limits.");
@@ -253,8 +260,10 @@ public sealed class ResponsesTextToolTransport : IChatTransport
             _modelId = request.Model.Id;
             _request = request;
             _rates = rates;
+            // Pi 1.5.0 stream(): a managed reply records its configuration_update effort on the output before any request work.
+            if (options.ProviderThinkingLevel is { } level) _properties = _properties.Set("providerThinkingLevel", StringData(level));
             var message = new AssistantMessage(request.Model.Api, request.Model.Provider, request.Model.Id,
-                request.Timestamp, [], TokenUsage.Zero, StopReason.Pending);
+                request.Timestamp, [], TokenUsage.Zero, StopReason.Pending, options.ProviderThinkingLevel is null ? null : _properties);
             Start = new(message);
             _reducer = new(message, new(options.MaximumContentSlots, options.MaximumContentCharacters));
             _reducer.Apply(Start);
