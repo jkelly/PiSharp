@@ -24,6 +24,9 @@ internal delegate Task<string?> PiSessionSelector(ImmutableArray<PiSessionInfo> 
 internal sealed record PiHost
 {
     internal required string Cwd { get; init; }
+    /// <summary>The process's working directory no longer exists (<see cref="PiCommand.ReadCwd"/> found none); <see cref="Cwd"/> is
+    /// empty and every command but <c>auth</c> ends with main.ts's error.</summary>
+    internal bool CwdMissing { get; init; }
     internal required string Home { get; init; }
     internal required Func<string, string?> GetEnvironment { get; init; }
     internal Action<string, string?> SetEnvironment { get; init; } = (_, _) => { };
@@ -90,6 +93,17 @@ internal static class PiCommand
                 if (host.GetEnvironment(name) is null) host.SetEnvironment(name, trimmedProxy);
     }
 
+    internal const string DeletedCwdMessage = "Error: The current working directory no longer exists. Change to an existing directory and try again.";
+
+    /// <summary>Source main.ts (Pi 1.5.0): the first <c>process.cwd()</c>, null when the directory no longer exists (ENOENT, which .NET
+    /// reports as a missing file or directory on Linux and macOS; Windows does not let a process's directory be deleted). Other errors
+    /// propagate.</summary>
+    internal static string? ReadCwd(Func<string> read)
+    {
+        try { return read(); }
+        catch (Exception error) when (error is FileNotFoundException or DirectoryNotFoundException) { return null; }
+    }
+
     internal static async Task<int> RunAsync(string[] args, PiHost host, CancellationToken cancellationToken)
     {
         try { return await RunCoreAsync(args, host, cancellationToken).ConfigureAwait(false); }
@@ -115,6 +129,7 @@ internal static class PiCommand
         var offline = args.Contains("--offline") || IsTruthyEnvFlag(host.GetEnvironment("PI_OFFLINE"));
         if (offline) { host.SetEnvironment("PI_OFFLINE", "1"); host.SetEnvironment("PI_SKIP_VERSION_CHECK", "1"); }
         if (args.Length > 0 && args[0] == "auth") return await PiAuthCommand.RunAsync(args, host, token).ConfigureAwait(false);
+        if (host.CwdMissing) { await Line(err, Paint(Red, DeletedCwdMessage)).ConfigureAwait(false); return 1; }
         // main.ts: the bootstrap settings (project untrusted) apply the global httpProxy before the package, config and mcp commands.
         ApplyHttpProxy(host, PiSettings.Load(host.Cwd, PiPaths.AgentDirectory(host.GetEnvironment, host.Home), projectTrusted: false).Global);
         if (args.Length > 0 && PackageCommands.Contains(args[0]))

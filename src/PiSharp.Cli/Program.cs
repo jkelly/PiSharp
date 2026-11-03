@@ -19,7 +19,7 @@ internal static class Program
             AppDomain.CurrentDomain.UnhandledException += (_, crash) =>
             {
                 if (crash.ExceptionObject is Exception error)
-                    Diagnostics.CrashReporting.ReportUncaughtException(error, Console.Error, [], null, Environment.CurrentDirectory);
+                    Diagnostics.CrashReporting.ReportUncaughtException(error, Console.Error, [], null, Pi.PiCommand.ReadCwd(() => Environment.CurrentDirectory) ?? "");
             };
         if (Commands.SessionHelp.For(args) is { } sessionHelp) { Console.Out.Write(sessionHelp); return 0; }
         // Pi rpc/print modes: SIGTERM and SIGHUP shut the host down gracefully, then exit 143 or 129.
@@ -77,9 +77,11 @@ internal static class Program
         try
         {
             var stdinRedirected = Console.IsInputRedirected;
+            // main.ts (Pi 1.5.0): a deleted working directory is reported by the entry (every command but auth) instead of crashing here.
+            var cwd = Pi.PiCommand.ReadCwd(Directory.GetCurrentDirectory);
             var host = new Pi.PiHost
             {
-                Cwd = Directory.GetCurrentDirectory(), Home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+                Cwd = cwd ?? "", CwdMissing = cwd is null, Home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
                 GetEnvironment = Environment.GetEnvironmentVariable, SetEnvironment = Environment.SetEnvironmentVariable,
                 Stdout = output, Stderr = Console.Error,
                 Stdin = stdinRedirected ? new StreamReader(Console.OpenStandardInput(), new System.Text.UTF8Encoding(false), false) : Console.In,
@@ -118,7 +120,7 @@ internal static class Program
         AppDomain.CurrentDomain.UnhandledException += (_, crash) =>
         {
             if (crash.ExceptionObject is Exception error)
-                Diagnostics.CrashReporting.ReportUncaughtException(error, Console.Error, [], sessionFile, Environment.CurrentDirectory);
+                Diagnostics.CrashReporting.ReportUncaughtException(error, Console.Error, [], sessionFile, Pi.PiCommand.ReadCwd(() => Environment.CurrentDirectory) ?? "");
         };
         if (options.Interactive is null)
             return await RunTerminalHostAsync(terminalArgs, token, liveRuntime: options.LiveRuntime, mcpHost: Mcp.McpSessionHost.CreateDefault()).ConfigureAwait(false);
