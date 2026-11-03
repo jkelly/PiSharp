@@ -339,6 +339,9 @@ internal static partial class TerminalEditorSourceWidth
         return false;
     }
     internal static bool Cjk(string value) => value.EnumerateRunes().Any(r => In(r.Value, CjkRanges));
+    /// <summary>East Asian Width W or F (the wide ranges), and single-code-point RGI emoji, for the CJK-friendly emphasis rules.</summary>
+    internal static bool EastAsianWideOrFull(int codePoint) => In(codePoint, WideRanges);
+    internal static bool RgiEmojiCodePoint(int codePoint) => In(codePoint, RgiSingleRanges);
     internal static bool Whitespace(string value) => value.Length > 0 && value[0] is '\u0009' or '\u000a' or '\u000b' or '\u000c' or '\u000d' or '\u0020' or '\u00a0' or '\u1680' or >= '\u2000' and <= '\u200a' or '\u2028' or '\u2029' or '\u202f' or '\u205f' or '\u3000' or '\ufeff';
     internal static int Visible(string text)
     {

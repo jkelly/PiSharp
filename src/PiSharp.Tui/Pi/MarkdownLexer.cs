@@ -1,5 +1,6 @@
 // A Markdown lexer producing marked's token shapes (marked 18.0.11, MIT, the parser Pi's Markdown component uses), with Pi's
-// strict strikethrough tokenizer and LaTeX extensions (packages/tui/src/components/markdown.ts, Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff).
+// tokenizer (strict strikethrough, bare URLs ending at CJK punctuation), CJK-friendly emphasis and LaTeX extensions
+// (packages/tui/src/components/markdown.ts, Pi f9a26365568127461c47a07a37dcb42c140a3ac5).
 // PiSharp has no marked dependency: this is an independent C# lexer over the same GFM rules, covering the block and inline
 // constructs Pi renders (headings, paragraphs, fenced and indented code, lists with tasks, blockquotes, tables, rules, HTML,
 // definitions, links, emphasis, code spans, strikethrough, breaks, autolinks, escapes and LaTeX).
@@ -49,17 +50,47 @@ public static partial class MarkdownLexer
     [GeneratedRegex(@"^ {0,3}\\\[[ \t]*(?:\n)?([\s\S]*)$")] private static partial Regex LatexPendingBracket();
     [GeneratedRegex(@"^ {0,3}\$\$[ \t]*(?:\n)?([\s\S]*)$")] private static partial Regex LatexPendingDollar();
     [GeneratedRegex(@"\\[A-Za-z]+|[_^=+*/<>()[\]|±≤≥≠≈∈→⇒∞∫∑√-]")] private static partial Regex PendingMath();
+    [GeneratedRegex(@"(?:^|\n) {0,3}(?:\$\$|\\\[)")] private static partial Regex LatexBlockStartAnywhere();
+    [GeneratedRegex(@"^ {0,3}\|?[ \t]*:?-+:?[ \t]*(?:\|[ \t]*:?-+:?[ \t]*)*\|?[ \t]*$")] private static partial Regex TableDelimiterRow();
+
+    /// <summary>marked clips a top-level paragraph at the next block extension start found in <c>src.slice(1)</c> (the latexBlock
+    /// extension's start: <c>$$</c> or <c>\[</c> at a line start, or right after the first character). Returns the clipped length.</summary>
+    private static int ParagraphClip(string src)
+    {
+        if (src.Length <= 1) return src.Length;
+        var matches = LatexBlockStartAnywhere().EnumerateMatches(src.AsSpan(1));
+        if (!matches.MoveNext()) return src.Length;
+        var start = matches.Current.Index + (src[1 + matches.Current.Index] == '\n' ? 1 : 0);
+        return start + 1;
+    }
+
+    // A GFM table starts with a header row followed by a delimiter row such as "|---|---|" or "| --- |". The header needs a "|"
+    // only when the delimiter has none: a pipe-free delimiter without a pipe in the header is a thematic break, not a table.
+    private static bool ContainsTableStart(string source)
+    {
+        var lines = source.Split('\n');
+        for (var index = 0; index < lines.Length - 1; index++)
+        {
+            var delimiterRow = lines[index + 1];
+            if ((delimiterRow.Contains('|') || lines[index].Contains('|')) && TableDelimiterRow().IsMatch(delimiterRow)) return true;
+        }
+        return false;
+    }
 
     private static string FirstLine(string src) { var n = src.IndexOf('\n'); return n == -1 ? src : src[..n]; }
     private static bool IsBlank(string line) => line.All(c => c is ' ' or '\t');
 
     /// <summary>Lexes Markdown into marked-shaped block tokens with inline children.</summary>
-    public static List<MarkdownToken> Lex(string markdown)
+    public static List<MarkdownToken> Lex(string markdown) => Lex(markdown, out _);
+
+    /// <summary>Lexes Markdown; <paramref name="linkCount"/> is the number of reference link definitions (marked's <c>tokens.links</c>).</summary>
+    internal static List<MarkdownToken> Lex(string markdown, out int linkCount)
     {
         var src = markdown.Replace("\r\n", "\n", StringComparison.Ordinal).Replace('\r', '\n');
         var links = new Dictionary<string, (string Href, string? Title)>(StringComparer.OrdinalIgnoreCase);
         var tokens = BlockTokens(src, true, links);
         foreach (var token in tokens) Inline(token, links);
+        linkCount = links.Count;
         return tokens;
     }
 
@@ -92,12 +123,15 @@ public static partial class MarkdownLexer
     {
         var tokens = new List<MarkdownToken>();
         MarkdownToken? Last() => tokens.Count > 0 ? tokens[^1] : null;
+        var lastParagraphClipped = false;
         while (src.Length > 0)
         {
             Match match;
             if ((match = Newline().Match(src)).Success && match.Length > 0)
             {
                 src = src[match.Length..];
+                // A paragraph here keeps its own line break, so any blank line is a space token in marked: no clipped-paragraph join.
+                lastParagraphClipped = false;
                 if (match.Value.Length == 1 && tokens.Count > 0) tokens[^1].Raw += "\n";
                 else tokens.Add(new() { Type = "space", Raw = match.Value });
                 continue;
@@ -158,37 +192,54 @@ public static partial class MarkdownLexer
             if (Table(src) is { } table) { src = src[table.Raw.Length..]; tokens.Add(table); continue; }
             {
                 // Setext heading or paragraph (top level), text (inside list items).
-                var lines = new List<string>(); var consumed = 0; MarkdownToken? setext = null;
-                var remaining = src;
-                while (remaining.Length > 0)
+                (List<string> Lines, int Consumed, MarkdownToken? Setext) Collect(string source)
                 {
-                    var line = FirstLine(remaining);
-                    if (IsBlank(line)) break;
-                    if (lines.Count > 0)
+                    var lines = new List<string>(); var consumed = 0; MarkdownToken? setext = null;
+                    var remaining = source;
+                    while (remaining.Length > 0)
                     {
-                        var underline = SetextUnderline().Match(remaining);
-                        if (underline.Success && top)
+                        var line = FirstLine(remaining);
+                        if (IsBlank(line)) break;
+                        if (lines.Count > 0)
                         {
-                            var raw = src[..consumed] + underline.Value;
-                            setext = new() { Type = "heading", Raw = raw, Depth = underline.Groups[1].Value[0] == '=' ? 1 : 2, Text = string.Join('\n', lines).Trim(), Tokens = [] };
-                            consumed += underline.Length; break;
+                            var underline = SetextUnderline().Match(remaining);
+                            if (underline.Success && top)
+                            {
+                                var raw = source[..consumed] + underline.Value;
+                                setext = new() { Type = "heading", Raw = raw, Depth = underline.Groups[1].Value[0] == '=' ? 1 : 2, Text = string.Join('\n', lines).Trim(), Tokens = [] };
+                                consumed += underline.Length; break;
+                            }
+                            if (InterruptsParagraph(line, remaining)) break;
                         }
-                        if (InterruptsParagraph(line, remaining)) break;
+                        lines.Add(line);
+                        var advance = Math.Min(remaining.Length, line.Length + 1);
+                        consumed += advance; remaining = remaining[advance..];
+                        if (!top) break;
                     }
-                    lines.Add(line);
-                    var advance = Math.Min(remaining.Length, line.Length + 1);
-                    consumed += advance; remaining = remaining[advance..];
-                    if (!top) break;
+                    if (lines.Count == 0 && setext is null) { var line = FirstLine(source); lines.Add(line); consumed = Math.Min(source.Length, line.Length + 1); }
+                    return (lines, consumed, setext);
                 }
-                if (setext is not null) { src = src[consumed..]; tokens.Add(setext); continue; }
-                if (lines.Count == 0) { var line = FirstLine(src); lines.Add(line); consumed = Math.Min(src.Length, line.Length + 1); }
+                var collected = Collect(src);
+                if (collected.Setext is { } setextHeading) { src = src[collected.Consumed..]; tokens.Add(setextHeading); continue; }
+                // A top-level paragraph stops where a block extension (display math) starts, as marked clips it; a paragraph lexed
+                // right after a clipped one joins it.
+                var clip = top ? ParagraphClip(src) : src.Length;
+                if (clip < src.Length && clip < collected.Consumed) collected = Collect(src[..clip]);
+                var (lines, consumed, _) = collected;
                 var rawText = src[..consumed];
+                var clipped = clip != src.Length;
                 src = src[consumed..];
                 var text = string.Join('\n', lines);
                 if (top)
                 {
                     var paragraph = text.EndsWith('\n') ? text[..^1] : text;
-                    tokens.Add(new() { Type = "paragraph", Raw = rawText, Text = paragraph, Tokens = [] });
+                    if (lastParagraphClipped && Last() is { Type: "paragraph" } clippedParagraph)
+                    {
+                        clippedParagraph.Raw += (clippedParagraph.Raw.EndsWith('\n') ? "" : "\n") + rawText;
+                        clippedParagraph.Text += "\n" + paragraph;
+                    }
+                    else tokens.Add(new() { Type = "paragraph", Raw = rawText, Text = paragraph, Tokens = [] });
+                    lastParagraphClipped = clipped;
                 }
                 else if (Last() is { Type: "text" } previousText)
                 {
@@ -203,14 +254,20 @@ public static partial class MarkdownLexer
 
     private static MarkdownToken? LatexBlock(string src)
     {
+        // Display math never spans a table. Without this check, an unclosed "$$" or "\[" pairs with a later opener or stays
+        // pending, swallowing the table (Pi #11159).
         var dollar = LatexDollarBlock().Match(src);
-        if (dollar.Success && dollar.Groups[1].Value.Length > 0) return new() { Type = "latexBlock", Raw = dollar.Value, Text = dollar.Groups[1].Value.Trim() };
+        if (dollar.Success && dollar.Groups[1].Value.Length > 0 && !ContainsTableStart(dollar.Groups[1].Value))
+            return new() { Type = "latexBlock", Raw = dollar.Value, Text = dollar.Groups[1].Value.Trim() };
         var bracket = LatexBracketBlock().Match(src);
-        if (bracket.Success && bracket.Groups[1].Value.Length > 0) return new() { Type = "latexBlock", Raw = bracket.Value, Text = bracket.Groups[1].Value.Trim() };
+        if (bracket.Success && bracket.Groups[1].Value.Length > 0 && !ContainsTableStart(bracket.Groups[1].Value))
+            return new() { Type = "latexBlock", Raw = bracket.Value, Text = bracket.Groups[1].Value.Trim() };
         var pendingBracket = LatexPendingBracket().Match(src);
-        if (pendingBracket.Success) return new() { Type = "latexBlock", Raw = pendingBracket.Value, Text = pendingBracket.Groups[1].Value, Pending = true };
+        if (pendingBracket.Success && pendingBracket.Groups[1].Value.Length > 0 && !ContainsTableStart(pendingBracket.Groups[1].Value))
+            return new() { Type = "latexBlock", Raw = pendingBracket.Value, Text = pendingBracket.Groups[1].Value, Pending = true };
         var pendingDollar = LatexPendingDollar().Match(src);
-        if (pendingDollar.Success && pendingDollar.Groups[1].Value.Length > 0 && PendingMath().IsMatch(pendingDollar.Groups[1].Value))
+        if (pendingDollar.Success && pendingDollar.Groups[1].Value.Length > 0 && PendingMath().IsMatch(pendingDollar.Groups[1].Value) &&
+            !ContainsTableStart(pendingDollar.Groups[1].Value))
             return new() { Type = "latexBlock", Raw = pendingDollar.Value, Text = pendingDollar.Groups[1].Value, Pending = true };
         return null;
     }
@@ -444,8 +501,9 @@ public static partial class MarkdownLexer
             string Remaining() => rest ??= src[position..];
             Match match;
             var c = src[position];
-            if (c == '\\' && (match = Escape().Match(Remaining())).Success) { Add(new() { Type = "escape", Raw = match.Value, Text = match.Groups[1].Value }); position += match.Length; previous = match.Value[^1]; continue; }
+            // marked tries inline extensions (latex) before its escape rule.
             if (c is '$' or '\\' && InlineLatex(Remaining()) is { } latex) { Add(latex); position += latex.Raw.Length; previous = latex.Raw[^1]; continue; }
+            if (c == '\\' && (match = Escape().Match(Remaining())).Success) { Add(new() { Type = "escape", Raw = match.Value, Text = match.Groups[1].Value }); position += match.Length; previous = match.Value[^1]; continue; }
             if (c == '<')
             {
                 if ((match = Autolink().Match(Remaining())).Success)
@@ -503,9 +561,15 @@ public static partial class MarkdownLexer
             if ((c is 'h' or 'f' or 'w') && (position == 0 || !char.IsLetterOrDigit(previous)) && Url().IsMatch(src.AsSpan(position)) && (match = Url().Match(Remaining())).Success)
             {
                 var url = TrimUrl(match.Value);
-                var href = url.StartsWith("www.", StringComparison.Ordinal) ? "http://" + url : url;
-                Add(new() { Type = "link", Raw = url, Text = url, Href = href, Tokens = [new() { Type = "text", Raw = url, Text = url }] });
-                position += url.Length; previous = url[^1]; continue;
+                // Bare URLs stop at CJK punctuation; explicit links and angle autolinks use separate tokenizers and keep it.
+                var punctuation = CjkPunctuationIndex(url);
+                if (punctuation >= 0) url = Url().Match(url[..punctuation]) is { Success: true } cut ? TrimUrl(cut.Value) : "";
+                if (url.Length > 0)
+                {
+                    var href = url.StartsWith("www.", StringComparison.Ordinal) ? "http://" + url : url;
+                    Add(new() { Type = "link", Raw = url, Text = url, Href = href, Tokens = [new() { Type = "text", Raw = url, Text = url }] });
+                    position += url.Length; previous = url[^1]; continue;
+                }
             }
             if (char.IsLetterOrDigit(c) && (position == 0 || !char.IsLetterOrDigit(previous) && previous is not ('.' or '+' or '-' or '_')) && Email().IsMatch(src.AsSpan(position)) && (match = Email().Match(Remaining())).Success)
             {
@@ -516,6 +580,18 @@ public static partial class MarkdownLexer
         }
         FlushText();
         return tokens;
+    }
+
+    /// <summary>The index of the first CJK punctuation character (<c>cjkPunctuationRegex</c>), or -1.</summary>
+    private static int CjkPunctuationIndex(string text)
+    {
+        for (var i = 0; i < text.Length;)
+        {
+            var length = char.IsSurrogatePair(text, i) ? 2 : 1;
+            if (TextUtils.IsCjkPunctuation(text.Substring(i, length))) return i;
+            i += length;
+        }
+        return -1;
     }
 
     /// <summary>GFM extended autolink trailing punctuation and unbalanced parenthesis trimming.</summary>
@@ -532,21 +608,62 @@ public static partial class MarkdownLexer
         return url;
     }
 
+    // CJK-friendly emphasis: Pi takes marked-cjk-friendly 0.1.2's emStrong tokenizer, which implements the markdown-cjk-friendly
+    // specification's flanking rules, ported here from that specification. CJK characters (East Asian Width W, F or H that are not
+    // emoji, or Hangul) and CJK punctuation next to a delimiter run no longer stop it from opening or closing emphasis; around other
+    // text the CommonMark rules are unchanged.
+    private enum Flank { Whitespace, NonCjkPunctuation, CjkPunctuation, Cjk, Other }
+
+    private static bool IsCjk(int codePoint) =>
+        (PiSharp.Tui.Input.TerminalEditorSourceWidth.EastAsianWideOrFull(codePoint) || IsHalfwidth(codePoint)) && !PiSharp.Tui.Input.TerminalEditorSourceWidth.RgiEmojiCodePoint(codePoint) ||
+        IsHangul(codePoint);
+    private static bool IsHalfwidth(int c) => c is 0x20a9 or >= 0xff61 and <= 0xffbe or >= 0xffc2 and <= 0xffc7 or >= 0xffca and <= 0xffcf or
+        >= 0xffd2 and <= 0xffd7 or >= 0xffda and <= 0xffdc or >= 0xffe8 and <= 0xffee;
+    private static bool IsHangul(int c) => c is >= 0x1100 and <= 0x11ff or 0x302e or 0x302f or >= 0x3131 and <= 0x318e or >= 0x3200 and <= 0x321e or
+        >= 0x3260 and <= 0x327e or >= 0xa960 and <= 0xa97c or >= 0xac00 and <= 0xd7a3 or >= 0xd7b0 and <= 0xd7c6 or >= 0xd7cb and <= 0xd7fb or
+        >= 0xffa0 and <= 0xffbe or >= 0xffc2 and <= 0xffc7 or >= 0xffca and <= 0xffcf or >= 0xffd2 and <= 0xffd7 or >= 0xffda and <= 0xffdc;
+
+    private static Flank Classify(Rune rune)
+    {
+        if (Rune.IsWhiteSpace(rune)) return Flank.Whitespace;
+        var punctuation = rune.IsBmp ? IsPunct((char)rune.Value) : Rune.IsPunctuation(rune) || Rune.IsSymbol(rune);
+        var cjk = IsCjk(rune.Value);
+        return punctuation ? cjk ? Flank.CjkPunctuation : Flank.NonCjkPunctuation : cjk ? Flank.Cjk : Flank.Other;
+    }
+
+    /// <summary>The character before <paramref name="index"/>: a non-emoji variation selector (U+FE00-U+FE0E) takes the class of the
+    /// character it follows; an ideographic variation selector is reported as such. The start of the text is whitespace.</summary>
+    private static (Flank Flank, bool Ivs) Before(string src, int index)
+    {
+        if (index <= 0 || Rune.DecodeLastFromUtf16(src.AsSpan(0, index), out var rune, out var length) != System.Buffers.OperationStatus.Done)
+            return (index <= 0 ? Flank.Whitespace : Flank.Other, false);
+        if (rune.Value is >= 0xe0100 and <= 0xe01ef) return (Flank.Other, true);
+        if (rune.Value is >= 0xfe00 and <= 0xfe0e && index - length > 0 &&
+            Rune.DecodeLastFromUtf16(src.AsSpan(0, index - length), out var baseRune, out _) == System.Buffers.OperationStatus.Done) return (Classify(baseRune), false);
+        return (Classify(rune), false);
+    }
+
+    /// <summary>The character at <paramref name="index"/>; the end of the text is whitespace.</summary>
+    private static Flank After(string src, int index) =>
+        index >= src.Length ? Flank.Whitespace : Rune.DecodeFromUtf16(src.AsSpan(index), out var rune, out _) == System.Buffers.OperationStatus.Done ? Classify(rune) : Flank.Other;
+
+    private static bool IsPunctuation(Flank flank) => flank is Flank.NonCjkPunctuation or Flank.CjkPunctuation;
+    private static bool LeftFlanking((Flank Flank, bool Ivs) before, Flank after) => after != Flank.Whitespace &&
+        (after != Flank.NonCjkPunctuation || before.Flank is Flank.Whitespace or Flank.NonCjkPunctuation or Flank.Cjk or Flank.CjkPunctuation || before.Ivs);
+    private static bool RightFlanking((Flank Flank, bool Ivs) before, Flank after) => before.Flank != Flank.Whitespace &&
+        (before.Flank != Flank.NonCjkPunctuation || after is Flank.Whitespace or Flank.NonCjkPunctuation or Flank.Cjk or Flank.CjkPunctuation);
+
     private static MarkdownToken? EmStrong(string src, int start, char previous, Dictionary<string, (string, string?)> links)
     {
         var marker = src[start];
         var runEnd = start;
         while (runEnd < src.Length && src[runEnd] == marker) runEnd++;
         var openLength = runEnd - start;
-        var next = runEnd < src.Length ? src[runEnd] : '\n';
-        var prevWhite = char.IsWhiteSpace(previous); var nextWhite = char.IsWhiteSpace(next);
-        var leftFlanking = !nextWhite && (!IsPunct(next) || prevWhite || IsPunct(previous));
-        if (!leftFlanking) return null;
-        if (marker == '_')
-        {
-            var rightFlankingOpen = !prevWhite && (!IsPunct(previous) || nextWhite || IsPunct(next));
-            if (rightFlankingOpen && !IsPunct(previous)) return null;
-        }
+        var before = Before(src, start);
+        var next = After(src, runEnd);
+        if (!LeftFlanking(before, next)) return null;
+        // "_" opens only when it is not also right-flanking, or when a punctuation character precedes it.
+        if (marker == '_' && RightFlanking(before, next) && !IsPunctuation(before.Flank)) return null;
         // Find a closing run.
         for (var i = runEnd; i < src.Length; i++)
         {
@@ -555,13 +672,10 @@ public static partial class MarkdownLexer
             if (src[i] != marker) continue;
             var closeStart = i; var closeEnd = i;
             while (closeEnd < src.Length && src[closeEnd] == marker) closeEnd++;
-            var before = src[closeStart - 1]; var after = closeEnd < src.Length ? src[closeEnd] : '\n';
-            var rightFlanking = !char.IsWhiteSpace(before) && (!IsPunct(before) || char.IsWhiteSpace(after) || IsPunct(after));
-            if (marker == '_' && rightFlanking)
-            {
-                var leftFlankingClose = !char.IsWhiteSpace(after) && (!IsPunct(after) || char.IsWhiteSpace(before) || IsPunct(before));
-                if (leftFlankingClose && !IsPunct(after)) rightFlanking = false;
-            }
+            var closeBefore = Before(src, closeStart); var closeAfter = After(src, closeEnd);
+            var rightFlanking = RightFlanking(closeBefore, closeAfter);
+            // "_" closes only when it is not also left-flanking, or when a punctuation character follows it.
+            if (marker == '_' && rightFlanking && LeftFlanking(closeBefore, closeAfter) && !IsPunctuation(closeAfter)) rightFlanking = false;
             if (!rightFlanking || closeStart == runEnd) { i = closeEnd - 1; continue; }
             var closeLength = closeEnd - closeStart;
             var use = Math.Min(Math.Min(openLength, closeLength), 3);

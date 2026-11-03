@@ -1,9 +1,10 @@
 // Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/tui/test/tui-alt-screen.test.ts, tui-render.test.ts,
 // exit-restore.test.ts, fixtures/exit-without-stop.ts, select-list.test.ts, settings-list.test.ts, editor.test.ts, text.test.ts,
-// keys.test.ts, fuzzy.test.ts, terminal.test.ts, terminal-image.test.ts, wrap-ansi.test.ts and autocomplete.test.ts.
+// keys.test.ts, fuzzy.test.ts, terminal.test.ts, terminal-image.test.ts, wrap-ansi.test.ts, autocomplete.test.ts and markdown.test.ts.
 // Ported expectations of the Pi 1.3.0-1.5.0 additions to those tests, read from the source; nothing is captured from an upstream
 // run. Cases marked "authored" cover PiSharp API seams the upstream tests reach differently.
 using System.Reflection;
+using System.Text.RegularExpressions;
 using PiSharp.Tui.Pi;
 using static Expect;
 
@@ -581,6 +582,203 @@ internal static class Sync150Cases
                 Seq([expected], result?.Items.Select(item => item.Value) ?? [], line);
             }
         });
+
+        foreach (var markdownCase in MarkdownCases()) yield return markdownCase;
+    }
+
+    // ---------------------------------------------------------------- Markdown (markdown.test.ts)
+
+    /// <summary>A chalk (level 3) style as test-themes.ts uses it: an inner close code re-opens the style, a line break closes and
+    /// re-opens it, and empty text stays empty.</summary>
+    private static Func<string, string> Chalk(string open, string close) => text =>
+        text.Length == 0 ? "" : open + text.Replace(close, close + open, StringComparison.Ordinal).Replace("\n", close + "\n" + open, StringComparison.Ordinal) + close;
+
+    private static readonly Func<string, string> Bold = Chalk("\u001b[1m", "\u001b[22m"), Dim = Chalk("\u001b[2m", "\u001b[22m"),
+        Italic = Chalk("\u001b[3m", "\u001b[23m"), Underline = Chalk("\u001b[4m", "\u001b[24m"), Strikethrough = Chalk("\u001b[9m", "\u001b[29m"),
+        Green = Chalk("\u001b[32m", "\u001b[39m"), Yellow = Chalk("\u001b[33m", "\u001b[39m"), Blue = Chalk("\u001b[34m", "\u001b[39m"),
+        Cyan = Chalk("\u001b[36m", "\u001b[39m");
+
+    /// <summary>test-themes.ts defaultMarkdownTheme.</summary>
+    private static MarkdownTheme DefaultMarkdownTheme => new()
+    {
+        Heading = text => Bold(Cyan(text)), Link = Blue, LinkUrl = Dim, Code = Yellow, CodeBlock = Green, CodeBlockBorder = Dim, Quote = Italic,
+        QuoteBorder = Dim, Hr = Dim, ListBullet = Cyan, Bold = Bold, Italic = Italic, Strikethrough = Strikethrough, Underline = Underline,
+    };
+
+    private static MarkdownTheme CountingTheme(List<string> calls) => DefaultMarkdownTheme with
+    {
+        HighlightCode = (code, lang) => { calls.Add($"{lang}:{code}"); return [.. code.Split('\n').Select(Green)]; },
+    };
+
+    /// <summary>markdown.test.ts stripAnsi: removes SGR codes only.</summary>
+    private static string StripSgr(string text) => Regex.Replace(text, @"\x1b\[[0-9;]*m", "");
+    private static List<string> Plain(IEnumerable<string> lines) => [.. lines.Select(line => StripSgr(line).TrimEnd())];
+
+    private static void WithCapabilities(TerminalCapabilities capabilities, Action run)
+    {
+        var previous = TerminalImage.GetCapabilities();
+        TerminalImage.SetCapabilities(capabilities);
+        try { run(); }
+        finally { TerminalImage.SetCapabilities(previous); }
+    }
+
+    private static IEnumerable<(string Id, Func<Task> Run)> MarkdownCases()
+    {
+        // ---------------------------------------------------------------- tui.markdown-block-reuse
+        yield return ("sync150.markdown-block-reuse.highlight-once-across-stream-and-resize", Sync(() =>
+        {
+            // markdown.test.ts: highlights a code block once across streamed text and resizes, and again after invalidate.
+            var calls = new List<string>();
+            var markdown = new Markdown("```ts\nx\n```", 0, 0, CountingTheme(calls));
+            markdown.Render(80);
+            markdown.SetText("```ts\nx\n```\n\nafter");
+            markdown.Render(40);
+            Seq(["ts:x"], calls, "after streaming and a resize");
+            markdown.Invalidate();
+            markdown.Render(40);
+            Seq(["ts:x", "ts:x"], calls, "after invalidate");
+        }));
+        yield return ("sync150.markdown-block-reuse.blocks-held-weakly", Sync(() =>
+        {
+            // markdown.test.ts: holds rendered blocks weakly, so a full garbage collection releases them.
+            var calls = new List<string>();
+            var markdown = new Markdown("```ts\nx\n```", 0, 0, CountingTheme(calls));
+            markdown.Render(80);
+            GC.Collect(); GC.WaitForPendingFinalizers(); GC.Collect();
+            markdown.Render(40);
+            Seq(["ts:x", "ts:x"], calls, "highlighted again after a collection");
+        }));
+        yield return ("sync150.markdown-block-reuse.next-block-changes-spacing", Sync(() =>
+        {
+            // markdown.test.ts: renders a block again when the block after it changes its spacing.
+            var markdown = new Markdown("# Title", 0, 0, DefaultMarkdownTheme);
+            markdown.Render(80);
+            markdown.SetText("# Title\nfoo");
+            Seq(["Title", "", "foo"], markdown.Render(80).Select(line => StripSgr(line).Trim()), "lines");
+        }));
+        yield return ("sync150.markdown-block-reuse.follows-reference-definitions", Sync(() => WithCapabilities(new(ImageProtocol.None, false, false), () =>
+        {
+            // markdown.test.ts: follows changed reference link definitions.
+            var markdown = new Markdown("[a][x]\n\n[x]: https://one.example", 0, 0, DefaultMarkdownTheme);
+            markdown.Render(80);
+            markdown.SetText("[a][x]\n\n[x]: https://two.example");
+            Contains(StripSgr(string.Join("\n", markdown.Render(80))), "https://two.example", "rendered link");
+        })));
+        yield return ("sync150.markdown-block-reuse.unchanged-blocks-keep-lines", Sync(() =>
+        {
+            // Authored: while text streams, an unchanged earlier block keeps its rendered line strings.
+            var markdown = new Markdown("para one\n\npara two", 0, 0, DefaultMarkdownTheme);
+            var first = markdown.Render(80);
+            markdown.SetText("para one\n\npara two and more");
+            var second = markdown.Render(80);
+            Check(ReferenceEquals(first[0], second[0]), "first block reused");
+            Equal("para two and more", StripSgr(second[^1]).TrimEnd(), "last block rendered again");
+        }));
+
+        // ---------------------------------------------------------------- tui.display-math-raw-fallback
+        yield return ("sync150.display-math-raw-fallback.wider-than-content", Sync(() =>
+        {
+            // markdown.test.ts (#11483): falls back to raw source when display math is wider than the content width.
+            var source = string.Join("\n", "\\[", @"\frac{\partial^2 u}{\partial x^2} + \frac{\partial^2 u}{\partial y^2} = \sum_{i=1}^{n} \frac{1}{i^2} + \int_0^1 f(x)\,dx", "\\]");
+            List<string> RenderAt(int width) => Plain(new Markdown(source, 0, 0, DefaultMarkdownTheme).Render(width));
+            Seq(["∂² u   ∂² u   n   1   1", "──── + ──── = ∑   ── +∫ f(x) dx", "∂ x²   ∂ y²  i=1  i²  0"], RenderAt(40), "width 40");
+            var narrow = RenderAt(30);
+            Equal("\\[", narrow[0], "first line");
+            Equal("\\]", narrow[^1], "last line");
+            Check(!narrow.Any(line => line.Contains('─')), "no 2D layout");
+            Check(narrow.All(line => line.Length <= 30), "within width");
+        }));
+
+        // ---------------------------------------------------------------- tui.unclosed-display-math
+        string[] table = ["| A | B |", "|---|---|", "| 1 | 2 |"];
+        string[] renderedTable = ["┌───┬───┐", "│ A │ B │", "├───┼───┤", "│ 1 │ 2 │", "└───┴───┘"];
+        static List<string> Render80(IEnumerable<string> lines) => Plain(new Markdown(string.Join("\n", lines), 0, 0, DefaultMarkdownTheme).Render(80));
+        // markdown.test.ts (#11159): unclosed display math before tables.
+        foreach (var (name, source, expected) in new (string, string[], string[])[]
+                 {
+                     ("table-after-orphan-dollars", ["Intro", "", "$$", "", .. table, "", "After"], ["Intro", "", "$$", "", .. renderedTable, "", "After"]),
+                     ("table-after-orphan-dollars-with-math", ["$$", "x = 1", "", .. table], ["$$", "x = 1", "", .. renderedTable]),
+                     ("no-pairing-across-table", ["Intro", "", "$$", "x = 1", "", .. table, "", "$$", "y^2", "$$"], ["Intro", "", "$$", "x = 1", "", .. renderedTable, "", "y²"]),
+                     ("single-column-pipe-free-delimiter", ["$$", "", "| A |", ":---:", "| 1 |"], ["$$", "", "┌───┐", "│ A │", "├───┤", "│ 1 │", "└───┘"]),
+                     ("table-after-orphan-bracket", ["\\\\[", "x^2", "", .. table], ["", "\\[", "x^2", "", .. renderedTable]),
+                     ("no-bracket-pairing-across-table", ["\\\\[", "x = 1", "", .. table, "", "\\\\[", "y^2", "\\\\]"],
+                         ["", "\\[", "x = 1", "", .. renderedTable, "", "\\", "", "\\[", "y^2", "\\\\]"]),
+                     ("pipe-free-header", ["$$", "x^2", "", "Value", "| --- |", "1"], ["$$", "x^2", "", "┌───────┐", "│ Value │", "├───────┤", "│ 1     │", "└───────┘"]),
+                     ("closed-math-then-table", ["$$", "a", "+ b", "$$", "", .. table], ["a + b", "", .. renderedTable]),
+                 })
+            yield return ($"sync150.unclosed-display-math.{name}", Sync(() => Seq(expected, Render80(source), string.Join("\\n", source))));
+
+        // ---------------------------------------------------------------- tui.nested-blockquote-linear
+        yield return ("sync150.nested-blockquote-linear.deeper-than-width", Sync(() =>
+        {
+            // markdown.test.ts (#11272): renders quotes nested deeper than the width allows without exploding.
+            var lines = Plain(new Markdown(new string('>', 60) + "x", 1, 0, DefaultMarkdownTheme).Render(80));
+            Equal(1, lines.Count, "single line: " + Show(string.Join("|", lines)));
+            Check(lines[0].EndsWith('x'), "content kept: " + Show(lines[0]));
+        }));
+
+        // ---------------------------------------------------------------- tui.wrap-styled-word-boundary (Markdown)
+        yield return ("sync150.wrap.markdown-styled-words-and-background", Sync(() =>
+        {
+            // markdown.test.ts (#10925): no line starts with a space and no style is carried into the padding.
+            var markdown = new Markdown("aaaa **bold** next ~~strk~~ more words", 1, 0, DefaultMarkdownTheme, new DefaultTextStyle(BgColor: text => $"\u001b[44m{text}\u001b[49m"));
+            Seq(["\u001b[44m aaaa \u001b[1mbold\u001b[22m \u001b[49m", "\u001b[44m next \u001b[9mstrk\u001b[29m \u001b[49m", "\u001b[44m more      \u001b[49m", "\u001b[44m words     \u001b[49m"],
+                markdown.Render(11), "lines");
+        }));
+
+        // ---------------------------------------------------------------- tui.cjk-emphasis
+        var tagTheme = DefaultMarkdownTheme with { Bold = text => $"<b>{text}</b>", Italic = text => $"<i>{text}</i>" };
+        List<string> Tags(string text) => [.. new Markdown(text, 0, 0, tagTheme).Render(80).Select(line => line.TrimEnd())];
+        yield return ("sync150.cjk-emphasis.next-to-cjk-punctuation", Sync(() =>
+        {
+            // markdown.test.ts (#10154): renders emphasis delimited next to CJK punctuation.
+            Seq(["<b>这是测试。</b>后面"], Tags("**这是测试。**后面"), "full stop");
+            Seq(["<b>一句话说清：</b>一台机器"], Tags("**一句话说清：**一台机器"), "fullwidth colon");
+            Seq(["<b>要点到此为止。</b>20 小时"], Tags("**要点到此为止。**20 小时"), "before a digit");
+            Seq(["字<b>「引用」</b>字"], Tags("字**「引用」**字"), "corner brackets");
+            Seq(["<i>斜体。</i>后面"], Tags("*斜体。*后面"), "italic");
+        }));
+        yield return ("sync150.cjk-emphasis.commonmark-elsewhere", Sync(() =>
+        {
+            // markdown.test.ts: keeps CommonMark flanking rules for non-CJK text.
+            Seq(["**end.**Then next"], Tags("**end.**Then next"), "non-CJK text");
+        }));
+
+        // ---------------------------------------------------------------- tui.bare-url-cjk-punctuation
+        yield return ("sync150.bare-url-cjk-punctuation.stops-at-cjk-punctuation", Sync(() => WithCapabilities(new(ImageProtocol.None, false, true), () =>
+        {
+            // markdown.test.ts: stops bare URLs at CJK punctuation and preserves the following text.
+            foreach (var punctuation in "。，；：！？、“”‘’（）【】《》「」『』…—·・〈〉［］｛｝．｡｢｣､･")
+                foreach (var url in new[] { "https://example.com", "https://example.com/中文?q=搜索#片段", "www.example.com" })
+                {
+                    var source = $"{url}{punctuation}后面的中文";
+                    var output = string.Concat(new Markdown(source, 0, 0, DefaultMarkdownTheme).Render(160));
+                    var href = url.StartsWith("www.", StringComparison.Ordinal) ? "http://" + url : url;
+                    Contains(output, $"\u001b]8;;{href}\u001b\\", source);
+                    Contains(StripSgr(output), $"\u001b]8;;\u001b\\{punctuation}后面的中文", source);
+                    Equal(source, StripSgr(Regex.Replace(output, @"\x1b\]8;;[^\x1b]*\x1b\\", "")).TrimEnd(), source);
+                }
+        })));
+        yield return ("sync150.bare-url-cjk-punctuation.keeps-cjk-letters", Sync(() => WithCapabilities(new(ImageProtocol.None, false, true), () =>
+        {
+            // markdown.test.ts: preserves Chinese characters without punctuation in bare URLs.
+            foreach (var url in new[] { "https://example.com紧接着中文", "https://example.com/中文?q=搜索#片段", "https://example.com/テストー한글" })
+                Contains(string.Concat(new Markdown(url, 0, 0, DefaultMarkdownTheme).Render(160)), $"\u001b]8;;{url}\u001b\\", url);
+        })));
+        yield return ("sync150.bare-url-cjk-punctuation.explicit-links-keep-punctuation", Sync(() => WithCapabilities(new(ImageProtocol.None, false, true), () =>
+        {
+            // markdown.test.ts: preserves CJK punctuation in explicit links and angle autolinks.
+            const string url = "https://example.com/中文，路径·テスト・한글…—。";
+            foreach (var source in new[] { $"[文档]({url})", $"<{url}>" })
+                Contains(string.Concat(new Markdown(source, 0, 0, DefaultMarkdownTheme).Render(160)), $"\u001b]8;;{url}\u001b\\", source);
+        })));
+        yield return ("sync150.bare-url-cjk-punctuation.english-trim-first", Sync(() => WithCapabilities(new(ImageProtocol.None, false, true), () =>
+        {
+            // markdown.test.ts: preserves English punctuation trimming before Chinese punctuation.
+            var output = string.Concat(new Markdown("https://example.com.，后面的中文", 0, 0, DefaultMarkdownTheme).Render(160));
+            Contains(output, "\u001b]8;;https://example.com\u001b\\", "link");
+            Contains(StripSgr(output), "\u001b]8;;\u001b\\.，后面的中文", "following text");
+        })));
     }
 
     private sealed class MutableLines(params string[] lines) : IComponent
