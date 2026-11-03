@@ -867,8 +867,9 @@ internal static partial class Program
         await Manager(sandbox, J("""{"packages":["git:github.com/user/repo"]}"""), processes: processes).UpdateAsync(source);
         Check(processes.Ran("npm", ["install", "--omit=dev", "--legacy-peer-deps"], target) && !processes.Ran("git", ["clean", "-fdx"], target), "repair without clean");
         processes = new FakeProcesses { OnCapture = (_, args, _) => UpstreamCapture(args, "old-head", "new-head"), OnRun = (_, args, _) => args[0] == "clean" ? throw new PiPackageException("simulated clean failure") : Task.CompletedTask };
-        Equal("simulated clean failure", (await ThrowsAsync<PiPackageException>(() => Manager(sandbox, J("""{"packages":["git:github.com/user/repo"]}"""), processes: processes).UpdateAsync(source))).Message, "clean failure");
-        Check(processes.Ran("npm", ["install", "--omit=dev", "--legacy-peer-deps"], target), "dependencies repaired after a failed clean");
+        // Pi 1.5.0: a failed clean no longer fails the update (sync150.package-git-clean-failure-installs-and-keeps-the-marker).
+        await Manager(sandbox, J("""{"packages":["git:github.com/user/repo"]}"""), processes: processes).UpdateAsync(source);
+        Check(processes.Ran("npm", ["install", "--omit=dev", "--legacy-peer-deps"], target), "dependencies installed after a failed clean");
 
         // Project scope with a wrapped pnpm.
         var projectTarget = Path.Combine(sandbox.Cwd, ".pi", "git", "github.com", "user", "repo");

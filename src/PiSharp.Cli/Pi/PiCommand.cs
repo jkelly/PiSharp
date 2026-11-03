@@ -170,22 +170,23 @@ internal static class PiCommand
 
         if (parsed.Help)
         {
-            await Report(startupDiagnostics).ConfigureAwait(false);
-            // main.ts: help prints after the runtime loaded the extensions (no trust prompt in this pass), listing their flags.
+            // main.ts: help prints after the runtime loaded the extensions (no trust prompt in this pass), listing their flags; the
+            // diagnostics reported first include the runtime's (a configured package that failed to install).
             IReadOnlyList<PiExtensionFlag>? helpFlags = null;
+            PiDiagnostic[] helpDiagnostics = [];
             if (host.LoadExtensions is null)
             {
                 var helpTrusted = parsed.ProjectTrustOverride ?? (!ProjectTrustStore.HasTrustRequiringProjectResources(cwd, home) || new ProjectTrustStore(agentDir, home).Get(cwd) == true);
                 await using var helpRun = await PiExtensionRun.LoadAsync(host, parsed, cwd, agentDir, home, helpTrusted, "print", false, null, token).ConfigureAwait(false);
-                helpFlags = helpRun.Host?.Flags;
+                helpFlags = helpRun.Host?.Flags; helpDiagnostics = [.. helpRun.Diagnostics];
             }
+            await Report(Deduplicate([.. startupDiagnostics, .. helpDiagnostics])).ConfigureAwait(false);
             await console.WriteAsync((PiHelp.Text(helpFlags, color: color) + "\n").AsMemory(), token).ConfigureAwait(false);
             await console.FlushAsync(token).ConfigureAwait(false);
             return 0;
         }
         if (parsed.ListModels is { } search)
         {
-            await Report(startupDiagnostics).ConfigureAwait(false);
             // main.ts: --list-models lists the runtime's models after createAgentSessionRuntime loaded the extensions (no trust prompt in
             // this pass): their providers join the registry, and a built-in llama.cpp extension that is not loaded registers none.
             var listRuntime = host.LiveRuntime;
@@ -213,6 +214,7 @@ internal static class PiCommand
                 }
             }
             await using var listed = listRun;
+            await Report(Deduplicate([.. startupDiagnostics, .. listRun?.Diagnostics ?? []])).ConfigureAwait(false);
             var registry = await listRuntime.CreateModelRegistryAsync(token).ConfigureAwait(false);
             await PiSharp.Cli.Models.ModelListing.ListAsync(registry, search.Length == 0 ? null : search, console, err, cancellationToken: token).ConfigureAwait(false);
             await console.FlushAsync(token).ConfigureAwait(false);

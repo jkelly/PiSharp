@@ -2,6 +2,8 @@ using System.Collections.Immutable;
 using System.Text.Json.Nodes;
 using PiSharp.Cli.Commands;
 using PiSharp.Cli.Extensions.Execution;
+using PiSharp.Cli.Packages;
+using PiSharp.Cli.Pi;
 using PiSharp.Extensions;
 using PiSharp.Extensions.Facade.Execution;
 using PiSharp.Extensions.Runtime;
@@ -9,7 +11,11 @@ using PiSharp.Tools.Processes;
 
 // Pi 1.5.0 (authored from the v1.5.0 sources, f9a26365568127461c47a07a37dcb42c140a3ac5): core/exec.ts (execCommand: maxBuffer and
 // truncated, SIGKILL after SIGTERM, UTF-8 decoding across chunks, spawn errors in stderr) through the Node bridge's pi.exec and native
-// pi.exec (NativeExtensionExecHost over the platform's separated process runner).
+// pi.exec (NativeExtensionExecHost over the platform's separated process runner);
+// core/package-manager.ts (getNpmInstallArgs and uninstallNpm with a real --prefix, resolvePackageSources: install failures,
+// temporary npm and git refresh; cleanAndInstallGitDependencies after a failed clean; reportUnchangedNpmUpdates), core/resource-loader.ts
+// (describePackageInstallFailure, formatPackageInstallWarning), main.ts (--help and --list-models report the runtime diagnostics) and
+// package-manager-cli.ts (progress events, pi config warnings).
 // Expectations are written from the sources by reading, never captured from an upstream run.
 internal static partial class Program
 {
@@ -17,6 +23,13 @@ internal static partial class Program
     [
         ("sync150.bridge-exec-max-buffer-utf8-and-spawn-errors", BridgeExecLimits),
         ("sync150.native-exec-max-buffer-truncates-stops-and-spawn-errors", NativeExecLimits),
+        ("sync150.package-npm-prefix-resolves-a-linked-agent-dir", PackageNpmRealPrefix),
+        ("sync150.package-temporary-npm-refreshes-to-latest", PackageTemporaryNpmRefresh),
+        ("sync150.package-temporary-git-ref-refreshes-unless-the-commit-is-checked-out", PackageTemporaryGitRefresh),
+        ("sync150.package-git-clean-failure-installs-and-keeps-the-marker", PackageGitCleanFailure),
+        ("sync150.package-update-warns-when-npm-leaves-the-version-unchanged", PackageUnchangedNpmUpdate),
+        ("sync150.package-install-failure-is-a-startup-warning", PackageInstallFailureAtStartup),
+        ("sync150.package-install-failure-warnings-follow-reload", PackageInstallFailureOnReload),
     ];
 
     private const string ExecExtension = """
@@ -167,5 +180,215 @@ internal static partial class Program
         var copy = node.DeepClone().AsObject();
         foreach (var name in names) copy.Remove(name);
         return copy.ToJsonString();
+    }
+
+    // getNpmInstallArgs and uninstallNpm: npm writes broken nested package-lock.json paths through a symlinked --prefix, so an agent
+    // directory reached through a link installs and uninstalls with the resolved root.
+    private static async Task PackageNpmRealPrefix()
+    {
+        using var sandbox = new Sandbox("pkg-real-prefix");
+        var linked = Path.Combine(sandbox.Root, "linked-agent");
+        if (!Link(linked, sandbox.AgentDir)) throw new SkipException("NO_LINK", "A directory link cannot be created here.");
+        var realRoot = Path.Combine(sandbox.AgentDir, "npm");
+        PiPackageManager Linked(FakeProcesses processes) =>
+            new(sandbox.Cwd, linked, sandbox.Home, PiSettings.FromObjects([], [], true), _ => null, processes);
+        var processes = new FakeProcesses();
+        await Linked(processes).InstallAsync("npm:real-pkg");
+        Check(processes.Ran("npm", ["install", "real-pkg", "--prefix", realRoot, "--legacy-peer-deps"]), "install prefix: " + string.Join(" | ", processes.Runs.Select(run => string.Join(' ', run.Args))));
+        processes = new FakeProcesses();
+        await Linked(processes).RemoveAsync("npm:real-pkg");
+        Check(processes.Ran("npm", ["uninstall", "real-pkg", "--prefix", realRoot, "--legacy-peer-deps"]), "uninstall prefix: " + string.Join(" | ", processes.Runs.Select(run => string.Join(' ', run.Args))));
+        // A root that does not exist yet is passed as it is.
+        Names(["install", "x", "--prefix", Path.Combine(linked, "absent"), "--legacy-peer-deps"], Linked(new()).GetNpmInstallArgs(["x"], Path.Combine(linked, "absent")), "missing root");
+    }
+
+    // resolvePackageSources: an installed unpinned temporary (-e) npm source with a newer registry version installs name@latest (a bare
+    // name keeps the saved range); a failed refresh keeps the cached install; pinned sources and offline mode never look the version up.
+    private static async Task PackageTemporaryNpmRefresh()
+    {
+        using var sandbox = new Sandbox("pkg-temp-npm");
+        var installed = Manager(sandbox).GetNpmInstallPath((PiNpmSource)PiPackageSource.Parse("npm:tmp-pkg"), "temporary");
+        var root = Path.GetDirectoryName(Path.GetDirectoryName(installed))!;
+        sandbox.Write(Path.Combine(installed, "package.json"), Jstr(new { name = "tmp-pkg", version = "1.0.0" }));
+        sandbox.Write(Path.Combine(installed, "extensions", "index.ts"), "export default function () {}");
+        var processes = new FakeProcesses { OnCapture = (_, args, _) => args[0] == "view" ? "\"2.0.0\"" : null };
+        var resolved = await Manager(sandbox, processes: processes).ResolveExtensionSourcesAsync(["npm:tmp-pkg"], temporary: true);
+        Names(["view", "tmp-pkg", "version", "--json"], processes.Captures.Single().Args, "registry lookup");
+        Check(processes.Ran("npm", ["install", "tmp-pkg@latest", "--prefix", root, "--legacy-peer-deps"]), "refresh to latest: " + string.Join(" | ", processes.Runs.Select(run => string.Join(' ', run.Args))));
+        Check(Enabled(resolved.Extensions, "tmp-pkg/extensions/index.ts"), "refreshed extension resolved");
+
+        processes = new FakeProcesses { OnCapture = (_, _, _) => "\"2.0.0\"", OnRun = (_, _, _) => throw new PiPackageException("registry down") };
+        resolved = await Manager(sandbox, processes: processes).ResolveExtensionSourcesAsync(["npm:tmp-pkg"], temporary: true);
+        Check(Enabled(resolved.Extensions, "tmp-pkg/extensions/index.ts") && resolved.InstallFailures.IsEmpty, "a failed refresh keeps the cached install");
+
+        processes = new FakeProcesses { OnCapture = (_, _, _) => "\"1.0.0\"" };
+        await Manager(sandbox, processes: processes).ResolveExtensionSourcesAsync(["npm:tmp-pkg"], temporary: true);
+        Equal(0, processes.Runs.Count, "current temporary source not reinstalled");
+        processes = new FakeProcesses { OnCapture = (_, _, _) => "\"2.0.0\"" };
+        await Manager(sandbox, processes: processes, environment: new() { ["PI_OFFLINE"] = "1" }).ResolveExtensionSourcesAsync(["npm:tmp-pkg"], temporary: true);
+        Equal(0, processes.Runs.Count + processes.Captures.Count, "offline: no refresh");
+        // A user-scope source is never refreshed during resolve (pi update does that).
+        var user = Path.Combine(sandbox.AgentDir, "npm", "node_modules", "tmp-pkg");
+        sandbox.Write(Path.Combine(user, "package.json"), Jstr(new { name = "tmp-pkg", version = "1.0.0" }));
+        processes = new FakeProcesses { OnCapture = (_, _, _) => "\"2.0.0\"" };
+        await Manager(sandbox, J("""{"packages":["npm:tmp-pkg"]}"""), processes: processes).ResolveAsync();
+        Equal(0, processes.Runs.Count + processes.Captures.Count, "user scope not refreshed on resolve");
+    }
+
+    // refreshTemporaryGitSource: a temporary git source with a ref is refreshed too (a ref can name a moving branch); only a commit-hash
+    // ref that is already checked out skips the fetch, compared without case.
+    private static async Task PackageTemporaryGitRefresh()
+    {
+        using var sandbox = new Sandbox("pkg-temp-git");
+        async Task<FakeProcesses> Resolve(string source, string head)
+        {
+            var git = (PiGitSource)PiPackageSource.Parse(source);
+            Directory.CreateDirectory(Manager(sandbox).GetGitInstallPath(git, "temporary"));
+            var processes = new FakeProcesses { OnCapture = (_, args, _) => args is ["rev-parse", "HEAD"] ? head + "\n" : "same" };
+            await Manager(sandbox, processes: processes).ResolveExtensionSourcesAsync([source], temporary: true);
+            return processes;
+        }
+        bool Fetched(FakeProcesses processes, string reference) => processes.Runs.Any(run => run.Command == "git" && run.Args.SequenceEqual(["fetch", "origin", reference]));
+        Check(Fetched(await Resolve("git:github.com/user/branchy@main", "0123456789abcdef0123456789abcdef01234567"), "main"), "a branch ref refreshes");
+        var current = await Resolve("git:github.com/user/hashed@ABC1234", "abc1234def5678abc1234def5678abc1234def56");
+        Check(!Fetched(current, "ABC1234") && current.Captures.Count == 1, "a checked-out commit hash skips the fetch");
+        Check(Fetched(await Resolve("git:github.com/user/moved@abc1234", "fedcba9876543210fedcba9876543210fedcba98"), "abc1234"), "another checkout fetches the hash");
+    }
+
+    // cleanAndInstallGitDependencies: a failed git clean (files in use by another session) reports a progress event, still installs the
+    // new commit's dependencies and keeps the update marker so the next update retries the clean.
+    private static async Task PackageGitCleanFailure()
+    {
+        using var sandbox = new Sandbox("pkg-git-clean");
+        var target = Path.Combine(sandbox.AgentDir, "git", "github.com", "user", "repo");
+        var marker = Path.Combine(sandbox.AgentDir, "git", "github.com", "user", ".repo.pi-update-incomplete");
+        sandbox.Write(Path.Combine(target, "package.json"), Jstr(new { name = "repo", version = "1.0.0" }));
+        var processes = new FakeProcesses
+        {
+            OnCapture = (_, args, _) => args switch
+            {
+                ["rev-parse", "--abbrev-ref", "@{upstream}"] => "origin/main", ["rev-parse", "HEAD"] => "old-head", _ => "new-head"
+            },
+            OnRun = (_, args, _) => args[0] == "clean" ? throw new PiPackageException("simulated clean failure") : Task.CompletedTask
+        };
+        var progress = new List<PiPackageProgressEvent>();
+        var manager = Manager(sandbox, J("""{"packages":["git:github.com/user/repo"]}"""), processes: processes);
+        manager.SetProgressCallback(progress.Add);
+        await manager.UpdateAsync("git:github.com/user/repo");
+        Check(processes.Ran("git", ["reset", "--hard", "@{upstream}^{commit}"], target) && processes.Ran("npm", ["install", "--omit=dev", "--legacy-peer-deps"], target),
+            "dependencies installed after a failed clean");
+        Check(File.Exists(marker), "the update marker stays for the next update");
+        var warning = progress.Single(e => e.Type == "progress");
+        Equal(("update", target, $"Could not remove all untracked files in {target} (simulated clean failure). Files may be in use by another pi session; close it and run the update again."),
+            (warning.Action, warning.Source, warning.Message), "clean failure progress");
+        Check(progress.Any(e => e is { Type: "complete", Source: "git:github.com/user/repo" }), "the update completes");
+        // The next update at the same commit retries the clean (the marker) and then clears the marker.
+        processes = new FakeProcesses { OnCapture = (_, args, _) => args switch { ["rev-parse", "--abbrev-ref", "@{upstream}"] => "origin/main", _ => "new-head" } };
+        await Manager(sandbox, J("""{"packages":["git:github.com/user/repo"]}"""), processes: processes).UpdateAsync("git:github.com/user/repo");
+        Check(processes.Ran("git", ["clean", "-fdx"], target) && !File.Exists(marker), "the retried clean clears the marker");
+    }
+
+    // reportUnchangedNpmUpdates: an announced update that leaves the installed version unchanged (stale registry metadata) is reported as
+    // a progress event, which the update command prints; a version lookup that failed or an update that took effect is not reported.
+    private static async Task PackageUnchangedNpmUpdate()
+    {
+        using var sandbox = new Sandbox("pkg-unchanged");
+        var userRoot = Path.Combine(sandbox.AgentDir, "npm");
+        void Installed(string name, string version) => sandbox.Write(Path.Combine(userRoot, "node_modules", name, "package.json"), Jstr(new { name, version }));
+        Installed("stale", "1.0.0"); Installed("fresh", "1.0.0"); Installed("unknown", "1.0.0");
+        FakeProcesses Processes() => new()
+        {
+            OnCapture = (_, args, _) => args[1] == "unknown" ? throw new PiPackageException("view failed") : "\"2.0.0\"",
+            OnRun = (_, args, _) => { if (args.Contains("fresh@latest")) Installed("fresh", "2.0.0"); return Task.CompletedTask; }
+        };
+        var processes = Processes();
+        var progress = new List<PiPackageProgressEvent>();
+        var manager = Manager(sandbox, J("""{"packages":["npm:stale","npm:fresh","npm:unknown"]}"""), processes: processes);
+        manager.SetProgressCallback(progress.Add);
+        await manager.UpdateAsync();
+        Check(processes.Ran("npm", ["install", "stale@latest", "fresh@latest", "unknown@latest", "--prefix", userRoot, "--legacy-peer-deps"]), "one batch");
+        var expected = "npm:stale is still 1.0.0 (registry reports 2.0.0); npm registry metadata may be stale, try again in a few minutes";
+        Names([expected], progress.Where(e => e.Type == "progress").Select(e => e.Message!), "unchanged warnings");
+        Check(progress.Single(e => e.Type == "progress") is { Action: "update", Source: "npm:stale" }, "warning source");
+
+        Installed("fresh", "1.0.0");
+        sandbox.Write(Path.Combine(sandbox.AgentDir, "settings.json"), """{"packages":["npm:stale","npm:fresh","npm:unknown"]}""");
+        var (code, stdout, stderr) = await RunPackages(sandbox, (_, _) => Processes(), "update", "--extensions");
+        Equal(0, code, "update exit; " + stderr);
+        Check(stdout.Split('\n').Any(line => line.Contains(expected, StringComparison.Ordinal)), "the update command prints the warning: " + stdout);
+    }
+
+    // resolvePackageSources: a configured package that cannot be installed is skipped and recorded (source, scope, message) instead of
+    // aborting the resolve; describePackageInstallFailure gives a scope-specific hint; the warning reaches a print run's diagnostics,
+    // --help, --list-models and pi config, and the next start tries the install again.
+    private static async Task PackageInstallFailureAtStartup()
+    {
+        using var sandbox = new Sandbox("pkg-install-failure");
+        FakeProcesses Failing() => new() { OnRun = (_, args, _) => args[0] == "install" ? throw new PiPackageException("registry unreachable") : Task.CompletedTask };
+        var resolved = await Manager(sandbox, J("""{"packages":["npm:broken-user"]}"""), J("""{"packages":["npm:broken-project"]}"""), processes: Failing()).ResolveAsync();
+        Equal("""[["npm:broken-project","project","registry unreachable"],["npm:broken-user","user","registry unreachable"]]""",
+            Jstr(resolved.InstallFailures.Select(failure => new[] { failure.Source, failure.Scope, failure.Message })), "install failures");
+        var temporary = await Manager(sandbox, processes: Failing()).ResolveExtensionSourcesAsync(["npm:broken-temp"], temporary: true);
+        Equal("temporary", temporary.InstallFailures.Single().Scope, "temporary failure");
+        Equal("Missing source: npm:broken-user", (await ThrowsAsync<PiPackageException>(() => Manager(sandbox, J("""{"packages":["npm:broken-user"]}"""), processes: Failing())
+            .ResolveAsync(_ => Task.FromResult(PiMissingSourceAction.Error)))).Message, "onMissing error still throws");
+
+        var user = "Extension package \"npm:broken-user\": failed to install (registry unreachable). Run \"pisharp remove npm:broken-user\" to remove it from settings.json.";
+        var project = "Extension package \"npm:broken-project\": failed to install (registry unreachable). Run \"pisharp remove npm:broken-project --local\" to remove it from settings.json.";
+        Equal(user, PiSharp.Cli.Extensions.Pi.PiExtensionRun.FormatPackageInstallWarning(resolved.InstallFailures[1]), "user hint");
+        Equal(project, PiSharp.Cli.Extensions.Pi.PiExtensionRun.FormatPackageInstallWarning(resolved.InstallFailures[0]), "project hint");
+        Equal("Extension package \"npm:broken-temp\": failed to install (registry unreachable). Check the source and try again.",
+            PiSharp.Cli.Extensions.Pi.PiExtensionRun.FormatPackageInstallWarning(temporary.InstallFailures[0]), "temporary hint");
+
+        sandbox.Write(Path.Combine(sandbox.AgentDir, "settings.json"), """{"packages":["npm:broken-user"]}""");
+        var installs = 0;
+        Func<TextWriter, TextWriter, PiPackageProcesses> processes = (_, _) => new FakeProcesses
+        { OnRun = (_, args, _) => { if (args[0] == "install") { Interlocked.Increment(ref installs); throw new PiPackageException("registry unreachable"); } return Task.CompletedTask; } };
+        var (code, stdout, stderr) = await RunPackages(sandbox, processes, [.. new[] { "-p" }, .. Model, "hello"]);
+        Equal(0, code, "a print run starts; " + stderr);
+        Equal("ok", stdout.Trim(), "print output");
+        Equal(1, stderr.Split('\n').Count(line => line == "Warning: " + user), "one warning: " + stderr);
+        Check(installs > 0, "the install was attempted");
+        (code, stdout, stderr) = await RunPackages(sandbox, processes, "--help");
+        Check(code == 0 && stderr.Split('\n').Contains("Warning: " + user), "--help reports the runtime diagnostics: " + stderr);
+        (code, _, stderr) = await RunPackages(sandbox, processes, "--list-models");
+        Check(code == 0 && stderr.Split('\n').Contains("Warning: " + user), "--list-models reports the runtime diagnostics: " + stderr);
+        (_, _, stderr) = await RunPackages(sandbox, processes, "config");
+        Equal(1, stderr.Split('\n').Count(line => line == "Warning: " + user), "pi config prints the warning once: " + stderr);
+    }
+
+    // resource-loader.ts reload: the install warnings are collected again on every load, so /reload reports a package that still fails
+    // and drops one that installed in the meantime.
+    private static async Task PackageInstallFailureOnReload()
+    {
+        using var sandbox = NodeSandbox("pkg-install-reload");
+        sandbox.Write(Path.Combine(sandbox.AgentDir, "settings.json"), """{"packages":["npm:broken-user"]}""");
+        var extension = sandbox.Write(Path.Combine(sandbox.Cwd, "ext.ts"), "export default function () {}");
+        var installRoot = Path.Combine(sandbox.AgentDir, "npm");
+        var succeed = false;
+        using var stdout = new StringWriter(); using var stderr = new StringWriter();
+        var host = sandbox.Host(stdout, stderr, null) with
+        {
+            PackageProcesses = (_, _) => new FakeProcesses
+            {
+                OnRun = (_, args, _) =>
+                {
+                    if (args[0] != "install") return Task.CompletedTask;
+                    if (!succeed) throw new PiPackageException("registry unreachable");
+                    sandbox.Write(Path.Combine(installRoot, "node_modules", "broken-user", "package.json"), Jstr(new { name = "broken-user", version = "1.0.0" }));
+                    return Task.CompletedTask;
+                }
+            }
+        };
+        await using var run = await PiSharp.Cli.Extensions.Pi.PiExtensionRun.LoadAsync(host, PiArgs.Parse(["-e", extension]), sandbox.Cwd, sandbox.AgentDir, sandbox.Home,
+            true, "print", false, null, CancellationToken.None);
+        var describe = "failed to install (registry unreachable). Run \"pisharp remove npm:broken-user\" to remove it from settings.json.";
+        Check(run.Diagnostics.Any(d => d.Type == "warning" && d.Message == "Extension package \"npm:broken-user\": " + describe), "load warning: " + string.Join(" | ", run.Diagnostics.Select(d => d.Message)));
+        Equal(("npm:broken-user", describe), run.Host!.PackageWarnings.Single(), "host warnings after load");
+        await run.Host.ResolveReloadPaths!(CancellationToken.None);
+        Check(run.Host.PackageWarnings.Length == 1, "a reload that still fails reports it again");
+        succeed = true;
+        await run.Host.ResolveReloadPaths!(CancellationToken.None);
+        Check(run.Host.PackageWarnings.IsEmpty, "a reload that installed the package drops the warning");
     }
 }

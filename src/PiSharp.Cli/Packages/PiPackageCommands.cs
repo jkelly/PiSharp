@@ -277,6 +277,10 @@ Options:
             var projectResolved = settings.ProjectTrusted
                 ? await new PiPackageManager(cwd, agentDir, host.Home, settings, host.GetEnvironment, processes, builtins).ResolveAsync(cancellationToken: token).ConfigureAwait(false)
                 : globalResolved;
+            // A configured package that could not be installed is skipped and reported once.
+            foreach (var warning in globalResolved.InstallFailures.Concat(projectResolved.InstallFailures)
+                .Select(PiSharp.Cli.Extensions.Pi.PiExtensionRun.FormatPackageInstallWarning).Distinct(StringComparer.Ordinal))
+                await console.Error(console.Yellow($"Warning: {warning}")).ConfigureAwait(false);
             if (host.ConfigSelector is null)
             {
                 // Source selectConfig always opens the TUI; this host has none (IMPL-I provides it).
@@ -350,8 +354,9 @@ Options:
         var manager = new PiPackageManager(cwd, agentDir, host.Home, settings, host.GetEnvironment, Processes(host));
         manager.SetProgressCallback(progress =>
         {
-            if (progress.Type != "start") return;
-            host.Stdout.Write(console.Dim($"{progress.Message}\n"));
+            if (progress.Type == "start") host.Stdout.Write(console.Dim($"{progress.Message}\n"));
+            else if (progress.Type == "progress" && !string.IsNullOrEmpty(progress.Message)) host.Stdout.Write(console.Yellow($"{progress.Message}\n"));
+            else return;
             host.Stdout.Flush();
         });
         try

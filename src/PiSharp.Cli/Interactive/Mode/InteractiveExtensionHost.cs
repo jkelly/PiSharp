@@ -122,7 +122,8 @@ internal sealed class PiInteractiveExtensionHost(PiExtensionHost host) : IIntera
 
     public IReadOnlyList<LoadedResource> LoadedExtensions() => [.. host.Extensions.Select(extension => new LoadedResource(extension.Path, null))];
 
-    public IReadOnlyList<ResourceDiagnostic> Diagnostics() => [.. host.Errors.Select(error => new ResourceDiagnostic("error", error.Error, error.Path))];
+    public IReadOnlyList<ResourceDiagnostic> Diagnostics() => [.. host.Errors.Select(error => new ResourceDiagnostic("error", error.Error, error.Path)),
+        .. host.PackageWarnings.Select(warning => new ResourceDiagnostic("warning", warning.Warning, warning.Path))];
 
     private readonly ConcurrentDictionary<string, NodeEditorComponent> editors = new(StringComparer.Ordinal);
 
