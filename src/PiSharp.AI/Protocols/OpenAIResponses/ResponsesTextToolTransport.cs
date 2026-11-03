@@ -209,11 +209,12 @@ public sealed class ResponsesTextToolTransport : IChatTransport
 
     private sealed class Slot(int index, string kind, string itemId, string? callId = null, string? name = null)
     {
-        // constrained-sampling.ts GrammarToolInputJsonBuffer for custom_tool_call input.
+        // constrained-sampling.ts GrammarToolInputJsonBuffer for custom_tool_call input, and the JSON text of the item's initial
+        // input, sent with the first delta (openai-responses-shared.ts CustomInput.unsent).
         public string? CustomProperty;
-        public string CustomInput = "";
-        public string BufferInput = "";
+        public readonly StringBuilder CustomInput = new();
         public bool BufferStarted, BufferClosed;
+        public string Unsent = "";
         public readonly int Index = index;
         public readonly string Kind = kind;
         public readonly string ItemId = itemId;
@@ -343,11 +344,11 @@ public sealed class ResponsesTextToolTransport : IChatTransport
                     break;
                 case "response.custom_tool_call_input.delta":
                     if (Active(value, "custom_tool_call") is not { } custom) break;
-                    CustomInput(custom, custom.CustomInput + String(value, "delta", allowEmpty: true), false, Emit);
+                    SendCustomInput(custom, AppendCustomInput(custom, String(value, "delta", allowEmpty: true)), Emit);
                     break;
                 case "response.custom_tool_call_input.done":
                     if (Active(value, "custom_tool_call") is not { } customDone) break;
-                    CustomInput(customDone, String(value, "input", allowEmpty: true), true, Emit);
+                    SendCustomInput(customDone, CloseCustomInput(customDone, String(value, "input", allowEmpty: true)), Emit);
                     break;
                 case "response.output_item.done":
                     var item = Object(value.GetProperty("item"));
@@ -389,26 +390,24 @@ public sealed class ResponsesTextToolTransport : IChatTransport
                     }
                     else if (slot.Kind == "custom_tool_call")
                     {
-                        CustomInput(slot, OptionalStringOrNull(item, "input") ?? slot.CustomInput, true, Emit);
+                        SendCustomInput(slot, CloseCustomInput(slot, OptionalStringOrNull(item, "input")), Emit);
                         var started = (ToolCallContent)_reducer.Snapshot().Content[slot.Index];
                         var customFields = started.ExtraProperties ?? JsonFields.Empty;
                         if (OptionalString(item, "namespace") is { } customNamespace) customFields = customFields.Set("namespace", StringData(customNamespace));
-                        var input = new JsonObject { [slot.CustomProperty!] = slot.CustomInput };
+                        var input = new JsonObject { [slot.CustomProperty!] = slot.CustomInput.ToString() };
                         Emit(new ToolCallEnded(slot.Index, new(started.Id, started.Name, JsonData.Parse(input.ToJsonString(SignatureJson)), customFields)));
                     }
                     else
                     {
+                        // openai-responses-shared.ts output_item.done: if (item.arguments) args.replace(item.arguments), then
+                        // Object.assign(block, args.finish()), so malformed arguments end as {} with argumentsError; then the namespace.
                         var raw = OptionalString(item, "arguments");
                         if (string.IsNullOrEmpty(raw)) raw = _reducer.GetToolJsonPreview(slot.Index);
-                        if (raw.Length == 0) raw = "{}";
-                        // openai-responses-shared.ts output_item.done: parseStreamingJson(item.arguments || partialJson || "{}").
-                        JsonData final;
-                        try { final = StreamingJson.Parse(raw); }
-                        catch (JsonException) { throw Protocol(); }
                         var original = (ToolCallContent)_reducer.Snapshot().Content[slot.Index];
-                        var fields = original.ExtraProperties ?? JsonFields.Empty;
-                        if (OptionalString(item, "namespace") is { } ns) fields = fields.Set("namespace", StringData(ns));
-                        Emit(new ToolCallEnded(slot.Index, new(original.Id, original.Name, final, fields)));
+                        var final = StreamingJson.ParseToolCallArguments(raw).AssignTo(new(original.Id, original.Name, JsonData.EmptyObject, original.ExtraProperties));
+                        if (OptionalString(item, "namespace") is { } ns)
+                            final = new(final.Id, final.Name, final.Arguments, (final.ExtraProperties ?? JsonFields.Empty).Set("namespace", StringData(ns)));
+                        Emit(new ToolCallEnded(slot.Index, final));
                     }
                     slot.Ended = true;
                     _slots.Remove(outputIndex);
@@ -550,7 +549,7 @@ public sealed class ResponsesTextToolTransport : IChatTransport
                 // Pi abe508 openai-responses-shared.ts: the input property of the declared grammar tool, else "input".
                 _grammarInputs ??= ResponsesGrammar.InputProperties(_request, _options.SupportsOpenAIGrammarTools, CancellationToken.None);
                 slot.CustomProperty = _grammarInputs.TryGetValue(slot.Name!, out var property) ? property : "input";
-                slot.CustomInput = OptionalStringOrNull(item, "input") ?? "";
+                slot.Unsent = AppendCustomInput(slot, OptionalStringOrNull(item, "input") ?? "") ?? "";
                 var fields = JsonFields.Empty;
                 if (OptionalString(item, "namespace") is { } ns) fields = fields.Set("namespace", StringData(ns));
                 emit(new ToolCallStarted(slot.Index, new(slot.CallId + "|" + itemId, slot.Name!, JsonData.EmptyObject, fields)));
@@ -560,24 +559,50 @@ public sealed class ResponsesTextToolTransport : IChatTransport
             return slot;
         }
 
-        // constrained-sampling.ts appendGrammarToolInputJsonDelta: stream the raw input as the JSON text {"<property>":"<input>"}.
-        private static void CustomInput(Slot slot, string next, bool close, Action<StreamEvent> emit)
+        // constrained-sampling.ts appendGrammarToolInputJsonDelta: append the new piece of input and return its piece of the JSON text
+        // {"<property>":"<input>"}, null for an empty piece. Costs time linear in the piece.
+        private static string? AppendCustomInput(Slot slot, string inputDelta)
         {
+            if (slot.BufferClosed) throw Protocol();
+            if (inputDelta.Length == 0) return null;
+            slot.CustomInput.Append(inputDelta);
+            return CustomJsonStart(slot) + Quoted(inputDelta)[1..^1];
+        }
+
+        // constrained-sampling.ts closeGrammarToolInputJson: close the input and return the rest of the JSON text. A final input the
+        // provider sends must continue the streamed one; closing again with the same input returns null.
+        private static string? CloseCustomInput(Slot slot, string? finalInput)
+        {
+            var streamed = slot.CustomInput;
+            var continues = finalInput is not null && finalInput.Length >= streamed.Length && streamed.Equals(finalInput.AsSpan(0, streamed.Length));
             if (slot.BufferClosed)
             {
-                if (close && next == slot.BufferInput) return;
+                if (finalInput is null || continues && finalInput.Length == streamed.Length) return null;
                 throw Protocol();
             }
-            if (!next.StartsWith(slot.BufferInput, StringComparison.Ordinal)) throw Protocol();
-            var inputDelta = next[slot.BufferInput.Length..];
-            slot.CustomInput = next;
-            if (!close && inputDelta.Length == 0) return;
-            var delta = new StringBuilder();
-            if (!slot.BufferStarted) { delta.Append('{').Append(Quoted(slot.CustomProperty!)).Append(":\""); slot.BufferStarted = true; }
-            delta.Append(Quoted(inputDelta)[1..^1]);
-            slot.BufferInput = next;
-            if (close) { delta.Append("\"}"); slot.BufferClosed = true; }
-            emit(new ToolCallDelta(slot.Index, delta.ToString()));
+            if (finalInput is not null && !continues) throw Protocol();
+            var rest = finalInput is null ? "" : finalInput[streamed.Length..];
+            streamed.Append(rest);
+            slot.BufferClosed = true;
+            return CustomJsonStart(slot) + Quoted(rest)[1..^1] + "\"}";
+        }
+
+        private static string CustomJsonStart(Slot slot)
+        {
+            if (slot.BufferStarted) return "";
+            slot.BufferStarted = true;
+            return "{" + Quoted(slot.CustomProperty!) + ":\"";
+        }
+
+        // openai-responses-shared.ts sendCustomInput: the item's initial input goes out with the first piece.
+        private static void SendCustomInput(Slot slot, string? jsonDelta, Action<StreamEvent> emit)
+        {
+            if (slot.Unsent.Length != 0)
+            {
+                jsonDelta = slot.Unsent + jsonDelta;
+                slot.Unsent = "";
+            }
+            if (jsonDelta is not null) emit(new ToolCallDelta(slot.Index, jsonDelta));
         }
 
         // getSlot(event.output_index, type): the open slot of that output_index when it has the type, matched by index alone

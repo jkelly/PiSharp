@@ -21,7 +21,8 @@ public sealed class AssistantStreamReducer
             ThinkingContent thinking => thinking.Thinking,
             _ => ""
         });
-        public readonly StringBuilder ToolJson = new();
+        // Tool blocks: the raw argument text, read once by a StreamingJsonParser for the display preview.
+        public readonly ToolCallArgumentsStream ToolArguments = new();
         public bool Ended;
         public bool Provisional;
     }
@@ -156,8 +157,8 @@ public sealed class AssistantStreamReducer
                 thinking.Content = new ThinkingContent(end.Content, thinkingProperties);
                 thinking.Text.Clear(); thinking.Text.Append(end.Content); thinking.Ended = true; break;
             case ToolCallCheckpoint checkpoint:
-                Replace(Active<ToolCallContent>(checkpoint.ContentIndex).ToolJson, checkpoint.Json); break;
-            case ToolCallDelta delta: Append(Active<ToolCallContent>(delta.ContentIndex).ToolJson, delta.Delta); break;
+                Replace(Active<ToolCallContent>(checkpoint.ContentIndex).ToolArguments, checkpoint.Json); break;
+            case ToolCallDelta delta: Append(Active<ToolCallContent>(delta.ContentIndex).ToolArguments, delta.Delta); break;
             case ToolCallEnded end:
                 var call = Active<ToolCallContent>(end.ContentIndex);
                 RequireToolIdentity(end.ToolCall);
@@ -204,11 +205,24 @@ public sealed class AssistantStreamReducer
     }
 
     /// <summary>Unparsed fragments are available for display only and never replace executable arguments.</summary>
-    public string GetToolJsonPreview(int index)
+    public string GetToolJsonPreview(int index) => ToolArguments(index).Text;
+
+    /// <summary>
+    /// The partial arguments of the tool block's text so far (streaming-json.ts <c>ToolCallArgumentsStream</c>), each delta read once.
+    /// Display only, like <see cref="GetToolJsonPreview"/>: they never replace executable arguments.
+    /// </summary>
+    [System.Diagnostics.CodeAnalysis.Experimental("PISHARP_AI001")]
+    public JsonData GetToolArgumentsPreview(int index) => ToolArguments(index).Partial();
+
+    /// <summary>The final arguments of the tool block's text: one <see cref="StreamingJson.ParseToolCallArguments"/> of it.</summary>
+    [System.Diagnostics.CodeAnalysis.Experimental("PISHARP_AI001")]
+    public ToolCallArgumentsResult FinishToolArguments(int index) => ToolArguments(index).Finish();
+
+    private ToolCallArgumentsStream ToolArguments(int index)
     {
         if (index < 0 || index >= _blocks.Count || _blocks[index].Content is not ToolCallContent)
             throw new StreamProtocolException("Tool preview has no tool block at that index.");
-        return _blocks[index].ToolJson.ToString();
+        return _blocks[index].ToolArguments;
     }
 
     public StreamError Failure(ChatFailure failure)
@@ -239,9 +253,10 @@ public sealed class AssistantStreamReducer
     }
 
     private void Append(StringBuilder builder, string text) { CheckSize(text.Length); builder.Append(text); }
-    private void Replace(StringBuilder builder, string text)
+    private void Append(ToolCallArgumentsStream arguments, string text) { CheckSize(text.Length); arguments.Write(text); }
+    private void Replace(ToolCallArgumentsStream arguments, string text)
     {
-        CheckSize(text.Length - builder.Length); builder.Clear(); builder.Append(text);
+        CheckSize(text.Length - arguments.Length); arguments.Reset(text);
     }
     private void CheckSize(long delta)
     {

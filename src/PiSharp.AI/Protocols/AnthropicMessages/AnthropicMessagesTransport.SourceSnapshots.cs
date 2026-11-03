@@ -25,21 +25,18 @@ public sealed partial class AnthropicMessagesTransport
                 {
                     var slot = pair.Value;
                     var block = content[slot.Index];
+                    // Stream state (the Anthropic index, partialJson) stays off the blocks, as anthropic-messages.ts keeps it in openBlocks.
                     var properties = block.ExtraProperties ?? JsonFields.Empty;
-                    if (!slot.Ended)
-                        properties = properties.Set("index", JsonData.Parse(pair.Key.ToString(System.Globalization.CultureInfo.InvariantCulture)));
                     if (block is ThinkingContent thinking)
                         block = new ThinkingContent(thinking.Thinking, properties.Set("thinkingSignature", TextData(slot.Signature.ToString())));
                     else if (block is ToolCallContent tool)
                     {
                         if (!slot.Ended)
                         {
-                            var raw = _reducer.GetToolJsonPreview(slot.Index);
-                            properties = properties.Set("partialJson", TextData(raw));
                             // Initial input survives until the first input_json_delta.
                             // Empty fragments still replace input with {} in Pi.
                             var arguments = _sourceToolDeltaIndices.Contains(slot.Index)
-                                ? StreamingJson.Parse(raw)
+                                ? _reducer.GetToolArgumentsPreview(slot.Index)
                                 : tool.Arguments;
                             block = new ToolCallContent(tool.Id, tool.Name, arguments, properties);
                         }

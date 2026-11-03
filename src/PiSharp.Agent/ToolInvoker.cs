@@ -343,6 +343,11 @@ public sealed class ToolInvoker : IFinalizedToolExecutor
                     initialView = invocation with { AssistantMessage = assistant with { Content = assistant.Content.SetItem(invocation.SourceIndex, call) }, Call = call };
                 }
             }
+            // validation.ts validateToolArguments first: a call whose complete argument text was malformed carries argumentsError, and
+            // fails with it, so the model sees what it sent instead of the tool running on a recovered subset.
+            if (PiSharp.AI.ToolCallArgumentsResult.ErrorOf(initialView.Call) is { } argumentsError)
+                return CompleteResult(ToolResult.Error(ToolFailureKind.InvalidArguments,
+                    $"Invalid arguments for tool \"{invocation.Call.Name}\": {argumentsError}"));
             // Source prepareToolCall: validateToolArguments(tool, preparedToolCall). The committed assistant message and the
             // tool execution events keep the model's arguments; only preparation and execution see the coerced ones.
             if (schemaAdapter is { ArgumentSchema: { } schema })

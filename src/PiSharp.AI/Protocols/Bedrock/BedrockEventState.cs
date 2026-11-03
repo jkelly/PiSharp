@@ -24,7 +24,9 @@ internal sealed class BedrockEventState
         internal bool Redacted;
         internal List<byte[]>? RedactedChunks;
         internal string Id = "", Name = "";
-        internal readonly StringBuilder PartialJson = new();
+        // bedrock-converse-stream.ts OpenBlock.arguments: each delta read once; Final is what contentBlockStop's finish() made.
+        internal readonly ToolCallArgumentsStream Arguments = new();
+        internal ToolCallContent? Final;
         internal bool Ended;
     }
 
@@ -132,7 +134,7 @@ internal sealed class BedrockEventState
         else if (delta?["toolUse"] is JsonObject toolUse && block is { Kind: "toolCall", Ended: false })
         {
             var input = Text(toolUse, "input") ?? "";
-            block.PartialJson.Append(input);
+            block.Arguments.Write(input);
             Emit(new ToolCallDelta(position, input), output);
         }
         else if (delta?["reasoningContent"] is JsonObject reasoning)
@@ -167,7 +169,11 @@ internal sealed class BedrockEventState
         {
             case "text": Emit(new TextEnded(index, block.Text.ToString()), output); break;
             case "thinking": Emit(new ThinkingEnded(index, block.Text.ToString(), ThinkingProperties(block)), output); break;
-            case "toolCall": Emit(new ToolCallEnded(index, new(block.Id, block.Name, Arguments(block))), output); break;
+            case "toolCall":
+                // handleContentBlockStop: Object.assign(block, open.arguments.finish()), so malformed arguments end as {} with
+                // argumentsError.
+                block.Final = block.Arguments.Finish().AssignTo(new(block.Id, block.Name, JsonData.EmptyObject));
+                Emit(new ToolCallEnded(index, block.Final), output); break;
         }
     }
 
@@ -178,8 +184,9 @@ internal sealed class BedrockEventState
         block.RedactedChunks = null;
     }
 
-    // bedrock-converse-stream.ts: block.arguments = parseStreamingJson(block.partialJson), whatever JSON value that is.
-    private static JsonData Arguments(Block block) => StreamingJson.Parse(block.PartialJson.ToString());
+    // A block the stream never stopped keeps the partial arguments its deltas showed (block.arguments = open.arguments.append(delta));
+    // a stopped one keeps its final arguments.
+    private static ToolCallContent ToolCall(Block block) => block.Final ?? new(block.Id, block.Name, block.Arguments.Partial());
 
     private static JsonFields Signature(string value) => JsonFields.Empty.Set("thinkingSignature", JsonData.Parse(JsonSerializer.Serialize(value)));
     private static JsonFields ThinkingProperties(Block block)
@@ -238,7 +245,7 @@ internal sealed class BedrockEventState
             {
                 "text" => new TextContent(block.Text.ToString()),
                 "thinking" => new ThinkingContent(block.Text.ToString(), ThinkingProperties(block)),
-                _ => new ToolCallContent(block.Id, block.Name, Arguments(block))
+                _ => ToolCall(block)
             }), output);
         }
         var properties = JsonFields.Empty;
@@ -260,7 +267,7 @@ internal sealed class BedrockEventState
             {
                 "text" => new TextContent(block.Text.ToString()),
                 "thinking" => new ThinkingContent(block.Text.ToString(), ThinkingProperties(block)),
-                _ => new ToolCallContent(block.Id, block.Name, Arguments(block))
+                _ => ToolCall(block)
             });
         }
         var properties = JsonFields.Empty;

@@ -333,9 +333,9 @@ public sealed partial class AnthropicMessagesTransport : IChatTransport
                         ended.Properties.Set("thinkingSignature", TextData(ended.Signature.ToString()))));
                     else if (content is ToolCallContent tool)
                     {
-                        // anthropic-messages.ts content_block_stop: block.arguments = parseStreamingJson(block.partialJson).
-                        var arguments = StreamingJson.Parse(_reducer.GetToolJsonPreview(ended.Index));
-                        Emit(new ToolCallEnded(ended.Index, tool with { Arguments = arguments }));
+                        // anthropic-messages.ts content_block_stop: Object.assign(block, open.arguments.finish()), so malformed
+                        // arguments end as {} with argumentsError.
+                        Emit(new ToolCallEnded(ended.Index, _reducer.FinishToolArguments(ended.Index).AssignTo(tool)));
                     }
                     else throw Protocol();
                     ended.Ended = true; break;

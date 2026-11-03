@@ -10,7 +10,8 @@ namespace PiSharp.AI.Protocols.MistralConversations;
 internal sealed class TextState(ChatRequest request, MistralTextOptions options)
 {
     private readonly List<AssistantContent> blocks = [];
-    private readonly Dictionary<string, (int Index, string Raw)> tools = new(StringComparer.Ordinal);
+    // mistral-conversations.ts toolCallsByKey: each call's arguments stream, kept off the content blocks.
+    private readonly Dictionary<string, (int Index, ToolCallArgumentsStream Arguments)> tools = new(StringComparer.Ordinal);
     private readonly Dictionary<int, TextFragments> text = [];
     private int currentText = -1;
     private long characters;
@@ -41,13 +42,21 @@ internal sealed class TextState(ChatRequest request, MistralTextOptions options)
         // A chunk is published as one batch. Restore every staged mutation if admission
         // fails so cleanup can only close text whose start/deltas were published.
         var oldBlocks = blocks.ToArray(); var oldTools = tools.ToArray(); var oldText = currentText;
+        var oldArgumentLengths = Array.ConvertAll(oldTools, item => item.Value.Arguments.Length);
         var oldFragments = text.ToArray();
         var oldCharacters = characters; var oldUsage = usage;
         var oldId = responseId; var oldStop = rawStop; var oldReason = Reason; var oldError = ProviderError;
         try { return Admit(() => ConvertCore(chunk)); }
         catch
         {
-            blocks.Clear(); blocks.AddRange(oldBlocks); tools.Clear(); foreach (var item in oldTools) tools.Add(item.Key, item.Value);
+            blocks.Clear(); blocks.AddRange(oldBlocks); tools.Clear();
+            for (var position = 0; position < oldTools.Length; position++)
+            {
+                // An admitted chunk's arguments only grow; a rejected chunk's text is cut off again.
+                var arguments = oldTools[position].Value.Arguments;
+                if (arguments.Length > oldArgumentLengths[position]) arguments.Reset(arguments.Text[..oldArgumentLengths[position]]);
+                tools.Add(oldTools[position].Key, oldTools[position].Value);
+            }
             text.Clear(); foreach (var item in oldFragments) text.Add(item.Key, item.Value);
             currentText = oldText; characters = oldCharacters; usage = oldUsage;
             responseId = oldId; rawStop = oldStop; Reason = oldReason; ProviderError = oldError;
@@ -119,7 +128,7 @@ internal sealed class TextState(ChatRequest request, MistralTextOptions options)
                     var name = function.GetProperty("name").GetString();
                     if (name is null) throw Fail(NativeChatFailureCode.MalformedStream, "Missing Mistral tool name.");
                     characters += id.Length + name.Length; Limit(characters, options.MaximumContentCharacters);
-                    saved = (blocks.Count, ""); tools.Add(key, saved);
+                    saved = (blocks.Count, new ToolCallArgumentsStream()); tools.Add(key, saved);
                     var block = new ToolCallContent(id, name, JsonData.EmptyObject); blocks.Add(block);
                     frames.Add(Snapshot(new ToolCallStarted(saved.Index, block)));
                 }
@@ -129,12 +138,9 @@ internal sealed class TextState(ChatRequest request, MistralTextOptions options)
                     : args.ValueKind is JsonValueKind.Null or JsonValueKind.False || args.ValueKind == JsonValueKind.Number && args.GetDouble() == 0 ? "{}"
                     : StreamingJson.ParseToJson(args.GetRawText());
                 characters += fragment.Length; Limit(characters, options.MaximumContentCharacters);
-                var raw = saved.Raw + fragment;
-                // mistral-conversations.ts: block.arguments = parseStreamingJson(block.partialArgs) on every delta and at the end.
-                var parsed = StreamingJson.Parse(raw);
+                // mistral-conversations.ts: block.arguments = open.arguments.append(argsDelta), each delta read once.
                 var previous = (ToolCallContent)blocks[saved.Index];
-                blocks[saved.Index] = previous with { Arguments = parsed };
-                tools[key] = (saved.Index, raw);
+                blocks[saved.Index] = previous with { Arguments = saved.Arguments.Append(fragment) };
                 frames.Add(Snapshot(new ToolCallDelta(saved.Index, fragment)));
             }
         return frames.ToImmutable();
@@ -175,7 +181,12 @@ internal sealed class TextState(ChatRequest request, MistralTextOptions options)
     public ImmutableArray<StreamEvent> Finish()
     {
         var frames = ImmutableArray.CreateBuilder<StreamEvent>(); EndText(frames);
-        foreach (var item in tools.Values) frames.Add(Snapshot(new ToolCallEnded(item.Index, (ToolCallContent)blocks[item.Index])));
+        foreach (var item in tools.Values)
+        {
+            // Object.assign(block, open.arguments.finish()): malformed arguments end as {} with argumentsError.
+            blocks[item.Index] = item.Arguments.Finish().AssignTo((ToolCallContent)blocks[item.Index]);
+            frames.Add(Snapshot(new ToolCallEnded(item.Index, (ToolCallContent)blocks[item.Index])));
+        }
         return frames.ToImmutable();
     }
     private StreamEvent Snapshot(StreamEvent frame)
