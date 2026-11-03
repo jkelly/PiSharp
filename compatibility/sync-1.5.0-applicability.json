@@ -56,11 +56,11 @@
     "changelogBullets": 477,
     "repeatedBullets": 23,
     "byStatus": {
-      "ported-with-deferral": 17,
-      "port": 197,
-      "ported": 75,
+      "ported": 109,
+      "ported-with-deferral": 19,
       "already-ported": 13,
-      "no-op": 24
+      "no-op": 25,
+      "port": 160
     },
     "byArea": {
       "ai": 58,
@@ -1620,7 +1620,7 @@
       "id": "ai.openai-responses-mid-convo-effort",
       "area": "ai",
       "phase": 2,
-      "status": "ported-with-deferral",
+      "status": "ported",
       "changelog": [
         "ai@1.3.0/Added#1",
         "coding-agent@1.3.0/New Features#2",
@@ -1648,19 +1648,21 @@
       "notes": "PiSharp has supportsMidConvoEffort only for Anthropic (AnthropicMessagesRequestProjector.cs:49); the Responses projector always writes reasoning.effort from the current level and the openai.json shard's GPT-6 compat lacks the flag. Needs the providerThinkingLevel field on assistant messages (shared with ai.claude-disabled-thinking-off) and the models.schema.json description update. The shard comes with the catalog refresh to pi-ai 1.5.0; ChatGPT-subscription detection must match upstream's key-prefix rule.",
       "evidence": {
         "commits": [
-          "3b1e184d"
+          "3b1e184d",
+          "3e657609",
+          "0f5a1041"
         ],
         "tests": [
-          "tests/PiSharp.ProviderSync.Tests/Sync150Cases.cs: sync150.responses-mid-conversation-effort-configuration-updates"
+          "tests/PiSharp.ProviderSync.Tests/Sync150Cases.cs: sync150.responses-mid-conversation-effort-configuration-updates",
+          "tests/PiSharp.Models.Tests/Sync150CatalogCases.cs: sync150.models-schema-v1.5.0"
         ]
-      },
-      "deferred": "compat.supportsMidConvoEffort catalog values for gpt-6-astra/sol/luna and gpt-6.1-sol belong to the ai-catalog openai.json refresh; the models.schema.json description belongs to the schemas.models-schema-descriptions row."
+      }
     },
     {
       "id": "ai.kimi-coding-chat-completions",
       "area": "ai",
       "phase": 2,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "ai@1.3.0/Changed#1",
         "coding-agent@1.3.0/New Features#3",
@@ -1682,7 +1684,16 @@
         "website/src/content/docs/docs/guides/providers.md"
       ],
       "release": "1.5.0",
-      "notes": "PiSharp registers kimi-coding as Messages at https://api.kimi.com/coding and the shard is all anthropic-messages. The Completions protocol already honours supportsMidConvoToolAdditions (CompletionsKeyAuthRequestFactory.cs:435), so the work is the provider registration, the shard refresh and checking that Kimi Code OAuth's header-owned Authorization works on the Completions route (today the x-api-key removal at ProviderRoutes.cs:168-170 serves the Anthropic SDK path). Upstream migrates no existing models.json overrides; the docs must say /v1 is now required."
+      "notes": "PiSharp registers kimi-coding as Messages at https://api.kimi.com/coding and the shard is all anthropic-messages. The Completions protocol already honours supportsMidConvoToolAdditions (CompletionsKeyAuthRequestFactory.cs:435), so the work is the provider registration, the shard refresh and checking that Kimi Code OAuth's header-owned Authorization works on the Completions route (today the x-api-key removal at ProviderRoutes.cs:168-170 serves the Anthropic SDK path). Upstream migrates no existing models.json overrides; the docs must say /v1 is now required.",
+      "evidence": {
+        "commits": [
+          "3e657609"
+        ],
+        "tests": [
+          "tests/PiSharp.Models.Tests/Sync150CatalogCases.cs: sync150.kimi-coding-chat-completions",
+          "tests/PiSharp.CliSync.Tests/Sync150CatalogCases.cs: sync150.kimi-coding-live-route-speaks-chat-completions"
+        ]
+      }
     },
     {
       "id": "ai.drop-cross-model-thinking",
@@ -1723,7 +1734,7 @@
       "id": "ai.invalid-unicode-escape-repair",
       "area": "ai",
       "phase": 2,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "ai@1.3.0/Fixed#1",
         "coding-agent@1.3.0/Fixed#11"
@@ -1738,7 +1749,17 @@
         "tools/NodeBridge/pi-host/virtual/ai/utils/json-parse.mjs"
       ],
       "release": "1.5.0",
-      "notes": "PiSharp's repair lists u among the valid escape letters without checking the hex digits (StreamingJson.cs:110, StreamingJsonPreview.cs:140), so it has the old behaviour. The bridge module follows the re-port. Shares json-parse.ts with ai.malformed-final-tool-arguments; port them together."
+      "notes": "PiSharp's repair lists u among the valid escape letters without checking the hex digits (StreamingJson.cs:110, StreamingJsonPreview.cs:140), so it has the old behaviour. The bridge module follows the re-port. Shares json-parse.ts with ai.malformed-final-tool-arguments; port them together.",
+      "evidence": {
+        "commits": [
+          "1b29939e"
+        ],
+        "tests": [
+          "tests/PiSharp.ProviderSync.Tests/Sync150StreamCases.cs: sync150.parse-tool-call-arguments-and-repair",
+          "tests/PiSharp.ProviderSync.Tests/Sync150StreamCases.cs: sync150.streaming-json-strings",
+          "tests/PiSharp.ProviderSync.Tests/Program.cs: tool-arguments.parse-streaming-json-matches-pi-ai-goldens"
+        ]
+      }
     },
     {
       "id": "ai.anthropic-error-tool-result-images",
@@ -1776,7 +1797,7 @@
       "id": "ai.opencode-inference-endpoints",
       "area": "ai",
       "phase": 2,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "ai@1.3.0/Fixed#3",
         "coding-agent@1.3.0/Fixed#13"
@@ -1799,13 +1820,21 @@
         "src/PiSharp.ModelRuntime/Models/BuiltinModelCatalog.cs"
       ],
       "release": "1.5.0",
-      "notes": "PiSharp's opencode-go registers only Messages, Completions and Responses (BuiltinProviders.cs:80), while opencode already has google-generative-ai; the shards carry the old /zen URLs, which no C# code hard-codes. The URLs arrive with the catalog refresh; the provider needs the Google API added and the OpenCode session header (ProviderHeaderPolicies.WithOpenCodeSessionHeader) checked on that route."
+      "notes": "PiSharp's opencode-go registers only Messages, Completions and Responses (BuiltinProviders.cs:80), while opencode already has google-generative-ai; the shards carry the old /zen URLs, which no C# code hard-codes. The URLs arrive with the catalog refresh; the provider needs the Google API added and the OpenCode session header (ProviderHeaderPolicies.WithOpenCodeSessionHeader) checked on that route.",
+      "evidence": {
+        "commits": [
+          "3e657609"
+        ],
+        "tests": [
+          "tests/PiSharp.Models.Tests/Sync150CatalogCases.cs: sync150.opencode-inference-endpoints"
+        ]
+      }
     },
     {
       "id": "ai.opencode-go-minimax-messages",
       "area": "ai",
       "phase": 2,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "ai@1.3.0/Fixed#4",
         "coding-agent@1.3.0/Fixed#14"
@@ -1820,7 +1849,15 @@
         "src/PiSharp.ModelRuntime/Models/BuiltinModelCatalog.cs"
       ],
       "release": "1.5.0",
-      "notes": "Catalog only: PiSharp's opencode-go shard lists minimax-m2.7 as openai-completions, and the provider already supports Messages. Lands with the pi-ai 1.5.0 shard refresh and ShardHashes update; depends on ai.opencode-inference-endpoints for the base URL."
+      "notes": "Catalog only: PiSharp's opencode-go shard lists minimax-m2.7 as openai-completions, and the provider already supports Messages. Lands with the pi-ai 1.5.0 shard refresh and ShardHashes update; depends on ai.opencode-inference-endpoints for the base URL.",
+      "evidence": {
+        "commits": [
+          "3e657609"
+        ],
+        "tests": [
+          "tests/PiSharp.Models.Tests/Sync150CatalogCases.cs: sync150.opencode-go-minimax-messages"
+        ]
+      }
     },
     {
       "id": "ai.retry-unable-to-forward-upstream",
@@ -1886,7 +1923,7 @@
       "id": "ai.completions-thinking-before-text",
       "area": "ai",
       "phase": 2,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "ai@1.3.0/Fixed#7",
         "coding-agent@1.3.0/Fixed#17"
@@ -1899,7 +1936,15 @@
         "src/PiSharp.AI/Providers/OpenAICompletionsWireSource.cs:356"
       ],
       "release": "1.5.0",
-      "notes": "PiSharp handles delta content first (OpenAICompletionsWireSource.cs:356-365) and reasoning after (:366-380, reasoning_details at :463), the old order. Reorder and add a fixture with both fields in one chunk."
+      "notes": "PiSharp handles delta content first (OpenAICompletionsWireSource.cs:356-365) and reasoning after (:366-380, reasoning_details at :463), the old order. Reorder and add a fixture with both fields in one chunk.",
+      "evidence": {
+        "commits": [
+          "accba7b1"
+        ],
+        "tests": [
+          "tests/PiSharp.ProviderSync.Tests/Sync150StreamCases.cs: sync150.completions-thinking-before-text"
+        ]
+      }
     },
     {
       "id": "ai.gemini4-thinking-level",
@@ -1935,7 +1980,7 @@
       "id": "ai.xiaomi-mimo-thinking-toggle",
       "area": "ai",
       "phase": 2,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "ai@1.3.0/Fixed#9",
         "coding-agent@1.3.0/Fixed#19"
@@ -1956,13 +2001,21 @@
         "src/PiSharp.ModelRuntime/Models/BuiltinModelCatalog.cs"
       ],
       "release": "1.5.0",
-      "notes": "Catalog only: the shards lack the flag and the level map, and CompletionsKeyAuthRequestFactory.cs:424 already drops reasoning_effort when supportsReasoningEffort is false. Lands with the shard refresh. The refreshed shards also drop mimo-v2.5-pro, which ModelResolver.cs:49-50 still uses as the Xiaomi default; upstream's switch to mimo-v2.6-pro (commit 90d863f7c) is a 1.4.0 change owned by another group."
+      "notes": "Catalog only: the shards lack the flag and the level map, and CompletionsKeyAuthRequestFactory.cs:424 already drops reasoning_effort when supportsReasoningEffort is false. Lands with the shard refresh. The refreshed shards also drop mimo-v2.5-pro, which ModelResolver.cs:49-50 still uses as the Xiaomi default; upstream's switch to mimo-v2.6-pro (commit 90d863f7c) is a 1.4.0 change owned by another group.",
+      "evidence": {
+        "commits": [
+          "3e657609"
+        ],
+        "tests": [
+          "tests/PiSharp.Models.Tests/Sync150CatalogCases.cs: sync150.xiaomi-mimo-thinking-toggle"
+        ]
+      }
     },
     {
       "id": "ai.codex-gpt61-sol-500k",
       "area": "ai",
       "phase": 2,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "ai@1.3.0/Fixed#10",
         "coding-agent@1.3.0/Fixed#20"
@@ -1977,13 +2030,21 @@
         "src/PiSharp.ModelRuntime/Models/BuiltinModelCatalog.cs"
       ],
       "release": "1.5.0",
-      "notes": "Catalog only: the shard has contextWindow 272000 for gpt-6.1-sol. Lands with the pi-ai 1.5.0 shard refresh and ShardHashes update."
+      "notes": "Catalog only: the shard has contextWindow 272000 for gpt-6.1-sol. Lands with the pi-ai 1.5.0 shard refresh and ShardHashes update.",
+      "evidence": {
+        "commits": [
+          "3e657609"
+        ],
+        "tests": [
+          "tests/PiSharp.Models.Tests/Sync150CatalogCases.cs: sync150.codex-gpt-6.1-sol-500k"
+        ]
+      }
     },
     {
       "id": "ai.malformed-final-tool-arguments",
       "area": "ai",
       "phase": 2,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "ai@1.3.0/Fixed#11",
         "coding-agent@1.3.0/Fixed#21"
@@ -2014,13 +2075,24 @@
         "tools/NodeBridge/pi-host/virtual/ai/utils/validation.mjs"
       ],
       "release": "1.5.0",
-      "notes": "PiSharp's transports call the tolerant StreamingJson.Parse for final arguments and keep whatever it recovered; ToolCallContent (AssistantMessage.cs:11) has no argumentsError, and the validation message at ToolArgumentValidation.cs:151 has no raw-text path. Adding the field touches the Contracts type, session JSON and the bridge's message mapping. Depends on the schema rows (pi-schema validation messages) and shares json-parse.ts with ai.invalid-unicode-escape-repair."
+      "notes": "PiSharp's transports call the tolerant StreamingJson.Parse for final arguments and keep whatever it recovered; ToolCallContent (AssistantMessage.cs:11) has no argumentsError, and the validation message at ToolArgumentValidation.cs:151 has no raw-text path. Adding the field touches the Contracts type, session JSON and the bridge's message mapping. Depends on the schema rows (pi-schema validation messages) and shares json-parse.ts with ai.invalid-unicode-escape-repair.",
+      "evidence": {
+        "commits": [
+          "1b29939e",
+          "accba7b1"
+        ],
+        "tests": [
+          "tests/PiSharp.ProviderSync.Tests/Sync150StreamCases.cs: sync150.parse-tool-call-arguments-and-repair",
+          "tests/PiSharp.Agent.Tests/Sync150Cases.cs: sync150.tool-invoker-reports-malformed-final-arguments",
+          "tests/PiSharp.Agent.Tests/Sync150Cases.cs: sync150.tool-invoker-runs-well-formed-and-empty-final-arguments"
+        ]
+      }
     },
     {
       "id": "ai.claude-disabled-thinking-off",
       "area": "ai",
       "phase": 2,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "ai@1.3.0/Fixed#12",
         "coding-agent@1.3.0/Fixed#22"
@@ -2043,7 +2115,19 @@
         "src/PiSharp.ModelRuntime/Models/BuiltinModelCatalog.cs"
       ],
       "release": "1.5.0",
-      "notes": "PiSharp's shards give both models off: null, and for managed (mid-conversation effort) models the projector always sends adaptive thinking with an effort (AnthropicMessagesRequestProjector.cs:49, :229-242), disabling only unmanaged models. The catalog part lands with the shard refresh; the projector needs the disabled branch. Shares providerThinkingLevel with ai.openai-responses-mid-convo-effort. The durable route (src/PiSharp.Durable/Models/NativeModelRoutes.cs) follows in phase 4."
+      "notes": "PiSharp's shards give both models off: null, and for managed (mid-conversation effort) models the projector always sends adaptive thinking with an effort (AnthropicMessagesRequestProjector.cs:49, :229-242), disabling only unmanaged models. The catalog part lands with the shard refresh; the projector needs the disabled branch. Shares providerThinkingLevel with ai.openai-responses-mid-convo-effort. The durable route (src/PiSharp.Durable/Models/NativeModelRoutes.cs) follows in phase 4.",
+      "evidence": {
+        "commits": [
+          "3e657609",
+          "8bf1babf"
+        ],
+        "tests": [
+          "tests/PiSharp.Models.Tests/Sync150CatalogCases.cs: sync150.claude-disabled-thinking-off-map",
+          "tests/PiSharp.ProviderSync.Tests/Sync150CatalogCases.cs: sync150.claude-opus-5-and-haiku-5-5-off-sends-disabled-thinking",
+          "tests/PiSharp.ProviderSync.Tests/Sync150CatalogCases.cs: sync150.claude-opus-5-5-off-unsupported-keeps-managed-effort",
+          "tests/PiSharp.CliSync.Tests/Sync150CatalogCases.cs: sync150.claude-opus-5-off-sends-disabled-thinking-live"
+        ]
+      }
     },
     {
       "id": "ai.client-identity",
@@ -2207,7 +2291,7 @@
       "id": "ai.whitespace-tool-output",
       "area": "ai",
       "phase": 2,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "ai@1.4.0/Fixed#2",
         "coding-agent@1.4.0/Fixed#19"
@@ -2224,7 +2308,15 @@
         "src/PiSharp.AI/Protocols/GoogleGenerativeAI/GoogleRequestProjector.cs"
       ],
       "release": "1.5.0",
-      "notes": "PiSharp tests the text length at CompletionsTranscriptProjector.cs:178, ResponsesTranscriptProjector.cs:488 and :492, and GoogleRequestProjector.cs:292. Use JavaScript trim() semantics (its whitespace and line-terminator set), not char.IsWhiteSpace. Mistral (MistralTools.cs:156) is unchanged upstream."
+      "notes": "PiSharp tests the text length at CompletionsTranscriptProjector.cs:178, ResponsesTranscriptProjector.cs:488 and :492, and GoogleRequestProjector.cs:292. Use JavaScript trim() semantics (its whitespace and line-terminator set), not char.IsWhiteSpace. Mistral (MistralTools.cs:156) is unchanged upstream.",
+      "evidence": {
+        "commits": [
+          "c29a9973"
+        ],
+        "tests": [
+          "tests/PiSharp.ProviderSync.Tests/Sync150StreamCases.cs: sync150.whitespace-tool-output-placeholders"
+        ]
+      }
     },
     {
       "id": "ai.retry-more-transient-errors",
@@ -2348,7 +2440,7 @@
       "id": "ai.minimax-m3-1-flash",
       "area": "ai",
       "phase": 2,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "ai@1.4.0/Added#6",
         "coding-agent@1.4.0/Added#4"
@@ -2366,13 +2458,23 @@
         "tests/PiSharp.Models.Tests/CatalogCases.cs"
       ],
       "release": "1.5.0",
-      "notes": "Catalog data only: arrives with the shard refresh from @earendil-works/pi-ai@1.5.0 (refresh-model-catalogs.mjs, worklist pin model-catalog-shards). The v1.2.0 minimax.json has M2.7, M2.7-highspeed and M3 only. The runtime already handles forceAdaptiveThinking and an off: null level map (AnthropicMessagesSimpleRequestFactory.cs:41-53); add a request test for the new model's efforts."
+      "notes": "Catalog data only: arrives with the shard refresh from @earendil-works/pi-ai@1.5.0 (refresh-model-catalogs.mjs, worklist pin model-catalog-shards). The v1.2.0 minimax.json has M2.7, M2.7-highspeed and M3 only. The runtime already handles forceAdaptiveThinking and an off: null level map (AnthropicMessagesSimpleRequestFactory.cs:41-53); add a request test for the new model's efforts.",
+      "evidence": {
+        "commits": [
+          "3e657609",
+          "8bf1babf"
+        ],
+        "tests": [
+          "tests/PiSharp.Models.Tests/Sync150CatalogCases.cs: sync150.minimax-m3.1-flash",
+          "tests/PiSharp.CliSync.Tests/Sync150CatalogCases.cs: sync150.minimax-m3.1-flash-sends-output-config-effort"
+        ]
+      }
     },
     {
       "id": "ai.grok-xhigh-thinking",
       "area": "ai",
       "phase": 2,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "ai@1.4.0/Changed#1",
         "coding-agent@1.4.0/Changed#6"
@@ -2386,13 +2488,21 @@
         "src/PiSharp.ModelRuntime/Models/BuiltinModelCatalog.cs"
       ],
       "release": "1.5.0",
-      "notes": "Catalog data only (worklist pin model-catalog-shards): the v1.2.0 xai.json maps xhigh to null for grok-4.3 and grok-4.5. Upstream's own change is the generated data plus xai-responses tests."
+      "notes": "Catalog data only (worklist pin model-catalog-shards): the v1.2.0 xai.json maps xhigh to null for grok-4.3 and grok-4.5. Upstream's own change is the generated data plus xai-responses tests.",
+      "evidence": {
+        "commits": [
+          "3e657609"
+        ],
+        "tests": [
+          "tests/PiSharp.Models.Tests/Sync150CatalogCases.cs: sync150.grok-xhigh-thinking"
+        ]
+      }
     },
     {
       "id": "ai.codex-chatgpt-models-removed",
       "area": "ai",
       "phase": 2,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "ai@1.4.0/Fixed#9",
         "coding-agent@1.4.0/Fixed#18"
@@ -2406,13 +2516,21 @@
         "src/PiSharp.ModelRuntime/Models/BuiltinModelCatalog.cs"
       ],
       "release": "1.5.0",
-      "notes": "Catalog data only (worklist pin model-catalog-shards); the v1.2.0 openai-codex.json still lists both models. PiSharp's openai-codex default is already gpt-6.1-sol (ModelResolver.cs:39). Check that no PiSharp test or sample names openai-codex/gpt-5.5."
+      "notes": "Catalog data only (worklist pin model-catalog-shards); the v1.2.0 openai-codex.json still lists both models. PiSharp's openai-codex default is already gpt-6.1-sol (ModelResolver.cs:39). Check that no PiSharp test or sample names openai-codex/gpt-5.5.",
+      "evidence": {
+        "commits": [
+          "3e657609"
+        ],
+        "tests": [
+          "tests/PiSharp.Models.Tests/Sync150CatalogCases.cs: sync150.codex-chatgpt-models-removed"
+        ]
+      }
     },
     {
       "id": "ai.classifier-image-input",
       "area": "ai",
       "phase": 2,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "ai@1.4.0/Added#8",
         "coding-agent@1.4.0/New Features#1",
@@ -2431,13 +2549,27 @@
         "src/PiSharp.AI/ModelOperations/ClassifierShared.cs"
       ],
       "release": "1.5.0",
-      "notes": "SystemOneClassifier.cs:32 rejects every image today. The form is chosen by compat.imageInput (ai.system-one-compat), otherwise detected: Workers AI picks images for @cf/cloudflare/clef* and assets otherwise; TypeSafe picks state-image-urls for OpenRouter (provider id or openrouter.ai host) and assets with the opt-in header otherwise. Codemode needs no change: models.classify() already passes images through (the context shape at CodemodeExecutor.cs:409). The new catalog entries are ai.workers-ai-classifier-models."
+      "notes": "SystemOneClassifier.cs:32 rejects every image today. The form is chosen by compat.imageInput (ai.system-one-compat), otherwise detected: Workers AI picks images for @cf/cloudflare/clef* and assets otherwise; TypeSafe picks state-image-urls for OpenRouter (provider id or openrouter.ai host) and assets with the opt-in header otherwise. Codemode needs no change: models.classify() already passes images through (the context shape at CodemodeExecutor.cs:409). The new catalog entries are ai.workers-ai-classifier-models.",
+      "evidence": {
+        "commits": [
+          "ef96da47"
+        ],
+        "tests": [
+          "tests/PiSharp.Classifiers.Tests/Sync150Cases.cs: sync150.typesafe-assets-with-the-opt-in-header",
+          "tests/PiSharp.Classifiers.Tests/Sync150Cases.cs: sync150.typesafe-detects-openrouter-by-provider-or-host",
+          "tests/PiSharp.Classifiers.Tests/Sync150Cases.cs: sync150.clef-images-as-data-urls",
+          "tests/PiSharp.Classifiers.Tests/Sync150Cases.cs: sync150.workers-jev-assets-without-the-opt-in-header",
+          "tests/PiSharp.Classifiers.Tests/Sync150Cases.cs: sync150.compat-overrides-detection",
+          "tests/PiSharp.Classifiers.Tests/Sync150Cases.cs: sync150.text-only-models-reject-images-by-id",
+          "tests/PiSharp.Classifiers.Tests/Sync150Cases.cs: sync150.catalog-compat-drives-the-image-form"
+        ]
+      }
     },
     {
       "id": "ai.system-one-compat",
       "area": "ai",
       "phase": 2,
-      "status": "port",
+      "status": "ported-with-deferral",
       "changelog": [
         "ai@1.4.0/Added#9",
         "coding-agent@1.4.0/Added#3"
@@ -2459,13 +2591,26 @@
         "src/PiSharp.Extensions.Abstractions/Facade/Registration/ModelOperationProviderContracts.cs"
       ],
       "release": "1.5.0",
-      "notes": "Lands with ai.classifier-image-input. The catalog compat values arrive with the shard refresh (model-catalog-shards). Check the TypeScript extension path (PiExtensionModels.cs) carries classifier compat across the Node bridge."
+      "notes": "Lands with ai.classifier-image-input. The catalog compat values arrive with the shard refresh (model-catalog-shards). Check the TypeScript extension path (PiExtensionModels.cs) carries classifier compat across the Node bridge.",
+      "evidence": {
+        "commits": [
+          "3e657609",
+          "ef96da47"
+        ],
+        "tests": [
+          "tests/PiSharp.Models.Tests/Sync150CatalogCases.cs: sync150.system-one-compat-catalog",
+          "tests/PiSharp.Models.Tests/Sync150CatalogCases.cs: sync150.system-one-compat-models-json-provider-compat",
+          "tests/PiSharp.Classifiers.Tests/Sync150Cases.cs: sync150.compat-overrides-detection",
+          "tests/PiSharp.Classifiers.Tests/Sync150Cases.cs: sync150.catalog-compat-drives-the-image-form"
+        ]
+      },
+      "deferred": "The CLI classifier registry (NativeExtensionModelOperations.CreateDefaultRegistry) reads the built-in shards only, so models.json baseUrl/compat never reach classify calls. Pre-existing; documented under Differences from Pi."
     },
     {
       "id": "ai.workers-ai-classifier-models",
       "area": "ai",
       "phase": 2,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "ai@1.4.0/Added#10",
         "coding-agent@1.4.0/Added#2"
@@ -2479,13 +2624,21 @@
         "src/PiSharp.ModelRuntime/Models/BuiltinModelCatalog.cs"
       ],
       "release": "1.5.0",
-      "notes": "Catalog data only (worklist pin model-catalog-shards): the v1.2.0 shard has clef, clef-flash and typesafe/jev. Image input for these models is ai.classifier-image-input."
+      "notes": "Catalog data only (worklist pin model-catalog-shards): the v1.2.0 shard has clef, clef-flash and typesafe/jev. Image input for these models is ai.classifier-image-input.",
+      "evidence": {
+        "commits": [
+          "3e657609"
+        ],
+        "tests": [
+          "tests/PiSharp.Models.Tests/Sync150CatalogCases.cs: sync150.workers-ai-classifier-models"
+        ]
+      }
     },
     {
       "id": "ai.workers-ai-classifier-pricing",
       "area": "ai",
       "phase": 2,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "ai@1.4.0/Fixed#1",
         "coding-agent@1.4.0/Fixed#22"
@@ -2499,7 +2652,15 @@
         "src/PiSharp.ModelRuntime/Models/BuiltinModelCatalog.cs"
       ],
       "release": "1.5.0",
-      "notes": "Catalog data only (worklist pin model-catalog-shards): the v1.2.0 shard prices clef-flash at 0.09 and typesafe/jev at 0."
+      "notes": "Catalog data only (worklist pin model-catalog-shards): the v1.2.0 shard prices clef-flash at 0.09 and typesafe/jev at 0.",
+      "evidence": {
+        "commits": [
+          "3e657609"
+        ],
+        "tests": [
+          "tests/PiSharp.Models.Tests/Sync150CatalogCases.cs: sync150.workers-ai-classifier-pricing"
+        ]
+      }
     },
     {
       "id": "ai.tool-argument-validation",
@@ -2553,7 +2714,7 @@
       "id": "ai.grammar-tool-input-delta",
       "area": "ai",
       "phase": 2,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "ai@1.5.0/Breaking Changes#4"
       ],
@@ -2568,7 +2729,16 @@
         "src/PiSharp.AI/Providers/OpenAICompletionsWireSource.cs"
       ],
       "release": "1.5.0",
-      "notes": "PiSharp keeps this helper private, so no public C# API breaks: ResponsesTextToolTransport.CustomInput (around line 560) still takes the whole input so far and a close flag, and OpenAICompletionsWireSource.AppendCustom re-parses the whole input for display on every delta. Split append and close, with cost linear in the delta. Lands with D1's row for ai@1.5.0/Fixed#4 (same commit f715a15c1)."
+      "notes": "PiSharp keeps this helper private, so no public C# API breaks: ResponsesTextToolTransport.CustomInput (around line 560) still takes the whole input so far and a close flag, and OpenAICompletionsWireSource.AppendCustom re-parses the whole input for display on every delta. Split append and close, with cost linear in the delta. Lands with D1's row for ai@1.5.0/Fixed#4 (same commit f715a15c1).",
+      "evidence": {
+        "commits": [
+          "accba7b1"
+        ],
+        "tests": [
+          "tests/PiSharp.ProviderSync.Tests/Sync150StreamCases.cs: sync150.completions-grammar-input-deltas",
+          "tests/PiSharp.ProviderSync.Tests/Program.cs: responses.ctc-replay-same-provider-and-streamed-grammar-call"
+        ]
+      }
     },
     {
       "id": "ai.device-code-confirm-options",
@@ -2604,7 +2774,7 @@
       "id": "ai.streaming-json-parser",
       "area": "ai",
       "phase": 2,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "ai@1.5.0/Added#2",
         "coding-agent@1.5.0/New Features#2"
@@ -2635,13 +2805,28 @@
         "tests/PiSharp.ProviderSync.Tests/StreamingJsonCases.cs"
       ],
       "release": "1.5.0",
-      "notes": "PiSharp's providers call StreamingJson.Parse (the parseStreamingJson port) on the whole accumulated text per delta (for example BedrockEventState.cs:181, OpenAICompletionsWireSource.cs:454, PiMessagesEventMapper.cs:88), the quadratic cost upstream removed. Port the parser and ToolCallArgumentsStream as new [Experimental] API and switch each provider (Google is not on upstream's list). This row is the parser; D1 owns the fixes built on it: ai@1.5.0/Fixed#3 and coding-agent@1.5.0/Fixed#17 (CPU and memory), agent@1.5.0/Fixed#1 (proxy), and the rendering half of New Features#2 (tui@1.5.0/Fixed#9, coding-agent@1.5.0/Fixed#31). finish() uses parseToolCallArguments with argumentsError (87f9a3641, another group). packages/ai/test/streaming-json.test.ts and test/data/json-test-suite.json give authored cases. Decision 0013 design point 'StreamingJsonParser'."
+      "notes": "PiSharp's providers call StreamingJson.Parse (the parseStreamingJson port) on the whole accumulated text per delta (for example BedrockEventState.cs:181, OpenAICompletionsWireSource.cs:454, PiMessagesEventMapper.cs:88), the quadratic cost upstream removed. Port the parser and ToolCallArgumentsStream as new [Experimental] API and switch each provider (Google is not on upstream's list). This row is the parser; D1 owns the fixes built on it: ai@1.5.0/Fixed#3 and coding-agent@1.5.0/Fixed#17 (CPU and memory), agent@1.5.0/Fixed#1 (proxy), and the rendering half of New Features#2 (tui@1.5.0/Fixed#9, coding-agent@1.5.0/Fixed#31). finish() uses parseToolCallArguments with argumentsError (87f9a3641, another group). packages/ai/test/streaming-json.test.ts and test/data/json-test-suite.json give authored cases. Decision 0013 design point 'StreamingJsonParser'.",
+      "evidence": {
+        "commits": [
+          "1b29939e",
+          "accba7b1"
+        ],
+        "tests": [
+          "tests/PiSharp.ProviderSync.Tests/Sync150StreamCases.cs: sync150.streaming-json-ported-vectors",
+          "tests/PiSharp.ProviderSync.Tests/Sync150StreamCases.cs: sync150.streaming-json-strings",
+          "tests/PiSharp.ProviderSync.Tests/Sync150StreamCases.cs: sync150.streaming-json-changes",
+          "tests/PiSharp.ProviderSync.Tests/Sync150StreamCases.cs: sync150.streaming-json-malformed-text",
+          "tests/PiSharp.ProviderSync.Tests/Sync150StreamCases.cs: sync150.streaming-json-random-documents-and-changes",
+          "tests/PiSharp.ProviderSync.Tests/Sync150StreamCases.cs: sync150.streaming-json-linear-allocation",
+          "tests/PiSharp.ProviderSync.Tests/Sync150StreamCases.cs: sync150.tool-call-arguments-stream"
+        ]
+      }
     },
     {
       "id": "ai.gpt-6.1-terra",
       "area": "ai",
       "phase": 2,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "ai@1.5.0/Added#3",
         "coding-agent@1.5.0/New Features#4",
@@ -2662,13 +2847,21 @@
         "tests/PiSharp.Models.Tests/CatalogCases.cs"
       ],
       "release": "1.5.0",
-      "notes": "Catalog data only upstream; no provider code is Terra-specific. None of the three shards lists gpt-6.1-terra today, so it arrives with ai.models-dev-v2-catalog's refresh. Mid-conversation effort relies on compat.supportsMidConvoEffort from ai@1.3.0/Added#1 (group A). Add catalog cases for prices, context windows and the thinking map; live checks stay manual (automated tests stay offline). Decision 0013 design point 'GPT-6.1 Terra'."
+      "notes": "Catalog data only upstream; no provider code is Terra-specific. None of the three shards lists gpt-6.1-terra today, so it arrives with ai.models-dev-v2-catalog's refresh. Mid-conversation effort relies on compat.supportsMidConvoEffort from ai@1.3.0/Added#1 (group A). Add catalog cases for prices, context windows and the thinking map; live checks stay manual (automated tests stay offline). Decision 0013 design point 'GPT-6.1 Terra'.",
+      "evidence": {
+        "commits": [
+          "3e657609"
+        ],
+        "tests": [
+          "tests/PiSharp.Models.Tests/Sync150CatalogCases.cs: sync150.gpt-6.1-terra"
+        ]
+      }
     },
     {
       "id": "ai.usage-total-from-provider",
       "area": "ai",
       "phase": 2,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "ai@1.5.0/Added#4",
         "coding-agent@1.5.0/Added#8"
@@ -2690,13 +2883,22 @@
         "src/PiSharp.CodingAgent/Usage/UsageTotals.cs"
       ],
       "release": "1.5.0",
-      "notes": "UsageCost (AssistantMessage.cs:14) has Input to Total plus ExtraProperties and no flag. calculateCost is ported per protocol (Anthropic, Bedrock, Google, Mistral, Responses, Completions), so each cost path must write totalFromProvider: false right after total to keep the session JSONL key order. UsageTotals.CombineUsage (UsageTotals.cs:48) gains the AND. The provider-reported true comes with D1's ai@1.5.0/Fixed#14 (OpenRouter billed totals). New C# members carry [Experimental]."
+      "notes": "UsageCost (AssistantMessage.cs:14) has Input to Total plus ExtraProperties and no flag. calculateCost is ported per protocol (Anthropic, Bedrock, Google, Mistral, Responses, Completions), so each cost path must write totalFromProvider: false right after total to keep the session JSONL key order. UsageTotals.CombineUsage (UsageTotals.cs:48) gains the AND. The provider-reported true comes with D1's ai@1.5.0/Fixed#14 (OpenRouter billed totals). New C# members carry [Experimental].",
+      "evidence": {
+        "commits": [
+          "48a3c1a9"
+        ],
+        "tests": [
+          "tests/PiSharp.ProviderSync.Tests/Sync150StreamCases.cs: sync150.usage-total-from-provider-and-combine",
+          "tests/PiSharp.Durable.Tests/ModelsCases.cs: models.stream.responses-sse-becomes-the-durable-assistant-message"
+        ]
+      }
     },
     {
       "id": "ai.pi-messages-response-model",
       "area": "ai",
       "phase": 2,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "ai@1.5.0/Added#5",
         "coding-agent@1.5.0/Added#9"
@@ -2711,13 +2913,21 @@
         "src/PiSharp.AI/Protocols/PiMessages/PiMessagesEventMapper.cs"
       ],
       "release": "1.5.0",
-      "notes": "PiMessagesEventMapper.cs:56-58 copies responseId and providerThinkingLevel from the terminal event but not responseModel; add it between them so the key order matches upstream (after responseId, before providerThinkingLevel). Upstream uses it to compare the physical model when deciding to keep thinking traces (#11000)."
+      "notes": "PiMessagesEventMapper.cs:56-58 copies responseId and providerThinkingLevel from the terminal event but not responseModel; add it between them so the key order matches upstream (after responseId, before providerThinkingLevel). Upstream uses it to compare the physical model when deciding to keep thinking traces (#11000).",
+      "evidence": {
+        "commits": [
+          "fdcc7166"
+        ],
+        "tests": [
+          "tests/PiSharp.ProviderSync.Tests/Sync150StreamCases.cs: sync150.pi-messages-response-model"
+        ]
+      }
     },
     {
       "id": "ai.faux-partial-tool-arguments",
       "area": "ai",
       "phase": 2,
-      "status": "port",
+      "status": "no-op",
       "changelog": [
         "ai@1.5.0/Changed#1"
       ],
@@ -2730,13 +2940,14 @@
         "samples/Durable.Examples/ScriptedModels.cs"
       ],
       "release": "1.5.0",
-      "notes": "PiSharp has no C# port of pi-ai's faux provider; the bridge's faux.mjs (regenerated by port-upstream.mjs) is the copy extensions see. ScriptedModels.cs, which cites faux.ts, sends one ToolCallDelta with the whole arguments (line 99); the PiSharp-only faux models (FauxDurableModels, FauxAgentModels, decision 0008) and the durable copies follow in phase 4 if wanted. Depends on ai.streaming-json-parser. The cache-write double count fixed in the same file is D1's ai@1.5.0/Fixed#19."
+      "notes": "PiSharp has no C# port of pi-ai's faux provider; the bridge's faux.mjs (regenerated by port-upstream.mjs) is the copy extensions see. ScriptedModels.cs, which cites faux.ts, sends one ToolCallDelta with the whole arguments (line 99); the PiSharp-only faux models (FauxDurableModels, FauxAgentModels, decision 0008) and the durable copies follow in phase 4 if wanted. Depends on ai.streaming-json-parser. The cache-write double count fixed in the same file is D1's ai@1.5.0/Fixed#19.",
+      "evidence": "PiSharp has no C# faux provider. samples/Durable.Examples/ScriptedModels.cs emits ToolCallStarted/ToolCallDelta/ToolCallEnded events, not partial messages; consumers' AssistantStreamReducer now derives partial arguments from the delta with ToolCallArgumentsStream (accba7b1), so partials already carry the parsed arguments. The bridge faux.mjs is regenerated by a later package."
     },
     {
       "id": "ai.models-dev-v2-catalog",
       "area": "ai",
       "phase": 2,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "ai@1.5.0/Changed#2",
         "coding-agent@1.5.0/Changed#7"
@@ -2759,7 +2970,17 @@
         "THIRD-PARTY-NOTICES.md"
       ],
       "release": "1.5.0",
-      "notes": "Decision 0013 'The model catalog': refresh the shards from @earendil-works/pi-ai@1.5.0 with refresh-model-catalogs.mjs and update BuiltinModelCatalog's ShardHashes and generatedAt and the CatalogCases pins. PiSharp runs none of the generator code. Today openai.json and azure.json still list gpt-realtime-2.1 and google.json/google-vertex.json the two Gemini live/image models. Check that image models dropped from the chat part still reach PiSharp's image catalog (the shards also feed flattenImageModelCatalog). Other rows land with the same refresh: ai.gpt-6.1-terra and other groups' catalog and default-model rows. Every provider shard in src/PiSharp.Cli/Models/ is regenerated."
+      "notes": "Decision 0013 'The model catalog': refresh the shards from @earendil-works/pi-ai@1.5.0 with refresh-model-catalogs.mjs and update BuiltinModelCatalog's ShardHashes and generatedAt and the CatalogCases pins. PiSharp runs none of the generator code. Today openai.json and azure.json still list gpt-realtime-2.1 and google.json/google-vertex.json the two Gemini live/image models. Check that image models dropped from the chat part still reach PiSharp's image catalog (the shards also feed flattenImageModelCatalog). Other rows land with the same refresh: ai.gpt-6.1-terra and other groups' catalog and default-model rows. Every provider shard in src/PiSharp.Cli/Models/ is regenerated.",
+      "evidence": {
+        "commits": [
+          "3e657609",
+          "eed75b1b"
+        ],
+        "tests": [
+          "tests/PiSharp.Models.Tests/Sync150CatalogCases.cs: sync150.catalog-drops-realtime-and-image-only-chat-models",
+          "tests/PiSharp.ProviderSync.Tests/Program.cs: catalog.pi-ai-1.1.0-shards-hashes-and-additions"
+        ]
+      }
     },
     {
       "id": "ai.anthropic-system-hold-past-dropped",
@@ -2819,7 +3040,7 @@
       "id": "ai.tool-call-args-incremental",
       "area": "ai",
       "phase": 2,
-      "status": "port",
+      "status": "ported-with-deferral",
       "changelog": [
         "ai@1.5.0/Fixed#3",
         "coding-agent@1.5.0/Fixed#17"
@@ -2852,13 +3073,30 @@
         "src/PiSharp.AI/Streaming/AssistantStreamReducer.cs"
       ],
       "release": "1.5.0",
-      "notes": "PiSharp re-parses the whole buffer per delta: PiMessagesEventMapper.cs:87-88, OpenAICompletionsWireSource.cs:454, GoogleEventMapper.cs:127-128, MistralConversations/TextState.cs:129-133, BedrockEventState.cs:181; AnthropicMessagesTransport.SourceSnapshots.cs:37-44 keeps partialJson and index on the block snapshot. Depends on group C's ai.streaming-json-parser (ai@1.5.0/Added#2), which brings StreamingJsonParser and ToolCallArgumentsStream. Add a large-argument test (hundreds of KB) per provider that bounds allocations. coding-agent Fixed#17 also maps to ai.grammar-input-delta, bridge.stream-proxy-incremental-args and cli.tool-args-render-per-frame."
+      "notes": "PiSharp re-parses the whole buffer per delta: PiMessagesEventMapper.cs:87-88, OpenAICompletionsWireSource.cs:454, GoogleEventMapper.cs:127-128, MistralConversations/TextState.cs:129-133, BedrockEventState.cs:181; AnthropicMessagesTransport.SourceSnapshots.cs:37-44 keeps partialJson and index on the block snapshot. Depends on group C's ai.streaming-json-parser (ai@1.5.0/Added#2), which brings StreamingJsonParser and ToolCallArgumentsStream. Add a large-argument test (hundreds of KB) per provider that bounds allocations. coding-agent Fixed#17 also maps to ai.grammar-input-delta, bridge.stream-proxy-incremental-args and cli.tool-args-render-per-frame.",
+      "evidence": {
+        "commits": [
+          "accba7b1"
+        ],
+        "tests": [
+          "tests/PiSharp.ProviderSync.Tests/Sync150StreamCases.cs: sync150.tool-call-arguments-stream",
+          "tests/PiSharp.ProviderSync.Tests/Program.cs: tool-arguments.parse-streaming-json-matches-pi-ai-goldens",
+          "tests/PiSharp.ProviderSync.Tests/Program.cs: tool-arguments.anthropic-finalizes-with-parse-streaming-json",
+          "tests/PiSharp.ProviderSync.Tests/Program.cs: tool-arguments.completions-finalizes-with-parse-streaming-json",
+          "tests/PiSharp.ProviderSync.Tests/Program.cs: tool-arguments.responses-finalizes-item-or-partial-arguments",
+          "tests/PiSharp.ProviderSync.Tests/Program.cs: tool-arguments.mistral-fragments-and-non-string-arguments",
+          "tests/PiSharp.ProviderSync.Tests/Program.cs: tool-arguments.google-args-of-any-json-kind",
+          "tests/PiSharp.ProviderSync.Tests/Program.cs: tool-arguments.pi-messages-object-assign-of-any-arguments",
+          "tests/PiSharp.ProviderApis.Tests/Program.cs: bedrock.tool-arguments-finalize-through-parse-streaming-json"
+        ]
+      },
+      "deferred": "Mistral still writes a full message snapshot per frame pi-messages Capture still deep-clones its partial failure-path partials in Anthropic and Completions are rebuilt rather than streamed"
     },
     {
       "id": "ai.grammar-input-delta",
       "area": "ai",
       "phase": 2,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "ai@1.5.0/Fixed#4",
         "coding-agent@1.5.0/Fixed#17"
@@ -2874,7 +3112,15 @@
         "src/PiSharp.AI/Protocols/OpenAIResponses/ResponsesTextToolTransport.cs"
       ],
       "release": "1.5.0",
-      "notes": "OpenAICompletionsWireSource.cs:618 (AppendCustom) does slot.CustomInput += input and calls CustomArguments(slot) on every delta; ResponsesTextToolTransport.cs:560 passes the whole input so far. This is the same change as group C's ai.grammar-tool-input-delta (ai@1.5.0/Breaking Changes#4, the append/close helper split); land the two rows together. The row stays separate because group D2 points at ai Fixed bullets."
+      "notes": "OpenAICompletionsWireSource.cs:618 (AppendCustom) does slot.CustomInput += input and calls CustomArguments(slot) on every delta; ResponsesTextToolTransport.cs:560 passes the whole input so far. This is the same change as group C's ai.grammar-tool-input-delta (ai@1.5.0/Breaking Changes#4, the append/close helper split); land the two rows together. The row stays separate because group D2 points at ai Fixed bullets.",
+      "evidence": {
+        "commits": [
+          "accba7b1"
+        ],
+        "tests": [
+          "tests/PiSharp.ProviderSync.Tests/Sync150StreamCases.cs: sync150.responses-grammar-initial-input-and-final-check"
+        ]
+      }
     },
     {
       "id": "ai.bounded-error-text-retention",
@@ -2901,7 +3147,7 @@
       "id": "ai.kimi-k31-k3-family",
       "area": "ai",
       "phase": 2,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "ai@1.5.0/Fixed#6",
         "coding-agent@1.5.0/Fixed#64"
@@ -2925,7 +3171,15 @@
         "src/PiSharp.ModelRuntime/Models/BuiltinModelCatalog.cs"
       ],
       "release": "1.5.0",
-      "notes": "The shards are still at pi-ai 1.2.0 and have no K3.1 entries. Lands with group C's catalog refresh ai.models-dev-v2-catalog (ai@1.5.0/Changed#2), which regenerates the shards from the pi-ai@1.5.0 tarball with tools/CompatibilityReport/refresh-model-catalogs.mjs. Check that BuiltinModelCatalog applies no hand-written Kimi family rule that would disagree with the new data."
+      "notes": "The shards are still at pi-ai 1.2.0 and have no K3.1 entries. Lands with group C's catalog refresh ai.models-dev-v2-catalog (ai@1.5.0/Changed#2), which regenerates the shards from the pi-ai@1.5.0 tarball with tools/CompatibilityReport/refresh-model-catalogs.mjs. Check that BuiltinModelCatalog applies no hand-written Kimi family rule that would disagree with the new data.",
+      "evidence": {
+        "commits": [
+          "3e657609"
+        ],
+        "tests": [
+          "tests/PiSharp.Models.Tests/Sync150CatalogCases.cs: sync150.kimi-k3.1-k3-family"
+        ]
+      }
     },
     {
       "id": "ai.oauth-trusted-http-urls",
@@ -2999,7 +3253,7 @@
       "id": "ai.opencode-deepseek-v41-retention",
       "area": "ai",
       "phase": 2,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "ai@1.5.0/Fixed#10",
         "coding-agent@1.5.0/Fixed#65"
@@ -3013,13 +3267,21 @@
         "src/PiSharp.AI/Protocols/OpenAICompletions/CompletionsKeyAuthRequestFactory.cs"
       ],
       "release": "1.5.0",
-      "notes": "PiSharp's opencode.json entry lacks the flag; CompletionsKeyAuthRequestFactory.cs:426 already honours it. Lands with group C's catalog refresh ai.models-dev-v2-catalog (ai@1.5.0/Changed#2)."
+      "notes": "PiSharp's opencode.json entry lacks the flag; CompletionsKeyAuthRequestFactory.cs:426 already honours it. Lands with group C's catalog refresh ai.models-dev-v2-catalog (ai@1.5.0/Changed#2).",
+      "evidence": {
+        "commits": [
+          "3e657609"
+        ],
+        "tests": [
+          "tests/PiSharp.Models.Tests/Sync150CatalogCases.cs: sync150.opencode-deepseek-v4.1-retention"
+        ]
+      }
     },
     {
       "id": "ai.gpt54-55-top-level-tools",
       "area": "ai",
       "phase": 2,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "ai@1.5.0/Fixed#11",
         "coding-agent@1.5.0/Fixed#66"
@@ -3034,7 +3296,15 @@
         "src/PiSharp.Cli/Models/opencode.json"
       ],
       "release": "1.5.0",
-      "notes": "PiSharp's openai.json gpt-5.5 compat still has supportsAdditionalTools:true and supportsToolSearch:true. Lands with group C's catalog refresh ai.models-dev-v2-catalog (ai@1.5.0/Changed#2)."
+      "notes": "PiSharp's openai.json gpt-5.5 compat still has supportsAdditionalTools:true and supportsToolSearch:true. Lands with group C's catalog refresh ai.models-dev-v2-catalog (ai@1.5.0/Changed#2).",
+      "evidence": {
+        "commits": [
+          "3e657609"
+        ],
+        "tests": [
+          "tests/PiSharp.Models.Tests/Sync150CatalogCases.cs: sync150.gpt-5.4-5.5-top-level-tools"
+        ]
+      }
     },
     {
       "id": "ai.bedrock-strict-fallback",
@@ -3073,7 +3343,7 @@
       "id": "ai.openrouter-anthropic-latest-aliases",
       "area": "ai",
       "phase": 2,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "ai@1.5.0/Fixed#13",
         "coding-agent@1.5.0/Fixed#68"
@@ -3088,13 +3358,24 @@
         "src/PiSharp.ModelRuntime/Models/OpenRouterUserModels.cs"
       ],
       "release": "1.5.0",
-      "notes": "PiSharp's openrouter.json lists these aliases as openai-completions. OpenRouterUserModels.cs already follows v1.5.0. Lands with group C's catalog refresh ai.models-dev-v2-catalog (ai@1.5.0/Changed#2)."
+      "notes": "PiSharp's openrouter.json lists these aliases as openai-completions. OpenRouterUserModels.cs already follows v1.5.0. Lands with group C's catalog refresh ai.models-dev-v2-catalog (ai@1.5.0/Changed#2).",
+      "evidence": {
+        "commits": [
+          "3e657609",
+          "b901d840",
+          "a9f45289"
+        ],
+        "tests": [
+          "tests/PiSharp.Models.Tests/Sync150CatalogCases.cs: sync150.openrouter-anthropic-latest-aliases",
+          "tests/PiSharp.CliSync.Tests/Sync150CatalogCases.cs: sync150.openrouter-anthropic-latest-alias-speaks-messages"
+        ]
+      }
     },
     {
       "id": "ai.openrouter-reported-cost",
       "area": "ai",
       "phase": 2,
-      "status": "port",
+      "status": "ported-with-deferral",
       "changelog": [
         "ai@1.5.0/Fixed#14",
         "coding-agent@1.5.0/Fixed#51"
@@ -3116,13 +3397,22 @@
         "src/PiSharp.CodingAgent/Export/SessionHtmlExport.cs"
       ],
       "release": "1.5.0",
-      "notes": "PiSharp has no is_byok handling and always uses the catalog estimate. Depends on group C's ai.usage-total-from-provider (ai@1.5.0/Added#4). The template.js change also changes the asset hashes in SessionHtmlExport.cs (lines 37-39); coordinate with cli.export-html-deep-sessions and cli.export-html-system-messages."
+      "notes": "PiSharp has no is_byok handling and always uses the catalog estimate. Depends on group C's ai.usage-total-from-provider (ai@1.5.0/Added#4). The template.js change also changes the asset hashes in SessionHtmlExport.cs (lines 37-39); coordinate with cli.export-html-deep-sessions and cli.export-html-system-messages.",
+      "evidence": {
+        "commits": [
+          "48a3c1a9"
+        ],
+        "tests": [
+          "tests/PiSharp.ProviderSync.Tests/Sync150StreamCases.cs: sync150.openrouter-reported-cost-completions-and-anthropic"
+        ]
+      },
+      "deferred": "export-html template.js cost sums (cli.export-html owner)"
     },
     {
       "id": "ai.opencode-protocol-endpoints",
       "area": "ai",
       "phase": 2,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "ai@1.5.0/Fixed#15",
         "coding-agent@1.5.0/Fixed#52"
@@ -3139,7 +3429,16 @@
         "src/PiSharp.AI/ModelOperations/SystemOneClassifier.cs"
       ],
       "release": "1.5.0",
-      "notes": "PiSharp's shards still use https://opencode.ai/zen/v1. Lands with group C's catalog refresh ai.models-dev-v2-catalog (ai@1.5.0/Changed#2); check that SystemOneClassifier takes the classifier base URL from the catalog rather than a constant."
+      "notes": "PiSharp's shards still use https://opencode.ai/zen/v1. Lands with group C's catalog refresh ai.models-dev-v2-catalog (ai@1.5.0/Changed#2); check that SystemOneClassifier takes the classifier base URL from the catalog rather than a constant.",
+      "evidence": {
+        "commits": [
+          "3e657609"
+        ],
+        "tests": [
+          "tests/PiSharp.Models.Tests/Sync150CatalogCases.cs: sync150.opencode-protocol-endpoints",
+          "tests/PiSharp.CliSync.Tests/Sync150CatalogCases.cs: sync150.opencode-go-google-route-carries-x-opencode-session"
+        ]
+      }
     },
     {
       "id": "ai.zhipu-1308-not-retryable",
@@ -3441,7 +3740,7 @@
       "id": "schemas.models-schema-descriptions",
       "area": "schemas",
       "phase": 2,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "coding-agent@1.4.0/Fixed#2"
       ],
@@ -3456,13 +3755,21 @@
         "src/PiSharp.CodingAgent/Schemas/models.schema.json"
       ],
       "release": "1.5.0",
-      "notes": "PiSharp's copy is byte-identical to v1.2.0's. Replace it with v1.5.0's generated file, which also carries SystemOneCompat (ai.system-one-compat) and the 1.5.0 schema changes of other rows; check ModelsJsonConfig.cs accepts the same fields."
+      "notes": "PiSharp's copy is byte-identical to v1.2.0's. Replace it with v1.5.0's generated file, which also carries SystemOneCompat (ai.system-one-compat) and the 1.5.0 schema changes of other rows; check ModelsJsonConfig.cs accepts the same fields.",
+      "evidence": {
+        "commits": [
+          "0f5a1041"
+        ],
+        "tests": [
+          "tests/PiSharp.Models.Tests/Sync150CatalogCases.cs: sync150.models-schema-v1.5.0"
+        ]
+      }
     },
     {
       "id": "schemas.models-schema-pi-schema",
       "area": "schemas",
       "phase": 2,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "ai@1.5.0/Breaking Changes#1"
       ],
@@ -3482,7 +3789,15 @@
         "tests/PiSharp.Models.Tests/ConfigSchemaCases.cs"
       ],
       "release": "1.5.0",
-      "notes": "The embedded models.schema.json is byte-identical to v1.2.0 (sha256 713410b0...). Refresh it to the v1.5.0 bytes once, together with the other groups' models.schema.json rows (7f225f25d, 8efd314fa, 60ac3bcc3 also change it). Check that TypeBoxJsonSchema's error order for an invalid models.json does not depend on keyword order. TypeBoxJsonSchema stays (decision 0013)."
+      "notes": "The embedded models.schema.json is byte-identical to v1.2.0 (sha256 713410b0...). Refresh it to the v1.5.0 bytes once, together with the other groups' models.schema.json rows (7f225f25d, 8efd314fa, 60ac3bcc3 also change it). Check that TypeBoxJsonSchema's error order for an invalid models.json does not depend on keyword order. TypeBoxJsonSchema stays (decision 0013).",
+      "evidence": {
+        "commits": [
+          "0f5a1041"
+        ],
+        "tests": [
+          "tests/PiSharp.Models.Tests/Sync150CatalogCases.cs: sync150.models-schema-v1.5.0"
+        ]
+      }
     },
     {
       "id": "core.resume-active-tools",
@@ -3747,7 +4062,7 @@
       "id": "core.default-models",
       "area": "coding-agent-core",
       "phase": 2,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "coding-agent@1.4.0/Changed#3",
         "coding-agent@1.4.0/Changed#4",
@@ -3761,7 +4076,15 @@
         "src/PiSharp.ModelRuntime/Models/ModelResolver.cs"
       ],
       "release": "1.5.0",
-      "notes": "DefaultModelPerProvider is at ModelResolver.cs:36-51. Per 0013 the new defaults apply only where no model is selected. nvidia/nemotron-3.5-super-vl-120b-a12b is not in the v1.2.0 nvidia.json shard, so it needs the catalog refresh (model-catalog-shards); the Copilot and Xiaomi targets are already in the shards. The 1.5.0 default changes (for example openai) are other rows."
+      "notes": "DefaultModelPerProvider is at ModelResolver.cs:36-51. Per 0013 the new defaults apply only where no model is selected. nvidia/nemotron-3.5-super-vl-120b-a12b is not in the v1.2.0 nvidia.json shard, so it needs the catalog refresh (model-catalog-shards); the Copilot and Xiaomi targets are already in the shards. The 1.5.0 default changes (for example openai) are other rows.",
+      "evidence": {
+        "commits": [
+          "3e657609"
+        ],
+        "tests": [
+          "tests/PiSharp.Models.Tests/Sync150CatalogCases.cs: sync150.default-models"
+        ]
+      }
     },
     {
       "id": "core.agent-tool-json-schema",
@@ -3793,7 +4116,7 @@
       "id": "core.default-openai-model",
       "area": "coding-agent-core",
       "phase": 2,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "coding-agent@1.5.0/Changed#6"
       ],
@@ -3805,7 +4128,15 @@
         "src/PiSharp.ModelRuntime/Models/ModelResolver.cs"
       ],
       "release": "1.5.0",
-      "notes": "ModelResolver.cs:39 still has (\"openai\", \"gpt-5.5\"); gpt-6.1-sol is already in the openai shard. Standing rule (decision 0013): a changed default applies only where no model is selected and never replaces the user's selection, as upstream does. The same upstream diff also moves the nvidia, github-copilot and xiaomi defaults; those come from other groups' bullets, so compare the whole table with v1.5.0's model-resolver.ts when porting. Decision 0013 design point 'default OpenAI model'."
+      "notes": "ModelResolver.cs:39 still has (\"openai\", \"gpt-5.5\"); gpt-6.1-sol is already in the openai shard. Standing rule (decision 0013): a changed default applies only where no model is selected and never replaces the user's selection, as upstream does. The same upstream diff also moves the nvidia, github-copilot and xiaomi defaults; those come from other groups' bullets, so compare the whole table with v1.5.0's model-resolver.ts when porting. Decision 0013 design point 'default OpenAI model'.",
+      "evidence": {
+        "commits": [
+          "3e657609"
+        ],
+        "tests": [
+          "tests/PiSharp.Models.Tests/Sync150CatalogCases.cs: sync150.default-openai-model-only-without-a-selection"
+        ]
+      }
     },
     {
       "id": "core.exec-max-buffer",
@@ -6718,7 +7049,7 @@
       "id": "docs.models-configuration-reference",
       "area": "docs",
       "phase": 2,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "coding-agent@1.4.0/New Features#2",
         "coding-agent@1.4.0/Added#1"
@@ -6735,7 +7066,16 @@
         "website/src/content/docs/docs/guides/providers.md"
       ],
       "release": "1.5.0",
-      "notes": "PiSharp's models.json documentation is the website configuration reference. Generate the reference from src/PiSharp.CodingAgent/Schemas/models.schema.json once it carries descriptions (schemas.models-schema-descriptions), or link Pi's page; describe only fields PiSharp accepts."
+      "notes": "PiSharp's models.json documentation is the website configuration reference. Generate the reference from src/PiSharp.CodingAgent/Schemas/models.schema.json once it carries descriptions (schemas.models-schema-descriptions), or link Pi's page; describe only fields PiSharp accepts.",
+      "evidence": {
+        "commits": [
+          "b481cc9b"
+        ],
+        "docs": [
+          "website/src/content/docs/docs/reference/configuration.md",
+          "website/src/content/docs/docs/guides/providers.md"
+        ]
+      }
     },
     {
       "id": "docs.sandbox-example-removed",

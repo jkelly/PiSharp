@@ -61,7 +61,12 @@ test('statuses, phases, releases and PiSharp paths', () => {
   assert.deepEqual(table.areas, Object.keys(PHASES));
   for (const row of table.rows) {
     assert(row.status in table.statusMeaning, row.id + ' status');
-    if (row.status === 'ported' || row.status === 'ported-with-deferral') {
+    if ((row.status === 'ported' || row.status === 'ported-with-deferral') && row.area === 'docs' && row.evidence.docs) {
+      // A ported docs row names its commits and the pages it changed.
+      assert(row.evidence.commits.length > 0 && row.evidence.commits.every(sha => /^[0-9a-f]{7,40}$/.test(sha)), row.id + ' commits');
+      assert(row.evidence.docs.length > 0 && !('tests' in row.evidence), row.id + ' docs');
+      for (const path of row.evidence.docs) assert(existsSync(resolve(repo, path)), row.id + ' names a missing page ' + path);
+    } else if (row.status === 'ported' || row.status === 'ported-with-deferral') {
       // A ported row names its commits and its authored tests, each test as <file>: <case id> in a file that holds it,
       // literally or as an interpolated $"<prefix>.{name}" with "<name>" in the same file.
       assert(row.evidence.commits.length > 0 && row.evidence.commits.every(sha => /^[0-9a-f]{7,40}$/.test(sha)), row.id + ' commits');
