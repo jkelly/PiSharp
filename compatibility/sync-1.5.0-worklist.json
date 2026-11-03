@@ -12,19 +12,19 @@
   },
   "rule": "A citation moves to the new commit only when every upstream path it names has the same git object id at both tags. The rest stay on the old commit until their area is re-ported, then move with the port.",
   "summary": {
-    "filesWithOldCommit": 944,
+    "filesWithOldCommit": 698,
     "citations": {
-      "repinned": 251,
-      "pending": 632,
+      "repinned": 250,
+      "pending": 633,
       "unparsed": 19,
       "nonHeader": 22,
-      "excludedHistorical": 1748,
+      "excludedHistorical": 1769,
       "releaseDocs": 5
     },
     "files": {
-      "repinned": 251,
+      "repinned": 250,
       "pending": 630,
-      "historical": 27,
+      "historical": 29,
       "releaseDocs": 2,
       "nonHeader": 21
     },
@@ -43,7 +43,7 @@
       },
       "coding-agent-core": {
         "files": 122,
-        "changeSize": 12530
+        "changeSize": 12759
       },
       "docs": {
         "files": 3,
@@ -4115,6 +4115,74 @@
       ]
     },
     {
+      "file": "THIRD-PARTY-NOTICES.md",
+      "area": "coding-agent-core",
+      "citations": [
+        {
+          "line": 114,
+          "changed": [
+            "packages/coding-agent/schemas"
+          ],
+          "unchanged": [
+            "packages/coding-agent/src/modes/interactive/theme/dark.json",
+            "packages/coding-agent/src/modes/interactive/theme/light.json"
+          ]
+        },
+        {
+          "line": 144,
+          "changed": [
+            "packages/durable/src/storage/sqlite/database.ts",
+            "packages/durable/src/storage/sqlite/migrations.ts",
+            "packages/durable/src/storage/sqlite/node.ts",
+            "packages/durable/src/storage/sqlite/storage.ts",
+            "packages/durable/src/storage/sqlite/index.ts"
+          ]
+        }
+      ],
+      "upstream": [
+        {
+          "path": "packages/coding-agent/schemas",
+          "status": "changed",
+          "linesChanged": 229
+        },
+        {
+          "path": "packages/durable/src/storage/sqlite/database.ts",
+          "status": "changed",
+          "linesChanged": 39
+        },
+        {
+          "path": "packages/durable/src/storage/sqlite/migrations.ts",
+          "status": "changed",
+          "linesChanged": 237
+        },
+        {
+          "path": "packages/durable/src/storage/sqlite/node.ts",
+          "status": "changed",
+          "linesChanged": 216
+        },
+        {
+          "path": "packages/durable/src/storage/sqlite/storage.ts",
+          "status": "changed",
+          "linesChanged": 281
+        },
+        {
+          "path": "packages/durable/src/storage/sqlite/index.ts",
+          "status": "changed",
+          "linesChanged": 4
+        }
+      ],
+      "changeSize": 1006,
+      "applicabilityRows": [],
+      "unmappedUpstream": [
+        "packages/coding-agent/schemas",
+        "packages/durable/src/storage/sqlite/database.ts",
+        "packages/durable/src/storage/sqlite/migrations.ts",
+        "packages/durable/src/storage/sqlite/node.ts",
+        "packages/durable/src/storage/sqlite/storage.ts",
+        "packages/durable/src/storage/sqlite/index.ts"
+      ]
+    },
+    {
       "file": "src/PiSharp.Cli/Settings/SettingsModelSelection.cs",
       "area": "coding-agent-core",
       "citations": [
@@ -4150,58 +4218,6 @@
         "packages/coding-agent/src/main.ts",
         "packages/coding-agent/src/core/model-resolver.ts",
         "packages/coding-agent/src/core/settings-manager.ts"
-      ]
-    },
-    {
-      "file": "THIRD-PARTY-NOTICES.md",
-      "area": "coding-agent-core",
-      "citations": [
-        {
-          "line": 144,
-          "changed": [
-            "packages/durable/src/storage/sqlite/database.ts",
-            "packages/durable/src/storage/sqlite/migrations.ts",
-            "packages/durable/src/storage/sqlite/node.ts",
-            "packages/durable/src/storage/sqlite/storage.ts",
-            "packages/durable/src/storage/sqlite/index.ts"
-          ]
-        }
-      ],
-      "upstream": [
-        {
-          "path": "packages/durable/src/storage/sqlite/database.ts",
-          "status": "changed",
-          "linesChanged": 39
-        },
-        {
-          "path": "packages/durable/src/storage/sqlite/migrations.ts",
-          "status": "changed",
-          "linesChanged": 237
-        },
-        {
-          "path": "packages/durable/src/storage/sqlite/node.ts",
-          "status": "changed",
-          "linesChanged": 216
-        },
-        {
-          "path": "packages/durable/src/storage/sqlite/storage.ts",
-          "status": "changed",
-          "linesChanged": 281
-        },
-        {
-          "path": "packages/durable/src/storage/sqlite/index.ts",
-          "status": "changed",
-          "linesChanged": 4
-        }
-      ],
-      "changeSize": 777,
-      "applicabilityRows": [],
-      "unmappedUpstream": [
-        "packages/durable/src/storage/sqlite/database.ts",
-        "packages/durable/src/storage/sqlite/migrations.ts",
-        "packages/durable/src/storage/sqlite/node.ts",
-        "packages/durable/src/storage/sqlite/storage.ts",
-        "packages/durable/src/storage/sqlite/index.ts"
       ]
     },
     {
@@ -18606,6 +18622,11 @@
       "reason": "the v1.2.0 sync record"
     },
     {
+      "file": "compatibility/sync-1.5.0-worklist.json",
+      "occurrences": 20,
+      "reason": "names the commit the v1.5.0 sync starts from"
+    },
+    {
       "file": "compatibility/target.lock.json",
       "occurrences": 1,
       "reason": "previousTarget names the previous target lock"
@@ -18634,6 +18655,11 @@
       "file": "docs/decisions/0006-pi-1.2.0-sync.md",
       "occurrences": 1,
       "reason": "the v1.2.0 sync decision"
+    },
+    {
+      "file": "docs/decisions/0013-pi-1.5.0-sync.md",
+      "occurrences": 1,
+      "reason": "names the commit the v1.5.0 sync starts from"
     },
     {
       "file": "docs/release-notes/1.2.0.1.md",
@@ -19926,14 +19952,6 @@
       "citations": 1,
       "upstream": [
         "packages/coding-agent/src/core/compaction/utils.ts"
-      ]
-    },
-    {
-      "file": "THIRD-PARTY-NOTICES.md",
-      "citations": 1,
-      "upstream": [
-        "packages/coding-agent/src/modes/interactive/theme/dark.json",
-        "packages/coding-agent/src/modes/interactive/theme/light.json"
       ]
     },
     {

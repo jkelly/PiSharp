@@ -236,6 +236,12 @@ for (const file of files) {
       } else {
         const text = citationText(lines, index, column);
         let parsed = pathsIn(text.after);
+        // "<path> (commit <sha>; ...)" and "<path> at <sha>" name their source before the commit: check those paths too,
+        // even when the text after it names other files.
+        if (/(\(commit|\bat)\s*`?$/.test(text.before)) {
+          const before = pathsIn(text.before);
+          parsed = { paths: [...new Set([...before.paths, ...parsed.paths])], unresolved: [...before.unresolved, ...parsed.unresolved] };
+        }
         if (parsed.paths.length === 0) parsed = pathsIn(text.before);
         if (parsed.paths.length === 0) {
           report.unparsed.push({ file, line: index + 1, text: lines[index].trim().slice(0, 200) });
