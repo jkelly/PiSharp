@@ -109,6 +109,7 @@ See [Sessions](/docs/guides/sessions/) for compaction and branch summaries.
 | `themes` | string array | none | Theme files or folders. |
 | `enableSkillCommands` | boolean | `true` | Registers each skill as a `/skill:name` command. |
 | `npmCommand` | string array | none | The npm command in argv form, such as `["mise", "exec", "node@20", "--", "npm"]`, for package lookup and installs. |
+| `selfUpdateCommand` | string array | none | The command `pisharp update` runs to update PiSharp itself, with `{packageName}`, `{version}` and `{installSpec}` placeholders. `PI_SELF_UPDATE_COMMAND` wins over it. Global settings only. See [Custom update command](/docs/reference/cli/#custom-update-command). |
 
 ## Terminal UI
 

@@ -412,10 +412,16 @@ Options:
                     }
                     if (target.Type is "all" or "self")
                     {
-                        // Source getSelfUpdateCommand/printSelfUpdateUnavailable: PiSharp is not installed by npm or Pi's installer, so the
-                        // self-update path always reports that this installation cannot update itself.
+                        // Pi 1.5.0 getConfiguredSelfUpdateArgv: PI_SELF_UPDATE_COMMAND, else the selfUpdateCommand of the global settings
+                        // (never a project file). A configured command replaces install-method detection.
+                        var configured = PiSelfUpdate.GetConfiguredSelfUpdateArgv(host.GetEnvironment(PiSelfUpdate.EnvironmentVariable),
+                            settings.Global[PiSelfUpdate.SettingName]);
+                        if (configured is not null) return await RunConfiguredSelfUpdate(console, host, configured, options.Force, token).ConfigureAwait(false);
+                        // Source getSelfUpdateCommand/printSelfUpdateUnavailable: PiSharp is not installed by npm or Pi's installer, so
+                        // without a configured command the self-update path reports that this installation cannot update itself.
                         await console.Error($"error: {App} cannot self-update this installation.").ConfigureAwait(false);
                         await console.Error($"Update {App} using the package manager, wrapper, or source checkout that provides this installation.").ConfigureAwait(false);
+                        await console.Error($"To make `{App} update` run your own update command, set {PiSelfUpdate.EnvironmentVariable} or the {PiSelfUpdate.SettingName} setting.").ConfigureAwait(false);
                         return 1;
                     }
                     return 0;
@@ -427,6 +433,58 @@ Options:
             await console.Error(console.Red($"Error: {error.Message}")).ConfigureAwait(false);
             return 1;
         }
+    }
+
+    /// <summary>Pi 1.5.0 getSelfUpdatePlan and runConfiguredSelfUpdate. The release check asks NuGet for PiSharp.Cli (decision 0013); the
+    /// command runs only when that release is newer than this PiSharp, or with <c>--force</c>. Exit code 0 does not prove an update, so the
+    /// version installed afterwards is read from this installation's assembly, else from <c>pisharp --version</c> on PATH.</summary>
+    private static async Task<int> RunConfiguredSelfUpdate(Console console, PiHost host, IReadOnlyList<string> argv, bool force, CancellationToken token)
+    {
+        var version = PiConfig.Version;
+        PiSharp.Cli.Interactive.Mode.Utilities.LatestRelease? latest;
+        try
+        {
+            latest = await PiSharp.Cli.Interactive.Mode.Utilities.VersionCheck.GetLatestRelease(version,
+                new() { Retry = true, Http = host.VersionCheckHttp, BaseUrl = host.NuGetBaseUrl, Env = host.GetEnvironment }, token).ConfigureAwait(false);
+        }
+        catch (Exception error) when (error is not OperationCanceledException || !token.IsCancellationRequested)
+        {
+            throw new PiPackageException($"Could not determine latest {App} version: {PiSharp.Cli.Interactive.Mode.Utilities.VersionCheck.FormatVersionCheckError(error)}");
+        }
+        if (latest is null) throw new PiPackageException($"Could not determine latest {App} version.");
+        if (!force && !PiSharp.Cli.Interactive.Mode.Utilities.VersionCheck.IsNewerPackageVersion(latest.Version, version))
+        {
+            await console.Log(console.Green($"{App} is already up to date (v{version})")).ConfigureAwait(false);
+            return 0;
+        }
+
+        var command = PiSelfUpdate.MakeConfiguredSelfUpdateCommand(argv, PiSharp.Cli.Interactive.Mode.Utilities.VersionCheck.PackageId, latest.Version);
+        var processes = Processes(host);
+        await console.Log(console.Dim($"Updating {App} with {command.Display}...")).ConfigureAwait(false);
+        int exitCode;
+        try { exitCode = await processes.RunInheritedAsync(command.Command, command.Args, null, token).ConfigureAwait(false); }
+        catch (PiPackageException error)
+        {
+            await console.Error(console.Red($"Error: {error.Message}")).ConfigureAwait(false);
+            return 1;
+        }
+        if (exitCode != 0)
+        {
+            await console.Error(console.Red($"Error: {command.Display} exited with code {exitCode}")).ConfigureAwait(false);
+            return 1;
+        }
+        // Wrappers such as mise or Nix install each version into a new directory and leave this installation untouched, so fall back
+        // to the PiSharp on PATH.
+        var change = PiSelfUpdate.DetectInstallChange(typeof(PiConfig).Assembly.Location, version);
+        var installed = change is { Kind: "updated" } && change.Version == latest.Version
+            ? change.Version : await PiSelfUpdate.ReadVersionOnPathAsync(processes, token).ConfigureAwait(false);
+        if (installed == latest.Version)
+        {
+            await console.Log(console.Green($"Updated {App} from {version} to {latest.Version}")).ConfigureAwait(false);
+            return 0;
+        }
+        await console.Log(console.Yellow($"Ran {command.Display}, but `{App} --version` reports {installed ?? "no version"}, not {latest.Version}.")).ConfigureAwait(false);
+        return 0;
     }
 
     /// <summary>Source refreshModelCatalogs: a forced network refresh of every remote catalog, 15 seconds at most.</summary>

@@ -71,6 +71,10 @@ internal sealed record PiHost
     internal Func<TextWriter, TextWriter, PiSharp.Cli.Packages.PiPackageProcesses>? PackageProcesses { get; init; }
     /// <summary>Adjusts the <c>mcp</c> command's collaborators (tests: fake channels and stores); null keeps the defaults.</summary>
     internal Func<McpCommandOptions, McpCommandOptions>? ConfigureMcp { get; init; }
+    /// <summary>The release check of <c>pisharp update</c> with a configured self-update command (tests: a fake NuGet); null uses the
+    /// shared client and <see cref="PiSharp.Cli.Interactive.Mode.Utilities.VersionCheck.DefaultNuGetBaseUrl"/>.</summary>
+    internal HttpMessageInvoker? VersionCheckHttp { get; init; }
+    internal string? NuGetBaseUrl { get; init; }
 }
 
 /// <summary>An exit decided by the entry after its messages were written.</summary>

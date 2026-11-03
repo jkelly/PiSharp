@@ -180,15 +180,27 @@ Sources take Pi's forms: `npm:@foo/bar`, `git:github.com/user/repo`, `git:git@gi
 | `--models` | Refreshes the model catalogs only and prints `Model catalogs refreshed`. |
 | `--all` | Updates packages, then PiSharp. |
 | `--extension <source>` | Updates one package. |
-| `--force` | Reinstalls PiSharp even if it is current. Moot, since self-update isn't possible (below). |
+| `--force` | Runs the custom update command even if PiSharp is current (below). |
 
 `--all`, `--models` and `--extension` can't be combined with each other, with `--self` or `--extensions`, or with a positional source.
 
-PiSharp can't update itself this way. `pisharp update`, `update self` and `update --all` end with `error: pisharp cannot self-update this installation.` and exit 1 (`--all` updates the packages first). Update the tool with:
+Without a custom update command, PiSharp can't update itself. `pisharp update`, `update self` and `update --all` end with `error: pisharp cannot self-update this installation.`, name the two ways to set a command, and exit 1 (`--all` updates the packages first). Update the tool with:
 
 ```sh
 dotnet tool update -g PiSharp.Cli
 ```
+
+### Custom update command
+
+Set `PI_SELF_UPDATE_COMMAND` so `pisharp update` runs your update command, as Pi 1.5.0 does:
+
+```sh
+export PI_SELF_UPDATE_COMMAND="dotnet tool update -g {packageName} --version {version}"
+```
+
+`pisharp update` asks NuGet for the newest `PiSharp.Cli` and runs the command only when that version is newer than the running PiSharp, or with `--force`. Otherwise it prints `pisharp is already up to date`. Pi asks pi.dev instead; this is an intentional difference. The command fills `{packageName}` (`PiSharp.Cli`), `{version}` and `{installSpec}` (`PiSharp.Cli@<version>`). It runs without a shell, and the value is split on spaces with no quoting. For arguments with spaces, use the `selfUpdateCommand` setting in `~/.pi/agent/settings.json`, an argv array such as `["dotnet", "tool", "update", "-g", "{packageName}", "--version", "{version}"]`. A project's `.pi/settings.json` can't set it. The variable wins over the setting.
+
+Exit code 0 doesn't prove the update worked, so PiSharp then checks the installed version, first in its own installation and then with `pisharp --version` on your `PATH`. If that isn't the new version, it says so in yellow.
 
 ## auth
 

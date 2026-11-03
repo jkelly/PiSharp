@@ -19,6 +19,14 @@ internal class PiPackageProcesses
     /// <summary>Source runCommand: stdio inherited; resolves on exit code 0, else <c>"&lt;command&gt; &lt;args&gt; failed with code N"</c>.</summary>
     internal virtual async Task RunAsync(string command, IReadOnlyList<string> args, string? cwd, CancellationToken cancellationToken)
     {
+        var exitCode = await RunInheritedAsync(command, args, cwd, cancellationToken).ConfigureAwait(false);
+        if (exitCode != 0) throw new PiPackageException($"{command} {string.Join(' ', args)} failed with code {exitCode}");
+    }
+
+    /// <summary>Pi 1.5.0 package-manager-cli.ts runSelfUpdate's spawnProcess: stdio inherited, no shell (cross-spawn on Windows),
+    /// the exit code returned; a command that cannot start throws <c>"spawn &lt;command&gt; ENOENT"</c>.</summary>
+    internal virtual async Task<int> RunInheritedAsync(string command, IReadOnlyList<string> args, string? cwd, CancellationToken cancellationToken)
+    {
         using var process = Start(command, args, cwd, null, capture: Output is not null || ErrorOutput is not null);
         var pumps = new List<Task>();
         if (process.StartInfo.RedirectStandardOutput) pumps.Add(Pump(process.StandardOutput, Output ?? Console.Out));
@@ -26,7 +34,7 @@ internal class PiPackageProcesses
         try { await process.WaitForExitAsync(cancellationToken).ConfigureAwait(false); }
         catch (OperationCanceledException) { Kill(process); throw; }
         await Task.WhenAll(pumps).ConfigureAwait(false);
-        if (process.ExitCode != 0) throw new PiPackageException($"{command} {string.Join(' ', args)} failed with code {process.ExitCode}");
+        return process.ExitCode;
     }
 
     /// <summary>Source runCommandCapture: stdout and stderr captured; the trimmed stdout on success, else the failure with

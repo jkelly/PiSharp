@@ -1133,7 +1133,8 @@ internal static partial class Program
         (code, stdout, stderr) = await sandbox.Run("update");
         Equal(1, code, "self update exit");
         Equal("Extensions are skipped. Run pisharp update --extensions to update extensions.\n", stdout, "skipped note");
-        Equal("error: pisharp cannot self-update this installation.\nUpdate pisharp using the package manager, wrapper, or source checkout that provides this installation.\n", stderr, "self update unavailable");
+        Equal("error: pisharp cannot self-update this installation.\nUpdate pisharp using the package manager, wrapper, or source checkout that provides this installation.\n" +
+            "To make `pisharp update` run your own update command, set PI_SELF_UPDATE_COMMAND or the selfUpdateCommand setting.\n", stderr, "self update unavailable");
         (code, stdout, _) = await sandbox.Run("update", "--extensions");
         Equal(0, code, "offline extension update"); Equal("Updated packages\n", stdout, "nothing to do offline");
     }
