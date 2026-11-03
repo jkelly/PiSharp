@@ -43,6 +43,7 @@ internal static partial class Program
             ("transport.no-dispatch-after-a-request-settles", NoDispatchAfterSettle)
         };
         cases.AddRange(CompletionCases());
+        cases.AddRange(Sync150CliCases());
         // Linked existing contract cases (tests/PiSharp.Extensions.ContractTests/McpConfigurationTests.cs).
         cases.AddRange(McpConfigurationTests.Cases().Select(item => ("linked." + item.Name, item.Run)));
         var results = new List<object>(); var failures = 0;
