@@ -288,8 +288,9 @@ public static class GoogleRequestProjector
                 else { var text = Text(block, "text") ?? throw GoogleData.Fail(GoogleFailure.UnsupportedValue); texts.Add(text); previousPlaceholder = text == "(tool image omitted: model does not support images)"; }
             }
             var value = string.Join("\n", texts);
+            // google-shared.ts: hasText = textResult.trim().length > 0, so whitespace-only output counts as empty.
             var response = new JsonObject { ["name"] = Text(tool, "toolName") ?? Text(tool, "name"),
-                ["response"] = new JsonObject { [error ? "error" : "output"] = value.Length > 0 ? Sanitize(value) : imageParts.Count > 0 ? "(see attached image)" : "" } };
+                ["response"] = new JsonObject { [error ? "error" : "output"] = !IsBlank(value) ? Sanitize(value) : imageParts.Count > 0 ? "(see attached image)" : "" } };
             var id = Text(tool, "toolCallId") ?? Text(tool, "id") ?? "";
             if (includeId) response["id"] = id;
             var multimodal = Major(model.Id) is null or >= 3;

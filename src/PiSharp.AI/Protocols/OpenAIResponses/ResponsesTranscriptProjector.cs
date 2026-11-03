@@ -485,13 +485,15 @@ public sealed class ResponsesTranscriptProjector
         // Pi abe508 openai-responses-shared.ts convertToolResultOutput (after transform-messages.ts downgradeUnsupportedImages).
         private JsonNode ToolOutput(JsonElement body)
         {
-            if (options.ModelSupportsImages is null) { var text = ContentText(body, true); return text.Length == 0 ? "(no tool output)" : text; }
+            // hasText = textResult.trim().length > 0: whitespace-only output counts as empty.
+            if (options.ModelSupportsImages is null) { var text = ContentText(body, true); return StreamingJson.IsJsBlank(text) ? "(no tool output)" : text; }
             var parts = MediaParts(body, true);
             var result = string.Join('\n', parts.Where(part => part.Data is null).Select(part => part.Text));
             var images = parts.Where(part => part.Data is not null).ToList();
-            if (images.Count == 0 || options.ModelSupportsImages != true) return result.Length != 0 ? result : images.Count > 0 ? "(see attached image)" : "(no tool output)";
+            var hasText = !StreamingJson.IsJsBlank(result);
+            if (images.Count == 0 || options.ModelSupportsImages != true) return hasText ? result : images.Count > 0 ? "(see attached image)" : "(no tool output)";
             var output = new JsonArray();
-            if (result.Length != 0) output.Add(new JsonObject { ["type"] = "input_text", ["text"] = result });
+            if (hasText) output.Add(new JsonObject { ["type"] = "input_text", ["text"] = result });
             foreach (var image in images) output.Add(new JsonObject { ["type"] = "input_image", ["detail"] = "auto", ["image_url"] = "data:" + image.Text + ";base64," + image.Data });
             return output;
         }
