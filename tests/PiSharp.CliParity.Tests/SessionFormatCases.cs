@@ -162,9 +162,25 @@ internal static partial class Program
             "and rejects with an Error on failure. A tool whose declaration returns an object resolves on failure too when it returned that object; check its fields. Calls still running when the script ends are cancelled."),
     ];
 
+    /// <summary>Authored, not captured, in the same way: the Pi 1.5.0 default prompt texts (core/system-prompt.ts and tools/edit.ts
+    /// editToolSystemPromptContribution at the 1.5.0 pin), as they appear JSON-escaped in the golden lines. No golden lists skills.</summary>
+    private static readonly (string Old, string New)[] Pi150TextChanges =
+    [
+        ("You are an expert coding assistant operating inside pi, a coding agent harness. You help users by reading files, executing commands, editing code, and writing new files.",
+            "You are a coding assistant running inside pi, a coding agent harness. Help users inspect files, run commands, and modify code."),
+        ("In addition to the tools above, you may have access to other custom tools depending on the project.", "Additional tools may be available."),
+        ("- Use edit for precise changes (edits[].oldText must match exactly)\\n- When changing multiple separate locations in one file, use one edit call with multiple entries in edits[] instead of multiple edit calls\\n- Each edits[].oldText is matched against the original file, not after earlier edits are applied. Do not emit overlapping or nested edits. Merge nearby changes into one edit.\\n- Keep edits[].oldText as small as possible while still being unique in the file. Do not pad with large unchanged regions.",
+            "- Use edit for targeted changes. Batch changes to one file in a single call.\\n- Each edits[].oldText must exactly and uniquely match the original file. Keep matches short and non-overlapping; merge nearby changes without including large unchanged regions."),
+        ("read only when the user asks about pi itself,", "read only when the user asks about the harness itself,"),
+        ("adding models (docs/models.md), pi packages (docs/packages.md)", "adding models (docs/models.md), packages (docs/packages.md)"),
+        ("\\n- When working on pi topics, read the docs and examples, and follow .md cross-references before implementing\\n- Always read pi .md files completely and follow links to related docs (e.g., tui.md for TUI API details)",
+            "\\n- Before implementing harness changes, read the relevant docs and examples in full, following related cross-references."),
+    ];
+
     private static string FollowPi120(string line)
     {
         foreach (var (old, replacement) in Pi120TextChanges) line = line.Replace(old, replacement, StringComparison.Ordinal);
+        foreach (var (old, replacement) in Pi150TextChanges) line = line.Replace(old, replacement, StringComparison.Ordinal);
         return line;
     }
 

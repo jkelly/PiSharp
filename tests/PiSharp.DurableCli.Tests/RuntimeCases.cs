@@ -225,7 +225,7 @@ internal static partial class Program
             var system = streams.Requests[0].Messages.OfType<JsonObjectValue>().First(message => ScriptedRequest.Role(message) == "system");
             var sections = (JsonObjectValue)system["sections"];
             string Section(string key) => sections.TryGetValue(key, out var value) && value is JsonStringValue text ? text.Value : "";
-            Equal("You are an expert coding assistant operating inside pi, a coding agent harness. You help users by reading files, executing commands, editing code, and writing new files.",
+            Equal("You are a coding assistant running inside pi, a coding agent harness. Help users inspect files, run commands, and modify code.",
                 Section("preamble"), "preamble");
             Check(Section("tools").StartsWith("<tools>\n- read: Read file contents\n- write: Create or overwrite files\n- edit: Make precise", StringComparison.Ordinal) &&
                 Section("tools").Contains("\n- bash: Execute bash commands (ls, grep, find, etc.)", StringComparison.Ordinal) &&

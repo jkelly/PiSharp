@@ -190,7 +190,7 @@ public sealed class SkillResourceSet
         if (visible.Length == 0) return "";
         var lines = new List<string> { "\n\nThe following skills provide specialized instructions for specific tasks.",
             fileReadTool == "read" ? "Use the read tool to load a skill's file when the task matches its description." : "Use bash to load a skill's file when the task matches its description.",
-            "When a skill file references a relative path, resolve it against the skill directory (parent of SKILL.md / dirname of the path) and use that absolute path in tool commands.", "", "<available_skills>" };
+            "Resolve relative paths against the skill's directory (parent of SKILL.md). Use absolute paths in tool calls.", "", "<available_skills>" };
         foreach (var skill in visible)
             lines.AddRange(["  <skill>", $"    <name>{Xml(skill.Name)}</name>", $"    <description>{Xml(skill.Description)}</description>",
                 $"    <location>{Xml(skill.FilePath)}</location>", "  </skill>"]);
