@@ -1,9 +1,10 @@
 // Pi 1.5.0 (authored from the v1.5.0 sources, f9a26365568127461c47a07a37dcb42c140a3ac5): core/compaction/compaction.ts
 // (createSummarizationOptions sets no maxTokens, #9512; generateTurnPrefixSummary appends the /compact instructions, #11058),
 // core/compaction/branch-summarization.ts (generateBranchSummary thinkingLevel; prepareBranchEntries applies the latest context edit
-// per target through projectContextEntry) and core/agent-session.ts navigateTree. The cases are modeled on the upstream tests
-// branch-summarization.test.ts and compaction-summary-reasoning.test.ts; their expectations are authored, never captured from an
-// upstream run.
+// per target through projectContextEntry) and core/agent-session.ts (navigateTree; _omitRecoveryAttempt omits the tool results that
+// answer the omitted message). The cases are modeled on the upstream tests branch-summarization.test.ts,
+// compaction-summary-reasoning.test.ts and regressions/11227-recovery-omits-tool-results.test.ts; their expectations are authored,
+// never captured from an upstream run.
 using System.Collections.Immutable;
 using System.Text.Json;
 using PiSharp.AI;
@@ -21,6 +22,7 @@ internal static partial class Program
         Case("sync150.branch-summary-thinking-level-follows-model-reasoning", BranchSummaryThinkingLevel),
         Case("sync150.branch-entries-apply-context-edits", BranchEntriesApplyContextEdits),
         Case("sync150.tree-summary-carries-thinking-level-and-context-edits", TreeSummaryLevelAndEdits),
+        Case("sync150.recovery-omits-tool-results-with-their-call", RecoveryOmitsToolResults),
     ];
 
     private static async Task SummariesUseModelLimitAndFocusPrefix()
@@ -101,5 +103,26 @@ internal static partial class Program
         Check(request.Prompt.Contains("edited abandoned request", StringComparison.Ordinal), "the replacement is missing from the tree summary");
         Check(!request.Prompt.Contains(new string('y', 100), StringComparison.Ordinal), "the replaced request reached the tree summary");
         Check(!request.Prompt.Contains("[Assistant]: second", StringComparison.Ordinal), "the omitted answer reached the tree summary");
+    }
+
+    // 11227: length-stop recovery omits the truncated call and the result that answers it, so the retried request carries neither.
+    private static async Task RecoveryOmitsToolResults()
+    {
+        await using var f = await CreateAsync(ToolCall("call_truncated") with { StopReason = StopReason.Length }, Response(text: "done"));
+        var summary = new RecordingSummary();
+        f.Session.ConfigureAutomaticCompaction(summary, new(true, 128, 80), contextWindow: 100_000);
+        f.Session.ConfigureAutomaticRecovery(1_000);
+        await f.Session.PromptAsync(new TranscriptEntry("user", JsonData.Parse("""{"role":"user","content":"check status","timestamp":20}""")));
+        await f.Session.WaitForIdleAsync();
+        Equal(2, f.Transport.Requests.Count, "provider requests");
+        Equal(1, summary.Requests.Count(request => request.Kind == SessionSummaryKind.History), "recovery compaction");
+        var edits = f.Session.Snapshot.Log.Entries.Where(entry => entry.Kind == SessionEntryKind.ContextEdit)
+            .Select(entry => f.Session.Snapshot.Log.ById[entry.WireBody.Value.GetProperty("targetId").GetString()!]).ToArray();
+        Check(edits.Select(target => target.WireBody.Value.GetProperty("message").GetProperty("role").GetString()).SequenceEqual(["assistant", "toolResult"]),
+            "omitted roles: " + string.Join(",", edits.Select(target => target.WireBody.Value.GetProperty("message").GetProperty("role").GetString())));
+        var retried = f.Transport.Requests[1].Messages;
+        Check(!retried.Any(message => message.Role == "toolResult"), "the truncated call's result reached the retried request");
+        Check(!retried.Where(message => message.Role == "assistant").Any(message => PiWireJson.ReadMessage(message.WireBody.Value).StopReason == StopReason.Length),
+            "the length-stopped attempt reached the retried request");
     }
 }
