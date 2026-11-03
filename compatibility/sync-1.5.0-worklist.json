@@ -12,26 +12,26 @@
   },
   "rule": "A citation moves to the new commit only when every upstream path it names has the same git object id at both tags. The rest stay on the old commit until their area is re-ported, then move with the port.",
   "summary": {
-    "filesWithOldCommit": 623,
+    "filesWithOldCommit": 569,
     "citations": {
       "repinned": 250,
-      "pending": 557,
+      "pending": 505,
       "unparsed": 17,
-      "nonHeader": 22,
-      "excludedHistorical": 1815,
+      "nonHeader": 18,
+      "excludedHistorical": 1813,
       "releaseDocs": 5
     },
     "files": {
       "repinned": 250,
-      "pending": 554,
+      "pending": 503,
       "historical": 32,
       "releaseDocs": 2,
-      "nonHeader": 21
+      "nonHeader": 18
     },
     "pendingByArea": {
       "ai": {
-        "files": 92,
-        "changeSize": 22406
+        "files": 86,
+        "changeSize": 21499
       },
       "chord": {
         "files": 8,
@@ -42,20 +42,16 @@
         "changeSize": 6709
       },
       "coding-agent-cli": {
-        "files": 61,
-        "changeSize": 4577
+        "files": 47,
+        "changeSize": 3974
       },
       "coding-agent-core": {
-        "files": 121,
-        "changeSize": 12815
-      },
-      "docs": {
-        "files": 2,
-        "changeSize": 70
+        "files": 107,
+        "changeSize": 11543
       },
       "durable": {
-        "files": 165,
-        "changeSize": 59303
+        "files": 166,
+        "changeSize": 60080
       },
       "env": {
         "files": 1,
@@ -66,24 +62,20 @@
         "changeSize": 1238
       },
       "node-bridge": {
-        "files": 23,
-        "changeSize": 1730
+        "files": 12,
+        "changeSize": 1141
       },
       "schemas": {
         "files": 2,
         "changeSize": 254
       },
-      "telemetry": {
-        "files": 1,
-        "changeSize": 30
-      },
       "tools": {
-        "files": 9,
-        "changeSize": 1235
+        "files": 8,
+        "changeSize": 1163
       },
       "tui": {
-        "files": 38,
-        "changeSize": 14324
+        "files": 35,
+        "changeSize": 13933
       }
     }
   },
@@ -734,52 +726,6 @@
         "ai.pi-messages-response-model",
         "ai.bounded-error-text-retention",
         "ai.pi-messages-content-index"
-      ]
-    },
-    {
-      "file": "src/PiSharp.ModelRuntime/Models/ModelResolver.cs",
-      "area": "ai",
-      "areas": [
-        "coding-agent-core",
-        "coding-agent-cli"
-      ],
-      "citations": [
-        {
-          "line": 1,
-          "changed": [
-            "packages/coding-agent/src/core/model-resolver.ts",
-            "packages/coding-agent/src/cli/args.ts",
-            "packages/coding-agent/src/main.ts"
-          ]
-        }
-      ],
-      "upstream": [
-        {
-          "path": "packages/coding-agent/src/core/model-resolver.ts",
-          "status": "changed",
-          "linesChanged": 754
-        },
-        {
-          "path": "packages/coding-agent/src/cli/args.ts",
-          "status": "changed",
-          "linesChanged": 15
-        },
-        {
-          "path": "packages/coding-agent/src/main.ts",
-          "status": "changed",
-          "linesChanged": 27
-        }
-      ],
-      "changeSize": 796,
-      "applicabilityRows": [
-        "core.default-models",
-        "core.default-openai-model",
-        "cli.model-reference-resolution",
-        "cli.model-provider-id-slash",
-        "cli.self-update-command",
-        "core.saved-trust-precedence",
-        "core.package-install-failure-startup",
-        "cli.deleted-cwd-startup"
       ]
     },
     {
@@ -2345,29 +2291,6 @@
       ]
     },
     {
-      "file": "tools/NodeBridge/pi-host/virtual/ai/utils/transcript.mjs",
-      "area": "ai",
-      "citations": [
-        {
-          "line": 1,
-          "changed": [
-            "packages/ai/src/utils/transcript.ts"
-          ]
-        }
-      ],
-      "upstream": [
-        {
-          "path": "packages/ai/src/utils/transcript.ts",
-          "status": "changed",
-          "linesChanged": 68
-        }
-      ],
-      "changeSize": 68,
-      "applicabilityRows": [
-        "ai.transcript-tool-support"
-      ]
-    },
-    {
       "file": "src/PiSharp.AI/Protocols/GoogleGenerativeAI/GoogleRetryPolicy.cs",
       "area": "ai",
       "citations": [
@@ -2811,30 +2734,6 @@
       ]
     },
     {
-      "file": "tools/NodeBridge/pi-host/virtual/ai/utils/json-parse.mjs",
-      "area": "ai",
-      "citations": [
-        {
-          "line": 1,
-          "changed": [
-            "packages/ai/src/utils/json-parse.ts"
-          ]
-        }
-      ],
-      "upstream": [
-        {
-          "path": "packages/ai/src/utils/json-parse.ts",
-          "status": "changed",
-          "linesChanged": 27
-        }
-      ],
-      "changeSize": 27,
-      "applicabilityRows": [
-        "ai.invalid-unicode-escape-repair",
-        "ai.malformed-final-tool-arguments"
-      ]
-    },
-    {
       "file": "src/PiSharp.AI/Protocols/AzureResponses/AzureResponsesRequestFactory.cs",
       "area": "ai",
       "citations": [
@@ -3145,29 +3044,6 @@
       ]
     },
     {
-      "file": "tools/NodeBridge/pi-host/virtual/ai/utils/text.mjs",
-      "area": "ai",
-      "citations": [
-        {
-          "line": 1,
-          "changed": [
-            "packages/ai/src/utils/text.ts"
-          ]
-        }
-      ],
-      "upstream": [
-        {
-          "path": "packages/ai/src/utils/text.ts",
-          "status": "changed",
-          "linesChanged": 10
-        }
-      ],
-      "changeSize": 10,
-      "applicabilityRows": [
-        "ai.bounded-error-text-retention"
-      ]
-    },
-    {
       "file": "samples/Durable.Examples/PacedModels.cs",
       "area": "ai",
       "areas": [
@@ -3383,29 +3259,6 @@
       ]
     },
     {
-      "file": "tools/NodeBridge/pi-host/virtual/ai/auth/types.mjs",
-      "area": "ai",
-      "citations": [
-        {
-          "line": 1,
-          "changed": [
-            "packages/ai/src/auth/types.ts"
-          ]
-        }
-      ],
-      "upstream": [
-        {
-          "path": "packages/ai/src/auth/types.ts",
-          "status": "changed",
-          "linesChanged": 4
-        }
-      ],
-      "changeSize": 4,
-      "applicabilityRows": [
-        "ai.device-code-confirm-options"
-      ]
-    },
-    {
       "file": "src/PiSharp.AI/Protocols/MistralConversations/MistralSimpleHttpSseTransport.cs",
       "area": "ai",
       "areas": [
@@ -3488,29 +3341,6 @@
     },
     {
       "file": "src/PiSharp.CodingAgent/Usage/UsageTotals.cs",
-      "area": "ai",
-      "citations": [
-        {
-          "line": 1,
-          "changed": [
-            "packages/coding-agent/src/core/usage-totals.ts"
-          ]
-        }
-      ],
-      "upstream": [
-        {
-          "path": "packages/coding-agent/src/core/usage-totals.ts",
-          "status": "changed",
-          "linesChanged": 2
-        }
-      ],
-      "changeSize": 2,
-      "applicabilityRows": [
-        "ai.usage-total-from-provider"
-      ]
-    },
-    {
-      "file": "tools/NodeBridge/pi-host/virtual/coding-agent/core/usage-totals.mjs",
       "area": "ai",
       "citations": [
         {
@@ -4131,53 +3961,6 @@
       ]
     },
     {
-      "file": "src/PiSharp.Cli/Interactive/Mode/Components/LoginDialog.cs",
-      "area": "coding-agent-cli",
-      "citations": [
-        {
-          "line": 1,
-          "changed": [
-            "packages/coding-agent/src/modes/interactive/components/login-dialog.ts"
-          ]
-        }
-      ],
-      "upstream": [
-        {
-          "path": "packages/coding-agent/src/modes/interactive/components/login-dialog.ts",
-          "status": "changed",
-          "linesChanged": 130
-        }
-      ],
-      "changeSize": 130,
-      "applicabilityRows": [
-        "cli.login-device-code-actions",
-        "cli.login-dialog-web-urls"
-      ]
-    },
-    {
-      "file": "src/PiSharp.Cli/Interactive/Mode/Components/SessionSelectorSearch.cs",
-      "area": "coding-agent-cli",
-      "citations": [
-        {
-          "line": 1,
-          "changed": [
-            "packages/coding-agent/src/modes/interactive/components/session-selector-search.ts"
-          ]
-        }
-      ],
-      "upstream": [
-        {
-          "path": "packages/coding-agent/src/modes/interactive/components/session-selector-search.ts",
-          "status": "changed",
-          "linesChanged": 112
-        }
-      ],
-      "changeSize": 112,
-      "applicabilityRows": [
-        "cli.resume-search-fields"
-      ]
-    },
-    {
       "file": "src/PiSharp.Cli/Pi/PiPaths.cs",
       "area": "coding-agent-cli",
       "areas": [
@@ -4283,35 +4066,6 @@
       ]
     },
     {
-      "file": "src/PiSharp.Cli/Interactive/Mode/Theme/SyntaxHighlight.cs",
-      "area": "coding-agent-cli",
-      "citations": [
-        {
-          "line": 1,
-          "changed": [
-            "packages/coding-agent/src/utils/syntax-highlight.ts",
-            "packages/coding-agent/src/modes/interactive/theme/theme.ts"
-          ]
-        }
-      ],
-      "upstream": [
-        {
-          "path": "packages/coding-agent/src/utils/syntax-highlight.ts",
-          "status": "changed",
-          "linesChanged": 8
-        },
-        {
-          "path": "packages/coding-agent/src/modes/interactive/theme/theme.ts",
-          "status": "changed",
-          "linesChanged": 64
-        }
-      ],
-      "changeSize": 72,
-      "applicabilityRows": [
-        "cli.highlight-reuse"
-      ]
-    },
-    {
       "file": "src/PiSharp.Cli/Pi/PiSessionPlanner.cs",
       "area": "coding-agent-cli",
       "areas": [
@@ -4384,52 +4138,6 @@
       ]
     },
     {
-      "file": "src/PiSharp.Cli/Interactive/Mode/Theme/Theme.cs",
-      "area": "coding-agent-cli",
-      "citations": [
-        {
-          "line": 1,
-          "changed": [
-            "packages/coding-agent/src/modes/interactive/theme/theme.ts"
-          ]
-        }
-      ],
-      "upstream": [
-        {
-          "path": "packages/coding-agent/src/modes/interactive/theme/theme.ts",
-          "status": "changed",
-          "linesChanged": 64
-        }
-      ],
-      "changeSize": 64,
-      "applicabilityRows": [
-        "cli.highlight-reuse"
-      ]
-    },
-    {
-      "file": "tools/NodeBridge/pi-host/virtual/theme.mjs",
-      "area": "coding-agent-cli",
-      "citations": [
-        {
-          "line": 1,
-          "changed": [
-            "packages/coding-agent/src/modes/interactive/theme/theme.ts"
-          ]
-        }
-      ],
-      "upstream": [
-        {
-          "path": "packages/coding-agent/src/modes/interactive/theme/theme.ts",
-          "status": "changed",
-          "linesChanged": 64
-        }
-      ],
-      "changeSize": 64,
-      "applicabilityRows": [
-        "cli.highlight-reuse"
-      ]
-    },
-    {
       "file": "src/PiSharp.Cli/Interactive/Mode/InteractiveMode.Mcp.cs",
       "area": "coding-agent-cli",
       "citations": [
@@ -4453,29 +4161,6 @@
       "changeSize": 59,
       "applicabilityRows": [
         "cli.selector-page-keys"
-      ]
-    },
-    {
-      "file": "src/PiSharp.Cli/Interactive/Mode/Components/ToolRenderers/Write.cs",
-      "area": "coding-agent-cli",
-      "citations": [
-        {
-          "line": 1,
-          "changed": [
-            "packages/coding-agent/src/core/tools/renderers/write.ts"
-          ]
-        }
-      ],
-      "upstream": [
-        {
-          "path": "packages/coding-agent/src/core/tools/renderers/write.ts",
-          "status": "changed",
-          "linesChanged": 41
-        }
-      ],
-      "changeSize": 41,
-      "applicabilityRows": [
-        "cli.highlight-reuse"
       ]
     },
     {
@@ -4637,30 +4322,6 @@
           ],
           "unchanged": [
             "packages/coding-agent/src/utils/changelog.ts"
-          ]
-        }
-      ],
-      "upstream": [
-        {
-          "path": "packages/coding-agent/src/config.ts",
-          "status": "changed",
-          "linesChanged": 35
-        }
-      ],
-      "changeSize": 35,
-      "applicabilityRows": [
-        "cli.self-update-command",
-        "cli.update-pnpm-ownership"
-      ]
-    },
-    {
-      "file": "tools/NodeBridge/pi-host/virtual/coding-agent/config.mjs",
-      "area": "coding-agent-cli",
-      "citations": [
-        {
-          "line": 1,
-          "changed": [
-            "packages/coding-agent/src/config.ts"
           ]
         }
       ],
@@ -4926,52 +4587,6 @@
       ]
     },
     {
-      "file": "src/PiSharp.Cli/Interactive/Mode/ModelSearch.cs",
-      "area": "coding-agent-cli",
-      "citations": [
-        {
-          "line": 1,
-          "changed": [
-            "packages/coding-agent/src/modes/interactive/model-search.ts"
-          ]
-        }
-      ],
-      "upstream": [
-        {
-          "path": "packages/coding-agent/src/modes/interactive/model-search.ts",
-          "status": "changed",
-          "linesChanged": 23
-        }
-      ],
-      "changeSize": 23,
-      "applicabilityRows": [
-        "cli.model-selector-distinct-names"
-      ]
-    },
-    {
-      "file": "src/PiSharp.Cli/Interactive/Mode/ExternalEditor.cs",
-      "area": "coding-agent-cli",
-      "citations": [
-        {
-          "line": 1,
-          "changed": [
-            "packages/coding-agent/src/modes/interactive/external-editor.ts"
-          ]
-        }
-      ],
-      "upstream": [
-        {
-          "path": "packages/coding-agent/src/modes/interactive/external-editor.ts",
-          "status": "changed",
-          "linesChanged": 22
-        }
-      ],
-      "changeSize": 22,
-      "applicabilityRows": [
-        "cli.external-editor-failures"
-      ]
-    },
-    {
       "file": "src/PiSharp.Cli/Interactive/Mode/Components/UserMessageSelector.cs",
       "area": "coding-agent-cli",
       "citations": [
@@ -5123,53 +4738,7 @@
       ]
     },
     {
-      "file": "src/PiSharp.Cli/Interactive/Mode/Components/ToolRenderers/CodemodeRenderer.cs",
-      "area": "coding-agent-cli",
-      "citations": [
-        {
-          "line": 1,
-          "changed": [
-            "packages/coding-agent/src/extensions/codemode/renderer.ts"
-          ]
-        }
-      ],
-      "upstream": [
-        {
-          "path": "packages/coding-agent/src/extensions/codemode/renderer.ts",
-          "status": "changed",
-          "linesChanged": 14
-        }
-      ],
-      "changeSize": 14,
-      "applicabilityRows": [
-        "cli.highlight-reuse"
-      ]
-    },
-    {
       "file": "src/PiSharp.Cli/Interactive/Mode/Components/CustomEditor.cs",
-      "area": "coding-agent-cli",
-      "citations": [
-        {
-          "line": 1,
-          "changed": [
-            "packages/coding-agent/src/modes/interactive/components/custom-editor.ts"
-          ]
-        }
-      ],
-      "upstream": [
-        {
-          "path": "packages/coding-agent/src/modes/interactive/components/custom-editor.ts",
-          "status": "changed",
-          "linesChanged": 10
-        }
-      ],
-      "changeSize": 10,
-      "applicabilityRows": [
-        "cli.selector-page-keys"
-      ]
-    },
-    {
-      "file": "tools/NodeBridge/pi-host/virtual/coding-agent/modes/interactive/components/custom-editor.mjs",
       "area": "coding-agent-cli",
       "citations": [
         {
@@ -5471,30 +5040,6 @@
       ]
     },
     {
-      "file": "src/PiSharp.Cli/Interactive/Mode/Utilities/ClipboardCommand.cs",
-      "area": "coding-agent-cli",
-      "citations": [
-        {
-          "line": 1,
-          "changed": [
-            "packages/coding-agent/src/utils/clipboard-command.ts"
-          ]
-        }
-      ],
-      "upstream": [
-        {
-          "path": "packages/coding-agent/src/utils/clipboard-command.ts",
-          "status": "changed",
-          "linesChanged": 7
-        }
-      ],
-      "changeSize": 7,
-      "applicabilityRows": [
-        "cli.clipboard-helper-process-group",
-        "cli.wsl-helpers-from-root"
-      ]
-    },
-    {
       "file": "src/PiSharp.Cli/Interactive/Mode/Utilities/BugReport.cs",
       "area": "coding-agent-cli",
       "citations": [
@@ -5521,52 +5066,6 @@
       ]
     },
     {
-      "file": "src/PiSharp.Cli/Interactive/Mode/Utilities/OpenBrowser.cs",
-      "area": "coding-agent-cli",
-      "citations": [
-        {
-          "line": 1,
-          "changed": [
-            "packages/coding-agent/src/utils/open-browser.ts"
-          ]
-        }
-      ],
-      "upstream": [
-        {
-          "path": "packages/coding-agent/src/utils/open-browser.ts",
-          "status": "changed",
-          "linesChanged": 5
-        }
-      ],
-      "changeSize": 5,
-      "applicabilityRows": [
-        "cli.wsl-helpers-from-root"
-      ]
-    },
-    {
-      "file": "src/PiSharp.Cli/Interactive/Mode/Components/ExtensionEditor.cs",
-      "area": "coding-agent-cli",
-      "citations": [
-        {
-          "line": 1,
-          "changed": [
-            "packages/coding-agent/src/modes/interactive/components/extension-editor.ts"
-          ]
-        }
-      ],
-      "upstream": [
-        {
-          "path": "packages/coding-agent/src/modes/interactive/components/extension-editor.ts",
-          "status": "changed",
-          "linesChanged": 4
-        }
-      ],
-      "changeSize": 4,
-      "applicabilityRows": [
-        "cli.external-editor-failures"
-      ]
-    },
-    {
       "file": "src/PiSharp.Cli/Interactive/Mode/Components/SettingsSubmenu.cs",
       "area": "coding-agent-cli",
       "citations": [
@@ -5587,84 +5086,6 @@
       "changeSize": 2,
       "applicabilityRows": [
         "cli.selector-page-keys"
-      ]
-    },
-    {
-      "file": "THIRD-PARTY-NOTICES.md",
-      "area": "coding-agent-core",
-      "areas": [
-        "ai",
-        "schemas",
-        "coding-agent-cli",
-        "durable"
-      ],
-      "citations": [
-        {
-          "line": 114,
-          "changed": [
-            "packages/coding-agent/schemas"
-          ],
-          "unchanged": [
-            "packages/coding-agent/src/modes/interactive/theme/dark.json",
-            "packages/coding-agent/src/modes/interactive/theme/light.json"
-          ]
-        },
-        {
-          "line": 154,
-          "changed": [
-            "packages/durable/src/storage/sqlite/database.ts",
-            "packages/durable/src/storage/sqlite/migrations.ts",
-            "packages/durable/src/storage/sqlite/node.ts",
-            "packages/durable/src/storage/sqlite/storage.ts",
-            "packages/durable/src/storage/sqlite/index.ts"
-          ]
-        }
-      ],
-      "upstream": [
-        {
-          "path": "packages/coding-agent/schemas",
-          "status": "changed",
-          "linesChanged": 229
-        },
-        {
-          "path": "packages/durable/src/storage/sqlite/database.ts",
-          "status": "changed",
-          "linesChanged": 39
-        },
-        {
-          "path": "packages/durable/src/storage/sqlite/migrations.ts",
-          "status": "changed",
-          "linesChanged": 237
-        },
-        {
-          "path": "packages/durable/src/storage/sqlite/node.ts",
-          "status": "changed",
-          "linesChanged": 216
-        },
-        {
-          "path": "packages/durable/src/storage/sqlite/storage.ts",
-          "status": "changed",
-          "linesChanged": 281
-        },
-        {
-          "path": "packages/durable/src/storage/sqlite/index.ts",
-          "status": "changed",
-          "linesChanged": 4
-        }
-      ],
-      "changeSize": 1006,
-      "applicabilityRows": [
-        "ai.openai-responses-mid-convo-effort",
-        "ai.system-one-compat",
-        "schemas.models-schema-descriptions",
-        "schemas.models-schema-pi-schema",
-        "cli.session-share-destination",
-        "cli.extension-changelogs",
-        "cli.self-update-command",
-        "durable.sqlite-chord-drivers",
-        "durable.sqlite-table-prefix",
-        "durable.sqlite-schema-v2",
-        "durable.storage-commit-batches"
       ]
     },
     {
@@ -7914,63 +7335,6 @@
       ]
     },
     {
-      "file": "src/PiSharp.CodingAgent/Export/SessionShare.cs",
-      "area": "coding-agent-core",
-      "areas": [
-        "ai",
-        "coding-agent-cli",
-        "tui"
-      ],
-      "citations": [
-        {
-          "line": 1,
-          "changed": [
-            "packages/coding-agent/src/modes/interactive/session-share.ts",
-            "packages/coding-agent/src/config.ts",
-            "packages/ai/src/providers/radius-config.ts",
-            "packages/tui/src/terminal-image.ts"
-          ],
-          "unchanged": [
-            "packages/coding-agent/src/core/radius.ts",
-            "packages/coding-agent/src/cli/auth-command.ts"
-          ]
-        }
-      ],
-      "upstream": [
-        {
-          "path": "packages/coding-agent/src/modes/interactive/session-share.ts",
-          "status": "changed",
-          "linesChanged": 9
-        },
-        {
-          "path": "packages/coding-agent/src/config.ts",
-          "status": "changed",
-          "linesChanged": 35
-        },
-        {
-          "path": "packages/ai/src/providers/radius-config.ts",
-          "status": "changed",
-          "linesChanged": 3
-        },
-        {
-          "path": "packages/tui/src/terminal-image.ts",
-          "status": "changed",
-          "linesChanged": 20
-        }
-      ],
-      "changeSize": 67,
-      "applicabilityRows": [
-        "cli.session-share-destination",
-        "cli.self-update-command",
-        "cli.update-pnpm-ownership",
-        "ai.models-dev-v2-catalog",
-        "ai.bounded-error-text-retention",
-        "tui.rex-terminal",
-        "tui.orca-kitty-images",
-        "tui.kitty-image-crop-boxed"
-      ]
-    },
-    {
       "file": "tests/PiSharp.CliParity.Tests/ResumeModelCases.cs",
       "area": "coding-agent-core",
       "areas": [
@@ -8221,32 +7585,6 @@
     },
     {
       "file": "tests/PiSharp.CliParity.Tests/SessionFormatCases.cs",
-      "area": "coding-agent-core",
-      "citations": [
-        {
-          "line": 1,
-          "changed": [
-            "packages/coding-agent/src/core/session-manager.ts"
-          ]
-        }
-      ],
-      "upstream": [
-        {
-          "path": "packages/coding-agent/src/core/session-manager.ts",
-          "status": "changed",
-          "linesChanged": 44
-        }
-      ],
-      "changeSize": 44,
-      "applicabilityRows": [
-        "core.windows-path-casing",
-        "core.session-write-failure-rollback",
-        "core.fork-single-file-handle",
-        "core.branch-summary-context-edits"
-      ]
-    },
-    {
-      "file": "tools/NodeBridge/pi-host/virtual/coding-agent/core/session-manager.mjs",
       "area": "coding-agent-core",
       "citations": [
         {
@@ -9013,78 +8351,6 @@
       ]
     },
     {
-      "file": "tools/NodeBridge/pi-host/virtual/coding-agent/core/extensions/types.mjs",
-      "area": "coding-agent-core",
-      "citations": [
-        {
-          "line": 1,
-          "changed": [
-            "packages/coding-agent/src/core/extensions/types.ts"
-          ]
-        }
-      ],
-      "upstream": [
-        {
-          "path": "packages/coding-agent/src/core/extensions/types.ts",
-          "status": "changed",
-          "linesChanged": 30
-        }
-      ],
-      "changeSize": 30,
-      "applicabilityRows": [
-        "core.extension-keybinding-hints",
-        "core.markdown-transform-entry-meta",
-        "core.custom-ui-blocked-status"
-      ]
-    },
-    {
-      "file": "tools/NodeBridge/pi-host/virtual/agent/types.mjs",
-      "area": "coding-agent-core",
-      "citations": [
-        {
-          "line": 1,
-          "changed": [
-            "packages/agent/src/types.ts"
-          ]
-        }
-      ],
-      "upstream": [
-        {
-          "path": "packages/agent/src/types.ts",
-          "status": "changed",
-          "linesChanged": 24
-        }
-      ],
-      "changeSize": 24,
-      "applicabilityRows": [
-        "core.agent-tool-json-schema"
-      ]
-    },
-    {
-      "file": "tools/NodeBridge/pi-host/virtual/coding-agent/core/skills.mjs",
-      "area": "coding-agent-core",
-      "citations": [
-        {
-          "line": 1,
-          "changed": [
-            "packages/coding-agent/src/core/skills.ts"
-          ]
-        }
-      ],
-      "upstream": [
-        {
-          "path": "packages/coding-agent/src/core/skills.ts",
-          "status": "changed",
-          "linesChanged": 21
-        }
-      ],
-      "changeSize": 21,
-      "applicabilityRows": [
-        "core.system-prompt-tightened",
-        "core.windows-path-casing"
-      ]
-    },
-    {
       "file": "tests/PiSharp.CliSync.Tests/OpenCodeSessionCases.cs",
       "area": "coding-agent-core",
       "areas": [
@@ -9231,75 +8497,6 @@
       ]
     },
     {
-      "file": "src/PiSharp.Agent/ToolBatchScheduler.cs",
-      "area": "coding-agent-core",
-      "citations": [
-        {
-          "line": 1,
-          "changed": [
-            "packages/agent/src/agent-loop.ts"
-          ]
-        }
-      ],
-      "upstream": [
-        {
-          "path": "packages/agent/src/agent-loop.ts",
-          "status": "changed",
-          "linesChanged": 10
-        }
-      ],
-      "changeSize": 10,
-      "applicabilityRows": [
-        "core.agent-identity"
-      ]
-    },
-    {
-      "file": "src/PiSharp.Agent/ToolInvoker.cs",
-      "area": "coding-agent-core",
-      "citations": [
-        {
-          "line": 1,
-          "changed": [
-            "packages/agent/src/agent-loop.ts"
-          ]
-        }
-      ],
-      "upstream": [
-        {
-          "path": "packages/agent/src/agent-loop.ts",
-          "status": "changed",
-          "linesChanged": 10
-        }
-      ],
-      "changeSize": 10,
-      "applicabilityRows": [
-        "core.agent-identity"
-      ]
-    },
-    {
-      "file": "src/PiSharp.Agent/ToolResultMessageMaterializer.cs",
-      "area": "coding-agent-core",
-      "citations": [
-        {
-          "line": 1,
-          "changed": [
-            "packages/agent/src/agent-loop.ts"
-          ]
-        }
-      ],
-      "upstream": [
-        {
-          "path": "packages/agent/src/agent-loop.ts",
-          "status": "changed",
-          "linesChanged": 10
-        }
-      ],
-      "changeSize": 10,
-      "applicabilityRows": [
-        "core.agent-identity"
-      ]
-    },
-    {
       "file": "src/PiSharp.Tools/Files/ReadWriteTools.cs",
       "area": "coding-agent-core",
       "citations": [
@@ -9326,124 +8523,6 @@
       "changeSize": 10,
       "applicabilityRows": [
         "core.agent-tool-json-schema"
-      ]
-    },
-    {
-      "file": "tests/PiSharp.Agent.Tests/ToolLoneSurrogateTests.cs",
-      "area": "coding-agent-core",
-      "citations": [
-        {
-          "line": 1,
-          "changed": [
-            "packages/agent/src/agent-loop.ts"
-          ]
-        }
-      ],
-      "upstream": [
-        {
-          "path": "packages/agent/src/agent-loop.ts",
-          "status": "changed",
-          "linesChanged": 10
-        }
-      ],
-      "changeSize": 10,
-      "applicabilityRows": [
-        "core.agent-identity"
-      ]
-    },
-    {
-      "file": "tests/PiSharp.CliParity.Tests/NamelessToolCallCases.cs",
-      "area": "coding-agent-core",
-      "citations": [
-        {
-          "line": 1,
-          "changed": [
-            "packages/agent/src/agent-loop.ts"
-          ]
-        }
-      ],
-      "upstream": [
-        {
-          "path": "packages/agent/src/agent-loop.ts",
-          "status": "changed",
-          "linesChanged": 10
-        }
-      ],
-      "changeSize": 10,
-      "applicabilityRows": [
-        "core.agent-identity"
-      ]
-    },
-    {
-      "file": "tests/PiSharp.ExtensionParity.Tests/CapCases.cs",
-      "area": "coding-agent-core",
-      "citations": [
-        {
-          "line": 1,
-          "changed": [
-            "packages/agent/src/agent.ts"
-          ],
-          "unchanged": [
-            "packages/coding-agent/src/core/extensions/runner.ts"
-          ]
-        }
-      ],
-      "upstream": [
-        {
-          "path": "packages/agent/src/agent.ts",
-          "status": "changed",
-          "linesChanged": 10
-        }
-      ],
-      "changeSize": 10,
-      "applicabilityRows": [
-        "core.agent-identity"
-      ]
-    },
-    {
-      "file": "tools/NodeBridge/pi-host/virtual/agent/agent-loop.mjs",
-      "area": "coding-agent-core",
-      "citations": [
-        {
-          "line": 1,
-          "changed": [
-            "packages/agent/src/agent-loop.ts"
-          ]
-        }
-      ],
-      "upstream": [
-        {
-          "path": "packages/agent/src/agent-loop.ts",
-          "status": "changed",
-          "linesChanged": 10
-        }
-      ],
-      "changeSize": 10,
-      "applicabilityRows": [
-        "core.agent-identity"
-      ]
-    },
-    {
-      "file": "tools/NodeBridge/pi-host/virtual/agent/agent.mjs",
-      "area": "coding-agent-core",
-      "citations": [
-        {
-          "line": 1,
-          "changed": [
-            "packages/agent/src/agent.ts"
-          ]
-        }
-      ],
-      "upstream": [
-        {
-          "path": "packages/agent/src/agent.ts",
-          "status": "changed",
-          "linesChanged": 10
-        }
-      ],
-      "changeSize": 10,
-      "applicabilityRows": [
-        "core.agent-identity"
       ]
     },
     {
@@ -9651,52 +8730,6 @@
       "changeSize": 2,
       "applicabilityRows": [
         "core.html-export-cjk-emphasis"
-      ]
-    },
-    {
-      "file": "src/PiSharp.Cli/docs/llama-cpp.md",
-      "area": "docs",
-      "citations": [
-        {
-          "line": 1,
-          "changed": [
-            "packages/coding-agent/docs/llama-cpp.md"
-          ]
-        }
-      ],
-      "upstream": [
-        {
-          "path": "packages/coding-agent/docs/llama-cpp.md",
-          "status": "changed",
-          "linesChanged": 35
-        }
-      ],
-      "changeSize": 35,
-      "applicabilityRows": [
-        "docs.llama-cpp-setup"
-      ]
-    },
-    {
-      "file": "tests/PiSharp.CliParity.Tests/LlamaCases.cs",
-      "area": "docs",
-      "citations": [
-        {
-          "line": 489,
-          "changed": [
-            "packages/coding-agent/docs/llama-cpp.md"
-          ]
-        }
-      ],
-      "upstream": [
-        {
-          "path": "packages/coding-agent/docs/llama-cpp.md",
-          "status": "changed",
-          "linesChanged": 35
-        }
-      ],
-      "changeSize": 35,
-      "applicabilityRows": [
-        "docs.llama-cpp-setup"
       ]
     },
     {
@@ -10086,6 +9119,56 @@
         "durable.thinking-level-recorded",
         "durable.partial-commit-appends",
         "durable.tool-control-terminate"
+      ]
+    },
+    {
+      "file": "THIRD-PARTY-NOTICES.md",
+      "area": "durable",
+      "citations": [
+        {
+          "line": 158,
+          "changed": [
+            "packages/durable/src/storage/sqlite/database.ts",
+            "packages/durable/src/storage/sqlite/migrations.ts",
+            "packages/durable/src/storage/sqlite/node.ts",
+            "packages/durable/src/storage/sqlite/storage.ts",
+            "packages/durable/src/storage/sqlite/index.ts"
+          ]
+        }
+      ],
+      "upstream": [
+        {
+          "path": "packages/durable/src/storage/sqlite/database.ts",
+          "status": "changed",
+          "linesChanged": 39
+        },
+        {
+          "path": "packages/durable/src/storage/sqlite/migrations.ts",
+          "status": "changed",
+          "linesChanged": 237
+        },
+        {
+          "path": "packages/durable/src/storage/sqlite/node.ts",
+          "status": "changed",
+          "linesChanged": 216
+        },
+        {
+          "path": "packages/durable/src/storage/sqlite/storage.ts",
+          "status": "changed",
+          "linesChanged": 281
+        },
+        {
+          "path": "packages/durable/src/storage/sqlite/index.ts",
+          "status": "changed",
+          "linesChanged": 4
+        }
+      ],
+      "changeSize": 777,
+      "applicabilityRows": [
+        "durable.sqlite-chord-drivers",
+        "durable.sqlite-table-prefix",
+        "durable.sqlite-schema-v2",
+        "durable.storage-commit-batches"
       ]
     },
     {
@@ -15585,37 +14668,6 @@
       ]
     },
     {
-      "file": "tools/NodeBridge/pi-host/virtual/ai/utils/validation.mjs",
-      "area": "node-bridge",
-      "areas": [
-        "ai",
-        "schema",
-        "node-bridge"
-      ],
-      "citations": [
-        {
-          "line": 1,
-          "changed": [
-            "packages/ai/src/utils/validation.ts"
-          ]
-        }
-      ],
-      "upstream": [
-        {
-          "path": "packages/ai/src/utils/validation.ts",
-          "status": "changed",
-          "linesChanged": 341
-        }
-      ],
-      "changeSize": 341,
-      "applicabilityRows": [
-        "ai.malformed-final-tool-arguments",
-        "ai.tool-argument-validation",
-        "schema.unresolved-refs",
-        "bridge.pi-schema-validation"
-      ]
-    },
-    {
       "file": "tools/NodeBridge/pi-host/runtime.mjs",
       "area": "node-bridge",
       "areas": [
@@ -15739,37 +14791,6 @@
       ]
     },
     {
-      "file": "tools/NodeBridge/pi-host/virtual/ai/models.mjs",
-      "area": "node-bridge",
-      "areas": [
-        "ai",
-        "telemetry"
-      ],
-      "citations": [
-        {
-          "line": 1,
-          "changed": [
-            "packages/ai/src/models.ts"
-          ]
-        }
-      ],
-      "upstream": [
-        {
-          "path": "packages/ai/src/models.ts",
-          "status": "changed",
-          "linesChanged": 81
-        }
-      ],
-      "changeSize": 81,
-      "applicabilityRows": [
-        "ai.client-identity",
-        "ai.opencode-session-custom-providers",
-        "ai.usage-total-from-provider",
-        "telemetry.request-option-span",
-        "telemetry.ai-request-tracing"
-      ]
-    },
-    {
       "file": "src/PiSharp.Cli/Extensions/Pi/PiNodeOwner.cs",
       "area": "node-bridge",
       "areas": [
@@ -15886,34 +14907,6 @@
       ]
     },
     {
-      "file": "tools/NodeBridge/pi-host/virtual/coding-agent/utils/paths.mjs",
-      "area": "node-bridge",
-      "areas": [
-        "coding-agent-core",
-        "coding-agent-cli"
-      ],
-      "citations": [
-        {
-          "line": 1,
-          "changed": [
-            "packages/coding-agent/src/utils/paths.ts"
-          ]
-        }
-      ],
-      "upstream": [
-        {
-          "path": "packages/coding-agent/src/utils/paths.ts",
-          "status": "changed",
-          "linesChanged": 46
-        }
-      ],
-      "changeSize": 46,
-      "applicabilityRows": [
-        "core.windows-path-casing",
-        "cli.home-tilde-anchored"
-      ]
-    },
-    {
       "file": "src/PiSharp.Cli/Extensions/Pi/PiNodeRuntime.cs",
       "area": "node-bridge",
       "areas": [
@@ -15996,41 +14989,6 @@
       ]
     },
     {
-      "file": "tools/NodeBridge/pi-host/virtual/ai/types.mjs",
-      "area": "node-bridge",
-      "areas": [
-        "ai",
-        "telemetry"
-      ],
-      "citations": [
-        {
-          "line": 1,
-          "changed": [
-            "packages/ai/src/types.ts"
-          ]
-        }
-      ],
-      "upstream": [
-        {
-          "path": "packages/ai/src/types.ts",
-          "status": "changed",
-          "linesChanged": 38
-        }
-      ],
-      "changeSize": 38,
-      "applicabilityRows": [
-        "ai.malformed-final-tool-arguments",
-        "ai.client-identity",
-        "ai.classifier-image-input",
-        "ai.system-one-compat",
-        "ai.tool-argument-validation",
-        "ai.usage-total-from-provider",
-        "ai.pi-messages-response-model",
-        "ai.openrouter-reported-cost",
-        "telemetry.request-option-span"
-      ]
-    },
-    {
       "file": "tools/NodeBridge/pi-host/loader-hooks.mjs",
       "area": "node-bridge",
       "areas": [
@@ -16104,80 +15062,6 @@
       ]
     },
     {
-      "file": "tools/NodeBridge/pi-host/virtual/agent/proxy.mjs",
-      "area": "node-bridge",
-      "citations": [
-        {
-          "line": 1,
-          "changed": [
-            "packages/agent/src/proxy.ts"
-          ]
-        }
-      ],
-      "upstream": [
-        {
-          "path": "packages/agent/src/proxy.ts",
-          "status": "changed",
-          "linesChanged": 22
-        }
-      ],
-      "changeSize": 22,
-      "applicabilityRows": [
-        "bridge.stream-proxy-incremental-args"
-      ]
-    },
-    {
-      "file": "tools/NodeBridge/pi-host/virtual/coding-agent/core/source-info.mjs",
-      "area": "node-bridge",
-      "areas": [
-        "coding-agent-core",
-        "coding-agent-cli"
-      ],
-      "citations": [
-        {
-          "line": 1,
-          "changed": [
-            "packages/coding-agent/src/core/source-info.ts"
-          ]
-        }
-      ],
-      "upstream": [
-        {
-          "path": "packages/coding-agent/src/core/source-info.ts",
-          "status": "changed",
-          "linesChanged": 22
-        }
-      ],
-      "changeSize": 22,
-      "applicabilityRows": [
-        "core.windows-path-casing",
-        "cli.extension-changelogs"
-      ]
-    },
-    {
-      "file": "tools/NodeBridge/pi-host/virtual/coding-agent/core/tools/tool-definition-wrapper.mjs",
-      "area": "node-bridge",
-      "citations": [
-        {
-          "line": 1,
-          "changed": [
-            "packages/coding-agent/src/core/tools/tool-definition-wrapper.ts"
-          ]
-        }
-      ],
-      "upstream": [
-        {
-          "path": "packages/coding-agent/src/core/tools/tool-definition-wrapper.ts",
-          "status": "changed",
-          "linesChanged": 21
-        }
-      ],
-      "changeSize": 21,
-      "applicabilityRows": [
-        "bridge.pi-ai-extension-view"
-      ]
-    },
-    {
       "file": "src/PiSharp.Cli/Extensions/Pi/PiExtensionHost.cs",
       "area": "node-bridge",
       "areas": [
@@ -16211,68 +15095,6 @@
       ]
     },
     {
-      "file": "tools/NodeBridge/pi-host/virtual/ai/index.mjs",
-      "area": "node-bridge",
-      "areas": [
-        "ai",
-        "node-bridge"
-      ],
-      "citations": [
-        {
-          "line": 1,
-          "changed": [
-            "packages/ai/src/index.ts"
-          ]
-        }
-      ],
-      "upstream": [
-        {
-          "path": "packages/ai/src/index.ts",
-          "status": "changed",
-          "linesChanged": 9
-        }
-      ],
-      "changeSize": 9,
-      "applicabilityRows": [
-        "ai.client-identity",
-        "ai.tool-argument-validation",
-        "ai.streaming-json-parser",
-        "bridge.drop-assistant-message-frame",
-        "bridge.pi-schema-validation"
-      ]
-    },
-    {
-      "file": "tools/NodeBridge/pi-host/virtual/ai/providers/faux.mjs",
-      "area": "node-bridge",
-      "areas": [
-        "ai",
-        "node-bridge"
-      ],
-      "citations": [
-        {
-          "line": 1,
-          "changed": [
-            "packages/ai/src/providers/faux.ts"
-          ]
-        }
-      ],
-      "upstream": [
-        {
-          "path": "packages/ai/src/providers/faux.ts",
-          "status": "changed",
-          "linesChanged": 9
-        }
-      ],
-      "changeSize": 9,
-      "applicabilityRows": [
-        "ai.streaming-json-parser",
-        "ai.faux-partial-tool-arguments",
-        "ai.models-dev-v2-catalog",
-        "ai.tool-call-args-incremental",
-        "bridge.faux-cache-write-tokens"
-      ]
-    },
-    {
       "file": "tools/NodeBridge/pi-host/virtual/pi-coding-agent.mjs",
       "area": "node-bridge",
       "areas": [
@@ -16299,52 +15121,6 @@
         "core.extension-keybinding-hints",
         "core.package-install-failure-startup",
         "tools.read-line-range-labels"
-      ]
-    },
-    {
-      "file": "tools/NodeBridge/pi-host/virtual/ai/utils/assistant-message-frame.mjs",
-      "area": "node-bridge",
-      "citations": [
-        {
-          "line": 1,
-          "changed": [
-            "packages/ai/src/utils/assistant-message-frame.ts"
-          ]
-        }
-      ],
-      "upstream": [
-        {
-          "path": "packages/ai/src/utils/assistant-message-frame.ts",
-          "status": "deleted"
-        }
-      ],
-      "changeSize": 0,
-      "applicabilityRows": [
-        "bridge.drop-assistant-message-frame"
-      ]
-    },
-    {
-      "file": "tools/NodeBridge/pi-host/virtual/ai/utils/typebox-helpers.mjs",
-      "area": "node-bridge",
-      "citations": [
-        {
-          "line": 1,
-          "changed": [
-            "packages/ai/src/utils/typebox-helpers.ts"
-          ]
-        }
-      ],
-      "upstream": [
-        {
-          "path": "packages/ai/src/utils/typebox-helpers.ts",
-          "status": "renamed",
-          "renamedTo": "packages/ai/src/utils/string-enum.ts"
-        }
-      ],
-      "changeSize": 0,
-      "applicabilityRows": [
-        "bridge.pi-schema-validation",
-        "bridge.pi-ai-extension-view"
       ]
     },
     {
@@ -16398,29 +15174,6 @@
       "applicabilityRows": [
         "schemas.models-schema-descriptions",
         "schemas.models-schema-pi-schema"
-      ]
-    },
-    {
-      "file": "tools/NodeBridge/pi-host/virtual/ai/api/lazy.mjs",
-      "area": "telemetry",
-      "citations": [
-        {
-          "line": 1,
-          "changed": [
-            "packages/ai/src/api/lazy.ts"
-          ]
-        }
-      ],
-      "upstream": [
-        {
-          "path": "packages/ai/src/api/lazy.ts",
-          "status": "changed",
-          "linesChanged": 30
-        }
-      ],
-      "changeSize": 30,
-      "applicabilityRows": [
-        "telemetry.ai-request-tracing"
       ]
     },
     {
@@ -16617,31 +15370,6 @@
         "tools.grep-no-config",
         "tools.grep-lone-cr-context",
         "tools.image-resize-smaller-encoding"
-      ]
-    },
-    {
-      "file": "tools/NodeBridge/pi-host/virtual/coding-agent/utils/shell.mjs",
-      "area": "tools",
-      "citations": [
-        {
-          "line": 1,
-          "changed": [
-            "packages/coding-agent/src/utils/shell.ts"
-          ]
-        }
-      ],
-      "upstream": [
-        {
-          "path": "packages/coding-agent/src/utils/shell.ts",
-          "status": "changed",
-          "linesChanged": 72
-        }
-      ],
-      "changeSize": 72,
-      "applicabilityRows": [
-        "tools.windows-store-shell-aliases",
-        "tools.windows-shell-install-dirs",
-        "tools.macos-stop-group-before-kill"
       ]
     },
     {
@@ -17844,63 +16572,6 @@
       ]
     },
     {
-      "file": "tools/NodeBridge/pi-host/virtual/tui/components/markdown.mjs",
-      "area": "tui",
-      "citations": [
-        {
-          "line": 1,
-          "changed": [
-            "packages/tui/src/components/markdown.ts"
-          ]
-        }
-      ],
-      "upstream": [
-        {
-          "path": "packages/tui/src/components/markdown.ts",
-          "status": "changed",
-          "linesChanged": 219
-        }
-      ],
-      "changeSize": 219,
-      "applicabilityRows": [
-        "tui.unclosed-display-math",
-        "tui.cjk-emphasis",
-        "tui.display-math-raw-fallback",
-        "tui.markdown-block-reuse",
-        "tui.bare-url-cjk-punctuation",
-        "tui.nested-blockquote-linear"
-      ]
-    },
-    {
-      "file": "src/PiSharp.Cli/Interactive/Mode/Components/AssistantMessage.cs",
-      "area": "tui",
-      "areas": [
-        "coding-agent-core",
-        "coding-agent-cli"
-      ],
-      "citations": [
-        {
-          "line": 1,
-          "changed": [
-            "packages/coding-agent/src/modes/interactive/components/assistant-message.ts"
-          ]
-        }
-      ],
-      "upstream": [
-        {
-          "path": "packages/coding-agent/src/modes/interactive/components/assistant-message.ts",
-          "status": "changed",
-          "linesChanged": 131
-        }
-      ],
-      "changeSize": 131,
-      "applicabilityRows": [
-        "core.markdown-transform-entry-meta",
-        "cli.highlight-reuse",
-        "cli.hidden-thinking-empty-label"
-      ]
-    },
-    {
       "file": "src/PiSharp.Cli/Interactive/Mode/Components/SettingsSelector.cs",
       "area": "tui",
       "areas": [
@@ -18188,42 +16859,6 @@
       "applicabilityRows": [
         "core.windows-path-casing",
         "cli.home-tilde-anchored"
-      ]
-    },
-    {
-      "file": "src/PiSharp.Cli/Interactive/Mode/Components/MarkdownTransform.cs",
-      "area": "tui",
-      "areas": [
-        "coding-agent-core",
-        "coding-agent-cli"
-      ],
-      "citations": [
-        {
-          "line": 1,
-          "changed": [
-            "packages/coding-agent/src/modes/interactive/components/markdown-transform.ts",
-            "packages/coding-agent/src/core/extensions/types.ts"
-          ]
-        }
-      ],
-      "upstream": [
-        {
-          "path": "packages/coding-agent/src/modes/interactive/components/markdown-transform.ts",
-          "status": "changed",
-          "linesChanged": 11
-        },
-        {
-          "path": "packages/coding-agent/src/core/extensions/types.ts",
-          "status": "changed",
-          "linesChanged": 30
-        }
-      ],
-      "changeSize": 41,
-      "applicabilityRows": [
-        "core.markdown-transform-entry-meta",
-        "cli.highlight-reuse",
-        "core.extension-keybinding-hints",
-        "core.custom-ui-blocked-status"
       ]
     },
     {
@@ -18677,7 +17312,7 @@
       "file": "tests/PiSharp.McpSync.Tests/Program.cs",
       "area": "mcp",
       "kind": "suite-label",
-      "line": 54,
+      "line": 55,
       "handling": "test-report baseline label; move it when the suite's area is re-ported and the suite passes against the new baseline"
     },
     {
@@ -18734,27 +17369,6 @@
       "kind": "suite-label",
       "line": 18,
       "handling": "test-report baseline label; move it when the suite's area is re-ported and the suite passes against the new baseline"
-    },
-    {
-      "file": "tools/NodeBridge/pi-host/virtual/port-upstream.mjs",
-      "area": "node-bridge",
-      "kind": "node-bridge",
-      "occurrences": 2,
-      "handling": "generator COMMIT constant; regenerate the compatibility modules against the new tag"
-    },
-    {
-      "file": "tools/NodeBridge/pi-host/virtual/selftest.mjs",
-      "area": "node-bridge",
-      "kind": "node-bridge",
-      "line": 153,
-      "handling": "selftest writes the upstream-exports.json snapshot with the generator's commit; move it with the regenerated modules"
-    },
-    {
-      "file": "tools/NodeBridge/pi-host/virtual/upstream-exports.json",
-      "area": "node-bridge",
-      "kind": "node-bridge",
-      "occurrences": 1,
-      "handling": "export snapshot of the old tag; regenerated with port-upstream.mjs"
     }
   ],
   "releaseDocs": [
@@ -18832,7 +17446,7 @@
     },
     {
       "file": "compatibility/sync-1.5.0-worklist.json",
-      "occurrences": 20,
+      "occurrences": 18,
       "reason": "names the commit the v1.5.0 sync starts from"
     },
     {
