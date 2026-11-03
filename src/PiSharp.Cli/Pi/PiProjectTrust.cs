@@ -36,7 +36,9 @@ internal sealed class ProjectTrustStore
         var current = NormalizeCwd(cwd);
         while (true)
         {
-            if (data.TryGetValue(current, out var value) && value is { } decision) return new ProjectTrustStoreEntry(current, decision);
+            // A key saved with other casing names the same folder on Windows.
+            foreach (var key in FindTrustFileKeys(data, current))
+                if (data[key] is { } decision) return new ProjectTrustStoreEntry(key, decision);
             var parent = Path.GetDirectoryName(current);
             if (parent is null || parent == current) return null;
             current = parent;
@@ -51,11 +53,16 @@ internal sealed class ProjectTrustStore
         foreach (var update in decisions)
         {
             var key = NormalizeCwd(update.Path);
-            if (update.Decision is null) data.Remove(key); else data[key] = update.Decision;
+            foreach (var existing in FindTrustFileKeys(data, key)) data.Remove(existing);
+            if (update.Decision is not null) data[key] = update.Decision;
         }
         WriteTrustFile(data);
         return 0;
     });
+
+    /// <summary>Source findTrustFileKeys: the keys naming <paramref name="path"/>; several on Windows when saved with other casing.</summary>
+    private static List<string> FindTrustFileKeys(Dictionary<string, bool?> data, string path) =>
+        [.. data.Keys.Where(key => PiPaths.PathsEqual(key, path))];
 
     /// <summary>Source readTrustFile, with its error texts.</summary>
     private Dictionary<string, bool?> ReadTrustFile()
@@ -106,7 +113,7 @@ internal sealed class ProjectTrustStore
         while (true)
         {
             var agentsSkills = Path.Join(current, ".agents", "skills");
-            if (agentsSkills != userAgentsSkills && Path.Exists(agentsSkills)) return true;
+            if (!PiPaths.PathsEqual(agentsSkills, userAgentsSkills) && Path.Exists(agentsSkills)) return true;
             var parent = Path.GetDirectoryName(current);
             if (parent is null || parent == current) return false;
             current = parent;

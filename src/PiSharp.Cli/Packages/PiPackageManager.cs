@@ -509,7 +509,7 @@ internal sealed class PiPackageManager
     {
         PiNpmSource npm => $"npm:{npm.Name}",
         PiGitSource git => $"git:{git.Host}/{git.Path}",
-        PiLocalSource local => $"local:{ResolvePath(local.Path)}",
+        PiLocalSource local => $"local:{PiPaths.ComparisonKey(ResolvePath(local.Path))}",
         _ => source
     };
 
@@ -517,7 +517,7 @@ internal sealed class PiPackageManager
     {
         PiNpmSource npm => $"npm:{npm.Name}",
         PiGitSource git => $"git:{git.Host}/{git.Path}",
-        PiLocalSource local => $"local:{ResolvePathFromBase(local.Path, GetBaseDirForScope(scope))}",
+        PiLocalSource local => $"local:{PiPaths.ComparisonKey(ResolvePathFromBase(local.Path, GetBaseDirForScope(scope)))}",
         _ => source
     };
 
@@ -561,7 +561,8 @@ internal sealed class PiPackageManager
     {
         PiNpmSource npm => $"npm:{npm.Name}",
         PiGitSource git => $"git:{git.Host}/{git.Path}",
-        PiLocalSource local => scope is not null ? $"local:{ResolvePathFromBase(local.Path, GetBaseDirForScope(scope))}" : $"local:{ResolvePath(local.Path)}",
+        PiLocalSource local => scope is not null ? $"local:{PiPaths.ComparisonKey(ResolvePathFromBase(local.Path, GetBaseDirForScope(scope)))}"
+            : $"local:{PiPaths.ComparisonKey(ResolvePath(local.Path))}",
         _ => source
     };
 
@@ -1213,7 +1214,7 @@ internal sealed class PiPackageManager
         var userAgentsSkillsDir = Path.Join(home, ".agents", "skills");
         var projectTrusted = settings.ProjectTrusted;
         var projectAgentsSkillDirs = projectTrusted
-            ? CollectAncestorAgentsSkillDirs(cwd).Where(directory => Path.GetFullPath(directory) != Path.GetFullPath(userAgentsSkillsDir)).ToList() : [];
+            ? CollectAncestorAgentsSkillDirs(cwd).Where(directory => !PiPaths.PathsEqual(directory, userAgentsSkillsDir)).ToList() : [];
 
         void Add(string resourceType, List<string> paths, PiPathMetadata metadata, List<string> overrides, string baseDir)
         {
@@ -1284,7 +1285,7 @@ internal sealed class PiPackageManager
             var seen = new HashSet<string>(StringComparer.Ordinal);
             return [.. accumulator.Maps[type].Select(pair => new PiResolvedResource(pair.Key, pair.Value.Enabled, pair.Value.Metadata))
                 .OrderBy(resource => ResourcePrecedenceRank(resource.Metadata))
-                .Where(resource => seen.Add(resource.Path.StartsWith(BuiltinPathPrefix, StringComparison.Ordinal) ? resource.Path : PiPaths.Canonicalize(resource.Path)))];
+                .Where(resource => seen.Add(PiSharp.Cli.Extensions.Pi.PiSourceInfo.ResourcePathKey(resource.Path)))];
         }
         return new(Map("extensions"), Map("skills"), Map("prompts"), Map("themes"));
     }

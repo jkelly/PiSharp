@@ -182,9 +182,10 @@ internal static class InteractiveModeHost
         var directory = startup.Host.CurrentSession?.Path is { } current ? Path.GetDirectoryName(current)! : startup.SessionDir ?? Path.GetDirectoryName(path)!;
         Directory.CreateDirectory(directory);
         var target = Path.Join(directory, Path.GetFileName(path));
-        if (File.Exists(target) && !string.Equals(Path.GetFullPath(target), Path.GetFullPath(path), OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal))
-            target = Path.Join(directory, $"{Path.GetFileNameWithoutExtension(path)}-{Guid.NewGuid():N}.jsonl");
-        if (!string.Equals(Path.GetFullPath(target), Path.GetFullPath(path), StringComparison.Ordinal)) File.Copy(path, target);
+        // agent-session-runtime.ts: a file already in the session directory (with any casing on Windows) is not copied onto itself.
+        var alreadyStored = PiPaths.PathsEqual(target, path);
+        if (!alreadyStored && File.Exists(target)) target = Path.Join(directory, $"{Path.GetFileNameWithoutExtension(path)}-{Guid.NewGuid():N}.jsonl");
+        if (!alreadyStored) File.Copy(path, target);
         return target;
     }
 

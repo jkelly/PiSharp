@@ -118,6 +118,30 @@ internal static partial class PiPaths
     internal static bool SameOrWithin(string root, string target) =>
         string.Equals(Path.TrimEndingDirectorySeparator(root), Path.TrimEndingDirectorySeparator(target), Comparison) || Within(root, target);
 
+    /// <summary>Source getPathComparisonKey: the resolved absolute path, lowercased on Windows, where <c>c:\Users</c> and <c>C:\Users</c>
+    /// are the same directory (per-directory NTFS case sensitivity is ignored). No filesystem access: canonicalize first when links must
+    /// compare equal. For comparison only, never for display or file access.</summary>
+    internal static string ComparisonKey(string path)
+    {
+        string resolved;
+        try { resolved = Path.TrimEndingDirectorySeparator(Path.GetFullPath(path)); }
+        catch (Exception error) when (error is ArgumentException or NotSupportedException or PathTooLongException) { resolved = path; }
+        return Windows ? resolved.ToLowerInvariant() : resolved;
+    }
+
+    /// <summary>Source pathsEqual: both paths name the same location (<see cref="ComparisonKey"/>).</summary>
+    internal static bool PathsEqual(string left, string right) => ComparisonKey(left) == ComparisonKey(right);
+
+    /// <summary>Source isPathWithin: <paramref name="child"/> is <paramref name="parent"/> or inside it, by whole segments
+    /// (<see cref="ComparisonKey"/>).</summary>
+    internal static bool IsPathWithin(string parent, string child)
+    {
+        var parentKey = ComparisonKey(parent); var childKey = ComparisonKey(child);
+        if (childKey == parentKey) return true;
+        // Filesystem roots (/, C:\) already end with a separator.
+        return childKey.StartsWith(parentKey.EndsWith(Path.DirectorySeparatorChar) ? parentKey : parentKey + Path.DirectorySeparatorChar, StringComparison.Ordinal);
+    }
+
     /// <summary>Strips one leading UTF-8 byte order mark (source stripBom).</summary>
     internal static string StripBom(string text) => text.Length > 0 && text[0] == '\ufeff' ? text[1..] : text;
 

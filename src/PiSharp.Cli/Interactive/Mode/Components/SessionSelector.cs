@@ -125,7 +125,7 @@ internal sealed class SessionList : IComponent, IFocusable, IInputHandler
     private readonly TuiKeybindingsManager keybindings;
     private bool showPath;
     private string? confirmingDeletePath;
-    private readonly string? currentSessionCanonicalPath;
+    private readonly string? currentSessionPathKey;
     public Action<string>? OnSelect { get; set; }
     public Action? OnCancel { get; set; }
     public Action OnExit { get; set; } = () => { };
@@ -156,7 +156,7 @@ internal sealed class SessionList : IComponent, IFocusable, IInputHandler
         this.sortMode = sortMode;
         this.nameFilter = nameFilter;
         this.keybindings = keybindings;
-        currentSessionCanonicalPath = CanonicalizePath(currentSessionFilePath);
+        currentSessionPathKey = SessionPathKey(currentSessionFilePath);
         FilterSessions("");
 
         // Handle Enter in search input - select current item
@@ -166,7 +166,8 @@ internal sealed class SessionList : IComponent, IFocusable, IInputHandler
         };
     }
 
-    private static string? CanonicalizePath(string? path) => string.IsNullOrEmpty(path) ? path : PiPaths.Canonicalize(path);
+    /// <summary>Comparison key for a session file path; follows symlinks and ignores case on Windows.</summary>
+    private static string? SessionPathKey(string? path) => string.IsNullOrEmpty(path) ? path : PiPaths.ComparisonKey(PiPaths.Canonicalize(path));
 
     public void SetSortMode(SortMode sortMode)
     {
@@ -200,16 +201,16 @@ internal sealed class SessionList : IComponent, IFocusable, IInputHandler
         var byPath = new Dictionary<string, SessionTreeNode>(StringComparer.Ordinal);
         foreach (var session in sessions)
         {
-            var sessionPath = CanonicalizePath(session.Path) ?? session.Path;
+            var sessionPath = SessionPathKey(session.Path) ?? session.Path;
             byPath[sessionPath] = new SessionTreeNode(session, session.Modified.ToUnixTimeMilliseconds());
         }
 
         var roots = new List<SessionTreeNode>();
         foreach (var session in sessions)
         {
-            var sessionPath = CanonicalizePath(session.Path) ?? session.Path;
+            var sessionPath = SessionPathKey(session.Path) ?? session.Path;
             var node = byPath[sessionPath];
-            var parentPath = CanonicalizePath(session.ParentSessionPath);
+            var parentPath = SessionPathKey(session.ParentSessionPath);
             if (!string.IsNullOrEmpty(parentPath) && byPath.TryGetValue(parentPath, out var parent)) parent.Children.Add(node);
             else roots.Add(node);
         }
@@ -297,8 +298,8 @@ internal sealed class SessionList : IComponent, IFocusable, IInputHandler
 
     private bool IsCurrentSessionPath(string path)
     {
-        if (string.IsNullOrEmpty(currentSessionCanonicalPath)) return false;
-        return (CanonicalizePath(path) ?? path) == currentSessionCanonicalPath;
+        if (string.IsNullOrEmpty(currentSessionPathKey)) return false;
+        return (SessionPathKey(path) ?? path) == currentSessionPathKey;
     }
 
     public void Invalidate() { }

@@ -34,7 +34,28 @@ internal static partial class Program
         ("sync150.glob-brace-expansion-is-bounded", Sync(GlobBraceAmplification)),
         ("sync150.glob-amplified-wildcards-and-globstars-answer-at-once", Sync(GlobWildcardAmplification)),
         ("sync150.trust-saved-decision-reaches-extensions", SavedTrustReachesExtensions),
+        ("sync150.package-local-identity-ignores-case-on-windows", PackageLocalIdentityCasing),
     ];
+
+    // package-manager.ts getSourceMatchKeyForInput, getSourceMatchKeyForSettings and getPackageIdentity (1be312b46): a local package
+    // matches with other casing on Windows (remove c:\pkg removes the configured C:\pkg) and stays case-sensitive elsewhere; resolved
+    // resources are deduplicated by getResourcePathKey.
+    private static async Task PackageLocalIdentityCasing()
+    {
+        using var sandbox = new Sandbox("pkg-casing");
+        var windows = OperatingSystem.IsWindows();
+        var package = Path.Combine(sandbox.Root, "LocalPkg");
+        sandbox.Write(Path.Combine(package, "extensions", "index.ts"), "export default function () {}");
+        var settingsPath = sandbox.Write(Path.Combine(sandbox.AgentDir, "settings.json"), Jstr(new { packages = new[] { package } }));
+        var manager = Manager(sandbox, J(File.ReadAllText(settingsPath)));
+        Equal(windows, manager.GetPackageIdentity(package, "user") == manager.GetPackageIdentity(Path.Combine(sandbox.Root, "localpkg"), "user"), "identity");
+        var resolved = await Manager(sandbox, J(Jstr(new { packages = new[] { package }, extensions = new[] { Path.Combine(sandbox.Root, "localpkg", "extensions", "index.ts") } }))).ResolveAsync();
+        // Elsewhere the result depends on the filesystem's own case sensitivity.
+        if (windows) Equal(1, resolved.Extensions.Length, "one extension file under two casings: " + string.Join(", ", resolved.Extensions.Select(e => e.Path)));
+        var (code, _, stderr) = await sandbox.Run("remove", Path.Combine(sandbox.Root, "localpkg"));
+        Equal(windows ? 0 : 1, code, "remove with other casing; " + stderr);
+        Equal(windows ? 0 : 1, JsonNode.Parse(File.ReadAllText(settingsPath))!["packages"]!.AsArray().Count, "the configured package is removed on Windows only");
+    }
 
     // main.ts createRuntime and project-trust.ts (31ade0e0d, test/project-trust-saved-decision.test.ts): for a project without
     // trust-requiring resources, ctx.isProjectTrusted() reports a saved "Do not trust", and auto-trust when nothing is saved.

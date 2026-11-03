@@ -159,7 +159,7 @@ internal static partial class PiSessions
         return null;
     }
 
-    private static bool CwdMatches(string? cwd, string resolvedCwd) => !string.IsNullOrEmpty(cwd) && Path.GetFullPath(cwd) == resolvedCwd;
+    private static bool CwdMatches(string? cwd, string resolvedCwd) => !string.IsNullOrEmpty(cwd) && PiPaths.PathsEqual(Path.GetFullPath(cwd), resolvedCwd);
 
     /// <summary>Source findMostRecentSession: the newest <c>.jsonl</c> by modification time with a valid header (matching the cwd when one is given).</summary>
     internal static string? FindMostRecentSession(string sessionDir, string? cwd)
@@ -178,7 +178,7 @@ internal static partial class PiSessions
     }
 
     private static bool FilterCwd(string? sessionDir, string dir, string cwd, string agentDir) =>
-        sessionDir is not null && !PiPaths.Comparer.Equals(dir, DefaultSessionDirectoryPath(cwd, agentDir));
+        sessionDir is not null && !PiPaths.PathsEqual(dir, DefaultSessionDirectoryPath(cwd, agentDir));
 
     private static string Directory_(string cwd, string? sessionDir, string agentDir) =>
         sessionDir is not null ? sessionDir : DefaultSessionDirectory(cwd, agentDir);
