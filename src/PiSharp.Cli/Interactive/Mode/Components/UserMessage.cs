@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): coding-agent/src/modes/interactive/components/user-message.ts.
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): coding-agent/src/modes/interactive/components/user-message.ts.
 using PiSharp.Tui.Pi;
 using static PiSharp.Cli.Interactive.Mode.ThemeGlobals;
 
@@ -15,9 +15,14 @@ internal sealed class UserMessageComponent : Container
     private readonly MarkdownTheme markdownTheme;
     private int outputPad;
     private readonly IReadOnlyList<MarkdownTransformer> markdownTransformers;
+    private readonly string? messageId;
+    private readonly string? timestamp;
 
-    public UserMessageComponent(string text, MarkdownTheme? markdownTheme = null, int outputPad = 1, IReadOnlyList<MarkdownTransformer>? markdownTransformers = null)
+    public UserMessageComponent(string text, MarkdownTheme? markdownTheme = null, int outputPad = 1, IReadOnlyList<MarkdownTransformer>? markdownTransformers = null,
+        string? messageId = null, string? timestamp = null)
     {
+        this.messageId = messageId;
+        this.timestamp = timestamp;
         this.text = text;
         this.markdownTheme = markdownTheme ?? Themes.GetMarkdownTheme();
         this.outputPad = outputPad;
@@ -45,7 +50,7 @@ internal sealed class UserMessageComponent : Container
             new MarkdownOptions(
                 PreserveOrderedListMarkers: true,
                 PreserveBackslashEscapes: true,
-                Transform: MarkdownTransform.CreateMarkdownTransform(MarkdownMessageType.User, false, markdownTransformers))));
+                Transform: MarkdownTransform.CreateMarkdownTransform(MarkdownMessageType.User, false, markdownTransformers, messageId, timestamp))));
     }
 
     public override List<string> Render(int width)

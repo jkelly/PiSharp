@@ -15,15 +15,20 @@ internal static class MarkdownMessageType
 /// <param name="MessageType">"user" | "assistant" | "assistant-thinking" (<see cref="MarkdownMessageType"/>).</param>
 /// <param name="IsStreaming">Whether the message is still streaming.</param>
 /// <param name="AvailableWidth">Content width the Markdown is rendered at.</param>
-internal sealed record MarkdownTransformContext(string MessageType, bool IsStreaming, int AvailableWidth);
+/// <param name="MessageId">Persisted session-entry id. Null for live messages or live rendering; set when rendering from persisted
+/// session entries (Pi 1.5.0).</param>
+/// <param name="Timestamp">Persisted session-entry ISO timestamp, under the same rule as <paramref name="MessageId"/>.</param>
+internal sealed record MarkdownTransformContext(string MessageType, bool IsStreaming, int AvailableWidth, string? MessageId = null, string? Timestamp = null);
 
 /// <summary>Rewrites Markdown before rendering. A null result keeps the current Markdown (upstream ignores non-string results).</summary>
 internal delegate string? MarkdownTransformer(string markdown, MarkdownTransformContext context);
 
 internal static class MarkdownTransform
 {
-    public static Func<string, int, string> CreateMarkdownTransform(string messageType, bool isStreaming, IReadOnlyList<MarkdownTransformer> transformers) =>
-        (markdown, availableWidth) => ApplyMarkdownTransformers(markdown, new MarkdownTransformContext(messageType, isStreaming, availableWidth), transformers);
+    public static Func<string, int, string> CreateMarkdownTransform(string messageType, bool isStreaming, IReadOnlyList<MarkdownTransformer> transformers,
+        string? messageId = null, string? timestamp = null) =>
+        (markdown, availableWidth) => ApplyMarkdownTransformers(markdown, new MarkdownTransformContext(messageType, isStreaming, availableWidth, messageId, timestamp),
+            transformers);
 
     private static string ApplyMarkdownTransformers(string markdown, MarkdownTransformContext context, IReadOnlyList<MarkdownTransformer> transformers)
     {
