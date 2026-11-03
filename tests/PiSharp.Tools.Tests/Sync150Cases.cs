@@ -38,13 +38,17 @@ internal static class Sync150Cases
             }
 
             var message = result.ErrorMessage!;
+            var expected = item.GetProperty("expected");
+            // A schema that refers to itself in place ({"$ref":"#"}) checks without end: JavaScript's RangeError, then as now.
+            if (message == "Maximum call stack size exceeded" && expected.TryGetProperty("errorType", out var type) && type.GetString() == "RangeError"
+                && expected.GetProperty("error").GetString() == message)
+                continue;
             var header = $"Validation failed for tool \"{name}\":\n";
             var split = message.IndexOf("\n\nReceived arguments:\n", StringComparison.Ordinal);
             if (!message.StartsWith(header, StringComparison.Ordinal) || split < 0) { failures.Add($"{name} {args}: {message}"); continue; }
             var lines = message[header.Length..split].Split('\n');
             if (lines.Any(line => !line.StartsWith("  - ", StringComparison.Ordinal) || !line.Contains(": ", StringComparison.Ordinal) || line.Length <= 6))
                 failures.Add($"{name} {args}: error lines {message[header.Length..split]}");
-            var expected = item.GetProperty("expected");
             if (!expected.GetProperty("ok").GetBoolean() && expected.GetProperty("error").GetString() is { } before && before.IndexOf("\n\nReceived arguments:\n", StringComparison.Ordinal) is var at and >= 0
                 && before[at..] != message[split..])
                 failures.Add($"{name} {args}: received arguments {message[split..]} instead of {before[at..]}");
