@@ -86,6 +86,10 @@ function runtimeExports(file, seen = new Set()) {
 const ENTRIES = {
 	"pi-tui.mjs": ["tui/src/index.ts"],
 	"pi-ai.mjs": ["ai/src/compat.ts", "ai/src/index.ts"],
+	// Pi 1.5.0: extensions import the pi-ai root and compat entry as the coding agent's extension view (compat plus TypeBox's Type
+	// and a TypeBox StringEnum); the view's `export * from "@earendil-works/pi-ai/compat"` is the two pi-ai entries above.
+	"pi-ai-extension-view.mjs": ["ai/src/compat.ts", "ai/src/index.ts", "coding-agent/src/core/extensions/pi-ai-extension-view.ts"],
+	"pi-ai-models.mjs": ["ai/src/models.ts"],
 	"pi-ai-oauth.mjs": ["ai/src/oauth.ts"],
 	"pi-ai-providers.mjs": ["ai/src/providers/all.ts"],
 	"pi-agent-core.mjs": ["agent/src/index.ts"],
@@ -113,6 +117,8 @@ for (const file of [
 	"typebox-value.mjs",
 	"pi-tui.mjs",
 	"pi-ai.mjs",
+	"pi-ai-extension-view.mjs",
+	"pi-ai-models.mjs",
 	"pi-ai-oauth.mjs",
 	"pi-ai-providers.mjs",
 	"pi-agent-core.mjs",
@@ -135,7 +141,7 @@ await test("index.json maps every upstream virtual specifier to an existing shim
 		"@sinclair/typebox/value",
 	];
 	for (const scope of ["@earendil-works", "@mariozechner"]) {
-		for (const name of ["pi-agent-core", "pi-tui", "pi-ai", "pi-ai/compat", "pi-ai/oauth", "pi-ai/providers/all", "pi-coding-agent"]) {
+		for (const name of ["pi-agent-core", "pi-tui", "pi-ai", "pi-ai/compat", "pi-ai/models", "pi-ai/oauth", "pi-ai/providers/all", "pi-coding-agent"]) {
 			required.push(`${scope}/${name}`);
 		}
 	}
@@ -150,7 +156,7 @@ const coverage = [];
 const expected = expectedExports();
 if (args.includes("--write-snapshot")) {
 	assert.ok(expected.source.startsWith("upstream"), "--write-snapshot needs --upstream <dir>");
-	fs.writeFileSync(snapshotPath, `${JSON.stringify({ commit: "06a466935536f8c9bcacb2d5efc0fc021be1bdff", exports: expected.exports }, null, "\t")}\n`);
+	fs.writeFileSync(snapshotPath, `${JSON.stringify({ commit: "f9a26365568127461c47a07a37dcb42c140a3ac5", exports: expected.exports }, null, "\t")}\n`);
 	console.log(`wrote ${snapshotPath}`);
 }
 for (const [mod, names] of Object.entries(expected.exports)) {
@@ -472,6 +478,10 @@ await test("(c) Type.Object with Optional produces the TypeBox JSON shape", () =
 		enum: ["x", "y"],
 		description: "d",
 	});
+	// Pi 1.5.0: the extension view's StringEnum is a TypeBox schema (Type.Unsafe) with the same JSON shape.
+	const viewEnum = mods["pi-ai-extension-view.mjs"].StringEnum(["x", "y"], { description: "d" });
+	assert.deepEqual(JSON.parse(JSON.stringify(viewEnum)), { type: "string", enum: ["x", "y"], description: "d" });
+	assert.equal(mods["pi-ai-extension-view.mjs"].Type, Type);
 });
 
 await test("(c) validator accepts/rejects samples with TypeBox-style errors", () => {
@@ -510,7 +520,9 @@ await test("(c) pi-ai validateToolArguments coerces and reports like upstream", 
 	const ai = mods["pi-ai.mjs"];
 	const tool = { name: "t", description: "", parameters: Type.Object({ count: Type.Number(), flag: Type.Optional(Type.Boolean()) }) };
 	assert.deepEqual(ai.validateToolArguments(tool, { id: "1", name: "t", arguments: { count: "3", flag: "false" } }), { count: 3, flag: false });
-	assert.throws(() => ai.validateToolArguments(tool, { id: "1", name: "t", arguments: {} }), /Validation failed for tool "t":\n {2}- count: must have required properties count/);
+	// Pi 1.5.0 validates with pi-schema: errors name the property and end with the arguments received.
+	assert.throws(() => ai.validateToolArguments(tool, { id: "1", name: "t", arguments: {} }), /^Error: Validation failed for tool "t":\n {2}- count: missing\n\nReceived arguments:\n\{\}$/);
+	assert.throws(() => ai.validateToolArguments(tool, { id: "1", name: "t", arguments: { count: "many" } }), /- count: expected number, got string\n\nReceived arguments:\n\{\n {2}"count": "many"\n\}$/);
 });
 
 // ---------------------------------------------------------------------------------------------
@@ -639,7 +651,7 @@ await test("pi-coding-agent: defineTool, guards, truncation, frontmatter, config
 	assert.equal(fm.body, "Body text");
 	assert.equal(ca.stripFrontmatter("---\na: 1\n---\nrest"), "rest");
 	assert.equal(ca.CONFIG_DIR_NAME, ".pi");
-	assert.equal(ca.VERSION, "1.2.0");
+	assert.equal(ca.VERSION, "1.5.0");
 	const previous = process.env.PI_CODING_AGENT_DIR;
 	process.env.PI_CODING_AGENT_DIR = path.join(here, "agent-dir-test");
 	assert.equal(ca.getAgentDir(), path.join(here, "agent-dir-test"));
@@ -769,6 +781,155 @@ await test("(1.2.0) themes: built-in $schema URL and strict theme JSON validatio
 });
 
 // ---------------------------------------------------------------------------------------------
+// Pi 1.5.0 behaviour carried by the regenerated modules
+// ---------------------------------------------------------------------------------------------
+
+await test("(1.5.0) pi-ai drops the assistant message frame API and TypeBox; the extension view adds Type and StringEnum back", () => {
+	const ai = mods["pi-ai.mjs"];
+	for (const name of ["AssistantMessageFrameEncoder", "reduceAssistantMessageFrames", "Type"]) assert.ok(!(name in ai), name);
+	assert.ok(!fs.existsSync(path.join(here, "ai/utils/assistant-message-frame.mjs")));
+	const view = mods["pi-ai-extension-view.mjs"];
+	assert.equal(view.Type, tb.Type);
+	assert.equal(view.complete, ai.complete, "the view re-exports pi-ai's compat entry");
+	const index = JSON.parse(fs.readFileSync(path.join(here, "index.json"), "utf8"));
+	for (const scope of ["@earendil-works", "@mariozechner"]) {
+		assert.equal(index[`${scope}/pi-ai`], "pi-ai-extension-view.mjs");
+		assert.equal(index[`${scope}/pi-ai/compat`], "pi-ai-extension-view.mjs");
+		assert.equal(index[`${scope}/pi-ai/models`], "pi-ai-models.mjs");
+	}
+});
+
+await test("(1.5.0) pi-ai/models: clampThinkingLevel and createModels load for extensions", () => {
+	const models = mods["pi-ai-models.mjs"];
+	const model = { id: "m", api: "faux", provider: "p", reasoning: true, thinkingLevelMap: { minimal: null, xhigh: null } };
+	assert.equal(models.clampThinkingLevel(model, "xhigh"), "high");
+	assert.equal(models.clampThinkingLevel({ ...model, reasoning: false }, "high"), "off");
+	assert.equal(typeof models.createModels().getProviders, "function");
+});
+
+await test("(1.5.0) pi-schema: compile coerces and reports errors at the property", async () => {
+	const schema = await import(pathToFileURL(path.join(here, "schema/index.mjs")).href);
+	const validator = schema.compile({ type: "object", properties: { n: { type: "number" }, s: { type: "string", format: "email" } }, required: ["n"] }, { coerce: true, formats: (await import(pathToFileURL(path.join(here, "schema/formats/index.mjs")).href)).formats });
+	const parsed = validator.parse({ n: "4" });
+	assert.ok(parsed.ok);
+	assert.deepEqual(parsed.value, { n: 4 });
+	const failed = validator.parse({ s: "nope" });
+	assert.ok(!failed.ok);
+	assert.deepEqual(failed.errors.map((error) => error.path).sort(), ["/n", "/s"]);
+});
+
+await test("(1.5.0) faux provider: with a session every prompt token is a cache read or a cache write", async () => {
+	const ai = mods["pi-ai.mjs"];
+	const registration = ai.registerFauxProvider();
+	try {
+		registration.setResponses([ai.fauxAssistantMessage("a"), ai.fauxAssistantMessage("b"), ai.fauxAssistantMessage("c")]);
+		const options = { sessionId: "session-1", cacheRetention: "short" };
+		const user = (content) => ({ role: "user", content, timestamp: 1 });
+		// "user:hello world" is 16 characters (4 tokens); with "user:next" the joined prompt is 27 (7 tokens).
+		const first = await ai.complete(registration.getModel(), { messages: [user("hello world")] }, options);
+		assert.deepEqual([first.usage.input, first.usage.cacheRead, first.usage.cacheWrite], [0, 0, 4]);
+		const extended = await ai.complete(registration.getModel(), { messages: [user("hello world"), user("next")] }, options);
+		assert.deepEqual([extended.usage.input, extended.usage.cacheRead, extended.usage.cacheWrite], [0, 4, 3]);
+		const uncached = await ai.complete(registration.getModel(), { messages: [user("hello world")] }, { sessionId: "s", cacheRetention: "none" });
+		assert.deepEqual([uncached.usage.input, uncached.usage.cacheRead, uncached.usage.cacheWrite], [4, 0, 0]);
+	} finally {
+		registration.unregister();
+	}
+});
+
+await test("(1.5.0) streamProxy parses tool-call arguments incrementally, off the content block", async () => {
+	const core = mods["pi-agent-core.mjs"];
+	const usage = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } };
+	const content = 'line "quoted" \\ end\n'.repeat(2_000);
+	const text = JSON.stringify({ path: "a.ts", content });
+	const events = [{ type: "start" }, { type: "toolcall_start", contentIndex: 0, id: "call_1", toolName: "write" }];
+	for (let index = 0; index < text.length; index += 32) events.push({ type: "toolcall_delta", contentIndex: 0, delta: text.slice(index, index + 32) });
+	events.push({ type: "toolcall_end", contentIndex: 0, toolCall: { type: "toolCall", id: "call_1", name: "write", arguments: { path: "a.ts", content } } }, { type: "done", reason: "toolUse", usage });
+	const original = globalThis.fetch;
+	globalThis.fetch = async () => new Response(events.map((event) => `data: ${JSON.stringify(event)}\n\n`).join(""), { status: 200 });
+	try {
+		const stream = core.streamProxy({ id: "m", api: "faux", provider: "faux" }, { messages: [] }, { authToken: "t", proxyUrl: "http://127.0.0.1:9" });
+		let deltas = 0;
+		for await (const event of stream) {
+			if (event.type !== "toolcall_delta") continue;
+			deltas++;
+			assert.deepEqual(Object.keys(event.partial.content[0]).sort(), ["arguments", "id", "name", "type"]);
+		}
+		assert.ok(deltas > 100);
+		assert.deepEqual((await stream.result()).content, [{ type: "toolCall", id: "call_1", name: "write", arguments: { path: "a.ts", content } }]);
+	} finally {
+		globalThis.fetch = original;
+	}
+	const args = new mods["pi-ai.mjs"].ToolCallArgumentsStream();
+	assert.deepEqual(args.append('{"path":"a'), { path: "a" });
+	assert.deepEqual(args.append('.txt","n":1}'), { path: "a.txt", n: 1 });
+});
+
+await test("(1.5.0) agent identity: requests carry the caller's identity and PiSharp adds no attribution", async () => {
+	const core = mods["pi-agent-core.mjs"];
+	const ai = mods["pi-ai.mjs"];
+	assert.deepEqual(core.DEFAULT_AGENT_IDENTITY, {});
+	const model = { id: "m", name: "m", api: "faux", provider: "faux", baseUrl: "", reasoning: false, input: ["text"], cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, contextWindow: 1000, maxTokens: 100 };
+	const identities = [];
+	const streamFn = (_model, _context, options) => {
+		identities.push(options.identity);
+		const s = ai.createAssistantMessageEventStream();
+		const msg = { role: "assistant", content: [{ type: "text", text: "ok" }], api: "faux", provider: "faux", model: "m", usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } }, stopReason: "stop", timestamp: 0 };
+		queueMicrotask(() => s.push({ type: "done", reason: "stop", message: msg }));
+		return s;
+	};
+	await new core.Agent({ initialState: { model, systemPrompt: "", tools: [] }, streamFn }).prompt("hi");
+	const agent = new core.Agent({ initialState: { model, systemPrompt: "", tools: [] }, streamFn, identity: { userAgent: "ext/1.0" } });
+	await agent.prompt("hi");
+	agent.identity = { attribution: { name: "ext" } };
+	await agent.prompt("again");
+	assert.deepEqual(identities, [{}, { userAgent: "ext/1.0" }, { attribution: { name: "ext" } }]);
+});
+
+await test("(1.5.0) Markdown: CJK-friendly emphasis next to CJK punctuation; CommonMark flanking elsewhere", () => {
+	const plain = (s) => s;
+	const theme = { heading: plain, link: plain, linkUrl: plain, code: plain, codeBlock: plain, codeBlockBorder: plain, quote: plain, quoteBorder: plain, hr: plain, listBullet: plain, bold: (s) => `<b>${s}</b>`, italic: (s) => `<i>${s}</i>`, strikethrough: plain, underline: plain };
+	const render = (source) => new tui.Markdown(source, 0, 0, theme).render(80).map((line) => strip(line).trimEnd());
+	assert.deepEqual(render("**这是测试。**后面"), ["<b>这是测试。</b>后面"]);
+	assert.deepEqual(render("字**「引用」**字"), ["字<b>「引用」</b>字"]);
+	assert.deepEqual(render("*斜体。*后面"), ["<i>斜体。</i>后面"]);
+	assert.deepEqual(render("**end.**Then next"), ["**end.**Then next"]);
+	assert.deepEqual(render("**bold *italic* bold** and `*code*` \\*x\\*"), ["<b>bold <i>italic</i> bold</b> and *code* *x*"]);
+	assert.deepEqual(render("a_b_c and _x_"), ["a_b_c and <i>x</i>"]);
+});
+
+await test("(1.5.0) Markdown: orphan display math before a table, raw fallback, deep quotes, bare URLs at CJK punctuation, block reuse", () => {
+	const plain = (s) => s;
+	const theme = { heading: plain, link: plain, linkUrl: plain, code: plain, codeBlock: plain, codeBlockBorder: plain, quote: plain, quoteBorder: plain, hr: plain, listBullet: plain, bold: plain, italic: plain, strikethrough: plain, underline: plain };
+	const render = (source, width = 80) => new tui.Markdown(source, 0, 0, theme).render(width).map((line) => strip(line).trimEnd());
+	const table = ["| A | B |", "|---|---|", "| 1 | 2 |"];
+	const renderedTable = ["┌───┬───┐", "│ A │ B │", "├───┼───┤", "│ 1 │ 2 │", "└───┴───┘"];
+	assert.deepEqual(render(["Intro", "", "$$", "", ...table, "", "After"].join("\n")), ["Intro", "", "$$", "", ...renderedTable, "", "After"]);
+	assert.deepEqual(render(["$$", "a", "+ b", "$$", "", ...table].join("\n")), ["a + b", "", ...renderedTable]);
+	const wide = ["\\[", String.raw`\frac{\partial^2 u}{\partial x^2} + \frac{\partial^2 u}{\partial y^2} = \sum_{i=1}^{n} \frac{1}{i^2} + \int_0^1 f(x)\,dx`, "\\]"].join("\n");
+	const narrow = render(wide, 30);
+	assert.deepEqual([narrow[0], narrow.at(-1)], ["\\[", "\\]"]);
+	assert.ok(!narrow.some((line) => line.includes("─")) && narrow.every((line) => line.length <= 30));
+	const quoted = new tui.Markdown(`${">".repeat(60)}x`, 1, 0, theme).render(80).map((line) => strip(line).trimEnd());
+	assert.equal(quoted.length, 1);
+	assert.ok(quoted[0].endsWith("x"));
+	tui.setCapabilities({ images: null, trueColor: false, hyperlinks: true });
+	try {
+		const output = new tui.Markdown("https://example.com/中文?q=搜索。后面的中文", 0, 0, theme).render(160).join("");
+		assert.ok(output.includes("\x1b]8;;https://example.com/中文?q=搜索\x1b\\"));
+		assert.ok(output.replace(/\x1b\[[0-9;]*m/g, "").includes("\x1b]8;;\x1b\\。后面的中文"));
+	} finally {
+		tui.resetCapabilitiesCache();
+	}
+	const calls = [];
+	const markdown = new tui.Markdown("```ts\nx\n```", 0, 0, { ...theme, highlightCode: (code, lang) => (calls.push(`${lang}:${code}`), code.split("\n")) });
+	markdown.render(80);
+	markdown.setText("```ts\nx\n```\n\nafter");
+	markdown.render(40);
+	assert.deepEqual(calls, ["ts:x"]);
+});
+
+// ---------------------------------------------------------------------------------------------
 // The installed Pi npm packages (--packages): every runtime export of the package entry points that
 // extensions import exists on the matching shim, and the shims identify as the installed version.
 // Runs last: importing the real coding agent initializes its own globals.
@@ -777,6 +938,8 @@ await test("(1.2.0) themes: built-in $schema URL and strict theme JSON validatio
 const PACKAGE_ENTRIES = {
 	"pi-tui.mjs": ["@earendil-works/pi-tui"],
 	"pi-ai.mjs": ["@earendil-works/pi-ai/compat", "@earendil-works/pi-ai"],
+	"pi-ai-extension-view.mjs": ["@earendil-works/pi-ai/compat", "@earendil-works/pi-ai"],
+	"pi-ai-models.mjs": ["@earendil-works/pi-ai/models"],
 	"pi-ai-oauth.mjs": ["@earendil-works/pi-ai/oauth"],
 	"pi-ai-providers.mjs": ["@earendil-works/pi-ai/providers/all"],
 	"pi-agent-core.mjs": ["@earendil-works/pi-agent-core"],
