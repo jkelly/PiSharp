@@ -190,7 +190,8 @@ internal static class CompletionsRequestFactoryTests
         Check(!projected[0].TryGetProperty("reasoning_content", out _), "Structured reasoning was duplicated as raw reasoning text.");
         var cross = request with { Model = new("other", "openai-completions", "openai") };
         var other = new CompletionsTranscriptProjector().Project(cross).Value;
-        Equal("PrivateAnswer", other[0].GetProperty("content").GetString()); Check(!other[0].TryGetProperty("reasoning_details", out _), "Cross-model reasoning signature leaked.");
+        // Pi 1.5.0 transformMessages drops thinking from another model (1.2.0 folded readable thinking into the text).
+        Equal("Answer", other[0].GetProperty("content").GetString()); Check(!other[0].TryGetProperty("reasoning_details", out _), "Cross-model reasoning signature leaked.");
         var schema = Request(E("""{"role":"system","content":"","toolsAdded":[{"name":"a","description":"A","parameters":{"type":"object","properties":{"value":{"type":"number","minimum":0.5},"opaque":{"x-num":1e400}},"x-unknown":{"wide":9007199254740993,"keep":null}}}],"timestamp":0}"""));
         var raw = schema.Messages[0].WireBody.ToString(); var plain = new CompletionsToolDeclarationProjector().Project(schema).Value[0].GetProperty("function");
         Equal("0.5", plain.GetProperty("parameters").GetProperty("properties").GetProperty("value").GetProperty("minimum").GetRawText());

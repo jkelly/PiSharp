@@ -58,7 +58,8 @@ internal static partial class Program
             var body = JsonDocument.Parse(requests[index].Body!).RootElement;
             Equal(expected[index], body.GetProperty("messages").GetRawText(), "messages " + index);
             Equal("""{"type":"adaptive","display":"summarized","block_binding":{"prefix_mismatch_behavior":"drop_block"}}""", body.GetProperty("thinking").GetRawText(), "thinking " + index);
-            Equal("""{"effort":"high"}""", body.GetProperty("output_config").GetRawText(), "output_config " + index);
+            // Pi 1.5.0 fixes the top-level effort at "low" (it was "high" in 1.2.0); the markers carry the level.
+            Equal("""{"effort":"low"}""", body.GetProperty("output_config").GetRawText(), "output_config " + index);
             Check(!body.TryGetProperty("temperature", out _), "temperature sent");
             Equal("mid-conversation-output-config-2026-07-01,thinking-binding-controls-2026-08-01", requests[index].Headers["anthropic-beta"], "betas " + index);
         }
@@ -67,7 +68,7 @@ internal static partial class Program
             .Select(record => record.Value.GetProperty("message").GetProperty("providerThinkingLevel").GetString()).ToArray();
         Names(["low", "max"], levels!, "providerThinkingLevel");
 
-        // The summary route carries no level metadata and runs thinking off: a managed model still sends managed "high" effort
+        // The summary route carries no level metadata and runs thinking off: a managed model still sends a managed "high" marker (under the fixed top-level "low")
         // (buildParams ignores thinkingEnabled for it), an unmanaged model keeps its disabled thinking, and an unmanaged model whose
         // thinkingLevelMap.off is null (claude-fable-5) sends no thinking field at all.
         const string managed = """{"type":"adaptive","display":"summarized","block_binding":{"prefix_mismatch_behavior":"drop_block"}}""";

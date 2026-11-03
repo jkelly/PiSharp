@@ -95,7 +95,7 @@ foreach (var observation in root.GetProperty("observations").EnumerateArray())
             var eventJsonMatches = publicationJson.Count == expectedEmissions.Length && publicationJson.Select((text, index) =>
                 JsonElement.DeepEquals(JsonData.Parse(text).Value, JsonData.Parse(expectedEmissions[index].GetProperty("serializedJson").GetString()!).Value)).All(value => value);
             using var body = JsonDocument.Parse(handler.Body!);
-            var bodyMatches = JsonElement.DeepEquals(expected.GetProperty("bodyJson"), body.RootElement);
+            var bodyMatches = JsonElement.DeepEquals(Pi150Body(id, expected.GetProperty("bodyJson")), body.RootElement);
             var affinityNames = new[] { "x-session-id", "session_id", "x-client-request-id", "x-session-affinity", "x-bound" };
             var expectedHeaders = expected.GetProperty("headers").EnumerateArray().ToDictionary(item => item[0].GetString()!, item => item[1].GetString()!, StringComparer.OrdinalIgnoreCase);
             var affinityMatches = affinityNames.All(name => expectedHeaders.GetValueOrDefault(name) == handler.Headers.GetValueOrDefault(name));
@@ -136,6 +136,17 @@ Console.WriteLine($"Completions anchored tools: {passed} passed, {failed} failed
 return failed == 0 ? 0 : 1;
 
 static TranscriptEntry Entry(JsonElement body) => new(body.GetProperty("role").GetString()!, JsonData.FromElement(body));
+// An authored Pi 1.5.0 delta over the capture, not a capture: transform-messages.ts now drops thinking from another model, so the
+// captured d86654ab body's text-converted foreign thought is gone and that tool-calling assistant message has null content.
+static JsonElement Pi150Body(string id, JsonElement captured)
+{
+    if (id != "cross-model-call-and-thinking-before-addition") return captured;
+    var node = System.Text.Json.Nodes.JsonNode.Parse(captured.GetRawText())!;
+    foreach (var message in node["messages"]!.AsArray())
+        if ((string?)message!["role"] == "assistant" && message["content"] is System.Text.Json.Nodes.JsonValue value &&
+            value.TryGetValue<string>(out var text) && text == "Prior signed thought.") message["content"] = null;
+    return JsonDocument.Parse(node.ToJsonString()).RootElement.Clone();
+}
 static object Identity(Assembly assembly) { var file = assembly.Location; var data = File.ReadAllBytes(file); return new { path = file, bytes = data.Length, sha256 = Convert.ToHexStringLower(SHA256.HashData(data)), productVersion = assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion }; }
 sealed class TrackedContent(byte[] bytes) : ByteArrayContent(bytes)
 { internal int Disposals; protected override void Dispose(bool disposing) { if (disposing) Disposals++; base.Dispose(disposing); } }

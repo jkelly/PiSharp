@@ -231,9 +231,9 @@ static class AnthropicMessagesRequestTests
         var cross = Assistant([new ThinkingContent("", Signature("signed")), new ThinkingContent("cross", Signature("sig")),
             new ThinkingContent("hidden", Signature("cipher", true)), new ToolCallContent("call|item", "read", JsonData.Parse("{\"x\":null}"))], "other-model");
         var output = Project(Request(cross, Result("call|item"))).Value.GetProperty("messages");
-        Equal(2, output[0].GetProperty("content").GetArrayLength()); Equal("cross", output[0].GetProperty("content")[0].GetProperty("text").GetString());
-        Equal("call_item", output[0].GetProperty("content")[1].GetProperty("id").GetString()); Equal("call_item", output[1].GetProperty("content")[0].GetProperty("tool_use_id").GetString());
-        Assert(!output[0].GetProperty("content")[0].TryGetProperty("signature", out _), "Cross-model signature leaked.");
+        // Pi 1.5.0 transformMessages drops every thinking block from another model (1.2.0 converted readable ones to text).
+        Equal(1, output[0].GetProperty("content").GetArrayLength()); Equal("tool_use", output[0].GetProperty("content")[0].GetProperty("type").GetString());
+        Equal("call_item", output[0].GetProperty("content")[0].GetProperty("id").GetString()); Equal("call_item", output[1].GetProperty("content")[0].GetProperty("tool_use_id").GetString());
         var failed = Project(Request(Assistant([new TextContent("failed")], reason: StopReason.Error), Entry("""{"role":"user","content":"retry"}"""))).Value;
         Equal(1, failed.GetProperty("messages").GetArrayLength()); Equal("retry", failed.GetProperty("messages")[0].GetProperty("content").GetString());
         return Task.CompletedTask;
@@ -268,8 +268,11 @@ static class AnthropicMessagesRequestTests
         Equal(2, downgraded[0].GetProperty("content").GetArrayLength()); Equal("(image omitted: model does not support images)", downgraded[0].GetProperty("content")[0].GetProperty("text").GetString());
         Equal("(tool image omitted: model does not support images)", downgraded[2].GetProperty("content")[0].GetProperty("content").GetString());
         var mixed = Entry("""{"role":"toolResult","toolCallId":"image","content":[{"type":"text","text":""},{"type":"image","mimeType":"image/gif","data":"Aw=="}],"isError":true}""");
-        var mixedContent = Project(Request(tool, mixed)).Value.GetProperty("messages")[1].GetProperty("content")[0].GetProperty("content");
-        Equal("", mixedContent[0].GetProperty("text").GetString()); Equal(2, mixedContent.GetArrayLength());
+        // Pi 1.5.0 (#10794): an error result keeps only text, with a note where its images were; the caption and images follow the results.
+        var mixedBlocks = Project(Request(tool, mixed)).Value.GetProperty("messages")[1].GetProperty("content");
+        Equal(3, mixedBlocks.GetArrayLength()); Equal("\n(image attached after the tool results)", mixedBlocks[0].GetProperty("content").GetString());
+        Equal("Images from the error result of tool call image (undefined):", mixedBlocks[1].GetProperty("text").GetString());
+        Equal("Aw==", mixedBlocks[2].GetProperty("source").GetProperty("data").GetString());
         return Task.CompletedTask;
     }
 
