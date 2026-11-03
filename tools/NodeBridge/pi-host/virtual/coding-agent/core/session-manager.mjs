@@ -220,7 +220,9 @@ export function buildContextEntries(entries, leafId, byId) {
     contextEntries.push(...path.slice(compactionIdx + 1));
     return contextEntries;
 }
-function projectContextEntry(entry, edit) {
+/** Project one entry into model-visible messages, applying its latest context edit if any. */
+// Pi 1.5.0 exports it for branch summarization (prepareBranchEntries).
+export function projectContextEntry(entry, edit) {
     const messages = sessionEntryToContextMessages(entry);
     if (!edit) return messages;
     const replacement = edit.replacement;
@@ -720,10 +722,21 @@ export class SessionManager {
         }
     }
     _appendEntry(entry) {
+        // Pi 1.5.0: a failed write (ENOSPC, EBUSY, ETIMEDOUT) rolls the entry back.
+        const previousLeafId = this.leafId;
         this.fileEntries.push(entry);
         this.byId.set(entry.id, entry);
         this.leafId = entry.id;
-        this._persist(entry);
+        try {
+            this._persist(entry);
+        } catch (error) {
+            // Keep memory in line with the file: an entry that was not written must not become the
+            // parent of later entries, or the file would hold entries pointing to a missing parent.
+            this.fileEntries.pop();
+            this.byId.delete(entry.id);
+            this.leafId = previousLeafId;
+            throw error;
+        }
     }
     appendMessage(message) {
         const entry = {
@@ -1200,13 +1213,18 @@ export class SessionManager {
             cwd: resolvedTargetCwd,
             parentSession: resolvedSourcePath
         };
-        writeFileSync(newSessionFile, `${JSON.stringify(newHeader)}\n`, {
-            flag: "wx"
-        });
-        for (const entry of sourceEntries){
-            if (entry.type !== "session") {
-                appendFileSync(newSessionFile, `${JSON.stringify(entry)}\n`);
+        // Pi 1.5.0: write the header and all non-header entries through one fd.
+        // Reopening the file per entry is slow where open/close is expensive (e.g. filesystem security monitors).
+        const fd = openSync(newSessionFile, "wx");
+        try {
+            writeFileSync(fd, `${JSON.stringify(newHeader)}\n`);
+            for (const entry of sourceEntries){
+                if (entry.type !== "session") {
+                    writeFileSync(fd, `${JSON.stringify(entry)}\n`);
+                }
             }
+        } finally {
+            closeSync(fd);
         }
         return new SessionManager(resolvedTargetCwd, dir, newSessionFile, true);
     }
