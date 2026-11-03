@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/test/llama-extension.test.ts, ported against
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/coding-agent/test/llama-extension.test.ts, ported against
 // packages/coding-agent/src/extensions/llama/{client,provider,huggingface}.ts, plus the built-in provider's integration in the model
 // registry (auth check/resolve, the persisted catalog, the live chat route and the classifier registry).
 using System.Collections.Immutable;

@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/src/codemode/output.ts.
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/src/codemode/output.ts.
 // - Text and image items are pi-ai content blocks as durable wire JSON: {type: "text", text} and {type: "image", data, mimeType}.
 // - A script's result is PiSharp.Codemode's CodemodeResult: its value is JSON (null for undefined) and its output items CodemodeTextOutput and
 //   CodemodeImageOutput. `JSON.stringify(value)` of the returned value is the durable JsonValue's JSON text, which prints JSON as

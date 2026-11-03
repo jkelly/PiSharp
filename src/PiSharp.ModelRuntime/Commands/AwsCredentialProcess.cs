@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/ai/src/providers/amazon-bedrock.ts (the AWS SDK default credential
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/ai/src/providers/amazon-bedrock.ts (the AWS SDK default credential
 // chain, whose @aws-sdk/credential-provider-process runs a profile's credential_process through child_process.exec).
 using System.Diagnostics;
 using System.Text;

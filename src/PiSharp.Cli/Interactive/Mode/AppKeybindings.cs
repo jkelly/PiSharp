@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/src/core/keybindings.ts (KEYBINDINGS, migrations,
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/coding-agent/src/core/keybindings.ts (KEYBINDINGS, migrations,
 // KeybindingsManager.create/reload, toKeybindingsConfig), src/core/key-id-schema.ts (KeybindingValueSchema) and
 // src/modes/interactive/components/keybinding-hints.ts (keyText, keyDisplayText, keyHint, rawKeyHint).
 using System.Text.Json.Nodes;

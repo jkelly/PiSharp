@@ -52,7 +52,7 @@ public static class SessionSummaryRequestBuilder
             if (message.Role == "user") { var text = Text(content, ""); if (text.Length != 0) Add("[User]: " + text); }
             else if (message.Role == "assistant")
             {
-                // Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/src/core/compaction/utils.ts
+                // Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/coding-agent/src/core/compaction/utils.ts
                 // (serializeConversation). Thinking is omitted: replayed thinking is often not part of the live context, and
                 // including it can make the summarization request larger than the context it summarizes.
                 if (content.EnumerateArray().Any(block => block.GetProperty("type").GetString() == "text")) Add("[Assistant]: " + Text(content, "\n"));

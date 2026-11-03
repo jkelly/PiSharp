@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): coding-agent/src/modes/interactive/components/radius-login-selector.ts.
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): coding-agent/src/modes/interactive/components/radius-login-selector.ts.
 // The `/login` menu with the animated "Sign in with Radius" option. Internal to the interactive mode: the shimmer
 // is Radius-only and is not exposed to other selectors. Upstream subclasses ExtensionSelectorComponent; here
 // RadiusLoginMenuComponent wraps one (its Dispose is not virtual, so a subclass could not stop the animation timer when

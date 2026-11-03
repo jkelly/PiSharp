@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/src/extensions/mcp/index.ts (providerToken:
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/coding-agent/src/extensions/mcp/index.ts (providerToken:
 // modelRegistry.getApiKeyForProvider) and packages/coding-agent/src/extensions/mcp/runtime.ts (auth.provider: read on every request).
 using PiSharp.Cli.Authentication;
 using PiSharp.Cli.Commands;

@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): coding-agent/src/modes/interactive/components/compaction-summary-message.ts.
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): coding-agent/src/modes/interactive/components/compaction-summary-message.ts.
 // The CompactionSummaryMessage is a JsonObject in core/messages.ts's shape: { role: "compactionSummary", summary, tokensBefore,
 // timestamp }. Number.prototype.toLocaleString() is rendered with en-US grouping (Node's default ICU locale).
 using System.Globalization;

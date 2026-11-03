@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/src/images/exif.ts
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/src/images/exif.ts
 // EXIF orientation of JPEG and WebP files, read from the bytes without decoding the image. Positions are JavaScript numbers upstream, and a
 // read past the end is undefined, which its bit operations turn into 0; At() does the same here.
 namespace PiSharp.Durable.Tools.Images;

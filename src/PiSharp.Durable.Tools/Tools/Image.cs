@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/src/tools/image.ts
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/src/tools/image.ts
 // Detection and header dimensions only: decoding is an image processor's (ImageProcessor.cs, Images/).
 namespace PiSharp.Durable.Tools;
 

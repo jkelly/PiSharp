@@ -5,7 +5,7 @@ using PiSharp.Cli.Interactive;
 // stored auth.json credential, sorted by name, then the selected one is deleted. Authored expectations; no network.
 internal static partial class Program
 {
-    // Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/src/core/auth-storage.ts (getRetryableLockErrorCode,
+    // Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/coding-agent/src/core/auth-storage.ts (getRetryableLockErrorCode,
     // MAX_EPERM_RETRIES; #10801). On Windows a just-removed lock folder can stay "delete pending" and taking the lock fails with EPERM
     // (access denied with no lock present): it is retried at most 5 times. Elsewhere, and for any other error, it fails at once.
     private static async Task AuthLockEpermRetries()

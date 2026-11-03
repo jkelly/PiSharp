@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/src/images/index.ts
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/src/images/index.ts
 // Upstream prepares images with Photon (Rust compiled to WebAssembly). PiSharp has no Photon: the decode, orient, resample and encode steps
 // are PiSharp.Tools' image codec seam (IImageCodec), the backend the coding agent's read tool already uses in place of Photon. The host picks
 // the codec: PiSharp.Tools.Skia's SkiaImageCodec decodes what Photon decodes (PNG, JPEG, GIF's first frame, WebP, BMP) and encodes PNG and

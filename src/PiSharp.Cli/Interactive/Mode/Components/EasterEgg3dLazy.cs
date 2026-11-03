@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): coding-agent/src/modes/interactive/components/easter-egg-3d.lazy.ts.
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): coding-agent/src/modes/interactive/components/easter-egg-3d.lazy.ts.
 // The dynamic import() becomes a post to the UI loop, so the animation starts on a later turn of the loop as upstream's does.
 using PiSharp.Tui.Pi;
 

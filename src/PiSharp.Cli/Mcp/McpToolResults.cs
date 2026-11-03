@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/src/extensions/mcp/tools.ts (createMcpResultSchema, relocateSchema, convertMcpResult,
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/coding-agent/src/extensions/mcp/tools.ts (createMcpResultSchema, relocateSchema, convertMcpResult,
 // toModelContent, blockToContent, limitMcpContent, MCP_OUTPUT_MAX_BYTES), packages/mcp/src/protocol/content.ts (toLlmContent) and
 // packages/coding-agent/src/core/tools/truncate.ts (truncateMiddle, formatSize).
 using System.Globalization;

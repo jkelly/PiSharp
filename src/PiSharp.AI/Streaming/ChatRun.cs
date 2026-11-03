@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/ai/src/utils/event-stream.ts.
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/ai/src/utils/event-stream.ts.
 using System.Runtime.CompilerServices;
 using System.Threading.Channels;
 using System.Text.Json;

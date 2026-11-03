@@ -18,7 +18,7 @@ internal static partial class Program
         Case("summary.serialize-conversation-omits-thinking-blocks", SerializeOmitsThinking),
     ];
 
-    // Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/src/core/compaction/utils.ts (serializeConversation).
+    // Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/coding-agent/src/core/compaction/utils.ts (serializeConversation).
     // Pi 1.2.0 drops thinking blocks from the serialized conversation (compaction, branch summaries, bug reports): the
     // "[Assistant thinking]" part is gone; visible text, tool calls and tool results remain, in order.
     private static Task SerializeOmitsThinking()

@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/test/session-document-cache-bench.ts. Session document cache
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/test/session-document-cache-bench.ts. Session document cache
 // benchmark: a Harness on SQLite creates N conversations and runs one short task in each, as a long-running agent with subagents does; then,
 // at a few retention settings, reports the documents left in the cache, the bytes live objects retain per conversation (HeapRetained.cs),
 // and the cost of reading a document of an old conversation again. Upstream's performance.now() is a Stopwatch; createModels() is a models

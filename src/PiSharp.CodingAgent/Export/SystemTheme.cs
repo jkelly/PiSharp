@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/src/modes/interactive/theme/system-theme.ts.
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/coding-agent/src/modes/interactive/theme/system-theme.ts.
 namespace PiSharp.CodingAgent.Export;
 
 /// <summary>What the terminal reported (pi-tui TerminalColors): default colors and ANSI palette 0-15.</summary>

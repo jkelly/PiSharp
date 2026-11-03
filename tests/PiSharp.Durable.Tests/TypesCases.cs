@@ -2,7 +2,7 @@ using System.Reflection;
 using PiSharp.Durable;
 using PiSharp.Durable.Chord;
 
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/test/types.test.ts (its runtime parts). Upstream's @ts-expect-error
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/test/types.test.ts (its runtime parts). Upstream's @ts-expect-error
 // lines are compile-time rejections of invalid record shapes; here each record kind is its own struct or closed type, and the shapes the
 // TypeScript union forbids are rejected where persisted JSON is decoded (FromJson) and by the records' Validate(). The third upstream test
 // ("types submissions, task waits, compaction, and tasks erased into extensions") types the Harness surface and joins with P6-P8.

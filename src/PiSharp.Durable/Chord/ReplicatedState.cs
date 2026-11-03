@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/chord/src/state.ts (StateSubscriber, ReplicatedStatePublisher,
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/chord/src/state.ts (StateSubscriber, ReplicatedStatePublisher,
 // MutableReplicatedStateImpl, AttachedReplicatedStateImpl, attachReplicatedStateSource and the replicatedState factory). Replicated state
 // is in process only: an immutable JSON value with ordered, serialized change notifications. Upstream v1.2.0 moved it out of services/
 // (whose host runtime replaced facets and services and is excluded by decision 0005), dropped the exact source listeners the service

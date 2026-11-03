@@ -24,7 +24,7 @@ public interface IMcpAdmittedHttpRequestOperation
     Task StopAsync();
 }
 public delegate IMcpAdmittedHttpRequestOperation McpAdmittedHttpRequestFactory(HttpRequestMessage request);
-/// <summary>Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/mcp/src/transports/transport.ts DEFAULT_MAX_MESSAGE_BYTES (16 MiB per
+/// <summary>Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/mcp/src/transports/transport.ts DEFAULT_MAX_MESSAGE_BYTES (16 MiB per
 /// message). The client correlates any number of requests in flight and answers any number of server requests over a
 /// connection's lifetime (client.ts has no count bound), so the request and callback counts are unbounded by default.</summary>
 public sealed record McpTransportLimits(int MaximumFrameBytes = 16 * 1024 * 1024, int ReadBufferBytes = 4096,

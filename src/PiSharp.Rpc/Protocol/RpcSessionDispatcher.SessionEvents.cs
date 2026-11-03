@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/src/modes/rpc/rpc-mode.ts (session.subscribe:
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/coding-agent/src/modes/rpc/rpc-mode.ts (session.subscribe:
 // output(toJsonEvent(event)); onError: output({type:"extension_error", ...})).
 using PiSharp.CodingAgent;
 

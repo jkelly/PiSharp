@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/chord/src/delta/revision-validator.ts. Upstream walks each
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/chord/src/delta/revision-validator.ts. Upstream walks each
 // revision for strict JSON (no cycles, plain objects, dense arrays, data properties, finite numbers) and remembers validated containers
 // so a revision costs only its new containers. JsonValue enforces all of those rules at construction, so what remains is the walk and
 // its memo: a consumer can still call Validate on every revision and pay only for containers it has not seen.

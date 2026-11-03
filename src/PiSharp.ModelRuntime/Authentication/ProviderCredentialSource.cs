@@ -1,5 +1,5 @@
 // Web Agent W2 (WU2, plan "Architecture" item 2): the one credential seam of PiSharp.ModelRuntime. It replaces the concrete
-// AuthJsonCredentialStore (Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/src/core/auth-storage.ts,
+// AuthJsonCredentialStore (Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/coding-agent/src/core/auth-storage.ts,
 // AuthStorage.read/list), which stays in PiSharp.Cli and implements it; PiSharp.WebAgent implements it over its own vault, per account.
 using PiSharp.AI.Authentication.OAuth;
 

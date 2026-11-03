@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/src/harness/registry.ts. Installs and subscriptions may come from any
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/src/harness/registry.ts. Installs and subscriptions may come from any
 // thread, so the current state and the listener list are guarded by a short lock; listeners run outside it, synchronously, after the new
 // state is published.
 using System.Collections.Immutable;

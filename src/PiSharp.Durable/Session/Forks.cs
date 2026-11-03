@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/src/session/forks.ts (prepareForkDocumentCopies, collectCopies).
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/src/session/forks.ts (prepareForkDocumentCopies, collectCopies).
 // Spec §3.7: an "asOf" document is copied from the ancestor that owns the fork entry at that entry's commit, a "current" one from the
 // immediate parent's current state; "initial" documents are not copied. Copies are definition-free: Storage materializes each source.
 using PiSharp.Durable.Chord;

@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/src/env/decode.ts.
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/src/env/decode.ts.
 // Decoding that matches `new TextDecoder().decode(bytes)` of the whole input when the input arrives in pieces. Node's streaming decoder with
 // BOM handling can drop a U+FEFF that follows a chunk boundary, so upstream turns BOM handling off and drops a leading mark itself. .NET's
 // UTF-8 decoder never drops a byte-order mark and replaces each maximal invalid subpart with one U+FFFD, as the WHATWG decoder does

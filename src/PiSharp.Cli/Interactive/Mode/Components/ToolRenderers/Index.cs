@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): coding-agent/src/core/tools/renderers/index.ts.
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): coding-agent/src/core/tools/renderers/index.ts.
 // Built-in tool renderers, without the tools themselves, plus the renderers the built-in tool definitions carry (edit draws its
 // own shell, codemode and MCP tools have their own renderers) and an adapter for extension renderers (async rows).
 using System.Text;

@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/src/extensions/mcp/index.ts and packages/mcp/src/client.ts.
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/coding-agent/src/extensions/mcp/index.ts and packages/mcp/src/client.ts.
 using PiSharp.Cli.Commands;
 using PiSharp.Cli.Mcp;
 using PiSharp.Cli.Pi;
