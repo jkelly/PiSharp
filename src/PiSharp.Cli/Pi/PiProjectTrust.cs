@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/src/core/trust-manager.ts (ProjectTrustStore,
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/coding-agent/src/core/trust-manager.ts (ProjectTrustStore,
 // hasTrustRequiringProjectResources, getProjectTrustOptions) and packages/coding-agent/src/core/project-trust.ts (resolveProjectTrusted).
 using System.Collections.Immutable;
 using System.Text.Json;

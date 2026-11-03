@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/src/core/resource-loader.ts (reload with resolveProjectTrust:
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/coding-agent/src/core/resource-loader.ts (reload with resolveProjectTrust:
 // loadProjectTrustExtensions, then loadFinalExtensionSet ordered as the final extension paths) and
 // packages/coding-agent/src/core/agent-session-services.ts (applyExtensionFlagValues).
 using System.Collections.Immutable;
