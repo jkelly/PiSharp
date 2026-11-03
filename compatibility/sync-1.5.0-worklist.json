@@ -20572,14 +20572,15 @@
       {
         "id": "surface-inventories-v1.5.0",
         "area": "coding-agent-core",
-        "status": "planned",
+        "status": "generated",
         "files": [
-          "compatibility/extensions/event-catalog.v1.2.0.json",
-          "compatibility/coding-agent-command-rpc-inventory.v1.2.0.json",
-          "tools/SurfaceInventory/inventory-refresh.test.mjs"
+          "compatibility/extensions/event-catalog.v1.5.0.json",
+          "compatibility/coding-agent-command-rpc-inventory.v1.5.0.json",
+          "tools/SurfaceInventory/inventory-refresh.test.mjs",
+          "tools/SurfaceInventory/build-command-rpc-inventory.mjs"
         ],
-        "pin": "The newest event catalog and command/RPC inventory are generated for v1.2.0 and validated against compatibility/target.v1.2.0.lock.json.",
-        "action": "Generate v1.5.0 refreshes from the v1.2.0 inventories against target.lock.json in phase 1, with overlays for native status, and check them in inventory-refresh.test.mjs as the v1.2.0 ones are."
+        "pin": "The v1.5.0 event catalog and command/RPC inventory are generated from the v1.2.0 ones against target.lock.json and checked in inventory-refresh.test.mjs (PI_UPSTREAM_V1_5_0 reproduces them).",
+        "action": "Each area adds overlay entries for the native statuses it reassesses (no overlay yet; statuses carry over from v1.2.0)."
       },
       {
         "id": "json-source-inventories",

@@ -1,4 +1,4 @@
-// Validates the preserved v0.99.1 event catalog and command/RPC inventory and their v1.1.0 and v1.2.0
+// Validates the preserved v0.99.1 event catalog and command/RPC inventory and their v1.1.0, v1.2.0 and v1.5.0
 // refreshes. The v1.1.0 inventories were generated for the v1.1.0 target, so they are checked against
 // that target's preserved lock (compatibility/target.v1.1.0.lock.json, named by target.lock.json's
 // previousTarget once the target moved to v1.2.0). Offline by default: it reads only repository files. With PI_UPSTREAM set to a Pi git
@@ -226,4 +226,59 @@ test('generators reproduce the v1.2.0 inventories byte-for-byte from upstream so
   const run = (tool, ...args) => execFileSync(process.execPath, [resolve(repo, 'tools/SurfaceInventory', tool), '--upstream', upstream120, ...args], { cwd: repo, stdio: 'pipe' });
   run('build-event-catalog.mjs', '--lock', V1_2_0_LOCK, '--template', NEW_CATALOG, '--overlay', V1_2_0_CATALOG_OVERLAY, '--check', V1_2_0_CATALOG);
   run('build-command-rpc-inventory.mjs', '--lock', V1_2_0_LOCK, '--template', NEW_INVENTORY, '--check', V1_2_0_INVENTORY);
+});
+
+// v1.5.0: generated from the v1.2.0 inventories for the current target (compatibility/target.lock.json), with no overlay yet;
+// native statuses carry over from v1.2.0 until the sync's areas reassess them (sync-1.5.0-applicability.json).
+const V1_5_0_CATALOG = 'compatibility/extensions/event-catalog.v1.5.0.json', V1_5_0_INVENTORY = 'compatibility/coding-agent-command-rpc-inventory.v1.5.0.json';
+const V1_5_0_LOCK = 'compatibility/target.lock.json', current150 = json(V1_5_0_LOCK);
+
+test('v1.5.0 event catalog: re-derived rows with no event changes since v1.2.0', () => {
+  const previous = json(V1_2_0_CATALOG), current = json(V1_5_0_CATALOG);
+  assert.equal(current150.source.tag, 'v1.5.0');
+  assert.equal(current.sourceSha, current150.source.commit); assert.equal(current.sourceTag, current150.source.tag);
+  assert.deepEqual(current.refresh.previousCatalog, { path: V1_2_0_CATALOG, sha256: sha256(bytes(V1_2_0_CATALOG)), sourceSha: current120.source.commit });
+  assert.deepEqual(current.events.map(row => row.name), previous.events.map(row => row.name));
+  for (const file of current.authority.sourceFiles) {
+    assert(file.sourceUrl.includes('/' + current150.source.commit + '/'), file.path);
+    const pin = lockPin(current150, file.path); if (pin) assert.equal(file.sha256, pin.sha256, file.path);
+  }
+  for (const row of current.events) assert.equal(row.sourceRefresh.previousSourceSha, current120.source.commit, row.name);
+  const { summary } = current.refresh;
+  assert.deepEqual([summary.added, summary.removed, summary.eventDeclarationTextChanged, summary.subscriptionTextChanged, summary.dispatcherTextChanged], [[], [], [], [], []]);
+  references(current).forEach((reference, index) => assertTestReference(reference, 'v1.5.0 catalog test ' + index));
+});
+
+test('v1.5.0 command/RPC inventory: rows, counts and pins at the target commit', () => {
+  const previous = json(V1_2_0_INVENTORY), current = json(V1_5_0_INVENTORY);
+  assert.equal(serialize(current), bytes(V1_5_0_INVENTORY).toString('utf8'), 'Canonical one-row-per-line layout');
+  assert.equal(current.sourceSha, current150.source.commit); assert.equal(current.sourceTree, current150.source.tree); assert.equal(current.sourceTag, current150.source.tag);
+  assert.equal(current.baselineId, 'pi-' + current150.source.tag + '@' + current150.source.commit);
+  assert.deepEqual(current.previousInventory, { path: V1_2_0_INVENTORY, sha256: sha256(bytes(V1_2_0_INVENTORY)), baselineId: previous.baselineId });
+  const ids = current.rows.map(row => row.id);
+  assert.equal(new Set(ids).size, ids.length);
+  for (const row of previous.rows) assert(ids.includes(row.id), 'v1.2.0 row kept: ' + row.id);
+  // The entries v1.2.0 marked removed are carried forward as they were.
+  for (const id of ['package.entry.client', 'package.entry.experimental.plugin'])
+    assert.deepEqual(current.rows.find(row => row.id === id), previous.rows.find(row => row.id === id), id);
+  assert.deepEqual(current.refresh.summary.added, ['sdk.root.KeybindingHints', 'sdk.root.PackageInstallFailure', 'sdk.root.formatReadLineRange']);
+  assert.deepEqual(current.refresh.summary.removed, []);
+  assert.deepEqual(current.refresh.summary.relocatedText, ['cli.help.command.mcp.source', 'cli.slash.import.source', 'cli.slash.share.source', 'cli.slash.resume.source']);
+  // A statement that quotes its source line follows the new text.
+  assert.equal(current.rows.find(row => row.id === 'cli.help.command.mcp').observed.statement, '${APP_NAME} mcp <command>             Manage MCP servers');
+  const formatRange = current.rows.find(row => row.id === 'sdk.root.formatReadLineRange');
+  assert.equal(formatRange.exportOrigin, './core/tools/render-utils.ts'); assert.match(formatRange.observed.statement, /of formatReadLineRange from \.\/core\/tools\/render-utils\.ts;/);
+  const checks = current.completenessChecks;
+  assert.equal(checks.rowCount, current.rows.length); assert.equal(checks.rowCount, 721);
+  assert.equal(checks.sdkRootNamedExports, 465); assert.equal(checks.rpcCommandVariants, 33); assert.equal(checks.rpcDispatchCases, 33);
+  for (const file of current.sourceFiles) { const pin = lockPin(current150, file.path); if (pin) assert.equal(file.sha256, pin.sha256, file.path); }
+  references(current).forEach((reference, index) => assertTestReference(reference, 'v1.5.0 inventory test ' + index));
+});
+
+// PI_UPSTREAM_V1_5_0: a Pi checkout at v1.5.0 that also has v1.2.0.
+const upstream150 = process.env.PI_UPSTREAM_V1_5_0;
+test('generators reproduce the v1.5.0 inventories byte-for-byte from upstream sources', { skip: upstream150 ? false : 'set PI_UPSTREAM_V1_5_0 to a Pi checkout at v1.5.0 containing v1.2.0' }, () => {
+  const run = (tool, ...args) => execFileSync(process.execPath, [resolve(repo, 'tools/SurfaceInventory', tool), '--upstream', upstream150, ...args], { cwd: repo, stdio: 'pipe' });
+  run('build-event-catalog.mjs', '--lock', V1_5_0_LOCK, '--template', V1_2_0_CATALOG, '--check', V1_5_0_CATALOG);
+  run('build-command-rpc-inventory.mjs', '--lock', V1_5_0_LOCK, '--template', V1_2_0_INVENTORY, '--check', V1_5_0_INVENTORY);
 });

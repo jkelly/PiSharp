@@ -1105,8 +1105,8 @@
       "originalSha256": "b17d6fdf7fbef642be6a2ecfc697a74fc2c18faa613801e2809fb861be6b6291"
     },
     {
-      "currentSha256": "d8cd3441f97927db4ef5c1e4214372c9e3e4bfb80e5633416e13c2abc0229018",
-      "currentBytes": 14704,
+      "currentSha256": "a6544220e7cc684c7706f7ebcb6ea14573b2977d3ebf555f03b3fc73117085e2",
+      "currentBytes": 15975,
       "originalBytes": 2925,
       "path": "docs/compatibility/baseline.md",
       "originalSha256": "60becce63e58e74237d4be073fb63b8d48ef2a227f9f8e52db3754df7fd704b6"

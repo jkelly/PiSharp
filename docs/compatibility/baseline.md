@@ -108,6 +108,16 @@ The command/RPC inventory records checkout bytes when the checkout is at the tar
 $env:PI_UPSTREAM_V1_2_0 = '<Pi checkout at v1.2.0 with v1.1.0>'; node --test tools/SurfaceInventory/inventory-refresh.test.mjs
 ```
 
+The v1.5.0 refreshes, [event-catalog.v1.5.0.json](../../compatibility/extensions/event-catalog.v1.5.0.json) and [coding-agent-command-rpc-inventory.v1.5.0.json](../../compatibility/coding-agent-command-rpc-inventory.v1.5.0.json), were generated from the v1.2.0 inventories with `--lock compatibility/target.lock.json`. They have no overlay yet: native statuses carry over from v1.2.0 until each area reassesses them ([sync-1.5.0-applicability.json](../../compatibility/sync-1.5.0-applicability.json)). Between the two:
+- **The events are unchanged.** The 41 extension events keep their declarations, subscriptions and dispatchers.
+- **New root exports.** `KeybindingHints`, `PackageInstallFailure` and `formatReadLineRange` are new root exports, giving 721 rows and 465 root exports.
+- **Changed text.** The text of the `mcp` help line and the `/import`, `/share` and `/resume` registry entries changed. The generator finds these lines again by their command or entry name. Their `observed.statement` follows the new text.
+- **Removed entries.** The entries v1.2.0 marked `removedUpstream` are carried forward as they were.
+
+```powershell
+$env:PI_UPSTREAM_V1_5_0 = '<Pi checkout at v1.5.0 with v1.2.0>'; node --test tools/SurfaceInventory/inventory-refresh.test.mjs
+```
+
 ## Evidence baseline: Pi v0.99.1
 
 The source target was public Pi v0.99.1 at `d86654abb8862e201933517d6f1fce9f88dd117f`. The local checkout HEAD, tag resolution and tree are recorded in [baseline.lock.json](../../compatibility/baseline.lock.json). The coding-agent and AI package versions are 0.99.1; the repository root package version is 0.0.3.
