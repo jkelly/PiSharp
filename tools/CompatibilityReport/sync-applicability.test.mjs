@@ -62,13 +62,15 @@ test('statuses, phases, releases and PiSharp paths', () => {
   for (const row of table.rows) {
     assert(row.status in table.statusMeaning, row.id + ' status');
     if (row.status === 'ported' || row.status === 'ported-with-deferral') {
-      // A ported row names its commits and its authored tests, each test as <file>: <case id> in a file that holds it.
+      // A ported row names its commits and its authored tests, each test as <file>: <case id> in a file that holds it,
+      // literally or as an interpolated $"<prefix>.{name}" with "<name>" in the same file.
       assert(row.evidence.commits.length > 0 && row.evidence.commits.every(sha => /^[0-9a-f]{7,40}$/.test(sha)), row.id + ' commits');
       assert(row.evidence.tests.length > 0, row.id + ' needs tests');
       for (const entry of row.evidence.tests) {
-        const [path, caseId] = entry.split(/: (.*)/s);
+        const [path, caseId] = entry.split(/: (.*)/s), cut = caseId.lastIndexOf('.') + 1;
         assert(existsSync(resolve(repo, path)), row.id + ' names a missing test file ' + path);
-        if (caseId) assert(readFileSync(resolve(repo, path), 'utf8').includes(caseId), row.id + ' names a missing case ' + entry);
+        const text = readFileSync(resolve(repo, path), 'utf8');
+        assert(text.includes(caseId) || (text.includes(caseId.slice(0, cut) + '{') && text.includes(`"${caseId.slice(cut)}"`)), row.id + ' names a missing case ' + entry);
       }
     } else if (row.status !== 'port') assert.equal(typeof row.evidence, 'string', row.id + ' needs evidence');
     assert.equal(typeof row.deferred === 'string', row.status === 'ported-with-deferral', row.id + ' deferred');

@@ -80,6 +80,7 @@ The release and the macOS workflow run these. Each covers one area of Pi, with e
 | `PiSharp.ToolSearch.Tests` | The built-in `tool_search` tool and deferred MCP exposure. |
 | `PiSharp.Classifiers.Tests` | The classifier and image generation APIs. |
 | `PiSharp.Models.Tests` | Model catalogs and model selection. `--tarball <pi-ai package>` also compares the embedded catalog shards with a published `pi-ai` package, byte for byte. |
+| `PiSharp.Schema.Tests` | JSON Schema validation of tool arguments, ported from Pi's pi-schema: the JSON-Schema-Test-Suite for drafts 2020-12 and 7 with pi-schema's known failures, coercion, formats and unresolved references. |
 | `PiSharp.Codemode.Tests` | [Code mode](/docs/guides/codemode/) on Jint, with declaration goldens from the upstream packages. It is also the code mode worker process its cases start. |
 | `PiSharp.ProviderApis.Tests` | Provider APIs and authentication: Bedrock, Codex, Copilot, Cloudflare and AWS signing. |
 | `PiSharp.CliParity.Tests` | The CLI, configuration and resources, and session file goldens in `SessionFormat/*.scenario.json`, captured from Pi v1.1.0. |

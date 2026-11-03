@@ -56,9 +56,11 @@
     "changelogBullets": 477,
     "repeatedBullets": 23,
     "byStatus": {
-      "port": 291,
-      "already-ported": 12,
-      "no-op": 23
+      "port": 246,
+      "already-ported": 13,
+      "ported": 32,
+      "no-op": 24,
+      "ported-with-deferral": 11
     },
     "byArea": {
       "ai": 58,
@@ -2389,7 +2391,7 @@
       "id": "ai.tool-argument-validation",
       "area": "ai",
       "phase": 2,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "ai@1.5.0/Breaking Changes#1",
         "ai@1.5.0/Breaking Changes#2",
@@ -2415,7 +2417,23 @@
         "website/src/content/docs/docs/extensions/api.md"
       ],
       "release": "1.5.0",
-      "notes": "PiSharp validates with its TypeBox 1.3.27 port (ToolArgumentValidation.cs ValidateCore: normalizeOptionalNulls, Value.Convert by ToolSchemaOrigin, Compile, coerceWithJsonSchema), called from ToolInvoker.cs:350. Switch the tool path to schema.compile-validator, schema.coercion, schema.formats and schema.unresolved-refs. ToolSchemaOrigin then no longer changes the result: keep it for API compatibility or obsolete it, and update api.md's ParametersOrigin row and PiNodeOwner's parametersOrigin mapping. Keep the TypeBox engine itself: TypeBoxJsonSchema (config files) uses its Validator. Expected error texts in tests change. The durable copy (src/PiSharp.Durable/Internal/PiAi/Validation.cs) moves in phase 4. The argumentsError check at the top of 1.5.0's validateToolArguments comes from 87f9a3641 (another group's row). Decision 0013 'Tool argument validation': native C# tools keep their JSON Schema parameters."
+      "notes": "PiSharp validates with its TypeBox 1.3.27 port (ToolArgumentValidation.cs ValidateCore: normalizeOptionalNulls, Value.Convert by ToolSchemaOrigin, Compile, coerceWithJsonSchema), called from ToolInvoker.cs:350. Switch the tool path to schema.compile-validator, schema.coercion, schema.formats and schema.unresolved-refs. ToolSchemaOrigin then no longer changes the result: keep it for API compatibility or obsolete it, and update api.md's ParametersOrigin row and PiNodeOwner's parametersOrigin mapping. Keep the TypeBox engine itself: TypeBoxJsonSchema (config files) uses its Validator. Expected error texts in tests change. The durable copy (src/PiSharp.Durable/Internal/PiAi/Validation.cs) moves in phase 4. The argumentsError check at the top of 1.5.0's validateToolArguments comes from 87f9a3641 (another group's row). Decision 0013 'Tool argument validation': native C# tools keep their JSON Schema parameters.",
+      "evidence": {
+        "commits": [
+          "9af4698ec345e0760aa043a139dc691c0d1455a5",
+          "8374c644818c3ccef5070d72207145037ca8f772",
+          "c36a0ac205464c6ca9d55c35249edb85e41095da",
+          "b6fe263c7cf7acecdad54ed8ee670c8686042d1c"
+        ],
+        "tests": [
+          "tests/PiSharp.Schema.Tests/Sync150Cases.cs: sync150.tool-arguments-message-and-paths",
+          "tests/PiSharp.Schema.Tests/Sync150Cases.cs: sync150.tool-arguments-coerced-for-every-origin",
+          "tests/PiSharp.Schema.Tests/Sync150Cases.cs: sync150.tool-arguments-dangling-ref-rejects-in-place",
+          "tests/PiSharp.Schema.Tests/Sync150Cases.cs: sync150.tool-arguments-uncompilable-schema",
+          "tests/PiSharp.Tools.Tests/Sync150SchemaCases.cs: sync150.validation-golden-inputs-keep-the-pi-schema-message-and-coercion-guarantees",
+          "tests/PiSharp.CliParity.Tests/Sync150SchemaCases.cs: sync150.validation-mcp-dangling-ref-rejects-only-values-at-its-place"
+        ]
+      }
     },
     {
       "id": "ai.grammar-tool-input-delta",
@@ -3031,7 +3049,7 @@
       "id": "schema.compile-validator",
       "area": "schema",
       "phase": 2,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "schema@1.5.0/Added#1"
       ],
@@ -3051,18 +3069,37 @@
       ],
       "change": "New package. compile(schema, options) reads a JSON Schema once (draft 2020-12 by default or draft 7; boolean schemas; $ref local, by anchor or to documents passed in `schemas`; $dynamicRef, unevaluated*, ECMAScript `u` patterns) into plain closures. Validator.check is the boolean test and Validator.errors returns { path (JSON Pointer), keyword, message } per failure with pi-schema's own messages (`missing`, `expected number, got string`, `unknown field`, `matches no alternative`). `format` is only an annotation unless a `formats` map is passed.",
       "pisharp": [
-        "src/PiSharp.Schema/ (new)",
+        "src/PiSharp.Contracts/Schema/",
         "src/PiSharp.Agent/ToolArgumentValidation.cs",
         "THIRD-PARTY-NOTICES.md"
       ],
       "release": "1.5.0",
-      "notes": "PiSharp has no pi-schema. Tool arguments run through a TypeBox 1.3.27 port (src/PiSharp.Agent/ToolArgumentValidation.cs: Validator.Compile/Check/Errors), copied into src/PiSharp.Durable/Internal/PiAi/Validation.cs. Port compile/check/errors as one engine (a new project or PiSharp.Contracts; settle in the schema area) that ai.tool-argument-validation and the durable re-sync (phase 4) both use; reuse the existing JsRegex, JS number/string and JSON.parse code. Length bounds count code points, not TypeBox's graphemes. The JSON-Schema-Test-Suite and meta-schema fixtures can drive authored C# tests; record their license with pi-schema's (MIT, TypeBox-derived parts) in THIRD-PARTY-NOTICES.md. New public API carries [Experimental]. Decision 0013 'Tool argument validation'. TypeBoxJsonSchema and its TypeBox Validator stay: models.json, keybindings and the theme are still compiled with TypeBox at v1.5.0."
+      "notes": "PiSharp has no pi-schema. Tool arguments run through a TypeBox 1.3.27 port (src/PiSharp.Agent/ToolArgumentValidation.cs: Validator.Compile/Check/Errors), copied into src/PiSharp.Durable/Internal/PiAi/Validation.cs. Port compile/check/errors as one engine (a new project or PiSharp.Contracts; settle in the schema area) that ai.tool-argument-validation and the durable re-sync (phase 4) both use; reuse the existing JsRegex, JS number/string and JSON.parse code. Length bounds count code points, not TypeBox's graphemes. The JSON-Schema-Test-Suite and meta-schema fixtures can drive authored C# tests; record their license with pi-schema's (MIT, TypeBox-derived parts) in THIRD-PARTY-NOTICES.md. New public API carries [Experimental]. Decision 0013 'Tool argument validation'. TypeBoxJsonSchema and its TypeBox Validator stay: models.json, keybindings and the theme are still compiled with TypeBox at v1.5.0.",
+      "evidence": {
+        "commits": [
+          "fa3892524a9c3901c75252ad79c51792eca8b44f",
+          "8374c644818c3ccef5070d72207145037ca8f772"
+        ],
+        "tests": [
+          "tests/PiSharp.Schema.Tests/Sync150Cases.cs: sync150.conformance-draft2020-12",
+          "tests/PiSharp.Schema.Tests/Sync150Cases.cs: sync150.conformance-draft7",
+          "tests/PiSharp.Schema.Tests/Sync150Cases.cs: sync150.errors-at-the-field",
+          "tests/PiSharp.Schema.Tests/Sync150Cases.cs: sync150.errors-tagged-union-branch",
+          "tests/PiSharp.Schema.Tests/Sync150Cases.cs: sync150.errors-pointer-escaping-and-refs",
+          "tests/PiSharp.Schema.Tests/Sync150Cases.cs: sync150.errors-messages",
+          "tests/PiSharp.Schema.Tests/Sync150Cases.cs: sync150.values-own-properties-and-bytes",
+          "tests/PiSharp.Schema.Tests/Sync150Cases.cs: sync150.string-lengths-in-code-points",
+          "tests/PiSharp.Schema.Tests/Sync150Cases.cs: sync150.options-formats-documents-draft7",
+          "tests/PiSharp.Schema.Tests/Sync150Cases.cs: sync150.malformed-schemas-throw",
+          "tests/PiSharp.Schema.Tests/Sync150Cases.cs: sync150.public-api-json-nodes"
+        ]
+      }
     },
     {
       "id": "schema.builders",
       "area": "schema",
       "phase": 2,
-      "status": "port",
+      "status": "no-op",
       "changelog": [
         "schema@1.5.0/Added#2"
       ],
@@ -3072,16 +3109,17 @@
       ],
       "change": "str, num, int, bool, nul, unknown, lit, oneOf, union, nullable, arr, tuple, map, bytes, obj and opt return plain JSON Schema objects: obj lists required properties and is closed (additionalProperties: false) unless { open: true }, opt marks an obj property optional, tuple uses prefixItems with items: false, and bytes is a non-JSON `type: \"bytes\"` for Uint8Array values. In TypeScript each carries the type of the values it accepts (Static<typeof schema>).",
       "pisharp": [
-        "src/PiSharp.Schema/ (new)"
+        "src/PiSharp.Contracts/Schema/"
       ],
       "release": "1.5.0",
-      "notes": "Only the JSON these builders produce can be ported: an experimental C# builder surface returning JsonObject with the same keys and order, for C# tools and tests. Static<> typing has no C# counterpart (see schema.typebox-static). Native C# tools keep declaring JSON Schema directly (decision 0013), so this is a convenience; TS extensions get the real builders from npm (bridge.pi-schema-validation). Decide `bytes` (byte[] values) with schema.compile-validator."
+      "notes": "Only the JSON these builders produce can be ported: an experimental C# builder surface returning JsonObject with the same keys and order, for C# tools and tests. Static<> typing has no C# counterpart (see schema.typebox-static). Native C# tools keep declaring JSON Schema directly (decision 0013), so this is a convenience; TS extensions get the real builders from npm (bridge.pi-schema-validation). Decide `bytes` (byte[] values) with schema.compile-validator.",
+      "evidence": "packages/schema/src/builders.ts (str/num/obj/arr/union/... and Static<>) only produce plain JSON Schema objects and TypeScript static types. Decision 0013 has native C# tools declare JSON Schema directly (ExtensionToolDescriptor.Parameters is JSON Schema; website/src/content/docs/docs/extensions/api.md), and Static<> has no C# meaning. TypeScript extensions get the builders through the Node bridge, which is row bridge.pi-schema-validation (later package). The JSON a builder emits is validated by the ported compiler (tests/PiSharp.Schema.Tests/Sync150Cases.cs covers the keywords builders emit, including type 'bytes')."
     },
     {
       "id": "schema.coercion",
       "area": "schema",
       "phase": 2,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "ai@1.5.0/Breaking Changes#2",
         "coding-agent@1.5.0/Breaking Changes#1",
@@ -3094,11 +3132,25 @@
       ],
       "change": "compile(schema, { coerce: true }) adds coerce() and parse(). Three passes in order: optional nulls dropped; TypeBox 1.3.27 Value.Convert rules keyed on JSON Schema keywords ($ref, const/enum, anyOf/oneOf first accepted branch, allOf, then by type: numeric strings, \"true\"/\"false\", null to \"null\" for strings, integers truncated, a single value wrapped into an array, object properties by properties/patternProperties/additionalProperties); then Ajv-style primitive coercion by type, including type arrays. coerce() copies only changed paths and returns the input when nothing changes; parse() coerces, then checks.",
       "pisharp": [
-        "src/PiSharp.Schema/ (new)",
+        "src/PiSharp.Contracts/Schema/",
         "src/PiSharp.Agent/ToolArgumentValidation.cs"
       ],
       "release": "1.5.0",
-      "notes": "ToolArgumentValidation.cs has the two separate 1.2.0 stages: TypeBoxConvert (Value.Convert, only for schemas with ~kind or inferred kinds) and Coercion (normalizeOptionalNulls, coerceWithJsonSchema). pi-schema merges them and applies them to every schema, keyed on keywords, not kinds. Behaviour differences listed in ai@1.5.0/Breaking Changes#2: property names are names (no regex match), additionalProperties converts only undeclared properties, BigInt/Undefined/Void reject JSON values. Pass 2 wins over pass 3 (null for a required string becomes \"null\"). The README lists every rule; packages/ai/test/validation-probes.test.ts gives authored cases. Depends on schema.compile-validator."
+      "notes": "ToolArgumentValidation.cs has the two separate 1.2.0 stages: TypeBoxConvert (Value.Convert, only for schemas with ~kind or inferred kinds) and Coercion (normalizeOptionalNulls, coerceWithJsonSchema). pi-schema merges them and applies them to every schema, keyed on keywords, not kinds. Behaviour differences listed in ai@1.5.0/Breaking Changes#2: property names are names (no regex match), additionalProperties converts only undeclared properties, BigInt/Undefined/Void reject JSON values. Pass 2 wins over pass 3 (null for a required string becomes \"null\"). The README lists every rule; packages/ai/test/validation-probes.test.ts gives authored cases. Depends on schema.compile-validator.",
+      "evidence": {
+        "commits": [
+          "fa3892524a9c3901c75252ad79c51792eca8b44f",
+          "8374c644818c3ccef5070d72207145037ca8f772"
+        ],
+        "tests": [
+          "tests/PiSharp.Schema.Tests/Sync150Cases.cs: sync150.coerce-copy-on-write-and-parse",
+          "tests/PiSharp.Schema.Tests/Sync150Cases.cs: sync150.coerce-pass1-optional-nulls",
+          "tests/PiSharp.Schema.Tests/Sync150Cases.cs: sync150.coerce-pass2-conversion-rules",
+          "tests/PiSharp.Schema.Tests/Sync150Cases.cs: sync150.coerce-pass3-primitives-and-conflicts",
+          "tests/PiSharp.Schema.Tests/Sync150Cases.cs: sync150.coerce-recursive-schemas",
+          "tests/PiSharp.Schema.Tests/Sync150Cases.cs: sync150.coerce-member-keywords"
+        ]
+      }
     },
     {
       "id": "schema.typebox-static",
@@ -3121,7 +3173,7 @@
       "id": "schema.unresolved-refs",
       "area": "schema",
       "phase": 2,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "ai@1.5.0/Breaking Changes#3",
         "schema@1.5.0/Added#5"
@@ -3135,17 +3187,29 @@
       ],
       "change": "CompileOptions.unresolvedRefs: \"throw\" (default) makes compile() throw on a $ref that names nothing (a missing definition or a document not in `schemas`); \"reject\" compiles it as false, so only values at that place fail, with the error `unresolved reference <ref>`. pi-ai's tool validation compiles with \"reject\", so a dangling $ref in an MCP server's schema rejects only arguments at that place (`- t: unresolved reference #/definitions/Missing`) instead of failing every call.",
       "pisharp": [
-        "src/PiSharp.Schema/ (new)",
+        "src/PiSharp.Contracts/Schema/",
         "src/PiSharp.Agent/ToolArgumentValidation.cs"
       ],
       "release": "1.5.0",
-      "notes": "Today an unknown $ref makes PiSharp's TypeBox Compile throw, so every call of that tool fails with the TypeBox rejection, as in 1.2.0. Part of the engine in schema.compile-validator; the tool path uses \"reject\" (ai.tool-argument-validation). Add a dangling-$ref MCP schema case."
+      "notes": "Today an unknown $ref makes PiSharp's TypeBox Compile throw, so every call of that tool fails with the TypeBox rejection, as in 1.2.0. Part of the engine in schema.compile-validator; the tool path uses \"reject\" (ai.tool-argument-validation). Add a dangling-$ref MCP schema case.",
+      "evidence": {
+        "commits": [
+          "fa3892524a9c3901c75252ad79c51792eca8b44f",
+          "9af4698ec345e0760aa043a139dc691c0d1455a5",
+          "8374c644818c3ccef5070d72207145037ca8f772"
+        ],
+        "tests": [
+          "tests/PiSharp.Schema.Tests/Sync150Cases.cs: sync150.unresolved-refs-throw-or-reject",
+          "tests/PiSharp.Schema.Tests/Sync150Cases.cs: sync150.tool-arguments-dangling-ref-rejects-in-place",
+          "tests/PiSharp.CliParity.Tests/Sync150SchemaCases.cs: sync150.validation-mcp-dangling-ref-rejects-only-values-at-its-place"
+        ]
+      }
     },
     {
       "id": "schema.formats",
       "area": "schema",
       "phase": 2,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "ai@1.5.0/Breaking Changes#2",
         "schema@1.5.0/Added#1",
@@ -3159,12 +3223,23 @@
       ],
       "change": "The optional `@earendil-works/pi-schema/formats` entry exports `formats`, checks for the standard formats (date, date-time, time, duration, email, idn-email, hostname, idn-hostname, ipv4, ipv6, uri, uri-reference, iri, iri-reference, uri-template, uuid, regex, json-pointer, relative-json-pointer) adapted from TypeBox, plus `url` and `json-pointer-uri-fragment` as TypeBox and ajv-formats check them. Tool validation passes it, so formats registered with TypeBox's Format.Set() are no longer checked.",
       "pisharp": [
-        "src/PiSharp.Schema/ (new)",
+        "src/PiSharp.Contracts/Schema/",
         "src/PiSharp.Agent/ToolArgumentValidation.cs",
         "THIRD-PARTY-NOTICES.md"
       ],
       "release": "1.5.0",
-      "notes": "ToolArgumentValidation.cs's Formats class ports TypeBox's formats with documented approximations (url, iri, iri-reference via System.Uri; hostname, idn-hostname, idn-email approximated). pi-schema vendors TypeBox's format code including the IDNA/punycode checks (formats/typebox/idna), so a faithful port can drop those approximations. TypeBox's MIT license travels with the code (THIRD-PARTY-NOTICES.md)."
+      "notes": "ToolArgumentValidation.cs's Formats class ports TypeBox's formats with documented approximations (url, iri, iri-reference via System.Uri; hostname, idn-hostname, idn-email approximated). pi-schema vendors TypeBox's format code including the IDNA/punycode checks (formats/typebox/idna), so a faithful port can drop those approximations. TypeBox's MIT license travels with the code (THIRD-PARTY-NOTICES.md).",
+      "evidence": {
+        "commits": [
+          "fa3892524a9c3901c75252ad79c51792eca8b44f",
+          "8374c644818c3ccef5070d72207145037ca8f772"
+        ],
+        "tests": [
+          "tests/PiSharp.Schema.Tests/Sync150Cases.cs: sync150.formats-standard",
+          "tests/PiSharp.Schema.Tests/Sync150Cases.cs: sync150.conformance-draft2020-12",
+          "tests/PiSharp.Schema.Tests/Sync150Cases.cs: sync150.conformance-draft7"
+        ]
+      }
     },
     {
       "id": "schema.bench",
@@ -4719,7 +4794,7 @@
       "id": "tui.rex-terminal",
       "area": "tui",
       "phase": 2,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "coding-agent@1.4.0/New Features#5",
         "coding-agent@1.4.0/Added#5",
@@ -4733,13 +4808,22 @@
         "src/PiSharp.Tui/Pi/TerminalImage.cs"
       ],
       "release": "1.5.0",
-      "notes": "Add the case after the herdr check (TerminalImage.cs:55). Rex implements only part of the Kitty graphics protocol (no Unicode placeholders), which upstream accepts. The 1.5.0 Orca detection in the same function is another row."
+      "notes": "Add the case after the herdr check (TerminalImage.cs:55). Rex implements only part of the Kitty graphics protocol (no Unicode placeholders), which upstream accepts. The 1.5.0 Orca detection in the same function is another row.",
+      "evidence": {
+        "commits": [
+          "0c77f68b",
+          "6b8a88ed"
+        ],
+        "tests": [
+          "tests/PiSharp.InteractiveParity.Tests/Sync150Cases.cs: sync150.terminal-image.rex"
+        ]
+      }
     },
     {
       "id": "tui.unclosed-display-math",
       "area": "tui",
       "phase": 2,
-      "status": "port",
+      "status": "ported-with-deferral",
       "changelog": [
         "coding-agent@1.4.0/Fixed#23",
         "tui@1.4.0/Fixed#1"
@@ -4753,13 +4837,29 @@
         "src/PiSharp.Tui/Pi/MarkdownLexer.cs"
       ],
       "release": "1.5.0",
-      "notes": "Latex.cs already cites v1.5.0 (latex.ts is unchanged); the fix is in markdown.ts's math tokenizers, which PiSharp ports in Markdown.cs and MarkdownLexer.cs. Port TABLE_DELIMITER_ROW_REGEX as is."
+      "notes": "Latex.cs already cites v1.5.0 (latex.ts is unchanged); the fix is in markdown.ts's math tokenizers, which PiSharp ports in Markdown.cs and MarkdownLexer.cs. Port TABLE_DELIMITER_ROW_REGEX as is.",
+      "evidence": {
+        "commits": [
+          "60e4fb8b"
+        ],
+        "tests": [
+          "tests/PiSharp.InteractiveParity.Tests/Sync150Cases.cs: sync150.unclosed-display-math.table-after-orphan-dollars",
+          "tests/PiSharp.InteractiveParity.Tests/Sync150Cases.cs: sync150.unclosed-display-math.table-after-orphan-dollars-with-math",
+          "tests/PiSharp.InteractiveParity.Tests/Sync150Cases.cs: sync150.unclosed-display-math.no-pairing-across-table",
+          "tests/PiSharp.InteractiveParity.Tests/Sync150Cases.cs: sync150.unclosed-display-math.single-column-pipe-free-delimiter",
+          "tests/PiSharp.InteractiveParity.Tests/Sync150Cases.cs: sync150.unclosed-display-math.table-after-orphan-bracket",
+          "tests/PiSharp.InteractiveParity.Tests/Sync150Cases.cs: sync150.unclosed-display-math.no-bracket-pairing-across-table",
+          "tests/PiSharp.InteractiveParity.Tests/Sync150Cases.cs: sync150.unclosed-display-math.pipe-free-header",
+          "tests/PiSharp.InteractiveParity.Tests/Sync150Cases.cs: sync150.unclosed-display-math.closed-math-then-table"
+        ]
+      },
+      "deferred": "Node bridge virtual/tui/components/markdown.mjs stays at Pi v1.2.0: the v1.5.0 module needs a marked-cjk-friendly shim, Tokenizer.url and tokens.links in vendor/marked.mjs and a port-upstream.mjs change (node-bridge/bridge area)."
     },
     {
       "id": "tui.cjk-emphasis",
       "area": "tui",
       "phase": 2,
-      "status": "port",
+      "status": "ported-with-deferral",
       "changelog": [
         "coding-agent@1.4.0/Fixed#24",
         "tui@1.4.0/Fixed#2"
@@ -4773,13 +4873,23 @@
         "src/PiSharp.Tui/Pi/MarkdownLexer.cs"
       ],
       "release": "1.5.0",
-      "notes": "PiSharp has no marked dependency; MarkdownLexer.cs is an independent C# lexer over marked 18.0.11's rules, so the CJK-friendly delimiter rules must be implemented there and checked against marked-cjk-friendly's cases. The HTML export counterpart is core.html-export-cjk-emphasis."
+      "notes": "PiSharp has no marked dependency; MarkdownLexer.cs is an independent C# lexer over marked 18.0.11's rules, so the CJK-friendly delimiter rules must be implemented there and checked against marked-cjk-friendly's cases. The HTML export counterpart is core.html-export-cjk-emphasis.",
+      "evidence": {
+        "commits": [
+          "60e4fb8b"
+        ],
+        "tests": [
+          "tests/PiSharp.InteractiveParity.Tests/Sync150Cases.cs: sync150.cjk-emphasis.next-to-cjk-punctuation",
+          "tests/PiSharp.InteractiveParity.Tests/Sync150Cases.cs: sync150.cjk-emphasis.commonmark-elsewhere"
+        ]
+      },
+      "deferred": "Node bridge virtual/tui/components/markdown.mjs stays at Pi v1.2.0: the v1.5.0 module needs a marked-cjk-friendly shim, Tokenizer.url and tokens.links in vendor/marked.mjs and a port-upstream.mjs change (node-bridge/bridge area)."
     },
     {
       "id": "tui.exit-restore-terminal-modes",
       "area": "tui",
       "phase": 2,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "coding-agent@1.4.0/Fixed#5",
         "tui@1.4.0/Fixed#3"
@@ -4796,13 +4906,24 @@
         "src/PiSharp.Tui/Pi/TuiAltScreen.cs"
       ],
       "release": "1.5.0",
-      "notes": "The .NET counterpart of process.on(\"exit\") is AppDomain.ProcessExit (it does not run on Environment.FailFast or a hard kill, as upstream's does not). Write the sequence synchronously to the raw output handle, as upstream uses fs.writeSync. Check the Windows console terminal (src/PiSharp.Tui/WindowsConsoleTerminal.cs) too."
+      "notes": "The .NET counterpart of process.on(\"exit\") is AppDomain.ProcessExit (it does not run on Environment.FailFast or a hard kill, as upstream's does not). Write the sequence synchronously to the raw output handle, as upstream uses fs.writeSync. Check the Windows console terminal (src/PiSharp.Tui/WindowsConsoleTerminal.cs) too.",
+      "evidence": {
+        "commits": [
+          "0c77f68b",
+          "6b8a88ed"
+        ],
+        "tests": [
+          "tests/PiSharp.InteractiveParity.Tests/Sync150Cases.cs: sync150.exit-restore.restores-modes-without-stop",
+          "tests/PiSharp.InteractiveParity.Tests/Sync150Cases.cs: sync150.exit-restore.no-second-restore-after-stop",
+          "tests/PiSharp.InteractiveParity.Tests/Sync150Cases.cs: sync150.exit-restore.main-screen-restores-terminal-modes"
+        ]
+      }
     },
     {
       "id": "tui.autocomplete-regex-metachar",
       "area": "tui",
       "phase": 2,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "coding-agent@1.4.0/Fixed#25",
         "tui@1.4.0/Fixed#4"
@@ -4815,13 +4936,23 @@
         "src/PiSharp.Tui/Pi/Autocomplete.cs"
       ],
       "release": "1.5.0",
-      "notes": "Autocomplete.cs:73 returns a single-segment query unescaped. Multi-segment queries use Regex.Escape (Autocomplete.cs:78), which escapes more characters (spaces, #) than upstream's escapeRegex ([.*+?^${}()|[\\]\\\\]); check what fd's Rust regex accepts, or port escapeRegex exactly."
+      "notes": "Autocomplete.cs:73 returns a single-segment query unescaped. Multi-segment queries use Regex.Escape (Autocomplete.cs:78), which escapes more characters (spaces, #) than upstream's escapeRegex ([.*+?^${}()|[\\]\\\\]); check what fd's Rust regex accepts, or port escapeRegex exactly.",
+      "evidence": {
+        "commits": [
+          "0c77f68b",
+          "6b8a88ed"
+        ],
+        "tests": [
+          "tests/PiSharp.InteractiveParity.Tests/Sync150Cases.cs: sync150.autocomplete.fd-query-escapes-metacharacters",
+          "tests/PiSharp.InteractiveParity.Tests/Sync150Cases.cs: sync150.autocomplete.metacharacters-match-literally"
+        ]
+      }
     },
     {
       "id": "tui.replace-control-characters",
       "area": "tui",
       "phase": 2,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "tui@1.5.0/Added#1"
       ],
@@ -4838,13 +4969,24 @@
         "tools/NodeBridge/pi-host/virtual/pi-tui.mjs"
       ],
       "release": "1.5.0",
-      "notes": "TerminalProgramStatus.cs:30 already has the same regex privately. Expose a shared ReplaceControlCharacters ([Experimental]) in TextUtils.cs and in the bridge's pi-tui exports. Its other callers are D1 rows: tui@1.5.0/Fixed#5 (setTitle) and coding-agent@1.5.0/Fixed#18 (login dialog URLs)."
+      "notes": "TerminalProgramStatus.cs:30 already has the same regex privately. Expose a shared ReplaceControlCharacters ([Experimental]) in TextUtils.cs and in the bridge's pi-tui exports. Its other callers are D1 rows: tui@1.5.0/Fixed#5 (setTitle) and coding-agent@1.5.0/Fixed#18 (login dialog URLs).",
+      "evidence": {
+        "commits": [
+          "0c77f68b",
+          "6b8a88ed"
+        ],
+        "tests": [
+          "tests/PiSharp.InteractiveParity.Tests/Sync150Cases.cs: sync150.replace-control-characters.runs-become-one-space",
+          "tests/PiSharp.InteractiveParity.Tests/Sync150Cases.cs: sync150.replace-control-characters.program-status-message",
+          "tests/PiSharp.InteractiveParity.Tests/Sync150Cases.cs: sync150.set-title.replaces-control-characters"
+        ]
+      }
     },
     {
       "id": "tui.captures-viewport-input",
       "area": "tui",
       "phase": 2,
-      "status": "port",
+      "status": "ported-with-deferral",
       "changelog": [
         "tui@1.5.0/Added#2"
       ],
@@ -4865,13 +5007,26 @@
         "tools/NodeBridge/pi-host/virtual/tui/tui.mjs"
       ],
       "release": "1.5.0",
-      "notes": "Same commit (3bae85274) as D1's tui@1.5.0/Fixed#7 and coding-agent@1.5.0/Fixed#19 (page keys in lists and selectors); port them together. Extension components live in Node, so the bridge must report the flag for a focused extension component. New member carries [Experimental]."
+      "notes": "Same commit (3bae85274) as D1's tui@1.5.0/Fixed#7 and coding-agent@1.5.0/Fixed#19 (page keys in lists and selectors); port them together. Extension components live in Node, so the bridge must report the flag for a focused extension component. New member carries [Experimental].",
+      "evidence": {
+        "commits": [
+          "0c77f68b",
+          "6b8a88ed"
+        ],
+        "tests": [
+          "tests/PiSharp.InteractiveParity.Tests/Sync150Cases.cs: sync150.captures-viewport-input.editor-autocomplete-pages",
+          "tests/PiSharp.InteractiveParity.Tests/Sync150Cases.cs: sync150.captures-viewport-input.focused-list-keeps-viewport",
+          "tests/PiSharp.InteractiveParity.Tests/Sync150Cases.cs: sync150.captures-viewport-input.editor-menu-releases-viewport",
+          "tests/PiSharp.InteractiveParity.Tests/Sync150Cases.cs: sync150.captures-viewport-input.component-defaults"
+        ]
+      },
+      "deferred": "A Node extension component's capturesViewportInput is not forwarded: PiSharp.Cli's extension component proxy and the bridge protocol would need to carry the flag (cli/bridge area)."
     },
     {
       "id": "tui.select-page-index",
       "area": "tui",
       "phase": 2,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "tui@1.5.0/Added#3"
       ],
@@ -4886,13 +5041,22 @@
         "tools/NodeBridge/pi-host/virtual/pi-tui.mjs"
       ],
       "release": "1.5.0",
-      "notes": "A public helper ([Experimental]) used by SelectList, SettingsList, editor autocomplete and the coding-agent selectors in D1's tui@1.5.0/Fixed#7 and coding-agent@1.5.0/Fixed#19."
+      "notes": "A public helper ([Experimental]) used by SelectList, SettingsList, editor autocomplete and the coding-agent selectors in D1's tui@1.5.0/Fixed#7 and coding-agent@1.5.0/Fixed#19.",
+      "evidence": {
+        "commits": [
+          "0c77f68b",
+          "6b8a88ed"
+        ],
+        "tests": [
+          "tests/PiSharp.InteractiveParity.Tests/Sync150Cases.cs: sync150.select-page.index-helper"
+        ]
+      }
     },
     {
       "id": "tui.native-shift-enter-esc-return",
       "area": "tui",
       "phase": 2,
-      "status": "port",
+      "status": "ported-with-deferral",
       "changelog": [
         "coding-agent@1.5.0/Fixed#3",
         "tui@1.5.0/Fixed#1"
@@ -4907,13 +5071,23 @@
         "src/PiSharp.Tui/Pi/RawTerminalIo.cs"
       ],
       "release": "1.5.0",
-      "notes": "Terminal.cs:227 holds PiSharp's native Shift+Enter check, which accepts only CR. PiSharp cannot read the Shift key on macOS (RawTerminalIo.cs:265, IsShiftPressed() => false), so the Apple Terminal case does nothing until a macOS modifier check exists; the owner may want that as a follow-up. Windows benefits at once."
+      "notes": "Terminal.cs:227 holds PiSharp's native Shift+Enter check, which accepts only CR. PiSharp cannot read the Shift key on macOS (RawTerminalIo.cs:265, IsShiftPressed() => false), so the Apple Terminal case does nothing until a macOS modifier check exists; the owner may want that as a follow-up. Windows benefits at once.",
+      "evidence": {
+        "commits": [
+          "0c77f68b",
+          "6b8a88ed"
+        ],
+        "tests": [
+          "tests/PiSharp.InteractiveParity.Tests/Sync150Cases.cs: sync150.native-shift-enter.esc-return"
+        ]
+      },
+      "deferred": "macOS: PiSharp cannot read the Shift state on macOS (RawTerminalIo.cs:265, no CoreGraphics query), so native Shift+Enter is not detected there. The Windows path is ported; the test fakes the Shift state."
     },
     {
       "id": "tui.regular-mode-strip-osc133",
       "area": "tui",
       "phase": 2,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "coding-agent@1.5.0/Fixed#4",
         "tui@1.5.0/Fixed#2"
@@ -4927,13 +5101,22 @@
         "src/PiSharp.Tui/Pi/Layout.cs"
       ],
       "release": "1.5.0",
-      "notes": "TuiMainScreen.cs:152 writes the lines. Reuse Layout.Osc133ZonePrefix() (Layout.cs:39) for the match."
+      "notes": "TuiMainScreen.cs:152 writes the lines. Reuse Layout.Osc133ZonePrefix() (Layout.cs:39) for the match.",
+      "evidence": {
+        "commits": [
+          "0c77f68b",
+          "6b8a88ed"
+        ],
+        "tests": [
+          "tests/PiSharp.InteractiveParity.Tests/Sync150Cases.cs: sync150.regular-mode.strips-osc133-markers"
+        ]
+      }
     },
     {
       "id": "tui.double-click-word-chars",
       "area": "tui",
       "phase": 2,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "coding-agent@1.5.0/Fixed#70",
         "tui@1.5.0/Fixed#3"
@@ -4946,13 +5129,22 @@
         "src/PiSharp.Tui/Pi/TuiAltScreen.cs"
       ],
       "release": "1.5.0",
-      "notes": "TuiAltScreen.cs:599 joins only \"/\" and \"-\"."
+      "notes": "TuiAltScreen.cs:599 joins only \"/\" and \"-\".",
+      "evidence": {
+        "commits": [
+          "0c77f68b",
+          "6b8a88ed"
+        ],
+        "tests": [
+          "tests/PiSharp.InteractiveParity.Tests/Sync150Cases.cs: sync150.double-click.path-word-joiners"
+        ]
+      }
     },
     {
       "id": "tui.fuzzy-contiguous-match",
       "area": "tui",
       "phase": 2,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "coding-agent@1.5.0/Fixed#12",
         "tui@1.5.0/Fixed#4"
@@ -4966,13 +5158,27 @@
         "src/PiSharp.Cli/Models/ModelListing.cs"
       ],
       "release": "1.5.0",
-      "notes": "Fuzzy lives at TextSupport.cs:164-203; ModelListing.cs:9-13 (FuzzyFilter) calls it. cli.resume-search-fields depends on this row."
+      "notes": "Fuzzy lives at TextSupport.cs:164-203; ModelListing.cs:9-13 (FuzzyFilter) calls it. cli.resume-search-fields depends on this row.",
+      "evidence": {
+        "commits": [
+          "0c77f68b",
+          "6b8a88ed"
+        ],
+        "tests": [
+          "tests/PiSharp.InteractiveParity.Tests/Sync150Cases.cs: sync150.fuzzy.contiguous-occurrence-beats-scattered-alignment",
+          "tests/PiSharp.Models.Tests/Sync150Cases.cs: sync150.fuzzy.contiguous-occurrence-beats-scattered-alignment",
+          "tests/PiSharp.InteractiveParity.Tests/Sync150Cases.cs: sync150.fuzzy.best-contiguous-occurrence",
+          "tests/PiSharp.Models.Tests/Sync150Cases.cs: sync150.fuzzy.best-contiguous-occurrence",
+          "tests/PiSharp.InteractiveParity.Tests/Sync150Cases.cs: sync150.fuzzy.filter-ranks-contained-query-first",
+          "tests/PiSharp.Models.Tests/Sync150Cases.cs: sync150.fuzzy.filter-ranks-contained-query-first"
+        ]
+      }
     },
     {
       "id": "tui.set-title-control-chars",
       "area": "tui",
       "phase": 2,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "coding-agent@1.5.0/Fixed#69",
         "tui@1.5.0/Fixed#5"
@@ -4989,13 +5195,22 @@
         "src/PiSharp.Tui/Rendering/TerminalProgramStatus.cs"
       ],
       "release": "1.5.0",
-      "notes": "Terminal.cs:293 (SetTitle) writes the title raw. TerminalProgramStatus.cs:29 and :42 already replace control characters, so only the title needs the fix. Depends on group C's tui.replace-control-characters (tui@1.5.0/Added#1)."
+      "notes": "Terminal.cs:293 (SetTitle) writes the title raw. TerminalProgramStatus.cs:29 and :42 already replace control characters, so only the title needs the fix. Depends on group C's tui.replace-control-characters (tui@1.5.0/Added#1).",
+      "evidence": {
+        "commits": [
+          "0c77f68b",
+          "6b8a88ed"
+        ],
+        "tests": [
+          "tests/PiSharp.InteractiveParity.Tests/Sync150Cases.cs: sync150.set-title.replaces-control-characters"
+        ]
+      }
     },
     {
       "id": "tui.display-math-raw-fallback",
       "area": "tui",
       "phase": 2,
-      "status": "port",
+      "status": "ported-with-deferral",
       "changelog": [
         "coding-agent@1.5.0/Fixed#71",
         "tui@1.5.0/Fixed#6"
@@ -5008,13 +5223,22 @@
         "src/PiSharp.Tui/Pi/Markdown.cs"
       ],
       "release": "1.5.0",
-      "notes": "Markdown.cs:145 handles display math."
+      "notes": "Markdown.cs:145 handles display math.",
+      "evidence": {
+        "commits": [
+          "60e4fb8b"
+        ],
+        "tests": [
+          "tests/PiSharp.InteractiveParity.Tests/Sync150Cases.cs: sync150.display-math-raw-fallback.wider-than-content"
+        ]
+      },
+      "deferred": "Node bridge virtual/tui/components/markdown.mjs stays at Pi v1.2.0: the v1.5.0 module needs a marked-cjk-friendly shim, Tokenizer.url and tokens.links in vendor/marked.mjs and a port-upstream.mjs change (node-bridge/bridge area)."
     },
     {
       "id": "tui.select-page-keys",
       "area": "tui",
       "phase": 2,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "coding-agent@1.5.0/Fixed#19",
         "tui@1.5.0/Fixed#7"
@@ -5036,13 +5260,23 @@
         "src/PiSharp.Tui/Pi/TuiAltScreen.cs"
       ],
       "release": "1.5.0",
-      "notes": "Depends on group C's tui.captures-viewport-input (tui@1.5.0/Added#2) and tui.select-page-index (tui@1.5.0/Added#3). cli.selector-page-keys builds on this row."
+      "notes": "Depends on group C's tui.captures-viewport-input (tui@1.5.0/Added#2) and tui.select-page-index (tui@1.5.0/Added#3). cli.selector-page-keys builds on this row.",
+      "evidence": {
+        "commits": [
+          "0c77f68b",
+          "6b8a88ed"
+        ],
+        "tests": [
+          "tests/PiSharp.InteractiveParity.Tests/Sync150Cases.cs: sync150.select-page.select-list",
+          "tests/PiSharp.InteractiveParity.Tests/Sync150Cases.cs: sync150.select-page.settings-list"
+        ]
+      }
     },
     {
       "id": "tui.wrap-styled-word-boundary",
       "area": "tui",
       "phase": 2,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "coding-agent@1.5.0/Fixed#72",
         "tui@1.5.0/Fixed#8"
@@ -5055,13 +5289,29 @@
         "src/PiSharp.Tui/Pi/TextUtils.cs"
       ],
       "release": "1.5.0",
-      "notes": "GetLineEndReset (TextUtils.cs:306) resets only underline and links; the wrap loop is near line 412."
+      "notes": "GetLineEndReset (TextUtils.cs:306) resets only underline and links; the wrap loop is near line 412.",
+      "evidence": {
+        "commits": [
+          "0c77f68b",
+          "60e4fb8b",
+          "6b8a88ed"
+        ],
+        "tests": [
+          "tests/PiSharp.InteractiveParity.Tests/Sync150Cases.cs: sync150.wrap.closing-code-stays-on-wrapped-line",
+          "tests/PiSharp.InteractiveParity.Tests/Sync150Cases.cs: sync150.wrap.closed-style-not-reopened",
+          "tests/PiSharp.InteractiveParity.Tests/Sync150Cases.cs: sync150.wrap.styled-whitespace-within-width",
+          "tests/PiSharp.InteractiveParity.Tests/Sync150Cases.cs: sync150.wrap.trims-spaces-before-long-word",
+          "tests/PiSharp.InteractiveParity.Tests/Sync150Cases.cs: sync150.wrap.strikethrough-reset-and-restored",
+          "tests/PiSharp.InteractiveParity.Tests/Sync150Cases.cs: sync150.wrap.strikethrough-reset-keeps-background",
+          "tests/PiSharp.InteractiveParity.Tests/Sync150Cases.cs: sync150.wrap.markdown-styled-words-and-background"
+        ]
+      }
     },
     {
       "id": "tui.markdown-block-reuse",
       "area": "tui",
       "phase": 2,
-      "status": "port",
+      "status": "ported-with-deferral",
       "changelog": [
         "tui@1.5.0/Fixed#9"
       ],
@@ -5073,13 +5323,26 @@
         "src/PiSharp.Tui/Pi/Markdown.cs"
       ],
       "release": "1.5.0",
-      "notes": "PiSharp re-renders the whole document on each update. A C# cache keyed by block source with ConditionalWeakTable or a bounded dictionary is the nearest match. cli.highlight-reuse depends on this row."
+      "notes": "PiSharp re-renders the whole document on each update. A C# cache keyed by block source with ConditionalWeakTable or a bounded dictionary is the nearest match. cli.highlight-reuse depends on this row.",
+      "evidence": {
+        "commits": [
+          "60e4fb8b"
+        ],
+        "tests": [
+          "tests/PiSharp.InteractiveParity.Tests/Sync150Cases.cs: sync150.markdown-block-reuse.highlight-once-across-stream-and-resize",
+          "tests/PiSharp.InteractiveParity.Tests/Sync150Cases.cs: sync150.markdown-block-reuse.blocks-held-weakly",
+          "tests/PiSharp.InteractiveParity.Tests/Sync150Cases.cs: sync150.markdown-block-reuse.next-block-changes-spacing",
+          "tests/PiSharp.InteractiveParity.Tests/Sync150Cases.cs: sync150.markdown-block-reuse.follows-reference-definitions",
+          "tests/PiSharp.InteractiveParity.Tests/Sync150Cases.cs: sync150.markdown-block-reuse.unchanged-blocks-keep-lines"
+        ]
+      },
+      "deferred": "Node bridge virtual/tui/components/markdown.mjs stays at Pi v1.2.0: the v1.5.0 module needs a marked-cjk-friendly shim, Tokenizer.url and tokens.links in vendor/marked.mjs and a port-upstream.mjs change (node-bridge/bridge area)."
     },
     {
       "id": "tui.text-settext-unchanged",
       "area": "tui",
       "phase": 2,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "tui@1.5.0/Fixed#10"
       ],
@@ -5091,13 +5354,22 @@
         "src/PiSharp.Tui/Pi/Components.cs"
       ],
       "release": "1.5.0",
-      "notes": "Components.cs:20 (Text.SetText) always clears the cache."
+      "notes": "Components.cs:20 (Text.SetText) always clears the cache.",
+      "evidence": {
+        "commits": [
+          "0c77f68b",
+          "6b8a88ed"
+        ],
+        "tests": [
+          "tests/PiSharp.InteractiveParity.Tests/Sync150Cases.cs: sync150.text.same-text-keeps-wrapped-lines"
+        ]
+      }
     },
     {
       "id": "tui.orca-kitty-images",
       "area": "tui",
       "phase": 2,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "coding-agent@1.5.0/Fixed#57",
         "tui@1.5.0/Fixed#11"
@@ -5110,13 +5382,22 @@
         "src/PiSharp.Tui/Pi/TerminalImage.cs"
       ],
       "release": "1.5.0",
-      "notes": "TerminalImage.cs:57-58 holds the capability detection."
+      "notes": "TerminalImage.cs:57-58 holds the capability detection.",
+      "evidence": {
+        "commits": [
+          "0c77f68b",
+          "6b8a88ed"
+        ],
+        "tests": [
+          "tests/PiSharp.InteractiveParity.Tests/Sync150Cases.cs: sync150.terminal-image.orca"
+        ]
+      }
     },
     {
       "id": "tui.bare-url-cjk-punctuation",
       "area": "tui",
       "phase": 2,
-      "status": "port",
+      "status": "ported-with-deferral",
       "changelog": [
         "coding-agent@1.5.0/Fixed#58",
         "tui@1.5.0/Fixed#12"
@@ -5130,13 +5411,27 @@
         "src/PiSharp.Tui/Pi/MarkdownLexer.cs"
       ],
       "release": "1.5.0",
-      "notes": "MarkdownLexer.cs:374 and :503-505 find the URL end."
+      "notes": "MarkdownLexer.cs:374 and :503-505 find the URL end.",
+      "evidence": {
+        "commits": [
+          "0c77f68b",
+          "60e4fb8b",
+          "6b8a88ed"
+        ],
+        "tests": [
+          "tests/PiSharp.InteractiveParity.Tests/Sync150Cases.cs: sync150.bare-url-cjk-punctuation.stops-at-cjk-punctuation",
+          "tests/PiSharp.InteractiveParity.Tests/Sync150Cases.cs: sync150.bare-url-cjk-punctuation.keeps-cjk-letters",
+          "tests/PiSharp.InteractiveParity.Tests/Sync150Cases.cs: sync150.bare-url-cjk-punctuation.explicit-links-keep-punctuation",
+          "tests/PiSharp.InteractiveParity.Tests/Sync150Cases.cs: sync150.bare-url-cjk-punctuation.english-trim-first"
+        ]
+      },
+      "deferred": "Node bridge virtual/tui/components/markdown.mjs stays at Pi v1.2.0: the v1.5.0 module needs a marked-cjk-friendly shim, Tokenizer.url and tokens.links in vendor/marked.mjs and a port-upstream.mjs change (node-bridge/bridge area)."
     },
     {
       "id": "tui.kitty-function-keys",
       "area": "tui",
       "phase": 2,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "coding-agent@1.5.0/Fixed#59",
         "tui@1.5.0/Fixed#13"
@@ -5149,13 +5444,23 @@
         "src/PiSharp.Tui/Pi/Keys.cs"
       ],
       "release": "1.5.0",
-      "notes": "Keys.cs:46 and :69-70 decode kitty codepoints without the PUA range check or the F1-F12 forms."
+      "notes": "Keys.cs:46 and :69-70 decode kitty codepoints without the PUA range check or the F1-F12 forms.",
+      "evidence": {
+        "commits": [
+          "0c77f68b",
+          "6b8a88ed"
+        ],
+        "tests": [
+          "tests/PiSharp.InteractiveParity.Tests/Sync150Cases.cs: sync150.keys.kitty-function-keys",
+          "tests/PiSharp.InteractiveParity.Tests/Sync150Cases.cs: sync150.keys.unmapped-kitty-functional-keys-not-printable"
+        ]
+      }
     },
     {
       "id": "tui.kitty-image-crop-boxed",
       "area": "tui",
       "phase": 2,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "coding-agent@1.5.0/Fixed#60",
         "tui@1.5.0/Fixed#14"
@@ -5170,13 +5475,23 @@
         "src/PiSharp.Tui/Pi/TerminalImage.cs"
       ],
       "release": "1.5.0",
-      "notes": "Layout.cs:224-238 breaks on a non-empty line."
+      "notes": "Layout.cs:224-238 breaks on a non-empty line.",
+      "evidence": {
+        "commits": [
+          "0c77f68b",
+          "6b8a88ed"
+        ],
+        "tests": [
+          "tests/PiSharp.InteractiveParity.Tests/Sync150Cases.cs: sync150.kitty-image-crop.padded-colored-box",
+          "tests/PiSharp.InteractiveParity.Tests/Sync150Cases.cs: sync150.kitty-image-crop.placeholder-rows-with-text"
+        ]
+      }
     },
     {
       "id": "tui.nested-blockquote-linear",
       "area": "tui",
       "phase": 2,
-      "status": "port",
+      "status": "ported-with-deferral",
       "changelog": [
         "coding-agent@1.5.0/Fixed#61",
         "tui@1.5.0/Fixed#15"
@@ -5189,13 +5504,22 @@
         "src/PiSharp.Tui/Pi/Markdown.cs"
       ],
       "release": "1.5.0",
-      "notes": "Markdown.cs:169 renders quote content at Math.Max(1, width - 2). Add a deep-nesting test."
+      "notes": "Markdown.cs:169 renders quote content at Math.Max(1, width - 2). Add a deep-nesting test.",
+      "evidence": {
+        "commits": [
+          "60e4fb8b"
+        ],
+        "tests": [
+          "tests/PiSharp.InteractiveParity.Tests/Sync150Cases.cs: sync150.nested-blockquote-linear.deeper-than-width"
+        ]
+      },
+      "deferred": "Node bridge virtual/tui/components/markdown.mjs stays at Pi v1.2.0: the v1.5.0 module needs a marked-cjk-friendly shim, Tokenizer.url and tokens.links in vendor/marked.mjs and a port-upstream.mjs change (node-bridge/bridge area)."
     },
     {
       "id": "codemode.stop-without-exit-wait",
       "area": "codemode",
       "phase": 2,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "codemode@1.3.0/Breaking Changes#1",
         "codemode@1.3.0/Fixed#1",
@@ -5215,13 +5539,22 @@
         "docs/compatibility/codemode-engine.md"
       ],
       "release": "1.5.0",
-      "notes": "PiSharp runs scripts in Jint in a child process or thread (decision 0003); on abort or timeout it waits for TerminateAsync up to TerminationLimit 10 s (CodemodeSandbox.cs:169, :444-448) before settling, and CloseAsync (:158-163) and RetireAsync (CodemodeWorkers.cs:164-178) also wait for exit. Settling on the request changes the public contract for embedders; record it in codemode-engine.md. Exit tracking moves to codemode.worker-lifetime-hooks."
+      "notes": "PiSharp runs scripts in Jint in a child process or thread (decision 0003); on abort or timeout it waits for TerminateAsync up to TerminationLimit 10 s (CodemodeSandbox.cs:169, :444-448) before settling, and CloseAsync (:158-163) and RetireAsync (CodemodeWorkers.cs:164-178) also wait for exit. Settling on the request changes the public contract for embedders; record it in codemode-engine.md. Exit tracking moves to codemode.worker-lifetime-hooks.",
+      "evidence": {
+        "commits": [
+          "01569b49"
+        ],
+        "tests": [
+          "tests/PiSharp.Codemode.Tests/Sync150Cases.cs: sync150.stop-without-exit-wait.abort-timeout-and-close-settle-before-exit",
+          "tests/PiSharp.Codemode.Tests/IsolationCases.cs: isolation.settles-when-termination-stalls"
+        ]
+      }
     },
     {
       "id": "codemode.worker-lifetime-hooks",
       "area": "codemode",
       "phase": 2,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "codemode@1.3.0/Added#1",
         "codemode@1.3.0/Added#2"
@@ -5239,13 +5572,25 @@
         "website/src/content/docs/docs/embed/codemode.md"
       ],
       "release": "1.5.0",
-      "notes": "CodemodeSandboxOptions (CodemodeTypes.cs:140-163) has no capacity or start hooks. New public API needs [Experimental] like the rest of PiSharp.Codemode and an embed-docs entry. Prerequisite for codemode.worker-admission-limit; pairs with codemode.stop-without-exit-wait."
+      "notes": "CodemodeSandboxOptions (CodemodeTypes.cs:140-163) has no capacity or start hooks. New public API needs [Experimental] like the rest of PiSharp.Codemode and an embed-docs entry. Prerequisite for codemode.worker-admission-limit; pairs with codemode.stop-without-exit-wait.",
+      "evidence": {
+        "commits": [
+          "01569b49"
+        ],
+        "tests": [
+          "tests/PiSharp.Codemode.Tests/Sync150Cases.cs: sync150.worker-lifetime-hooks.denied-admission-starts-no-worker",
+          "tests/PiSharp.Codemode.Tests/Sync150Cases.cs: sync150.worker-lifetime-hooks.release-when-the-worker-fails-to-start",
+          "tests/PiSharp.Codemode.Tests/Sync150Cases.cs: sync150.worker-lifetime-hooks.no-admission-before-start",
+          "tests/PiSharp.Codemode.Tests/Sync150Cases.cs: sync150.worker-lifetime-hooks.execute-and-start-report-the-actual-exit",
+          "tests/PiSharp.Codemode.Tests/Sync150Cases.cs: sync150.worker-lifetime-hooks.failing-hook-requests-termination"
+        ]
+      }
     },
     {
       "id": "codemode.worker-admission-limit",
       "area": "codemode",
       "phase": 2,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "coding-agent@1.3.0/Fixed#4"
       ],
@@ -5260,13 +5605,22 @@
         "website/src/content/docs/docs/guides/codemode.md"
       ],
       "release": "1.5.0",
-      "notes": "PiSharp's executor caps concurrent model calls (MaxConcurrentModelCalls = 4) but not live workers, so repeated timeouts can pile up child processes. Depends on codemode.worker-lifetime-hooks. A later upstream bullet in another group turns the rejection into waiting for capacity; port the final behaviour and the matching docs once."
+      "notes": "PiSharp's executor caps concurrent model calls (MaxConcurrentModelCalls = 4) but not live workers, so repeated timeouts can pile up child processes. Depends on codemode.worker-lifetime-hooks. A later upstream bullet in another group turns the rejection into waiting for capacity; port the final behaviour and the matching docs once.",
+      "evidence": {
+        "commits": [
+          "01569b49"
+        ],
+        "tests": [
+          "tests/PiSharp.Codemode.Tests/Sync150Cases.cs: sync150.worker-admission-limit.max-workers-variable",
+          "tests/PiSharp.Codemode.Tests/Sync150Cases.cs: sync150.wait-for-free-worker.waits-in-arrival-order"
+        ]
+      }
     },
     {
       "id": "codemode.wait-for-free-worker",
       "area": "codemode",
       "phase": 2,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "coding-agent@1.4.0/New Features#4",
         "coding-agent@1.4.0/Fixed#8"
@@ -5284,7 +5638,18 @@
         "website/src/content/docs/docs/reference/environment.md"
       ],
       "release": "1.5.0",
-      "notes": "PiSharp has no worker admission at all: each execution starts its own worker (CodemodeSandbox.cs:228), so it never had the 1.3.0 \"worker limit reached\" failure. This row depends on the 1.3.0 admission rows owned by group A (coding-agent@1.3.0/Fixed#4 and codemode@1.3.0/Added#2, the acquireWorker hook). src/PiSharp.Cli/docs/codemode.md is a byte copy of docs/codemode.md and changes with it. Port the error texts from execute.ts."
+      "notes": "PiSharp has no worker admission at all: each execution starts its own worker (CodemodeSandbox.cs:228), so it never had the 1.3.0 \"worker limit reached\" failure. This row depends on the 1.3.0 admission rows owned by group A (coding-agent@1.3.0/Fixed#4 and codemode@1.3.0/Added#2, the acquireWorker hook). src/PiSharp.Cli/docs/codemode.md is a byte copy of docs/codemode.md and changes with it. Port the error texts from execute.ts.",
+      "evidence": {
+        "commits": [
+          "01569b49"
+        ],
+        "tests": [
+          "tests/PiSharp.Codemode.Tests/Sync150Cases.cs: sync150.wait-for-free-worker.waits-in-arrival-order",
+          "tests/PiSharp.Codemode.Tests/Sync150Cases.cs: sync150.wait-for-free-worker.timeout-abort-and-cap",
+          "tests/PiSharp.Codemode.Tests/Sync150Cases.cs: sync150.wait-for-free-worker.deadline-shrinks-by-the-wait",
+          "tests/PiSharp.Codemode.Tests/Sync150Cases.cs: sync150.worker-admission-limit.max-workers-variable"
+        ]
+      }
     },
     {
       "id": "codemode.readme-pi-schema",
@@ -5306,7 +5671,7 @@
       "id": "codemode.output-type-summaries",
       "area": "codemode",
       "phase": 2,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "coding-agent@1.5.0/Fixed#35"
       ],
@@ -5320,7 +5685,17 @@
         "src/PiSharp.Codemode/CodemodeDeclarations.cs"
       ],
       "release": "1.5.0",
-      "notes": "CodemodeToolDefinition.cs:171-180 builds the summary; CodemodeDeclarations.cs:80 renders the types."
+      "notes": "CodemodeToolDefinition.cs:171-180 builds the summary; CodemodeDeclarations.cs:80 renders the types.",
+      "evidence": {
+        "commits": [
+          "01569b49"
+        ],
+        "tests": [
+          "tests/PiSharp.Codemode.Tests/Sync150Cases.cs: sync150.output-type-summaries.union-multi-line-and-single-line",
+          "tests/PiSharp.Codemode.Tests/DeclarationDifferentialCases.cs: differential.codemode-loadout-descriptions",
+          "tests/PiSharp.Codemode.Tests/ExecutorCases.cs: tool.description-modes-and-inline-budget"
+        ]
+      }
     },
     {
       "id": "mcp.mcp-json-bom",
@@ -5428,7 +5803,7 @@
       "id": "tools.read-line-range-labels",
       "area": "tools",
       "phase": 2,
-      "status": "port",
+      "status": "ported-with-deferral",
       "changelog": [
         "coding-agent@1.3.0/Fixed#6"
       ],
@@ -5451,13 +5826,24 @@
         "tools/NodeBridge/pi-host/virtual/upstream-exports.json"
       ],
       "release": "1.5.0",
-      "notes": "PiSharp formats the range separately in Read.cs:23-31, TreeSelector.cs:915-925 and template.js:578 and :968, each with the old handling of string and null offsets. Port the helper once in RenderUtils and add formatReadLineRange to the bridge's coding-agent exports."
+      "notes": "PiSharp formats the range separately in Read.cs:23-31, TreeSelector.cs:915-925 and template.js:578 and :968, each with the old handling of string and null offsets. Port the helper once in RenderUtils and add formatReadLineRange to the bridge's coding-agent exports.",
+      "evidence": {
+        "commits": [
+          "795448e3"
+        ],
+        "tests": [
+          "tests/PiSharp.InteractiveParity.Tests/Sync150ToolCases.cs: sync150.read-line-range-labels.format",
+          "tests/PiSharp.InteractiveParity.Tests/Sync150ToolCases.cs: sync150.read-line-range-labels.session-tree",
+          "tests/PiSharp.InteractiveParity.Tests/Sync150ToolCases.cs: sync150.read-line-range-labels.tool-renderer"
+        ]
+      },
+      "deferred": "HTML export template.js keeps the pinned Pi 1.2.0 copy (SessionParity pins its sha256); it moves with the export template re-sync. Upstream examples (minimal-mode.ts, subagent) have no PiSharp copy."
     },
     {
       "id": "tools.grep-no-config",
       "area": "tools",
       "phase": 2,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "coding-agent@1.4.0/Fixed#14"
       ],
@@ -5471,13 +5857,23 @@
         "src/PiSharp.Tools/Files/RipgrepExecutor.cs"
       ],
       "release": "1.5.0",
-      "notes": "Prepend --no-config to the argument lists at PiGrepTool.cs:129 and RipgrepExecutor.cs:117. Upstream's argument order is --no-config, --json, --line-number, --color=never, --hidden."
+      "notes": "Prepend --no-config to the argument lists at PiGrepTool.cs:129 and RipgrepExecutor.cs:117. Upstream's argument order is --no-config, --json, --line-number, --color=never, --hidden.",
+      "evidence": {
+        "commits": [
+          "795448e3"
+        ],
+        "tests": [
+          "tests/PiSharp.CliParity.Tests/Sync150Cases.cs: sync150.grep-no-config",
+          "tests/PiSharp.Tools.Tests/Sync150Cases.cs: sync150.grep-no-config",
+          "tests/PiSharp.CliParity.Tests/Sync150Cases.cs: sync150.grep-no-config.real-ripgrep-ignores-ripgrep-config-path"
+        ]
+      }
     },
     {
       "id": "tools.windows-store-shell-aliases",
       "area": "tools",
       "phase": 2,
-      "status": "port",
+      "status": "already-ported",
       "changelog": [
         "coding-agent@1.4.0/Fixed#15"
       ],
@@ -5489,13 +5885,14 @@
         "src/PiSharp.Tools/Processes/ShellDiscovery.cs"
       ],
       "release": "1.5.0",
-      "notes": "ShellDiscovery checks paths with File.Exists through ShellHost (ShellDiscovery.cs:27). File.Exists reads attributes without opening the file, so it may already accept app-execution aliases; verify on Windows against a WindowsApps alias and record the row as already-ported with that test if it does."
+      "notes": "ShellDiscovery checks paths with File.Exists through ShellHost (ShellDiscovery.cs:27). File.Exists reads attributes without opening the file, so it may already accept app-execution aliases; verify on Windows against a WindowsApps alias and record the row as already-ported with that test if it does.",
+      "evidence": "ShellHost.Current checks with File.Exists, which accepts app execution aliases (reparse points); sync150.windows-store-shell-aliases resolves real %LOCALAPPDATA%\\Microsoft\\WindowsApps aliases on this machine."
     },
     {
       "id": "tools.windows-shell-install-dirs",
       "area": "tools",
       "phase": 2,
-      "status": "port",
+      "status": "ported-with-deferral",
       "changelog": [
         "coding-agent@1.4.0/Fixed#16"
       ],
@@ -5509,13 +5906,22 @@
         "src/PiSharp.Tools/Processes/ShellDiscovery.cs"
       ],
       "release": "1.5.0",
-      "notes": "ShellDiscovery.IsLegacyWslBashPath hard-codes c:/windows (ShellDiscovery.cs:38-41). PiSharp's CLI registers no powershell tool (PiHelp.cs:12), so the PowerShell lookup applies only to the durable powershell tool (durable phase), and PiToolsManager extracts archives in-process (PiToolsManager.cs:155-162), so the tar change does not apply."
+      "notes": "ShellDiscovery.IsLegacyWslBashPath hard-codes c:/windows (ShellDiscovery.cs:38-41). PiSharp's CLI registers no powershell tool (PiHelp.cs:12), so the PowerShell lookup applies only to the durable powershell tool (durable phase), and PiToolsManager extracts archives in-process (PiToolsManager.cs:155-162), so the tar change does not apply.",
+      "evidence": {
+        "commits": [
+          "795448e3"
+        ],
+        "tests": [
+          "tests/PiSharp.Tools.Tests/Sync150Cases.cs: sync150.windows-shell-install-dirs"
+        ]
+      },
+      "deferred": "PowerShell install-directory lookup: the CLI has no powershell tool; the durable powershell tool follows in the phase 4 durable re-sync. taskkill/tar SystemRoot change does not apply (PiSharp kills in-process and extracts archives in-process)."
     },
     {
       "id": "tools.fd-rg-unsupported-arch",
       "area": "tools",
       "phase": 2,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "coding-agent@1.5.0/Fixed#11"
       ],
@@ -5527,13 +5933,22 @@
         "src/PiSharp.Cli/Pi/PiToolsManager.cs"
       ],
       "release": "1.5.0",
-      "notes": "PiToolsManager.cs:27 and :36 fall back to x86_64 for any unknown architecture. Return no target, print upstream's warning, and keep the tools that need fd or rg on their existing fallback."
+      "notes": "PiToolsManager.cs:27 and :36 fall back to x86_64 for any unknown architecture. Return no target, print upstream's warning, and keep the tools that need fd or rg on their existing fallback.",
+      "evidence": {
+        "commits": [
+          "795448e3"
+        ],
+        "tests": [
+          "tests/PiSharp.CliParity.Tests/Sync150Cases.cs: sync150.fd-rg-unsupported-arch.release-targets",
+          "tests/PiSharp.CliParity.Tests/Sync150Cases.cs: sync150.fd-rg-unsupported-arch.warns-and-downloads-nothing"
+        ]
+      }
     },
     {
       "id": "tools.macos-stop-group-before-kill",
       "area": "tools",
       "phase": 2,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "coding-agent@1.5.0/Fixed#16"
       ],
@@ -5546,13 +5961,21 @@
         "src/PiSharp.Tools/Processes/Unix/UnixProcessLease.cs"
       ],
       "release": "1.5.0",
-      "notes": "PiSharp kills the group directly (PosixSpawnProcessAdmission.cs:58 and :193, UnixProcessLease.cs:73). Add the SIGSTOP step on macOS only; it needs a macOS test run."
+      "notes": "PiSharp kills the group directly (PosixSpawnProcessAdmission.cs:58 and :193, UnixProcessLease.cs:73). Add the SIGSTOP step on macOS only; it needs a macOS test run.",
+      "evidence": {
+        "commits": [
+          "795448e3"
+        ],
+        "tests": [
+          "tests/PiSharp.CliParity.Tests/Sync150Cases.cs: sync150.macos-stop-group-before-kill.no-next-command-after-stop"
+        ]
+      }
     },
     {
       "id": "tools.strip-ansi-private-csi",
       "area": "tools",
       "phase": 2,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "coding-agent@1.5.0/Fixed#20"
       ],
@@ -5564,13 +5987,21 @@
         "src/PiSharp.Tools/Processes/ShellAnsiText.cs"
       ],
       "release": "1.5.0",
-      "notes": "Update the pattern at ShellAnsiText.cs:17 and add cases for ESC[<35;59;1M and ESC= followed by digits."
+      "notes": "Update the pattern at ShellAnsiText.cs:17 and add cases for ESC[<35;59;1M and ESC= followed by digits.",
+      "evidence": {
+        "commits": [
+          "795448e3"
+        ],
+        "tests": [
+          "tests/PiSharp.Tools.Tests/Sync150Cases.cs: sync150.strip-ansi-private-csi"
+        ]
+      }
     },
     {
       "id": "tools.tool-search-name-weight",
       "area": "tools",
       "phase": 2,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "coding-agent@1.5.0/Fixed#28"
       ],
@@ -5583,13 +6014,24 @@
         "src/PiSharp.Cli/Mcp/McpToolSearch.cs"
       ],
       "release": "1.5.0",
-      "notes": "Codemode's searchTools shares ToolSearchRanker, so its results change too. Land with tools.tool-search-unicode-words."
+      "notes": "Codemode's searchTools shares ToolSearchRanker, so its results change too. Land with tools.tool-search-unicode-words.",
+      "evidence": {
+        "commits": [
+          "e22354e0"
+        ],
+        "tests": [
+          "tests/PiSharp.ToolSearch.Tests/Sync150Cases.cs: sync150.tool-search-name-weight.exact-name-first",
+          "tests/PiSharp.ToolSearch.Tests/Sync150Cases.cs: sync150.tool-search-name-weight.name-above-mentions",
+          "tests/PiSharp.ToolSearch.Tests/Sync150Cases.cs: sync150.tool-search-name-weight.whole-name-bonus",
+          "tests/PiSharp.ToolSearch.Tests/Sync150Cases.cs: sync150.tool-search-name-weight.coverage-first"
+        ]
+      }
     },
     {
       "id": "tools.tool-search-unicode-words",
       "area": "tools",
       "phase": 2,
-      "status": "port",
+      "status": "ported-with-deferral",
       "changelog": [
         "coding-agent@1.5.0/Fixed#29"
       ],
@@ -5603,13 +6045,23 @@
         "src/PiSharp.Durable/Search.cs"
       ],
       "release": "1.5.0",
-      "notes": "Owner design point: .NET has no Intl.Segmenter word granularity (ICU dictionary segmentation for CJK and Thai). PiSharp's WordSegmenter (src/PiSharp.Tui/Pi/TextSupport.cs:48-60) is UAX#29-like: CJK ideographs stand alone and Thai is not split. Choose ICU interop or accept that segmenter. The durable copy (Search.cs) moves with the phase 4 durable re-sync."
+      "notes": "Owner design point: .NET has no Intl.Segmenter word granularity (ICU dictionary segmentation for CJK and Thai). PiSharp's WordSegmenter (src/PiSharp.Tui/Pi/TextSupport.cs:48-60) is UAX#29-like: CJK ideographs stand alone and Thai is not split. Choose ICU interop or accept that segmenter. The durable copy (Search.cs) moves with the phase 4 durable re-sync.",
+      "evidence": {
+        "commits": [
+          "e22354e0"
+        ],
+        "tests": [
+          "tests/PiSharp.ToolSearch.Tests/Sync150Cases.cs: sync150.tool-search-unicode-words.tokenize",
+          "tests/PiSharp.ToolSearch.Tests/Sync150Cases.cs: sync150.tool-search-unicode-words.rank"
+        ]
+      },
+      "deferred": "Residual differences from Intl.Segmenter: the system ICU version (Windows icu.dll, macOS libicucore, Linux libicuuc.so.N) can differ from V8's bundled ICU; without ICU a run stays one word (no CJK/Thai split); with invariant globalization NFC is a no-op; JS Final_Sigma lowercasing is not reproduced; root locale only. The durable copy moves with durable.tool-search-unicode (phase 4)."
     },
     {
       "id": "tools.image-resize-smaller-encoding",
       "area": "tools",
       "phase": 2,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "coding-agent@1.5.0/Fixed#32"
       ],
@@ -5623,13 +6075,23 @@
         "src/PiSharp.Tools.Skia/SkiaImageCodec.cs"
       ],
       "release": "1.5.0",
-      "notes": "ImageProcessing.cs:203 picks the encoding; SkiaImageCodec.cs:33-51 encodes."
+      "notes": "ImageProcessing.cs:203 picks the encoding; SkiaImageCodec.cs:33-51 encodes.",
+      "evidence": {
+        "commits": [
+          "795448e3"
+        ],
+        "tests": [
+          "tests/PiSharp.Tools.Tests/Sync150Cases.cs: sync150.image-resize-smaller-encoding",
+          "tests/PiSharp.Tools.Tests/SkiaCodecTests.cs: skia dimension limits at and over the edge resize with Lanczos3 and the dimension note",
+          "tests/PiSharp.Tools.Tests/SkiaCodecTests.cs: skia byte limit at and over the edge and the PNG then JPEG quality-step choice"
+        ]
+      }
     },
     {
       "id": "tools.grep-lone-cr-context",
       "area": "tools",
       "phase": 2,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "coding-agent@1.5.0/Fixed#43"
       ],
@@ -5643,7 +6105,17 @@
         "src/PiSharp.Tools/Files/GrepTool.cs"
       ],
       "release": "1.5.0",
-      "notes": "Both grep tools still replace lone CRs: PiGrepTool.cs:123 (pi tool policy) and GrepTool.cs:183 (the explicit profile's context reader). Both take match line numbers from ripgrep (IGrepExecutor and RipgrepExecutor). Drop the lone-CR replacement in both and add a fixture with a lone CR before a match. GrepTool's MaximumContextFileLines count follows the new split. The Node bridge's grep runs on the host (tools.mjs hostExecute), so no bridge change."
+      "notes": "Both grep tools still replace lone CRs: PiGrepTool.cs:123 (pi tool policy) and GrepTool.cs:183 (the explicit profile's context reader). Both take match line numbers from ripgrep (IGrepExecutor and RipgrepExecutor). Drop the lone-CR replacement in both and add a fixture with a lone CR before a match. GrepTool's MaximumContextFileLines count follows the new split. The Node bridge's grep runs on the host (tools.mjs hostExecute), so no bridge change.",
+      "evidence": {
+        "commits": [
+          "795448e3"
+        ],
+        "tests": [
+          "tests/PiSharp.CliParity.Tests/Sync150Cases.cs: sync150.grep-lone-cr-context",
+          "tests/PiSharp.Tools.Tests/Sync150Cases.cs: sync150.grep-lone-cr-context",
+          "tests/PiSharp.CliParity.Tests/Sync150Cases.cs: sync150.grep-lone-cr-context.real-ripgrep-line-numbers"
+        ]
+      }
     },
     {
       "id": "bridge.drop-assistant-message-frame",
