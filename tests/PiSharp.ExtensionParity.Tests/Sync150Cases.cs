@@ -15,7 +15,8 @@ using PiSharp.Tools.Processes;
 // core/package-manager.ts (getNpmInstallArgs and uninstallNpm with a real --prefix, resolvePackageSources: install failures,
 // temporary npm and git refresh; cleanAndInstallGitDependencies after a failed clean; reportUnchangedNpmUpdates), core/resource-loader.ts
 // (describePackageInstallFailure, formatPackageInstallWarning), main.ts (--help and --list-models report the runtime diagnostics) and
-// package-manager-cli.ts (progress events, pi config warnings).
+// package-manager-cli.ts (progress events, pi config warnings); the minimatch 11.0.3 upgrade (b4c2e92ac: brace-expansion 5 limits and
+// nonrecursive-glob-match) as PiMinimatch ports its protection, from the brace-expansion 5.0.12 and minimatch 11.0.3 sources.
 // Expectations are written from the sources by reading, never captured from an upstream run.
 internal static partial class Program
 {
@@ -30,7 +31,51 @@ internal static partial class Program
         ("sync150.package-update-warns-when-npm-leaves-the-version-unchanged", PackageUnchangedNpmUpdate),
         ("sync150.package-install-failure-is-a-startup-warning", PackageInstallFailureAtStartup),
         ("sync150.package-install-failure-warnings-follow-reload", PackageInstallFailureOnReload),
+        ("sync150.glob-brace-expansion-is-bounded", Sync(GlobBraceAmplification)),
+        ("sync150.glob-amplified-wildcards-and-globstars-answer-at-once", Sync(GlobWildcardAmplification)),
     ];
+
+    // brace-expansion 5 (minimatch 11): an amplified brace pattern is truncated instead of expanded without bound: at most 100,000
+    // results and 4,000,000 characters, chained sets combined without recursion, nesting followed 1,000 levels deep.
+    private static void GlobBraceAmplification()
+    {
+        var chained = PiMinimatch.BraceExpand(string.Concat(Enumerable.Repeat("{a,b}", 20)));
+        Equal(100_000, chained.Count, "2^20 expansions capped");
+        Equal(new string('a', 20), chained[0], "first expansion");
+        Equal(100_000, chained.Distinct().Count(), "distinct expansions");
+        var lengthy = PiMinimatch.BraceExpand(string.Concat(Enumerable.Repeat("{a,b}", 1500)));
+        Check(lengthy.Count > 0 && lengthy.Sum(item => (long)item.Length) <= 4_000_000 && lengthy.All(item => item.Length == 1500), "character cap: " + lengthy.Count);
+        var sequence = PiMinimatch.BraceExpand("{1..2000000}");
+        Equal(100_000, sequence.Count, "sequence capped"); Equal("100000", sequence[^1], "last sequence item");
+        Equal(1, PiMinimatch.BraceExpand("{1..3..99999999999}").Count, "a step wider than the range");
+        var nested = PiMinimatch.BraceExpand(string.Concat(Enumerable.Repeat("{a,", 5000)) + "b" + new string('}', 5000));
+        Check(nested.Count <= 1_002 && nested[0] == "a", "nesting past 1,000 levels stays literal: " + nested.Count);
+        // Ordinary expansions are unchanged.
+        Names(["a1x", "a1y", "a2x", "a2y", "bx", "by"], PiMinimatch.BraceExpand("{a{1,2},b}{x,y}"), "nested and chained sets");
+        Names(["x{y}z1", "x{y}z2"], PiMinimatch.BraceExpand("x{y}z{1,2}"), "a literal set, then a list");
+        Names(["f01", "f03", "f05"], PiMinimatch.BraceExpand("f{01..05..2}"), "padded sequence with a step");
+        Check(PiMinimatch.Match(new string('a', 20), string.Concat(Enumerable.Repeat("{a,b}", 20))), "a capped pattern matches its first expansion");
+    }
+
+    // nonrecursive-glob-match and minimatch 11's globstar walk: a portion with many stars is matched without backtracking and a pattern
+    // with many ** without a recursive walk per split, so pathological patterns answer at once; ordinary results are unchanged.
+    private static void GlobWildcardAmplification()
+    {
+        var watch = System.Diagnostics.Stopwatch.StartNew();
+        var stars = string.Concat(Enumerable.Repeat("*a", 40));
+        Check(!PiMinimatch.Match(new string('a', 400), stars + "*b"), "many stars, no final literal");
+        Check(PiMinimatch.Match(new string('a', 400) + "b", stars + "*b"), "many stars and the final literal");
+        Check(!PiMinimatch.Match(new string('a', 400), stars + "*B", ignoreCase: true), "many stars, ignoring case");
+        var path = string.Join('/', Enumerable.Repeat("a", 60));
+        var globstars = string.Concat(Enumerable.Repeat("**/a/", 30));
+        Check(!PiMinimatch.Match(path, globstars + "b"), "many globstars, no final segment");
+        Check(PiMinimatch.Match(path + "/b", globstars + "b"), "many globstars and the final segment");
+        Check(!PiMinimatch.Match(path + "/.x/b", globstars + "b"), "a ** never swallows a dot segment");
+        Check(watch.Elapsed < TimeSpan.FromSeconds(20), "pathological patterns answer at once: " + watch.Elapsed);
+        Check(!PiMinimatch.Match(".a", "*") && PiMinimatch.Match(".a", ".*") && PiMinimatch.Match(".a", "[.]a") && !PiMinimatch.Match(".a", "?a"), "dot rule");
+        Check(PiMinimatch.Match("X.TS", "*.[t]s", ignoreCase: true) && !PiMinimatch.Match("X.TS", "*.[t]s") && PiMinimatch.Match("ab1", "a?[[:digit:]]"), "classes");
+        Check(PiMinimatch.Match("a/b/", "a/**/*") && PiMinimatch.Match("x/y/z.ts", "**/*.ts") && !PiMinimatch.Match("x/.y/z.ts", "**/*.ts"), "globstar results");
+    }
 
     private const string ExecExtension = """
         import { appendFileSync } from "node:fs";
