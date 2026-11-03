@@ -78,16 +78,17 @@ internal sealed class PiExtensionRun : IAsyncDisposable
             ? await manager.ResolveExtensionSourcesAsync(paths, temporary: true, cancellationToken: token).ConfigureAwait(false)
             : PiSharp.Cli.Packages.PiResolvedPaths.Empty;
         var resolved = _parsed.NoExtensions ? PiSharp.Cli.Packages.PiResolvedPaths.Empty : await manager.ResolveAsync(cancellationToken: token).ConfigureAwait(false);
-        var seen = new HashSet<string>(PiPaths.Comparer);
+        // Source mergePaths: each path once by getResourcePathKey.
+        var seen = new HashSet<string>(StringComparer.Ordinal);
         var list = ImmutableArray.CreateBuilder<PiExtensionSource>();
         foreach (var resource in cli.Extensions.Concat(resolved.Extensions))
         {
             if (!resource.Enabled || resource.Path.StartsWith("builtin:", StringComparison.Ordinal)) continue;
-            if (seen.Add(Path.GetFullPath(resource.Path))) list.Add(new(resource.Path, resource.Metadata.Scope, resource.Metadata.Source, resource.Metadata.Origin, resource.Metadata.BaseDir));
+            if (seen.Add(PiSourceInfo.ResourcePathKey(resource.Path))) list.Add(new(resource.Path, resource.Metadata.Scope, resource.Metadata.Source, resource.Metadata.Origin, resource.Metadata.BaseDir));
         }
         // A local -e path that does not exist is still reported (Extension path does not exist).
         foreach (var path in _parsed.Extensions ?? [])
-            if (PiPaths.IsLocalPath(path) && PiPaths.ResolvePath(path, _cwd, _home, trim: true) is var local && !Path.Exists(local) && seen.Add(Path.GetFullPath(local)))
+            if (PiPaths.IsLocalPath(path) && PiPaths.ResolvePath(path, _cwd, _home, trim: true) is var local && !Path.Exists(local) && seen.Add(PiSourceInfo.ResourcePathKey(local)))
                 list.Add(new(local, "temporary", "cli"));
         return (list.ToImmutable(), [.. resolved.InstallFailures, .. cli.InstallFailures]);
     }

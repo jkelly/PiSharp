@@ -51,7 +51,7 @@ internal sealed partial class PiExtensionHost
         {
             generation = ++_runtimeGeneration;
             _extensions.Clear(); _errors.Clear();
-            _order = [.. paths.Select(Path.GetFullPath)];
+            _order = [.. paths.Select(PiSourceInfo.ResourcePathKey)];
             if (result is { } reloaded)
             {
                 foreach (var item in reloaded.GetProperty("results").EnumerateArray())

@@ -191,11 +191,11 @@ internal sealed partial class PiExtensionHost : IPiNodeHostPeer, IAsyncDisposabl
     /// at the end.</summary>
     internal void Reorder(IEnumerable<string> paths)
     {
-        var order = paths.Select(Path.GetFullPath).ToList();
+        var order = paths.Select(PiSourceInfo.ResourcePathKey).ToList();
         lock (_extensions)
         {
             _order = [.. order];
-            var ranked = _extensions.Select((extension, position) => (extension, rank: order.FindIndex(path => PiPaths.Comparer.Equals(path, extension.ResolvedPath)), position))
+            var ranked = _extensions.Select((extension, position) => (extension, rank: order.IndexOf(PiSourceInfo.ResourcePathKey(extension.ResolvedPath)), position))
                 .OrderBy(item => item.rank < 0 ? int.MaxValue : item.rank).ThenBy(item => item.position).Select(item => item.extension).ToList();
             _extensions.Clear(); _extensions.AddRange(ranked);
         }
