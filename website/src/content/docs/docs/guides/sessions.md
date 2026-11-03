@@ -105,7 +105,7 @@ Summaries may use the model's full output limit. When the cut falls inside a tur
 
 The HTML page is Pi's export page, drawn in your current theme.
 
-`/share` uses the GitHub CLI. Install [`gh`](https://cli.github.com/) and run `gh auth login` first. PiSharp uploads the HTML page as a secret gist and prints two links: the gist, and a viewer link made of `PI_SHARE_VIEWER_URL` (default `https://pi.dev/session/`), `#` and the gist id. Point `PI_SHARE_VIEWER_URL` at your own viewer to keep links off pi.dev. If you are signed in to Radius, `/share` uploads to Radius instead, visible to your organization, as Pi does.
+`/share` uses the GitHub CLI. Install [`gh`](https://cli.github.com/) and run `gh auth login` first. PiSharp uploads the HTML page as a secret gist and prints two links: the gist, and a viewer link made of `PI_SHARE_VIEWER_URL` (default `https://pi.dev/session/`), `#` and the gist id. Point `PI_SHARE_VIEWER_URL` at your own viewer to keep links off pi.dev. If you are signed in to Radius, `/share` uploads to Radius instead, visible to your organization, as Pi does. Set [`sessionShareDestination`](/docs/reference/settings/) to `gist` or `radius` to force one destination; with `radius` and no Radius sign-in, `/share` stops with "Radius authentication is not configured. Run '/login radius' first."
 
 ## Copy and migrate session files
 

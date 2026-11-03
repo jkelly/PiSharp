@@ -765,6 +765,28 @@ internal static class Sync150CliCases
             }
             finally { KeybindingsManager.SetGlobal(previous); }
         }));
+
+        // settings-selector.ts "share-destination" (after Transport) and settings-manager.ts getSessionShareDestination /
+        // setSessionShareDestination: the choice cycles auto, gist, radius; anything else in settings.json reads as auto.
+        yield return ("sync150.settings-session-share-destination", Sync(() =>
+        {
+            var changes = new List<string>();
+            var list = new SettingsSelectorComponent(new SettingsConfig { SessionShareDestination = "auto" },
+                new SettingsCallbacks { OnSessionShareDestinationChange = changes.Add }).GetSettingsList();
+            list.SelectItem("share-destination");
+            Contains(string.Join("\n", Strip(list.Render(140))), "Session share destination", "item row");
+            Contains(string.Join("\n", Strip(list.Render(140))),
+                "Where to upload sessions with /share (auto prefers Radius when authenticated, otherwise GitHub Gist)", "item description");
+            const string Enter = "\r";
+            list.HandleInput(Enter); list.HandleInput(Enter); list.HandleInput(Enter);
+            Equal("gist,radius,auto", string.Join(",", changes), "cycled values");
+
+            var settings = new InteractiveSettings(new JsonObject { ["sessionShareDestination"] = "github" });
+            Equal("auto", settings.SessionShareDestination, "unknown value");
+            settings.SetSessionShareDestination("radius");
+            Equal("radius", settings.SessionShareDestination, "saved value");
+            Equal("auto", new InteractiveSettings(new JsonObject()).SessionShareDestination, "default");
+        }));
     }
 
     /// <summary>A model runtime with a fixed available snapshot and no refresh errors.</summary>

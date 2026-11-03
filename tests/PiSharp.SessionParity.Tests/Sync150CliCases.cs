@@ -2,7 +2,9 @@
 // session tree walks, #11225; cost totals prefer the recorded total, #9980; system message entries, #11261; read line ranges, #9887).
 // The cases are modeled on the upstream tests export-html-deep-tree.test.ts, export-html-cost.test.ts,
 // export-html-system-messages.test.ts and the HTML viewer part of read-line-range-display.test.ts; their expectations are authored,
-// never captured from an upstream run.
+// never captured from an upstream run. modes/interactive/session-share.ts and core/settings-manager.ts (sessionShareDestination, #11021)
+// are read for the /share destination case.
+#pragma warning disable PISHARP_EXTUI001 // SessionShareSession.Destination (Pi 1.5.0 sessionShareDestination)
 using System.Globalization;
 using System.Text;
 using System.Text.Json;
@@ -19,6 +21,7 @@ internal static partial class Program
         Case("sync150.html-export-cost-total-prefers-the-recorded-total", HtmlExportCostTotals),
         Case("sync150.html-export-renders-system-messages", HtmlExportSystemMessages),
         Case("sync150.html-export-read-rows-show-line-ranges", HtmlExportReadLineRange),
+        Case("sync150.share-destination-chooses-radius-or-gist", ShareDestination),
     ];
 
     private static string TemplateJs() => Encoding.UTF8.GetString(SessionHtmlExport.ReadAssetBytes("template.js"));
@@ -231,5 +234,44 @@ internal static partial class Program
         Equal("<span class=\"tree-role-tool\">[read: notes.txt:25-37]</span>", engine.Evaluate("viewer.getTreeNodeDisplayHtml(resultEntry)").AsString(), "tree row");
         var row = engine.Evaluate("viewer.renderEntry(assistantEntry)").AsString();
         Check(row.Contains("<span class=\"line-numbers\">:25-37</span>", StringComparison.Ordinal), "read row: " + row);
+    }
+
+    // session-share.ts shareSession: "gist" never asks Radius; "radius" without a Radius credential shows the /login hint and never runs
+    // gh; "auto" (and any unknown value, getSessionShareDestination) tries Radius first and falls back to a gist.
+    private static async Task ShareDestination()
+    {
+        var root = Temp("share-destination"); var fixture = WriteFixture(root);
+        SessionShareSession Session(ShareProviderAuth? auth, string destination) => new(() => SessionExportSource.Open(fixture),
+            () => new SessionExportAgentState("sys", []), (path, _) => { File.WriteAllText(path, "<html>"); return Task.CompletedTask; }, new FakeRadius(auth))
+        { Destination = destination };
+        async Task<(string Log, FakeProcesses Processes, FakeHttp Http)> Run(SessionShareSession session)
+        {
+            var ui = new RecordingUi(); var processes = new FakeProcesses { Gist = new(0, "https://gist.github.com/user/abc123", "") };
+            var http = new FakeHttp((System.Net.HttpStatusCode.OK, "OK", "{\"artifact\":{\"canonical_url\":\"https://radius.pi.dev/a/1\"}}"));
+            await new SessionShare { Processes = processes, Http = new HttpMessageInvoker(http), TempRoot = root, Environment = NoEnvironment }.ShareSessionAsync(session, ui.Ui);
+            return (ui.Log, processes, http);
+        }
+        const string Gist = "loader:Creating gist...|restore|status:Share URL: ";
+        var signedIn = new ShareProviderAuth("tok");
+
+        var (log, processes, http) = await Run(Session(signedIn, "gist"));
+        Check(log.StartsWith(Gist, StringComparison.Ordinal) && http.Requests.Count == 0 && processes.Commands.Count == 2, "gist skips a signed-in Radius: " + log);
+
+        (log, processes, http) = await Run(Session(null, "radius"));
+        Equal("error:Radius authentication is not configured. Run '/login radius' first.", log, "radius without auth");
+        Check(processes.Commands.Count == 0 && http.Requests.Count == 0, "radius without auth runs no gh");
+        (log, _, http) = await Run(Session(signedIn, "radius"));
+        Equal("loader:Uploading to Radius...|restore|status:Share URL: " + Link("https://radius.pi.dev/a/1"), log, "radius signed in");
+
+        foreach (var destination in new[] { "auto", "Radius", "" })
+        {
+            (log, processes, http) = await Run(Session(signedIn, destination));
+            Check(log.StartsWith("loader:Uploading to Radius...", StringComparison.Ordinal) && http.Requests.Count == 1 && processes.Commands.Count == 0,
+                destination + " prefers a signed-in Radius: " + log);
+            (log, processes, _) = await Run(Session(null, destination));
+            Check(log.StartsWith(Gist, StringComparison.Ordinal) && processes.Commands.Count == 2, destination + " falls back to a gist: " + log);
+        }
+        Equal("auto", new SessionShareSession(() => throw new InvalidOperationException(), () => throw new InvalidOperationException(),
+            (_, _) => Task.CompletedTask).Destination, "default destination");
     }
 }

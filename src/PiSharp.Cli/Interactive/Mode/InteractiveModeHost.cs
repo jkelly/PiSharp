@@ -64,7 +64,7 @@ internal static class InteractiveModeHost
                 var session = startup.Host.CurrentSession ?? throw new InvalidOperationException("The session is not ready.");
                 var share = PiSharp.CodingAgent.Export.AgentSessionExport.ShareSession(session,
                     new PiSharp.CodingAgent.Export.SessionHtmlExportHost(new PiSharp.CodingAgent.Export.PiThemeHost { AgentDirectory = startup.AgentDir },
-                        settings.ThemeSetting, startup.Cwd, () => createExportToolRenderer?.Invoke()), themeName);
+                        settings.ThemeSetting, startup.Cwd, () => createExportToolRenderer?.Invoke()), themeName) with { Destination = settings.SessionShareDestination };
                 return new PiSharp.CodingAgent.Export.SessionShare().ShareSessionAsync(share, ui, abort);
             },
             ImportSessionFile = path => ImportSessionFile(path, startup),

@@ -53,6 +53,7 @@ Before merging, PiSharp migrates old keys in each file, as Pi does: `queueMode` 
 | Key | Type | Default | Effect |
 | --- | --- | --- | --- |
 | `sessionDir` | string | none | Session folder, in the `--session-dir` format. `--session-dir` and `PI_CODING_AGENT_SESSION_DIR` win over it. |
+| `sessionShareDestination` | `auto`, `gist`, `radius` | `auto` | Where `/share` uploads. `auto` uses Radius when you're signed in to it, otherwise a GitHub gist. `gist` always uses a gist. `radius` needs Radius sign-in and never falls back to a gist. Any other value reads as `auto`. `/settings` writes it to global settings. |
 | `steeringMode` | `all`, `one-at-a-time` | `one-at-a-time` | How messages you send while the agent works are delivered: all at once, or one per turn. |
 | `followUpMode` | `all`, `one-at-a-time` | `one-at-a-time` | The same for follow-up messages, which wait until the agent stops. |
 | `doubleEscapeAction` | `tree`, `fork`, `none` | `tree` | What pressing `Esc` twice in an empty editor opens: `/tree`, the `/fork` picker, or nothing. |
