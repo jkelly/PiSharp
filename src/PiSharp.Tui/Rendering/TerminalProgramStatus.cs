@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/tui/src/program-status.ts and packages/tui/src/terminal.ts (ProcessTerminal program status).
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/tui/src/program-status.ts and packages/tui/src/terminal.ts (ProcessTerminal program status).
 using System.Text;
 using System.Text.RegularExpressions;
 
@@ -27,8 +27,6 @@ public static partial class TerminalProgramStatusProtocol
     private static partial Regex ReplyPattern();
     [GeneratedRegex(@"^[A-Za-z0-9_.+-]{1,32}\z", RegexOptions.CultureInvariant)]
     private static partial Regex AppPattern();
-    [GeneratedRegex(@"[\u0000-\u001f\u007f-\u009f]+", RegexOptions.CultureInvariant)]
-    private static partial Regex ControlCharacters();
 
     /// <summary>The reply to <see cref="Query"/>. Later spec revisions may add pairs after the <c>?</c>.</summary>
     public static bool IsReply(string sequence) => sequence is not null && ReplyPattern().IsMatch(sequence);
@@ -40,7 +38,7 @@ public static partial class TerminalProgramStatusProtocol
         var pairs = new List<string> { "state=" + Name(status.State) };
         if (status.App is not null && AppPattern().IsMatch(status.App)) pairs.Add("app=" + status.App);
         if (status.State == TerminalProgramState.Blocked && status.Kind is { } kind) pairs.Add("kind=" + kind.ToString().ToLowerInvariant());
-        var message = TruncateUtf8(ControlCharacters().Replace(status.Message ?? "", " ").Trim(JsWhitespace), MaximumMessageBytes);
+        var message = TruncateUtf8(Pi.TextUtils.ReplaceControlCharacters(status.Message ?? "").Trim(JsWhitespace), MaximumMessageBytes);
         if (message.Length != 0) pairs.Add("msg=" + Convert.ToBase64String(Encoding.UTF8.GetBytes(message)));
         return "\u001b]7501;" + string.Join(":", pairs) + "\u001b\\";
     }

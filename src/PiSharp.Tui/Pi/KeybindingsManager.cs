@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/tui/src/keybindings.ts.
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/tui/src/keybindings.ts.
 namespace PiSharp.Tui.Pi;
 
 public sealed record KeybindingDefinition(IReadOnlyList<string> DefaultKeys, string? Description = null)
@@ -117,4 +117,19 @@ public sealed class KeybindingsManager
     public static void SetGlobal(KeybindingsManager manager) { lock (GlobalGate) global = manager; }
     /// <summary>The process-wide bindings (<c>getKeybindings</c>); the TUI defaults until the app sets its own.</summary>
     public static KeybindingsManager Global { get { lock (GlobalGate) return global ??= new(TuiKeybindings); } }
+
+    /// <summary>The selection index after a <c>tui.select.pageUp</c> or <c>tui.select.pageDown</c> key, moved by
+    /// <paramref name="pageSize"/> and clamped to <c>0..itemCount - 1</c> (<c>getSelectPageIndex</c>). Null when
+    /// <paramref name="data"/> is not a selection page key, and 0 for a page key on an empty list, so callers must still check that
+    /// the list has items before selecting.</summary>
+    [System.Diagnostics.CodeAnalysis.Experimental("PISHARP_TUI001")]
+    public static int? GetSelectPageIndex(KeybindingsManager keybindings, string data, int selectedIndex, int itemCount, int pageSize)
+    {
+        ArgumentNullException.ThrowIfNull(keybindings);
+        int direction;
+        if (keybindings.Matches(data, "tui.select.pageUp")) direction = -1;
+        else if (keybindings.Matches(data, "tui.select.pageDown")) direction = 1;
+        else return null;
+        return Math.Max(0, Math.Min(itemCount - 1, selectedIndex + direction * pageSize));
+    }
 }

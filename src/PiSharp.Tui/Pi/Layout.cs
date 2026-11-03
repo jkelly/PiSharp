@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/tui/src/layout-node.ts, packages/tui/src/layout.ts,
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/tui/src/layout-node.ts, packages/tui/src/layout.ts,
 // packages/tui/src/components/stack.ts, v-stack.ts, h-stack.ts, scroll-view.ts, mouse-region.ts, alt-screen-flash.ts,
 // packages/tui/src/wheel-scroll.ts.
 using System.Text.RegularExpressions;
@@ -222,21 +222,23 @@ public static partial class LayoutEngine
         }
         foreach (var child in box.Children) PaintBox(child, screen, totalWidth);
         if (box.ScrollView is { } view && box.ScrollContentLines is { } content && view.ScrollTop > 0 && box.Rect.Height > 0)
-            for (var imageRow = view.ScrollTop - 1; imageRow >= 0; imageRow--)
+        {
+            // Find the nearest image line above the viewport. Placeholder rows below an image line may contain padding, borders, or
+            // side-by-side text, so the search is bounded by the tallest registered image instead of by row content.
+            var minRow = Math.Max(0, view.ScrollTop - TerminalImage.GetMaxKittyImageRows());
+            for (var imageRow = view.ScrollTop - 1; imageRow >= minRow; imageRow--)
             {
                 var imageLine = imageRow < content.Count ? content[imageRow] : "";
-                if (TerminalImage.GetKittyImageMetadata(imageLine) is { } metadata)
+                if (!TerminalImage.IsImageLine(imageLine) || TerminalImage.GetKittyImageMetadata(imageLine) is not { } metadata) continue;
+                var hidden = view.ScrollTop - imageRow;
+                if (hidden < metadata.Rows)
                 {
-                    var hidden = view.ScrollTop - imageRow;
-                    if (hidden < metadata.Rows)
-                    {
-                        var cropped = TerminalImage.CropKittyImageLine(imageLine, hidden, Math.Min(box.Rect.Height, metadata.Rows - hidden));
-                        if (box.Rect.X == 0 && box.Rect.Width >= totalWidth && box.Rect.Y >= 0 && box.Rect.Y < screen.Count) screen[box.Rect.Y] = cropped;
-                    }
-                    break;
+                    var cropped = TerminalImage.CropKittyImageLine(imageLine, hidden, Math.Min(box.Rect.Height, metadata.Rows - hidden));
+                    if (box.Rect.X == 0 && box.Rect.Width >= totalWidth && box.Rect.Y >= 0 && box.Rect.Y < screen.Count) screen[box.Rect.Y] = cropped;
                 }
-                if (imageLine.Length != 0) break;
+                break;
             }
+        }
         PaintScrollbar(box, screen, totalWidth);
     }
 

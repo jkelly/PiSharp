@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/tui/src/keys.ts.
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/tui/src/keys.ts.
 using System.Globalization;
 using System.Text.RegularExpressions;
 
@@ -25,6 +25,12 @@ public static partial class Keys
     private const int CpEscape = 27, CpTab = 9, CpEnter = 13, CpSpace = 32, CpBackspace = 127, CpKpEnter = 57414;
     private const int ArrowUp = -1, ArrowDown = -2, ArrowRight = -3, ArrowLeft = -4;
     private const int FnDelete = -10, FnInsert = -11, FnPageUp = -12, FnPageDown = -13, FnHome = -14, FnEnd = -15;
+    // F1 is -21 down to F12 at -32.
+    private const int FnF1 = -21, FnF2 = -22, FnF3 = -23, FnF4 = -24, FnF5 = -25, FnF6 = -26, FnF7 = -27, FnF8 = -28, FnF9 = -29, FnF10 = -30,
+        FnF11 = -31, FnF12 = -32;
+    // Kitty reserves this Private Use Area range for functional keys (F13-F35, media keys, modifier keys, ...). CSI-u codepoints in
+    // it are never text.
+    private const int KittyFunctionalPuaStart = 57344, KittyFunctionalPuaEnd = 63743;
 
     private static readonly Dictionary<int, int> KittyFunctionalEquivalents = new()
     {
@@ -79,8 +85,8 @@ public static partial class Keys
     public enum KeyEventType { Press, Repeat, Release }
     private sealed record KittySequence(int Codepoint, int? ShiftedKey, int? BaseLayoutKey, int Modifier, KeyEventType EventType);
 
-    private static readonly string[] ReleaseMarkers = [":3u", ":3~", ":3A", ":3B", ":3C", ":3D", ":3H", ":3F"];
-    private static readonly string[] RepeatMarkers = [":2u", ":2~", ":2A", ":2B", ":2C", ":2D", ":2H", ":2F"];
+    private static readonly string[] ReleaseMarkers = [":3u", ":3~", ":3A", ":3B", ":3C", ":3D", ":3H", ":3F", ":3P", ":3Q", ":3S"];
+    private static readonly string[] RepeatMarkers = [":2u", ":2~", ":2A", ":2B", ":2C", ":2D", ":2H", ":2F", ":2P", ":2Q", ":2S"];
     /// <summary>Kitty flag 2 release events (bracketed paste content never counts).</summary>
     public static bool IsKeyRelease(string data) => !data.Contains("\u001b[200~", StringComparison.Ordinal) && ReleaseMarkers.Any(m => data.Contains(m, StringComparison.Ordinal));
     public static bool IsKeyRepeat(string data) => !data.Contains("\u001b[200~", StringComparison.Ordinal) && RepeatMarkers.Any(m => data.Contains(m, StringComparison.Ordinal));
@@ -91,6 +97,7 @@ public static partial class Keys
     [GeneratedRegex(@"^\x1b\[(\d+)(?:;(\d+))?(?::(\d+))?~$")] private static partial Regex Functional();
     [GeneratedRegex(@"^\x1b\[1;(\d+)(?::(\d+))?([HF])$")] private static partial Regex HomeEnd();
     [GeneratedRegex(@"^\x1b\[27;(\d+);(\d+)~$")] private static partial Regex ModifyOtherKeysPattern();
+    [GeneratedRegex(@"^\x1b\[(?:1;(\d+)(?::(\d+))?)?([PQS])$")] private static partial Regex FunctionKeyPqs();
 
     private static int Int(string value) => int.TryParse(value, NumberStyles.None, CultureInfo.InvariantCulture, out var result) ? result : int.MaxValue;
     private static KittySequence? ParseKitty(string data)
@@ -110,13 +117,24 @@ public static partial class Keys
         match = Functional().Match(data);
         if (match.Success)
         {
-            int? codepoint = Int(match.Groups[1].Value) switch { 2 => FnInsert, 3 => FnDelete, 5 => FnPageUp, 6 => FnPageDown, 7 => FnHome, 8 => FnEnd, _ => null };
+            int? codepoint = Int(match.Groups[1].Value) switch
+            {
+                2 => FnInsert, 3 => FnDelete, 5 => FnPageUp, 6 => FnPageDown, 7 => FnHome, 8 => FnEnd,
+                11 => FnF1, 12 => FnF2, 13 => FnF3, 14 => FnF4, 15 => FnF5, 17 => FnF6, 18 => FnF7, 19 => FnF8, 20 => FnF9, 21 => FnF10,
+                23 => FnF11, 24 => FnF12, _ => null
+            };
             if (codepoint is { } value)
                 return new(value, null, null, (match.Groups[2].Success ? Int(match.Groups[2].Value) : 1) - 1, EventType(match.Groups[3].Success ? match.Groups[3].Value : null));
         }
         match = HomeEnd().Match(data);
         if (match.Success)
             return new(match.Groups[3].Value == "H" ? FnHome : FnEnd, null, null, Int(match.Groups[1].Value) - 1, EventType(match.Groups[2].Success ? match.Groups[2].Value : null));
+        // F1, F2, F4: \x1b[P/Q/S or \x1b[1;<mod>P/Q/S or \x1b[1;<mod>:<event>P/Q/S. F3 is sent as \x1b[13~ because \x1b[1;<mod>R
+        // collides with cursor position reports.
+        match = FunctionKeyPqs().Match(data);
+        if (match.Success)
+            return new(match.Groups[3].Value switch { "P" => FnF1, "Q" => FnF2, _ => FnF4 }, null, null,
+                (match.Groups[1].Success ? Int(match.Groups[1].Value) : 1) - 1, EventType(match.Groups[2].Success ? match.Groups[2].Value : null));
         return null;
     }
 
@@ -286,7 +304,8 @@ public static partial class Keys
                 if (modifier == Ctrl) return data == "\u001b[1;5C" || MatchesLegacyModifier(data, "right", Ctrl) || MatchesKitty(data, ArrowRight, Ctrl);
                 return Functional(data, "right", ArrowRight, modifier);
             case "f1" or "f2" or "f3" or "f4" or "f5" or "f6" or "f7" or "f8" or "f9" or "f10" or "f11" or "f12":
-                return modifier == 0 && MatchesLegacy(data, LegacyKeySequences[key]);
+                if (modifier == 0 && MatchesLegacy(data, LegacyKeySequences[key])) return true;
+                return MatchesKitty(data, FnF1 - (int.Parse(key.AsSpan(1), CultureInfo.InvariantCulture) - 1), modifier);
         }
         if (key.Length == 1 && (key[0] is >= 'a' and <= 'z' or >= '0' and <= '9' || SymbolKeys.Contains(key)))
         {
@@ -325,6 +344,7 @@ public static partial class Keys
         {
             CpEscape => "escape", CpTab => "tab", CpEnter or CpKpEnter => "enter", CpSpace => "space", CpBackspace => "backspace",
             FnDelete => "delete", FnInsert => "insert", FnHome => "home", FnEnd => "end", FnPageUp => "pageUp", FnPageDown => "pageDown",
+            <= FnF1 and >= FnF12 => "f" + (FnF1 - effective + 1).ToString(CultureInfo.InvariantCulture),
             ArrowUp => "up", ArrowDown => "down", ArrowLeft => "left", ArrowRight => "right",
             >= 48 and <= 57 or >= 97 and <= 122 => ((char)effective).ToString(),
             _ => SymbolKeys.Contains(CharOf(effective)) ? CharOf(effective) : null
@@ -412,6 +432,8 @@ public static partial class Keys
         var effective = (modifier & Shift) != 0 && shifted is { } s ? s : codepoint;
         effective = NormalizeKittyFunctional(effective);
         if (effective < 32 || effective > 0x10ffff || effective is >= 0xd800 and <= 0xdfff) return null;
+        // Drop unmapped Kitty functional keys (F13-F35, media keys, ...).
+        if (effective is >= KittyFunctionalPuaStart and <= KittyFunctionalPuaEnd) return null;
         return char.ConvertFromUtf32(effective);
     }
 

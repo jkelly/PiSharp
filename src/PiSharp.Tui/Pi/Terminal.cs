@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/tui/src/terminal.ts, packages/tui/src/program-status.ts,
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/tui/src/terminal.ts, packages/tui/src/program-status.ts,
 // packages/tui/src/native-modifiers.ts.
 using System.Runtime.InteropServices;
 using System.Text;
@@ -18,7 +18,7 @@ public sealed record ProgramStatus(ProgramState State, string? App = null, Progr
         var pairs = new List<string> { "state=" + State.ToString().ToLowerInvariant() };
         if (App is not null && Regex.IsMatch(App, "^[A-Za-z0-9_.+-]{1,32}$")) pairs.Add("app=" + App);
         if (State == ProgramState.Blocked && Kind is { } kind) pairs.Add("kind=" + kind.ToString().ToLowerInvariant());
-        var message = TruncateUtf8(Regex.Replace(Message ?? "", "[\u0000-\u001f\u007f-\u009f]+", " ").Trim(), 2048);
+        var message = TruncateUtf8(TextUtils.ReplaceControlCharacters(Message ?? "").Trim(), 2048);
         if (message.Length > 0) pairs.Add("msg=" + Convert.ToBase64String(Encoding.UTF8.GetBytes(message)));
         return "\u001b]7501;" + string.Join(':', pairs) + "\u001b\\";
     }
@@ -54,6 +54,10 @@ public interface ITerminal
     void SetTitle(string title);
     void SetProgress(bool active);
     void SetProgramStatus(ProgramStatus status);
+    /// <summary>Synchronously restore terminal modes from a process exit handler when <see cref="Stop"/> did not run. Writes
+    /// <paramref name="before"/>, then this terminal's own mode resets, then <paramref name="after"/>. Does nothing by default.</summary>
+    [System.Diagnostics.CodeAnalysis.Experimental("PISHARP_TUI001")]
+    void RestoreOnExit(string before, string after) { }
 }
 
 /// <summary>Raw terminal I/O over the process's standard streams: Windows console handles with VT input and output, or a
@@ -221,10 +225,13 @@ public sealed partial class ProcessTerminal : ITerminal
         negotiationFlushTimer = loop.SetTimeout(() => { negotiationFlushTimer = null; FlushNegotiationBufferAsInput(); }, 150);
     }
 
+    // Some Apple Terminal setups send ESC+CR (Alt+Enter) for Shift+Enter.
+    private static bool IsNativeShiftEnterCandidate(string data) => data is "\r" or "\u001b\r";
+
     private void ForwardInput(string sequence)
     {
         if (inputHandler is null) return;
-        var detect = sequence == "\r" && (OperatingSystem.IsWindows() || OperatingSystem.IsMacOS() && env("TERM_PROGRAM") == "Apple_Terminal");
+        var detect = IsNativeShiftEnterCandidate(sequence) && (OperatingSystem.IsWindows() || OperatingSystem.IsMacOS() && env("TERM_PROGRAM") == "Apple_Terminal");
         inputHandler(detect && io.IsShiftPressed() ? "\u001b[13;2u" : sequence);
     }
 
@@ -278,6 +285,21 @@ public sealed partial class ProcessTerminal : ITerminal
         io.ExitRawMode();
     }
 
+    [System.Diagnostics.CodeAnalysis.Experimental("PISHARP_TUI001")]
+    public void RestoreOnExit(string before, string after)
+    {
+        var sequence = new StringBuilder(before);
+        if (progressInterval is not null) sequence.Append(ProgressClear);
+        sequence.Append("\u001b[?2004l");
+        if (keyboardProtocolPushed || kittyActive) sequence.Append("\u001b[<u");
+        if (modifyOtherKeysActive) sequence.Append("\u001b[>4;0m");
+        sequence.Append(after);
+        // The raw I/O writes synchronously, as upstream's fs.writeSync, so the sequence is flushed during exit.
+        try { io.Write(sequence.ToString()); } catch { /* The terminal may already be gone. */ }
+        // Node resets the tty's raw mode itself when the process exits; .NET does not.
+        try { io.ExitRawMode(); } catch { }
+    }
+
     public void Write(string data)
     {
         io.Write(data);
@@ -290,7 +312,9 @@ public sealed partial class ProcessTerminal : ITerminal
     public void ClearLine() => Write("\u001b[K");
     public void ClearFromCursor() => Write("\u001b[J");
     public void ClearScreen() => Write("\u001b[2J\u001b[H");
-    public void SetTitle(string title) => Write("\u001b]0;" + title + "\u0007");
+    // A BEL or ESC in the title would end the sequence early and send the rest to the terminal as escape sequences (session
+    // names come from session files).
+    public void SetTitle(string title) => Write("\u001b]0;" + TextUtils.ReplaceControlCharacters(title) + "\u0007");
     public void SetProgramStatus(ProgramStatus status)
     {
         programStatus = status.State == ProgramState.Clear ? null : status;
