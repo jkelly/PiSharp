@@ -400,7 +400,11 @@ internal static class ToolParityTests
         Equal("Create or overwrite files", BuiltinToolPrompts.Snippets["write"]);
         Check(BuiltinToolPrompts.Guidelines["read"].SequenceEqual(["Use read to examine files instead of cat or sed."]), "Read guideline differs.");
         Check(BuiltinToolPrompts.Guidelines["write"].SequenceEqual(["Use write only for new files or complete rewrites."]), "Write guideline differs.");
-        Equal(4, BuiltinToolPrompts.Guidelines["edit"].Length);
+        // Pi 1.5.0 core/tools/edit.ts editToolSystemPromptContribution (f9a26365) replaced the four 1.2.0 guidelines with two.
+        Check(BuiltinToolPrompts.Guidelines["edit"].SequenceEqual([
+            "Use edit for targeted changes. Batch changes to one file in a single call.",
+            "Each edits[].oldText must exactly and uniquely match the original file. Keep matches short and non-overlapping; merge nearby changes without including large unchanged regions."]),
+            "Edit guidelines differ.");
         Check(BuiltinToolPrompts.Guidelines["grep"].IsEmpty && BuiltinToolPrompts.Guidelines["ls"].IsEmpty, "Unexpected search guidelines.");
         Check(BuiltinToolPrompts.DefaultToolNames.SequenceEqual(["read", "bash", "edit", "write"]), "Default tools differ.");
         return Task.CompletedTask;

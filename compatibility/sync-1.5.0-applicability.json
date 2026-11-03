@@ -56,11 +56,11 @@
     "changelogBullets": 477,
     "repeatedBullets": 23,
     "byStatus": {
-      "port": 246,
+      "port": 218,
       "already-ported": 13,
-      "ported": 32,
+      "ported": 57,
       "no-op": 24,
-      "ported-with-deferral": 11
+      "ported-with-deferral": 14
     },
     "byArea": {
       "ai": 58,
@@ -3309,7 +3309,7 @@
       "id": "core.resume-active-tools",
       "area": "coding-agent-core",
       "phase": 2,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "coding-agent@1.3.0/New Features#5",
         "coding-agent@1.3.0/Fixed#2"
@@ -3327,13 +3327,22 @@
         "website/src/content/docs/docs/reference/tools.md"
       ],
       "release": "1.5.0",
-      "notes": "PiSharp always sets InitialActiveToolNames from the lifetime selection (SessionRuntimeRegistry.cs:212-216), and those names replace the transcript's tool loadout on resume (:440, PersistentAgentSession.cs:391-395), so tools activated during the session are lost. AllowedToolSelection already distinguishes default selections and +/- modifiers (UsesDefaultTools, DefaultToolModifiers at :22-45, :76-77), which the fix can build on."
+      "notes": "PiSharp always sets InitialActiveToolNames from the lifetime selection (SessionRuntimeRegistry.cs:212-216), and those names replace the transcript's tool loadout on resume (:440, PersistentAgentSession.cs:391-395), so tools activated during the session are lost. AllowedToolSelection already distinguishes default selections and +/- modifiers (UsesDefaultTools, DefaultToolModifiers at :22-45, :76-77), which the fix can build on.",
+      "evidence": {
+        "commits": [
+          "a99a2be5"
+        ],
+        "tests": [
+          "tests/PiSharp.CliSync.Tests/Sync150Cases.cs: sync150.resume-keeps-branch-tools-with-default-selection",
+          "tests/PiSharp.CliSync.Tests/Sync150Cases.cs: sync150.resume-cli-keeps-tools-enabled-in-the-session"
+        ]
+      }
     },
     {
       "id": "core.prompt-template-empty-args",
       "area": "coding-agent-core",
       "phase": 2,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "coding-agent@1.3.0/Fixed#9"
       ],
@@ -3345,7 +3354,15 @@
         "src/PiSharp.CodingAgent/Resources/PromptTemplateExpander.cs:14"
       ],
       "release": "1.5.0",
-      "notes": "PromptTemplateExpander.cs:14-35 emits a token only when its text is non-empty, so it drops empty quoted arguments like the old upstream. Small, self-contained fix with a test for \"\" and '' followed by later arguments."
+      "notes": "PromptTemplateExpander.cs:14-35 emits a token only when its text is non-empty, so it drops empty quoted arguments like the old upstream. Small, self-contained fix with a test for \"\" and '' followed by later arguments.",
+      "evidence": {
+        "commits": [
+          "e2467e4b"
+        ],
+        "tests": [
+          "tests/PiSharp.CliSync.Tests/Sync150Cases.cs: sync150.prompt-template-empty-quoted-arguments"
+        ]
+      }
     },
     {
       "id": "core.agent-identity",
@@ -3403,7 +3420,7 @@
       "id": "core.summaries-model-output-limit",
       "area": "coding-agent-core",
       "phase": 2,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "coding-agent@1.4.0/New Features#3",
         "coding-agent@1.4.0/Changed#2",
@@ -3422,13 +3439,21 @@
         "website/src/content/docs/docs/guides/sessions.md"
       ],
       "release": "1.5.0",
-      "notes": "PiSharp still computes the old limits (SessionSummaryRequestBuilder.cs:24, :31 and :42, clamped at :84). Check that a summary request without a maximum gets the same output sizing the transports give normal turns. guides/sessions.md:71 says branchSummary.reserveTokens keeps room for the summary answer; update it."
+      "notes": "PiSharp still computes the old limits (SessionSummaryRequestBuilder.cs:24, :31 and :42, clamped at :84). Check that a summary request without a maximum gets the same output sizing the transports give normal turns. guides/sessions.md:71 says branchSummary.reserveTokens keeps room for the summary answer; update it.",
+      "evidence": {
+        "commits": [
+          "be30acea"
+        ],
+        "tests": [
+          "tests/PiSharp.SessionParity.Tests/Sync150Cases.cs: sync150.summaries-send-no-output-cap-and-focus-the-split-turn-prefix"
+        ]
+      }
     },
     {
       "id": "core.compact-instructions-split-turn",
       "area": "coding-agent-core",
       "phase": 2,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "coding-agent@1.4.0/Fixed#11"
       ],
@@ -3441,13 +3466,21 @@
         "src/PiSharp.CodingAgent/PersistentAgentSession.Compaction.cs"
       ],
       "release": "1.5.0",
-      "notes": "SessionSummaryRequestBuilder.TurnPrefix (SessionSummaryRequestBuilder.cs:26-32) builds the prompt without options.CustomInstructions, while History uses Focus(). The caller already passes the summary options (PersistentAgentSession.Compaction.cs:243)."
+      "notes": "SessionSummaryRequestBuilder.TurnPrefix (SessionSummaryRequestBuilder.cs:26-32) builds the prompt without options.CustomInstructions, while History uses Focus(). The caller already passes the summary options (PersistentAgentSession.Compaction.cs:243).",
+      "evidence": {
+        "commits": [
+          "be30acea"
+        ],
+        "tests": [
+          "tests/PiSharp.SessionParity.Tests/Sync150Cases.cs: sync150.summaries-send-no-output-cap-and-focus-the-split-turn-prefix"
+        ]
+      }
     },
     {
       "id": "core.extension-tools-active-on-resume",
       "area": "coding-agent-core",
       "phase": 2,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "coding-agent@1.4.0/Fixed#12"
       ],
@@ -3460,13 +3493,21 @@
         "src/PiSharp.CodingAgent/PersistentAgentSession.Activation.cs"
       ],
       "release": "1.5.0",
-      "notes": "SessionRuntimeRegistry.ResolveRestored (SessionRuntimeRegistry.cs:367-391) restores the recorded loadout from the projected context's LlmMessages, which lose tool changes from before a compaction, and never activates unmentioned extension tools. DefaultActive is already on the binding (SessionRuntimeRegistry.cs:18). Keep the --tools and --exclude-tools rules (_isAllowedTool)."
+      "notes": "SessionRuntimeRegistry.ResolveRestored (SessionRuntimeRegistry.cs:367-391) restores the recorded loadout from the projected context's LlmMessages, which lose tool changes from before a compaction, and never activates unmentioned extension tools. DefaultActive is already on the binding (SessionRuntimeRegistry.cs:18). Keep the --tools and --exclude-tools rules (_isAllowedTool).",
+      "evidence": {
+        "commits": [
+          "a99a2be5"
+        ],
+        "tests": [
+          "tests/PiSharp.CliSync.Tests/Sync150Cases.cs: sync150.resume-activates-unmentioned-extension-tools-over-the-whole-branch"
+        ]
+      }
     },
     {
       "id": "core.recovery-omits-tool-results",
       "area": "coding-agent-core",
       "phase": 2,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "coding-agent@1.4.0/Fixed#13"
       ],
@@ -3479,13 +3520,21 @@
         "src/PiSharp.CodingAgent/PersistentAgentSession.Retry.cs"
       ],
       "release": "1.5.0",
-      "notes": "PiSharp recovers only after a run and omits just the synthetic truncated results of the final turn (PersistentAgentSession.Recovery.cs:166-176), so a result that answers another call of the omitted message stays in context. OmitRetryAssistantAsync (PersistentAgentSession.Retry.cs:208-222) omits the assistant message alone. Port upstream's regression test (11227-recovery-omits-tool-results.test.ts) as an authored case."
+      "notes": "PiSharp recovers only after a run and omits just the synthetic truncated results of the final turn (PersistentAgentSession.Recovery.cs:166-176), so a result that answers another call of the omitted message stays in context. OmitRetryAssistantAsync (PersistentAgentSession.Retry.cs:208-222) omits the assistant message alone. Port upstream's regression test (11227-recovery-omits-tool-results.test.ts) as an authored case.",
+      "evidence": {
+        "commits": [
+          "42c7a22a"
+        ],
+        "tests": [
+          "tests/PiSharp.SessionParity.Tests/Sync150Cases.cs: sync150.recovery-omits-tool-results-with-their-call"
+        ]
+      }
     },
     {
       "id": "core.html-export-cjk-emphasis",
       "area": "coding-agent-core",
       "phase": 2,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "coding-agent@1.4.0/Fixed#4"
       ],
@@ -3505,7 +3554,15 @@
         "THIRD-PARTY-NOTICES.md"
       ],
       "release": "1.5.0",
-      "notes": "Copy the new vendor file next to marked.min.js and add the placeholder to SessionHtmlExport.cs:131. Record the vendored marked-cjk-friendly's license with the other third-party notices. The terminal Markdown fix is tui.cjk-emphasis."
+      "notes": "Copy the new vendor file next to marked.min.js and add the placeholder to SessionHtmlExport.cs:131. Record the vendored marked-cjk-friendly's license with the other third-party notices. The terminal Markdown fix is tui.cjk-emphasis.",
+      "evidence": {
+        "commits": [
+          "14824428"
+        ],
+        "tests": [
+          "tests/PiSharp.SessionParity.Tests/Sync150Cases.cs: sync150.html-export-renders-emphasis-next-to-cjk-punctuation"
+        ]
+      }
     },
     {
       "id": "core.default-models",
@@ -3575,7 +3632,7 @@
       "id": "core.exec-max-buffer",
       "area": "coding-agent-core",
       "phase": 2,
-      "status": "port",
+      "status": "ported-with-deferral",
       "changelog": [
         "coding-agent@1.5.0/Added#2",
         "coding-agent@1.5.0/Fixed#7"
@@ -3592,13 +3649,23 @@
         "tools/NodeBridge/pi-host/runtime.mjs"
       ],
       "release": "1.5.0",
-      "notes": "ExtensionExecResult(Stdout, Stderr, Code, Killed) (ExtensionExecContracts.cs:17) has no Truncated and the options no MaxBuffer; the bridge's execCommand (runtime.mjs:38) is the 1.2.0 one. The same commit (c466a3595) carries D1's coding-agent@1.5.0/Fixed#7 (default cap) and Fixed#8 (SIGKILL escalation); port them together. An incomplete UTF-8 suffix at the cut is dropped, not replaced. New C# members carry [Experimental]."
+      "notes": "ExtensionExecResult(Stdout, Stderr, Code, Killed) (ExtensionExecContracts.cs:17) has no Truncated and the options no MaxBuffer; the bridge's execCommand (runtime.mjs:38) is the 1.2.0 one. The same commit (c466a3595) carries D1's coding-agent@1.5.0/Fixed#7 (default cap) and Fixed#8 (SIGKILL escalation); port them together. An incomplete UTF-8 suffix at the cut is dropped, not replaced. New C# members carry [Experimental].",
+      "evidence": {
+        "commits": [
+          "bec784ed"
+        ],
+        "tests": [
+          "tests/PiSharp.ExtensionParity.Tests/Sync150PackageCases.cs: sync150.bridge-exec-max-buffer-utf8-and-spawn-errors",
+          "tests/PiSharp.ExtensionParity.Tests/Sync150PackageCases.cs: sync150.native-exec-max-buffer-truncates-stops-and-spawn-errors"
+        ]
+      },
+      "deferred": "Native pi.exec still captures at most 1 MiB per pipe (the separated process runner's per-pipe bound), so native output stops and reads truncated at 1 MiB per pipe even when maxBuffer (default 256 MiB) is larger. The bridge honours maxBuffer in full."
     },
     {
       "id": "core.system-prompt-tightened",
       "area": "coding-agent-core",
       "phase": 2,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "coding-agent@1.5.0/Changed#2"
       ],
@@ -3618,13 +3685,24 @@
         "tests/PiSharp.CliParity.Tests/SessionFormat/"
       ],
       "release": "1.5.0",
-      "notes": "OriginalSystemPromptBuilder.cs:90-107, SkillResources.cs and BuiltinToolPrompts.cs:29 hold the 1.2.0 strings verbatim. The text is byte-exact; prompt cases and session-format scenarios that embed the old prompt need new expectations. src/PiSharp.Cli/Durable/DurablePrompt.cs also cites core/skills.ts: check it in phase 4. The bridge modules regenerate with port-upstream.mjs."
+      "notes": "OriginalSystemPromptBuilder.cs:90-107, SkillResources.cs and BuiltinToolPrompts.cs:29 hold the 1.2.0 strings verbatim. The text is byte-exact; prompt cases and session-format scenarios that embed the old prompt need new expectations. src/PiSharp.Cli/Durable/DurablePrompt.cs also cites core/skills.ts: check it in phase 4. The bridge modules regenerate with port-upstream.mjs.",
+      "evidence": {
+        "commits": [
+          "0cd05dc6"
+        ],
+        "tests": [
+          "tests/PiSharp.CliSync.Tests/Program.cs: prompt.hidden-tools-byte-exact-sections",
+          "tests/PiSharp.CliParity.Tests/EntryCases.cs: entry.system-prompt-default-sections-byte-exact",
+          "tests/PiSharp.CliParity.Tests/ResourceCases.cs: resources.prompt-carries-context-append-and-skills-through-the-cli",
+          "tests/PiSharp.DurableCli.Tests/RuntimeCases.cs: runtime.prompt.pi-sections"
+        ]
+      }
     },
     {
       "id": "core.extension-keybinding-hints",
       "area": "coding-agent-core",
       "phase": 2,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "coding-agent@1.5.0/Added#5"
       ],
@@ -3648,13 +3726,23 @@
         "tools/NodeBridge/pi-host/runtime.mjs"
       ],
       "release": "1.5.0",
-      "notes": "The bridge's render path (runtime.mjs:949-974) passes theme and context but no key functions. Add keyText/keyHint to the bridged render contexts (backed by the host's keybindings, sent to Node or answered over the bridge) and to ExtensionToolRenderContext for native renderers ([Experimental])."
+      "notes": "The bridge's render path (runtime.mjs:949-974) passes theme and context but no key functions. Add keyText/keyHint to the bridged render contexts (backed by the host's keybindings, sent to Node or answered over the bridge) and to ExtensionToolRenderContext for native renderers ([Experimental]).",
+      "evidence": {
+        "commits": [
+          "8cce2e80"
+        ],
+        "tests": [
+          "tests/PiSharp.InteractiveParity.Tests/Sync150SessionCases.cs: sync150.message-and-entry-render-options-carry-host-key-hints",
+          "tests/PiSharp.InteractiveParity.Tests/Sync150SessionCases.cs: sync150.extension-tool-render-context-carries-host-key-hints",
+          "tests/PiSharp.ExtensionParity.Tests/Sync150Cases.cs: sync150.bridge-render-options-carry-the-modes-key-hints"
+        ]
+      }
     },
     {
       "id": "core.markdown-transform-entry-meta",
       "area": "coding-agent-core",
       "phase": 2,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "coding-agent@1.5.0/Added#6"
       ],
@@ -3674,13 +3762,24 @@
         "tools/NodeBridge/pi-host/runtime.mjs"
       ],
       "release": "1.5.0",
-      "notes": "MarkdownTransformContext(MessageType, IsStreaming, AvailableWidth) (MarkdownTransform.cs:18) lacks both fields. Pass the entry id and timestamp where PiSharp rebuilds the chat from session entries (upstream's addMessageToChat options); the bridge hands the context object to TS transformers (runtime.mjs:1002) and must include them."
+      "notes": "MarkdownTransformContext(MessageType, IsStreaming, AvailableWidth) (MarkdownTransform.cs:18) lacks both fields. Pass the entry id and timestamp where PiSharp rebuilds the chat from session entries (upstream's addMessageToChat options); the bridge hands the context object to TS transformers (runtime.mjs:1002) and must include them.",
+      "evidence": {
+        "commits": [
+          "e8858bf6"
+        ],
+        "tests": [
+          "tests/PiSharp.InteractiveParity.Tests/Sync150SessionCases.cs: sync150.user-message-transformer-context-carries-entry-identity",
+          "tests/PiSharp.InteractiveParity.Tests/Sync150SessionCases.cs: sync150.assistant-message-transformer-context-carries-entry-identity",
+          "tests/PiSharp.InteractiveParity.Tests/Sync150SessionCases.cs: sync150.bridged-transformer-context-carries-entry-identity",
+          "tests/PiSharp.InteractiveParity.Tests/Sync150SessionCases.cs: sync150.resumed-session-transformers-see-entry-identity"
+        ]
+      }
     },
     {
       "id": "core.custom-ui-blocked-status",
       "area": "coding-agent-core",
       "phase": 2,
-      "status": "port",
+      "status": "ported-with-deferral",
       "changelog": [
         "coding-agent@1.5.0/Added#7"
       ],
@@ -3699,13 +3798,23 @@
         "tools/NodeBridge/pi-host/runtime.mjs"
       ],
       "release": "1.5.0",
-      "notes": "Built-in extension dialogs already report blocked (InteractiveMode.ExtensionUi.cs:136 programStatus.SetBlocked(\"extension-dialog\", ...)); custom components do not. The bridge's ui.custom request (runtime.mjs:567) forwards overlay and overlayOptions only, so add blocked there and in the native custom-component contract ([Experimental])."
+      "notes": "Built-in extension dialogs already report blocked (InteractiveMode.ExtensionUi.cs:136 programStatus.SetBlocked(\"extension-dialog\", ...)); custom components do not. The bridge's ui.custom request (runtime.mjs:567) forwards overlay and overlayOptions only, so add blocked there and in the native custom-component contract ([Experimental]).",
+      "evidence": {
+        "commits": [
+          "b6f26b0c"
+        ],
+        "tests": [
+          "tests/PiSharp.InteractiveParity.Tests/Sync150SessionCases.cs: sync150.custom-component-blocked-option-is-inline-only",
+          "tests/PiSharp.InteractiveParity.Tests/Sync150SessionCases.cs: sync150.inline-custom-component-reports-blocked-status"
+        ]
+      },
+      "deferred": "Clearing the status when a plain custom component is stacked on top and restoring it when that one closes: PiSharp shows one inline component at a time and has no dialog stack yet, so this waits for cli.concurrent-extension-dialogs (cli package)."
     },
     {
       "id": "core.glob-amplification",
       "area": "coding-agent-core",
       "phase": 2,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "coding-agent@1.5.0/Fixed#1"
       ],
@@ -3718,13 +3827,24 @@
         "src/PiSharp.ModelRuntime/Models/ModelResolver.cs"
       ],
       "release": "1.5.0",
-      "notes": "PiSharp has its own minimatch subset (PiMinimatch in PiGlob.cs, with brace expansion and globstar) and a model-scope glob (ModelResolver.cs:311). Cap brace expansion like brace-expansion 5 and make globstar matching non-recursive; add pathological-pattern tests. Read the minimatch 11 and brace-expansion 5 sources before porting; the clone holds only the version bump."
+      "notes": "PiSharp has its own minimatch subset (PiMinimatch in PiGlob.cs, with brace expansion and globstar) and a model-scope glob (ModelResolver.cs:311). Cap brace expansion like brace-expansion 5 and make globstar matching non-recursive; add pathological-pattern tests. Read the minimatch 11 and brace-expansion 5 sources before porting; the clone holds only the version bump.",
+      "evidence": {
+        "commits": [
+          "f3b1a75b",
+          "1daccfe1"
+        ],
+        "tests": [
+          "tests/PiSharp.ExtensionParity.Tests/Sync150PackageCases.cs: sync150.glob-brace-expansion-is-bounded",
+          "tests/PiSharp.ExtensionParity.Tests/Sync150PackageCases.cs: sync150.glob-amplified-wildcards-and-globstars-answer-at-once",
+          "tests/PiSharp.Models.Tests/Sync150PackageCases.cs: sync150.model-scope-amplified-globs-answer-at-once"
+        ]
+      }
     },
     {
       "id": "core.saved-trust-precedence",
       "area": "coding-agent-core",
       "phase": 2,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "coding-agent@1.5.0/Fixed#2"
       ],
@@ -3738,7 +3858,17 @@
         "src/PiSharp.Cli/Pi/PiCommand.cs"
       ],
       "release": "1.5.0",
-      "notes": "PiProjectTrust.cs:157 returns true before it reads the saved decision, and PiCommand.cs:178 and :195 use !has || Get == true. Read the saved decision first in both places."
+      "notes": "PiProjectTrust.cs:157 returns true before it reads the saved decision, and PiCommand.cs:178 and :195 use !has || Get == true. Read the saved decision first in both places.",
+      "evidence": {
+        "commits": [
+          "8f9841fb",
+          "1daccfe1"
+        ],
+        "tests": [
+          "tests/PiSharp.CliParity.Tests/Sync150PackageCases.cs: sync150.trust-saved-decision-wins-over-auto-trust",
+          "tests/PiSharp.ExtensionParity.Tests/Sync150PackageCases.cs: sync150.trust-saved-decision-reaches-extensions"
+        ]
+      }
     },
     {
       "id": "core.summary-auth-runtime",
@@ -3764,7 +3894,7 @@
       "id": "core.active-tools-keep-order",
       "area": "coding-agent-core",
       "phase": 2,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "coding-agent@1.5.0/Fixed#6"
       ],
@@ -3776,13 +3906,21 @@
         "src/PiSharp.CodingAgent/SessionRuntimeRegistry.cs"
       ],
       "release": "1.5.0",
-      "notes": "SessionRuntimeRegistry.cs (around lines 226-244) builds the list in the requested order. Keep current order for retained tools, append new ones, and test that the request's tool order is stable."
+      "notes": "SessionRuntimeRegistry.cs (around lines 226-244) builds the list in the requested order. Keep current order for retained tools, append new ones, and test that the request's tool order is stable.",
+      "evidence": {
+        "commits": [
+          "a99a2be5"
+        ],
+        "tests": [
+          "tests/PiSharp.CliSync.Tests/Sync150Cases.cs: sync150.active-tools-keep-their-order"
+        ]
+      }
     },
     {
       "id": "core.exec-sigkill-escalation",
       "area": "coding-agent-core",
       "phase": 2,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "coding-agent@1.5.0/Fixed#8"
       ],
@@ -3796,13 +3934,21 @@
         "src/PiSharp.Tools/Processes/NativeProcessRunner.cs"
       ],
       "release": "1.5.0",
-      "notes": "The bridge's execCommand has the same bug (runtime.mjs:46-47, if (!proc.killed) proc.kill('SIGKILL')). It is hand-written, so fix it directly. The native path (NativeExtensionExecHost through NativeProcessRunner) needs checking that a cancelled or timed-out child that ignores SIGTERM is killed. Pairs with group C's core.exec-max-buffer, which also ends the process."
+      "notes": "The bridge's execCommand has the same bug (runtime.mjs:46-47, if (!proc.killed) proc.kill('SIGKILL')). It is hand-written, so fix it directly. The native path (NativeExtensionExecHost through NativeProcessRunner) needs checking that a cancelled or timed-out child that ignores SIGTERM is killed. Pairs with group C's core.exec-max-buffer, which also ends the process.",
+      "evidence": {
+        "commits": [
+          "bec784ed"
+        ],
+        "tests": [
+          "tests/PiSharp.ExtensionParity.Tests/Sync150PackageCases.cs: sync150.bridge-exec-max-buffer-utf8-and-spawn-errors"
+        ]
+      }
     },
     {
       "id": "core.npm-prefix-realpath",
       "area": "coding-agent-core",
       "phase": 2,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "coding-agent@1.5.0/Fixed#9"
       ],
@@ -3814,13 +3960,21 @@
         "src/PiSharp.Cli/Packages/PiPackageManager.cs"
       ],
       "release": "1.5.0",
-      "notes": "GetNpmInstallArgs and UninstallNpm (PiPackageManager.cs:601-623) pass installRoot as is. Resolve links with Directory.ResolveLinkTarget(returnFinalTarget: true) or an equivalent realpath."
+      "notes": "GetNpmInstallArgs and UninstallNpm (PiPackageManager.cs:601-623) pass installRoot as is. Resolve links with Directory.ResolveLinkTarget(returnFinalTarget: true) or an equivalent realpath.",
+      "evidence": {
+        "commits": [
+          "307f2d16"
+        ],
+        "tests": [
+          "tests/PiSharp.ExtensionParity.Tests/Sync150PackageCases.cs: sync150.package-npm-prefix-resolves-a-linked-agent-dir"
+        ]
+      }
     },
     {
       "id": "core.temporary-extension-refresh",
       "area": "coding-agent-core",
       "phase": 2,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "coding-agent@1.5.0/Fixed#21"
       ],
@@ -3833,13 +3987,22 @@
         "src/PiSharp.Cli/Packages/PiPackageManager.cs"
       ],
       "release": "1.5.0",
-      "notes": "PiSharp already refreshes temporary sources: npm through NpmHasAvailableUpdate (PiPackageManager.cs:356, :633) and git through RefreshTemporaryGitSource (:420-421, :956). Compare against v1.5.0: install name@latest rather than the bare name, and skip the git fetch for a checked-out commit hash. Decide after that comparison whether only part of the row remains."
+      "notes": "PiSharp already refreshes temporary sources: npm through NpmHasAvailableUpdate (PiPackageManager.cs:356, :633) and git through RefreshTemporaryGitSource (:420-421, :956). Compare against v1.5.0: install name@latest rather than the bare name, and skip the git fetch for a checked-out commit hash. Decide after that comparison whether only part of the row remains.",
+      "evidence": {
+        "commits": [
+          "307f2d16"
+        ],
+        "tests": [
+          "tests/PiSharp.ExtensionParity.Tests/Sync150PackageCases.cs: sync150.package-temporary-npm-refreshes-to-latest",
+          "tests/PiSharp.ExtensionParity.Tests/Sync150PackageCases.cs: sync150.package-temporary-git-ref-refreshes-unless-the-commit-is-checked-out"
+        ]
+      }
     },
     {
       "id": "core.windows-path-casing",
       "area": "coding-agent-core",
       "phase": 2,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "coding-agent@1.5.0/Fixed#22"
       ],
@@ -3868,13 +4031,27 @@
         "src/PiSharp.Cli/Interactive/Mode/Components/SessionSelector.cs"
       ],
       "release": "1.5.0",
-      "notes": "PiSharp compares these paths with StringComparison.Ordinal in most places. Add one comparison helper in PiPaths (OrdinalIgnoreCase on Windows) and use it at each site. Pairs with cli.home-tilde-anchored (same commit)."
+      "notes": "PiSharp compares these paths with StringComparison.Ordinal in most places. Add one comparison helper in PiPaths (OrdinalIgnoreCase on Windows) and use it at each site. Pairs with cli.home-tilde-anchored (same commit).",
+      "evidence": {
+        "commits": [
+          "dc23bb2b",
+          "7aa2604e",
+          "2da1abdd",
+          "1daccfe1"
+        ],
+        "tests": [
+          "tests/PiSharp.CliParity.Tests/Sync150PackageCases.cs: sync150.paths-compare-without-case-on-windows",
+          "tests/PiSharp.CliParity.Tests/Sync150PackageCases.cs: sync150.trust-and-sessions-match-other-casing-on-windows",
+          "tests/PiSharp.ExtensionParity.Tests/Sync150PackageCases.cs: sync150.package-local-identity-ignores-case-on-windows",
+          "tests/PiSharp.ExtensionParity.Tests/Sync150PackageCases.cs: sync150.bridge-skills-match-other-casing-on-windows"
+        ]
+      }
     },
     {
       "id": "core.git-clean-failure-continues",
       "area": "coding-agent-core",
       "phase": 2,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "coding-agent@1.5.0/Fixed#30"
       ],
@@ -3886,13 +4063,22 @@
         "src/PiSharp.Cli/Packages/PiPackageManager.cs"
       ],
       "release": "1.5.0",
-      "notes": "PiPackageManager.cs:923-934 throws when git clean fails."
+      "notes": "PiPackageManager.cs:923-934 throws when git clean fails.",
+      "evidence": {
+        "commits": [
+          "307f2d16"
+        ],
+        "tests": [
+          "tests/PiSharp.ExtensionParity.Tests/PackageCases.cs: sync150.package-git-clean-failure-installs-and-keeps-the-marker",
+          "tests/PiSharp.ExtensionParity.Tests/Sync150PackageCases.cs: sync150.package-git-clean-failure-installs-and-keeps-the-marker"
+        ]
+      }
     },
     {
       "id": "core.npm-update-unchanged-warning",
       "area": "coding-agent-core",
       "phase": 2,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "coding-agent@1.5.0/Fixed#33"
       ],
@@ -3905,13 +4091,21 @@
         "src/PiSharp.Cli/Packages/PiPackageCommands.cs"
       ],
       "release": "1.5.0",
-      "notes": "PiSharp reports a successful update without comparing versions."
+      "notes": "PiSharp reports a successful update without comparing versions.",
+      "evidence": {
+        "commits": [
+          "307f2d16"
+        ],
+        "tests": [
+          "tests/PiSharp.ExtensionParity.Tests/Sync150PackageCases.cs: sync150.package-update-warns-when-npm-leaves-the-version-unchanged"
+        ]
+      }
     },
     {
       "id": "core.session-write-failure-rollback",
       "area": "coding-agent-core",
       "phase": 2,
-      "status": "port",
+      "status": "ported-with-deferral",
       "changelog": [
         "coding-agent@1.5.0/Fixed#38"
       ],
@@ -3923,13 +4117,23 @@
         "tools/NodeBridge/pi-host/virtual/coding-agent/core/session-manager.mjs"
       ],
       "release": "1.5.0",
-      "notes": "Native sessions already behave this way: SessionLogStore.AppendAsync builds the next snapshot aside (SessionLogStore.cs:196-200) and CommitBytesAsync publishes it only after write, flush and checkpoint succeed (SessionLogStore.cs:219). A failure poisons the store (SessionLogStore.cs:222), so later appends are refused (SessionLogStore.cs:174) instead of chaining to an unwritten parent. PersistentAgentSession records the fault (for example PersistentAgentSession.Activation.cs:178). That is stricter than upstream, which keeps writing after the failure, and the difference is pre-existing. The port is the bridge's fallback copy of SessionManager (session-manager.mjs:722-727, used when the Pi npm packages are not installed), which still keeps the entry in memory. 0013 lists session write failures under the core area. Move with core.fork-single-file-handle and the projectContextEntry export of core.branch-summary-context-edits, which touch the same module."
+      "notes": "Native sessions already behave this way: SessionLogStore.AppendAsync builds the next snapshot aside (SessionLogStore.cs:196-200) and CommitBytesAsync publishes it only after write, flush and checkpoint succeed (SessionLogStore.cs:219). A failure poisons the store (SessionLogStore.cs:222), so later appends are refused (SessionLogStore.cs:174) instead of chaining to an unwritten parent. PersistentAgentSession records the fault (for example PersistentAgentSession.Activation.cs:178). That is stricter than upstream, which keeps writing after the failure, and the difference is pre-existing. The port is the bridge's fallback copy of SessionManager (session-manager.mjs:722-727, used when the Pi npm packages are not installed), which still keeps the entry in memory. 0013 lists session write failures under the core area. Move with core.fork-single-file-handle and the projectContextEntry export of core.branch-summary-context-edits, which touch the same module.",
+      "evidence": {
+        "commits": [
+          "7eefac89",
+          "b798b054"
+        ],
+        "tests": [
+          "tests/PiSharp.ExtensionParity.Tests/Sync150Cases.cs: sync150.bridge-session-manager-rolls-back-unwritten-entries-and-forks-through-one-fd"
+        ]
+      },
+      "deferred": "Only the Node bridge's fallback SessionManager copy follows v1.5.0. Native sessions already keep memory in line with the file (the snapshot is published only after a write succeeds), but after a write that may have reached the file the session faults and accepts no more writes, where upstream rolls the entry back and keeps writing. Whether native sessions follow upstream there is an owner decision (a possibly torn line stays in the file)."
     },
     {
       "id": "core.branch-summary-thinking-level",
       "area": "coding-agent-core",
       "phase": 2,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "coding-agent@1.5.0/Fixed#39"
       ],
@@ -3944,13 +4148,22 @@
         "tools/NodeBridge/pi-host/virtual/coding-agent/core/compaction/branch-summarization.mjs"
       ],
       "release": "1.5.0",
-      "notes": "SessionSummaryRequestBuilder.Branch drops the level on purpose (\"Source branch requests do not forward the optional thinking level\", SessionSummaryRequestBuilder.cs:39-42). Request() already applies upstream's reasoning rule for History and TurnPrefix (SessionSummaryRequestBuilder.cs:85). The /tree path builds its options without a level (PersistentAgentSession.NavigationSummary.cs:35-36). Pass the revision's thinking level and the model's reasoning flag there, and for the branch request in PersistentAgentSession.Compaction.cs:278-279. The bridge's fallback branch-summarization.mjs (requestOptions at :167) needs the same option. Summary-request tests that expect no reasoning on branch requests change. The 4096 output cap in Branch() belongs to the 1.4.0 summaries-at-the-output-limit row (coding-agent@1.4.0/Fixed#1), not this one."
+      "notes": "SessionSummaryRequestBuilder.Branch drops the level on purpose (\"Source branch requests do not forward the optional thinking level\", SessionSummaryRequestBuilder.cs:39-42). Request() already applies upstream's reasoning rule for History and TurnPrefix (SessionSummaryRequestBuilder.cs:85). The /tree path builds its options without a level (PersistentAgentSession.NavigationSummary.cs:35-36). Pass the revision's thinking level and the model's reasoning flag there, and for the branch request in PersistentAgentSession.Compaction.cs:278-279. The bridge's fallback branch-summarization.mjs (requestOptions at :167) needs the same option. Summary-request tests that expect no reasoning on branch requests change. The 4096 output cap in Branch() belongs to the 1.4.0 summaries-at-the-output-limit row (coding-agent@1.4.0/Fixed#1), not this one.",
+      "evidence": {
+        "commits": [
+          "be30acea"
+        ],
+        "tests": [
+          "tests/PiSharp.SessionParity.Tests/Sync150Cases.cs: sync150.branch-summary-thinking-level-follows-model-reasoning",
+          "tests/PiSharp.SessionParity.Tests/Sync150Cases.cs: sync150.tree-summary-carries-thinking-level-and-context-edits"
+        ]
+      }
     },
     {
       "id": "core.fork-single-file-handle",
       "area": "coding-agent-core",
       "phase": 2,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "coding-agent@1.5.0/Fixed#45"
       ],
@@ -3962,13 +4175,22 @@
         "tools/NodeBridge/pi-host/virtual/coding-agent/core/session-manager.mjs"
       ],
       "release": "1.5.0",
-      "notes": "The native --fork path already writes once: PiSessions.ForkFrom builds the whole text, then writes it through one FileStream opened with FileMode.CreateNew (PiSessions.cs:304-307). Only the bridge's fallback SessionManager.forkFrom still appends per entry (session-manager.mjs:1203-1210). Port it with core.session-write-failure-rollback; both touch the same module."
+      "notes": "The native --fork path already writes once: PiSessions.ForkFrom builds the whole text, then writes it through one FileStream opened with FileMode.CreateNew (PiSessions.cs:304-307). Only the bridge's fallback SessionManager.forkFrom still appends per entry (session-manager.mjs:1203-1210). Port it with core.session-write-failure-rollback; both touch the same module.",
+      "evidence": {
+        "commits": [
+          "7eefac89",
+          "b798b054"
+        ],
+        "tests": [
+          "tests/PiSharp.ExtensionParity.Tests/Sync150Cases.cs: sync150.bridge-session-manager-rolls-back-unwritten-entries-and-forks-through-one-fd"
+        ]
+      }
     },
     {
       "id": "core.exec-utf8-chunk-decoding",
       "area": "coding-agent-core",
       "phase": 2,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "coding-agent@1.5.0/Fixed#46"
       ],
@@ -3980,13 +4202,22 @@
         "tools/NodeBridge/pi-host/runtime.mjs"
       ],
       "release": "1.5.0",
-      "notes": "Native pi.exec already decodes correctly: SeparatedProcessCapture buffers each pipe's bytes and decodes the whole buffer once (SeparatedProcessCapture.cs:26-35), and NativeExtensionExecHost returns those strings. The Node bridge's own execCommand, which TS extensions' pi.exec always uses, still calls data.toString() per chunk (runtime.mjs:51-52). Port it together with D1's pi.exec limits (coding-agent@1.5.0/Fixed#7 and #8, coding-agent@1.5.0/Added#2 maxBuffer and truncated) and core.exec-spawn-error-stderr, which rewrite the same function. 0013 lists the pi.exec() limits under the core area."
+      "notes": "Native pi.exec already decodes correctly: SeparatedProcessCapture buffers each pipe's bytes and decodes the whole buffer once (SeparatedProcessCapture.cs:26-35), and NativeExtensionExecHost returns those strings. The Node bridge's own execCommand, which TS extensions' pi.exec always uses, still calls data.toString() per chunk (runtime.mjs:51-52). Port it together with D1's pi.exec limits (coding-agent@1.5.0/Fixed#7 and #8, coding-agent@1.5.0/Added#2 maxBuffer and truncated) and core.exec-spawn-error-stderr, which rewrite the same function. 0013 lists the pi.exec() limits under the core area.",
+      "evidence": {
+        "commits": [
+          "bec784ed"
+        ],
+        "tests": [
+          "tests/PiSharp.ExtensionParity.Tests/Sync150PackageCases.cs: sync150.bridge-exec-max-buffer-utf8-and-spawn-errors",
+          "tests/PiSharp.ExtensionParity.Tests/Sync150PackageCases.cs: sync150.native-exec-max-buffer-truncates-stops-and-spawn-errors"
+        ]
+      }
     },
     {
       "id": "core.exec-spawn-error-stderr",
       "area": "coding-agent-core",
       "phase": 2,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "coding-agent@1.5.0/Fixed#47"
       ],
@@ -3999,13 +4230,22 @@
         "src/PiSharp.Cli/Extensions/Execution/NativeExtensionExecHost.cs"
       ],
       "release": "1.5.0",
-      "notes": "The bridge execCommand resolves an empty stderr both for a synchronous spawn throw (runtime.mjs:43) and for the 'error' event (runtime.mjs:58, done(1)); use stderr || error.message in both. Native pi.exec throws an IOException when a run fails to start (NativeExtensionExecHost.cs:127-129). Under the standing rule (PiSharp follows what current Pi does), a process that could not start resolves to Pi's { stderr: <message>, code: 1 } result. Port with core.exec-utf8-chunk-decoding."
+      "notes": "The bridge execCommand resolves an empty stderr both for a synchronous spawn throw (runtime.mjs:43) and for the 'error' event (runtime.mjs:58, done(1)); use stderr || error.message in both. Native pi.exec throws an IOException when a run fails to start (NativeExtensionExecHost.cs:127-129). Under the standing rule (PiSharp follows what current Pi does), a process that could not start resolves to Pi's { stderr: <message>, code: 1 } result. Port with core.exec-utf8-chunk-decoding.",
+      "evidence": {
+        "commits": [
+          "bec784ed"
+        ],
+        "tests": [
+          "tests/PiSharp.ExtensionParity.Tests/Sync150PackageCases.cs: sync150.bridge-exec-max-buffer-utf8-and-spawn-errors",
+          "tests/PiSharp.ExtensionParity.Tests/Sync150PackageCases.cs: sync150.native-exec-max-buffer-truncates-stops-and-spawn-errors"
+        ]
+      }
     },
     {
       "id": "core.package-install-failure-startup",
       "area": "coding-agent-core",
       "phase": 2,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "coding-agent@1.5.0/Fixed#48"
       ],
@@ -4027,13 +4267,22 @@
         "website/src/content/docs/docs/extensions/packages.md"
       ],
       "release": "1.5.0",
-      "notes": "PiPackageManager's InstallMissing lets InstallParsedSource throw (PiPackageManager.cs:389-399), so a configured package that cannot install aborts resolution. PiResolvedPaths has no failure list (PiPackageSource.cs:63). --help and --list-models report only the startup settings diagnostics (PiCommand.cs:171-188). The config command resolves both scopes (PiPackageCommands.cs:276-278) without printing install warnings. Port the failure record, the warning text with scope-specific hints, its merge into the extension run's diagnostics (PiExtensionRun.cs:71-73, also on /reload), the earlier runtime-diagnostics report and the pi config warnings. Add upstream's packages.md paragraph to the website page. Tests use the fake package process runner; no network."
+      "notes": "PiPackageManager's InstallMissing lets InstallParsedSource throw (PiPackageManager.cs:389-399), so a configured package that cannot install aborts resolution. PiResolvedPaths has no failure list (PiPackageSource.cs:63). --help and --list-models report only the startup settings diagnostics (PiCommand.cs:171-188). The config command resolves both scopes (PiPackageCommands.cs:276-278) without printing install warnings. Port the failure record, the warning text with scope-specific hints, its merge into the extension run's diagnostics (PiExtensionRun.cs:71-73, also on /reload), the earlier runtime-diagnostics report and the pi config warnings. Add upstream's packages.md paragraph to the website page. Tests use the fake package process runner; no network.",
+      "evidence": {
+        "commits": [
+          "307f2d16"
+        ],
+        "tests": [
+          "tests/PiSharp.ExtensionParity.Tests/Sync150PackageCases.cs: sync150.package-install-failure-is-a-startup-warning",
+          "tests/PiSharp.ExtensionParity.Tests/Sync150PackageCases.cs: sync150.package-install-failure-warnings-follow-reload"
+        ]
+      }
     },
     {
       "id": "core.branch-summary-context-edits",
       "area": "coding-agent-core",
       "phase": 2,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "coding-agent@1.5.0/Fixed#73"
       ],
@@ -4048,7 +4297,17 @@
         "tools/NodeBridge/pi-host/virtual/coding-agent/core/session-manager.mjs"
       ],
       "release": "1.5.0",
-      "notes": "SessionBranchSummaryPlanner.Prepare deliberately ignores context edits (\"Source branch summaries deliberately do not apply context edits\", SessionBranchSummaryPlanner.cs:10) and calls SessionContextInfluenceProjector.ProjectEntry(entry, null, ...) (SessionBranchSummaryPlanner.cs:61). ProjectEntry already takes a replacement and returns nothing for a null one (SessionContextInfluenceProjector.cs:43-46). Collect the latest context_edit per targetId from the entries passed in and pass its replacement. Both callers benefit (PersistentAgentSession.NavigationSummary.cs:30, PersistentAgentSession.Compaction.cs:270). In the bridge fallback, export projectContextEntry (session-manager.mjs:223) and apply it in branch-summarization.mjs (getMessageFromEntry :37, prepareBranchEntries :56). Branch-summary tests that expect raw entries change. Pair with core.branch-summary-thinking-level."
+      "notes": "SessionBranchSummaryPlanner.Prepare deliberately ignores context edits (\"Source branch summaries deliberately do not apply context edits\", SessionBranchSummaryPlanner.cs:10) and calls SessionContextInfluenceProjector.ProjectEntry(entry, null, ...) (SessionBranchSummaryPlanner.cs:61). ProjectEntry already takes a replacement and returns nothing for a null one (SessionContextInfluenceProjector.cs:43-46). Collect the latest context_edit per targetId from the entries passed in and pass its replacement. Both callers benefit (PersistentAgentSession.NavigationSummary.cs:30, PersistentAgentSession.Compaction.cs:270). In the bridge fallback, export projectContextEntry (session-manager.mjs:223) and apply it in branch-summarization.mjs (getMessageFromEntry :37, prepareBranchEntries :56). Branch-summary tests that expect raw entries change. Pair with core.branch-summary-thinking-level.",
+      "evidence": {
+        "commits": [
+          "be30acea",
+          "7eefac89"
+        ],
+        "tests": [
+          "tests/PiSharp.SessionParity.Tests/Sync150Cases.cs: sync150.branch-entries-apply-context-edits",
+          "tests/PiSharp.SessionParity.Tests/Sync150Cases.cs: sync150.tree-summary-carries-thinking-level-and-context-edits"
+        ]
+      }
     },
     {
       "id": "cli.session-share-destination",
