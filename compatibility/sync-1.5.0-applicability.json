@@ -56,11 +56,11 @@
     "changelogBullets": 477,
     "repeatedBullets": 23,
     "byStatus": {
-      "ported": 151,
-      "ported-with-deferral": 12,
+      "ported": 159,
+      "ported-with-deferral": 13,
       "already-ported": 13,
       "no-op": 25,
-      "port": 125
+      "port": 116
     },
     "byArea": {
       "ai": 58,
@@ -7471,7 +7471,7 @@
       "id": "telemetry.request-option-span",
       "area": "telemetry",
       "phase": 3,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "ai@1.4.0/Breaking Changes#1"
       ],
@@ -7488,13 +7488,23 @@
         "src/PiSharp.AI/Abstractions/IChatTransport.cs"
       ],
       "release": "1.5.0",
-      "notes": "PiSharp admits telemetryContext only as an opaque option that is never serialized (CompletionsSimpleOptions.cs:14, CompletionsSimpleRequestFactory.cs:37-40). Rename it and type it as a PiSharp.Telemetry span (telemetry.adapter-contract), as [Experimental] API."
+      "notes": "PiSharp admits telemetryContext only as an opaque option that is never serialized (CompletionsSimpleOptions.cs:14, CompletionsSimpleRequestFactory.cs:37-40). Rename it and type it as a PiSharp.Telemetry span (telemetry.adapter-contract), as [Experimental] API.",
+      "evidence": {
+        "commits": [
+          "62d68506"
+        ],
+        "tests": [
+          "tests/PiSharp.Telemetry.Tests/AiCases.cs: telemetry.ai.request-options-carry-the-span-through-registry-dispatch",
+          "tests/PiSharp.Telemetry.Tests/AiCases.cs: telemetry.ai.defaults-to-no-telemetry",
+          "tests/PiSharp.CompletionsSimple.Tests/SimpleRepairRegressionCases.cs: bounded-opaque-options-and-explicit-cache-priority"
+        ]
+      }
     },
     {
       "id": "telemetry.ai-request-tracing",
       "area": "telemetry",
       "phase": 3,
-      "status": "port",
+      "status": "ported-with-deferral",
       "changelog": [
         "ai@1.4.0/Added#4",
         "ai@1.4.0/Added#5"
@@ -7513,13 +7523,37 @@
         "src/PiSharp.AI/Streaming/ChatRun.cs"
       ],
       "release": "1.5.0",
-      "notes": "Needs telemetry.adapter-contract, telemetry.metrics and telemetry.request-option-span. PiSharp's chat requests have no Models wrapper: pick the layer that sees every request and its normalized events (the transport registry or the stream run). Upstream's coding agent passes no telemetry span, so tracing stays opt-in for SDK hosts. Pending and deferred polls are excluded from token and cost metrics. Secrets never reach span attributes (standing rule); upstream records no content."
+      "notes": "Needs telemetry.adapter-contract, telemetry.metrics and telemetry.request-option-span. PiSharp's chat requests have no Models wrapper: pick the layer that sees every request and its normalized events (the transport registry or the stream run). Upstream's coding agent passes no telemetry span, so tracing stays opt-in for SDK hosts. Pending and deferred polls are excluded from token and cost metrics. Secrets never reach span attributes (standing rule); upstream records no content.",
+      "evidence": {
+        "commits": [
+          "62d68506",
+          "ae16d659"
+        ],
+        "tests": [
+          "tests/PiSharp.Telemetry.Tests/AiCases.cs: telemetry.ai.request-observes-a-chat-run-without-changing-events-or-results",
+          "tests/PiSharp.Telemetry.Tests/AiCases.cs: telemetry.ai.poll-span-and-metrics",
+          "tests/PiSharp.Telemetry.Tests/AiCases.cs: telemetry.ai.error-status-without-error-attributes-or-events",
+          "tests/PiSharp.Telemetry.Tests/AiCases.cs: telemetry.ai.aborted-status-stays-ok",
+          "tests/PiSharp.Telemetry.Tests/AiCases.cs: telemetry.ai.bounds-error-messages-to-500-characters",
+          "tests/PiSharp.Telemetry.Tests/AiCases.cs: telemetry.ai.bounded-error-does-not-keep-a-large-message-alive",
+          "tests/PiSharp.Telemetry.Tests/AiCases.cs: telemetry.ai.redacts-credentials-in-error-messages",
+          "tests/PiSharp.Telemetry.Tests/AiCases.cs: telemetry.ai.records-setup-failures-without-their-details",
+          "tests/PiSharp.Telemetry.Tests/AiCases.cs: telemetry.ai.counts-interleaved-tool-deltas-without-reading-arguments",
+          "tests/PiSharp.Telemetry.Tests/AiCases.cs: telemetry.ai.tracing-only-span-without-metrics",
+          "tests/PiSharp.Telemetry.Tests/AiCases.cs: telemetry.ai.low-cardinality-metrics-with-monotonic-durations",
+          "tests/PiSharp.Telemetry.Tests/AiCases.cs: telemetry.ai.records-poll-usage-only-when-final",
+          "tests/PiSharp.Telemetry.Tests/AiCases.cs: telemetry.ai.creates-instruments-once-per-metrics-object",
+          "tests/PiSharp.Telemetry.Tests/AiCases.cs: telemetry.ai.a-failing-adapter-never-changes-the-chat",
+          "tests/PiSharp.Telemetry.Tests/AiCases.cs: telemetry.ai.defaults-to-no-telemetry"
+        ]
+      },
+      "deferred": "pi.ai.poll is implemented (AiTelemetry.ObserveModelRequest with poll: true, tested directly) but nothing calls it yet: PiSharp.AI has no streamDeferred/fetchDeferred, and PiSharp's deferred-response polls live in PiSharp.Durable (NativeDurableModels.StreamDeferred/FetchDeferredAsync), whose API takes no span. Wire the poll span there when the durable deferred path gains a telemetry option."
     },
     {
       "id": "telemetry.adapter-contract",
       "area": "telemetry",
       "phase": 3,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "telemetry@1.4.0/Breaking Changes#1"
       ],
@@ -7535,13 +7569,31 @@
         "src/PiSharp.Telemetry/ (new)"
       ],
       "release": "1.5.0",
-      "notes": "PiSharp has no pi-telemetry port; the Node bridge only installs @earendil-works/pi-telemetry for TypeScript extensions (PiNodeRuntime.cs:37). This row carries the base package at v1.5.0: TelemetryContext and TelemetrySpan, schema definitions with createTypedSpanStarter, and the no-op adapter, as [Experimental] API with its own diagnostic id. The later telemetry rows build on it, and durable (phase 4) and Chord (phase 6) consume it. Upstream ships only no-op and in-memory adapters; an ActivitySource or OpenTelemetry adapter would be PiSharp-only and is not required."
+      "notes": "PiSharp has no pi-telemetry port; the Node bridge only installs @earendil-works/pi-telemetry for TypeScript extensions (PiNodeRuntime.cs:37). This row carries the base package at v1.5.0: TelemetryContext and TelemetrySpan, schema definitions with createTypedSpanStarter, and the no-op adapter, as [Experimental] API with its own diagnostic id. The later telemetry rows build on it, and durable (phase 4) and Chord (phase 6) consume it. Upstream ships only no-op and in-memory adapters; an ActivitySource or OpenTelemetry adapter would be PiSharp-only and is not required. Conformance evidence names the kit cases in src/PiSharp.Telemetry/Testing/Conformance.cs; the Telemetry suite runs each as telemetry.conformance.memory: <group>: <name> (the capabilities group also as telemetry.conformance.noop: ...).",
+      "evidence": {
+        "commits": [
+          "f68a5259",
+          "ae16d659"
+        ],
+        "tests": [
+          "tests/PiSharp.Telemetry.Tests/PackageCases.cs: telemetry.schema.serializable-exact-attributes",
+          "tests/PiSharp.Telemetry.Tests/PackageCases.cs: telemetry.schema.combined-vocabularies-and-child-starters",
+          "tests/PiSharp.Telemetry.Tests/PackageCases.cs: telemetry.noop.admits-synchronously-and-reuses-one-span",
+          "tests/PiSharp.Telemetry.Tests/PackageCases.cs: telemetry.noop.preserves-rejection-values",
+          "tests/PiSharp.Telemetry.Tests/PackageCases.cs: telemetry.noop.ignores-recording-payloads",
+          "src/PiSharp.Telemetry/Testing/Conformance.cs: admits once synchronously and preserves the result",
+          "src/PiSharp.Telemetry/Testing/Conformance.cs: preserves synchronous and asynchronous rejection values",
+          "src/PiSharp.Telemetry/Testing/Conformance.cs: uses last explicit status without automatic overwrite",
+          "src/PiSharp.Telemetry/Testing/Conformance.cs: merges attributes and records ordered events",
+          "src/PiSharp.Telemetry/Testing/Conformance.cs: makes calls after settlement inert"
+        ]
+      }
     },
     {
       "id": "telemetry.span-links",
       "area": "telemetry",
       "phase": 3,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "telemetry@1.4.0/Breaking Changes#2",
         "telemetry@1.4.0/Added#2"
@@ -7557,13 +7609,27 @@
         "src/PiSharp.Telemetry/ (new)"
       ],
       "release": "1.5.0",
-      "notes": "Part of the phase 3 package port; depends on telemetry.adapter-contract and telemetry.propagation (link targets carry carrier-shaped identities). Durable's submissions start their own trace linked to the caller (group E)."
+      "notes": "Part of the phase 3 package port; depends on telemetry.adapter-contract and telemetry.propagation (link targets carry carrier-shaped identities). Durable's submissions start their own trace linked to the caller (group E). Conformance evidence names the kit cases in src/PiSharp.Telemetry/Testing/Conformance.cs; the Telemetry suite runs each as telemetry.conformance.memory: <group>: <name> (the capabilities group also as telemetry.conformance.noop: ...).",
+      "evidence": {
+        "commits": [
+          "f68a5259",
+          "ae16d659"
+        ],
+        "tests": [
+          "tests/PiSharp.Telemetry.Tests/PackageCases.cs: telemetry.propagation.links-a-new-root-to-an-extracted-remote-target",
+          "tests/PiSharp.Telemetry.Tests/PackageCases.cs: telemetry.propagation.detaches-carriers-and-links-and-retains-settled-targets",
+          "tests/PiSharp.Telemetry.Tests/PackageCases.cs: telemetry.render.prints-cross-trace-links-without-following-cycles",
+          "tests/PiSharp.Telemetry.Tests/PackageCases.cs: telemetry.store.detaches-link-attributes-and-error-details",
+          "src/PiSharp.Telemetry/Testing/Conformance.cs: records initial and late links without changing parents",
+          "src/PiSharp.Telemetry/Testing/Conformance.cs: ignores links added after source settlement"
+        ]
+      }
     },
     {
       "id": "telemetry.context-capabilities",
       "area": "telemetry",
       "phase": 3,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "telemetry@1.4.0/Breaking Changes#3",
         "telemetry@1.4.0/Added#4",
@@ -7580,13 +7646,24 @@
         "src/PiSharp.Telemetry/ (new)"
       ],
       "release": "1.5.0",
-      "notes": "Part of the phase 3 package port; depends on telemetry.adapter-contract. pi-ai reads telemetry.metrics from the request span (telemetry.ai-request-tracing)."
+      "notes": "Part of the phase 3 package port; depends on telemetry.adapter-contract. pi-ai reads telemetry.metrics from the request span (telemetry.ai-request-tracing). Conformance evidence names the kit cases in src/PiSharp.Telemetry/Testing/Conformance.cs; the Telemetry suite runs each as telemetry.conformance.memory: <group>: <name> (the capabilities group also as telemetry.conformance.noop: ...).",
+      "evidence": {
+        "commits": [
+          "f68a5259",
+          "ae16d659"
+        ],
+        "tests": [
+          "tests/PiSharp.Telemetry.Tests/PackageCases.cs: telemetry.metrics.shared-noop-instruments",
+          "tests/PiSharp.Telemetry.Tests/AiCases.cs: telemetry.ai.tracing-only-span-without-metrics",
+          "src/PiSharp.Telemetry/Testing/Conformance.cs: carries adapter capabilities through contexts and spans"
+        ]
+      }
     },
     {
       "id": "telemetry.propagation",
       "area": "telemetry",
       "phase": 3,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "telemetry@1.4.0/Added#1"
       ],
@@ -7600,13 +7677,29 @@
         "src/PiSharp.Telemetry/ (new)"
       ],
       "release": "1.5.0",
-      "notes": "Part of the phase 3 package port. Carriers are adapter-owned JSON data; durable stores them on submissions and tasks (group E). Never put secrets in carriers (standing rule)."
+      "notes": "Part of the phase 3 package port. Carriers are adapter-owned JSON data; durable stores them on submissions and tasks (group E). Never put secrets in carriers (standing rule). Conformance evidence names the kit cases in src/PiSharp.Telemetry/Testing/Conformance.cs; the Telemetry suite runs each as telemetry.conformance.memory: <group>: <name> (the capabilities group also as telemetry.conformance.noop: ...).",
+      "evidence": {
+        "commits": [
+          "f68a5259",
+          "ae16d659"
+        ],
+        "tests": [
+          "tests/PiSharp.Telemetry.Tests/PackageCases.cs: telemetry.propagation.continues-a-parent-in-another-process",
+          "tests/PiSharp.Telemetry.Tests/PackageCases.cs: telemetry.propagation.isolates-crossed-concurrent-remote-parents",
+          "tests/PiSharp.Telemetry.Tests/PackageCases.cs: telemetry.propagation.detaches-carriers-and-links-and-retains-settled-targets",
+          "tests/PiSharp.Telemetry.Tests/PackageCases.cs: telemetry.propagation.uses-the-root-for-absent-and-unknown-carriers",
+          "tests/PiSharp.Telemetry.Tests/PackageCases.cs: telemetry.propagation.treats-recognized-identifiers-as-opaque-strings",
+          "src/PiSharp.Telemetry/Testing/Conformance.cs: roundtrips parent identity through JSON without retaining the carrier",
+          "src/PiSharp.Telemetry/Testing/Conformance.cs: absent and unknown carriers produce recorded roots",
+          "src/PiSharp.Telemetry/Testing/Conformance.cs: propagates across fresh adapters and multiple hops"
+        ]
+      }
     },
     {
       "id": "telemetry.metrics",
       "area": "telemetry",
       "phase": 3,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "telemetry@1.4.0/Added#3",
         "telemetry@1.4.0/Added#6"
@@ -7621,13 +7714,27 @@
         "src/PiSharp.Telemetry/ (new)"
       ],
       "release": "1.5.0",
-      "notes": "Part of the phase 3 package port. TypeScript enforces the typed instruments at compile time; in C# that needs generated or schema-checked wrappers. Decide the C# shape before telemetry.ai-request-tracing uses it."
+      "notes": "Part of the phase 3 package port. TypeScript enforces the typed instruments at compile time; in C# that needs generated or schema-checked wrappers. Decide the C# shape before telemetry.ai-request-tracing uses it. Conformance evidence names the kit cases in src/PiSharp.Telemetry/Testing/Conformance.cs; the Telemetry suite runs each as telemetry.conformance.memory: <group>: <name> (the capabilities group also as telemetry.conformance.noop: ...).",
+      "evidence": {
+        "commits": [
+          "f68a5259",
+          "ae16d659"
+        ],
+        "tests": [
+          "tests/PiSharp.Telemetry.Tests/PackageCases.cs: telemetry.metrics.binds-names-kinds-metadata-and-attributes",
+          "tests/PiSharp.Telemetry.Tests/PackageCases.cs: telemetry.metrics.requires-declared-histogram-attributes",
+          "tests/PiSharp.Telemetry.Tests/PackageCases.cs: telemetry.metrics.detached-snapshots-with-exemplars-and-boundaries",
+          "tests/PiSharp.Telemetry.Tests/PackageCases.cs: telemetry.metrics.shared-noop-instruments",
+          "src/PiSharp.Telemetry/Testing/Conformance.cs: records ordered measurements and optional histogram exemplars",
+          "src/PiSharp.Telemetry/Testing/Conformance.cs: copies instrument metadata and measurement attributes"
+        ]
+      }
     },
     {
       "id": "telemetry.memory-adapter-conformance",
       "area": "telemetry",
       "phase": 3,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "telemetry@1.4.0/Added#7"
       ],
@@ -7643,13 +7750,28 @@
         "tests/PiSharp.Telemetry.Tests/ (new)"
       ],
       "release": "1.5.0",
-      "notes": "Port InMemoryTelemetryContext and the conformance cases as a reusable test kit; upstream's propagation test uses a worker process (propagation-worker.ts), so the authored C# test needs a second process or an equivalent. Tests stay faux and offline (standing rule)."
+      "notes": "Port InMemoryTelemetryContext and the conformance cases as a reusable test kit; upstream's propagation test uses a worker process (propagation-worker.ts), so the authored C# test needs a second process or an equivalent. Tests stay faux and offline (standing rule). Conformance evidence names the kit cases in src/PiSharp.Telemetry/Testing/Conformance.cs; the Telemetry suite runs each as telemetry.conformance.memory: <group>: <name> (the capabilities group also as telemetry.conformance.noop: ...).",
+      "evidence": {
+        "commits": [
+          "f68a5259",
+          "ae16d659"
+        ],
+        "tests": [
+          "tests/PiSharp.Telemetry.Tests/ConformanceCases.cs: telemetry.conformance.memory: returns detached snapshots without exposing mutable recording state",
+          "src/PiSharp.Telemetry/Testing/Conformance.cs: carries adapter capabilities through contexts and spans",
+          "src/PiSharp.Telemetry/Testing/Conformance.cs: records ordered measurements and optional histogram exemplars",
+          "src/PiSharp.Telemetry/Testing/Conformance.cs: records initial and late links without changing parents",
+          "src/PiSharp.Telemetry/Testing/Conformance.cs: propagates across fresh adapters and multiple hops",
+          "src/PiSharp.Telemetry/Testing/Conformance.cs: preserves synchronous and asynchronous rejection values",
+          "src/PiSharp.Telemetry/Testing/Conformance.cs: records nested and concurrent child relationships"
+        ]
+      }
     },
     {
       "id": "telemetry.store-and-render",
       "area": "telemetry",
       "phase": 3,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "telemetry@1.4.0/Added#8"
       ],
@@ -7664,7 +7786,26 @@
         "src/PiSharp.Telemetry/ (new)"
       ],
       "release": "1.5.0",
-      "notes": "Part of the phase 3 package port. Chord's SQLite telemetry store (phase 6, group F) implements TelemetryStore. renderTrace output is text, so authored tests can compare it byte for byte with upstream's render.test.ts cases."
+      "notes": "Part of the phase 3 package port. Chord's SQLite telemetry store (phase 6, group F) implements TelemetryStore. renderTrace output is text, so authored tests can compare it byte for byte with upstream's render.test.ts cases.",
+      "evidence": {
+        "commits": [
+          "f68a5259",
+          "ae16d659"
+        ],
+        "tests": [
+          "tests/PiSharp.Telemetry.Tests/PackageCases.cs: telemetry.render.unordered-trace-with-attributes-durations-errors-events-links",
+          "tests/PiSharp.Telemetry.Tests/PackageCases.cs: telemetry.render.missing-parents-are-roots-ordered-by-start",
+          "tests/PiSharp.Telemetry.Tests/PackageCases.cs: telemetry.render.deduplicates-merged-spans-by-global-id",
+          "tests/PiSharp.Telemetry.Tests/PackageCases.cs: telemetry.render.deep-trees-without-recursion",
+          "tests/PiSharp.Telemetry.Tests/PackageCases.cs: telemetry.store.wall-clock-boundaries-and-relative-event-times",
+          "tests/PiSharp.Telemetry.Tests/PackageCases.cs: telemetry.store.count-one-metric-rows-without-private-timing",
+          "tests/PiSharp.Telemetry.Tests/PackageCases.cs: telemetry.store-conformance.settled-traces-complete-snapshots-detached-results",
+          "tests/PiSharp.Telemetry.Tests/PackageCases.cs: telemetry.store-conformance.filters-name-start-errors-and-one-span-attributes",
+          "tests/PiSharp.Telemetry.Tests/PackageCases.cs: telemetry.store-conformance.pages-complete-traces-when-starts-tie",
+          "tests/PiSharp.Telemetry.Tests/PackageCases.cs: telemetry.store-conformance.inherits-remote-trace-ids-and-keeps-remote-parents-and-links",
+          "tests/PiSharp.Telemetry.Tests/PackageCases.cs: telemetry.store-conformance.metric-names-interval-bounds-typed-equality-detached-values"
+        ]
+      }
     },
     {
       "id": "telemetry.export-source-condition",
