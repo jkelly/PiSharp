@@ -121,6 +121,10 @@ The Node extension bridge carries the same pi-schema package mechanically ported
 
 The pi-schema suite (`tests/PiSharp.Schema.Tests`, a test project, never packed or shipped) vendors pi-schema's test fixtures unmodified: the JSON-Schema-Test-Suite at commit `3f05891cac5d51ffa068d7076d1372130e00c829` (MIT, Copyright (c) 2012 Julian Berman; `fixtures/json-schema-test-suite/LICENSE`) and the official JSON Schema meta-schemas (`fixtures/meta-schemas/`, published by the JSON Schema organization under AFL-3.0 or BSD-3-Clause).
 
+## Pi v1.5.0 telemetry (pi-telemetry)
+
+`src/PiSharp.Telemetry/` ports Pi v1.5.0 `packages/telemetry` (pi-telemetry, commit `f9a26365568127461c47a07a37dcb42c140a3ac5`): the span, link, carrier and metric contract, typed schemas, the no-op and in-memory adapters, the trace store, `renderTrace` and the adapter conformance kit. `src/PiSharp.AI/Telemetry/AiTelemetry.cs` ports the request tracing of `packages/ai/src/telemetry.ts` from the same commit. Both are under the Pi MIT notice above; pi-telemetry has no dependencies of its own, and nothing in either exports or sends telemetry.
+
 ## Anthropic SDK reviewed development oracle
 
 The eight exact upstream-locked packages in [the actual scoped restore receipt](compatibility/anthropic-oracle-setup.json) are development-oracle dependencies only. The receipt retains every observed packaged LICENSE/NOTICE text verbatim and its byte hash, including the SDK's root MIT license and internal qs BSD-3-Clause notice. Packages are @anthropic-ai/sdk0.124.0, @babel/runtime7.29.2, @stablelib/base641.0.1, fast-sha2561.3.0, json-schema-to-ts3.1.1, partial-json0.1.7, standardwebhooks1.1.1 and ts-algebra2.0.0. No package is bundled into the native product.

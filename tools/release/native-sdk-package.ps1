@@ -7,7 +7,7 @@ function Assert-PiSharpNativeSdkPackage {
         [Parameter(Mandatory)][ValidateSet('PiSharp.Contracts','PiSharp.AI','PiSharp.Agent','PiSharp.Sessions','PiSharp.Tools','PiSharp.Tools.Skia','PiSharp.CodingAgent',
             'PiSharp.PromptTemplates.Yaml','PiSharp.Rpc','PiSharp.Tui','PiSharp.Extensions.Abstractions','PiSharp.Extensions.Runtime',
             'PiSharp.Extensions.Agent','PiSharp.ExtensionHost','PiSharp.Compatibility.Node','PiSharp.Codemode','PiSharp.Durable','PiSharp.Durable.Tools','PiSharp.Durable.Sqlite',
-            'PiSharp.CustomAgents','PiSharp.CustomAgents.JavaScript','PiSharp.CustomAgents.Scripting')][string]$PackageId,
+            'PiSharp.CustomAgents','PiSharp.CustomAgents.JavaScript','PiSharp.CustomAgents.Scripting','PiSharp.Telemetry')][string]$PackageId,
         [Parameter(Mandatory)][string]$Version,
         [Parameter(Mandatory)][ValidatePattern('^[0-9a-f]{40}$')][string]$SourceCommit,
         [Parameter(Mandatory)][string]$Repo,
@@ -59,7 +59,9 @@ function Assert-PiSharpNativeSdkPackage {
     # Sibling packages follow the release version; external packages keep their exact pinned versions.
     $siblings=@{
         'PiSharp.Contracts'=@();'PiSharp.Tui'=@()
-        'PiSharp.AI'=@('PiSharp.Contracts');'PiSharp.Sessions'=@('PiSharp.Contracts');'PiSharp.ExtensionHost'=@('PiSharp.Contracts')
+        # Decision 0013 (experimental, from 1.5.0): pi-telemetry has no dependencies, and pi-ai depends on it.
+        'PiSharp.Telemetry'=@()
+        'PiSharp.AI'=@('PiSharp.Contracts','PiSharp.Telemetry');'PiSharp.Sessions'=@('PiSharp.Contracts');'PiSharp.ExtensionHost'=@('PiSharp.Contracts')
         'PiSharp.Extensions.Abstractions'=@('PiSharp.Contracts');'PiSharp.Extensions.Runtime'=@('PiSharp.Extensions.Abstractions')
         'PiSharp.Agent'=@('PiSharp.Contracts','PiSharp.AI');'PiSharp.Tools'=@('PiSharp.Agent','PiSharp.Contracts')
         'PiSharp.Tools.Skia'=@('PiSharp.Tools')
