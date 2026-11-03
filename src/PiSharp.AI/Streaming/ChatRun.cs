@@ -30,6 +30,8 @@ public sealed class ChatRun : IAsyncDisposable
     private int _disposed;
     private readonly TimeProvider? _time;
     private readonly long _started;
+    // Opt-in tracing (telemetry.ts observeModelRequest): only a request that carries a span is observed.
+    private AiRequestObserver? _telemetry;
 
     internal ChatRun(IChatTransport transport, ChatRequest request, int capacity, StreamLimits? limits,
         CancellationToken cancellationToken, bool settleAbortedTerminal = false, long? fallbackTimestamp = null,
@@ -55,6 +57,9 @@ public sealed class ChatRun : IAsyncDisposable
         _cancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         _readerDetached = detachReader ? new(TaskCreationOptions.RunContinuationsAsynchronously) : null;
         _detachedDrain = detachReader ? DrainDetachedAsync() : Task.CompletedTask;
+        // The span starts with the logical request, so it also covers authentication and provider setup.
+        if (request.Telemetry is { } telemetry)
+            _telemetry = AiTelemetry.TryObserve(request.Model, telemetry, request.ThinkingLevel, timeProvider);
         _producer = ProduceAsync(transport, request, reducer, settleAbortedTerminal);
     }
 
@@ -199,6 +204,7 @@ public sealed class ChatRun : IAsyncDisposable
                         break; // Terminal wins once; never ask a provider for subsequent events.
                     }
                     await _progress.Writer.WriteAsync(value, _cancellation.Token).ConfigureAwait(false);
+                    Observe(value); // lazy.ts: observed after the push, never changing the delivered event.
                 }
                 catch (Exception) when (_googleDiagnostics || _mistralDiagnostics)
                 {
@@ -318,11 +324,34 @@ public sealed class ChatRun : IAsyncDisposable
                 terminal = terminal with { NativeDiagnostic = diagnostic, NativeCleanupDiagnostic = cleanupDiagnostic };
             if (failure is not null) failure = failure with { NativeDiagnostic = terminal.NativeDiagnostic };
             terminal = Timed(terminal, request);
+            // The final terminal (setup failures included) settles the request span before the run's result is published.
+            Observe(terminal);
+            ObserveResult(terminal.Message);
             _terminal.TrySetResult(terminal);
             _completion.TrySetResult(new(terminal.Message, failure)
             { NativeDiagnostic = terminal.NativeDiagnostic, NativeCleanupDiagnostic = terminal.NativeCleanupDiagnostic });
             _progress.Writer.TryComplete();
         }
+    }
+
+    private void Observe(StreamEvent value)
+    {
+        if (_telemetry is not { } observer) return;
+        try { observer.OnEvent(value); }
+        catch (Exception)
+        {
+            // A faulty telemetry adapter never changes the chat: stop observing and settle the span.
+            _telemetry = null;
+            observer.Abandon();
+        }
+    }
+
+    private void ObserveResult(AssistantMessage message)
+    {
+        if (_telemetry is not { } observer) return;
+        _telemetry = null;
+        try { observer.OnResult(message); }
+        catch (Exception) { observer.Abandon(); }
     }
 
     /// <summary>

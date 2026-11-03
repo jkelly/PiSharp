@@ -185,7 +185,8 @@
       "pisharp.ai": {
         "type": "Project",
         "dependencies": {
-          "PiSharp.Contracts": "[1.2.0, )"
+          "PiSharp.Contracts": "[1.2.0, )",
+          "PiSharp.Telemetry": "[1.2.0, )"
         }
       },
       "pisharp.contracts": {
@@ -197,6 +198,9 @@
           "PiSharp.AI": "[1.2.0, )",
           "PiSharp.Contracts": "[1.2.0, )"
         }
+      },
+      "pisharp.telemetry": {
+        "type": "Project"
       }
     }
   }

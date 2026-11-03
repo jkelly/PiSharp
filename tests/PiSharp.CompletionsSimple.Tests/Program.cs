@@ -379,7 +379,8 @@ internal static class Program
         {
             case "signal": break; // CancellationToken is passed through the actual start/stream seam; fault cases remain separate.
             case "transport": Set(options, "TransportPreference", "sse"); break;
-            case "telemetryContext": Set(options, "TelemetryContext", JsonData.Parse("{\"authoredInertOpaqueContext\":true}")); break;
+            // The fixture predates the rename (Pi 1.4.0: telemetryContext became the typed telemetry span, with no alias).
+            case "telemetryContext": Set(options, "Telemetry", PiSharp.Telemetry.NoopTelemetry.Context); break;
             case "websocketConnectTimeoutMs": Set(options, "WebsocketConnectTimeoutMilliseconds", 4321); break;
             case "env": Set(options, "Environment", JsonData.Parse("{\"PI_CACHE_RETENTION\":\"none\",\"HTTP_PROXY\":\"\",\"HTTPS_PROXY\":\"\",\"ALL_PROXY\":\"\"}")); break;
         }
