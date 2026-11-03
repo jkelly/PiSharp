@@ -56,11 +56,11 @@
     "changelogBullets": 477,
     "repeatedBullets": 23,
     "byStatus": {
-      "port": 218,
+      "ported-with-deferral": 17,
+      "port": 197,
+      "ported": 75,
       "already-ported": 13,
-      "ported": 57,
-      "no-op": 24,
-      "ported-with-deferral": 14
+      "no-op": 24
     },
     "byArea": {
       "ai": 58,
@@ -1620,7 +1620,7 @@
       "id": "ai.openai-responses-mid-convo-effort",
       "area": "ai",
       "phase": 2,
-      "status": "port",
+      "status": "ported-with-deferral",
       "changelog": [
         "ai@1.3.0/Added#1",
         "coding-agent@1.3.0/New Features#2",
@@ -1645,7 +1645,16 @@
         "src/PiSharp.ModelRuntime/Models/BuiltinModelCatalog.cs"
       ],
       "release": "1.5.0",
-      "notes": "PiSharp has supportsMidConvoEffort only for Anthropic (AnthropicMessagesRequestProjector.cs:49); the Responses projector always writes reasoning.effort from the current level and the openai.json shard's GPT-6 compat lacks the flag. Needs the providerThinkingLevel field on assistant messages (shared with ai.claude-disabled-thinking-off) and the models.schema.json description update. The shard comes with the catalog refresh to pi-ai 1.5.0; ChatGPT-subscription detection must match upstream's key-prefix rule."
+      "notes": "PiSharp has supportsMidConvoEffort only for Anthropic (AnthropicMessagesRequestProjector.cs:49); the Responses projector always writes reasoning.effort from the current level and the openai.json shard's GPT-6 compat lacks the flag. Needs the providerThinkingLevel field on assistant messages (shared with ai.claude-disabled-thinking-off) and the models.schema.json description update. The shard comes with the catalog refresh to pi-ai 1.5.0; ChatGPT-subscription detection must match upstream's key-prefix rule.",
+      "evidence": {
+        "commits": [
+          "3b1e184d"
+        ],
+        "tests": [
+          "tests/PiSharp.ProviderSync.Tests/Sync150Cases.cs: sync150.responses-mid-conversation-effort-configuration-updates"
+        ]
+      },
+      "deferred": "compat.supportsMidConvoEffort catalog values for gpt-6-astra/sol/luna and gpt-6.1-sol belong to the ai-catalog openai.json refresh; the models.schema.json description belongs to the schemas.models-schema-descriptions row."
     },
     {
       "id": "ai.kimi-coding-chat-completions",
@@ -1679,7 +1688,7 @@
       "id": "ai.drop-cross-model-thinking",
       "area": "ai",
       "phase": 2,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "ai@1.3.0/Changed#2",
         "coding-agent@1.3.0/New Features#4",
@@ -1699,7 +1708,16 @@
         "src/PiSharp.AI/Protocols/MistralConversations/MistralReplay.cs:58"
       ],
       "release": "1.5.0",
-      "notes": "PiSharp's shared transcript transform turns cross-model thinking into text (ProviderTranscript.cs:170) and several projectors repeat the conversion locally; each copy must drop the block instead. Any replay fixtures that expect the text form change with it."
+      "notes": "PiSharp's shared transcript transform turns cross-model thinking into text (ProviderTranscript.cs:170) and several projectors repeat the conversion locally; each copy must drop the block instead. Any replay fixtures that expect the text form change with it.",
+      "evidence": {
+        "commits": [
+          "1d59f09c"
+        ],
+        "tests": [
+          "tests/PiSharp.ProviderSync.Tests/Sync150Cases.cs: sync150.cross-model-thinking-dropped-on-every-api",
+          "tests/PiSharp.ProviderSync.Tests/Sync150Cases.cs: sync150.completions-thinking-kept-only-from-the-target-model"
+        ]
+      }
     },
     {
       "id": "ai.invalid-unicode-escape-repair",
@@ -1726,7 +1744,7 @@
       "id": "ai.anthropic-error-tool-result-images",
       "area": "ai",
       "phase": 2,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "ai@1.3.0/Fixed#2",
         "coding-agent@1.3.0/Fixed#12"
@@ -1743,7 +1761,16 @@
         "src/PiSharp.AI/Protocols/Bedrock/BedrockConverseRequest.cs"
       ],
       "release": "1.5.0",
-      "notes": "PiSharp sends error tool results with their images inline, which Anthropic rejects with a 400. The split must apply only to Claude on Bedrock, as upstream gates it; other Bedrock models are unchanged. The placeholder and caption texts must match byte for byte for prompt-cache parity."
+      "notes": "PiSharp sends error tool results with their images inline, which Anthropic rejects with a 400. The split must apply only to Claude on Bedrock, as upstream gates it; other Bedrock models are unchanged. The placeholder and caption texts must match byte for byte for prompt-cache parity.",
+      "evidence": {
+        "commits": [
+          "1d59f09c"
+        ],
+        "tests": [
+          "tests/PiSharp.ProviderSync.Tests/Sync150Cases.cs: sync150.anthropic-error-tool-result-images-follow-the-results",
+          "tests/PiSharp.ProviderApis.Tests/Sync150Cases.cs: sync150.bedrock-claude-error-tool-result-images-follow-the-results"
+        ]
+      }
     },
     {
       "id": "ai.opencode-inference-endpoints",
@@ -1799,7 +1826,7 @@
       "id": "ai.retry-unable-to-forward-upstream",
       "area": "ai",
       "phase": 2,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "ai@1.3.0/Fixed#5",
         "coding-agent@1.3.0/Fixed#15"
@@ -1815,13 +1842,21 @@
         "tools/NodeBridge/pi-host/virtual/ai/utils/retry.mjs"
       ],
       "release": "1.5.0",
-      "notes": "PiSharp keeps the transient pattern in AgentRetryPolicy.cs:44-45 and a copy in the durable Retry.cs:32-35 that a test compares with it, so both change together (the durable copy is otherwise phase 4 ground). InteractiveModeHost.cs:200-205 has a shorter IsRetryableAssistantError pattern used by InteractiveMode.Events.cs:961; decide whether it should share the full list. Port with ai.retry-service-temporarily-unavailable."
+      "notes": "PiSharp keeps the transient pattern in AgentRetryPolicy.cs:44-45 and a copy in the durable Retry.cs:32-35 that a test compares with it, so both change together (the durable copy is otherwise phase 4 ground). InteractiveModeHost.cs:200-205 has a shorter IsRetryableAssistantError pattern used by InteractiveMode.Events.cs:961; decide whether it should share the full list. Port with ai.retry-service-temporarily-unavailable.",
+      "evidence": {
+        "commits": [
+          "c49f8a90"
+        ],
+        "tests": [
+          "tests/PiSharp.ProviderSync.Tests/Sync150Cases.cs: sync150.retry-gateway-service-unavailable-node-fetch-and-codex-disconnect"
+        ]
+      }
     },
     {
       "id": "ai.retry-service-temporarily-unavailable",
       "area": "ai",
       "phase": 2,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "ai@1.3.0/Fixed#6",
         "coding-agent@1.3.0/Fixed#16"
@@ -1837,7 +1872,15 @@
         "tools/NodeBridge/pi-host/virtual/ai/utils/retry.mjs"
       ],
       "release": "1.5.0",
-      "notes": "PiSharp's pattern is service.?unavailable, which misses the \"is temporarily\" wording. Same files and the same parity test as ai.retry-unable-to-forward-upstream; check that compaction's retry path uses AgentRetryPolicy."
+      "notes": "PiSharp's pattern is service.?unavailable, which misses the \"is temporarily\" wording. Same files and the same parity test as ai.retry-unable-to-forward-upstream; check that compaction's retry path uses AgentRetryPolicy.",
+      "evidence": {
+        "commits": [
+          "c49f8a90"
+        ],
+        "tests": [
+          "tests/PiSharp.ProviderSync.Tests/Sync150Cases.cs: sync150.retry-gateway-service-unavailable-node-fetch-and-codex-disconnect"
+        ]
+      }
     },
     {
       "id": "ai.completions-thinking-before-text",
@@ -1862,7 +1905,7 @@
       "id": "ai.gemini4-thinking-level",
       "area": "ai",
       "phase": 2,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "ai@1.3.0/Fixed#8",
         "coding-agent@1.3.0/Fixed#18"
@@ -1878,7 +1921,15 @@
         "src/PiSharp.WebAgent/Runs/RunModelOptions.cs:460"
       ],
       "release": "1.5.0",
-      "notes": "PiSharp has four copies of the Gemini-3 model test; all must take the Gemini 4+ alternative, ideally from one shared helper. RunModelOptions.cs is the Web Agent's copy."
+      "notes": "PiSharp has four copies of the Gemini-3 model test; all must take the Gemini 4+ alternative, ideally from one shared helper. RunModelOptions.cs is the Web Agent's copy.",
+      "evidence": {
+        "commits": [
+          "1d59f09c"
+        ],
+        "tests": [
+          "tests/PiSharp.ProviderSync.Tests/Sync150Cases.cs: sync150.google-gemini-4-and-later-thinking-level"
+        ]
+      }
     },
     {
       "id": "ai.xiaomi-mimo-thinking-toggle",
@@ -1998,7 +2049,7 @@
       "id": "ai.client-identity",
       "area": "ai",
       "phase": 2,
-      "status": "port",
+      "status": "ported-with-deferral",
       "changelog": [
         "ai@1.4.0/Breaking Changes#2",
         "ai@1.4.0/Added#1",
@@ -2039,13 +2090,24 @@
         "src/PiSharp.AI/Protocols/MistralConversations/source-inventory.json"
       ],
       "release": "1.5.0",
-      "notes": "PiSharp has no identity type today: user agents are fixed per protocol (\"PiSharp\" at CompletionsKeyAuthRequestFactory.cs:167, AnthropicMessagesKeyAuthRequestFactory.cs:113 and AnthropicMessagesAuthenticatedRequestFactory.cs:63; \"pi/1.2.0\" at GoogleKeyAuthRequestFactory.cs:46, GoogleVertexRequestFactory.cs:42 and OpenAICodexResponsesTransport.cs:41; none on Responses or Azure), and the only attribution header is x-opencode-client: pisharp, sent with a session (NativeProviderFactory.ProviderRoutes.cs:100). Port ClientIdentity, FormatUserAgent, GetIdentityHeaders and the merge rules into PiSharp.AI as [Experimental] API, with the identity on ChatRequest and ModelRequestOptions. 0013 design point Identity: the version is the Pi version PiSharp tracks (1.5.0, worklist pin pi-version-identity) and the runtime field names .NET (dotnet/<version>, as BugReport.PiUserAgent does at BugReport.cs:84). Which attribution PiSharp sends is the owner's call (core.client-identity-attribution). Regenerate the Mistral source-inventory.json, which pins the deleted pi-user-agent.ts (worklist pin json-source-inventories). Bedrock, images, pi-messages and classifiers are ai.identity-more-requests."
+      "notes": "PiSharp has no identity type today: user agents are fixed per protocol (\"PiSharp\" at CompletionsKeyAuthRequestFactory.cs:167, AnthropicMessagesKeyAuthRequestFactory.cs:113 and AnthropicMessagesAuthenticatedRequestFactory.cs:63; \"pi/1.2.0\" at GoogleKeyAuthRequestFactory.cs:46, GoogleVertexRequestFactory.cs:42 and OpenAICodexResponsesTransport.cs:41; none on Responses or Azure), and the only attribution header is x-opencode-client: pisharp, sent with a session (NativeProviderFactory.ProviderRoutes.cs:100). Port ClientIdentity, FormatUserAgent, GetIdentityHeaders and the merge rules into PiSharp.AI as [Experimental] API, with the identity on ChatRequest and ModelRequestOptions. 0013 design point Identity: the version is the Pi version PiSharp tracks (1.5.0, worklist pin pi-version-identity) and the runtime field names .NET (dotnet/<version>, as BugReport.PiUserAgent does at BugReport.cs:84). Which attribution PiSharp sends is the owner's call (core.client-identity-attribution). Regenerate the Mistral source-inventory.json, which pins the deleted pi-user-agent.ts (worklist pin json-source-inventories). Bedrock, images, pi-messages and classifiers are ai.identity-more-requests.",
+      "evidence": {
+        "commits": [
+          "3b1e184d",
+          "cc075493"
+        ],
+        "tests": [
+          "tests/PiSharp.ProviderSync.Tests/Sync150Cases.cs: sync150.identity-user-agent-merge-and-attribution-headers",
+          "tests/PiSharp.ProviderSync.Tests/Sync150Cases.cs: sync150.identity-headers-on-chat-requests"
+        ]
+      },
+      "deferred": "Models-level createModels({identity}) / withClientIdentity is not ported; identity travels on ChatRequest.Identity and provider options. Callers that still build their own UA (RemoteModelCatalog, BugReport, PiToolsManager) belong to core.client-identity-attribution."
     },
     {
       "id": "ai.identity-more-requests",
       "area": "ai",
       "phase": 2,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "ai@1.4.0/Added#2"
       ],
@@ -2066,7 +2128,15 @@
         "src/PiSharp.AI/ModelOperations/ProviderRequest.cs"
       ],
       "release": "1.5.0",
-      "notes": "Depends on ai.client-identity. PiSharp's Bedrock transport signs requests itself (no AWS SDK) and sends User-Agent: PiSharp (BedrockConverseStreamTransport.cs:190); there is no SDK user agent to append to, so decide how the pi/<version> pair is rendered and keep it out of the SigV4 signed headers. PiSharp's image, pi-messages and classifier requests set no User-Agent today (PiMessagesKeyAuthRequestFactory.cs:66, ClassifierShared.cs:73)."
+      "notes": "Depends on ai.client-identity. PiSharp's Bedrock transport signs requests itself (no AWS SDK) and sends User-Agent: PiSharp (BedrockConverseStreamTransport.cs:190); there is no SDK user agent to append to, so decide how the pi/<version> pair is rendered and keep it out of the SigV4 signed headers. PiSharp's image, pi-messages and classifier requests set no User-Agent today (PiMessagesKeyAuthRequestFactory.cs:66, ClassifierShared.cs:73).",
+      "evidence": {
+        "commits": [
+          "3b1e184d"
+        ],
+        "tests": [
+          "tests/PiSharp.ProviderApis.Tests/Sync150Cases.cs: sync150.identity-bedrock-and-codex-user-agents"
+        ]
+      }
     },
     {
       "id": "ai.opencode-session-custom-providers",
@@ -2097,7 +2167,7 @@
       "id": "ai.transcript-tool-support",
       "area": "ai",
       "phase": 2,
-      "status": "port",
+      "status": "ported-with-deferral",
       "changelog": [
         "ai@1.4.0/Breaking Changes#3",
         "ai@1.4.0/Fixed#7",
@@ -2122,7 +2192,16 @@
         "src/PiSharp.AI/Protocols/AzureResponses/AzureResponsesRequestFactory.cs"
       ],
       "release": "1.5.0",
-      "notes": "Completions: PiSharp anchors Kimi tool messages only while no tool was ever removed (CompletionsToolDeclarationProjector.CanAnchorAdditions, CompletionsToolDeclarationProjector.cs:161, used at CompletionsTranscriptProjector.cs:75-93); port the fold up to the last non-additive change. Responses, Codex and Azure: PiSharp never implemented additional_tools or tool search and always sends the current tool list (docs/compatibility/responses-tools-sdk-reference.md; Azure refuses those compat flags at AzureResponsesRequestFactory.cs:52). The \"changes\" and \"additions\" modes there are new request shapes for catalog models flagged supportsAdditionalTools or supportsToolSearch (openai.json, openai-codex.json, github-copilot.json), so they need their own wire tests."
+      "notes": "Completions: PiSharp anchors Kimi tool messages only while no tool was ever removed (CompletionsToolDeclarationProjector.CanAnchorAdditions, CompletionsToolDeclarationProjector.cs:161, used at CompletionsTranscriptProjector.cs:75-93); port the fold up to the last non-additive change. Responses, Codex and Azure: PiSharp never implemented additional_tools or tool search and always sends the current tool list (docs/compatibility/responses-tools-sdk-reference.md; Azure refuses those compat flags at AzureResponsesRequestFactory.cs:52). The \"changes\" and \"additions\" modes there are new request shapes for catalog models flagged supportsAdditionalTools or supportsToolSearch (openai.json, openai-codex.json, github-copilot.json), so they need their own wire tests.",
+      "evidence": {
+        "commits": [
+          "1d59f09c"
+        ],
+        "tests": [
+          "tests/PiSharp.ProviderSync.Tests/Sync150Cases.cs: sync150.completions-kimi-tool-additions-fold-to-the-last-removal"
+        ]
+      },
+      "deferred": "Responses/Codex/Azure additional_tools (\"changes\") and tool search (\"additions\") are request shapes PiSharp never implemented; AzureResponsesRequestFactory refuses those flags. Removal announcements belong to that mode."
     },
     {
       "id": "ai.whitespace-tool-output",
@@ -2151,7 +2230,7 @@
       "id": "ai.retry-more-transient-errors",
       "area": "ai",
       "phase": 2,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "ai@1.4.0/Fixed#3",
         "ai@1.4.0/Fixed#4",
@@ -2168,13 +2247,21 @@
         "src/PiSharp.AI/Protocols/GoogleVertex/GoogleVertexAuthentication.cs"
       ],
       "release": "1.5.0",
-      "notes": "AgentRetryPolicy.Transient (AgentRetryPolicy.cs:44-45) is the pi-ai port; InteractiveModeHost.IsRetryableAssistantError (InteractiveModeHost.cs:199-206) keeps an older, shorter copy for the interactive error display and should follow. PiSharp's Vertex token refresh (GoogleVertexAuthentication.cs:170-173) surfaces .NET's HttpRequestException text, not node-fetch's \"request to ... failed, reason:\", so decide how a transient refresh failure becomes retryable. The durable copy (src/PiSharp.Durable/Internal/PiAi/Retry.cs) moves with the durable phase."
+      "notes": "AgentRetryPolicy.Transient (AgentRetryPolicy.cs:44-45) is the pi-ai port; InteractiveModeHost.IsRetryableAssistantError (InteractiveModeHost.cs:199-206) keeps an older, shorter copy for the interactive error display and should follow. PiSharp's Vertex token refresh (GoogleVertexAuthentication.cs:170-173) surfaces .NET's HttpRequestException text, not node-fetch's \"request to ... failed, reason:\", so decide how a transient refresh failure becomes retryable. The durable copy (src/PiSharp.Durable/Internal/PiAi/Retry.cs) moves with the durable phase.",
+      "evidence": {
+        "commits": [
+          "c49f8a90"
+        ],
+        "tests": [
+          "tests/PiSharp.ProviderSync.Tests/Sync150Cases.cs: sync150.retry-gateway-service-unavailable-node-fetch-and-codex-disconnect"
+        ]
+      }
     },
     {
       "id": "ai.retry-standalone-status-codes",
       "area": "ai",
       "phase": 2,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "ai@1.4.0/Fixed#6",
         "coding-agent@1.4.0/Fixed#20"
@@ -2188,13 +2275,21 @@
         "src/PiSharp.Cli/Interactive/Mode/InteractiveModeHost.cs"
       ],
       "release": "1.5.0",
-      "notes": "AgentRetryPolicy.cs:45 and InteractiveModeHost.cs:204 match the bare numbers. AgentRetryPolicy canonicalizes to upper case before matching (AgentRetryPolicy.cs:47-58), so the lookarounds must cover upper-case letters too. Durable's Retry.cs moves with the durable phase."
+      "notes": "AgentRetryPolicy.cs:45 and InteractiveModeHost.cs:204 match the bare numbers. AgentRetryPolicy canonicalizes to upper case before matching (AgentRetryPolicy.cs:47-58), so the lookarounds must cover upper-case letters too. Durable's Retry.cs moves with the durable phase.",
+      "evidence": {
+        "commits": [
+          "c49f8a90"
+        ],
+        "tests": [
+          "tests/PiSharp.ProviderSync.Tests/Sync150Cases.cs: sync150.retry-standalone-status-codes"
+        ]
+      }
     },
     {
       "id": "ai.chatgpt-workspace-usage-limit",
       "area": "ai",
       "phase": 2,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "ai@1.4.0/Added#7",
         "coding-agent@1.4.0/Changed#7"
@@ -2209,13 +2304,23 @@
         "src/PiSharp.CodingAgent/Configuration/AgentRetryPolicy.cs"
       ],
       "release": "1.5.0",
-      "notes": "PiSharp handles only subscription_sharing_usage_limit_exceeded: the usage hint at ResponsesTextToolTransport.cs:171-172 and the permanent pattern at AgentRetryPolicy.cs:42-43. Copy the hint text from openai-responses.ts byte for byte."
+      "notes": "PiSharp handles only subscription_sharing_usage_limit_exceeded: the usage hint at ResponsesTextToolTransport.cs:171-172 and the permanent pattern at AgentRetryPolicy.cs:42-43. Copy the hint text from openai-responses.ts byte for byte.",
+      "evidence": {
+        "commits": [
+          "c49f8a90",
+          "1d59f09c"
+        ],
+        "tests": [
+          "tests/PiSharp.ProviderSync.Tests/Sync150Cases.cs: sync150.retry-chatgpt-workspace-and-zhipu-1308-limits-not-retried",
+          "tests/PiSharp.ProviderSync.Tests/Sync150Cases.cs: sync150.responses-chatgpt-workspace-usage-limit-hint"
+        ]
+      }
     },
     {
       "id": "ai.copilot-413-overflow",
       "area": "ai",
       "phase": 2,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "ai@1.4.0/Fixed#8",
         "coding-agent@1.4.0/Fixed#17"
@@ -2228,7 +2333,16 @@
         "src/PiSharp.CodingAgent/SessionRecoveryClassifier.cs"
       ],
       "release": "1.5.0",
-      "notes": "SessionRecoveryClassifier.cs:14-27 recognises only a bodyless 400/413 (\"413 (no body)\", line 27). Check the error text PiSharp's Copilot route produces for a 413 matches the \"github-copilot API error (413):\" form the new pattern expects. Durable's Overflow.cs moves with the durable phase."
+      "notes": "SessionRecoveryClassifier.cs:14-27 recognises only a bodyless 400/413 (\"413 (no body)\", line 27). Check the error text PiSharp's Copilot route produces for a 413 matches the \"github-copilot API error (413):\" form the new pattern expects. Durable's Overflow.cs moves with the durable phase.",
+      "evidence": {
+        "commits": [
+          "c49f8a90"
+        ],
+        "tests": [
+          "tests/PiSharp.ProviderSync.Tests/Sync150Cases.cs: sync150.overflow-http-413-and-litellm-context-window",
+          "tests/PiSharp.ProviderApis.Tests/Sync150Cases.cs: sync150.copilot-responses-http-413-is-context-overflow"
+        ]
+      }
     },
     {
       "id": "ai.minimax-m3-1-flash",
@@ -2460,7 +2574,7 @@
       "id": "ai.device-code-confirm-options",
       "area": "ai",
       "phase": 2,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "ai@1.5.0/Added#1",
         "coding-agent@1.5.0/Added#3"
@@ -2476,7 +2590,15 @@
         "src/PiSharp.Cli/Extensions/Pi/PiExtensionOAuth.cs"
       ],
       "release": "1.5.0",
-      "notes": "AuthEvent (ProviderOAuth.cs:24-33) has UserCode and VerificationUri but neither flag; PiExtensionOAuth.cs:149 maps an extension provider's device_code event and must carry both, including from onDeviceCode. Built-in providers set neither, so the defaults apply. New members carry [Experimental]. The dialog side is cli.login-device-code-actions."
+      "notes": "AuthEvent (ProviderOAuth.cs:24-33) has UserCode and VerificationUri but neither flag; PiExtensionOAuth.cs:149 maps an extension provider's device_code event and must carry both, including from onDeviceCode. Built-in providers set neither, so the defaults apply. New members carry [Experimental]. The dialog side is cli.login-device-code-actions.",
+      "evidence": {
+        "commits": [
+          "519d2294"
+        ],
+        "tests": [
+          "tests/PiSharp.ExtensionParity.Tests/Sync150ProviderCases.cs: sync150.oauth-device-code-confirm-options-reach-the-auth-event"
+        ]
+      }
     },
     {
       "id": "ai.streaming-json-parser",
@@ -2643,7 +2765,7 @@
       "id": "ai.anthropic-system-hold-past-dropped",
       "area": "ai",
       "phase": 2,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "ai@1.5.0/Fixed#1",
         "coding-agent@1.5.0/Fixed#62"
@@ -2656,13 +2778,21 @@
         "src/PiSharp.AI/Protocols/AnthropicMessages/AnthropicMessagesRequestProjector.cs"
       ],
       "release": "1.5.0",
-      "notes": "PiSharp buffers system updates in _pendingSystems (AnthropicMessagesRequestProjector.cs:95) and calls FlushSystems() before it builds the assistant blocks (around line 165), so a dropped assistant turn leaves the update in the buffer. Move the flush after block conversion and add a test with an empty assistant turn between two system updates."
+      "notes": "PiSharp buffers system updates in _pendingSystems (AnthropicMessagesRequestProjector.cs:95) and calls FlushSystems() before it builds the assistant blocks (around line 165), so a dropped assistant turn leaves the update in the buffer. Move the flush after block conversion and add a test with an empty assistant turn between two system updates.",
+      "evidence": {
+        "commits": [
+          "1d59f09c"
+        ],
+        "tests": [
+          "tests/PiSharp.ProviderSync.Tests/Sync150Cases.cs: sync150.anthropic-system-update-held-past-a-dropped-assistant"
+        ]
+      }
     },
     {
       "id": "ai.anthropic-low-top-level-effort",
       "area": "ai",
       "phase": 2,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "ai@1.5.0/Fixed#2",
         "coding-agent@1.5.0/Fixed#63"
@@ -2675,7 +2805,15 @@
         "src/PiSharp.AI/Protocols/AnthropicMessages/AnthropicMessagesRequestProjector.cs"
       ],
       "release": "1.5.0",
-      "notes": "PiSharp sets root[\"output_config\"] = { effort = \"high\" } at AnthropicMessagesRequestProjector.cs:233. ProviderThinkingLevel (line 49) and the per-turn marker (line 457) stay as they are. Update the request snapshot tests that pin the body."
+      "notes": "PiSharp sets root[\"output_config\"] = { effort = \"high\" } at AnthropicMessagesRequestProjector.cs:233. ProviderThinkingLevel (line 49) and the per-turn marker (line 457) stay as they are. Update the request snapshot tests that pin the body.",
+      "evidence": {
+        "commits": [
+          "1d59f09c"
+        ],
+        "tests": [
+          "tests/PiSharp.ProviderSync.Tests/Sync150Cases.cs: sync150.anthropic-managed-effort-top-level-low"
+        ]
+      }
     },
     {
       "id": "ai.tool-call-args-incremental",
@@ -2793,7 +2931,7 @@
       "id": "ai.oauth-trusted-http-urls",
       "area": "ai",
       "phase": 2,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "ai@1.5.0/Fixed#7"
       ],
@@ -2810,7 +2948,15 @@
         "src/PiSharp.AI/Authentication/OAuth/ProviderOAuth.cs"
       ],
       "release": "1.5.0",
-      "notes": "PiSharp already checks Copilot (GitHubCopilotOAuth.cs:61), Kimi (SubscriptionOAuth.cs:100) and Meta (SubscriptionOAuth.cs:193) through OAuthFlows.TrustedHttpUrl (ProviderOAuth.cs:194). Radius lacks the check for the authorization endpoint (SubscriptionOAuth.cs:351) and the verification_uri (SubscriptionOAuth.cs:403). Add both and match upstream's error text."
+      "notes": "PiSharp already checks Copilot (GitHubCopilotOAuth.cs:61), Kimi (SubscriptionOAuth.cs:100) and Meta (SubscriptionOAuth.cs:193) through OAuthFlows.TrustedHttpUrl (ProviderOAuth.cs:194). Radius lacks the check for the authorization endpoint (SubscriptionOAuth.cs:351) and the verification_uri (SubscriptionOAuth.cs:403). Add both and match upstream's error text.",
+      "evidence": {
+        "commits": [
+          "519d2294"
+        ],
+        "tests": [
+          "tests/PiSharp.ProviderApis.Tests/Sync150Cases.cs: sync150.radius-oauth-trusts-only-http-urls"
+        ]
+      }
     },
     {
       "id": "ai.pi-messages-content-index",
@@ -2894,7 +3040,7 @@
       "id": "ai.bedrock-strict-fallback",
       "area": "ai",
       "phase": 2,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "ai@1.5.0/Fixed#12",
         "coding-agent@1.5.0/Fixed#67"
@@ -2912,7 +3058,16 @@
         "src/PiSharp.AI/Protocols/AnthropicMessages/AnthropicStrictToolsFallback.cs"
       ],
       "release": "1.5.0",
-      "notes": "PiSharp has the Anthropic strict-tools fallback (AnthropicStrictToolsFallback.cs) but no Bedrock retry. Share the limit-message matcher between the two. Test with a recorded ValidationException."
+      "notes": "PiSharp has the Anthropic strict-tools fallback (AnthropicStrictToolsFallback.cs) but no Bedrock retry. Share the limit-message matcher between the two. Test with a recorded ValidationException.",
+      "evidence": {
+        "commits": [
+          "1d59f09c",
+          "3b1e184d"
+        ],
+        "tests": [
+          "tests/PiSharp.ProviderApis.Tests/Sync150Cases.cs: sync150.bedrock-strict-tool-limit-rejection-retries-preferred-tools-once"
+        ]
+      }
     },
     {
       "id": "ai.openrouter-anthropic-latest-aliases",
@@ -2990,7 +3145,7 @@
       "id": "ai.zhipu-1308-not-retryable",
       "area": "ai",
       "phase": 2,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "ai@1.5.0/Fixed#16",
         "coding-agent@1.5.0/Fixed#53"
@@ -3004,13 +3159,21 @@
         "src/PiSharp.Durable/Internal/PiAi/Retry.cs"
       ],
       "release": "1.5.0",
-      "notes": "Add the pattern next to the existing ones (AgentRetryPolicy.cs:43). The durable copy (Retry.cs) moves with the phase 4 durable re-sync."
+      "notes": "Add the pattern next to the existing ones (AgentRetryPolicy.cs:43). The durable copy (Retry.cs) moves with the phase 4 durable re-sync.",
+      "evidence": {
+        "commits": [
+          "c49f8a90"
+        ],
+        "tests": [
+          "tests/PiSharp.ProviderSync.Tests/Sync150Cases.cs: sync150.retry-chatgpt-workspace-and-zhipu-1308-limits-not-retried"
+        ]
+      }
     },
     {
       "id": "ai.litellm-context-overflow",
       "area": "ai",
       "phase": 2,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "ai@1.5.0/Fixed#17",
         "coding-agent@1.5.0/Fixed#54"
@@ -3024,13 +3187,21 @@
         "src/PiSharp.Durable/Internal/PiAi/Overflow.cs"
       ],
       "release": "1.5.0",
-      "notes": "Add the pattern to SessionRecoveryClassifier.cs:17. The durable copy (Overflow.cs) moves with the phase 4 durable re-sync."
+      "notes": "Add the pattern to SessionRecoveryClassifier.cs:17. The durable copy (Overflow.cs) moves with the phase 4 durable re-sync.",
+      "evidence": {
+        "commits": [
+          "c49f8a90"
+        ],
+        "tests": [
+          "tests/PiSharp.ProviderSync.Tests/Sync150Cases.cs: sync150.overflow-http-413-and-litellm-context-window"
+        ]
+      }
     },
     {
       "id": "ai.gemini-const-as-enum",
       "area": "ai",
       "phase": 2,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "ai@1.5.0/Fixed#18",
         "coding-agent@1.5.0/Fixed#55"
@@ -3043,7 +3214,15 @@
         "src/PiSharp.AI/Protocols/GoogleGenerativeAI/GoogleRequestProjector.cs"
       ],
       "release": "1.5.0",
-      "notes": "GoogleRequestProjector.cs:85 sends parametersJsonSchema unchanged. Port rewriteConstAsEnum over JsonNode; it must not treat a property literally named const or enum as a keyword. Check whether Vertex shares the projector."
+      "notes": "GoogleRequestProjector.cs:85 sends parametersJsonSchema unchanged. Port rewriteConstAsEnum over JsonNode; it must not treat a property literally named const or enum as a keyword. Check whether Vertex shares the projector.",
+      "evidence": {
+        "commits": [
+          "1d59f09c"
+        ],
+        "tests": [
+          "tests/PiSharp.ProviderSync.Tests/Sync150Cases.cs: sync150.google-const-rewritten-as-enum-in-parameters-json-schema"
+        ]
+      }
     },
     {
       "id": "schema.compile-validator",
