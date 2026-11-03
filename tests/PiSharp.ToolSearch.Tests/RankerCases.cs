@@ -30,9 +30,10 @@ internal static partial class Program
         // The stems: -ies only above four characters, sibilant -es, a plain -s but not -ss, and nothing at three characters.
         Names(["tie", "class", "box", "bus", "gas", "item", "ys"], ToolSearch.Tokenize("ties classes boxes bus gas items ys"), "stem lengths");
         Names([], ToolSearch.Tokenize(" -- the a__an "), "only stop words and separators");
-        Names(["caf", "x2", "v"], ToolSearch.Tokenize("café x2-v"), "non-ASCII letters separate terms");
-        // JavaScript lowercases U+0130 to "i" and U+0307, and the combining dot separates terms.
-        Names(["i", "stanbul"], ToolSearch.Tokenize("İstanbul"), "U+0130 lowercases to i and U+0307");
+        // Pi 1.5.0: letters, marks and digits of any script are word characters, so non-ASCII letters stay in their words.
+        Names(["café", "x2", "v"], ToolSearch.Tokenize("café x2-v"), "non-ASCII letters stay in the term");
+        // JavaScript lowercases U+0130 to "i" and U+0307, a combining mark that stays in the word.
+        Names(["i̇stanbul"], ToolSearch.Tokenize("İstanbul"), "U+0130 lowercases to i and U+0307");
     }
 
     private static void RanksCorpus()
@@ -56,23 +57,29 @@ internal static partial class Program
 
     private static void DocumentsAndScores()
     {
-        // The namespace name, description and instructions are part of the text.
+        // The namespace name, description and instructions are searchable, as a field of their own (Pi 1.5.0); the name is the
+        // document's Name, no longer part of its text.
         var namespaced = Document("mcp__x__run", "Run it.", group: new("mcp__x", "Kubernetes cluster tools"));
         var match = new Bm25Ranker().Rank("kubernetes", [namespaced], 8).Single();
         Check(match.Name == "mcp__x__run" && match.Score > 0, "namespace description searchable");
-        Equal("mcp__x__run mcp  x  run Run it. mcp__x Kubernetes cluster tools", namespaced.Text, "namespace document text (blank parts dropped)");
-        Equal("mcp__github__list_issues mcp  github  list issues List issues in a repository. state open or closed", Corpus[0].Text, "document text");
+        Equal("Run it.", namespaced.Text, "namespace document text");
+        Equal("mcp__x Kubernetes cluster tools ", namespaced.NamespaceText, "namespace text (an absent part is empty, not dropped)");
+        Equal("List issues in a repository. state open or closed", Corpus[0].Text, "document text");
+        Equal("", Corpus[0].NamespaceText, "no namespace");
         var nested = Document("t", "", """{"filters":{"type":"array","items":{"anyOf":[{"description":"by label"},{"type":"object","properties":{"assignee":{"description":"user login"}}}]}}}""",
             new ToolNamespace("mcp__t") { Instructions = "Use carefully." });
-        Equal("t t filters by label assignee user login mcp__t Use carefully.", nested.Text, "items, anyOf, nested properties and instructions");
+        Equal("filters by label assignee user login", nested.Text, "items, anyOf and nested properties (blank parts dropped)");
+        Equal("mcp__t  Use carefully.", nested.NamespaceText, "namespace instructions");
         // Okapi BM25 with k1 = 1.2 and b = 0.75: one term in a two-term document of a two-document corpus (average length 1.5).
         var scored = new Bm25Ranker().Rank("alpha", [new("a", "alpha beta"), new("b", "gamma")], 8).Single();
         var expected = Math.Log(1 + (2 - 1 + 0.5) / (1 + 0.5)) * (1 * 2.2 / (1 + 1.2 * (1 - 0.75 + 0.75 * 2 / 1.5)));
         Check(Math.Abs(expected - scored.Score) < 1e-12, $"BM25 score {scored.Score} != {expected}");
-        // U+0130 yields an "i" term and splits the word, so "i" finds the second document and "istanbul" only the first.
+        // U+0130 lowercases to "i" and U+0307, which stays in the word: "i" finds nothing, "istanbul" only the first document and
+        // "İstanbul" only the second.
         ToolSearchDocument[] dotted = [new("city", "istanbul guide"), new("turkish", "İzmir İstanbul")];
-        Names(["turkish"], new Bm25Ranker().Rank("i", dotted, 8).Select(item => item.Name), "U+0130 term");
-        Names(["city"], new Bm25Ranker().Rank("istanbul", dotted, 8).Select(item => item.Name), "U+0130 splits the word");
+        Names([], new Bm25Ranker().Rank("i", dotted, 8).Select(item => item.Name), "no bare i term");
+        Names(["city"], new Bm25Ranker().Rank("istanbul", dotted, 8).Select(item => item.Name), "dotless query");
+        Names(["turkish"], new Bm25Ranker().Rank("İstanbul", dotted, 8).Select(item => item.Name), "U+0130 query");
         // Ties keep document order.
         Names(["first", "second"], new Bm25Ranker().Rank("same", [new("first", "same"), new("second", "same")], 8).Select(item => item.Name), "stable ties");
     }

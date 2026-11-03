@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/src/utils/image-process.ts, utils/image-resize.ts,
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/coding-agent/src/utils/image-process.ts, utils/image-resize.ts,
 // utils/image-resize-core.ts, utils/image-convert.ts (convertImageBytesToPng) and utils/tool-result-images.ts.
 using System.Buffers.Binary;
 using System.Collections.Immutable;
@@ -170,7 +170,8 @@ public static class ImageProcessor
 
     /// <summary>
     /// Source resizeImageInProcess: an image within all limits passes through unchanged; otherwise fit the dimensions,
-    /// try PNG then JPEG qualities, and shrink by 0.75 per step until a candidate is below maxBytes, or null.
+    /// try the smaller of PNG and JPEG at the configured quality, then the other, then lower JPEG qualities, and shrink by 0.75 per
+    /// step until a candidate is below maxBytes, or null.
     /// </summary>
     public static ResizedImage? Resize(ReadOnlySpan<byte> bytes, string mimeType, ImageResizeOptions? options = null, IImageCodec? codec = null)
     {
@@ -197,11 +198,11 @@ public static class ImageProcessor
             ImmutableArray<(byte[] Bytes, string MimeType)>? candidates;
             try { candidates = codec.Encode(input, mimeType, width, height, qualities); } catch (Exception) { return null; }
             if (candidates is not { } encoded) return null;
-            foreach (var (candidate, candidateMime) in encoded)
-            {
-                var data = Convert.ToBase64String(candidate);
+            var tried = encoded.Select(candidate => (Data: Convert.ToBase64String(candidate.Bytes), candidate.MimeType)).ToList();
+            // The smaller of PNG and JPEG at the configured quality goes first; lower JPEG qualities only if neither fits.
+            if (tried.Count > 1 && tried[1].Data.Length < tried[0].Data.Length) (tried[0], tried[1]) = (tried[1], tried[0]);
+            foreach (var (data, candidateMime) in tried)
                 if (data.Length < opts.MaxBytes) return new(data, candidateMime, originalWidth, originalHeight, width, height, true);
-            }
             if (width == 1 && height == 1) break;
             var nextWidth = width == 1 ? 1 : Math.Max(1, (int)Math.Floor(width * 0.75));
             var nextHeight = height == 1 ? 1 : Math.Max(1, (int)Math.Floor(height * 0.75));

@@ -54,9 +54,10 @@ internal static class SkiaCodecTests
         var atLimit = Jpeg(Gradient(2000, 2000), 60);
         var kept = ImageProcessor.Resize(atLimit, "image/jpeg", codec: Codec)!;
         Check(!kept.WasResized && kept.Data == Convert.ToBase64String(atLimit) && kept.Width == 2000, "At-limit image was changed.");
-        // One pixel over: round(10 * 2000 / 2001) = 10, the PNG candidate fits first.
-        var over = ImageProcessor.Resize(Jpeg(Gradient(2001, 10), 90), "image/jpeg", codec: Codec)!;
-        Check(over.WasResized && over.Width == 2000 && over.Height == 10 && over.MimeType == "image/png", "One-pixel-over resize differs.");
+        // One pixel over: round(10 * 2000 / 2001) = 10, and the smaller of PNG and JPEG at quality 80 fits first (Pi 1.5.0).
+        var overInput = Jpeg(Gradient(2001, 10), 90);
+        var over = ImageProcessor.Resize(overInput, "image/jpeg", codec: Codec)!;
+        Check(over.WasResized && over.Width == 2000 && over.Height == 10 && over.MimeType == SmallerMime(overInput, 2000, 10), "One-pixel-over resize differs.");
         Equal("[Image: original 2001x10, displayed at 2000x10. Multiply coordinates by 1.00 to map to original image.]", ImageProcessor.FormatDimensionNote(over));
         var tall = ImageProcessor.Resize(Webp(Gradient(300, 900)), "image/webp", new(MaxWidth: 400, MaxHeight: 300), Codec)!;
         Check(tall.WasResized && tall.Width == 100 && tall.Height == 300, "Height limit resize differs.");
@@ -77,7 +78,8 @@ internal static class SkiaCodecTests
         Check(ImageProcessor.Resize(noise, "image/jpeg", new(MaxBytes: base64 + 1), Codec) is { WasResized: false }, "Below the byte limit was resized.");
         var atBytes = ImageProcessor.Resize(noise, "image/jpeg", new(MaxBytes: base64), Codec)!;
         Check(atBytes.WasResized && atBytes.Width == 300 && atBytes.MimeType == "image/jpeg", "At the byte limit was not re-encoded at full size.");
-        // Candidates are PNG, then JPEG at [80, 85, 70, 55, 40]; the first below maxBytes wins.
+        // The codec encodes PNG, then JPEG at [80, 85, 70, 55, 40]. Since Pi 1.5.0 the smaller of PNG and JPEG 80 is tried first, then
+        // the other, then the lower qualities; the first below maxBytes wins. Noise makes PNG the largest, so the order stays.
         var candidates = Codec.Encode(noise, "image/jpeg", 300, 300, Qualities)!.Value;
         Equal(6, candidates.Length);
         Check(candidates[0].MimeType == "image/png" && candidates.Skip(1).All(item => item.MimeType == "image/jpeg"), "Candidate order differs.");
@@ -95,10 +97,18 @@ internal static class SkiaCodecTests
         var custom = Codec.Encode(noise, "image/jpeg", 300, 300, [95, 85, 70, 55, 40])!.Value;
         var first = ImageProcessor.Resize(noise, "image/jpeg", new(MaxBytes: Convert.ToBase64String(custom[1].Bytes).Length + 1, JpegQuality: 95), Codec)!;
         Equal(Convert.ToBase64String(custom[1].Bytes), first.Data);
-        // A flat image fits as PNG, which is tried first.
-        var flat = ImageProcessor.Resize(Jpeg(Gradient(2400, 100), 90), "image/jpeg", codec: Codec)!;
-        Equal("image/png", flat.MimeType);
+        // A gradient that fits either way gets the smaller encoding (round(100 * 2000 / 2400) = 83).
+        var gradient = Jpeg(Gradient(2400, 100), 90);
+        var flat = ImageProcessor.Resize(gradient, "image/jpeg", codec: Codec)!;
+        Equal(SmallerMime(gradient, 2000, 83), flat.MimeType);
         return Task.CompletedTask;
+    }
+
+    /// <summary>The MIME type of the smaller of the PNG and quality-80 JPEG encodings at the given size.</summary>
+    private static string SmallerMime(byte[] input, int width, int height)
+    {
+        var candidates = Codec.Encode(input, "image/jpeg", width, height, Qualities)!.Value;
+        return Convert.ToBase64String(candidates[1].Bytes).Length < Convert.ToBase64String(candidates[0].Bytes).Length ? "image/jpeg" : "image/png";
     }
 
     private static Task ShrinkSteps()

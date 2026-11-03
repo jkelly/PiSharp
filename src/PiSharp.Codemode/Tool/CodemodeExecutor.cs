@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/src/extensions/codemode/execute.ts.
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/coding-agent/src/extensions/codemode/execute.ts.
 using System.Collections.Immutable;
 using System.Diagnostics;
 using System.Globalization;
@@ -22,6 +22,19 @@ public static class CodemodeExecutor
     /// <summary>Default token budget for script output.</summary>
     public const int DefaultMaxOutputTokens = 10_000;
     private const int CharsPerToken = 4;
+    /// <summary>execute.ts DEFAULT_MAX_CODEMODE_WORKERS: workers alive at once across every session in this process. Two allow one
+    /// replacement while a cancelled worker is still exiting.</summary>
+    internal const int DefaultMaxWorkers = 2;
+    /// <summary>execute.ts CODEMODE_WORKER_WAIT_MS: how long a script waits for a free worker before it fails without running. It bounds
+    /// the wait when every worker is held by a script that waits on another script, for example an in-process subagent that uses codemode.
+    /// Tests shorten it.</summary>
+    internal static int WorkerWaitMs { get; set; } = 60_000;
+    /// <summary>Changes <see cref="DefaultMaxWorkers"/> when it is a positive integer; read on every call so hosts can set it at runtime.</summary>
+    internal const string MaxWorkersVariable = "PI_CODEMODE_MAX_WORKERS";
+    private static readonly object AdmissionGate = new();
+    private static int activeWorkers;
+    /// <summary>Scripts waiting for a worker, in arrival order.</summary>
+    private static readonly LinkedList<TaskCompletionSource<string>> WorkerWaiters = new();
     private static readonly ImmutableDictionary<string, string> ImageExtensions = new Dictionary<string, string>
         { ["image/png"] = ".png", ["image/jpeg"] = ".jpg", ["image/gif"] = ".gif", ["image/webp"] = ".webp" }.ToImmutableDictionary();
     private static readonly string[] ModelTypes = ["chat", "image", "classifier"];
@@ -55,6 +68,62 @@ public static class CodemodeExecutor
                 block.TryGetProperty("type", out var type) && type.ValueKind == JsonValueKind.String && type.GetString() == "text" &&
                 block.TryGetProperty("text", out var text) && text.ValueKind == JsonValueKind.String).Select(block => block.GetProperty("text").GetString()))
             : "";
+
+    /// <summary>execute.ts maxCodemodeWorkers: <c>PI_CODEMODE_MAX_WORKERS</c> if <c>Number()</c> of it is a positive integer.</summary>
+    internal static int MaxWorkers()
+    {
+        var value = Environment.GetEnvironmentVariable(MaxWorkersVariable);
+        if (value is null) return DefaultMaxWorkers;
+        var number = Jint.Runtime.TypeConverter.ToNumber(new Jint.Native.JsString(value));
+        return double.IsInteger(number) && number > 0 ? (int)Math.Min(number, int.MaxValue) : DefaultMaxWorkers;
+    }
+
+    /// <summary>Worker slots taken, by running scripts and by workers that have not exited yet (tests).</summary>
+    internal static int ActiveWorkers { get { lock (AdmissionGate) return activeWorkers; } }
+
+    /// <summary>Scripts waiting for a worker slot (tests).</summary>
+    internal static int WaitingScripts { get { lock (AdmissionGate) return WorkerWaiters.Count; } }
+
+    /// <summary>execute.ts reserveCodemodeWorker: reserves one worker slot, waiting in arrival order while all are taken. Completes with
+    /// "reserved", or with why it could not reserve one: "aborted" (the token fired) or "timeout" (<paramref name="timeoutMs"/> passed).</summary>
+    private static async Task<string> ReserveWorkerAsync(double timeoutMs, CancellationToken cancellationToken)
+    {
+        if (cancellationToken.IsCancellationRequested) return "aborted";
+        var waiter = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
+        LinkedListNode<TaskCompletionSource<string>> node;
+        lock (AdmissionGate) { node = WorkerWaiters.AddLast(waiter); AdmitWorkers(); }
+        if (waiter.Task.IsCompleted) return await waiter.Task.ConfigureAwait(false);
+        void Settle(string outcome)
+        {
+            // The first of the grant, the timer and the token wins: a waiter no longer queued has been granted a slot.
+            lock (AdmissionGate)
+            {
+                if (node.List is null) return;
+                WorkerWaiters.Remove(node);
+            }
+            waiter.TrySetResult(outcome);
+        }
+        using var timer = new Timer(_ => Settle("timeout"), null, TimeSpan.FromMilliseconds(Math.Max(0, timeoutMs)), Timeout.InfiniteTimeSpan);
+        using var registration = cancellationToken.Register(() => Settle("aborted"));
+        return await waiter.Task.ConfigureAwait(false);
+    }
+
+    /// <summary>execute.ts admitCodemodeWorkers: gives free slots to waiting scripts in arrival order. Runs under the gate.</summary>
+    private static void AdmitWorkers()
+    {
+        while (WorkerWaiters.First is { } first && activeWorkers < MaxWorkers())
+        {
+            activeWorkers++;
+            WorkerWaiters.RemoveFirst();
+            first.Value.TrySetResult("reserved");
+        }
+    }
+
+    /// <summary>execute.ts releaseCodemodeWorker.</summary>
+    private static void ReleaseWorker()
+    {
+        lock (AdmissionGate) { activeWorkers--; AdmitWorkers(); }
+    }
 
     /// <summary>Run one script: <paramref name="input"/> is the tool's <c>code</c> argument. Returns the tool result JSON
     /// (<c>{ content, details, usage?, isError? }</c>). Invalid <c>// @options:</c> throw <see cref="CodemodeSourceException"/>.</summary>
@@ -125,16 +194,56 @@ public static class CodemodeExecutor
                 usage => { lock (gate) modelUsage = CombineUsage(modelUsage, usage); },
                 count => Interlocked.Add(ref generatedImages, count)));
 
+        // The wait for a worker counts toward the script's deadline.
+        double deadline = parsed.Options.TimeoutMs is { } timeout ? timeout : double.PositiveInfinity;
+        var waitStarted = Stopwatch.StartNew();
+        var waitLimit = WorkerWaitMs;
+        var admission = await ReserveWorkerAsync(Math.Min(deadline, waitLimit), cancellationToken).ConfigureAwait(false);
+        var waitedMs = waitStarted.Elapsed.TotalMilliseconds;
+        if (admission != "reserved")
+        {
+            var waited = (started.Elapsed.TotalMilliseconds / 1000).ToString("F1", CultureInfo.InvariantCulture);
+            // The token carries no reason; an AbortSignal aborted without one reports this message.
+            var error = admission == "aborted" ? "Script aborted: " + CodemodeSandbox.AbortedMessage
+                : deadline <= waitLimit ? $"Script timed out: Execution timed out after {Js.Number(deadline)} ms while waiting for a free codemode worker"
+                : $"No codemode worker became free within {Js.Number(waitLimit / 1000.0)} seconds. All {MaxWorkers()} workers, shared by every session in this process, are held by other scripts. Retry after they finish.";
+            var refused = new JsonObject
+            {
+                ["content"] = new JsonArray
+                {
+                    new JsonObject { ["type"] = "text", ["text"] = $"Script failed\nWall time {waited} seconds\nOutput:\n" },
+                    new JsonObject { ["type"] = "text", ["text"] = $"Script error:\n{error}\n\nThe script did not start." }
+                },
+                ["details"] = JsonNode.Parse(Snapshot().ToString()),
+                ["isError"] = true
+            };
+            return JsonData.Parse(refused.ToJsonString(Relaxed));
+        }
+        // The reservation covers the one worker this script starts. A launch after the result settled finds it released and starts no worker.
+        var reserved = 1;
+        CodemodeSandbox? sandbox = null;
         CodemodeResult result;
-        await using (var sandbox = new CodemodeSandbox(new()
+        try
         {
-            Tools = sandboxTools, Globals = [.. globals],
-            TimeoutMs = parsed.Options.TimeoutMs is { } timeout ? timeout : null,
-            MemoryLimitBytes = CodemodeLimits.DefaultMemoryLimitBytes
-        }))
-        {
+            sandbox = new CodemodeSandbox(new()
+            {
+                Tools = sandboxTools, Globals = [.. globals],
+                TimeoutMs = double.IsFinite(deadline) ? Math.Max(1, Math.Floor(deadline - waitedMs + 0.5)) : null,
+                MemoryLimitBytes = CodemodeLimits.DefaultMemoryLimitBytes,
+                AcquireWorker = () =>
+                {
+                    if (Interlocked.Exchange(ref reserved, 0) == 0) throw new InvalidOperationException("The script already settled");
+                    // From here the sandbox releases the slot when the worker actually exits.
+                    return ReleaseWorker;
+                }
+            });
             var store = host?.ReadStore() ?? [];
             result = await sandbox.ExecuteAsync(parsed.Code, new() { Store = store }, cancellationToken).ConfigureAwait(false);
+        }
+        finally
+        {
+            if (sandbox is not null) await sandbox.CloseAsync().ConfigureAwait(false);
+            if (Interlocked.Exchange(ref reserved, 0) == 1) ReleaseWorker();
         }
         lock (gate) foreach (var call in calls) if (call.Status == "running") call.Status = "cancelled";
 

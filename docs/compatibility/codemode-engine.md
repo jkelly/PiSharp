@@ -23,9 +23,25 @@ speaking upstream's protocol (start, call, output, done, crash, result, plus `re
 - A crash ends only the worker. The script fails as a `sandbox` error, `Worker exited with code -1073741571 before the
   script settled`, exactly as upstream reports a dying worker, and the host keeps running.
 - Deadlines, aborts and finished scripts kill the worker process (upstream: `worker.terminate()`); no worker outlives its
-  script. Terminating kills the worker (SIGKILL on Linux and macOS), closes its standard input and waits for its exit, so
-  the child is reaped before the result is delivered. One spare worker is started ahead and warmed (engine compiled) so the
-  next script starts quickly; spares are retired the same way. A worker exits when its standard input reaches end of file,
+  script for long. Terminating kills the worker (SIGKILL on Linux and macOS), closes its standard input and waits (up to 5 s)
+  for its exit in the background, so the child is reaped. Since Pi 1.3.0 (`codemode.stop-without-exit-wait`) the result,
+  `CloseAsync()` and `CodemodeRun.Result` settle once termination has been requested, without waiting for that exit; PiSharp
+  1.2.0.x waited up to 10 s (`TerminationLimit`, now removed). An engine on a thread (no launcher) is told to stop the same
+  way and may run on until Jint next checks its cancellation token. One spare worker is started ahead and warmed (engine
+  compiled) so the next script starts quickly; spares are retired the same way.
+- Worker lifetime hooks (Pi 1.3.0, `[Experimental("PISHARP_CODEMODE001")]`): `CodemodeSandboxOptions.AcquireWorker` runs
+  synchronously just before a script's worker starts and may throw to refuse it (a `sandbox` error with the exception's
+  message); its release callback runs once when the worker has exited, or at once if it failed to start.
+  `OnWorkerStarted` receives a task that completes on that exit. Upstream calls `acquireWorker()` after loading the wasm
+  module, which PiSharp does not have, and only for worker threads; PiSharp calls both hooks for worker processes and engine
+  threads. A spare process is not counted until a script takes it, so up to one more process than the hooks admit can exist.
+  `OnWorkerStarted` runs after the worker was handed its script; a hook that throws fails the execution unless the script
+  already settled in that instant.
+- The coding agent's executor (`CodemodeExecutor`, Pi 1.3.0 and 1.4.0 `execute.ts`) admits at most
+  `PI_CODEMODE_MAX_WORKERS` (default 2) workers across the process through `AcquireWorker`. Scripts at the limit wait in
+  arrival order, up to 60 s or their `timeout_ms`, and the wait counts toward the deadline. The caller's token has no reason,
+  so an abort while waiting reports `Script aborted: This operation was aborted`, the message upstream reports for an
+  `AbortSignal` aborted without one. A worker exits when its standard input reaches end of file,
   so a worker whose host dies, even by SIGKILL, ends too; a normal host exit kills its spares at once.
 - Cost: each script still pays a process start (about 100 to 300 ms with the spare, against a few ms for a Node worker).
 - Hosts set `CodemodeWorker.Default` (the CLI does at startup). An SDK host that sets nothing runs engines on a thread of
@@ -59,7 +75,7 @@ speaking upstream's protocol (start, call, output, done, crash, result, plus `re
 | Native nesting depth | Stack guard: a catchable `RangeError` | A shim evaluated before the prelude makes Array `join`/`toString`/`toLocaleString`, `flat` and `JSON.stringify` throw a catchable `RangeError: Maximum call stack size exceeded` past 1000 levels; `JSON.parse` stops at 1000 levels with a catchable `SyntaxError`. The bound is low because unwinding an exception through Jint costs memory that grows with the square of its depth (a throw about 3000 calls deep exceeds the 256 MiB budget). Other native recursion (prototype or proxy chains) can exhaust the worker's 256 MiB stack: the worker exits and the script fails as a sandbox error. |
 | Memory | 256 MiB heap (`memoryLimit`); overruns throw a catchable `InternalError: out of memory` | Jint's `LimitMemory(256 MiB)` counts bytes **allocated** by the engine thread between two host entries (the start of the script and every settled tool call), plus a 1 GiB budget for the whole execution. Overruns fail the script with `InternalError: out of memory`; Jint does not let the script catch it. |
 | Recursion of script functions | Stack guard; overflow is a catchable `RangeError` | `LimitRecursion(10000)`. Overflow fails the script with `RangeError: Maximum call stack size exceeded`; Jint does not let the script catch it. |
-| Deadline | `timeout_ms` (none by default for the tool); the worker is terminated | `timeout_ms` kills the worker process. It counts from the moment the engine starts the script (the worker's `ready` message), so starting a worker process is not charged to the script; a worker that does not start within 60 s fails the script as a sandbox error. |
+| Deadline | `timeout_ms` (none by default for the tool), including the wait for a free worker; the worker is asked to terminate | `timeout_ms` kills the worker process. The executor subtracts the wait for a free worker, as upstream does; the rest counts from the moment the engine starts the script (the worker's `ready` message), so starting a worker process is not charged to the script; a worker that does not start within 60 s fails the script as a sandbox error. |
 | Caller cancellation | `AbortSignal`; the worker is terminated | The caller's `CancellationToken` kills the worker process. |
 | Regular expressions | Interruptible | Jint's regex timeout of 5 s inside the worker; deadlines and aborts kill the worker regardless. |
 | Arrays | Heap limit | `MaxArraySize` of 32 Mi elements in addition to the memory budget. |

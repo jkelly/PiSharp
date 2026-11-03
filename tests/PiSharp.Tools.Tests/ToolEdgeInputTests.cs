@@ -102,7 +102,8 @@ internal static class ToolEdgeInputTests
             .ExecuteAsync(Invocation("ls", """{"path":"a\u0000b"}"""), default)), "ls");
         var grep = new ToolInvoker([new PiGrepTool(temp.Root, temp.Root, _ => ValueTask.FromResult<string?>("rg"))], new Allow());
         Equal("Path not found: " + Path.Join(temp.Root, "a\0b"), Text(await grep.ExecuteAsync(Invocation("grep", """{"pattern":"x","path":"a\u0000b"}"""), default)), "grep path");
-        Equal("The argument 'args[5]' must be a string without null bytes. Received 'a\\x00b'",
+        // Pi 1.5.0's leading --no-config moves the pattern to args[6].
+        Equal("The argument 'args[6]' must be a string without null bytes. Received 'a\\x00b'",
             Text(await grep.ExecuteAsync(Invocation("grep", """{"pattern":"a\u0000b"}"""), default)), "grep pattern");
         var find = new ToolInvoker([new PiFindTool(temp.Root, temp.Root, _ => ValueTask.FromResult<string?>("fd"))], new Allow());
         Equal("The argument 'args[7]' must be a string without null bytes. Received 'a\\x00b'",

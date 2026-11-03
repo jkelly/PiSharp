@@ -34,9 +34,10 @@ profile, rather than promising protection against concurrent filesystem swaps.
 For positive context, each selected match produces its own block: match lines
 use `path:line: text`, neighbors use `path-line- text`. Overlapping blocks and
 duplicate matches are repeated in original match order. File reads are cached
-by absolute path only within one invocation. CRLF and bare CR become LF;
-trailing LF retains its empty split line. Context text comes from the reader,
-while zero context continues to use the match receipt and performs no reads.
+by absolute path only within one invocation. CRLF becomes LF; a bare CR stays
+inside its line, since ripgrep counts no line end there; trailing LF retains
+its empty split line. Context text comes from the reader, while zero context
+continues to use the match receipt and performs no reads.
 Ordinary I/O/read denial produces Pi's `(unable to read file)` marker and is
 cached. Cancellation, malformed UTF-8/NUL, resource failures and containment
 errors are not hidden as read-denial markers. Unrelated exceptions remain

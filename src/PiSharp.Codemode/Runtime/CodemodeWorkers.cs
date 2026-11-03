@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/codemode/src/runtime/host.ts (the worker launcher, worker.terminate),
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/codemode/src/runtime/host.ts (the worker launcher, worker.terminate),
 // packages/codemode/src/runtime/execution.ts (Execution) and packages/codemode/src/runtime/worker.ts (the worker entry). Pi isolates each script in a Node worker running a separate wasm
 // instance; PiSharp runs each script's Jint engine in a child process of its own, so nothing a script does to the engine's
 // stack or memory can take the host process down.
@@ -101,8 +101,11 @@ internal interface ICodemodeWorker
     /// <summary><paramref name="exited"/> reports a worker that ended before the host terminated it, with its exit code.</summary>
     void Start(CodemodeStartMessage start, Action<CodemodeWorkerMessage> received, Action<int?> exited, Action<Exception> broken);
     void Send(CodemodeResultMessage result);
-    /// <summary>worker.terminate(): stops the engine and resolves once it is gone.</summary>
+    /// <summary>worker.terminate(): requests the stop synchronously, then resolves once the engine is gone. Callers that only need the
+    /// request (host.ts stop) do not await it.</summary>
     Task TerminateAsync();
+    /// <summary>host.ts <c>onWorkerStarted</c>'s promise: completes when the engine has actually ended, at once if it never started.</summary>
+    Task Exited { get; }
 }
 
 /// <summary>The engine on a dedicated thread of the host process.</summary>
@@ -112,16 +115,22 @@ internal sealed class CodemodeThreadWorker : ICodemodeWorker
     private readonly TaskCompletionSource ended = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private CodemodeEngineRunner? runner;
 
+    public Task Exited => ended.Task;
+
     public void Start(CodemodeStartMessage start, Action<CodemodeWorkerMessage> received, Action<int?> exited, Action<Exception> broken)
     {
-        runner = new(start, received);
-        var thread = new Thread(() =>
+        try
         {
-            try { runner.Run(stop.Token); }
-            catch (Exception error) { broken(error); }
-            finally { ended.TrySetResult(); }
-        }, Environment.Is64BitProcess ? 1024 * 1024 * 1024 : 64 * 1024 * 1024) { IsBackground = true, Name = "codemode" };
-        thread.Start();
+            runner = new(start, received);
+            var thread = new Thread(() =>
+            {
+                try { runner.Run(stop.Token); }
+                catch (Exception error) { broken(error); }
+                finally { ended.TrySetResult(); }
+            }, Environment.Is64BitProcess ? 1024 * 1024 * 1024 : 64 * 1024 * 1024) { IsBackground = true, Name = "codemode" };
+            thread.Start();
+        }
+        catch (Exception) { ended.TrySetResult(); throw; }
     }
 
     public void Send(CodemodeResultMessage result) => runner?.Settle(result);
@@ -153,9 +162,14 @@ internal sealed class CodemodeProcessWorker(CodemodeWorkerLauncher launcher) : I
     internal static int Running => Live.Count;
 
     private readonly object gate = new();
+    private readonly TaskCompletionSource ended = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private Process? process;
     private Task reading = Task.CompletedTask;
     private bool terminating;
+
+    /// <summary>Completes when the process this worker took has exited, or retirement gave up waiting for a killed one; at once if no
+    /// process was taken.</summary>
+    public Task Exited => ended.Task;
 
     /// <summary>Stops the spare workers kept ready for the next script and waits until they are gone.</summary>
     internal static Task DiscardSparesAsync() =>
@@ -226,8 +240,14 @@ internal sealed class CodemodeProcessWorker(CodemodeWorkerLauncher launcher) : I
 
     public void Start(CodemodeStartMessage start, Action<CodemodeWorkerMessage> received, Action<int?> exited, Action<Exception> broken)
     {
-        var started = Take(launcher);
-        lock (gate) process = started;
+        Process started;
+        try { started = Take(launcher); }
+        catch (Exception) { ended.TrySetResult(); throw; }
+        bool stopped;
+        lock (gate) { process = started; stopped = terminating; }
+        _ = ExitOf(started).ContinueWith(_ => ended.TrySetResult(), CancellationToken.None, TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
+        // Terminated while it was being taken: retire it unstarted instead of letting it run a script no one waits for.
+        if (stopped) { _ = RetireAsync(started).ContinueWith(_ => ended.TrySetResult(), TaskScheduler.Default); return; }
         started.StandardInput.WriteLine(CodemodeWireCodec.Encode(start));
         started.StandardInput.Flush();
         reading = Task.Run(async () =>
@@ -263,6 +283,8 @@ internal sealed class CodemodeProcessWorker(CodemodeWorkerLauncher launcher) : I
         lock (gate) { terminating = true; target = process; }
         if (target is null) return;
         await RetireAsync(target).ConfigureAwait(false);
+        // Killed and waited for (bounded): count it as gone even if its exit was never observed.
+        ended.TrySetResult();
         try { await reading.ConfigureAwait(false); } catch (Exception) { }
     }
 }

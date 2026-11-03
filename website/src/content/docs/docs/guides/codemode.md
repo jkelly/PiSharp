@@ -57,7 +57,7 @@ return files.output;
 | Option | Default | Meaning |
 | --- | --- | --- |
 | `max_output_tokens` | `10000` | Output limit. Longer output keeps its start and end, and the full text goes to a temp file named in the result. |
-| `timeout_ms` | none | Hard deadline for the whole script. |
+| `timeout_ms` | none | Hard deadline for the whole script, including any wait for a free worker. |
 
 Each tool is a method of `tools`, named by its identifier with characters JavaScript doesn't allow turned into `_`: the MCP tool `mcp__dev-radius__search` is `tools.mcp__dev_radius__search`. A failed call rejects with the tool's error text. Tool calls are real: calls made before a script fails aren't undone.
 
@@ -83,7 +83,10 @@ With the default `codemode` exposure, an MCP server's tools aren't declared to t
 | Output | 16,777,216 characters of text and image data, and 100,000 `text()`, `image()` and `console` calls. |
 | Store | 262,144 characters of JSON per value, 1,048,576 in total. |
 | Model calls | 4 at once per script. |
-| Deadline | `timeout_ms`, counted from when the script starts running. |
+| Workers | 2 alive at once across every session in the process. `PI_CODEMODE_MAX_WORKERS` changes the limit. |
+| Deadline | `timeout_ms`, counting any wait for a free worker and then the script's running time. |
+
+As in Pi, a stopped or timed-out script's worker keeps its slot until it has exited. At the limit, new scripts wait for a free worker in arrival order. A script that gets no worker within 60 seconds, or before its `timeout_ms`, fails without running.
 
 `store()` and `load()` keep small JSON values across scripts. Values are saved in the session only when a script succeeds, so a resumed session keeps them and each branch sees only its own.
 
@@ -105,9 +108,9 @@ The `codemode` description the model reads is Pi's, so it still says scripts run
 
 ### Worker processes
 
-Jint runs on the .NET stack, and .NET can't recover from a stack overflow. So each script runs in a child process of PiSharp itself (`pisharp --codemode-worker`). A crash ends only that worker, and the script fails with `Worker exited with code N before the script settled`, as in Pi. Deadlines and aborts kill the worker.
+Jint runs on the .NET stack, and .NET can't recover from a stack overflow. So each script runs in a child process of PiSharp itself (`pisharp --codemode-worker`). A crash ends only that worker, and the script fails with `Worker exited with code N before the script settled`, as in Pi. Deadlines and aborts kill the worker, and the call ends without waiting for it to exit.
 
-Starting a process costs about 100 to 300 ms per script, against a few milliseconds for Pi's worker thread. PiSharp keeps one warmed spare worker ready to cut that, and the start isn't charged to `timeout_ms`. A worker that doesn't start within 60 seconds fails the script.
+Starting a process costs about 100 to 300 ms per script, against a few milliseconds for Pi's worker thread. PiSharp keeps one warmed spare worker ready to cut that. The spare doesn't count toward the worker limit, and the start isn't charged to `timeout_ms`. A worker that doesn't start within 60 seconds fails the script.
 
 The worker's engine thread gets a 256 MiB stack (64 MiB in a 32-bit process). Set `PISHARP_CODEMODE_WORKER_STACK_BYTES` to change it, in bytes; values under 1 MiB are ignored.
 

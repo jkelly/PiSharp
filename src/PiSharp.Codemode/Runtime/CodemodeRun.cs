@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/codemode/src/types.ts (CodemodeRun) and
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/codemode/src/types.ts (CodemodeRun) and
 // packages/codemode/src/runtime/execution.ts (the object CodemodeSandboxBase.start() returns).
 namespace PiSharp.Codemode;
 
@@ -17,7 +17,7 @@ public sealed class CodemodeRun
     public Task<CodemodeResult> Result { get; }
 
     /// <summary>Whether the run has its outcome: the script ended, timed out or failed, or the run was aborted. Set when that is decided,
-    /// before <see cref="Result"/> completes (which waits for the engine to stop); calls can no longer be answered.</summary>
+    /// before <see cref="Result"/> completes; calls can no longer be answered. It does not mean the engine has exited.</summary>
     public bool Finished => execution.Finished;
 
     /// <summary>

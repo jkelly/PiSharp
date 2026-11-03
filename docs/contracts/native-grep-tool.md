@@ -8,7 +8,7 @@ Pi v0.99.1 is pinned at `d86654abb8862e201933517d6f1fce9f88dd117f`; local read-o
 
 | Source behavior | Native slice |
 | --- | --- |
-| `--json --line-number --color=never --hidden`, then ignore-case, fixed-strings, optional glob, `--`, pattern, absolute path | Same ordered argv with individual immutable argument entries. Pattern/glob are handled by admitted rg, never a local regex/glob approximation or shell. Empty pattern accepted; empty glob omitted. No context/count flag is added. |
+| `--no-config --json --line-number --color=never --hidden`, then ignore-case, fixed-strings, optional glob, `--`, pattern, absolute path | Same ordered argv with individual immutable argument entries. Pattern/glob are handled by admitted rg, never a local regex/glob approximation or shell. Empty pattern accepted; empty glob omitted. No context/count flag is added. |
 | Default limit 100; count each `match` event once, regardless of submatch count | Positive integral 1..10000 only; preserve event order and duplicates, format first limit events, report reached notice at count >= limit. Complete bounded capture required, described below. |
 | Directory relative POSIX paths, basename for file targets; relative names starting `..` fall back to basename | Same formatting after stricter lexical and canonical containment. Every received event is checked, including undisplayed events beyond limit. |
 | Zero-context JSON line text preferred; normalize CRLF, remove CR and one final LF | Same within bounded BMP text and single-line event domain. Missing/base64 text and multiline events reject. |
