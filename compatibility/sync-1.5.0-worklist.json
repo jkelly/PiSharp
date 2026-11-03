@@ -12,10 +12,10 @@
   },
   "rule": "A citation moves to the new commit only when every upstream path it names has the same git object id at both tags. The rest stay on the old commit until their area is re-ported, then move with the port.",
   "summary": {
-    "filesWithOldCommit": 569,
+    "filesWithOldCommit": 568,
     "citations": {
       "repinned": 250,
-      "pending": 505,
+      "pending": 504,
       "unparsed": 17,
       "nonHeader": 18,
       "excludedHistorical": 1813,
@@ -23,15 +23,15 @@
     },
     "files": {
       "repinned": 250,
-      "pending": 503,
+      "pending": 502,
       "historical": 32,
       "releaseDocs": 2,
       "nonHeader": 18
     },
     "pendingByArea": {
       "ai": {
-        "files": 86,
-        "changeSize": 21499
+        "files": 85,
+        "changeSize": 21461
       },
       "chord": {
         "files": 8,
@@ -2621,41 +2621,6 @@
         "cli.extension-changelogs",
         "ai.opencode-session-custom-providers",
         "core.client-identity-attribution"
-      ]
-    },
-    {
-      "file": "src/PiSharp.AI/ModelOperations/ModelRequestOptions.cs",
-      "area": "ai",
-      "areas": [
-        "ai",
-        "telemetry"
-      ],
-      "citations": [
-        {
-          "line": 1,
-          "changed": [
-            "packages/ai/src/types.ts"
-          ]
-        }
-      ],
-      "upstream": [
-        {
-          "path": "packages/ai/src/types.ts",
-          "status": "changed",
-          "linesChanged": 38
-        }
-      ],
-      "changeSize": 38,
-      "applicabilityRows": [
-        "ai.malformed-final-tool-arguments",
-        "ai.client-identity",
-        "ai.classifier-image-input",
-        "ai.system-one-compat",
-        "ai.tool-argument-validation",
-        "ai.usage-total-from-provider",
-        "ai.pi-messages-response-model",
-        "ai.openrouter-reported-cost",
-        "telemetry.request-option-span"
       ]
     },
     {
@@ -9126,7 +9091,7 @@
       "area": "durable",
       "citations": [
         {
-          "line": 158,
+          "line": 162,
           "changed": [
             "packages/durable/src/storage/sqlite/database.ts",
             "packages/durable/src/storage/sqlite/migrations.ts",
