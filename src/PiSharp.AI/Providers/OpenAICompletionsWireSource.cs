@@ -1,12 +1,14 @@
 using System.Collections.Immutable;
 using System.Globalization;
 using System.Runtime.CompilerServices;
+using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using PiSharp.Contracts;
 using PiSharp.Contracts.Compatibility;
 using PiSharp.AI.Protocols;
 using PiSharp.AI.Protocols.OpenAICompletions;
+using PiSharp.AI.Protocols.ProviderShared;
 
 namespace PiSharp.AI.Providers;
 
@@ -22,6 +24,8 @@ public sealed record OpenAICompletionsWireOptions(int MaximumChunks = 4096, int 
     /// <summary>Explicit bounded source-view capture; ordinary native progress remains compact.</summary>
     public bool CaptureSourceEmissionSnapshots { get; init; }
     public bool SupportsOpenAIGrammarTools { get; init; }
+    // openai-completions.ts parseChunkUsage: isOpenRouterModel(model) applies OpenRouter's billed total. Set by the request factory.
+    internal bool OpenRouterReportedCost { get; init; }
     // Factory-resolved admission is immutable and survives ordinary record clones.
     // Mapping must retain its strict capability and configured history/output limits.
     internal CompletionsToolDeclarationProjectionOptions? ToolDeclarations { get; init; }
@@ -179,14 +183,12 @@ public sealed class OpenAICompletionsWireSource : IChatTransport
         public string Id { get; set; } = id;
         public string Name { get; set; } = name;
         public int? WireIndex { get; set; }
-        public string RawArguments { get; set; } = "";
-        public JsonData DisplayArguments { get; set; } = JsonData.EmptyObject;
         public bool Ended { get; set; }
+        // A grammar (custom) tool's input (constrained-sampling.ts GrammarToolInputJsonBuffer); JSON arguments stream into the reducer.
         public string? CustomProperty { get; set; }
-        public string CustomInput { get; set; } = "";
+        public StringBuilder CustomInput { get; } = new();
         public bool CustomJsonStarted { get; set; }
         public bool CustomJsonClosed { get; set; }
-        public bool UndefinedPartialArguments { get; set; }
     }
 
     private sealed class State
@@ -250,17 +252,11 @@ public sealed class OpenAICompletionsWireSource : IChatTransport
         {
             var snapshot = _reducer.Snapshot() with { Usage = _usage, StopReason = _reason, ExtraProperties = _properties };
             if (item is StreamTerminalEvent terminal) snapshot = terminal.Message;
+            // openai-completions.ts keeps tool stream state in toolCallStates, off the blocks: a partial shows only the arguments.
             return CompletionsSourceEventProjection.Capture(item is ToolCallHeaderUpdated ? Start : item, snapshot,
-                _tools.Select(tool => new CompletionsToolSourceView(tool.ContentIndex, tool.WireIndex,
-                    tool.RawArguments, tool.DisplayArguments, tool.Ended)
-                    {
-                        CustomInput = tool.CustomProperty is null ? null : JsonData.Parse(new JsonObject
-                        {
-                            ["property"] = tool.CustomProperty, ["jsonBuffer"] = new JsonObject
-                            { ["input"] = tool.CustomInput, ["started"] = tool.CustomJsonStarted, ["closed"] = tool.CustomJsonClosed }
-                        }.ToJsonString(CompletionsJson.Output)),
-                        UndefinedPartialArguments = tool.UndefinedPartialArguments
-                    }).ToArray(), _sourceResponseIdAssigned, _sourceResponseId, _sourcePropertyOrder);
+                _tools.Where(tool => !tool.Ended).Select(tool => new CompletionsToolSourceView(tool.ContentIndex,
+                    tool.CustomProperty is null ? _reducer.GetToolArgumentsPreview(tool.ContentIndex) : CustomArguments(tool)))
+                    .ToArray(), _sourceResponseIdAssigned, _sourceResponseId, _sourcePropertyOrder);
         }
 
         public AssistantMessage Current() => _reducer.Snapshot() with { Usage = _usage, StopReason = _reason, ExtraProperties = _properties };
@@ -355,14 +351,8 @@ public sealed class OpenAICompletionsWireSource : IChatTransport
             void Push(StreamEvent item) => Emit(item, progress);
             if (delta.TryGetProperty("content", out var contentValue) && contentValue.ValueKind == JsonValueKind.Array)
                 throw new UnsupportedSignalException();
-            var text = OptionalString(delta, "content");
-            if (!string.IsNullOrEmpty(text))
-            {
-                Charge(text.Length);
-                if (_textIndex is null)
-                { _textIndex = NextIndex(); Push(new TextStarted(_textIndex.Value, new(""))); }
-                Push(new TextDelta(_textIndex.Value, text));
-            }
+            // openai-completions.ts handles reasoning before content: a proxy such as LiteLLM may send both in one delta, and the
+            // thinking block must precede the text block.
             foreach (var field in new[] { "reasoning_content", "reasoning", "reasoning_text" })
             {
                 var reasoning = OptionalString(delta, field);
@@ -378,6 +368,27 @@ public sealed class OpenAICompletionsWireSource : IChatTransport
                 }
                 Push(new ThinkingDelta(_thinkingIndex.Value, reasoning));
                 break;
+            }
+            if (delta.TryGetProperty("reasoning_details", out var details) && details.ValueKind == JsonValueKind.Array)
+                foreach (var detail in details.EnumerateArray())
+                {
+                    if (!ReasoningDetail(detail)) continue;
+                    if (_thinkingIndex is null)
+                    {
+                        _thinkingIndex = NextIndex();
+                        var properties = JsonFields.Empty.Set("thinkingSignature", TextData(""));
+                        Charge("thinkingSignature".Length + 2);
+                        Push(new ThinkingStarted(_thinkingIndex.Value, new("", properties)));
+                    }
+                    AppendDetail(detail);
+                }
+            var text = OptionalString(delta, "content");
+            if (!string.IsNullOrEmpty(text))
+            {
+                Charge(text.Length);
+                if (_textIndex is null)
+                { _textIndex = NextIndex(); Push(new TextStarted(_textIndex.Value, new(""))); }
+                Push(new TextDelta(_textIndex.Value, text));
             }
             if (delta.TryGetProperty("tool_calls", out var toolCalls) && toolCalls.ValueKind != JsonValueKind.Null)
             {
@@ -417,7 +428,7 @@ public sealed class OpenAICompletionsWireSource : IChatTransport
                         if (callId.Contains('\0') || name.Contains('\0')) throw Protocol();
                         Charge(callId.Length + (long)name.Length + 2);
                         slot = new(NextIndex(), callId, name) { WireIndex = wireIndex };
-                        if (isCustom && function.ValueKind != JsonValueKind.Object) InitializeCustom(slot, undefinedPartial: true);
+                        if (isCustom && function.ValueKind != JsonValueKind.Object) InitializeCustom(slot);
                         _tools.Add(slot);
                         if (callId.Length > 0) _toolsById.Add(callId, slot);
                         if (wireIndex is { } firstIndex) _toolsByIndex.Add(firstIndex, slot);
@@ -443,36 +454,18 @@ public sealed class OpenAICompletionsWireSource : IChatTransport
                         { if (name.Contains('\0')) throw Protocol(); Charge(name.Length); slot.Name = name; filled = true; }
                         if (filled) Push(new ToolCallHeaderUpdated(slot.ContentIndex, slot.Id, slot.Name));
                     }
-                    if (isCustom && slot.CustomProperty is null) InitializeCustom(slot, undefinedPartial: false);
-                    if (!string.IsNullOrEmpty(arguments))
+                    if (isCustom && slot.CustomProperty is null) InitializeCustom(slot);
+                    // The reducer reads each JSON delta once (input.arguments.append(delta)); a grammar tool appends only the new input.
+                    if (!string.IsNullOrEmpty(arguments) && slot.CustomProperty is null)
                     {
                         Charge(arguments.Length);
-                        if (_options.CaptureSourceEmissionSnapshots)
-                        {
-                            slot.RawArguments += arguments;
-                            // The partial carries block.arguments = parseStreamingJson(block.partialArgs).
-                            slot.DisplayArguments = StreamingJson.Parse(slot.RawArguments);
-                        }
                         Push(new ToolCallDelta(slot.ContentIndex, arguments));
                     }
-                    else if (isCustom && !string.IsNullOrEmpty(customInput))
-                        Push(new ToolCallDelta(slot.ContentIndex, AppendCustom(slot, customInput, close: false)));
+                    else if (isCustom && !string.IsNullOrEmpty(customInput) && slot.CustomProperty is not null)
+                        Push(new ToolCallDelta(slot.ContentIndex, AppendCustom(slot, customInput)));
                     else Push(new ToolCallDelta(slot.ContentIndex, ""));
                 }
             }
-            if (delta.TryGetProperty("reasoning_details", out var details) && details.ValueKind == JsonValueKind.Array)
-                foreach (var detail in details.EnumerateArray())
-                {
-                    if (!ReasoningDetail(detail)) continue;
-                    if (_thinkingIndex is null)
-                    {
-                        _thinkingIndex = NextIndex();
-                        var properties = JsonFields.Empty.Set("thinkingSignature", TextData(""));
-                        Charge("thinkingSignature".Length + 2);
-                        Push(new ThinkingStarted(_thinkingIndex.Value, new("", properties)));
-                    }
-                    AppendDetail(detail);
-                }
             CaptureDrainBatch(progress);
         }
 
@@ -495,11 +488,11 @@ public sealed class OpenAICompletionsWireSource : IChatTransport
                     foreach (var slot in _tools)
                     {
                         if (slot.Id.Length > 0 && !identities.Add(slot.Id)) throw Protocol();
-                        // openai-completions.ts finishCurrentBlock: block.arguments = parseStreamingJson(block.partialArgs); a custom tool
-                        // call keeps the arguments its input built.
-                        var parsed = slot.CustomProperty is null ? StreamingJson.Parse(_reducer.GetToolJsonPreview(slot.ContentIndex))
-                            : JsonData.Parse(CustomArguments(slot).ToString());
-                        finals.Add(slot.ContentIndex, new(slot.Id, slot.Name, parsed));
+                        // openai-completions.ts finishBlock: Object.assign(block, input.arguments.finish()), so malformed arguments end
+                        // as {} with argumentsError; a custom tool call keeps the arguments its input built.
+                        var call = new ToolCallContent(slot.Id, slot.Name, JsonData.EmptyObject);
+                        finals.Add(slot.ContentIndex, slot.CustomProperty is null
+                            ? _reducer.FinishToolArguments(slot.ContentIndex).AssignTo(call) : call with { Arguments = CustomArguments(slot) });
                     }
                     for (var index = 0; index < snapshot.Content.Length; index++)
                     {
@@ -522,8 +515,8 @@ public sealed class OpenAICompletionsWireSource : IChatTransport
                         if (ended is ToolCallEnded)
                         {
                             var slot = _tools.Single(tool => tool.ContentIndex == index);
-                            if (slot.CustomProperty is not null)
-                                Emit(new ToolCallDelta(index, AppendCustom(slot, "", close: true)), progress);
+                            if (slot.CustomProperty is not null && CloseCustom(slot) is { } rest)
+                                Emit(new ToolCallDelta(index, rest), progress);
                             slot.Ended = true;
                         }
                         Emit(ended, progress);
@@ -601,31 +594,45 @@ public sealed class OpenAICompletionsWireSource : IChatTransport
             MaximumOutputBytes: (int)Math.Min(int.MaxValue, 4L * _options.MaximumContentCharacters),
             MaximumDepth: _options.MaximumJsonDepth, MaximumStringCharacters: _options.MaximumContentCharacters);
 
-        private void InitializeCustom(ToolSlot slot, bool undefinedPartial)
+        private void InitializeCustom(ToolSlot slot)
         {
             slot.CustomProperty = _grammarInputs.GetValueOrDefault(slot.Name, "input");
             Charge(slot.CustomProperty.Length + 2L);
-            slot.DisplayArguments = CustomArguments(slot);
-            slot.RawArguments = "";
-            slot.UndefinedPartialArguments = undefinedPartial;
         }
 
+        // block.arguments = { [input.property]: input.buffer.input }, built only when a partial or the final needs it.
         private JsonData CustomArguments(ToolSlot slot) => JsonData.Parse(EcmaScriptJsonProjection.Project(
-            new JsonObject { [slot.CustomProperty!] = slot.CustomInput }.ToJsonString(CompletionsJson.Output), ProjectionLimits()));
+            new JsonObject { [slot.CustomProperty!] = slot.CustomInput.ToString() }.ToJsonString(CompletionsJson.Output), ProjectionLimits()));
 
         private string JsonString(string value) => EcmaScriptJsonProjection.Project(JsonSerializer.Serialize(value), ProjectionLimits());
 
-        private string AppendCustom(ToolSlot slot, string input, bool close)
+        // constrained-sampling.ts appendGrammarToolInputJsonDelta: append the new piece and return its JSON text, linear in the piece.
+        private string AppendCustom(ToolSlot slot, string input)
         {
             if (slot.CustomProperty is null || slot.CustomJsonClosed) throw Protocol();
             Unicode(input);
-            var encoded = JsonString(input);
-            var delta = (slot.CustomJsonStarted ? "" : "{" + JsonString(slot.CustomProperty) + ":\"") + encoded[1..^1] + (close ? "\"}" : "");
+            var delta = CustomJsonStart(slot) + JsonString(input)[1..^1];
             Charge(input.Length + (long)delta.Length);
-            slot.CustomInput += input;
-            slot.CustomJsonStarted = true; slot.CustomJsonClosed = close;
-            slot.DisplayArguments = CustomArguments(slot);
+            slot.CustomInput.Append(input);
             return delta;
+        }
+
+        // constrained-sampling.ts closeGrammarToolInputJson(buffer, property, undefined): the rest of the JSON text, once.
+        private string? CloseCustom(ToolSlot slot)
+        {
+            if (slot.CustomProperty is null) throw Protocol();
+            if (slot.CustomJsonClosed) return null;
+            var delta = CustomJsonStart(slot) + "\"}";
+            Charge(delta.Length);
+            slot.CustomJsonClosed = true;
+            return delta;
+        }
+
+        private string CustomJsonStart(ToolSlot slot)
+        {
+            if (slot.CustomJsonStarted) return "";
+            slot.CustomJsonStarted = true;
+            return "{" + JsonString(slot.CustomProperty!) + ":\"";
         }
 
         private static bool ReasoningDetail(JsonElement detail)
@@ -697,6 +704,9 @@ public sealed class OpenAICompletionsWireSource : IChatTransport
             var costWrite = (double)rates.CacheWrite * write / 1_000_000d;
             var total = ((costInput + costOutput) + costRead) + costWrite;
             if (!double.IsFinite(total)) throw Protocol();
+            // parseChunkUsage: calculateCost, then applyOpenRouterReportedCost for an OpenRouter model.
+            var reported = _options.OpenRouterReportedCost ? ProviderCost.OpenRouterReportedTotal(usage) : null;
+            total = reported ?? total;
             var sourceCost = JsonData.Parse(EcmaScriptJsonProjection.Project(JsonSerializer.Serialize(new
             { input = costInput, output = costOutput, cacheRead = costRead, cacheWrite = costWrite, total }),
                 new(MaximumInputCharacters: 4096, MaximumInputBytes: 16384, MaximumOutputCharacters: 4096,
@@ -709,7 +719,7 @@ public sealed class OpenAICompletionsWireSource : IChatTransport
             _usage = new(input, output, cacheRead, write, input + output + cacheRead + write,
                 new(source.GetProperty("input").GetDecimal(), source.GetProperty("output").GetDecimal(),
                     source.GetProperty("cacheRead").GetDecimal(), source.GetProperty("cacheWrite").GetDecimal(),
-                    source.GetProperty("total").GetDecimal(), SourceBinary64Cost: sourceCost), extras) { ExtrasBeforeTotal = true };
+                    source.GetProperty("total").GetDecimal(), ProviderCost.TotalFromProvider(reported is not null), sourceCost), extras) { ExtrasBeforeTotal = true };
         }
         private void Set(string name, string text)
         {

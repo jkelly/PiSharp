@@ -1,5 +1,5 @@
 <Project Sdk="Microsoft.NET.Sdk">
-  <PropertyGroup><OutputType>Exe</OutputType><NoWarn>$(NoWarn);PISHARP_TIERS001;PISHARP_IDENTITY001</NoWarn></PropertyGroup>
+  <PropertyGroup><OutputType>Exe</OutputType><NoWarn>$(NoWarn);PISHARP_TIERS001;PISHARP_IDENTITY001;PISHARP_AI001</NoWarn></PropertyGroup>
   <ItemGroup><ProjectReference Include="../../src/PiSharp.CodingAgent/PiSharp.CodingAgent.csproj" /></ItemGroup>
   <ItemGroup><None Include="StreamingJson/*.json" CopyToOutputDirectory="PreserveNewest" /></ItemGroup>
 </Project>

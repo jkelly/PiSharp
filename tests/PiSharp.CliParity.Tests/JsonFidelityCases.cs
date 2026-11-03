@@ -270,8 +270,10 @@ internal static partial class Program
                 Equal("done\n", stdout, api + " answer");
                 var file = sandbox.SessionFiles().Single(path => !before.Contains(path));
                 var line = File.ReadLines(file).Single(text => text.Contains("\"role\":\"assistant\"", StringComparison.Ordinal));
-                Equal(expected[api], PiSharp.AI.StreamingJson.JsonReformat(JsonDocument.Parse(line).RootElement.GetProperty("message").GetProperty("usage").GetRawText()), api + " usage");
-                Check(line.Contains("\"usage\":" + expected[api], StringComparison.Ordinal), api + " session line: " + line);
+                // Pi f9a26365 calculateCost adds totalFromProvider after total (authored, see FollowPi150).
+                var usage = FollowPi150(expected[api]);
+                Equal(usage, PiSharp.AI.StreamingJson.JsonReformat(JsonDocument.Parse(line).RootElement.GetProperty("message").GetProperty("usage").GetRawText()), api + " usage");
+                Check(line.Contains("\"usage\":" + usage, StringComparison.Ordinal), api + " session line: " + line);
                 // The session reopens with its fractional usage (the context estimate reads it) and continues.
                 var (again, _, againError) = await sandbox.Run(["-p", "--provider", api, "--model", "m", "--session", file, "more"]);
                 Equal(0, again, api + " reopen; " + againError);

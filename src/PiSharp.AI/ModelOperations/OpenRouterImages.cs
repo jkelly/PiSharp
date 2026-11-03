@@ -141,7 +141,7 @@ public sealed partial class OpenRouterImages : IImagesApi
         static double Tokens(double value) => value;
         return ProviderRequest.Usage(Tokens(input), Tokens(completion), Tokens(cacheRead), Tokens(cacheWrite),
             Tokens(input + completion + cacheRead + cacheWrite),
-            (inputCost, outputCost, readCost, writeCost, inputCost + outputCost + readCost + writeCost));
+            (inputCost, outputCost, readCost, writeCost, inputCost + outputCost + readCost + writeCost), totalFromProvider: false);
     }
 
     /// <summary>OpenAI SDK <c>APIError</c>: the message is built from the parsed body's <c>error</c> member (or the raw text

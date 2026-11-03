@@ -92,6 +92,7 @@ internal static partial class Program
             ("google.wire-body-matches-genai-for-gemini-and-vertex", GoogleWireBodies)
         };
         cases = [.. cases, .. Sync150Cases];
+        cases = [.. cases, .. Sync150StreamCases()];
         var results = new List<object>(); var failures = 0;
         foreach (var test in cases)
         {

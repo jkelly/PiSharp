@@ -153,12 +153,13 @@ internal static partial class Program
         JsonSame("""
             {"role":"assistant","content":[{"type":"thinking","thinking":"think","thinkingSignature":"sig"},{"type":"text","text":"Hello"},{"type":"toolCall","id":"t1","name":"read","arguments":{"path":"a.txt"}}],
              "api":"bedrock-converse-stream","provider":"amazon-bedrock","model":"anthropic.claude-sonnet-4-5-20250929-v1:0",
-             "usage":{"input":100,"output":50,"cacheRead":10,"cacheWrite":20,"cacheWrite1h":20,"totalTokens":180,"cost":{"input":0.00030000000000000003,"output":0.00075,"cacheRead":0.000003,"cacheWrite":0.00012,"total":0.0011730000000000002}},
+             "usage":{"input":100,"output":50,"cacheRead":10,"cacheWrite":20,"cacheWrite1h":20,"totalTokens":180,"cost":{"input":0.00030000000000000003,"output":0.00075,"cacheRead":0.000003,"cacheWrite":0.00012,"total":0.0011730000000000002,"totalFromProvider":false}},
              "stopReason":"toolUse","timestamp":77,"rawStopReason":"tool_use"}
             """, Wire(done.Message), "done message");
         // models.ts calculateCost runs in binary64: (3 / 1000000) * 100 is 0.00030000000000000003 and the total sums those Numbers
-        // (formerly decimal arithmetic wrote 0.0003 and 0.001173). Expected costs computed by calculateCost in Node 22.
-        Check(Wire(done.Message).Contains("\"cost\":{\"input\":0.00030000000000000003,\"output\":0.00075,\"cacheRead\":0.000003,\"cacheWrite\":0.00012,\"total\":0.0011730000000000002}", StringComparison.Ordinal),
+        // (formerly decimal arithmetic wrote 0.0003 and 0.001173). Expected costs computed by calculateCost in Node 22; Pi f9a26365
+        // calculateCost then records totalFromProvider false.
+        Check(Wire(done.Message).Contains("\"cost\":{\"input\":0.00030000000000000003,\"output\":0.00075,\"cacheRead\":0.000003,\"cacheWrite\":0.00012,\"total\":0.0011730000000000002,\"totalFromProvider\":false}", StringComparison.Ordinal),
             "binary64 cost text: " + Wire(done.Message));
         // Fractional counts with a 1h share of the cache writes, priced in binary64 as Pi does.
         var fraction = Bedrock(SonnetRow);
@@ -167,7 +168,7 @@ internal static partial class Program
             EventMessage("messageStop", """{"stopReason":"end_turn"}"""),
             EventMessage("metadata", """{"usage":{"inputTokens":3.5,"outputTokens":2.75,"cacheReadInputTokens":1.25,"cacheWriteInputTokens":7,"cacheDetails":[{"inputTokens":2.5,"ttl":"1h"}],"totalTokens":14.5}}""")]));
         var fractional = (StreamDone)(await Collect(fraction.Transport, new(fraction.Model, [Entry("""{"role":"user","content":"Hi","timestamp":1}""")], 1)))[^1];
-        Check(Wire(fractional.Message).Contains("\"usage\":{\"input\":3.5,\"output\":2.75,\"cacheRead\":1.25,\"cacheWrite\":7,\"totalTokens\":14.5,\"cost\":{\"input\":0.000010500000000000001,\"output\":0.00004125,\"cacheRead\":3.75e-7,\"cacheWrite\":0.000031875,\"total\":0.00008400000000000001},\"cacheWrite1h\":2.5}", StringComparison.Ordinal),
+        Check(Wire(fractional.Message).Contains("\"usage\":{\"input\":3.5,\"output\":2.75,\"cacheRead\":1.25,\"cacheWrite\":7,\"totalTokens\":14.5,\"cost\":{\"input\":0.000010500000000000001,\"output\":0.00004125,\"cacheRead\":3.75e-7,\"cacheWrite\":0.000031875,\"total\":0.00008400000000000001,\"totalFromProvider\":false},\"cacheWrite1h\":2.5}", StringComparison.Ordinal),
             "fractional binary64 cost: " + Wire(fractional.Message));
         // Stop reasons: end_turn/stop_sequence stop, max_tokens/model_context_window_exceeded length.
         foreach (var (raw, expected) in new[] { ("end_turn", StopReason.Stop), ("stop_sequence", StopReason.Stop), ("max_tokens", StopReason.Length), ("model_context_window_exceeded", StopReason.Length) })
@@ -226,13 +227,21 @@ internal static partial class Program
 
     private static async Task BedrockToolArguments()
     {
-        // bedrock-converse-stream.ts finalizes every tool call, stopped or not, with block.arguments = parseStreamingJson(block.partialJson):
-        // malformed input never fails the turn and any JSON value is kept.
-        foreach (var (input, expected) in new[]
+        // Pi f9a26365 bedrock-converse-stream.ts: each delta sets block.arguments = open.arguments.append(input), the partial arguments
+        // (a root that is not an object shows as {}); contentBlockStop assigns open.arguments.finish(), json-parse.ts
+        // parseToolCallArguments of the complete text, so malformed or non-object arguments end as {} with an argumentsError. A block
+        // the stream never stopped keeps its partial arguments. Malformed input never fails the turn. Authored from that source, with
+        // V8's JSON.parse messages (of the repaired text when repairJson changed it).
+        const string notObject = "Tool arguments must be a JSON object";
+        foreach (var (input, final, error, partial) in new (string, string, string?, string)[]
         {
-            ("{\"path\":\"a\",\"path\":\"b\",\"n\":1.50}", "{\"path\":\"b\",\"n\":1.5}"), ("[1,2", "[1,2]"), ("\"text\"", "\"text\""), ("not json", "{}"),
-            ("{\"p\":\"C:\\x\\y\"", "{}"), ("{\"p\":\"C:\\x\\y\"}", "{\"p\":\"C:\\\\x\\\\y\"}"), ("{\"a\":\"x\u0001", "{}"),
-            ("{\"a\":\"x\u0001\"}", "{\"a\":\"x\\u0001\"}"), ("null", "null"), ("", "{}"),
+            ("{\"path\":\"a\",\"path\":\"b\",\"n\":1.50}", "{\"path\":\"b\",\"n\":1.5}", null, "{\"path\":\"b\",\"n\":1.5}"),
+            ("[1,2", "{}", "Expected ',' or ']' after array element in JSON at position 4 (line 1 column 5)", "{}"),
+            ("\"text\"", "{}", notObject, "{}"), ("not json", "{}", "Unexpected token 'o', \"not json\" is not valid JSON", "{}"),
+            ("{\"p\":\"C:\\x\\y\"", "{}", "Expected ',' or '}' after property value in JSON at position 15 (line 1 column 16)", "{\"p\":\"C:\\\\x\\\\y\"}"),
+            ("{\"p\":\"C:\\x\\y\"}", "{\"p\":\"C:\\\\x\\\\y\"}", null, "{\"p\":\"C:\\\\x\\\\y\"}"),
+            ("{\"a\":\"x\u0001", "{}", "Unterminated string in JSON at position 13 (line 1 column 14)", "{\"a\":\"x\\u0001\"}"),
+            ("{\"a\":\"x\u0001\"}", "{\"a\":\"x\\u0001\"}", null, "{\"a\":\"x\\u0001\"}"), ("null", "{}", notObject, "{}"), ("", "{}", null, "{}"),
         })
             foreach (var stopped in new[] { true, false })
             {
@@ -249,7 +258,10 @@ internal static partial class Program
                 var events = await Collect(tool.Transport, new(tool.Model, [Entry("""{"role":"user","content":"Hi","timestamp":1}""")], 6));
                 var done = (StreamDone)events[^1];
                 Equal(StopReason.ToolUse, done.Reason, input);
-                Equal(expected, done.Message.Content.OfType<ToolCallContent>().Single().Arguments.ToString(), (stopped ? "stopped " : "unstopped ") + input);
+                var call = done.Message.Content.OfType<ToolCallContent>().Single();
+                Equal(stopped ? final : partial, call.Arguments.ToString(), (stopped ? "stopped " : "unstopped ") + input);
+                var reported = call.ExtraProperties is { } fields && fields.TryGet("argumentsError", out var value) ? value!.Value.GetString() : null;
+                Equal(stopped && error is not null ? error + "\n\nReceived arguments:\n" + input : null, reported, "argumentsError " + (stopped ? "stopped " : "unstopped ") + input);
             }
     }
 

@@ -117,7 +117,7 @@ internal static partial class Program
             var lines = actual[index].Split('\n', StringSplitOptions.RemoveEmptyEntries);
             foreach (var line in lines)
                 if (PiSharp.AI.StreamingJson.JsonReformat(line) != line) problems.Add("not JSON.stringify(entry): " + line);
-            var want = NormalizeSession(expected[index].Select(FollowPi120), "pi", problems);
+            var want = NormalizeSession(expected[index].Select(FollowPi120).Select(FollowPi150), "pi", problems);
             var have = NormalizeSession(lines.Select(line => Scrub(line, sandbox.Root)), "pisharp", problems);
             for (var line = 0; line < Math.Max(want.Count, have.Count); line++)
             {
@@ -186,6 +186,15 @@ internal static partial class Program
         foreach (var (old, replacement) in Pi150TextChanges) line = line.Replace(old, replacement, StringComparison.Ordinal);
         return line;
     }
+
+    /// <summary>Authored, not captured: Pi f9a26365 (1.5.0) models.ts calculateCost ends with <c>usage.cost.totalFromProvider = false</c>,
+    /// so every cost it prices gains that field after <c>total</c>. The captures predate it; this adds it to each five-field cost. The
+    /// one error message here (retry: an HTTP 500 before any response) is never priced: the provider's catch keeps its initial usage.</summary>
+    private static readonly Regex CalculatedCost =
+        new(@"(""cost"":\{""input"":[^,{}]+,""output"":[^,{}]+,""cacheRead"":[^,{}]+,""cacheWrite"":[^,{}]+,""total"":[^,{}]+)\}", RegexOptions.CultureInvariant);
+
+    private static string FollowPi150(string line) => line.Contains("\"stopReason\":\"error\"", StringComparison.Ordinal) ? line
+        : CalculatedCost.Replace(line, "$1,\"totalFromProvider\":false}");
 
     private static List<string> NormalizeSession(IEnumerable<string> lines, string side, List<string> problems)
     {

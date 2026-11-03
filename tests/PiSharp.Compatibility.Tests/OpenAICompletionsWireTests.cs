@@ -34,25 +34,27 @@ internal static class OpenAICompletionsWireTests
             new(Rates: new(1_000_000, 2_000_000, 500_000, 1_500_000)));
         var frames = await Collect(mapper);
         Equal(1, source.Disposals); Equal(Completed.Length + 1, source.Pulls);
+        // Pi f9a26365 openai-completions.ts (63035734f) reads a chunk's reasoning fields before its content, so a chunk carrying both
+        // opens the thinking block first; finishBlock closes the blocks in content order (authored from that source).
         var expectedOperations = new[]
         {
-            "start", "text_start:0", "text_delta:0", "thinking_start:1", "thinking_delta:1",
+            "start", "thinking_start:0", "thinking_delta:0", "text_start:1", "text_delta:1",
             "toolcall_start:2", "toolcall_delta:2", "toolcall_start:3", "toolcall_delta:3",
-            "text_delta:0", "thinking_delta:1", "toolcall_delta:3", "toolcall_delta:2",
-            "text_end:0", "thinking_end:1", "toolcall_end:2", "toolcall_end:3", "done"
+            "thinking_delta:0", "text_delta:1", "toolcall_delta:3", "toolcall_delta:2",
+            "thinking_end:0", "text_end:1", "toolcall_end:2", "toolcall_end:3", "done"
         };
         Check(expectedOperations.SequenceEqual(frames.Select(Operation)), "Source-informed operation/index order differs.");
         var terminal = (StreamDone)frames[^1]; Equal(StopReason.ToolUse, terminal.Reason);
-        // Pi abe508 openai-completions.ts:464 finishCurrentBlock: block.arguments = parseStreamingJson(block.partialArgs), a JSON.parse
-        // whose Number 1.00 is 1 (installed pi-ai 1.1.0 prints {"n":1}).
+        // Pi f9a26365 openai-completions.ts finishBlock: Object.assign(block, arguments.finish()), one JSON.parse of the complete text
+        // whose Number 1.00 is 1; calculateCost records totalFromProvider false (authored from that source).
         var expected = JsonData.Parse("""
             {"role":"assistant","api":"openai-completions","provider":"fixture-provider","model":"requested-model","timestamp":123,
              "stopReason":"toolUse","responseId":"resp-first","responseModel":"actual-model","rawStopReason":"tool_calls",
-             "content":[{"type":"text","text":"Hi there"},{"type":"thinking","thinking":"plan more","thinkingSignature":"reasoning_content"},
+             "content":[{"type":"thinking","thinking":"plan more","thinkingSignature":"reasoning_content"},{"type":"text","text":"Hi there"},
                 {"type":"toolCall","id":"call-a","name":"read","arguments":{"path":"a\nb"}},
                 {"type":"toolCall","id":"call-b","name":"sum","arguments":{"n":1}}],
              "usage":{"input":15,"output":7,"cacheRead":2,"cacheWrite":3,"reasoning":1,"totalTokens":27,
-                "cost":{"input":15,"output":14,"cacheRead":1,"cacheWrite":4.5,"total":34.5}}}
+                "cost":{"input":15,"output":14,"cacheRead":1,"cacheWrite":4.5,"total":34.5,"totalFromProvider":false}}}
             """);
         Check(Same(expected.Value, PiWireJson.WriteMessage(terminal.Message).Value), "Complete authored final message fields differ.");
         var reducer = new AssistantStreamReducer(((StreamStarted)frames[0]).Partial);
@@ -142,22 +144,26 @@ internal static class OpenAICompletionsWireTests
 
     private static async Task StrictAndUnsupported()
     {
-        // Pi abe508 openai-completions.ts:464 finalizes every tool call with parseStreamingJson (json-parse.ts:104-124), so partial,
-        // duplicate, invalid-escape, out-of-range and non-object arguments end the call and the turn completes. Expected values are the
-        // installed pi-ai 1.1.0 results as JSON.stringify writes them (1e999 is Infinity, written null); a lone surrogate is kept, as
+        // Pi f9a26365 openai-completions.ts finishBlock finalizes every tool call with arguments.finish(), json-parse.ts
+        // parseToolCallArguments: one JSON.parse of the complete text, then of its repairJson when that changed it. Malformed and
+        // non-object arguments still end the call and the turn completes, as {} with an argumentsError. Authored from that source, with
+        // V8's JSON.parse message, as JSON.stringify writes the values (1e999 is Infinity, written null); a lone surrogate is kept, as
         // its JSON.stringify escape (see JsonUtf16).
-        foreach (var (raw, expected) in new[]
+        foreach (var (raw, expected, error) in new (string, string, string?)[]
         {
-            ("{\"path\":\"private", "{\"path\":\"private\"}"), ("{\"n\":1,\"n\":2}", "{\"n\":2}"), ("[1]", "[1]"), ("null", "null"),
-            ("{\"path\":\"\\q\"}", "{\"path\":\"\\\\q\"}"), ("{\"n\":1e999}", "{\"n\":null}"), ("{\"s\":\"\\ud800\"}", "{\"s\":\"\\ud800\"}")
+            ("{\"path\":\"private", "{}", "Unterminated string in JSON at position 16 (line 1 column 17)"), ("{\"n\":1,\"n\":2}", "{\"n\":2}", null),
+            ("[1]", "{}", "Tool arguments must be a JSON object"), ("null", "{}", "Tool arguments must be a JSON object"),
+            ("{\"path\":\"\\q\"}", "{\"path\":\"\\\\q\"}", null), ("{\"n\":1e999}", "{\"n\":null}", null), ("{\"s\":\"\\ud800\"}", "{\"s\":\"\\ud800\"}", null)
         })
         {
             var frames = await Collect([ToolChunk(new { index = 9, id = "call", function = new { name = "read", arguments = raw } }),
                 Finish("tool_calls")]);
             Check(Terminal(frames) is StreamDone { Reason: StopReason.ToolUse } && frames.OfType<ToolCallEnded>().Count() == 1,
-                "parseStreamingJson final failed the turn: " + raw);
-            Check(Same(JsonData.Parse(expected).Value, ((ToolCallContent)Terminal(frames).Message.Content[0]).Arguments.Value),
-                "Final arguments differ from parseStreamingJson: " + raw);
+                "Final arguments failed the turn: " + raw);
+            var call = (ToolCallContent)Terminal(frames).Message.Content[0];
+            Check(Same(JsonData.Parse(expected).Value, call.Arguments.Value), "Final arguments differ from parseToolCallArguments: " + raw);
+            var actualError = call.ExtraProperties is { } fields && fields.TryGet("argumentsError", out var value) ? value!.Value.GetString() : null;
+            Check(actualError == (error is null ? null : error + "\n\nReceived arguments:\n" + raw), "argumentsError differs: " + raw + " " + actualError);
         }
         foreach (var unsupported in new[]
         {

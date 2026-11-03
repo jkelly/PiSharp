@@ -23,6 +23,7 @@ internal static class CompletionsToolImageFlowTests
         foreach (var captured in source.RootElement.GetProperty("observations").EnumerateArray())
         {
             var request = Request(captured); var original = request.Messages.Select(entry => entry.WireBody.ToString()).ToArray();
+            var expectedBody = FollowPi150Body(captured);
             var body = new OwnedBody(); var content = new BodyContent(body); JsonData? actual = null; Exception? observed = null; HttpRequestMessage? sent = null; var sends = 0; var builds = 0;
             using var handler = new Handler(async (http, token) =>
             {
@@ -31,7 +32,7 @@ internal static class CompletionsToolImageFlowTests
                 {
                     Equal("POST", http.Method.Method); Equal(captured.GetProperty("requests")[0].GetProperty("url").GetString(), http.RequestUri!.AbsoluteUri);
                     actual = JsonData.Parse(await http.Content!.ReadAsStringAsync(token));
-                    Check(JsonElement.DeepEquals(captured.GetProperty("requests")[0].GetProperty("bodyJson"), actual.Value), "Complete actual HTTP image request differs: " + captured.GetProperty("id").GetString());
+                    Check(JsonElement.DeepEquals(expectedBody, actual.Value), "Complete actual HTTP image request differs: " + captured.GetProperty("id").GetString());
                     return new(HttpStatusCode.OK) { Content = content };
                 }
                 catch (Exception error) { observed = error; throw; }
@@ -47,6 +48,22 @@ internal static class CompletionsToolImageFlowTests
             try { _ = await sent!.Content!.ReadAsStringAsync(); throw new InvalidOperationException("Request ownership retained after completion."); } catch (ObjectDisposedException) { }
             Check(!handler.Disposed, "Flow disposed the borrowed HTTP client.");
         }
+    }
+    // Authored, not captured: Pi f9a26365 openai-completions.ts (4dd2b149d) counts whitespace-only tool output as no text
+    // (textResult.trim().length > 0) and sends the placeholder instead: "(see attached image)" when the result has images, else
+    // "(no tool output)". The d86654 capture predates that; only the content of such tool messages changes.
+    private static JsonElement FollowPi150Body(JsonElement captured)
+    {
+        var body = System.Text.Json.Nodes.JsonNode.Parse(captured.GetProperty("requests")[0].GetProperty("bodyJson").GetRawText())!;
+        var images = captured.GetProperty("context").GetProperty("messages").EnumerateArray()
+            .Where(message => message.GetProperty("role").GetString() == "toolResult")
+            .ToDictionary(message => message.GetProperty("toolCallId").GetString()!,
+                message => message.GetProperty("content").EnumerateArray().Any(part => part.GetProperty("type").GetString() == "image"), StringComparer.Ordinal);
+        foreach (var message in body["messages"]!.AsArray())
+            if (message!["role"]!.GetValue<string>() == "tool" && message["content"] is System.Text.Json.Nodes.JsonValue content &&
+                content.GetValueKind() == JsonValueKind.String && string.IsNullOrWhiteSpace(content.GetValue<string>()))
+                message["content"] = images.GetValueOrDefault(message["tool_call_id"]!.GetValue<string>()) ? "(see attached image)" : "(no tool output)";
+        return JsonDocument.Parse(body.ToJsonString()).RootElement.Clone();
     }
     private static async Task Cleanup()
     {

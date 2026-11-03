@@ -5,12 +5,8 @@ using PiSharp.Contracts;
 
 namespace PiSharp.AI.Protocols.OpenAICompletions;
 
-internal sealed record CompletionsToolSourceView(int ContentIndex, int? WireIndex, string RawArguments,
-    JsonData DisplayArguments, bool Ended)
-{
-    internal JsonData? CustomInput { get; init; }
-    internal bool UndefinedPartialArguments { get; init; }
-}
+// An unfinished tool call: the arguments its partial shows.
+internal sealed record CompletionsToolSourceView(int ContentIndex, JsonData DisplayArguments);
 
 /// <summary>
 /// Source-facing owned push snapshots. Native compact frames and their immutable
@@ -58,28 +54,10 @@ public static class CompletionsSourceEventProjection
         var partial = SourceMessage(snapshot, responseIdAssigned, responseId, addedPropertyOrder);
         var content = partial["content"]!.AsArray();
         var undefined = new JsonArray();
+        // Stream state (partialArgs, customInput, streamIndex) stays in openai-completions.ts toolCallStates, off the blocks; an
+        // unfinished call shows its parsed arguments, on a terminal too.
         foreach (var tool in tools)
-        {
-            if (tool.Ended) continue;
-            var node = content[tool.ContentIndex]!.AsObject();
-            node["arguments"] = PiSharp.Contracts.JsonUtf16.MutableNode(tool.DisplayArguments.ToString());
-            // Pi's catch removes parsing buffers before its error publication.
-            // Retain the real parsed preview, without reconstructing scratch fields on a terminal.
-            if (frame is StreamTerminalEvent) continue;
-            if (tool.CustomInput is { } custom)
-            {
-                node.Remove("partialArgs");
-                node["customInput"] = PiSharp.Contracts.JsonUtf16.MutableNode(custom.ToString());
-                if (tool.UndefinedPartialArguments) undefined.Add($"/partial/content/{tool.ContentIndex}/partialArgs");
-            }
-            else
-            {
-                node["partialArgs"] = tool.RawArguments;
-                undefined.Add($"/partial/content/{tool.ContentIndex}/customInput");
-            }
-            if (tool.WireIndex is { } index) node["streamIndex"] = index;
-            if (tool.WireIndex is null) undefined.Add($"/partial/content/{tool.ContentIndex}/streamIndex");
-        }
+            content[tool.ContentIndex]!.AsObject()["arguments"] = PiSharp.Contracts.JsonUtf16.MutableNode(tool.DisplayArguments.ToString());
         var value = new JsonObject();
         switch (frame)
         {

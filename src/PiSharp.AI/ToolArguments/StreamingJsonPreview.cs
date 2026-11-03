@@ -137,7 +137,8 @@ public sealed class StreamingJsonPreview
                 var next = input[index + 1];
                 if (next == 'u' && index + 5 < input.Length && input.AsSpan(index + 2, 4).ToArray().All(char.IsAsciiHexDigit))
                 { output.Append(input, index, 6); index += 5; continue; }
-                if ("\"\\/bfnrtu".Contains(next)) { output.Append(character); output.Append(next); index++; continue; }
+                // json-parse.ts VALID_JSON_ESCAPES has no "u": a \u without four hex digits doubles its backslash.
+                if ("\"\\/bfnrt".Contains(next)) { output.Append(character); output.Append(next); index++; continue; }
                 output.Append("\\\\"); continue;
             }
             if (character < 0x20) output.Append("\\u").Append(((int)character).ToString("x4", CultureInfo.InvariantCulture));

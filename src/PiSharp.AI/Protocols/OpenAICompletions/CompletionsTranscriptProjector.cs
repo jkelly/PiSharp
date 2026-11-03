@@ -177,7 +177,8 @@ public sealed class CompletionsTranscriptProjector
                 }
                 var resultText = string.Join("\n", pieces);
                 var result = new JsonObject { ["role"] = "tool",
-                    ["content"] = resultText.Length != 0 ? resultText : hasImages ? "(see attached image)" : "(no tool output)",
+                    // openai-completions.ts: hasText = textResult.trim().length > 0, so whitespace-only output gets the placeholder.
+                    ["content"] = !StreamingJson.IsJsBlank(resultText) ? resultText : hasImages ? "(see attached image)" : "(no tool output)",
                     ["tool_call_id"] = entry.ResultWireId ?? String(body, "toolCallId") };
                 if (options.RequiresToolResultName && body.TryGetProperty("toolName", out var name) && Text(name).Length != 0) result["name"] = Text(name);
                 _output.Add(result);

@@ -39,17 +39,34 @@ internal static class CompletionsToolImageTests
                 RequiresToolResultName: captured.GetProperty("projection").GetProperty("requiresToolResultName").GetBoolean())
                 { ModelSupportsImages = modelBody.GetProperty("input").EnumerateArray().Any(value => value.GetString() == "image") },
             new(MaxTokens: Number(options, "maxTokens"), Temperature: Number(options, "temperature")));
+        var expectedBody = FollowPi150Body(captured);
         // Repeated materialization must preserve content order and borrow the same untouched canonical input.
         for (var repeat = 0; repeat < 2; repeat++)
         {
             using var http = factory.Create(request, "authored-inert-image-key");
             using var body = JsonDocument.Parse(await http.Content!.ReadAsStringAsync());
-            Check(JsonElement.DeepEquals(fetch.GetProperty("bodyJson"), body.RootElement), "Complete request differs from unchanged Pi/SDK capture: " + captured.GetProperty("id").GetString());
+            Check(JsonElement.DeepEquals(expectedBody, body.RootElement), "Complete request differs from the Pi/SDK capture: " + captured.GetProperty("id").GetString());
             Check(originals.SequenceEqual(request.Messages.Select(entry => entry.WireBody.ToString())), "User image projection changed canonical history.");
         }
         Equal(1, captured.GetProperty("payloadCalls").GetInt32()); Equal(1, captured.GetProperty("responseCalls").GetInt32());
         Equal("stop", captured.GetProperty("result").GetProperty("stopReason").GetString());
         Check(captured.GetProperty("canonicalContextUnchanged").GetBoolean(), "Source mutated canonical context.");
+    }
+    // Authored, not captured: Pi f9a26365 openai-completions.ts (4dd2b149d) counts whitespace-only tool output as no text
+    // (textResult.trim().length > 0) and sends the placeholder instead: "(see attached image)" when the result has images, else
+    // "(no tool output)". The d86654 capture predates that; only the content of such tool messages changes.
+    private static JsonElement FollowPi150Body(JsonElement captured)
+    {
+        var body = System.Text.Json.Nodes.JsonNode.Parse(captured.GetProperty("requests")[0].GetProperty("bodyJson").GetRawText())!;
+        var images = captured.GetProperty("context").GetProperty("messages").EnumerateArray()
+            .Where(message => message.GetProperty("role").GetString() == "toolResult")
+            .ToDictionary(message => message.GetProperty("toolCallId").GetString()!,
+                message => message.GetProperty("content").EnumerateArray().Any(part => part.GetProperty("type").GetString() == "image"), StringComparer.Ordinal);
+        foreach (var message in body["messages"]!.AsArray())
+            if (message!["role"]!.GetValue<string>() == "tool" && message["content"] is System.Text.Json.Nodes.JsonValue content &&
+                content.GetValueKind() == JsonValueKind.String && string.IsNullOrWhiteSpace(content.GetValue<string>()))
+                message["content"] = images.GetValueOrDefault(message["tool_call_id"]!.GetValue<string>()) ? "(see attached image)" : "(no tool output)";
+        return JsonDocument.Parse(body.ToJsonString()).RootElement.Clone();
     }
     private static Task Admission()
     {

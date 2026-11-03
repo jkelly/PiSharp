@@ -312,7 +312,7 @@ internal static partial class ProviderRequest
     /// <summary>A usage record priced with <see cref="ModelCost.Calculate"/>; the exact binary64 costs travel as the
     /// source cost snapshot.</summary>
     internal static TokenUsage Usage(double input, double output, double cacheRead, double cacheWrite, double totalTokens,
-        (double Input, double Output, double CacheRead, double CacheWrite, double Total) cost)
+        (double Input, double Output, double CacheRead, double CacheWrite, double Total) cost, bool? totalFromProvider = null)
     {
         if (!double.IsFinite(cost.Total)) throw new InvalidDataException("Usage cost is not a finite number.");
         var exact = JsonData.Parse(new JsonObject
@@ -321,7 +321,8 @@ internal static partial class ProviderRequest
         }.ToJsonString());
         decimal Decimal(string name) => exact.Value.GetProperty(name).GetDecimal();
         return new(input, output, cacheRead, cacheWrite, totalTokens,
-            new(Decimal("input"), Decimal("output"), Decimal("cacheRead"), Decimal("cacheWrite"), Decimal("total"), SourceBinary64Cost: exact));
+            new(Decimal("input"), Decimal("output"), Decimal("cacheRead"), Decimal("cacheWrite"), Decimal("total"),
+                totalFromProvider is { } reported ? Protocols.ProviderShared.ProviderCost.TotalFromProvider(reported) : null, exact));
     }
 
     internal static long Now(ModelRequestOptions? options) => (options?.TimeProvider ?? TimeProvider.System).GetUtcNow().ToUnixTimeMilliseconds();

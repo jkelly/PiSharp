@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <!-- Decision 0007: the PiSharp-only service tiers are [Experimental]; this project carries them to each request. -->
-    <NoWarn>$(NoWarn);PISHARP_TIERS001</NoWarn>
+    <NoWarn>$(NoWarn);PISHARP_TIERS001;PISHARP_AI001</NoWarn>
     <!-- Pi v1.5.0 sync: tool arguments are validated with the [Experimental] pi-schema port in PiSharp.Contracts.Schema. -->
     <NoWarn>$(NoWarn);PISHARP_SCHEMA001</NoWarn>
   </PropertyGroup>

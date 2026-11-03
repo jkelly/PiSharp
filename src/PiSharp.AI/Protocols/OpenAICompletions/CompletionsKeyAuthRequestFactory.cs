@@ -100,7 +100,8 @@ public sealed class CompletionsKeyAuthRequestFactory
             endpoint.AbsoluteUri.Contains("openrouter.ai", StringComparison.Ordinal) ? CompletionsReasoningFormat.OpenRouter : CompletionsReasoningFormat.OpenAI)) ==
             CompletionsReasoningFormat.OpenRouter ? "openrouter" : "openai";
         _cacheControlFormat = expectedModel.Provider == "openrouter" && expectedModel.Id.StartsWith("anthropic/", StringComparison.Ordinal) ? "anthropic" : null;
-        ResolvedWireOptions = new() { SupportsOpenAIGrammarTools = _projectionOptions.ToolDeclarations?.SupportsOpenAIGrammarTools == true };
+        ResolvedWireOptions = new() { SupportsOpenAIGrammarTools = _projectionOptions.ToolDeclarations?.SupportsOpenAIGrammarTools == true,
+            OpenRouterReportedCost = ProviderShared.ProviderCost.IsOpenRouter(expectedModel.Provider, endpoint.AbsoluteUri) };
         if (_options.ModelMetadata is { } metadata)
         {
             var binding = BindModelMetadata(metadata);
@@ -475,7 +476,7 @@ public sealed class CompletionsKeyAuthRequestFactory
             }
             return new(options, projection, cacheFormat, Object(compat, "openRouterRouting"), Object(model, "samplingParams"), priority,
                 new(SupportsFinishReason: Flag("supportsFinishReason", true), Rates: new(Rate("input"), Rate("output"), Rate("cacheRead"), Rate("cacheWrite")) { Tiers = tiers.ToImmutable() })
-                    { SupportsOpenAIGrammarTools = grammarTools }, thinkingFormat, budgetField, modelMaxTokens,
+                    { SupportsOpenAIGrammarTools = grammarTools, OpenRouterReportedCost = isOpenRouter }, thinkingFormat, budgetField, modelMaxTokens,
                 Object(compat, "chatTemplateKwargs"), Object(compat, "chatTemplateArgs"), Flag("zaiToolStream", false),
                 Object(model, "samplingParamsByThinkingLevel"));
         }

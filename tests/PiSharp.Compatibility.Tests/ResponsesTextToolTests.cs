@@ -47,13 +47,14 @@ static class ResponsesTextToolTests
             {
                 Assert(failure is null, "Completed oracle case rejected.");
                 var terminal = progress.OfType<StreamDone>().Single();
-                Assert(Same(observation.GetProperty("finalOutput"), PiWireJson.WriteMessage(terminal.Message).Value), "Completed Responses final output differs.");
+                var finalOutput = WithCalculatedCostFlag(observation.GetProperty("finalOutput"));
+                Assert(Same(finalOutput, PiWireJson.WriteMessage(terminal.Message).Value), "Completed Responses final output differs.");
                 Equal(StopReason.ToolUse, terminal.Reason); Equal(34.5m, terminal.Message.Usage.Cost.Total);
                 var tool = (ToolCallContent)terminal.Message.Content[1];
                 Equal("call_complete|fc_complete", tool.Id);
                 Assert(tool.ExtraProperties!.TryGet("namespace", out var ns) && ns!.Value.GetString() == "fs.final", "Final namespace lost.");
                 var integrated = await new ChatClient(transport, capacity: 1).CompleteAsync(Request());
-                Assert(integrated.Failure is null && Same(observation.GetProperty("finalOutput"), PiWireJson.WriteMessage(integrated.Message).Value), "Authored ChatRun integration differs.");
+                Assert(integrated.Failure is null && Same(finalOutput, PiWireJson.WriteMessage(integrated.Message).Value), "Authored ChatRun integration differs.");
             }
             else
             {
@@ -103,20 +104,24 @@ static class ResponsesTextToolTests
 
     public static async Task FinalArgumentsFollowParseStreamingJson()
     {
-        // Pi abe508 openai-responses-shared.ts:716 finalizes with parseStreamingJson (json-parse.ts:104-124), so partial, duplicate,
-        // non-object and invalid-escape arguments complete the call; expected values are the installed pi-ai 1.1.0 results.
-        foreach (var (raw, expected) in new[]
+        // Pi f9a26365 openai-responses-shared.ts output_item.done finishes with ToolCallArgumentsStream.finish(), which is json-parse.ts
+        // parseToolCallArguments: one parse of the complete text (repaired when JSON.parse rejects it). Malformed or non-object text still
+        // completes the call, as {} with an argumentsError. Authored from that source, with V8's JSON.parse message for the cut-off text.
+        foreach (var (raw, expected, error) in new (string, string, string?)[]
         {
-            ("{\"path\":\"private", "{\"path\":\"private\"}"), ("{\"a\":1,\"a\":2}", "{\"a\":2}"), ("[1]", "[1]"), ("null", "null"),
-            ("{\"path\":\"C:\\q\"}", "{\"path\":\"C:\\\\q\"}")
+            ("{\"path\":\"private", "{}", "Unterminated string in JSON at position 16 (line 1 column 17)"), ("{\"a\":1,\"a\":2}", "{\"a\":2}", null),
+            ("[1]", "{}", "Tool arguments must be a JSON object"), ("null", "{}", "Tool arguments must be a JSON object"),
+            ("{\"path\":\"C:\\q\"}", "{\"path\":\"C:\\\\q\"}", null)
         })
         {
             var end = JsonSerializer.Serialize(new { type = "response.output_item.done", output_index = 9,
                 item = new { type = "function_call", id = "item", call_id = "call", name = "read", arguments = raw } });
             var result = await Complete(ToolStart, end, Completed);
-            Assert(result.Failure is null && result.Message.StopReason == StopReason.ToolUse, "parseStreamingJson final failed the turn: " + raw);
-            Assert(Same(JsonData.Parse(expected).Value, ((ToolCallContent)result.Message.Content[0]).Arguments.Value),
-                "Final arguments differ from parseStreamingJson: " + raw);
+            Assert(result.Failure is null && result.Message.StopReason == StopReason.ToolUse, "Final arguments failed the turn: " + raw);
+            var call = (ToolCallContent)result.Message.Content[0];
+            Assert(Same(JsonData.Parse(expected).Value, call.Arguments.Value), "Final arguments differ from parseToolCallArguments: " + raw);
+            var actualError = call.ExtraProperties is { } fields && fields.TryGet("argumentsError", out var value) ? value!.Value.GetString() : null;
+            Equal(error is null ? null : error + "\n\nReceived arguments:\n" + raw, actualError);
         }
         var checkpoint = """{"type":"response.function_call_arguments.done","output_index":9,"item_id":"item","arguments":"{\"value\":null}"}""";
         var endFallback = """{"type":"response.output_item.done","output_index":9,"item":{"type":"function_call","id":"item","call_id":"call","name":"read","arguments":""}}""";
@@ -315,6 +320,14 @@ static class ResponsesTextToolTests
         var opaque = await Complete(ToolStart, end, Completed); Assert(opaque.Failure is null, "Complete numeric argument object rejected.");
         var arguments = PiWireJson.WriteMessage(opaque.Message).Value.GetProperty("content")[0].GetProperty("arguments");
         Equal("1", arguments.GetProperty("integerScale").GetRawText()); Equal("9007199254740992", arguments.GetProperty("large").GetRawText());
+    }
+    // Authored, not captured: Pi f9a26365 models.ts calculateCost ends with usage.cost.totalFromProvider = false, after total. The
+    // 0.99.1 capture predates the field, so it is added to the captured message's cost before the comparison.
+    private static JsonElement WithCalculatedCostFlag(JsonElement message)
+    {
+        var node = JsonNode.Parse(message.GetRawText())!;
+        if (node["usage"]?["cost"] is JsonObject cost) cost["totalFromProvider"] = false;
+        return JsonDocument.Parse(node.ToJsonString()).RootElement.Clone();
     }
     private static bool Same(JsonElement expected, JsonElement actual)
     {
