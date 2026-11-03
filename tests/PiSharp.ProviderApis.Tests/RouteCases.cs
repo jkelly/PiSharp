@@ -48,7 +48,7 @@ internal static partial class Program
         Equal("https://api.individual.githubcopilot.com/chat/completions", completions.Url, "completions url");
         Check(completions.Header("authorization") == "Bearer " + CopilotToken && completions.Header("x-initiator") == "agent" &&
             completions.Header("copilot-vision-request") is null && completions.Header("openai-intent") == "conversation-edits", "completions copilot headers");
-        var responses = await RouteRequest("github-copilot", "gpt-5.5", UserTurn(), Auth);
+        var responses = await RouteRequest("github-copilot", "gpt-5.6-sol", UserTurn(), Auth);
         Equal("https://api.individual.githubcopilot.com/responses", responses.Url, "responses url");
         Check(responses.Header("authorization") == "Bearer " + CopilotToken && responses.Header("x-initiator") == "user", "responses copilot headers");
         // The enterprise proxy endpoint named by the token.
@@ -91,7 +91,7 @@ internal static partial class Program
         var image = Convert.ToBase64String(new byte[4_700_000]);
         ImmutableArray<TranscriptEntry> Big() => [Entry($$$"""{"role":"user","content":[{"type":"text","text":"look"},{"type":"image","data":"{{{image}}}","mimeType":"image/png"}],"timestamp":1}""")];
         ValueTask<ProviderRequestAuth> Auth() => ValueTask.FromResult(new ProviderRequestAuth(CopilotToken, ProviderHeaderPolicies.CopilotBaseUrl(CopilotToken, null)));
-        foreach (var id in new[] { "claude-sonnet-4.6", "kimi-k3", "gpt-5.5" })
+        foreach (var id in new[] { "claude-sonnet-4.6", "kimi-k3", "gpt-5.6-sol" })
         {
             var request = await RouteRequest("github-copilot", id, Big(), Auth);
             Check(request.BodyBytes.Length > 6_000_000 && request.Body.Contains(image[..64], StringComparison.Ordinal), "copilot " + id + " carries the image");

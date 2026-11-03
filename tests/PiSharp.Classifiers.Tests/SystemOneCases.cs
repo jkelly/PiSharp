@@ -62,11 +62,11 @@ internal static partial class Program
             var http = FakeHttp.Always(() => FakeHttp.Json("{}"));
             var other = await TypeSafeSystemOneClassifier.Instance.ClassifyAsync(Jev with { Api = "cloudflare-workers-ai-system-one" }, SystemOneContext,
                 new ClassifierOptions { ApiKey = "secret", Http = http.Client });
-            var images = await TypeSafeSystemOneClassifier.Instance.ClassifyAsync(Jev with { Input = ["text", "image"] },
+            var images = await TypeSafeSystemOneClassifier.Instance.ClassifyAsync(Jev,
                 SystemOneContext with { Images = [new("aW1hZ2U=", "image/png")] }, new ClassifierOptions { ApiKey = "secret", Http = http.Client });
             Equal(0, http.Requests.Count, "requests");
             Equal("Unsupported classifier API: cloudflare-workers-ai-system-one", other.ErrorMessage, "other api");
-            Equal("System One API does not support image input", images.ErrorMessage, "images");
+            Equal("System One API does not support image input for jev-latest", images.ErrorMessage, "images");
             Equal(ModelOperationStopReason.Error, images.StopReason, "stop");
         }),
         ("system-one.headers-merge-case-insensitively-with-null-suppression", async () =>

@@ -23,7 +23,7 @@ internal static partial class Program
     private static ModelDescriptor Descriptor(FrozenCatalogModel row) => new(row.Id, row.DeclaredApi, row.Provider);
 
     private static (OpenAICodexResponsesTransport Transport, FakeHttp Http, ModelDescriptor Model, List<TimeSpan> Delays) Codex(OpenAICodexResponsesOptions? options = null,
-        string id = "gpt-5.5", string token = "")
+        string id = "gpt-5.6-sol", string token = "")
     {
         var row = CatalogRow("openai-codex", id); var http = new FakeHttp(); var delays = new List<TimeSpan>();
         // These cases pin the SSE wire ("sse"); the default "auto" tries the WebSocket first (CodexWebSocketCases).
@@ -50,7 +50,7 @@ internal static partial class Program
         var request = http.All.Single();
         Equal("https://chatgpt.com/backend-api/codex/responses", request.Url, "url");
         JsonEqual("""
-            {"model":"gpt-5.5","store":false,"stream":true,"instructions":"Be brief.",
+            {"model":"gpt-5.6-sol","store":false,"stream":true,"instructions":"Be brief.",
              "input":[{"role":"user","content":[{"type":"input_text","text":"Hi"}]}],
              "text":{"verbosity":"low"},"include":["reasoning.encrypted_content"],"prompt_cache_key":"sess-1","tool_choice":"auto","parallel_tool_calls":true,
              "tools":[{"type":"function","name":"read","description":"Read a file","parameters":{"type":"object","properties":{"path":{"type":"string"}},"required":["path"]},"strict":null}],
@@ -67,10 +67,10 @@ internal static partial class Program
         // Off: reasoning effort none; no session: no cache key; a "required" tool choice and service tier travel as given.
         var off = Codex(new() { ToolChoice = "required", ServiceTier = "flex", TextVerbosity = "high", Temperature = 0.2 });
         Check(off.Transport.BuildBody(new(off.Model, CodexTranscript(), 3) { ThinkingLevel = "off" }).ToJsonString() ==
-            JsonDocument.Parse("""{"model":"gpt-5.5","store":false,"stream":true,"instructions":"Be brief.","input":[{"role":"user","content":[{"type":"input_text","text":"Hi"}]}],"text":{"verbosity":"high"},"include":["reasoning.encrypted_content"],"tool_choice":"required","parallel_tool_calls":true,"temperature":0.2,"service_tier":"flex","tools":[{"type":"function","name":"read","description":"Read a file","parameters":{"type":"object","properties":{"path":{"type":"string"}},"required":["path"]},"strict":null}],"reasoning":{"effort":"none"}}""").RootElement.GetRawText(),
+            JsonDocument.Parse("""{"model":"gpt-5.6-sol","store":false,"stream":true,"instructions":"Be brief.","input":[{"role":"user","content":[{"type":"input_text","text":"Hi"}]}],"text":{"verbosity":"high"},"include":["reasoning.encrypted_content"],"tool_choice":"required","parallel_tool_calls":true,"temperature":0.2,"service_tier":"flex","tools":[{"type":"function","name":"read","description":"Read a file","parameters":{"type":"object","properties":{"path":{"type":"string"}},"required":["path"]},"strict":null}],"reasoning":{"effort":"none"}}""").RootElement.GetRawText(),
             "off body");
         // minimal clamps through the thinkingLevelMap (minimal -> low); a missing system prompt uses the default instructions.
-        var spark = Codex(id: "gpt-5.3-codex-spark");
+        var spark = Codex(id: "gpt-5.6-luna");
         var minimal = spark.Transport.BuildBody(new(spark.Model, [Entry("""{"role":"user","content":"Hi","timestamp":2}""")], 3) { ThinkingLevel = "minimal" });
         Equal("""{"effort":"low","summary":"auto"}""", minimal["reasoning"]!.ToJsonString(), "minimal mapped");
         Equal("You are a helpful assistant.", minimal["instructions"]!.GetValue<string>(), "default instructions");
@@ -96,7 +96,7 @@ internal static partial class Program
         Check(done.Message.Content.Single() is TextContent { Text: "Hello" }, "text");
         Equal(900L, done.Message.Usage.Input, "input excludes cached");
         // models.ts calculateCost then applyServiceTierPricing, in binary64 Numbers.
-        Equal(0.015125000000000001m, done.Message.Usage.Cost.Total, "priority pricing for gpt-5.5 (x2.5)");
+        Equal(0.00928m, done.Message.Usage.Cost.Total, "priority pricing for gpt-5.6-sol (x2; only gpt-5.5 is x2.5)");
         // Incomplete for max_output_tokens settles as length.
         var incomplete = Codex();
         incomplete.Http.OnUrl("https://", _ => Sse("""{"type":"response.incomplete","response":{"status":"incomplete","incomplete_details":{"reason":"max_output_tokens"},"output":[]}}"""));

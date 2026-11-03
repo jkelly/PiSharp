@@ -254,8 +254,8 @@ public static partial class NativeProviderFactory
         var factory = new AnthropicMessagesKeyAuthRequestFactory(endpoint, model, projectionOptions, requestOptions);
         var maximum = requestOptions.MaxTokens ?? projectionOptions.MaximumTokens;
         var profile = modelMetadata is null ? null : new NativeThinkingProfile(model, modelMetadata, projectionOptions.ModelReasoning, (int)maximum);
-        if (profile is not null && profile.MidConversationEffort != projectionOptions.SupportsMidConversationEffort)
-            factory = new(endpoint, model, projectionOptions = projectionOptions with { SupportsMidConversationEffort = profile.MidConversationEffort }, requestOptions);
+        if (profile is not null && (profile.MidConversationEffort != projectionOptions.SupportsMidConversationEffort || profile.SupportsOff != projectionOptions.SupportsThinkingOff))
+            factory = new(endpoint, model, projectionOptions = projectionOptions with { SupportsMidConversationEffort = profile.MidConversationEffort, SupportsThinkingOff = profile.SupportsOff }, requestOptions);
         var messagesOptions = AnthropicMessagesOptionsForModel(modelMetadata);
         return Bind(model, handler, client =>
         {

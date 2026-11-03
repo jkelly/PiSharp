@@ -85,7 +85,7 @@ public static partial class NativeProviderFactory
         if (maximum != Math.Truncate(maximum) || maximum is <= 0 or > int.MaxValue) throw new ArgumentException("Unsupported native thinking token cap.");
         var metadata = thinkingProfile ? modelMetadata : null;
         var profile = metadata is null ? null : new NativeThinkingProfile(model, metadata, projectionOptions.ModelReasoning, (int)maximum);
-        if (profile is not null) projectionOptions = projectionOptions with { SupportsMidConversationEffort = profile.MidConversationEffort };
+        if (profile is not null) projectionOptions = projectionOptions with { SupportsMidConversationEffort = profile.MidConversationEffort, SupportsThinkingOff = profile.SupportsOff };
         if (profile is null && projectionOptions.ModelReasoning && !projectionOptions.SupportsThinkingOff)
             throw new ArgumentException("Native thinking off is unsupported by the configured profile.");
         var factory = new AnthropicMessagesKeyAuthRequestFactory(endpoint, model, projectionOptions, requestOptions);

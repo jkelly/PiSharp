@@ -104,7 +104,7 @@ internal static partial class Program
             ("mistral-conversations", "mistral", LongModel("mistral", "mistral-conversations")),
             ("pi-messages", "radius", LongModel("radius", "pi-messages")),
             ("bedrock-converse-stream", "amazon-bedrock", "amazon.nova-lite-v1:0"),
-            ("openai-codex-responses", "openai-codex", "gpt-5.5"),
+            ("openai-codex-responses", "openai-codex", "gpt-5.6-sol"),
             ("github-copilot-completions", "github-copilot", "kimi-k3"), ("github-copilot-anthropic", "github-copilot", "claude-sonnet-4.6"),
             ("cloudflare-workers-ai", "cloudflare-workers-ai", "@cf/deepseek-ai/deepseek-v4-flash-0731"),
             ("cloudflare-ai-gateway", "cloudflare-ai-gateway", "claude-fable-5"),

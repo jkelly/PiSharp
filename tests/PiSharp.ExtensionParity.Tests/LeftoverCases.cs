@@ -18,7 +18,7 @@ internal static partial class Program
 
     // agent-session.ts bindExtensions setModel -> setModel: the level is _getThinkingLevelForModelSwitch(model) (the per-model setting,
     // else defaultThinkingLevel, else the current level), clamped to the model by setThinkingLevel; anthropic/claude-haiku-4-5 supports
-    // off..high and anthropic/claude-haiku-5-5 low..max.
+    // off..high and anthropic/claude-haiku-5-5 off and low..max (minimal null).
     private static async Task SetModelAppliesSettingsThinking()
     {
         using var sandbox = NodeSandbox("set-model-thinking");

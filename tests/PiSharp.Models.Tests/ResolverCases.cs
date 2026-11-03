@@ -187,7 +187,7 @@ internal static partial class Program
 
     private static void DefaultsExist()
     {
-        Equal("gpt-5.5", ModelResolver.DefaultModelFor("openai"), "openai"); Equal("gpt-6.1-sol", ModelResolver.DefaultModelFor("openai-codex"), "codex");
+        Equal("gpt-6.1-sol", ModelResolver.DefaultModelFor("openai"), "openai"); Equal("gpt-6.1-sol", ModelResolver.DefaultModelFor("openai-codex"), "codex");
         Equal("glm-5.3", ModelResolver.DefaultModelFor("zai"), "zai"); Equal("MiniMax-M2.7", ModelResolver.DefaultModelFor("minimax-cn"), "minimax-cn");
         Equal("gpt-oss-120b", ModelResolver.DefaultModelFor("cerebras"), "cerebras"); Equal("Ring-2.6-1T", ModelResolver.DefaultModelFor("ant-ling"), "ant-ling");
         Equal("zai/glm-5.1", ModelResolver.DefaultModelFor("vercel-ai-gateway"), "gateway"); Equal("grok-4.7", ModelResolver.DefaultModelFor("xai"), "xai");

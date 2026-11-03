@@ -9,7 +9,7 @@ using PiSharp.AI;
 using PiSharp.Cli.Pi;
 
 // Issue #5: /clear (new_session) crashed with "RPC command failed." on a model whose thinking cannot be turned off, because the new
-// session was refused at "off" instead of being clamped. anthropic/claude-haiku-5-5 maps off and minimal to null (levels low..max);
+// session was refused at "off" instead of being clamped. anthropic/claude-sonnet-5-5 maps off and minimal to null (levels low..max);
 // anthropic/claude-haiku-4-5 has no map (levels off..high). Expectations were written from the pinned sources by reading.
 internal static partial class Program
 {
@@ -36,7 +36,7 @@ internal static partial class Program
         {
             using var sandbox = new Sandbox("clamp-new-session");
             sandbox.Write(Path.Combine(sandbox.AgentDir, "settings.json"),
-                """{"defaultProvider":"anthropic","defaultModel":"claude-haiku-5-5","defaultThinkingLevel":"off"}""");
+                """{"defaultProvider":"anthropic","defaultModel":"claude-sonnet-5-5","defaultThinkingLevel":"off"}""");
             var events = new List<JsonNode>();
             var responses = await RpcUntilIdle(sandbox, ["--mode", "rpc"], events,
                 """{"id":"1","type":"get_state"}""",
@@ -48,30 +48,30 @@ internal static partial class Program
             // the nearest level above, "low".
             Equal("low", responses[0]["data"]!["thinkingLevel"]!.GetValue<string>(), "startup level");
             Check(responses[1]["success"]!.GetValue<bool>(), "new_session: " + responses[1].ToJsonString());
-            Equal("claude-haiku-5-5", responses[2]["data"]!["model"]!["id"]!.GetValue<string>(), "new session model");
+            Equal("claude-sonnet-5-5", responses[2]["data"]!["model"]!["id"]!.GetValue<string>(), "new session model");
             Equal("low", responses[2]["data"]!["thinkingLevel"]!.GetValue<string>(), "new session level");
             Check(responses[3]["success"]!.GetValue<bool>(), "prompt: " + responses[3].ToJsonString());
             Equal("low", responses[4]["data"]!["thinkingLevel"]!.GetValue<string>(), "level after the turn");
             Check(!events.Any(line => line["type"]?.GetValue<string>() == "agent_end" && line.ToJsonString().Contains("\"stopReason\":\"error\"", StringComparison.Ordinal)),
                 "the turn after new_session failed");
-            Equal("claude-haiku-5-5", sandbox.Requests[^1].Json.GetProperty("model").GetString(), "the request goes to the new session's model");
+            Equal("claude-sonnet-5-5", sandbox.Requests[^1].Json.GetProperty("model").GetString(), "the request goes to the new session's model");
             // The new session recorded its model and the clamped level once (appendModelChange, appendThinkingLevelChange), then the turn.
             var file = responses[2]["data"]!["sessionFile"]!.GetValue<string>();
             var entries = File.ReadLines(file).Skip(1).Select(line => JsonNode.Parse(line)!).ToList();
             Names(["model_change", "thinking_level_change", "message:system", "message:user", "message:assistant"], entries.Select(Kind), "new session entries");
-            Equal("claude-haiku-5-5", entries[0]["modelId"]!.GetValue<string>(), "recorded model");
+            Equal("claude-sonnet-5-5", entries[0]["modelId"]!.GetValue<string>(), "recorded model");
             Equal("low", entries[1]["thinkingLevel"]!.GetValue<string>(), "recorded clamped level");
         }),
         ("thinking-clamp.resume-opens-at-the-clamped-level-and-later-turns-run", async () =>
         {
             using var sandbox = new Sandbox("clamp-resume");
             // The branch records "off" on a model that cannot turn thinking off.
-            var session = SeedSession(sandbox, "haiku55.jsonl", "anthropic", "claude-haiku-5-5");
+            var session = SeedSession(sandbox, "haiku55.jsonl", "anthropic", "claude-sonnet-5-5");
             var seeded = File.ReadAllLines(session).Length;
             var responses = await RpcSequence(sandbox, ["--mode", "rpc", "--session", session],
                 """{"id":"1","type":"get_state"}""",
                 """{"id":"2","type":"get_available_thinking_levels"}""");
-            Equal("claude-haiku-5-5", responses[0]["data"]!["model"]!["id"]!.GetValue<string>(), "restored model");
+            Equal("claude-sonnet-5-5", responses[0]["data"]!["model"]!["id"]!.GetValue<string>(), "restored model");
             Equal("low", responses[0]["data"]!["thinkingLevel"]!.GetValue<string>(), "restored level clamped");
             Names(["low", "medium", "high", "xhigh", "max"], responses[1]["data"]!["levels"]!.AsArray().Select(level => level!.GetValue<string>()), "levels");
             // sdk.ts appends a thinking_level_change only to a session without one: the recorded "off" stays, nothing is written.
@@ -81,7 +81,7 @@ internal static partial class Program
             {
                 var (code, stdout, stderr) = await sandbox.Run("-p", "--session", session, "turn " + turn);
                 Check(code == 0 && stdout == "ok\n", $"turn {turn}: {code} {stdout} {stderr}");
-                Equal("claude-haiku-5-5", sandbox.Requests[^1].Json.GetProperty("model").GetString(), "turn " + turn + " model");
+                Equal("claude-sonnet-5-5", sandbox.Requests[^1].Json.GetProperty("model").GetString(), "turn " + turn + " model");
             }
             var appended = File.ReadLines(session).Skip(seeded).Select(line => JsonNode.Parse(line)!).ToList();
             // Only the turns are recorded: no thinking_level_change for the clamped level.
@@ -106,11 +106,11 @@ internal static partial class Program
             using var sandbox = new Sandbox("clamp-switch");
             var session = SeedSession(sandbox, "haiku45.jsonl", "anthropic", "claude-haiku-4-5");
             var seeded = File.ReadAllLines(session).Length;
-            var responses = await RpcSequence(sandbox, ["--mode", "rpc", "--session", session, "--models", "anthropic/claude-haiku-4-5:off,anthropic/claude-haiku-5-5:off"],
+            var responses = await RpcSequence(sandbox, ["--mode", "rpc", "--session", session, "--models", "anthropic/claude-haiku-4-5:off,anthropic/claude-sonnet-5-5:off"],
                 """{"id":"1","type":"set_thinking_level","level":"max"}""",
                 """{"id":"2","type":"get_state"}""",
                 """{"id":"3","type":"set_thinking_level","level":"off"}""",
-                """{"id":"4","type":"set_model","provider":"anthropic","modelId":"claude-haiku-5-5"}""",
+                """{"id":"4","type":"set_model","provider":"anthropic","modelId":"claude-sonnet-5-5"}""",
                 """{"id":"5","type":"get_state"}""",
                 """{"id":"6","type":"set_thinking_level","level":"minimal"}""",
                 """{"id":"7","type":"set_thinking_level","level":"off"}""",
@@ -123,7 +123,7 @@ internal static partial class Program
             // haiku-4-5 has no xhigh or max: "max" clamps down to "high".
             Equal("high", responses[1]["data"]!["thinkingLevel"]!.GetValue<string>(), "max clamped down");
             // setModel: no settings default, so the current level ("off"), clamped to haiku-5-5 ("low").
-            Equal("claude-haiku-5-5", responses[4]["data"]!["model"]!["id"]!.GetValue<string>(), "set_model");
+            Equal("claude-sonnet-5-5", responses[4]["data"]!["model"]!["id"]!.GetValue<string>(), "set_model");
             Equal("low", responses[4]["data"]!["thinkingLevel"]!.GetValue<string>(), "set_model clamps the current level");
             Equal("low", responses[7]["data"]!["thinkingLevel"]!.GetValue<string>(), "minimal and off clamp up to low");
             Equal("medium", responses[8]["data"]!["level"]!.GetValue<string>(), "cycle from the clamped level");
@@ -131,20 +131,20 @@ internal static partial class Program
             Equal("claude-haiku-4-5", responses[9]["data"]!["model"]!["id"]!.GetValue<string>(), "cycle to haiku-4-5");
             Equal("off", responses[9]["data"]!["thinkingLevel"]!.GetValue<string>(), "scoped off on haiku-4-5");
             Equal(true, responses[9]["data"]!["isScoped"]!.GetValue<bool>(), "scoped cycle");
-            Equal("claude-haiku-5-5", responses[10]["data"]!["model"]!["id"]!.GetValue<string>(), "cycle to haiku-5-5");
+            Equal("claude-sonnet-5-5", responses[10]["data"]!["model"]!["id"]!.GetValue<string>(), "cycle to haiku-5-5");
             Equal("low", responses[10]["data"]!["thinkingLevel"]!.GetValue<string>(), "scoped off clamped on haiku-5-5");
             Equal("low", responses[11]["data"]!["thinkingLevel"]!.GetValue<string>(), "state after the cycle");
             // setThinkingLevel records the clamped level only when it changes (minimal and off on haiku-5-5 leave "low").
             var recorded = File.ReadLines(session).Skip(seeded).Select(line => JsonNode.Parse(line)!)
                 .Select(entry => entry["type"]!.GetValue<string>() == "model_change" ? "model:" + entry["modelId"]!.GetValue<string>() : "thinking:" + entry["thinkingLevel"]!.GetValue<string>());
-            Names(["thinking:high", "thinking:off", "model:claude-haiku-5-5", "thinking:low", "thinking:medium", "model:claude-haiku-4-5", "thinking:off",
-                "model:claude-haiku-5-5", "thinking:low"], recorded, "recorded changes");
+            Names(["thinking:high", "thinking:off", "model:claude-sonnet-5-5", "thinking:low", "thinking:medium", "model:claude-haiku-4-5", "thinking:off",
+                "model:claude-sonnet-5-5", "thinking:low"], recorded, "recorded changes");
         }),
         ("thinking-clamp.tree-clone-fork-and-switch-open-clamped-sessions", async () =>
         {
             using var sandbox = new Sandbox("clamp-replace");
-            var session = SeedSession(sandbox, "haiku55.jsonl", "anthropic", "claude-haiku-5-5");
-            var other = SeedSession(sandbox, "other55.jsonl", "anthropic", "claude-haiku-5-5");
+            var session = SeedSession(sandbox, "haiku55.jsonl", "anthropic", "claude-sonnet-5-5");
+            var other = SeedSession(sandbox, "other55.jsonl", "anthropic", "claude-sonnet-5-5");
             // A second exchange, so a fork before its prompt keeps messages (a fork without messages opens as a new session).
             var (code, stdout, stderr) = await sandbox.Run("-p", "--session", session, "second");
             Check(code == 0 && stdout == "ok\n", $"second turn: {code} {stdout} {stderr}");
@@ -172,7 +172,7 @@ internal static partial class Program
             Equal("Selected", responses[2]["data"]!["disposition"]?.GetValue<string>(), "navigated");
             foreach (var (index, what) in new[] { (0, "resumed"), (3, "after tree navigation"), (5, "fork"), (7, "clone"), (9, "switch_session") })
             {
-                Equal("claude-haiku-5-5", responses[index]["data"]!["model"]!["id"]!.GetValue<string>(), what + " model");
+                Equal("claude-sonnet-5-5", responses[index]["data"]!["model"]!["id"]!.GetValue<string>(), what + " model");
                 Equal("low", responses[index]["data"]!["thinkingLevel"]!.GetValue<string>(), what + " level");
             }
             // setThinkingLevel clamps a level the model does not list; an unknown one becomes the model's first level.
