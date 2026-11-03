@@ -161,7 +161,7 @@ internal static partial class Program
             var prices = new ModelPrices(host.Catalog, settings, () => host.Models);
             var billing = new BillingModes(host.Catalog, settings, prices, host.Accounts, () => host.Models);
             var estimator = new CostEstimator(host.Catalog, settings, billing, prices, host.Accounts);
-            foreach (var (provider, model) in new[] { ("anthropic", "claude-haiku-5-5"), ("anthropic", "claude-sonnet-5-5"), ("openai-codex", "gpt-5.5") })
+            foreach (var (provider, model) in new[] { ("anthropic", "claude-haiku-5-5"), ("anthropic", "claude-sonnet-5-5"), ("openai-codex", "gpt-5.6-sol") })
                 Check(host.Catalog.FindModel(provider, model) is { MaxTokens: >= 8_192 }, $"{provider}/{model} is in the routed catalog");
 
             Equal(BillingKind.Metered, billing.Resolve("anthropic", null).Mode, "anthropic is metered");
@@ -178,19 +178,19 @@ internal static partial class Program
             Equal("12,000 × $2.50/M + 8,192 × $10.00/M = $0.0300 + $0.0819 = $0.1119", SpendEstimateText.Formula(sonnet),
                 "Claude Sonnet 5.5's cache-write rate ($2.50) is its worst input rate");
 
-            // A ChatGPT sign-in is a subscription: list price (with GPT-5.5's 272K tier), never counted.
+            // A ChatGPT sign-in is a subscription: list price (with GPT-5.6 Sol's 272K tier), never counted.
             var personal = await host.AddCodexAsync("acct-personal", Planted("access-"), Planted("refresh-"), dueSoon: false);
             Equal(new BillingResolution(BillingKind.Subscription, BillingKind.Subscription, false, "ChatGPT sign-in"), billing.Resolve("openai-codex", personal), "ChatGPT");
             var plus = (await host.Vault.SaveSignInAsync("openai-codex", new OAuthCredentialSnapshot(Planted("access-"), Planted("refresh-"),
                 DateTimeOffset.UtcNow.AddHours(1).ToUnixTimeMilliseconds(), new Dictionary<string, string> { ["accountId"] = "acct-plus" }), "acct-plus",
                 new Dictionary<string, string> { ["plan"] = "plus" }, "Personal", null, default)).Account.Id;
             Equal("ChatGPT Plus", billing.Resolve("openai-codex", plus).Basis, "the plan names it");
-            var codex = estimator.Estimate(new SpendEstimateInput("openai-codex", "gpt-5.5", plus, EstBytes(300_000)));
+            var codex = estimator.Estimate(new SpendEstimateInput("openai-codex", "gpt-5.6-sol", plus, EstBytes(300_000)));
             Equal(BillingKind.Subscription, codex.Billing, "billed as a subscription");
             Equal(272_000d, codex.Price!.TierInputTokensAbove, "above 272K");
-            Equal(3_368_640L, codex.WorstMicros, "300,000 x $10/M + 8,192 x $45/M at list price");
+            Equal(3_245_760L, codex.WorstMicros, "300,000 x $10/M (the tier's cache-write rate) + 8,192 x $30/M at list price");
             Check(codex.PriceKnown && !codex.CountsTowardCaps, "shown, never counted toward money caps");
-            Equal("≈ $3.37 list", SpendEstimateText.Chip(codex), "≈ list");
+            Equal("≈ $3.25 list", SpendEstimateText.Chip(codex), "≈ list");
             var copilot = (await host.Vault.SaveSignInAsync("github-copilot", new OAuthCredentialSnapshot(Planted("access-"), Planted("refresh-"),
                 DateTimeOffset.UtcNow.AddHours(1).ToUnixTimeMilliseconds(), new Dictionary<string, string>()), null,
                 new Dictionary<string, string> { ["host"] = "github.com" }, "GitHub Copilot", null, default)).Account.Id;
