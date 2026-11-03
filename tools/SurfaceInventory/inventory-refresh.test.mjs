@@ -165,10 +165,11 @@ test('generator helpers: line mapping, censuses and comment-safe export spans', 
   assert.deepEqual(parserBranches(args).map(row => row.spellings), [['--'], ['--a', '-a'], ['--b']]);
 });
 
-// v1.2.0: generated from the v1.1.0 inventories for the current target (target.lock.json).
+// v1.2.0: generated from the v1.1.0 inventories for the v1.2.0 target, so checked against that target's preserved lock
+// (compatibility/target.v1.2.0.lock.json, named by target.lock.json's previousTarget once the target moved to v1.5.0).
 const V1_2_0_CATALOG = 'compatibility/extensions/event-catalog.v1.2.0.json', V1_2_0_CATALOG_OVERLAY = 'compatibility/extensions/event-catalog.v1.2.0.overlay.json';
 const V1_2_0_INVENTORY = 'compatibility/coding-agent-command-rpc-inventory.v1.2.0.json';
-const current120 = json('compatibility/target.lock.json');
+const V1_2_0_LOCK = 'compatibility/target.v1.2.0.lock.json', current120 = json(V1_2_0_LOCK);
 
 test('v1.2.0 event catalog: re-derived rows and the before_agent_start union', () => {
   const previous = json(NEW_CATALOG), current = json(V1_2_0_CATALOG);
@@ -223,6 +224,6 @@ test('generators reproduce every inventory byte-for-byte from upstream sources',
 const upstream120 = process.env.PI_UPSTREAM_V1_2_0;
 test('generators reproduce the v1.2.0 inventories byte-for-byte from upstream sources', { skip: upstream120 ? false : 'set PI_UPSTREAM_V1_2_0 to a Pi checkout at v1.2.0 containing v1.1.0' }, () => {
   const run = (tool, ...args) => execFileSync(process.execPath, [resolve(repo, 'tools/SurfaceInventory', tool), '--upstream', upstream120, ...args], { cwd: repo, stdio: 'pipe' });
-  run('build-event-catalog.mjs', '--lock', 'compatibility/target.lock.json', '--template', NEW_CATALOG, '--overlay', V1_2_0_CATALOG_OVERLAY, '--check', V1_2_0_CATALOG);
-  run('build-command-rpc-inventory.mjs', '--lock', 'compatibility/target.lock.json', '--template', NEW_INVENTORY, '--check', V1_2_0_INVENTORY);
+  run('build-event-catalog.mjs', '--lock', V1_2_0_LOCK, '--template', NEW_CATALOG, '--overlay', V1_2_0_CATALOG_OVERLAY, '--check', V1_2_0_CATALOG);
+  run('build-command-rpc-inventory.mjs', '--lock', V1_2_0_LOCK, '--template', NEW_INVENTORY, '--check', V1_2_0_INVENTORY);
 });

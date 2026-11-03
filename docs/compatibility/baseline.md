@@ -1,15 +1,23 @@
 # Partial immutable baseline evidence
 
-## Current target: Pi v1.2.0 (source-level re-freeze)
+## Current target: Pi v1.5.0 (source-level re-freeze)
 
-Under [decision 0006](../decisions/0006-pi-1.2.0-sync.md), the source target is public Pi **v1.2.0** at `06a466935536f8c9bcacb2d5efc0fc021be1bdff` (tree `e8872645392bc4d214e3153104864e4b69d99ed0`), recorded in [target.lock.json](../../compatibility/target.lock.json). [refreeze-baseline.mjs](../../tools/CompatibilityReport/refreeze-baseline.mjs) generated it from the v1.1.0 target lock under the unchanged hash policy:
-- it carries forward the previous 103 source-file paths, none of which upstream removed;
-- it adds 18: the new configuration-schema sources (`ai/src/providers/{compat-schema,model-schema}.ts`, `coding-agent/src/core/{settings-schema,settings-defaults,keybindings-schema,key-id-schema}.ts`, `coding-agent/src/modes/interactive/theme/{theme-schema,theme-tokens}.ts` and the four published `coding-agent/schemas/*.schema.json`), the OpenRouter per-key catalog (`ai/src/providers/{openrouter,openrouter-api}.ts`, `coding-agent/src/core/remote-catalog-provider.ts`), and `codemode/src/{declarations,source}.ts` and `mcp/src/client.ts`.
+Under [decision 0013](../decisions/0013-pi-1.5.0-sync.md), the source target is public Pi **v1.5.0** at `f9a26365568127461c47a07a37dcb42c140a3ac5` (tree `b7734e15f2c1a10846284f77034a2214746a4da6`), recorded in [target.lock.json](../../compatibility/target.lock.json). The sync goes straight from v1.2.0: v1.3.0 and v1.4.0 get no lock of their own. [refreeze-baseline.mjs](../../tools/CompatibilityReport/refreeze-baseline.mjs) generated it from the v1.2.0 target lock under the unchanged hash policy:
+- it carries forward the previous 121 source-file paths and drops the two that upstream removed: `ai/scripts/generate-models.ts` (the catalog generator moved to `ai/catalog/`) and `ai/src/utils/assistant-message-frame.ts` (removed in v1.3.0);
+- it adds 78:
+  - the new pi-ai sources: `ai/src/auth/oauth/trusted-url.ts`, `ai/src/providers/schema-builders.ts`, `ai/src/telemetry.ts` and `ai/src/utils/{identity,openrouter-cost,streaming-json,string-enum,version}.ts`;
+  - the catalog generator: `ai/catalog/{build,define,generate,reasoning}.ts`, `ai/catalog/sources/*.ts`, `ai/catalog/providers/index.ts` and `ai/catalog/families/*.ts`;
+  - `coding-agent/src/core/{client-identity,pi-ai-schemas}.ts` and `coding-agent/src/core/extensions/pi-ai-extension-view.ts`;
+  - the new `schema` package (`package.json` and its 43 `src` files);
+  - the `telemetry` package (`package.json` and its 8 `src` files), now in scope.
 
-Of the 121 rows, 21 changed, 82 are byte-identical and 18 are new. The coding-agent, AI, agent, TUI, codemode and MCP package versions are 1.2.0; the root package is 0.0.3. The open gaps carry forward unchanged.
+Of the 197 rows, 92 changed, 27 are byte-identical and 78 are new. The coding-agent, AI, agent, TUI, codemode, MCP, schema and telemetry package versions are 1.5.0; the root package is 0.0.3. The re-freeze tool now records the version of every package with a tracked file; regenerated from the v1.1.0 lock at v1.2.0, it reproduces the v1.2.0 lock byte for byte apart from `acquiredAt`. The open gaps carry forward unchanged.
 
-Two earlier locks stay byte-for-byte:
-- [target.v1.1.0.lock.json](../../compatibility/target.v1.1.0.lock.json) is the v1.1.0 target lock, named by `previousTarget`. The v1.1.0 event catalog and command/RPC inventory below were generated for that target and stay validated against it.
+One `surfaces.json` requirement cited a removed file. `stream.indexed-events` (indexed text, thinking and tool-call frame reduction) named `assistant-message-frame.ts`. It now names `ai/src/types.ts`, where v1.5.0 defines the indexed `AssistantMessageEvent`s. Its status and evidence are unchanged (`Deferred`, `NarrowEvidenceOnly`).
+
+Three earlier locks stay byte-for-byte:
+- [target.v1.2.0.lock.json](../../compatibility/target.v1.2.0.lock.json) is the v1.2.0 target lock, named by `previousTarget`. The v1.2.0 event catalog and command/RPC inventory below were generated for that target and stay validated against it.
+- [target.v1.1.0.lock.json](../../compatibility/target.v1.1.0.lock.json) is the v1.1.0 target lock. The v1.1.0 inventories stay validated against it.
 - [baseline.lock.json](../../compatibility/baseline.lock.json) is the v0.99.1 **evidence** lock, named by `previousBaseline`. `fixtures/pi-v0.99.1/**`, its captures, `provenance.json` and every frozen inventory that hashes that lock remain validated against it. No fixture or frozen inventory was recaptured, relabelled or re-sealed.
 
 Target consumers read `target.lock.json`: `surfaces.json`, `parity.json`, the release record, the release and packaging scripts, and the website. `check.mjs` validates `surfaces.json`, `parity.json` and `--upstream` against the target lock, and provenance and fixtures against the evidence lock.
@@ -17,16 +25,26 @@ Target consumers read `target.lock.json`: `surfaces.json`, `parity.json`, the re
 To verify the target lock against a clean upstream checkout without the fixture corpus or the pinned development Node executable:
 
 ```powershell
-node tools/CompatibilityReport/verify-baseline.mjs --upstream <checkout of v1.2.0>
+node tools/CompatibilityReport/verify-baseline.mjs --upstream <checkout of v1.5.0>
 ```
 
-It verified all 121 files and the archive hash (176 checks).
+It verified all 197 files and the archive hash (252 checks).
 
-Source citations in PiSharp files that named v1.1.0 (`abe508e…`) were re-pinned to v1.2.0 by [repin-sources.mjs](../../tools/CompatibilityReport/repin-sources.mjs) only where every cited upstream file is byte-identical between the two tags. The rest moved with their area's port, once the cited change was ported or verified. [sync-1.2.0-worklist.json](../../compatibility/sync-1.2.0-worklist.json) now lists no pending citation: the v1.1.0 commit remains only in historical records and in the README until the 1.2.0 release.
+Source citations in PiSharp files that named v1.2.0 (`06a4669…`) were re-pinned to v1.5.0 by [repin-sources.mjs](../../tools/CompatibilityReport/repin-sources.mjs) only where every cited upstream file is byte-identical between the two tags: 251 citations in 251 files. The other 632 citations, in 630 files, stay on v1.2.0 until their area is ported. 19 more could not be parsed and are checked by hand with their area. [sync-1.5.0-worklist.json](../../compatibility/sync-1.5.0-worklist.json) lists them all by area.
 
-The v1.2.0 event catalog and command/RPC inventory are generated; see the surface inventories below.
+The v1.5.0 event catalog and command/RPC inventory are not generated yet. Until they are, the v1.2.0 inventories are the newest; see the work list.
 
-## Previous target: Pi v1.1.0
+## Previous target: Pi v1.2.0
+
+Under [decision 0006](../decisions/0006-pi-1.2.0-sync.md), the source target was public Pi **v1.2.0** at `06a466935536f8c9bcacb2d5efc0fc021be1bdff` (tree `e8872645392bc4d214e3153104864e4b69d99ed0`), now preserved in [target.v1.2.0.lock.json](../../compatibility/target.v1.2.0.lock.json). `refreeze-baseline.mjs` generated that lock from the v1.1.0 target lock:
+- it carried forward the previous 103 source-file paths, none of which upstream removed;
+- it added 18: the new configuration-schema sources (`ai/src/providers/{compat-schema,model-schema}.ts`, `coding-agent/src/core/{settings-schema,settings-defaults,keybindings-schema,key-id-schema}.ts`, `coding-agent/src/modes/interactive/theme/{theme-schema,theme-tokens}.ts` and the four published `coding-agent/schemas/*.schema.json`), the OpenRouter per-key catalog (`ai/src/providers/{openrouter,openrouter-api}.ts`, `coding-agent/src/core/remote-catalog-provider.ts`), and `codemode/src/{declarations,source}.ts` and `mcp/src/client.ts`.
+
+Of the 121 rows, 21 changed, 82 were byte-identical and 18 were new. The coding-agent, AI, agent, TUI, codemode and MCP package versions were 1.2.0. It verified all 121 files and the archive hash (176 checks).
+
+Source citations that named v1.1.0 (`abe508e…`) were re-pinned to v1.2.0 where every cited upstream file was byte-identical, and the rest moved with their area's port. [sync-1.2.0-worklist.json](../../compatibility/sync-1.2.0-worklist.json) ended with no pending citation.
+
+## Earlier target: Pi v1.1.0
 
 Under [decision 0002](../decisions/0002-pi-1.1.0-sync.md), the source target was public Pi **v1.1.0** at `abe508e1b89912adde45528136c3221eb69acdd7` (tree `77d78fae728879c16550b1f874785aed7851233c`), now preserved in [target.v1.1.0.lock.json](../../compatibility/target.v1.1.0.lock.json). `refreeze-baseline.mjs` generated that lock from the v0.99.1 lock:
 - it carried forward the previous 99 source-file paths;
@@ -80,7 +98,7 @@ Native status:
 $env:PI_UPSTREAM = '<Pi checkout with v0.99.1 and v1.1.0>'; node --test tools/SurfaceInventory/inventory-refresh.test.mjs
 ```
 
-The v1.2.0 refreshes ([event-catalog.v1.2.0.json](../../compatibility/extensions/event-catalog.v1.2.0.json) with its [overlay](../../compatibility/extensions/event-catalog.v1.2.0.overlay.json), and [coding-agent-command-rpc-inventory.v1.2.0.json](../../compatibility/coding-agent-command-rpc-inventory.v1.2.0.json)) are generated from the v1.1.0 inventories with `--lock compatibility/target.lock.json`. The v1.1.0 inventories stay validated against `target.v1.1.0.lock.json`. Between the two:
+The v1.2.0 refreshes ([event-catalog.v1.2.0.json](../../compatibility/extensions/event-catalog.v1.2.0.json) with its [overlay](../../compatibility/extensions/event-catalog.v1.2.0.overlay.json), and [coding-agent-command-rpc-inventory.v1.2.0.json](../../compatibility/coding-agent-command-rpc-inventory.v1.2.0.json)) were generated from the v1.1.0 inventories with `--lock compatibility/target.lock.json` while v1.2.0 was the target, and now stay validated against `target.v1.2.0.lock.json`, as the v1.1.0 inventories stay validated against `target.v1.1.0.lock.json`. Between the two:
 - `before_agent_start` is a union on `messageType`: `BeforeAgentStartUserEvent` and `BeforeAgentStartCustomEvent` are new root exports, and its runner dispatcher takes a trigger;
 - the removed `./client` and `./experimental/plugin` package entries are kept and marked `removedUpstream`.
 

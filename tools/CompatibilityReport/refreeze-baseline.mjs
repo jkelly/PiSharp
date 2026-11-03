@@ -58,6 +58,12 @@ for (const path of paths) {
 const archive = git("archive", "--format=tar", commit);
 const previousArchive = previous.artifacts.find(row => row.kind === "source-archive");
 const version = path => JSON.parse(git("show", `${commit}:${path}`).toString()).version;
+// After the first re-freeze, agent, tui, codemode and mcp report their versions, then every other package with a
+// tracked file, in name order (schema and telemetry since v1.5.0).
+const trackedPackages = [...new Set(rows.map(row => /^packages\/([^/]+)\//.exec(row.path)?.[1]).filter(Boolean))]
+  .filter(dir => !["coding-agent", "ai"].includes(dir));
+const packageOrder = ["agent", "tui", "codemode", "mcp"];
+const packageKey = dir => dir.replace(/-([a-z])/g, (_, letter) => letter.toUpperCase());
 
 const lock = {
   schemaVersion: 1,
@@ -69,8 +75,8 @@ const lock = {
   ...(args.evidence ? { previousTarget: { tag: previous.source.tag, commit: previous.source.commit, tree: previous.source.tree,
     lock: args["previous-path"], note: "The previous target lock, preserved byte-for-byte; inventories generated for that target stay validated against it." } } : {}),
   packageVersions: { root: version("package.json"), codingAgent: version("packages/coding-agent/package.json"), ai: version("packages/ai/package.json"),
-    ...Object.fromEntries([["agent", "agent"], ["tui", "tui"], ["codemode", "codemode"], ["mcp", "mcp"]]
-      .filter(([, dir]) => args.evidence && exists(`packages/${dir}/package.json`)).map(([key, dir]) => [key, version(`packages/${dir}/package.json`)])) },
+    ...Object.fromEntries([...packageOrder, ...trackedPackages.filter(dir => !packageOrder.includes(dir)).sort()]
+      .filter(dir => args.evidence && exists(`packages/${dir}/package.json`)).map(dir => [packageKey(dir), version(`packages/${dir}/package.json`)])) },
   hashPolicy: previous.hashPolicy,
   referenceRuntime: previous.referenceRuntime,
   artifacts: [
