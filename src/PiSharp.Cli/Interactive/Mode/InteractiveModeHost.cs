@@ -195,15 +195,10 @@ internal static class InteractiveModeHost
         PosixSuspend.Run(stop, resume);
     }
 
-    /// <summary>pi-ai isRetryableAssistantError: transient provider failures the retry loop handles.</summary>
-    internal static bool IsRetryableAssistantError(JsonObject message)
-    {
-        if (SessionEntries.Str(message["stopReason"]) != "error") return false;
-        var error = SessionEntries.Str(message["errorMessage"]) ?? "";
-        return System.Text.RegularExpressions.Regex.IsMatch(error,
-            @"overloaded|rate.?limit|too many requests|429|500|502|503|504|service.?unavailable|server error|internal error|connection.?error|connection.?refused|other side closed|fetch failed|upstream.?connect|reset before headers|terminated|retry delay",
-            System.Text.RegularExpressions.RegexOptions.IgnoreCase);
-    }
+    /// <summary>pi-ai isRetryableAssistantError: transient provider failures the retry loop handles (the same classifier the retry loop uses).</summary>
+    internal static bool IsRetryableAssistantError(JsonObject message) =>
+        SessionEntries.Str(message["stopReason"]) == "error" &&
+        PiSharp.CodingAgent.Configuration.AgentRetryPolicy.IsRetryableError(PiSharp.Contracts.StopReason.Error, SessionEntries.Str(message["errorMessage"]));
 }
 
 [System.Runtime.Versioning.UnsupportedOSPlatform("windows")]

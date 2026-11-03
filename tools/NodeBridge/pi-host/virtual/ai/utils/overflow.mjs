@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/ai/src/utils/overflow.ts.
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/ai/src/utils/overflow.ts.
 // Ported to plain ESM for the PiSharp Node extension bridge (TypeScript types stripped mechanically; behaviour unchanged).
 const OVERFLOW_PATTERNS = [
     /prompt (?:is )?too long/i,
@@ -7,6 +7,7 @@ const OVERFLOW_PATTERNS = [
     /input is too long for requested model/i,
     /exceeds the context window/i,
     /exceeds (?:the )?(?:model'?s )?maximum context length(?: of [\d,]+ tokens?|\s*\([\d,]+\))/i,
+    /context window exceeded/i,
     /input token count.*exceeds the maximum/i,
     /maximum prompt length is \d+/i,
     /reduce the length of the messages/i,
@@ -25,7 +26,8 @@ const OVERFLOW_PATTERNS = [
     /range of input length should be/i,
     /context[_ ]length[_ ]exceeded/i,
     /too many tokens/i,
-    /token limit exceeded/i
+    /token limit exceeded/i,
+    /^(?:[\w -]+ API error \(413\):|413(?:\s|:|$))/i
 ];
 const CEREBRAS_BODYLESS_OVERFLOW_PATTERN = /^4(?:00|13)\s*(?:status code)?\s*\(no body\)/i;
 const NON_OVERFLOW_PATTERNS = [

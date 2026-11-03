@@ -1,10 +1,10 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/ai/src/utils/retry.ts (isRetryableAssistantError, retryDelayMs) over a pi-ai
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/ai/src/utils/retry.ts (isRetryableAssistantError, retryDelayMs) over a pi-ai
 // wire assistant message. PiSharp.CodingAgent's AgentRetryPolicy ports the same classifier over PiSharp.Contracts stop reasons, but
 // PiSharp.Durable does not reference PiSharp.CodingAgent; this port uses its regex translation, and the test project compares the two on
 // shared inputs. retryAssistantCall is not ported: generation drives its own durable retry loop.
 //
 // JavaScript semantics kept: non-Unicode /i canonicalizes by upper-casing, never folding a non-ASCII character into ASCII, and `.` excludes
-// the JavaScript line terminators.
+// the JavaScript line terminators; `\s` and `\S` use JavaScript's whitespace set.
 using System.Text.RegularExpressions;
 using PiSharp.Durable.Chord;
 
@@ -23,25 +23,34 @@ internal static class PiAiRetry
         "GoUsageLimitError", "FreeUsageLimitError", "Monthly usage limit reached", "available balance",
         // Generic quota/budget/billing exhaustion.
         "insufficient_quota", "out of budget", "quota exceeded", "billing",
-        // Sign in with ChatGPT: the subscription's shared usage limit.
-        "subscription_sharing_usage_limit_exceeded"));
+        // Sign in with ChatGPT: the subscription's shared usage limit, and a ChatGPT Business limit set by the workspace admin.
+        "subscription_sharing_usage_limit_exceeded", "subscription_sharing_workplace_individual_usage_limit_exceeded",
+        // Zhipu/Z.ai error code 1308: the plan's usage limit is reached, sent as HTTP 429 (#11537).
+        "\"code\"\\s*:\\s*\"?1308(?![0-9])"));
 
     private static readonly Regex RetryableProviderError = Pattern(string.Join("|",
         // Generic provider load, HTTP status, and server-side transient failures.
         "overloaded", "server_busy", "servers are currently busy", "currently experiencing high demand", "model is at capacity", "rate.?limit",
-        "too many requests", "429", "500", "502", "503", "504", "520", "524", "service.?unavailable", "server.?error", "internal.?error",
+        "too many requests",
+        // Status codes must not be part of a longer word or number, e.g. a request id or byte count (#11057).
+        "(?<![a-z0-9])(?:429|500|502|503|504|520|524)(?![a-z0-9])",
+        // Also matches "The service is temporarily unavailable" (#10965).
+        "service.?(?:is.?)?(?:temporarily.?)?unavailable", "server.?error", "internal.?error",
         // Wrapper/provider text for transient upstream failures, including gateway wording such as "The upstream provider returned an
         // error" (Pi v1.2.0, #10842).
         "provider.?returned.?(?:an.?)?error", "exceeded request buffer limit while retrying upstream",
-        // Network, proxy, and fetch transport failures.
-        "network.?error", "connection.?error", "connection.?refused", "connection.?lost", "other side closed", "fetch failed", "getaddrinfo",
+        // Gateway failures relaying the upstream response stream, as `response.failed` events or error codes (#10920).
+        "unable to forward upstream", "upstream.?request.?failed", "upstream_stream_read_error", "stream was interrupted", "http/?2 stream failed",
+        // Network, proxy, and fetch transport failures; node-fetch system errors such as a Google ADC token refresh (#10996).
+        "network.?error", "connection.?error", "connection.?refused", "connection.?lost", "other side closed", "fetch failed",
+        "request to \\S+ failed, reason:", "getaddrinfo",
         "ENOTFOUND", "EAI_AGAIN", "upstream.?connect", "reset before headers", "socket hang up", "socket connection was closed", "timed? out",
         "timeout", "terminated",
         // WebSocket close/error text.
         "websocket.?closed", "websocket.?error",
-        // Premature stream endings from SDKs and transports.
+        // Premature stream endings from SDKs and transports, including Codex CLI proxies' mid-stream disconnect (#11057).
         "ended without", "stream ended before message_stop", "stream ended before a terminal response event",
-        "http2 request did not get a response", "pending stream has been canceled",
+        "http2 request did not get a response", "stream disconnected before completion", "pending stream has been canceled",
         // Provider-requested retry delay cap failures.
         "retry delay",
         // Explicit retry guidance emitted mid-stream.
@@ -73,17 +82,24 @@ internal static class PiAiRetry
         return Math.Min(safe, maxAgentDelayMs ?? DefaultMaxAgentRetryDelayMs);
     }
 
-    private static Regex Pattern(string expression) => new(
-        Canonicalize(expression).Replace(".?", "[^\\r\\n\\u2028\\u2029]?", StringComparison.Ordinal), RegexOptions.CultureInvariant);
+    private const string JsSpace = "\\u0009-\\u000D\\u0020\\u00A0\\u1680\\u2000-\\u200A\\u2028\\u2029\\u202F\\u205F\\u3000\\uFEFF";
 
-    private static string Canonicalize(string text) => string.Create(text.Length, text, static (target, source) =>
+    private static Regex Pattern(string expression) => new(
+        Canonicalize(expression, escapes: true).Replace(".?", "[^\\r\\n\\u2028\\u2029]?", StringComparison.Ordinal)
+            .Replace("\\s", "[" + JsSpace + "]", StringComparison.Ordinal).Replace("\\S", "[^" + JsSpace + "]", StringComparison.Ordinal),
+        RegexOptions.CultureInvariant);
+
+    private static string Canonicalize(string text, bool escapes = false) => string.Create(text.Length, (text, escapes), static (target, state) =>
     {
+        var (source, keepEscapes) = state;
         for (var index = 0; index < source.Length; index++)
         {
             var value = source[index];
             var upper = char.ToUpperInvariant(value);
             // JavaScript non-Unicode /i does not fold non-ASCII characters into ASCII.
             target[index] = value >= 128 && upper < 128 ? value : upper;
+            // Pattern escapes keep their case: \s is not \S.
+            if (keepEscapes && value == '\\' && index + 1 < source.Length) { index++; target[index] = source[index]; }
         }
     });
 }

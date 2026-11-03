@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/ai/src/utils/overflow.ts.
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/ai/src/utils/overflow.ts.
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using PiSharp.Contracts;
@@ -15,14 +15,17 @@ public static class SessionRecoveryClassifier
     {
         @"prompt (?:is )?too long", @"prompt exceeds max length", @"request_too_large", @"input is too long for requested model",
         @"exceeds the context window", @"exceeds (?:the )?(?:model'?s )?maximum context length(?: of [\d,]+ tokens?|\s*\([\d,]+\))",
-        @"input token count.*exceeds the maximum", @"maximum prompt length is \d+", @"reduce the length of the messages",
+        @"context window exceeded", @"input token count.*exceeds the maximum", @"maximum prompt length is \d+", @"reduce the length of the messages",
         @"maximum context length is \d+ tokens", @"exceeds (?:the )?maximum allowed input length of [\d,]+ tokens?",
         @"input \(\d+ tokens\) is longer than the model'?s context length \(\d+ tokens\)", @"exceeds the limit of \d+",
         @"exceeds the available context size", @"greater than the context length", @"context window exceeds limit",
         @"exceeded model token limit", @"too large for model with \d+ maximum context length",
         @"prompt has [\d,]+ tokens?, but the configured context size is [\d,]+ tokens?",
         @"model_context_window_exceeded", @"prompt too long; exceeded (?:max )?context length",
-        @"range of input length should be", @"context[_ ]length[_ ]exceeded", @"too many tokens", @"token limit exceeded"
+        @"range of input length should be", @"context[_ ]length[_ ]exceeded", @"too many tokens", @"token limit exceeded",
+        // Any HTTP 413: formatProviderError's "<provider> API error (413):" prefix or a raw SDK error starting with 413, not a status in
+        // the body. JavaScript's non-Unicode \w is ASCII, lower-cased here with the text.
+        @"^(?:[0-9a-z_ -]+ api error \(413\):|413(?:\s|:|$))"
     }.Select(Compile).ToArray();
     private static readonly Regex Bodyless = Compile(@"^4(?:00|13)\s*(?:status code)?\s*\(no body\)");
     private static readonly Regex[] NonOverflow = new[] { @"^(throttling error|service unavailable):", @"rate limit", @"too many requests" }.Select(Compile).ToArray();

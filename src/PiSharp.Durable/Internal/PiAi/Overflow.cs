@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/ai/src/utils/overflow.ts (isContextOverflow) over a pi-ai wire assistant
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/ai/src/utils/overflow.ts (isContextOverflow) over a pi-ai wire assistant
 // message. PiSharp.CodingAgent's SessionRecoveryClassifier ports the same function over PiSharp.Contracts messages, but PiSharp.Durable does
 // not reference PiSharp.CodingAgent; this port uses its regex translation, and the test project compares the two on shared inputs.
 //
@@ -22,6 +22,7 @@ internal static class PiAiOverflow
         @"input is too long for requested model", // Amazon Bedrock
         @"exceeds the context window", // OpenAI (Completions & Responses API)
         @"exceeds (?:the )?(?:model'?s )?maximum context length(?: of [\d,]+ tokens?|\s*\([\d,]+\))", // OpenAI-compatible proxies (LiteLLM)
+        @"context window exceeded", // LiteLLM pre-call check (ContextWindowExceededError)
         @"input token count.*exceeds the maximum", // Google (Gemini)
         @"maximum prompt length is \d+", // xAI (Grok)
         @"reduce the length of the messages", // Groq
@@ -41,6 +42,9 @@ internal static class PiAiOverflow
         @"context[_ ]length[_ ]exceeded", // Generic fallback
         @"too many tokens", // Generic fallback
         @"token limit exceeded", // Generic fallback
+        // HTTP 413 means request-size overflow regardless of provider or body text. Match raw SDK errors and formatProviderError's prefix,
+        // not a status mentioned in the body. JavaScript's non-Unicode \w is ASCII; the text is lower-cased.
+        @"^(?:[0-9a-z_ -]+ api error \(413\):|413(?:\s|:|$))",
     }.Select(Compile).ToArray();
 
     private static readonly Regex CerebrasBodylessOverflow = Compile(@"^4(?:00|13)\s*(?:status code)?\s*\(no body\)");
