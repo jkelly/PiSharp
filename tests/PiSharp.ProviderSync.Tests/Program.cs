@@ -632,11 +632,11 @@ internal static partial class Program
             Check(catalog.Models.All(model => model.Provider == provider), "Shard contains a foreign provider identity.");
             return catalog;
         }
-        // Byte-for-byte package/dist/providers/data shards of @earendil-works/pi-ai@1.2.0 (tarball SHA256 c3e69423...4535); the 1.1.0 additions below are still present.
-        var anthropic = Shard("anthropic", "327ea610aca64889902458243e9b6a440eb678671f5993b88ad32ac6e827b587");
-        var openai = Shard("openai", "f4c1ac9f8f84cb9f2a952b0ceec51c90a38b31b4cdf33200e018ece9d408e95f");
-        var openrouter = Shard("openrouter", "07ad378d40ea46b78c52c80490b4cf8d5b1f4000b2e1e3e13a8c0193f5fd1e98");
-        var mistral = Shard("mistral", "27aa66c71a0504b53dc87ec194286fa7e70b99747fc8df9b709b23b3548afe50");
+        // Byte-for-byte package/dist/providers/data shards of @earendil-works/pi-ai@1.5.0 (tarball SHA256 e320fe7b...ea5c); the 1.1.0 additions below are still present.
+        var anthropic = Shard("anthropic", "e462beb2e6d227b4dd1a8df22152cdebc9f3768d5dcf0939e1bf35e359129753");
+        var openai = Shard("openai", "df2fe1f312051bbe29801ef903ab370c701a74a680f1370e96eb465eacd1d82d");
+        var openrouter = Shard("openrouter", "ea1220ec52009a91d78b8e5ffae261ece94bafa4a03e8d75f1fd98e2b9351322");
+        var mistral = Shard("mistral", "013b34618e8f9a3968e0442e7e1339cc2a1bbad467f04bab0b8589a9c451b780");
         Check(anthropic.TryGetModel(CatalogModelType.Chat, "claude-haiku-5-5", out var haiku), "Claude Haiku 5.5 missing.");
         Equal("anthropic-messages", haiku!.DeclaredApi);
         Equal("""[{"inputTokensAbove":100000,"input":0.5,"output":2.5,"cacheRead":0.05,"cacheWrite":0.625}]""", haiku.Cost.Value.GetProperty("tiers").GetRawText());
@@ -646,13 +646,14 @@ internal static partial class Program
         Check(openrouter.TryGetModel(CatalogModelType.Chat, "anthropic/claude-haiku-5.5", out _), "OpenRouter Haiku 5.5 missing.");
         Check(anthropic.TryGetModel(CatalogModelType.Chat, "claude-sonnet-4-5", out _) && openai.TryGetModel(CatalogModelType.Chat, "gpt-4o", out _),
             "Models used by existing CLI selections disappeared.");
-        // mistral.json replaced its v0.99.1 source-catalog copy (10f33bff...): 32 -> 40 chat rows, none removed.
-        Equal(40, mistral.Models.Length);
+        // mistral.json replaced its v0.99.1 source-catalog copy (10f33bff...): 32 -> 40 chat rows, none removed. The
+        // @earendil-works/pi-ai@1.5.0 shard has 34: it drops nine older rows, open-mistral-7b among them, and adds three.
+        Equal(34, mistral.Models.Length);
         foreach (var added in new[] { "codestral-2508", "glm-5-2", "labs-leanstral-1-5-1", "ministral-14b-2512", "ministral-3b-2512", "ministral-8b-2512", "mistral-large-4", "voxtral-small-2507" })
             Check(mistral.TryGetModel(CatalogModelType.Chat, added, out var row) && row!.DeclaredApi == "mistral-conversations", "Mistral 1.1.0 addition missing: " + added);
         Check(mistral.TryGetModel(CatalogModelType.Chat, "magistral-medium-latest", out var magistral) && magistral!.DeclaresImageInput, "Magistral Medium lost image input.");
         Equal("""{"off":"none","minimal":null,"low":null,"medium":null,"high":"high","xhigh":null,"max":null}""", magistral!.Raw.Value.GetProperty("thinkingLevelMap").GetRawText());
-        Check(mistral.TryGetModel(CatalogModelType.Chat, "open-mistral-7b", out _) && mistral.TryGetModel(CatalogModelType.Chat, "codestral-latest", out _),
+        Check(mistral.TryGetModel(CatalogModelType.Chat, "open-mistral-nemo", out _) && mistral.TryGetModel(CatalogModelType.Chat, "codestral-latest", out _),
             "Mistral models used by existing CLI selections disappeared.");
         return Task.CompletedTask;
     }
@@ -828,9 +829,10 @@ internal static partial class Program
 
     private static async Task SharedPromptLengthPricing()
     {
-        // Completions (binary64): the OpenRouter catalog row carries the Haiku tier.
-        var latest = CatalogRow("openrouter", "~anthropic/claude-haiku-latest");
-        var router = new ModelDescriptor("~anthropic/claude-haiku-latest", "openai-completions", "openrouter");
+        // Completions (binary64): the OpenRouter catalog row carries the Haiku tier. At pi-ai 1.5.0 ~anthropic/claude-haiku-latest is
+        // an anthropic-messages row; the batch Haiku 5.5 row keeps the 100000 threshold at half the rates.
+        var latest = CatalogRow("openrouter", "anthropic/claude-haiku-5.5:batch");
+        var router = new ModelDescriptor("anthropic/claude-haiku-5.5:batch", "openai-completions", "openrouter");
         async Task<TokenUsage> Completions(int prompt, int cached, int written)
         {
             var usage = "{\"choices\":[],\"usage\":{\"prompt_tokens\":" + prompt + ",\"completion_tokens\":1000,\"prompt_tokens_details\":{\"cached_tokens\":" + cached + ",\"cache_write_tokens\":" + written + "}}}";
@@ -839,9 +841,9 @@ internal static partial class Program
                 new(MaxTokensField: "max_tokens", SupportsStore: false, SupportsLongCacheRetention: false) { ModelMetadata = latest }, handler, latest);
             return (await new ChatClient(provider).CompleteAsync(new(router, [Ask], 1)).WaitAsync(Deadline)).Message.Usage;
         }
-        Cost(await Completions(100000, 1000, 0), 0.0099m, 0.0005m, 0.00001m, 0m, 0.01041m);
-        Cost(await Completions(100001, 1001, 0), 0.049499999999999995m, 0.0025m, 0.000050050000000000004m, 0m, 0.05205005m);
-        Cost(await Completions(100001, 0, 10001), 0.045m, 0.0025m, 0m, 0.006250625m, 0.053750625m);
+        Cost(await Completions(100000, 1000, 0), 0.00495m, 0.00025m, 0.000005m, 0m, 0.005205m);
+        Cost(await Completions(100001, 1001, 0), 0.024749999999999998m, 0.00125m, 0.000025025000000000002m, 0m, 0.026025025m);
+        Cost(await Completions(100001, 0, 10001), 0.0225m, 0.00125m, 0m, 0.0031253125m, 0.0268753125m);
 
         // Responses (binary64): GPT-5.4 at its 272000 threshold, cached tokens included in input_tokens.
         var gpt = CatalogRow("openai", "gpt-5.4");

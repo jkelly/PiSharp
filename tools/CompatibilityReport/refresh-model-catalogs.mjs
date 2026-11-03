@@ -7,7 +7,7 @@
 // exactly those shards, then:
 //   - copies the shards (removing embedded shards the package no longer has);
 //   - rewrites the pins in src/PiSharp.ModelRuntime/Models/BuiltinModelCatalog.cs (package version, generatedAt,
-//     manifest and package SHA256, ShardHashes);
+//     manifest and package SHA256, ShardHashes) and the same ShardHashes table in src/PiSharp.Durable/Models/BuiltinCatalog.cs;
 //   - rewrites the copied manifest, its hashes, generatedAt and the shard and model counts in
 //     tests/PiSharp.Models.Tests/CatalogCases.cs;
 //   - rewrites the catalog paragraph of THIRD-PARTY-NOTICES.md.
@@ -109,9 +109,17 @@ catalog = replace(catalog, /GeneratedAtUnixMilliseconds = [0-9_]+;/, `GeneratedA
 catalog = replace(catalog, /ManifestSha256 = "[0-9a-f]{64}"/, `ManifestSha256 = "${sha256(manifestBytes)}"`, catalogPath);
 catalog = replace(catalog, /PackageSha256 = "[0-9a-f]{64}"/, `PackageSha256 = "${tarballSha256}"`, catalogPath);
 catalog = replace(catalog, /Every shard of pi-ai \d+\.\d+\.\d+ with/, `Every shard of pi-ai ${version} with`, catalogPath);
-catalog = replace(catalog, /(ShardHashes = new Dictionary<string, string>\(StringComparer\.Ordinal\)\r?\n\s*\{\r?\n)[\s\S]*?(\r?\n\s*\}\.ToImmutableDictionary)/,
-  (_, open, close) => open + providers.map(([provider, hash]) => `        ["${provider}"] = "${hash}",`).join("\n") + close, catalogPath);
+const shardTable = (text, path) => replace(text, /(ShardHashes = new Dictionary<string, string>\(StringComparer\.Ordinal\)\r?\n\s*\{\r?\n)[\s\S]*?(\r?\n\s*\}\.ToImmutableDictionary)/,
+  (_, open, close) => open + providers.map(([provider, hash]) => `        ["${provider}"] = "${hash}",`).join("\n") + close, path);
+catalog = shardTable(catalog, catalogPath);
 write(catalogPath, catalog);
+
+// PiSharp.Durable's copy of the table (it embeds the same shards by link and cannot reference PiSharp.ModelRuntime).
+const durablePath = "src/PiSharp.Durable/Models/BuiltinCatalog.cs";
+let durable = readFileSync(resolve(repo, durablePath), "utf8");
+durable = replace(durable, /Every shard of pi-ai \d+\.\d+\.\d+ with/, `Every shard of pi-ai ${version} with`, durablePath);
+durable = shardTable(durable, durablePath);
+write(durablePath, durable);
 
 // CatalogCases.cs.
 const testsPath = "tests/PiSharp.Models.Tests/CatalogCases.cs";

@@ -26,12 +26,12 @@ internal static class MistralLiveSelectionTests
                 Check(selection.Definition.Raw.Value.GetProperty("cost").GetProperty(field).GetDouble() == value.GetProperty("cost").GetProperty(field).GetDouble());
             Check(selection.Definition.DeclaresImageInput == value.GetProperty("input").EnumerateArray().Any(item => item.GetString() == "image")); count++;
         }
-        // The @earendil-works/pi-ai@1.1.0 shard has 40 chat rows; the v0.99.1 source catalog had 32.
-        Check(count == 40); return Task.CompletedTask;
+        // The @earendil-works/pi-ai@1.5.0 shard has 34 chat rows (1.1.0 had 40; the v0.99.1 source catalog had 32).
+        Check(count == 34); return Task.CompletedTask;
     }
     private static async Task Routes()
     {
-        var selected = LiveSessionSelection.Parse("mistral", "open-mistral-7b", "8000");
+        var selected = LiveSessionSelection.Parse("mistral", "open-mistral-nemo", "8000");
         using var handler = new Handler(); var reads = new List<string>();
         using var connection = selected.Connect(new(name => { reads.Add(name); return name == "MISTRAL_API_KEY" ? "fixture-only" : null; }, () => handler));
         var normal = connection.CreateTransport(); var summary = connection.CreateTransport(summary: true);
@@ -62,7 +62,7 @@ internal static class MistralLiveSelectionTests
     }
     private static async Task ImageRoutes()
     {
-        foreach (var (id, supportsImages) in new[] { ("mistral-large-latest", true), ("open-mistral-7b", false) })
+        foreach (var (id, supportsImages) in new[] { ("mistral-large-latest", true), ("open-mistral-nemo", false) })
         {
             var selected = LiveSessionSelection.Parse("mistral", id, "100");
             Check(selected.Definition.DeclaresImageInput == supportsImages);
@@ -108,7 +108,7 @@ internal static class MistralLiveSelectionTests
     }
     private static Task Refusals()
     {
-        foreach (var (provider, model, max) in new[] { ("mistral", "missing", "100"), ("mistral", "codestral-latest", "8192"), ("mistral", "open-mistral-7b", "0") })
+        foreach (var (provider, model, max) in new[] { ("mistral", "missing", "100"), ("mistral", "codestral-latest", "8192"), ("mistral", "open-mistral-nemo", "0") })
         {
             var refused = false;
             try { LiveSessionSelection.Parse(provider, model, max); } catch (Exception error) when (error is LiveSessionException or SessionCommandException) { refused = true; }

@@ -34,10 +34,10 @@ internal static partial class Program
             Check(code == 0 && stdout == "ok\n", $"print on the fallback model: {code} {stdout} {stderr}");
             Equal("claude-opus-4-8", sandbox.Requests[^1].Json.GetProperty("model").GetString(), "the request goes to the fallback model");
             Check(!File.ReadLines(gone).Skip(before).Any(line => line.Contains("\"type\":\"model_change\"", StringComparison.Ordinal)), "no model_change recorded");
-            // No auth for the session's provider: another provider's default (Pi 1.1.0: openai/gpt-5.5).
+            // No auth for the session's provider: another provider's default (Pi 1.5.0: openai/gpt-6.1-sol).
             sandbox.Vars.Remove("ANTHROPIC_API_KEY"); sandbox.Vars["OPENAI_API_KEY"] = "sk-openai";
             var other = SeedSession(sandbox, "other.jsonl", "anthropic", "claude-haiku-4-5");
-            Equal("openai/gpt-5.5", await StateModel(sandbox, "--session", other), "no auth falls back");
+            Equal("openai/gpt-6.1-sol", await StateModel(sandbox, "--session", other), "no auth falls back");
             // Nothing available: the unknown model, whose prompt is refused.
             sandbox.Vars.Remove("OPENAI_API_KEY");
             var none = SeedSession(sandbox, "none.jsonl", "anthropic", "claude-haiku-4-5");

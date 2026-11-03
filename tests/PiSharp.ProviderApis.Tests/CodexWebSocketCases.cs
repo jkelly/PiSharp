@@ -37,7 +37,7 @@ internal static partial class Program
     private static (OpenAICodexResponsesTransport Transport, ModelDescriptor Model, FixedTime Time) CodexOver(CodexServer server, string transport,
         string? sessionId = null, OpenAICodexResponsesOptions? options = null, HttpMessageInvoker? invoker = null)
     {
-        var row = CatalogRow("openai-codex", "gpt-5.5");
+        var row = CatalogRow("openai-codex", "gpt-5.6-sol");
         var raw = (JsonObject)JsonNode.Parse(row.Raw.ToString())!; raw["baseUrl"] = server.BaseUrl;
         var time = new FixedTime(1_800_000_000_000);
         options = (options ?? new()) with { SessionId = sessionId, Transport = () => transport, Time = time, WebSocketInvoker = invoker };

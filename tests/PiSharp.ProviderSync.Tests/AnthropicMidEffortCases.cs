@@ -18,13 +18,14 @@ internal static partial class Program
     private const string MidBetas = "mid-conversation-output-config-2026-07-01,thinking-binding-controls-2026-08-01";
     private const string Managed = "\"thinking\":{\"type\":\"adaptive\",\"display\":\"summarized\",\"block_binding\":{\"prefix_mismatch_behavior\":\"drop_block\"}},\"output_config\":{\"effort\":\"high\"}";
     private const string Ephemeral = ",\"cache_control\":{\"type\":\"ephemeral\"}";
-    // models.ts getSupportedThinkingLevels over each row's thinkingLevelMap: off is null for all five.
+    // models.ts getSupportedThinkingLevels over each row's thinkingLevelMap: off is null except for claude-opus-5 and claude-haiku-5-5,
+    // which accept disabled thinking at pi-ai 1.5.0.
     private static readonly (string Id, string[] Levels)[] MidEffortModels =
     [
-        ("claude-opus-5", ["minimal", "low", "medium", "high", "xhigh", "max"]),
+        ("claude-opus-5", ["off", "minimal", "low", "medium", "high", "xhigh", "max"]),
         ("claude-opus-5-5", ["low", "medium", "high", "xhigh", "max"]),
         ("claude-sonnet-5-5", ["low", "medium", "high", "xhigh", "max"]),
-        ("claude-haiku-5-5", ["low", "medium", "high", "xhigh", "max"]),
+        ("claude-haiku-5-5", ["off", "low", "medium", "high", "xhigh", "max"]),
         ("claude-fable-5-1", ["minimal", "low", "medium", "high", "xhigh", "max"])
     ];
 
@@ -96,14 +97,15 @@ internal static partial class Program
     private static TranscriptEntry UserText(string text, long timestamp) => Entry("{\"role\":\"user\",\"content\":\"" + text + "\",\"timestamp\":" + timestamp + "}");
 
     // Every managed row constructs on the key route and the resolved route, at a normal and a sub-2048 cap, with
-    // upstream's level list; the first allowed level (the session default when off is unavailable) sends managed effort.
+    // upstream's level list; the first allowed level other than off (the session default when off is unavailable) sends managed effort.
     private static async Task MidEffortModelsConstruct()
     {
         foreach (var (id, levels) in MidEffortModels)
         {
             var row = CatalogRow("anthropic", id).Value;
             Check(row.GetProperty("compat").GetProperty("supportsMidConvoEffort").GetBoolean() && row.GetProperty("compat").GetProperty("forceAdaptiveThinking").GetBoolean() &&
-                row.GetProperty("thinkingLevelMap").GetProperty("off").ValueKind == JsonValueKind.Null, id + " catalog row changed.");
+                (row.GetProperty("thinkingLevelMap").TryGetProperty("off", out var off) && off.ValueKind == JsonValueKind.Null) == (levels[0] != "off"),
+                id + " catalog row changed.");
             var model = new ModelDescriptor(id, "anthropic-messages", "anthropic");
             foreach (var maximum in new[] { 4096, 1024 })
             {
@@ -111,14 +113,14 @@ internal static partial class Program
                 using (var provider = NativeAnthropic(id, maximum, endpoint))
                 {
                     Check(ThinkingLevels.GetSupported(provider.Transport, model).SequenceEqual(levels), id + " key-route levels.");
-                    var result = await new ChatClient(provider.Transport).CompleteAsync(new(model, [Ask], 1) { ThinkingLevel = levels[0] }).WaitAsync(Deadline);
+                    var result = await new ChatClient(provider.Transport).CompleteAsync(new(model, [Ask], 1) { ThinkingLevel = levels.First(level => level != "off") }).WaitAsync(Deadline);
                     Equal(StopReason.Stop, result.Message.StopReason); Equal("low", Level(result.Message));
                 }
                 var (lease, resolvedLevels) = await ResolvedAnthropic(id, maximum, endpoint);
                 await using (lease)
                 {
                     Check(resolvedLevels.SequenceEqual(levels), id + " resolved-route levels.");
-                    var result = await new ChatClient(lease.Transport).CompleteAsync(new(model, [Ask], 1) { ThinkingLevel = levels[0] }).WaitAsync(Deadline);
+                    var result = await new ChatClient(lease.Transport).CompleteAsync(new(model, [Ask], 1) { ThinkingLevel = levels.First(level => level != "off") }).WaitAsync(Deadline);
                     Equal(StopReason.Stop, result.Message.StopReason); Equal("low", Level(result.Message));
                 }
                 foreach (var sent in endpoint.Requests)
