@@ -57,10 +57,10 @@
     "repeatedBullets": 23,
     "byStatus": {
       "ported": 177,
-      "ported-with-deferral": 15,
+      "ported-with-deferral": 16,
       "already-ported": 12,
       "no-op": 25,
-      "port": 97
+      "port": 96
     },
     "byArea": {
       "ai": 58,
@@ -11116,7 +11116,7 @@
       "id": "chord.next-entry-point",
       "area": "chord",
       "phase": 4,
-      "status": "port",
+      "status": "ported-with-deferral",
       "changelog": [
         "chord@1.5.0/Added#2",
         "chord@1.5.0/Added#6"
@@ -11136,7 +11136,28 @@
       "pulledInBy": [
         "durable.store-storage"
       ],
-      "notes": "Upstream builds v2 slice by slice: 1 to 8, 7a to 7c and 10 exist at v1.5.0, while 9 (telemetry) and 11 (web and TUI) are still to come, so the port tracks a moving API. The new APIs carry [Experimental] (0013). The internal adapter surface is what Durable's StoreStorage uses (durable@1.5.0/Added#1, group E), which puts chord.next-store, chord.next-documents-state and the column helpers of chord.next-contracts-data on phase 4's path. Phase 4 ports these now, under [Experimental] in src/PiSharp.Chord (decision 0013, Durable), and phase 6 follows the API as it moves."
+      "notes": "Upstream builds v2 slice by slice: 1 to 8, 7a to 7c and 10 exist at v1.5.0, while 9 (telemetry) and 11 (web and TUI) are still to come, so the port tracks a moving API. The new APIs carry [Experimental] (0013). The internal adapter surface is what Durable's StoreStorage uses (durable@1.5.0/Added#1, group E), which puts chord.next-store, chord.next-documents-state and the column helpers of chord.next-contracts-data on phase 4's path. Phase 4 ports these now, under [Experimental] in src/PiSharp.Chord (decision 0013, Durable), and phase 6 follows the API as it moves.",
+      "evidence": {
+        "commits": [
+          "3d081163",
+          "41ab14b8",
+          "e56cd5f6"
+        ],
+        "tests": [
+          "tests/PiSharp.Chord.Tests/NextCases.cs: next.index.is-the-experimental-chord-next-entry-point",
+          "tests/PiSharp.Chord.Tests/NextCases.cs: next.index.references-pisharp-contracts-and-no-durable-project",
+          "tests/PiSharp.Chord.Tests/Contracts/DeclareCases.cs: contracts.declare.accept-a-remote-and-a-local-declaration",
+          "tests/PiSharp.Chord.Tests/Contracts/DeclareCases.cs: contracts.declare.pins-the-fingerprint-of-upstream-fingerprint-test-notes",
+          "tests/PiSharp.Chord.Tests/Contracts/DeclareCases.cs: contracts.declare.pins-the-schema-switch-contract-fingerprints-and-normal-forms",
+          "tests/PiSharp.Chord.Tests/Contracts/DeclareCases.cs: contracts.declare.fingerprints-hash-javascripts-json-text",
+          "tests/PiSharp.Chord.Tests/Contracts/DeclareCases.cs: contracts.declare.d11-refuses-a-method-with-different-signatures-in-two-variants",
+          "tests/PiSharp.Chord.Tests/Contracts/ContractCases.cs: contracts.contract.handles-are-branded-spread-and-hand-built-copies-are-refused",
+          "tests/PiSharp.Chord.Tests/Contracts/HostKindCases.cs: contracts.host-kind.make-addresses-the-kind-the-params-and-a-key-built-like-an-identity-key",
+          "tests/PiSharp.Chord.Tests/Contracts/ParamsCases.cs: contracts.params.refuses-optional-fields-at-declaration",
+          "tests/PiSharp.Chord.Tests/Contracts/SchemaCases.cs: contracts.schema.bytes-checks-the-type-and-the-length-bounds"
+        ]
+      },
+      "deferred": "The entry point (src/PiSharp.Chord, PiSharp.Chord.ChordNext, experimental PISHARP_CHORD001, not packable) and its contracts layer are ported with their tests. The other layers @earendil-works/chord/next exports come with later areas: data, state, documents, registries and the store with the cv2-*, store-storage and registry-reader areas; hosts, jobs, links and relays in phase 6. Contract evolution and checkAccepts come with cv2-evolve. Of support.ts, the GC check and the slice declarations are ported; its counters, watch frames, store helpers, NotesDoc, rejection helpers and createHost/link helpers come with the first area whose tests use them (ChordSupport.cs's header lists them)."
     },
     {
       "id": "chord.next-contracts-data",
