@@ -2779,7 +2779,10 @@
         "watch-folding"
       ],
       "commits": [
-        "8b0caefc2"
+        "8b0caefc2",
+        "65d03d13",
+        "317fe41a",
+        "ec11d00c"
       ],
       "notes": "No synchronous observer API today; PiSharp's watches sit on Observation.cs's source attachments. In .NET 'no awaits' means a callback that returns; a Task-returning advance that faults counts as rejected. Chord's self.follow, which the close-as-failed rule serves, is group F (phase 6). 8b0caefc2 also publishes commits at adoption inside Storage.commit's adopt callback, which PiSharp never had: area publication-caches ports the final publication order instead (its session-adoption cases). Session/Observation.cs was deleted by area watches (2cce573d); its committed-state observers are Chord's Watch (Chord/Watch.cs) and the view and task graph observers, so this area no longer edits it."
     },
