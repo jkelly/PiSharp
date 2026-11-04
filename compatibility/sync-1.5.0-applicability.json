@@ -8086,7 +8086,7 @@
         "src/PiSharp.Durable/Storage/ (new)"
       ],
       "release": "1.5.0",
-      "notes": "Blocked on Chord v2's store (chord@1.5.0/Added#1 and Added#2, group F), which decision 0013 puts in phase 6 (1.5.0.x). The owner decides whether this row moves to 1.5.0.x with Chord or phase 6's store is pulled forward; until then PiSharp 1.5.0 cannot claim it. Depends on durable.storage-commit-batches."
+      "notes": "Blocked on Chord v2's store (chord@1.5.0/Added#1 and Added#2, group F), which phase 4 ports with the parts of Chord v2 durable needs (decision 0013, Durable: src/PiSharp.Chord, with StoreStorage in the src/PiSharp.Durable.Store adapter). Depends on durable.storage-commit-batches."
     },
     {
       "id": "durable.durable-sleep",
@@ -9806,7 +9806,7 @@
         "src/PiSharp.Durable/Harness/ (new)"
       ],
       "release": "1.5.0",
-      "notes": "Blocked on Chord v2 registries (chord@1.5.0/Added#3, group F), which decision 0013 puts in phase 6 (1.5.0.x). PiSharp's IRegistryReader (Harness/Types.cs) and Registry.cs need no other change. The owner decides whether this row moves to 1.5.0.x with Chord, as for durable.store-storage."
+      "notes": "Blocked on Chord v2 registries (chord@1.5.0/Added#3, group F), which phase 4 ports with the parts of Chord v2 durable needs (decision 0013, Durable). PiSharp's IRegistryReader (Harness/Types.cs) and Registry.cs need no other change."
     },
     {
       "id": "durable.upstream-tests",
@@ -10876,7 +10876,7 @@
       "pulledInBy": [
         "durable.store-storage"
       ],
-      "notes": "Upstream builds v2 slice by slice: 1 to 8, 7a to 7c and 10 exist at v1.5.0, while 9 (telemetry) and 11 (web and TUI) are still to come, so the port tracks a moving API. The new APIs carry [Experimental] (0013). The internal adapter surface is what Durable's StoreStorage uses (durable@1.5.0/Added#1, group E), which puts chord.next-store, chord.next-documents-state and the column helpers of chord.next-contracts-data on phase 4's path. The owner decides whether to port v2 now or after upstream gives it a stable entry point."
+      "notes": "Upstream builds v2 slice by slice: 1 to 8, 7a to 7c and 10 exist at v1.5.0, while 9 (telemetry) and 11 (web and TUI) are still to come, so the port tracks a moving API. The new APIs carry [Experimental] (0013). The internal adapter surface is what Durable's StoreStorage uses (durable@1.5.0/Added#1, group E), which puts chord.next-store, chord.next-documents-state and the column helpers of chord.next-contracts-data on phase 4's path. Phase 4 ports these now, under [Experimental] in src/PiSharp.Chord (decision 0013, Durable), and phase 6 follows the API as it moves."
     },
     {
       "id": "chord.next-contracts-data",
