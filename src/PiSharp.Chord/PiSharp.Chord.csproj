@@ -12,6 +12,8 @@
   <ItemGroup>
     <!-- Upstream's tests import each layer's internal.ts; the suite reaches the same surface. -->
     <InternalsVisibleTo Include="PiSharp.Chord.Tests" />
+    <!-- The StoreStorage cases (area store-storage) attach a hand-built host's batch, as upstream's attach their createHost (phase 6). -->
+    <InternalsVisibleTo Include="PiSharp.Durable.Tests" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../PiSharp.Contracts/PiSharp.Contracts.csproj" />

@@ -18,8 +18,10 @@ public interface IClaimant
     string Label { get; }
 }
 
-/// <summary>A store's claims, by key; one claimant per key (upstream <c>Claims</c>).</summary>
-internal sealed class Claims
+/// <summary>A store's claims, by key; one claimant per key (upstream <c>Claims</c>). Public as far as upstream's <c>ChordStore.claims</c>
+/// serves adapters (Durable's StoreStorage claims its document namespaces and releases them at close): <see cref="Documents"/> and
+/// <see cref="Release"/>; tables are claimed through <see cref="StoreOwnerTables.Declare"/>.</summary>
+public sealed class Claims
 {
     private readonly Dictionary<string, IClaimant> holders = new(StringComparer.Ordinal);
     private readonly Dictionary<IClaimant, List<string>> keys = new(ReferenceEqualityComparer.Instance);
@@ -35,7 +37,7 @@ internal sealed class Claims
 
     /// <summary>Claims the documents of <paramref name="owner"/> in <paramref name="namespace"/> for <paramref name="claimant"/>; held by
     /// another: <c>invalid/args</c>.</summary>
-    internal void Documents(string owner, string @namespace, IClaimant claimant) => Claim(DocumentsKey(owner, @namespace), claimant);
+    public void Documents(string owner, string @namespace, IClaimant claimant) => Claim(DocumentsKey(owner, @namespace), claimant);
 
     /// <summary>Throws as <see cref="Table"/> would for <paramref name="claimant"/>, claiming nothing (a reload's staging checks its
     /// declarations).</summary>
@@ -52,8 +54,9 @@ internal sealed class Claims
     }
 
     /// <summary>Releases every claim <paramref name="claimant"/> holds.</summary>
-    internal void Release(IClaimant claimant)
+    public void Release(IClaimant claimant)
     {
+        ArgumentNullException.ThrowIfNull(claimant);
         if (keys.Remove(claimant, out var held))
         {
             foreach (var key in held) holders.Remove(key);

@@ -34,8 +34,9 @@ internal interface IDelivered
 }
 
 /// <summary>A host's batch (upstream <c>Batch</c>): the reentrancy flag, the watched sources a commit changed, and where background errors
-/// go.</summary>
-internal sealed class Batch
+/// go. Public as far as upstream's <c>ChordStore.batch</c> serves adapters (Durable's StoreStorage publishes its commits in it):
+/// <see cref="Running"/> and <see cref="Within"/>; the rest is the host's.</summary>
+public sealed class Batch
 {
     private static readonly Action<Action> ThreadPoolSchedule = static work => ThreadPool.UnsafeQueueUserWorkItem(static run => run(), work, preferLocal: false);
 
@@ -59,7 +60,7 @@ internal sealed class Batch
     /// <param name="report">Gets what the batch reports (the host's <c>onError</c>).</param>
     /// <param name="metrics">The host's metrics, which <see cref="Count"/> counts on; null counts nothing.</param>
     /// <param name="schedule">Runs work later, never inline (upstream <c>queueMicrotask</c>); by default the thread pool.</param>
-    public Batch(Action<BatchError> report, ITelemetryMetrics? metrics, Action<Action>? schedule = null)
+    internal Batch(Action<BatchError> report, ITelemetryMetrics? metrics, Action<Action>? schedule = null)
     {
         ArgumentNullException.ThrowIfNull(report);
         this.report = report;
@@ -69,17 +70,17 @@ internal sealed class Batch
     }
 
     /// <summary>Reports a throwing watch listener's error (to the host's <c>onError</c>); what watches get as their <c>report</c>.</summary>
-    public Action<Exception> ReportListener { get; }
+    internal Action<Exception> ReportListener { get; }
 
     /// <summary>The host's scheduler: the watches made on this batch deliver through it, and <see cref="Soon"/> commits through it.</summary>
-    public Action<Action> Schedule { get; }
+    internal Action<Action> Schedule { get; }
 
     /// <summary>Whether a commit's adoption, a delivery or a derive compute runs now: a change made now lands in this batch.</summary>
     public bool Running => running;
 
     /// <summary>Throws <c>invalid/reentrant</c> inside the batch: <paramref name="operation"/> may not run during adoptions or derive
     /// computes.</summary>
-    public void AssertOutside(string operation)
+    internal void AssertOutside(string operation)
     {
         if (running) throw DataInternal.Invalid("reentrant", $"{operation} inside a commit or a derive compute");
     }
@@ -88,14 +89,14 @@ internal sealed class Batch
     /// Throws <c>invalid/reentrant</c> inside a pure compute (a derive's, a registry's <c>compose</c>): <paramref name="operation"/> would
     /// change a source while one is computed from it. Changes inside an adoption are fine (they land in its batch).
     /// </summary>
-    public void AssertNotComputing(string operation)
+    internal void AssertNotComputing(string operation)
     {
         if (computing) throw DataInternal.Invalid("reentrant", $"{operation} inside a derive compute or a compose");
     }
 
     /// <summary>Runs the pure compute <paramref name="work"/> (<see cref="Run{T}"/>, and changes refused: <see cref="AssertNotComputing"/>);
     /// nests.</summary>
-    public T Compute<T>(Func<T> work)
+    internal T Compute<T>(Func<T> work)
     {
         var wasRunning = running;
         var wasComputing = computing;
@@ -113,7 +114,7 @@ internal sealed class Batch
     }
 
     /// <summary>Runs <paramref name="work"/> with reentrant calls refused; nests (a derive compute inside a commit).</summary>
-    public T Run<T>(Func<T> work)
+    internal T Run<T>(Func<T> work)
     {
         var outer = running;
         running = true;
@@ -132,7 +133,7 @@ internal sealed class Batch
     /// recompute through their reads), then runs the flushes the deliveries listed. A delivery or flush that throws is reported; the others
     /// still run. What <see cref="Within"/> deferred while the flushes sent runs as the next commit, right after.
     /// </summary>
-    public void Commit(Action adopt, ChordContext context)
+    internal void Commit(Action adopt, ChordContext context)
     {
         ArgumentNullException.ThrowIfNull(adopt);
         ArgumentNullException.ThrowIfNull(context);
@@ -198,7 +199,7 @@ internal sealed class Batch
     /// Runs <paramref name="adopt"/> in one commit the scheduler runs next, together with every other <see cref="Soon"/> until then
     /// (changes arriving outside any commit: one batch for all of them). <paramref name="context"/> is the first one's.
     /// </summary>
-    public void Soon(Action adopt, ChordContext context)
+    internal void Soon(Action adopt, ChordContext context)
     {
         if (soon is not null)
         {
@@ -218,13 +219,13 @@ internal sealed class Batch
     }
 
     /// <summary>Lists a watched source the current commit changed.</summary>
-    public void Changed(IDelivered source) => changed.Add(source);
+    internal void Changed(IDelivered source) => changed.Add(source);
 
     /// <summary>Lists <paramref name="flush"/> to run at the end of the current commit, after its deliveries.</summary>
-    public void Flushing(Action<ChordContext> flush) => flushes.Add(flush);
+    internal void Flushing(Action<ChordContext> flush) => flushes.Add(flush);
 
     /// <summary>Counts one unit of derive or registry work on the host's metrics (<c>chord.derive.computes</c>, <c>chord.derive.diffs</c>,
     /// <c>chord.registry.composes</c>, <c>chord.registry.adapts</c>, <c>chord.contract.adapts</c>; a lazy read has no context to count
     /// through).</summary>
-    public void Count(string counter) => metrics?.Counter(counter).Add(1);
+    internal void Count(string counter) => metrics?.Counter(counter).Add(1);
 }

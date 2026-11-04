@@ -64,7 +64,8 @@ function sourcePlan(path) {
   else if (parts[0] === 'session') [phase, project, dir] = ['P3', 'PiSharp.Durable', 'Session'];
   else if (parts[0] === 'storage' && parts.length > 2 && parts[1] === 'sqlite') [phase, project, dir] = ['P5', 'PiSharp.Durable.Sqlite', ''];
   else if (parts[0] === 'storage' && parts.length > 2 && parts[1] === 'jsonl') [phase, project, dir] = ['P4', 'PiSharp.Durable', 'Storage/Jsonl'];
-  else if (parts[0] === 'storage' && parts.length > 2 && parts[1] === 'store') [phase, project, dir] = ['P2', 'PiSharp.Durable', 'Storage/Store'];
+  // Area store-storage: StoreStorage needs Chord v2 types, so it is the adapter project PiSharp.Durable.Store (decision 0013, phase 4).
+  else if (parts[0] === 'storage' && parts.length > 2 && parts[1] === 'store') [phase, project, dir] = ['P2', 'PiSharp.Durable.Store', ''];
   else if (parts[0] === 'storage') [phase, project, dir] = ['P2', 'PiSharp.Durable', 'Storage'];
   else if (parts[0] === 'env' && base === 'index') [phase, project, dir] = ['P4', 'PiSharp.Durable', 'Env'];
   else if (parts[0] === 'env') [phase, project, dir] = ['P9', 'PiSharp.Durable.Tools', 'Env'];

@@ -11,7 +11,8 @@
 // ahead of it, as a promise's then does), and the catalog is replaced, never changed in place, after a COMMIT. Upstream's Store interface
 // is IStore (also IAsyncDisposable, C#'s form of a resource the app owns and closes); its export(context) is Export, whose StoreExport and
 // the parts it reads are in Export.cs (area cv2-store-archive, which added it here). ChordStore's members whose types are internal here
-// (TableRecord, CommitFence, Claims, Batch) are internal: table(), tables, commit(), claims, batch, attach() and replay(); its error for a
+// (TableRecord, CommitFence, Attachment) are internal: table(), tables, commit(), attach() and replay(); claims and batch are public, for
+// adapters (area store-storage: Durable's StoreStorage in PiSharp.Durable.Store), with only the members they use public. Its error for a
 // seq past the safe range is an InvalidOperationException, and a close's abort is the context's OperationCanceledException (upstream's
 // awaitWithContext rejects with the signal's reason).
 using PiSharp.Chord.Data;
@@ -189,10 +190,10 @@ public sealed class ChordStore : IStore, IChordStore
     public IdAllocator Ids { get; }
 
     /// <summary>The claims of its tables and documents (slice 6b).</summary>
-    internal Claims Claims { get; } = new();
+    public Claims Claims { get; } = new();
 
     /// <summary>The open host's batch, in which an adapter publishes its commits; null without a host.</summary>
-    internal Batch? Batch
+    public Batch? Batch
     {
         get
         {

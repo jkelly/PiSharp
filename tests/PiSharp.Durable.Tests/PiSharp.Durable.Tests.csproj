@@ -1,11 +1,15 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>Exe</OutputType>
-    <NoWarn>$(NoWarn);PISHARP_DURABLE001;PISHARP_MEDIA001;PISHARP_TIERS001</NoWarn>
+    <NoWarn>$(NoWarn);PISHARP_DURABLE001;PISHARP_MEDIA001;PISHARP_TIERS001;PISHARP_CHORD001</NoWarn>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../../src/PiSharp.Durable/PiSharp.Durable.csproj" />
     <ProjectReference Include="../../src/PiSharp.Durable.Sqlite/PiSharp.Durable.Sqlite.csproj" />
+    <!-- Area store-storage: Durable on Chord v2's store (StoreStorage*.cs); the cases attach a hand-built host batch through PiSharp.Chord's
+         internals. Neither project is packable, nor is this one. -->
+    <ProjectReference Include="../../src/PiSharp.Durable.Store/PiSharp.Durable.Store.csproj" />
+    <ProjectReference Include="../../src/PiSharp.Chord/PiSharp.Chord.csproj" />
     <!-- Decision 0007: the storage.mssql.* groups (Storage/SqlServerStorageCases.cs). -->
     <ProjectReference Include="../../src/PiSharp.Durable.MSSQL/PiSharp.Durable.MSSQL.csproj" />
     <ProjectReference Include="../../src/PiSharp.Durable.Tools/PiSharp.Durable.Tools.csproj" />

@@ -26,11 +26,11 @@ internal static partial class Program
             var one = new BenchOptions(0, 1, 0, 0);
             var output = new StringWriter();
             var results = await StorageBench.RunAsync(new StorageBenchOptions { Scale = tiny, Read = one, Write = one, Reopen = one, TempRoot = root }, output);
-            // 12 read and 3 write scenarios on three backends, and reopen on the two persistent ones.
-            Equal(12 * 3 + 3 * 3 + 2, results.Count, "storage benchmark results");
+            // 12 read and 3 write scenarios on four backends (the store's since area store-storage), and reopen on the three persistent ones.
+            Equal(12 * 4 + 3 * 4 + 3, results.Count, "storage benchmark results");
             Check(results.All(result => result.Samples == 1), "one sample each");
 
-            foreach (var backend in new[] { BenchBackend.Memory, BenchBackend.Sqlite, BenchBackend.Jsonl })
+            foreach (var backend in new[] { BenchBackend.Memory, BenchBackend.Sqlite, BenchBackend.Store, BenchBackend.Jsonl })
             {
                 var footprint = await StorageMemory.RunWorkerAsync(backend, tiny, root);
                 Equal(StorageBench.Name(backend), footprint.Backend, "footprint backend");
