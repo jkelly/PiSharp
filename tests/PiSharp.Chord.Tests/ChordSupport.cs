@@ -23,9 +23,10 @@ using static PiSharp.Chord.Contracts.Schemas;
 // Equal<A, B> is a type-level check with no C# counterpart. The rest needs layers later areas bring, and each comes with the first area
 // whose tests use it: exported and countInflated (export and import, area cv2-store-archive), the remaining declarations (NotesDoc; the
 // documents areas), and the hosts, links, relays and raw peers (failLive, restartable,
-// storeRestartable, loaded, loadedPlugins, fakeTimers, flushed, failures, linked, RawPeer, partValue, CODECS, forEachCodec, rawLinked,
+// storeRestartable, loaded, loadedPlugins, failures, linked, RawPeer, partValue, CODECS, forEachCodec, rawLinked,
 // transported, serveNotes, addNote, rawProvider, rawParent, statesOf, EDITOR, bindNext, bindHold, instancesOf, relayed, rawWorkers,
-// incarnationOf, settledHeap), which build on createHost and the link layer (phase 6).
+// incarnationOf, settledHeap), which build on createHost and the link layer (phase 6). Area cv2-documents-core ported fakeTimers and
+// flushed, a TimeProvider and a short delay (FakeTimers.cs).
 internal static class ChordSupport
 {
     /// <summary>Expects every referent to be collected once nothing else holds it (upstream runs gc() between macrotasks).</summary>

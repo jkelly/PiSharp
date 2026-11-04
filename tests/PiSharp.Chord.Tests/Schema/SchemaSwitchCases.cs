@@ -6,9 +6,9 @@ using System.Text.Json.Nodes;
 // from TypeBox to pi-schema: the same declarations give byte-identical fingerprints and normal forms, and data stored by the code before
 // the switch loads after it. recorded.json and stored/ (store.db, archive.jsonl) are upstream's files, read as test input, not captures:
 // Fixtures/schema holds them byte for byte (their own .gitattributes keeps git from touching their line endings), and the first case pins
-// their git blob ids at the pinned commit. The fingerprint case compares the contracts and the profile's normal form; documents' and
-// tables' fingerprints, the job's and "stored data" (storedReads: a host reading stored/store.db and an import of stored/archive.jsonl)
-// wait for the layers they need (Proofs.cs). write-stored.ts, which wrote stored/ with the TypeBox helpers, is not ported: the fixtures
+// their git blob ids at the pinned commit. The fingerprint case compares the contracts and the documents (the profile's fingerprint and
+// normal form, the notes' and importState's fingerprints); tables' fingerprints, the job's and "stored data" (storedReads: a host reading
+// stored/store.db and an import of stored/archive.jsonl) wait for the layers they need (Proofs.cs). write-stored.ts, which wrote stored/ with the TypeBox helpers, is not ported: the fixtures
 // are kept as upstream wrote them and never rewritten (decision 0013).
 internal static partial class Program
 {
@@ -42,12 +42,13 @@ internal static partial class Program
         }),
         Case("schema.schema-switch.keeps-every-fingerprint-and-normal-form-of-contracts", () =>
         {
-            // fingerprints() toEqual recorded.fingerprints, for the parts ported so far: the contracts and the profile's normal form.
+            // fingerprints() toEqual recorded.fingerprints, for the parts ported so far: the contracts and the documents.
             var recorded = SchemaRecorded()["fingerprints"]!;
             var fingerprints = SchemaProofs.Fingerprints();
             Json(recorded["contracts"]!.ToJsonString(), fingerprints["contracts"], "the contracts");
-            Json(recorded["documents"]!["profile"]!["normal"]!.ToJsonString(), fingerprints["documents"]!["profile"]!["normal"], "the profile's normal form");
+            Json(recorded["documents"]!.ToJsonString(), fingerprints["documents"], "the documents");
             Sequence(["everything", "account", "owner"], Keys(recorded["contracts"]), "recorded.json's contracts");
+            Sequence(["profile", "notes", "importState"], Keys(recorded["documents"]), "recorded.json's documents");
         }),
     ];
 }
