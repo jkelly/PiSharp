@@ -288,7 +288,7 @@ internal static class ToolSearchTests
 
         // Upstream c7372af42's example (#11331): the search text no longer repeats the name, which the ranker weighs as a field of its own,
         // and a query that is exactly a tool's name loads that tool, not the one that mentions its words more.
-        yield return Case(prefix + "search.loads-the-tool-the-query-names", async () =>
+        yield return Case("tool-search.search.loads-the-tool-the-query-names", async () =>
         {
             var chat = ChatTests.Setup();
             AddTool(chat.Registry, Tool("mcp__app__queue_read", "Read a queued message of this thread.", tool => tool with { Deferred = true }));
@@ -338,7 +338,7 @@ internal static class ToolSearchTests
             }
         });
 
-        yield return Case(prefix + "ranking-differential.rank-fields", () =>
+        yield return Case("tool-search.ranking-differential.rank-fields", () =>
         {
             AwaitDurableResync();
             var next = Random(4);

@@ -19,7 +19,7 @@ using static SessionTests;
 
 internal static partial class Program
 {
-    private static IEnumerable<(string, Func<Task>)> SearchCases() => SearchTests.Cases("search.");
+    private static IEnumerable<(string, Func<Task>)> SearchCases() => SearchTests.Cases();
 }
 
 /// <summary>The search.* cases (upstream search.test.ts, and the authored cases of the file header).</summary>
@@ -28,28 +28,28 @@ internal static class SearchTests
     private static SearchDocument Doc(string name, string text, string? namespaceText = null) =>
         namespaceText is null ? new(name, text) : new(name, text, namespaceText);
 
-    private static readonly (string Script, string Text, string[] Words)[] UnicodeWords =
+    private static readonly (string Id, string Text, string[] Words)[] UnicodeWords =
     [
-        ("chinese", "搜索仓库问题", ["搜索", "仓库", "问题"]),
-        ("japanese", "文書を検索", ["文書", "を", "検索"]),
-        ("korean", "문서 검색", ["문서", "검색"]),
-        ("thai", "ค้นหาเอกสาร", ["ค้นหา", "เอกสาร"]),
-        ("russian", "Поиск документов", ["поиск", "документов"]),
-        ("arabic", "البحث عن الملفات", ["البحث", "عن", "الملفات"]),
-        ("hindi", "फ़ाइल खोजें", ["फ़ाइल", "खोजें"]),
-        ("french", "Éléments cafés", ["éléments", "cafés"]),
+        ("search.tokenize.segments-unicode-words-in-chinese", "搜索仓库问题", ["搜索", "仓库", "问题"]),
+        ("search.tokenize.segments-unicode-words-in-japanese", "文書を検索", ["文書", "を", "検索"]),
+        ("search.tokenize.segments-unicode-words-in-korean", "문서 검색", ["문서", "검색"]),
+        ("search.tokenize.segments-unicode-words-in-thai", "ค้นหาเอกสาร", ["ค้นหา", "เอกสาร"]),
+        ("search.tokenize.segments-unicode-words-in-russian", "Поиск документов", ["поиск", "документов"]),
+        ("search.tokenize.segments-unicode-words-in-arabic", "البحث عن الملفات", ["البحث", "عن", "الملفات"]),
+        ("search.tokenize.segments-unicode-words-in-hindi", "फ़ाइल खोजें", ["फ़ाइल", "खोजें"]),
+        ("search.tokenize.segments-unicode-words-in-french", "Éléments cafés", ["éléments", "cafés"]),
     ];
 
-    private static readonly (string Script, string Text, string Query)[] UnicodeQueries =
+    private static readonly (string Id, string Text, string Query)[] UnicodeQueries =
     [
-        ("chinese", "搜索仓库问题", "问题"),
-        ("japanese", "文書を検索", "検索"),
-        ("korean", "문서 검색", "검색"),
-        ("thai", "ค้นหาเอกสาร", "เอกสาร"),
-        ("russian", "Поиск документов", "документов"),
-        ("arabic", "البحث عن الملفات", "الملفات"),
-        ("hindi", "फ़ाइल खोजें", "खोजें"),
-        ("french", "Rechercher un café", "cafe\u0301"),
+        ("search.rank-documents.matches-unicode-queries-against-chinese", "搜索仓库问题", "问题"),
+        ("search.rank-documents.matches-unicode-queries-against-japanese", "文書を検索", "検索"),
+        ("search.rank-documents.matches-unicode-queries-against-korean", "문서 검색", "검색"),
+        ("search.rank-documents.matches-unicode-queries-against-thai", "ค้นหาเอกสาร", "เอกสาร"),
+        ("search.rank-documents.matches-unicode-queries-against-russian", "Поиск документов", "документов"),
+        ("search.rank-documents.matches-unicode-queries-against-arabic", "البحث عن الملفات", "الملفات"),
+        ("search.rank-documents.matches-unicode-queries-against-hindi", "फ़ाइल खोजें", "खोजें"),
+        ("search.rank-documents.matches-unicode-queries-against-french", "Rechercher un café", "cafe\u0301"),
     ];
 
     private static readonly SearchDocument[] Documents =
@@ -60,32 +60,32 @@ internal static class SearchTests
         Doc("mcp__docs__search", "Search the documentation."),
     ];
 
-    internal static IEnumerable<(string, Func<Task>)> Cases(string prefix)
+    internal static IEnumerable<(string, Func<Task>)> Cases()
     {
         // ─── tokenize ───────────────────────────────────────────────────────
 
-        yield return Case(prefix + "tokenize.splits-camelcase-and-snake-case-drops-stop-words-and-folds-plurals", () =>
+        yield return Case("search.tokenize.splits-camelcase-and-snake-case-drops-stop-words-and-folds-plurals", () =>
         {
             Seq(["list", "issue", "git", "hub", "repo"], Search.Tokenize("listIssues for the GitHub_repo"), "listIssues for the GitHub_repo");
             Seq(["search", "query", "http", "server"], Search.Tokenize("searches queries HTTPServer"), "searches queries HTTPServer");
             Seq(["repo", "issue", "search", "query"], Search.Tokenize("repo.issues/search:queries"), "repo.issues/search:queries");
         });
 
-        foreach (var (script, text, words) in UnicodeWords)
-            yield return Case(prefix + "tokenize.segments-unicode-words-in-" + script, () => Seq(words, Search.Tokenize(text), text));
+        foreach (var (id, text, words) in UnicodeWords)
+            yield return Case(id, () => Seq(words, Search.Tokenize(text), text));
 
-        yield return Case(prefix + "tokenize.preserves-non-ascii-words-and-splits-mixed-language-identifiers", () =>
+        yield return Case("search.tokenize.preserves-non-ascii-words-and-splits-mixed-language-identifiers", () =>
             Seq(["搜索", "git", "hub", "repo", "issue", "résumé", "cafés"], Search.Tokenize("搜索GitHub_repoIssues résumé cafés"), "mixed"));
 
-        yield return Case(prefix + "tokenize.normalizes-canonically-equivalent-unicode-text", () =>
+        yield return Case("search.tokenize.normalizes-canonically-equivalent-unicode-text", () =>
             Seq(["café", "café"], Search.Tokenize("CAFÉ cafe\u0301"), "CAFÉ cafe + U+0301"));
 
-        yield return Case(prefix + "tokenize.ignores-whitespace-punctuation-and-emoji", () =>
+        yield return Case("search.tokenize.ignores-whitespace-punctuation-and-emoji", () =>
             Seq([], Search.Tokenize(" \t，。!? \U0001F600 "), "whitespace, punctuation and emoji"));
 
         // ─── rankDocuments ──────────────────────────────────────────────────
 
-        yield return Case(prefix + "rank-documents.ranks-by-term-relevance-and-respects-the-limit", () =>
+        yield return Case("search.rank-documents.ranks-by-term-relevance-and-respects-the-limit", () =>
         {
             Seq(["mcp__linear__search_issues", "mcp__github__list_issues"], Search.RankDocuments("issue", Documents, 8), "issue");
             Equal("mcp__github__create_pull_request", Search.RankDocuments("pull requests", Documents, 8)[0], "pull requests");
@@ -93,25 +93,25 @@ internal static class SearchTests
             Seq(["mcp__github__list_issues"], Search.RankDocuments("closed", Documents, 8), "closed");
         });
 
-        foreach (var (script, text, query) in UnicodeQueries)
-            yield return Case(prefix + "rank-documents.matches-unicode-queries-against-" + script, () =>
+        foreach (var (id, text, query) in UnicodeQueries)
+            yield return Case(id, () =>
                 Seq(["localized"], Search.RankDocuments(query, [.. Documents, Doc("localized", text)], 8), $"{query} against {text}"));
 
-        yield return Case(prefix + "rank-documents.returns-nothing-for-unknown-or-empty-queries", () =>
+        yield return Case("search.rank-documents.returns-nothing-for-unknown-or-empty-queries", () =>
         {
             Seq([], Search.RankDocuments("kubernetes", Documents, 8), "kubernetes");
             Seq([], Search.RankDocuments("the", Documents, 8), "the");
             Seq([], Search.RankDocuments("未知", Documents, 8), "未知");
         });
 
-        yield return Case(prefix + "rank-documents.searches-the-namespace-text", () =>
+        yield return Case("search.rank-documents.searches-the-namespace-text", () =>
         {
             SearchDocument[] namespaced = [Doc("mcp__x__run", "Run it.", "mcp__x Kubernetes cluster tools")];
             Seq(["mcp__x__run"], Search.RankDocuments("kubernetes", namespaced, 8), "kubernetes");
         });
 
         // https://github.com/earendil-works/pi/issues/11331
-        yield return Case(prefix + "rank-documents.ranks-a-tool-first-when-the-query-is-its-name", () =>
+        yield return Case("search.rank-documents.ranks-a-tool-first-when-the-query-is-its-name", () =>
         {
             SearchDocument[] named =
             [
@@ -126,7 +126,7 @@ internal static class SearchTests
         });
 
         // https://github.com/earendil-works/pi/issues/11331
-        yield return Case(prefix + "rank-documents.ranks-a-name-match-above-mentions-in-descriptions", () =>
+        yield return Case("search.rank-documents.ranks-a-name-match-above-mentions-in-descriptions", () =>
         {
             SearchDocument[] ci =
             [
@@ -138,7 +138,7 @@ internal static class SearchTests
         });
 
         // https://github.com/earendil-works/pi/issues/11331
-        yield return Case(prefix + "rank-documents.ranks-a-tool-first-when-the-query-contains-its-whole-name", () =>
+        yield return Case("search.rank-documents.ranks-a-tool-first-when-the-query-contains-its-whole-name", () =>
         {
             const string peekaboo = "mcp__peekaboo Peekaboo controls macOS apps by app name.";
             SearchDocument[] named =
@@ -159,7 +159,7 @@ internal static class SearchTests
         });
 
         // https://github.com/earendil-works/pi/issues/11331
-        yield return Case(prefix + "rank-documents.ranks-a-tool-matching-more-query-terms-first-whatever-the-scores", () =>
+        yield return Case("search.rank-documents.ranks-a-tool-matching-more-query-terms-first-whatever-the-scores", () =>
         {
             SearchDocument[] peekaboo =
             [
@@ -177,7 +177,7 @@ internal static class SearchTests
 
         // ─── Authored: code mode's searchTools() (see the file header) ──────
 
-        yield return Case(prefix + "code-mode.search-tools-searches-namespace-instructions-and-ranks-a-named-tool-first", async () =>
+        yield return Case("search.code-mode.search-tools-searches-namespace-instructions-and-ranks-a-named-tool-first", async () =>
         {
             var chat = new CodemodeTests.Chat([],
             [
