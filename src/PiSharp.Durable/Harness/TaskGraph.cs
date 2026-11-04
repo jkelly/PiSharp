@@ -17,8 +17,11 @@
 // Pi v1.5.0 sync (area watches, 92ab53602 and 42cb822f1): a task graph watch is Chord's Watch (Chord/Watch.cs) on the Session line's
 // scheduler, and the task graph state getter (Harness.taskGraph()) is removed.
 // Pi v1.5.0 sync (area deferred-commits, 6c2fd73b0): the graph observes the Session's commits as memory adopts them
-// (Session.ObserveCommits) and skips a held one, which changes conversation documents only. The citation stays on v1.2.0 until the file's
-// other areas land.
+// (Session.ObserveCommits) and skips a held one, which changes conversation documents only.
+// Pi v1.5.0 sync (area observers, 8b0caefc2 with v1.5.0's shapes): Harness.observeTaskGraph() attaches a host's Observer<T> to the mount
+// behind GuardedObserver<T> (ObserveAsync, upstream observe); the mount's observers are SyncObserver<TaskGraph>s, watches (WatchObserver<T>)
+// and guarded host observers, which a publication hands one value call. The Session's close ends a watch ended and a host observer failed
+// with "session closed" (CloseEnds). The citation stays on v1.2.0 until the file's other areas land.
 using System.Collections.Immutable;
 using PiSharp.Durable.Chord;
 using PiSharp.Durable.Chord.Delta;
@@ -264,18 +267,40 @@ internal sealed class TaskGraphView
                 mount = null;
             }
             if (current is null) return;
-            var failure = session.Failure;
-            foreach (var observer in current.Snapshot(gate)) Session.Contained(() => observer.End(Session.CloseEnd(failure)), session.Report);
+            var ends = CloseEnds.Of(session.Failure);
+            foreach (var observer in current.Snapshot(gate)) Session.Contained(() => observer.End(ends.For(observer.IsWatch)), session.Report);
         });
     }
 
-    /// <summary>A serialized watch of the graph, Chord's <see cref="Watch{T}"/>; cancelling <paramref name="context"/> ends it aborted
-    /// (upstream <c>watch</c>).</summary>
+    /// <summary>
+    /// Attaches a synchronous observer of the graph (<see cref="IHarness.ObserveTaskGraphAsync"/>), behind <see cref="GuardedObserver{T}"/>;
+    /// <paramref name="context"/> governs only the attachment (upstream <c>observe</c>).
+    /// </summary>
+    public async Task<Observation<TaskGraph>> ObserveAsync(Observer<TaskGraph> observer, DurableContext context)
+    {
+        TaskGraph? value = null;
+        var (guarded, _) = await AttachAsync((current, release) =>
+        {
+            value = current;
+            return new GuardedObserver<TaskGraph>(observer, release, (error, _) => session.Report(error));
+        }, context).ConfigureAwait(false);
+        if (context.IsCancellationRequested)
+        {
+            guarded.Detach();
+            context.ThrowIfCancellationRequested();
+        }
+        return new Observation<TaskGraph>(value!, guarded);
+    }
+
+    /// <summary>A serialized watch of the graph, Chord's <see cref="Watch{T}"/>, an observer of its mount; cancelling
+    /// <paramref name="context"/> ends it aborted (upstream <c>watch</c>).</summary>
     public async Task<IWatchHandle<TaskGraph>> WatchAsync(DurableContext context)
     {
-        var (watch, _) = await AttachAsync(
-            (value, release) => new Watch<TaskGraph>(value, release, session.Report, graph => graph.ToJson(), session.Defer), context)
+        var (observer, _) = await AttachAsync(
+            (value, release) => new WatchObserver<TaskGraph>(
+                new Watch<TaskGraph>(value, release, session.Report, graph => graph.ToJson(), session.Defer)), context)
             .ConfigureAwait(false);
+        var watch = observer.Watch;
         if (context.IsCancellationRequested)
         {
             watch.Abort();
@@ -285,14 +310,15 @@ internal sealed class TaskGraphView
         return watch;
     }
 
-    /// <summary>Registers a watch created from the current revision, atomically on the Session line (upstream <c>attach</c>).</summary>
-    private Task<(Watch<TaskGraph> Observer, Action Detach)> AttachAsync(Func<TaskGraph, Action, Watch<TaskGraph>> create, DurableContext context) =>
+    /// <summary>Registers an observer created from the current revision, atomically on the Session line (upstream <c>attach</c>).</summary>
+    private Task<(TObserver Observer, Action Detach)> AttachAsync<TObserver>(Func<TaskGraph, Action, TObserver> create, DurableContext context)
+        where TObserver : SyncObserver<TaskGraph> =>
         session.ReadOnLineAsync(async () =>
         {
             Mount? existing;
             lock (gate) existing = mount;
             var target = existing ?? await BuildAsync(context).ConfigureAwait(false);
-            Watch<TaskGraph>? registered = null;
+            SyncObserver<TaskGraph>? registered = null;
             void Detach()
             {
                 lock (gate)
@@ -437,10 +463,10 @@ internal sealed class TaskGraphView
         public TaskGraph Value { get; set; } = value;
         /// <summary>Upstream's <c>records</c>, in its Map order. Read and written on the Session line only.</summary>
         public OrderedDictionary<TaskId, BlockedSubject> Records { get; } = records;
-        /// <summary>In registration order; guarded by the view's lock.</summary>
-        public List<Watch<TaskGraph>> Observers { get; } = [];
+        /// <summary>Watches and guarded host observers, in registration order; guarded by the view's lock.</summary>
+        public List<SyncObserver<TaskGraph>> Observers { get; } = [];
 
-        public Watch<TaskGraph>[] Snapshot(Lock gate)
+        public SyncObserver<TaskGraph>[] Snapshot(Lock gate)
         {
             lock (gate) return [.. Observers];
         }

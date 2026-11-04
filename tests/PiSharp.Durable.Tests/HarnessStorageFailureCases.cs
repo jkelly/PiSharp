@@ -632,7 +632,7 @@ internal static class StorageFailureTests
         public override void Publication(ConversationView before, ConversationView after, System.Collections.Immutable.ImmutableArray<PiSharp.Durable.Chord.Delta.Op> ops,
             ObservedCommit publication, DurableContext context) => throw failure;
 
-        public override void End(Exception? failure) { }
+        public override void End(WatchEnd end) { }
     }
 
     private sealed record HeldRange(Deferred Entered, Task Release);

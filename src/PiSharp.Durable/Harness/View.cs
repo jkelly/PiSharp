@@ -14,8 +14,12 @@
 // Pi v1.5.0 sync (area watches, 92ab53602 and 42cb822f1): a view watch is Chord's Watch (Chord/Watch.cs) on the Session line's scheduler,
 // ViewObserver.closeSession is end(failure), and the view state getter (Conversation.viewState()) is removed.
 // Pi v1.5.0 sync (area deferred-commits, 6c2fd73b0): views observe the Session's commits as memory adopts them (Session.ObserveCommits),
-// deferred ones included, so a view shows a held partial or tool output at once. The citation stays on v1.2.0 until the file's other areas
-// land.
+// deferred ones included, so a view shows a held partial or tool output at once.
+// Pi v1.5.0 sync (area observers, 8b0caefc2 with v1.5.0's shapes): Harness.observeConversation() attaches a host's Observer<T> to a mount
+// behind GuardedObserver<T> (ObserveAsync, upstream observe); a mount's observers are SyncObserver<ConversationView>s, watches
+// (WatchObserver<T>), guarded host observers, and ViewObservers (the events stream, which keeps upstream 8b0caefc2's publication hook until
+// area events), and each publication hands all of them one value call. The Session's close ends a watch or a ViewObserver ended and a host
+// observer failed with "session closed" (CloseEnds). The citation stays on v1.2.0 until the file's other areas land.
 using System.Collections.Immutable;
 using PiSharp.Durable.Chord;
 using PiSharp.Durable.Chord.Delta;
@@ -78,27 +82,21 @@ public sealed class ConversationView
     public override string ToString() => ToJson().ToJson();
 }
 
-/// <summary>Receives each next revision of a mount, every publication, and the Session's close (upstream <c>ViewObserver</c>).</summary>
-internal abstract class ViewObserver
+/// <summary>
+/// A mount's observer that also gets every publication (upstream 8b0caefc2's <c>ViewObserver</c> with its <c>publication</c> hook): the
+/// events stream. Its next revisions come as one value call per publication that changed the mount, shared by every observer; the
+/// Session's close ends it as a watch (<c>ended</c>, or <c>failed</c> with the error that failed the Session).
+/// </summary>
+internal abstract class ViewObserver : SyncObserver<ConversationView>
 {
     /// <summary>A next revision and the mount's operations that produced it.</summary>
-    public virtual void Advance(ConversationView value, ImmutableArray<Op> ops, DurableContext context) { }
+    public override void Advance(WatchCall<ConversationView> call, DurableContext context) { }
 
     /// <summary>Every publication, after the mount took it; <paramref name="ops"/> are the mount's, possibly none.</summary>
     public virtual void Publication(ConversationView before, ConversationView after, ImmutableArray<Op> ops, ObservedCommit publication,
         DurableContext context) { }
 
-    /// <summary>The Session closed, or failed with <paramref name="failure"/> (upstream <c>end</c>).</summary>
-    public abstract void End(Exception? failure);
-}
-
-/// <summary>A view observer forwarding revisions to a view watch.</summary>
-internal sealed class WatchViewObserver(Watch<ConversationView> watch) : ViewObserver
-{
-    public override void Advance(ConversationView value, ImmutableArray<Op> ops, DurableContext context) =>
-        watch.Advance(new WatchValueCall<ConversationView>(value, ops), context);
-
-    public override void End(Exception? failure) => watch.End(Session.CloseEnd(failure));
+    public override bool IsWatch => true;
 }
 
 /// <summary>
@@ -138,9 +136,9 @@ internal sealed class ConversationViews
                 current = [.. mounts.Values];
                 mounts.Clear();
             }
-            var failure = session.Failure;
+            var ends = CloseEnds.Of(session.Failure);
             foreach (var mount in current)
-                foreach (var observer in mount.Snapshot(gate)) Session.Contained(() => observer.End(failure), Report);
+                foreach (var observer in mount.Snapshot(gate)) Session.Contained(() => observer.End(ends.For(observer.IsWatch)), Report);
         });
     }
 
@@ -154,14 +152,31 @@ internal sealed class ConversationViews
     public static ConversationViews Of(IHarness harness) =>
         harness is DurableHarness durable ? durable.Views : throw new ArgumentException("Not a Harness", nameof(harness));
 
-    /// <summary>A serialized watch of the view, Chord's <see cref="Watch{T}"/>; cancelling <paramref name="context"/> ends it aborted
-    /// (upstream <c>watch</c>).</summary>
+    /// <summary>
+    /// Attaches a synchronous observer of the view (<see cref="IHarness.ObserveConversationAsync"/>), behind
+    /// <see cref="GuardedObserver{T}"/>; <paramref name="context"/> governs only the attachment (upstream <c>observe</c>).
+    /// </summary>
+    public async Task<Observation<ConversationView>> ObserveAsync(ConversationId id, Observer<ConversationView> observer, DurableContext context)
+    {
+        var (value, guarded) = await AttachCoreAsync(id, (current, release, _) =>
+            Task.FromResult((current, new GuardedObserver<ConversationView>(observer, release, (error, _) => Report(error)))), context)
+            .ConfigureAwait(false);
+        if (context.IsCancellationRequested)
+        {
+            guarded.Detach();
+            context.ThrowIfCancellationRequested();
+        }
+        return new Observation<ConversationView>(value, guarded);
+    }
+
+    /// <summary>A serialized watch of the view, Chord's <see cref="Watch{T}"/>, an observer of its mount; cancelling
+    /// <paramref name="context"/> ends it aborted (upstream <c>watch</c>).</summary>
     public async Task<IWatchHandle<ConversationView>> WatchAsync(ConversationId id, DurableContext context)
     {
-        var (watch, _) = await AttachAsync(id, (value, release, _) =>
+        var (watch, _) = await AttachCoreAsync(id, (value, release, _) =>
         {
             var created = new Watch<ConversationView>(value, release, Report, view => view.ToJson(), Schedule);
-            return Task.FromResult((created, (ViewObserver)new WatchViewObserver(created)));
+            return Task.FromResult((created, new WatchObserver<ConversationView>(created)));
         }, context).ConfigureAwait(false);
         if (context.IsCancellationRequested)
         {
@@ -177,14 +192,31 @@ internal sealed class ConversationViews
     /// earlier (upstream <c>attach</c>). <paramref name="create"/> may read committed Storage, still on the line. The returned detach drops
     /// the observer, and the mount with its last observer.
     /// </summary>
-    public Task<(T Result, Action Detach)> AttachAsync<T>(ConversationId id,
-        Func<ConversationView, Action, IStorage, Task<(T Result, ViewObserver Observer)>> create, DurableContext context) =>
+    public async Task<(T Result, Action Detach)> AttachAsync<T>(ConversationId id,
+        Func<ConversationView, Action, IStorage, Task<(T Result, ViewObserver Observer)>> create, DurableContext context)
+    {
+        var (result, _, detach) = await AttachObserverAsync(id, create, context).ConfigureAwait(false);
+        return (result, detach);
+    }
+
+    /// <summary><see cref="AttachAsync"/> for the view's own observers, which keep what they attached.</summary>
+    private async Task<(T Result, TObserver Observer)> AttachCoreAsync<T, TObserver>(ConversationId id,
+        Func<ConversationView, Action, IStorage, Task<(T Result, TObserver Observer)>> create, DurableContext context)
+        where TObserver : SyncObserver<ConversationView>
+    {
+        var (result, observer, _) = await AttachObserverAsync(id, create, context).ConfigureAwait(false);
+        return (result, observer);
+    }
+
+    private Task<(T Result, TObserver Observer, Action Detach)> AttachObserverAsync<T, TObserver>(ConversationId id,
+        Func<ConversationView, Action, IStorage, Task<(T Result, TObserver Observer)>> create, DurableContext context)
+        where TObserver : SyncObserver<ConversationView> =>
         session.ReadOnLineAsync(async () =>
         {
             Mount? existing;
             lock (gate) mounts.TryGetValue(id, out existing);
             var mount = existing ?? await BuildAsync(id, context).ConfigureAwait(false);
-            ViewObserver? observer = null;
+            SyncObserver<ConversationView>? observer = null;
             void Detach()
             {
                 lock (gate)
@@ -201,9 +233,9 @@ internal sealed class ConversationViews
                 if (closed) throw HarnessUtil.ClosedError(session);
                 context.ThrowIfCancellationRequested();
                 mounts[id] = mount;
-                mount.Observers.Add(observer);
+                mount.Observers.Add(created);
             }
-            return (result, (Action)Detach);
+            return (result, created, (Action)Detach);
         });
 
     private async Task<Mount> BuildAsync(ConversationId id, DurableContext context)
@@ -285,10 +317,12 @@ internal sealed class ConversationViews
             // Document operations address ["docs", kind, ...]; Docs is the "docs" object itself.
             var docs = docOps.Count == 0 ? before.Docs : (JsonObjectValue)DeltaApplyTrusted.Apply(before.Docs, docOps.Select(Unprefixed));
             mount.Value = new ConversationView(before.Conversation, entries, docs);
-            foreach (var observer in mount.Snapshot(gate)) Session.Contained(() => observer.Advance(mount.Value, ops, frameContext), report);
+            // One call shared by every observer of the mount.
+            var call = new WatchValueCall<ConversationView>(mount.Value, ops);
+            foreach (var observer in mount.Snapshot(gate)) Session.Contained(() => observer.Advance(call, frameContext), report);
         }
         foreach (var observer in mount.Snapshot(gate))
-            Session.Contained(() => observer.Publication(before, mount.Value, ops, publication, frameContext), report);
+            if (observer is ViewObserver view) Session.Contained(() => view.Publication(before, mount.Value, ops, publication, frameContext), report);
     }
 
     /// <summary><paramref name="op"/> moved under <paramref name="prefix"/>; a root replacement becomes a set of the prefix (upstream
@@ -311,10 +345,10 @@ internal sealed class ConversationViews
         public ConversationView Value { get; set; } = value;
         /// <summary>Mounted incarnation and definition version per kind; another incarnation or version is set whole. Session line only.</summary>
         public Dictionary<string, (DocumentId Id, int Version)> Docs { get; } = docs;
-        /// <summary>In registration order; guarded by the views' lock.</summary>
-        public List<ViewObserver> Observers { get; } = [];
+        /// <summary>Watches, guarded host observers and view observers, in registration order; guarded by the views' lock.</summary>
+        public List<SyncObserver<ConversationView>> Observers { get; } = [];
 
-        public ViewObserver[] Snapshot(Lock gate)
+        public SyncObserver<ConversationView>[] Snapshot(Lock gate)
         {
             lock (gate) return [.. Observers];
         }

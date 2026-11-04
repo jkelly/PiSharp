@@ -25,6 +25,8 @@
 // are Chord's IWatchHandle<T>. Area watch-folding (d8d99950a): their docs say commits made while a listener runs arrive folded.
 // Pi v1.5.0 sync (area deferred-commits, 6c2fd73b0): IConversation.CommitAsync and IToolExecutionApi.CommitAsync take CommitOptions, and
 // ProgressPolicy and ProgressSettings PersistWithinMs: progress commits are deferred (CommitPersistence).
+// Pi v1.5.0 sync (area observers, 8b0caefc2): IHarness.ObserveConversationAsync and ObserveTaskGraphAsync, synchronous Observer<T>s of
+// the view and task graph mounts the watches share.
 using System.Collections.Immutable;
 using PiSharp.AI;
 using PiSharp.Durable.Chord;
@@ -1186,7 +1188,8 @@ public interface IConversation
     /// </summary>
     Task WaitForIdleAsync(DurableContext context);
     /// <summary>The structural view (spec §9.3) as a serialized watch, Chord's <see cref="IWatchHandle{T}"/>; commits made while its
-    /// listener runs arrive folded; cancelling <paramref name="context"/> ends it aborted.</summary>
+    /// listener runs arrive folded; cancelling <paramref name="context"/> ends it aborted. Built on the same mount as
+    /// <see cref="IHarness.ObserveConversationAsync"/>.</summary>
     Task<IWatchHandle<ConversationView>> WatchAsync(DurableContext context);
 }
 
@@ -1251,6 +1254,19 @@ public interface IHarness : ISession
     /// <see cref="IWatchHandle{T}"/>, whose operations address <see cref="TaskGraph.ToJson"/>; commits made while its listener runs arrive
     /// folded; cancelling <paramref name="context"/> ends it aborted. Reads only: it does not enable scheduling.</summary>
     Task<IWatchHandle<TaskGraph>> WatchTaskGraphAsync(DurableContext context);
+    /// <summary>
+    /// Attaches a synchronous <see cref="Observer{T}"/> to a conversation's structural view (spec §9.3), atomically on the Session line, for
+    /// adapters: it gets each next revision with its operations as memory adopts the commit, at the publication once Storage stored a
+    /// stored one and before it is stored for a deferred one, so it only records it. <paramref name="context"/> governs only the
+    /// attachment. A closed Harness or an unknown conversation faults the task; the call never throws.
+    /// </summary>
+    Task<Observation<ConversationView>> ObserveConversationAsync(ConversationId id, Observer<ConversationView> observer, DurableContext context);
+    /// <summary>
+    /// Attaches a synchronous <see cref="Observer{T}"/> to the task graph (spec §9.5), as <see cref="ObserveConversationAsync"/> does to a
+    /// view. A <c>blocked</c> reason that changes without a commit (a registry change, a failed migration) advances it on the Session line
+    /// outside any commit, with the background context. Reads only: it does not enable scheduling.
+    /// </summary>
+    Task<Observation<TaskGraph>> ObserveTaskGraphAsync(Observer<TaskGraph> observer, DurableContext context);
 }
 
 /// <summary>Result of <see cref="IHarness.AbortTaskAsync"/>.</summary>

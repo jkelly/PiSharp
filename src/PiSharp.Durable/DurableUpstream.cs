@@ -9,7 +9,8 @@
 // and DocumentWatch are Chord's IWatchHandle<T>, WatchEnd, WatchCall<T> and NativeWatchCall<T> in PiSharp.Durable.Chord, and
 // DocumentState is gone with documentState(); the document definition and semantics types are the scope-typed
 // tokens of Documents.cs (NestedCallDoc is HarnessTasks.NestedCallDoc); TableCommitChange is ICommitChange; SessionFailed and
-// StorageRequestError are SessionFailedException and StorageRequestException.
+// StorageRequestError are SessionFailedException and StorageRequestException. Pi v1.5.0 sync (area observers, 8b0caefc2): the Observer
+// and Observation exports are the classes Observer<T> and Observation<T> (TypesSession.cs).
 namespace PiSharp.Durable;
 
 /// <summary>The upstream source this port follows (decision 0005): Pi's <c>packages/durable</c> and the Chord subset it uses, at the
