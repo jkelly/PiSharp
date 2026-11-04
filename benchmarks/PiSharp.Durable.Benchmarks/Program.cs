@@ -2,18 +2,18 @@ using PiSharp.Durable.Benchmarks;
 
 // Usage: PiSharp.Durable.Benchmarks [storage] [storage-memory] [tool-output [<scenario label filter>]] [document-append [N,...]]
 //   [document-cache [N,...]] [scheduler-memory [N,...]] [scheduler-scale [fanout N,...] [chain N,...]] [scheduler-fanout [N,...]]
-//   [nested-tools [streaming|nesting]] [nested-images [count]] [codemode [N,...]]
-// With no argument, runs all eleven (upstream: npm run bench:storage, bench:storage:memory, bench:tool-output, bench:document-append,
+//   [nested-tools [streaming|nesting]] [nested-images [count]] [codemode [N,...]] [partial-commits [N,...]]
+// With no argument, runs all twelve (upstream: npm run bench:storage, bench:storage:memory, bench:tool-output, bench:document-append,
 // bench:document-cache, bench:scheduler-memory, bench:scheduler-fanout and bench:codemode, and test/nested-tools-bench.ts and
 // test/nested-images-bench.ts;
-// scheduler-scale is PiSharp-authored, see SchedulerScaleBench.cs). Report only: the
+// scheduler-scale and partial-commits are PiSharp-authored, see SchedulerScaleBench.cs and PartialCommitsBench.cs). Report only: the
 // benchmarks print tables and never pass or fail on a timing. Run in Release. The --worker forms are the child processes of storage-memory
 // and tool-output.
 if (args is ["storage-memory", "--worker", var backend, var scale]) return await StorageMemory.WorkerMainAsync(backend, scale, Console.Out);
 if (args is ["tool-output", "--worker", var scenario]) return await ToolOutputBench.WorkerMainAsync(scenario, Console.Out);
 
 string[] benchmarks = ["storage", "storage-memory", "tool-output", "document-append", "document-cache", "scheduler-memory", "scheduler-scale",
-    "scheduler-fanout", "nested-tools", "nested-images", "codemode"];
+    "scheduler-fanout", "nested-tools", "nested-images", "codemode", "partial-commits"];
 var selected = args.Length == 0 ? benchmarks : args;
 string? filter = null;
 for (var index = 0; index < selected.Length; index++)
@@ -87,8 +87,14 @@ for (var index = 0; index < selected.Length; index++)
             Console.WriteLine("## codemode-bench");
             await CodemodeBench.RunAsync(CodemodeBench.ParseSizes(codemodeSizes), Console.Out);
             break;
+        case "partial-commits":
+            string? partialSizes = null;
+            if (index + 1 < selected.Length && !benchmarks.Contains(selected[index + 1])) partialSizes = selected[++index];
+            Console.WriteLine("## partial-commits (PiSharp-authored)");
+            await PartialCommitsBench.RunAsync(PartialCommitsBench.ParseSizes(partialSizes), Console.Out);
+            break;
         default:
-            Console.Error.WriteLine("Usage: PiSharp.Durable.Benchmarks [storage] [storage-memory] [tool-output [<scenario label filter>]] [document-append [N,...]] [document-cache [N,...]] [scheduler-memory [N,...]] [scheduler-scale [fanout N,...] [chain N,...]] [scheduler-fanout [N,...]] [nested-tools [streaming|nesting]] [nested-images [count]] [codemode [N,...]]");
+            Console.Error.WriteLine("Usage: PiSharp.Durable.Benchmarks [storage] [storage-memory] [tool-output [<scenario label filter>]] [document-append [N,...]] [document-cache [N,...]] [scheduler-memory [N,...]] [scheduler-scale [fanout N,...] [chain N,...]] [scheduler-fanout [N,...]] [nested-tools [streaming|nesting]] [nested-images [count]] [codemode [N,...]] [partial-commits [N,...]]");
             return 2;
     }
 }
