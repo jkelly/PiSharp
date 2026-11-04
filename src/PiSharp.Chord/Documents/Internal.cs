@@ -3,10 +3,11 @@
 // PiSharp.Chord.Documents: AddressSource (address-source.ts), Documents and DocumentsOwner (documents.ts: IDocumentsOwner, with its
 // DocumentsStore, and the engine's view of a slot, IDeclaredSlot, and of the transaction holding the line, ILineHolder), SealToken
 // (fence.ts) and SlotDefinition (slot.ts; its AnyDefinition is StateDefinition). Line (line.ts) and Residency, Resident and IResidentSlot
-// (residency.ts) are the engine's own, and Stored (persistence.ts) the record a resident keeps. Area cv2-documents-slots brings the rest:
-// KeyDeclarer, Keyed and Singleton (handles.ts), KeyedSlot and KeySource (keyed-slot.ts), DocumentChange, Held, Persistence, StoredChange and
-// storedAfter (persistence.ts), DocumentSlot, PersistedSlot and SingletonSlot (slot.ts), and Staged and Transaction (transaction.ts).
-// DocumentsInternal holds the layer's free functions as those files bring them.
+// (residency.ts) are the engine's own, and Stored (persistence.ts) the record a resident keeps. Area cv2-documents-slots ported the rest:
+// KeyDeclarer, Keyed and Singleton (handles.ts: IKeyDeclarer, Keyed, Singleton), KeyedSlot and KeySource (keyed-slot.ts), DocumentChange,
+// Held, Persistence, StoredChange and storedAfter (persistence.ts; DocumentsInternal.StoredAfter), DocumentSlot, PersistedSlot and
+// SingletonSlot (slot.ts: IDocumentSlot, IPersistedSlot, SingletonSlot), and Staged and Transaction (transaction.ts: IStaged, Transaction).
+// DocumentsInternal holds the layer's free functions.
 //
 // Threads: as the state layer's (State/Internal.cs), an object's documents belong to their host, which serializes the calls that reach
 // them; the line, the seal tokens and the residency's timer are safe on any thread (Documents.cs).
