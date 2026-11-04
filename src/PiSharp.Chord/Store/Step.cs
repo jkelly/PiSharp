@@ -1,10 +1,10 @@
 // Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/chord/src/next/store/step.ts
 //
 // The commit step's working state (slice 6a §3, slice 6b §1.3) and the shape every write takes into it: a write staged before the queue
-// (serialized, rule 8), applied inside the step, returning the writes it recorded. Area cv2-store-tables added this file because the table
-// writes are staged writes applied in a step; it ports step.ts except the step's id allocator (upstream's ids: IdAllocator, D3), which
-// comes with allocator.ts in area cv2-store-engine, which owns step.ts. Upstream's StagedWrite is an object type that an adapter's class
-// implements (Durable's DurableCommit), so here it is the interface IStagedWrite.
+// (serialized, rule 8), applied inside the step, returning the writes it recorded. Upstream's StagedWrite is an object type that an adapter's
+// class implements (Durable's DurableCommit), so here it is the interface IStagedWrite. Upstream passes a Step wherever a function reads
+// through Pick<SqliteExecutor, "get" | "all"> (the engine's reads, a series commit's check); here Step implements ISqliteExecutor for that,
+// its ExecAsync counted as a statement like the others.
 using PiSharp.Chord.Sqlite;
 
 namespace PiSharp.Chord.Store;
@@ -33,17 +33,19 @@ internal sealed class StagedWrite(WriteOrder order, Func<Step, Task<IReadOnlyLis
     public Task<IReadOnlyList<StoreWrite>> ApplyAsync(Step step) => apply(step);
 }
 
-/// <summary>One commit step: its backend transaction, its seq, the ids of the documents it created, the table records it changed (the
-/// store's catalog takes them after <c>COMMIT</c>) and the statements it ran (<c>chord.store.statements</c>). Its reads are the step reader
-/// of adapters: they see the step's own writes (upstream <c>Step</c>).</summary>
-public sealed class Step
+/// <summary>One commit step: its backend transaction, its seq, the store's id allocator (D3: ids are taken from it as the writes apply, never
+/// copied), the ids of the documents it created, the table records it changed (the store's catalog takes them after <c>COMMIT</c>) and the
+/// statements it ran (<c>chord.store.statements</c>). Its reads are the step reader of adapters: they see the step's own writes (upstream
+/// <c>Step</c>).</summary>
+public sealed class Step : ISqliteExecutor
 {
     private readonly IReadOnlyDictionary<string, TableRecord> catalog;
 
-    internal Step(ISqliteExecutor executor, long seq, IReadOnlyDictionary<string, TableRecord> catalog)
+    internal Step(ISqliteExecutor executor, long seq, IdAllocator ids, IReadOnlyDictionary<string, TableRecord> catalog)
     {
         Executor = executor;
         Seq = seq;
+        Ids = ids;
         this.catalog = catalog;
     }
 
@@ -52,6 +54,9 @@ public sealed class Step
 
     /// <summary>The seq this step commits.</summary>
     public long Seq { get; }
+
+    /// <summary>The store's id allocator: a creation takes its id from it as it applies.</summary>
+    public IdAllocator Ids { get; }
 
     /// <summary>The ids of the commit's created documents, in the order of their writes.</summary>
     public List<long> Created { get; } = [];
@@ -65,6 +70,13 @@ public sealed class Step
     /// <summary>The record of table <paramref name="name"/> as this step leaves it so far.</summary>
     internal TableRecord? Table(string name) =>
         Tables.TryGetValue(name, out var changed) ? changed : catalog.TryGetValue(name, out var recorded) ? recorded : null;
+
+    /// <summary>Runs SQL text without bindings (counted as one statement).</summary>
+    public Task ExecAsync(string sql)
+    {
+        Statements++;
+        return Executor.ExecAsync(sql);
+    }
 
     /// <summary>Runs one statement.</summary>
     public Task RunAsync(string sql, params object?[] parameters)

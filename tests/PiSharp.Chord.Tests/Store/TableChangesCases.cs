@@ -4,7 +4,7 @@ using static PiSharp.Chord.Contracts.Schemas;
 using static PiSharp.Chord.Store.Expressions;
 
 // Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/chord/test/next/store/table-changes.test.ts. Every case is ported, over
-// TestStore (TableSupport.cs) for upstream's memoryStore; each case closes its store (upstream's afterEach). Upstream's callback casts
+// ChordStore and support.ts's memoryStore (ChordSupport.cs); each case closes its store (upstream's afterEach). Upstream's callback casts
 // ((e: { hits: never }) => ...) are type-level only. Rows are compared as JSON (StoreJson); an absent row is null (upstream's undefined).
 internal static partial class Program
 {
@@ -16,7 +16,7 @@ internal static partial class Program
     });
 
     /// <summary>Changes to a table holding e1 (committed); the staged list they append to.</summary>
-    private static async Task<(TestStore Store, TableChanges Changes, List<IStagedWrite> Staged)> StoreChangesSeeded()
+    private static async Task<(ChordStore Store, TableChanges Changes, List<IStagedWrite> Staged)> StoreChangesSeeded()
     {
         var store = await MemoryStore();
         var edits = await TableIn(store, StoreChangesEdits);

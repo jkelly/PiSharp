@@ -2,8 +2,9 @@
 //
 // The store's write vocabulary (StoreWrite, slice 6a §7, §8; decision "Writes carry their versions"): one change of the store each, as the
 // outbox and archives record it. Upstream's StoreWrite is the union DocumentWrite | TableWrite; here it is an abstract record whose
-// variants are the table writes (TableWrites.cs) and the documents engine's writes (DocumentWrite, engine.ts). Area cv2-store-tables added
-// this file with the table writes, which a staged write returns; area cv2-store-engine, which owns writes.ts, adds DocumentWrite.
+// variants are the table writes (TableWrites.cs) and the documents engine's writes (DocumentWrite, which upstream's engine.ts declares:
+// Engine.cs). Area cv2-store-tables added this file with the table writes, which a staged write returns; area cv2-store-engine, which owns
+// writes.ts, keeps it as it is: the union's other half lives with the engine.
 using System.Text.Json.Nodes;
 
 namespace PiSharp.Chord.Store;

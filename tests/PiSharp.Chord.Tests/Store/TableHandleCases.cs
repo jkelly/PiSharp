@@ -6,7 +6,7 @@ using static PiSharp.Chord.Contracts.Schemas;
 using static PiSharp.Chord.Store.Expressions;
 
 // Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/chord/test/next/store/table-handle.test.ts. Every case is ported, over
-// TestStore (TableSupport.cs) for upstream's memoryStore and holdNextCommit; each case closes its store (upstream's afterEach). One
+// ChordStore and support.ts's memoryStore and holdNextCommit (ChordSupport.cs); each case closes its store (upstream's afterEach). One
 // assertion is not: page(q, 1.5, ...), since a C# limit is a long (a fraction does not compile); limit 0 is refused as upstream refuses
 // both. Upstream's query(Other) as never needs no cast here. Rows are compared as JSON (StoreJson); an absent row is null.
 internal static partial class Program
@@ -26,7 +26,7 @@ internal static partial class Program
     });
 
     /// <summary>A store with a table of <paramref name="count"/> rows e000..: path p/&lt;i % 3&gt;, at i.</summary>
-    private static async Task<(TestStore Store, TableHandle Edits)> StoreHandleFilled(int count, TestTableOwner? owner = null)
+    private static async Task<(ChordStore Store, TableHandle Edits)> StoreHandleFilled(int count, TestTableOwner? owner = null)
     {
         var store = await MemoryStore();
         var edits = await TableIn(store, StoreHandleEdits, owner);
@@ -102,7 +102,7 @@ internal static partial class Program
             Case("store.table-handle.reads-outside-a-transaction-reads-go-through-the-store-s-guard-refused-once-the-store-closed", async () =>
             {
                 var (store, edits) = await StoreHandleFilled(1);
-                await store.CloseAsync();
+                await store.CloseAsync(ChordContext.Background);
                 Rejected(await StoreRejection(edits.GetAsync(StoreValue("""{"id":"e000"}"""), context)), "released", null, "a read after close");
             }),
             Case("store.table-handle.unreadable-cells-a-json-cell-of-a-newer-version-fails-the-owner-and-the-read-the-data-intact", async () =>
@@ -136,7 +136,7 @@ internal static partial class Program
                 var v2 = Tables.EvolveTable(v1, t => t.Rename("old", "new"));
                 await using var store = await MemoryStore();
                 var old = await TableIn(store, v1);
-                var (entered, release) = store.HoldNextCommit();
+                var (entered, release) = HoldNextCommit(store);
                 var changing = TableIn(store, v2);
                 await entered;
                 var reading = StoreRejection(old.GetAsync(StoreValue("""{"id":"x"}"""), context));

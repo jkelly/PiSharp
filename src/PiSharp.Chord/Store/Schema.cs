@@ -2,11 +2,13 @@
 //
 // The store's own SQL schema (slice 6a §2): its metadata, the recorded table definitions, the documents engine's records and revisions,
 // and the outbox; versioned by applySqliteMigrations. Declared tables are named "<owner>:<table>", so no name here can meet one of them.
-// This file ports the schema's data: the tables, the migration history (the statements byte for byte as upstream writes them, tabs and
-// newlines included, since the DDL is what a store database records), the schema version, the metadata row and the one-read query of
-// an open. Upstream's applyStoreSchema(db) and currentMeta(db) run them over a SqliteDatabase and applySqliteMigrations from
-// chord/sqlite, which PiSharp ports in PiSharp.Durable.Sqlite (area sqlite); PiSharp.Chord references no PiSharp.Durable project, so the
-// two functions come with the store's backend (Backend.cs, area cv2-store-engine) and its SQLite seam.
+// The migration history keeps the statements byte for byte as upstream writes them, tabs and newlines included, since the DDL is what a
+// store database records. Area cv2-store-sql ported the schema's data; area cv2-store-engine adds applyStoreSchema(db) and currentMeta(db),
+// which run it over Chord v2's database surface (Sqlite/Database.cs) with chord/sqlite's migration runner (Sqlite/Migrations.cs, a second
+// copy of the one PiSharp.Durable.Sqlite ports: PiSharp.Chord references no PiSharp.Durable project). Upstream's Error is an
+// InvalidOperationException.
+using PiSharp.Chord.Sqlite;
+
 namespace PiSharp.Chord.Store;
 
 /// <summary>One entry of a schema history: its version and the statements that reach it (upstream <c>SqliteMigration</c>).</summary>
@@ -103,4 +105,48 @@ internal static partial class StoreInternal
     internal const string CurrentMetaSql =
         "SELECT s.version, e.encoding, m.last_seq, m.next_id, m.outbox, m.outbox_floor\n" +
         "\tFROM chord_store_schema s, pragma_encoding e, chord_meta m WHERE s.singleton = 1 AND m.singleton = 1";
+
+    /// <summary>The schema history as the migration runner takes it.</summary>
+    private static readonly IReadOnlyList<SqliteMigration> Migrations =
+        [.. StoreMigrations.Select(migration => new SqliteMigration(migration.Version, migration.Statements))];
+
+    /// <summary>Brings <paramref name="db"/> to the store's schema and reads its metadata row (upstream <c>applyStoreSchema</c>): a store
+    /// at the newest schema in UTF-8 is read in one query, without the migrations' write transaction (most opens: the cost of a reopen);
+    /// any other database is checked to be UTF-8, migrated, then read. Throws when the encoding is another or the row is missing.</summary>
+    internal static async Task<MetaRow> ApplyStoreSchemaAsync(ISqliteDatabase db)
+    {
+        if (await CurrentMetaAsync(db).ConfigureAwait(false) is { } current) return current;
+        var encoding = await db.GetAsync("PRAGMA encoding").ConfigureAwait(false);
+        var name = encoding is not null && encoding.TryGetValue("encoding", out var value) ? value as string : null;
+        // Upstream interpolates `encoding?.encoding`: `undefined` when the backend returned no row.
+        if (name != "UTF-8") throw new InvalidOperationException($"store: the database encoding is {name ?? "undefined"}, not UTF-8");
+        await SqliteMigrations.ApplyAsync(db, Migrations, StoreSchemaTable).ConfigureAwait(false);
+        var meta = await db.GetAsync(MetaSql).ConfigureAwait(false) ?? throw new InvalidOperationException("store: the metadata row is missing");
+        return MetaOf(meta);
+    }
+
+    /// <summary>The metadata row of a store at the newest schema in UTF-8; null for any other database (upstream <c>currentMeta</c>).</summary>
+    internal static async Task<MetaRow?> CurrentMetaAsync(ISqliteDatabase db)
+    {
+        IReadOnlyDictionary<string, object?>? row;
+        try
+        {
+            row = await db.GetAsync(CurrentMetaSql).ConfigureAwait(false);
+        }
+        catch (Exception)
+        {
+            // A database without the store's tables (new, or not a store) or a backend without `pragma_encoding`: the migrations' path
+            // creates, refuses or reads it.
+            return null;
+        }
+        if (row is null || SqliteValues.Integer(row["version"]) != StoreSchema || row["encoding"] as string != "UTF-8") return null;
+        return MetaOf(row);
+    }
+
+    /// <summary>The metadata row of a <c>chord_meta</c> read.</summary>
+    private static MetaRow MetaOf(IReadOnlyDictionary<string, object?> row) => new(
+        SqliteValues.Integer(row["last_seq"]),
+        SqliteValues.Integer(row["next_id"]),
+        SqliteValues.Integer(row["outbox"]),
+        SqliteValues.Integer(row["outbox_floor"]));
 }

@@ -3,8 +3,8 @@ using PiSharp.Chord;
 using PiSharp.Chord.Store;
 using static PiSharp.Chord.Contracts.Schemas;
 
-// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/chord/test/next/store/catalog.test.ts. Every case is ported, over TestStore
-// (TableSupport.cs) for upstream's openStore and memoryStore: the first case opens a store twice on a file in a fresh temporary directory
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/chord/test/next/store/catalog.test.ts. Every case is ported, over ChordStore
+// and support.ts's memoryStore (ChordSupport.cs): the first case opens a store twice on a file in a fresh temporary directory
 // (upstream's mkdtemp and openNodeSqliteDatabase(path)). The failing write of the second is a staged write of its own whose statement
 // fails; the commit rejects with SQLite's error, which names the missing table.
 internal static partial class Program
@@ -29,10 +29,10 @@ internal static partial class Program
                 try
                 {
                     var path = Path.Combine(directory.FullName, "store.sqlite");
-                    var first = await TestStore.OpenAsync(path);
+                    var first = await StoreOver(new TestSqliteDatabase(path));
                     await TableIn(first, edits);
-                    await first.CloseAsync();
-                    var second = await TestStore.OpenAsync(path);
+                    await first.CloseAsync(ChordContext.Background);
+                    var second = await StoreOver(new TestSqliteDatabase(path));
                     var expected = new JsonObject
                     {
                         ["table"] = table,
@@ -44,7 +44,7 @@ internal static partial class Program
                         ["indexes"] = new JsonObject { ["by_at"] = new JsonArray("at") },
                     };
                     Json(expected.ToJsonString(), second.Table(table)?.ToJson(), "the reopened store's record");
-                    await second.CloseAsync();
+                    await second.CloseAsync(ChordContext.Background);
                 }
                 finally
                 {
