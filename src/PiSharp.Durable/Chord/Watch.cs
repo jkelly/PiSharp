@@ -1,7 +1,7 @@
 // Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/chord/src/watch.ts (WatchEnd, WatchCall, NativeWatchCall, WatchHandle,
 // Watchable, NativeWatchable, NativeWatchHandle, the shared WatchLifecycle, Watch and NativeWatch), which packages/chord/src/index.ts
-// exports. Watch handles: the watch types and the one implementation of their lifecycle, for JSON and native values. Durable's own watch
-// (Session/Observation.cs, TypesSession.cs) still follows v1.2.0 until work list area watches moves it onto these types.
+// exports. Watch handles: the watch types and the one implementation of their lifecycle, for JSON and native values. Durable's document,
+// view, task graph and event watches are built on them (work list area watches).
 //
 // Mappings:
 // - Upstream's tagged unions are C# records: WatchCall<T> is WatchValueCall<T> or WatchFailedCall<T>, NativeWatchCall<T> is
@@ -10,9 +10,10 @@
 // - Structural interfaces take the I prefix (IWatchHandle, IWatchable, INativeWatchable, INativeWatchHandle); a promise is a task.
 // - An AbortSignal is a CancellationToken: ObserveAbort registers on it and the registration is dropped when the watch ends.
 // - Upstream defers delivery with queueMicrotask. .NET has no microtask queue, so a watch takes a scheduler (`schedule`, which runs the
-//   work it is given later and never inline), by default the thread pool; a Durable Session can pass its line (Session.Defer), and tests
+//   work it is given later and never inline), by default the thread pool; a Durable Session passes its line (Session.Defer), and tests
 //   pass a queue they flush. Frames advanced before the scheduled work runs fold into one call, as frames advanced in one synchronous
-//   stretch do upstream. The scheduler is a reference into the source too, so termination drops it.
+//   stretch do upstream. The scheduler is a reference into the source too, so termination drops it. start() schedules a drain only when
+//   something is pending: upstream's drain of nothing does nothing, and on a Session line it would be a job per watch.
 // - Callers may be on any thread: one short lock guards a watch's state and is never held while the listener, detach, report or the
 //   scheduler runs. Exactly one drain runs at a time (upstream's #running); it is released in the same lock that finds nothing pending,
 //   so a frame advanced on another thread schedules the next drain. A listener's task continues on the thread that completes it, and the
@@ -277,14 +278,16 @@ public abstract class WatchLifecycle<T, TCall> where TCall : class
     public void Start(Func<TCall, DurableContext, Task> listener)
     {
         ArgumentNullException.ThrowIfNull(listener);
+        bool pending;
         lock (Gate)
         {
             if (started) throw new InvalidOperationException("Watch is already started");
             if (end is not null) throw new InvalidOperationException("Watch is stopped");
             started = true;
             this.listener = listener;
+            pending = PendingContext is not null;
         }
-        Schedule();
+        if (pending) Schedule();
     }
 
     /// <summary>Idempotently stops future callbacks and returns this watch's terminal result.</summary>

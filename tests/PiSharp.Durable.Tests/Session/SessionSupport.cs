@@ -3,14 +3,16 @@
 // them on MemoryStorage, and P4 (JSONL) and P5 (SQLite) rerun them by calling SessionTests.All with their own prefix and factory.
 //
 // Shared adaptations, repeated where they matter:
-// - flush() (one macrotask turn) is Flush(session): a no-op job on the Session line. Every document-state and watch delivery a commit
-//   schedules runs on the line before that commit's task completes, and a watch started from outside the line delivers in its own line
-//   job, so the barrier covers both. Where upstream flushes while the line is deliberately held, the check is a negative one and a
+// - flush() (one macrotask turn) is Flush(session): a no-op job on the Session line. Every watch delivery a commit schedules runs on the
+//   line before that commit's task completes, and a watch started from outside the line delivers in its own line job, so the barrier
+//   covers both. Where upstream flushes while the line is deliberately held, the check is a negative one and a
 //   Task.Yield stands in.
 // - Deferreds are TaskCompletionSource barriers. A release barrier continues its waiter inline (a resolved promise's then), so a released
 //   watch listener has delivered everything buffered behind it when Resolve returns.
 // - toBe is ReferenceEquals; for operation batches it is ImmutableArray equality, which compares the underlying array.
 // - TypeScript type-level assertions are compile-time overload checks here (see SessionDefinitionsCases.cs).
+// - A watch listener's destructured call, ({ value, ops, retired }, context), is Change(call): a Durable watch delivers value calls only
+//   (Pi v1.5.0 sync, area watches).
 using System.Collections.Immutable;
 using PiSharp.Durable;
 using PiSharp.Durable.Chord;
@@ -21,6 +23,11 @@ using static Program;
 internal static partial class Program
 {
     private static IEnumerable<(string, Func<Task>)> SessionCases() => SessionTests.All("session.", () => new MemoryStorage());
+
+    /// <summary>The value call a Durable watch delivered, which upstream's listeners destructure (<c>({ value, ops }, context)</c>); a
+    /// Durable watch sends no failed call.</summary>
+    internal static WatchValueCall<T> Change<T>(WatchCall<T> call) =>
+        call as WatchValueCall<T> ?? throw new InvalidOperationException("a Durable watch delivered a " + call.Kind + " call");
 }
 
 /// <summary>The session.* case groups and their support, parameterized by storage so later backends can rerun them.</summary>
@@ -36,7 +43,6 @@ internal static partial class SessionTests
         .. DocumentCases(prefix + "documents.", storage),
         .. CheckpointsMigrations(prefix + "checkpoints-migrations.", storage),
         .. ForkCases(prefix + "forks.", storage),
-        .. States(prefix + "states.", storage),
         .. Watches(prefix + "watches.", storage),
         .. Line(prefix + "line.", storage),
     ];

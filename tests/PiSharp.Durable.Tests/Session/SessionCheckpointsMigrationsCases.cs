@@ -282,8 +282,9 @@ internal static partial class SessionTests
             // An observer of the older shape.
             var watch = (await session.WatchDocAsync(old, Context))!;
             var frames = new List<string>();
-            watch.Start((value, ops, _) =>
+            watch.Start((call, _) =>
             {
+                var (value, ops, _) = Change(call);
                 lock (frames) frames.Add(value!.ToJson() + " " + OpsJson(ops));
                 return Task.CompletedTask;
             });
@@ -292,9 +293,9 @@ internal static partial class SessionTests
             // An observer of the new shape: the migration changes nothing it sees.
             var currentWatch = (await session.WatchDocAsync(current, Context))!;
             var currentFrames = new List<string>();
-            currentWatch.Start((value, _, _) =>
+            currentWatch.Start((call, _) =>
             {
-                lock (currentFrames) currentFrames.Add(value!.ToJson());
+                lock (currentFrames) currentFrames.Add(Change(call).Value!.ToJson());
                 return Task.CompletedTask;
             });
 
@@ -556,22 +557,19 @@ internal static partial class SessionTests
         {
             var (_, session, _) = Open(storageFactory);
             await session.CommitAsync(tx => tx.DocAsync(v1Doc), Context);
-            var state = (await session.DocumentStateAsync(v1Doc, Context))!;
             var watch = (await session.WatchDocAsync(v1Doc, Context))!;
             var frames = new List<string>();
             var delivered = new Deferred(inline: false);
-            watch.Start((_, ops, _) =>
+            watch.Start((call, _) =>
             {
-                lock (frames) frames.Add(OpsJson(ops));
+                lock (frames) frames.Add(OpsJson(Change(call).Ops));
                 delivered.Resolve();
                 return Task.CompletedTask;
             });
             await session.CommitAsync(async tx => (await tx.DocAsync(v2Doc)).GetArray("names").Add("second"), Context);
             await delivered.Task;
-            SameJson("{\"names\":[\"first\",\"second\"]}", state.Value, "state");
             SameJson("{\"names\":[\"first\",\"second\"]}", watch.Value, "watch");
             lock (frames) Seq(["[[\"r\",{\"names\":[\"first\",\"second\"]}]]"], frames, "frames");
-            state.Dispose();
             await watch.StopAsync();
         });
 

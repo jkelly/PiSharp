@@ -795,13 +795,13 @@ public static class Jobs
         {
             if (Decision(watch.Value) is { } ready) return ready;
             var decided = new TaskCompletionSource<JsonObjectValue>(TaskCreationOptions.RunContinuationsAsynchronously);
-            watch.Start((value, _, _) =>
+            watch.Start((call, _) =>
             {
-                if (Decision(value) is { } decision) decided.TrySetResult(decision);
+                if (call is WatchValueCall<JsonObjectValue?> change && Decision(change.Value) is { } decision) decided.TrySetResult(decision);
                 return Task.CompletedTask;
             });
             _ = watch.Closed.ContinueWith(closed => decided.TrySetException(new InvalidOperationException(
-                $"The approval watch of task {approvalTask.Value} ended: {closed.Result.Reason}", closed.Result.Error)),
+                $"The approval watch of task {approvalTask.Value} ended: {closed.Result.Kind}", closed.Result.Error as Exception)),
                 CancellationToken.None, TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
             if (deadline is not { } at) return await context.WaitAsync(decided.Task).ConfigureAwait(false);
             // A review deadline (decision 0010) resolves the approval as expired, never approved. The decision document is written

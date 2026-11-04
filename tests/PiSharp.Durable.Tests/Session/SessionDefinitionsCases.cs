@@ -152,14 +152,7 @@ internal static partial class SessionTests
         _ = rewound;
         // @ts-expect-error latest conversation, Session and task documents keep no history: SnapshotAsOfAsync takes only rewindable tokens.
 
-        Task<AttachedReplicatedState<JsonObjectValue?>?> state = session.DocumentStateAsync(DefinitionsSessionDoc, Context);
-        state = session.DocumentStateAsync(DefinitionsLatestDoc, conversationId, Context);
-        state = session.DocumentStateAsync(DefinitionsTaskDoc, taskId, Context);
-        state = session.DocumentStateAsync(DefinitionsSessionFamily, "k", Context);
-        state = session.DocumentStateAsync(DefinitionsConversationFamily, conversationId, "k", Context);
-        state = session.DocumentStateAsync(DefinitionsTaskFamily, taskId, "k", Context);
-        _ = state;
-        Task<PiSharp.Durable.IWatchHandle<JsonObjectValue?>?> watch = session.WatchDocAsync(DefinitionsSessionDoc, Context);
+        Task<IWatchHandle<JsonObjectValue?>?> watch = session.WatchDocAsync(DefinitionsSessionDoc, Context);
         watch = session.WatchDocAsync(DefinitionsLatestDoc, conversationId, Context);
         watch = session.WatchDocAsync(DefinitionsTaskDoc, taskId, Context);
         watch = session.WatchDocAsync(DefinitionsSessionFamily, "k", Context);

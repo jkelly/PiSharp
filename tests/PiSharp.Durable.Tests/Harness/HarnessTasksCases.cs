@@ -20,7 +20,6 @@
 using System.Collections.Concurrent;
 using PiSharp.Durable;
 using PiSharp.Durable.Chord;
-using WatchEnd = PiSharp.Durable.WatchEnd; // Durable's v1.2.0 watch end, beside Chord's (Chord/Watch.cs) until work list area watches moves onto it
 using PiSharp.Durable.Storage;
 using static Program;
 using static SessionTests;
@@ -539,9 +538,10 @@ internal static partial class HarnessTests
                 handlerContext = ctx;
                 absent = await runtime.WatchDocAsync(absentDoc, ctx);
                 var watch = await runtime.WatchDocAsync(notes, ctx);
-                watch!.Start((value, _, _) =>
+                watch!.Start((call, _) =>
                 {
-                    delivered.Add(value is null ? "retired" : S(value["text"]));
+                    var (value, _, retired) = Change(call);
+                    delivered.Add(retired ? "retired" : S(value!["text"]));
                     return Task.CompletedTask;
                 });
                 watchClosed = watch.Closed;
@@ -1191,7 +1191,7 @@ internal static partial class HarnessTests
             await reached.Task;
             await harness.CloseAsync(Context);
             await RejectsAsync(() => fromListener!, "closed", "commit from the signal listener");
-            Equal(WatchEnd.SessionClosed, watchEnd, "watch end");
+            Equal(WatchEnd.Ended, watchEnd, "watch end");
         });
 
         yield return Case(prefix + "task-close.writes-no-fault-when-close-seals-while-the-step-after-a-failed-phase-is-queued", async () =>

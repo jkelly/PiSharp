@@ -9,6 +9,9 @@
 // process) fails the Session the same way; upstream's proper-lockfile onCompromised throws, which ends its process.
 // PiSharp-only (decision 0005, "PiSharp-only additions"): the controller answers ask_user_question, reviews plans and switches plan mode,
 // each through the PiSharp.Durable.Tools host API in one commit of the shown conversation.
+// Since pi-durable 1.5.0 (Pi v1.5.0 sync, area watches): Durable has no state getters (viewState(), taskGraph()), so the view follows a
+// watch of the shown conversation's view (Conversation.watch()) and the open task panel a task graph watch (Harness.watchTaskGraph()),
+// each started at its acquisition value, which the view shows at once.
 using System.Collections.Immutable;
 using System.Text.RegularExpressions;
 using PiSharp.Cli.Commands;
@@ -278,19 +281,17 @@ internal sealed class DurableSession : IOpenDurable, IDurableViewSource, IDurabl
     private bool notifying;
     private long nextNotice = 1;
     private volatile IConversation current;
-    private AttachedReplicatedState<ConversationView> conversation;
-    private IDisposable unsubscribe;
+    private IWatchHandle<ConversationView> conversation;
     private IDisposable? unsubscribeCommits;
     private IDisposable? unsubscribeClose;
     /// <summary>Set when the Harness begins to close: ours, or a failed Session's.</summary>
     private volatile bool ended;
-    private AttachedReplicatedState<TaskGraph>? tasks;
-    private IDisposable? unsubscribeTasks;
+    private IWatchHandle<TaskGraph>? tasks;
     private Task queue = Task.CompletedTask;
     private Task? closing;
 
     private DurableSession(DurableSessionLocation location, DurableExecutionEnvs envs, IHarness harness, DurableModels models, PiSettings settings,
-        IConversation root, AttachedReplicatedState<ConversationView> conversation, IReadOnlyList<DurableConversationSummary> summaries,
+        IConversation root, IWatchHandle<ConversationView> conversation, IReadOnlyList<DurableConversationSummary> summaries,
         IRegistryReader registry, Func<ConversationId, string> planDirectory)
     {
         this.location = location; this.envs = envs; this.harness = harness; this.models = models; Settings = settings;
@@ -301,8 +302,16 @@ internal sealed class DurableSession : IOpenDurable, IDurableViewSource, IDurabl
         state = new DurableView(new DurableSessionInfo(location.Id, location.Directory, location.Cwd), conversation.Value, [.. summaries],
             ModelSummaries(), []);
         state = WithShown(state, conversation.Value);
-        unsubscribe = conversation.Subscribe((value, _, _) => Update(view => WithShown(view, value)));
+        Follow(conversation);
     }
+
+    /// <summary>Shows each later revision of <paramref name="watch"/>, the shown conversation's view watch, until another replaces it (a
+    /// call already running when the switch stopped it shows nothing).</summary>
+    private void Follow(IWatchHandle<ConversationView> watch) => watch.Start((call, _) =>
+    {
+        if (call is WatchValueCall<ConversationView> change && ReferenceEquals(conversation, watch)) Update(view => WithShown(view, change.Value));
+        return Task.CompletedTask;
+    });
 
     /// <summary>The view showing <paramref name="value"/>, a revision of the shown conversation, with its nested calls gathered; another
     /// conversation's revision starts them afresh.</summary>
@@ -320,7 +329,7 @@ internal sealed class DurableSession : IOpenDurable, IDurableViewSource, IDurabl
         DurableModels models, PiSettings settings, IConversation root, IReadOnlyList<DurableConversationSummary> summaries,
         DurableInitialModel? initial, DurableReports reports, IRegistryReader registry, Func<ConversationId, string> planDirectory)
     {
-        var view = await root.ViewStateAsync(Context).ConfigureAwait(false);
+        var view = await root.WatchAsync(Context).ConfigureAwait(false);
         var session = new DurableSession(location, envs, harness, models, settings, root, view, summaries, registry, planDirectory);
         // Since pi-durable 1.2.0 a storage error fails and closes the Harness (SessionFailed); the view then says so (durable work list area l).
         // Close listeners run as the close begins, before the failed call's caller sees its error and before the failure is reported, so
@@ -626,16 +635,19 @@ internal sealed class DurableSession : IOpenDurable, IDurableViewSource, IDurabl
             Update(view => view with { Tasks = null });
             return;
         }
-        var graph = await harness.TaskGraphAsync(Context).ConfigureAwait(false);
+        var graph = await harness.WatchTaskGraphAsync(Context).ConfigureAwait(false);
         tasks = graph;
-        unsubscribeTasks = graph.Subscribe((value, _, _) => Update(view => view with { Tasks = value }));
+        Update(view => view with { Tasks = graph.Value });
+        graph.Start((call, _) =>
+        {
+            if (call is WatchValueCall<TaskGraph> change && ReferenceEquals(tasks, graph)) Update(view => view with { Tasks = change.Value });
+            return Task.CompletedTask;
+        });
     });
 
     private void CloseTasks()
     {
-        unsubscribeTasks?.Dispose();
-        unsubscribeTasks = null;
-        tasks?.Dispose();
+        _ = tasks?.StopAsync();
         tasks = null;
     }
 
@@ -643,12 +655,12 @@ internal sealed class DurableSession : IOpenDurable, IDurableViewSource, IDurabl
     public Task SwitchConversationAsync(ConversationId id) => Command(async () =>
     {
         var next = await harness.ConversationAsync(id, Context).ConfigureAwait(false) ?? throw new InvalidOperationException($"Conversation {id.Value} does not exist");
-        var nextState = await next.ViewStateAsync(Context).ConfigureAwait(false);
-        unsubscribe.Dispose();
-        conversation.Dispose();
+        var nextWatch = await next.WatchAsync(Context).ConfigureAwait(false);
+        _ = conversation.StopAsync();
         current = next;
-        conversation = nextState;
-        unsubscribe = nextState.Subscribe((value, _, _) => Update(view => WithShown(view, value)));
+        conversation = nextWatch;
+        Update(view => WithShown(view, nextWatch.Value));
+        Follow(nextWatch);
     });
 
     // ─── Questions and plan mode (PiSharp-only, decision 0005) ──────────────
@@ -725,10 +737,9 @@ internal sealed class DurableSession : IOpenDurable, IDurableViewSource, IDurabl
 
     private async Task CloseAsync()
     {
-        unsubscribe.Dispose();
         unsubscribeCommits?.Dispose();
         unsubscribeClose?.Dispose();
-        conversation.Dispose();
+        _ = conversation.StopAsync();
         CloseTasks();
         try
         {

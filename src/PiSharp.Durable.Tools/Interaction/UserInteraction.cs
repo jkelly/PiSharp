@@ -72,8 +72,10 @@ public static class UserInteraction
     {
         ArgumentNullException.ThrowIfNull(conversation);
         ArgumentNullException.ThrowIfNull(context);
-        using var state = await conversation.ViewStateAsync(context).ConfigureAwait(false);
-        return PendingIn(state.Value);
+        // A one-off read: the acquisition value of a view watch, which stops at once (pi-durable 1.5.0 removed viewState()).
+        var watch = await conversation.WatchAsync(context).ConfigureAwait(false);
+        try { return PendingIn(watch.Value); }
+        finally { await watch.StopAsync().ConfigureAwait(false); }
     }
 
     /// <summary>
@@ -135,13 +137,13 @@ internal static class InteractionWait
         {
             if (UserInteraction.ResponseOf(watch.Value) is not null) return watch.Value!;
             var answered = new TaskCompletionSource<JsonObjectValue>(TaskCreationOptions.RunContinuationsAsynchronously);
-            watch.Start((value, _, _) =>
+            watch.Start((call, _) =>
             {
-                if (UserInteraction.ResponseOf(value) is not null) answered.TrySetResult(value!);
+                if (call is WatchValueCall<JsonObjectValue?> { Value: { } value } && UserInteraction.ResponseOf(value) is not null) answered.TrySetResult(value);
                 return Task.CompletedTask;
             });
             _ = watch.Closed.ContinueWith(closed => answered.TrySetException(
-                    new InvalidOperationException($"The interaction watch of tool call {api.CallId} ended: {closed.Result.Reason}", closed.Result.Error)),
+                    new InvalidOperationException($"The interaction watch of tool call {api.CallId} ended: {closed.Result.Kind}", closed.Result.Error as Exception)),
                 CancellationToken.None, TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
             return await context.WaitAsync(answered.Task).ConfigureAwait(false);
         }

@@ -8,13 +8,15 @@
 // and ToJson() writes it in that order. Revisions share unchanged nodes by reference, as upstream's applyImmutable does.
 //
 // Threading: as in View.cs, publications and attachment run on the Session line, while a close listener and an observer's detach (a
-// disposed state, a stopped watch) may run on any thread, so the mount and its observer list are guarded by one lock that is never held
-// while observer code runs.
+// stopped watch) may run on any thread, so the mount and its observer list are guarded by one lock that is never held while observer code
+// runs.
 //
 // Pi v1.5.0 sync (area reports): TaskGraphNode.blocked (a30c2a81d, 440a5fcdb). The mount keeps what the scheduler's blocked reason reads
 // of each live task (BlockedSubject), in upstream's Map order; a registry change or a failed migration derives every reason again on the
-// Session line and publishes the changed ones as set or delete ops on ["tasks", id, "blocked"], with the background context. The
-// citation stays on v1.2.0 until the file's other areas land.
+// Session line and publishes the changed ones as set or delete ops on ["tasks", id, "blocked"], with the background context.
+// Pi v1.5.0 sync (area watches, 92ab53602 and 42cb822f1): a task graph watch is Chord's Watch (Chord/Watch.cs) on the Session line's
+// scheduler, and the task graph state getter (Harness.taskGraph()) is removed. The citation stays on v1.2.0 until the file's other areas
+// land.
 using System.Collections.Immutable;
 using PiSharp.Durable.Chord;
 using PiSharp.Durable.Chord.Delta;
@@ -259,50 +261,34 @@ internal sealed class TaskGraphView
             }
             if (current is null) return;
             var failure = session.Failure;
-            foreach (var observer in current.Snapshot(gate)) Session.Contained(() => observer.CloseSession(failure), session.Report);
+            foreach (var observer in current.Snapshot(gate)) Session.Contained(() => observer.End(Session.CloseEnd(failure)), session.Report);
         });
     }
 
-    /// <summary>A disposable read-only Chord state of the graph (upstream <c>state</c>).</summary>
-    public async Task<AttachedReplicatedState<TaskGraph>> StateAsync(DurableContext context)
-    {
-        var (source, detach) = await AttachAsync((value, release) => new CommittedStateSource<TaskGraph>(value, release, session.Defer), context)
-            .ConfigureAwait(false);
-        try
-        {
-            return ReplicatedState.Attach<TaskGraph>(source, new ReplicatedStateSourceOptions { OnError = session.Report });
-        }
-        catch
-        {
-            detach();
-            throw;
-        }
-    }
-
-    /// <summary>A serialized exact-frame watch of the graph; cancelling <paramref name="context"/> stops it (upstream <c>watch</c>).</summary>
+    /// <summary>A serialized watch of the graph, Chord's <see cref="Watch{T}"/>; cancelling <paramref name="context"/> ends it aborted
+    /// (upstream <c>watch</c>).</summary>
     public async Task<IWatchHandle<TaskGraph>> WatchAsync(DurableContext context)
     {
         var (watch, _) = await AttachAsync(
-            (value, release) => new CommittedWatch<TaskGraph>(value, release, session.Defer, session.Report, json: graph => graph.ToJson()), context)
+            (value, release) => new Watch<TaskGraph>(value, release, session.Report, graph => graph.ToJson(), session.Defer), context)
             .ConfigureAwait(false);
         if (context.IsCancellationRequested)
         {
-            watch.Cancel();
+            watch.Abort();
             context.ThrowIfCancellationRequested();
         }
-        if (context.HasCancellation) watch.ObserveCancellation(context);
+        if (context.HasCancellation) watch.ObserveAbort(context.CancellationToken);
         return watch;
     }
 
-    /// <summary>Registers an observer created from the current revision, atomically on the Session line (upstream <c>attach</c>).</summary>
-    private Task<(T Observer, Action Detach)> AttachAsync<T>(Func<TaskGraph, Action, T> create, DurableContext context)
-        where T : ICommittedObserver<TaskGraph> =>
+    /// <summary>Registers a watch created from the current revision, atomically on the Session line (upstream <c>attach</c>).</summary>
+    private Task<(Watch<TaskGraph> Observer, Action Detach)> AttachAsync(Func<TaskGraph, Action, Watch<TaskGraph>> create, DurableContext context) =>
         session.ReadOnLineAsync(async () =>
         {
             Mount? existing;
             lock (gate) existing = mount;
             var target = existing ?? await BuildAsync(context).ConfigureAwait(false);
-            ICommittedObserver<TaskGraph>? registered = null;
+            Watch<TaskGraph>? registered = null;
             void Detach()
             {
                 lock (gate)
@@ -435,7 +421,8 @@ internal sealed class TaskGraphView
         target.Value = new TaskGraph(builder.ToImmutable());
         ImmutableArray<Op> frame = [.. ops];
         var frameContext = context.WithoutCancellation();
-        foreach (var observer in target.Snapshot(gate)) Session.Contained(() => observer.Advance(target.Value, frame, frameContext), report);
+        var call = new WatchValueCall<TaskGraph>(target.Value, frame);
+        foreach (var observer in target.Snapshot(gate)) Session.Contained(() => observer.Advance(call, frameContext), report);
     }
 
     /// <summary>The mount: its current revision, its observers, and what the blocked reason reads of each live task, so a registry change
@@ -447,9 +434,9 @@ internal sealed class TaskGraphView
         /// <summary>Upstream's <c>records</c>, in its Map order. Read and written on the Session line only.</summary>
         public OrderedDictionary<TaskId, BlockedSubject> Records { get; } = records;
         /// <summary>In registration order; guarded by the view's lock.</summary>
-        public List<ICommittedObserver<TaskGraph>> Observers { get; } = [];
+        public List<Watch<TaskGraph>> Observers { get; } = [];
 
-        public ICommittedObserver<TaskGraph>[] Snapshot(Lock gate)
+        public Watch<TaskGraph>[] Snapshot(Lock gate)
         {
             lock (gate) return [.. Observers];
         }

@@ -94,13 +94,15 @@ internal static class QuestionsTests
             var (harness, root) = await Open(open, setup, dirs);
             // The first view revision that shows the question: by then its document is committed and the slot's pending details are durable.
             var seen = new TaskCompletionSource<PendingInteraction>(TaskCreationOptions.RunContinuationsAsynchronously);
-            using var state = await root.ViewStateAsync(Ctx);
-            using var subscription = state.Subscribe((view, _, _) =>
+            var watch = await root.WatchAsync(Ctx);
+            watch.Start((call, _) =>
             {
-                if (UserInteraction.PendingIn(view) is [var first, ..]) seen.TrySetResult(first);
+                if (UserInteraction.PendingIn(Change(call).Value) is [var first, ..]) seen.TrySetResult(first);
+                return Task.CompletedTask;
             });
             var submission = await Submit(root, "go");
             var pending = await seen.Task.WaitAsync(InteractionTests.Timeout);
+            await watch.StopAsync();
             var doc = await harness.SnapshotAsync(UserInteraction.InteractionDoc, pending.TaskId, Ctx);
             Equal(UserQuestions.DetailsKind, pending.Kind, "kind");
             Equal("q1", pending.CallId, "call id");

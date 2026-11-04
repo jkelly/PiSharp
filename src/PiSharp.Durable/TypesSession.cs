@@ -2,6 +2,10 @@
 // the Tx and Session surfaces, document states and watches; split from Types.cs). Upstream's overloads keyed by token type become one C#
 // overload per token type; its `(...) => void` disposers become IDisposable; its promises become tasks. A document value is a
 // JsonObjectValue, and null stands for upstream's retired `null` value.
+// Pi v1.5.0 sync (area watches, 92ab53602 and 42cb822f1): the watch types are Chord's (Chord/Watch.cs: IWatchHandle<T>, WatchEnd,
+// WatchCall<T> and NativeWatchCall<T>, which upstream's index re-exports; in C# they stay in PiSharp.Durable.Chord), and the document
+// state getters and their type are removed (Session.documentState(), DocumentState). The citation stays on v1.2.0 until the file's other
+// areas land.
 using System.Collections.Immutable;
 using PiSharp.Durable.Chord;
 using PiSharp.Durable.Chord.Delta;
@@ -142,7 +146,7 @@ public sealed record DocumentCommitChange(DocumentRecord Record, ConversationId?
 }
 
 /// <summary>Definition-free child initialization by a fork (upstream <c>DocumentCommitChange</c> of type <c>"document.copy"</c>); consumers
-/// hydrate through state or watch acquisition.</summary>
+/// hydrate through watch acquisition.</summary>
 /// <param name="Record">The new child incarnation.</param>
 /// <param name="ConversationId">The child conversation.</param>
 /// <param name="Source">The exact stored source.</param>
@@ -156,42 +160,6 @@ public sealed record DocumentCopyCommitChange(DocumentRecord Record, Conversatio
 /// <param name="Seq">The commit sequence.</param>
 /// <param name="Changes">The changes.</param>
 public sealed record CommitPublication(Seq Seq, IReadOnlyList<ICommitChange> Changes);
-
-/// <summary>Why a watch terminated.</summary>
-public enum WatchEndReason
-{
-    /// <summary><c>stop()</c> was called.</summary>
-    Stopped,
-    /// <summary>The acquisition context was cancelled.</summary>
-    Cancelled,
-    /// <summary>The Session closed.</summary>
-    SessionClosed,
-    /// <summary>The observed incarnation was retired and its retirement delivered.</summary>
-    Retired,
-    /// <summary>The listener failed; <see cref="WatchEnd.Error"/> holds the failure.</summary>
-    ListenerError,
-    /// <summary>The Session failed; <see cref="WatchEnd.Error"/> holds what failed it, usually a storage error (see
-    /// <see cref="SessionFailedException"/>).</summary>
-    SessionFailed,
-}
-
-/// <summary>Terminal result of one watch (upstream <c>WatchEnd</c>).</summary>
-/// <param name="Reason">Why it ended.</param>
-/// <param name="Error">The listener failure of <see cref="WatchEndReason.ListenerError"/>, or the error that failed the Session for
-/// <see cref="WatchEndReason.SessionFailed"/>; otherwise null.</param>
-public sealed record WatchEnd(WatchEndReason Reason, Exception? Error = null)
-{
-    /// <summary><c>{reason: "stopped"}</c>.</summary>
-    public static WatchEnd Stopped { get; } = new(WatchEndReason.Stopped);
-    /// <summary><c>{reason: "cancelled"}</c>.</summary>
-    public static WatchEnd Cancelled { get; } = new(WatchEndReason.Cancelled);
-    /// <summary><c>{reason: "session_closed"}</c>.</summary>
-    public static WatchEnd SessionClosed { get; } = new(WatchEndReason.SessionClosed);
-    /// <summary><c>{reason: "retired"}</c>.</summary>
-    public static WatchEnd Retired { get; } = new(WatchEndReason.Retired);
-    /// <summary><c>{reason: "session_failed", error}</c>.</summary>
-    public static WatchEnd SessionFailed(Exception error) => new(WatchEndReason.SessionFailed, error);
-}
 
 /// <summary>Why a Session ended: <c>close()</c>, or a failed Storage call, whose error it carries (upstream <c>SessionEnd</c>).</summary>
 /// <param name="Reason"><see cref="SessionEndReason.Closed"/> or <see cref="SessionEndReason.Failed"/>.</param>
@@ -211,23 +179,6 @@ public enum SessionEndReason
     Closed,
     /// <summary>A failed Storage call failed it, and it closed itself.</summary>
     Failed,
-}
-
-/// <summary>Serialized exact-frame observation of an immutable value with bounded pending delivery (upstream <c>WatchHandle</c>).</summary>
-/// <typeparam name="T">The immutable value type; null retires the watch.</typeparam>
-public interface IWatchHandle<T>
-{
-    /// <summary>The acquisition revision before <see cref="Start"/>; the latest delivered immutable revision afterward.</summary>
-    T Value { get; }
-
-    /// <summary>Installs the sole asynchronous listener. It is never invoked inline. Throws when already started or stopped.</summary>
-    void Start(Func<T, ImmutableArray<Op>, DurableContext, Task> listener);
-
-    /// <summary>Idempotently stops future callbacks and returns this watch's terminal result (always the same task).</summary>
-    Task<WatchEnd> StopAsync();
-
-    /// <summary>Completes when the watch terminates; an already-running callback remains caller-owned.</summary>
-    Task<WatchEnd> Closed { get; }
 }
 
 /// <summary>Committed document reads (upstream <c>DocumentReader</c>). Reads never create a document and return null when it is absent;
@@ -255,8 +206,14 @@ public interface IDocumentReader
         DurableContext context);
 }
 
-/// <summary>Non-creating document watch acquisition shared by the Session and later invocation APIs (upstream <c>DocumentObserver</c>).
-/// A watch binds one existing incarnation and returns null when it is absent; the acquisition context's cancellation stops it.</summary>
+/// <summary>
+/// Non-creating document watch acquisition shared by the Session and later invocation APIs (upstream <c>DocumentObserver</c>). A watch
+/// (upstream <c>DocumentWatch</c>, Chord's <see cref="IWatchHandle{T}"/>) binds one existing incarnation and returns null when it is
+/// absent; cancelling the acquisition context ends it <see cref="WatchEndKind.Aborted"/>. Its listener gets
+/// <see cref="WatchValueCall{T}"/>s, never a failed call. A retirement is its last call, with a null value, <c>[["r", null]]</c> and
+/// <c>Retired</c>, after which it ends <see cref="WatchEndKind.Ended"/>; the Session's close ends it <see cref="WatchEndKind.Ended"/>, its
+/// failure <see cref="WatchEndKind.Failed"/> with the error that failed it.
+/// </summary>
 public interface IDocumentObserver
 {
     /// <summary>Watches a Session singleton.</summary>
@@ -280,8 +237,8 @@ public interface IDocumentObserver
 public interface ISession : IDocumentObserver, IDocumentReader
 {
     /// <summary>Runs one atomic transaction on the Session mutation line and returns the callback's result. Inside the callback read only
-    /// through the transaction: <c>SnapshotAsync</c>, <c>DocumentStateAsync</c>, <c>WatchDocAsync</c> and the other Session and runtime reads
-    /// may queue on the line the callback holds, and then never complete.</summary>
+    /// through the transaction: <c>SnapshotAsync</c>, <c>WatchDocAsync</c> and the other Session and runtime reads may queue on the line the
+    /// callback holds, and then never complete.</summary>
     Task<T> CommitAsync<T>(Func<ITx, Task<T>> change, DurableContext context);
     /// <summary>Runs one atomic asynchronous transaction on the Session mutation line.</summary>
     Task CommitAsync(Func<ITx, Task> change, DurableContext context);
@@ -313,20 +270,6 @@ public interface ISession : IDocumentObserver, IDocumentReader
 
     /// <summary>An asynchronous close listener: a faulted task it returns is reported without being awaited.</summary>
     IDisposable SubscribeClose(Func<Task> listener);
-
-    /// <summary>A disposable read-only Chord state bound to the current incarnation of a Session singleton; null when absent.</summary>
-    Task<AttachedReplicatedState<JsonObjectValue?>?> DocumentStateAsync(SessionDocToken token, DurableContext context);
-    /// <summary>A document state of a conversation singleton.</summary>
-    Task<AttachedReplicatedState<JsonObjectValue?>?> DocumentStateAsync(ConversationDocToken token, ConversationId conversationId, DurableContext context);
-    /// <summary>A document state of a task singleton.</summary>
-    Task<AttachedReplicatedState<JsonObjectValue?>?> DocumentStateAsync(TaskDocToken token, TaskId taskId, DurableContext context);
-    /// <summary>A document state of a Session family member.</summary>
-    Task<AttachedReplicatedState<JsonObjectValue?>?> DocumentStateAsync(SessionDocFamilyToken token, string key, DurableContext context);
-    /// <summary>A document state of a conversation family member.</summary>
-    Task<AttachedReplicatedState<JsonObjectValue?>?> DocumentStateAsync(ConversationDocFamilyToken token, ConversationId conversationId, string key,
-        DurableContext context);
-    /// <summary>A document state of a task family member.</summary>
-    Task<AttachedReplicatedState<JsonObjectValue?>?> DocumentStateAsync(TaskDocFamilyToken token, TaskId taskId, string key, DurableContext context);
 }
 
 /// <summary>

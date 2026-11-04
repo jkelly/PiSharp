@@ -306,7 +306,11 @@ internal sealed class Messenger(AgentTeam team, MessagingPort port, string? self
             if (watch is not null)
             {
                 Offer(watch.Value);
-                watch.Start((value, _, _) => { Offer(value); return Task.CompletedTask; });
+                watch.Start((call, _) =>
+                {
+                    if (call is WatchValueCall<JsonObjectValue?> change) Offer(change.Value);
+                    return Task.CompletedTask;
+                });
             }
             else Offer(await port.Reader.SnapshotAsync(Mailboxes.Doc, sender.Address, context).ConfigureAwait(false));
             while (await channel.Reader.WaitToReadAsync(cancellationToken).ConfigureAwait(false))

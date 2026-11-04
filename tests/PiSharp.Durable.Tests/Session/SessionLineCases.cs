@@ -77,7 +77,7 @@ internal static partial class SessionTests
             var gate = new Deferred();
             var held = session.CommitAsync(async _ => await gate.Task, Context);
             var delivered = new Deferred(inline: false);
-            watch.Start((_, _, _) =>
+            watch.Start((_, _) =>
             {
                 delivered.Resolve();
                 return Task.CompletedTask;

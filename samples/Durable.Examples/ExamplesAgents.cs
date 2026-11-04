@@ -46,10 +46,10 @@ public static partial class Examples
                 printed = text;
             }
         }
-        liveWatch.Start((value, _, _) =>
+        liveWatch.Start((call, _) =>
         {
-            if (value is not null && value.TryGetValue("generation", out var generation) && generation is JsonObjectValue live &&
-                live.TryGetValue("message", out var message)) PrintText(TextOf(message as JsonObjectValue));
+            if (call is WatchValueCall<JsonObjectValue?> { Value: { } value } && value.TryGetValue("generation", out var generation) &&
+                generation is JsonObjectValue live && live.TryGetValue("message", out var message)) PrintText(TextOf(message as JsonObjectValue));
             return Task.CompletedTask;
         });
         harness.Resume();

@@ -8,6 +8,8 @@
 // Each example prints what upstream's console.log prints, as JSON. Upstream runs every example on a fresh MemoryStorage; here each one
 // can also run on its own JSONL directory or SQLite file, and then the storage is reopened in a new Session and read back (milestone M0
 // of decision 0005: the examples survive close and reopen).
+// Pi v1.5.0 sync (area watches, 92ab53602): 04-chord-state is gone, as upstream deleted it with Session.documentState(); 05-watches keeps
+// its v1.2.0 name and output until work list area watch-folding brings it to v1.5.0's 04-watches.
 using PiSharp.Durable.Chord;
 using PiSharp.Durable.Sqlite;
 using PiSharp.Durable.Storage;
@@ -47,7 +49,6 @@ public static partial class Examples
         ("01-documents", DocumentsAsync),
         ("02-forks", ForksAsync),
         ("03-owned-conversations", OwnedConversationsAsync),
-        ("04-chord-state", ChordStateAsync),
         ("05-watches", WatchesAsync),
         ("06-harness", HarnessAsync),
         ("07-configuration", ConfigurationAsync),
@@ -281,36 +282,6 @@ public static partial class Examples
         });
     }
 
-    // 04: expose a document through Chord.
-    private static async Task ChordStateAsync(Func<Task<IStorage>> open, TextWriter output)
-    {
-        var session = Session.Create(await open());
-        var chat = await session.CommitAsync(async tx =>
-        {
-            var conversation = await tx.CreateConversationAsync(ConversationOwnership.Ownerless);
-            (await tx.DocAsync(Notes, conversation.Id)).Set("text", "first");
-            return conversation;
-        }, Context);
-
-        // DocumentStateAsync never creates a document. It returns a hydrated read-only Chord state bound to the current concrete
-        // incarnation.
-        var notesState = await session.DocumentStateAsync(Notes, chat.Id, Context) ?? throw new InvalidOperationException("notes are absent");
-        var stopNotes = notesState.Subscribe((value, _, delivery) =>
-            output.WriteLine($"Chord notes: {delivery.Kind.ToString().ToLowerInvariant()} {delivery.Sequence} {Json(value)}"));
-        await session.CommitAsync(async tx => (await tx.DocAsync(Notes, chat.Id)).Set("text", "published through Chord"), Context);
-        stopNotes.Dispose();
-        notesState.Dispose();
-
-        await session.CloseAsync(Context);
-        await ReopenAsync(open, output, async reopened =>
-        {
-            var state = await reopened.DocumentStateAsync(Notes, chat.Id, Context) ?? throw new InvalidOperationException("notes are absent");
-            using (state.Subscribe((value, _, delivery) =>
-                output.WriteLine($"Chord notes: {delivery.Kind.ToString().ToLowerInvariant()} {delivery.Sequence} {Json(value)}"))) { }
-            state.Dispose();
-        });
-    }
-
     // 05: serialize asynchronous document work with a watch.
     private static async Task WatchesAsync(Func<Task<IStorage>> open, TextWriter output)
     {
@@ -322,14 +293,16 @@ public static partial class Examples
             return conversation;
         }, Context);
 
-        // A watch starts from one stable acquisition revision. Slow callbacks never overlap; exact committed frames buffer, with a
-        // full-value reset after 100.
+        // A watch starts from one stable acquisition revision. Callbacks never overlap: commits made while one runs arrive folded into the
+        // next call (one full-value replacement once more than 10,000 ops pile up).
         var notesWatch = await session.WatchDocAsync(Notes, chat.Id, Context) ?? throw new InvalidOperationException("notes are absent");
         await output.WriteLineAsync("watch baseline: " + Json(notesWatch.Value));
         var delivered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        notesWatch.Start(async (value, _, _) =>
+        notesWatch.Start(async (call, _) =>
         {
-            await output.WriteLineAsync("watch update: " + Json(value));
+            // Calls are tagged: a failed call is a failure a source recovers from, which Durable never sends.
+            if (call is not WatchValueCall<JsonObjectValue?> change) return;
+            await output.WriteLineAsync("watch update: " + Json(change.Value));
             delivered.TrySetResult();
         });
         await session.CommitAsync(async tx => (await tx.DocAsync(Notes, chat.Id)).Set("text", "observed asynchronously"), Context);

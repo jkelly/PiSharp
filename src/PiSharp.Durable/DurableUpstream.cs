@@ -5,7 +5,9 @@
 // document states (LiveState, InboxState, ProviderState, NestedCallState, and the slot types ToolSlot, NestedToolSlot, NestedToolSummary,
 // CompactionStatus and CompactionFailure) are JSON values; the helper types AnyTask, HooksOf, HookResult, UserInput and
 // InputSubmissionDraft become DurableTask, a task's hook class, the hook delegates' return types and SubmissionDraft; ToolHookCall is a
-// hook's call JSON with its parent; the watch types are IWatchHandle<T>; the document definition and semantics types are the scope-typed
+// hook's call JSON with its parent; the watch types upstream re-exports from Chord (WatchHandle, WatchEnd, WatchCall, NativeWatchCall)
+// and DocumentWatch are Chord's IWatchHandle<T>, WatchEnd, WatchCall<T> and NativeWatchCall<T> in PiSharp.Durable.Chord, and
+// DocumentState is gone with documentState(); the document definition and semantics types are the scope-typed
 // tokens of Documents.cs (NestedCallDoc is HarnessTasks.NestedCallDoc); TableCommitChange is ICommitChange; SessionFailed and
 // StorageRequestError are SessionFailedException and StorageRequestException.
 namespace PiSharp.Durable;

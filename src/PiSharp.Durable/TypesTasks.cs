@@ -49,8 +49,8 @@ public interface ITaskRuntime : IDocumentObserver, IDocumentReader, IHookApi
     /// closing, or, in a run invocation, the task carries an abort mark. A returned state (running, waiting, sleeping or terminal; see
     /// <see cref="NextTaskState"/>) replaces the task's state in the same commit; returning null leaves it unchanged.
     /// <c>tx.CreateTaskAsync()</c> defaults to the task's conversation, and appended entries carry the task as <c>byTaskId</c>. Inside the
-    /// callback read only through the transaction: <c>SnapshotAsync</c>, <c>DocumentStateAsync</c>, <c>WatchDocAsync</c>,
-    /// <c>GetTaskAsync</c> and the other Session and runtime reads may queue on the line the callback holds, and then never complete.
+    /// callback read only through the transaction: <c>SnapshotAsync</c>, <c>WatchDocAsync</c>, <c>GetTaskAsync</c> and the other Session
+    /// and runtime reads may queue on the line the callback holds, and then never complete.
     /// </summary>
     Task CommitAsync(Func<ITx, RunningTask, Task<TaskState?>> change, DurableContext context);
     /// <summary><see cref="CommitAsync(Func{ITx, RunningTask, Task{TaskState?}}, DurableContext)"/> leaving the state unchanged.</summary>

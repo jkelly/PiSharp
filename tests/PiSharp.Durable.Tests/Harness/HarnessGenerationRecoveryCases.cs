@@ -157,9 +157,9 @@ internal static class GenerationRecoveryTests
             opened.Harness.Resume();
             var watch = (await opened.Harness.WatchDocAsync(Live.LiveDoc, opened.Root.Id, Context))!;
             string? watched = null;
-            watch.Start((value, _, _) =>
+            watch.Start((call, _) =>
             {
-                watched = TextOf(Generation(value, "message")) ?? watched;
+                watched = TextOf(Generation(Change(call).Value, "message")) ?? watched;
                 return Task.CompletedTask;
             });
             var id = (await Submit(opened.Root, "hi")).Id;

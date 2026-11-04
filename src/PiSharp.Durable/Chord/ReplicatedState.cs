@@ -24,6 +24,10 @@
 //   delivery earlier.
 // The default error reporter (upstream reportErrorAsync, which rethrows in a microtask as an uncaught error) raises
 // ReplicatedState.UnhandledError synchronously instead.
+//
+// Pi v1.5.0 sync (area watches, 92ab53602): Durable no longer uses replicatedState(): its document, view and task graph state getters are
+// removed and its watches are Chord's Watch (Watch.cs). The file stays for Chord's own replicated state until phase 6 settles it; Durable
+// still contains a throwing report through ReportUnhandled.
 using System.Diagnostics;
 using System.Globalization;
 using System.Runtime.CompilerServices;

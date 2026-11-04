@@ -10,10 +10,13 @@
 //   enqueued before the barrier has run when it completes (the listeners here complete synchronously).
 // - A held commit is a commit whose callback awaits a deferred; an aborted controller is a DurableCancellation cancelled with
 //   Exception("cancelled"), which is what the acquisition rejects with.
+// Pi v1.5.0 sync (area watches, 92ab53602): Conversation.viewState() is gone, so fresh() reads a watch's acquisition value, the cases that
+// kept a state beside the watches use watches alone (renamed with them), a close ends a watch Ended and a listener takes one value call.
+// Chord's Watch folds the commits made while a listener is not yet started, so the 101-commit case takes upstream d8d99950a's expectation
+// (work list area watch-folding): one call whose ops reach the newest view.
 using System.Collections.Immutable;
 using PiSharp.Durable;
 using PiSharp.Durable.Chord;
-using WatchEnd = PiSharp.Durable.WatchEnd; // Durable's v1.2.0 watch end, beside Chord's (Chord/Watch.cs) until work list area watches moves onto it
 using PiSharp.Durable.Chord.Delta;
 using PiSharp.Durable.Sqlite;
 using PiSharp.Durable.Storage;
@@ -50,8 +53,9 @@ internal static partial class ViewTests
         var watch = await conversation.WatchAsync(Context);
         var initial = watch.Value;
         var frames = new SyncList<Frame>();
-        watch.Start((value, ops, _) =>
+        watch.Start((call, _) =>
         {
+            var (value, ops, _) = Change(call);
             frames.Add(new Frame(value, ops));
             return Task.CompletedTask;
         });
@@ -61,9 +65,9 @@ internal static partial class ViewTests
     /// <summary>A freshly built view of <paramref name="conversation"/>, for comparing with an advanced one (upstream <c>fresh</c>).</summary>
     internal static async Task<ConversationView> Fresh(IConversation conversation)
     {
-        var state = await conversation.ViewStateAsync(Context);
-        var value = state.Value;
-        state.Dispose();
+        var watch = await conversation.WatchAsync(Context);
+        var value = watch.Value;
+        await watch.StopAsync();
         return value;
     }
 
@@ -262,41 +266,44 @@ internal static partial class ViewTests
             await harness.CloseAsync(Context);
         });
 
-        yield return Case(prefix + "replaces-undelivered-frames-with-the-newest-view-after-100-pending-frames", async () =>
+        yield return Case(prefix + "folds-undelivered-commits-into-one-call-whose-ops-reach-the-newest-view", async () =>
         {
             var (harness, root) = await OpenChat(await fresh(), Setup());
             var watch = await root.WatchAsync(Context);
+            var initial = watch.Value;
             for (var index = 0; index < 101; index++) await Note(root, "note");
             var frames = new SyncList<Frame>();
-            watch.Start((value, ops, _) =>
+            watch.Start((call, _) =>
             {
+                var (value, ops, _) = Change(call);
                 frames.Add(new Frame(value, ops));
                 return Task.CompletedTask;
             });
             await Drained(harness);
             var all = frames.Snapshot();
             Equal(1, all.Count, "frames");
-            Equal("[[\"r\"," + all[0].Value.ToJson().ToJson() + "]]", OpsJson(all[0].Ops), "replacement");
+            Check(all[0].Ops is not [ReplaceOp, ..], "folded ops, not a replacement: " + OpsJson(all[0].Ops));
+            SameView(DeltaApply.Apply(initial.ToJson(), all[0].Ops), all[0].Value, "the ops reach the newest view");
             Equal(101, all[0].Value.Entries.Length, "entries");
             await watch.StopAsync();
             await harness.CloseAsync(Context);
         });
 
-        yield return Case(prefix + "keeps-states-and-watches-of-one-conversation-independent-and-remounts-after-the-last-one-detaches", async () =>
+        yield return Case(prefix + "keeps-watches-of-one-conversation-independent-and-remounts-after-the-last-one-detaches", async () =>
         {
             var (harness, root) = await OpenChat(await fresh(), Setup());
-            var state = await root.ViewStateAsync(Context);
+            var kept = await Record(root);
             var (_, frames, stop) = await Record(root);
             await Note(root, "one");
             await Drained(harness);
-            Seq(["one"], KindsOf(state.Value), "state after one");
+            Seq(["one"], KindsOf(kept.Frames.Snapshot()[^1].Value), "kept after one");
             await stop();
             Equal(1, frames.Count, "frames");
             await Note(root, "two");
             await Drained(harness);
-            Seq(["one", "two"], KindsOf(state.Value), "state after two");
-            var last = state.Value;
-            state.Dispose();
+            var last = kept.Frames.Snapshot()[^1].Value;
+            Seq(["one", "two"], KindsOf(last), "kept after two");
+            await kept.Stop();
             // No observer is left, so the mount was dropped: a new observer builds a new revision from committed state.
             var rebuilt = await Fresh(root);
             SameView(last.ToJson(), rebuilt, "rebuilt");
@@ -304,16 +311,14 @@ internal static partial class ViewTests
             await harness.CloseAsync(Context);
         });
 
-        yield return Case(prefix + "ends-states-and-watches-at-close-and-rejects-later-acquisition", async () =>
+        yield return Case(prefix + "ends-watches-at-close-and-rejects-later-acquisition", async () =>
         {
             var (harness, root) = await OpenChat(await fresh(), Setup());
             var watch = await root.WatchAsync(Context);
-            var state = await root.ViewStateAsync(Context);
             await harness.CloseAsync(Context);
-            Equal(WatchEnd.SessionClosed, await watch.Closed, "watch end");
-            Equal(0, state.Value.Entries.Length, "state entries");
+            Equal(WatchEnd.Ended, await watch.Closed, "watch end");
+            Equal(0, watch.Value.Entries.Length, "watch entries");
             await ThrowsAsync<Exception>(() => root.WatchAsync(Context), "watch after close");
-            await ThrowsAsync<Exception>(() => root.ViewStateAsync(Context), "state after close");
         });
 
         yield return Case(prefix + "rejects-an-acquisition-cancelled-or-closed-while-it-waits-for-the-session-line", async () =>
@@ -341,14 +346,14 @@ internal static partial class ViewTests
             var (harness, root) = await OpenChat(await fresh(), Setup());
             var failing = await root.WatchAsync(Context);
             var (_, frames, stop) = await Record(root);
-            var shared = await root.ViewStateAsync(Context);
+            var shared = await root.WatchAsync(Context);
             Same(shared.Value, failing.Value, "one mount");
-            shared.Dispose();
-            failing.Start((_, _, _) => throw new InvalidOperationException("listener failed"));
+            await shared.StopAsync();
+            failing.Start((_, _) => throw new InvalidOperationException("listener failed"));
             await Note(root, "one");
             await Note(root, "two");
             await Drained(harness);
-            Equal(WatchEndReason.ListenerError, (await failing.Closed).Reason, "failing end");
+            Equal(WatchEndKind.ListenerError, (await failing.Closed).Kind, "failing end");
             Equal(2, frames.Count, "frames");
             await stop();
             await harness.CloseAsync(Context);

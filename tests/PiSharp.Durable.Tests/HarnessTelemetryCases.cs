@@ -993,8 +993,9 @@ internal static class TelemetryTests
             var root = await harness.RootAsync(Context);
             var view = await root.WatchAsync(Context);
             var shown = new SyncList<EntryId?>();
-            view.Start((value, _, _) =>
+            view.Start((call, _) =>
             {
+                var value = Change(call).Value;
                 shown.Add(value.Entries.Length > 0 ? value.Entries[^1].Id : null);
                 return Task.CompletedTask;
             });

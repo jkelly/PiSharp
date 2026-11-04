@@ -114,7 +114,7 @@ internal static class BlockedTests
             opened = await OpenWith(openFile, path, second);
             var graph = await opened.Harness.WatchTaskGraphAsync(Context);
             // A started watch keeps its value current.
-            graph.Start((_, _, _) => Task.CompletedTask);
+            graph.Start((_, _) => Task.CompletedTask);
             opened.Harness.Resume();
             await Eventually(() => graph.Value.Node(id)?.Blocked == BlockedReason.MigrationFailed);
             await Eventually(() => !opened.Harness.Wake().Active);
@@ -137,7 +137,7 @@ internal static class BlockedTests
             opened = await OpenWith(openFile, path, Registry.Create());
             var graph = await opened.Harness.WatchTaskGraphAsync(Context);
             // A started watch keeps its value current.
-            graph.Start((_, _, _) => Task.CompletedTask);
+            graph.Start((_, _) => Task.CompletedTask);
             opened.Harness.Resume();
             await Eventually(async () => (await opened.Harness.GetTaskAsync(id, Context))?.AbortReason == TaskAbortReason.Restart);
             await Eventually(() => graph.Value.Node(id)?.Blocked == BlockedReason.MissingTask);
@@ -163,7 +163,7 @@ internal static class BlockedTests
             var (harness, wakes, _) = await OpenWith(openFile, path, registry);
             var graph = await harness.WatchTaskGraphAsync(Context);
             // A started watch keeps its value current.
-            graph.Start((_, _, _) => Task.CompletedTask);
+            graph.Start((_, _) => Task.CompletedTask);
             var id = await Create(harness, missing);
             harness.Resume();
             await Eventually(() => graph.Value.Node(id)?.Blocked == BlockedReason.MissingTask);
