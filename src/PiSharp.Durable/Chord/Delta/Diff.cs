@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/chord/src/delta/diff.ts. Identity is JavaScript's: containers compare by
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/chord/src/delta/diff.ts. Identity is JavaScript's: containers compare by
 // reference, scalars by value, so structurally shared revisions diff narrowly and reconstructed ones fall back to semantic alignment.
 using System.Collections.Immutable;
 
@@ -71,6 +71,8 @@ public static class DeltaDiff
         return result;
     }
 
+    // O(length): comparing two revisions reads both strings; an op's text is a range, a string of its own (upstream's ownedSlice). A
+    // writer that knows what it appended records it with DraftObject.AppendText instead of diffing.
     private static void EmitString(string before, string after, ImmutableArray<PathSegment> path, Batch batch)
     {
         if (string.Equals(before, after, StringComparison.Ordinal)) return;
