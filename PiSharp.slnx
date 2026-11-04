@@ -23,6 +23,7 @@
     <Project Path="src/PiSharp.Durable/PiSharp.Durable.csproj" />
     <Project Path="src/PiSharp.Durable.MSSQL/PiSharp.Durable.MSSQL.csproj" />
     <Project Path="src/PiSharp.Durable.Sqlite/PiSharp.Durable.Sqlite.csproj" />
+    <Project Path="src/PiSharp.Durable.Store/PiSharp.Durable.Store.csproj" />
     <Project Path="src/PiSharp.Durable.Tools/PiSharp.Durable.Tools.csproj" />
     <Project Path="src/PiSharp.CustomAgents/PiSharp.CustomAgents.csproj" />
     <Project Path="src/PiSharp.CustomAgents.JavaScript/PiSharp.CustomAgents.JavaScript.csproj" />
