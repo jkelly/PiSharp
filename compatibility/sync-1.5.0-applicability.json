@@ -56,11 +56,11 @@
     "changelogBullets": 477,
     "repeatedBullets": 23,
     "byStatus": {
-      "ported": 167,
-      "ported-with-deferral": 13,
+      "ported": 171,
+      "ported-with-deferral": 14,
       "already-ported": 13,
       "no-op": 25,
-      "port": 108
+      "port": 103
     },
     "byArea": {
       "ai": 58,
@@ -7870,7 +7870,7 @@
       "id": "durable.sqlite-table-prefix",
       "area": "durable",
       "phase": 4,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "durable@1.3.0/Added#1"
       ],
@@ -7893,7 +7893,21 @@
         "tests/PiSharp.Durable.Tests/Storage/SqliteMigrationsCases.cs"
       ],
       "release": "1.5.0",
-      "notes": "Migrations.cs:30 hard-codes the v1 DDL with fixed names and SqliteStorage takes no prefix. The Durable Object opener is Cloudflare (durable.cloudflare-adapters, no-op). Land with durable.sqlite-schema-v2 and durable.sqlite-chord-drivers: one migration list rendered per prefix. PiSharp-only SQL Server storage (decision 0007) already takes a schema name ({schema} in SqlServerMigrations.cs) and needs no change."
+      "notes": "Migrations.cs:30 hard-codes the v1 DDL with fixed names and SqliteStorage takes no prefix. The Durable Object opener is Cloudflare (durable.cloudflare-adapters, no-op). Land with durable.sqlite-schema-v2 and durable.sqlite-chord-drivers: one migration list rendered per prefix. PiSharp-only SQL Server storage (decision 0007) already takes a schema name ({schema} in SqlServerMigrations.cs) and needs no change.",
+      "evidence": {
+        "commits": [
+          "6dd9ef3f"
+        ],
+        "tests": [
+          "tests/PiSharp.Durable.Tests/Storage/SqliteStorageCases.cs: storage.sqlite.namespaces-tables-and-indexes-with-a-prefix-across-reopen",
+          "tests/PiSharp.Durable.Tests/Storage/SqliteStorageCases.cs: storage.sqlite.rejects-an-invalid-prefix-before-creating-the-database",
+          "tests/PiSharp.Durable.Tests/Storage/SqliteStorageCases.cs: storage.sqlite.prefix.keeps-schema-names-unprefixed-by-default",
+          "tests/PiSharp.Durable.Tests/Storage/SqliteStorageCases.cs: storage.sqlite.prefix.prefixes-the-tables-and-indexes-without-changing-host-tables",
+          "tests/PiSharp.Durable.Tests/Storage/SqliteStorageCases.cs: storage.sqlite.prefix.isolates-concurrently-opened-prefixes-on-one-database",
+          "tests/PiSharp.Durable.Tests/Storage/SqliteStorageCases.cs: storage.sqlite.prefix.rejects-invalid-and-reserved-prefixes-and-closes-the-database",
+          "tests/PiSharp.Durable.Tests/Storage/SqliteMigrationsCases.cs: storage.sqlite.migrations.prefixed-schema-is-upstream-text-verbatim"
+        ]
+      }
     },
     {
       "id": "durable.cloudflare-adapters",
@@ -7921,7 +7935,7 @@
       "id": "durable.sqlite-schema-v2",
       "area": "durable",
       "phase": 4,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "durable@1.4.0/Breaking Changes#3"
       ],
@@ -7938,13 +7952,27 @@
         "tests/PiSharp.Durable.Tests/Storage/SqlServerStorageCases.cs"
       ],
       "release": "1.5.0",
-      "notes": "Migrations.cs:30 has only version 1. Decision 0005 §6 says PiSharp writes upstream's SQLite DDL so either side opens the other's sessions; after this row PiSharp 1.2.0.x cannot open a database PiSharp 1.5.0 opened (no rollback), which the decision and the release notes must say. SQL Server storage is PiSharp-only (decision 0007): its tasks CHECK (SqlServerMigrations.cs:79) lacks sleeping and needs its own migration. Upstream's commit-log replication (4c25119f5) was reverted in the range and adds nothing. Depends on durable.durable-sleep."
+      "notes": "Migrations.cs:30 has only version 1. Decision 0005 §6 says PiSharp writes upstream's SQLite DDL so either side opens the other's sessions; after this row PiSharp 1.2.0.x cannot open a database PiSharp 1.5.0 opened (no rollback), which the decision and the release notes must say. SQL Server storage is PiSharp-only (decision 0007): its tasks CHECK (SqlServerMigrations.cs:79) lacks sleeping and needs its own migration. Upstream's commit-log replication (4c25119f5) was reverted in the range and adds nothing. Depends on durable.durable-sleep.",
+      "evidence": {
+        "commits": [
+          "6dd9ef3f",
+          "e4af0a3d"
+        ],
+        "tests": [
+          "tests/PiSharp.Durable.Tests/Storage/SqliteMigrationsCases.cs: storage.sqlite.migrations.initial-schema-is-upstream-text-verbatim",
+          "tests/PiSharp.Durable.Tests/Storage/SqliteMigrationsCases.cs: storage.sqlite.migrations.migrates-a-version-1-database-to-store-sleeping-tasks-keeping-its-tasks-and-indexes",
+          "tests/PiSharp.Durable.Tests/Storage/SqliteMigrationsCases.cs: storage.sqlite.migrations.rejects-a-database-newer-than-the-portable-core",
+          "tests/PiSharp.Durable.Tests/Storage/SqliteMigrationsCases.cs: storage.sqlite.migrations.rolls-a-failed-migration-back-and-preserves-stored-data-for-a-successful-retry",
+          "tests/PiSharp.Durable.Tests/Storage/SqlServerStorageCases.cs: storage.mssql.migrates-a-version-1-schema-to-store-sleeping-tasks",
+          "tests/PiSharp.Durable.Tests/Storage/SqlServerStorageCases.cs: storage.mssql.rejects-a-newer-schema-version-and-invalid-names"
+        ]
+      }
     },
     {
       "id": "durable.sqlite-chord-drivers",
       "area": "durable",
       "phase": 4,
-      "status": "port",
+      "status": "ported-with-deferral",
       "changelog": [
         "durable@1.5.0/Breaking Changes#2",
         "durable@1.4.0/Changed#5"
@@ -7972,7 +8000,19 @@
         "tests/PiSharp.Durable.Tests/Storage/SqliteMigrationsCases.cs"
       ],
       "release": "1.5.0",
-      "notes": "PiSharp's ISqliteExecutor (Database.cs:19) has no RunCounted; Microsoft.Data.Sqlite's ExecuteNonQuery already returns the change count. The driver stays in PiSharp.Durable.Sqlite for phase 4. The Chord-side bullets (chord@1.4.0/Added#3, chord@1.5.0/Breaking Changes#4 and Fixed#2) are group F, phase 6, which decides whether a PiSharp Chord SQLite layer later takes it over; the public C# names stay where they are, as upstream's re-exports do."
+      "notes": "PiSharp's ISqliteExecutor (Database.cs:19) has no RunCounted; Microsoft.Data.Sqlite's ExecuteNonQuery already returns the change count. The driver stays in PiSharp.Durable.Sqlite for phase 4. The Chord-side bullets (chord@1.4.0/Added#3, chord@1.5.0/Breaking Changes#4 and Fixed#2) are group F, phase 6, which decides whether a PiSharp Chord SQLite layer later takes it over; the public C# names stay where they are, as upstream's re-exports do.",
+      "evidence": {
+        "commits": [
+          "6dd9ef3f"
+        ],
+        "tests": [
+          "tests/PiSharp.Durable.Tests/Storage/SqliteFacadeCases.cs: chord.sqlite.node.reports-the-rows-a-statement-changed-without-index-writes",
+          "tests/PiSharp.Durable.Tests/Storage/SqliteFacadeCases.cs: storage.sqlite.facade.reads-storage-commits-in-call-order",
+          "tests/PiSharp.Durable.Tests/Storage/SqliteMigrationsCases.cs: chord.sqlite.migrations.tracks-independent-histories-and-skips-migrations-already-applied",
+          "tests/PiSharp.Durable.Tests/Storage/SqliteMigrationsCases.cs: storage.sqlite.migrations.creates-the-current-schema-and-can-be-applied-repeatedly"
+        ]
+      },
+      "deferred": "Durable's storage forwarding runCounted through its watched executor (storage.ts watchCalls, e5c6182ba) and storage's own use of runCounted are in packages/durable/src/storage/sqlite/storage.ts, which area storage-batches ports; the facade and migrations test rows (alsoChangedBy storage-batches) stay needs-sync for the same reason."
     },
     {
       "id": "durable.storage-commit-batches",
@@ -10443,7 +10483,7 @@
       "id": "chord.sqlite",
       "area": "chord",
       "phase": 4,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "chord@1.4.0/Added#3"
       ],
@@ -10466,13 +10506,30 @@
       "pulledInBy": [
         "durable.sqlite-chord-drivers"
       ],
-      "notes": "PiSharp ports Durable v1.2.0's layer in PiSharp.Durable.Sqlite: ISqliteExecutor and ISqliteDatabase (Database.cs), the Microsoft.Data.Sqlite driver (ConnectionDatabase.cs) and Durable's migrations on the fixed durable_schema table (Migrations.cs:49 and :60). Missing: the generic runner over a named table and the schema-prefix check. Durable's side is durable@1.4.0/Changed#5 (group E); chord.telemetry-sqlite and the v2 store's SQLite backend build on this. The Cloudflare driver is chord.sqlite-cloudflare."
+      "notes": "PiSharp ports Durable v1.2.0's layer in PiSharp.Durable.Sqlite: ISqliteExecutor and ISqliteDatabase (Database.cs), the Microsoft.Data.Sqlite driver (ConnectionDatabase.cs) and Durable's migrations on the fixed durable_schema table (Migrations.cs:49 and :60). Missing: the generic runner over a named table and the schema-prefix check. Durable's side is durable@1.4.0/Changed#5 (group E); chord.telemetry-sqlite and the v2 store's SQLite backend build on this. The Cloudflare driver is chord.sqlite-cloudflare.",
+      "evidence": {
+        "commits": [
+          "6dd9ef3f"
+        ],
+        "tests": [
+          "tests/PiSharp.Durable.Tests/Storage/SqliteMigrationsCases.cs: chord.sqlite.migrations.tracks-independent-histories-and-skips-migrations-already-applied",
+          "tests/PiSharp.Durable.Tests/Storage/SqliteMigrationsCases.cs: chord.sqlite.migrations.rejects-invalid-migration-versions-before-touching-the-database",
+          "tests/PiSharp.Durable.Tests/Storage/SqliteMigrationsCases.cs: chord.sqlite.migrations.validates-prefixes-and-migration-table-identifiers-before-executing-sql",
+          "tests/PiSharp.Durable.Tests/Storage/SqliteMigrationsCases.cs: chord.sqlite.migrations.names-the-refused-prefix-and-a-reserved-one",
+          "tests/PiSharp.Durable.Tests/Storage/SqliteMigrationsCases.cs: storage.sqlite.migrations.rolls-initial-bootstrap-and-every-pending-migration-back-together",
+          "tests/PiSharp.Durable.Tests/Storage/SqliteFacadeCases.cs: chord.sqlite.node.configures-connection-defaults-and-accepts-explicit-settings",
+          "tests/PiSharp.Durable.Tests/Storage/SqliteFacadeCases.cs: chord.sqlite.node.transaction-outcome.rejects-with-the-callbacks-own-error-after-a-rollback",
+          "tests/PiSharp.Durable.Tests/Storage/SqliteFacadeCases.cs: chord.sqlite.node.transaction-outcome.rejects-with-another-error-when-begin-immediate-fails",
+          "tests/PiSharp.Durable.Tests/Storage/SqliteFacadeCases.cs: chord.sqlite.node.transaction-outcome.rejects-with-another-error-when-commit-fails",
+          "tests/PiSharp.Durable.Tests/Storage/SqliteFacadeCases.cs: chord.sqlite.node.transaction-outcome.rejects-with-an-aggregate-error-not-the-callbacks-error-when-its-rollback-fails"
+        ]
+      }
     },
     {
       "id": "chord.sqlite-run-counted",
       "area": "chord",
       "phase": 4,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "chord@1.5.0/Breaking Changes#4"
       ],
@@ -10491,7 +10548,16 @@
       "pulledInBy": [
         "durable.sqlite-chord-drivers"
       ],
-      "notes": "ISqliteExecutor (Database.cs) has ExecAsync, RunAsync, GetAsync and AllAsync. Microsoft.Data.Sqlite reports changed rows from ExecuteNonQuery; the test must pin that trigger and index writes do not count. Needed by phase 4: durable@1.5.0/Breaking Changes#2 (group E) re-exports it and Durable's storage uses it."
+      "notes": "ISqliteExecutor (Database.cs) has ExecAsync, RunAsync, GetAsync and AllAsync. Microsoft.Data.Sqlite reports changed rows from ExecuteNonQuery; the test must pin that trigger and index writes do not count. Needed by phase 4: durable@1.5.0/Breaking Changes#2 (group E) re-exports it and Durable's storage uses it.",
+      "evidence": {
+        "commits": [
+          "6dd9ef3f"
+        ],
+        "tests": [
+          "tests/PiSharp.Durable.Tests/Storage/SqliteFacadeCases.cs: chord.sqlite.node.reports-the-rows-a-statement-changed-without-index-writes",
+          "tests/PiSharp.Durable.Tests/Storage/SqliteFacadeCases.cs: chord.sqlite.node.counts-no-rows-that-triggers-change"
+        ]
+      }
     },
     {
       "id": "chord.sqlite-statement-cache",
