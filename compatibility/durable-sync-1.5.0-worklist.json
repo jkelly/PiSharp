@@ -269,7 +269,7 @@
         "src/PiSharp.Durable/Chord/Delta/Ops.cs",
         "src/PiSharp.Durable/Chord/Delta/Pending.cs (new)",
         "src/PiSharp.Durable/Chord/Watch.cs (new)",
-        "src/PiSharp.Durable/Session/Observation.cs",
+        "src/PiSharp.Durable/Session/Observation.cs (removed)",
         "src/PiSharp.Durable/TypesSession.cs",
         "tests/PiSharp.Durable.Tests/Chord/ContextCases.cs",
         "tests/PiSharp.Durable.Tests/Chord/DeltaPendingCases.cs (new)",
@@ -1404,7 +1404,7 @@
         "tests/PiSharp.Durable.Tests/Session/SessionDocumentsCases.cs",
         "tests/PiSharp.Durable.Tests/Session/SessionForksCases.cs",
         "tests/PiSharp.Durable.Tests/Session/SessionLineCases.cs",
-        "tests/PiSharp.Durable.Tests/Session/SessionStatesCases.cs",
+        "tests/PiSharp.Durable.Tests/Session/SessionStatesCases.cs (removed)",
         "tests/PiSharp.Durable.Tests/Session/SessionTablesCases.cs",
         "tests/PiSharp.Durable.Tests/Session/SessionWatchesCases.cs",
         "tests/PiSharp.Durable.Tests/SessionDocumentRetentionCases.cs",
@@ -2286,7 +2286,7 @@
         "src/PiSharp.Durable/Harness/TaskGraph.cs",
         "src/PiSharp.Durable/Harness/Types.cs",
         "src/PiSharp.Durable/Harness/View.cs",
-        "src/PiSharp.Durable/Session/Observation.cs",
+        "src/PiSharp.Durable/Session/Observation.cs (removed)",
         "src/PiSharp.Durable/Session/Session.cs",
         "src/PiSharp.Durable/Types.cs",
         "src/PiSharp.Durable/TypesSession.cs",
@@ -2311,7 +2311,7 @@
         "tests/PiSharp.Durable.Tests/Interaction/QuestionsCases.cs",
         "tests/PiSharp.Durable.Tests/Session/SessionCheckpointsMigrationsCases.cs",
         "tests/PiSharp.Durable.Tests/Session/SessionDefinitionsCases.cs",
-        "tests/PiSharp.Durable.Tests/Session/SessionStatesCases.cs",
+        "tests/PiSharp.Durable.Tests/Session/SessionStatesCases.cs (removed)",
         "tests/PiSharp.Durable.Tests/Session/SessionSupport.cs",
         "tests/PiSharp.Durable.Tests/Session/SessionWatchesCases.cs",
         "tests/PiSharp.Durable.Tests/SessionAdoptionCases.cs (new)",
@@ -2344,7 +2344,10 @@
       ],
       "commits": [
         "42cb822f1",
-        "92ab53602"
+        "92ab53602",
+        "2cce573d",
+        "bcfa9515",
+        "6885ab6b"
       ],
       "notes": "Session/Observation.cs ports v1.2.0's observation.ts, which upstream deleted (its successor is chord/src/watch.ts, area chord-watch): rebuild IWatchHandle<T>, WatchEnd and WatchEndReason (TypesSession.cs) on Chord/Watch.cs and retire Observation.cs's own frame buffer. PiSharp-only state-getter callers move to watches: Server DeviceService.cs (a one-off view read), Durable.Tools UserInteraction.cs, pisharp durable (DurableRuntime.cs, which follows the view state across revisions). Whether Chord/ReplicatedState.cs stays for Chord (phase 6) or goes with Durable's last use is group F's call: keep the file, drop Durable's use. Example 04-chord-state.ts was deleted upstream (its Examples.cs part goes; the port map row is removed-upstream)."
     },
@@ -2402,7 +2405,6 @@
         "src/PiSharp.Durable/Harness/TaskGraph.cs",
         "src/PiSharp.Durable/Harness/Types.cs",
         "src/PiSharp.Durable/Harness/View.cs",
-        "src/PiSharp.Durable/Session/Observation.cs",
         "src/PiSharp.Durable/Session/Session.cs",
         "src/PiSharp.Durable/TypesSession.cs",
         "src/PiSharp.WebAgent/Chat/ChatStreamMux.cs",
@@ -2433,7 +2435,7 @@
         "8b0caefc2",
         "d8d99950a"
       ],
-      "notes": "PiSharp buffers one frame per commit with a 100-frame limit (Observation.cs); folding uses PendingOps from area chord-watch. PiSharp-only consumers that expect one call per commit: the device server's agent and document frames (Server AgentFrames.cs; decision 0008 says one batch per commit, which becomes one batch per delivery: state it in the decision when phase 8 updates the docs), the web agent's per-tab mux and pisharp durable's TUI. Address-following: PiSharp-only code that waits for a task-scoped document's end relies on the [[r, null]] retirement end today and must test retired and stop the watch, or it lives until the Session ends: ask_user_question and plan approval (UserInteraction.cs), job approvals (Hosting Apps/Jobs.cs), workflow runs (CustomAgents Workflows/Engine/Composition.cs) and team mailboxes (Teams/Messaging.cs)."
+      "notes": "PiSharp buffers one frame per commit with a 100-frame limit (Observation.cs); folding uses PendingOps from area chord-watch. PiSharp-only consumers that expect one call per commit: the device server's agent and document frames (Server AgentFrames.cs; decision 0008 says one batch per commit, which becomes one batch per delivery: state it in the decision when phase 8 updates the docs), the web agent's per-tab mux and pisharp durable's TUI. Address-following: PiSharp-only code that waits for a task-scoped document's end relies on the [[r, null]] retirement end today and must test retired and stop the watch, or it lives until the Session ends: ask_user_question and plan approval (UserInteraction.cs), job approvals (Hosting Apps/Jobs.cs), workflow runs (CustomAgents Workflows/Engine/Composition.cs) and team mailboxes (Teams/Messaging.cs). Session/Observation.cs was deleted by area watches (2cce573d); its committed-state observers are Chord's Watch (Chord/Watch.cs) and the view and task graph observers, so this area no longer edits it."
     },
     {
       "id": "partial-commits",
@@ -2716,7 +2718,6 @@
         "src/PiSharp.Durable/Harness/TaskGraph.cs",
         "src/PiSharp.Durable/Harness/Types.cs",
         "src/PiSharp.Durable/Harness/View.cs",
-        "src/PiSharp.Durable/Session/Observation.cs",
         "src/PiSharp.Durable/Session/Session.cs",
         "src/PiSharp.Durable/Types.cs",
         "src/PiSharp.Durable/TypesSession.cs",
@@ -2769,7 +2770,7 @@
       "commits": [
         "8b0caefc2"
       ],
-      "notes": "No synchronous observer API today; PiSharp's watches sit on Observation.cs's source attachments. In .NET 'no awaits' means a callback that returns; a Task-returning advance that faults counts as rejected. Chord's self.follow, which the close-as-failed rule serves, is group F (phase 6). 8b0caefc2 also publishes commits at adoption inside Storage.commit's adopt callback, which PiSharp never had: area publication-caches ports the final publication order instead (its session-adoption cases)."
+      "notes": "No synchronous observer API today; PiSharp's watches sit on Observation.cs's source attachments. In .NET 'no awaits' means a callback that returns; a Task-returning advance that faults counts as rejected. Chord's self.follow, which the close-as-failed rule serves, is group F (phase 6). 8b0caefc2 also publishes commits at adoption inside Storage.commit's adopt callback, which PiSharp never had: area publication-caches ports the final publication order instead (its session-adoption cases). Session/Observation.cs was deleted by area watches (2cce573d); its committed-state observers are Chord's Watch (Chord/Watch.cs) and the view and task graph observers, so this area no longer edits it."
     },
     {
       "id": "view",
@@ -4470,7 +4471,6 @@
         "src/PiSharp.Durable/Harness/Scheduler.cs",
         "src/PiSharp.Durable/Session/CachedStorage.cs (new)",
         "src/PiSharp.Durable/Session/ConversationTails.cs (new)",
-        "src/PiSharp.Durable/Session/Observation.cs",
         "src/PiSharp.Durable/Session/Session.cs",
         "src/PiSharp.Durable/TypesStorage.cs",
         "tests/PiSharp.Durable.Tests/Harness/HarnessContextCases.cs",
@@ -4512,7 +4512,7 @@
         "8b0caefc2",
         "e5c6182ba"
       ],
-      "notes": ".NET has no macrotask/microtask split: the area defines the C# order (Durable observers, then commit observers, then waits and abort signals) and pins it with the ported adoption and observer tests (session-adoption.test.ts, session-observers.test.ts). The Fixed#8 case matters for PiSharp's JSONL storage. Records and JSON values are immutable in PiSharp (Context.cs: upstream's freezeJson has no counterpart), so the frozen-result half holds by construction; the caches are new. SQL Server storage gains the most from the caches."
+      "notes": ".NET has no macrotask/microtask split: the area defines the C# order (Durable observers, then commit observers, then waits and abort signals) and pins it with the ported adoption and observer tests (session-adoption.test.ts, session-observers.test.ts). The Fixed#8 case matters for PiSharp's JSONL storage. Records and JSON values are immutable in PiSharp (Context.cs: upstream's freezeJson has no counterpart), so the frozen-result half holds by construction; the caches are new. SQL Server storage gains the most from the caches. Session/Observation.cs was deleted by area watches (2cce573d); its committed-state observers are Chord's Watch (Chord/Watch.cs) and the view and task graph observers, so this area no longer edits it."
     },
     {
       "id": "scheduler-idle",
@@ -6582,7 +6582,6 @@
         "tests/PiSharp.Durable.Tests/Session/SessionDefinitionsCases.cs",
         "tests/PiSharp.Durable.Tests/Session/SessionDocumentsCases.cs",
         "tests/PiSharp.Durable.Tests/Session/SessionForksCases.cs",
-        "tests/PiSharp.Durable.Tests/Session/SessionStatesCases.cs",
         "tests/PiSharp.Durable.Tests/Session/SessionSupport.cs",
         "tests/PiSharp.Durable.Tests/Session/SessionTablesCases.cs",
         "tests/PiSharp.Durable.Tests/Session/SessionWatchesCases.cs",
@@ -6691,7 +6690,7 @@
         "scheduler-idle"
       ],
       "commits": [],
-      "notes": "Runs last, after every area (and after the Chord v2 areas if the owner pulls them in). It moves the Durable suite's report label (tests/PiSharp.Durable.Tests/Program.cs Upstream, on v1.2.0 during the sync) to v1.5.0 and DurableUpstream.cs's line 1 citation once index.ts is ported; DurableWire.DurableVersion (Client Wire.cs, \"1.2.0\") is the pi-durable version the device wire announces: move it to 1.5.0 only if the device protocol keeps durable-pi compatibility at 1.5.0 (area events), otherwise leave it and say why. The upgrade case group upgrade-from-v1.2.0 (a v1.2.0-written corpus opened by v1.5.0 code, like upgrade-from-v1.1.0) lands here if the format areas have not added it. Moves every port map row to ported whose area landed with its tests passing, and checks that no needs-sync or planned row is left outside phase 6. The renamed examples (05-harness to 30-reload-and-restart) changed only their numbers unless a listed area owns them: their C# files keep their names, so only their citations move."
+      "notes": "Runs last, after every area (and after the Chord v2 areas if the owner pulls them in). It moves the Durable suite's report label (tests/PiSharp.Durable.Tests/Program.cs Upstream, on v1.2.0 during the sync) to v1.5.0 and DurableUpstream.cs's line 1 citation once index.ts is ported; DurableWire.DurableVersion (Client Wire.cs, \"1.2.0\") is the pi-durable version the device wire announces: move it to 1.5.0 only if the device protocol keeps durable-pi compatibility at 1.5.0 (area events), otherwise leave it and say why. The upgrade case group upgrade-from-v1.2.0 (a v1.2.0-written corpus opened by v1.5.0 code, like upgrade-from-v1.1.0) lands here if the format areas have not added it. Moves every port map row to ported whose area landed with its tests passing, and checks that no needs-sync or planned row is left outside phase 6. The renamed examples (05-harness to 30-reload-and-restart) changed only their numbers unless a listed area owns them: their C# files keep their names, so only their citations move. Session/SessionStatesCases.cs was deleted by area watches (2cce573d), so this area no longer edits it."
     }
   ],
   "excluded": [

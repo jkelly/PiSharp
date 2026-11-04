@@ -12,7 +12,8 @@
 //   area in area order;
 // - waves: every area in exactly one wave of at most 5, its dependsOn in earlier waves, and areas that share a pisharp file (other than
 //   tests/*/Program.cs and the port map) in different waves, the earlier area in order first;
-// - files: pisharp and tests paths exist in the repository unless marked " (new)", and every needs-sync or planned port map row's
+// - files: pisharp and tests paths exist in the repository unless marked " (new)" (a file the area creates), a path marked " (removed)"
+//   (a file a landed area deleted) does not, and every needs-sync or planned port map row's
 //   upstream file is covered.
 import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
@@ -39,7 +40,8 @@ const fail = message => errors.push(message);
 const D = 'packages/durable/', C = 'packages/chord/';
 const SHARED = path => /^tests\/[^/]+\/Program\.cs$/.test(path) || path === worklist.portMap;
 const NEW = ' (new)';
-const bare = path => (path.endsWith(NEW) ? path.slice(0, -NEW.length) : path);
+const REMOVED = ' (removed)';
+const bare = path => (path.endsWith(NEW) ? path.slice(0, -NEW.length) : path.endsWith(REMOVED) ? path.slice(0, -REMOVED.length) : path);
 
 // ---------------------------------------------------------------- shape
 for (const field of ['schemaVersion', 'decision', 'portMap', 'from', 'to', 'rule', 'sizeScale', 'areas', 'excluded', 'order', 'waves'])
@@ -194,7 +196,8 @@ for (const area of areas) {
   const paths = [...(area.pisharp ?? []), ...(area.tests ?? []).map(test => test.pisharp).filter(Boolean)];
   for (const path of paths) {
     if (/\\|^\//.test(path)) fail(`area ${area.id}: ${path} is not a repository-relative path`);
-    if (!path.endsWith(NEW) && !existsSync(join(root, path))) fail(`area ${area.id}: ${path} does not exist; mark a file to create " (new)"`);
+    if (path.endsWith(REMOVED)) { if (existsSync(join(root, bare(path)))) fail(`area ${area.id}: ${path} still exists`); }
+    else if (!path.endsWith(NEW) && !existsSync(join(root, path))) fail(`area ${area.id}: ${path} does not exist; mark a file to create " (new)" or one a landed area deleted " (removed)"`);
   }
   for (const test of area.tests ?? []) if (!(area.upstream ?? []).some(entry => entry.path === test.upstream))
     fail(`area ${area.id}: tests names ${test.upstream}, which is not in its upstream list`);

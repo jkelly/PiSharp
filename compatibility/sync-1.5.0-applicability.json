@@ -56,11 +56,11 @@
     "changelogBullets": 477,
     "repeatedBullets": 23,
     "byStatus": {
-      "ported": 192,
+      "ported": 194,
       "ported-with-deferral": 24,
       "already-ported": 12,
       "no-op": 25,
-      "port": 73
+      "port": 71
     },
     "byArea": {
       "ai": 58,
@@ -8518,7 +8518,7 @@
       "id": "durable.watch-handles",
       "area": "durable",
       "phase": 4,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "durable@1.5.0/Breaking Changes#5",
         "durable@1.5.0/Breaking Changes#6",
@@ -8550,7 +8550,40 @@
         "tests/PiSharp.Durable.Tests/Session/SessionWatchesCases.cs"
       ],
       "release": "1.5.0",
-      "notes": "PiSharp's IWatchHandle<T>, WatchEnd(Reason, Error) and WatchEndReason (TypesSession.cs:161-218) and Session/Observation.cs port v1.2.0's observation.ts, which upstream deleted. The Chord side (chord@1.5.0/Added#8, Added#9, Breaking Changes#3, #5, #6 and #7) is group F, phase 6: phase 4 ports the subset Durable needs into PiSharp.Durable/Chord, as decision 0005 §1 does for the rest of Chord, and phase 6 reconciles. PiSharp-only listeners change shape: Hosting Apps/Jobs.cs:780 and Feeds.cs, CustomAgents Teams/Messaging.cs:293, Orchestration.cs:130, :393 and :548, Workflows/Engine/Composition.cs:300, Durable.Tools Interaction/UserInteraction.cs:131, and pisharp durable (DurableRuntime.cs). Land with durable.document-watch-address, durable.watch-folding and durable.observers."
+      "notes": "PiSharp's IWatchHandle<T>, WatchEnd(Reason, Error) and WatchEndReason (TypesSession.cs:161-218) and Session/Observation.cs port v1.2.0's observation.ts, which upstream deleted. The Chord side (chord@1.5.0/Added#8, Added#9, Breaking Changes#3, #5, #6 and #7) is group F, phase 6: phase 4 ports the subset Durable needs into PiSharp.Durable/Chord, as decision 0005 §1 does for the rest of Chord, and phase 6 reconciles. PiSharp-only listeners change shape: Hosting Apps/Jobs.cs:780 and Feeds.cs, CustomAgents Teams/Messaging.cs:293, Orchestration.cs:130, :393 and :548, Workflows/Engine/Composition.cs:300, Durable.Tools Interaction/UserInteraction.cs:131, and pisharp durable (DurableRuntime.cs). Land with durable.document-watch-address, durable.watch-folding and durable.observers.",
+      "evidence": {
+        "commits": [
+          "2cce573d",
+          "bcfa9515",
+          "6885ab6b"
+        ],
+        "tests": [
+          "tests/PiSharp.Durable.Tests/Session/SessionWatchesCases.cs: keeps-the-acquisition-revision-until-start-then-delivers-the-commits-since-in-one-call",
+          "tests/PiSharp.Durable.Tests/Session/SessionWatchesCases.cs: serializes-callbacks-and-folds-the-commits-made-while-one-is-in-flight-into-the-next",
+          "tests/PiSharp.Durable.Tests/Session/SessionWatchesCases.cs: folds-101-pending-commits-of-one-field-into-one-set",
+          "tests/PiSharp.Durable.Tests/Session/SessionWatchesCases.cs: replaces-the-root-once-more-than-10000-ops-are-pending-after-folding",
+          "tests/PiSharp.Durable.Tests/Session/SessionWatchesCases.cs: never-folds-the-in-flight-frame-into-the-next-call",
+          "tests/PiSharp.Durable.Tests/Session/SessionWatchesCases.cs: folds-retirement-over-pending-commits-and-then-closes",
+          "tests/PiSharp.Durable.Tests/Session/SessionWatchesCases.cs: delivers-retirement-and-does-not-follow-recreation",
+          "tests/PiSharp.Durable.Tests/Session/SessionWatchesCases.cs: supports-idempotent-stop-and-rejects-repeated-or-late-start",
+          "tests/PiSharp.Durable.Tests/Session/SessionWatchesCases.cs: cancels-acquisition-without-leaking-a-registered-watch",
+          "tests/PiSharp.Durable.Tests/Session/SessionWatchesCases.cs: cancels-future-delivery-without-aborting-an-in-flight-callback",
+          "tests/PiSharp.Durable.Tests/Session/SessionWatchesCases.cs: session-close-stops-future-delivery-without-joining-an-in-flight-callback",
+          "tests/PiSharp.Durable.Tests/Session/SessionWatchesCases.cs: settles-listener-failure-on-only-the-affected-watch",
+          "tests/PiSharp.Durable.Tests/Session/SessionWatchesCases.cs: retains-neither-its-session-nor-its-listener-once-stopped-while-still-referenced",
+          "tests/PiSharp.Durable.Tests/Harness/HarnessViewCases.cs: folds-undelivered-commits-into-one-call-whose-ops-reach-the-newest-view",
+          "tests/PiSharp.Durable.Tests/Harness/HarnessViewCases.cs: ends-watches-at-close-and-rejects-later-acquisition",
+          "tests/PiSharp.Durable.Tests/Harness/HarnessViewCases.cs: shares-one-mount-between-concurrent-observers-and-isolates-a-failing-listener",
+          "tests/PiSharp.Durable.Tests/Harness/HarnessTaskGraphCases.cs: follows-every-live-task-through-its-statuses-owner-edges-and-owned-conversations",
+          "tests/PiSharp.Durable.Tests/Harness/HarnessTaskGraphCases.cs: registers-nothing-for-an-acquisition-cancelled-while-it-waits-for-the-line",
+          "tests/PiSharp.Durable.Tests/Harness/HarnessTaskGraphCases.cs: publishes-no-revision-for-a-commit-that-changes-no-node-and-shares-one-mount-between-observers",
+          "tests/PiSharp.Durable.Tests/Harness/HarnessLifecycleCases.cs: publishes-no-frame-to-watches-from-a-commit-that-settles-during-close",
+          "tests/PiSharp.Durable.Tests/Harness/HarnessLifecycleCases.cs: leaves-no-subscription-behind-a-watch-acquisition-cancelled-on-the-line",
+          "tests/PiSharp.Durable.Tests/HarnessStorageFailureCases.cs: ends-everything-with-the-first-error-the-call-later-calls-waits-watches-streams-running-tasks",
+          "tests/PiSharp.Durable.Tests/HarnessStorageFailureCases.cs: ends-what-a-task-holds-as-failed-not-as-cancelled-by-its-signal",
+          "tests/PiSharp.Durable.Tests/HarnessStorageFailureCases.cs: reports-a-throwing-watch-listener-which-ends-that-watch"
+        ]
+      }
     },
     {
       "id": "durable.document-watch-address",
@@ -8613,7 +8646,7 @@
       "id": "durable.state-getters-removed",
       "area": "durable",
       "phase": 4,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "durable@1.5.0/Breaking Changes#9"
       ],
@@ -8640,7 +8673,28 @@
         "src/PiSharp.Cli/Durable/DurableRuntime.cs"
       ],
       "release": "1.5.0",
-      "notes": "PiSharp still exposes DocumentStateAsync, ViewStateAsync and the task graph state over its ReplicatedState port (Chord/ReplicatedState.cs). PiSharp-only callers: Server DeviceService.cs:390 (a one-off view read), Durable.Tools Interaction/UserInteraction.cs:74, and pisharp durable (DurableRuntime.cs:321 and :644, which follows the view state across revisions). Whether ReplicatedState.cs stays for Chord (phase 6) or goes with Durable's last use is group F's call. Depends on durable.watch-handles."
+      "notes": "PiSharp still exposes DocumentStateAsync, ViewStateAsync and the task graph state over its ReplicatedState port (Chord/ReplicatedState.cs). PiSharp-only callers: Server DeviceService.cs:390 (a one-off view read), Durable.Tools Interaction/UserInteraction.cs:74, and pisharp durable (DurableRuntime.cs:321 and :644, which follows the view state across revisions). Whether ReplicatedState.cs stays for Chord (phase 6) or goes with Durable's last use is group F's call. Depends on durable.watch-handles.",
+      "evidence": {
+        "commits": [
+          "2cce573d",
+          "bcfa9515",
+          "6885ab6b"
+        ],
+        "tests": [
+          "tests/PiSharp.Durable.Tests/SessionDocumentRetentionCases.cs: never-evicts-a-document-a-watch-observes-and-evicts-it-once-the-last-watch-detaches",
+          "tests/PiSharp.Durable.Tests/SessionDocumentRetentionCases.cs: does-not-keep-a-replacement-cached-for-an-observer-of-the-retired-incarnation",
+          "tests/PiSharp.Durable.Tests/SessionDocumentRetentionCases.cs: evicts-on-its-timer-without-a-commit-and-tolerates-a-stop-called-twice",
+          "tests/PiSharp.Durable.Tests/Harness/HarnessConversationsCases.cs: forwards-generic-session-document-apis",
+          "tests/PiSharp.Durable.Tests/Harness/HarnessLifecycleCases.cs: rejects-conversation-and-harness-operations-once-close-begins-inspect-queued-before-reports-closing",
+          "tests/PiSharp.Durable.Tests/Harness/HarnessLifecycleCases.cs: completes-reads-queued-at-the-seal-and-rejects-queued-waits-and-acquisitions-that-would-follow-commits",
+          "tests/PiSharp.Durable.Tests/Harness/HarnessTaskGraphCases.cs: lists-owned-conversations-in-id-order-whatever-order-one-commit-creates-them-in",
+          "tests/PiSharp.Durable.Tests/Interaction/QuestionsCases.cs: pending-committed-before-shown",
+          "tests/PiSharp.Durable.Tests/ExamplesCases.cs: examples.memory.upstream-output",
+          "tests/PiSharp.DurableCli.Tests/RuntimeCases.cs: runtime.tasks.toggle-panel",
+          "tests/PiSharp.DurableCli.Tests/RuntimeCases.cs: runtime.subagent.owned-child-conversation",
+          "tests/PiSharp.DurableCli.Tests/RuntimeLibraryCases.cs: runtime.subagent.abort-ends-the-call-and-the-child"
+        ]
+      }
     },
     {
       "id": "durable.observers",
