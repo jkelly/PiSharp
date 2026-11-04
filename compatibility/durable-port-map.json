@@ -2421,9 +2421,9 @@
       "lines": 451,
       "pisharp": "tests/PiSharp.Durable.Tests/HarnessSleepCases.cs",
       "phase": "sync-1.5.0",
-      "status": "in-progress",
+      "status": "ported",
       "upstreamChange": "added",
-      "note": "v1.5.0 (work list area sleep): harness.sleep.* (13 of 13), verbatim on MemoryStorage and a SQLite file with fake host timers (FakeTimers), and in the store pass as harness.sleep.store.* (StoreStorageNode.cs: the reopen case on a StoreStorage file, the MemoryStorage cases on a fresh StoreStorage). The `eventually(() => !harness.wake().active)` waits are 440a5fcdb's, which counts open's recovery pass and reconcile work as activity: they hold at once until area reports lands; in progress until then"
+      "note": "v1.5.0 (work list areas sleep and reports): harness.sleep.* (13 of 13), verbatim on MemoryStorage and a SQLite file with fake host timers (FakeTimers), and in the store pass as harness.sleep.store.* (StoreStorageNode.cs: the reopen case on a StoreStorage file, the MemoryStorage cases on a fresh StoreStorage). The `eventually(() => !harness.wake().active)` waits count open's recovery pass and reconcile work as activity since area reports ported 440a5fcdb"
     },
     {
       "upstream": "packages/durable/test/harness-storage-failure.test.ts",

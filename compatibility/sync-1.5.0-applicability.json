@@ -9748,7 +9748,7 @@
           "tests/PiSharp.Durable.Tests/ModelsCases.cs: models.payload.on-payload-replaces-the-json-request-body-and-null-keeps-it"
         ]
       },
-      "deferred": "Two parts wait: (1) upstream reports a throwing hook with ReportInfo naming the extension; ReportInfo is area reports', so the case checks the report's message. (2) The web agent's account routes (src/PiSharp.WebAgent/Routing/AccountRouter.cs via WebDurableModels, outside this area's files) build their transports on an unwrapped provider handler, so the hook reaches the web agent's native routes but not its account routes; wrapping that handler with NativeDurableModels.PayloadHandler.Wrap (internal today) is a follow-up."
+      "deferred": "One part waits: the web agent's account routes (src/PiSharp.WebAgent/Routing/AccountRouter.cs via WebDurableModels, outside the durable areas' files) build their transports on an unwrapped provider handler, so the hook reaches the web agent's native routes but not its account routes; wrapping that handler with NativeDurableModels.PayloadHandler.Wrap (internal today) is a follow-up. A throwing hook's report names its extension in ReportInfo since area reports (f4373fcf)."
     },
     {
       "id": "durable.thinking-level-recorded",
