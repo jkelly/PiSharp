@@ -1791,7 +1791,10 @@
       ],
       "commits": [
         "bb65e3e49",
-        "e17e2e105"
+        "e17e2e105",
+        "81a37065",
+        "f7388640",
+        "2e4a9bee"
       ],
       "notes": "Codemode.cs reads DateTimeOffset.UtcNow for its start, deadline and resume check; switch to IToolExecutionApi.Now() from area sleep. durable.codemode-declarations-import is no-op and sits here as the nearest area: PiSharp runs Jint, not QuickJS, and has no module graph (codemode-imports.test.ts is skipped in the port map). codemode.ts also changes for owned slices (no-op), checkpointWhen (area checkpoint-when), searchTools ranking (area tool-search), pi-schema declarations and read's image blocks (area tools-schema); the upstream list's alsoChangedBy names them, and this area, the last of them in order, re-pins Codemode.cs. The compat.codemode.* cases keep their fingerprint difference (Jint)."
     },

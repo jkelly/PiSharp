@@ -56,11 +56,11 @@
     "changelogBullets": 477,
     "repeatedBullets": 23,
     "byStatus": {
-      "ported": 187,
+      "ported": 188,
       "ported-with-deferral": 22,
       "already-ported": 12,
       "no-op": 25,
-      "port": 80
+      "port": 79
     },
     "byArea": {
       "ai": 58,
@@ -9868,7 +9868,7 @@
       "id": "durable.codemode-harness-clock",
       "area": "durable",
       "phase": 4,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "durable@1.4.0/Changed#4"
       ],
@@ -9882,7 +9882,18 @@
         "tests/PiSharp.Durable.Tests/CodemodeCases.cs"
       ],
       "release": "1.5.0",
-      "notes": "Codemode.cs:258 reads DateTimeOffset.UtcNow, which the deadline (:326) and the resume check (:372) use. Depends on durable.host-timers for IToolExecutionApi.Now(). Code mode's other changes in the range: owned slices (durable.owned-slices, no-op), checkpointWhen (durable.checkpoint-when-required), searchTools ranking (durable.tool-search-ranking) and pi-schema (durable.pi-schema-tools)."
+      "notes": "Codemode.cs:258 reads DateTimeOffset.UtcNow, which the deadline (:326) and the resume check (:372) use. Depends on durable.host-timers for IToolExecutionApi.Now(). Code mode's other changes in the range: owned slices (durable.owned-slices, no-op), checkpointWhen (durable.checkpoint-when-required), searchTools ranking (durable.tool-search-ranking) and pi-schema (durable.pi-schema-tools).",
+      "evidence": {
+        "commits": [
+          "99bcf00f",
+          "81a37065",
+          "2e4a9bee"
+        ],
+        "tests": [
+          "tests/PiSharp.Durable.Tests/CodemodeCases.cs: codemode.reads-the-script-s-start-its-results-times-and-its-wall-time-from-the-harness-clock",
+          "tests/PiSharp.Durable.Tests/CodemodeCases.cs: codemode.measures-the-script-s-deadline-on-the-harness-clock-across-a-restart"
+        ]
+      }
     },
     {
       "id": "durable.codemode-declarations-import",
@@ -9900,7 +9911,7 @@
       "pisharp": [],
       "release": "1.5.0",
       "notes": "Nothing to port beyond the citation re-pin of Codemode.cs.",
-      "evidence": "JavaScript module-graph fix: PiSharp has no WASM QuickJS runtime. DurableCodemode calls PiSharp.Codemode's static CodemodeIdentifier.ToIdentifier (src/PiSharp.Durable.Tools/Codemode/Codemode.cs:295), and the Jint engine starts only when a CodemodeSandbox run starts, so the helper loads no engine."
+      "evidence": "src/PiSharp.Durable.Tools/Codemode/Codemode.cs:304 calls PiSharp.Codemode's static CodemodeIdentifier.ToIdentifier, which starts no engine (Jint starts only when a CodemodeSandbox run starts); PiSharp has no WASM QuickJS runtime and no module graph, so upstream's /declarations import (bb65e3e49) has nothing to port. Recorded in the Codemode.cs header (line 24); codemode-imports.test.ts stays skipped in the port map."
     },
     {
       "id": "durable.tool-search-ranking",
