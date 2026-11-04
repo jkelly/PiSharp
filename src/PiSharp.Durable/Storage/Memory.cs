@@ -1,12 +1,12 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/src/storage/memory.ts.
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/src/storage/memory.ts.
 //
 // Upstream clones every retained write and every read result, and deep-freezes prepared writes, to simulate the ownership boundary that
 // serialization gives SQLite and JSONL (spec §4, §11.1). Records and JSON values here are immutable, so sharing them is already detached:
 // no caller can change a retained value or a read result, and the copies are omitted. Upstream runs on one JavaScript thread; this port
 // takes one lock per operation so that concurrent reads never observe a half-applied commit. The Session still serializes commits.
 // The batch validation, addressing and paging rules are shared with SqliteStorage (StorageRules.cs).
-// Pi v1.5.0 (f9a26365568127461c47a07a37dcb42c140a3ac5, area storage-batches): the batch commit. The sleeping status follows with area
-// sleep; until then the rest of the file follows v1.2.0.
+// Pi v1.5.0 (f9a26365568127461c47a07a37dcb42c140a3ac5, area storage-batches): the batch commit. Area sleep: the status index has the
+// sleeping status, as every DurableTaskStatus value has one (upstream f75b3240a).
 using System.Collections.Immutable;
 using PiSharp.Durable.Chord;
 

@@ -10,6 +10,8 @@
 // Pi v1.5.0 sync (area model-requests): HarnessOptions.Identity over DEFAULT_HARNESS_IDENTITY, applied by currentModels through
 // withClientIdentity (adc5fa9f8, 04a93bad8). Upstream's default attributes requests to pi (PI_ATTRIBUTION); PiSharp's is empty and adds no
 // attribution, as PiSharp.Agent's DefaultIdentity, until the owner decides core.client-identity-attribution.
+// Pi v1.5.0 sync (area sleep): HarnessOptions.SetTimer reaches the Session (document sweeps) and the scheduler as hostTimers, each over
+// the default timers of HarnessOptions.TimeProvider; wake() and HarnessOptions.OnWake (f75b3240a, ec1be23eb).
 using System.Collections.Immutable;
 using PiSharp.AI;
 using PiSharp.Durable.Chord;
@@ -95,7 +97,8 @@ internal sealed class DurableHarness : Session, IHarness
     private DurableHarness(IStorage rawStorage, HarnessOptions options, DurableContext context, Action<Exception> report,
         Func<HarnessSettings?> hostSettings)
         // Read at each use, as all settings are, but only this field: it is read on every commit.
-        : base(rawStorage, SafeNow(Clock(options), options.Now is not null, report), () => hostSettings()?.DocumentRetentionMs, options.ReadOnly)
+        : base(rawStorage, SafeNow(Clock(options), options.Now is not null, report), () => hostSettings()?.DocumentRetentionMs, options.ReadOnly,
+            options.SetTimer, options.TimeProvider)
     {
         // Every component reads and writes through the Session's failure guard: rawStorage serves only the base constructor.
         var storage = GuardedStorage;
@@ -114,7 +117,8 @@ internal sealed class DurableHarness : Session, IHarness
             Settings = () => Agents.ResolveSettings(hostSettings()),
             Env = BuildEnvAsync,
             Now = Now,
-            TimeProvider = options.TimeProvider ?? TimeProvider.System,
+            OnWake = options.OnWake,
+            Timers = new HostTimers(options.SetTimer, NativeTimer.Of(options.TimeProvider ?? TimeProvider.System), report),
             Report = report,
             SettleOutcome = (tx, record, outcome) => Live.SettleSchedulerOutcomeAsync(tx, record, outcome),
             WithdrawInputs = (tx, id) => Inbox.WithdrawQueuedInputsAsync(tx, id),
@@ -229,6 +233,12 @@ internal sealed class DurableHarness : Session, IHarness
     {
         AssertUsable();
         scheduler.Resume();
+    }
+
+    public Wake Wake()
+    {
+        AssertUsable();
+        return scheduler.Wake();
     }
 
     public Task<TaskRecord?> GetTaskAsync(TaskId id, DurableContext context) => ReadOnLineAsync(() => storage.GetTaskAsync(id, context));

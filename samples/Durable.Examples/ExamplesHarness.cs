@@ -3,7 +3,9 @@
 // Each prints what upstream's console.log prints, with JSON in place of util.inspect (so a property whose value is undefined is absent).
 // Upstream's createModels() with no provider is EmptyDurableModels; 11's faux provider is ScriptedModels. On a file backend, 06, 07, 11 and
 // 12 reopen their storage in a new Session and read back what they stored. 13 is itself a close-and-reopen example: on memory it keeps its
-// storage in a temporary SQLite file as upstream does, and on a file backend it reopens the runner's storage.
+// storage in a temporary SQLite file as upstream does, and on a file backend it reopens the runner's storage. Pi v1.5.0 sync (area sleep):
+// 13's pause between ticks is a durable sleep (runtime.SleepUntilAsync), as f75b3240a's 13-recovery.ts (v1.5.0's 12-recovery.ts) has it;
+// the rest of the file stays on v1.2.0 until its other areas land.
 using PiSharp.Durable.Chord;
 using PiSharp.Durable.Sqlite;
 using PiSharp.Durable.Storage;
@@ -505,14 +507,15 @@ public static partial class Examples
                         await output.WriteLineAsync($"tick {n}");
                     }
                     await reachedTick(n, runtime.Signal);
-                    // Save the outcome: the next tick, or the final result.
+                    // Save the outcome: the final result, or the next tick after a short sleep. The sleep is stored with the checkpoint, so the
+                    // task holds no invocation meanwhile, and a Harness opened later continues it once its time has come.
                     var to = (int)((JsonNumberValue)((JsonObjectValue)task.Input)["to"]).Value;
-                    await runtime.CommitAsync((_, _) => n == to
-                        ? NextTaskState.Completed($"counted to {n}")
-                        : NextTaskState.Running(JsonValue.Object([new("phase", "tick"), new("n", n + 1)])), taskContext);
-                    // Wait a little between ticks. Closing the Harness cancels this wait; the checkpoint saved above is where the next Harness
-                    // continues.
-                    await runtime.SleepAsync(runtime.Now() + 50, taskContext);
+                    if (n == to)
+                    {
+                        await runtime.CommitAsync((_, _) => NextTaskState.Completed($"counted to {n}"), taskContext);
+                        return;
+                    }
+                    await runtime.SleepUntilAsync(runtime.Now() + 50, JsonValue.Object([new("phase", "tick"), new("n", n + 1)]), taskContext);
                 },
             },
             Abort = (_, runtime, taskContext) => runtime.CommitAsync((_, _) => NextTaskState.Aborted(), taskContext),

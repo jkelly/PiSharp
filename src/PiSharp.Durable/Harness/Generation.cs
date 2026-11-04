@@ -5,7 +5,10 @@
 // and overflow recovery use the per-model compaction policy (upstream 6085986e4, #10942); the citation stays on v1.2.0 until the file's
 // other areas land. Pi v1.5.0 sync (area model-requests): classify records the requested thinking level on every provider message it
 // handles, and a poll checkpoint pins it (upstream d5b3de22d); a request passes the beforeProviderRequest chain as its onPayload
-// (upstream d280e1ffa), only when the phase's agent has such a hook.
+// (upstream d280e1ffa), only when the phase's agent has such a hook. Pi v1.5.0 sync (area sleep): retry backoffs and deferred polls
+// sleep instead of waiting in a running phase, and a retry or poll run before its time (an early wake, or a record an earlier version
+// stored as running) sleeps again; poll checks pollAt before the model lookup (f75b3240a, ec1be23eb). The partial throttle arms
+// runtime.SetTimer.
 //
 // Mappings:
 // - Checkpoints, live state and results are upstream's JSON, built in upstream's key order: prepare {phase, attempt, compacted?, overflow?},
@@ -16,8 +19,8 @@
 //   compact frames, not upstream's events carrying a `partial`; the partial is the snapshot of a PiSharp.AI AssistantStreamReducer fed
 //   every non-terminal event. A message with a non-finite usage count is not strict JSON and throws Chord's copyJson error, as upstream's
 //   copy does; PiWireJson alone would write it as null.
-// - The partial throttle's setTimeout is a timer of the Harness TimeProvider (the scheduler's), so fake time drives it as vi fake timers
-//   would. Its one commit in flight is tracked under a lock: timer callbacks run on other threads.
+// - The partial throttle's timers are runtime.SetTimer's (HarnessOptions.SetTimer), so fake time drives them as vi fake timers would. Its
+//   one commit in flight is tracked under a lock: timer callbacks run on other threads.
 // - The invocation signal is ITaskRuntime.Signal: it is passed to the stream and polls as their cancellation token, and
 //   `signal.throwIfAborted()` throws OperationCanceledException.
 using System.Collections.Immutable;
@@ -256,12 +259,18 @@ internal static class GenerationPhases
             .ConfigureAwait(false);
     }
 
+    /// <summary>After the backoff's sleep; a run before <c>until</c> (an early wake, or a record of an earlier version) sleeps again.</summary>
     public static async Task RetryAsync(RunningTask task, ITaskRuntime runtime, DurableContext context)
     {
         var checkpoint = (JsonObjectValue)task.Checkpoint;
         var attempt = Attempt(checkpoint);
         var compacted = OptionalTask(checkpoint, "compacted");
-        await runtime.SleepAsync(((JsonNumberValue)checkpoint["until"]).Value, context).ConfigureAwait(false);
+        var until = ((JsonNumberValue)checkpoint["until"]).Value;
+        if (until > runtime.Now())
+        {
+            await runtime.SleepUntilAsync(until, checkpoint, context).ConfigureAwait(false);
+            return;
+        }
         await runtime.CommitAsync(async (tx, _) =>
         {
             (await tx.DocAsync(Live.LiveDoc, runtime.ConversationId).ConfigureAwait(false)).Set("generation", GenerationState(attempt + 1));
@@ -269,9 +278,16 @@ internal static class GenerationPhases
         }, context).ConfigureAwait(false);
     }
 
+    /// <summary>After the sleep until <c>pollAt</c>; a run before it (an early wake, or a record of an earlier version) sleeps again.</summary>
     public static async Task PollAsync(RunningTask task, ITaskRuntime runtime, DurableContext context)
     {
         var checkpoint = (JsonObjectValue)task.Checkpoint;
+        var pollAt = ((JsonNumberValue)checkpoint["pollAt"]).Value;
+        if (pollAt > runtime.Now())
+        {
+            await runtime.SleepUntilAsync(pollAt, checkpoint, context).ConfigureAwait(false);
+            return;
+        }
         var reference = ModelRef.FromJson(checkpoint["model"])!;
         var model = runtime.Models.GetModel(reference.Provider, reference.ModelId);
         if (model is null)
@@ -279,8 +295,6 @@ internal static class GenerationPhases
             await FailNoModelAsync(runtime, reference, context).ConfigureAwait(false);
             return;
         }
-        var pollAt = ((JsonNumberValue)checkpoint["pollAt"]).Value;
-        await runtime.SleepAsync(pollAt, context).ConfigureAwait(false);
         var handle = new DurableDeferredHandle((JsonObjectValue)checkpoint["handle"]);
         var fetched = await runtime.Models.FetchDeferredAsync(model, handle, runtime.Signal).ConfigureAwait(false);
         // A checkpoint an earlier version wrote has no thinking level, and its answer records none.
@@ -429,21 +443,22 @@ internal static class GenerationPhases
     private static async Task<JsonObjectValue> StreamResponseAsync(ITaskRuntime runtime, DurableModel model, ImmutableArray<JsonValue> messages,
         DurableStreamOptions options, int attempt, DurableContext context)
     {
-        var interval = TimeSpan.FromMilliseconds(Math.Max(0, runtime.Settings.Progress.PartialIntervalMs));
-        var time = (runtime as ITaskTimeSource)?.TimeProvider ?? TimeProvider.System;
+        var interval = runtime.Settings.Progress.PartialIntervalMs;
         var gate = new Lock();
         AssistantMessage? pending = null;
-        ITimer? timer = null;
+        // Disarms the armed timer.
+        Action? timer = null;
         Task? inFlight = null;
         var stopped = false;
 
-        void Schedule() => timer = time.CreateTimer(_ => Flush(), null, interval, Timeout.InfiniteTimeSpan);
+        // Called under the lock: runtime.SetTimer arms the host's timer, which must not block, and a timer that fires synchronously finds
+        // the lock reentrant.
+        void Schedule() => timer = runtime.SetTimer(Flush, interval);
 
         void Flush()
         {
             lock (gate)
             {
-                timer?.Dispose();
                 timer = null;
                 var partial = pending;
                 pending = null;
@@ -514,13 +529,15 @@ internal static class GenerationPhases
         finally
         {
             Task? flushing;
+            Action? disarm;
             lock (gate)
             {
                 stopped = true;
-                timer?.Dispose();
+                disarm = timer;
                 timer = null;
                 flushing = inFlight;
             }
+            disarm?.Invoke();
             if (flushing is not null) await flushing.ConfigureAwait(false);
         }
     }
@@ -554,7 +571,7 @@ internal static class GenerationPhases
                     .Add("handle", handle)
                     .Number("pollAt", pollAt)
                     .Build();
-                return (TaskState?)NextTaskState.Running(checkpoint);
+                return (TaskState?)NextTaskState.Sleeping(checkpoint, pollAt);
             }, context).ConfigureAwait(false);
             return;
         }
@@ -610,7 +627,7 @@ internal static class GenerationPhases
                 live.Set("generation", new RecordJson.Writer().Number("attempt", attempt).Add("retry", retryState).Build());
                 var checkpoint = new RecordJson.Writer().Add("phase", "retry").Number("attempt", attempt).Add("compacted", compacted?.ToJson())
                     .Number("until", until).Build();
-                return (TaskState?)NextTaskState.Running(checkpoint);
+                return (TaskState?)NextTaskState.Sleeping(checkpoint, until);
             }
             var text = Str(message, "errorMessage") ?? $"Model response ended with stop reason {stopReason ?? "undefined"}";
             Live.EndRun(tx, live, runtime.TaskId, SubmissionSettlement.Unanswered("model_error", text));
@@ -905,11 +922,4 @@ internal static class GenerationPhases
 
     private static double? OptionalNumber(JsonObjectValue value, string key) =>
         value.TryGetValue(key, out var field) && field is JsonNumberValue number ? number.Value : null;
-}
-
-/// <summary>The timers of a task runtime: the Harness TimeProvider, which drives the partial throttle as upstream's setTimeout.</summary>
-internal interface ITaskTimeSource
-{
-    /// <summary>The Harness TimeProvider.</summary>
-    TimeProvider TimeProvider { get; }
 }

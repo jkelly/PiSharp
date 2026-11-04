@@ -15,7 +15,7 @@
 // - `runtime.signal.aborted` is ITaskRuntime.Signal; an abort reaches a running tool as its context's cancellation, so the tool rejects
 //   with an OperationCanceledException (upstream's AbortError) or the reason.
 // - The tool reports from any thread; what it reported (output buffer, diagnostics, details, the ended flag) sits behind one lock, and the
-//   progress commits run on the Harness TimeProvider's timers (output.ts). A nested call is admitted under that lock, so none starts after
+//   progress commits run on the Harness clock and runtime.SetTimer timers (output.ts, upstream progressClock). A nested call is admitted under that lock, so none starts after
 //   the call ended, as upstream's single thread guarantees.
 // - Upstream chains each nested call's admission on the attempt's madeNestedCalls memo, so admissions commit in call order, back to back
 //   once the memo committed. NestedCalls queues them behind the memo and enqueues their commits in call order under one lock, so the
@@ -422,7 +422,26 @@ internal static class ToolPhases
             if (runtime.Signal.IsCancellationRequested) return;
             try { runtime.Report(error); }
             catch (Exception) { /* the invocation ended */ }
-        }, runtime.Settings.Progress.OutputIntervalMs, (runtime as ITaskTimeSource)?.TimeProvider);
+        }, runtime.Settings.Progress.OutputIntervalMs, ProgressClockOf(runtime));
+    }
+
+    /// <summary>The Harness clock and timers for progress pacing (upstream <c>progressClock</c>). After the invocation ends nothing more
+    /// commits, and the clock answers with the last time it read.</summary>
+    private static ProgressClock ProgressClockOf(ITaskRuntime runtime)
+    {
+        var last = 0d;
+        return new ProgressClock(() =>
+        {
+            try
+            {
+                Interlocked.Exchange(ref last, runtime.Now());
+            }
+            catch (Exception)
+            {
+                // The invocation ended.
+            }
+            return Interlocked.CompareExchange(ref last, 0, 0);
+        }, runtime.SetTimer);
     }
 
     /// <summary>
@@ -1073,6 +1092,8 @@ internal sealed class ToolExecutionApi : IToolExecutionApi
     public IExecutionEnv? Env { get; }
     public ShellOutputWindow? OutputWindow { get; }
 
+    public double Now() => runtime.Now();
+
     public Task<Agent> AgentAsync(DurableContext context) => runtime.AgentAsync(context);
 
     public void Output(string chunk, ShellOutputSkip? skipped = null)
@@ -1259,6 +1280,8 @@ public class DelegatingToolExecutionApi(IToolExecutionApi inner) : IToolExecutio
     public virtual IDurableModels Models => Inner.Models;
     /// <inheritdoc/>
     public virtual IExecutionEnv? Env => Inner.Env;
+    /// <inheritdoc/>
+    public virtual double Now() => Inner.Now();
     /// <inheritdoc/>
     public virtual ShellOutputWindow? OutputWindow => Inner.OutputWindow;
     /// <inheritdoc/>

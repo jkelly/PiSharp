@@ -32,6 +32,8 @@ using PiSharp.Durable.Examples;
 // baseline and leads the context past assistant messages, where Pi v1.2.0 printed it after them. The lines follow v1.5.0's context.ts and
 // examples/24-compaction.ts's printing; no v1.5.0 run was captured. Area tools-schema: 19's lines declare the built-in tools with
 // pi-schema's key order ("properties" before "required"), authored from the v1.2.0 capture (ToolsSchema150.cs), not captured.
+// Area sleep: 24-child-tasks's tree lines print the charged payments as sleeping, authored from f75b3240a's 24-child-tasks.ts (v1.5.0's
+// 23-child-tasks.ts, whose payments end their charge phase in runtime.sleepUntil), not captured; 13-recovery's lines are unchanged.
 internal static partial class Program
 {
     private static readonly string[] CodingToolsTranscript =
@@ -226,10 +228,10 @@ internal static partial class Program
         "  checkout: failed",
         "The customer cancels:",
         "  example.checkout 12: waiting on 13, 14, 15, 16",
-        "    example.payment 13: running",
-        "    example.payment 14: running",
-        "    example.payment 15: running",
-        "    example.payment 16: running",
+        "    example.payment 13: sleeping",
+        "    example.payment 14: sleeping",
+        "    example.payment 15: sleeping",
+        "    example.payment 16: sleeping",
         "  payment visa-5 aborted, refunded",
         "  payment visa-6 aborted, refunded",
         "  payment visa-7 aborted, refunded",

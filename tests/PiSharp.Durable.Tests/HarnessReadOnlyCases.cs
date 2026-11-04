@@ -3,7 +3,7 @@
 // adaptations in HarnessSupport.cs and ChatSupport.cs, and these:
 // - openNodeSqliteStorage is SqliteStorage.OpenAsync, and head() reads durable_metadata through Microsoft.Data.Sqlite (a pool-free
 //   connection, as upstream's DatabaseSync is one connection).
-// - Harness.wake() and HarnessOptions.onWake do not exist here yet (area sleep): the first case does not check them.
+// - Area sleep: the first case checks Harness.Wake() and HarnessOptions.OnWake as upstream does.
 // - TaskRecord.restarts does not exist here yet (area restarts): the last case checks the pending status only.
 // - ReadOnlySession is ReadOnlySessionException; root.commit(() => "nothing") is a CommitAsync whose callback writes nothing.
 using Microsoft.Data.Sqlite;
@@ -26,13 +26,14 @@ internal static class ReadOnlyTests
 
     private static string SqlitePath() => Path.Combine(Temp("read-only"), "session.sqlite");
 
-    private static async Task<IHarness> OpenReadOnly(string path, ChatSetup setup) =>
+    private static async Task<IHarness> OpenReadOnly(string path, ChatSetup setup, Action<Wake>? onWake = null) =>
         await Harness.OpenAsync(await SqliteStorage.OpenAsync(path), new HarnessOptions
         {
             Models = setup.Models,
             Registry = setup.Registry,
             ReadOnly = true,
             OnReport = setup.Reports.Add,
+            OnWake = onWake,
         }, Context);
 
     /// <summary>The next sequence the file would commit, read beside every open handle; null before the schema exists.</summary>
@@ -70,17 +71,20 @@ internal static class ReadOnlyTests
             var setup = Setup();
             var driver = await RunningSession(path, setup);
             var before = Head(path);
+            var wakes = new SyncList<Wake>();
 
-            var viewer = await OpenReadOnly(path, Setup());
+            var viewer = await OpenReadOnly(path, Setup(), wakes.Add);
             var root = await viewer.RootAsync(Context);
             Seq(["pi.user"], (await AllEntries(root)).Select(entry => entry.Kind), "kinds");
             var run = await RunTaskId(viewer, root);
             Equal(DurableTaskStatus.Running, (await viewer.GetTaskAsync(run, Context))?.State.Status, "the run's status");
             var inspection = await viewer.InspectAsync(Context);
             Equal(HarnessScheduling.Paused, inspection.Scheduling, "scheduling");
+            Equal(new Wake(false), viewer.Wake(), "wake");
             await viewer.CloseAsync(Context);
 
             Equal(before, Head(path), "head");
+            Seq([], wakes.Snapshot(), "wakes");
             await driver.Harness.CloseAsync(Context);
         });
 

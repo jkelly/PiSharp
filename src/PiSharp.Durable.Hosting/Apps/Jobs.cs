@@ -2,6 +2,9 @@
 // a repeatable workflow of named phases; each phase is a task checkpoint, so a restart resumes the current phase. A repeat phase runs again
 // after a durable sleep; an approval phase waits for a person in a child task that watches a task document (the pattern of decision 0005's
 // UserInteraction) instead of polling it as durable-pi does. Runs are recorded in a conversation document the UI renders as job cards.
+// Pi v1.5.0 sync (area sleep): ITaskRuntime.SleepAsync is gone. A repeat phase's pause commits a durable sleep (the task holds no
+// invocation and resumes at the phase), and a review deadline that races a decision inside a phase waits on runtime.SetTimer timers that
+// recheck the Harness clock (DelayUntilAsync).
 using System.Diagnostics;
 using System.Text;
 using PiSharp.Durable.Chord;
@@ -589,7 +592,12 @@ public static class Jobs
             await BypassAsync(phase, next, data, runtime, context).ConfigureAwait(false);
             return;
         }
-        if (checkpoint.TryGetValue("wakeAt", out var wake) && wake is JsonNumberValue at) await runtime.SleepAsync(at.Value, context).ConfigureAwait(false);
+        // A run before its time (an early wake) sleeps again.
+        if (checkpoint.TryGetValue("wakeAt", out var wake) && wake is JsonNumberValue at && at.Value > runtime.Now())
+        {
+            await runtime.SleepUntilAsync(at.Value, checkpoint, context).ConfigureAwait(false);
+            return;
+        }
         await runtime.CommitAsync((tx, running) => UpdateRunAsync(tx, running.ConversationId, running.Id,
             run => Begin(run, phase, iteration, runtime.Now())), context).ConfigureAwait(false);
         var agent = await runtime.AgentAsync(context).ConfigureAwait(false);
@@ -618,7 +626,9 @@ public static class Jobs
             {
                 await UpdateRunAsync(tx, running.ConversationId, running.Id, run => UpdatePhase(run, phase.Id,
                     item => item.SetItem("summary", result.Summary).SetItem("progress", iteration + 1))).ConfigureAwait(false);
-                return (TaskState?)NextTaskState.Running(Checkpoint(phase.Id, iteration + 1, result.Data, now + result.AgainAfterMs));
+                var wakeAt = now + result.AgainAfterMs;
+                var again = Checkpoint(phase.Id, iteration + 1, result.Data, wakeAt);
+                return wakeAt > now ? NextTaskState.Sleeping(again, wakeAt) : NextTaskState.Running(again);
             }
             JsonObjectValue? finished = null;
             await UpdateRunAsync(tx, running.ConversationId, running.Id, run =>
@@ -797,7 +807,7 @@ public static class Jobs
             // A review deadline (decision 0010) resolves the approval as expired, never approved. The decision document is written
             // only when nobody decided first, so a late person and the deadline cannot both win.
             using var stop = new CancellationTokenSource();
-            var sleeping = runtime.SleepAsync(at, context.WithCancellation(stop.Token));
+            var sleeping = DelayUntilAsync(runtime, at, context.WithCancellation(stop.Token));
             var waiting = context.WaitAsync(decided.Task);
             if (await Task.WhenAny(waiting, sleeping).ConfigureAwait(false) == sleeping && !decided.Task.IsCompleted)
             {
@@ -823,6 +833,31 @@ public static class Jobs
 
     private static JsonObjectValue? Decision(JsonObjectValue? doc) =>
         doc is not null && doc.TryGetValue("decision", out var decision) && decision is JsonObjectValue value ? value : null;
+
+    /// <summary>
+    /// Waits inside a phase until the Harness clock reaches <paramref name="until"/>, on <see cref="ITaskRuntime.SetTimer"/> timers that
+    /// recheck the clock when they fire; rejects when <paramref name="context"/> or the invocation is cancelled. Not durable: for a deadline
+    /// that races another event inside one phase, which a restart rearms from its stored time.
+    /// </summary>
+    internal static async Task DelayUntilAsync(ITaskRuntime runtime, double until, DurableContext context)
+    {
+        while (true)
+        {
+            context.ThrowIfCancellationRequested();
+            var remaining = until - runtime.Now();
+            if (remaining <= 0) return;
+            var fired = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var disarm = runtime.SetTimer(() => fired.TrySetResult(), remaining);
+            try
+            {
+                await context.WaitAsync(fired.Task).ConfigureAwait(false);
+            }
+            finally
+            {
+                disarm();
+            }
+        }
+    }
 
     // ─── Tools ──────────────────────────────────────────────────────────────
 

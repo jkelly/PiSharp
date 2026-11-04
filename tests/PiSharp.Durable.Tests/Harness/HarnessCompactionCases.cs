@@ -23,7 +23,9 @@
 // cases (6085986e4: harness.compaction.per-model-compaction-overrides.applies-the-current-model-s-override-to-the-blocking-threshold,
 // harness.compaction.per-model-compaction-overrides.applies-the-request-model-s-override-on-a-context-overflow and
 // harness.compaction.per-model-compaction-overrides.applies-the-model-s-override-when-a-compaction-selects-and-sizes-its-summary) are
-// v1.5.0's; the citation stays on v1.2.0 until the file's other areas land.
+// v1.5.0's; the citation stays on v1.2.0 until the file's other areas land. Area sleep: "resumes a retry backoff after reopen" is
+// ec1be23eb's: the backoff is a durable sleep, and a retry an earlier version stored as a running phase sleeps again when reopened before
+// its time; upstream's SQL that turns the stored status back to running is a write of the record read from the closed storage.
 using System.Collections.Immutable;
 using System.Text.RegularExpressions;
 using PiSharp.Contracts;
@@ -1783,9 +1785,20 @@ internal static class CompactionTests
             chat.Setup.Retry = new RetrySettings { Enabled = true, MaxRetries = 2, BaseDelayMs = 60_000 };
             chat.Faux.Summaries.Push(Failure("overloaded"));
             var id = await Compact(chat.Root);
-            await Eventually(async () => await Compactions(chat) is JsonArrayValue { Count: > 0 } statuses &&
-                ((JsonObjectValue)statuses[0]).ContainsKey("retry"));
-            MatchJson("""{"checkpoint":{"phase":"retry","attempt":1}}""", (await chat.Harness.GetTaskAsync(id, Context))!.State.ToJson(), "retrying");
+            await Eventually(async () => (await chat.Harness.GetTaskAsync(id, Context))?.State.Status == DurableTaskStatus.Sleeping);
+            var until = (now + 60_000).ToString(System.Globalization.CultureInfo.InvariantCulture);
+            MatchJson($$"""{"status":"sleeping","checkpoint":{"phase":"retry","attempt":1,"until":{{until}}},"until":{{until}}}""",
+                (await chat.Harness.GetTaskAsync(id, Context))!.State.ToJson(), "retrying");
+            await chat.Harness.CloseAsync(Context);
+            // Earlier versions slept inside a running `retry` phase: reopened before its time, it sleeps again.
+            var storage = await open();
+            var record = (await storage.GetTaskAsync(id, Context))!;
+            await PiSharp.Durable.Testing.CommitWrites.CommitWritesAsync(storage,
+                [new TaskWrite(record with { State = new RunningTaskState(((SleepingTaskState)record.State).Checkpoint) })], Context);
+            await storage.CloseAsync(Context);
+            chat = await Reopen(open, chat.Setup, chat.Faux);
+            await Eventually(async () => (await chat.Harness.GetTaskAsync(id, Context))?.State.Status == DurableTaskStatus.Sleeping);
+            Equal(1, chat.Faux.SummaryRequests.Count, "summary requests before its time");
             await chat.Harness.CloseAsync(Context);
             Volatile.Write(ref now, now + 120_000);
             chat = await Reopen(open, chat.Setup, chat.Faux);
