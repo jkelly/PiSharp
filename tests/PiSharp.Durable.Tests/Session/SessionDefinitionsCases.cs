@@ -8,6 +8,11 @@ using PiSharp.Durable.Chord;
 using PiSharp.Durable.Chord.Delta;
 using static Program;
 
+internal static partial class Program
+{
+    private static IEnumerable<(string, Func<Task>)> SessionDefinitionsCheckpointWhenCases() => SessionTests.DefinitionsCheckpointWhen();
+}
+
 internal static partial class SessionTests
 {
     private static readonly SessionDocToken DefinitionsSessionDoc = Documents.DefineSessionDoc("t.session", 1, () => O("{\"value\":0}"),
@@ -26,15 +31,17 @@ internal static partial class SessionTests
     private static readonly TaskDocFamilyToken DefinitionsTaskFamily = Documents.DefineTaskDocFamily("t.task-family", 1, seed => Obj(("value", seed)),
         checkpointWhen: (_, _, _) => false);
 
-    private static IEnumerable<(string, Func<Task>)> Definitions(string prefix, Func<IStorage> storageFactory)
+    /// <summary>Upstream's "requires an explicit checkpoint predicate for documents and families".</summary>
+    internal static IEnumerable<(string, Func<Task>)> DefinitionsCheckpointWhen()
     {
         // Pi v1.5.0 (area checkpoint-when). Upstream's two @ts-expect-error lines are compile-time checks here too, since checkpointWhen is a
         // required, non-nullable parameter of every factory:
         // @ts-expect-error document definitions require checkpointWhen:        Documents.DefineSessionDoc("t.missing-checkpoint", 1, initial)
         // @ts-expect-error document family definitions require checkpointWhen: Documents.DefineSessionDocFamily("t.missing-family-checkpoint",
         //                                                                       1, seed => ...)
-        // The case checks the same by reflection, and that a null predicate, which C# still lets a caller pass, is rejected.
-        yield return Case(prefix + "requires-an-explicit-checkpoint-predicate-for-documents-and-families", () =>
+        // The case checks the same by reflection, and that a null predicate, which C# still lets a caller pass, is rejected. It reads no
+        // storage, so it runs once rather than on every session.* backend.
+        yield return Case("session.definitions.requires-an-explicit-checkpoint-predicate-for-documents-and-families", () =>
         {
             var factories = typeof(Documents).GetMethods(BindingFlags.Public | BindingFlags.Static)
                 .Where(method => method.Name.StartsWith("Define", StringComparison.Ordinal)).ToList();
@@ -53,7 +60,10 @@ internal static partial class SessionTests
             Program.Throws<ArgumentNullException>(() => Documents.DefineSessionDocFamily("t.missing-family-checkpoint", 1,
                 seed => Obj(("value", seed)), null!), "a family without a predicate");
         });
+    }
 
+    private static IEnumerable<(string, Func<Task>)> Definitions(string prefix, Func<IStorage> storageFactory)
+    {
         yield return Case(prefix + "validates-persisted-version-semantics", () =>
         {
             Rejects(Program.Throws<ArgumentException>(() => Documents.DefineSessionDoc("k", 0, () => O("{\"value\":0}"),
