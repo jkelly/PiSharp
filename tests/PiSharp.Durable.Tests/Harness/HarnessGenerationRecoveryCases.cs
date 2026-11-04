@@ -4,9 +4,10 @@
 //   every case reopening a JSONL directory.
 // - `aborted(ctx.abortSignal!)` in a section is Aborted(ctx.CancellationToken); `aborted(options!.signal!)` in a faux response is
 //   Aborted(request.Signal).
-// - Pi v1.5.0 sync (area model-requests): "polls a checkpoint stored without a thinking level and records none" (d5b3de22d). Upstream
-//   removes the field with SQLite's json_remove; here the task record is read from the closed storage and written back without it, so the
-//   case runs on both backends.
+// - Pi v1.5.0 sync (area model-requests): "polls a checkpoint stored without a thinking level and records none" (d5b3de22d), which is
+//   harness.generation-recovery.polls-a-checkpoint-stored-without-a-thinking-level-and-records-none. Upstream removes the field with
+//   SQLite's json_remove; here the task record is read from the closed storage and written back without it, so the case runs on both
+//   backends.
 using PiSharp.Durable;
 using PiSharp.Durable.Chord;
 using PiSharp.Durable.Sqlite;

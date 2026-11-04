@@ -12,10 +12,12 @@
 // - "uses explicit null details": `details: null` is JsonValue.Null (a C# null is upstream's undefined).
 // - The two "coding tools" cases run CodingTools over a LocalExecutionEnv (upstream NodeExecutionEnv) in a fresh directory, on each backend
 //   (upstream: MemoryStorage only); the shell is Git Bash on Windows.
-// - Pi v1.5.0 sync (area model-requests): "gives tools and hooks the Harness's models" takes v1.5.0's form (adc5fa9f8): one view of the
-//   host's models that adds the Harness identity; `getProviders()` is compared through GetModel, as IDurableModels has no provider list.
-//   The two beforeProviderRequest cases are d280e1ffa's; upstream's report info names the throwing hook's extension, which waits on
-//   ReportInfo (area reports), so the C# case checks the report's message.
+// - Pi v1.5.0 sync (area model-requests): "gives tools and hooks the Harness's models" (harness.tools.gives-tools-and-hooks-the-harness-s-models)
+//   takes v1.5.0's form (adc5fa9f8): one view of the host's models that adds the Harness identity; `getProviders()` is compared through
+//   GetModel, as IDurableModels has no provider list. The two beforeProviderRequest cases are d280e1ffa's:
+//   harness.tools.chains-beforeproviderrequest-over-every-provider-request-body and
+//   harness.tools.reports-a-throwing-beforeproviderrequest-hook-and-continues-the-chain. Upstream's report info names the throwing hook's
+//   extension, which waits on ReportInfo (area reports), so the C# case checks the report's message.
 using System.Collections.Immutable;
 using System.Text;
 using PiSharp.Durable;

@@ -11,10 +11,12 @@
 //   strict JSON either, and the detail contains Chord's "non-finite number".
 // - `expect(seen[0]!.signal).toBeInstanceOf(AbortSignal)` checks that the request's cancellation token can be cancelled.
 // - `toContainEqual(new Error(text))` checks for a report whose message is the text.
-// Pi v1.5.0 sync (area model-requests): "records the requested thinking level on answers, streamed and polled" (d5b3de22d) and "attributes
-// model requests to pi by default and merges the Harness identity over it" (adc5fa9f8), which is
-// sends-the-harness-default-identity-and-merges-the-harness-identity-over-it: upstream's default identity is { attribution: PI_ATTRIBUTION };
-// PiSharp's Harness.DefaultIdentity is empty, so a Harness without an identity sends none (pending core.client-identity-attribution).
+// Pi v1.5.0 sync (area model-requests): "records the requested thinking level on answers, streamed and polled" (d5b3de22d), which is
+// harness.generation.records-the-requested-thinking-level-on-answers-streamed-and-polled, and "attributes model requests to pi by default
+// and merges the Harness identity over it" (adc5fa9f8), which is
+// harness.generation.sends-the-harness-default-identity-and-merges-the-harness-identity-over-it: upstream's default identity is
+// { attribution: PI_ATTRIBUTION }; PiSharp's Harness.DefaultIdentity is empty, so a Harness without an identity sends none (pending
+// core.client-identity-attribution). Both also run as harness.generation.jsonl.* and harness.generation.sqlite.*.
 #pragma warning disable PISHARP_IDENTITY001 // PiSharp.AI's ClientIdentity (Pi v1.5.0) is experimental.
 using System.Collections.Immutable;
 using System.Text.RegularExpressions;
