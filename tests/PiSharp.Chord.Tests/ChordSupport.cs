@@ -1,16 +1,20 @@
 using System.Runtime.CompilerServices;
 using System.Text.Json.Nodes;
+using PiSharp.Chord;
 using PiSharp.Chord.Contracts;
+using PiSharp.Chord.Data;
+using PiSharp.Telemetry;
 using static PiSharp.Chord.Contracts.Schemas;
 
 // Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/chord/test/next/support.ts, the test support every Chord v2 test imports.
 // Ported here: the GC check (expectCollected) and the shared declarations of the slice tests (Server, SERVER_ADDRESS, Notes and its
-// variants, Session, PlacedNotes, NoteStore, Restartable, StoreRestartable), and wireNames without its `named` (which reads link parts).
+// variants, Session, PlacedNotes, NoteStore, Restartable, StoreRestartable), and wireNames without its `named` (which reads link parts);
+// area cv2-data added the counters (counted, metered) and rejection.
 // Equal<A, B> is a type-level check with no C# counterpart. The rest needs layers later areas bring, and each comes with the first area
-// whose tests use it: the counters (counted, metered; the data layer, cv2-data), watch frames and changes (delivered, framesOf,
+// whose tests use it: watch frames and changes (delivered, framesOf,
 // changesOf, valuesOf; the state layer, cv2-state), the store helpers (memoryStore, faultyDatabase, faultyStore, holdNextCommit,
 // tableOwner, tableIn, ArchiveTables, archiveStore, exported, countInflated; the store areas), the remaining declarations (NotesDoc; the
-// documents areas), rejection (ChordError JSON; cv2-data), and the hosts, links, relays and raw peers (failLive, restartable,
+// documents areas), and the hosts, links, relays and raw peers (failLive, restartable,
 // storeRestartable, loaded, loadedPlugins, fakeTimers, flushed, failures, linked, RawPeer, partValue, CODECS, forEachCodec, rawLinked,
 // transported, serveNotes, addNote, rawProvider, rawParent, statesOf, EDITOR, bindNext, bindHold, instancesOf, relayed, rawWorkers,
 // incarnationOf, settledHeap), which build on createHost and the link layer (phase 6).
@@ -112,4 +116,51 @@ internal static class ChordSupport
 
     /// <summary>A JSON node from its text (the expected values of a case).</summary>
     internal static JsonNode Parse(string json) => JsonNode.Parse(json)!;
+
+    /// <summary>Counts of the <c>chord.data.*</c> counters (upstream <c>Counts</c>).</summary>
+    internal readonly record struct Counts(double Walks, double Validations, double Compilations);
+
+    /// <summary>Runs <paramref name="work"/> with a counting context and returns the counters it added (upstream <c>counted</c>).</summary>
+    internal static async Task<Counts> Counted(Action<ChordContext> work)
+    {
+        var telemetry = new InMemoryTelemetryContext();
+        await telemetry.StartSpanAsync("test", span => work(ChordContext.WithTelemetry(span, ChordContext.Background)));
+        double walks = 0, validations = 0, compilations = 0;
+        foreach (var measurement in telemetry.GetMetrics())
+        {
+            switch (measurement.Name)
+            {
+                case "chord.data.walks": walks += measurement.Value; break;
+                case "chord.data.validations": validations += measurement.Value; break;
+                case "chord.data.compilations": compilations += measurement.Value; break;
+                default: throw new InvalidOperationException("an unexpected counter: " + measurement.Name);
+            }
+        }
+        return new Counts(walks, validations, compilations);
+    }
+
+    /// <summary>A telemetry adapter, a context counting through it, and the counters recorded so far, by name (upstream <c>metered</c>).</summary>
+    internal static async Task<(InMemoryTelemetryContext Telemetry, ChordContext Context, Func<IReadOnlyDictionary<string, double>> Counts)> Metered()
+    {
+        var telemetry = new InMemoryTelemetryContext();
+        // A settled span still records through its adapter's metrics.
+        var span = await telemetry.StartSpanAsync("test", span => span);
+        IReadOnlyDictionary<string, double> Counts() =>
+            telemetry.GetMetrics().GroupBy(measurement => measurement.Name, StringComparer.Ordinal).ToDictionary(group => group.Key, group => group.Sum(measurement => measurement.Value), StringComparer.Ordinal);
+        return (telemetry, ChordContext.WithTelemetry(span, ChordContext.Background), Counts);
+    }
+
+    /// <summary>The error <paramref name="task"/> fails with, as ChordError JSON when it is one (upstream <c>rejection</c>).</summary>
+    internal static async Task<object> Rejection(Task task)
+    {
+        try
+        {
+            await task;
+        }
+        catch (Exception error)
+        {
+            return error is ChordError chord ? chord.ToJson() : error;
+        }
+        throw new InvalidOperationException("expected a rejection");
+    }
 }

@@ -1,8 +1,9 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>Exe</OutputType>
-    <!-- The Chord v2 port (PiSharp.Chord) is [Experimental("PISHARP_CHORD001")]; the pi-schema port it builds on is PISHARP_SCHEMA001. -->
-    <NoWarn>$(NoWarn);PISHARP_CHORD001;PISHARP_SCHEMA001</NoWarn>
+    <!-- The Chord v2 port (PiSharp.Chord) is [Experimental("PISHARP_CHORD001")]; the pi-schema port it builds on is PISHARP_SCHEMA001, and
+         the pi-telemetry port its context carries (the counters' in-memory adapter) PISHARP_TELEMETRY001. -->
+    <NoWarn>$(NoWarn);PISHARP_CHORD001;PISHARP_SCHEMA001;PISHARP_TELEMETRY001</NoWarn>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../../src/PiSharp.Chord/PiSharp.Chord.csproj" />
