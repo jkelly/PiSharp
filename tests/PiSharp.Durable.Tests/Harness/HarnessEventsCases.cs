@@ -273,6 +273,32 @@ internal static partial class EventTests
             await harness.CloseAsync(Context);
         });
 
+        // Pi v1.5.0 (area watch-folding, d8d99950a): the stream is a NativeWatch, so pending batches are not folded as state watches are.
+        yield return Case(prefix + "delivers-each-of-100-pending-batches-in-its-own-call-in-order-unlike-state-watches", async () =>
+        {
+            var (harness, root) = await OpenChat(await fresh(), Setup());
+            var stream = await harness.WatchEventsAsync(root.Id, Context);
+            for (var index = 0; index < 100; index++)
+            {
+                var data = JsonValue.Object([new("index", index)]);
+                await root.CommitAsync(tx => tx.AppendEntryAsync(root.Id, new EntryDraft { Kind = "note", Data = data }), Context);
+            }
+            var batches = new SyncList<List<AgentEvent>>();
+            stream.Start((events, _) =>
+            {
+                batches.Add([.. events]);
+                return Task.CompletedTask;
+            });
+            await ViewTests.Drained(harness);
+            var all = batches.Snapshot();
+            Equal(100, all.Count, "batches");
+            static JsonValue DataOf(AgentEvent item) => item is EntryAppendedEvent appended ? appended.Entry.Data ?? JsonValue.Null : item.ToJson();
+            Seq(Enumerable.Range(0, 100).Select(index => "[{\"index\":" + index + "}]"),
+                all.Select(events => JsonValue.Array(events.Select(DataOf)).ToJson()), "each batch in order");
+            await stream.StopAsync();
+            await harness.CloseAsync(Context);
+        });
+
         yield return Case(prefix + "replaces-undelivered-batches-with-one-snapshot-after-100-pending-batches", async () =>
         {
             var (harness, root) = await OpenChat(await fresh(), Setup());

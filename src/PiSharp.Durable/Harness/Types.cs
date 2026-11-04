@@ -22,7 +22,7 @@
 // settings.afterFailedRun (AfterFailedRun, a30c2a81d), and TaskInspectionKind.Pending replaces Ready (TaskState's word).
 // Pi v1.5.0 sync (area telemetry): HarnessOptions.Telemetry, the host-owned adapter of DURABLE_TELEMETRY_SCHEMA (2ec55d808, 48909d987).
 // Pi v1.5.0 sync (area watches, 92ab53602): Conversation.viewState() and Harness.taskGraph() are removed; the view and task graph watches
-// are Chord's IWatchHandle<T>.
+// are Chord's IWatchHandle<T>. Area watch-folding (d8d99950a): their docs say commits made while a listener runs arrive folded.
 using System.Collections.Immutable;
 using PiSharp.AI;
 using PiSharp.Durable.Chord;
@@ -1167,8 +1167,8 @@ public interface IConversation
     /// transitively, by its non-background tasks.
     /// </summary>
     Task WaitForIdleAsync(DurableContext context);
-    /// <summary>The structural view (spec §9.3) as a serialized watch, Chord's <see cref="IWatchHandle{T}"/>; cancelling
-    /// <paramref name="context"/> ends it aborted.</summary>
+    /// <summary>The structural view (spec §9.3) as a serialized watch, Chord's <see cref="IWatchHandle{T}"/>; commits made while its
+    /// listener runs arrive folded; cancelling <paramref name="context"/> ends it aborted.</summary>
     Task<IWatchHandle<ConversationView>> WatchAsync(DurableContext context);
 }
 
@@ -1230,8 +1230,8 @@ public interface IHarness : ISession
     /// <summary>Session total: every conversation's <c>pi.usage</c> summed (upstream <c>UsageState</c> JSON).</summary>
     Task<JsonObjectValue> UsageAsync(DurableContext context);
     /// <summary>Every live task with its owner edge, status, and owned conversations (spec §9.5), as a serialized watch, Chord's
-    /// <see cref="IWatchHandle{T}"/>, whose operations address <see cref="TaskGraph.ToJson"/>; cancelling <paramref name="context"/> ends it
-    /// aborted. Reads only: it does not enable scheduling.</summary>
+    /// <see cref="IWatchHandle{T}"/>, whose operations address <see cref="TaskGraph.ToJson"/>; commits made while its listener runs arrive
+    /// folded; cancelling <paramref name="context"/> ends it aborted. Reads only: it does not enable scheduling.</summary>
     Task<IWatchHandle<TaskGraph>> WatchTaskGraphAsync(DurableContext context);
 }
 

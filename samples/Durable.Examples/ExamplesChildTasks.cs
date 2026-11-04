@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/test/examples/24-child-tasks.ts. Upstream times its fake bank with
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/test/examples/23-child-tasks.ts. Upstream times its fake bank with
 // Date.now() and setTimeout; here an ExampleClock drives the Harness clock (HarnessOptions.TimeProvider), so a payment's sleep ends only when
 // the example advances the clock, and two barriers stand in for what Node's event loop orders: a declined card is declined only after the
 // checkout's other payments were charged (upstream runs every reserved payment's first step before the decline's commit lands), and the
@@ -6,7 +6,8 @@
 // file; here that holds on the memory run, and a file backend reopens the runner's storage. Abort handlers print in task order.
 // Pi v1.5.0 sync (area sleep): a payment waits for the bank's confirmation in a durable sleep, charge then confirm, as f75b3240a's
 // 24-child-tasks.ts (v1.5.0's 23-child-tasks.ts) has it, so the tree prints the charged payments as sleeping; the example prints the tree
-// once every charged payment is asleep (upstream waits 20 ms). The rest stays on v1.2.0 until the file's other areas land.
+// once every charged payment is asleep (upstream waits 20 ms). Area watches (92ab53602): the tree is read from a task graph watch, which
+// is then stopped. The example keeps its v1.2.0 name, 24-child-tasks, as the other renumbered examples do (b9fb2b854).
 using PiSharp.Durable.Chord;
 using PiSharp.Durable.Sqlite;
 using PiSharp.Durable.Storage;

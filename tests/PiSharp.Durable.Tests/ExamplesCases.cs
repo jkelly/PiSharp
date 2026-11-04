@@ -37,6 +37,9 @@ using PiSharp.Durable.Examples;
 // Area watches: 04-chord-state is gone, as upstream deleted it with Session.documentState() (92ab53602). 21-late-join's view is a watch
 // (Conversation.watch()), which makes no call at start, so the line the v1.2.0 state printed as it hydrated ("view output now" with the
 // first five lines) is gone; authored from 92ab53602's 21-late-join.ts (v1.5.0's 20-late-join.ts), not captured.
+// Area watch-folding: 05-watches runs v1.5.0's 04-watches.ts (d8d99950a): its first call stays busy while three commits land, which arrive
+// folded into the second call (the three appends to `text` as one append op), and it prints each update's ops and the number of calls;
+// authored from 04-watches.ts and Chord's PendingOps (appends at one path merge), not captured.
 internal static partial class Program
 {
     private static readonly string[] CodingToolsTranscript =
@@ -88,7 +91,10 @@ internal static partial class Program
         "registry: {\"agents\":{\"researcher\":{\"conversationId\":4,\"requestId\":\"researcher:first-message:3\"}}}",
         "== 05-watches",
         "watch baseline: {\"text\":\"first\"}",
-        "watch update: {\"text\":\"observed asynchronously\"}",
+        // Authored for Pi v1.5.0 (area watch-folding, see the header): the busy first call, then three commits folded into one append.
+        "watch update: {\"text\":\"observed\"} [[\"s\",[\"text\"],\"observed\"]]",
+        "watch update: {\"text\":\"observed asynchronously, folded!\"} [[\"a\",[\"text\"],\" asynchronously, folded!\"]]",
+        "listener calls: 2",
         "== 06-harness",
         "root: 1 {\"text\":\"root notes\"}",
         "stored agent: {\"thinkingLevel\":\"low\"}",
@@ -426,7 +432,7 @@ internal static partial class Program
             "child conversation: {\"id\":4,\"owner\":{\"conversationId\":2,\"taskId\":3}}",
             "registry: {\"agents\":{\"researcher\":{\"conversationId\":4,\"requestId\":\"researcher:first-message:3\"}}}",
         ],
-        ["watch update: {\"text\":\"observed asynchronously\"}"] = ["watch baseline: {\"text\":\"observed asynchronously\"}"],
+        ["listener calls: 2"] = ["watch baseline: {\"text\":\"observed asynchronously, folded!\"}"],
         [HarnessResolved] = ["root: 1 {\"text\":\"root notes\"}", "stored agent: {\"thinkingLevel\":\"low\"}"],
         // The last configure call selected exactly files and search, and cleared the tool selection.
         [ConfigurationReinstalled] =
