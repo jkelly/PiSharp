@@ -12,9 +12,11 @@ using System.Text.Json.Nodes;
 using PiSharp.Chord.Delta;
 using PiSharp.Chord.Sqlite;
 using PiSharp.Contracts;
-using static PiSharp.Chord.Store.StoreInternal.StoreTables;
 
 namespace PiSharp.Chord.Store;
+
+// Inside the namespace, so the store's table names come before the documents layer's namespace (PiSharp.Chord.Documents) in name lookup.
+using static PiSharp.Chord.Store.StoreInternal.StoreTables;
 
 /// <summary>A document's address: the owner name, the adapter's namespace (claimed with the owner: Chord's <c>chord</c>, <c>chord.jobs</c>,
 /// <c>chord.job-states</c>; Durable's scopes), the kind and, for a keyed document, its key; a singleton has none (upstream
