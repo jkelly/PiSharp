@@ -288,14 +288,9 @@
       "size": "L",
       "dependsOn": [],
       "commits": [
-        "42cb822f1",
-        "5e106ab1c",
-        "5f312dac4",
-        "8b0caefc2",
-        "92ab53602",
-        "a2fd25f56",
-        "bdb151774",
-        "d8d99950a"
+        "d676746e",
+        "35f289a9",
+        "cefeb937"
       ],
       "notes": "New files only (PiSharp.Durable/Chord, decision 0005 §1: the Chord subset Durable needs lives in PiSharp.Durable), so this area can land before anything uses it; area watches moves Durable's watches onto it. chord/src/index.ts is the Chord barrel: C# has no counterpart, the area owns it only because chord.watch-handle names it (its other export changes are phase 6). Port chord/test/watch.test.ts and delta-pending.test.ts as new case groups (Chord/WatchCases.cs, Chord/DeltaPendingCases.cs); the PendingOps fuzz cases (bdb151774 widened their timing) stay seeded and offline. The Chord-side bullets are group F (phase 6), which reconciles this subset with a full Chord port later."
     },

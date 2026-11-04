@@ -56,11 +56,11 @@
     "changelogBullets": 477,
     "repeatedBullets": 23,
     "byStatus": {
-      "ported": 165,
-      "ported-with-deferral": 12,
+      "ported": 167,
+      "ported-with-deferral": 13,
       "already-ported": 13,
       "no-op": 25,
-      "port": 111
+      "port": 108
     },
     "byArea": {
       "ai": 58,
@@ -10050,7 +10050,7 @@
       "id": "chord.watch-handle",
       "area": "chord",
       "phase": 4,
-      "status": "port",
+      "status": "ported-with-deferral",
       "changelog": [
         "chord@1.5.0/Breaking Changes#3",
         "chord@1.5.0/Breaking Changes#5",
@@ -10076,13 +10076,35 @@
       "pulledInBy": [
         "durable.watch-handles"
       ],
-      "notes": "PiSharp has Durable v1.2.0's watch: `IWatchHandle<T>` with a `(value, ops, ctx)` listener where null retires the watch, and `WatchEnd`/`WatchEndReason` (stopped, cancelled, session_closed, retired, listener_error, session_failed) in TypesSession.cs:161-232, implemented by `CommittedWatch<T>` (Session/Observation.cs:222). Missing: the generic `Watch<T>` a source drives, tagged calls, failure calls, retirement as a flag, `endAfterDelivery()` and folding through PendingOps (chord.delta-pending-ops). Needed by phase 4: pi-durable v1.5.0 imports Watch, WatchCall, WatchEnd and WatchHandle from Chord (durable@1.5.0/Breaking Changes#5, #19 and Changed#1, group E). The owner decides whether this shared code moves into phase 4 (release 1.5.0) and whether it lives in a new PiSharp.Chord project or stays in PiSharp.Durable/Chord."
+      "notes": "PiSharp has Durable v1.2.0's watch: `IWatchHandle<T>` with a `(value, ops, ctx)` listener where null retires the watch, and `WatchEnd`/`WatchEndReason` (stopped, cancelled, session_closed, retired, listener_error, session_failed) in TypesSession.cs:161-232, implemented by `CommittedWatch<T>` (Session/Observation.cs:222). Missing: the generic `Watch<T>` a source drives, tagged calls, failure calls, retirement as a flag, `endAfterDelivery()` and folding through PendingOps (chord.delta-pending-ops). Needed by phase 4: pi-durable v1.5.0 imports Watch, WatchCall, WatchEnd and WatchHandle from Chord (durable@1.5.0/Breaking Changes#5, #19 and Changed#1, group E). The owner decides whether this shared code moves into phase 4 (release 1.5.0) and whether it lives in a new PiSharp.Chord project or stays in PiSharp.Durable/Chord.",
+      "evidence": {
+        "commits": [
+          "35f289a9",
+          "cefeb937"
+        ],
+        "tests": [
+          "tests/PiSharp.Durable.Tests/Chord/WatchCases.cs: chord.watch.delivery.keeps-the-acquisition-value-until-start-then-delivers-the-frames-since-in-one-call",
+          "tests/PiSharp.Durable.Tests/Chord/WatchCases.cs: chord.watch.delivery.awaits-each-callback-and-folds-frames-advanced-while-one-is-in-flight-into-the-next-call",
+          "tests/PiSharp.Durable.Tests/Chord/WatchCases.cs: chord.watch.slow-listener.gets-one-call-per-batch-whose-ops-turn-the-previous-delivered-value-into-the-newest",
+          "tests/PiSharp.Durable.Tests/Chord/WatchCases.cs: chord.watch.overflow.keeps-max-pending-ops-after-folding-and-replaces-the-root-past-them",
+          "tests/PiSharp.Durable.Tests/Chord/WatchCases.cs: chord.watch.retirement.reports-a-retirement-in-the-next-call-with-the-value-the-source-gives-and-goes-on",
+          "tests/PiSharp.Durable.Tests/Chord/WatchCases.cs: chord.watch.failure.delivers-a-failure-as-a-call-stays-open-keeps-the-last-value-and-replaces-the-root-on-recovery",
+          "tests/PiSharp.Durable.Tests/Chord/WatchCases.cs: chord.watch.failure.passes-every-lone-value-call-on-by-identity-so-a-value-call-costs-the-watch-no-allocation",
+          "tests/PiSharp.Durable.Tests/Chord/WatchCases.cs: chord.watch.end-after-delivery.takes-no-more-frames-delivers-what-is-pending-then-ends-ended-and-only-then-detaches",
+          "tests/PiSharp.Durable.Tests/Chord/WatchCases.cs: chord.watch.calls.hands-a-listener-plain-data-only-kind-value-ops-retired",
+          "tests/PiSharp.Durable.Tests/Chord/WatchCases.cs: chord.watch.ends.ends-aborted-when-its-acquisition-signal-aborts-also-when-already-aborted",
+          "tests/PiSharp.Durable.Tests/Chord/WatchCases.cs: chord.watch.ends.ends-listener-error-on-a-throw-reports-it-and-delivers-nothing-more",
+          "tests/PiSharp.Durable.Tests/Chord/WatchCases.cs: chord.watch.references.retain-neither-source-listener-nor-signal-once-ended-while-still-referenced",
+          "tests/PiSharp.Durable.Tests/Chord/WatchCases.cs: chord.watch.threads.a-producer-thread-and-a-slow-listener-converge-on-the-newest-value"
+        ]
+      },
+      "deferred": "Chord's watch API (IWatchHandle, IWatchable, WatchEnd by kind, tagged calls, Watch<T>) is ported in src/PiSharp.Durable/Chord/Watch.cs, but Durable's own watches (TypesSession.cs WatchEnd/WatchEndReason/IWatchHandle, Session/Observation.cs CommittedWatch) still follow v1.2.0: the coordinator assigned moving them onto Chord's to work list area watches (row durable.watch-handles). packages/chord/README.md has no PiSharp counterpart; chord/src/index.ts is the barrel, with no C# counterpart."
     },
     {
       "id": "chord.native-watch",
       "area": "chord",
       "phase": 4,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "chord@1.5.0/Breaking Changes#3",
         "chord@1.5.0/Breaking Changes#6",
@@ -10103,13 +10125,29 @@
         "durable.watch-handles",
         "durable.observers"
       ],
-      "notes": "PiSharp has no native watch. Durable v1.5.0 re-exports `NativeWatchCall` for its synchronous observers (durable@1.5.0/Breaking Changes#19, group E), and Chord v2's writables, registry values and `ref.state` are native watchables (chord.next-documents-state, chord.next-registries). Shares the lifecycle code of chord.watch-handle."
+      "notes": "PiSharp has no native watch. Durable v1.5.0 re-exports `NativeWatchCall` for its synchronous observers (durable@1.5.0/Breaking Changes#19, group E), and Chord v2's writables, registry values and `ref.state` are native watchables (chord.next-documents-state, chord.next-registries). Shares the lifecycle code of chord.watch-handle.",
+      "evidence": {
+        "commits": [
+          "35f289a9",
+          "cefeb937"
+        ],
+        "tests": [
+          "tests/PiSharp.Durable.Tests/Chord/WatchCases.cs: chord.watch.native.delivers-values-by-identity-in-order-with-a-context-never-inline",
+          "tests/PiSharp.Durable.Tests/Chord/WatchCases.cs: chord.watch.native.collapses-101-pending-values-to-the-newest",
+          "tests/PiSharp.Durable.Tests/Chord/WatchCases.cs: chord.watch.native.collapses-101-pending-values-to-the-value-of-replace",
+          "tests/PiSharp.Durable.Tests/Chord/WatchCases.cs: chord.watch.native.ends-with-every-reason-of-its-lifecycle",
+          "tests/PiSharp.Durable.Tests/Chord/WatchCases.cs: chord.watch.native.delivers-a-failure-as-a-call-stays-open-and-folds-it-with-the-values-around-it",
+          "tests/PiSharp.Durable.Tests/Chord/WatchCases.cs: chord.watch.native.retains-neither-its-source-nor-its-listener-once-stopped-while-still-referenced",
+          "tests/PiSharp.Durable.Tests/Chord/WatchCases.cs: chord.watch.references.delivers-a-native-backlog-that-never-drains-in-order",
+          "tests/PiSharp.Durable.Tests/Chord/WatchCases.cs: chord.watch.threads.default-scheduler-never-runs-the-listener-inside-advance"
+        ]
+      }
     },
     {
       "id": "chord.delta-pending-ops",
       "area": "chord",
       "phase": 4,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "chord@1.5.0/Added#12"
       ],
@@ -10127,7 +10165,24 @@
       "pulledInBy": [
         "durable.watch-folding"
       ],
-      "notes": "PiSharp's delta port has the op types (Ops.cs) and no folding queue; the new class goes next to them. `Watch` folds with it (chord.watch-handle), and pi-durable v1.5.0 imports it from chord/delta, so phase 4 needs it."
+      "notes": "PiSharp's delta port has the op types (Ops.cs) and no folding queue; the new class goes next to them. `Watch` folds with it (chord.watch-handle), and pi-durable v1.5.0 imports it from chord/delta, so phase 4 needs it.",
+      "evidence": {
+        "commits": [
+          "d676746e",
+          "cefeb937"
+        ],
+        "tests": [
+          "tests/PiSharp.Durable.Tests/Chord/DeltaPendingCases.cs: chord.delta-pending.folding.is-invisible-to-a-replica-tracker-edits-anywhere-appends-splices-and-reorders",
+          "tests/PiSharp.Durable.Tests/Chord/DeltaPendingCases.cs: chord.delta-pending.folding.is-invisible-to-a-replica-diff-revisions-between-arbitrary-values",
+          "tests/PiSharp.Durable.Tests/Chord/DeltaPendingCases.cs: chord.delta-pending.adversarial.an-ancestor-primitive-s-between-leaf-ops-below-it",
+          "tests/PiSharp.Durable.Tests/Chord/DeltaPendingCases.cs: chord.delta-pending.adversarial.joins-appends-folds-appends-into-a-string-set-and-keeps-split-surrogates",
+          "tests/PiSharp.Durable.Tests/Chord/DeltaPendingCases.cs: chord.delta-pending.cap.keeps-max-pending-ops-and-replaces-past-them",
+          "tests/PiSharp.Durable.Tests/Chord/DeltaPendingCases.cs: chord.delta-pending.ownership.hands-over-a-received-batch-by-identity-and-never-mutates-batches-or-op-tuples",
+          "tests/PiSharp.Durable.Tests/Chord/DeltaPendingCases.cs: chord.delta-pending.size.counts-pending-ops-after-folding-the-replacement-once-overflowed-and-nothing-once-taken",
+          "tests/PiSharp.Durable.Tests/Chord/DeltaPendingCases.cs: chord.delta-pending.cost.computes-one-path-key-per-leaf-op-once-folding-none-for-one-batch-or-structural-ops",
+          "tests/PiSharp.Durable.Tests/Chord/DeltaPendingCases.cs: chord.delta-pending.references.releases-a-folded-over-op-and-the-index-and-everything-pending-once-taken"
+        ]
+      }
     },
     {
       "id": "chord.delta-append-text",
