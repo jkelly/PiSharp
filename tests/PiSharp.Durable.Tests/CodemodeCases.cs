@@ -20,8 +20,9 @@
 //   process.on("unhandledRejection") is TaskScheduler.UnobservedTaskException after a full collection.
 // - Pi v1.5.0 sync (area codemode): replays-results-in-the-order-they-arrived-not-the-order-the-calls-were-made releases call 1 once call 2
 //   finished (slows.finishedCall, e17e2e105) instead of from an Eventually poll. Two authored cases check that code mode reads the Harness
-//   clock (f75b3240a), which upstream's suite does not: reads-the-script-s-start-its-results-times-and-its-wall-time-from-the-harness-clock
-//   and measures-the-script-s-deadline-on-the-harness-clock-across-a-restart, both with HarnessOptions.Now as a test clock.
+//   clock (f75b3240a), which upstream's suite does not:
+//   codemode.reads-the-script-s-start-its-results-times-and-its-wall-time-from-the-harness-clock and
+//   codemode.measures-the-script-s-deadline-on-the-harness-clock-across-a-restart, both with HarnessOptions.Now as a test clock.
 using System.Collections.Concurrent;
 using System.Text.RegularExpressions;
 using PiSharp.Codemode;
