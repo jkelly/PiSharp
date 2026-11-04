@@ -7,13 +7,11 @@ using static PiSharp.Chord.Contracts.Schemas;
 using static PiSharp.Chord.Store.Expressions;
 
 // Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/chord/test/next/store/apply-batch.test.ts. Every case is ported, over ChordStore
-// on TestSqliteDatabase (ChordSupport.cs), with two changes of form. "the same archive, manifest included" compares exported(replica) with
-// exported(source); export comes with area cv2-store-archive, so here the replica's database is compared with the source's instead: every
-// table but chord_meta (whose outbox switch differs) and chord_outbox (the replica has none), each table's rows as a set, every index's
-// SQL, and lastSeq and nextId (the manifest's position). That compares more than an archive carries (retired records, every revision,
-// the catalog's records). "a claim is refused while it applies" tries a claim between microtask turns until the batch applied; here the
-// claim is tried before each statement the batch's transaction runs (the database's OnTransactionStatement), which is while it applies,
-// and the first refusal is kept. structuredClone of commits is a copy of their JSON.
+// on TestSqliteDatabase (ChordSupport.cs), with one change of form: "a claim is refused while it applies" tries a claim between microtask
+// turns until the batch applied; here the claim is tried before each statement the batch's transaction runs (the database's
+// OnTransactionStatement), which is while it applies, and the first refusal is kept. structuredClone of commits is a copy of their JSON.
+// "the same archive, manifest included" compares exported(replica) with exported(source), as upstream does (area cv2-store-archive moved
+// it there from a comparison of the two databases).
 internal static partial class Program
 {
     private static readonly TableDefinition StoreBatchCountsV1 = Tables.DefineTable("counts", new TableOptions
@@ -116,27 +114,6 @@ internal static partial class Program
         }
     }
 
-    /// <summary>The store's database as the replay case compares it: every table but chord_meta and chord_outbox, by name, its rows as a
-    /// sorted set of their JSON; every index's SQL.</summary>
-    private static async Task<JsonObject> StoreBatchDump(ChordStore store)
-    {
-        var context = ChordContext.Background;
-        var dump = new JsonObject();
-        var tables = await store.ReadAsync(executor => executor.AllAsync(
-            "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name"), context);
-        foreach (var table in tables.Select(row => (string)row["name"]!))
-        {
-            if (table is StoreInternal.StoreTables.Meta or StoreInternal.StoreTables.Outbox) continue;
-            var rows = await store.ReadAsync(executor => executor.AllAsync($"SELECT * FROM \"{table}\""), context);
-            var texts = rows.Select(row => StoreSqlJson(row)!.ToJsonString()).Order(StringComparer.Ordinal);
-            dump[table] = new JsonArray([.. texts.Select(text => (JsonNode?)JsonValue.Create(text))]);
-        }
-        var indexes = await store.ReadAsync(executor => executor.AllAsync(
-            "SELECT name, tbl_name, sql FROM sqlite_master WHERE type = 'index' AND sql IS NOT NULL ORDER BY name"), context);
-        dump["indexes"] = StoreSqlJson(indexes);
-        return dump;
-    }
-
     private static IEnumerable<(string, Func<Task>)> StoreApplyBatchCases()
     {
         var context = ChordContext.Background;
@@ -155,7 +132,7 @@ internal static partial class Program
                 await using var replica = await MemoryStore();
                 await Tables.ApplyBatchAsync(replica, all[..3], context);
                 await Tables.ApplyBatchAsync(replica, all[3..], context);
-                Json((await StoreBatchDump(source)).ToJsonString(), await StoreBatchDump(replica), "the replica's data");
+                SameParts(await Exported(source), await Exported(replica), "the replica's archive");
                 Sequence([source.LastSeq, source.NextId], [replica.LastSeq, replica.NextId], "the position");
             }),
             Case("store.apply-batch.replay-restores-the-allocator-a-replica-mints-above-every-id-it-holds", async () =>

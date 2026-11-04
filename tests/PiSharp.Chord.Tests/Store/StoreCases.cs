@@ -7,9 +7,9 @@ using static PiSharp.Chord.Contracts.Schemas;
 
 // Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/chord/test/next/store/store.test.ts. Every case is ported, over ChordStore on
 // TestSqliteDatabase (ChordSupport.cs); the it.each rows are a case each. A store on a file lives in a fresh temporary directory, deleted
-// after its case (upstream's mkdtemp and afterEach). Two cases start from a store near the seq bound that upstream makes with importStore
-// (an empty store's export with the manifest's lastSeq edited); import comes with area cv2-store-archive, so here chord_meta's last_seq is
-// written by hand before the store opens, which is the state that import leaves. What each case asserts after that is upstream's.
+// after its case (upstream's mkdtemp and afterEach). Two cases start from a store near the seq bound, which upstream makes with importStore
+// (an empty store's export with the manifest's lastSeq edited), as StoreAtSeq does (area cv2-store-archive moved it there from a
+// hand-written chord_meta row); the empty store exported is closed here.
 // String(error) is StoreText (an exception's type and message); a plain Error thrown by a test is an InvalidOperationException; the
 // receipts' JavaScript template of an id array (`${ids}`) is its ids joined by commas. Telemetry counts are compared as a JSON object.
 internal static partial class Program
@@ -68,10 +68,10 @@ internal static partial class Program
     /// export with that lastSeq leaves it.</summary>
     private static async Task<ChordStore> StoreAtSeq(long lastSeq)
     {
-        var db = new TestSqliteDatabase(":memory:");
-        await StoreInternal.ApplyStoreSchemaAsync(db);
-        await db.RunAsync($"UPDATE {StoreInternal.StoreTables.Meta} SET last_seq = ? WHERE singleton = 1", lastSeq);
-        return await StoreOver(db);
+        List<JsonObject> parts;
+        await using (var empty = await MemoryStore()) parts = await Exported(empty);
+        parts[0]["lastSeq"] = lastSeq;
+        return (ChordStore)await Tables.ImportStoreAsync(Tables.SqliteBackend(new TestSqliteDatabase(":memory:")), parts, ChordContext.Background);
     }
 
     /// <summary>Runs <paramref name="run"/> with a path in a fresh directory, deleting the directory after it.</summary>
