@@ -2072,7 +2072,7 @@
       "upstreamChange": "modified",
       "previousBlobSha1": "d6e9cc3261ae596c2fd086c0b458561789155de2",
       "changedLines": 294,
-      "note": "harness.context.* (16 cases) on MemoryStorage, plus harness.context.jsonl.* and harness.context.sqlite.* (16 each); countingSetup is CountingStorage over the group storage. Adapted: keeps-returned-views-and-kept-ranges-apart and freezes-kept-entries-deeply (no mutable arrays or freezeJson here: views are ImmutableArrays of immutable JsonValues, so the ports replace the returned arrays / read through fresh copies and keep the final equality checks); the fake-timer case uses ManualTimeProvider and awaits the expiry timer with Eventually because idle waiters resume on the thread pool. Differential check against upstream on Node: 192 views (as-of reads and the 150+20-step pseudo-random transcript) are identical",
+      "note": "harness.context.* (16 cases) on MemoryStorage, plus harness.context.jsonl.* and harness.context.sqlite.* (16 each); countingSetup is CountingStorage over the group storage. Adapted: keeps-returned-views-and-kept-ranges-apart and freezes-kept-entries-deeply (no mutable arrays or freezeJson here: views are ImmutableArrays of immutable JsonValues, so the ports replace the returned arrays / read through fresh copies and keep the final equality checks); the fake-timer case uses ManualTimeProvider and awaits the expiry timer with Eventually because idle waiters resume on the thread pool. Differential check against upstream on Node: 192 views (as-of reads and the 150+20-step pseudo-random transcript) are identical v1.5.0 sync (area harness-options): 5713c9507's baseline cases (#10904, six) and its pseudo-random transcript categories are ported, with 5713c9507's scanned-row counts; publication-caches (e5c6182ba, group commit) brings the rest to v1.5.0",
       "portedBlobSha1": "d6e9cc3261ae596c2fd086c0b458561789155de2"
     },
     {
@@ -2175,8 +2175,9 @@
       "lines": 125,
       "pisharp": "tests/PiSharp.Durable.Tests/HarnessHostInputsCases.cs",
       "phase": "sync-1.5.0",
-      "status": "planned",
-      "upstreamChange": "added"
+      "status": "in-progress",
+      "upstreamChange": "added",
+      "note": "v1.5.0 sync (area harness-options): harness.host-inputs.* (the 4 upstream cases, plus 3 PiSharp-only checks that Models or CurrentModels, and Settings or CurrentSettings, are exclusive) on MemoryStorage. The tools case checks api.Models by a lookup of the second Models' extra provider, as v1.5.0 does. In progress until tools-schema and model-requests, which also change the file, land"
     },
     {
       "upstream": "packages/durable/test/harness-idle-scopes.test.ts",
@@ -2359,8 +2360,9 @@
       "lines": 144,
       "pisharp": "tests/PiSharp.Durable.Tests/HarnessReadOnlyCases.cs",
       "phase": "sync-1.5.0",
-      "status": "planned",
-      "upstreamChange": "added"
+      "status": "in-progress",
+      "upstreamChange": "added",
+      "note": "v1.5.0 sync (area harness-options): harness.read-only.* (4 of 4) on a SQLite file. Not checked yet: Harness.wake() and HarnessOptions.onWake (area sleep) and TaskRecord.restarts (area restarts). In progress until those and vocabulary, which also changes the file, land"
     },
     {
       "upstream": "packages/durable/test/harness-registry-reader.test.ts",
