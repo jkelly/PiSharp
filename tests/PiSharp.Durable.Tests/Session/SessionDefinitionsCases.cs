@@ -117,7 +117,7 @@ internal static partial class SessionTests
         state = session.DocumentStateAsync(DefinitionsConversationFamily, conversationId, "k", Context);
         state = session.DocumentStateAsync(DefinitionsTaskFamily, taskId, "k", Context);
         _ = state;
-        Task<IWatchHandle<JsonObjectValue?>?> watch = session.WatchDocAsync(DefinitionsSessionDoc, Context);
+        Task<PiSharp.Durable.IWatchHandle<JsonObjectValue?>?> watch = session.WatchDocAsync(DefinitionsSessionDoc, Context);
         watch = session.WatchDocAsync(DefinitionsLatestDoc, conversationId, Context);
         watch = session.WatchDocAsync(DefinitionsTaskDoc, taskId, Context);
         watch = session.WatchDocAsync(DefinitionsSessionFamily, "k", Context);
