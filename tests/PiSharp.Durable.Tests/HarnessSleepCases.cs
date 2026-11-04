@@ -2,7 +2,9 @@
 // Pi v1.5.0 sync (area sleep). Durable sleep: a task ends a phase asleep with runtime.sleepUntil(), holds no invocation until its time, and
 // resumes at its checkpoint once due; Harness.wake(), HarnessOptions.onWake and HarnessOptions.setTimer. Verbatim apart from the
 // adaptations in HarnessSupport.cs, and these:
-// - openNodeSqliteStorage is SqliteStorage.OpenAsync over a file in a fresh temporary directory.
+// - openNodeSqliteStorage is SqliteStorage.OpenAsync over a file in a fresh temporary directory. The store pass (StoreStorageNode.cs)
+//   reruns the cases as harness.sleep.store.*, opening that file as a StoreStorage, as upstream's vitest.store.config.ts does, and,
+//   as its other groups do here, running the cases upstream keeps on MemoryStorage on a fresh StoreStorage too.
 // - toEqual of a Wake is record equality (a Wake without `at` is new Wake(false), as its At is null); toEqual and toMatchObject of
 //   states and outcomes compare their JSON.
 // - settle() is Flush(), a 20 ms delay, and Flush().
@@ -22,7 +24,8 @@ using static SessionTests;
 
 internal static partial class Program
 {
-    private static IEnumerable<(string, Func<Task>)> HarnessSleepCases() => SleepTests.Cases();
+    private static IEnumerable<(string, Func<Task>)> HarnessSleepCases() =>
+        SleepTests.Cases("harness.sleep.", () => new MemoryStorage(), async path => await SqliteStorage.OpenAsync(path));
 }
 
 /// <summary>The harness.sleep.* cases (upstream harness-sleep.test.ts).</summary>
@@ -106,9 +109,11 @@ internal static class SleepTests
         await Flush();
     }
 
-    internal static IEnumerable<(string, Func<Task>)> Cases()
+    /// <param name="prefix">The case ID prefix: harness.sleep., or harness.sleep.store. for the store pass (StoreStorageNode.cs).</param>
+    /// <param name="fresh">Opens the storage of a case upstream runs on MemoryStorage.</param>
+    /// <param name="openFile">Upstream's openNodeSqliteStorage: opens the storage over the file at a path.</param>
+    internal static IEnumerable<(string, Func<Task>)> Cases(string prefix, Func<IStorage> fresh, Func<string, Task<IStorage>> openFile)
     {
-        const string prefix = "harness.sleep.";
 
         yield return Case(prefix + "sleeps-without-an-invocation-and-resumes-at-its-checkpoint-once-due", async () =>
         {
@@ -116,7 +121,7 @@ internal static class SleepTests
             var wakes = new SyncList<Wake>();
             var runs = new Runs();
             var nap = NapTask(1_000, runs);
-            var (harness, _, _) = await OpenTasks(new MemoryStorage(), [nap], now: () => Volatile.Read(ref clock), onWake: wakes.Add);
+            var (harness, _, _) = await OpenTasks(fresh(), [nap], now: () => Volatile.Read(ref clock), onWake: wakes.Add);
             var graph = await harness.WatchTaskGraphAsync(Context);
             // A started watch keeps its value current.
             graph.Start((_, _, _) => Task.CompletedTask);
@@ -169,13 +174,13 @@ internal static class SleepTests
             var nap = NapTask(60_000);
             async Task<IHarness> Open(IStorage storage) =>
                 (await OpenTasks(storage, [nap], now: () => Volatile.Read(ref clock), onWake: _ => { })).Harness;
-            var harness = await Open(await SqliteStorage.OpenAsync(path));
+            var harness = await Open(await openFile(path));
             var id = await StartNap(harness, nap);
             harness.Resume();
             await Eventually(async () => await StatusOf(harness, id) == DurableTaskStatus.Sleeping);
             await harness.CloseAsync(Context);
 
-            harness = await Open(await SqliteStorage.OpenAsync(path));
+            harness = await Open(await openFile(path));
             // Known from storage before scheduling starts, once open's recovery pass is done.
             await Eventually(() => !harness.Wake().Active);
             Equal(new Wake(false, 61_000), harness.Wake(), "wake after reopen");
@@ -185,7 +190,7 @@ internal static class SleepTests
             await harness.CloseAsync(Context);
 
             Volatile.Write(ref clock, 61_000);
-            harness = await Open(await SqliteStorage.OpenAsync(path));
+            harness = await Open(await openFile(path));
             Equal(new Wake(true), harness.Wake(), "wake once due");
             harness.Resume();
             SameJson("""{"status":"completed","result":61000}""",
@@ -198,7 +203,7 @@ internal static class SleepTests
             double clock = 1_000;
             var timers = new FakeTimers();
             var nap = NapTask(500);
-            var (harness, _, _) = await OpenTasks(new MemoryStorage(), [nap], now: () => Volatile.Read(ref clock), setTimer: timers.SetTimer);
+            var (harness, _, _) = await OpenTasks(fresh(), [nap], now: () => Volatile.Read(ref clock), setTimer: timers.SetTimer);
             var id = await StartNap(harness, nap);
             harness.Resume();
             await Eventually(() => timers.Live().Any(timer => timer.DelayMs == 500));
@@ -216,7 +221,7 @@ internal static class SleepTests
             double clock = 1_000;
             var timers = new FakeTimers();
             var nap = NapTask(500);
-            var (harness, registry, _) = await OpenTasks(new MemoryStorage(), [nap], now: () => Volatile.Read(ref clock),
+            var (harness, registry, _) = await OpenTasks(fresh(), [nap], now: () => Volatile.Read(ref clock),
                 setTimer: timers.SetTimer);
             var id = await StartNap(harness, nap);
             harness.Resume();
@@ -235,7 +240,7 @@ internal static class SleepTests
             const double clock = 1_000;
             var timers = new FakeTimers();
             var shortNap = NapTask(500);
-            var (harness, _, _) = await OpenTasks(new MemoryStorage(), [shortNap], now: () => clock, setTimer: timers.SetTimer);
+            var (harness, _, _) = await OpenTasks(fresh(), [shortNap], now: () => clock, setTimer: timers.SetTimer);
             var aborted = await StartNap(harness, shortNap);
             harness.Resume();
             await Eventually(() => timers.Live().Any(timer => timer.DelayMs == 500));
@@ -268,7 +273,7 @@ internal static class SleepTests
                 Abort = (_, _, _) => Task.CompletedTask,
             });
             var timers = new FakeTimers();
-            var (harness, _, _) = await OpenTasks(new MemoryStorage(), [timed], setTimer: timers.SetTimer);
+            var (harness, _, _) = await OpenTasks(fresh(), [timed], setTimer: timers.SetTimer);
             var root = await harness.RootAsync(Context);
             var id = await root.CommitAsync(tx => tx.CreateTaskAsync(timed, JsonValue.Null, new TaskOptions(TaskOwnership.Conversation)), Context);
             harness.Resume();
@@ -286,7 +291,7 @@ internal static class SleepTests
             double clock = 1_000;
             var timers = new FakeTimers();
             var nap = NapTask(500);
-            var (harness, _, _) = await OpenTasks(new MemoryStorage(), [nap], now: () => Volatile.Read(ref clock), setTimer: timers.SetTimer,
+            var (harness, _, _) = await OpenTasks(fresh(), [nap], now: () => Volatile.Read(ref clock), setTimer: timers.SetTimer,
                 onWake: _ => { });
             var id = await StartNap(harness, nap);
             harness.Resume();
@@ -303,7 +308,7 @@ internal static class SleepTests
         yield return Case(prefix + "arms-a-foreground-timer-the-host-declines-with-settimeout-reporting-it-once", async () =>
         {
             var nap = NapTask(10);
-            var (harness, _, reports) = await OpenTasks(new MemoryStorage(), [nap], setTimer: (_, _, _) => null);
+            var (harness, _, reports) = await OpenTasks(fresh(), [nap], setTimer: (_, _, _) => null);
             var first = await StartNap(harness, nap);
             var second = await StartNap(harness, nap);
             harness.Resume();
@@ -340,7 +345,7 @@ internal static class SleepTests
             });
             foreach (var hold in new[] { false, true })
             {
-                var (harness, _, _) = await OpenTasks(new MemoryStorage(), [parent, child], now: () => clock, onWake: _ => { });
+                var (harness, _, _) = await OpenTasks(fresh(), [parent, child], now: () => clock, onWake: _ => { });
                 var root = await harness.RootAsync(Context);
                 var id = await root.CommitAsync(tx => tx.CreateTaskAsync(parent, JsonValue.Object([new("hold", JsonValue.Boolean(hold))]),
                     new TaskOptions(TaskOwnership.Conversation)), Context);
@@ -358,7 +363,7 @@ internal static class SleepTests
         {
             const double clock = 1_000;
             var nap = NapTask(60_000);
-            var (harness, _, _) = await OpenTasks(new MemoryStorage(), [nap], now: () => clock, onWake: _ => { });
+            var (harness, _, _) = await OpenTasks(fresh(), [nap], now: () => clock, onWake: _ => { });
             var id = await StartNap(harness, nap);
             harness.Resume();
             await Eventually(async () => await StatusOf(harness, id) == DurableTaskStatus.Sleeping);
@@ -404,7 +409,7 @@ internal static class SleepTests
                     await runtime.CommitAsync((_, _) => AbortedWith("test"), ctx);
                 },
             });
-            var (harness, _, _) = await OpenTasks(new MemoryStorage(), [invalid, aborting]);
+            var (harness, _, _) = await OpenTasks(fresh(), [invalid, aborting]);
             var root = await harness.RootAsync(Context);
             var id = await root.CommitAsync(tx => tx.CreateTaskAsync(invalid, JsonValue.Null, new TaskOptions(TaskOwnership.Conversation)), Context);
             var abortingId = await root.CommitAsync(tx => tx.CreateTaskAsync(aborting, JsonValue.Null, new TaskOptions(TaskOwnership.Conversation)), Context);
@@ -425,7 +430,7 @@ internal static class SleepTests
         yield return Case(prefix + "does-not-count-a-task-without-a-definition-as-active", async () =>
         {
             var missing = NapTask(10);
-            var (harness, _, _) = await OpenTasks(new MemoryStorage(), []);
+            var (harness, _, _) = await OpenTasks(fresh(), []);
             var root = await harness.RootAsync(Context);
             // Created through a token the registry does not hold: nothing can run it.
             await root.CommitAsync(tx => tx.CreateTaskAsync(missing, JsonValue.Null, new TaskOptions(TaskOwnership.Conversation)), Context);
@@ -445,7 +450,7 @@ internal static class SleepTests
             var failure = new InvalidOperationException("alarm failed");
             var failing = 1;
             var nap = NapTask(1_000);
-            var (harness, registry, reports) = await OpenTasks(new MemoryStorage(), [nap], now: () => Volatile.Read(ref clock), onWake: wake =>
+            var (harness, registry, reports) = await OpenTasks(fresh(), [nap], now: () => Volatile.Read(ref clock), onWake: wake =>
             {
                 wakes.Add(wake);
                 if (Volatile.Read(ref failing) == 1 && wake.At is not null) throw failure;
