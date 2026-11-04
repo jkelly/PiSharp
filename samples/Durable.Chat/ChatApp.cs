@@ -168,7 +168,7 @@ public static class ChatApp
                 var printer = new LivePrinter(output);
                 liveWatch.Start((call, _) =>
                 {
-                    if (call is WatchValueCall<JsonObjectValue?> change) printer.Show(change.Value);
+                    if (call is WatchValueCall<JsonObjectValue> change) printer.Show(change.Value);
                     return Task.CompletedTask;
                 });
                 harness.Resume();

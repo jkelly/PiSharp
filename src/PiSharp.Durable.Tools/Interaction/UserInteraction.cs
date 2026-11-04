@@ -127,7 +127,9 @@ internal static class InteractionWait
     /// <summary>
     /// Waits until the call's interaction document has a response and returns the document. Checks the watch's acquisition revision first;
     /// later revisions are delivered in order once the listener starts. Cancellation of <paramref name="context"/> (an abort, a close) ends
-    /// the wait with an <see cref="OperationCanceledException"/>; a watch that ends otherwise fails it.
+    /// the wait with an <see cref="OperationCanceledException"/>; a retirement of the document without a response, or a watch that ends
+    /// otherwise, fails it. A document watch follows its address since pi-durable 1.5.0 (a retirement is a call, not its end), so the
+    /// retirement is tested here, and the watch is stopped either way.
     /// </summary>
     public static async Task<JsonObjectValue> WaitForResponseAsync(IToolExecutionApi api, DurableContext context)
     {
@@ -135,11 +137,14 @@ internal static class InteractionWait
             ?? throw new InvalidOperationException($"Tool call {api.CallId} has no interaction document");
         try
         {
-            if (UserInteraction.ResponseOf(watch.Value) is not null) return watch.Value!;
+            if (UserInteraction.ResponseOf(watch.Value) is not null) return watch.Value;
             var answered = new TaskCompletionSource<JsonObjectValue>(TaskCreationOptions.RunContinuationsAsynchronously);
             watch.Start((call, _) =>
             {
-                if (call is WatchValueCall<JsonObjectValue?> { Value: { } value } && UserInteraction.ResponseOf(value) is not null) answered.TrySetResult(value);
+                if (call is not WatchValueCall<JsonObjectValue> change) return Task.CompletedTask;
+                if (UserInteraction.ResponseOf(change.Value) is not null) answered.TrySetResult(change.Value);
+                else if (change.Retired)
+                    answered.TrySetException(new InvalidOperationException($"The interaction document of tool call {api.CallId} was retired"));
                 return Task.CompletedTask;
             });
             _ = watch.Closed.ContinueWith(closed => answered.TrySetException(

@@ -14,6 +14,11 @@
 // (area watches, 92ab53602 and 42cb822f1): a document watch is Chord's Watch (Chord/Watch.cs) on the Session line's scheduler; the Session
 // ends it ended at close, failed with its failure, and delivers a retirement as its last call (a null value, [["r", null]] and retired),
 // after which it ends ended (Chord's endAfterDelivery). documentState() is removed, and Durable no longer uses Chord's replicatedState().
+// Pi v1.5.0 sync (area watch-folding, 8b0caefc2 and 5f312dac4): instead, a document watch follows its address (DocumentFollower, upstream
+// #observeDocument with createWatch and endWatch): a retirement is a retired call with the last value and no ops, a later incarnation
+// arrives as [["r", value]], the current incarnation is pinned (nothing while the address is absent), and a task document's watch ends
+// ended after the retirement call of the commit that makes its task terminal. Its value is never null. The synchronous observers
+// (observeDoc, area observers) and publication at adoption are not here yet.
 //
 // Concurrency model. Upstream relies on one JavaScript thread: `#enqueue` chains every mutation and cold load onto one promise, and
 // listeners run in later microtasks. Here .NET callers may be on any thread, so:
@@ -402,24 +407,24 @@ public class Session : ISession
     // ─── Watches ────────────────────────────────────────────────────────────
 
     /// <inheritdoc/>
-    public Task<IWatchHandle<JsonObjectValue?>?> WatchDocAsync(SessionDocToken token, DurableContext context) => WatchDoc(token, null, null, context);
+    public Task<IWatchHandle<JsonObjectValue>?> WatchDocAsync(SessionDocToken token, DurableContext context) => WatchDoc(token, null, null, context);
     /// <inheritdoc/>
-    public Task<IWatchHandle<JsonObjectValue?>?> WatchDocAsync(ConversationDocToken token, ConversationId conversationId, DurableContext context) =>
+    public Task<IWatchHandle<JsonObjectValue>?> WatchDocAsync(ConversationDocToken token, ConversationId conversationId, DurableContext context) =>
         WatchDoc(token, conversationId.Value, null, context);
     /// <inheritdoc/>
-    public Task<IWatchHandle<JsonObjectValue?>?> WatchDocAsync(TaskDocToken token, TaskId taskId, DurableContext context) =>
+    public Task<IWatchHandle<JsonObjectValue>?> WatchDocAsync(TaskDocToken token, TaskId taskId, DurableContext context) =>
         WatchDoc(token, taskId.Value, null, context);
     /// <inheritdoc/>
-    public Task<IWatchHandle<JsonObjectValue?>?> WatchDocAsync(SessionDocFamilyToken token, string key, DurableContext context) =>
+    public Task<IWatchHandle<JsonObjectValue>?> WatchDocAsync(SessionDocFamilyToken token, string key, DurableContext context) =>
         WatchDoc(token, null, key, context);
     /// <inheritdoc/>
-    public Task<IWatchHandle<JsonObjectValue?>?> WatchDocAsync(ConversationDocFamilyToken token, ConversationId conversationId, string key,
+    public Task<IWatchHandle<JsonObjectValue>?> WatchDocAsync(ConversationDocFamilyToken token, ConversationId conversationId, string key,
         DurableContext context) => WatchDoc(token, conversationId.Value, key, context);
     /// <inheritdoc/>
-    public Task<IWatchHandle<JsonObjectValue?>?> WatchDocAsync(TaskDocFamilyToken token, TaskId taskId, string key, DurableContext context) =>
+    public Task<IWatchHandle<JsonObjectValue>?> WatchDocAsync(TaskDocFamilyToken token, TaskId taskId, string key, DurableContext context) =>
         WatchDoc(token, taskId.Value, key, context);
 
-    private async Task<IWatchHandle<JsonObjectValue?>?> WatchDoc(DocumentToken token, long? owner, string? key, DurableContext context)
+    private async Task<IWatchHandle<JsonObjectValue>?> WatchDoc(DocumentToken token, long? owner, string? key, DurableContext context)
     {
         AssertUsable();
         ArgumentNullException.ThrowIfNull(token);
@@ -1023,56 +1028,17 @@ public class Session : ISession
     internal static WatchEnd CloseEnd(Exception? failure) => failure is null ? WatchEnd.Ended : WatchEnd.Failed(failure);
 
     /// <summary>
-    /// Attaches a watch to one committed incarnation: checks the definition, pins the incarnation in the cache, then forwards this
-    /// incarnation's committed changes, its retirement and close (upstream <c>#attachDocument</c>). The watch's detach removes both
-    /// subscriptions and the pin.
+    /// Attaches a watch to the address of the incarnation <paramref name="loaded"/>, after checking the definition (upstream
+    /// <c>#observeDocument</c> with <c>createWatch</c> and <c>endWatch</c>); see <see cref="DocumentFollower"/>. The watch's detach removes
+    /// its subscriptions and its pin.
     /// </summary>
-    private Watch<JsonObjectValue?> AttachDocument(DocDefinition definition, LoadedDocument loaded)
+    private Watch<JsonObjectValue> AttachDocument(DocDefinition definition, LoadedDocument loaded)
     {
         Documents.CheckRecordScope(definition, loaded.Record);
         Documents.CheckRecordVersion(definition, loaded.Record, loaded.StoredVersion);
-        IDisposable? commitSubscription = null;
-        IDisposable? closeSubscription = null;
-        // Attached, the incarnation stays cached; once its watch detaches, or it retires, it is idle again.
-        var unpin = PinDocument(loaded.AddressId, loaded.Record.Id);
-        var detach = () =>
-        {
-            commitSubscription?.Dispose();
-            closeSubscription?.Dispose();
-            unpin();
-        };
-        var watch = new Watch<JsonObjectValue?>(loaded.Value, detach, Report, schedule: Defer);
-        var observedVersion = loaded.ValueVersion;
-        var recordId = loaded.Record.Id;
-        try
-        {
-            commitSubscription = ObserveCommits((publication, context) =>
-            {
-                foreach (var change in publication.Changes)
-                {
-                    if (change is not DocumentCommitChange document || document.Record.Id != recordId) continue;
-                    if (document.Value is null)
-                    {
-                        // A retired incarnation never changes again: its watch delivers the retirement but pins nothing, then ends.
-                        unpin();
-                        watch.Advance(Retirement, context);
-                        watch.EndAfterDelivery();
-                        continue;
-                    }
-                    var ops = ObservedOperations(ref observedVersion, document);
-                    // A migration-only base changes nothing for an observer of the new version.
-                    if (ops.IsEmpty) continue;
-                    watch.Advance(new WatchValueCall<JsonObjectValue?>(document.Value, ops), context);
-                }
-            });
-            closeSubscription = SubscribeClose(() => watch.End(CloseEnd(Failure)));
-        }
-        catch
-        {
-            // Close or failure began while the document loaded: attach nothing.
-            detach();
-            throw;
-        }
+        var follower = new DocumentFollower(this, loaded);
+        var watch = new Watch<JsonObjectValue>(loaded.Value, follower.Detach, Report, schedule: Defer);
+        follower.Attach(watch);
         return watch;
     }
 
@@ -1121,22 +1087,182 @@ public class Session : ISession
         if (failure is { } failed) throw new SessionFailedException(failed.Error);
     }
 
-    /// <summary>The last call of a watch whose incarnation retired: a null value and <c>[["r", null]]</c> (upstream's
-    /// <c>RETIREMENT_OPERATIONS</c>), retired.</summary>
-    private static readonly WatchValueCall<JsonObjectValue?> Retirement = new(null, [new ReplaceOp(JsonValue.Null)], Retired: true);
+    private sealed record FailureBox(Exception Error);
 
     /// <summary>
-    /// Operations a watch applies for one committed change of a live incarnation. A watch hydrated under another definition version holds a
-    /// differently shaped value, so it receives the new value as a root replacement instead of operations for that shape.
+    /// What a document watch follows (upstream <c>#observeDocument</c>): the address (kind, scope and key) of the incarnation it was acquired
+    /// at, from that incarnation on. Its watch gets each committed change there; a retirement as a <c>retired</c> call with the last value it
+    /// was given and no ops (a change in the retiring commit is not published: that commit publishes the retirement only); a later
+    /// incarnation, or a value of another definition version, whose shape the watch's value does not have, as a root replacement. When a
+    /// commit makes the owner task of a task document terminal, no later commit can change the address: after its changes the commit
+    /// subscription and the pin go, and the watch ends <c>ended</c> once it delivered them (Chord's <c>endAfterDelivery</c>); it stays
+    /// subscribed to the Session's close until it ends. The current incarnation is pinned in the cache, nothing while the address is absent.
     /// </summary>
-    private static ImmutableArray<Op> ObservedOperations(ref int observedVersion, DocumentCommitChange change)
+    /// <remarks>
+    /// Publications run on the line; the watch's detach (a stop, an abort, a listener failure) may run on any thread, so one short lock
+    /// guards what is followed and is never held while a pin is released (which may arm a host timer) or a subscription is removed. Only
+    /// the address is kept (the cache's ID and the first record), never <c>LoadedDocument</c>, whose tracker a retirement frees.
+    /// </remarks>
+    private sealed class DocumentFollower
     {
-        if (change.Version == observedVersion) return change.Ops;
-        observedVersion = change.Version!.Value;
-        return [new ReplaceOp(change.Value!)];
+        private static readonly Action Unpinned = static () => { };
+
+        private readonly Session session;
+        private readonly string addressId;
+        private readonly DocumentRecord address;
+        private readonly Lock gate = new();
+        private Watch<JsonObjectValue>? watch;
+        private IDisposable? commitSubscription;
+        private IDisposable? closeSubscription;
+        private bool attached = true;
+        // The incarnation followed and its value: none while the address is absent, so the Session keeps no retired value.
+        private DocumentId? incarnation;
+        private JsonObjectValue? value;
+        // The definition version the watch's value has: a change of another version replaces it whole.
+        private int version;
+        // The incarnation followed stays cached; once it retires or the watch detaches, it is idle again.
+        private Action unpin;
+
+        public DocumentFollower(Session session, LoadedDocument loaded)
+        {
+            this.session = session;
+            addressId = loaded.AddressId;
+            address = loaded.Record;
+            incarnation = loaded.Record.Id;
+            value = loaded.Value;
+            version = loaded.ValueVersion;
+            unpin = session.PinDocument(addressId, loaded.Record.Id);
+        }
+
+        /// <summary>Subscribes <paramref name="followed"/> to the Session's commits and close; a Session closing meanwhile attaches nothing.</summary>
+        public void Attach(Watch<JsonObjectValue> followed)
+        {
+            watch = followed;
+            try
+            {
+                commitSubscription = session.ObserveCommits(Follow);
+                closeSubscription = session.SubscribeClose(Close);
+            }
+            catch
+            {
+                // Close or failure began while the document loaded: attach nothing.
+                Detach();
+                throw;
+            }
+        }
+
+        /// <summary>The watch's detach: idempotent; once it ran, nothing more of a commit underway reaches the watch or pins anything for it.</summary>
+        public void Detach()
+        {
+            Action release;
+            IDisposable? commits;
+            IDisposable? closes;
+            lock (gate)
+            {
+                if (!attached) return;
+                attached = false;
+                release = unpin;
+                unpin = Unpinned;
+                commits = commitSubscription;
+                closes = closeSubscription;
+                commitSubscription = null;
+                closeSubscription = null;
+                incarnation = null;
+                value = null;
+            }
+            commits?.Dispose();
+            closes?.Dispose();
+            release();
+        }
+
+        private void Close() => watch?.End(CloseEnd(session.Failure));
+
+        private void Follow(CommitPublication publication, DurableContext context)
+        {
+            Action? released = null;
+            IDisposable? commits = null;
+            Watch<JsonObjectValue>? ending = null;
+            lock (gate)
+            {
+                // Listeners run from a copy of the list: the watch may have detached since.
+                if (!attached || watch is not { } followed) return;
+                var ownerEnds = false;
+                foreach (var change in publication.Changes)
+                {
+                    if (change is TaskWrite task)
+                    {
+                        if (address.Scope.Kind == DocumentScopeKind.Task && task.Value.Id.Value == address.Scope.OwnerId &&
+                            task.Value.State.Status == DurableTaskStatus.Terminal)
+                            ownerEnds = true;
+                        continue;
+                    }
+                    // The incarnation followed is at the address by definition; only another record needs the address compared.
+                    if (change is not DocumentCommitChange document) continue;
+                    var record = document.Record;
+                    if (record.Id != incarnation && !AtAddress(record)) continue;
+                    if (document.Value is not { } next)
+                    {
+                        if (record.Id != incarnation) continue;
+                        // Set with every incarnation.
+                        var last = value!;
+                        incarnation = null;
+                        value = null;
+                        Release(ref released);
+                        followed.Advance(new WatchValueCall<JsonObjectValue>(last, NoOperations, Retired: true), context);
+                    }
+                    else if (record.Id != incarnation || document.Version != version)
+                    {
+                        // A new incarnation at the address, or a value of another definition version, whose shape the watch's value does
+                        // not have: shown whole.
+                        if (record.Id != incarnation)
+                        {
+                            incarnation = record.Id;
+                            Release(ref released);
+                            unpin = session.PinDocument(addressId, record.Id);
+                        }
+                        version = document.Version!.Value;
+                        value = next;
+                        followed.Advance(new WatchValueCall<JsonObjectValue>(next, [new ReplaceOp(next)]), context);
+                    }
+                    else
+                    {
+                        // A migration-only base changes nothing for an observer of the new version.
+                        if (document.Ops.IsEmpty) continue;
+                        value = next;
+                        followed.Advance(new WatchValueCall<JsonObjectValue>(next, document.Ops), context);
+                    }
+                    // The watch may have detached meanwhile (a stop on another thread): the rest of the commit is not its.
+                    if (!attached) return;
+                }
+                if (ownerEnds)
+                {
+                    commits = commitSubscription;
+                    commitSubscription = null;
+                    Release(ref released);
+                    ending = followed;
+                }
+            }
+            commits?.Dispose();
+            released?.Invoke();
+            ending?.EndAfterDelivery();
+        }
+
+        /// <summary>Takes the pin of the incarnation followed, to release outside the lock with the others the commit released.</summary>
+        private void Release(ref Action? released)
+        {
+            var pin = unpin;
+            unpin = Unpinned;
+            if (!ReferenceEquals(pin, Unpinned)) released += pin;
+        }
+
+        /// <summary>Whether <paramref name="record"/> is an incarnation at the address followed (upstream <c>atAddress</c>).</summary>
+        private bool AtAddress(DocumentRecord record) =>
+            record.Kind == address.Kind && record.Key == address.Key && record.Scope.Kind == address.Scope.Kind &&
+            record.Scope.OwnerId == address.Scope.OwnerId;
     }
 
-    private sealed record FailureBox(Exception Error);
+    /// <summary>The ops of a retirement call (upstream <c>NO_OPERATIONS</c>).</summary>
+    private static readonly ImmutableArray<Op> NoOperations = [];
 
     private sealed class DocumentSweep(double at)
     {

@@ -48,7 +48,7 @@ public static partial class Examples
         }
         liveWatch.Start((call, _) =>
         {
-            if (call is WatchValueCall<JsonObjectValue?> { Value: { } value } && value.TryGetValue("generation", out var generation) &&
+            if (call is WatchValueCall<JsonObjectValue> { Value: var value } && value.TryGetValue("generation", out var generation) &&
                 generation is JsonObjectValue live && live.TryGetValue("message", out var message)) PrintText(TextOf(message as JsonObjectValue));
             return Task.CompletedTask;
         });

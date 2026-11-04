@@ -1275,16 +1275,16 @@ internal sealed class ToolExecutionApi : IToolExecutionApi
     public Task<JsonObjectValue?> SnapshotAsOfAsync(RewindableConversationDocFamilyToken token, ConversationId conversationId, string key, EntryId at,
         DurableContext context) => runtime.SnapshotAsOfAsync(token, conversationId, key, at, context);
 
-    public Task<IWatchHandle<JsonObjectValue?>?> WatchDocAsync(SessionDocToken token, DurableContext context) => runtime.WatchDocAsync(token, context);
-    public Task<IWatchHandle<JsonObjectValue?>?> WatchDocAsync(ConversationDocToken token, ConversationId conversationId, DurableContext context) =>
+    public Task<IWatchHandle<JsonObjectValue>?> WatchDocAsync(SessionDocToken token, DurableContext context) => runtime.WatchDocAsync(token, context);
+    public Task<IWatchHandle<JsonObjectValue>?> WatchDocAsync(ConversationDocToken token, ConversationId conversationId, DurableContext context) =>
         runtime.WatchDocAsync(token, conversationId, context);
-    public Task<IWatchHandle<JsonObjectValue?>?> WatchDocAsync(TaskDocToken token, TaskId taskId, DurableContext context) =>
+    public Task<IWatchHandle<JsonObjectValue>?> WatchDocAsync(TaskDocToken token, TaskId taskId, DurableContext context) =>
         runtime.WatchDocAsync(token, taskId, context);
-    public Task<IWatchHandle<JsonObjectValue?>?> WatchDocAsync(SessionDocFamilyToken token, string key, DurableContext context) =>
+    public Task<IWatchHandle<JsonObjectValue>?> WatchDocAsync(SessionDocFamilyToken token, string key, DurableContext context) =>
         runtime.WatchDocAsync(token, key, context);
-    public Task<IWatchHandle<JsonObjectValue?>?> WatchDocAsync(ConversationDocFamilyToken token, ConversationId conversationId, string key,
+    public Task<IWatchHandle<JsonObjectValue>?> WatchDocAsync(ConversationDocFamilyToken token, ConversationId conversationId, string key,
         DurableContext context) => runtime.WatchDocAsync(token, conversationId, key, context);
-    public Task<IWatchHandle<JsonObjectValue?>?> WatchDocAsync(TaskDocFamilyToken token, TaskId taskId, string key, DurableContext context) =>
+    public Task<IWatchHandle<JsonObjectValue>?> WatchDocAsync(TaskDocFamilyToken token, TaskId taskId, string key, DurableContext context) =>
         runtime.WatchDocAsync(token, taskId, key, context);
 }
 
@@ -1368,21 +1368,21 @@ public class DelegatingToolExecutionApi(IToolExecutionApi inner) : IToolExecutio
     public virtual Task<JsonObjectValue?> SnapshotAsOfAsync(RewindableConversationDocFamilyToken token, ConversationId conversationId, string key,
         EntryId at, DurableContext context) => Inner.SnapshotAsOfAsync(token, conversationId, key, at, context);
     /// <inheritdoc/>
-    public virtual Task<IWatchHandle<JsonObjectValue?>?> WatchDocAsync(SessionDocToken token, DurableContext context) => Inner.WatchDocAsync(token, context);
+    public virtual Task<IWatchHandle<JsonObjectValue>?> WatchDocAsync(SessionDocToken token, DurableContext context) => Inner.WatchDocAsync(token, context);
     /// <inheritdoc/>
-    public virtual Task<IWatchHandle<JsonObjectValue?>?> WatchDocAsync(ConversationDocToken token, ConversationId conversationId, DurableContext context) =>
+    public virtual Task<IWatchHandle<JsonObjectValue>?> WatchDocAsync(ConversationDocToken token, ConversationId conversationId, DurableContext context) =>
         Inner.WatchDocAsync(token, conversationId, context);
     /// <inheritdoc/>
-    public virtual Task<IWatchHandle<JsonObjectValue?>?> WatchDocAsync(TaskDocToken token, TaskId taskId, DurableContext context) =>
+    public virtual Task<IWatchHandle<JsonObjectValue>?> WatchDocAsync(TaskDocToken token, TaskId taskId, DurableContext context) =>
         Inner.WatchDocAsync(token, taskId, context);
     /// <inheritdoc/>
-    public virtual Task<IWatchHandle<JsonObjectValue?>?> WatchDocAsync(SessionDocFamilyToken token, string key, DurableContext context) =>
+    public virtual Task<IWatchHandle<JsonObjectValue>?> WatchDocAsync(SessionDocFamilyToken token, string key, DurableContext context) =>
         Inner.WatchDocAsync(token, key, context);
     /// <inheritdoc/>
-    public virtual Task<IWatchHandle<JsonObjectValue?>?> WatchDocAsync(ConversationDocFamilyToken token, ConversationId conversationId, string key,
+    public virtual Task<IWatchHandle<JsonObjectValue>?> WatchDocAsync(ConversationDocFamilyToken token, ConversationId conversationId, string key,
         DurableContext context) => Inner.WatchDocAsync(token, conversationId, key, context);
     /// <inheritdoc/>
-    public virtual Task<IWatchHandle<JsonObjectValue?>?> WatchDocAsync(TaskDocFamilyToken token, TaskId taskId, string key, DurableContext context) =>
+    public virtual Task<IWatchHandle<JsonObjectValue>?> WatchDocAsync(TaskDocFamilyToken token, TaskId taskId, string key, DurableContext context) =>
         Inner.WatchDocAsync(token, taskId, key, context);
 }
 

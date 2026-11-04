@@ -278,6 +278,22 @@ internal static class QuestionsTests
             await harness.CloseAsync(Ctx);
         });
 
+        // Pi v1.5.0 sync (area watch-folding, 8b0caefc2): a document watch follows its address, so a retirement is a call, not the watch's
+        // end; the wait tests Retired and fails, where it would otherwise wait for a recreation.
+        yield return Case(prefix + "retired-while-waiting", async () =>
+        {
+            var setup = NewSetup();
+            AskOnce(setup, Color);
+            var (harness, root) = await Open(location(), setup, new Dirs("retired-while-waiting"));
+            var (submission, pending) = await UntilPending(root);
+            await harness.CommitAsync(tx => tx.RetireDocAsync(UserInteraction.InteractionDoc, pending.TaskId), Ctx);
+            Equal(SubmissionStatus.Done, (await Settled(submission)).Status, "submission");
+            var result = (await Results(root)).Single();
+            Check(IsError(result) && Text(result).Contains("was retired", StringComparison.Ordinal), "retired result: " + Text(result));
+            await NoLiveTasks(harness);
+            await harness.CloseAsync(Ctx);
+        });
+
         yield return Case(prefix + "answer-after-abort", async () =>
         {
             var setup = NewSetup();
