@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/src/env/node.ts (NodeExecutionEnv: the Shell half, exec with
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/src/env/node.ts (NodeExecutionEnv: the Shell half, exec with
 // streamed output, spill, cancellation, timeout and cleanup; the FileSystem half is LocalFileSystem, which this class extends).
 // Intentional differences, each following PiSharp's coding-agent bash tool:
 // - Shell discovery is PiSharp.Tools' ShellDiscovery (upstream getShellConfig): the configured shell path, then on Windows Git Bash under

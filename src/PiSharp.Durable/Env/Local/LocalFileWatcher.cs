@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/src/env/node-watch.ts.
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/src/env/node-watch.ts.
 // Node's fs.watch is FileSystemWatcher here: per directory without subdirectories on Linux (as upstream installs one inotify watch per
 // directory), one recursive watcher per target elsewhere. FileSystemWatcher cannot watch a single file, so a target that is a symbolic link
 // to a file is watched through the directory of the file it resolves to, filtered to that name. Identities (device and inode) come from
@@ -39,6 +39,8 @@ internal sealed class LocalFileWatcher : IFileWatcher
     private const int FsEventsSettleMs = 500;
     private const int DefaultPollMs = 2000;
     private const int DefaultMaxDirectories = 10_000;
+    /// <summary>The one <c>overflow</c> change; it carries nothing else.</summary>
+    private static readonly FileChange Overflow = new FileOverflowChange();
     /// <summary>In polling mode, recently modified small files are also compared by content: a second write within the file system's
     /// timestamp granularity can keep size and modification time.</summary>
     private const long HashMaxBytes = 256 * 1024;
@@ -79,13 +81,13 @@ internal sealed class LocalFileWatcher : IFileWatcher
     private sealed class BudgetExceededException(string message) : Exception(message);
 
     private readonly ImmutableArray<ResolvedTarget> targets;
-    private readonly Action<WatchChange> onChange;
+    private readonly Action<FileChange> onChange;
     private readonly int pollIntervalMs;
     private readonly int maxDirectories;
     private readonly object gate = new();
     private readonly Dictionary<string, Installed> watchers = new(StringComparer.Ordinal);
     private readonly HashSet<string> events = new(StringComparer.Ordinal);
-    private volatile bool closed;
+    private volatile bool stopped;
     private WatchMode mode;
     private Dictionary<string, Entry> snapshot = new(StringComparer.Ordinal);
     private Timer? timer;
@@ -93,7 +95,7 @@ internal sealed class LocalFileWatcher : IFileWatcher
     private Task? running;
     private bool dirty;
 
-    private LocalFileWatcher(ImmutableArray<ResolvedTarget> targets, Action<WatchChange> onChange, WatchMode mode, LocalWatchOptions options)
+    private LocalFileWatcher(ImmutableArray<ResolvedTarget> targets, Action<FileChange> onChange, WatchMode mode, LocalWatchOptions options)
     {
         this.targets = targets;
         this.onChange = onChange;
@@ -104,7 +106,7 @@ internal sealed class LocalFileWatcher : IFileWatcher
 
     /// <summary>Establishes coverage: watchers first, then the snapshot later changes are compared with.</summary>
     public static async Task<LocalFileWatcher> OpenAsync(IReadOnlyList<WatchTarget> targets, Func<string, string> resolvePath,
-        Action<WatchChange> onChange, LocalWatchOptions options)
+        Action<FileChange> onChange, LocalWatchOptions options)
     {
         var resolved = targets.Select(target => new ResolvedTarget(resolvePath(target.Path), target.Recursive, target.Exclude?.Hidden == true,
             (target.Exclude?.Names ?? []).ToImmutableHashSet(StringComparer.Ordinal))).ToImmutableArray();
@@ -128,12 +130,12 @@ internal sealed class LocalFileWatcher : IFileWatcher
 
     public WatchMode Mode { get { lock (gate) return mode; } }
 
-    public async Task CloseAsync(DurableContext context)
+    public async Task StopAsync(DurableContext context)
     {
         Task? pending;
         lock (gate)
         {
-            if (closed) return;
+            if (stopped) return;
             pending = running;
         }
         Stop();
@@ -145,7 +147,7 @@ internal sealed class LocalFileWatcher : IFileWatcher
         List<Installed> installed;
         lock (gate)
         {
-            closed = true;
+            stopped = true;
             timer?.Dispose();
             timer = null;
             settleTimer?.Dispose();
@@ -156,9 +158,9 @@ internal sealed class LocalFileWatcher : IFileWatcher
         foreach (var entry in installed) entry.Watcher.Dispose();
     }
 
-    private void Deliver(WatchChange change)
+    private void Deliver(FileChange change)
     {
-        if (closed) return;
+        if (stopped) return;
         try { onChange(change); }
         catch (Exception) { } // A throwing callback must not stop watching.
     }
@@ -167,7 +169,7 @@ internal sealed class LocalFileWatcher : IFileWatcher
     {
         lock (gate)
         {
-            if (closed || mode != WatchMode.Polling) return;
+            if (stopped || mode != WatchMode.Polling) return;
             timer?.Dispose();
             timer = new Timer(_ =>
             {
@@ -181,7 +183,7 @@ internal sealed class LocalFileWatcher : IFileWatcher
     {
         lock (gate)
         {
-            if (closed || timer is not null) return;
+            if (stopped || timer is not null) return;
             timer = new Timer(_ =>
             {
                 lock (gate) { timer?.Dispose(); timer = null; }
@@ -194,7 +196,7 @@ internal sealed class LocalFileWatcher : IFileWatcher
     {
         lock (gate)
         {
-            if (closed) return;
+            if (stopped) return;
             settleTimer?.Dispose();
             settleTimer = new Timer(_ =>
             {
@@ -213,7 +215,7 @@ internal sealed class LocalFileWatcher : IFileWatcher
                 dirty = true;
                 return running;
             }
-            if (closed) return Task.CompletedTask;
+            if (stopped) return Task.CompletedTask;
             return running = Task.Run(RunFlush);
         }
     }
@@ -233,10 +235,10 @@ internal sealed class LocalFileWatcher : IFileWatcher
                 }
                 var changed = Sync(report: true);
                 foreach (var path in pending) changed.Add(path);
-                if (changed.Count > 0) Deliver(new WatchPathsChange([.. changed.Order(StringComparer.Ordinal)]));
+                if (changed.Count > 0) Deliver(new FilePathsChange([.. changed.Order(StringComparer.Ordinal)]));
                 lock (gate)
                 {
-                    if (!dirty || closed)
+                    if (!dirty || stopped)
                     {
                         running = null;
                         return;
@@ -247,7 +249,7 @@ internal sealed class LocalFileWatcher : IFileWatcher
         catch (Exception error)
         {
             var fileError = error as FileError ?? new FileError(IsDenied(error) ? FileErrorCode.PermissionDenied : FileErrorCode.Invalid, error.Message);
-            Deliver(new WatchErrorChange(fileError));
+            Deliver(new FileFailedChange(fileError));
             Stop();
             lock (gate) running = null;
         }
@@ -257,11 +259,11 @@ internal sealed class LocalFileWatcher : IFileWatcher
     private HashSet<string> Sync(bool report)
     {
         var changed = new HashSet<string>(StringComparer.Ordinal);
-        for (var round = 0; round < 10 && !closed; round++)
+        for (var round = 0; round < 10 && !stopped; round++)
         {
             var scan = ScanAll();
-            // Closed during the scan: installing watchers now would leak them.
-            if (closed) break;
+            // Stopped during the scan: installing watchers now would leak them.
+            if (stopped) break;
             var next = scan.Snapshot;
             if (report) foreach (var path in Diff(snapshot, next)) changed.Add(path);
             snapshot = next;
@@ -399,7 +401,7 @@ internal sealed class LocalFileWatcher : IFileWatcher
         var overflow = false;
         lock (gate)
         {
-            if (closed) return false;
+            if (stopped) return false;
             foreach (var (path, installed) in watchers.ToList())
             {
                 // Gone, or replaced: a watcher follows the directory it was installed on, not the path.
@@ -442,7 +444,7 @@ internal sealed class LocalFileWatcher : IFileWatcher
         foreach (var watcher in removed) watcher.Dispose();
         if (overflow)
         {
-            Deliver(new WatchOverflowChange());
+            Deliver(Overflow);
             SchedulePoll();
         }
         return added;
@@ -506,7 +508,7 @@ internal sealed class LocalFileWatcher : IFileWatcher
 
     private void OnEvent(string directory, string? name)
     {
-        if (closed) return;
+        if (stopped) return;
         var path = name is null ? directory : (directory.EndsWith(Separator) ? directory : directory + Separator) + name;
         // Events about unrelated siblings of an ancestor, or about excluded entries, are ignored.
         var relevant = InScope(path);
@@ -517,7 +519,7 @@ internal sealed class LocalFileWatcher : IFileWatcher
     /// <summary>The file a target links to changed: report the target.</summary>
     private void OnLinkedFileEvent(string target)
     {
-        if (closed) return;
+        if (stopped) return;
         lock (gate) events.Add(target);
         ScheduleFlush();
     }

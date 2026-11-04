@@ -113,12 +113,11 @@
       "lines": 380,
       "pisharp": "src/PiSharp.Durable/Env/Env.cs",
       "phase": "P4",
-      "status": "needs-sync",
+      "status": "ported",
       "upstreamChange": "modified",
       "previousBlobSha1": "89437d3c2bdb65bb012c9cbc61e751a30521bff5",
       "changedLines": 18,
-      "note": "Env.cs: Result<TValue, TError>/Unit, FileErrorCode/FileError, ExecutionErrorCode/ExecutionError (SpillPath), FileKind, FileMetadata (upstream FileInfo). FileSystem.cs: IFileSystem with ITextLineReader/TextLine, ReadTextLinesOptions, IBinaryReader (ScanLinesAsync, LineScan), IDirReader, WatchTarget/WatchExclusions, the WatchChange records (WatchPathsChange, WatchOverflowChange, WatchErrorChange), IFileWatcher/WatchMode, TempFileOptions, CleanupAsync, and the optional listFiles: IFileSystem.ListFilesAsync (a default interface method failing with not_supported), ListFilesOptions (bounds as doubles, validated as non-negative safe integers), FileListing, FileListEntry; LocalFileSystem implements it with pi-env daemon semantics (Env/Local/LocalFileListing.cs, a port of packages/env/daemon/src/list.rs and the ignore crate 0.4.33 it walks with). Shell.cs: ShellCommand (string or argv), ShellExecOptions, ShellSpillOptions, ShellExecResult, ShellOutputWindow/ShellOutputSkip/ShellOutputInfo/ShellStream, ShellOutputHandler, IShell, IExecutionEnv : IFileSystem, IShell. Contents are bytes with UTF-8 string overloads (FileSystemExtensions). Tests: env.*, env.list-files.*",
-      "portedBlobSha1": "89437d3c2bdb65bb012c9cbc61e751a30521bff5"
+      "note": "Env.cs: Result<TValue, TError>/Unit, FileErrorCode/FileError, ExecutionErrorCode/ExecutionError (SpillPath), FileKind, FileMetadata (upstream FileInfo). FileSystem.cs: IFileSystem with ITextLineReader/TextLine, ReadTextLinesOptions, IBinaryReader (ScanLinesAsync, LineScan), IDirReader, WatchTarget/WatchExclusions, the FileChange records tagged by FileChangeKind (FilePathsChange, FileOverflowChange, FileFailedChange), IFileWatcher (StopAsync)/WatchMode, TempFileOptions, CleanupAsync, and the optional listFiles: IFileSystem.ListFilesAsync (a default interface method failing with not_supported), ListFilesOptions (bounds as doubles, validated as non-negative safe integers), FileListing, FileListEntry; LocalFileSystem implements it with pi-env daemon semantics (Env/Local/LocalFileListing.cs, a port of packages/env/daemon/src/list.rs and the ignore crate 0.4.33 it walks with). Shell.cs: ShellCommand (string or argv), ShellExecOptions, ShellSpillOptions, ShellExecResult, ShellOutputWindow/ShellOutputSkip (OutputSkip's shape)/ShellOutputInfo/ShellStream, ShellOutputHandler, IShell, IExecutionEnv : IFileSystem, IShell. Contents are bytes with UTF-8 string overloads (FileSystemExtensions). Tests: env.*, env.list-files.*, env.node-conformance.* (FileChange kinds, StopAsync)"
     },
     {
       "upstream": "packages/durable/src/env/line-scan.ts",
@@ -135,12 +134,11 @@
       "lines": 524,
       "pisharp": "src/PiSharp.Durable/Env/Local/LocalFileWatcher.cs",
       "phase": "P9",
-      "status": "needs-sync",
+      "status": "ported",
       "upstreamChange": "modified",
       "previousBlobSha1": "7f3b8ab55de8824076a858af3ab0c77ec325902c",
       "changedLines": 44,
-      "note": "LocalFileWatcher and LocalWatchOptions (Env/Local, the file-system side of the boundary). fs.watch is FileSystemWatcher: per directory on Linux, one recursive watcher per target elsewhere, a linked file watched through its target's directory; polling by default on Windows and on Linux network/FUSE file systems (statfs magic). Device and inode identities come from NativeFiles (Env/Local/NativeFileStatus.cs: GetFileInformationByHandle, statx, macOS lstat), with creation time as the identity where statx is missing. Tests: env.node-conformance.*.watch-*, env.node-conformance.watch-limits.*",
-      "portedBlobSha1": "7f3b8ab55de8824076a858af3ab0c77ec325902c"
+      "note": "LocalFileWatcher and LocalWatchOptions (Env/Local, the file-system side of the boundary). fs.watch is FileSystemWatcher: per directory on Linux, one recursive watcher per target elsewhere, a linked file watched through its target's directory; polling by default on Windows and on Linux network/FUSE file systems (statfs magic). Device and inode identities come from NativeFiles (Env/Local/NativeFileStatus.cs: GetFileInformationByHandle, statx, macOS lstat), with creation time as the identity where statx is missing. Tests: env.node-conformance.*.watch-*, env.node-conformance.watch-limits.*"
     },
     {
       "upstream": "packages/durable/src/env/node.ts",
@@ -148,12 +146,11 @@
       "lines": 1235,
       "pisharp": "src/PiSharp.Durable.Tools/Env/LocalExecutionEnv.cs",
       "phase": "P9",
-      "status": "needs-sync",
+      "status": "ported",
       "upstreamChange": "modified",
       "previousBlobSha1": "bb9776e7249280fdc09f4d81ac81b7a5eaaaa629",
       "changedLines": 21,
-      "note": "Split along the storage boundary: the FileSystem half is LocalFileSystem (src/PiSharp.Durable/Env/Local/LocalFileSystem.cs: text-line reader, scanLines, temp files, cleanup, watch, a FIFO refused before opening); the Shell half is LocalExecutionEnv : LocalFileSystem, IExecutionEnv with LocalExecutionEnvOptions (Cwd, ShellPath, ShellEnv, Watch), over PiSharp.Tools' ShellDiscovery, the Windows job-object lifetime and the POSIX process-group admission (Env/LocalProcess.cs). Intentional differences, documented in LocalExecutionEnv.cs: settling kills descendants left in the job or group; killed Windows jobs exit 1; the working directory is not searched for bash. Tests: env.node.*, env.node-conformance.*, env.node-spill.*",
-      "portedBlobSha1": "bb9776e7249280fdc09f4d81ac81b7a5eaaaa629"
+      "note": "Split along the storage boundary: the FileSystem half is LocalFileSystem (src/PiSharp.Durable/Env/Local/LocalFileSystem.cs: text-line reader, scanLines, temp files, cleanup, watch, a FIFO refused before opening); the Shell half is LocalExecutionEnv : LocalFileSystem, IExecutionEnv with LocalExecutionEnvOptions (Cwd, ShellPath, ShellEnv, Watch), over PiSharp.Tools' ShellDiscovery, the Windows job-object lifetime and the POSIX process-group admission (Env/LocalProcess.cs). Intentional differences, documented in LocalExecutionEnv.cs: settling kills descendants left in the job or group; killed Windows jobs exit 1; the working directory is not searched for bash. Legacy WSL bash under %SystemRoot% (System32 or Sysnative; C:\\Windows only when unset) comes from ShellDiscovery.IsLegacyWslBashPath; killProcessTree's taskkill and its SystemRoot fallback have no counterpart (jobs and process groups are killed directly, LocalProcess.cs). Tests: env.node.*, env.node-conformance.*, env.node-spill.*"
     },
     {
       "upstream": "packages/durable/src/errors.ts",
@@ -880,12 +877,11 @@
       "lines": 633,
       "pisharp": "src/PiSharp.Durable/Testing/EnvConformance.cs",
       "phase": "P9",
-      "status": "needs-sync",
+      "status": "ported",
       "upstreamChange": "modified",
       "previousBlobSha1": "a2c7d43ba47b4536eb82aec6d340f111fd8a527d",
       "changedLines": 24,
-      "note": "EnvConformance.Create(EnvConformanceOptions or provider): all 24 cases plus the 5 listFiles cases (EnvConformanceOptions.ListFiles; the symbolic link one also needs Symlinks) over IExecutionEnv with injected assertions (read(0, 1.5) dropped: integer offsets). Tests: env.node-conformance.conformance.* and env.node-conformance.polling.*",
-      "portedBlobSha1": "a2c7d43ba47b4536eb82aec6d340f111fd8a527d"
+      "note": "EnvConformance.Create(EnvConformanceOptions or provider): all 24 cases plus the 5 listFiles cases (EnvConformanceOptions.ListFiles; the symbolic link one also needs Symlinks) over IExecutionEnv with injected assertions (read(0, 1.5) dropped: integer offsets). Tests: env.node-conformance.conformance.* and env.node-conformance.polling.*"
     },
     {
       "upstream": "packages/durable/src/testing/index.ts",
@@ -1437,12 +1433,11 @@
       "lines": 126,
       "pisharp": "tests/PiSharp.Durable.Tests/EnvNodeConformanceCases.cs",
       "phase": "P9",
-      "status": "needs-sync",
+      "status": "ported",
       "upstreamChange": "modified",
       "previousBlobSha1": "38e8de61b60c08c027aca65bdbe020dc32e9a763",
       "changedLines": 10,
-      "note": "Both kit registrations through ConformanceRunner on LocalExecutionEnv (env.node-conformance.conformance.*, env.node-conformance.polling.*: 22 cases on Windows with Git Bash and symlinks off as upstream, 24 elsewhere), watch limits (env.node-conformance.watch-limits.*) and readers (env.node-conformance.readers.*; the FIFO case POSIX only, as upstream)",
-      "portedBlobSha1": "38e8de61b60c08c027aca65bdbe020dc32e9a763"
+      "note": "Both kit registrations through ConformanceRunner on LocalExecutionEnv (env.node-conformance.conformance.*, env.node-conformance.polling.*: 22 cases on Windows with Git Bash and symlinks off as upstream, 24 elsewhere), watch limits (env.node-conformance.watch-limits.*) and readers (env.node-conformance.readers.*; the FIFO case POSIX only, as upstream)"
     },
     {
       "upstream": "packages/durable/test/env-node-spill.test.ts",
@@ -1459,12 +1454,11 @@
       "lines": 1010,
       "pisharp": "tests/PiSharp.Durable.Tests/EnvNodeCases.cs",
       "phase": "P9",
-      "status": "needs-sync",
+      "status": "ported",
       "upstreamChange": "modified",
       "previousBlobSha1": "37410f05ca418c6643c13769f32c736f9c59f2c9",
       "changedLines": 14,
-      "note": "All 47 cases (49 with it.each rows) as env.node.*, plus the authored held-open-file case. Adapted: non-integer truncation sizes dropped; FileHandle spies become LocalFileSystem seams (SyncFile, ReadTextChunkAsync); node -e commands become printf/head/tr; the taskkill case keeps its observable claim (abort wins over an external kill). Platform skips as upstream: legacy WSL path, signal exit and taskkill on Windows; symlink assertions where links can be created",
-      "portedBlobSha1": "37410f05ca418c6643c13769f32c736f9c59f2c9"
+      "note": "All 47 cases (53 with it.each rows) as env.node.*, plus the authored held-open-file case. Adapted: non-integer truncation sizes dropped; FileHandle spies become LocalFileSystem seams (SyncFile, ReadTextChunkAsync); node -e commands become printf/head/tr; the taskkill case keeps its observable claim (abort wins over an external kill). Platform skips as upstream: the legacy WSL rows (env.node.selects-command-transport-for-*, with SystemRoot set per row), signal exit and taskkill on Windows; symlink assertions where links can be created"
     },
     {
       "upstream": "packages/durable/test/env-truncate.test.ts",

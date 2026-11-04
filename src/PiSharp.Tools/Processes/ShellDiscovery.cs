@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/src/utils/shell.ts (getShellConfig, getShellEnv)
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/coding-agent/src/utils/shell.ts (getShellConfig, getShellEnv)
 // and utils/paths.ts (normalizePath for the shellPath setting).
 using System.Collections.Immutable;
 using System.Text.RegularExpressions;

@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/src/testing/env-conformance.ts.
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/src/testing/env-conformance.ts.
 // Cases keep upstream's names, inputs and expected values. Adapted: upstream's read(0, 1.5) check is dropped because offsets and lengths are
 // integers here; the line-scan case's reference decoding (`new TextDecoder()`) is this port's StreamDecoder and range decoder, which the
 // env.line-scan cases pin against Node-captured output; upstream's `{ ...info }` partial matches compare the named properties; the listFiles
@@ -220,7 +220,7 @@ public static class EnvConformance
                     string[] hidden = [await watch.Absolute("skills/node_modules"), await watch.Absolute("skills/.SKILL.md.tmp")];
                     foreach (var change in watch.Changes)
                     {
-                        if (change is not WatchPathsChange paths) continue;
+                        if (change is not FilePathsChange paths) continue;
                         foreach (var path in paths.Paths)
                             assert.Ok(!hidden.Any(excluded => path == excluded || path.StartsWith(excluded, StringComparison.Ordinal)), $"excluded {path}");
                     }
@@ -249,16 +249,16 @@ public static class EnvConformance
                 });
             }),
 
-            WatchCase("watch stops reporting once closed", async env =>
+            WatchCase("watch stops reporting once stopped", async env =>
             {
-                var changes = new List<WatchChange>();
+                var changes = new List<FileChange>();
                 var watcher = (await env.WatchAsync([new WatchTarget("file.txt")], change => { lock (changes) changes.Add(change); }, Context)).GetOrThrow();
                 assert.Ok(watcher.Mode is WatchMode.Native or WatchMode.Polling, "watcher reports its mode");
-                await watcher.CloseAsync(Context);
-                await watcher.CloseAsync(Context);
+                await watcher.StopAsync(Context);
+                await watcher.StopAsync(Context);
                 (await env.WriteFileAsync("file.txt", "x", Context)).GetOrThrow();
                 await Task.Delay(300);
-                lock (changes) assert.DeepEqual(changes, Array.Empty<WatchChange>());
+                lock (changes) assert.DeepEqual(changes, Array.Empty<FileChange>());
             }),
 
             Case("argv exec passes arguments to the program without shell parsing", async env =>
@@ -521,11 +521,11 @@ public static class EnvConformance
     /// <summary>The change helpers of upstream's <c>watching</c>.</summary>
     private sealed class Watch(IExecutionEnv env)
     {
-        private readonly List<WatchChange> changes = [];
+        private readonly List<FileChange> changes = [];
 
-        public IReadOnlyList<WatchChange> Changes { get { lock (changes) return [.. changes]; } }
+        public IReadOnlyList<FileChange> Changes { get { lock (changes) return [.. changes]; } }
 
-        public void Add(WatchChange change) { lock (changes) changes.Add(change); }
+        public void Add(FileChange change) { lock (changes) changes.Add(change); }
 
         public async Task<string> Absolute(string path) => (await env.AbsolutePathAsync(path, Context)).GetOrThrow();
 
@@ -539,7 +539,7 @@ public static class EnvConformance
             var deadline = Environment.TickCount64 + 3000;
             while (true)
             {
-                List<WatchChange> since;
+                List<FileChange> since;
                 lock (changes) since = changes.Skip(from).ToList();
                 if (since.Any(entry => Covers(entry, target))) return;
                 if (Environment.TickCount64 > deadline)
@@ -555,22 +555,22 @@ public static class EnvConformance
         var watch = new Watch(env);
         var watcher = (await env.WatchAsync(targets, watch.Add, Context)).GetOrThrow();
         try { await run(watch); }
-        finally { await watcher.CloseAsync(Context); }
+        finally { await watcher.StopAsync(Context); }
     }
 
     /// <summary>Whether a change reports <paramref name="path"/>: an overflow, or a reported path at or above it.</summary>
-    private static bool Covers(WatchChange change, string path) => change switch
+    private static bool Covers(FileChange change, string path) => change switch
     {
-        WatchOverflowChange => true,
-        WatchPathsChange paths => paths.Paths.Any(reported =>
+        FileOverflowChange => true,
+        FilePathsChange paths => paths.Paths.Any(reported =>
             path == reported || path.StartsWith(reported + "/", StringComparison.Ordinal) || path.StartsWith(reported + "\\", StringComparison.Ordinal)),
         _ => false,
     };
 
-    private static string Describe(WatchChange change) => change switch
+    private static string Describe(FileChange change) => change switch
     {
-        WatchPathsChange paths => "[" + string.Join(", ", paths.Paths) + "]",
-        WatchErrorChange error => "error: " + error.Error.Message,
+        FilePathsChange paths => "[" + string.Join(", ", paths.Paths) + "]",
+        FileFailedChange failed => "failed: " + failed.Error.Message,
         _ => "overflow",
     };
 
