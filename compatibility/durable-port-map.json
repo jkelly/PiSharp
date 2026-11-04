@@ -1096,12 +1096,11 @@
       "lines": 174,
       "pisharp": "src/PiSharp.Durable/Truncate.cs",
       "phase": "P2",
-      "status": "needs-sync",
+      "status": "ported",
       "upstreamChange": "modified",
       "previousBlobSha1": "ed2041f788b6b0bfc3c96a6e313247c71056b2d7",
       "changedLines": 39,
-      "note": "Truncation.TruncateHead/TruncateHeadOf/Utf8ByteLength/FormatSize and the 2000-line/50KB defaults. Tests: truncate.*",
-      "portedBlobSha1": "ed2041f788b6b0bfc3c96a6e313247c71056b2d7"
+      "note": "Truncation.TruncateHead/TruncateHeadOf/Utf8ByteLength/FormatSize and the 2000-line/50KB defaults. Tests: truncate.*. v1.5.0 (work list area chord-output): utf8ByteLength moved to Chord output; Truncation.Utf8ByteLength stays public and forwards to ToolOutput.Utf8ByteLength, as truncate.ts re-exports Chord's, so there is one implementation."
     },
     {
       "upstream": "packages/durable/src/types.ts",
@@ -1214,13 +1213,12 @@
       "lines": 409,
       "pisharp": "src/PiSharp.Durable/Harness/Output.cs",
       "phase": "P9",
-      "status": "needs-sync",
+      "status": "ported",
       "upstreamChange": "renamed",
       "renamedFrom": "packages/durable/src/harness/output.ts",
       "previousBlobSha1": "de9aa526a6de110aafbb8b2694cdb34144cc0863",
       "changedLines": 104,
-      "note": "ToolOutput (sanitizeOutput, boundOutput, characterEnd), OutputBuffer and Progress, internal as upstream does not export them. TextEncoder/TextDecoder are a UTF8Encoding and its streaming Decoder; Progress runs on the Harness TimeProvider and settles waiters inline, in order. Tests: harness.output.*, harness.output-skip.*",
-      "portedBlobSha1": "de9aa526a6de110aafbb8b2694cdb34144cc0863"
+      "note": "ToolOutput (sanitizeOutput, boundOutput, characterEnd), OutputBuffer and Progress, internal as upstream does not export them. TextEncoder/TextDecoder are a UTF8Encoding and its streaming Decoder; Progress runs on the Harness TimeProvider and settles waiters inline, in order. Tests: harness.output.*, harness.output-skip.*. v1.5.0 (work list area chord-output): the module upstream moved to Chord, ported whole at v1.5.0 and kept internal in PiSharp.Durable: OutputSkip is Env's ShellOutputSkip; utf8ByteLength is ToolOutput.Utf8ByteLength; sanitizeOutput removes whole 7-bit escape sequences (the same regular expression) before single control characters (#11607); Progress paces on a ProgressClock (Now, SetTimer returning a disarm action; a TimeProvider makes one, TimeProvider.System by default) and a timer that fires early schedules again from the clock (ec1be23eb). Tests: harness.output.* (22, of upstream chord/test/output.test.ts), harness.output-skip.* (4, of chord/test/output-skip.test.ts)."
     },
     {
       "upstream": "packages/chord/src/sqlite/cloudflare.ts",
@@ -1466,12 +1464,11 @@
       "lines": 100,
       "pisharp": "tests/PiSharp.Durable.Tests/TruncateCases.cs",
       "phase": "P9",
-      "status": "needs-sync",
+      "status": "ported",
       "upstreamChange": "modified",
       "previousBlobSha1": "7a2f3f5efc064c3799b875835d10baa0eb22a1c6",
       "changedLines": 2,
-      "note": "Ported early with truncate.ts; the no-Buffer child process becomes a check of Truncation.Utf8ByteLength against .NET UTF-8 encoding. Tests: truncate.*",
-      "portedBlobSha1": "7a2f3f5efc064c3799b875835d10baa0eb22a1c6"
+      "note": "Ported early with truncate.ts; the no-Buffer child process becomes a check of Truncation.Utf8ByteLength against .NET UTF-8 encoding. Tests: truncate.*. v1.5.0 (work list area chord-output): the only change runs the child process from workspace sources (--conditions=source), which has no C# counterpart; truncate.* unchanged."
     },
     {
       "upstream": "packages/durable/test/examples/00-conversation.ts",
@@ -2298,7 +2295,7 @@
       "phase": "P9",
       "status": "removed-upstream",
       "upstreamChange": "removed",
-      "note": "4 of 4 tests: harness.output-skip.* (storage-free). Adapted: mulberry32 on uint (Math.imul arithmetic modulo 2^32)",
+      "note": "4 of 4 tests: harness.output-skip.* (storage-free). Adapted: mulberry32 on uint (Math.imul arithmetic modulo 2^32). v1.5.0 (work list area chord-output): its successor chord/test/output-skip.test.ts is ported in the same file under the same harness.output-skip.* ids (map rows cover Durable tests only).",
       "successor": "packages/chord/test/output-skip.test.ts"
     },
     {
@@ -2309,7 +2306,7 @@
       "phase": "P9",
       "status": "removed-upstream",
       "upstreamChange": "removed",
-      "note": "20 of 20 tests: harness.output.* (storage-free). Adapted: Buffer is Encoding.UTF8; vi fake timers are a ManualTimeProvider passed to Progress; the fuzz PRNG runs on uint",
+      "note": "20 of 20 tests: harness.output.* (storage-free). Adapted: Buffer is Encoding.UTF8; vi fake timers are a ManualTimeProvider passed to Progress; the fuzz PRNG runs on uint. v1.5.0 (work list area chord-output): its successor chord/test/output.test.ts is ported in the same file under the same harness.output.* ids (map rows cover Durable tests only).",
       "successor": "packages/chord/test/output.test.ts"
     },
     {

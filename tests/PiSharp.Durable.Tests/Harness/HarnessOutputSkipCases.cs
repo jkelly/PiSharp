@@ -1,7 +1,9 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/test/harness-output-skip.test.ts. Verbatim apart from these
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/chord/test/output-skip.test.ts.
+//
+// Upstream moved it from Durable's harness-output-skip.test.ts; the case ids keep the harness.output-skip prefix. Verbatim apart from these
 // adaptations: the mulberry32 PRNG runs on uint, which is Math.imul's and `>>> 0`'s arithmetic modulo 2^32; `for (const character of
 // text)` walks code points, a surrogate pair as one; Buffer.byteLength is Encoding.UTF8.GetByteCount; BoundedOutput is a record struct, so
-// toEqual is struct equality.
+// toEqual is struct equality; OutputSkip is Env's ShellOutputSkip, as in Output.cs.
 using System.Text;
 using PiSharp.Durable;
 using PiSharp.Durable.Env;
@@ -12,7 +14,7 @@ internal static partial class Program
     private static IEnumerable<(string, Func<Task>)> HarnessOutputSkipCases() => OutputSkipTests.Cases("harness.output-skip.");
 }
 
-/// <summary>The harness.output-skip.* cases (upstream harness-output-skip.test.ts).</summary>
+/// <summary>The harness.output-skip.* cases (upstream Chord output-skip.test.ts).</summary>
 internal static class OutputSkipTests
 {
     /// <summary>Deterministic PRNG (mulberry32) so failures reproduce from the printed seed.</summary>

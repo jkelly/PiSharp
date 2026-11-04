@@ -1,20 +1,29 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/src/harness/output.ts.
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/chord/src/output.ts.
+//
+// Chord's output module (`@earendil-works/chord/output`), which upstream moved out of Durable's harness/output.ts. PiSharp keeps it internal
+// to PiSharp.Durable, the only code that uses it.
 //
 // Mappings:
 // - TextEncoder and TextDecoder("utf-8", {ignoreBOM: true}) are a UTF8Encoding without a preamble that substitutes invalid data: a lone
 //   surrogate encodes as U+FFFD, and decoding keeps a U+FEFF and replaces each maximal invalid subpart with one U+FFFD, as the WHATWG
 //   decoder does. The streaming `decode(chunk, {stream: true})` is a System.Text.Decoder, and `decode()` is its flush.
 // - Byte offsets and counts are long; `Uint8Array.indexOf` and `lastIndexOf` are span searches with upstream's start positions.
-// - Progress: Date.now and setTimeout are the clock and timers of a TimeProvider (the Harness's in a tool task, so fake time drives it as
-//   vi fake timers would). As upstream, mark() starts the write synchronously, so what it captures is the state at that call, and a write
-//   that completes synchronously settles its waiters inline. A lock guards the state: timers fire and tools report on other threads. The
-//   write itself runs outside the lock.
+// - OutputSkip is Env's ShellOutputSkip: upstream's env declares ShellOutputSkip as an interface of OutputSkip's shape, one type under
+//   TypeScript's structural typing, so one C# record serves both. The core names it type-only, as the runtime-boundary case allows.
+// - utf8ByteLength is ToolOutput.Utf8ByteLength, upstream's fallback counter (Buffer.byteLength counts the same). Truncation.Utf8ByteLength,
+//   truncate.ts's re-export, forwards to it.
+// - The escape sequences are the same regular expression; .NET's backtracking matches it as JavaScript's does.
+// - Progress: ProgressClock is a record of the two functions. The default clock is Date.now and setTimeout of TimeProvider.System, and a
+//   TimeProvider (the Harness's in a tool task, so fake time drives it as vi fake timers would) is a clock of its own. As upstream, mark()
+//   starts the write synchronously, so what it captures is the state at that call, and a write that completes synchronously settles its
+//   waiters inline. A lock guards the state: timers fire and tools report on other threads. The write itself runs outside the lock.
 using System.Text;
+using System.Text.RegularExpressions;
 using PiSharp.Durable.Env;
 
 namespace PiSharp.Durable;
 
-/// <summary>Retention limits of one tool's output (upstream <c>OutputLimits</c>).</summary>
+/// <summary>Retention limits of one output stream (upstream <c>OutputLimits</c>).</summary>
 internal readonly record struct OutputLimits(long MaxBytes, long MaxLines, ToolOutputRetention Retain);
 
 /// <summary>Retained output and what the limits dropped (upstream <c>BoundedOutput</c>).</summary>
@@ -23,10 +32,11 @@ internal readonly record struct BoundedOutput(string Text, long DroppedBytes, lo
 /// <summary>An exact slice of the input within the limits, and what it left out (upstream <c>OutputSlice</c>).</summary>
 internal readonly record struct OutputSlice(string Text, long Bytes, long DroppedBytes, long DroppedLines);
 
-/// <summary>Bounds and sanitizing of tool output (upstream <c>output.ts</c>).</summary>
-internal static class ToolOutput
+/// <summary>Bounds and sanitizing of output streams (upstream Chord <c>output.ts</c>).</summary>
+internal static partial class ToolOutput
 {
     private const byte Newline = 0x0a;
+    private const char Escape = '\x1b';
 
     /// <summary>Each progress commit also buys a pause proportional to what it wrote (upstream <c>PROGRESS_BYTES_PER_SECOND</c>).</summary>
     public const double ProgressBytesPerSecond = 100 * 1024;
@@ -34,14 +44,27 @@ internal static class ToolOutput
     /// <summary>TextEncoder and TextDecoder: no byte-order mark is written or dropped, and invalid data is replaced.</summary>
     internal static readonly UTF8Encoding Utf8 = new(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: false);
 
-    /// <summary>Removes control characters that break display and transcripts; tabs and newlines stay (upstream <c>sanitizeOutput</c>,
-    /// <c>/[\x00-\x08\x0b-\x1f￹-￻]/g</c>).</summary>
+    /// <summary>Whole 7-bit escape sequences: strings (OSC, DCS, APC, PM, SOS) up to BEL or ST, CSI, and short <c>ESC x</c> forms (upstream
+    /// <c>ESCAPE_SEQUENCE</c>).</summary>
+    [GeneratedRegex(@"\x1b[\]PX^_][^\x07\x1b]*(?:\x07|\x1b\\)|\x1b\[[\x30-\x3f]*[\x20-\x2f]*[\x40-\x7e]|\x1b[\x20-\x2f]*[\x30-\x7e]", RegexOptions.CultureInvariant)]
+    private static partial Regex EscapeSequence();
+
+    /// <summary>Removes escape sequences and control characters that break display and transcripts; tabs and newlines stay (upstream
+    /// <c>sanitizeOutput</c>: <c>ESCAPE_SEQUENCE</c>, then <c>/[\x00-\x08\x0b-\x1f￹-￻]/g</c>).</summary>
     public static string SanitizeOutput(string text)
     {
         ArgumentNullException.ThrowIfNull(text);
         var index = 0;
         while (index < text.Length && !Invalid(text[index])) index++;
         if (index == text.Length) return text;
+        // Every escape sequence starts with ESC, itself a control character, so only text with one needs the first pass, and that pass
+        // leaves the text before `index` as it was.
+        if (text.IndexOf(Escape, index) != -1)
+        {
+            text = EscapeSequence().Replace(text, "");
+            while (index < text.Length && !Invalid(text[index])) index++;
+            if (index == text.Length) return text;
+        }
         var builder = new StringBuilder(text.Length);
         builder.Append(text, 0, index);
         for (; index < text.Length; index++)
@@ -183,13 +206,31 @@ internal static class ToolOutput
     /// <summary>Lines of text with <paramref name="newlines"/> newlines; a final unterminated line counts.</summary>
     internal static long Lines(long newlines, bool terminated) => newlines + (terminated ? 0 : 1);
 
+    /// <summary>The UTF-8 byte length of <paramref name="content"/>; a lone surrogate counts as U+FFFD, three bytes (upstream
+    /// <c>utf8ByteLength</c>).</summary>
+    public static long Utf8ByteLength(string content)
+    {
+        ArgumentNullException.ThrowIfNull(content);
+        long bytes = 0;
+        for (var index = 0; index < content.Length; index++)
+        {
+            var code = content[index];
+            if (code <= 0x7f) bytes += 1;
+            else if (code <= 0x7ff) bytes += 2;
+            else if (char.IsHighSurrogate(code) && index + 1 < content.Length && char.IsLowSurrogate(content[index + 1])) { bytes += 4; index++; }
+            else bytes += 3;
+        }
+        return bytes;
+    }
+
     internal static long CountNewlines(string text) => text.AsSpan().Count('\n');
 }
 
 /// <summary>
-/// Bounded running output of one tool call (upstream <c>OutputBuffer</c>). Accepting a chunk costs time proportional to the chunk: head
-/// retention stops storing once the window is full, and tail retention drops stored text the window no longer needs when it snapshots.
-/// Counts of the whole stream are kept so the dropped totals stay exact. Not thread-safe; the tool task serializes its use.
+/// Bounded running output of one stream, such as a tool call's or a process's (upstream <c>OutputBuffer</c>). Accepting a chunk costs time
+/// proportional to the chunk: head retention stops storing once the window is full, and tail retention drops stored text the window no
+/// longer needs when it snapshots. Counts of the whole stream are kept so the dropped totals stay exact. Not thread-safe; the tool task
+/// serializes its use.
 /// </summary>
 internal sealed class OutputBuffer(OutputLimits limits)
 {
@@ -216,7 +257,7 @@ internal sealed class OutputBuffer(OutputLimits limits)
 
     /// <summary>
     /// Accepts a string chunk; returns whether anything was accepted. <paramref name="skipped"/> is output omitted right before the chunk,
-    /// which must be more than the tail window by at least one byte or line (<c>ShellOutputInfo.skipped</c>); only tail retention accepts it.
+    /// which must be more than the tail window by at least one byte or line; only tail retention accepts it.
     /// </summary>
     public bool Push(string chunk, ShellOutputSkip? skipped = null)
     {
@@ -277,7 +318,7 @@ internal sealed class OutputBuffer(OutputLimits limits)
     private bool Accept(string text)
     {
         if (text.Length == 0) return false;
-        var bytes = Truncation.Utf8ByteLength(text);
+        var bytes = ToolOutput.Utf8ByteLength(text);
         var newlines = ToolOutput.CountNewlines(text);
         totalBytes += bytes;
         totalNewlines += newlines;
@@ -319,7 +360,7 @@ internal sealed class OutputBuffer(OutputLimits limits)
         if (limits.Retain == ToolOutputRetention.Tail || chunks.Count > 1)
         {
             var text = limits.Retain == ToolOutputRetention.Tail ? ToolOutput.TailMargin(stored, limits) : stored;
-            var bytes = limits.Retain == ToolOutputRetention.Tail ? Truncation.Utf8ByteLength(text) : storedBytes;
+            var bytes = limits.Retain == ToolOutputRetention.Tail ? ToolOutput.Utf8ByteLength(text) : storedBytes;
             chunks = new Queue<Chunk>();
             if (text.Length > 0) chunks.Enqueue(new Chunk(text, bytes, ToolOutput.CountNewlines(text)));
             storedBytes = bytes;
@@ -332,24 +373,49 @@ internal sealed class OutputBuffer(OutputLimits limits)
     }
 }
 
+/// <summary>The clock and timer progress commits pace on (upstream <c>ProgressClock</c>).</summary>
+/// <param name="Now">The time in milliseconds.</param>
+/// <param name="SetTimer">Calls the callback once after about the delay in milliseconds; returns an action that disarms it.</param>
+internal sealed record ProgressClock(Func<double> Now, Func<Action, double, Action> SetTimer)
+{
+    /// <summary><c>Date.now</c> and <c>setTimeout</c> (upstream <c>SYSTEM_CLOCK</c>).</summary>
+    public static ProgressClock SystemClock { get; } = Of(TimeProvider.System);
+
+    /// <summary>The clock and one-shot timers of <paramref name="time"/>.</summary>
+    public static ProgressClock Of(TimeProvider time)
+    {
+        ArgumentNullException.ThrowIfNull(time);
+        return new(
+            () => time.GetUtcNow().ToUnixTimeMilliseconds(),
+            (callback, delayMs) => time.CreateTimer(_ => callback(), null, TimeSpan.FromMilliseconds(delayMs), Timeout.InfiniteTimeSpan).Dispose);
+    }
+}
+
 /// <summary>
 /// Adaptive progress commits (upstream <c>Progress</c>): the first change after an idle period commits at once; each commit then delays
 /// the next by at least <c>minIntervalMs</c> and by its written size at 100 KiB/s. At most one commit is in flight; changes made meanwhile
-/// coalesce into the next one.
+/// coalesce into the next one. Paces on <paramref name="clock"/>, by default <see cref="ProgressClock.SystemClock"/>.
 /// </summary>
-internal sealed class Progress(Func<Task<long>> write, Action<Exception> onError, double minIntervalMs, TimeProvider? timeProvider = null)
+internal sealed class Progress(Func<Task<long>> write, Action<Exception> onError, double minIntervalMs, ProgressClock? clock = null)
 {
     private readonly Func<Task<long>> write = write;
     private readonly Action<Exception> onError = onError;
     private readonly double minIntervalMs = minIntervalMs;
-    private readonly TimeProvider time = timeProvider ?? TimeProvider.System;
+    private readonly ProgressClock clock = clock ?? ProgressClock.SystemClock;
     private readonly Lock gate = new();
     private List<TaskCompletionSource> waiters = [];
-    private ITimer? timer;
+    /// <summary>Disarms the armed timer.</summary>
+    private Action? timer;
     private Task? inFlight;
     private double nextAt;
     private bool dirty;
     private bool stopped;
+
+    /// <summary>Paces on the clock and timers of <paramref name="timeProvider"/>, or of the system when it is null.</summary>
+    public Progress(Func<Task<long>> write, Action<Exception> onError, double minIntervalMs, TimeProvider? timeProvider)
+        : this(write, onError, minIntervalMs, timeProvider is null ? null : ProgressClock.Of(timeProvider))
+    {
+    }
 
     /// <summary>Schedules a commit.</summary>
     public void Mark()
@@ -380,7 +446,7 @@ internal sealed class Progress(Func<Task<long>> write, Action<Exception> onError
         lock (gate)
         {
             stopped = true;
-            timer?.Dispose();
+            timer?.Invoke();
             timer = null;
             flying = inFlight;
         }
@@ -393,15 +459,13 @@ internal sealed class Progress(Func<Task<long>> write, Action<Exception> onError
         }
     }
 
-    private double Now() => time.GetUtcNow().ToUnixTimeMilliseconds();
-
     /// <summary>Upstream <c>#schedule</c>; returns a flush to start once the lock is released.</summary>
     private Flight? ScheduleLocked()
     {
         if (stopped || timer is not null || inFlight is not null) return null;
-        var wait = nextAt - Now();
+        var wait = nextAt - clock.Now();
         if (wait <= 0) return FlushLocked();
-        timer = time.CreateTimer(_ => OnTimer(), null, TimeSpan.FromMilliseconds(wait), Timeout.InfiniteTimeSpan);
+        timer = clock.SetTimer(OnTimer, wait);
         return null;
     }
 
@@ -410,9 +474,9 @@ internal sealed class Progress(Func<Task<long>> write, Action<Exception> onError
         Flight? flight;
         lock (gate)
         {
-            timer?.Dispose();
             timer = null;
-            flight = FlushLocked();
+            // Checks the clock again: a timer that fires early waits for the rest.
+            flight = ScheduleLocked();
         }
         flight?.Start();
     }
@@ -424,7 +488,7 @@ internal sealed class Progress(Func<Task<long>> write, Action<Exception> onError
         dirty = false;
         var claimed = waiters;
         waiters = [];
-        var flight = new Flight(this, claimed, Now());
+        var flight = new Flight(this, claimed, clock.Now());
         inFlight = flight.Done;
         return flight;
     }
