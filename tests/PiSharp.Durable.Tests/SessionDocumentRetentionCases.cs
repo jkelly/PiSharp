@@ -10,7 +10,9 @@
 // - "gives the same events ...": the run flushes the Session line before it stops the event stream, as the inbox cases do (a C# wait
 //   resumes on its own listener, upstream's after all listeners and the deliveries they queued).
 // Pi v1.5.0 sync (area watches, 92ab53602): Session.documentState() is gone, so the cases that held a state hold a watch, started where its
-// value must stay current (two cases renamed with them); a retired watch ends Ended (Chord's WatchEnd has no retired end).
+// value must stay current (two cases renamed with them). Area watch-folding (8b0caefc2): a watch follows its address and its value is
+// never null, so "does not keep a replacement cached for an observer of the retired incarnation" is 8b0caefc2's "pins only what is at the
+// address a watch follows". The citation stays on v1.2.0: the file's later upstream changes wait on areas events and group-commit.
 using PiSharp.Durable;
 using PiSharp.Durable.Chord;
 using PiSharp.Durable.Storage;
@@ -136,11 +138,10 @@ internal static class DocumentRetentionTests
             var seen = new SyncList<double>();
             watch.Start((call, _) =>
             {
-                var value = Change(call).Value;
-                seen.Add(value is null ? -1 : N(value["count"]));
+                seen.Add(N(Change(call).Value["count"]));
                 return Task.CompletedTask;
             });
-            static double? CountOf(JsonObjectValue? value) => value is null ? null : N(value["count"]);
+            static double CountOf(JsonObjectValue value) => N(value["count"]);
             clock.Now += 1_000_000;
             await Bump(session, conversationId);
             await SettleLine(session);
@@ -319,7 +320,7 @@ internal static class DocumentRetentionTests
             await session.CloseAsync(Context);
         });
 
-        yield return Case(prefix + "does-not-keep-a-replacement-cached-for-an-observer-of-the-retired-incarnation", async () =>
+        yield return Case(prefix + "pins-only-what-is-at-the-address-a-watch-follows-nothing-while-retired-then-the-new-incarnation", async () =>
         {
             var (_, session, _) = Open(0);
             var conversationId = await CreateConversation(session);
@@ -327,12 +328,15 @@ internal static class DocumentRetentionTests
             var watch = (await session.WatchDocAsync(CounterDoc, conversationId, Context))!;
             watch.Start((_, _) => Task.CompletedTask);
             await session.CommitAsync(tx => tx.RetireDocAsync(CounterDoc, conversationId), Context);
-            Equal(WatchEnd.Ended, await watch.Closed, "retired");
-            Check(watch.Value is null, "retired value");
-            await Bump(session, conversationId, 5);
             await Evicted(session);
-            SameJson("""{"count":5}""", await session.SnapshotAsync(CounterDoc, conversationId, Context), "replacement");
+            Equal(0, session.DocumentCacheSizes.Attached, "attached while retired");
+            await Bump(session, conversationId, 5);
+            await SettleLine(session);
+            var sizes = session.DocumentCacheSizes;
+            Equal((1, 1), (sizes.Cached, sizes.Attached), "the new incarnation, pinned");
+            await Eventually(() => N(watch.Value["count"]) == 5);
             await watch.StopAsync();
+            await Evicted(session);
             await session.CloseAsync(Context);
         });
 

@@ -8,8 +8,9 @@
 // Each example prints what upstream's console.log prints, as JSON. Upstream runs every example on a fresh MemoryStorage; here each one
 // can also run on its own JSONL directory or SQLite file, and then the storage is reopened in a new Session and read back (milestone M0
 // of decision 0005: the examples survive close and reopen).
-// Pi v1.5.0 sync (area watches, 92ab53602): 04-chord-state is gone, as upstream deleted it with Session.documentState(); 05-watches keeps
-// its v1.2.0 name and output until work list area watch-folding brings it to v1.5.0's 04-watches.
+// Pi v1.5.0 sync (area watches, 92ab53602): 04-chord-state is gone, as upstream deleted it with Session.documentState(). Area
+// watch-folding (d8d99950a, 8b0caefc2 and 5f312dac4): 05-watches runs v1.5.0's 04-watches (a busy first call, three commits folded into
+// the second, the ops printed with each update); it keeps its v1.2.0 name, as the other renumbered examples do.
 using PiSharp.Durable.Chord;
 using PiSharp.Durable.Sqlite;
 using PiSharp.Durable.Storage;
@@ -282,7 +283,7 @@ public static partial class Examples
         });
     }
 
-    // 05: serialize asynchronous document work with a watch.
+    // 05 (upstream 04-watches since v1.5.0): serialize asynchronous document work with a watch.
     private static async Task WatchesAsync(Func<Task<IStorage>> open, TextWriter output)
     {
         var session = Session.Create(await open());
@@ -294,19 +295,36 @@ public static partial class Examples
         }, Context);
 
         // A watch starts from one stable acquisition revision. Callbacks never overlap: commits made while one runs arrive folded into the
-        // next call (one full-value replacement once more than 10,000 ops pile up).
+        // next call, which gets the newest value and ops that turn the previously delivered value into it (one full-value replacement
+        // [["r", value]] once more than 10,000 ops pile up).
         var notesWatch = await session.WatchDocAsync(Notes, chat.Id, Context) ?? throw new InvalidOperationException("notes are absent");
         await output.WriteLineAsync("watch baseline: " + Json(notesWatch.Value));
-        var delivered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var busy = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var done = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var calls = 0;
         notesWatch.Start(async (call, _) =>
         {
-            // Calls are tagged: a failed call is a failure a source recovers from, which Durable never sends.
-            if (call is not WatchValueCall<JsonObjectValue?> change) return;
-            await output.WriteLineAsync("watch update: " + Json(change.Value));
-            delivered.TrySetResult();
+            // Calls are tagged: a failed call is a failure a source recovers from, which Durable never sends (its failures end the watch,
+            // see Closed).
+            if (call is not WatchValueCall<JsonObjectValue> change) return;
+            var ops = JsonValue.Array(change.Ops.Select(op => (JsonValue)op.ToJson()));
+            await output.WriteLineAsync("watch update: " + Json(change.Value) + " " + Json(ops));
+            // The first call stays busy, as a slow consumer would, while three more commits land.
+            if (Interlocked.Increment(ref calls) == 1) await busy.Task;
+            else done.TrySetResult();
         });
-        await session.CommitAsync(async tx => (await tx.DocAsync(Notes, chat.Id)).Set("text", "observed asynchronously"), Context);
-        await delivered.Task;
+        await session.CommitAsync(async tx => (await tx.DocAsync(Notes, chat.Id)).Set("text", "observed"), Context);
+        foreach (var more in new[] { " asynchronously", ", folded", "!" })
+        {
+            await session.CommitAsync(async tx =>
+            {
+                var notes = await tx.DocAsync(Notes, chat.Id);
+                notes.Set("text", ((JsonStringValue)notes.Get("text")!).Value + more);
+            }, Context);
+        }
+        busy.TrySetResult();
+        await done.Task;
+        await output.WriteLineAsync("listener calls: " + Volatile.Read(ref calls));
         await notesWatch.StopAsync();
 
         await session.CloseAsync(Context);

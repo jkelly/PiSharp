@@ -4,8 +4,9 @@
 // JsonObjectValue, and null stands for upstream's retired `null` value.
 // Pi v1.5.0 sync (area watches, 92ab53602 and 42cb822f1): the watch types are Chord's (Chord/Watch.cs: IWatchHandle<T>, WatchEnd,
 // WatchCall<T> and NativeWatchCall<T>, which upstream's index re-exports; in C# they stay in PiSharp.Durable.Chord), and the document
-// state getters and their type are removed (Session.documentState(), DocumentState). The citation stays on v1.2.0 until the file's other
-// areas land.
+// state getters and their type are removed (Session.documentState(), DocumentState). Area watch-folding (8b0caefc2 and d8d99950a): a
+// document watch follows its address and its value is never null (DocumentWatch<T> = WatchHandle<Readonly<T>>), so WatchDocAsync returns
+// IWatchHandle<JsonObjectValue>. The citation stays on v1.2.0 until the file's other areas land.
 using System.Collections.Immutable;
 using PiSharp.Durable.Chord;
 using PiSharp.Durable.Chord.Delta;
@@ -208,26 +209,31 @@ public interface IDocumentReader
 
 /// <summary>
 /// Non-creating document watch acquisition shared by the Session and later invocation APIs (upstream <c>DocumentObserver</c>). A watch
-/// (upstream <c>DocumentWatch</c>, Chord's <see cref="IWatchHandle{T}"/>) binds one existing incarnation and returns null when it is
-/// absent; cancelling the acquisition context ends it <see cref="WatchEndKind.Aborted"/>. Its listener gets
-/// <see cref="WatchValueCall{T}"/>s, never a failed call. A retirement is its last call, with a null value, <c>[["r", null]]</c> and
-/// <c>Retired</c>, after which it ends <see cref="WatchEndKind.Ended"/>; the Session's close ends it <see cref="WatchEndKind.Ended"/>, its
-/// failure <see cref="WatchEndKind.Failed"/> with the error that failed it.
+/// (upstream <c>DocumentWatch</c>, Chord's <see cref="IWatchHandle{T}"/> of a value that is never null) follows one document address
+/// (kind, scope and key) from the incarnation found at acquisition on, and acquisition returns null when the address is absent; cancelling
+/// the acquisition context ends it <see cref="WatchEndKind.Aborted"/>. Its listener gets <see cref="WatchValueCall{T}"/>s, never a failed
+/// call; commits made while the listener runs, or before <see cref="IWatchHandle{T}.Start"/>, arrive folded into one call. A retirement is
+/// a call with <c>Retired</c> set, the last value the watch was given and no ops (a change made in the retiring commit itself is not
+/// shown: that commit publishes the retirement only); the watch goes on, and a document created at the address later arrives as
+/// <c>[["r", value]]</c>, folded with what is pending. It ends <see cref="WatchEndKind.Ended"/> when its scope's owner ends: a task
+/// document's watch once the retirement call of the commit that makes its task terminal returned, and every watch at the Session's close
+/// (a pending retirement dropped); <see cref="WatchEndKind.Failed"/> with the error that failed the Session. A watch of an address that
+/// stays retired lives until it is stopped or the Session ends.
 /// </summary>
 public interface IDocumentObserver
 {
     /// <summary>Watches a Session singleton.</summary>
-    Task<IWatchHandle<JsonObjectValue?>?> WatchDocAsync(SessionDocToken token, DurableContext context);
+    Task<IWatchHandle<JsonObjectValue>?> WatchDocAsync(SessionDocToken token, DurableContext context);
     /// <summary>Watches a conversation singleton.</summary>
-    Task<IWatchHandle<JsonObjectValue?>?> WatchDocAsync(ConversationDocToken token, ConversationId conversationId, DurableContext context);
+    Task<IWatchHandle<JsonObjectValue>?> WatchDocAsync(ConversationDocToken token, ConversationId conversationId, DurableContext context);
     /// <summary>Watches a task singleton.</summary>
-    Task<IWatchHandle<JsonObjectValue?>?> WatchDocAsync(TaskDocToken token, TaskId taskId, DurableContext context);
+    Task<IWatchHandle<JsonObjectValue>?> WatchDocAsync(TaskDocToken token, TaskId taskId, DurableContext context);
     /// <summary>Watches a Session family member.</summary>
-    Task<IWatchHandle<JsonObjectValue?>?> WatchDocAsync(SessionDocFamilyToken token, string key, DurableContext context);
+    Task<IWatchHandle<JsonObjectValue>?> WatchDocAsync(SessionDocFamilyToken token, string key, DurableContext context);
     /// <summary>Watches a conversation family member.</summary>
-    Task<IWatchHandle<JsonObjectValue?>?> WatchDocAsync(ConversationDocFamilyToken token, ConversationId conversationId, string key, DurableContext context);
+    Task<IWatchHandle<JsonObjectValue>?> WatchDocAsync(ConversationDocFamilyToken token, ConversationId conversationId, string key, DurableContext context);
     /// <summary>Watches a task family member.</summary>
-    Task<IWatchHandle<JsonObjectValue?>?> WatchDocAsync(TaskDocFamilyToken token, TaskId taskId, string key, DurableContext context);
+    Task<IWatchHandle<JsonObjectValue>?> WatchDocAsync(TaskDocFamilyToken token, TaskId taskId, string key, DurableContext context);
 }
 
 /// <summary>

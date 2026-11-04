@@ -2443,7 +2443,7 @@ internal sealed class DurableTaskScheduler
     /// and its task is free.</summary>
     private void End(Invocation invocation)
     {
-        List<IWatchHandle<JsonObjectValue?>> watches;
+        List<IWatchHandle<JsonObjectValue>> watches;
         List<Action> disarms = [];
         lock (gate)
         {
@@ -2635,7 +2635,7 @@ internal sealed class DurableTaskScheduler
         /// <summary>The fault the invocation's step decided, whose terminal record is published after the invocation ended.</summary>
         public FaultedTaskOutcome? Fault { get; set; }
         /// <summary>Watches acquired through the runtime; stopped at invocation end. Guarded by the scheduler lock.</summary>
-        public HashSet<IWatchHandle<JsonObjectValue?>> Watches { get; } = [];
+        public HashSet<IWatchHandle<JsonObjectValue>> Watches { get; } = [];
         /// <summary>Timers armed through the runtime; disarmed at invocation end. Guarded by the scheduler lock.</summary>
         public HashSet<TimerSlot> Timers { get; } = [];
         private volatile bool ended;
@@ -3148,20 +3148,20 @@ internal sealed class DurableTaskScheduler
         public Task<JsonObjectValue?> SnapshotAsOfAsync(RewindableConversationDocFamilyToken token, ConversationId conversationId, string key, EntryId at,
             DurableContext context) => Read(() => scheduler.session.SnapshotAsOfAsync(token, conversationId, key, at, context));
 
-        public Task<IWatchHandle<JsonObjectValue?>?> WatchDocAsync(SessionDocToken token, DurableContext context) =>
+        public Task<IWatchHandle<JsonObjectValue>?> WatchDocAsync(SessionDocToken token, DurableContext context) =>
             Watch(() => scheduler.session.WatchDocAsync(token, context));
-        public Task<IWatchHandle<JsonObjectValue?>?> WatchDocAsync(ConversationDocToken token, ConversationId conversationId, DurableContext context) =>
+        public Task<IWatchHandle<JsonObjectValue>?> WatchDocAsync(ConversationDocToken token, ConversationId conversationId, DurableContext context) =>
             Watch(() => scheduler.session.WatchDocAsync(token, conversationId, context));
-        public Task<IWatchHandle<JsonObjectValue?>?> WatchDocAsync(TaskDocToken token, TaskId taskId, DurableContext context) =>
+        public Task<IWatchHandle<JsonObjectValue>?> WatchDocAsync(TaskDocToken token, TaskId taskId, DurableContext context) =>
             Watch(() => scheduler.session.WatchDocAsync(token, taskId, context));
-        public Task<IWatchHandle<JsonObjectValue?>?> WatchDocAsync(SessionDocFamilyToken token, string key, DurableContext context) =>
+        public Task<IWatchHandle<JsonObjectValue>?> WatchDocAsync(SessionDocFamilyToken token, string key, DurableContext context) =>
             Watch(() => scheduler.session.WatchDocAsync(token, key, context));
-        public Task<IWatchHandle<JsonObjectValue?>?> WatchDocAsync(ConversationDocFamilyToken token, ConversationId conversationId, string key,
+        public Task<IWatchHandle<JsonObjectValue>?> WatchDocAsync(ConversationDocFamilyToken token, ConversationId conversationId, string key,
             DurableContext context) => Watch(() => scheduler.session.WatchDocAsync(token, conversationId, key, context));
-        public Task<IWatchHandle<JsonObjectValue?>?> WatchDocAsync(TaskDocFamilyToken token, TaskId taskId, string key, DurableContext context) =>
+        public Task<IWatchHandle<JsonObjectValue>?> WatchDocAsync(TaskDocFamilyToken token, TaskId taskId, string key, DurableContext context) =>
             Watch(() => scheduler.session.WatchDocAsync(token, taskId, key, context));
 
-        private async Task<IWatchHandle<JsonObjectValue?>?> Watch(Func<Task<IWatchHandle<JsonObjectValue?>?>> acquire)
+        private async Task<IWatchHandle<JsonObjectValue>?> Watch(Func<Task<IWatchHandle<JsonObjectValue>?>> acquire)
         {
             if (invocation.Ended) throw EndedError(invocation);
             var watch = await acquire().ConfigureAwait(false);

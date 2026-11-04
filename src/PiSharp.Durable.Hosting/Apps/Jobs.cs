@@ -786,7 +786,9 @@ public static class Jobs
         return status == "completed" && !passedAudit ? finished.SetItem("status", "failed").SetItem("error", "Completion audit failed: " + string.Join(", ", missing)) : finished;
     }
 
-    /// <summary>Waits until the approval document holds a decision, watching it rather than polling.</summary>
+    /// <summary>Waits until the approval document holds a decision, watching it rather than polling. A document watch follows its address
+    /// since pi-durable 1.5.0 (a retirement is a call, not its end), so a retirement without a decision fails the wait, as the watch's end
+    /// does, and the watch is stopped either way.</summary>
     private static async Task<JsonObjectValue> WaitForDecisionAsync(ITaskRuntime runtime, TaskId approvalTask, DurableContext context, double? deadline = null)
     {
         var watch = await runtime.WatchDocAsync(ApprovalDoc, approvalTask, context).ConfigureAwait(false)
@@ -797,7 +799,10 @@ public static class Jobs
             var decided = new TaskCompletionSource<JsonObjectValue>(TaskCreationOptions.RunContinuationsAsynchronously);
             watch.Start((call, _) =>
             {
-                if (call is WatchValueCall<JsonObjectValue?> change && Decision(change.Value) is { } decision) decided.TrySetResult(decision);
+                if (call is not WatchValueCall<JsonObjectValue> change) return Task.CompletedTask;
+                if (Decision(change.Value) is { } decision) decided.TrySetResult(decision);
+                else if (change.Retired)
+                    decided.TrySetException(new InvalidOperationException($"The approval document of task {approvalTask.Value} was retired."));
                 return Task.CompletedTask;
             });
             _ = watch.Closed.ContinueWith(closed => decided.TrySetException(new InvalidOperationException(

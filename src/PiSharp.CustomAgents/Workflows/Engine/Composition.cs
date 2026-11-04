@@ -294,7 +294,9 @@ internal sealed class SignalStep<TData, TSignal>(string name, string signal, Act
         }
     }
 
-    /// <summary>Waits until the run document holds a matching signal or <paramref name="deadline"/> passes.</summary>
+    /// <summary>Waits until the run document holds a matching signal or <paramref name="deadline"/> passes. The run document is a
+    /// conversation family member, which outlives the task (pi-durable 1.5.0's watch follows its address: a retirement is a call, and a run
+    /// document created again at the key arrives on the same watch); the watch is stopped once the wait ends, so it never outlives it.</summary>
     private async Task WaitForChangeAsync(ITaskRuntime runtime, RunningTask task, string key, double? deadline, DurableContext context)
     {
         var arrived = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -306,7 +308,7 @@ internal sealed class SignalStep<TData, TSignal>(string name, string signal, Act
             {
                 watch.Start((call, _) =>
                 {
-                    if (call is WatchValueCall<JsonObjectValue?> change && First(change.Value) is not null) arrived.TrySetResult();
+                    if (call is WatchValueCall<JsonObjectValue> change && First(change.Value) is not null) arrived.TrySetResult();
                     return Task.CompletedTask;
                 });
                 if (First(watch.Value) is not null) arrived.TrySetResult();

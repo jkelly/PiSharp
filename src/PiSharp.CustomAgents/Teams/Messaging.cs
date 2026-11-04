@@ -306,9 +306,11 @@ internal sealed class Messenger(AgentTeam team, MessagingPort port, string? self
             if (watch is not null)
             {
                 Offer(watch.Value);
+                // The watch follows the mailbox's address (pi-durable 1.5.0): a mailbox created again after a retirement goes on arriving
+                // here; the watch is stopped when the reader stops.
                 watch.Start((call, _) =>
                 {
-                    if (call is WatchValueCall<JsonObjectValue?> change) Offer(change.Value);
+                    if (call is WatchValueCall<JsonObjectValue> change) Offer(change.Value);
                     return Task.CompletedTask;
                 });
             }

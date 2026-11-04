@@ -1525,13 +1525,12 @@
       "lines": 58,
       "pisharp": "samples/Durable.Examples/Examples.cs",
       "phase": "P13",
-      "status": "needs-sync",
+      "status": "ported",
       "upstreamChange": "renamed",
       "renamedFrom": "packages/durable/test/examples/05-watches.ts",
       "previousBlobSha1": "c0c6d6b58f957ed73e248a225decd905841bb591",
       "changedLines": 99,
-      "note": "Milestone M0: runs on memory, JSONL and SQLite storage and reads back after reopen; tests/PiSharp.Durable.Tests/ExamplesCases.cs pins the output the pinned upstream prints under Node.",
-      "portedBlobSha1": "c0c6d6b58f957ed73e248a225decd905841bb591"
+      "note": "Milestone M0: runs on memory, JSONL and SQLite storage and reads back after reopen; tests/PiSharp.Durable.Tests/ExamplesCases.cs pins the output the pinned upstream prints under Node. v1.5.0 (work list area watch-folding, d8d99950a): 05-watches runs v1.5.0's 04-watches (a busy first call, three commits folded into the second, the ops printed with each update) and keeps its v1.2.0 name; examples.* pins its output, authored, not captured (ExamplesCases.cs). The tagged call (5f312dac4) and the one change object (8b0caefc2) were in place from areas chord-watch and watches."
     },
     {
       "upstream": "packages/durable/test/examples/05-harness.ts",
@@ -1786,13 +1785,12 @@
       "lines": 146,
       "pisharp": "samples/Durable.Examples/ExamplesChildTasks.cs",
       "phase": "P13",
-      "status": "needs-sync",
+      "status": "ported",
       "upstreamChange": "renamed",
       "renamedFrom": "packages/durable/test/examples/24-child-tasks.ts",
       "previousBlobSha1": "e1b49defe1ab44e47b0c40c0e4716048b5279251",
       "changedLines": 17,
-      "note": "samples/Durable.Examples 24-child-tasks on an ExampleClock (payments sleep on the Harness clock); barriers stand in for Node's event-loop order: a declined card is declined after the checkout's other payments were charged, the graph is printed and the process stopped once all four were charged (upstream waits 20 ms), and abort handlers print in task order. Restarts on its own storage as 13 does; examples.* pins upstream's Node output v1.5.0 (work list area sleep): a payment ends its charge phase asleep (runtime.SleepUntilAsync, then a confirm phase; f75b3240a), so the tree prints the charged payments as sleeping, authored, not captured (ExamplesCases.cs); the barrier releases once every charged payment is asleep. The task graph is still read with TaskGraphAsync: waits on area watches (watchTaskGraph, stop)",
-      "portedBlobSha1": "e1b49defe1ab44e47b0c40c0e4716048b5279251"
+      "note": "samples/Durable.Examples 24-child-tasks on an ExampleClock (payments sleep on the Harness clock); barriers stand in for Node's event-loop order: a declined card is declined after the checkout's other payments were charged, the graph is printed and the process stopped once all four were charged (upstream waits 20 ms), and abort handlers print in task order. Restarts on its own storage as 13 does; examples.* pins upstream's Node output v1.5.0 (work list area sleep): a payment ends its charge phase asleep (runtime.SleepUntilAsync, then a confirm phase; f75b3240a), so the tree prints the charged payments as sleeping, authored, not captured (ExamplesCases.cs); the barrier releases once every charged payment is asleep. v1.5.0 (work list area watches, 92ab53602): the tree is read from a task graph watch (WatchTaskGraphAsync), then stopped; the example keeps its v1.2.0 name (b9fb2b854 renumbered them)."
     },
     {
       "upstream": "packages/durable/test/examples/24-compaction.ts",
@@ -2087,7 +2085,7 @@
       "phase": "P10",
       "status": "removed-upstream",
       "upstreamChange": "removed",
-      "note": "harness.events.* (14 cases) on MemoryStorage, harness.events.jsonl.* and harness.events.sqlite.* (14 each). Adapted: events compare by ToJson(); drained() is a Session line barrier; waitFor is Eventually; applyChanges works on System.Text.Json nodes; tools sleep with Task.Delay in real time where upstream uses setTimeout v1.2.0: tool_execution_start carries taskId."
+      "note": "harness.events.* (14 cases) on MemoryStorage, harness.events.jsonl.* and harness.events.sqlite.* (14 each). Adapted: events compare by ToJson(); drained() is a Session line barrier; waitFor is Eventually; applyChanges works on System.Text.Json nodes; tools sleep with Task.Delay in real time where upstream uses setTimeout v1.2.0: tool_execution_start carries taskId. v1.5.0 (work list area watch-folding, d8d99950a): \"delivers each of 100 pending batches in its own call, in order, unlike state watches\" is here (harness.events.*): the event stream is a NativeWatch, so it does not fold."
     },
     {
       "upstream": "packages/durable/test/harness-failed-run-inbox.test.ts",
@@ -2808,12 +2806,11 @@
       "lines": 202,
       "pisharp": "tests/PiSharp.Durable.Tests/Session/SessionDefinitionsCases.cs",
       "phase": "P3",
-      "status": "needs-sync",
+      "status": "ported",
       "upstreamChange": "modified",
       "previousBlobSha1": "ddc791187926619044dc139f0c39e1fdad7415f7",
       "changedLines": 55,
-      "note": "session.definitions.* (4 cases). The expectTypeOf/@ts-expect-error cases are compile-time overload checks (TypeChecks/ObservationTypeChecks); version 1.5 cannot be written (int); one authored case runs the typed-entry overloads v1.5.0 (work list area checkpoint-when): every definition states checkpointWhen (_, _, _) => false, and session.definitions.requires-an-explicit-checkpoint-predicate-for-documents-and-families ports the new case (reflection for its @ts-expect-error lines); waits on area watches",
-      "portedBlobSha1": "ddc791187926619044dc139f0c39e1fdad7415f7"
+      "note": "session.definitions.* (4 cases). The expectTypeOf/@ts-expect-error cases are compile-time overload checks (TypeChecks/ObservationTypeChecks); version 1.5 cannot be written (int); one authored case runs the typed-entry overloads v1.5.0 (work list area checkpoint-when): every definition states checkpointWhen (_, _, _) => false, and session.definitions.requires-an-explicit-checkpoint-predicate-for-documents-and-families ports the new case (reflection for its @ts-expect-error lines) v1.5.0 (work list areas watches and watch-folding): the document state checks went with Session.documentState(), and DocumentWatch<T> is never null, so every WatchDocAsync overload returns IWatchHandle<JsonObjectValue>."
     },
     {
       "upstream": "packages/durable/test/session-document-cache-bench.ts",
@@ -2834,7 +2831,7 @@
       "upstreamChange": "modified",
       "previousBlobSha1": "c648451839e25294b3acd4a787c08279f043f415",
       "changedLines": 100,
-      "note": "All 21 tests: session.document-retention.*. Adapted: a retention of the wrong type (\"soon\") is not expressible (double?), NaN and -5 are checked; \"keeps no timer where timers cannot be unreferenced\" checks eviction at the end of commits, since .NET timers never keep a process alive and the Session always keeps one; \"gives the same events ...\" flushes the Session line before it stops the stream (a C# wait resumes on its own listener) v1.5.0 (work list area watches, 92ab53602): the cases that held a document state hold a watch (two renamed), and a retired watch ends ended (Chord's WatchEnd has no retired end); waits on watch-folding, events and group-commit.",
+      "note": "All 21 tests: session.document-retention.*. Adapted: a retention of the wrong type (\"soon\") is not expressible (double?), NaN and -5 are checked; \"keeps no timer where timers cannot be unreferenced\" checks eviction at the end of commits, since .NET timers never keep a process alive and the Session always keeps one; \"gives the same events ...\" flushes the Session line before it stops the stream (a C# wait resumes on its own listener) v1.5.0 (work list area watches, 92ab53602): the cases that held a document state hold a watch (two renamed), and a retired watch ends ended (Chord's WatchEnd has no retired end) v1.5.0 (work list area watch-folding, 8b0caefc2): a watch follows its address and its value is never null, so \"does not keep a replacement cached for an observer of the retired incarnation\" is \"pins only what is at the address a watch follows: nothing while retired, then the new incarnation\"; waits on events and group-commit.",
       "portedBlobSha1": "c648451839e25294b3acd4a787c08279f043f415"
     },
     {
@@ -2923,12 +2920,11 @@
       "lines": 853,
       "pisharp": "tests/PiSharp.Durable.Tests/Session/SessionWatchesCases.cs",
       "phase": "P3",
-      "status": "needs-sync",
+      "status": "ported",
       "upstreamChange": "modified",
       "previousBlobSha1": "3b03d182293af71c8503f45b383f1176ed4013f9",
       "changedLines": 568,
-      "note": "session.watches.* (21 cases). Adapted: \"never inline\" is checked by thread and Start scope; AbortController is CancellationTokenSource; applyImmutable is DeltaApply.Apply",
-      "portedBlobSha1": "3b03d182293af71c8503f45b383f1176ed4013f9"
+      "note": "session.watches.* (28 cases), session.jsonl.watches.* and session.sqlite.watches.* (28 each), and session.mssql.watches.* (28) with SQL Server. Adapted: \"never inline\" is checked by thread and Start scope; AbortController is CancellationTokenSource; applyImmutable is DeltaApply.Apply; the garbage-collection cases use WeakReference and GC.Collect, with what they hold built in methods the JIT does not inline v1.5.0 (work list areas watches and watch-folding, 92ab53602, d8d99950a, 8b0caefc2 and 5f312dac4): the watch is Chord's; the commits made while its listener runs or before start arrive folded in one call ([[\"r\", value]] past 10,000 pending ops); a watch follows its address (Session.DocumentFollower): a retirement is a retired call with the last value and the watch goes on, and a recreation, or a value of another definition version, arrives as [[\"r\", value]]."
     },
     {
       "upstream": "packages/durable/test/setup-document-retention.ts",

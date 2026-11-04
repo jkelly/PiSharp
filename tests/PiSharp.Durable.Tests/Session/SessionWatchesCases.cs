@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/test/session-watches.test.ts. Verbatim apart from the adaptations in
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/test/session-watches.test.ts. Verbatim apart from the adaptations in
 // SessionSupport.cs and these:
 // - "never invokes the listener inline": a watch started from outside the line delivers in its own line job on the thread pool, so the
 //   listener checks it is not running inside Start on the starting thread, and upstream's "no delivery yet right after start" becomes that
@@ -6,14 +6,16 @@
 // - AbortController/withAbortSignal is a CancellationTokenSource through DurableContext.WithCancellation; withCancel is WithCancel.
 // - applyImmutable is DeltaApply.Apply (immutable application of a batch).
 // - A reload after unloading is shown by the storage read, not a new object (an immutable stored value may be handed out again).
-// Pi v1.5.0 sync (area watches, 92ab53602 and 42cb822f1): the watch is Chord's (Chord/Watch.cs). A listener takes one value call before
-// the context (Change(call)); a Session close ends a watch Ended, a cancellation Aborted, a listener failure ListenerError; a retirement is
-// the last call, (null, [["r", null]], Retired), and then the watch ends Ended. 92ab53602's case "retains neither its Session nor its
-// listener once stopped" is here, with WeakReference and GC.Collect for WeakRef and --expose-gc, the watch built in a method the JIT does
-// not inline; as upstream's collect() waits a timer tick before each gc(), each round waits one, so a line job or I/O completion that is
-// still unwinding on another thread (SQL Server's) has let go first. Chord's Watch folds the commits made while a listener is busy or not yet started, so the folding cases take the expectations
-// of upstream d8d99950a (work list area watch-folding), with its root-replacement case; address-following (8b0caefc2, also watch-folding)
-// is not here, so a retirement still ends the watch and a recreation is not followed. The citation stays on v1.2.0 until watch-folding.
+// - A listener takes one value call before the context: Change(call), or the call itself where upstream compares whole calls.
+// - The garbage-collection cases use WeakReference and GC.Collect for WeakRef and --expose-gc, with what they hold built in a method the
+//   JIT does not inline; as upstream's collect() waits a timer tick before each gc(), each round waits one, so a line job or I/O completion
+//   that is still unwinding on another thread (SQL Server's) has let go first. A delegate that captures nothing is one cached instance
+//   here, so a listener whose collection is checked captures a marker. "keeps no earlier incarnation alive" opens its Sessions on the
+//   group's storage, as upstream's on a new MemoryStorage.
+// Pi v1.5.0 sync: the watch is Chord's (Chord/Watch.cs, area watches); a Session close ends a watch Ended, a cancellation Aborted, a
+// listener failure ListenerError. Area watch-folding (d8d99950a, 8b0caefc2 and 5f312dac4): the commits made while a listener is busy or not
+// yet started arrive folded, and a watch follows its address (Session.DocumentFollower): a retirement is a Retired call with the last value
+// and the watch goes on, a recreation arrives as a root replacement, and a watch's value is never null.
 using System.Collections.Immutable;
 using System.Runtime.CompilerServices;
 using PiSharp.Durable;
@@ -28,7 +30,7 @@ internal static partial class SessionTests
         var stateDoc = Documents.DefineSessionDoc("watch.state", 1, () => O("{\"value\":0,\"items\":[\"a\",\"b\"],\"retained\":{\"label\":\"stable\"}}"),
             checkpointWhen: (_, _, _) => false);
         var keysDoc = Documents.DefineSessionDoc("watch.keys", 1, () => O("{\"keys\":{}}"), checkpointWhen: (_, _, _) => false);
-        static double ValueOf(JsonObjectValue? value) => value is null ? -1 : N(value["value"]);
+        static double ValueOf(JsonObjectValue value) => N(value["value"]);
         Task SetValue(Session session, double value) => session.CommitAsync(async tx => (await tx.DocAsync(stateDoc))["value"] = value, Context);
 
         async Task<TestSession> CreateState()
@@ -63,7 +65,7 @@ internal static partial class SessionTests
             var startingThread = Environment.CurrentManagedThreadId;
             var inStart = true;
             var inline = false;
-            var deliveries = new List<(JsonObjectValue? Value, ImmutableArray<Op> Ops)>();
+            var deliveries = new List<(JsonObjectValue Value, ImmutableArray<Op> Ops)>();
             watch.Start((call, _) =>
             {
                 var (value, ops, _) = Change(call);
@@ -191,7 +193,7 @@ internal static partial class SessionTests
                     for (var index = from; index < to; index++) keys["k" + index] = index;
                 }, Context);
             }
-            var deliveries = new List<(JsonObjectValue? Value, string Ops)>();
+            var deliveries = new List<(JsonObjectValue Value, string Ops)>();
             watch.Start((call, _) =>
             {
                 var (value, ops, _) = Change(call);
@@ -203,9 +205,9 @@ internal static partial class SessionTests
             {
                 Equal(1, deliveries.Count, "one call");
                 Same(watch.Value, deliveries[0].Value, "newest value");
-                Equal("[[\"r\"," + watch.Value!.ToJson() + "]]", deliveries[0].Ops, "root replacement");
+                Equal("[[\"r\"," + watch.Value.ToJson() + "]]", deliveries[0].Ops, "root replacement");
             }
-            Equal(10_001, ((JsonObjectValue)watch.Value!["keys"]).Count, "keys");
+            Equal(10_001, ((JsonObjectValue)watch.Value["keys"]).Count, "keys");
             await watch.StopAsync();
         });
 
@@ -245,25 +247,39 @@ internal static partial class SessionTests
             await watch.StopAsync();
         });
 
-        yield return Case(prefix + "folds-retirement-over-pending-commits-and-then-closes", async () =>
+        yield return Case(prefix + "folds-a-retirement-into-the-pending-commits-call-which-reports-it-with-the-last-value-and-goes-on", async () =>
         {
             var (_, session, _) = await CreateState();
             var watch = (await session.WatchDocAsync(stateDoc, Context))!;
             for (var value = 1; value <= 100; value++) await SetValue(session, value);
+            var last = (await session.SnapshotAsync(stateDoc, Context))!;
             await session.CommitAsync(tx => tx.RetireDocAsync(stateDoc), Context);
-            var deliveries = new List<(JsonObjectValue? Value, string Ops, bool Retired)>();
+            var changes = new List<WatchValueCall<JsonObjectValue>>();
             watch.Start((call, _) =>
             {
-                var (value, ops, retired) = Change(call);
-                lock (deliveries) deliveries.Add((value, OpsJson(ops), retired));
+                lock (changes) changes.Add(Change(call));
                 return Task.CompletedTask;
             });
-            Equal(WatchEnd.Ended, await watch.Closed, "closed");
-            lock (deliveries)
+            await Flush(session);
+            lock (changes)
             {
-                Equal(1, deliveries.Count, "one delivery");
-                Check(deliveries[0] is (null, "[[\"r\",null]]", true), "retirement reset");
+                Equal(1, changes.Count, "one call");
+                Same(last, changes[0].Value, "the last value");
+                Equal("[[\"s\",[\"value\"],100]]", OpsJson(changes[0].Ops), "folded ops");
+                Check(changes[0].Retired, "retired");
             }
+            Same(last, watch.Value, "watch.value");
+            await SetValue(session, 7);
+            await Flush(session);
+            const string recreated = "{\"value\":7,\"items\":[\"a\",\"b\"],\"retained\":{\"label\":\"stable\"}}";
+            lock (changes)
+            {
+                Equal(2, changes.Count, "calls");
+                Equal(recreated, changes[1].Value.ToJson(), "the new incarnation");
+                Equal("[[\"r\"," + recreated + "]]", OpsJson(changes[1].Ops), "a root replacement");
+                Check(!changes[1].Retired, "not retired");
+            }
+            await watch.StopAsync();
         });
 
         yield return Case(prefix + "delivers-replayable-structural-no-op-commits-instead-of-suppressing-them", async () =>
@@ -339,20 +355,48 @@ internal static partial class SessionTests
             await Flush(session);
             Same(watch.Value, delivered, "delivered is the current value");
             Check(!ReferenceEquals(delivered, initial), "a new revision");
-            Same(initial!["retained"], delivered!["retained"], "retained subtree shared");
+            Same(initial["retained"], delivered!["retained"], "retained subtree shared");
             Equal(0.0, ValueOf(initial), "initial unchanged");
             await watch.StopAsync();
         });
 
-        yield return Case(prefix + "delivers-retirement-and-does-not-follow-recreation", async () =>
+        yield return Case(prefix + "reports-a-change-and-a-retirement-in-one-commit-as-the-retirement-with-the-value-it-was-given-before", async () =>
+        {
+            var (storage, session, _) = await CreateState();
+            var watch = (await session.WatchDocAsync(stateDoc, Context))!;
+            var before = watch.Value;
+            var changes = new List<WatchValueCall<JsonObjectValue>>();
+            watch.Start((call, _) =>
+            {
+                lock (changes) changes.Add(Change(call));
+                return Task.CompletedTask;
+            });
+            await session.CommitAsync(async tx =>
+            {
+                (await tx.DocAsync(stateDoc))["value"] = 5;
+                await tx.RetireDocAsync(stateDoc);
+            }, Context);
+            await Flush(session);
+            // Storage got the change, then the retirement; the commit publishes the retirement only.
+            Seq(["document.change", "document.retire"], storage.LastCommit.Select(write => write.Type), "writes");
+            lock (changes)
+            {
+                Equal(1, changes.Count, "one call");
+                Same(before, changes[0].Value, "the value it was given before");
+                Equal("[]", OpsJson(changes[0].Ops), "no ops");
+                Check(changes[0].Retired, "retired");
+            }
+            await watch.StopAsync();
+        });
+
+        yield return Case(prefix + "follows-its-address-across-a-retirement-and-a-recreation-in-one-commit-in-one-call", async () =>
         {
             var (_, session, _) = await CreateState();
-            var oldWatch = (await session.WatchDocAsync(stateDoc, Context))!;
-            var values = new List<(JsonObjectValue? Value, bool Retired)>();
-            oldWatch.Start((call, _) =>
+            var watch = (await session.WatchDocAsync(stateDoc, Context))!;
+            var changes = new List<WatchValueCall<JsonObjectValue>>();
+            watch.Start((call, _) =>
             {
-                var (value, _, retired) = Change(call);
-                lock (values) values.Add((value, retired));
+                lock (changes) changes.Add(Change(call));
                 return Task.CompletedTask;
             });
             await session.CommitAsync(async tx =>
@@ -360,16 +404,26 @@ internal static partial class SessionTests
                 await tx.RetireDocAsync(stateDoc);
                 (await tx.DocAsync(stateDoc))["value"] = 10;
             }, Context);
-            Equal(WatchEnd.Ended, await oldWatch.Closed, "closed");
-            lock (values) Check(values is [(null, true)], "retirement delivered");
-            Check(oldWatch.Value is null, "value null");
-
-            var replacement = (await session.WatchDocAsync(stateDoc, Context))!;
-            Equal(10.0, ValueOf(replacement.Value), "replacement");
+            await Flush(session);
+            var recreated = (await session.SnapshotAsync(stateDoc, Context))!;
+            lock (changes)
+            {
+                Equal(1, changes.Count, "one call");
+                Same(recreated, changes[0].Value, "the new incarnation");
+                Equal("[[\"r\"," + recreated.ToJson() + "]]", OpsJson(changes[0].Ops), "a root replacement");
+                Check(changes[0].Retired, "retired");
+            }
             await SetValue(session, 11);
             await Flush(session);
-            Check(oldWatch.Value is null, "old watch stays retired");
-            await replacement.StopAsync();
+            lock (changes)
+            {
+                Same(watch.Value, changes[1].Value, "the newest value");
+                Equal("[[\"s\",[\"value\"],11]]", OpsJson(changes[1].Ops), "its ops");
+                Check(!changes[1].Retired, "not retired");
+            }
+            Equal(11.0, ValueOf(watch.Value), "value");
+            Check(!watch.Closed.IsCompleted, "still open");
+            await watch.StopAsync();
         });
 
         yield return Case(prefix + "session-close-discards-retirement-buffered-before-start", async () =>
@@ -390,11 +444,10 @@ internal static partial class SessionTests
             var watch = (await session.WatchDocAsync(stateDoc, Context))!;
             var entered = new Deferred(inline: false);
             var release = new Deferred();
-            var values = new List<double?>();
+            var values = new List<double>();
             watch.Start(async (call, _) =>
             {
-                var value = Change(call).Value;
-                lock (values) values.Add(value is null ? null : ValueOf(value));
+                lock (values) values.Add(ValueOf(Change(call).Value));
                 entered.Resolve();
                 await release.Task;
             });
@@ -405,7 +458,7 @@ internal static partial class SessionTests
             Equal(WatchEnd.Ended, await watch.Closed, "closed");
             release.Resolve();
             await Flush(session);
-            lock (values) Seq([(double?)1.0], values, "values");
+            lock (values) Seq([1.0], values, "values");
         });
 
         yield return Case(prefix + "supports-idempotent-stop-and-rejects-repeated-or-late-start", async () =>
@@ -570,6 +623,126 @@ internal static partial class SessionTests
             await watch.StopAsync();
         });
 
+        yield return Case(prefix + "ignores-the-same-kind-in-another-conversation-and-under-another-family-key", async () =>
+        {
+            var notesDoc = Documents.DefineConversationDoc("watch.scoped-notes", 1, DocumentFork.Initial, () => O("{\"text\":\"\"}"),
+                checkpointWhen: (_, _, _) => false);
+            var membersDoc = Documents.DefineSessionDocFamily("watch.members", 1, _ => O("{\"text\":\"\"}"), checkpointWhen: (_, _, _) => false);
+            var (_, session, _) = Open(storageFactory);
+            var watched = await CreateConversation(session);
+            var other = await CreateConversation(session);
+            await session.CommitAsync(async tx =>
+            {
+                (await tx.DocAsync(notesDoc, watched))["text"] = "a";
+                (await tx.DocAsync(membersDoc, "watched", JsonValue.Null))["text"] = "a";
+            }, Context);
+            var notes = (await session.WatchDocAsync(notesDoc, watched, Context))!;
+            var member = (await session.WatchDocAsync(membersDoc, "watched", Context))!;
+            var changes = new List<WatchCall<JsonObjectValue>>();
+            notes.Start((call, _) =>
+            {
+                lock (changes) changes.Add(call);
+                return Task.CompletedTask;
+            });
+            member.Start((call, _) =>
+            {
+                lock (changes) changes.Add(call);
+                return Task.CompletedTask;
+            });
+            // The same kinds at other addresses: created, changed, retired, and created again.
+            await session.CommitAsync(async tx =>
+            {
+                (await tx.DocAsync(notesDoc, other))["text"] = "other";
+                (await tx.DocAsync(membersDoc, "other", JsonValue.Null))["text"] = "other";
+            }, Context);
+            await session.CommitAsync(async tx =>
+            {
+                await tx.RetireDocAsync(notesDoc, other);
+                await tx.RetireDocAsync(membersDoc, "other");
+            }, Context);
+            await session.CommitAsync(async tx =>
+            {
+                (await tx.DocAsync(notesDoc, other))["text"] = "again";
+                (await tx.DocAsync(membersDoc, "other", JsonValue.Null))["text"] = "again";
+            }, Context);
+            await Flush(session);
+            lock (changes) Equal(0, changes.Count, "calls");
+            Equal(2, session.DocumentCacheSizes.Attached, "attached");
+            await notes.StopAsync();
+            await member.StopAsync();
+            await session.CloseAsync(Context);
+        });
+
+        yield return Case(prefix + "takes-the-version-of-a-recreation-written-by-a-newer-definition-then-its-ops", async () =>
+        {
+            var old = Documents.DefineSessionDoc("watch.recreated-version", 1, () => O("{\"value\":1}"), checkpointWhen: (_, _, _) => false);
+            var current = Documents.DefineSessionDoc("watch.recreated-version", 2, () => O("{\"value\":0,\"migrated\":false}"),
+                checkpointWhen: (_, _, _) => false,
+                migrate: (value, _) => Obj(("value", value["value"]), ("migrated", true)));
+            var (_, session, _) = Open(storageFactory);
+            await session.CommitAsync(tx => tx.DocAsync(old), Context);
+            var watch = (await session.WatchDocAsync(old, Context))!;
+            var changes = new List<WatchValueCall<JsonObjectValue>>();
+            watch.Start((call, _) =>
+            {
+                lock (changes) changes.Add(Change(call));
+                return Task.CompletedTask;
+            });
+            await session.CommitAsync(async tx =>
+            {
+                await tx.RetireDocAsync(current);
+                (await tx.DocAsync(current))["value"] = 5;
+            }, Context);
+            await Flush(session);
+            await session.CommitAsync(async tx => (await tx.DocAsync(current))["value"] = 6, Context);
+            await Flush(session);
+            lock (changes)
+            {
+                Seq(["{\"value\":5,\"migrated\":false}", "{\"value\":6,\"migrated\":false}"], changes.Select(change => change.Value.ToJson()),
+                    "values");
+                Seq(["[[\"r\",{\"value\":5,\"migrated\":false}]]", "[[\"s\",[\"value\"],6]]"], changes.Select(change => OpsJson(change.Ops)),
+                    "ops");
+                Seq([true, false], changes.Select(change => change.Retired), "retired");
+            }
+            await watch.StopAsync();
+            await session.CloseAsync(Context);
+        });
+
+        yield return Case(prefix + "keeps-no-earlier-incarnation-alive-after-a-retirement-and-a-recreation-while-it-goes-on", async () =>
+        {
+            // Retention 0 evicts the retired incarnation at once; the default keeps the cache until it is unloaded.
+            foreach (var (retention, drop) in new[] { (0.0, false), (600_000.0, true) })
+            {
+                var session = new Session(storageFactory(), null, () => retention);
+                var (watch, first) = await FollowRecreation(session, stateDoc, drop);
+                await CollectGarbage();
+                Equal(2.0, ValueOf(watch.Value), "value");
+                SameJson("{\"label\":\"stable\"}", watch.Value["retained"], "retained");
+                Check(!first.IsAlive, $"the first incarnation is gone (retention {retention})");
+                await watch.StopAsync();
+                await session.CloseAsync(Context);
+            }
+        });
+
+        yield return Case(prefix + "keeps-a-watch-of-a-retired-conversation-document-until-it-is-stopped-then-nothing-of-it", async () =>
+        {
+            var notesDoc = Documents.DefineConversationDoc("watch.notes", 1, DocumentFork.Initial, () => O("{\"text\":\"\"}"),
+                checkpointWhen: (_, _, _) => false);
+            var (_, session, _) = Open(storageFactory);
+            var conversationId = await CreateConversation(session);
+            // A watch follows its address, so a forgotten one stays until it is stopped or the Session ends.
+            var forgotten = await RetiredNotesWatch(session, notesDoc, conversationId, stop: false);
+            await CollectGarbage();
+            Check(forgotten.Watch.IsAlive, "a forgotten watch stays");
+            await ((IWatchHandle<JsonObjectValue>)forgotten.Watch.Target!).StopAsync();
+
+            var stopped = await RetiredNotesWatch(session, notesDoc, conversationId, stop: true);
+            await CollectGarbage();
+            Check(!stopped.Watch.IsAlive, "the stopped watch is gone");
+            Check(!stopped.Listener.IsAlive, "its listener is gone");
+            await session.CloseAsync(Context);
+        });
+
         yield return Case(prefix + "retains-neither-its-session-nor-its-listener-once-stopped-while-still-referenced", async () =>
         {
             // Control: a running watch keeps its Session, so the collection below is real.
@@ -592,14 +765,14 @@ internal static partial class SessionTests
     /// when <paramref name="stop"/> says so. The documents stay and no timer is armed, so nothing but the watch can keep the Session alive.
     /// The listener captures a marker, so it is its own delegate instance.</summary>
     [MethodImpl(MethodImplOptions.NoInlining)]
-    private static async Task<(IWatchHandle<JsonObjectValue?> Watch, WeakReference Session, WeakReference Listener)> UnreferencedWatch(
+    private static async Task<(IWatchHandle<JsonObjectValue> Watch, WeakReference Session, WeakReference Listener)> UnreferencedWatch(
         Func<IStorage> storageFactory, SessionDocToken stateDoc, bool stop)
     {
         var session = new Session(storageFactory(), null, () => double.PositiveInfinity, setTimer: (_, _, _) => () => { });
         await session.CommitAsync(tx => tx.DocAsync(stateDoc), Context);
         var watch = (await session.WatchDocAsync(stateDoc, Context))!;
         var marker = new object();
-        Func<WatchCall<JsonObjectValue?>, DurableContext, Task> listener = (_, _) =>
+        Func<WatchCall<JsonObjectValue>, DurableContext, Task> listener = (_, _) =>
         {
             GC.KeepAlive(marker);
             return Task.CompletedTask;
@@ -609,6 +782,47 @@ internal static partial class SessionTests
         await Flush(session);
         if (stop) await watch.StopAsync();
         return (watch, new WeakReference(session), new WeakReference(listener));
+    }
+
+    /// <summary>Upstream's <c>follow</c>: watches the document, retires and recreates it, and delivers the new value; <paramref name="drop"/>
+    /// then unloads the cache. <c>First</c> refers to the first incarnation's <c>retained</c> object.</summary>
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static async Task<(IWatchHandle<JsonObjectValue> Watch, WeakReference First)> FollowRecreation(Session session,
+        SessionDocToken stateDoc, bool drop)
+    {
+        await session.CommitAsync(async tx => (await tx.DocAsync(stateDoc))["retained"] = O("{\"label\":\"first incarnation\"}"), Context);
+        var watch = (await session.WatchDocAsync(stateDoc, Context))!;
+        var first = new WeakReference(watch.Value["retained"]);
+        watch.Start((_, _) => Task.CompletedTask);
+        await session.CommitAsync(async tx =>
+        {
+            await tx.RetireDocAsync(stateDoc);
+            (await tx.DocAsync(stateDoc))["value"] = 2;
+        }, Context);
+        await Flush(session);
+        if (drop) await session.UnloadDocumentsAsync();
+        return (watch, first);
+    }
+
+    /// <summary>Upstream's <c>acquire</c> in "keeps a watch of a retired conversation document": a started watch of a document that is then
+    /// retired, stopped first when <paramref name="stop"/> says so. The listener captures a marker, so it is its own delegate instance.</summary>
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static async Task<(WeakReference Watch, WeakReference Listener)> RetiredNotesWatch(Session session, ConversationDocToken notesDoc,
+        ConversationId conversationId, bool stop)
+    {
+        await session.CommitAsync(async tx => (await tx.DocAsync(notesDoc, conversationId))["text"] = "kept", Context);
+        var watch = (await session.WatchDocAsync(notesDoc, conversationId, Context))!;
+        var marker = new object();
+        Func<WatchCall<JsonObjectValue>, DurableContext, Task> listener = (_, _) =>
+        {
+            GC.KeepAlive(marker);
+            return Task.CompletedTask;
+        };
+        watch.Start(listener);
+        await session.CommitAsync(tx => tx.RetireDocAsync(notesDoc, conversationId), Context);
+        await Flush(session);
+        if (stop) await watch.StopAsync();
+        return (new WeakReference(watch), new WeakReference(listener));
     }
 
     /// <summary>Upstream's <c>collect()</c>: rounds of a timer tick (its <c>setTimeout(resolve, 0)</c>) and a full collection.</summary>

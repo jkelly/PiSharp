@@ -1,7 +1,10 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/test/session-definitions.test.ts. The two type-level cases
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/test/session-definitions.test.ts. The two type-level cases
 // (expectTypeOf and @ts-expect-error) are compile-time checks here: TypeChecks below must compile, and each @ts-expect-error line is kept
 // as a comment naming the overload that does not exist. Their runtime parts (the snapshot calls of the first type case) run as upstream's
 // do. "version 1.5" cannot be written: versions are int.
+// Pi v1.5.0 sync: every definition states checkpointWhen (area checkpoint-when), the document state checks are gone with
+// Session.documentState() (area watches), and DocumentWatch<T> is WatchHandle<Readonly<T>>, never null, so every WatchDocAsync overload
+// returns IWatchHandle<JsonObjectValue> (area watch-folding).
 using System.Reflection;
 using PiSharp.Durable;
 using PiSharp.Durable.Chord;
@@ -152,7 +155,7 @@ internal static partial class SessionTests
         _ = rewound;
         // @ts-expect-error latest conversation, Session and task documents keep no history: SnapshotAsOfAsync takes only rewindable tokens.
 
-        Task<IWatchHandle<JsonObjectValue?>?> watch = session.WatchDocAsync(DefinitionsSessionDoc, Context);
+        Task<IWatchHandle<JsonObjectValue>?> watch = session.WatchDocAsync(DefinitionsSessionDoc, Context);
         watch = session.WatchDocAsync(DefinitionsLatestDoc, conversationId, Context);
         watch = session.WatchDocAsync(DefinitionsTaskDoc, taskId, Context);
         watch = session.WatchDocAsync(DefinitionsSessionFamily, "k", Context);
