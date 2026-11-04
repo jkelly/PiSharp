@@ -14,10 +14,12 @@ using PiSharp.Durable.Chord.Delta;
 //   kept, so "type" appends and an absent "signature" throws.
 // - The retention case checks with WeakReference and GC.Collect that the ops do not keep the strings their text was cut from alive, in
 //   place of used_heap_size under --expose-gc. A .NET string is never a view of a larger one, so an op holds the caller's text as is.
-// - The cost case counts the thread's allocated bytes (GC.GetAllocatedBytesForCurrentThread) in place of GCProfiler. .NET has no ropes:
-//   each change's new string copies the whole text, O(length), where V8's concatenation is O(1). The case subtracts those characters and
-//   holds upstream's bounds on the rest, which is what AppendText, the draft and the tracker cost per change. The 500 KB stream still
-//   copies about 6 GB of characters in all, as upstream's `draft.text += chunk` allocates on Node.
+// - The cost case counts the thread's allocated bytes (GC.GetAllocatedBytesForCurrentThread) in place of GCProfiler. Pi v1.5.0 sync (area
+//   partial-commits): a .NET string has no rope, so an appended JsonStringValue defers its concatenation (JsonStringValue.Concat) as V8's
+//   string does, and the case holds upstream's bounds on everything the thread allocates. It used to subtract the characters each change's
+//   new string copied (O(length) a change, about 6 GB for the 500 KB stream); renamed from
+//   costs-o-chunk-per-change-beyond-the-copy-a-dotnet-string-makes. The two cases before it are PiSharp-authored checks of that deferred
+//   string: built once on first read, each revision keeping its value, and a deep chain read without recursion from several threads.
 internal static partial class Program
 {
     private static JsonValue AppendTextDoc() =>
@@ -155,11 +157,50 @@ internal static partial class Program
             Check(ops.All(op => op is AppendOp { Text.Length: 40 }), "each op holds the 40 characters appended");
             GC.KeepAlive(tracker);
         }),
-        Case("chord.delta-append-text.cost.costs-o-chunk-per-change-beyond-the-copy-a-dotnet-string-makes", () =>
+        // PiSharp-authored: the deferred concatenation of an appended JsonStringValue (see the header).
+        Case("chord.delta-append-text.builds-a-long-appended-string-once-and-keeps-each-revisions-value", () =>
+        {
+            var tracker = Tracker.Track(AppendTextDoc());
+            var expected = new System.Text.StringBuilder("hello");
+            JsonValue? middle = null;
+            for (var index = 0; index < 2_000; index++)
+            {
+                var chunk = index.ToString("D5", CultureInfo.InvariantCulture);
+                AppendTextCommit(tracker, draft => AppendTextBlock(draft).AppendText("text", chunk));
+                expected.Append(chunk);
+                if (index == 999) middle = tracker.Value;
+            }
+            var text = (JsonStringValue)At(tracker.Value, "content", 0, "text");
+            Equal(expected.Length, text.Length, "the length, known before the string is built");
+            var built = text.Value;
+            Equal(expected.ToString(), built, "the string");
+            Check(ReferenceEquals(built, text.Value), "built once: a second read returns the same string");
+            // An earlier revision shares the appends before it and reads its own value, after the later one was built.
+            Equal(expected.ToString(0, 5 + 1_000 * 5), Str(At(middle!, "content", 0, "text")), "the earlier revision's text");
+            Check(JsonValue.DeepEquals(JsonValue.String(expected.ToString()), text), "equal to the flat string");
+            Check(!JsonValue.DeepEquals(JsonValue.String(expected.ToString(0, expected.Length - 1) + "?"), text), "unequal to another string");
+        }),
+        Case("chord.delta-append-text.reads-a-deep-chain-of-deferred-appends-without-recursion-from-several-threads", () =>
+        {
+            // A chain far deeper than a recursive build's stack allows, read at once by several threads.
+            var value = JsonValue.String(new string('a', 2_000));
+            for (var index = 0; index < 200_000; index++) value = JsonStringValue.Concat(value, "b");
+            var expected = new string('a', 2_000) + new string('b', 200_000);
+            var reads = new string[8];
+            Parallel.For(0, reads.Length, index => reads[index] = value.Value);
+            Check(reads.All(read => read == expected), "every thread reads the whole string");
+            Equal(expected.Length, value.Length, "the length");
+            // Below 1024 characters an append concatenates at once.
+            var small = JsonStringValue.Concat(JsonValue.String("ab"), "c");
+            Equal("abc", small.Value, "a short append");
+            Check(ReferenceEquals(value, JsonStringValue.Concat(value, "")), "an empty append is the string itself");
+        }),
+        Case("chord.delta-append-text.cost.costs-o-chunk-per-change-a-500-kb-stream-allocates-linearly", () =>
         {
             var small = AppendTextStream(50_000);
             var large = AppendTextStream(500_000);
-            Check(small > 0 && large > 0, $"allocated beyond the strings: small {small}, large {large}");
+            Equal("hello" + string.Concat(Enumerable.Repeat(AppendTextChunk, 500_000 / AppendTextChunk.Length)), AppendTextStreamed,
+                "the streamed text");
             // Ten times the text: linear growth is about 10x.
             Check((double)large / small < 20, $"large {large} / small {small}");
             Check(large / 12_500d < 40_000, $"{large / 12_500d:F0} bytes per change");
@@ -174,21 +215,25 @@ internal static partial class Program
         return new WeakReference(source);
     }
 
+    private const string AppendTextChunk = "0123456789abcdefghij0123456789abcdefghij";
+
+    // The text the last AppendTextStream streamed, read after its measure.
+    private static string AppendTextStreamed = "";
+
     /// <summary>One change per 40-character chunk, appended to one streamed text until it has <paramref name="length"/> characters: the
-    /// bytes the thread allocates, less the characters of each change's new string, which a .NET concatenation copies in full.</summary>
+    /// bytes the thread allocates.</summary>
     private static long AppendTextStream(int length)
     {
-        const string chunk = "0123456789abcdefghij0123456789abcdefghij";
         var tracker = Tracker.Track(AppendTextDoc());
-        long copied = 0;
         var before = GC.GetAllocatedBytesForCurrentThread();
-        for (var streamed = 0; streamed < length; streamed += chunk.Length)
+        for (var streamed = 0; streamed < length; streamed += AppendTextChunk.Length)
         {
             var change = tracker.BeginChange();
-            AppendTextBlock(Root(change)).AppendText("text", chunk);
+            AppendTextBlock(Root(change)).AppendText("text", AppendTextChunk);
             tracker.Adopt(change.Prepare());
-            copied += sizeof(char) * (5L + streamed + chunk.Length);
         }
-        return GC.GetAllocatedBytesForCurrentThread() - before - copied;
+        var allocated = GC.GetAllocatedBytesForCurrentThread() - before;
+        AppendTextStreamed = Str(At(tracker.Value, "content", 0, "text"));
+        return allocated;
     }
 }
