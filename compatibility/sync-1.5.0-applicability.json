@@ -11207,9 +11207,11 @@
         "commits": [
           "261aa78a",
           "4501b9aa",
-          "9ac86c43"
+          "9ac86c43",
+          "dd60340e"
         ],
         "tests": [
+          "tests/PiSharp.Chord.Tests/Data/ArgsCases.cs: data.args.bind-provider-checks-the-accepts-table-once-and-lists-the-accepted-versions",
           "tests/PiSharp.Chord.Tests/Data/ArgsCases.cs: data.args.check-args-checks-an-old-version-against-the-old-schema-then-maps-directly-to-the-current-shape",
           "tests/PiSharp.Chord.Tests/Data/ArgsCases.cs: data.args.check-args-treats-format-as-an-annotation-a-contract-with-format-email-accepts-any-string",
           "tests/PiSharp.Chord.Tests/Data/ArgsCases.cs: data.args.check-args-compiles-lazily-once-per-accepted-version-and-method-equal-schema-objects-share-a-validator",
@@ -11226,7 +11228,7 @@
           "tests/PiSharp.Chord.Tests/Schema/SchemaSwitchCases.cs: schema.schema-switch.keeps-every-fingerprint-and-normal-form-of-contracts"
         ]
       },
-      "deferred": "The data half is ported: all nine packages/chord/src/next/data files (src/PiSharp.Chord/Data) and all six data tests (73 new cases, every upstream case except the type-level ones). Left: (1) bindProvider's checkAccepts step. accepts.ts, the AcceptsTable type and evolve belong to area cv2-evolve and are not merged here, so BindProvider takes the table in the form checkAccepts leaves it (CheckedAccepts, args.ts's own view of it). args.test.ts runs against hand-built evolved contracts (ArgsDraft in ArgsCases.cs, materialized the way evolve's Draft.next does, so the fingerprints are evolve's). Once cv2-evolve is in: add BindProvider(contract, AcceptsTable) = CheckAccepts, then this BindProvider; switch ArgsCases to evolve; and port args.test.ts's one remaining assertion, bindProvider(NotesV3, { 1: {} }) refused with \"notes accepts[1].methods.add: missing mapping\". (2) The row's contracts half belongs to cv2-contracts (merged) and cv2-evolve (evolve, accepts, fingerprint, history and snapshot tests; in flight). (3) schema-switch.test.ts: the contracts' fingerprints and normal forms, and the profile's normal form, match recorded.json now. Documents' fingerprints wait for defineState (documents areas), tables' for defineTable/evolveTable/json (cv2-store-tables), and the job's for defineJob (jobs, phase 6). \"stored data\" (storedReads: a host reading stored/store.db and an import of stored/archive.jsonl) needs createHost and defineFacet (phase 6) plus the store engine and archive. (4) owner.ts waits for phase 6 (createHost, defineFacet). write-stored.ts is not ported: it rewrites the fixtures, which decision 0013 rules out."
+      "deferred": "Contracts (cv2-contracts, cv2-evolve) and data (cv2-data) are ported: every file of packages/chord/src/next/contracts and next/data, and every upstream case of test/next/contracts and test/next/data except the type-level ones. bindProvider now runs checkAccepts on cv2-evolve's AcceptsTable, args.test.ts evolves with Contract.Evolve, and its \"missing mapping\" assertion is ported. Left, all in test/next/schema and waiting on other areas: (1) schema-switch.test.ts compares the contracts' fingerprints and normal forms, and the profile's normal form, with recorded.json now. Documents' fingerprints wait for defineState (documents areas, e.g. cv2-state), tables' for defineTable/evolveTable/json (cv2-store-tables), and the job's for defineJob (jobs, phase 6). \"stored data\" (storedReads: a host reading stored/store.db and an import of stored/archive.jsonl) needs createHost and defineFacet (phase 6) plus the store engine and archive. (2) owner.ts waits for phase 6 (createHost, defineFacet). write-stored.ts is not ported: it rewrites the fixtures, which decision 0013 rules out."
     },
     {
       "id": "chord.next-documents-state",
