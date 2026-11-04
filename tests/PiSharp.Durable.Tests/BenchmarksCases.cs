@@ -5,13 +5,14 @@ using PiSharp.Durable.Testing;
 // and test/tool-output-bench.ts (ported at v1.1.0, unchanged in v1.2.0) over src/PiSharp.Durable/Testing/StorageBenchmark.cs (src/testing/storage-benchmark.ts), and Pi v1.2.0
 // test/document-append-bench.ts, test/session-document-cache-bench.ts, test/scheduler-memory-bench.ts, test/scheduler-fanout-bench.ts,
 // test/nested-tools-bench.ts, test/nested-images-bench.ts and test/codemode-bench.ts, plus the PiSharp-authored scheduler-scale
-// (SchedulerScaleBench.cs). The
+// (SchedulerScaleBench.cs) and partial-commits (PartialCommitsBench.cs). The
 // benchmarks are report only (docs/durable-benchmarks.md).
 // This smoke case runs each of them at a tiny size so they cannot rot: one sample per storage scenario on every backend (each scenario's
 // result is checked before it is timed), the footprint worker on every backend in-process, a short rate round closed mid-round and
 // replayed, a firehose, a repetitive firehose, a bash cat of 1 MiB, 20 document appends of each kind, three conversations at each
 // document retention, three subagent cycles under a live parent, a fan-out of four child tasks and a chain of five, four nested calls, two
-// tiny nested-tools scenarios, the four nested-images variants of two images, and the four code mode rows of three echo calls. It asserts
+// tiny nested-tools scenarios, the four nested-images variants of two images, the four code mode rows of three echo calls, and a 2,000
+// character partial-commits answer (PartialCommitsBench.cs, Pi v1.5.0 sync area partial-commits). It asserts
 // completion,
 // the number of results and the scheduler's bounded indexes, never a timing.
 internal static partial class Program
@@ -105,6 +106,11 @@ internal static partial class Program
                 "codemode rows: each shape plain and in code mode, code mode journaling on top");
             Check(codemodeOutput.ToString().StartsWith("sequential n=3: plain ", StringComparison.Ordinal), "codemode lines: " + codemodeOutput);
             Equal("100,1000", string.Join(",", CodemodeBench.ParseSizes(null)), "codemode default sizes");
+            var partialOutput = new StringWriter();
+            var partialRows = await PartialCommitsBench.RunAsync([2_000], partialOutput);
+            Check(partialRows is [{ Size: 2_000, Text.Commits: > 0, ToolCall.Commits: > 0 }], "one partial-commits row, both phases committing");
+            Check(partialOutput.ToString().StartsWith("size=2000: text ", StringComparison.Ordinal), "partial-commits line: " + partialOutput);
+            Equal("40000,400000,500000", string.Join(",", PartialCommitsBench.ParseSizes(null)), "partial-commits default sizes");
             Directory.Delete(root, recursive: true);
         });
     }

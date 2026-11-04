@@ -1,6 +1,7 @@
 // Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/chord/src/json.ts (JsonValue, which v1.2.0 moved here from types.ts).
 // Chord's values are plain JavaScript JSON; here they are immutable trees whose reference identity is the unit of structural sharing, so
 // copyJson and isJsonValue are unnecessary, and JsonRepresentation is a compile-time mapping of TypeScript types with no C# counterpart.
+// Pi v1.5.0 sync (area partial-commits): a long JsonStringValue that grows by appends defers the concatenation, as V8's ropes do.
 using System.Collections;
 using System.Collections.Immutable;
 using System.Globalization;
@@ -55,7 +56,9 @@ public abstract class JsonValue
         {
             case JsonBooleanValue boolean: return boolean.Value == ((JsonBooleanValue)right).Value;
             case JsonNumberValue number: return number.Value == ((JsonNumberValue)right).Value;
-            case JsonStringValue text: return string.Equals(text.Value, ((JsonStringValue)right).Value, StringComparison.Ordinal);
+            case JsonStringValue text:
+                // Lengths first: a deferred string has its length without being built.
+                return text.Length == ((JsonStringValue)right).Length && string.Equals(text.Value, ((JsonStringValue)right).Value, StringComparison.Ordinal);
             case JsonArrayValue array:
             {
                 var other = (JsonArrayValue)right;
@@ -265,13 +268,89 @@ public sealed class JsonNumberValue : JsonValue
 }
 
 /// <summary>A string of UTF-16 code units.</summary>
+/// <remarks>
+/// Pi v1.5.0 sync (area partial-commits): a long string that grows by appends (<see cref="Concat"/>: Chord's <c>appendText()</c> and
+/// <c>a</c> ops) defers the concatenation, as V8 builds a rope for <c>a + b</c>: it keeps the string it extends and the text appended,
+/// and <see cref="Value"/> builds the whole string once, on first read, and drops them. Without it each append copies the whole string, so
+/// a streamed answer of n characters in pieces costs O(n²) copying. The value is the same either way; nothing public changes.
+/// </remarks>
 public sealed class JsonStringValue : JsonValue
 {
-    internal JsonStringValue(string value) { Value = value ?? throw new ArgumentNullException(nameof(value)); }
+    // Below this length an append concatenates at once: a deferred one costs an object, and short strings copy cheaply.
+    private const int DeferredMinimumLength = 1024;
+
+    // The string, or a Pending concatenation until the first read of Value replaces it with the string. Only that replacement writes it.
+    private object state;
+
+    internal JsonStringValue(string value)
+    {
+        state = value ?? throw new ArgumentNullException(nameof(value));
+        Length = value.Length;
+    }
+
+    private JsonStringValue(Pending pending, int length)
+    {
+        state = pending;
+        Length = length;
+    }
+
     /// <summary>The string.</summary>
-    public string Value { get; }
+    public string Value => Volatile.Read(ref state) as string ?? Build();
+
+    /// <summary>The string's length, without building a deferred one.</summary>
+    internal int Length { get; }
+
     /// <inheritdoc/>
     public override JsonValueKind Kind => JsonValueKind.String;
+
+    /// <summary><paramref name="left"/> followed by <paramref name="text"/>: a deferred concatenation once the result is long.</summary>
+    internal static JsonStringValue Concat(JsonStringValue left, string text)
+    {
+        ArgumentNullException.ThrowIfNull(left);
+        ArgumentNullException.ThrowIfNull(text);
+        if (text.Length == 0) return left;
+        var length = checked(left.Length + text.Length);
+        return length < DeferredMinimumLength ? new JsonStringValue(string.Concat(left.Value, text)) : new JsonStringValue(new Pending(left, text), length);
+    }
+
+    private sealed class Pending(JsonStringValue left, string text)
+    {
+        public JsonStringValue Left { get; } = left;
+        public string Text { get; } = text;
+    }
+
+    // Walks the deferred appends back to a built string, without recursion, and copies the pieces once. Two threads may both build it;
+    // either string is the same value, and the last write wins.
+    private string Build()
+    {
+        var pieces = new List<string>();
+        var node = this;
+        string head;
+        while (true)
+        {
+            var current = Volatile.Read(ref node.state);
+            if (current is string built)
+            {
+                head = built;
+                break;
+            }
+            var pending = (Pending)current;
+            pieces.Add(pending.Text);
+            node = pending.Left;
+        }
+        var value = string.Create(Length, (head, pieces), static (span, parts) =>
+        {
+            parts.head.AsSpan().CopyTo(span);
+            var offset = parts.head.Length;
+            for (var index = parts.pieces.Count - 1; index >= 0; index--)
+            {
+                parts.pieces[index].AsSpan().CopyTo(span[offset..]);
+                offset += parts.pieces[index].Length;
+            }
+        });
+        Volatile.Write(ref state, value);
+        return value;
+    }
 }
 
 /// <summary>An immutable array.</summary>

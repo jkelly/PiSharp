@@ -234,7 +234,7 @@
       "upstreamChange": "modified",
       "previousBlobSha1": "d6042e537290fd429a8ddd6d732b98bab122b063",
       "changedLines": 702,
-      "note": "HarnessTasks.GenerationTask (pi.generation v1, initial {phase: prepare, attempt: 1}) with phases prepare, request, retry, poll and tools and its abort handler (GenerationPhases): section rendering and pi.system planning, threshold and overflow compaction starts, streaming through IDurableModels with throttled partial commits to pi.live.generation.message (an AssistantStreamReducer snapshot per event; the throttle timer is the Harness TimeProvider's), the beforeRequest/afterResponse/onYield/afterTools hooks (the runtime is the hooks' IHookApi), retry backoff, deferred polling and cancellation, usage recording (appendAssistant), the final boundary, the tool round hand-off (tool_unavailable results, owned tool tasks, sequential pending calls, finishToolRound with terminate/handoff/addTools controls) and startRun/handOver. Provider messages are stored as PiWireJson wire JSON; a non-finite usage count throws Chord's copyJson error. Tests: harness.generation.*, harness.generation-recovery.*, harness.chat-differential.*, harness.structured.tool-rounds.* v1.2.0: the blocking threshold flag (area j); tool tasks take {kind: \"model\", ...}, controls are read from model-issued results only, and a round handed over removes nestedTools (area a). v1.5.0 (work list area model-requests): classify records the requested thinking level on the message and the poll checkpoint pins it; a poll of a checkpoint without it records none (d5b3de22d); a request passes the beforeProviderRequest chain as DurableStreamOptions.OnPayload when the phase's agent has such a hook, a throwing hook reported and skipped (d280e1ffa). The retry checkpoint's poll.thinkingLevel is b3a29f111's (area restarts). Tests: harness.generation.records-the-requested-thinking-level-on-answers-streamed-and-polled, harness.generation-recovery.polls-a-checkpoint-stored-without-a-thinking-level-and-records-none, harness.tools.chains-beforeproviderrequest-over-every-provider-request-body, harness.tools.reports-a-throwing-beforeproviderrequest-hook-and-continues-the-chain; the compat, examples and differential captures compare as authored forms (ModelRequests150.cs); waits on the file's other areas v1.5.0 (work list area sleep): a retry backoff and a deferred poll commit a sleep, and a run before its time sleeps again, the poll before its model lookup; the partial-commit throttle arms runtime.SetTimer (f75b3240a, ec1be23eb). Tests: harness.generation-recovery.* v1.5.0 (work list area telemetry): requests, deferred polls and deferred cancels take the phase's span as their telemetry parent, and a run's generation is created with its inputs' submission IDs, so it runs in the first admission's trace and links the others (2ec55d808). Tests: harness.telemetry.starts-each-queued-input-s-run-in-its-admission-trace-and-links-input-roots-to-their-caller, harness.telemetry.links-the-other-queued-inputs-to-the-first-invocation-of-their-shared-run; waits on the file's other areas",
+      "note": "HarnessTasks.GenerationTask (pi.generation v1, initial {phase: prepare, attempt: 1}) with phases prepare, request, retry, poll and tools and its abort handler (GenerationPhases): section rendering and pi.system planning, threshold and overflow compaction starts, streaming through IDurableModels with throttled partial commits to pi.live.generation.message (an AssistantStreamReducer snapshot per event; the throttle timer is the Harness TimeProvider's), the beforeRequest/afterResponse/onYield/afterTools hooks (the runtime is the hooks' IHookApi), retry backoff, deferred polling and cancellation, usage recording (appendAssistant), the final boundary, the tool round hand-off (tool_unavailable results, owned tool tasks, sequential pending calls, finishToolRound with terminate/handoff/addTools controls) and startRun/handOver. Provider messages are stored as PiWireJson wire JSON; a non-finite usage count throws Chord's copyJson error. Tests: harness.generation.*, harness.generation-recovery.*, harness.chat-differential.*, harness.structured.tool-rounds.* v1.2.0: the blocking threshold flag (area j); tool tasks take {kind: \"model\", ...}, controls are read from model-issued results only, and a round handed over removes nestedTools (area a). v1.5.0 (work list area model-requests): classify records the requested thinking level on the message and the poll checkpoint pins it; a poll of a checkpoint without it records none (d5b3de22d); a request passes the beforeProviderRequest chain as DurableStreamOptions.OnPayload when the phase's agent has such a hook, a throwing hook reported and skipped (d280e1ffa). The retry checkpoint's poll.thinkingLevel is b3a29f111's (area restarts). Tests: harness.generation.records-the-requested-thinking-level-on-answers-streamed-and-polled, harness.generation-recovery.polls-a-checkpoint-stored-without-a-thinking-level-and-records-none, harness.tools.chains-beforeproviderrequest-over-every-provider-request-body, harness.tools.reports-a-throwing-beforeproviderrequest-hook-and-continues-the-chain; the compat, examples and differential captures compare as authored forms (ModelRequests150.cs); waits on the file's other areas v1.5.0 (work list area sleep): a retry backoff and a deferred poll commit a sleep, and a run before its time sleeps again, the poll before its model lookup; the partial-commit throttle arms runtime.SetTimer (f75b3240a, ec1be23eb). Tests: harness.generation-recovery.* v1.5.0 (work list area telemetry): requests, deferred polls and deferred cancels take the phase's span as their telemetry parent, and a run's generation is created with its inputs' submission IDs, so it runs in the first admission's trace and links the others (2ec55d808). Tests: harness.telemetry.starts-each-queued-input-s-run-in-its-admission-trace-and-links-input-roots-to-their-caller, harness.telemetry.links-the-other-queued-inputs-to-the-first-invocation-of-their-shared-run; waits on the file's other areas v1.5.0 (work list area partial-commits): a partial commit appends what text and thinking grew by and applies the tool-call argument changes since the last commit (PartialChanges, da412b039); the committed partial is rebuilt from a reducer snapshot only after structural events, its text growing by deferred appends (JsonStringValue.Concat) between them, and now carries the streamed arguments. Tests: harness.partial-changes.*, harness.events.streamed-partials.*; waits on the file's other areas",
       "portedBlobSha1": "d6042e537290fd429a8ddd6d732b98bab122b063"
     },
     {
@@ -269,12 +269,11 @@
       "lines": 62,
       "pisharp": "src/PiSharp.Durable/Harness/Json.cs",
       "phase": "P6",
-      "status": "needs-sync",
+      "status": "in-progress",
       "upstreamChange": "modified",
       "previousBlobSha1": "66cfcd891f484e0f3809b3d7d93c957a543bb69a",
       "changedLines": 43,
-      "note": "HarnessJson.AssignJson over DraftObject/DraftArray, used by generation (pi.live.generation.message partials) and the tool task (slot details), as upstream. Upstream has no test of its own; covered by harness.live-deltas.* (streams-partial-text-as-appends, diffs-details-leaf-by-leaf-and-appends-diagnostics)",
-      "portedBlobSha1": "66cfcd891f484e0f3809b3d7d93c957a543bb69a"
+      "note": "HarnessJson.AssignJson over DraftObject/DraftArray, used by generation (pi.live.generation.message partials) and the tool task (slot details), as upstream. Upstream has no test of its own; covered by harness.live-deltas.* (streams-partial-text-as-appends, diffs-details-leaf-by-leaf-and-appends-diagnostics) v1.5.0 (work list area partial-commits): an AssignPlan says how a value is written instead of leaf by leaf: keep (the caller writes it), append (a string member that grew by the planned text, checked by length, is appended with DraftObject.AppendText) or fields (plans for members and items) (da412b039). The __proto__ guard (89c921d8b) has no C# counterpart: a draft is a keyed map with no prototype, read only where it has the key. Json.cs matches the v1.5.0 blob and cites it; 6c2fd73b0's generic signature (area deferred-commits) is TypeScript typing. Tests: harness.json.*, harness.partial-changes.*; in progress until area deferred-commits lands"
     },
     {
       "upstream": "packages/durable/src/harness/live.ts",
@@ -306,8 +305,9 @@
       "lines": 184,
       "pisharp": "src/PiSharp.Durable/Harness/PartialChanges.cs",
       "phase": "sync-1.5.0",
-      "status": "planned",
-      "upstreamChange": "added"
+      "status": "in-progress",
+      "upstreamChange": "added",
+      "note": "v1.5.0 (work list area partial-commits): PartialChanges (observe, take, commit, restore) over PiSharp.Contracts stream frames, with PiSharp.AI's StreamingJsonParser per tool call (da412b039); 6c2fd73b0's typing and its two tool-call narrowings (area deferred-commits) are in. PiSharp-only frames: ToolCallCheckpoint continues or restarts a call's parse, ThinkingCheckpoint drops the block's pending appends, ContentBlockFinalized ends a block, ToolCallProvisionalStarted starts tracking. An AssistantStreamReducer snapshot keeps an unfinished call's start arguments, so the snapshot fallback commits a parse of the call's text at take() and keeps tracking the call. Its own lock orders the stream, the throttle's flush, the commit and its restore. Tests: harness.partial-changes.*, harness.events.streamed-partials.*; in progress until area deferred-commits lands"
     },
     {
       "upstream": "packages/durable/src/harness/prompt.ts",
@@ -2085,7 +2085,7 @@
       "phase": "P10",
       "status": "removed-upstream",
       "upstreamChange": "removed",
-      "note": "harness.events.* (14 cases) on MemoryStorage, harness.events.jsonl.* and harness.events.sqlite.* (14 each). Adapted: events compare by ToJson(); drained() is a Session line barrier; waitFor is Eventually; applyChanges works on System.Text.Json nodes; tools sleep with Task.Delay in real time where upstream uses setTimeout v1.2.0: tool_execution_start carries taskId. v1.5.0 (work list area watch-folding, d8d99950a): \"delivers each of 100 pending batches in its own call, in order, unlike state watches\" is here (harness.events.*): the event stream is a NativeWatch, so it does not fold."
+      "note": "harness.events.* (14 cases) on MemoryStorage, harness.events.jsonl.* and harness.events.sqlite.* (14 each). Adapted: events compare by ToJson(); drained() is a Session line barrier; waitFor is Eventually; applyChanges works on System.Text.Json nodes; tools sleep with Task.Delay in real time where upstream uses setTimeout v1.2.0: tool_execution_start carries taskId. v1.5.0 (work list area watch-folding, d8d99950a): \"delivers each of 100 pending batches in its own call, in order, unlike state watches\" is here (harness.events.*): the event stream is a NativeWatch, so it does not fold. v1.5.0 (work list area partial-commits; f715a15c1, da412b039, 1e42501bb): the \"streamed partials\" cases are harness.events.streamed-partials.* (memory only, in their harness-events.test.ts form; at v1.5.0 they are in harness-view-run.test.ts, area view). The cost and memory cases pace the faux stream on commits instead of real time (.NET timers on Windows tick every 15.6 ms) and measure with GC.GetTotalAllocatedBytes and GC.GetTotalMemory."
     },
     {
       "upstream": "packages/durable/test/harness-failed-run-inbox.test.ts",
@@ -2205,8 +2205,9 @@
       "lines": 23,
       "pisharp": "tests/PiSharp.Durable.Tests/HarnessJsonCases.cs",
       "phase": "sync-1.5.0",
-      "status": "planned",
-      "upstreamChange": "added"
+      "status": "ported",
+      "upstreamChange": "added",
+      "note": "v1.5.0 (work list area partial-commits): harness.json.does-not-merge-a-new-proto-member-into-object-prototype (89c921d8b): the __proto__ member is a plain member, assigned whole, and nothing else in the document changes; C# has no prototype to pollute. Three PiSharp-authored harness.json.* cases check AssignPlan"
     },
     {
       "upstream": "packages/durable/test/harness-lifecycle.test.ts",
@@ -2310,8 +2311,9 @@
       "lines": 215,
       "pisharp": "tests/PiSharp.Durable.Tests/HarnessPartialChangesCases.cs",
       "phase": "sync-1.5.0",
-      "status": "planned",
-      "upstreamChange": "added"
+      "status": "in-progress",
+      "upstreamChange": "added",
+      "note": "v1.5.0 (work list area partial-commits): harness.partial-changes.* (the 7 upstream cases of the v1.5.0 blob, and 5 PiSharp-authored ones for the frames pi-ai has no event for). Adapted: events are PiSharp.Contracts frames, the partial is fresh wire JSON per commit with ToolCallArgumentsStream's arguments, the snapshot fallback keeps tracking the call, and each change is replayed before it is adopted. 6c2fd73b0's edits (area deferred-commits) are TypeScript typing and copyJson; in progress until that area lands"
     },
     {
       "upstream": "packages/durable/test/harness-prompt.test.ts",

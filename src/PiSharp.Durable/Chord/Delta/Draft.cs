@@ -230,8 +230,8 @@ public sealed class DraftObject : Draft
     /// Upstream's <c>appendText(draft, key, text)</c>: appends <paramref name="text"/> to the string at <paramref name="key"/> and records
     /// the change as one append op (several appends to the key in one change join into one op), so <see cref="Change.Prepare"/> does not
     /// compare the old and new strings. A <see cref="Set"/> or <see cref="Delete"/> of the key in the same change, or an append after a
-    /// <see cref="Set"/>, falls back to that comparison. The new value is still a .NET concatenation, which copies the whole string where
-    /// V8 builds a rope.
+    /// <see cref="Set"/>, falls back to that comparison. The new value defers the concatenation once the string is long, as V8 builds a
+    /// rope (<see cref="JsonStringValue"/>), so an append costs the appended text.
     /// </summary>
     /// <exception cref="InvalidOperationException">The key holds no string, or the change is settled.</exception>
     public void AppendText(string key, string text)
@@ -246,9 +246,10 @@ public sealed class DraftObject : Draft
         string? appended = null;
         if (Appends is not null && Appends.TryGetValue(key, out var sofar)) appended = sofar;
         else if (Writes?.ContainsKey(key) != true) appended = "";
-        // A .NET string is never a view of a larger one, so the op and the new value keep only these characters (upstream's ownedSlice).
+        // A .NET string is never a view of a larger one, so the op keeps only these characters (upstream's ownedSlice); the new value defers
+        // the concatenation once the string is long (JsonStringValue).
         Writes ??= new OrderedDictionary<string, JsonValue>(StringComparer.Ordinal);
-        Writes[key] = current.Value + text;
+        Writes[key] = JsonStringValue.Concat(current, text);
         MarkDirty();
         if (appended is not null) (Appends ??= new Dictionary<string, string>(StringComparer.Ordinal))[key] = appended + text;
     }
@@ -949,7 +950,8 @@ internal static class JsonIdentity
             JsonNullValue => right is JsonNullValue,
             JsonBooleanValue boolean => right is JsonBooleanValue other && boolean.Value == other.Value,
             JsonNumberValue number => right is JsonNumberValue other && number.Value == other.Value,
-            JsonStringValue text => right is JsonStringValue other && string.Equals(text.Value, other.Value, StringComparison.Ordinal),
+            JsonStringValue text => right is JsonStringValue other && text.Length == other.Length &&
+                string.Equals(text.Value, other.Value, StringComparison.Ordinal),
             _ => false
         };
     }

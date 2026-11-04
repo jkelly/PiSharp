@@ -9,8 +9,14 @@
 //   does; the assertions compare event streams with the committed values whatever the timing.
 // - applyChanges and the partial rebuild work on System.Text.Json nodes, as upstream's structuredClone and mutation do on objects.
 // - An aborted controller is a DurableCancellation cancelled with Exception("cancelled").
+// - Pi v1.5.0 sync (area partial-commits): the "streamed partials" cases upstream added to this file (f715a15c1, da412b039, 1e42501bb) are
+//   HarnessEventsStreamedPartialsCases() (harness.events.streamed-partials.*), memory only as upstream's, in their harness-events.test.ts
+//   form; area view moves them with the file. Two of them pace the faux stream on commits instead of real time (EventTests.CommitPaced),
+//   and they count allocations with GC.GetTotalAllocatedBytes and the heap with GC.GetTotalMemory in place of V8's GCProfiler and heap
+//   statistics. The rest of this file still ports v1.2.0.
 using System.Collections.Immutable;
 using JsonNode = System.Text.Json.Nodes.JsonNode;
+using PiSharp.Contracts;
 using PiSharp.Durable;
 using PiSharp.Durable.Chord;
 using PiSharp.Durable.Sqlite;
@@ -30,6 +36,8 @@ internal static partial class Program
 
     private static IEnumerable<(string, Func<Task>)> HarnessEventsSqliteCases() =>
         EventTests.Cases("harness.events.sqlite.", async () => await SqliteStorage.OpenAsync(Path.Combine(Temp("events-sqlite"), "events.sqlite")));
+
+    private static IEnumerable<(string, Func<Task>)> HarnessEventsStreamedPartialsCases() => EventTests.StreamedPartials("harness.events.streamed-partials.");
 }
 
 /// <summary>The harness.events.* cases and their support.</summary>
@@ -608,6 +616,221 @@ internal static partial class EventTests
             Equal(1, listening.Events().Count(item => item is RunStartEvent), "run starts");
             Equal(1, listening.Events().Count(item => item is RunEndEvent), "run ends");
             Seq(["entry_appended", "submission"], listening.Batches.Snapshot()[^1].Select(item => item.Type), "reset batch");
+            await listening.Stream.StopAsync();
+            await harness.CloseAsync(Context);
+        });
+    }
+}
+
+/// <summary>
+/// The harness.events.streamed-partials.* cases (upstream harness-events.test.ts's "streamed partials", #9265: f715a15c1, da412b039 and
+/// 1e42501bb). Memory only, as upstream runs them, and in their harness-events.test.ts form: area view moves them with the file
+/// (harness-view-run.test.ts at v1.5.0, on conversation views).
+/// </summary>
+internal static partial class EventTests
+{
+    /// <summary>
+    /// The faux provider with each streamed piece waiting for the partial commit it makes, for at most a second, and then for
+    /// <see cref="AfterPiece"/>; once a piece makes no commit, the rest stream unpaced. Upstream paces the faux stream in real time (1 ms a piece) under a 1 ms partial interval, which gives about
+    /// one commit a piece on Node; .NET's timers on Windows tick every 15.6 ms, so a piece would take 15.6 ms and the cases far longer
+    /// than upstream's. The cases that use it run with a partial interval of 0 instead and get one commit a piece whatever the timers.
+    /// </summary>
+    private sealed class CommitPaced(IDurableModels inner) : IDurableModels
+    {
+        private long commits;
+        private TaskCompletionSource next = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private volatile bool pacing = true;
+
+        public long Commits => Interlocked.Read(ref commits);
+
+        /// <summary>Runs after each paced piece's commit, with the stream held until it returns.</summary>
+        public Func<StreamEvent, Task>? AfterPiece { get; set; }
+
+        /// <summary>Called for every commit of the Harness.</summary>
+        public void Committed()
+        {
+            Interlocked.Increment(ref commits);
+            Interlocked.Exchange(ref next, new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously)).TrySetResult();
+        }
+
+        private async Task<bool> After(long seen)
+        {
+            var deadline = DateTime.UtcNow.AddSeconds(1);
+            while (Commits <= seen)
+            {
+                var waiting = Volatile.Read(ref next).Task;
+                if (Commits > seen) return true;
+                var left = deadline - DateTime.UtcNow;
+                if (left <= TimeSpan.Zero) return false;
+                try { await waiting.WaitAsync(left); }
+                catch (TimeoutException) { return false; }
+            }
+            return true;
+        }
+
+        public DurableModel? GetModel(string provider, string modelId) => inner.GetModel(provider, modelId);
+
+        public async IAsyncEnumerable<StreamEvent> StreamSimple(DurableModel model, ImmutableArray<JsonValue> messages, DurableStreamOptions? options,
+            [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken)
+        {
+            await foreach (var item in inner.StreamSimple(model, messages, options, cancellationToken).WithCancellation(cancellationToken))
+            {
+                var seen = Commits;
+                yield return item;
+                if (!pacing || item is not (TextDelta or ThinkingDelta or ToolCallDelta)) continue;
+                pacing = await After(seen);
+                if (pacing && AfterPiece is { } after) await after(item);
+            }
+        }
+
+        public Task<AssistantMessage> CompleteSimpleAsync(DurableModel model, ImmutableArray<JsonValue> messages, DurableStreamOptions? options,
+            CancellationToken cancellationToken) => inner.CompleteSimpleAsync(model, messages, options, cancellationToken);
+
+        public IAsyncEnumerable<StreamEvent> StreamDeferred(DurableModel model, DurableDeferredHandle handle, CancellationToken cancellationToken) =>
+            inner.StreamDeferred(model, handle, cancellationToken);
+
+        public Task<AssistantMessage> FetchDeferredAsync(DurableModel model, DurableDeferredHandle handle, CancellationToken cancellationToken) =>
+            inner.FetchDeferredAsync(model, handle, cancellationToken);
+
+        public Task CancelDeferredAsync(DurableModel model, DurableDeferredHandle handle, CancellationToken cancellationToken) =>
+            inner.CancelDeferredAsync(model, handle, cancellationToken);
+    }
+
+    /// <summary>A setup whose faux stream is paced on commits (see <see cref="CommitPaced"/>), and the pacer to subscribe.</summary>
+    private static (ChatSetup Setup, CommitPaced Paced) PacedSetup(int tokenSize)
+    {
+        var setup = Setup(new FauxOptions { MinTokenSize = tokenSize, MaxTokenSize = tokenSize });
+        var paced = new CommitPaced(setup.Faux);
+        setup.Models = paced;
+        setup.Progress = new ProgressSettings { PartialIntervalMs = 0, OutputIntervalMs = 100 };
+        return (setup, paced);
+    }
+
+    /// <summary>Heap bytes in use after full collections (upstream <c>heapInUse</c>).</summary>
+    private static async Task<long> HeapInUse(IHarness harness)
+    {
+        for (var round = 0; round < 3; round++)
+        {
+            await ViewTests.Drained(harness);
+            GC.Collect(GC.MaxGeneration, GCCollectionMode.Forced, blocking: true, compacting: true);
+            GC.WaitForPendingFinalizers();
+        }
+        return GC.GetTotalMemory(forceFullCollection: false);
+    }
+
+    internal static IEnumerable<(string, Func<Task>)> StreamedPartials(string prefix)
+    {
+        yield return Case(prefix + "streams-a-tool-call-partial-as-toolcall-delta-appends-at-its-argument-paths", async () =>
+        {
+            var setup = Setup(new FauxOptions { TokensPerSecond = 500, MinTokenSize = 1, MaxTokenSize = 1 });
+            setup.Progress = new ProgressSettings { PartialIntervalMs = 20, OutputIntervalMs = 100 };
+            var arguments = Obj(("path", "src/file.ts"), ("content", string.Concat(Enumerable.Repeat("const a = 1;\n", 150))));
+            setup.Faux.SetResponses(FauxAssistantMessage([FauxToolCall("missing", arguments, "c1")], stopReason: "toolUse"),
+                FauxAssistantMessage([FauxText("done")]));
+            var (harness, root) = await OpenChat(new MemoryStorage(), setup);
+            var partials = PartialsOf(harness);
+            var listening = await Listen(harness, root);
+            await (await root.SubmitAsync(SubmissionDraft.Input("go"), Context)).WaitAsync(Context);
+            await ViewTests.Drained(harness);
+            var changes = listening.Events().OfType<MessageUpdateEvent>().SelectMany(update => update.Changes).ToList();
+            var deltas = changes.OfType<ToolCallDeltaChange>().ToList();
+            Check(deltas.Count > 10, $"toolcall_delta changes: {deltas.Count}");
+            Check(deltas.All(change => change.Path is [{ Key: "path" or "content" }]), "every delta at a top-level argument");
+            // The call is resent whole only when a member appears (at most once per argument); growing strings are appends.
+            // With the raw argument text on the block, every commit resent the whole call.
+            Equal(0, changes.Count(change => change.Type == "message"), "message changes");
+            Check(changes.Count(change => change.Type == "block") <= 2, $"block changes: {changes.Count(change => change.Type == "block")}");
+            // The committed partials carry only the parsed arguments, never the raw argument text.
+            foreach (var partial in partials.Snapshot())
+            {
+                foreach (var block in ((JsonArrayValue)partial["content"]).Cast<JsonObjectValue>())
+                    Equal("arguments,id,name,type", string.Join(",", block.Keys.Order(StringComparer.Ordinal)), "block members");
+            }
+            await listening.Stream.StopAsync();
+            await harness.CloseAsync(Context);
+        });
+
+        yield return Case(prefix + "commits-a-growing-text-and-tool-call-at-a-cost-that-follows-the-new-text-not-the-string-lengths", async () =>
+        {
+            // Bytes allocated while streaming one answer of `size` characters of text and as much tool-call content.
+            static async Task<(long Bytes, long Commits)> Stream(int size)
+            {
+                var (setup, paced) = PacedSetup(64);
+                // Keep `pi.live` cached between commits, as the default retention does. Evicted after each use (the suite's evicting run),
+                // every commit replays the document's delta chain: a cost of eviction, not of appending.
+                setup.DocumentRetentionMs = 60_000;
+                var text = string.Concat(Enumerable.Repeat("streamed text with \"quotes\" and \\ escapes\n", size / 40));
+                setup.Faux.SetResponses(
+                    FauxAssistantMessage([FauxText(text), FauxToolCall("missing", Obj(("path", "a.ts"), ("content", text)), "c1")],
+                        stopReason: "toolUse"),
+                    FauxAssistantMessage([FauxText("done")]));
+                var (harness, root) = await OpenChat(new MemoryStorage(), setup);
+                using var subscription = harness.SubscribeCommits((_, _) => paced.Committed());
+                // Upstream's allocatedBytes: the bytes allocated meanwhile, on every thread.
+                GC.Collect();
+                var before = GC.GetTotalAllocatedBytes(precise: true);
+                await (await root.SubmitAsync(SubmissionDraft.Input("go"), Context)).WaitAsync(Context);
+                var bytes = GC.GetTotalAllocatedBytes(precise: true) - before;
+                var commits = paced.Commits;
+                await harness.CloseAsync(Context);
+                return (bytes, commits);
+            }
+            var small = await Stream(40_000);
+            var large = await Stream(400_000);
+            Check(large.Commits > small.Commits * 5, $"commits: large {large.Commits}, small {small.Commits}");
+            // Per commit, the cost stays flat: comparing the whole strings on every commit made it grow with their length.
+            var ratio = (double)large.Bytes / large.Commits / ((double)small.Bytes / small.Commits);
+            Check(ratio < 2, $"per-commit bytes, large over small: {ratio:F2} (large {large.Bytes} in {large.Commits}, small {small.Bytes} in {small.Commits})");
+        });
+
+        yield return Case(prefix + "keeps-a-watchers-memory-proportional-to-a-long-streamed-text-and-tool-call-not-to-their-commits", async () =>
+        {
+            var (setup, paced) = PacedSetup(16);
+            static string Line(int index) => $"line {index}: some streamed source text with \"quotes\" and \\ escapes\n";
+            var text = string.Concat(Enumerable.Range(0, 2_000).Select(Line));
+            var content = string.Concat(Enumerable.Range(0, 2_000).Select(Line));
+            setup.Faux.SetResponses(
+                FauxAssistantMessage([FauxText(text), FauxToolCall("missing", Obj(("path", "a.ts"), ("content", content)), "c1")], stopReason: "toolUse"),
+                FauxAssistantMessage([FauxText("done")]));
+            var (harness, root) = await OpenChat(new MemoryStorage(), setup);
+            using var subscription = harness.SubscribeCommits((_, _) => paced.Committed());
+            var listening = await Listen(harness, root);
+            var before = await HeapInUse(harness);
+            var submission = await root.SubmitAsync(SubmissionDraft.Input("go"), Context);
+            async Task<int> Shown(int index)
+            {
+                var live = await harness.SnapshotAsync(Live.LiveDoc, root.Id, Context);
+                if (live is null || !live.TryGetValue("generation", out var generation) || generation is not JsonObjectValue state ||
+                    !state.TryGetValue("message", out var message)) return 0;
+                var blocks = (JsonArrayValue)((JsonObjectValue)message)["content"];
+                if (index >= blocks.Count) return 0;
+                var block = (JsonObjectValue)blocks[index];
+                if (S(block["type"]) == "text") return S(block["text"]).Length;
+                return S(block["type"]) == "toolCall" && ((JsonObjectValue)block["arguments"]).TryGetValue("content", out var shown) ? S(shown).Length : 0;
+            }
+            var retained = new List<long>();
+            // Measure while the text, then the tool call, is almost complete: the watcher's view holds the most then. Upstream polls for it
+            // while the stream goes on; the stream is held for it here (its pace is the commits', see CommitPaced).
+            var raw = new[] { text.Length, Obj(("path", "a.ts"), ("content", content)).ToJson().Length };
+            var streamed = new int[2];
+            var measured = 0;
+            paced.AfterPiece = async item =>
+            {
+                var (index, length) = item switch { TextDelta delta => (delta.ContentIndex, delta.Delta.Length),
+                    ToolCallDelta delta => (delta.ContentIndex, delta.Delta.Length), _ => (-1, 0) };
+                if (index != measured) return;
+                streamed[index] += length;
+                if (streamed[index] < raw[index] * 0.9 || await Shown(index) <= (index == 0 ? text.Length : content.Length) * 0.95) return;
+                retained.Add(await HeapInUse(harness) - before);
+                measured++;
+            };
+            await submission.WaitAsync(Context);
+            Equal(2, retained.Count, "measures");
+            var commits = listening.Batches.Count;
+            Check(commits > 500, $"batches: {commits}");
+            // The two 140 KB strings, the watcher's recorded batches and the rest of the stream: about 3 MB upstream. Sliced append ops
+            // made the watcher's view hold a copy of the text per commit: well over 100 MB.
+            foreach (var bytes in retained) Check(bytes < 20_000_000, $"retained bytes: {string.Join(", ", retained)}");
             await listening.Stream.StopAsync();
             await harness.CloseAsync(Context);
         });

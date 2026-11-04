@@ -149,7 +149,8 @@ public static class DeltaApply
                 break;
             case AppendOp append:
                 if (parent.Read(key) is not JsonStringValue current) throw new PathError(path);
-                parent.Set(key, JsonValue.String(current.Value + append.Text));
+                // Deferred once the string is long (JsonStringValue): a replica's append costs the appended text, not the string.
+                parent.Set(key, JsonStringValue.Concat(current, append.Text));
                 break;
             case TruncateOp truncate:
                 if (parent.Read(key) is not JsonStringValue text) throw new PathError(path);

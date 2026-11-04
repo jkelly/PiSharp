@@ -17,8 +17,9 @@ PiSharp ports ten upstream benchmarks of Pi v1.2.0 (`06a466935536f8c9bcacb2d5efc
 | `test/nested-images-bench.ts` (new in v1.2.0) | `NestedImagesBench.cs` (`nested-images [count]`) | 1 MiB images passed between nested calls inline or by a `NestedCallDoc` reference |
 | `test/codemode-bench.ts` (`npm run bench:codemode`, new in v1.2.0) | `CodemodeBench.cs` (`codemode [N,...]`) | durable code mode's overhead: N calls of a trivial tool, sequential or parallel, from a code mode script (journaled) and from a plain tool's nested calls, on SQLite |
 | none: PiSharp-authored, Node twin `benchmarks/PiSharp.Durable.Benchmarks/node/scheduler-scale-bench.ts` | `SchedulerScaleBench.cs` (`scheduler-scale [fanout N,...] [chain N,...]`) | the scheduler's fan-out (one tool creating N child tasks at once) and owned chains of N tasks settling bottom-up |
+| none: PiSharp-authored, for Pi v1.5.0's partial commits (upstream bounds the same path in a test) | `PartialCommitsBench.cs` (`partial-commits [N,...]`) | the partial commits of one long streamed answer, a text and then a tool call of about N characters each: commits, bytes allocated and time per phase |
 
-Run them with `dotnet run -c Release --project benchmarks/PiSharp.Durable.Benchmarks -- [storage] [storage-memory] [tool-output] [document-append [N,...]] [document-cache [N,...]] [scheduler-memory [N,...]] [scheduler-scale [fanout N,...] [chain N,...]] [scheduler-fanout [N,...]] [nested-tools [streaming|nesting]] [nested-images [count]] [codemode [N,...]]`. There is no benchmark library and no new dependency. The timing loops mirror upstream's.
+Run them with `dotnet run -c Release --project benchmarks/PiSharp.Durable.Benchmarks -- [storage] [storage-memory] [tool-output] [document-append [N,...]] [document-cache [N,...]] [scheduler-memory [N,...]] [scheduler-scale [fanout N,...] [chain N,...]] [scheduler-fanout [N,...]] [nested-tools [streaming|nesting]] [nested-images [count]] [codemode [N,...]] [partial-commits [N,...]]`. There is no benchmark library and no new dependency. The timing loops mirror upstream's.
 
 ## Machine
 
@@ -320,6 +321,23 @@ Work list area d. Measured on 2026-10-15, same machine, two runs each with Node 
 - **Commits are upstream's** for every plain run and every sequential script: a sequential script costs two commits per call on top of its nested call's own, the journal entry and the acknowledged count, as upstream's design says.
 - **A parallel script's journal batches follow timing.** Results that finish together are journaled in one commit. Under Node every result that is ready when a commit lands joins the next one; PiSharp's nested calls finish on several threads, so a few more batches form (322 to 326 commits for 100 calls, 3,040 to 3,050 for 1,000, against Node's 322 and 3,020).
 - **Code mode's own cost** in a sequential script, over the plain tool's: 1.3 ms per call at 100 calls and 0.4 ms at 1,000 under Node; in PiSharp 2.8 ms at 100 calls (its first script, with the engine's warm-up) and none measurable at 1,000. Parallel scripts cost little in either. PiSharp's plain sequential calls are slower than Node's (2.2 against 1.3 ms per call at 1,000), as in the fan-out rows above.
+
+## Partial commits (`partial-commits`)
+
+Pi v1.5.0 sync, durable area partial-commits. Measured on 2026-11-04, same machine, one run each. Upstream has no benchmark for this path: its changelog reports about 20 s of CPU and a 100 MB heap peak for a 500 KB tool call before the fix, and its test (`harness-view-run.test.ts`, "commits a growing text and tool call at a cost that follows the new text"; `harness.events.streamed-partials.*` here) bounds the per-commit ratio of a 400 KB answer over a 40 KB one below 2. The benchmark streams the answer in 256-character pieces through the real generation task on memory storage, with a partial interval of 0 and each piece waiting for its commit, so every piece that changes the partial gets one commit.
+
+| size | phase | before: commits | before: KiB/commit | before: total | after: commits | after: KiB/commit | after: total |
+|---:|---|---:|---:|---:|---:|---:|---:|
+| 40,000 | text | 165 | 303.5 | 48.9 MiB | 165 | 26.5 | 4.3 MiB |
+| 40,000 | tool call | 1 | 16,681.9 | 16.3 MiB | 180 | 33.6 | 5.9 MiB |
+| 400,000 | text | 1,641 | 2,480.8 | 3,975.6 MiB | 1,641 | 26.0 | 41.6 MiB |
+| 400,000 | tool call | 1 | 1,603,567.9 | 1,566.0 MiB | 1,797 | 31.4 | 55.1 MiB |
+| 500,000 | text | 2,051 | 3,047.0 | 6,102.9 MiB | 2,051 | 26.0 | 52.1 MiB |
+| 500,000 | tool call | 1 | 2,670,936.1 | 2,608.3 MiB | 2,247 | 31.4 | 68.9 MiB |
+
+- **Before**, each text commit reassigned the whole growing string, which Chord compared with the committed one and .NET copied: the per-commit cost grew with the length (10.0 times from 40,000 to 500,000 characters). A tool call's partial kept the arguments it started with (`{}`) until the call ended, so its pieces committed nothing and the call's end committed it whole.
+- **After**, a commit appends what text and thinking grew by and applies the argument changes of PiSharp.AI's `StreamingJsonParser` since the last commit, and an appended `JsonStringValue` defers its concatenation until it is read. The per-commit cost is flat in both phases (ratios 0.98 and 0.93), and the partials now show the streamed arguments, as upstream's do.
+- The 500,000-character text phase took 2,332 ms before and 161 ms after.
 
 ## Throughput target
 
