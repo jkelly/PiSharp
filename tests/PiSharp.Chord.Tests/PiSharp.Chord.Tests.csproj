@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <!-- The Chord v2 port (PiSharp.Chord) is [Experimental("PISHARP_CHORD001")]; the pi-schema port it builds on is PISHARP_SCHEMA001. -->
+    <NoWarn>$(NoWarn);PISHARP_CHORD001;PISHARP_SCHEMA001</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../src/PiSharp.Chord/PiSharp.Chord.csproj" />
+  </ItemGroup>
+</Project>
