@@ -57,10 +57,10 @@
     "repeatedBullets": 23,
     "byStatus": {
       "ported": 183,
-      "ported-with-deferral": 18,
+      "ported-with-deferral": 19,
       "already-ported": 12,
       "no-op": 25,
-      "port": 88
+      "port": 87
     },
     "byArea": {
       "ai": 58,
@@ -11296,7 +11296,7 @@
       "id": "chord.next-documents-state",
       "area": "chord",
       "phase": 4,
-      "status": "port",
+      "status": "ported-with-deferral",
       "changelog": [
         "chord@1.5.0/Added#2",
         "chord@1.5.0/Added#3",
@@ -11316,7 +11316,32 @@
       "pulledInBy": [
         "durable.store-storage"
       ],
-      "notes": "Builds on chord.watch-handle, chord.native-watch and the delta tracker (chord.delta-core). Persisted documents live in the store (chord.next-store)."
+      "notes": "Builds on chord.watch-handle, chord.native-watch and the delta tracker (chord.delta-core). Persisted documents live in the store (chord.next-store).",
+      "evidence": {
+        "commits": [
+          "090c2960",
+          "9a92bdf4"
+        ],
+        "tests": [
+          "tests/PiSharp.Chord.Tests/Documents/SlotCases.cs: documents.slot.persisted-singletons-load-once-per-object-at-activation-not-again-on-a-retry-and-survive-the-host",
+          "tests/PiSharp.Chord.Tests/Documents/SlotCases.cs: documents.slot.pisharp-persisted-singletons-a-flipped-persist-fails-the-activation-broken",
+          "tests/PiSharp.Chord.Tests/Documents/KeyedSlotCases.cs: documents.keyed-slot.at-key-a-persisted-key-is-loaded-before-the-object-goes-live-and-stays-pinned-until-the-next-factory-returns",
+          "tests/PiSharp.Chord.Tests/Documents/KeyedSlotCases.cs: documents.keyed-slot.cold-keyed-loads-on-the-line-tx-retire-of-a-cold-key-stored-at-a-newer-version-fails-the-owner-broken-as-a-read-would-and-keeps-it-r15-audit",
+          "tests/PiSharp.Chord.Tests/Documents/KeyedSlotCases.cs: documents.keyed-slot.pisharp-at-key-is-initial-while-absent-a-derive-source-retirement-arrives-with-the-flag",
+          "tests/PiSharp.Chord.Tests/Documents/PersistenceCases.cs: documents.persistence.staged-writes-store-a-creation-as-a-base-changes-as-deltas-until-checkpointwhen-asks-for-a-base",
+          "tests/PiSharp.Chord.Tests/Documents/PersistenceCases.cs: documents.persistence.loads-refuse-a-stored-version-newer-than-the-codes-and-the-same-version-with-another-fingerprint-d9",
+          "tests/PiSharp.Chord.Tests/Documents/TransactionCases.cs: documents.transaction.transactions-commit-the-objects-documents-in-one-batch-one-compute-one-frame",
+          "tests/PiSharp.Chord.Tests/Documents/TransactionCases.cs: documents.transaction.the-seal-fence-discards-the-transaction-holding-the-line-at-the-seal-the-line-is-free-its-later-uses-are-refused",
+          "tests/PiSharp.Chord.Tests/Documents/TransactionCases.cs: documents.transaction.tables-in-a-transaction-a-commit-queued-behind-another-owners-step-is-refused-at-the-seal-an-admitted-one-is-adopted",
+          "tests/PiSharp.Chord.Tests/Documents/TransactionCases.cs: documents.transaction.persisted-documents-in-a-transaction-commit-persisted-and-in-memory-documents-in-one-step-a-delta-commit-takes-three-statements",
+          "tests/PiSharp.Chord.Tests/Documents/TransactionCases.cs: documents.transaction.pisharp-transactions-a-kept-draft-is-detached-and-a-settled-transaction-refuses-its-drafts",
+          "tests/PiSharp.Chord.Tests/Documents/HandlesCases.cs: documents.handles.sealed-handles-still-read-synchronously-and-from-memory-changes-and-retirements-are-refused-released",
+          "tests/PiSharp.Chord.Tests/Documents/DocumentsCases.cs: documents.documents.when-the-owner-ends-documents-are-dropped-every-use-throws-released-and-watches-end",
+          "tests/PiSharp.Chord.Tests/Documents/DefinitionCases.cs: documents.definition.definestate-types-the-value-and-whether-it-is-keyed",
+          "tests/PiSharp.Chord.Tests/State/DeriveCases.cs: state.derive.the-pull-model-computes-a-diamonds-derives-once-each-per-batch"
+        ]
+      },
+      "deferred": "Transactions over job runs (Tx.start, the job-run slots) and Tracker's prepareReplace and appendText wait for chord.next-jobs (phase 6). Five of the 83 upstream cases of this area's six test files are not ported as written: four need createHost (phase 6) and one has no .NET counterpart. (1) slot.test.ts 'refuse persisting without a stable identity or a store, and a flipped persist' needs the host's P3 checks; its flipped-persist part runs as documents.slot.pisharp-persisted-singletons-a-flipped-persist-fails-the-activation-broken. (2) keyed-slot.test.ts 'at(key) is initial while absent: a state member, derive and on source' needs members and self.on; its derive-source part runs as documents.keyed-slot.pisharp-at-key-is-initial-while-absent-a-derive-source-retirement-arrives-with-the-flag. (3) transaction.test.ts 'a handler's commit held in the SQL past closeTimeout' needs a method handler's drain and closeTimeout. (4) transaction.test.ts 'revoke their drafts when they settle' cannot hold: a JsonObject draft cannot be revoked, so expect(() => kept.n).toThrow() has no counterpart; documents.transaction.pisharp-transactions-a-kept-draft-is-detached-and-a-settled-transaction-refuses-its-drafts checks that a kept draft is detached and a settled transaction refuses drafts. (5) transaction.test.ts 'settles an in-memory change within five microtask turns' counts JavaScript microtask turns, which have no .NET counterpart; not ported."
     },
     {
       "id": "chord.next-host-objects",
