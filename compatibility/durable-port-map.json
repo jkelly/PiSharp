@@ -1147,12 +1147,11 @@
       "lines": 525,
       "pisharp": "src/PiSharp.Durable/Chord/Delta/Diff.cs",
       "phase": "P1",
-      "status": "needs-sync",
+      "status": "ported",
       "upstreamChange": "modified",
       "previousBlobSha1": "774ad1b59176692173f0b30192b44900e1c6d58e",
       "changedLines": 8,
-      "note": "DeltaDiff.DiffRevisions with JavaScript identity (containers by reference, scalars by value). Tests: chord.diff.*, chord.fuzz.diff-replays-between-tracked-and-reconstructed-revisions",
-      "portedBlobSha1": "774ad1b59176692173f0b30192b44900e1c6d58e"
+      "note": "DeltaDiff.DiffRevisions with JavaScript identity (containers by reference, scalars by value). Tests: chord.diff.*, chord.fuzz.diff-replays-between-tracked-and-reconstructed-revisions v1.5.0: append ops are ranges, strings of their own, so they need no ownedSlice (row chord.delta-owned-slice, already-ported); a writer that knows what it appended records it with DraftObject.AppendText instead of diffing."
     },
     {
       "upstream": "packages/chord/src/delta/index.ts",
@@ -1164,7 +1163,7 @@
       "upstreamChange": "modified",
       "previousBlobSha1": "388c88514399317e95d9488f02f6f8353a4d7a36",
       "changedLines": 39,
-      "note": "Ops, validation, overlap, apply/applyImmutable(Batches) and codec. Tests: chord.delta.*, chord.apply-immutable.* P13: compat.ops.* replay the upstream-captured ops corpus, and upstream replays PiSharp's operations (compat.reverse.*). v1.2.0: appendCopy (Apply.cs) builds an append to an array not yet copied in one copy (chord.apply-immutable.appends-to-an-array-not-yet-copied-in-one-copy-sharing-everything-else).",
+      "note": "Ops, validation, overlap, apply/applyImmutable(Batches) and codec. Tests: chord.delta.*, chord.apply-immutable.* P13: compat.ops.* replay the upstream-captured ops corpus, and upstream replays PiSharp's operations (compat.reverse.*). v1.2.0: appendCopy (Apply.cs) builds an append to an array not yet copied in one copy (chord.apply-immutable.appends-to-an-array-not-yet-copied-in-one-copy-sharing-everything-else). v1.5.0: appendText (DraftObject.AppendText) and PendingOps (Pending.cs) are exported; ownedSlice has no C# counterpart, as a .NET range copies. Needs-sync for phase 6: d0aa218cb's container copies (row chord.delta-container-copies, no-op), the codec's batch-concatenation comment and Decoder.decode's typing.",
       "portedBlobSha1": "388c88514399317e95d9488f02f6f8353a4d7a36"
     },
     {
@@ -1175,7 +1174,7 @@
       "phase": "sync-1.5.0",
       "status": "ported",
       "upstreamChange": "added",
-      "note": "PendingOps (Push, Take, Size, MaxPendingOps) and PendingTake (Ops or Replace). Op records and ImmutableArray batches are immutable, so a batch kept alone is handed over by identity and a merge makes a new op; a leaf that folds many appends keeps the appended text in a StringBuilder and builds the merged op once in Take, as .NET strings copy on every concatenation. Tests: chord.delta-pending.* (the fuzz cases use AppendString until work list area chord-append-text lands appendText)"
+      "note": "PendingOps (Push, Take, Size, MaxPendingOps) and PendingTake (Ops or Replace). Op records and ImmutableArray batches are immutable, so a batch kept alone is handed over by identity and a merge makes a new op; a leaf that folds many appends keeps the appended text in a StringBuilder and builds the merged op once in Take, as .NET strings copy on every concatenation. Tests: chord.delta-pending.* (the fuzz cases append with DraftObject.AppendText, upstream appendText)"
     },
     {
       "upstream": "packages/chord/src/delta/revision-validator.ts",
@@ -1193,7 +1192,7 @@
       "pisharp": "src/PiSharp.Durable/Chord/Delta/Draft.cs",
       "phase": "P1",
       "status": "needs-sync",
-      "note": "An explicit copy-on-write draft API replaces the Proxy tracker (decision 0005): Draft.cs (DraftObject/DraftArray) and Tracker.cs (Tracker, Change, Prepared, emission). Upstream's asserted op sequences are reproduced exactly. Tests: chord.tracker.*, chord.fuzz.tracker-ops-replay-to-value P13: compat.ops.* make the seeded edits of an upstream-captured ops corpus (Fixtures/upstream-sessions/ops-corpus.json) and must emit upstream's exact operations. v1.2.0: an array draft stays a piece table while elements are only inserted or removed (DraftArray.Pieces; a short list instead of the treap, flattened into entries past 64 pieces or when an element moves), and emission plans it from the pieces alone (orderedArrayPlan, DraftEmitter.EmitOrderedArrayPlan); a flattened draft is planned by the element walk (elementArrayPlan). chord.tracker.native.piece-table-and-flattened-drafts-emit-the-same-operations checks both plans emit the same operations; benchmarks: document-append (docs/durable-benchmarks.md).",
+      "note": "An explicit copy-on-write draft API replaces the Proxy tracker (decision 0005): Draft.cs (DraftObject/DraftArray) and Tracker.cs (Tracker, Change, Prepared, emission). Upstream's asserted op sequences are reproduced exactly. Tests: chord.tracker.*, chord.fuzz.tracker-ops-replay-to-value P13: compat.ops.* make the seeded edits of an upstream-captured ops corpus (Fixtures/upstream-sessions/ops-corpus.json) and must emit upstream's exact operations. v1.2.0: an array draft stays a piece table while elements are only inserted or removed (DraftArray.Pieces; a short list instead of the treap, flattened into entries past 64 pieces or when an element moves), and emission plans it from the pieces alone (orderedArrayPlan, DraftEmitter.EmitOrderedArrayPlan); a flattened draft is planned by the element walk (elementArrayPlan). chord.tracker.native.piece-table-and-flattened-drafts-emit-the-same-operations checks both plans emit the same operations; benchmarks: document-append (docs/durable-benchmarks.md). v1.5.0 (area chord-append-text): DraftObject.AppendText (upstream appendText) records an append op per key without the prepare-time string comparison, and a Set or Delete of the key drops it (DraftObject.Appends, DraftEmitter.EmitObject); tests: chord.delta-append-text.*. Needs-sync for phase 6: a92283056 (the open change held without a WeakRef); ownedSlice needs nothing (row chord.delta-owned-slice).",
       "upstreamChange": "modified",
       "previousBlobSha1": "8e01705fa45212a3e680fba2e49f7dac20410096",
       "changedLines": 156,
