@@ -10,6 +10,11 @@
 // Threading: as in View.cs, publications and attachment run on the Session line, while a close listener and an observer's detach (a
 // disposed state, a stopped watch) may run on any thread, so the mount and its observer list are guarded by one lock that is never held
 // while observer code runs.
+//
+// Pi v1.5.0 sync (area reports): TaskGraphNode.blocked (a30c2a81d, 440a5fcdb). The mount keeps what the scheduler's blocked reason reads
+// of each live task (BlockedSubject), in upstream's Map order; a registry change or a failed migration derives every reason again on the
+// Session line and publishes the changed ones as set or delete ops on ["tasks", id, "blocked"], with the background context. The
+// citation stays on v1.2.0 until the file's other areas land.
 using System.Collections.Immutable;
 using PiSharp.Durable.Chord;
 using PiSharp.Durable.Chord.Delta;
@@ -96,15 +101,15 @@ public sealed class TaskGraphState : IEquatable<TaskGraphState>
 
 /// <summary>
 /// One live task of the graph (upstream <c>TaskGraphNode</c>): the committed record without its input, checkpoint and outcome payloads and
-/// memos, plus the conversations it owns. JSON key order: <c>id, kind, conversationId, owner?, background, abortRequested, state,
-/// conversations</c>.
+/// memos, plus the conversations it owns and why it cannot run here, if it cannot. JSON key order: <c>id, kind, conversationId, owner?,
+/// background, abortRequested, state, conversations, blocked?</c>.
 /// </summary>
 public sealed class TaskGraphNode : IEquatable<TaskGraphNode>
 {
     private JsonObjectValue? json;
 
     internal TaskGraphNode(TaskId id, string kind, ConversationId conversationId, TaskId? owner, bool background, bool abortRequested,
-        TaskGraphState state, ImmutableArray<ConversationId> conversations)
+        TaskGraphState state, ImmutableArray<ConversationId> conversations, BlockedReason? blocked = null)
     {
         Id = id;
         Kind = kind;
@@ -114,6 +119,7 @@ public sealed class TaskGraphNode : IEquatable<TaskGraphNode>
         AbortRequested = abortRequested;
         State = state;
         Conversations = conversations;
+        Blocked = blocked;
     }
 
     /// <summary>The task ID.</summary>
@@ -132,6 +138,12 @@ public sealed class TaskGraphNode : IEquatable<TaskGraphNode>
     public TaskGraphState State { get; }
     /// <summary>Conversations this task owns, in ID order.</summary>
     public ImmutableArray<ConversationId> Conversations { get; }
+    /// <summary>
+    /// Why it cannot run here, when it cannot: no registered definition takes it (<see cref="BlockedReason.MissingTask"/>,
+    /// <see cref="BlockedReason.TaskTooOld"/>, <see cref="BlockedReason.MigrationFailed"/>). Follows registry changes. Null otherwise; JSON
+    /// <c>blocked</c>, absent when null.
+    /// </summary>
+    public BlockedReason? Blocked { get; }
 
     /// <summary>The node as upstream's JSON object; computed once.</summary>
     public JsonObjectValue ToJson()
@@ -139,17 +151,21 @@ public sealed class TaskGraphNode : IEquatable<TaskGraphNode>
         if (Volatile.Read(ref json) is { } built) return built;
         var value = new RecordJson.Writer().Add("id", Id.ToJson()).Add("kind", Kind).Add("conversationId", ConversationId.ToJson())
             .Add("owner", Owner?.ToJson()).Add("background", Background).Add("abortRequested", AbortRequested).Add("state", State.ToJson())
-            .Add("conversations", JsonValue.Array(Conversations.Select(id => (JsonValue)id.ToJson()))).Build();
+            .Add("conversations", JsonValue.Array(Conversations.Select(id => (JsonValue)id.ToJson())))
+            .Add("blocked", Blocked is { } blocked ? TaskInspectionState.ReasonName(blocked) : null).Build();
         return Interlocked.CompareExchange(ref json, value, null) ?? value;
     }
 
     /// <summary>Upstream <c>nodeOf</c>.</summary>
-    internal static TaskGraphNode Of(TaskRecord record, ImmutableArray<ConversationId> conversations) =>
+    internal static TaskGraphNode Of(TaskRecord record, ImmutableArray<ConversationId> conversations, BlockedReason? blocked) =>
         new(record.Id, record.Kind, record.ConversationId, record.Owner, record.Background, record.AbortRequested, TaskGraphState.Of(record.State),
-            conversations);
+            conversations, blocked);
 
     internal TaskGraphNode WithConversations(ImmutableArray<ConversationId> conversations) =>
-        new(Id, Kind, ConversationId, Owner, Background, AbortRequested, State, conversations);
+        new(Id, Kind, ConversationId, Owner, Background, AbortRequested, State, conversations, Blocked);
+
+    internal TaskGraphNode WithBlocked(BlockedReason? blocked) =>
+        new(Id, Kind, ConversationId, Owner, Background, AbortRequested, State, Conversations, blocked);
 
     /// <summary>Structural equality: equal JSON (upstream compares <c>JSON.stringify</c> of two nodes).</summary>
     public bool Equals(TaskGraphNode? other) =>
@@ -208,21 +224,30 @@ internal sealed class TaskGraphView
 
     private readonly DurableHarness session;
     private readonly IStorage storage;
+    /// <summary>The scheduler's blocked reason of a task (upstream <c>TaskGraphBlocking.blocked</c>).</summary>
+    private readonly Func<BlockedSubject, BlockedReason?> blocked;
     private readonly Lock gate = new();
     // Guarded by gate.
     private Mount? mount;
     private bool closed;
 
-    public TaskGraphView(DurableHarness session, IStorage storage)
+    /// <param name="session">The Harness.</param>
+    /// <param name="storage">Its guarded Storage.</param>
+    /// <param name="blocked">A task's blocked reason (upstream <c>TaskGraphBlocking.blocked</c>).</param>
+    /// <param name="subscribeBlocked">Subscribes to changes of blocked reasons without a commit (upstream
+    /// <c>TaskGraphBlocking.subscribeBlocked</c>).</param>
+    public TaskGraphView(DurableHarness session, IStorage storage, Func<BlockedSubject, BlockedReason?> blocked, Func<Action, Action> subscribeBlocked)
     {
         this.session = session;
         this.storage = storage;
+        this.blocked = blocked;
         session.ObserveCommits((publication, context) =>
         {
             Mount? current;
             lock (gate) current = mount;
             if (current is not null) Advance(current, publication, context, session.Report);
         });
+        subscribeBlocked(RefreshBlocked);
         session.SubscribeClose(() =>
         {
             Mount? current;
@@ -276,7 +301,7 @@ internal sealed class TaskGraphView
         {
             Mount? existing;
             lock (gate) existing = mount;
-            var target = existing ?? new Mount(await BuildAsync(context).ConfigureAwait(false));
+            var target = existing ?? await BuildAsync(context).ConfigureAwait(false);
             ICommittedObserver<TaskGraph>? registered = null;
             void Detach()
             {
@@ -299,7 +324,33 @@ internal sealed class TaskGraphView
             return (observer, (Action)Detach);
         });
 
-    private async Task<TaskGraph> BuildAsync(DurableContext context)
+    /// <summary>On the Session line: derives every node's blocked reason again, and publishes the ones that changed (upstream
+    /// <c>#refreshBlocked</c>).</summary>
+    private void RefreshBlocked()
+    {
+        lock (gate) if (mount is null || closed) return;
+        // Rejected only once the Session is closing or failed.
+        Session.Observe(session.ReadOnLineAsync(() =>
+        {
+            Mount? current;
+            lock (gate) current = mount;
+            if (current is null) return Task.FromResult(false);
+            var ops = new List<Op>();
+            var changed = new Dictionary<TaskId, TaskGraphNode?>();
+            foreach (var (id, subject) in current.Records)
+            {
+                var reason = blocked(subject);
+                if (current.Value.Node(id) is not { } node || reason == node.Blocked) continue;
+                var path = ImmutableArray.Create(PathSegment.Of("tasks"), PathSegment.Of(TaskGraph.Key(id)), PathSegment.Of("blocked"));
+                ops.Add(reason is { } set ? new SetOp(path, TaskInspectionState.ReasonName(set)) : new DeleteOp(path));
+                changed[id] = node.WithBlocked(reason);
+            }
+            Publish(current, ops, changed, DurableContext.Background, session.Report);
+            return Task.FromResult(true);
+        }), _ => { });
+    }
+
+    private async Task<Mount> BuildAsync(DurableContext context)
     {
         var records = new List<TaskRecord>();
         foreach (var status in LiveStatuses)
@@ -307,13 +358,16 @@ internal sealed class TaskGraphView
                 storage.ScanTasksAsync(new TaskQuery { Status = status }, ScanPageSize, cursor, context)).ConfigureAwait(false));
         records.Sort((left, right) => left.Id.Value.CompareTo(right.Id.Value));
         var tasks = ImmutableSortedDictionary.CreateBuilder<TaskId, TaskGraphNode>(TaskGraph.ById);
+        var live = new OrderedDictionary<TaskId, BlockedSubject>();
         foreach (var record in records)
         {
             var owned = await HarnessUtil.ScanAll(cursor =>
                 storage.ScanConversationsAsync(new ConversationQuery { OwnerTaskId = record.Id }, ScanPageSize, cursor, context)).ConfigureAwait(false);
-            tasks[record.Id] = TaskGraphNode.Of(record, [.. owned.Select(conversation => conversation.Id).OrderBy(id => id.Value)]);
+            var subject = BlockedSubject.Of(record);
+            tasks[record.Id] = TaskGraphNode.Of(record, [.. owned.Select(conversation => conversation.Id).OrderBy(id => id.Value)], blocked(subject));
+            live[record.Id] = subject;
         }
-        return new TaskGraph(tasks.ToImmutable());
+        return new Mount(new TaskGraph(tasks.ToImmutable()), live);
     }
 
     /// <summary>Derives the mount's operations from one publication, applies them, and hands the revision to every observer (upstream
@@ -332,12 +386,15 @@ internal sealed class TaskGraphView
             var previous = Node(record.Id);
             if (record.State is TerminalTaskState)
             {
+                target.Records.Remove(record.Id);
                 if (previous is null) continue;
                 ops.Add(new DeleteOp([PathSegment.Of("tasks"), PathSegment.Of(key)]));
                 changed[record.Id] = null;
                 continue;
             }
-            var next = TaskGraphNode.Of(record, previous?.Conversations ?? []);
+            var subject = BlockedSubject.Of(record);
+            target.Records[record.Id] = subject;
+            var next = TaskGraphNode.Of(record, previous?.Conversations ?? [], blocked(subject));
             if (previous is not null && next.Equals(previous)) continue;
             ops.Add(new SetOp([PathSegment.Of("tasks"), PathSegment.Of(key)], next.ToJson()));
             changed[record.Id] = next;
@@ -361,8 +418,15 @@ internal sealed class TaskGraphView
                 JsonValue.Array(conversations.Select(id => (JsonValue)id.ToJson()))));
             changed[owner] = node.WithConversations(conversations);
         }
+        Publish(target, ops, changed, context, report);
+    }
+
+    /// <summary>Applies <paramref name="ops"/>, whose nodes are <paramref name="changed"/>, to the mount and hands the revision to every
+    /// observer; one that throws is reported (upstream <c>publish</c>). Runs on the Session line.</summary>
+    private void Publish(Mount target, List<Op> ops, Dictionary<TaskId, TaskGraphNode?> changed, DurableContext context, Action<Exception> report)
+    {
         if (ops.Count == 0) return;
-        var builder = tasks.ToBuilder();
+        var builder = target.Value.Tasks.ToBuilder();
         foreach (var (id, node) in changed)
         {
             if (node is null) builder.Remove(id);
@@ -374,11 +438,14 @@ internal sealed class TaskGraphView
         foreach (var observer in target.Snapshot(gate)) Session.Contained(() => observer.Advance(target.Value, frame, frameContext), report);
     }
 
-    /// <summary>The mount: its current revision and its observers.</summary>
-    private sealed class Mount(TaskGraph value)
+    /// <summary>The mount: its current revision, its observers, and what the blocked reason reads of each live task, so a registry change
+    /// can derive it again without payloads.</summary>
+    private sealed class Mount(TaskGraph value, OrderedDictionary<TaskId, BlockedSubject> records)
     {
         /// <summary>Written on the Session line only.</summary>
         public TaskGraph Value { get; set; } = value;
+        /// <summary>Upstream's <c>records</c>, in its Map order. Read and written on the Session line only.</summary>
+        public OrderedDictionary<TaskId, BlockedSubject> Records { get; } = records;
         /// <summary>In registration order; guarded by the view's lock.</summary>
         public List<ICommittedObserver<TaskGraph>> Observers { get; } = [];
 

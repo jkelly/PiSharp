@@ -12,6 +12,10 @@
 // attribution, as PiSharp.Agent's DefaultIdentity, until the owner decides core.client-identity-attribution.
 // Pi v1.5.0 sync (area sleep): HarnessOptions.SetTimer reaches the Session (document sweeps) and the scheduler as hostTimers, each over
 // the default timers of HarnessOptions.TimeProvider; wake() and HarnessOptions.OnWake (f75b3240a, ec1be23eb).
+// Pi v1.5.0 sync (area reports): OnReport takes one Report, an error with its ReportInfo (a30c2a81d). safeReport passes the info on (its
+// pi.durable.reports counter and event are area telemetry's), safeNow reports host_error now, and the scheduler's timers host_error
+// setTimer; an agent resolution names the conversation and the extension whose wrapper failed. The task graph reads blocked reasons from
+// the scheduler (440a5fcdb). One safeNow serves the Session and the Harness, as upstream's one `now` does, so a broken clock reports once.
 using System.Collections.Immutable;
 using PiSharp.AI;
 using PiSharp.Durable.Chord;
@@ -83,7 +87,7 @@ internal sealed class DurableHarness : Session, IHarness
     private readonly IStorage storage;
     private readonly HarnessOptions options;
     private readonly Func<HarnessSettings?> hostSettings;
-    private readonly Action<Exception> report;
+    private readonly Action<Exception, ReportInfo> report;
     private readonly DurableTaskScheduler scheduler;
     private readonly Submissions submissions;
     private readonly ConversationViews views;
@@ -94,11 +98,16 @@ internal sealed class DurableHarness : Session, IHarness
     {
     }
 
-    private DurableHarness(IStorage rawStorage, HarnessOptions options, DurableContext context, Action<Exception> report,
+    private DurableHarness(IStorage rawStorage, HarnessOptions options, DurableContext context, Action<Exception, ReportInfo> report,
         Func<HarnessSettings?> hostSettings)
+        : this(rawStorage, options, context, report, hostSettings, SafeNow(Clock(options), options.Now is not null, report))
+    {
+    }
+
+    private DurableHarness(IStorage rawStorage, HarnessOptions options, DurableContext context, Action<Exception, ReportInfo> report,
+        Func<HarnessSettings?> hostSettings, Func<double> now)
         // Read at each use, as all settings are, but only this field: it is read on every commit.
-        : base(rawStorage, SafeNow(Clock(options), options.Now is not null, report), () => hostSettings()?.DocumentRetentionMs, options.ReadOnly,
-            options.SetTimer, options.TimeProvider)
+        : base(rawStorage, now, () => hostSettings()?.DocumentRetentionMs, options.ReadOnly, options.SetTimer, options.TimeProvider)
     {
         // Every component reads and writes through the Session's failure guard: rawStorage serves only the base constructor.
         var storage = GuardedStorage;
@@ -106,7 +115,7 @@ internal sealed class DurableHarness : Session, IHarness
         this.options = options;
         this.hostSettings = hostSettings;
         this.report = report;
-        Now = SafeNow(Clock(options), options.Now is not null, report);
+        Now = now;
         scheduler = new DurableTaskScheduler(new DurableTaskSchedulerOptions
         {
             Session = this,
@@ -118,7 +127,8 @@ internal sealed class DurableHarness : Session, IHarness
             Env = BuildEnvAsync,
             Now = Now,
             OnWake = options.OnWake,
-            Timers = new HostTimers(options.SetTimer, NativeTimer.Of(options.TimeProvider ?? TimeProvider.System), report),
+            Timers = new HostTimers(options.SetTimer, NativeTimer.Of(options.TimeProvider ?? TimeProvider.System),
+                error => report(error, ReportInfo.HostError(HostCallback.SetTimer))),
             Report = report,
             SettleOutcome = (tx, record, outcome) => Live.SettleSchedulerOutcomeAsync(tx, record, outcome),
             WithdrawInputs = (tx, id) => Inbox.WithdrawQueuedInputsAsync(tx, id),
@@ -132,7 +142,7 @@ internal sealed class DurableHarness : Session, IHarness
         });
         submissions = new Submissions(this, storage, Now, () => Agents.ResolveSettings(hostSettings()), () => scheduler.Resume());
         views = new ConversationViews(this, storage);
-        taskGraph = new TaskGraphView(this, storage);
+        taskGraph = new TaskGraphView(this, storage, scheduler.BlockedReasonOf, scheduler.SubscribeBlocked);
     }
 
     /// <summary>The Harness clock.</summary>
@@ -178,15 +188,16 @@ internal sealed class DurableHarness : Session, IHarness
     }
 
     /// <summary><c>OnReport</c> that cannot fail (upstream <c>safeReport</c>): it is the last place an error goes, so its own throw is
-    /// dropped.</summary>
-    internal static Action<Exception> SafeReport(Action<Exception>? onReport) => error => Contained(() => onReport?.Invoke(error), _ => { });
+    /// dropped. It hears one <see cref="Durable.Report"/>, the error with what it is about.</summary>
+    internal static Action<Exception, ReportInfo> SafeReport(Action<Report>? onReport) =>
+        (error, info) => Contained(() => onReport?.Invoke(new Report(info, error)), _ => { });
 
     /// <summary>
     /// The host clock, falling back to the system clock when it throws (upstream <c>safeNow</c>): a broken clock must not stop commits. The
     /// first throw is reported; the clock is read in every task change, so later ones are not. <paramref name="host"/> is false for the
     /// Harness's own TimeProvider clock, which needs no guard.
     /// </summary>
-    internal static Func<double> SafeNow(Func<double> now, bool host, Action<Exception> report)
+    internal static Func<double> SafeNow(Func<double> now, bool host, Action<Exception, ReportInfo> report)
     {
         if (!host) return now;
         var reported = 0;
@@ -199,14 +210,14 @@ internal sealed class DurableHarness : Session, IHarness
             catch (Exception error)
             {
                 // Set first: a report handler that reads the clock again must not report again.
-                if (Interlocked.Exchange(ref reported, 1) == 0) report(error);
+                if (Interlocked.Exchange(ref reported, 1) == 0) report(error, ReportInfo.HostError(HostCallback.Now));
                 return DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
             }
         };
     }
 
-    /// <summary>The Session's failure and listener errors go to <c>OnReport</c>.</summary>
-    internal override void Report(Exception error) => report(error);
+    /// <summary>The Session's failure and listener errors go to <c>OnReport</c>, with what they are about.</summary>
+    internal override void Report(Exception error, ReportInfo info) => report(error, info);
 
     /// <summary>Resolves a conversation's committed <c>pi.agent</c> against <paramref name="snapshot"/>, or the current one, and the current
     /// settings.</summary>
@@ -214,7 +225,8 @@ internal sealed class DurableHarness : Session, IHarness
     {
         var registry = snapshot ?? options.Registry.Snapshot();
         var state = await SnapshotAsync(Agents.AgentDoc, id, context).ConfigureAwait(false);
-        return Agents.ResolveAgent(state, registry, Agents.ResolveSettings(hostSettings()), report);
+        return Agents.ResolveAgent(state, registry, Agents.ResolveSettings(hostSettings()),
+            (error, extension) => report(error, new ReportInfo(ReportKind.ExtensionError) { ConversationId = id, Extension = extension }));
     }
 
     /// <summary>Builds a conversation's environment from its current <c>cwd</c>; null without an <c>Env</c> option.</summary>

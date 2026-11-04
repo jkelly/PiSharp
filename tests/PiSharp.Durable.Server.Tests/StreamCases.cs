@@ -1,5 +1,8 @@
 using System.Text.Json.Nodes;
 using Microsoft.AspNetCore.Http;
+using PiSharp.Durable;
+using ChordJson = PiSharp.Durable.Chord.JsonValue;
+using DurableContext = PiSharp.Durable.Chord.DurableContext;
 using PiSharp.Durable.Client;
 using PiSharp.Durable.Server;
 
@@ -99,6 +102,30 @@ internal static partial class Program
             // did on macOS, so only neighbours have to differ.
             var trees = deviceFrames.Frames.Where(frame => Type(frame) == "tree").Select(frame => frame.ToJsonString()).ToList();
             Equal(0, trees.Zip(trees.Skip(1)).Count(pair => pair.First == pair.Second), "tree frames are deduplicated");
+        }),
+
+        // Pi v1.5.0 sync (area reports): a live task that cannot run carries TaskGraphNode.blocked's reason on the wire.
+        Case("streams.session-tasks-say-why-a-task-cannot-run", async () =>
+        {
+            await using var server = await TestServer.StartAsync("streams-blocked");
+            var id = await server.CreateSessionAsync("Blocked task");
+            var session = new SessionModel();
+            await using var sessionFrames = new FrameLog(server.Client, $"/v1/sessions/{id}/events", frame => session.Apply(frame));
+            await WaitUntilAsync(() => session.Ready, "the session frame");
+            // A definition no extension installs: the task waits for one.
+            var missing = Tasks.DefineTask(new TaskDefinition
+            {
+                Name = "test.missing",
+                Version = 1,
+                Initial = _ => ChordJson.Object([new("phase", "run")]),
+                Phases = new Dictionary<string, TaskPhaseHandler> { ["run"] = (_, _, _) => Task.CompletedTask },
+                Abort = (_, _, _) => Task.CompletedTask,
+            });
+            var harness = server.Host.ResolveSession(id).GetHarness();
+            var root = await harness.RootAsync(DurableContext.Background);
+            await root.CommitAsync(tx => tx.CreateTaskAsync(missing, ChordJson.Null, new TaskOptions(TaskOwnership.Conversation)), DurableContext.Background);
+            await WaitUntilAsync(() => session.Tasks.Any(task => task.Kind == "test.missing" && task.Blocked == "missing_task"), "the blocked task");
+            Check(session.Tasks.Where(task => task.Kind != "test.missing").All(task => task.Blocked is null), "a task that can run has no reason");
         }),
 
         Case("streams.errors-before-the-stream-starts", async () =>

@@ -1,7 +1,7 @@
 // PiSharp-only (decision 0008). The durable network's v1 JSON bodies, after durable-pi's wire contract (apps/dpi-sdk/src/api.ts, MIT). Keys and
 // value spellings are durable-pi's, so its clients and hub can talk to a PiSharp device and ours to theirs. PiSharp additions are optional
-// fields a durable-pi client ignores: a model's provider next to its id, a tool's effect and whether it is deferred, and a session's
-// provider. Agent events are not typed here: they pass through as pi-durable's own JSON (PiSharp.Durable's AgentEvent.ToJson()).
+// fields a durable-pi client ignores: a model's provider next to its id, a tool's effect and whether it is deferred, a session's
+// provider, and why a live task cannot run (TaskNode.Blocked, pi-durable's TaskGraphNode.blocked; Pi v1.5.0 sync, area reports). Agent events are not typed here: they pass through as pi-durable's own JSON (PiSharp.Durable's AgentEvent.ToJson()).
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
@@ -300,6 +300,9 @@ public sealed record TaskNode
     public string? Label { get; init; }
     /// <summary>A <c>pi.tool</c> task's call id.</summary>
     public string? CallId { get; init; }
+    /// <summary>Why the task cannot run: <c>missing_task</c>, <c>task_too_old</c> or <c>migration_failed</c> (pi-durable
+    /// <c>TaskGraphNode.blocked</c>); absent while it can. A PiSharp addition.</summary>
+    public string? Blocked { get; init; }
 }
 
 /// <summary>Token counts and costs (pi-ai <c>Usage</c>).</summary>

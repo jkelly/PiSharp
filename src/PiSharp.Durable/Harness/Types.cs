@@ -18,6 +18,9 @@
 // v1.2.0 until the file's other areas land.
 // Pi v1.5.0 sync (area model-requests): HarnessOptions.Identity (adc5fa9f8, 04a93bad8) and GenerationHooks.BeforeProviderRequest
 // (d280e1ffa).
+// Pi v1.5.0 sync (area reports): HarnessOptions.OnReport takes one Report (TypesReports.cs; a30c2a81d, 91b33cab3, 5f312dac4),
+// settings.afterFailedRun (AfterFailedRun, a30c2a81d), and TaskInspectionKind.Pending replaces Ready (TaskState's word). TelemetryOptions
+// and the report's telemetry context are area telemetry's.
 using System.Collections.Immutable;
 using PiSharp.AI;
 using PiSharp.Durable.Chord;
@@ -736,6 +739,25 @@ public class HarnessSettings
     /// default.
     /// </summary>
     public virtual double? DocumentRetentionMs { get; init; }
+    /// <summary>
+    /// What a run that fails (<c>model_error</c>, <c>no_model</c>) does with the inputs queued behind it: <see cref="Durable.AfterFailedRun.Keep"/>
+    /// leaves them queued until the next input or queued write, <see cref="Durable.AfterFailedRun.Continue"/> starts the next run with them, as an
+    /// answer would, and <see cref="Durable.AfterFailedRun.Withdraw"/> settles them <c>unanswered</c> with reason <c>run_failed</c>. Default
+    /// <see cref="Durable.AfterFailedRun.Keep"/>.
+    /// </summary>
+    public virtual AfterFailedRun? AfterFailedRun { get; init; }
+}
+
+/// <summary>What a failed run does with the inputs queued behind it (<see cref="HarnessSettings.AfterFailedRun"/>; upstream
+/// <c>AfterFailedRun</c>).</summary>
+public enum AfterFailedRun
+{
+    /// <summary><c>keep</c>: they stay queued until the next input or queued write.</summary>
+    Keep,
+    /// <summary><c>continue</c>: the next run starts with them, as after an answer.</summary>
+    Continue,
+    /// <summary><c>withdraw</c>: they settle <c>unanswered</c> with reason <c>run_failed</c>.</summary>
+    Withdraw,
 }
 
 /// <summary>Resolved settings: every field over its built-in default, object fields merged (upstream <c>Settings</c>).</summary>
@@ -762,6 +784,8 @@ public sealed record Settings
     public required double ContextRetentionMs { get; init; }
     /// <summary>Unobserved document retention.</summary>
     public required double DocumentRetentionMs { get; init; }
+    /// <summary>What a failed run does with the inputs queued behind it.</summary>
+    public AfterFailedRun AfterFailedRun { get; init; }
 }
 
 /// <summary>What <c>HarnessOptions.Env</c> builds an environment for (upstream <c>EnvTarget</c>).</summary>
@@ -828,10 +852,13 @@ public sealed record HarnessOptions
     /// </summary>
     public Action<Wake>? OnWake { get; init; }
     /// <summary>
-    /// Receives failures that do not fail the calling operation, such as a throwing hook or listener, and the error that fails the Session,
-    /// once. Its own throw is dropped. (An <c>async void</c> handler's exception escapes to the thread pool, which no caller can contain.)
+    /// Receives failures that do not fail the calling operation, such as a throwing hook or listener, a task that faulted, and the error that
+    /// fails the Session, once: one <see cref="Durable.Report"/>, the error and what happened (its <see cref="ReportInfo"/>, by kind). A host
+    /// can tell a failed Session (<see cref="ReportKind.StorageFailed"/>, often a platform reset) from a faulted task
+    /// (<see cref="ReportKind.TaskFaulted"/>). Its own throw is dropped. (An <c>async void</c> handler's exception escapes to the thread pool,
+    /// which no caller can contain.)
     /// </summary>
-    public Action<Exception>? OnReport { get; init; }
+    public Action<Report>? OnReport { get; init; }
     /// <summary>
     /// Opens for reading only, as a viewer of a session that another process drives, for example a synced copy on a device that only shows
     /// it (upstream <c>readOnly</c>). Open recovers nothing: a <c>running</c> task stays as committed. Every commit with writes throws
@@ -865,20 +892,20 @@ public enum HarnessScheduling
     Closing,
 }
 
-/// <summary>What the scheduler would do with a live task.</summary>
+/// <summary>What the scheduler would do with a live task (upstream <c>TaskInspection["state"]["kind"]</c>).</summary>
 public enum TaskInspectionKind
 {
     /// <summary>An invocation is active.</summary>
     Running,
-    /// <summary>The next scheduling pass reserves it.</summary>
-    Ready,
+    /// <summary>The next scheduling pass reserves it (upstream <c>pending</c>, TaskState's word; v1.2.0's <c>ready</c>).</summary>
+    Pending,
     /// <summary>It waits for live tasks.</summary>
     Waiting,
     /// <summary>It sleeps until the Harness clock reaches <see cref="TaskInspectionState.Until"/>.</summary>
     Sleeping,
     /// <summary>Its outcome is held until its ordinary owned work drains.</summary>
     Completing,
-    /// <summary>No registered definition can take it.</summary>
+    /// <summary>Cannot run here: no registered definition can take it (aborting it settles it as <c>orphaned</c>).</summary>
     Blocked,
 }
 
@@ -896,7 +923,7 @@ public enum BlockedReason
 /// <summary>The derived state of a live task (upstream <c>TaskInspection["state"]</c>).</summary>
 public sealed record TaskInspectionState(TaskInspectionKind Kind)
 {
-    /// <summary>For <see cref="TaskInspectionKind.Ready"/>: its definition is newer and has a migration.</summary>
+    /// <summary>For <see cref="TaskInspectionKind.Pending"/>: its definition is newer and has a migration.</summary>
     public bool Migrates { get; init; }
     /// <summary>For <see cref="TaskInspectionKind.Waiting"/>: the live tasks it waits for.</summary>
     public ImmutableArray<TaskId> On { get; init; } = [];

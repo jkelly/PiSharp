@@ -2,7 +2,8 @@
 // adaptations in HarnessSupport.cs and HarnessRecoverySupport.cs, and these:
 // - Crashes are simulated as upstream does: the crashed Harness is abandoned without close, its held commit never lands
 //   (ControlledStorage.Crash) and its blocked handlers never return; a new Harness opens the same storage instance.
-// - String(report) is the report's type name and message; (report as Error).cause is the cause the scheduler stores in Exception.Data.
+// - String(report) is the report's type name and message. Pi v1.5.0 sync (area reports): the handover reports are read from their
+//   ReportInfo (upstream's infos, 5f312dac4), and the task_too_old case is ported.
 // - "preserves an abort mark that races the handover commit ...": the commit log is read after close instead of before it; close writes no
 //   task state, and storage.commits is not safe to read while commits may still land.
 // None of the 24 tests needs generation, tools or compaction; all are ported.
@@ -98,17 +99,30 @@ internal static partial class HarnessRecoveryTests
         });
     }
 
-    private sealed record Handover(IHarness Harness, IRegistry Registry, SyncList<Exception> Reports, IDisposable Old, TaskId Id);
+    private sealed record Handover(IHarness Harness, IRegistry Registry, SyncList<ReportInfo> Infos, IDisposable Old, TaskId Id);
 
-    private static async Task<Handover> StartHandover(SyncList<string> log, Gates gates, IStorage storage)
+    private static async Task<Handover> StartHandover(SyncList<string> log, Gates gates, IStorage storage, int version = 1)
     {
         var registry = Registry.Create();
-        var old = AddTask(registry, HandoverTask("old", 1, log, gates));
-        var (harness, _, reports) = await OpenTasks(storage, [], registry);
-        var id = await CreateIn(harness, HandoverTask("old", 1, log));
+        var old = AddTask(registry, HandoverTask("old", version, log, gates));
+        var opened = await OpenTasks(storage, [], registry);
+        var harness = opened.Harness;
+        var id = await CreateIn(harness, HandoverTask("old", version, log));
         harness.Resume();
         await Eventually(() => log.Count == 1);
-        return new Handover(harness, registry, reports, old, id);
+        return new Handover(harness, registry, opened.Infos, old, id);
+    }
+
+    /// <summary>Upstream <c>toMatchObject([{ kind, task: { id }, reason? }, ...])</c> over report infos.</summary>
+    private static void MatchInfos(IReadOnlyList<(ReportKind Kind, ReportReason? Reason)> expected, IReadOnlyList<ReportInfo> infos, TaskId id)
+    {
+        Check(infos.Count == expected.Count, $"infos: expected {expected.Count}, actual {string.Join(", ", infos)}");
+        for (var index = 0; index < expected.Count; index++)
+        {
+            var info = infos[index];
+            Check(info.Kind == expected[index].Kind && info.Task?.Id == id && (expected[index].Reason is null || info.Reason == expected[index].Reason),
+                $"info {index}: expected {expected[index]}, actual {info}");
+        }
     }
 
     internal static IEnumerable<(string, Func<Task>)> RecoveryCases(string prefix, Backend backend)
@@ -618,11 +632,12 @@ internal static partial class HarnessRecoveryTests
         {
             var log = new SyncList<string>();
             var gate = new Deferred();
-            var (harness, registry, reports, _, id) = await StartHandover(log, new Gates(A: gate.Task), backend.Fresh());
+            var (harness, registry, infos, _, id) = await StartHandover(log, new Gates(A: gate.Task), backend.Fresh());
             // The same extension name replaces the old one in place.
             AddTask(registry, HandoverTask("broken", 2, log, migrate: (_, _, _) => throw new InvalidOperationException("broken migration")));
             gate.Resolve();
-            await Eventually(() => reports.Count == 1);
+            await Eventually(() => infos.Count == 1);
+            MatchInfos([(ReportKind.MigrationFailed, null)], infos.Snapshot(), id);
             await Flush();
             MatchJson("""{"version":1,"state":{"status":"pending","checkpoint":{"phase":"b"}}}""", (await harness.GetTaskAsync(id, Context))?.ToJson(), "record");
             Seq(["old:a start", "old:a end"], log.Snapshot(), "log");
@@ -634,16 +649,31 @@ internal static partial class HarnessRecoveryTests
             var log = new SyncList<string>();
             var gateA = new Deferred();
             var gateB = new Deferred();
-            var (harness, registry, reports, old, id) = await StartHandover(log, new Gates(A: gateA.Task, B: gateB.Task), backend.Fresh());
+            var (harness, registry, infos, old, id) = await StartHandover(log, new Gates(A: gateA.Task, B: gateB.Task), backend.Fresh());
             old.Dispose();
             gateA.Resolve();
             await Eventually(() => log.Snapshot().Contains("old:b start"));
             // A newer definition without a migration cannot take the task either.
-            AddTask(registry, HandoverTask("incompatible", 2, log));
+            AddTask(registry, HandoverTask("unmigratable", 2, log));
             gateB.Resolve();
             await harness.WaitForTaskAsync(id, Context);
             Seq(["old:a start", "old:a end", "old:b start", "old:b end", "old:c"], log.Snapshot(), "log");
-            Seq(["missing_task", "incompatible_task"], reports.Snapshot().Select(report => Cause(report) as string), "report causes");
+            MatchInfos([(ReportKind.TaskOutdated, ReportReason.MissingTask), (ReportKind.TaskOutdated, ReportReason.MigrationFailed)],
+                infos.Snapshot(), id);
+            await harness.CloseAsync(Context);
+        });
+
+        yield return Case(prefix + "definition-handover.reports-a-replacement-older-than-the-running-task-as-task_too_old-and-keeps-the-old-definition", async () =>
+        {
+            var log = new SyncList<string>();
+            var gate = new Deferred();
+            var (harness, registry, infos, _, id) = await StartHandover(log, new Gates(A: gate.Task), backend.Fresh(), version: 2);
+            // The same extension name replaces the running definition with an older version.
+            AddTask(registry, HandoverTask("older", 1, log));
+            gate.Resolve();
+            await harness.WaitForTaskAsync(id, Context);
+            Seq(["old:a start", "old:a end", "old:b start", "old:b end", "old:c"], log.Snapshot(), "log");
+            MatchInfos([(ReportKind.TaskOutdated, ReportReason.TaskTooOld)], infos.Snapshot(), id);
             await harness.CloseAsync(Context);
         });
 

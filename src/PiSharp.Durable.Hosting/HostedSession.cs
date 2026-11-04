@@ -729,7 +729,7 @@ public sealed partial class HostedSession
                     host.Options.SessionStream is null ? null : StreamMetadata),
                 Env = envs.EnvAsync,
                 TimeProvider = host.Options.TimeProvider,
-                OnReport = report => host.Options.OnReport?.Invoke(Id, report),
+                OnReport = report => host.Options.OnReport?.Invoke(Id, report.Error),
             }, context).ConfigureAwait(false);
             if (createModel is null)
             {

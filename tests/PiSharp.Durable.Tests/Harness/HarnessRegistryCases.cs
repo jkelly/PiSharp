@@ -38,7 +38,7 @@ internal static partial class HarnessTests
 
     /// <summary>Resolves <paramref name="state"/> against <paramref name="snapshot"/> and <paramref name="settings"/>, collecting reports.</summary>
     private static Agent ResolveFor(string? state, IRegistrySnapshot snapshot, HarnessSettings? settings = null, List<Exception>? reports = null) =>
-        Agents.ResolveAgent(state is null ? null : O(state), snapshot, Agents.ResolveSettings(settings ?? new HarnessSettings()), error => reports?.Add(error));
+        Agents.ResolveAgent(state is null ? null : O(state), snapshot, Agents.ResolveSettings(settings ?? new HarnessSettings()), (error, _) => reports?.Add(error));
 
     private static async Task<List<(string Key, string? Text)>> Rendered(Agent agent)
     {
@@ -258,8 +258,11 @@ internal static partial class HarnessTests
                 Hooks = [Define.Hook(HarnessTasks.ToolTask, first), Define.Hook(HarnessTasks.GenerationTask, onYield)],
             });
             local.Install(new Extension { Name = "b", Hooks = [Define.Hook(HarnessTasks.ToolTask, second)] });
-            Seq([first, second], Agents.AgentHooks(ResolveFor(null, local.Snapshot()), "pi.tool"), "default order");
-            Seq([second, first], Agents.AgentHooks(ResolveFor("""{"extensions":["b","a"]}""", local.Snapshot()), "pi.tool"), "selected order");
+            // Pi v1.5.0 sync (area reports): each handler comes with its extension's name (a30c2a81d).
+            (string, object) a = ("a", first);
+            (string, object) b = ("b", second);
+            Seq([a, b], Agents.AgentHooks(ResolveFor(null, local.Snapshot()), "pi.tool"), "default order");
+            Seq([b, a], Agents.AgentHooks(ResolveFor("""{"extensions":["b","a"]}""", local.Snapshot()), "pi.tool"), "selected order");
             Seq([], Agents.AgentHooks(ResolveFor("""{"extensions":["b"]}""", local.Snapshot()), "pi.generation"), "unselected");
 
             var defaults = ResolveFor(null, local.Snapshot());

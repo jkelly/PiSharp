@@ -8,7 +8,9 @@
 // (upstream d280e1ffa), only when the phase's agent has such a hook. Pi v1.5.0 sync (area sleep): retry backoffs and deferred polls
 // sleep instead of waiting in a running phase, and a retry or poll run before its time (an early wake, or a record an earlier version
 // stored as running) sleeps again; poll checks pollAt before the model lookup (f75b3240a, ec1be23eb). The partial throttle arms
-// runtime.SetTimer.
+// runtime.SetTimer. Pi v1.5.0 sync (area reports): settings.afterFailedRun decides the inputs queued behind a run that fails with
+// model_error or no_model (prepareFailure, read before the commit's first table write, and endFailedRun; a30c2a81d); the environment
+// builder's failure reports host_error env, a section's extension_error with its extension, and a deferred cancel's host_error models.
 //
 // Mappings:
 // - Checkpoints, live state and results are upstream's JSON, built in upstream's key order: prepare {phase, attempt, compacted?, overflow?},
@@ -169,7 +171,6 @@ internal static class GenerationPhases
         }
         var view = await runtime.ContextAsync(conversationId, context).ConfigureAwait(false);
         var shown = HarnessPrompt.ReplaySections(view.Messages);
-        void Report(Exception error) => runtime.Report(error);
         Env.IExecutionEnv? env = null;
         try
         {
@@ -178,10 +179,11 @@ internal static class GenerationPhases
         catch (Exception error)
         {
             if (context.IsCancellationRequested) throw;
-            Report(error);
+            runtime.Report(error, ReportFrom.Host(HostCallback.Env));
         }
         var input = new PromptInput { ConversationId = conversationId, Agent = agent, Env = env, Shown = shown, Read = runtime };
-        var desired = await HarnessPrompt.RenderSectionsAsync(agent.Sections, input, shown, Report, context).ConfigureAwait(false);
+        var desired = await HarnessPrompt.RenderSectionsAsync(agent.Sections, input, shown,
+            (error, section) => runtime.Report(error, ReportFrom.FromExtension(Agents.SectionExtension(agent, section.Key))), context).ConfigureAwait(false);
         var entries = HarnessPrompt.PlanSystemEntries(view, desired, agent.Tools, runtime.Now());
         var threshold = compacted is null ? ThresholdCompaction(view, entries, resolved.ContextWindow, Compaction.PolicyFor(settings, model)) : null;
         if (threshold == "blocking")
@@ -355,7 +357,7 @@ internal static class GenerationPhases
             }
             catch (Exception error)
             {
-                runtime.Report(error);
+                runtime.Report(error, ReportFrom.Host(HostCallback.Models));
             }
         }
         var conversationId = runtime.ConversationId;
@@ -418,8 +420,9 @@ internal static class GenerationPhases
     private static Task FailModelErrorAsync(ITaskRuntime runtime, string text, DurableContext context) =>
         runtime.CommitAsync(async (tx, _) =>
         {
+            var failure = await PrepareFailureAsync(tx, runtime).ConfigureAwait(false);
             var live = await tx.DocAsync(Live.LiveDoc, runtime.ConversationId).ConfigureAwait(false);
-            Live.EndRun(tx, live, runtime.TaskId, SubmissionSettlement.Unanswered("model_error", text));
+            await EndFailedRunAsync(tx, runtime, live, failure, SubmissionSettlement.Unanswered("model_error", text)).ConfigureAwait(false);
             return (TaskState?)NextTaskState.Failed(text, Reason("model_error"));
         }, context);
 
@@ -429,10 +432,39 @@ internal static class GenerationPhases
         var message = reference is null ? "No model is configured" : $"Model {reference.Provider}/{reference.ModelId} is not available";
         return runtime.CommitAsync(async (tx, _) =>
         {
+            var failure = await PrepareFailureAsync(tx, runtime).ConfigureAwait(false);
             var live = await tx.DocAsync(Live.LiveDoc, runtime.ConversationId).ConfigureAwait(false);
-            Live.EndRun(tx, live, runtime.TaskId, SubmissionSettlement.Unanswered("no_model"));
+            await EndFailedRunAsync(tx, runtime, live, failure, SubmissionSettlement.Unanswered("no_model")).ConfigureAwait(false);
             return (TaskState?)NextTaskState.Failed(message, Reason("no_model"));
         }, context);
+    }
+
+    /// <summary>What a failed run's end needs from the table, read before the commit's first table write (upstream <c>Failure</c>).</summary>
+    private sealed record Failure(AfterFailedRun Policy, Inbox.Boundary? Boundary);
+
+    /// <summary>Reads <c>settings.afterFailedRun</c>, and for <c>continue</c> prepares the final boundary (upstream
+    /// <c>prepareFailure</c>).</summary>
+    private static async Task<Failure> PrepareFailureAsync(ITx tx, ITaskRuntime runtime)
+    {
+        var settings = runtime.Settings;
+        var policy = settings.AfterFailedRun;
+        if (policy != AfterFailedRun.Continue) return new Failure(policy, null);
+        return new Failure(policy, await Inbox.PrepareBoundaryAsync(tx, runtime.ConversationId, settings).ConfigureAwait(false));
+    }
+
+    /// <summary>
+    /// Ends a failed run, settling its inputs with <paramref name="settlement"/>, and does with the inputs queued behind it what
+    /// <c>settings.afterFailedRun</c> says (upstream <c>endFailedRun</c>, spec §6): keep them, start the next run with them, or withdraw
+    /// them. A withdrawal leaves queued writes for later placement.
+    /// </summary>
+    private static async Task EndFailedRunAsync(ITx tx, ITaskRuntime runtime, DraftObject live, Failure failure, SubmissionSettlement settlement)
+    {
+        var conversationId = runtime.ConversationId;
+        Live.EndRun(tx, live, runtime.TaskId, settlement);
+        if (failure.Policy == AfterFailedRun.Withdraw) await Inbox.WithdrawQueuedInputsAsync(tx, conversationId, "run_failed").ConfigureAwait(false);
+        if (failure.Boundary is not { } boundary) return;
+        var (users, _) = await Inbox.ApplyBoundaryAsync(tx, boundary, true, runtime.Now()).ConfigureAwait(false);
+        if (!users.IsEmpty) await HarnessTasks.StartRunAsync(tx, conversationId, live, users).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -616,9 +648,11 @@ internal static class GenerationPhases
         var until = retry ? runtime.Now() + PiAiRetry.RetryDelayMs(retryPolicy.BaseDelayMs, retryPolicy.MaxAgentDelayMs, attempt) : 0;
         await runtime.CommitAsync(async (tx, _) =>
         {
+            // Read before the first table write; only a failure uses it.
+            var failure = retry ? null : await PrepareFailureAsync(tx, runtime).ConfigureAwait(false);
             var live = await tx.DocAsync(Live.LiveDoc, conversationId).ConfigureAwait(false);
             await HarnessTasks.AppendAssistantAsync(tx, conversationId, message).ConfigureAwait(false);
-            if (retry)
+            if (failure is null)
             {
                 var retryState = JsonValue.Object([
                     KeyValuePair.Create("at", (JsonValue)until),
@@ -630,7 +664,7 @@ internal static class GenerationPhases
                 return (TaskState?)NextTaskState.Sleeping(checkpoint, until);
             }
             var text = Str(message, "errorMessage") ?? $"Model response ended with stop reason {stopReason ?? "undefined"}";
-            Live.EndRun(tx, live, runtime.TaskId, SubmissionSettlement.Unanswered("model_error", text));
+            await EndFailedRunAsync(tx, runtime, live, failure, SubmissionSettlement.Unanswered("model_error", text)).ConfigureAwait(false);
             return (TaskState?)NextTaskState.Failed(text, Reason("model_error"));
         }, context).ConfigureAwait(false);
     }

@@ -151,17 +151,17 @@ public static class Inbox
 
     /// <summary>
     /// Withdraws every queued input of a conversation, as <c>Conversation.AbortAsync()</c> and abort cascades do (upstream
-    /// <c>withdrawQueuedInputs</c>): each settles <c>unanswered</c> with <c>aborted</c> and leaves the inbox; queued writes stay for later
-    /// placement.
+    /// <c>withdrawQueuedInputs</c>): each settles <c>unanswered</c> with <paramref name="reason"/> (default <c>aborted</c>; a failed run's
+    /// <c>run_failed</c>) and leaves the inbox; queued writes stay for later placement.
     /// </summary>
-    public static async Task WithdrawQueuedInputsAsync(ITx tx, ConversationId conversationId)
+    public static async Task WithdrawQueuedInputsAsync(ITx tx, ConversationId conversationId, string reason = "aborted")
     {
         var items = (await tx.DocAsync(InboxDoc, conversationId).ConfigureAwait(false)).GetArray("items");
         for (var index = items.Count - 1; index >= 0; index--)
         {
             var item = (JsonObjectValue)items.Get(index);
             if (item["mode"] is JsonStringValue { Value: "write" }) continue;
-            tx.SettleSubmission(new SubmissionId(ItemId(item)), SubmissionSettlement.Unanswered("aborted"));
+            tx.SettleSubmission(new SubmissionId(ItemId(item)), SubmissionSettlement.Unanswered(reason));
             items.RemoveAt(index);
         }
     }

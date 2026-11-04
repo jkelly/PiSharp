@@ -12,8 +12,8 @@
 //   their lists are read under a lock, as the scheduler arms and disarms timers on thread-pool threads.
 // - onWake runs on a thread-pool thread, which reports its throw after the wake is recorded: "reports a throwing onWake ..." awaits the
 //   report with Eventually where upstream's synchronous report is there at once.
-// - The `eventually(() => !harness.wake().active)` waits are 440a5fcdb's (area reports), which counts open's recovery pass and
-//   reconcile work as activity; until that area lands here they hold at once.
+// - The `eventually(() => !harness.wake().active)` waits are 440a5fcdb's, which counts open's recovery pass and reconcile work as
+//   activity (ported by area reports).
 using PiSharp.Durable;
 using PiSharp.Durable.Chord;
 using PiSharp.Durable.Sqlite;

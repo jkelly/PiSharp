@@ -1,6 +1,7 @@
 // Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/src/types.ts (TaskRuntime and HookRunner; split from Types.cs).
 // Upstream's AbortSignal becomes a CancellationToken plus the handler context, which the same signal cancels; its memo and entry overloads
-// become C# overloads; its synchronous-or-promise commit callback becomes four overloads, as ISession.CommitAsync has.
+// become C# overloads; its synchronous-or-promise commit callback becomes four overloads, as ISession.CommitAsync has. Pi v1.5.0 sync
+// (area reports): TaskRuntime.report takes whose code failed (ReportFrom, a30c2a81d); the file's other areas keep the citation on v1.2.0.
 using PiSharp.Durable.Chord;
 using PiSharp.Durable.Env;
 
@@ -94,12 +95,16 @@ public interface ITaskRuntime : IDocumentObserver, IDocumentReader, IHookApi
     /// <summary>
     /// Calls <paramref name="callback"/> once after about <paramref name="delayMs"/> on the Harness's timer (<see cref="HarnessOptions.SetTimer"/>),
     /// for pacing work inside a phase, such as throttled progress commits. Not durable: the invocation's end disarms it, and after its end
-    /// nothing is armed. Returns an action that disarms it. The callback runs on a timer thread; a throw from it is reported. Wait for time
-    /// between phases with <see cref="SleepUntilAsync"/>.
+    /// nothing is armed. Returns an action that disarms it. The callback runs on a timer thread; a throw from it is reported as the task's
+    /// (<see cref="ReportKind.TaskError"/>). Wait for time between phases with <see cref="SleepUntilAsync"/>.
     /// </summary>
     Action SetTimer(Action callback, double delayMs);
-    /// <summary>Forwards a non-fatal failure to <c>HarnessOptions.OnReport</c>.</summary>
-    void Report(Exception error);
+    /// <summary>
+    /// Forwards a non-fatal failure to <c>HarnessOptions.OnReport</c>, about this task. Without <paramref name="from"/> it is the task's own
+    /// (<see cref="ReportKind.TaskError"/>, naming the extension that installed its definition); with it, the code it names failed: an
+    /// extension's, such as a section (<see cref="ReportKind.ExtensionError"/>), or a host callback (<see cref="ReportKind.HostError"/>).
+    /// </summary>
+    void Report(Exception error, ReportFrom? from = null);
     /// <summary>
     /// Commits a sleep: the task holds no invocation until the Harness clock reaches <paramref name="until"/>, then resumes at
     /// <paramref name="checkpoint"/>. Completes once the sleep is stored, not when the time comes; the phase returns right after. Returning

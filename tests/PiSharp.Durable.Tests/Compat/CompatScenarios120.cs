@@ -117,7 +117,8 @@ internal static class CompatScenarios120
     {
         var harness = await Harness.OpenAsync(storage, new HarnessOptions
         {
-            Models = setup.Models, Registry = setup.Registry, Settings = setup.Settings, Now = CompatTimers.Clock(() => setup.Now()), OnReport = onReport,
+            Models = setup.Models, Registry = setup.Registry, Settings = setup.Settings, Now = CompatTimers.Clock(() => setup.Now()),
+            OnReport = onReport is null ? null : report => onReport(report.Error),
             SetTimer = CompatTimers.SetTimer, Env = env is null ? null : (_, _) => Task.FromResult<IExecutionEnv?>(env),
         }, Context);
         var root = await harness.RootAsync(Context, new AgentChange { Model = new ModelRef("faux", "faux-1") });

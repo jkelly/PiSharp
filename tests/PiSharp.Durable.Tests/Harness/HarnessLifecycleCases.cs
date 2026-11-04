@@ -197,7 +197,7 @@ internal static class LifecycleTests
             {
                 Models = EmptyDurableModels.Instance,
                 Registry = Registry.Create(),
-                OnReport = reports.Add,
+                OnReport = report => reports.Add(report.Error),
             }, Context);
             await RejectsAsync(() => opening, "disk full", "open");
             // The storage failure that failed open is the cause; the close that fails after it adds no report.
@@ -657,7 +657,7 @@ internal static class LifecycleTests
                 $"blocked: {string.Join(", ", inspected.Select(task => task.State))}");
             var installed = AddTask(first.Registry, DefineLate("v1"));
             inspected = (await first.Harness.InspectAsync(Context)).Tasks;
-            Check(inspected.Length == 1 && inspected[0].State.Kind == TaskInspectionKind.Ready, $"ready: {string.Join(", ", inspected.Select(task => task.State))}");
+            Check(inspected.Length == 1 && inspected[0].State.Kind == TaskInspectionKind.Pending, $"pending: {string.Join(", ", inspected.Select(task => task.State))}");
             // The same extension name replaces the definition in place, still before resume.
             installed.Dispose();
             AddTask(first.Registry, DefineLate("v2"));

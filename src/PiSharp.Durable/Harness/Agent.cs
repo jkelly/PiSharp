@@ -2,7 +2,10 @@
 // pi.agent document's JSON object, written with upstream's key order: fields appear in the order they were first set, as a JavaScript
 // object's do. Composition uses OrderedDictionary, whose replacement keeps a key's position as a JavaScript Map's does. v1.2.0: the
 // modelTools filter (an array, or {remove?, add?}), ToolRegistration.Callers and Deferred, Agent.Callable and Deferred, addTools extending
-// modelTools, and settings.documentRetentionMs (area b).
+// modelTools, and settings.documentRetentionMs (area b). Pi v1.5.0 sync (area reports): agentHooks pairs each handler with its extension,
+// sectionExtension and toolExtension name the extension whose code a section or tool runs, a wrapper's failure is reported with its
+// extension's name, and settings.afterFailedRun (a30c2a81d, 5f312dac4, 91b33cab3). The file's other areas (restart limit, persistWithinMs,
+// maxTurns) keep the citation on v1.2.0.
 using System.Collections.Immutable;
 using PiSharp.Durable.Chord;
 using PiSharp.Durable.Chord.Delta;
@@ -56,6 +59,7 @@ public static class Agents
             FollowUpMode = settings?.FollowUpMode ?? QueueMode.OneAtATime,
             ContextRetentionMs = settings?.ContextRetentionMs ?? DefaultContextRetentionMs,
             DocumentRetentionMs = Session.DocumentRetention(settings?.DocumentRetentionMs),
+            AfterFailedRun = settings?.AfterFailedRun ?? AfterFailedRun.Keep,
         };
     }
 
@@ -156,22 +160,54 @@ public static class Agents
         foreach (var (key, value) in (JsonObjectValue)owner.ToValue()) agent.Set(key, value);
     }
 
-    /// <summary>Handlers of the selected extensions' hooks for a task name, in extension order (upstream <c>agentHooks</c>).</summary>
-    public static IReadOnlyList<object> AgentHooks(Agent agent, string taskName)
+    /// <summary>Handlers of the selected extensions' hooks for a task name, each with its extension's name, in extension order (upstream
+    /// <c>agentHooks</c>).</summary>
+    public static IReadOnlyList<(string Extension, object Handlers)> AgentHooks(Agent agent, string taskName)
     {
         ArgumentNullException.ThrowIfNull(agent);
-        var handlers = new List<object>();
+        var handlers = new List<(string Extension, object Handlers)>();
         foreach (var extension in agent.Extensions)
             foreach (var hook in extension.Hooks ?? [])
-                if (hook.Task == taskName) handlers.Add(hook.Handlers);
+                if (hook.Task == taskName) handlers.Add((extension.Name, hook.Handlers));
         return handlers;
+    }
+
+    /// <summary>The extension whose code a section of <paramref name="agent"/> runs: the last selected one that provides or wraps it
+    /// (upstream <c>sectionExtension</c>).</summary>
+    public static string? SectionExtension(Agent agent, string key)
+    {
+        ArgumentNullException.ThrowIfNull(agent);
+        string? found = null;
+        foreach (var extension in agent.Extensions)
+        {
+            var provides = extension.Sections?.Any(section => section.Key == key) == true;
+            var wraps = extension.Wraps?.Any(wrap => wrap is SectionWrap section && section.Section == key) == true;
+            if (provides || wraps) found = extension.Name;
+        }
+        return found;
+    }
+
+    /// <summary>The extension whose code a tool of <paramref name="agent"/> runs: the last selected one that provides or wraps it (upstream
+    /// <c>toolExtension</c>).</summary>
+    public static string? ToolExtension(Agent agent, string name)
+    {
+        ArgumentNullException.ThrowIfNull(agent);
+        string? found = null;
+        foreach (var extension in agent.Extensions)
+        {
+            var provides = extension.Tools?.Any(tool => tool.Name == name) == true;
+            var wraps = extension.Wraps?.Any(wrap => wrap is ToolWrap tool && tool.Tool == name) == true;
+            if (provides || wraps) found = extension.Name;
+        }
+        return found;
     }
 
     /// <summary>
     /// Resolves an agent from its stored state (null: every field unset), a registry snapshot and resolved settings (upstream
-    /// <c>resolveAgent</c>). A wrapper that throws or renames drops its target and is reported; a wrapper without a target does nothing.
+    /// <c>resolveAgent</c>). A wrapper that throws or renames drops its target and is reported to <paramref name="report"/> with the name of
+    /// the wrapper's extension; a wrapper without a target does nothing.
     /// </summary>
-    public static Agent ResolveAgent(JsonObjectValue? state, IRegistrySnapshot snapshot, Settings settings, Action<Exception> report)
+    public static Agent ResolveAgent(JsonObjectValue? state, IRegistrySnapshot snapshot, Settings settings, Action<Exception, string> report)
     {
         ArgumentNullException.ThrowIfNull(snapshot);
         ArgumentNullException.ThrowIfNull(settings);
@@ -186,8 +222,9 @@ public static class Agents
         {
             foreach (var wrap in extension.Wraps ?? [])
             {
-                if (wrap is ToolWrap tool) ApplyWrap(composed, tool.Tool, tool.Apply, item => item.Name, report);
-                else if (wrap is SectionWrap section) ApplyWrap(sections, section.Section, section.Apply, item => item.Key, report);
+                void WrapReport(Exception error) => report(error, extension.Name);
+                if (wrap is ToolWrap tool) ApplyWrap(composed, tool.Tool, tool.Apply, item => item.Name, WrapReport);
+                else if (wrap is SectionWrap section) ApplyWrap(sections, section.Section, section.Apply, item => item.Key, WrapReport);
             }
         }
 

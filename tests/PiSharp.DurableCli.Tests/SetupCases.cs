@@ -61,7 +61,7 @@ internal static partial class Program
                     new DurablePromptResources(directory, directory, new OriginalPromptDocumentation("", "", "")));
                 registry.Install(DurableSubagent.Extension);
                 var harnessSettings = DurableHarnessSetup.CreateHarnessSettings(settings, registry);
-                Agent Resolve() => Agents.ResolveAgent(null, registry.Snapshot(), Agents.ResolveSettings(harnessSettings), error => throw error);
+                Agent Resolve() => Agents.ResolveAgent(null, registry.Snapshot(), Agents.ResolveSettings(harnessSettings), (error, _) => throw error);
                 static string Names(IEnumerable<ToolRegistration> tools) => string.Join(",", tools.Select(tool => tool.Name));
 
                 var installed = registry.Snapshot().GetExtension("tool-search");

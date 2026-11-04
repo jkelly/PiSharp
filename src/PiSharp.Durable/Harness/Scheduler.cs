@@ -47,7 +47,17 @@
 // a foreground timer while scheduling runs; with it, OnWake hears each change of Wake(). A read-only scheduler never schedules a wake and
 // answers inactive (be14d9732). runtime.SleepUntilAsync commits the sleep; runtime.SetTimer's timers are disarmed at the invocation's end;
 // the idle context expiry is a background timer. Each pass, inspection and wake reads the Harness clock once, outside the lock. Upstream's
-// reconcile work in wake() (440a5fcdb) and its idle index are other areas': Wake() scans the live tasks as f75b3240a's does.
+// idle index is another area's: Wake() scans the live tasks as f75b3240a's does.
+//
+// Pi v1.5.0 sync (area reports): every report carries its ReportInfo (a30c2a81d, 91b33cab3, 5f312dac4). An invocation keeps the extension
+// that installed its definition at reservation (installerOf), which a task's own failure names: task_error, task_faulted with reason threw
+// once the fault is durable, task_outdated with outdatedReason's reason in place of v1.2.0's cause, migration_failed; a hook names its own
+// extension, runtime.Report(error, from) the code it names. BlockedReasonOf and SubscribeBlocked serve the task graph (440a5fcdb): a registry
+// change and a failed migration notify the graph, and a failed migration schedules a wake. Wake() counts a reconcile pass with work, one
+// underway or one due (reconcileWork), so open's recovery pass keeps the host's wake active until it lands (5ba1cbaf3). The restart limit,
+// task_interrupted and the telemetry context of a report are other areas' (restarts, telemetry). Host timer callbacks the scheduler runs
+// are contained, as a throw on a timer thread would end the process: a task's own SetTimer callback reports task_error, a host disarm
+// host_error setTimer, and the scheduler's own callbacks listener_error.
 using System.Collections;
 using System.Collections.Immutable;
 using PiSharp.Durable.Chord;
@@ -68,6 +78,17 @@ internal sealed record InvocationBinding(CancellationSignal Signal, Action Check
 internal readonly record struct SchedulerIndexSizes(int Live, int Settled, int Edges, int Below, int Roots, int Unloaded, int DropQueue);
 
 /// <summary>Options of the task scheduler (upstream <c>TaskSchedulerOptions</c>).</summary>
+/// <summary>What <see cref="DurableTaskScheduler.BlockedReasonOf"/> reads of a task: the task graph keeps only this of each record
+/// (upstream <c>BlockedSubject</c>).</summary>
+internal readonly record struct BlockedSubject(TaskId Id, string Kind, int Version, bool AbortRequested, TaskAbortReason? AbortReason,
+    DurableTaskStatus Status)
+{
+    /// <summary>The part of <paramref name="record"/> <see cref="DurableTaskScheduler.BlockedReasonOf"/> reads (upstream
+    /// <c>blockedSubject</c>).</summary>
+    public static BlockedSubject Of(TaskRecord record) =>
+        new(record.Id, record.Kind, record.Version, record.AbortRequested, record.AbortReason, record.State.Status);
+}
+
 internal sealed record DurableTaskSchedulerOptions
 {
     public required Session Session { get; init; }
@@ -86,7 +107,8 @@ internal sealed record DurableTaskSchedulerOptions
     public Action<Wake>? OnWake { get; init; }
     /// <summary>The host's timers (<see cref="HarnessOptions.SetTimer"/>).</summary>
     public required HostTimers Timers { get; init; }
-    public required Action<Exception> Report { get; init; }
+    /// <summary>The Harness's report: never throws.</summary>
+    public required Action<Exception, ReportInfo> Report { get; init; }
     /// <summary>Harness cleanup staged in the commit that makes an outcome the scheduler wrote itself terminal.</summary>
     public required SettleOutcome SettleOutcome { get; init; }
     /// <summary>Withdraws a conversation's queued inputs, for conversation abort and abort cascades.</summary>
@@ -135,7 +157,7 @@ internal sealed class DurableTaskScheduler
     private readonly Func<double> now;
     private readonly Action<Wake>? onWake;
     private readonly HostTimers timers;
-    private readonly Action<Exception> report;
+    private readonly Action<Exception, ReportInfo> report;
     private readonly SettleOutcome settleOutcome;
     private readonly Func<Transaction, ConversationId, Task> withdrawInputs;
     private readonly Func<ConversationId, InvocationBinding, DurableContext, Task<IConversationHandle?>> conversation;
@@ -214,6 +236,13 @@ internal sealed class DurableTaskScheduler
     private bool cascadePending;
     /// <summary>Reconciliation passes running now; with the flags above, what <see cref="QuiesceAsync"/> waits out.</summary>
     private int reconciling;
+    /// <summary>Reconcile passes underway with work (they may overlap): their commits finalize held outcomes and mark cascades, so
+    /// <see cref="Wake"/> counts them.</summary>
+    private int reconcilingWork;
+    /// <summary>Listeners of <see cref="SubscribeBlocked"/>. Guarded by <see cref="gate"/>; called outside it.</summary>
+    private ImmutableArray<Action> blockedListeners = [];
+    /// <summary>A registry snapshot that threw for the task graph was reported; it is read per record, so only once.</summary>
+    private int snapshotReported;
     private IDisposable? registrySubscription;
     private bool enabled;
     private bool closing;
@@ -267,7 +296,11 @@ internal sealed class DurableTaskScheduler
     {
         session.ObserveCommits((publication, _) => Observe(publication));
         session.SubscribeClose(Seal);
-        registrySubscription = registry.Subscribe(Kick);
+        registrySubscription = registry.Subscribe(() =>
+        {
+            NotifyBlocked();
+            Kick();
+        });
         await session.CommitWithAsync(async tx =>
         {
             // Every table read before the first write.
@@ -348,9 +381,64 @@ internal sealed class DurableTaskScheduler
     }
 
     /// <summary>
-    /// When the Session next needs a process (upstream <c>wake()</c>): <c>Active</c> while some task can run now or is running, <c>At</c> for
-    /// the earliest sleep not yet due. From memory; a task whose chain is not loaded yet counts as it would alone. A read-only scheduler runs
-    /// nothing, so it never needs a process.
+    /// Why a live task cannot run here, if it cannot (upstream <c>blockedReason</c>): its definition is missing, too old, or failed to
+    /// migrate. A running task, an abort-marked one, and one holding its outcome are never blocked. A registry snapshot that throws is
+    /// reported once, and blocks nothing.
+    /// </summary>
+    public BlockedReason? BlockedReasonOf(BlockedSubject record)
+    {
+        if (record.Status is DurableTaskStatus.Running or DurableTaskStatus.Completing or DurableTaskStatus.Terminal) return null;
+        // An abort request runs its handler or orphans the task; a `restart` mark waits for the definition, blocked.
+        if (record.AbortRequested && record.AbortReason is null) return null;
+        IRegistrySnapshot snapshot;
+        try
+        {
+            snapshot = registry.Snapshot();
+        }
+        catch (Exception error)
+        {
+            if (Interlocked.Exchange(ref snapshotReported, 1) == 0) report(error, RegistryError);
+            return null;
+        }
+        var fit = Fit(record.Id, record.Version, snapshot.GetTask(record.Kind));
+        if (fit.Reason is { } reason) return reason;
+        return fit.Migrates && fit.Task!.Definition.Migrate is null ? Durable.BlockedReason.MigrationFailed : null;
+    }
+
+    /// <summary>Calls <paramref name="listener"/> when blocked reasons may have changed without a commit: a registry change or a failed
+    /// migration (upstream <c>subscribeBlocked</c>). Returns its unsubscribe.</summary>
+    public Action SubscribeBlocked(Action listener)
+    {
+        ArgumentNullException.ThrowIfNull(listener);
+        lock (gate) blockedListeners = blockedListeners.Add(listener);
+        return () =>
+        {
+            lock (gate) blockedListeners = blockedListeners.Remove(listener);
+        };
+    }
+
+    private void NotifyBlocked()
+    {
+        ImmutableArray<Action> listeners;
+        lock (gate) listeners = blockedListeners;
+        foreach (var listener in listeners)
+        {
+            try
+            {
+                listener();
+            }
+            catch (Exception error)
+            {
+                report(error, ReportInfo.ListenerError);
+            }
+        }
+    }
+
+    /// <summary>
+    /// When the Session next needs a process (upstream <c>wake()</c>): <c>Active</c> while some task can run now or is running, or a reconcile
+    /// pass has work (it finalizes held outcomes and marks cascades, at open as recovery: a process that dies before it lands must be woken
+    /// again), <c>At</c> for the earliest sleep not yet due. From memory; a task whose chain is not loaded yet counts as it would alone. A
+    /// read-only scheduler runs nothing, so it never needs a process.
     /// </summary>
     public Wake Wake()
     {
@@ -361,7 +449,7 @@ internal sealed class DurableTaskScheduler
         var check = new List<TaskRecord>();
         lock (gate)
         {
-            active = invocations.Count > 0;
+            active = invocations.Count > 0 || reconcilingWork > 0 || ReconcileWorkLocked();
             foreach (var record in live.Values)
             {
                 var state = record.State;
@@ -396,7 +484,7 @@ internal sealed class DurableTaskScheduler
         }
         catch (Exception error)
         {
-            report(error);
+            report(error, RegistryError);
             return true;
         }
         foreach (var record in records)
@@ -628,7 +716,7 @@ internal sealed class DurableTaskScheduler
         }
         catch (Exception error)
         {
-            report(error);
+            report(error, SettingsError);
             return 0;
         }
     }
@@ -690,7 +778,7 @@ internal sealed class DurableTaskScheduler
             {
                 lock (timerGate) if (ReferenceEquals(expiry, armed)) expiry = null;
                 SettleIdle();
-            }), when - now());
+            }, ReportInfo.ListenerError), when - now());
             if (disarm is null)
             {
                 if (ReferenceEquals(expiry, armed)) expiry = null;
@@ -703,11 +791,12 @@ internal sealed class DurableTaskScheduler
     /// <summary>Disarms a scheduler timer; the host's disarm is host code, and a throw is reported.</summary>
     private void Disarm(ArmedTimer? armed)
     {
-        if (armed?.Disarm is { } disarm) Contained(disarm);
+        if (armed?.Disarm is { } disarm) Contained(disarm, SetTimerError);
     }
 
-    /// <summary>Runs a timer callback or a host action, reporting a throw: on a timer thread it would end the process.</summary>
-    private void Contained(Action action)
+    /// <summary>Runs a timer callback or a host action, reporting a throw as <paramref name="info"/>: on a timer thread it would end the
+    /// process.</summary>
+    private void Contained(Action action, ReportInfo info)
     {
         try
         {
@@ -715,7 +804,7 @@ internal sealed class DurableTaskScheduler
         }
         catch (Exception error)
         {
-            report(error);
+            report(error, info);
         }
     }
 
@@ -737,10 +826,13 @@ internal sealed class DurableTaskScheduler
     private async Task ReconcileAsync()
     {
         List<TaskId> checks;
+        bool work;
         lock (gate)
         {
             reconcileScheduled = false;
             reconciling++;
+            work = ReconcileWorkLocked();
+            if (work) reconcilingWork++;
             checks = [.. failFastChecks];
             failFastChecks.Clear();
         }
@@ -811,10 +903,19 @@ internal sealed class DurableTaskScheduler
         }
         finally
         {
-            lock (gate) reconciling--;
+            lock (gate)
+            {
+                reconciling--;
+                if (work) reconcilingWork--;
+            }
         }
+        ScheduleWake();
         SettleIdle();
     }
+
+    /// <summary>Whether a reconcile pass would have work: a cascade to derive, held outcomes to check, or <c>failFast</c> waits (upstream
+    /// <c>#reconcileWork</c>).</summary>
+    private bool ReconcileWorkLocked() => cascadePending || finalizeChecks.Count > 0 || failFastChecks.Count > 0;
 
     /// <summary>Whether any of <paramref name="ids"/> holds or ended with an outcome other than <c>completed</c>.</summary>
     private async Task<bool> AnyFailedAsync(ImmutableArray<TaskId> ids)
@@ -1405,7 +1506,7 @@ internal sealed class DurableTaskScheduler
         }
         catch (Exception error)
         {
-            report(error);
+            report(error, RegistryError);
         }
         lock (timerGate)
         {
@@ -1464,12 +1565,12 @@ internal sealed class DurableTaskScheduler
                 }
                 catch (Exception error)
                 {
-                    report(error);
+                    report(error, OnWakeError);
                 }
             }
             catch (Exception error)
             {
-                report(error);
+                report(error, ReportInfo.ListenerError);
             }
         }
     }
@@ -1497,7 +1598,7 @@ internal sealed class DurableTaskScheduler
                 var due = now();
                 lock (gate) WakeDueLocked(due);
                 Kick();
-            }), when - now());
+            }, ReportInfo.ListenerError), when - now());
         }
     }
 
@@ -1736,7 +1837,7 @@ internal sealed class DurableTaskScheduler
                         tx.SetTask(WithState(resolved, new RunningTaskState(((LiveTaskState)resolved.State).Checkpoint)));
                     // Registered on the line, so marks and later reservations see it and close joins it; End makes it a candidate again.
                     lock (gate) runnable.Remove(id);
-                    var invocation = CreateInvocation(record, mode);
+                    var invocation = CreateInvocation(record, mode, InstallerOf(snapshot, resolution.Task));
                     reservations.Add(new Reservation(invocation, resolution.Task!, snapshot));
                 }
             }, context).ConfigureAwait(false);
@@ -1802,26 +1903,31 @@ internal sealed class DurableTaskScheduler
         catch (Exception error)
         {
             lock (gate) failedMigrations[record.Id] = (fit.Task, error);
-            report(error);
+            // Blocked now without a commit: the graph and the host's wake must hear it. Queued, as upstream's microtask: this runs on the line.
+            ThreadPool.UnsafeQueueUserWorkItem(static scheduler => scheduler.NotifyBlocked(), this, preferLocal: false);
+            ScheduleWake();
+            report(error, new ReportInfo(ReportKind.MigrationFailed) { Task = ReportTaskOf(record), Extension = InstallerOf(snapshot, fit.Task) });
             return new Resolution(null, null, BlockedReason.MigrationFailed);
         }
     }
 
-    private FitResult Fit(TaskRecord record, DurableTask? task)
+    private FitResult Fit(TaskRecord record, DurableTask? task) => Fit(record.Id, record.Version, task);
+
+    private FitResult Fit(TaskId id, int recordVersion, DurableTask? task)
     {
         if (task is null) return new FitResult(null, false, BlockedReason.MissingTask, null);
         var version = task.Definition.Version;
-        if (version == record.Version) return new FitResult(task, false, null, null);
-        if (version < record.Version) return new FitResult(null, false, BlockedReason.TaskTooOld, null);
+        if (version == recordVersion) return new FitResult(task, false, null, null);
+        if (version < recordVersion) return new FitResult(null, false, BlockedReason.TaskTooOld, null);
         lock (gate)
-            if (failedMigrations.TryGetValue(record.Id, out var failed) && ReferenceEquals(failed.Task, task))
+            if (failedMigrations.TryGetValue(id, out var failed) && ReferenceEquals(failed.Task, task))
                 return new FitResult(null, false, BlockedReason.MigrationFailed, failed.Error);
         return new FitResult(task, true, null, null);
     }
 
     /// <summary>
     /// Scheduling state and every live task with its derived state, read on the Session line. Runs no task code: a pending migration shows as
-    /// ready with <c>Migrates</c>, and only a migration the scheduler already tried, or one that cannot exist, shows as failed.
+    /// pending with <c>Migrates</c>, and only a migration the scheduler already tried, or one that cannot exist, shows as failed.
     /// </summary>
     public async Task<(HarnessScheduling Scheduling, ImmutableArray<TaskInspection> Tasks)> InspectAsync(IRegistrySnapshot snapshot)
     {
@@ -1850,13 +1956,15 @@ internal sealed class DurableTaskScheduler
                 Reason = BlockedReason.MigrationFailed,
                 Error = MissingMigration(record, fit.Task.Definition),
             };
-        return new TaskInspectionState(TaskInspectionKind.Ready) { Migrates = fit.Migrates };
+        return new TaskInspectionState(TaskInspectionKind.Pending) { Migrates = fit.Migrates };
     }
 
-    private Invocation CreateInvocation(TaskRecord record, InvocationMode mode)
+    /// <summary>An invocation of <paramref name="record"/>, whose definition <paramref name="extension"/> installed (none for a built-in
+    /// task).</summary>
+    private Invocation CreateInvocation(TaskRecord record, InvocationMode mode, string? extension)
     {
         var controller = new CancellationSignal();
-        var invocation = new Invocation(record.Id, record.ConversationId, mode, controller, context.WithSignal(controller));
+        var invocation = new Invocation(record.Id, record.Kind, record.ConversationId, extension, mode, controller, context.WithSignal(controller));
         lock (gate) invocations[record.Id] = invocation;
         return invocation;
     }
@@ -1878,7 +1986,7 @@ internal sealed class DurableTaskScheduler
         }
         catch (Exception error)
         {
-            report(error);
+            report(error, AboutTask(ReportKind.TaskError, invocation));
         }
         finally
         {
@@ -1898,7 +2006,7 @@ internal sealed class DurableTaskScheduler
         PhaseResult? previous = null;
         while (true)
         {
-            var current = await StepAsync(invocation, (tx, task) => Decide(tx, task, previous, state)).ConfigureAwait(false);
+            var current = await StepAsync(invocation, (tx, task) => Decide(tx, invocation, task, previous, state)).ConfigureAwait(false);
             // Close may seal between the decision and dispatch.
             bool closingNow;
             lock (gate) closingNow = closing;
@@ -1925,7 +2033,7 @@ internal sealed class DurableTaskScheduler
     /// Precedence rules for a run invocation, on the line. Rules 1 (terminal, <c>completing</c>, <c>waiting</c>, or <c>sleeping</c>) and 2
     /// (closing) are applied by <see cref="StepAsync"/>. Returns whether the invocation continues with the next phase.
     /// </summary>
-    private Decision Decide(Transaction tx, RunningTask current, PhaseResult? previous, RunState state)
+    private Decision Decide(Transaction tx, Invocation invocation, RunningTask current, PhaseResult? previous, RunState state)
     {
         // 3. abort mark: end; a fresh abort invocation starts once the task's ordinary owned work is gone.
         if (current.AbortRequested) return Decision.End;
@@ -1961,9 +2069,8 @@ internal sealed class DurableTaskScheduler
             if (state.Reported is null || !ReferenceEquals(state.Reported.Task, next))
             {
                 state.Reported = new ReportedTask(next);
-                var error = new InvalidOperationException($"Task {current.Id} keeps running under its old {current.Kind} definition");
-                error.Data["cause"] = next is null ? "missing_task" : "incompatible_task";
-                report(error);
+                report(new InvalidOperationException($"Task {current.Id} keeps running under its old {current.Kind} definition"),
+                    AboutTask(ReportKind.TaskOutdated, invocation) with { Reason = OutdatedReason(next, current.Record) });
             }
         }
         return Decision.Continue;
@@ -2002,9 +2109,10 @@ internal sealed class DurableTaskScheduler
     /// </summary>
     private async Task<RunningTask?> StepAsync(Invocation invocation, Func<Transaction, RunningTask, Decision> decide)
     {
+        Exception? fault = null;
         try
         {
-            return await session.CommitWithAsync(async tx =>
+            var continued = await session.CommitWithAsync(async tx =>
             {
                 RunningTask? current;
                 bool closingNow;
@@ -2018,9 +2126,15 @@ internal sealed class DurableTaskScheduler
                 if (decision.Kind == DecisionKind.Continue) return current;
                 End(invocation);
                 if (decision.Kind == DecisionKind.Fault)
+                {
+                    fault = decision.Error!;
                     await TerminateAsync(tx, current!.Record, new FaultedTaskOutcome(new TaskOutcomeError(DurableErrors.MessageOf(decision.Error!)))).ConfigureAwait(false);
+                }
                 return null;
             }, context).ConfigureAwait(false);
+            // Reported once the fault is durable: a host may count it, for example toward a breaker.
+            if (fault is not null) report(fault, AboutTask(ReportKind.TaskFaulted, invocation) with { Reason = ReportReason.Threw });
+            return continued;
         }
         catch (Exception error)
         {
@@ -2180,7 +2294,7 @@ internal sealed class DurableTaskScheduler
             invocation.Timers.Clear();
         }
         foreach (var watch in watches) _ = watch.StopAsync();
-        foreach (var disarm in disarms) Contained(disarm);
+        foreach (var disarm in disarms) Contained(disarm, SetTimerError);
         // Pending waits bound to the invocation, such as a tool's WaitForTaskAsync, reject with it.
         Signal(invocation, EndedError(invocation));
     }
@@ -2195,7 +2309,7 @@ internal sealed class DurableTaskScheduler
         }
         catch (Exception error)
         {
-            report(error);
+            report(error, ReportInfo.ListenerError);
         }
     }
 
@@ -2286,16 +2400,58 @@ internal sealed class DurableTaskScheduler
     private static string? PhaseOf(JsonValue checkpoint) =>
         checkpoint is JsonObjectValue value && value.TryGetValue("phase", out var phase) && phase is JsonStringValue name ? name.Value : null;
 
+    // ─── Reports ─────────────────────────────────────────────────────────────
+
+    private static readonly ReportInfo RegistryError = ReportInfo.HostError(HostCallback.Registry);
+    private static readonly ReportInfo SettingsError = ReportInfo.HostError(HostCallback.Settings);
+    private static readonly ReportInfo OnWakeError = ReportInfo.HostError(HostCallback.OnWake);
+    private static readonly ReportInfo SetTimerError = ReportInfo.HostError(HostCallback.SetTimer);
+
+    /// <summary>What a report about an invocation's own code says of it (upstream <c>#aboutTask</c> of an invocation): the task, and the
+    /// extension that installed the definition it runs.</summary>
+    private static ReportInfo AboutTask(ReportKind kind, Invocation invocation) =>
+        new(kind) { Task = ReportTaskOf(invocation), Extension = invocation.Extension };
+
+    /// <summary>The task an invocation's report is about (upstream <c>reportTask</c>).</summary>
+    private static ReportTask ReportTaskOf(Invocation invocation) => new(invocation.TaskId, invocation.Kind, invocation.ConversationId);
+
+    /// <summary>A stored task, as a report names it (upstream <c>reportTask(recordTask(record))</c>).</summary>
+    private static ReportTask ReportTaskOf(TaskRecord record) => new(record.Id, record.Kind, record.ConversationId);
+
+    /// <summary>The extension that installed <paramref name="task"/> in <paramref name="snapshot"/>, the last one that lists it; none for a
+    /// built-in task (upstream <c>installerOf</c>).</summary>
+    private static string? InstallerOf(IRegistrySnapshot snapshot, DurableTask? task)
+    {
+        if (task is null) return null;
+        var installed = snapshot.Installed();
+        for (var index = installed.Count - 1; index >= 0; index--)
+        {
+            if (installed[index].Tasks is { } tasks && tasks.Any(listed => ReferenceEquals(listed, task))) return installed[index].Name;
+        }
+        return null;
+    }
+
+    /// <summary>Why a replacement definition cannot take a running task, in <see cref="Fit(TaskRecord, DurableTask?)"/>'s words: none is
+    /// registered, it is older than the task, or it is newer without a migration (upstream <c>outdatedReason</c>).</summary>
+    private static ReportReason OutdatedReason(DurableTask? task, TaskRecord record)
+    {
+        if (task is null) return ReportReason.MissingTask;
+        return task.Definition.Version < record.Version ? ReportReason.TaskTooOld : ReportReason.MigrationFailed;
+    }
+
     // ─── Types ───────────────────────────────────────────────────────────────
 
     private enum InvocationMode { Run, Abort }
 
     /// <summary>One in-memory execution of a task in run or abort mode.</summary>
-    private sealed class Invocation(TaskId taskId, ConversationId conversationId, InvocationMode mode, CancellationSignal controller,
-        DurableContext context)
+    private sealed class Invocation(TaskId taskId, string kind, ConversationId conversationId, string? extension, InvocationMode mode,
+        CancellationSignal controller, DurableContext context)
     {
         public TaskId TaskId { get; } = taskId;
+        public string Kind { get; } = kind;
         public ConversationId ConversationId { get; } = conversationId;
+        /// <summary>The extension that installed the definition this invocation runs, at reservation; none for a built-in task.</summary>
+        public string? Extension { get; } = extension;
         public InvocationMode Mode { get; } = mode;
         public CancellationSignal Controller { get; } = controller;
         /// <summary>Context passed to handlers; cancelled by <see cref="Controller"/>.</summary>
@@ -2535,7 +2691,7 @@ internal sealed class DurableTaskScheduler
         {
             ArgumentNullException.ThrowIfNull(select);
             ArgumentNullException.ThrowIfNull(invoke);
-            foreach (var handlers in Agents.AgentHooks(await PhaseAgent().ConfigureAwait(false), phase.Task().Definition.Name))
+            foreach (var (extension, handlers) in Agents.AgentHooks(await PhaseAgent().ConfigureAwait(false), phase.Task().Definition.Name))
             {
                 if (handlers is not THooks typed || select(typed) is not { } handler) continue;
                 try
@@ -2545,7 +2701,7 @@ internal sealed class DurableTaskScheduler
                 catch (Exception error)
                 {
                     if (invocation.Controller.Token.IsCancellationRequested) throw;
-                    scheduler.report(error);
+                    scheduler.report(error, new ReportInfo(ReportKind.ExtensionError) { Extension = extension, Task = ReportTaskOf(invocation) });
                 }
             }
         }
@@ -2756,7 +2912,7 @@ internal sealed class DurableTaskScheduler
                     invocation.Timers.Remove(slot);
                 }
                 if (!invocation.Ended) callback();
-            }), delayMs);
+            }, AboutTask(ReportKind.TaskError, invocation)), delayMs);
             bool done;
             lock (scheduler.gate)
             {
@@ -2764,7 +2920,7 @@ internal sealed class DurableTaskScheduler
                 if (!done) slot.Disarm = disarm;
             }
             // Ended with its invocation, or fired, while it was armed: End found nothing to disarm.
-            if (done) scheduler.Contained(disarm);
+            if (done) scheduler.Contained(disarm, SetTimerError);
             return () =>
             {
                 Action? armed;
@@ -2778,10 +2934,18 @@ internal sealed class DurableTaskScheduler
             };
         }
 
-        public void Report(Exception error)
+        public void Report(Exception error, ReportFrom? from = null)
         {
+            ArgumentNullException.ThrowIfNull(error);
             if (invocation.Ended) throw EndedError(invocation);
-            scheduler.report(error);
+            // The task's own failure names the task's extension; any other names whose code failed, if anyone's.
+            var task = ReportTaskOf(invocation);
+            scheduler.report(error, from switch
+            {
+                null => AboutTask(ReportKind.TaskError, invocation),
+                { Kind: ReportFromKind.Extension } => new ReportInfo(ReportKind.ExtensionError) { Task = task, Extension = from.Extension },
+                _ => ReportInfo.HostError(from.Callback!.Value, task),
+            });
         }
 
         // ─── Committed document reads and watches ───

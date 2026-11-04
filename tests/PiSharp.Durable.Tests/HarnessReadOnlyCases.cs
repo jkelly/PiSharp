@@ -32,7 +32,7 @@ internal static class ReadOnlyTests
             Models = setup.Models,
             Registry = setup.Registry,
             ReadOnly = true,
-            OnReport = setup.Reports.Add,
+            OnReport = setup.Record,
             OnWake = onWake,
         }, Context);
 

@@ -586,7 +586,7 @@ internal static class StorageFailureTests
         {
             var reports = new List<Exception>();
             Func<double>? clock = null;
-            clock = DurableHarness.SafeNow(() => throw new InvalidOperationException("clock broke"), true, error =>
+            clock = DurableHarness.SafeNow(() => throw new InvalidOperationException("clock broke"), true, (error, _) =>
             {
                 reports.Add(error);
                 // Reentry, as a handler that commits does: the clock is read again before this report returns.

@@ -91,7 +91,7 @@ public sealed class AgentTeam
             Settings = new TeamSettings(Options.Settings),
             Env = Options.Env,
             TimeProvider = Options.TimeProvider,
-            OnReport = Options.OnReport,
+            OnReport = Options.OnReport is { } onReport ? report => onReport(report.Error) : null,
         }, context).ConfigureAwait(false);
         try
         {

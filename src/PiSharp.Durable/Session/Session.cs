@@ -5,7 +5,9 @@
 // the result, as session/writer.ts does for a call of one part: a refusal fails the Session and is the commit's error, as a rejection is.
 // Group commit (several parts per call) and the publication scope (Storage.publishing) follow with their own areas; GuardedStorage
 // already forwards both. Pi v1.5.0 sync (area sleep): createSession's setTimer arms the document sweep as a background timer (upstream
-// f75b3240a, Timers.cs); a host that declines one leaves eviction to the end of each commit.
+// f75b3240a, Timers.cs); a host that declines one leaves eviction to the end of each commit. Pi v1.5.0 sync (area reports): a report
+// carries its ReportInfo (a30c2a81d): the Session's failure and a failing close are storage_failed, a host timer host_error setTimer, and a
+// listener's throw listener_error, the default.
 //
 // Concurrency model. Upstream relies on one JavaScript thread: `#enqueue` chains every mutation and cold load onto one promise, and
 // listeners run in later microtasks. Here .NET callers may be on any thread, so:
@@ -130,7 +132,8 @@ public class Session : ISession
             try { return DocumentRetention(retention()); }
             catch (Exception) { return DocumentRetention(null); }
         };
-        timers = new HostTimers(setTimer, timeProvider is null ? NativeTimer.System : NativeTimer.Of(timeProvider), error => Report(error));
+        timers = new HostTimers(setTimer, timeProvider is null ? NativeTimer.System : NativeTimer.Of(timeProvider),
+            error => Report(error, ReportInfo.HostError(HostCallback.SetTimer)));
         host = new Host(this);
     }
 
@@ -188,7 +191,7 @@ public class Session : ISession
         var finishClose = BeginClose(DurableContext.Background);
         _ = closing!.ContinueWith(static task => _ = task.Exception, CancellationToken.None,
             TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
-        Report(error);
+        Report(error, ReportInfo.StorageFailed);
         // Upstream's next microtask: the join and the closing line job follow the listeners and the report. They start on the thread pool,
         // not inside the call that failed, which may be a line job or a Storage call.
         if (finishClose is not null) ThreadPool.UnsafeQueueUserWorkItem(static finish => finish(), finishClose, preferLocal: false);
@@ -204,8 +207,12 @@ public class Session : ISession
         }
     }
 
-    /// <summary>Internal: the Session's failure, and errors of listeners, which never fail what ran them. A plain Session drops them.</summary>
-    internal virtual void Report(Exception error) { }
+    /// <summary>Internal: errors of listeners, which never fail what ran them, reported as <c>listener_error</c>.</summary>
+    internal void Report(Exception error) => Report(error, ReportInfo.ListenerError);
+
+    /// <summary>Internal: the Session's failure, and errors that never fail what ran them, with what they are about (upstream
+    /// <c>report(error, info)</c>). A plain Session drops them.</summary>
+    internal virtual void Report(Exception error, ReportInfo info) { }
 
     // ─── Commits ────────────────────────────────────────────────────────────
 
@@ -568,7 +575,7 @@ public class Session : ISession
                 catch (Exception error)
                 {
                     // A Storage that cannot close is a failed one; an earlier failure stays the cause.
-                    if (TrySetFailure(error)) Report(error);
+                    if (TrySetFailure(error)) Report(error, ReportInfo.StorageFailed);
                     throw;
                 }
                 return true;
@@ -589,7 +596,7 @@ public class Session : ISession
             disarm = documentSweep?.Disarm;
             documentSweep = null;
         }
-        if (disarm is not null) Contained(disarm, Report);
+        if (disarm is not null) Contained(disarm, SetTimerError);
         foreach (var listener in listeners) Contained(listener, Report);
     }
 
@@ -748,7 +755,7 @@ public class Session : ISession
             else if (documentTimersUnavailable) documentSweep = null;
             else arm = true;
         }
-        if (replaced is not null) Contained(replaced, Report);
+        if (replaced is not null) Contained(replaced, SetTimerError);
         if (!arm) return;
         // A timer that fires early sweeps nothing and arms the next one.
         var disarm = timers.Background(() =>
@@ -770,8 +777,11 @@ public class Session : ISession
             }
         }
         // Replaced, swept or closed while it was armed.
-        Contained(disarm, Report);
+        Contained(disarm, SetTimerError);
     }
+
+    /// <summary>Reports a host timer's throw, such as its disarm's.</summary>
+    private void SetTimerError(Exception error) => Report(error, ReportInfo.HostError(HostCallback.SetTimer));
 
     /// <summary>Queues the sweep job on the line; called under <see cref="documentsGate"/>, and never runs the job inline.</summary>
     private void QueueDocumentSweepLocked(DocumentSweep sweep)

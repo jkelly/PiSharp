@@ -89,7 +89,7 @@ internal static class ChatTests
             Settings = setup.Settings,
             Env = env,
             Now = () => setup.Now(),
-            OnReport = setup.Reports.Add,
+            OnReport = setup.Record,
         }, Context);
         var root = await harness.RootAsync(Context, new AgentChange { Model = new ModelRef("faux", "faux-1") });
         return new OpenedChat(harness, root);
@@ -202,14 +202,15 @@ internal sealed class ChatSetup
 {
     private readonly Values values;
 
-    public ChatSetup(FauxModels faux) : this(faux, PiSharp.Durable.Registry.Create(), new SyncList<Exception>(), new Values()) { }
+    public ChatSetup(FauxModels faux) : this(faux, PiSharp.Durable.Registry.Create(), new SyncList<Exception>(), new SyncList<ReportInfo>(), new Values()) { }
 
-    private ChatSetup(FauxModels faux, IRegistry registry, SyncList<Exception> reports, Values values)
+    private ChatSetup(FauxModels faux, IRegistry registry, SyncList<Exception> reports, SyncList<ReportInfo> infos, Values values)
     {
         Faux = faux;
         Models = faux;
         Registry = registry;
         Reports = reports;
+        Infos = infos;
         this.values = values;
         Settings = new LiveSettings(values);
     }
@@ -219,6 +220,8 @@ internal sealed class ChatSetup
     public IDurableModels Models { get; set; }
     public IRegistry Registry { get; }
     public SyncList<Exception> Reports { get; }
+    /// <summary>What each report was about, in the order of <see cref="Reports"/> (upstream <c>infos</c>).</summary>
+    public SyncList<ReportInfo> Infos { get; }
     public Func<double> Now { get; set; } = () => DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
     /// <summary>The HarnessSettings the Harness reads; its getters read the mutable fields below at every resolution.</summary>
     public HarnessSettings Settings { get; }
@@ -236,13 +239,24 @@ internal sealed class ChatSetup
     public QueueMode? FollowUpMode { get => values.FollowUpMode; set => values.FollowUpMode = value; }
     public double? ContextRetentionMs { get => values.ContextRetentionMs; set => values.ContextRetentionMs = value; }
     public double? DocumentRetentionMs { get => values.DocumentRetentionMs; set => values.DocumentRetentionMs = value; }
+    public AfterFailedRun? AfterFailedRun { get => values.AfterFailedRun; set => values.AfterFailedRun = value; }
+
+    /// <summary><c>OnReport</c>: the error in <see cref="Reports"/>, what it is about in <see cref="Infos"/>, at the same index.</summary>
+    public void Record(Report report)
+    {
+        lock (Reports)
+        {
+            Reports.Add(report.Error);
+            Infos.Add(report.Info);
+        }
+    }
 
     /// <summary>A copy sharing the faux provider, registry, reports and settings object, with other models (upstream
     /// <c>{ ...base, models }</c>).</summary>
-    public ChatSetup WithModels(IDurableModels models) => new(Faux, Registry, Reports, values) { Models = models, Now = Now, Identity = Identity };
+    public ChatSetup WithModels(IDurableModels models) => new(Faux, Registry, Reports, Infos, values) { Models = models, Now = Now, Identity = Identity };
 
     /// <summary>A copy with a fresh settings object (upstream <c>{ ...base, settings }</c>).</summary>
-    public ChatSetup WithFreshSettings() => new(Faux, Registry, Reports, new Values()) { Models = Models, Now = Now, Identity = Identity };
+    public ChatSetup WithFreshSettings() => new(Faux, Registry, Reports, Infos, new Values()) { Models = Models, Now = Now, Identity = Identity };
 
     private sealed class Values
     {
@@ -256,6 +270,7 @@ internal sealed class ChatSetup
         public QueueMode? FollowUpMode;
         public double? ContextRetentionMs;
         public double? DocumentRetentionMs;
+        public AfterFailedRun? AfterFailedRun;
     }
 
     private sealed class LiveSettings(Values values) : HarnessSettings
@@ -270,6 +285,7 @@ internal sealed class ChatSetup
         public override QueueMode? FollowUpMode { get => values.FollowUpMode; init { } }
         public override double? ContextRetentionMs { get => values.ContextRetentionMs; init { } }
         public override double? DocumentRetentionMs { get => values.DocumentRetentionMs; init { } }
+        public override AfterFailedRun? AfterFailedRun { get => values.AfterFailedRun; init { } }
     }
 }
 

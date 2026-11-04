@@ -90,10 +90,10 @@ internal static partial class TuiTests
             .Invoke([status, phase, on ?? [], policy, outcome, until]);
 
     public static TaskGraphNode Node(long id, string kind, ConversationId conversation, TaskGraphState state, long? owner = null,
-        bool background = false, bool abortRequested = false, long[]? conversations = null) =>
+        bool background = false, bool abortRequested = false, long[]? conversations = null, BlockedReason? blocked = null) =>
         (TaskGraphNode)typeof(TaskGraphNode).GetConstructors(BindingFlags.NonPublic | BindingFlags.Instance).Single()
             .Invoke([new TaskId(id), kind, conversation, owner is null ? null : new TaskId(owner.Value), background, abortRequested, state,
-                (conversations ?? []).Select(value => new ConversationId(value)).ToImmutableArray()]);
+                (conversations ?? []).Select(value => new ConversationId(value)).ToImmutableArray(), blocked]);
 
     public static TaskGraph Graph(params TaskGraphNode[] nodes) =>
         (TaskGraph)typeof(TaskGraph).GetConstructors(BindingFlags.NonPublic | BindingFlags.Instance).Single()

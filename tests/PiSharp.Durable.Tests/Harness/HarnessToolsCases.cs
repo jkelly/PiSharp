@@ -773,6 +773,9 @@ internal static class ToolsTests
             Equal(SubmissionStatus.Done, ran.Status, "status");
             Equal("""{"body":1,"after":true}""", sent, "sent");
             Equal(1, setup.Reports.Snapshot().Count(error => error.Message == "broken hook"), "reports");
+            // Pi v1.5.0 sync (area reports): the report names the hook's extension.
+            var extensionErrors = setup.Infos.Snapshot().Where(info => info.Kind == ReportKind.ExtensionError).ToList();
+            Check(extensionErrors.Count == 1 && extensionErrors[0].Extension == "broken", $"extension errors: {string.Join(", ", extensionErrors)}");
             await ran.Harness.CloseAsync(Context);
         });
 
