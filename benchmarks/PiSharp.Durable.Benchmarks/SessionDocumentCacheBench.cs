@@ -4,6 +4,7 @@
 // and the cost of reading a document of an old conversation again. Upstream's performance.now() is a Stopwatch; createModels() is a models
 // catalog without providers (the task makes no request). Upstream casts the Harness to SessionImpl for its internal readOnLine() and
 // documentCacheSizes; this assembly reaches the Session's internal FlushLineAsync and DocumentCacheSizes by reflection.
+// Pi v1.5.0 sync (area deferred-commits): DocumentCacheSizes also counts the documents with held changes.
 using System.Diagnostics;
 using System.Globalization;
 using System.Reflection;
@@ -126,8 +127,8 @@ public static class SessionDocumentCacheBench
 
         public Task FlushLineAsync() => (Task)Flush.Invoke(session, null)!;
 
-        public (int Cached, int Idle, int Attached, int Sweeps) DocumentCacheSizes =>
-            ((int Cached, int Idle, int Attached, int Sweeps))Sizes.GetValue(session)!;
+        public (int Cached, int Idle, int Attached, int Sweeps, int Held) DocumentCacheSizes =>
+            ((int Cached, int Idle, int Attached, int Sweeps, int Held))Sizes.GetValue(session)!;
     }
 
     /// <summary>Upstream's arguments: comma-separated sizes, or the defaults.</summary>
