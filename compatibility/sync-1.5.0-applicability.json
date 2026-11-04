@@ -56,11 +56,11 @@
     "changelogBullets": 477,
     "repeatedBullets": 23,
     "byStatus": {
-      "ported": 184,
+      "ported": 187,
       "ported-with-deferral": 22,
       "already-ported": 12,
       "no-op": 25,
-      "port": 83
+      "port": 80
     },
     "byArea": {
       "ai": 58,
@@ -8191,7 +8191,7 @@
       "id": "durable.durable-sleep",
       "area": "durable",
       "phase": 4,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "durable@1.4.0/Breaking Changes#1",
         "durable@1.4.0/Breaking Changes#2",
@@ -8233,13 +8233,38 @@
         "samples/Durable.Examples/ExamplesChildTasks.cs"
       ],
       "release": "1.5.0",
-      "notes": "PiSharp has ITaskRuntime.SleepAsync(until, context) (TypesTasks.cs:98), which waits inside the phase. PiSharp-only callers must move to sleepUntil phases: recurring jobs (decision 0009; Hosting Apps/Jobs.cs:590 and :798, Apps/JobBranches.cs:266) and custom agent workflows (decision 0012; CustomAgents Workflows/Engine/Composition.cs:313, WorkflowEngine.cs:115). SQLite and SQL Server task tables need the sleeping status (durable.sqlite-schema-v2). Depends on durable.host-timers (the timers that resume sleepers); pairs with durable.wake. Upstream renumbered the examples (13-recovery is 12-recovery, 24-child-tasks is 23-child-tasks)."
+      "notes": "PiSharp has ITaskRuntime.SleepAsync(until, context) (TypesTasks.cs:98), which waits inside the phase. PiSharp-only callers must move to sleepUntil phases: recurring jobs (decision 0009; Hosting Apps/Jobs.cs:590 and :798, Apps/JobBranches.cs:266) and custom agent workflows (decision 0012; CustomAgents Workflows/Engine/Composition.cs:313, WorkflowEngine.cs:115). SQLite and SQL Server task tables need the sleeping status (durable.sqlite-schema-v2). Depends on durable.host-timers (the timers that resume sleepers); pairs with durable.wake. Upstream renumbered the examples (13-recovery is 12-recovery, 24-child-tasks is 23-child-tasks).",
+      "evidence": {
+        "commits": [
+          "17ba6640",
+          "99bcf00f",
+          "0b370f2c",
+          "ecaa9172",
+          "f4c99d09"
+        ],
+        "tests": [
+          "tests/PiSharp.Durable.Tests/HarnessSleepCases.cs: sleeps-without-an-invocation-and-resumes-at-its-checkpoint-once-due",
+          "tests/PiSharp.Durable.Tests/HarnessSleepCases.cs: keeps-a-sleep-across-reopen",
+          "tests/PiSharp.Durable.Tests/HarnessSleepCases.cs: runs-a-due-sleep-at-any-scheduling-pass-before-its-timer-fires",
+          "tests/PiSharp.Durable.Tests/HarnessSleepCases.cs: runs-the-abort-handler-of-a-sleeping-task-without-waiting-for-its-time",
+          "tests/PiSharp.Durable.Tests/HarnessSleepCases.cs: rejects-a-sleep-until-something-that-is-not-a-time-and-a-sleep-in-an-abort-handler",
+          "tests/PiSharp.Durable.Tests/Harness/HarnessGenerationRecoveryCases.cs: resumes-a-retry-backoff-after-reopen",
+          "tests/PiSharp.Durable.Tests/Harness/HarnessGenerationRecoveryCases.cs: sleeps-again-for-a-retry-stored-as-a-running-phase-by-an-earlier-version",
+          "tests/PiSharp.Durable.Tests/Harness/HarnessGenerationRecoveryCases.cs: resumes-polling-a-deferred-response-after-reopen",
+          "tests/PiSharp.Durable.Tests/Harness/HarnessGenerationRecoveryCases.cs: fails-no-model-when-the-pinned-model-is-gone-after-reopen-in-request-and-in-poll",
+          "tests/PiSharp.Durable.Tests/Harness/HarnessCompactionCases.cs: resumes-a-retry-backoff-after-reopen",
+          "tests/PiSharp.Durable.Tests/Harness/HarnessTasksCases.cs: task-runtime.rejects-runtime-operations-after-the-invocation-ends-and-stops-its-watches",
+          "src/PiSharp.Durable/Testing/StorageConformance.cs: stores and scans sleeping tasks by status",
+          "tests/PiSharp.Durable.Tests/ExamplesCases.cs: examples.memory.upstream-output",
+          "tests/PiSharp.DurableCli.Tests/TuiStateCases.cs: tui.state.describe-task"
+        ]
+      }
     },
     {
       "id": "durable.host-timers",
       "area": "durable",
       "phase": 4,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "durable@1.4.0/Breaking Changes#4",
         "durable@1.4.0/Added#5"
@@ -8266,13 +8291,29 @@
         "src/PiSharp.Durable/ (new)"
       ],
       "release": "1.5.0",
-      "notes": "PiSharp already has a .NET seam for part of this: HarnessOptions.TimeProvider (Harness/Types.cs:747-749) arms sleeps and idle context expiry. Missing: the Session's timers (createSession, document retention, progress throttles), the foreground/background split with its fallback report, ITaskRuntime.SetTimer and IToolExecutionApi.Now. The area decides whether setTimer maps onto TimeProvider (a fake TimeProvider for tests) or a new delegate; a .NET timer never keeps the process alive, so 'background' needs no unref. Code that builds ITaskRuntime or IToolExecutionApi by hand must add the members (none outside tests today). The Progress clock is chord@1.4.0/Added#4 (group F), ported here in PiSharp's Chord subset (Harness/Output.cs). durable.codemode-harness-clock depends on Now()."
+      "notes": "PiSharp already has a .NET seam for part of this: HarnessOptions.TimeProvider (Harness/Types.cs:747-749) arms sleeps and idle context expiry. Missing: the Session's timers (createSession, document retention, progress throttles), the foreground/background split with its fallback report, ITaskRuntime.SetTimer and IToolExecutionApi.Now. The area decides whether setTimer maps onto TimeProvider (a fake TimeProvider for tests) or a new delegate; a .NET timer never keeps the process alive, so 'background' needs no unref. Code that builds ITaskRuntime or IToolExecutionApi by hand must add the members (none outside tests today). The Progress clock is chord@1.4.0/Added#4 (group F), ported here in PiSharp's Chord subset (Harness/Output.cs). durable.codemode-harness-clock depends on Now().",
+      "evidence": {
+        "commits": [
+          "17ba6640",
+          "99bcf00f",
+          "0b370f2c",
+          "ecaa9172",
+          "f4c99d09"
+        ],
+        "tests": [
+          "tests/PiSharp.Durable.Tests/HarnessSleepCases.cs: resumes-a-due-sleep-with-its-timer-without-onwake-with-background-timers-declined",
+          "tests/PiSharp.Durable.Tests/HarnessSleepCases.cs: disarms-the-sleep-timer-when-the-sleep-is-aborted-and-when-the-harness-closes",
+          "tests/PiSharp.Durable.Tests/HarnessSleepCases.cs: disarms-an-invocation-s-timers-when-it-ends-and-a-late-fire-runs-nothing",
+          "tests/PiSharp.Durable.Tests/HarnessSleepCases.cs: arms-a-foreground-timer-the-host-declines-with-settimeout-reporting-it-once",
+          "tests/PiSharp.Durable.Tests/CodemodeCases.cs: drops-a-global-s-result-that-arrives-after-the-script-finished"
+        ]
+      }
     },
     {
       "id": "durable.wake",
       "area": "durable",
       "phase": 4,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "durable@1.4.0/Added#6"
       ],
@@ -8292,7 +8333,24 @@
         "tests/PiSharp.Durable.Tests/Harness/HarnessTasksCases.cs"
       ],
       "release": "1.5.0",
-      "notes": "No counterpart today. Depends on durable.durable-sleep; 1.5.0 makes wake() cheap (durable.scheduler-idle-index), and a read-only Harness's wake() is always inactive (durable.read-only-harness). PiSharp-only: the device host (decision 0008, Hosting DurableDeviceHost.cs) and recurring job schedules (decision 0009, Hosting JobSchedules.cs) keep sessions open and arm their own timers; onWake would let them close idle sessions and reopen at the wake time. Record whether they adopt it; nothing requires them to."
+      "notes": "No counterpart today. Depends on durable.durable-sleep; 1.5.0 makes wake() cheap (durable.scheduler-idle-index), and a read-only Harness's wake() is always inactive (durable.read-only-harness). PiSharp-only: the device host (decision 0008, Hosting DurableDeviceHost.cs) and recurring job schedules (decision 0009, Hosting JobSchedules.cs) keep sessions open and arm their own timers; onWake would let them close idle sessions and reopen at the wake time. Record whether they adopt it; nothing requires them to.",
+      "evidence": {
+        "commits": [
+          "17ba6640",
+          "99bcf00f",
+          "0b370f2c",
+          "ecaa9172",
+          "f4c99d09"
+        ],
+        "tests": [
+          "tests/PiSharp.Durable.Tests/HarnessSleepCases.cs: sleeps-without-an-invocation-and-resumes-at-its-checkpoint-once-due",
+          "tests/PiSharp.Durable.Tests/HarnessSleepCases.cs: arms-no-timer-for-sleeps-with-onwake",
+          "tests/PiSharp.Durable.Tests/HarnessSleepCases.cs: counts-neither-a-wait-on-a-sleeping-task-nor-an-outcome-held-over-one-as-active",
+          "tests/PiSharp.Durable.Tests/HarnessSleepCases.cs: does-not-count-a-task-without-a-definition-as-active",
+          "tests/PiSharp.Durable.Tests/HarnessSleepCases.cs: reports-a-throwing-onwake-and-offers-the-same-wake-again-at-the-next-pass",
+          "tests/PiSharp.Durable.Tests/HarnessReadOnlyCases.cs: harness.read-only.opens-a-session-with-work-running-elsewhere-without-writing"
+        ]
+      }
     },
     {
       "id": "durable.restart-limit",

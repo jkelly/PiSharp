@@ -1732,7 +1732,13 @@
         "00bf7193d",
         "ea7c64843",
         "ec1be23eb",
-        "f75b3240a"
+        "f75b3240a",
+        "17ba6640",
+        "99bcf00f",
+        "951e3aec",
+        "0b370f2c",
+        "ecaa9172",
+        "f4c99d09"
       ],
       "notes": "PiSharp-only callers of ITaskRuntime.SleepAsync move to sleepUntil phases: recurring jobs (decision 0009; Hosting Apps/Jobs.cs and Apps/JobBranches.cs) and custom agent workflows (decision 0012; Workflows/Engine/Composition.cs, WorkflowEngine.cs). Switches over the task state (TaskStateKind) gain sleeping: the CLI TUI (DurableTuiState.cs, DurableTuiView.cs), the device host and custom agents. Timers: HarnessOptions.TimeProvider (Harness/Types.cs) already arms sleeps and idle context expiry; decide whether setTimer maps onto TimeProvider (a fake TimeProvider for tests) or a separate ITimerHost, add the Session's timers (createSession, document retention, progress throttles through chord-output's ProgressClock), the foreground/background split with its single fallback report, ITaskRuntime.SetTimer and IToolExecutionApi.Now (area codemode reads it). wake()/onWake: no counterpart today; the device host (DurableDeviceHost.cs) and job schedules (JobSchedules.cs) could close idle sessions with it, which is optional. Storage: the sleeping status needs the SQLite schema version 2 (area sqlite) and the SQL Server CHECK migration (area sqlite) before a sleeping task is stored. The Cloudflare half of the timer change and test-workers/wake.test.ts are excluded (Cloudflare). examples 12-recovery and 23-child-tasks change (upstream renumbered them)."
     },
