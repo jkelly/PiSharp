@@ -12,6 +12,10 @@
 // Since pi-durable 1.5.0 (Pi v1.5.0 sync, area watches): Durable has no state getters (viewState(), taskGraph()), so the view follows a
 // watch of the shown conversation's view (Conversation.watch()) and the open task panel a task graph watch (Harness.watchTaskGraph()),
 // each started at its acquisition value, which the view shows at once.
+// Pi v1.5.0 sync (area view): the view watch's entries are a window over the whole transcript (newest 50, dropping the oldest past 100), so
+// the view also carries the shown conversation's active transcript, which the TUI renders: read with Conversation.context() when a watch
+// starts, advanced by the entries each later value appends (the 1.2.0 view's head-marker cut), and read again when entries left the
+// window before a value showed them.
 using System.Collections.Immutable;
 using System.Text.RegularExpressions;
 using PiSharp.Cli.Commands;
@@ -291,8 +295,8 @@ internal sealed class DurableSession : IOpenDurable, IDurableViewSource, IDurabl
     private Task? closing;
 
     private DurableSession(DurableSessionLocation location, DurableExecutionEnvs envs, IHarness harness, DurableModels models, PiSettings settings,
-        IConversation root, IWatchHandle<ConversationView> conversation, IReadOnlyList<DurableConversationSummary> summaries,
-        IRegistryReader registry, Func<ConversationId, string> planDirectory)
+        IConversation root, IWatchHandle<ConversationView> conversation, ImmutableArray<EntryRecord> transcript,
+        IReadOnlyList<DurableConversationSummary> summaries, IRegistryReader registry, Func<ConversationId, string> planDirectory)
     {
         this.location = location; this.envs = envs; this.harness = harness; this.models = models; Settings = settings;
         this.registry = registry; this.planDirectory = planDirectory;
@@ -301,25 +305,49 @@ internal sealed class DurableSession : IOpenDurable, IDurableViewSource, IDurabl
         this.conversation = conversation;
         state = new DurableView(new DurableSessionInfo(location.Id, location.Directory, location.Cwd), conversation.Value, [.. summaries],
             ModelSummaries(), []);
-        state = WithShown(state, conversation.Value);
-        Follow(conversation);
+        state = WithShown(state, conversation.Value, transcript);
+        Follow(conversation, root);
     }
 
-    /// <summary>Shows each later revision of <paramref name="watch"/>, the shown conversation's view watch, until another replaces it (a
-    /// call already running when the switch stopped it shows nothing).</summary>
-    private void Follow(IWatchHandle<ConversationView> watch) => watch.Start((call, _) =>
+    /// <summary>Shows each later revision of <paramref name="watch"/>, the view watch of <paramref name="shown"/>, the shown conversation, with
+    /// its active transcript, until another replaces it (a call already running when the switch stopped it shows nothing).</summary>
+    private void Follow(IWatchHandle<ConversationView> watch, IConversation shown) => watch.Start(async (call, _) =>
     {
-        if (call is WatchValueCall<ConversationView> change && ReferenceEquals(conversation, watch)) Update(view => WithShown(view, change.Value));
-        return Task.CompletedTask;
+        if (call is not WatchValueCall<ConversationView> change || !ReferenceEquals(conversation, watch)) return;
+        var before = Current;
+        var transcript = await TranscriptAsync(shown, before.Conversation, before.Transcript, change.Value).ConfigureAwait(false);
+        Update(view => ReferenceEquals(conversation, watch) ? WithShown(view, change.Value, transcript) : view);
     });
 
-    /// <summary>The view showing <paramref name="value"/>, a revision of the shown conversation, with its nested calls gathered; another
-    /// conversation's revision starts them afresh.</summary>
-    private static DurableView WithShown(DurableView view, ConversationView value)
+    /// <summary>The view showing <paramref name="value"/>, a revision of the shown conversation, with its active transcript and its nested
+    /// calls gathered; another conversation's revision starts them afresh.</summary>
+    private static DurableView WithShown(DurableView view, ConversationView value, ImmutableArray<EntryRecord> transcript)
     {
         var none = ImmutableSortedDictionary<long, DurableNestedCall>.Empty;
         var calls = view.Conversation.Conversation.Id == value.Conversation.Id ? view.NestedCalls ?? none : none;
-        return view with { Conversation = value, NestedCalls = DurableNestedCall.Merge(calls, value) };
+        return view with { Conversation = value, Transcript = transcript, NestedCalls = DurableNestedCall.Merge(calls, value) };
+    }
+
+    /// <summary>
+    /// The active transcript of <paramref name="shown"/> once it shows <paramref name="value"/>, its view after <paramref name="previous"/>:
+    /// <paramref name="transcript"/> advanced by the entries past its newest that <paramref name="value"/>'s window holds. The window holds
+    /// every entry after its <see cref="ConversationView.Before"/>, so it shows each of them unless entries left it before this value; then
+    /// the transcript is read again (Conversation.context()). The newest entry is always active, so the transcript's newest ID is the
+    /// newest entry it has taken.
+    /// </summary>
+    internal static async Task<ImmutableArray<EntryRecord>> TranscriptAsync(IConversation shown, ConversationView previous,
+        ImmutableArray<EntryRecord> transcript, ConversationView value)
+    {
+        if (previous.Conversation.Id == value.Conversation.Id && previous.Entries == value.Entries) return transcript;
+        // The head marker leads the active transcript; the entries after it are in ID order.
+        long? newest = transcript.IsEmpty ? null : Math.Max(transcript[0].Id.Value, transcript[^1].Id.Value);
+        if (value.Before is not { } before || (newest is { } seen && before.Value <= seen))
+        {
+            foreach (var entry in value.Entries)
+                if (newest is null || entry.Id.Value > newest) transcript = ConversationContext.AppendActive(transcript, entry);
+            return transcript;
+        }
+        return (await shown.ContextAsync(Context).ConfigureAwait(false)).Entries;
     }
 
     /// <summary>The label of a conversation in the switcher.</summary>
@@ -330,7 +358,9 @@ internal sealed class DurableSession : IOpenDurable, IDurableViewSource, IDurabl
         DurableInitialModel? initial, DurableReports reports, IRegistryReader registry, Func<ConversationId, string> planDirectory)
     {
         var view = await root.WatchAsync(Context).ConfigureAwait(false);
-        var session = new DurableSession(location, envs, harness, models, settings, root, view, summaries, registry, planDirectory);
+        // Read after the watch starts, so it has at least the entries the watch showed; later values add only newer ones.
+        var transcript = (await root.ContextAsync(Context).ConfigureAwait(false)).Entries;
+        var session = new DurableSession(location, envs, harness, models, settings, root, view, transcript, summaries, registry, planDirectory);
         // Since pi-durable 1.2.0 a storage error fails and closes the Harness (SessionFailed); the view then says so (durable work list area l).
         // Close listeners run as the close begins, before the failed call's caller sees its error and before the failure is reported, so
         // neither becomes a notice besides the failure.
@@ -656,11 +686,12 @@ internal sealed class DurableSession : IOpenDurable, IDurableViewSource, IDurabl
     {
         var next = await harness.ConversationAsync(id, Context).ConfigureAwait(false) ?? throw new InvalidOperationException($"Conversation {id.Value} does not exist");
         var nextWatch = await next.WatchAsync(Context).ConfigureAwait(false);
+        var transcript = (await next.ContextAsync(Context).ConfigureAwait(false)).Entries;
         _ = conversation.StopAsync();
         current = next;
         conversation = nextWatch;
-        Update(view => WithShown(view, nextWatch.Value));
-        Follow(nextWatch);
+        Update(view => WithShown(view, nextWatch.Value, transcript));
+        Follow(nextWatch, next);
     });
 
     // ─── Questions and plan mode (PiSharp-only, decision 0005) ──────────────

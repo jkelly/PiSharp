@@ -388,10 +388,9 @@ internal sealed class DeviceService(DurableDeviceHost host, DurableDeviceServerO
     public static async Task<List<JsonObject>> ActiveEntriesAsync(HostedSession session, long agentId, CancellationToken cancellationToken)
     {
         var conversation = await ConversationAsync(session, agentId, cancellationToken).ConfigureAwait(false);
-        // A one-off read: the acquisition value of a view watch, which stops at once (pi-durable 1.5.0 removed viewState()).
-        var view = await conversation.WatchAsync(Context(cancellationToken)).ConfigureAwait(false);
-        try { return [.. view.Value.Entries.Select(entry => (JsonObject)ToNode(entry.ToJson())!)]; }
-        finally { await view.StopAsync().ConfigureAwait(false); }
+        // What the model sees: pi-durable 1.5.0's view is a window over the whole transcript, not the active context.
+        var active = await conversation.ContextAsync(Context(cancellationToken)).ConfigureAwait(false);
+        return [.. active.Entries.Select(entry => (JsonObject)ToNode(entry.ToJson())!)];
     }
 
     /// <summary>One page of all entries, oldest first, with an opaque cursor.</summary>

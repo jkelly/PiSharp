@@ -40,6 +40,9 @@ using PiSharp.Durable.Examples;
 // Area watch-folding: 05-watches runs v1.5.0's 04-watches.ts (d8d99950a): its first call stays busy while three commits land, which arrive
 // folded into the second call (the three appends to `text` as one append op), and it prints each update's ops and the number of calls;
 // authored from 04-watches.ts and Chord's PendingOps (appends at one path merge), not captured.
+// Area view (f3255de76): 32-transcript is v1.5.0's 31-transcript.ts; its lines are authored from that example and the windowed view's
+// rules (a watch starts with the newest min entries, a resume from the entry after the newest held), not captured. Its file backends count
+// the stored chat entries.
 internal static partial class Program
 {
     private static readonly string[] CodingToolsTranscript =
@@ -328,7 +331,19 @@ internal static partial class Program
         "after restart, before install: []",
         // Upstream's util.inspect prints [ 'version' ].
         "after install: [\"version\"]",
+        // Pi v1.5.0 sync (area view): v1.5.0's 31-transcript.ts, authored (see the file header).
+        "== 32-transcript",
+        "attach                       [load earlier] 191..200",
+        "15 more, live                [load earlier] 191..215",
+        "load earlier                 [load earlier] 171..215",
+        "resume after 40 missed       [load earlier] 171..215 [load more] 246..255",
+        "fill gap                     [load earlier] 171..235 [load more] 246..255",
+        "fill gap                     [load earlier] 171..255",
+        "resume after 3 missed        window: 3 entries",
+        TranscriptLastLine,
     ];
+
+    private const string TranscriptLastLine = "                             [load earlier] 171..258";
 
     private const string HarnessResolved = """resolved: low ["files"] ["read"]""";
     private const string ConfigurationStored =
@@ -458,6 +473,7 @@ internal static partial class Program
         [CodingAgentLastLine] = ["bash ran in: <workspace>", CodingAgentLastLine],
         [PlanModeLastLine] = [PlanSteps],
         [ReviewerTranscript[^1]] = ReviewerTranscript,
+        [TranscriptLastLine] = ["stored: 258 chat entries, the newest \"line 258\""],
     };
 
     private static IEnumerable<(string, Func<Task>)> ExamplesCases()

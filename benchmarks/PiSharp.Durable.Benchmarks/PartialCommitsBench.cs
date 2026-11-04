@@ -1,7 +1,7 @@
 // PiSharp-authored, for Pi v1.5.0's partial commits (durable work list area partial-commits; packages/durable/CHANGELOG.md 1.5.0 Fixed:
 // "partial commits of a streamed answer copying every growing text, thinking and tool-call argument string in full on each commit"). Not an
 // upstream file: upstream measures the same path in a test (harness-view-run.test.ts, "commits a growing text and tool call at a cost that
-// follows the new text, not the string lengths"; harness.events.streamed-partials.* here), which bounds a ratio and prints nothing.
+// follows the new text, not the string lengths"; harness.view-run.streamed-partials.* here), which bounds a ratio and prints nothing.
 // One answer streams through the real generation task on MemoryStorage: a text of about `size` characters, then a tool call whose
 // `content` argument is the same text, both in 256-character pieces (pi-ai's faux provider at token size 64). The partial throttle's interval
 // is 0, and after each piece the model waits for the next commit, so a piece that changes the partial gets exactly one partial commit

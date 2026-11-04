@@ -7,6 +7,10 @@
 // `setTimeout(0)` before reading the last frame is ViewTests.Drained (a Session line barrier).
 // Pi v1.5.0 sync (area model-requests): the cases compare with the capture's authored v1.5.0 form (ModelRequests150.cs), not the
 // capture itself: v1.5.0 records the requested thinking level on each message it classifies. A byte comparison needs a recapture.
+// Pi v1.5.0 sync (area view, f3255de76): the watch frames compare with an authored v1.5.0 form too. v1.5.0's windowed view appends a
+// commit's entries in one splice (["p",["entries"],length,0,inserted]), where v1.2.0 spliced each entry in on its own; Splices150 joins
+// each run of consecutive entry splices of a captured frame into that one splice. The scenarios hold fewer entries than the default window
+// (50), so no frame drops entries or sets "before".
 using PiSharp.Durable;
 using PiSharp.Durable.Chord;
 using PiSharp.Durable.Sqlite;
@@ -35,8 +39,39 @@ internal static class ViewsDifferentialTests
     private const double T = 1000;
 
     // Pi v1.5.0 (area model-requests): the capture's authored v1.5.0 form (see the file header).
-    private static readonly Lazy<JsonObjectValue> Upstream = new(() => (JsonObjectValue)ModelRequests150.Authored(JsonValue.Parse(
-        File.ReadAllText(Path.Combine(RepositoryRoot(), "tests", "PiSharp.Durable.Tests", "Fixtures", "v1.2.0", "views.upstream.json")))));
+    private static readonly Lazy<JsonObjectValue> Upstream = new(() => Splices150((JsonObjectValue)ModelRequests150.Authored(JsonValue.Parse(
+        File.ReadAllText(Path.Combine(RepositoryRoot(), "tests", "PiSharp.Durable.Tests", "Fixtures", "v1.2.0", "views.upstream.json"))))));
+
+    /// <summary>Pi v1.5.0 (area view): every scenario's frames with each run of consecutive entry splices joined into one (see the file
+    /// header).</summary>
+    private static JsonObjectValue Splices150(JsonObjectValue capture) => JsonObjectValue.From(capture.Select(scenario =>
+        KeyValuePair.Create(scenario.Key, scenario.Value is JsonObjectValue parts && parts.TryGetValue("frames", out var frames)
+            ? (JsonValue)JsonObjectValue.From(parts.Select(part => KeyValuePair.Create(part.Key, part.Key == "frames"
+                ? (JsonValue)JsonValue.Array(((JsonArrayValue)frames).Select(frame => (JsonValue)JoinedSplices((JsonArrayValue)frame)))
+                : part.Value)))
+            : scenario.Value)));
+
+    private static JsonArrayValue JoinedSplices(JsonArrayValue frame)
+    {
+        static bool IsAppend(JsonValue op) => op is JsonArrayValue { Count: 5 } splice && splice[0] is JsonStringValue { Value: "p" } &&
+            splice[1] is JsonArrayValue { Count: 1 } path && path[0] is JsonStringValue { Value: "entries" } && splice[3] is JsonNumberValue { Value: 0 };
+        var ops = new List<JsonValue>();
+        foreach (var op in frame)
+        {
+            if (IsAppend(op) && ops.Count > 0 && IsAppend(ops[^1]))
+            {
+                var last = (JsonArrayValue)ops[^1];
+                var inserted = (JsonArrayValue)last[4];
+                if (N(((JsonArrayValue)op)[2]) == N(last[2]) + inserted.Count)
+                {
+                    ops[^1] = JsonValue.Array([last[0], last[1], last[2], last[3], JsonValue.Array([.. inserted, .. (JsonArrayValue)((JsonArrayValue)op)[4]])]);
+                    continue;
+                }
+            }
+            ops.Add(op);
+        }
+        return JsonValue.Array(ops);
+    }
 
     /// <summary><c>Type.Object({ text: Type.String() })</c>, as TypeBox prints it.</summary>
     private static readonly JsonObjectValue TextParameters = O("""{"type":"object","required":["text"],"properties":{"text":{"type":"string"}}}""");

@@ -324,7 +324,7 @@ Work list area d. Measured on 2026-10-15, same machine, two runs each with Node 
 
 ## Partial commits (`partial-commits`)
 
-Pi v1.5.0 sync, durable area partial-commits. Measured on 2026-11-04, same machine, one run each. Upstream has no benchmark for this path: its changelog reports about 20 s of CPU and a 100 MB heap peak for a 500 KB tool call before the fix, and its test (`harness-view-run.test.ts`, "commits a growing text and tool call at a cost that follows the new text"; `harness.events.streamed-partials.*` here) bounds the per-commit ratio of a 400 KB answer over a 40 KB one below 2. The benchmark streams the answer in 256-character pieces through the real generation task on memory storage, with a partial interval of 0 and each piece waiting for its commit, so every piece that changes the partial gets one commit.
+Pi v1.5.0 sync, durable area partial-commits. Measured on 2026-11-04, same machine, one run each. Upstream has no benchmark for this path: its changelog reports about 20 s of CPU and a 100 MB heap peak for a 500 KB tool call before the fix, and its test (`harness-view-run.test.ts`, "commits a growing text and tool call at a cost that follows the new text"; `harness.view-run.streamed-partials.*` here) bounds the per-commit ratio of a 400 KB answer over a 40 KB one below 2. The benchmark streams the answer in 256-character pieces through the real generation task on memory storage, with a partial interval of 0 and each piece waiting for its commit, so every piece that changes the partial gets one commit.
 
 | size | phase | before: commits | before: KiB/commit | before: total | after: commits | after: KiB/commit | after: total |
 |---:|---|---:|---:|---:|---:|---:|---:|
@@ -338,6 +338,30 @@ Pi v1.5.0 sync, durable area partial-commits. Measured on 2026-11-04, same machi
 - **Before**, each text commit reassigned the whole growing string, which Chord compared with the committed one and .NET copied: the per-commit cost grew with the length (10.0 times from 40,000 to 500,000 characters). A tool call's partial kept the arguments it started with (`{}`) until the call ended, so its pieces committed nothing and the call's end committed it whole.
 - **After**, a commit appends what text and thinking grew by and applies the argument changes of PiSharp.AI's `StreamingJsonParser` since the last commit, and an appended `JsonStringValue` defers its concatenation until it is read. The per-commit cost is flat in both phases (ratios 0.98 and 0.93), and the partials now show the streamed arguments, as upstream's do.
 - The 500,000-character text phase took 2,332 ms before and 161 ms after.
+
+## Conversation view (`conversation-view-bench.ts`)
+
+Pi v1.5.0 sync, durable area view: `PiSharp.Durable.Benchmarks conversation-view both` (ConversationViewBench.cs), measured on 2026-11-04, same machine, one run, each scenario in its own child process. Upstream prints its table and records no numbers, and no upstream run was taken here. The view is a window over the transcript (the newest 50 entries at start, up to 100 while a watch runs), so starting and resuming a watch do not scan the conversation's 5,000 entries, and a watch's heap stays flat while 20,000 entries are appended.
+
+| scenario | storage | p50 ms | µs per commit | window entries | heap with watches MiB | first entry collected | CPU ms | wall ms |
+|---|---|---:|---:|---:|---:|---:|---:|---:|
+| watch start, 5000 entries | sqlite | 0.44 | | 50 | | | 31 | 24 |
+| resume 20 back, 5000 entries | sqlite | 0.22 | | 20 | | | 16 | 22 |
+| append x1 per commit, 1 watch | sqlite | | 96.6 | 61 | 0.5 | | 188 | 209 |
+| append x1 per commit, 4 watches | sqlite | | 91.4 | 61 | 0.5 | | 203 | 201 |
+| append x50 per commit, 4 watches | sqlite | | 1,785.8 | 50 | 0.5 | | 406 | 375 |
+| pi.live only, 4 watches | sqlite | | 122.9 | | | | 672 | 630 |
+| long-lived watch, 20000 appends | sqlite | | | 59 | 0.5 | yes | 1,906 | 1,487 |
+| watch start, 5000 entries | store | 0.43 | | 50 | | | 31 | 23 |
+| resume 20 back, 5000 entries | store | 0.23 | | 20 | | | 31 | 22 |
+| append x1 per commit, 1 watch | store | | 203.2 | 61 | 0.7 | | 500 | 423 |
+| append x1 per commit, 4 watches | store | | 207.8 | 61 | 0.7 | | 594 | 435 |
+| append x50 per commit, 4 watches | store | | 2,301.7 | 50 | 0.7 | | 547 | 483 |
+| pi.live only, 4 watches | store | | 215.4 | | | | 1,531 | 1,094 |
+| long-lived watch, 20000 appends | store | | | 59 | 0.8 | yes | 4,016 | 2,721 |
+
+- The heap is the GC heap after two blocking full collections (upstream: `heapUsed` after two `gc()` calls). It was 0.4 to 0.7 MiB before each scenario, so neither the stored history nor the watches' windows stay on it.
+- Delivery waits poll with `Task.Delay(1)`, which ticks at the timer resolution (15.6 ms on Windows), so the per-commit times include up to one tick spread over a scenario's commits.
 
 ## Throughput target
 

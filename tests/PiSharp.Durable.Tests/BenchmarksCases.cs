@@ -12,7 +12,8 @@ using PiSharp.Durable.Testing;
 // replayed, a firehose, a repetitive firehose, a bash cat of 1 MiB, 20 document appends of each kind, three conversations at each
 // document retention, three subagent cycles under a live parent, a fan-out of four child tasks and a chain of five, four nested calls, two
 // tiny nested-tools scenarios, the four nested-images variants of two images, the four code mode rows of three echo calls, and a 2,000
-// character partial-commits answer (PartialCommitsBench.cs, Pi v1.5.0 sync area partial-commits). It asserts
+// character partial-commits answer (PartialCommitsBench.cs, Pi v1.5.0 sync area partial-commits), and every conversation-view scenario
+// over 120 entries on SQLite and the store (ConversationViewBench.cs, area view: test/conversation-view-bench.ts). It asserts
 // completion,
 // the number of results and the scheduler's bounded indexes, never a timing.
 internal static partial class Program
@@ -111,6 +112,31 @@ internal static partial class Program
             Check(partialRows is [{ Size: 2_000, Text.Commits: > 0, ToolCall.Commits: > 0 }], "one partial-commits row, both phases committing");
             Check(partialOutput.ToString().StartsWith("size=2000: text ", StringComparison.Ordinal), "partial-commits line: " + partialOutput);
             Equal("40000,400000,500000", string.Join(",", PartialCommitsBench.ParseSizes(null)), "partial-commits default sizes");
+            // Pi v1.5.0 sync (area view): every conversation-view scenario, tiny, in this process, on SQLite and on the store.
+            foreach (var storage in new[] { "sqlite", "store" })
+            {
+                ConversationViewScenario[] views =
+                [
+                    new() { Kind = "start", Entries = 120, Storage = storage },
+                    new() { Kind = "resume", Entries = 120, Storage = storage },
+                    new() { Kind = "append", Entries = 120, Watches = 2, Burst = 1, Commits = 20, Storage = storage },
+                    new() { Kind = "append", Entries = 120, Watches = 2, Burst = 5, Commits = 10, Storage = storage },
+                    new() { Kind = "stream", Entries = 120, Watches = 2, Commits = 20, Storage = storage },
+                    new() { Kind = "long-lived", Entries = 150, Storage = storage },
+                ];
+                var windows = new List<double>();
+                foreach (var scenario in views)
+                {
+                    var metrics = await ConversationViewBench.RunScenarioAsync(scenario);
+                    Check(metrics.ContainsKey("cpuMs") && metrics.ContainsKey("wallMs") && metrics.ContainsKey("heapBeforeMiB"), scenario.Label + ": totals");
+                    if (metrics.TryGetValue("windowEntries", out var window)) windows.Add(window);
+                    Check(ConversationViewBench.Row(scenario, metrics).StartsWith("| " + scenario.Label + " | " + storage + " |", StringComparison.Ordinal),
+                        scenario.Label + ": row");
+                }
+                // The default window: the newest 50 of a start, the 20 since `from` of a resume, at most 100 for a started watch.
+                Check(windows is [50, 20, >= 50 and <= 100, >= 50 and <= 100, >= 50 and <= 100], $"{storage} windows: {string.Join(", ", windows)}");
+            }
+            Equal(7, ConversationViewBench.Scenarios().Count, "conversation-view scenario count");
             Directory.Delete(root, recursive: true);
         });
     }

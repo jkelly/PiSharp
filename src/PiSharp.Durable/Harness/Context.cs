@@ -3,7 +3,9 @@
 // its own arrays because ImmutableArray values are never shared mutably. Pi v1.5.0 sync (area harness-options): the harness baseline
 // leads the context past assistant messages (upstream 5713c9507, #10904); upstream's `system !== baseline` is reference equality of the
 // stored message, which Contribute passes through unchanged and an edit's replacement never is. Group commit and the windowed view
-// change this file again (areas publication-caches, group-commit and view), so the citation stays on v1.2.0.
+// change this file again (areas publication-caches, group-commit and view), so the citation stays on v1.2.0. Area view (f3255de76): the
+// windowed view no longer reads the active transcript, and upstream removed activeEntries with watchEvents; ActiveEntriesAsync and
+// AppendActive stay for PiSharp's readers of the active transcript (the events stream until area events, the durable TUI).
 using System.Collections.Immutable;
 using PiSharp.Durable.Chord;
 
@@ -116,7 +118,7 @@ internal static class ConversationContext
         return DeriveRange(bounds, await ScanRangeAsync(storage, conversationId, RangeQuery(conversationId, bounds), context).ConfigureAwait(false)).View;
     }
 
-    /// <summary>The raw active entries within captured bounds, without deriving model context (upstream <c>activeEntries</c>).</summary>
+    /// <summary>The raw active entries within captured bounds, without deriving model context (upstream v1.2.0 <c>activeEntries</c>).</summary>
     public static async Task<ImmutableArray<EntryRecord>> ActiveEntriesAsync(IStorage storage, ConversationId conversationId, ContextBounds? bounds,
         DurableContext context)
     {
@@ -247,6 +249,27 @@ internal static class ConversationContext
         } while (cursor is not null);
         entries.Reverse();
         return [.. entries];
+    }
+
+    /// <summary>
+    /// <paramref name="active"/>, raw active entries, after <paramref name="entry"/> is appended: a non-head entry goes last, and a head
+    /// marker goes in front of the non-head entries from its head, which are always a suffix (upstream v1.2.0 view.ts's head-marker cut).
+    /// A head that targets an entry before the ones <paramref name="active"/> holds keeps every non-head entry it holds; the entries it
+    /// never held stay absent.
+    /// </summary>
+    internal static ImmutableArray<EntryRecord> AppendActive(ImmutableArray<EntryRecord> active, EntryRecord entry)
+    {
+        if (entry.Head is not { } target) return active.Add(entry);
+        var kept = active.Length;
+        for (var index = 0; index < active.Length; index++)
+        {
+            if (active[index].Head is null && active[index].Id.Value >= target.Value)
+            {
+                kept = index;
+                break;
+            }
+        }
+        return [entry, .. active.AsSpan()[kept..]];
     }
 
     /// <summary>The head marker followed by the range's non-head entries, or the whole range without a marker.</summary>

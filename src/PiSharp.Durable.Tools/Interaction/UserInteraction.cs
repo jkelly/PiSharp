@@ -72,8 +72,9 @@ public static class UserInteraction
     {
         ArgumentNullException.ThrowIfNull(conversation);
         ArgumentNullException.ThrowIfNull(context);
-        // A one-off read: the acquisition value of a view watch, which stops at once (pi-durable 1.5.0 removed viewState()).
-        var watch = await conversation.WatchAsync(context).ConfigureAwait(false);
+        // A one-off read: the acquisition value of a view watch, which stops at once (pi-durable 1.5.0 removed viewState()). Only its
+        // documents count, so its window holds one entry.
+        var watch = await conversation.WatchAsync(context, new ConversationWindow { Min = 1 }).ConfigureAwait(false);
         try { return PendingIn(watch.Value); }
         finally { await watch.StopAsync().ConfigureAwait(false); }
     }
