@@ -3,12 +3,15 @@
 // tool tasks take {kind: "model", assistant, callId}, a round reads controls only from model-issued results (a version 1 result has no
 // kind), and handing a round over removes pi.live.nestedTools with its slots. Pi v1.5.0 sync (area harness-options): the threshold check
 // and overflow recovery use the per-model compaction policy (upstream 6085986e4, #10942); the citation stays on v1.2.0 until the file's
-// other areas land.
+// other areas land. Pi v1.5.0 sync (area model-requests): classify records the requested thinking level on every provider message it
+// handles, and a poll checkpoint pins it (upstream d5b3de22d); a request passes the beforeProviderRequest chain as its onPayload
+// (upstream d280e1ffa), only when the phase's agent has such a hook.
 //
 // Mappings:
 // - Checkpoints, live state and results are upstream's JSON, built in upstream's key order: prepare {phase, attempt, compacted?, overflow?},
 //   request {phase, attempt, compacted?, model, thinkingLevel, streamOptions, cutoff}, retry {phase, attempt, compacted?, until}, poll
-//   {phase, attempt, compacted?, model, cutoff, handle, pollAt}, tools {phase, assistant, tools, pending}; the result is {entryId}.
+//   {phase, attempt, compacted?, model, thinkingLevel?, cutoff, handle, pollAt}, tools {phase, assistant, tools, pending}; the result is
+//   {entryId}.
 // - Provider messages cross IDurableModels as PiSharp.Contracts values and are stored as pi-ai wire JSON (PiWireJson). Stream events are
 //   compact frames, not upstream's events carrying a `partial`; the partial is the snapshot of a PiSharp.AI AssistantStreamReducer fed
 //   every non-terminal event. A message with a non-finite usage count is not strict JSON and throws Chord's copyJson error, as upstream's
@@ -110,7 +113,7 @@ internal static class GenerationPhases
     private const double DefaultPollAfterMs = 5000;
 
     /// <summary>What classification needs from the request that produced a message (upstream <c>Request</c>).</summary>
-    private sealed record Request(int Attempt, TaskId? Compacted, ModelRef Model, EntryId Cutoff)
+    private sealed record Request(int Attempt, TaskId? Compacted, ModelRef Model, string? ThinkingLevel, EntryId Cutoff)
     {
         /// <summary>Committed model context through <see cref="Cutoff"/>, when the phase already derived it.</summary>
         public ImmutableArray<JsonValue>? Messages { get; init; }
@@ -246,9 +249,11 @@ internal static class GenerationPhases
             SessionId = await ProviderIdentity.EnsureProviderSessionIdAsync(runtime, context).ConfigureAwait(false),
             Reasoning = thinkingLevel == "off" ? null : thinkingLevel,
             ServiceTier = serviceTier,
+            OnPayload = await ProviderPayloadAsync(runtime, context).ConfigureAwait(false),
         };
         var message = await StreamResponseAsync(runtime, model, messages, request, attempt, context).ConfigureAwait(false);
-        await ClassifyAsync(runtime, new Request(attempt, compacted, reference, cutoff) { Messages = view.Messages }, message, context).ConfigureAwait(false);
+        await ClassifyAsync(runtime, new Request(attempt, compacted, reference, thinkingLevel, cutoff) { Messages = view.Messages }, message, context)
+            .ConfigureAwait(false);
     }
 
     public static async Task RetryAsync(RunningTask task, ITaskRuntime runtime, DurableContext context)
@@ -278,7 +283,10 @@ internal static class GenerationPhases
         await runtime.SleepAsync(pollAt, context).ConfigureAwait(false);
         var handle = new DurableDeferredHandle((JsonObjectValue)checkpoint["handle"]);
         var fetched = await runtime.Models.FetchDeferredAsync(model, handle, runtime.Signal).ConfigureAwait(false);
-        var request = new Request(Attempt(checkpoint), OptionalTask(checkpoint, "compacted"), reference, new EntryId(Id(checkpoint["cutoff"])))
+        // A checkpoint an earlier version wrote has no thinking level, and its answer records none.
+        var thinkingLevel = checkpoint.TryGetValue("thinkingLevel", out var level) && level is JsonStringValue levelText ? levelText.Value : null;
+        var request = new Request(Attempt(checkpoint), OptionalTask(checkpoint, "compacted"), reference, thinkingLevel,
+            new EntryId(Id(checkpoint["cutoff"])))
         {
             PollAt = pollAt,
         };
@@ -523,7 +531,9 @@ internal static class GenerationPhases
         // An abort mark or close: the abort invocation or the reopened run handles the committed state.
         runtime.Signal.ThrowIfCancellationRequested();
         var conversationId = runtime.ConversationId;
-        var (attempt, compacted, reference, cutoff) = (request.Attempt, request.Compacted, request.Model, request.Cutoff);
+        var (attempt, compacted, reference, thinkingLevel, cutoff) = (request.Attempt, request.Compacted, request.Model, request.ThinkingLevel, request.Cutoff);
+        // Record the requested level, as pi-agent-core's agent loop does.
+        if (thinkingLevel is not null) message = message.SetItem("thinkingLevel", thinkingLevel);
         var stopReason = Str(message, "stopReason");
         if (stopReason == "deferred" && message.TryGetValue("deferred", out var deferred) && deferred is JsonObjectValue handle)
         {
@@ -539,6 +549,7 @@ internal static class GenerationPhases
                     .Number("attempt", attempt)
                     .Add("compacted", compacted?.ToJson())
                     .Add("model", reference.ToJson())
+                    .Add("thinkingLevel", thinkingLevel)
                     .Add("cutoff", cutoff.ToJson())
                     .Add("handle", handle)
                     .Number("pollAt", pollAt)
@@ -821,6 +832,34 @@ internal static class GenerationPhases
         CacheRetention = OptionalString(pinned, "cacheRetention"),
         Deferred = pinned.TryGetValue("deferred", out var deferred) ? deferred : null,
     };
+
+    /// <summary>
+    /// The request's <c>onPayload</c> (upstream <c>providerPayload</c>): the beforeProviderRequest hooks chained over each provider request
+    /// body, in registry order, each seeing the body the previous left. Null when the phase's agent has none: its hooks are fixed for the
+    /// phase, so a chain of none would leave every body unchanged, and the model adapter need not read the body at all.
+    /// </summary>
+    private static async Task<Func<JsonValue, DurableModel, CancellationToken, Task<JsonValue?>>?> ProviderPayloadAsync(ITaskRuntime runtime,
+        DurableContext context)
+    {
+        var any = false;
+        await runtime.Hooks.EachAsync<GenerationHooks, Func<DurableModel, JsonValue, IHookApi, DurableContext, Task<JsonValue?>>>(
+            hooks => hooks.BeforeProviderRequest, _ =>
+            {
+                any = true;
+                return Task.CompletedTask;
+            }).ConfigureAwait(false);
+        if (!any) return null;
+        return async (payload, model, _) =>
+        {
+            var current = payload;
+            await runtime.Hooks.EachAsync<GenerationHooks, Func<DurableModel, JsonValue, IHookApi, DurableContext, Task<JsonValue?>>>(
+                hooks => hooks.BeforeProviderRequest, async hook =>
+                {
+                    if (await hook(model, current, runtime, context).ConfigureAwait(false) is { } replaced) current = replaced;
+                }).ConfigureAwait(false);
+            return current;
+        };
+    }
 
     private static JsonObjectValue Prepare(int attempt, TaskId? compacted, string? overflow, bool threshold = false) => new RecordJson.Writer()
         .Add("phase", "prepare").Number("attempt", attempt).Add("compacted", compacted?.ToJson()).Add("overflow", overflow)

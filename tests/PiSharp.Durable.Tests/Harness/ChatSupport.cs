@@ -14,6 +14,8 @@
 //   HarnessSettings whose getters read them at every resolution.
 // - `new Proxy(models, { get })` overriding streamSimple or cancelDeferred is ModelsOverride, a decorator.
 // - waitFor (a 5 ms poll for at most 5 s) is Eventually (a bounded poll of about 20 s): only how long a slow machine may take differs.
+// Pi v1.5.0 sync (area model-requests): ChatSetup.Identity, the setup's HarnessOptions.Identity (upstream adc5fa9f8).
+#pragma warning disable PISHARP_IDENTITY001 // PiSharp.AI's ClientIdentity (Pi v1.5.0) is experimental.
 using System.Collections.Concurrent;
 using System.Collections.Immutable;
 using System.Runtime.CompilerServices;
@@ -82,6 +84,7 @@ internal static class ChatTests
         {
             TimeProvider = timeProvider,
             Models = setup.Models,
+            Identity = setup.Identity,
             Registry = setup.Registry,
             Settings = setup.Settings,
             Env = env,
@@ -219,6 +222,8 @@ internal sealed class ChatSetup
     public Func<double> Now { get; set; } = () => DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
     /// <summary>The HarnessSettings the Harness reads; its getters read the mutable fields below at every resolution.</summary>
     public HarnessSettings Settings { get; }
+    /// <summary><c>HarnessOptions.Identity</c>.</summary>
+    public PiSharp.AI.ClientIdentity? Identity { get; set; }
 
     // Upstream's `setup.settings.<field> = ...`.
     public IReadOnlyList<Extension>? Extensions { get => values.Extensions; set => values.Extensions = value; }
@@ -234,10 +239,10 @@ internal sealed class ChatSetup
 
     /// <summary>A copy sharing the faux provider, registry, reports and settings object, with other models (upstream
     /// <c>{ ...base, models }</c>).</summary>
-    public ChatSetup WithModels(IDurableModels models) => new(Faux, Registry, Reports, values) { Models = models, Now = Now };
+    public ChatSetup WithModels(IDurableModels models) => new(Faux, Registry, Reports, values) { Models = models, Now = Now, Identity = Identity };
 
     /// <summary>A copy with a fresh settings object (upstream <c>{ ...base, settings }</c>).</summary>
-    public ChatSetup WithFreshSettings() => new(Faux, Registry, Reports, new Values()) { Models = Models, Now = Now };
+    public ChatSetup WithFreshSettings() => new(Faux, Registry, Reports, new Values()) { Models = Models, Now = Now, Identity = Identity };
 
     private sealed class Values
     {

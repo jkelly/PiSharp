@@ -2,6 +2,8 @@
 // it: getModel, getAvailableSnapshot, hasConfiguredAuth, and the Models streams the Harness calls) and packages/ai/src/models.ts
 // (getSupportedThinkingLevels, clampThinkingLevel). Decision 0005's CLI model adapter: pi's model registry (built-in catalogs, models.json,
 // persisted catalogs) and auth (auth.json with OAuth refresh, models.json keys and headers, the environment) behind IDurableModels.
+// Pi v1.5.0 sync (area model-requests): the live routes' HTTP handlers apply a request's onPayload (pi-durable 1.5.0's
+// beforeProviderRequest, d280e1ffa) as NativeDurableModels' own routes do; a request's identity reaches the live route's ChatRequest.
 using System.Collections.Concurrent;
 using System.Collections.Immutable;
 using PiSharp.AI;
@@ -27,6 +29,8 @@ namespace PiSharp.Cli.Durable;
 internal sealed class DurableModels : IDurableModels, IAsyncDisposable
 {
     private readonly LiveSessionRuntime runtime;
+    /// <summary><see cref="runtime"/> whose provider HTTP handlers apply a request's <see cref="DurableStreamOptions.OnPayload"/>.</summary>
+    private readonly LiveSessionRuntime routeRuntime;
     private readonly NativeDurableModels native;
     private readonly IDurableModels? streams;
     private readonly HttpMessageHandler? handler;
@@ -36,6 +40,7 @@ internal sealed class DurableModels : IDurableModels, IAsyncDisposable
     private DurableModels(LiveSessionRuntime runtime, ModelRegistry registry, IDurableModels? streams)
     {
         this.runtime = runtime;
+        routeRuntime = runtime with { CreateHttpHandler = () => NativeDurableModels.PayloadHandler.Wrap(runtime.CreateHttpHandler()) };
         Registry = registry;
         this.streams = streams;
         handler = runtime.CreateHttpHandler();
@@ -120,7 +125,7 @@ internal sealed class DurableModels : IDurableModels, IAsyncDisposable
     {
         if (Registry.Find(model.Provider, model.Id) is not { } entry || !Routable(entry)) return ValueTask.FromResult<IChatTransport?>(null);
         ObjectDisposedException.ThrowIf(Volatile.Read(ref disposed) != 0, this);
-        var route = routes.GetOrAdd((model.Provider, model.Id), _ => new LazyModelTransport(entry, model.Descriptor, () => Registry, runtime));
+        var route = routes.GetOrAdd((model.Provider, model.Id), _ => new LazyModelTransport(entry, model.Descriptor, () => Registry, routeRuntime));
         if (options?.MaxTokens is not null || options?.CacheRetention == "none")
         {
             var maximum = options?.MaxTokens is { } cap && double.IsFinite(cap) && cap >= 1 ? (int)Math.Min(cap, int.MaxValue)

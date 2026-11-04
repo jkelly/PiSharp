@@ -1,7 +1,8 @@
 // PiSharp-only (decision 0008): one session of a durable device, after durable-pi's per-session store logic (apps/dpi-backend/src/store.ts):
 // agents by number or name with derived names, busy state from the task graph, idempotent sends that can wait for the answer, forks, the
 // read-only switch, per-session compaction, and model re-routing on reopen. Decision 0011 adds the host's per-session stream metadata
-// (DurableDeviceOptions.SessionStream) to every request a session prepares.
+// (DurableDeviceOptions.SessionStream) to every request a session prepares. Pi v1.5.0 sync (area model-requests): the Harness takes the
+// device's DurableDeviceOptions.Identity.
 using PiSharp.Durable.Chord;
 using PiSharp.Durable.Sqlite;
 using PiSharp.Durable.Tools;
@@ -721,6 +722,7 @@ public sealed partial class HostedSession
             opened = await Harness.OpenAsync(storage, new HarnessOptions
             {
                 Models = host.Options.Models,
+                Identity = host.Options.Identity,
                 Registry = created,
                 Settings = new SessionHarnessSettings(host.Options.Settings, () => Compaction,
                     () => [.. created.Snapshot().Installed().Where(extension => DeviceApps.IsDefault(extension.Name))],

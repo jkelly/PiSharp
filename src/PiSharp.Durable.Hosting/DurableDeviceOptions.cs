@@ -1,6 +1,8 @@
 // PiSharp-only (decision 0008). What a host passes in instead of the CLI pieces a library cannot reference: models (the CLI's DurableModels,
 // NativeDurableModels or FauxDurableModels), base Harness settings (the CLI's PiHarnessSettings) and a registry per session. SessionStream
 // (decision 0011) lets a host bind each session's model requests to its own routing data, such as the web agent's chat accounts.
+// Pi v1.5.0 sync (area model-requests): Identity, each session Harness's HarnessOptions.Identity.
+using PiSharp.AI;
 using PiSharp.Durable.Chord;
 
 namespace PiSharp.Durable.Hosting;
@@ -17,6 +19,10 @@ public sealed record DurableDeviceOptions
 
     /// <summary>The device's models; provider keys stay with them on the device.</summary>
     public required IDurableModels Models { get; init; }
+
+    /// <summary>How every session's model requests identify the app to providers: each session Harness's
+    /// <see cref="HarnessOptions.Identity"/>. Null: <see cref="Harness.DefaultIdentity"/>, which adds no attribution.</summary>
+    public ClientIdentity? Identity { get; init; }
 
     /// <summary>The device's name; null is the machine name.</summary>
     public string? DeviceName { get; init; }

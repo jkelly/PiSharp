@@ -9,6 +9,10 @@ using PiSharp.Durable.Chord;
 // NativeDurableModels (decision 0005, P8): the production IDurableModels over PiSharp.AI. Authored native cases, fully offline: every
 // request goes to a recording HttpMessageHandler that serves recorded SSE, every environment is an injected dictionary (never the process
 // environment) and every key is a fake test value.
+// Pi v1.5.0 sync (area model-requests): models.payload.on-payload-replaces-the-json-request-body-and-null-keeps-it (pi-ai's onPayload,
+// which pi-durable 1.5.0's beforeProviderRequest uses, d280e1ffa) and models.identity.a-request-identity-sets-the-user-agent (pi-ai's
+// StreamOptions.identity, which the Harness identity sets, adc5fa9f8).
+#pragma warning disable PISHARP_IDENTITY001 // PiSharp.AI's ClientIdentity (Pi v1.5.0) is experimental.
 internal static partial class Program
 {
     private static IEnumerable<(string, Func<Task>)> ModelsCases() =>
@@ -189,6 +193,54 @@ internal static partial class Program
             Equal("24h", body.GetProperty("prompt_cache_retention").GetString(), "long retention");
             Check(body.GetProperty("stream").GetBoolean(), "streams");
             Equal("yes", request.Header("X-Durable-Test"), "caller header");
+        }),
+        Case("models.payload.on-payload-replaces-the-json-request-body-and-null-keeps-it", async () =>
+        {
+            var handler = new RecordingHandler(_ => Sse(ResponsesText));
+            using var models = Models(new() { ["OPENAI_API_KEY"] = "test-openai-key" }, handler);
+            var model = models.GetModel("openai", "gpt-5")!;
+            var seen = new List<string>();
+            await models.CompleteSimpleAsync(model, UserTurn("hi"), new DurableStreamOptions
+            {
+                OnPayload = (payload, target, _) =>
+                {
+                    seen.Add($"{target.Provider}/{target.Id} {((JsonObjectValue)payload)["model"].ToJson()}");
+                    return Task.FromResult<JsonValue?>(((JsonObjectValue)payload).SetItem("x_hook", "yes"));
+                },
+            }, CancellationToken.None);
+            await models.CompleteSimpleAsync(model, UserTurn("hi"), new DurableStreamOptions { OnPayload = (_, _, _) => Task.FromResult<JsonValue?>(null) },
+                CancellationToken.None);
+            await models.CompleteSimpleAsync(model, UserTurn("hi"), null, CancellationToken.None);
+            Equal("openai/gpt-5 \"gpt-5\"", string.Join(" | ", seen), "the hook sees the provider body and the model");
+            var (replaced, kept, plain) = (handler.Requests[0], handler.Requests[1], handler.Requests[2]);
+            Equal("yes", replaced.Json.GetProperty("x_hook").GetString(), "the replacement is sent");
+            Equal("gpt-5", replaced.Json.GetProperty("model").GetString(), "the rest of the body");
+            Equal(plain.Header("Content-Type"), replaced.Header("Content-Type"), "content type");
+            Equal(plain.Body, kept.Body, "a null result sends the body as built");
+            Check(!kept.Json.TryGetProperty("x_hook", out _), "no replacement");
+        }),
+        Case("models.identity.a-request-identity-sets-the-user-agent", async () =>
+        {
+            var handler = new RecordingHandler(_ => Sse(ResponsesText));
+            using var models = Models(new() { ["OPENAI_API_KEY"] = "test-openai-key" }, handler);
+            var model = models.GetModel("openai", "gpt-5")!;
+            await models.CompleteSimpleAsync(model, UserTurn("hi"), null, CancellationToken.None);
+            await models.CompleteSimpleAsync(model, UserTurn("hi"), new DurableStreamOptions { Identity = new PiSharp.AI.ClientIdentity() }, CancellationToken.None);
+            await models.CompleteSimpleAsync(model, UserTurn("hi"),
+                new DurableStreamOptions { Identity = new PiSharp.AI.ClientIdentity { UserAgent = PiSharp.AI.ClientUserAgent.Custom("acme-agent/2") } },
+                CancellationToken.None);
+            var detailed = PiSharp.AI.ClientIdentities.FormatUserAgent(null);
+            Check(detailed.StartsWith("pi/1.5.0 (", StringComparison.Ordinal), "the default user agent: " + detailed);
+            // RecordingHandler joins a header's values with commas, and HttpHeaders splits User-Agent into its products and comment.
+            static string Recorded(string userAgent)
+            {
+                using var message = new HttpRequestMessage();
+                message.Headers.TryAddWithoutValidation("User-Agent", userAgent);
+                return string.Join(",", message.Headers.GetValues("User-Agent"));
+            }
+            Equal(Recorded(detailed), handler.Requests[0].Header("User-Agent"), "no identity");
+            Equal(Recorded(detailed), handler.Requests[1].Header("User-Agent"), "an empty identity, the Harness default");
+            Equal(Recorded("acme-agent/2"), handler.Requests[2].Header("User-Agent"), "the request's identity");
         }),
         Case("models.mapping.defaults-use-the-model-cap-and-clamp-the-level", async () =>
         {

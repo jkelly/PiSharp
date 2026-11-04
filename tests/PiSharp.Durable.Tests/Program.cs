@@ -41,8 +41,9 @@ internal static partial class Program
             var started = System.Diagnostics.Stopwatch.StartNew();
             Console.Error.WriteLine("start " + test.Id);
             // compat.* cases check PiSharp against sessions and operations the pinned upstream itself produced (Compat/CompatCases.cs):
-            // captured upstream evidence, counted apart from the authored cases.
-            var upstreamCapture = test.Id.StartsWith("compat.", StringComparison.Ordinal);
+            // captured upstream evidence, counted apart from the authored cases. Those that compare with an authored Pi v1.5.0 form of the
+            // capture (CompatTests.AuthoredOverCapture) count as authored.
+            var upstreamCapture = test.Id.StartsWith("compat.", StringComparison.Ordinal) && !CompatTests.AuthoredOverCapture.Contains(test.Id);
             try
             {
                 await test.Run().WaitAsync(TimeSpan.FromSeconds(120));

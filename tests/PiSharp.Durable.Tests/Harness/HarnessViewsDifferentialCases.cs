@@ -5,6 +5,8 @@
 // normalized as HarnessChatDifferentialCases.cs's fixture is and compared as JSON values and by their exact text; every event's keys must
 // also come in upstream's order. The scenarios run here on memory, JSONL and SQLite and must deliver the same frames and batches, IDs included. Upstream's
 // `setTimeout(0)` before reading the last frame is ViewTests.Drained (a Session line barrier).
+// Pi v1.5.0 sync (area model-requests): the cases compare with the capture's authored v1.5.0 form (ModelRequests150.cs), not the
+// capture itself: v1.5.0 records the requested thinking level on each message it classifies. A byte comparison needs a recapture.
 using PiSharp.Durable;
 using PiSharp.Durable.Chord;
 using PiSharp.Durable.Sqlite;
@@ -32,8 +34,9 @@ internal static class ViewsDifferentialTests
     private static readonly DurableContext Context = DurableContext.Background;
     private const double T = 1000;
 
-    private static readonly Lazy<JsonObjectValue> Upstream = new(() => (JsonObjectValue)JsonValue.Parse(
-        File.ReadAllText(Path.Combine(RepositoryRoot(), "tests", "PiSharp.Durable.Tests", "Fixtures", "v1.2.0", "views.upstream.json"))));
+    // Pi v1.5.0 (area model-requests): the capture's authored v1.5.0 form (see the file header).
+    private static readonly Lazy<JsonObjectValue> Upstream = new(() => (JsonObjectValue)ModelRequests150.Authored(JsonValue.Parse(
+        File.ReadAllText(Path.Combine(RepositoryRoot(), "tests", "PiSharp.Durable.Tests", "Fixtures", "v1.2.0", "views.upstream.json")))));
 
     /// <summary><c>Type.Object({ text: Type.String() })</c>, as TypeBox prints it.</summary>
     private static readonly JsonObjectValue TextParameters = O("""{"type":"object","required":["text"],"properties":{"text":{"type":"string"}}}""");

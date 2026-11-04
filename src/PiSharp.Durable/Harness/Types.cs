@@ -16,7 +16,10 @@
 // #10942), HarnessOptions.CurrentModels and CurrentSettings (upstream's function forms of models and settings, 7ec1f648e) and
 // HarnessOptions.ReadOnly (be14d9732), and ToolControl.Terminate as a bool? that may be false (6085986e4, #10858). The citation stays on
 // v1.2.0 until the file's other areas land.
+// Pi v1.5.0 sync (area model-requests): HarnessOptions.Identity (adc5fa9f8, 04a93bad8) and GenerationHooks.BeforeProviderRequest
+// (d280e1ffa).
 using System.Collections.Immutable;
+using PiSharp.AI;
 using PiSharp.Durable.Chord;
 using PiSharp.Durable.Env;
 using PiSharp.Durable.Internal;
@@ -775,6 +778,13 @@ public sealed record HarnessOptions
     /// without reopening the Harness (upstream's <c>models</c> as a function). Set this or <see cref="Models"/>.
     /// </summary>
     public Func<IDurableModels>? CurrentModels { get; init; }
+    /// <summary>
+    /// How model requests identify the app to providers (upstream <c>identity</c>), merged field by field over
+    /// <see cref="Harness.DefaultIdentity"/>. It applies to every chat request through the Harness's models, including those of hooks and
+    /// tools (<see cref="DurableStreamOptions.Identity"/>), and overrides the identity the models were created with; a request's own
+    /// identity overrides it. PiSharp's default sends no attribution (see <see cref="Harness.DefaultIdentity"/>).
+    /// </summary>
+    public ClientIdentity? Identity { get; init; }
     /// <summary>The registry; it may keep changing while the Harness runs.</summary>
     public required IRegistryReader Registry { get; init; }
     /// <summary>Harness-wide run policy, read at each use. Set this or <see cref="CurrentSettings"/>, or neither.</summary>
@@ -1184,6 +1194,14 @@ public sealed class GenerationHooks
 {
     /// <summary>Before every request attempt, including recovery; a returned message list is used for that request only.</summary>
     public Func<ImmutableArray<JsonValue>, IHookApi, DurableContext, Task<ImmutableArray<JsonValue>?>>? BeforeRequest { get; init; }
+    /// <summary>
+    /// After the model adapter builds the provider request body, before it is sent (upstream <c>beforeProviderRequest</c>, Pi v1.5.0): it
+    /// receives the model and the body, and a returned body replaces it for that request only; null keeps it. Runs again whenever the body
+    /// is rebuilt, such as a retry within one attempt. The body is in the provider API's own format (<see cref="DurableModel.Api"/>), so a
+    /// hook checks the API before changing it. It reaches the provider through <see cref="DurableStreamOptions.OnPayload"/>, which
+    /// <see cref="NativeDurableModels"/> applies to JSON request bodies; compaction requests do not run it.
+    /// </summary>
+    public Func<DurableModel, JsonValue, IHookApi, DurableContext, Task<JsonValue?>>? BeforeProviderRequest { get; init; }
     /// <summary>Every terminal provider message, before classification.</summary>
     public Func<JsonObjectValue, IHookApi, DurableContext, Task>? AfterResponse { get; init; }
     /// <summary>A final answer; the first returned user input continues the run.</summary>

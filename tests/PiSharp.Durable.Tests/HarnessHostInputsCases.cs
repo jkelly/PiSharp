@@ -1,5 +1,6 @@
-// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/test/harness-host-inputs.test.ts (7ec1f648e), ported in the Pi
-// v1.5.0 sync (area harness-options). Verbatim apart from the adaptations in HarnessSupport.cs and ChatSupport.cs, and these:
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/test/harness-host-inputs.test.ts (7ec1f648e, adc5fa9f8, 6536f8012),
+// ported in the Pi v1.5.0 sync (areas harness-options, tools-schema and model-requests). Verbatim apart from the adaptations in
+// HarnessSupport.cs and ChatSupport.cs, and these:
 // - Upstream's `models` and `settings`, each a value or a function, are HarnessOptions.Models or CurrentModels, and Settings or
 //   CurrentSettings.
 // - A second Models with an extra "second-only" provider is AlsoServing, a decorator over the faux provider that also serves the faux models
@@ -82,7 +83,7 @@ internal static class HostInputsTests
                 FauxAssistantMessage([FauxToolCall("probe", JsonObjectValue.Empty, "call-1")], stopReason: "toolUse"),
                 FauxAssistantMessage("done"));
             IDurableModels first = faux;
-            // Marks the second Models.
+            // Marks the second Models: tools see views of the host's Models that add the Harness identity.
             IDurableModels second = new AlsoServing(faux, new FauxModels(new FauxOptions { Provider = "second-only" }));
             var current = first;
             var seen = new SyncList<IDurableModels>();
