@@ -15,6 +15,8 @@
 // - Pi v1.5.0 sync (area sleep): f75b3240a replaces runtime.sleep with sleepUntil, so the ended-invocation check calls SleepUntilAsync and
 //   the two in-phase sleep cases are gone (HarnessSleepCases.cs covers durable sleep). The citation stays on v1.2.0 until the file's other
 //   areas land.
+// - Pi v1.5.0 sync (area telemetry): upstream's withSignal derives through withAbortSignal(signal, context) since 2ec55d808, which keeps
+//   the context's values and telemetry span; DurableContext.WithCancel() already derives the same way, so the cases are unchanged.
 using System.Collections.Concurrent;
 using PiSharp.Durable;
 using PiSharp.Durable.Chord;

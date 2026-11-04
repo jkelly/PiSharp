@@ -6,6 +6,8 @@
 //   the same Storage once close resolved". harness.lifecycle.* does the same; harness.lifecycle.jsonl.* reruns every case on JSONL (the
 //   reopen case reopening a JSONL directory) and harness.lifecycle.sqlite.* reruns the cases that need no reopen on a fresh SQLite file.
 // - `{...context, abortSignal}` is DurableContext.WithCancel(); `controller.abort(error)` is Cancel(error).
+//   Pi v1.5.0 sync (area telemetry): upstream's withSignal derives through withAbortSignal(signal, context) since 2ec55d808, which keeps
+//   the context's values and telemetry span; WithCancel() already derives the same way, so the cases are unchanged.
 // - `class FailingClose extends ControlledStorage` is FailingCloseStorage, a decorator over ControlledStorage.
 // - "leaves no subscription behind ...": upstream replaces `harness.subscribeCommits` to count the subscriptions made after the patch. A
 //   C# method cannot be replaced, so the case counts the Session's commit listeners (by reflection) against the count before the cancelled
