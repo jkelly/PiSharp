@@ -10,7 +10,11 @@
 // Pi v1.5.0 sync (area telemetry, 2ec55d808): a created task records its trace: the option's carrier, none for "root", else the carrier
 // the commit context's span injects (none without propagation); a run's generation (CreateTaskAsync with submission IDs) takes the
 // first submission's carrier as its trace and links the others'. Once settled, the transaction drops its commit context (and with it the
-// caller's span) for the background context. The citation stays on v1.2.0 until the file's other areas land.
+// caller's span) for the background context. Pi v1.5.0 sync (area deferred-commits, 6c2fd73b0): a deferred commit (CommitPersistence) that
+// only changes existing latest, initial-fork conversation documents is held (Holdable, AdoptHeld): adopted in memory, its operations queued
+// per incarnation by the Session (HeldDocument). The next commit that reads or writes such a document stores them first (TakeHeld, right
+// before Storage admission), and adoption then publishes its own changes to the Session's observers and what it stored to SubscribeCommits
+// (AdoptedDocuments). The citation stays on v1.2.0 until the file's other areas land.
 using System.Collections.Immutable;
 using PiSharp.Durable.Chord;
 using PiSharp.Durable.Chord.Delta;
@@ -33,6 +37,30 @@ internal sealed class LoadedDocument(string addressId, DocumentRecord record, in
     /// <summary>The current immutable revision.</summary>
     public JsonObjectValue Value => (JsonObjectValue)Tracker.Value;
 }
+
+/// <summary>
+/// The changes of a cached incarnation that deferred commits adopted in memory and the Session has not stored yet
+/// (<see cref="CommitPersistence"/>), folded (upstream <c>HeldDocument</c>). The Session owns it; a commit that stores them takes them.
+/// Used on the line only.
+/// </summary>
+internal class HeldDocument(LoadedDocument loaded)
+{
+    public LoadedDocument Loaded { get; } = loaded;
+    public PendingOps Pending { get; } = new();
+    /// <summary>Set when a held commit selected a base (<c>CheckpointWhen</c>): their store writes the whole value.</summary>
+    public bool Base { get; set; }
+}
+
+/// <summary>One changed incarnation of a commit that may be held (<see cref="Transaction.Holdable"/>): its operations, and whether its
+/// checkpoint predicate selected a base.</summary>
+internal sealed record HeldChange(LoadedDocument Loaded, ImmutableArray<Op> Ops, bool Base);
+
+/// <summary>What adoption publishes (upstream <c>AdoptedDocuments</c>): to the Session's own observers, and the stored changes to
+/// <c>SubscribeCommits</c>.</summary>
+/// <param name="Observed">This commit's own changes, as memory adopted them.</param>
+/// <param name="Stored">What Storage got: <paramref name="Observed"/> itself, unless the commit also stored held changes, which precede its
+/// own.</param>
+internal sealed record AdoptedDocuments(List<ICommitChange> Observed, List<ICommitChange> Stored);
 
 /// <summary>Session services used by a transaction while it holds the mutation line (upstream <c>TransactionHost</c>).</summary>
 internal interface ITransactionHost
@@ -585,10 +613,116 @@ internal sealed class Transaction : ITx
     /// <summary>Aborts every prepared change after Storage failure or when no write is required.</summary>
     public void Discard() => AbortChanges();
 
-    /// <summary>Adopts every prepared change by pointer swap after Storage success and describes the publication.</summary>
-    public List<ICommitChange> Adopt(Seq seq)
+    /// <summary>
+    /// Internal: what a deferred commit holds in memory instead of storing (<see cref="CommitPersistence"/>), each changed incarnation with
+    /// its operations and whether they selected a base; null when the commit must be stored (upstream <c>holdable</c>). It may be held only
+    /// when every write changes an existing <c>latest</c>, <c>initial</c>-fork conversation document at its stored version.
+    /// </summary>
+    public List<HeldChange>? Holdable()
+    {
+        foreach (var write in writes)
+            if (write is not DocumentChangeWrite) return null;
+        var held = new List<HeldChange>();
+        foreach (var plan in plans)
+        {
+            var content = plan.Content;
+            if (content is null && !plan.Retire) continue;
+            if (plan.Retire || plan.Change is not { Loaded: { } loaded } change || content is not DocumentChangeWrite write) return null;
+            var record = loaded.Record;
+            if (record.Scope.Kind != DocumentScopeKind.Conversation || record.History != DocumentHistory.Latest || record.Fork != DocumentFork.Initial)
+                return null;
+            // A migration stores a base at once.
+            if (loaded.StoredVersion != change.Version) return null;
+            held.Add(new HeldChange(loaded, change.Prepared.Ops, write.Content is DocumentBase));
+        }
+        return held;
+    }
+
+    /// <summary>
+    /// Internal: adopts a held commit (<see cref="Holdable"/>) in memory only (upstream <c>adoptHeld</c>). Trackers advance by pointer swap;
+    /// stored versions and delta counts stay, as nothing was stored. Returns its publication for the Session's own observers.
+    /// </summary>
+    public List<ICommitChange> AdoptHeld()
     {
         var publications = new List<ICommitChange>();
+        foreach (var plan in plans)
+        {
+            // Every plan of a held commit changes or reads a loaded incarnation (Holdable).
+            var change = plan.Change!;
+            var prepared = change.Prepared;
+            if (prepared.Ops.IsEmpty)
+            {
+                prepared.Abort();
+                continue;
+            }
+            change.Tracker.Adopt(prepared);
+            publications.Add(new DocumentCommitChange(change.Loaded!.Record, plan.ConversationId, change.Version, (JsonObjectValue)prepared.Value,
+                prepared.Ops));
+        }
+        return publications;
+    }
+
+    /// <summary>
+    /// Internal: stores the held changes of every incarnation this commit reads or writes in front of its own, so a stored document never
+    /// misses an operation its later ones build on (upstream <c>takeHeld</c>). Called right before Storage admission, after every fallible
+    /// step, because it empties the holds: a failure earlier keeps them. Returns the holds it took.
+    /// </summary>
+    public List<THold> TakeHeld<THold>(Func<DocumentId, THold?> held) where THold : HeldDocument
+    {
+        var taken = new List<THold>();
+        foreach (var plan in plans)
+        {
+            // A new incarnation holds nothing yet.
+            if (plan.Record is not DocumentRecord record) continue;
+            if (held(record.Id) is not { } hold) continue;
+            taken.Add(hold);
+            var own = plan.Content as DocumentChangeWrite;
+            var change = plan.Change;
+            var value = change is null ? hold.Loaded.Value : (JsonObjectValue)change.Prepared.Value;
+            var stored = StoreHeld(hold, change?.Prepared.Ops ?? EmptyOperations, value, hold.Loaded.ValueVersion);
+            // A base this commit selected or must write covers what was held.
+            var content = own?.Content is DocumentBase ? own.Content : stored.Content;
+            var write = new DocumentChangeWrite(record.Id, content);
+            if (own is not null) writes[writes.FindIndex(candidate => ReferenceEquals(candidate, own))] = write;
+            else InsertBeforeRetirement(write);
+            if (!plan.Retire) plan.Held = new HeldPublication(stored.Ops, own is not null);
+            plan.Content = write;
+            // Held documents are conversation documents; one this commit only read has no owner resolved yet.
+            if (record.Scope.ConversationId is { } conversationId) plan.ConversationId = conversationId;
+        }
+        return taken;
+    }
+
+    /// <summary>Stages a content write for an incarnation, before its retirement when it retires.</summary>
+    private void InsertBeforeRetirement(DocumentChangeWrite write)
+    {
+        var at = writes.FindIndex(candidate => candidate is DocumentRetireWrite retire && retire.Id == write.Id);
+        if (at < 0) writes.Add(write);
+        else writes.Insert(at, write);
+    }
+
+    /// <summary>
+    /// Takes a hold's changes after <paramref name="ops"/>, a commit's own on top of them, as one stored content for an incarnation now at
+    /// <paramref name="value"/>, and the operations a reader of the stored state applies to reach it (upstream <c>storeHeld</c>): the folded
+    /// ones, or a root replacement after the queue overflowed, which stores a base, as does a hold whose commits selected one.
+    /// </summary>
+    internal static (DocumentContent Content, ImmutableArray<Op> Ops) StoreHeld(HeldDocument hold, ImmutableArray<Op> ops, JsonObjectValue value,
+        int version)
+    {
+        hold.Pending.Push(ops);
+        var taken = hold.Pending.Take();
+        if (taken.Kind == PendingTakeKind.Replace) return (DocumentContent.Base(version, value), [new ReplaceOp(value)]);
+        if (hold.Base) return (DocumentContent.Base(version, value), taken.Ops);
+        return (new DocumentDelta(version, taken.Ops), taken.Ops);
+    }
+
+    /// <summary>Adopts every prepared change by pointer swap after Storage success and describes the publication: this commit's own changes
+    /// for the Session's observers, and what it stored, held changes first, for <c>SubscribeCommits</c>.</summary>
+    public AdoptedDocuments Adopt(Seq seq)
+    {
+        var publications = new List<ICommitChange>();
+        // Only when the commit stored held changes: then what Storage got differs from what memory adopted.
+        List<ICommitChange>? stored = null;
         foreach (var plan in plans)
         {
             var committed = plan.Record is DocumentRecord;
@@ -614,22 +748,32 @@ internal sealed class Transaction : ITx
                     host.Install(new LoadedDocument(plan.AddressId, record, change.Version, change.Version, 0, change.Tracker));
                 }
             }
-            if (plan.Retire)
+            if (plan.Retire && committed) host.Evict(plan.AddressId, record.Id);
+            if (Describe(plan, record) is not { } publication) continue;
+            if (plan.Held is not { } held)
             {
-                if (committed) host.Evict(plan.AddressId, record.Id);
-                publications.Add(new DocumentCommitChange(record, plan.ConversationId, null, null, EmptyOperations));
+                publications.Add(publication);
+                stored?.Add(publication);
+                continue;
             }
-            else if (plan.Content is DocumentCopyWrite copy)
-            {
-                publications.Add(new DocumentCopyCommitChange(record, plan.ConversationId!.Value, copy.Source));
-            }
-            else if (change is not null && Publishes(plan))
-            {
-                var ops = change.Loaded is null ? EmptyOperations : change.Prepared.Ops;
-                publications.Add(new DocumentCommitChange(record, plan.ConversationId, change.Version, (JsonObjectValue)change.Prepared.Value, ops));
-            }
+            stored ??= [.. publications];
+            if (held.Observed) publications.Add(publication);
+            // Only a document change of a loaded incarnation carries held operations.
+            stored.Add(publication is DocumentCommitChange document ? document with { Ops = held.Ops } : publication);
         }
-        return publications;
+        return new AdoptedDocuments(publications, stored ?? publications);
+    }
+
+    /// <summary>The publication of one adopted plan, if it publishes (<see cref="Publishes"/>), with <paramref name="record"/> as committed
+    /// (upstream <c>describe</c>).</summary>
+    private static ICommitChange? Describe(DocumentPlan plan, DocumentRecord record)
+    {
+        if (plan.Retire) return new DocumentCommitChange(record, plan.ConversationId, null, null, EmptyOperations);
+        if (plan.Content is DocumentCopyWrite copy) return new DocumentCopyCommitChange(record, plan.ConversationId!.Value, copy.Source);
+        var change = plan.Change;
+        if (change is null || !Publishes(plan)) return null;
+        var ops = change.Loaded is null ? EmptyOperations : change.Prepared.Ops;
+        return new DocumentCommitChange(record, plan.ConversationId, change.Version, (JsonObjectValue)change.Prepared.Value, ops);
     }
 
     private async Task<IReadOnlyList<StorageWrite>> AssembleAsync()
@@ -1026,5 +1170,11 @@ internal sealed class Transaction : ITx
         public PlanChange? Change { get; init; }
         /// <summary>Resolved before Storage admission so adoption performs no reads.</summary>
         public ConversationId? ConversationId { get; set; }
+        /// <summary>Set when this commit also stores held changes of the incarnation (<see cref="TakeHeld{THold}"/>): the operations its stored
+        /// change publishes, held first, and whether it has a change of its own to show the Session's observers.</summary>
+        public HeldPublication? Held { get; set; }
     }
+
+    /// <summary>What a plan that stores held changes publishes to <c>SubscribeCommits</c> (<see cref="DocumentPlan.Held"/>).</summary>
+    private sealed record HeldPublication(ImmutableArray<Op> Ops, bool Observed);
 }

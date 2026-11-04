@@ -630,7 +630,7 @@ internal static class StorageFailureTests
     private sealed class ThrowingObserver(Exception failure) : ViewObserver
     {
         public override void Publication(ConversationView before, ConversationView after, System.Collections.Immutable.ImmutableArray<PiSharp.Durable.Chord.Delta.Op> ops,
-            CommitPublication publication, DurableContext context) => throw failure;
+            ObservedCommit publication, DurableContext context) => throw failure;
 
         public override void End(Exception? failure) { }
     }

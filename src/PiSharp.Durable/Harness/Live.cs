@@ -5,6 +5,8 @@
 // {callId, name, taskId?, status, output?, droppedBytes?, droppedLines?, details?, diagnostics?, entry?}; a NestedToolSlot is {callId,
 // parentCallId, parentTaskId, name, taskId, arguments, status, output?, ..., summary?: {isError, durationMs?, usage?, error?}}.
 // Upstream's run writers startRun and handOver live in generation.ts, as HarnessTasks.StartRunAsync and HandOver do in Generation.cs.
+// Pi v1.5.0 sync (area deferred-commits, 6c2fd73b0): ProgressCommit (upstream PROGRESS_COMMIT), the deferred commit of streamed progress.
+// The citation stays on v1.2.0 until the file's other areas land.
 using PiSharp.Durable.Chord;
 using PiSharp.Durable.Chord.Delta;
 
@@ -25,6 +27,14 @@ public static class Live
     public static ConversationDocToken LiveDoc { get; } = Documents.DefineConversationDoc("pi.live", 1, DocumentFork.Initial,
         () => JsonObjectValue.Empty,
         checkpointWhen: (value, _, _) => !value.ContainsKey("generation") && !AnyRunning(value, "tools") && !AnyRunning(value, "nestedTools"));
+
+    /// <summary>
+    /// How the progress throttles commit a partial answer and running tool output into <c>pi.live</c> (upstream <c>PROGRESS_COMMIT</c>):
+    /// deferred, so Storage gets them together, at the next commit that reads or writes <c>pi.live</c> or after
+    /// <see cref="ProgressPolicy.PersistWithinMs"/>. Every commit that consumes or clears streamed fields reads <c>pi.live</c>, so it stores
+    /// them with its own changes (spec §8.2).
+    /// </summary>
+    internal static CommitOptions ProgressCommit { get; } = new(CommitPersistence.Deferred());
 
     private static bool AnyRunning(JsonObjectValue live, string key) =>
         live.TryGetValue(key, out var listed) && listed is JsonArrayValue slots &&

@@ -292,6 +292,14 @@ internal static partial class Program
         return articles;
     }
 
+    /// <summary>
+    /// A word of a slow answer (a word every 40 ms) that the page shows only after Storage got a partial: about 2.4 s into the answer. Partial
+    /// commits are deferred (Pi v1.5.0 sync, area deferred-commits: durable@1.5.0 Breaking Changes#10): the page shows each at once, and
+    /// Storage gets them together within <c>settings.progress.persistWithinMs</c> (1,000 ms by default). A server killed before the first store
+    /// answers once with no aborted entry.
+    /// </summary>
+    private const string StoredWord = "w060";
+
     /// <summary>The distinct words <c>w001</c>... of a slow answer that <paramref name="html"/> shows.</summary>
     private static int SlowWords(string html) => Regex.Matches(html, @"\bw\d{3}\b").Select(match => match.Value).Distinct(StringComparer.Ordinal).Count();
 
@@ -301,11 +309,11 @@ internal static partial class Program
         {
             await using var app = await RecoveryApp.StartAsync("recovery-stream", ToolApprovalMode.Ask);
             // The faux model answers a "slow:" message a word every 40 ms, and the app commits progress about every 150 ms: 150 words take
-            // about 6 s, so the server is killed well before the end, once a committed partial answer is on the stream.
+            // about 6 s, so the server is killed well before the end, once a stored partial answer is on the stream (StoredWord).
             var words = Enumerable.Range(1, 150).Select(index => $"w{index:000}").ToList();
             var id = await app.CreateAsync("slow: " + string.Join(' ', words), "r1");
-            await app.WatchAsync(id, 1, html => AssistantArticles(html).Any(answer => answer.Contains("w010", StringComparison.Ordinal) &&
-                !answer.Contains("w150", StringComparison.Ordinal)), "a committed partial answer");
+            await app.WatchAsync(id, 1, html => AssistantArticles(html).Any(answer => answer.Contains(StoredWord, StringComparison.Ordinal) &&
+                !answer.Contains("w150", StringComparison.Ordinal)), "a stored partial answer");
             await app.KillAndRestartAsync();
 
             var page = await app.WaitIdleAsync(id, html => AssistantArticles(html).Any(answer => answer.Contains("w150", StringComparison.Ordinal)),

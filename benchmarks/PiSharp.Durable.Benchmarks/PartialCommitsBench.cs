@@ -9,6 +9,9 @@
 // nothing and committed nothing: once 200 ms pass without a commit, the phase streams its other pieces without waiting. Each phase reports its
 // commits, the bytes allocated on every thread meanwhile (GC.GetTotalAllocatedBytes) and the time. A per-commit cost that grows with the
 // size is an O(length) copy per commit; a flat one is the cost of the new text.
+// Pi v1.5.0 sync (area deferred-commits): partial commits are deferred, and SubscribeCommits sees only what was stored; the run sets
+// progress.persistWithinMs to 0, so each partial is still stored on its own right after its commit and every phase measures a commit and
+// its store, as before.
 using System.Collections.Immutable;
 using System.Diagnostics;
 using System.Globalization;
@@ -69,7 +72,8 @@ public static class PartialCommitsBench
         var text = string.Concat(Enumerable.Repeat("streamed text with \"quotes\" and \\ escapes\n", Math.Max(1, size / 40)));
         var gate = new CommitGate();
         var models = new StreamingModels(text, gate);
-        var settings = new HarnessSettings { Progress = new ProgressSettings { PartialIntervalMs = 0, OutputIntervalMs = 100 },
+        // Each partial stored on its own, right after its commit (see the file header).
+        var settings = new HarnessSettings { Progress = new ProgressSettings { PartialIntervalMs = 0, OutputIntervalMs = 100, PersistWithinMs = 0 },
             // Keeps `pi.live` cached between commits whatever the run's default (upstream 1e42501bb).
             DocumentRetentionMs = 60_000 };
         var harness = await Harness.OpenAsync(new MemoryStorage(), new HarnessOptions { Models = models, Registry = Registry.Create(), Settings = settings },

@@ -126,7 +126,8 @@ internal static class CrashScenarios
 {
     internal static readonly DurableContext Ctx = DurableContext.Background;
 
-    /// <summary>Appended to every chat answer, so the slow child stream of <c>chat.stream</c> commits many partials.</summary>
+    /// <summary>Appended to every chat answer, so the slow child stream of <c>chat.stream</c> and <c>chat.stream-stored</c> commits many
+    /// partials.</summary>
     internal static readonly string Padding = " " + new string('.', 400);
 
     /// <summary>A commit-boundary checkpoint: the batch it matches, and whether the kill comes after the batch landed; a failing one makes
@@ -167,6 +168,11 @@ internal static class CrashScenarios
     internal static bool AbortMark(IReadOnlyList<StorageWrite> writes) => writes.OfType<TaskWrite>().Any(write =>
         write.Value.AbortRequested && write.Value.State is LiveTaskState);
 
+    /// <summary>A store of held pi.live changes on their own that holds a partial message (Pi v1.5.0 sync, area deferred-commits: the window's
+    /// timer stores what deferred partial commits held).</summary>
+    internal static bool StoredPartial(IReadOnlyList<StorageWrite> writes) =>
+        writes is [DocumentChangeWrite change] && change.Content.ToJson().ToJson().Contains("\"message\"", StringComparison.Ordinal);
+
     /// <summary>The commit trigger of a checkpoint; null for checkpoints the scenario code reaches itself.</summary>
     internal static CommitTrigger? Trigger(string scenario, string checkpoint) => (scenario, checkpoint) switch
     {
@@ -185,6 +191,7 @@ internal static class CrashScenarios
         ("submit", "admit-after") => new(Admission("r1"), true),
         ("submit", "queued-admit-after") => new(Admission("r2"), true),
         ("abort", _) => new(AbortMark, true),
+        ("chat", "stream-stored") => new(StoredPartial, true),
         _ => null,
     };
 
@@ -197,12 +204,12 @@ internal static class CrashScenarios
     // ─── Setup ──────────────────────────────────────────────────────────────
 
     /// <summary>The models, registry and settings of a scenario. Identical in both processes except for the child's gates, holds and its
-    /// slow <c>chat.stream</c> model.</summary>
+    /// slow <c>chat.stream</c> and <c>chat.stream-stored</c> model and their progress windows.</summary>
     internal static ChatSetup BuildSetup(string scenario, string checkpoint, CrashGate gate, string workDir)
     {
         // The ask-user and plan-approval scenarios (InteractionCrashScenarios.cs).
         if (InteractionCrash.Uses(scenario)) return InteractionCrash.BuildSetup(scenario, workDir);
-        var slow = gate.Child && scenario == "chat" && checkpoint == "stream";
+        var slow = gate.Child && scenario == "chat" && checkpoint is "stream" or "stream-stored";
         var setup = new ChatSetup(new FauxModels(new FauxOptions
         {
             Api = "faux-crash",
@@ -211,6 +218,9 @@ internal static class CrashScenarios
             MaxTokenSize = slow ? 1 : null,
         }));
         setup.Progress = new ProgressSettings { PartialIntervalMs = 5 };
+        // Pi v1.5.0 sync (area deferred-commits): chat.stream's partials stay in memory until the kill; chat.stream-stored's are stored
+        // within 20 ms, so the kill after the first such store lands.
+        if (slow) setup.Progress = new ProgressSettings { PartialIntervalMs = 5, PersistWithinMs = checkpoint == "stream" ? double.PositiveInfinity : 20 };
         if (scenario == "chat")
         {
             setup.Retry = new RetrySettings { Enabled = true, MaxRetries = 2, BaseDelayMs = 60_000 };

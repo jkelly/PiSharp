@@ -9,6 +9,8 @@
 // non-finite usage count instead of a function, see HarnessGenerationCases.cs); upstream's module-level blockingTool and toolCalls are
 // BlockingRoundTool and ToolCalls below; `Promise.all([one.started, two.started])` is Task.WhenAll; "aborts a parallel round ..." orders the
 // two tools' aborts with a barrier (see there).
+// Pi v1.5.0 sync (area deferred-commits, 6c2fd73b0): "... fails the Harness on a failed final commit" stores progress at once
+// (progress.persistWithinMs 0), as upstream's does.
 using PiSharp.Durable;
 using PiSharp.Durable.Chord;
 using static ChatTests;
@@ -136,6 +138,9 @@ internal static partial class StructuredTests
             var nodes = new Nodes();
             var setupBase = Setup();
             var setup = setupBase.WithModels(new ModelsOverride(setupBase.Models) { StreamSimpleOverride = (_, _, _, token) => GenerationTests.InvalidFinalStream(token) });
+            // The partial is stored at once, so the failed final commit leaves it for the reopened run to convert; held, it would be lost
+            // with the failed Session.
+            setup.Progress = new ProgressSettings { PersistWithinMs = 0 };
             AddTask(setup.Registry, nodes.Node);
             IHarness? opened = null;
             AddHooks(setup.Registry, HarnessTasks.GenerationTask, new GenerationHooks

@@ -22,6 +22,8 @@
 // contained, as the report is the last place an error goes. Reports carry the context of what raised them (ReportSink).
 // Pi v1.5.0 sync (area watches, 92ab53602): the state getters Conversation.viewState() and Harness.taskGraph() are removed; their watches
 // stay (Conversation.watch(), Harness.watchTaskGraph()).
+// Pi v1.5.0 sync (area deferred-commits, 6c2fd73b0): Conversation.commit() takes CommitOptions, and the Session reads
+// settings.progress.persistWithinMs at each use, as the default window of a deferred commit.
 using System.Collections.Immutable;
 using PiSharp.AI;
 using PiSharp.Durable.Chord;
@@ -117,8 +119,9 @@ internal sealed class DurableHarness : Session, IHarness
 
     private DurableHarness(IStorage rawStorage, HarnessOptions options, DurableContext context, ReportSink report,
         Func<HarnessSettings?> hostSettings, Func<double> now)
-        // Read at each use, as all settings are, but only this field: it is read on every commit.
-        : base(rawStorage, now, () => hostSettings()?.DocumentRetentionMs, options.ReadOnly, options.SetTimer, options.TimeProvider)
+        // Read at each use, as all settings are, but only these fields: they are read on every commit.
+        : base(rawStorage, now, () => hostSettings()?.DocumentRetentionMs, options.ReadOnly, options.SetTimer, options.TimeProvider,
+            () => hostSettings()?.Progress?.PersistWithinMs)
     {
         // Every component reads and writes through the Session's failure guard: rawStorage serves only the base constructor.
         var storage = GuardedStorage;
@@ -432,28 +435,28 @@ internal sealed class ConversationImpl(ConversationId id, DurableHarness harness
         return await harness.CommitWithAsync(tx => Compaction.CreateCompactionAsync(tx, Id, "manual", instructions), context).ConfigureAwait(false);
     }
 
-    public Task<T> CommitAsync<T>(Func<ITx, Task<T>> change, DurableContext context)
+    public Task<T> CommitAsync<T>(Func<ITx, Task<T>> change, DurableContext context, CommitOptions? options = null)
     {
         ArgumentNullException.ThrowIfNull(change);
-        return harness.CommitWithAsync(tx => change(tx), context, new TransactionScope(Id));
+        return harness.CommitWithAsync(tx => change(tx), context, new TransactionScope(Id), options);
     }
 
-    public Task CommitAsync(Func<ITx, Task> change, DurableContext context)
+    public Task CommitAsync(Func<ITx, Task> change, DurableContext context, CommitOptions? options = null)
     {
         ArgumentNullException.ThrowIfNull(change);
-        return harness.CommitWithAsync(tx => change(tx), context, new TransactionScope(Id));
+        return harness.CommitWithAsync(tx => change(tx), context, new TransactionScope(Id), options);
     }
 
-    public Task<T> CommitAsync<T>(Func<ITx, T> change, DurableContext context)
+    public Task<T> CommitAsync<T>(Func<ITx, T> change, DurableContext context, CommitOptions? options = null)
     {
         ArgumentNullException.ThrowIfNull(change);
-        return harness.CommitWithAsync(tx => Task.FromResult(change(tx)), context, new TransactionScope(Id));
+        return harness.CommitWithAsync(tx => Task.FromResult(change(tx)), context, new TransactionScope(Id), options);
     }
 
-    public Task CommitAsync(Action<ITx> change, DurableContext context)
+    public Task CommitAsync(Action<ITx> change, DurableContext context, CommitOptions? options = null)
     {
         ArgumentNullException.ThrowIfNull(change);
-        return harness.CommitWithAsync(tx => change(tx), context, new TransactionScope(Id));
+        return harness.CommitWithAsync(tx => change(tx), context, new TransactionScope(Id), options);
     }
 
     public Task<ContextView> ContextAsync(DurableContext context, EntryId? at = null) =>

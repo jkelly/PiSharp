@@ -73,6 +73,19 @@ internal static partial class SessionTests
     internal static List<DocumentCommitChange> DocumentChanges(CommitPublication publication) =>
         [.. publication.Changes.OfType<DocumentCommitChange>()];
 
+    /// <summary>The document changes of what an internal observer saw (Pi v1.5.0 sync, area deferred-commits: upstream's
+    /// <c>documentChanges</c> takes anything with changes).</summary>
+    internal static List<DocumentCommitChange> DocumentChanges(ObservedCommit publication) =>
+        [.. publication.Changes.OfType<DocumentCommitChange>()];
+
+    /// <summary>
+    /// Observe every commit as memory adopts it, deferred ones before they are stored, as views and document watches do;
+    /// <see cref="ISession.SubscribeCommits"/> sees only what was stored (upstream <c>observeCommits</c>, 6c2fd73b0). The internal
+    /// observer is on <see cref="Session"/>, which every Session and Harness is.
+    /// </summary>
+    internal static IDisposable ObserveCommits(ISession session, Action<ObservedCommit, DurableContext> listener) =>
+        ((Session)session).ObserveCommits(listener);
+
     internal static List<DocumentCopyCommitChange> DocumentCopyChanges(CommitPublication publication) =>
         [.. publication.Changes.OfType<DocumentCopyCommitChange>()];
 
@@ -317,5 +330,14 @@ internal sealed class ControlledStorage(IStorage inner) : IStorage
         return this;
     }
 
-    public Task CloseAsync(DurableContext context) => KeepOpenForReopen ? Task.CompletedTask : Inner.CloseAsync(context);
+    /// <summary>How many times the Session closed this storage, kept open or not (Pi v1.5.0 sync, area deferred-commits: upstream reads
+    /// MemoryStorage's closed flag).</summary>
+    public int CloseCount => Volatile.Read(ref closeCount);
+    private int closeCount;
+
+    public Task CloseAsync(DurableContext context)
+    {
+        Interlocked.Increment(ref closeCount);
+        return KeepOpenForReopen ? Task.CompletedTask : Inner.CloseAsync(context);
+    }
 }

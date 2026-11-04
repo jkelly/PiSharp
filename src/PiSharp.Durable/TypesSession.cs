@@ -6,7 +6,9 @@
 // WatchCall<T> and NativeWatchCall<T>, which upstream's index re-exports; in C# they stay in PiSharp.Durable.Chord), and the document
 // state getters and their type are removed (Session.documentState(), DocumentState). Area watch-folding (8b0caefc2 and d8d99950a): a
 // document watch follows its address and its value is never null (DocumentWatch<T> = WatchHandle<Readonly<T>>), so WatchDocAsync returns
-// IWatchHandle<JsonObjectValue>. The citation stays on v1.2.0 until the file's other areas land.
+// IWatchHandle<JsonObjectValue>. Area deferred-commits (6c2fd73b0): a commit takes CommitOptions, whose CommitPersistence may defer storing
+// it (spec §4.1), and a CommitPublication is what one storage transaction stored. The citation stays on v1.2.0 until the file's other areas
+// land.
 using System.Collections.Immutable;
 using PiSharp.Durable.Chord;
 using PiSharp.Durable.Chord.Delta;
@@ -157,10 +159,51 @@ public sealed record DocumentCopyCommitChange(DocumentRecord Record, Conversatio
     public string Type => "document.copy";
 }
 
-/// <summary>Every immutable change from one successful Session commit; change order is unspecified (upstream <c>CommitPublication</c>).</summary>
+/// <summary>
+/// Every immutable change one Session storage transaction stored, with its <c>seq</c>; change order is unspecified (upstream
+/// <c>CommitPublication</c>). A commit held in memory (<see cref="CommitPersistence"/>) is published once it is stored: by the next commit
+/// that reads or writes its document, alone (a <c>seq</c> of its own), or with that commit, whose document change then carries the held
+/// operations followed by its own.
+/// </summary>
 /// <param name="Seq">The commit sequence.</param>
 /// <param name="Changes">The changes.</param>
 public sealed record CommitPublication(Seq Seq, IReadOnlyList<ICommitChange> Changes);
+
+/// <summary>
+/// When a commit reaches Storage (upstream <c>CommitPersistence</c>). <see cref="Immediate"/>, the default: before the commit completes.
+/// <see cref="Deferred"/>: when every write of the commit changes an existing conversation document with history <c>latest</c> and fork
+/// <c>initial</c> (no creation, migration or retirement), the Session adopts it in memory, shows it to watches and views, and completes, but
+/// stores it later: with the next commit that reads (<c>tx.DocAsync</c>) or writes that document, before the document leaves memory or
+/// retires, at close, and at the latest about <see cref="WithinMs"/> after the commit (default
+/// <see cref="ProgressSettings.PersistWithinMs"/>, 1,000 ms; <see cref="double.PositiveInfinity"/> waits for one of the others). A commit
+/// that writes anything else is immediate. A crash loses what is held, so only state whose loss is acceptable, such as streamed progress,
+/// should be deferred, and nothing durable may depend on it without reading it in a commit.
+/// </summary>
+/// <param name="Kind"><c>immediate</c> or <c>deferred</c>.</param>
+/// <param name="WithinMs">For a deferred commit, how long it may stay in memory: a number of milliseconds, 0 or more; null for the default.
+/// Anything else (NaN, a negative value) fails the commit with <see cref="ArgumentOutOfRangeException"/> before it is queued (upstream's
+/// <c>TypeError</c>).</param>
+public sealed record CommitPersistence(CommitPersistenceKind Kind, double? WithinMs = null)
+{
+    /// <summary><c>{kind: "immediate"}</c>.</summary>
+    public static CommitPersistence Immediate { get; } = new(CommitPersistenceKind.Immediate);
+
+    /// <summary><c>{kind: "deferred", withinMs}</c>.</summary>
+    public static CommitPersistence Deferred(double? withinMs = null) => new(CommitPersistenceKind.Deferred, withinMs);
+}
+
+/// <summary>When a commit reaches Storage (upstream <c>CommitPersistence["kind"]</c>).</summary>
+public enum CommitPersistenceKind
+{
+    /// <summary><c>immediate</c>: stored before the commit completes.</summary>
+    Immediate,
+    /// <summary><c>deferred</c>: held in memory when it may be (<see cref="CommitPersistence"/>).</summary>
+    Deferred,
+}
+
+/// <summary>Options of one Session commit (upstream <c>CommitOptions</c>).</summary>
+/// <param name="Persistence">When it reaches Storage; null: immediately.</param>
+public sealed record CommitOptions(CommitPersistence? Persistence = null);
 
 /// <summary>Why a Session ended: <c>close()</c>, or a failed Storage call, whose error it carries (upstream <c>SessionEnd</c>).</summary>
 /// <param name="Reason"><see cref="SessionEndReason.Closed"/> or <see cref="SessionEndReason.Failed"/>.</param>
@@ -244,14 +287,14 @@ public interface ISession : IDocumentObserver, IDocumentReader
 {
     /// <summary>Runs one atomic transaction on the Session mutation line and returns the callback's result. Inside the callback read only
     /// through the transaction: <c>SnapshotAsync</c>, <c>WatchDocAsync</c> and the other Session and runtime reads may queue on the line the
-    /// callback holds, and then never complete.</summary>
-    Task<T> CommitAsync<T>(Func<ITx, Task<T>> change, DurableContext context);
+    /// callback holds, and then never complete. <paramref name="options"/> may defer storing it (<see cref="CommitPersistence"/>).</summary>
+    Task<T> CommitAsync<T>(Func<ITx, Task<T>> change, DurableContext context, CommitOptions? options = null);
     /// <summary>Runs one atomic asynchronous transaction on the Session mutation line.</summary>
-    Task CommitAsync(Func<ITx, Task> change, DurableContext context);
+    Task CommitAsync(Func<ITx, Task> change, DurableContext context, CommitOptions? options = null);
     /// <summary>Runs one atomic synchronous transaction on the Session mutation line and returns the callback's result.</summary>
-    Task<T> CommitAsync<T>(Func<ITx, T> change, DurableContext context);
+    Task<T> CommitAsync<T>(Func<ITx, T> change, DurableContext context, CommitOptions? options = null);
     /// <summary>Runs one atomic synchronous transaction on the Session mutation line.</summary>
-    Task CommitAsync(Action<ITx> change, DurableContext context);
+    Task CommitAsync(Action<ITx> change, DurableContext context, CommitOptions? options = null);
 
     /// <summary>Seals admission, settles admitted commits, then closes storage. Cancelling the wait does not reopen admission.</summary>
     Task CloseAsync(DurableContext context);
@@ -262,8 +305,9 @@ public interface ISession : IDocumentObserver, IDocumentReader
     /// </summary>
     Task<SessionEnd> Closed { get; }
 
-    /// <summary>Observes complete commits synchronously after adoption. The listener must not block or call Session APIs; a throw, or a
-    /// faulted task it returns, is reported (<c>HarnessOptions.OnReport</c>) and the other listeners still run.</summary>
+    /// <summary>Observes stored commits synchronously after adoption, each with exactly what it stored; a commit held in memory is published
+    /// when it is stored (<see cref="CommitPublication"/>). The listener must not block or call Session APIs; a throw, or a faulted task it
+    /// returns, is reported (<c>HarnessOptions.OnReport</c>) and the other listeners still run.</summary>
     IDisposable SubscribeCommits(Action<CommitPublication, DurableContext> listener);
 
     /// <summary>An asynchronous commit listener: it still runs synchronously after adoption, and a faulted task it returns (upstream's

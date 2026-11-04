@@ -15,7 +15,8 @@
 // parent, and a run's generation is created with its inputs' submission IDs, so its trace is the first admission's and the others link.
 // Pi v1.5.0 sync (area partial-commits, da412b039): partial commits append what text and thinking grew by and apply the argument changes
 // of their own parse of the streamed argument text (PartialChanges), so a committed partial now carries a streaming tool call's parsed
-// arguments, as upstream's does.
+// arguments, as upstream's does. Pi v1.5.0 sync (area deferred-commits, 6c2fd73b0): partial commits are deferred (Live.ProgressCommit),
+// and so is the request phase's attempt commit unless it converts an interrupted attempt's partial (e5c6182ba, durable@1.5.0 Changed#5).
 //
 // Mappings:
 // - Checkpoints, live state and results are upstream's JSON, built in upstream's key order: prepare {phase, attempt, compacted?, overflow?},
@@ -245,12 +246,14 @@ internal static class GenerationPhases
         var streamOptions = checkpoint.TryGetValue("streamOptions", out var pinned) && pinned is JsonObjectValue options ? options : JsonObjectValue.Empty;
         var cutoff = new EntryId(Id(checkpoint["cutoff"]));
         var conversationId = runtime.ConversationId;
+        // The attempt shown is presentation, stored like progress (Live.ProgressCommit); converting a partial left by an interrupted attempt
+        // appends an entry, which makes the commit immediate.
         await runtime.CommitAsync(async (tx, _) =>
         {
             var live = await tx.DocAsync(Live.LiveDoc, conversationId).ConfigureAwait(false);
             await HarnessTasks.ConvertPartialAsync(tx, live, conversationId).ConfigureAwait(false);
             live.Set("generation", GenerationState(attempt));
-        }, context).ConfigureAwait(false);
+        }, context, Live.ProgressCommit).ConfigureAwait(false);
         var model = runtime.Models.GetModel(reference.Provider, reference.ModelId);
         if (model is null)
         {
@@ -486,7 +489,8 @@ internal static class GenerationPhases
 
     /// <summary>
     /// Streams one request and returns the terminal message (upstream <c>streamResponse</c>). Partials commit as trailing writes at most
-    /// every <c>progress.partialIntervalMs</c> (default 100 ms) with one commit in flight; <c>finally</c> stops the throttle and awaits that
+    /// every <c>progress.partialIntervalMs</c> (default 100 ms) with one commit in flight, deferred (<see cref="Live.ProgressCommit"/>);
+    /// <c>finally</c> stops the throttle and awaits that
     /// commit, so no stale partial lands after the outcome. A commit appends what text and thinking grew by and applies the argument
     /// changes since the last one (<see cref="PartialChanges"/>), so its cost follows the new text, not the strings' length.
     /// </summary>
@@ -542,7 +546,7 @@ internal static class GenerationPhases
                         var live = await tx.DocAsync(Live.LiveDoc, runtime.ConversationId).ConfigureAwait(false);
                         if (!live.ContainsKey("generation")) live.Set("generation", GenerationState(attempt));
                         changes.Commit(live.GetObject("generation"), taken!);
-                    }, context).ConfigureAwait(false);
+                    }, context, Live.ProgressCommit).ConfigureAwait(false);
                 }
                 catch (Exception)
                 {

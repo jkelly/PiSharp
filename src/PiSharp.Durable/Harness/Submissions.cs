@@ -3,6 +3,9 @@
 // SubmissionRecord whose status is done or unanswered (upstream SettledSubmissionRecord). Upstream's checkInputEntry guards untyped callers;
 // an InputEntry is typed, so only its kind is checked.
 //
+// Pi v1.5.0 sync (area deferred-commits, 6c2fd73b0): the inbox observes the Session's commits as memory adopts them
+// (Session.ObserveCommits) and skips a held one, which holds no submission.
+//
 // Pi v1.5.0 sync (area telemetry, 2ec55d808): a public admission is a pi.durable.submit span: an input's is a root of the Harness telemetry
 // linked to the caller's span, a write's a child of it. The commit runs under the span, so its entry and submission events land there, and
 // admission stores the span's carrier on the record and links a steer to the running generation's trace. An error records only the error
@@ -121,8 +124,10 @@ internal sealed class Submissions
             return record.Status == SubmissionStatus.Placed ? SubmissionAbortResult.AlreadyPlaced : SubmissionAbortResult.Settled;
         }, context);
 
-    private void Observe(CommitPublication publication)
+    private void Observe(ObservedCommit publication)
     {
+        // A commit held in memory changes documents only.
+        if (publication.IsMemory) return;
         foreach (var change in publication.Changes)
             if (change is SubmissionWrite { Value: var record } && IsSettled(record)) waiters.Resolve(record.Id, record);
     }

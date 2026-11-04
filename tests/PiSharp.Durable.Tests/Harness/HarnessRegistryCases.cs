@@ -122,7 +122,7 @@ internal static partial class HarnessTests
         yield return Case(prefix + "settings.keeps-the-default-of-a-progress-interval-given-as-undefined", () =>
         {
             var settings = Agents.ResolveSettings(new HarnessSettings { Progress = new ProgressSettings { PartialIntervalMs = null, OutputIntervalMs = 250 } });
-            Equal(new ProgressPolicy(100, 250), settings.Progress, "progress");
+            Equal(new ProgressPolicy(100, 250, 1000), settings.Progress, "progress");
         });
 
         // ─── agent resolution ───

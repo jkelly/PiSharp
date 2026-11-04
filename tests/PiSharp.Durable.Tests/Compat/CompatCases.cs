@@ -20,6 +20,9 @@
 // forms, not the capture: v1.5.0 records the requested thinking level on each message it classifies, "off" here. A resume classifies only
 // the messages it adds, so the messages the resumed session already held keep their captured form. A case that compares with an authored
 // form is authored, not captured evidence: AuthoredOverCapture lists them, and the run reports them as authored.
+// Pi v1.5.0 sync (area deferred-commits): the written cases also compare with DeferredCommits150.cs's authored forms: v1.5.0 holds the
+// commits that only show progress in pi.live and stores them with the next commit that reads or writes it, or at close, so the commits
+// after a held one move down a seq, and the held changes are stored with a later commit. A resume after the run reads the moved seqs.
 // - upgrade-from-v1.1.0: a v1.2.0 Harness opens copies of the v1.1.0 sessions (Fixtures/upstream-sessions) without resuming them, and
 //   resumes the resumable ones with their scenario's model, ending with the records upstream's v1.2.0 left (its v1 pi.tool tasks migrate to
 //   version 2 when they run).
@@ -266,19 +269,22 @@ internal static partial class CompatTests
                 yield return Case(AuthoredCase(prefix + "written"), async () =>
                 {
                     // Pi v1.5.0 (area model-requests): the messages PiSharp classifies record the thinking level (ModelRequests150.cs).
+                    // (area deferred-commits) and DeferredCommits150's, the commits v1.5.0 holds and stores later.
+                    var deferred = DeferredCommits150.For(Path.Combine(Fixtures, scenario.Name));
                     var directory = Temp($"compat-written-{scenario.Name}-{backend}");
                     await scenario.Run(() => OpenBackend(backend, directory));
-                    SameJson(ModelRequests150.Authored(Expected(scenario.Name, "records.json", backend)), await Dump(await OpenBackend(backend, directory)), "records");
+                    SameJson(deferred.Records(ModelRequests150.Authored(Expected(scenario.Name, "records.json", backend))), await Dump(await OpenBackend(backend, directory)),
+                        "records");
                     var upstream = Path.Combine(Fixtures, scenario.Name, backend);
-                    if (backend == "jsonl") SameFiles(upstream, directory, ModelRequests150.AuthoredText);
+                    if (backend == "jsonl") SameFiles(upstream, directory, ModelRequests150.AuthoredText, deferred);
                     // A copy: even a read-only connection to a WAL database leaves -wal and -shm files beside it.
                     else SameColumns(Path.Combine(CopyFixture(scenario.Name, backend), "session.sqlite"), Path.Combine(directory, "session.sqlite"),
-                        ModelRequests150.AuthoredText);
+                        ModelRequests150.AuthoredText, deferred);
                     if (scenario.Resume is { } resume)
                     {
                         await resume(() => OpenBackend(backend, directory));
-                        SameJson(ModelRequests150.Authored(Expected(scenario.Name, "resumed.json", backend)), await Dump(await OpenBackend(backend, directory)),
-                            "resumed records");
+                        SameJson(deferred.Records(ModelRequests150.Authored(Expected(scenario.Name, "resumed.json", backend))),
+                            await Dump(await OpenBackend(backend, directory)), "resumed records");
                     }
                 });
             }
@@ -364,18 +370,22 @@ internal static partial class CompatTests
                     // Pi v1.5.0 (area tools-schema): what PiSharp writes is compared with ToolsSchema150's authored forms of the capture, the
                     // built-in tools' pi-schema declarations and pi-schema's validation messages; (area model-requests) and ModelRequests150's, the
                     // thinking level each classified message records.
+                    // (area deferred-commits) and DeferredCommits150's, the commits v1.5.0 holds and stores later (records only: no event,
+                    // frame or observed value holds a seq).
                     static JsonValue Authored(JsonValue capture) => ModelRequests150.Authored(ToolsSchema150.Authored(capture));
                     static string AuthoredText(string text) => ModelRequests150.AuthoredText(ToolsSchema150.AuthoredText(text));
+                    var deferred = DeferredCommits150.For(Path.Combine(root, scenario.Name));
                     var writtenEvents = expectedEvents is null ? null : (JsonObjectValue)Authored(expectedEvents);
                     var directory = Temp($"compat-written-{scenario.Name}-{backend}");
                     var runEvents = CompatEvents.Expect(writtenEvents, "run");
                     var observed = await CompatEvents.Record(runEvents, () => runScenario(() => OpenBackend(backend, directory)));
                     runEvents?.Check("run events");
-                    SameJson(Authored(Expected(scenario.Name, "records.json", backend, root)), await Dump(await OpenBackend(backend, directory)), "records");
+                    SameJson(deferred.Records(Authored(Expected(scenario.Name, "records.json", backend, root))), await Dump(await OpenBackend(backend, directory)),
+                        "records");
                     var upstream = Path.Combine(root, scenario.Name, backend);
-                    if (backend == "jsonl") SameFiles(upstream, directory, AuthoredText);
+                    if (backend == "jsonl") SameFiles(upstream, directory, AuthoredText, deferred);
                     else SameColumns(Path.Combine(CopyFixture(scenario.Name, backend, root), "session.sqlite"), Path.Combine(directory, "session.sqlite"),
-                        AuthoredText);
+                        AuthoredText, deferred);
                     var observedFile = Path.Combine(root, scenario.Name, "observed.json");
                     JsonObjectValue? expectedObserved = File.Exists(observedFile)
                         ? (JsonObjectValue)Authored(Expected(scenario.Name, "observed.json", backend, root)) : null;
@@ -386,7 +396,7 @@ internal static partial class CompatTests
                         var resumeEvents = CompatEvents.Expect(writtenEvents, "resume");
                         var resumed = await CompatEvents.Record(resumeEvents, () => resume(() => OpenBackend(backend, directory)));
                         resumeEvents?.Check("resume events");
-                        SameJson(Authored(Expected(scenario.Name, "resumed.json", backend, root)), await Dump(await OpenBackend(backend, directory)),
+                        SameJson(deferred.Records(Authored(Expected(scenario.Name, "resumed.json", backend, root))), await Dump(await OpenBackend(backend, directory)),
                             "resumed records");
                         if (expectedObserved?.TryGetValue("resume", out var onResume) == true)
                             SameObserved(onResume, resumed ?? throw new InvalidOperationException("the resume observed nothing"), scenario.UnobservedFields,
@@ -566,14 +576,17 @@ internal static partial class CompatTests
     // ─── written ────────────────────────────────────────────────────────────────
 
     /// <summary>The JSONL session PiSharp wrote is upstream's, byte for byte, apart from the varying fields; <paramref name="authored"/>, when
-    /// given, turns each captured line into its authored form.</summary>
-    private static void SameFiles(string upstream, string pisharp, Func<string, string>? authored = null)
+    /// given, turns each captured line into its authored form, and <paramref name="deferred"/> then moves the commits v1.5.0 holds.</summary>
+    private static void SameFiles(string upstream, string pisharp, Func<string, string>? authored = null, DeferredCommits150.Plan? deferred = null)
     {
         static List<string> Names(string directory) => [.. Directory.GetFiles(directory).Select(path => Path.GetFileName(path)).Order(StringComparer.Ordinal)];
         Equal(string.Join(",", Names(upstream)), string.Join(",", Names(pisharp)), "JSONL files");
+        var files = Names(upstream).ToDictionary(name => name,
+            name => File.ReadAllText(Path.Combine(upstream, name)).Split('\n').Select(authored ?? (line => line)).ToArray(), StringComparer.Ordinal);
+        if (deferred is not null) files = deferred.Jsonl(files);
         foreach (var name in Names(upstream))
         {
-            var expected = NormalizeText(string.Join('\n', File.ReadAllText(Path.Combine(upstream, name)).Split('\n').Select(authored ?? (line => line)))).Split('\n');
+            var expected = NormalizeText(string.Join('\n', files[name])).Split('\n');
             var actual = NormalizeText(File.ReadAllText(Path.Combine(pisharp, name))).Split('\n');
             for (var index = 0; index < Math.Max(expected.Length, actual.Length); index++)
                 Equal(index < expected.Length ? expected[index] : "<end>", index < actual.Length ? actual[index] : "<end>", $"{name} line {index + 1}");
@@ -593,17 +606,18 @@ internal static partial class CompatTests
     ];
 
     /// <summary>The SQLite session PiSharp wrote holds upstream's rows and JSON text, apart from the varying fields; <paramref name="authored"/>,
-    /// when given, turns each captured column into its authored form.</summary>
-    private static void SameColumns(string upstream, string pisharp, Func<string, string>? authored = null)
+    /// when given, turns each captured column into its authored form, and <paramref name="deferred"/> then moves the commits v1.5.0 holds.</summary>
+    private static void SameColumns(string upstream, string pisharp, Func<string, string>? authored = null, DeferredCommits150.Plan? deferred = null)
     {
         using var left = ReadOnly(upstream);
         using var right = ReadOnly(pisharp);
         foreach (var sql in Columns)
         {
-            var expected = Rows(left, sql);
+            var expected = Rows(left, sql).Select(row => row.Select(authored ?? (cell => cell)).ToArray()).ToList();
+            if (deferred is not null) expected = deferred.Rows(sql, expected);
             var actual = Rows(right, sql);
             for (var index = 0; index < Math.Max(expected.Count, actual.Count); index++)
-                Equal(index < expected.Count ? NormalizeText(string.Join(" | ", expected[index].Select(authored ?? (cell => cell)))) : "<end>",
+                Equal(index < expected.Count ? NormalizeText(string.Join(" | ", expected[index])) : "<end>",
                     index < actual.Count ? NormalizeText(string.Join(" | ", actual[index])) : "<end>", $"{sql} row {index + 1}");
         }
     }

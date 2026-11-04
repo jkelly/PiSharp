@@ -4,7 +4,9 @@
 // user-interaction, plan-mode and the device apps) plus web-approval, which reads Settings › Tools at every call. Its SessionStream answers
 // {account, tier} from the chat binding and, for the Spend Guard (run W3, S0), {source: "chat", run: the chat id} (the host adds op).
 // Model progress is committed about every 150 ms, which is what the pages stream
-// (committed text only). No default model: a session whose model the device no longer knows is never moved to another one. The web agent
+// (committed text only). Pi v1.5.0 sync (durable area deferred-commits): those commits are deferred, so the pages show each at once while
+// Storage gets them within settings.progress.persistWithinMs (1,000 ms by default, left as is here): a crash loses up to about a second of
+// streamed text, and one before the first store leaves no aborted entry. No default model: a session whose model the device no longer knows is never moved to another one. The web agent
 // defines no durable jobs and runs no schedules. The service also keeps each chat's running flag for the sidebar, refreshed from the
 // device's coalesced changes.
 // W4 fix 2: the host streams through Models: the app's IDurableModels under every registered IDeviceModelsDecorator (DeviceModels), so an

@@ -15,8 +15,10 @@
 // of each live task (BlockedSubject), in upstream's Map order; a registry change or a failed migration derives every reason again on the
 // Session line and publishes the changed ones as set or delete ops on ["tasks", id, "blocked"], with the background context.
 // Pi v1.5.0 sync (area watches, 92ab53602 and 42cb822f1): a task graph watch is Chord's Watch (Chord/Watch.cs) on the Session line's
-// scheduler, and the task graph state getter (Harness.taskGraph()) is removed. The citation stays on v1.2.0 until the file's other areas
-// land.
+// scheduler, and the task graph state getter (Harness.taskGraph()) is removed.
+// Pi v1.5.0 sync (area deferred-commits, 6c2fd73b0): the graph observes the Session's commits as memory adopts them
+// (Session.ObserveCommits) and skips a held one, which changes conversation documents only. The citation stays on v1.2.0 until the file's
+// other areas land.
 using System.Collections.Immutable;
 using PiSharp.Durable.Chord;
 using PiSharp.Durable.Chord.Delta;
@@ -245,6 +247,8 @@ internal sealed class TaskGraphView
         this.blocked = blocked;
         session.ObserveCommits((publication, context) =>
         {
+            // A commit held in memory changes documents only, which the graph does not show.
+            if (publication.IsMemory) return;
             Mount? current;
             lock (gate) current = mount;
             if (current is not null) Advance(current, publication, context, session.Report);
@@ -358,7 +362,7 @@ internal sealed class TaskGraphView
 
     /// <summary>Derives the mount's operations from one publication, applies them, and hands the revision to every observer (upstream
     /// <c>advance</c>). Runs on the Session line.</summary>
-    private void Advance(Mount target, CommitPublication publication, DurableContext context, Action<Exception> report)
+    private void Advance(Mount target, ObservedCommit publication, DurableContext context, Action<Exception> report)
     {
         var ops = new List<Op>();
         // Nodes this publication set or deleted, over the mount's value.

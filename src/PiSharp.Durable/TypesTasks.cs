@@ -1,7 +1,8 @@
 // Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/src/types.ts (TaskRuntime and HookRunner; split from Types.cs).
 // Upstream's AbortSignal becomes a CancellationToken plus the handler context, which the same signal cancels; its memo and entry overloads
 // become C# overloads; its synchronous-or-promise commit callback becomes four overloads, as ISession.CommitAsync has. Pi v1.5.0 sync
-// (area reports): TaskRuntime.report takes whose code failed (ReportFrom, a30c2a81d); the file's other areas keep the citation on v1.2.0.
+// (area reports): TaskRuntime.report takes whose code failed (ReportFrom, a30c2a81d). Area deferred-commits (6c2fd73b0): TaskRuntime.commit
+// takes CommitOptions. The file's other areas keep the citation on v1.2.0.
 using PiSharp.Durable.Chord;
 using PiSharp.Durable.Env;
 
@@ -50,16 +51,17 @@ public interface ITaskRuntime : IDocumentObserver, IDocumentReader, IHookApi
     /// <see cref="NextTaskState"/>) replaces the task's state in the same commit; returning null leaves it unchanged.
     /// <c>tx.CreateTaskAsync()</c> defaults to the task's conversation, and appended entries carry the task as <c>byTaskId</c>. Inside the
     /// callback read only through the transaction: <c>SnapshotAsync</c>, <c>WatchDocAsync</c>, <c>GetTaskAsync</c> and the other Session
-    /// and runtime reads may queue on the line the callback holds, and then never complete.
+    /// and runtime reads may queue on the line the callback holds, and then never complete. <paramref name="options"/> may defer storing a
+    /// commit that changes only documents (<see cref="CommitPersistence"/>); one that returns a state is immediate.
     /// </summary>
-    Task CommitAsync(Func<ITx, RunningTask, Task<TaskState?>> change, DurableContext context);
-    /// <summary><see cref="CommitAsync(Func{ITx, RunningTask, Task{TaskState?}}, DurableContext)"/> leaving the state unchanged.</summary>
-    Task CommitAsync(Func<ITx, RunningTask, Task> change, DurableContext context);
-    /// <summary><see cref="CommitAsync(Func{ITx, RunningTask, Task{TaskState?}}, DurableContext)"/> with a synchronous callback.</summary>
-    Task CommitAsync(Func<ITx, RunningTask, TaskState?> change, DurableContext context);
-    /// <summary><see cref="CommitAsync(Func{ITx, RunningTask, Task{TaskState?}}, DurableContext)"/> with a synchronous callback leaving the
+    Task CommitAsync(Func<ITx, RunningTask, Task<TaskState?>> change, DurableContext context, CommitOptions? options = null);
+    /// <summary><see cref="CommitAsync(Func{ITx, RunningTask, Task{TaskState?}}, DurableContext, CommitOptions?)"/> leaving the state unchanged.</summary>
+    Task CommitAsync(Func<ITx, RunningTask, Task> change, DurableContext context, CommitOptions? options = null);
+    /// <summary><see cref="CommitAsync(Func{ITx, RunningTask, Task{TaskState?}}, DurableContext, CommitOptions?)"/> with a synchronous callback.</summary>
+    Task CommitAsync(Func<ITx, RunningTask, TaskState?> change, DurableContext context, CommitOptions? options = null);
+    /// <summary><see cref="CommitAsync(Func{ITx, RunningTask, Task{TaskState?}}, DurableContext, CommitOptions?)"/> with a synchronous callback leaving the
     /// state unchanged.</summary>
-    Task CommitAsync(Action<ITx, RunningTask> change, DurableContext context);
+    Task CommitAsync(Action<ITx, RunningTask> change, DurableContext context, CommitOptions? options = null);
 
     /// <summary>The committed task record.</summary>
     Task<TaskRecord?> GetTaskAsync(TaskId id, DurableContext context);

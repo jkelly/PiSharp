@@ -7,6 +7,11 @@
 // scheduler: every event batch is its own call, in order (folding would drop events), and past 100 undelivered batches one snapshot of
 // the newest view replaces them; it ends as Chord's watches do (aborted, ended, failed). The stream's listener keeps its (events, context)
 // shape. The citation stays on v1.2.0 until the file's other areas land.
+// Pi v1.5.0 sync (area deferred-commits, 6c2fd73b0 and e5c6182ba): the stream translates what views observe, deferred commits included,
+// as memory adopts them. A model-issued call's slot now turns running in a deferred commit after its state-only intent commit (Tool.cs),
+// so the stream remembers each intent's arguments (by tool task, until the slot turns running or the task ends) for the
+// tool_execution_start the slot's commit causes. A stream attached between the two commits has not seen the intent, and its start
+// carries no arguments. Upstream removed watchEvents before it deferred the running status (f3255de76, area events), so this is PiSharp's.
 //
 // Mappings: each AgentEvent variant is a sealed record whose ToJson() is upstream's object with upstream's key order, so a JSON-mode host
 // prints what upstream prints. pi-ai messages, usage, tool slots, compaction statuses and the pi.agent / pi.usage states are wire JSON, as
@@ -457,6 +462,7 @@ public static class AgentEvents
 {
     private const string GenerationKind = "pi.generation";
     private const string NestedCallKind = "pi.tool.nested-call";
+    private const string ToolKind = "pi.tool";
     private static readonly ImmutableArray<PathSegment> PartialPath = Path("docs", "pi.live", "generation", "message");
 
     /// <summary>
@@ -475,6 +481,8 @@ public static class AgentEvents
             var query = new TaskQuery { ConversationId = conversationId, Kind = GenerationKind, Status = DurableTaskStatus.Completing };
             var completing = await HarnessUtil.ScanAll(cursor => storage.ScanTasksAsync(query, 100, cursor, context)).ConfigureAwait(false);
             var held = new HashSet<TaskId>(completing.Select(record => record.Id));
+            // The arguments of intents whose slot has not turned running yet, by tool task (see the file header).
+            var intents = new Dictionary<TaskId, JsonObjectValue>();
             var current = initial;
             // Batches are the watch's values, each delivered (folding would drop events); an overflow delivers a snapshot of the newest view
             // instead.
@@ -482,7 +490,7 @@ public static class AgentEvents
             var observer = new EventsObserver(watch, (before, after, ops, publication, commitContext) =>
             {
                 current = after;
-                var events = Translate(conversationId, before, after, ops, publication, held);
+                var events = Translate(conversationId, before, after, ops, publication, held, intents);
                 if (events.Count > 0) watch.Advance(events, commitContext);
             });
             return (new EventStream(SnapshotOf(initial), watch), (ViewObserver)observer);
@@ -517,9 +525,9 @@ public static class AgentEvents
     }
 
     private sealed class EventsObserver(NativeWatch<IReadOnlyList<AgentEvent>> watch,
-        Action<ConversationView, ConversationView, ImmutableArray<Op>, CommitPublication, DurableContext> publication) : ViewObserver
+        Action<ConversationView, ConversationView, ImmutableArray<Op>, ObservedCommit, DurableContext> publication) : ViewObserver
     {
-        public override void Publication(ConversationView before, ConversationView after, ImmutableArray<Op> ops, CommitPublication commit,
+        public override void Publication(ConversationView before, ConversationView after, ImmutableArray<Op> ops, ObservedCommit commit,
             DurableContext context) => publication(before, after, ops, commit, context);
 
         public override void End(Exception? failure) => watch.End(Session.CloseEnd(failure));
@@ -575,7 +583,7 @@ public static class AgentEvents
 
     /// <summary>Every event one publication causes, in the order of spec §9.4.</summary>
     private static List<AgentEvent> Translate(ConversationId conversationId, ConversationView before, ConversationView after,
-        ImmutableArray<Op> viewOps, CommitPublication publication, HashSet<TaskId> held)
+        ImmutableArray<Op> viewOps, ObservedCommit publication, HashSet<TaskId> held, Dictionary<TaskId, JsonObjectValue> intents)
     {
         var entries = new List<EntryRecord>();
         // In the order the commit first touched each task, as upstream's Map keeps it.
@@ -609,6 +617,15 @@ public static class AgentEvents
                     break;
             }
         }
+        // A model-issued call's intent: remembered until its slot turns running, which a later, deferred commit records (Tool.cs).
+        foreach (var task in tasks)
+        {
+            if (task.Kind != ToolKind) continue;
+            if (task.State.Status == DurableTaskStatus.Terminal) intents.Remove(task.Id);
+            else if (task.State is LiveTaskState { Checkpoint: JsonObjectValue state } && state.TryGetValue("phase", out var phase) &&
+                phase is JsonStringValue { Value: "execute" } && state.TryGetValue("arguments", out var arguments) && arguments is JsonObjectValue given)
+                intents[task.Id] = given;
+        }
         if (viewOps.IsEmpty && entries.Count == 0 && tasks.Count == 0 && submissions.Count == 0 && nestedResults.Count == 0) return [];
         TaskRecord? TaskOf(TaskId id) => taskIndex.TryGetValue(id, out var index) ? tasks[index] : null;
         // Entries are appended in ID order; submission records are published in the order the commit first touched them.
@@ -641,16 +658,11 @@ public static class AgentEvents
             var isNested = slot.ContainsKey("parentCallId");
             var previous = isNested ? nestedBefore.GetValueOrDefault(Integer(slot["taskId"])) : slotsBefore.GetValueOrDefault(Text(slot["callId"]));
             if (Status(slot) != "running" || (previous is not null && Status(previous) == "running")) continue;
-            // A nested slot carries the arguments the call runs with; a model-issued call's are in its intent checkpoint.
+            // A nested slot carries the arguments the call runs with; a model-issued call's are in its intent checkpoint, committed in this
+            // commit or before it.
             JsonObjectValue args;
             if (isNested) args = (JsonObjectValue)slot["arguments"];
-            else
-            {
-                var checkpoint = Field(slot, "taskId") is { } taskId && TaskOf(new TaskId(Integer(taskId)))?.State is LiveTaskState live
-                    ? live.Checkpoint : null;
-                args = checkpoint is JsonObjectValue state && state.TryGetValue("arguments", out var arguments) && arguments is JsonObjectValue given
-                    ? given : JsonObjectValue.Empty;
-            }
+            else args = Field(slot, "taskId") is { } taskId && intents.Remove(new TaskId(Integer(taskId)), out var given) ? given : JsonObjectValue.Empty;
             events.Add(new ToolExecutionStartEvent(CallOf(slot), args));
         }
         var partialBefore = Field(was.Generation, "message") as JsonObjectValue;
