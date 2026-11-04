@@ -18,6 +18,11 @@
 //   54 journal commits in all, by VM and storage speed; 10 on a macOS runner).
 // - Pi v1.5.0 sync (area sleep): drops-a-global-s-result-that-arrives-after-the-script-finished is ec1be23eb's case; upstream's
 //   process.on("unhandledRejection") is TaskScheduler.UnobservedTaskException after a full collection.
+// - Pi v1.5.0 sync (area codemode): replays-results-in-the-order-they-arrived-not-the-order-the-calls-were-made releases call 1 once call 2
+//   finished (slows.finishedCall, e17e2e105) instead of from an Eventually poll. Two authored cases check that code mode reads the Harness
+//   clock (f75b3240a), which upstream's suite does not:
+//   codemode.reads-the-script-s-start-its-results-times-and-its-wall-time-from-the-harness-clock and
+//   codemode.measures-the-script-s-deadline-on-the-harness-clock-across-a-restart, both with HarnessOptions.Now as a test clock.
 using System.Collections.Concurrent;
 using System.Text.RegularExpressions;
 using PiSharp.Codemode;
@@ -79,10 +84,13 @@ internal static partial class CodemodeTests
 
     internal sealed class Slows
     {
-        private readonly ConcurrentDictionary<long, Deferred> gates = new();
+        private readonly ConcurrentDictionary<long, Deferred> gates = new(), done = new();
         public SyncList<long> Finished { get; } = new();
         public Deferred Gate(long id) => gates.GetOrAdd(id, _ => new Deferred());
         public void Release(long id) => Gate(id).Resolve();
+        /// <summary>Resolves once call <paramref name="id"/> has finished.</summary>
+        public Task FinishedCall(long id) => Done(id).Task;
+        internal Deferred Done(long id) => done.GetOrAdd(id, _ => new Deferred());
     }
 
     /// <summary>
@@ -130,6 +138,7 @@ internal static partial class CodemodeTests
                 var id = ((JsonObjectValue)args).TryGetValue("id", out var value) && value is JsonNumberValue number ? (long)number.Value : 0;
                 await Slows.Gate(id).Task;
                 Slows.Finished.Add(id);
+                Slows.Done(id).Resolve();
                 return TextResult($"slow {IdArg(args)}");
             }));
         }
@@ -158,10 +167,17 @@ internal static partial class CodemodeTests
     /// themselves.</summary>
     internal static async Task<ResultText> ResultOf(IConversation root)
     {
+        var (text, isError) = await FullResultOf(root);
+        return new ResultText(Header.Replace(text, "", 1), isError);
+    }
+
+    /// <summary>The code mode call's result text with its header.</summary>
+    internal static async Task<ResultText> FullResultOf(IConversation root)
+    {
         var entry = (await AllEntries(root)).First(candidate => candidate.Kind == "pi.tool-result");
         var message = (JsonObjectValue)entry.Model![0];
         var text = string.Concat(((JsonArrayValue)message["content"]).Cast<JsonObjectValue>().Select(item => S(item["type"]) == "text" ? S(item["text"]) : ""));
-        return new ResultText(Header.Replace(text, "", 1), message["isError"] is JsonBooleanValue { Value: true });
+        return new ResultText(text, message["isError"] is JsonBooleanValue { Value: true });
     }
 
     private static void SameText(ResultText expected, ResultText actual, string what)
@@ -269,7 +285,7 @@ internal static partial class CodemodeTests
                 """;
             // 2 finishes first, then 1.
             chat.Slows.Release(2);
-            _ = Eventually(() => chat.Slows.Finished.Snapshot().Contains(2)).ContinueWith(_ => chat.Slows.Release(1), TaskScheduler.Default);
+            _ = chat.Slows.FinishedCall(2).ContinueWith(_ => chat.Slows.Release(1), TaskScheduler.Default);
             var restarted = await Restart(chat, code);
             SameText(new("[2,1]", false), restarted.Result, "result");
             SameCounts(new() { ["2,1"] = 1 }, chat.EchoCounts(), "echo");
@@ -802,6 +818,48 @@ internal static partial class CodemodeTests
                 """, (_, _) => Task.Delay(400));
             Equal(true, restarted.Result.IsError, "isError");
             Contains(restarted.Result.Text, "deadline passed", "result");
+            Equal(0, chat.Echo.Count, "echo runs");
+            Equal(1, chat.VmStarts, "VM starts");
+            await restarted.Harness.CloseAsync(Context);
+        });
+
+        // Authored (Pi v1.5.0, area codemode): upstream moved code mode onto the Harness clock (f75b3240a) without a case for it.
+        yield return Case(prefix + "reads-the-script-s-start-its-results-times-and-its-wall-time-from-the-harness-clock", async () =>
+        {
+            var now = 1_000_000L;
+            var chat = new Chat([Global("advance", _ =>
+            {
+                Interlocked.Add(ref now, 2_500);
+                return Task.FromResult<JsonValue?>("advanced");
+            })]);
+            chat.Setup.Now = () => Interlocked.Read(ref now);
+            chat.Setup.Faux.SetResponses(Script("const t0 = Date.now(); await advance(); return [t0, Date.now()];"), Done);
+            var (harness, root) = await OpenChat(await SqliteStorage.OpenAsync(SqlitePath()), chat.Setup);
+            await (await root.SubmitAsync(SubmissionDraft.Input("go"), Context)).WaitAsync(Context);
+            // The script starts at the Harness clock, its clock moves to the time its result arrived, and the wall time is the clock's 2.5 s.
+            SameText(new("Script completed\nWall time 2.5 seconds\nOutput:\n[1000000,1002500]", false), await FullResultOf(root), "result");
+            await harness.CloseAsync(Context);
+        });
+
+        // Authored (Pi v1.5.0, area codemode), as times-a-script-out-across-a-restart-without-admitting-new-calls with the Harness clock.
+        yield return Case(prefix + "measures-the-script-s-deadline-on-the-harness-clock-across-a-restart", async () =>
+        {
+            var now = 1_000_000L;
+            var chat = new Chat();
+            chat.Setup.Now = () => Interlocked.Read(ref now);
+            var restarted = await Restart(chat, """
+                // @options: {"timeout_ms": 60000}
+                				await tools.hold({}); await tools.echo({ text: "late" });
+                """, async (opened, task) =>
+                {
+                    var start = (JsonObjectValue)(await opened.SnapshotAsync(DurableCodemode.RunDoc, task, Context))!["start"];
+                    Equal(1_000_000.0, N(start["startedAt"]), "startedAt");
+                    Equal(1_060_000.0, N(start["deadline"]), "deadline");
+                    // A minute passes on the Harness clock while next to none passes on the system clock.
+                    Interlocked.Add(ref now, 60_000);
+                });
+            Equal(true, restarted.Result.IsError, "isError");
+            Contains(restarted.Result.Text, "Script timed out: its deadline passed while it was interrupted.", "result");
             Equal(0, chat.Echo.Count, "echo runs");
             Equal(1, chat.VmStarts, "VM starts");
             await restarted.Harness.CloseAsync(Context);
