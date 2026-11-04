@@ -1507,8 +1507,9 @@ internal static class CompactionTests
             // The parent is untouched.
             Check(!(await KindsOf(chat.Root)).Contains("pi.compaction"), "parent untouched");
             // The fork's view keeps the parent entries the summary kept.
-            using var state = await fork.ViewStateAsync(Context);
-            SameEntries(view.Entries, state.Value.Entries, "view entries");
+            var watch = await fork.WatchAsync(Context);
+            SameEntries(view.Entries, watch.Value.Entries, "view entries");
+            await watch.StopAsync();
             await chat.Harness.CloseAsync(Context);
         });
 
@@ -1950,11 +1951,13 @@ internal static class CompactionTests
         {
             var chat = await Open(fresh);
             await History(chat);
-            using var state = await chat.Root.ViewStateAsync(Context);
+            var watch = await chat.Root.WatchAsync(Context);
+            watch.Start((_, _) => Task.CompletedTask);
             chat.Faux.Summaries.Push(Summary());
             await Result(chat, await Compact(chat.Root));
-            await Eventually(() => state.Value.Entries is { Length: > 0 } entries && entries[0].Kind == "pi.compaction");
-            SameEntries((await chat.Root.ContextAsync(Context)).Entries, state.Value.Entries, "mounted entries");
+            await Eventually(() => watch.Value.Entries is { Length: > 0 } entries && entries[0].Kind == "pi.compaction");
+            SameEntries((await chat.Root.ContextAsync(Context)).Entries, watch.Value.Entries, "mounted entries");
+            await watch.StopAsync();
             await chat.Harness.CloseAsync(Context);
         });
     }

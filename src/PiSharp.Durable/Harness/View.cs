@@ -8,8 +8,12 @@
 // instance in the next revision.
 //
 // Threading: upstream runs on one event loop. Here publications and attachment run on the Session line, while a close listener and an
-// observer's detach (a disposed state, a stopped watch) may run on any thread, so the mount table and each mount's observer list are
-// guarded by one lock that is never held while observer code runs.
+// observer's detach (a stopped watch) may run on any thread, so the mount table and each mount's observer list are guarded by one lock
+// that is never held while observer code runs.
+//
+// Pi v1.5.0 sync (area watches, 92ab53602 and 42cb822f1): a view watch is Chord's Watch (Chord/Watch.cs) on the Session line's scheduler,
+// ViewObserver.closeSession is end(failure), and the view state getter (Conversation.viewState()) is removed. The citation stays on v1.2.0
+// until the file's other areas land.
 using System.Collections.Immutable;
 using PiSharp.Durable.Chord;
 using PiSharp.Durable.Chord.Delta;
@@ -82,16 +86,17 @@ internal abstract class ViewObserver
     public virtual void Publication(ConversationView before, ConversationView after, ImmutableArray<Op> ops, CommitPublication publication,
         DurableContext context) { }
 
-    /// <summary>The Session closes; <paramref name="failure"/> is what failed it, when it failed.</summary>
-    public abstract void CloseSession(Exception? failure);
+    /// <summary>The Session closed, or failed with <paramref name="failure"/> (upstream <c>end</c>).</summary>
+    public abstract void End(Exception? failure);
 }
 
-/// <summary>A view observer forwarding revisions to a committed state source or watch.</summary>
-internal sealed class CommittedViewObserver(ICommittedObserver<ConversationView> target) : ViewObserver
+/// <summary>A view observer forwarding revisions to a view watch.</summary>
+internal sealed class WatchViewObserver(Watch<ConversationView> watch) : ViewObserver
 {
-    public override void Advance(ConversationView value, ImmutableArray<Op> ops, DurableContext context) => target.Advance(value, ops, context);
+    public override void Advance(ConversationView value, ImmutableArray<Op> ops, DurableContext context) =>
+        watch.Advance(new WatchValueCall<ConversationView>(value, ops), context);
 
-    public override void CloseSession(Exception? failure) => target.CloseSession(failure);
+    public override void End(Exception? failure) => watch.End(Session.CloseEnd(failure));
 }
 
 /// <summary>
@@ -133,53 +138,35 @@ internal sealed class ConversationViews
             }
             var failure = session.Failure;
             foreach (var mount in current)
-                foreach (var observer in mount.Snapshot(gate)) Session.Contained(() => observer.CloseSession(failure), Report);
+                foreach (var observer in mount.Snapshot(gate)) Session.Contained(() => observer.End(failure), Report);
         });
     }
 
     /// <summary>Reports an observer's listener error through the Harness (upstream <c>report</c>).</summary>
     public void Report(Exception error) => session.Report(error);
 
-    /// <summary>The observation scheduler of the Session (upstream <c>queueMicrotask</c>).</summary>
-    public ObservationScheduler Schedule => session.Defer;
+    /// <summary>The watch scheduler of the Session (upstream <c>queueMicrotask</c>).</summary>
+    public Action<Action> Schedule => session.Defer;
 
     /// <summary>The view mounts of <paramref name="harness"/>, for adapters built on them (upstream <c>conversationViews</c>).</summary>
     public static ConversationViews Of(IHarness harness) =>
         harness is DurableHarness durable ? durable.Views : throw new ArgumentException("Not a Harness", nameof(harness));
 
-    /// <summary>A disposable read-only Chord state of the view (upstream <c>state</c>).</summary>
-    public async Task<AttachedReplicatedState<ConversationView>> StateAsync(ConversationId id, DurableContext context)
-    {
-        var (source, detach) = await AttachAsync(id, (value, release, _) =>
-        {
-            var created = new CommittedStateSource<ConversationView>(value, release, Schedule);
-            return Task.FromResult((created, (ViewObserver)new CommittedViewObserver(created)));
-        }, context).ConfigureAwait(false);
-        try
-        {
-            return ReplicatedState.Attach<ConversationView>(source, new ReplicatedStateSourceOptions { OnError = Report });
-        }
-        catch
-        {
-            detach();
-            throw;
-        }
-    }
-
-    /// <summary>A serialized exact-frame watch of the view; cancelling <paramref name="context"/> stops it (upstream <c>watch</c>).</summary>
+    /// <summary>A serialized watch of the view, Chord's <see cref="Watch{T}"/>; cancelling <paramref name="context"/> ends it aborted
+    /// (upstream <c>watch</c>).</summary>
     public async Task<IWatchHandle<ConversationView>> WatchAsync(ConversationId id, DurableContext context)
     {
         var (watch, _) = await AttachAsync(id, (value, release, _) =>
         {
-            var created = new CommittedWatch<ConversationView>(value, release, Schedule, Report, json: view => view.ToJson());
-            return Task.FromResult((created, (ViewObserver)new CommittedViewObserver(created)));
+            var created = new Watch<ConversationView>(value, release, Report, view => view.ToJson(), Schedule);
+            return Task.FromResult((created, (ViewObserver)new WatchViewObserver(created)));
         }, context).ConfigureAwait(false);
         if (context.IsCancellationRequested)
         {
-            watch.Cancel();
+            watch.Abort();
             context.ThrowIfCancellationRequested();
         }
-        if (context.HasCancellation) watch.ObserveCancellation(context);
+        if (context.HasCancellation) watch.ObserveAbort(context.CancellationToken);
         return watch;
     }
 

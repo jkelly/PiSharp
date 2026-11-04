@@ -124,7 +124,7 @@ internal static class SleepTests
             var (harness, _, _) = await OpenTasks(fresh(), [nap], now: () => Volatile.Read(ref clock), onWake: wakes.Add);
             var graph = await harness.WatchTaskGraphAsync(Context);
             // A started watch keeps its value current.
-            graph.Start((_, _, _) => Task.CompletedTask);
+            graph.Start((_, _) => Task.CompletedTask);
             var id = await StartNap(harness, nap);
             harness.Resume();
             await Eventually(async () => await StatusOf(harness, id) == DurableTaskStatus.Sleeping);

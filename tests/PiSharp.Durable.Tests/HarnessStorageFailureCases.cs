@@ -17,7 +17,6 @@
 //   test makes, so Running also awaits Waiting's phase start.
 using PiSharp.Durable;
 using PiSharp.Durable.Chord;
-using WatchEnd = PiSharp.Durable.WatchEnd; // Durable's v1.2.0 watch end, beside Chord's (Chord/Watch.cs) until work list area watches moves onto it
 using PiSharp.Durable.Storage;
 using static HarnessTests;
 using static Program;
@@ -126,8 +125,8 @@ internal static class StorageFailureTests
 
             await FailedWith(failure, () => task, "task wait");
             await FailedWith(failure, () => idle, "idle wait");
-            Equal(WatchEnd.SessionFailed(failure), await watch.Closed, "watch");
-            Equal(WatchEnd.SessionFailed(failure), await stream.Closed, "stream");
+            Equal(WatchEnd.Failed(failure), await watch.Closed, "watch");
+            Equal(WatchEnd.Failed(failure), await stream.Closed, "stream");
             // Every later call, and a wait that starts now.
             await FailedWith(failure, () => harness.GetTaskAsync(id, Context), "getTask");
             await FailedWith(failure, () => harness.WaitForIdleAsync(Context), "waitForIdle");
@@ -223,7 +222,7 @@ internal static class StorageFailureTests
             await harness.CloseAsync(Context);
         });
 
-        yield return Case(prefix + "ends-what-a-task-holds-with-session-failed-not-as-cancelled-by-its-signal", async () =>
+        yield return Case(prefix + "ends-what-a-task-holds-as-failed-not-as-cancelled-by-its-signal", async () =>
         {
             var ends = new SyncList<object>();
             var watching = new Deferred();
@@ -259,7 +258,7 @@ internal static class StorageFailureTests
             await opened.Harness.Closed;
             var seen = ends.Snapshot();
             Equal(2, seen.Count, "ends");
-            Equal(WatchEnd.SessionFailed(failure), seen[0], "watch end");
+            Equal(WatchEnd.Failed(failure), seen[0], "watch end");
             Equal(nameof(SessionFailedException), seen[1], "idle wait");
             await opened.Harness.CloseAsync(Context);
         });
@@ -487,16 +486,16 @@ internal static class StorageFailureTests
             await views.AttachAsync(root.Id, (_, _, _) => Task.FromResult((true, (ViewObserver)new ThrowingObserver(failure))), Context);
             var watch = await root.WatchAsync(Context);
             var seen = new SyncList<ConversationView>();
-            watch.Start((value, _, _) =>
+            watch.Start((call, _) =>
             {
-                seen.Add(value);
+                seen.Add(Change(call).Value);
                 return Task.CompletedTask;
             });
             await Note(root);
             await Eventually(() => seen.Count > 0);
             Seq([failure], reports.Snapshot(), "reports");
             await harness.CloseAsync(Context);
-            Equal(WatchEnd.SessionClosed, await watch.Closed, "watch end");
+            Equal(WatchEnd.Ended, await watch.Closed, "watch end");
         });
 
         yield return Case(prefix + "contains-a-fulfilled-thenable-that-calls-only-its-fulfillment-handler", async () =>
@@ -550,9 +549,9 @@ internal static class StorageFailureTests
             var (harness, root, reports, _, _) = await Start(new MemoryStorage());
             var watch = (await harness.WatchDocAsync(Live.LiveDoc, root.Id, Context))!;
             var failure = new InvalidOperationException("listener broke");
-            watch.Start((_, _, _) => throw failure);
+            watch.Start((_, _) => throw failure);
             await root.CommitAsync(async tx => (await tx.DocAsync(Live.LiveDoc, root.Id))["compactions"] = JsonArrayValue.Empty, Context);
-            Equal(new WatchEnd(WatchEndReason.ListenerError, failure), await watch.Closed, "watch end");
+            Equal(WatchEnd.ListenerError(failure), await watch.Closed, "watch end");
             Seq([failure], reports.Snapshot(), "reports");
             await harness.CloseAsync(Context);
         });
@@ -571,13 +570,13 @@ internal static class StorageFailureTests
             var opened = await OpenTasks(new MemoryStorage(), [throws]);
             var root = await opened.Harness.RootAsync(Context);
             var watch = (await opened.Harness.WatchDocAsync(Live.LiveDoc, root.Id, Context))!;
-            watch.Start((_, _, _) => throw unformattable);
+            watch.Start((_, _) => throw unformattable);
             var id = await root.CommitAsync(tx => tx.CreateTaskAsync(throws, JsonValue.Null, OwnConversation()), Context);
             opened.Harness.Resume();
             var outcome = ((SettlingTaskState)(await opened.Harness.WaitForTaskAsync(id, Context)).State).Outcome;
             SameJson("""{"status":"faulted","error":{"message":"[object UnformattableException]"}}""", outcome.ToJson(), "outcome");
             await root.CommitAsync(async tx => (await tx.DocAsync(Live.LiveDoc, root.Id))["compactions"] = JsonArrayValue.Empty, Context);
-            Equal(WatchEndReason.ListenerError, (await watch.Closed).Reason, "watch end");
+            Equal(WatchEndKind.ListenerError, (await watch.Closed).Kind, "watch end");
             await Note(root);
             await opened.Harness.CloseAsync(Context);
         });
@@ -633,7 +632,7 @@ internal static class StorageFailureTests
         public override void Publication(ConversationView before, ConversationView after, System.Collections.Immutable.ImmutableArray<PiSharp.Durable.Chord.Delta.Op> ops,
             CommitPublication publication, DurableContext context) => throw failure;
 
-        public override void CloseSession(Exception? failure) { }
+        public override void End(Exception? failure) { }
     }
 
     private sealed record HeldRange(Deferred Entered, Task Release);

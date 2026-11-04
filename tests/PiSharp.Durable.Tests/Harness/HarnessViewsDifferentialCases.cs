@@ -49,9 +49,9 @@ internal static class ViewsDifferentialTests
         var root = await harness.RootAsync(Context, new AgentChange { Model = new ModelRef("faux", "faux-1") });
         var watch = await root.WatchAsync(Context);
         var frames = new SyncList<JsonValue>();
-        watch.Start((_, ops, _) =>
+        watch.Start((call, _) =>
         {
-            frames.Add(JsonValue.Array(ops.Select(op => (JsonValue)op.ToJson())));
+            frames.Add(JsonValue.Array(Change(call).Ops.Select(op => (JsonValue)op.ToJson())));
             return Task.CompletedTask;
         });
         var stream = await harness.WatchEventsAsync(root.Id, Context);

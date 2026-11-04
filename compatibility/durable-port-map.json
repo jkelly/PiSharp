@@ -599,7 +599,7 @@
       "phase": "P3",
       "status": "removed-upstream",
       "upstreamChange": "removed",
-      "note": "CommittedStateSource, SessionSourceAttachment and CommittedWatch (IWatchHandle) with the 100-frame overflow; queueMicrotask becomes an ObservationScheduler (Session.Defer: deliveries a commit schedules run on the line right after its publication; a started watch delivers in its own line job, never inline). Tests: session.states.*, session.watches.*. CommittedWatch<T> takes any reference type (P10): a value that is not JSON, the conversation view, gives its JSON for the overflow replacement v1.2.0: CommittedWatch takes a report callback (a listener's throw is reported and ends the watch with listener_error) and closeSession(failure) ends it with session_failed and the error; CommittedStateSource ends its attached states the same way on failure.",
+      "note": "CommittedStateSource, SessionSourceAttachment and CommittedWatch (IWatchHandle) with the 100-frame overflow; queueMicrotask becomes an ObservationScheduler (Session.Defer: deliveries a commit schedules run on the line right after its publication; a started watch delivers in its own line job, never inline). Tests: session.states.*, session.watches.*. CommittedWatch<T> takes any reference type (P10): a value that is not JSON, the conversation view, gives its JSON for the overflow replacement v1.2.0: CommittedWatch takes a report callback (a listener's throw is reported and ends the watch with listener_error) and closeSession(failure) ends it with session_failed and the error; CommittedStateSource ends its attached states the same way on failure. v1.5.0 (work list area watches): retired. Durable's document, view and task graph watches are Chord's Watch (Chord/Watch.cs, area chord-watch) and its events NativeWatch; Session.Defer schedules their delivery; session.states.* went with the state getters.",
       "successor": "packages/chord/src/watch.ts"
     },
     {
@@ -1517,7 +1517,7 @@
       "phase": "P13",
       "status": "removed-upstream",
       "upstreamChange": "removed",
-      "note": "Milestone M0: runs on memory, JSONL and SQLite storage and reads back after reopen; tests/PiSharp.Durable.Tests/ExamplesCases.cs pins the output the pinned upstream prints under Node."
+      "note": "Milestone M0: runs on memory, JSONL and SQLite storage and reads back after reopen; tests/PiSharp.Durable.Tests/ExamplesCases.cs pins the output the pinned upstream prints under Node. v1.5.0 (work list area watches): retired with Session.documentState(); Examples.cs and ExamplesCases.cs no longer have it."
     },
     {
       "upstream": "packages/durable/test/examples/04-watches.ts",
@@ -2064,12 +2064,11 @@
       "lines": 477,
       "pisharp": "tests/PiSharp.Durable.Tests/Harness/HarnessConversationsCases.cs",
       "phase": "P6",
-      "status": "needs-sync",
+      "status": "ported",
       "upstreamChange": "modified",
       "previousBlobSha1": "ed5deba6eefac8c20d5bce5c6a4ecb425f8264e5",
       "changedLines": 7,
-      "note": "harness.conversations.* (12 cases) on MemoryStorage, plus harness.conversations.jsonl.* (12) and harness.conversations.sqlite.* (11; the reopen case needs one reopenable location, so it runs on a SQLite file as upstream does and on a JSONL directory, closing storage before each reopen). Support in Harness/HarnessConversationsSupport.cs. Adapted: the paginates case cannot pass a foreign conversationId (EntryQueryBounds has no conversation field); expect.unreachable() init is a throwing init v1.2.0: closed-Harness rejections match \"is closed\" (Session is closed).",
-      "portedBlobSha1": "ed5deba6eefac8c20d5bce5c6a4ecb425f8264e5"
+      "note": "harness.conversations.* (12 cases) on MemoryStorage, plus harness.conversations.jsonl.* (12) and harness.conversations.sqlite.* (11; the reopen case needs one reopenable location, so it runs on a SQLite file as upstream does and on a JSONL directory, closing storage before each reopen). Support in Harness/HarnessConversationsSupport.cs. Adapted: the paginates case cannot pass a foreign conversationId (EntryQueryBounds has no conversation field); expect.unreachable() init is a throwing init v1.2.0: closed-Harness rejections match \"is closed\" (Session is closed). v1.5.0 (work list areas checkpoint-when and watches): NoteDoc states checkpointWhen, and the snapshot case reads a document watch's acquisition value in place of documentState()."
     },
     {
       "upstream": "packages/durable/test/harness-deferred-progress.test.ts",
@@ -2221,7 +2220,7 @@
       "upstreamChange": "modified",
       "previousBlobSha1": "395e94ccb203a906f55ade5cb3002ee655a1f711",
       "changedLines": 79,
-      "note": "14 of 14 tests: harness.lifecycle.* (14) on MemoryStorage with the reopen case on a SQLite file as upstream, harness.lifecycle.jsonl.* (14, reopening a JSONL directory) and harness.lifecycle.sqlite.* (13, no reopen). Adapted: FailingClose is a decorator; the patched harness.subscribeCommits is a count of the Session's commit listeners; a context read queued at close's seal is held open by Session.HoldStorageOpen, which upstream's single thread does not need v1.2.0: \"rethrows the open error and reports it once, though closing then fails too\"; the subscription count includes the internal ObserveCommits listeners. The stubborn tool's empty result keeps ToolExecutionResult.Content until area a renames it to Output in every test. v1.5.0 (work list area telemetry): withSignal derives through withAbortSignal (2ec55d808); WithCancel() already derives, keeping values and the telemetry span, so the cases are unchanged; waits on the file's other areas",
+      "note": "14 of 14 tests: harness.lifecycle.* (14) on MemoryStorage with the reopen case on a SQLite file as upstream, harness.lifecycle.jsonl.* (14, reopening a JSONL directory) and harness.lifecycle.sqlite.* (13, no reopen). Adapted: FailingClose is a decorator; the patched harness.subscribeCommits is a count of the Session's commit listeners; a context read queued at close's seal is held open by Session.HoldStorageOpen, which upstream's single thread does not need v1.2.0: \"rethrows the open error and reports it once, though closing then fails too\"; the subscription count includes the internal ObserveCommits listeners. The stubborn tool's empty result keeps ToolExecutionResult.Content until area a renames it to Output in every test. v1.5.0 (work list area telemetry): withSignal derives through withAbortSignal (2ec55d808); WithCancel() already derives, keeping values and the telemetry span, so the cases are unchanged; waits on the file's other areas v1.5.0 (work list area watches, 92ab53602): the close cases use watches alone (\"publishes no frame to watches ...\" renamed), a close ends a watch ended; waits on vocabulary and group-commit-scheduler.",
       "portedBlobSha1": "395e94ccb203a906f55ade5cb3002ee655a1f711"
     },
     {
@@ -2508,7 +2507,7 @@
       "upstreamChange": "modified",
       "previousBlobSha1": "3beb45e0111f2ba0711d48a404f780c36f720738",
       "changedLines": 94,
-      "note": "5 of 5 tests: harness.task-graph.* on MemoryStorage with the reopen case on a SQLite file as upstream, harness.task-graph.jsonl.* (5, the reopen case reopening a JSONL directory) and harness.task-graph.sqlite.* (4: the reopen case runs in harness.task-graph.*). Adapted: a TaskGraph is a typed class (toEqual compares ToJson(), toBe is ReferenceEquals); flush() is a Session line barrier; the watch listener's replay expect is collected and asserted by the test body; statuses() is a sorted list of \"kind#id status\"",
+      "note": "5 of 5 tests: harness.task-graph.* on MemoryStorage with the reopen case on a SQLite file as upstream, harness.task-graph.jsonl.* (5, the reopen case reopening a JSONL directory) and harness.task-graph.sqlite.* (4: the reopen case runs in harness.task-graph.*). Adapted: a TaskGraph is a typed class (toEqual compares ToJson(), toBe is ReferenceEquals); flush() is a Session line barrier; the watch listener's replay expect is collected and asserted by the test body; statuses() is a sorted list of \"kind#id status\" v1.5.0 (work list area watches, 92ab53602): every case observes through watchTaskGraph(), started where its value must stay current; waits on observers, vocabulary and group-commit-scheduler.",
       "portedBlobSha1": "3beb45e0111f2ba0711d48a404f780c36f720738"
     },
     {
@@ -2835,7 +2834,7 @@
       "upstreamChange": "modified",
       "previousBlobSha1": "c648451839e25294b3acd4a787c08279f043f415",
       "changedLines": 100,
-      "note": "All 21 tests: session.document-retention.*. Adapted: a retention of the wrong type (\"soon\") is not expressible (double?), NaN and -5 are checked; \"keeps no timer where timers cannot be unreferenced\" checks eviction at the end of commits, since .NET timers never keep a process alive and the Session always keeps one; \"gives the same events ...\" flushes the Session line before it stops the stream (a C# wait resumes on its own listener)",
+      "note": "All 21 tests: session.document-retention.*. Adapted: a retention of the wrong type (\"soon\") is not expressible (double?), NaN and -5 are checked; \"keeps no timer where timers cannot be unreferenced\" checks eviction at the end of commits, since .NET timers never keep a process alive and the Session always keeps one; \"gives the same events ...\" flushes the Session line before it stops the stream (a C# wait resumes on its own listener) v1.5.0 (work list area watches, 92ab53602): the cases that held a document state hold a watch (two renamed), and a retired watch ends ended (Chord's WatchEnd has no retired end); waits on watch-folding, events and group-commit.",
       "portedBlobSha1": "c648451839e25294b3acd4a787c08279f043f415"
     },
     {
@@ -2890,7 +2889,7 @@
       "phase": "P3",
       "status": "removed-upstream",
       "upstreamChange": "removed",
-      "note": "session.states.* (10 cases). v1.2.0 dropped the exact-listener operation checks (getReplicatedStateInternals); Object.isFrozen checks dropped (immutable values)."
+      "note": "session.states.* (10 cases). v1.2.0 dropped the exact-listener operation checks (getReplicatedStateInternals); Object.isFrozen checks dropped (immutable values). v1.5.0 (work list area watches): retired; SessionStatesCases.cs went with Session.documentState()."
     },
     {
       "upstream": "packages/durable/test/session-support.ts",

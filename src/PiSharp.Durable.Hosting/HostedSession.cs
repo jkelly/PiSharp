@@ -121,8 +121,7 @@ public sealed partial class HostedSession
         var opened = GetHarness();
         var context = Context(cancellationToken);
         var records = await ConversationsAsync(opened, context).ConfigureAwait(false);
-        using var graph = await opened.TaskGraphAsync(context).ConfigureAwait(false);
-        var nodes = graph.Value.Tasks.Values.ToList();
+        var nodes = (await GraphOfAsync(opened, context).ConfigureAwait(false)).Tasks.Values.ToList();
         var names = host.Catalog.AgentNames(Id);
         return [.. records.Select(record => Summarize(record, names, nodes))];
     }
@@ -456,10 +455,15 @@ public sealed partial class HostedSession
     }
 
     /// <summary>The live tasks of the session (for a task panel).</summary>
-    public async Task<TaskGraph> TaskGraphAsync(CancellationToken cancellationToken = default)
+    public Task<TaskGraph> TaskGraphAsync(CancellationToken cancellationToken = default) => GraphOfAsync(GetHarness(), Context(cancellationToken));
+
+    /// <summary>The task graph now: the acquisition value of a task graph watch, which stops at once (pi-durable 1.5.0 removed the
+    /// <c>taskGraph()</c> state getter).</summary>
+    private static async Task<TaskGraph> GraphOfAsync(IHarness harness, DurableContext context)
     {
-        using var graph = await GetHarness().TaskGraphAsync(Context(cancellationToken)).ConfigureAwait(false);
-        return graph.Value;
+        var watch = await harness.WatchTaskGraphAsync(context).ConfigureAwait(false);
+        try { return watch.Value; }
+        finally { await watch.StopAsync().ConfigureAwait(false); }
     }
 
     /// <summary>Aborts one task, such as a job run; its owned work stops first.</summary>

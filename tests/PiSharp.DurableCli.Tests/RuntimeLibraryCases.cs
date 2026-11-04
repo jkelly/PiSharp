@@ -288,11 +288,12 @@ internal static partial class Program
         generation is JsonObjectValue current && current.TryGetValue("message", out var message) && message is JsonObjectValue partial &&
         ScriptedRequest.Text(partial).Length > 0;
 
-    /// <summary>The conversation's view now.</summary>
+    /// <summary>The conversation's view now: the acquisition value of a view watch, which stops at once.</summary>
     private static async Task<ConversationView> ViewOf(IConversation conversation)
     {
-        using var state = await conversation.ViewStateAsync(DurableRuntime.Context);
-        return state.Value;
+        var watch = await conversation.WatchAsync(DurableRuntime.Context);
+        try { return watch.Value; }
+        finally { await watch.StopAsync(); }
     }
 
     /// <summary>Whether <paramref name="view"/> runs a turn.</summary>

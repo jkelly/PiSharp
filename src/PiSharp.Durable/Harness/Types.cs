@@ -21,6 +21,8 @@
 // Pi v1.5.0 sync (area reports): HarnessOptions.OnReport takes one Report (TypesReports.cs; a30c2a81d, 91b33cab3, 5f312dac4),
 // settings.afterFailedRun (AfterFailedRun, a30c2a81d), and TaskInspectionKind.Pending replaces Ready (TaskState's word).
 // Pi v1.5.0 sync (area telemetry): HarnessOptions.Telemetry, the host-owned adapter of DURABLE_TELEMETRY_SCHEMA (2ec55d808, 48909d987).
+// Pi v1.5.0 sync (area watches, 92ab53602): Conversation.viewState() and Harness.taskGraph() are removed; the view and task graph watches
+// are Chord's IWatchHandle<T>.
 using System.Collections.Immutable;
 using PiSharp.AI;
 using PiSharp.Durable.Chord;
@@ -733,7 +735,7 @@ public class HarnessSettings
     /// <summary>How long an idle conversation keeps its last context read in memory; 0 drops it once the conversation is idle.</summary>
     public virtual double? ContextRetentionMs { get; init; }
     /// <summary>
-    /// How long a loaded document that no watch or document state observes stays in memory after its last read or write; the next access
+    /// How long a loaded document that no watch observes stays in memory after its last read or write; the next access
     /// loads it from Storage. Observed documents always stay. Default ten minutes; 0 drops one right after use;
     /// <see cref="double.PositiveInfinity"/> keeps them. Anything else that is not a number of milliseconds (NaN, a negative value) means the
     /// default.
@@ -1165,10 +1167,8 @@ public interface IConversation
     /// transitively, by its non-background tasks.
     /// </summary>
     Task WaitForIdleAsync(DurableContext context);
-    /// <summary>The structural view (spec §9.3) as a disposable read-only Chord state.</summary>
-    Task<AttachedReplicatedState<ConversationView>> ViewStateAsync(DurableContext context);
-    /// <summary>The structural view as a serialized exact-frame watch with bounded pending frames; cancelling <paramref name="context"/> stops
-    /// it.</summary>
+    /// <summary>The structural view (spec §9.3) as a serialized watch, Chord's <see cref="IWatchHandle{T}"/>; cancelling
+    /// <paramref name="context"/> ends it aborted.</summary>
     Task<IWatchHandle<ConversationView>> WatchAsync(DurableContext context);
 }
 
@@ -1229,11 +1229,9 @@ public interface IHarness : ISession
     Task WaitForIdleAsync(DurableContext context);
     /// <summary>Session total: every conversation's <c>pi.usage</c> summed (upstream <c>UsageState</c> JSON).</summary>
     Task<JsonObjectValue> UsageAsync(DurableContext context);
-    /// <summary>Every live task with its owner edge, status, and owned conversations, as a disposable read-only Chord state (spec §9.5).
-    /// Reads only: it does not enable scheduling.</summary>
-    Task<AttachedReplicatedState<TaskGraph>> TaskGraphAsync(DurableContext context);
-    /// <summary>The task graph as a serialized exact-frame watch whose operations address <see cref="TaskGraph.ToJson"/>; cancelling
-    /// <paramref name="context"/> stops it (spec §9.5).</summary>
+    /// <summary>Every live task with its owner edge, status, and owned conversations (spec §9.5), as a serialized watch, Chord's
+    /// <see cref="IWatchHandle{T}"/>, whose operations address <see cref="TaskGraph.ToJson"/>; cancelling <paramref name="context"/> ends it
+    /// aborted. Reads only: it does not enable scheduling.</summary>
     Task<IWatchHandle<TaskGraph>> WatchTaskGraphAsync(DurableContext context);
 }
 

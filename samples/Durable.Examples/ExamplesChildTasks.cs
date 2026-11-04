@@ -168,7 +168,9 @@ public static partial class Examples
         id = await Checkout(root, "visa-5", "visa-6", "visa-7", "visa-8");
         harness.Resume();
         await Charges(id).All.Task;
-        using (var graph = await harness.TaskGraphAsync(Context)) await PrintGraph(graph.Value);
+        var graph = await harness.WatchTaskGraphAsync(Context);
+        await PrintGraph(graph.Value);
+        await graph.StopAsync();
         await harness.AbortTaskAsync(id, Context);
         await output.WriteLineAsync($"  checkout: {Outcome(await harness.WaitForTaskAsync(id, Context))}");
 

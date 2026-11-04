@@ -52,7 +52,7 @@ public static partial class Examples
         await clock.RunForAsync(500);
 
         // Structural client: the view holds the committed transcript and documents, including the running tool's output.
-        var view = await root.ViewStateAsync(Context);
+        var view = await root.WatchAsync(Context);
         static JsonObjectValue? FirstSlot(ConversationView value) =>
             value.Doc("pi.live") is { } live && live.TryGetValue("tools", out var tools) && tools is JsonArrayValue { Count: > 0 } slots
                 ? slots[0] as JsonObjectValue
@@ -62,10 +62,11 @@ public static partial class Examples
         await output.WriteLineAsync("view entries: " + JsonNames(view.Value.Entries.Select(entry => entry.Kind)));
         var joined = FirstSlot(view.Value);
         await output.WriteLineAsync($"view tool slot: {Field(joined, "status")} {Json(JsonValue.String(Field(joined, "output")))}");
-        var subscription = view.Subscribe((value, _, _) =>
+        view.Start((call, _) =>
         {
-            var slot = FirstSlot(value);
-            if (Field(slot, "status") == "running") output.WriteLine("view output now: " + Json(JsonValue.String(Field(slot, "output"))));
+            if (call is WatchValueCall<ConversationView> change && FirstSlot(change.Value) is var slot && Field(slot, "status") == "running")
+                output.WriteLine("view output now: " + Json(JsonValue.String(Field(slot, "output"))));
+            return Task.CompletedTask;
         });
         await clock.SettleAsync();
 
@@ -96,8 +97,7 @@ public static partial class Examples
         await clock.RunUntilAsync(harness.WaitForIdleAsync(Context));
         await clock.SettleAsync();
         await stream.StopAsync();
-        subscription.Dispose();
-        view.Dispose();
+        await view.StopAsync();
         await harness.CloseAsync(Context);
 
         await ReopenAsync(open, output, async reopened =>

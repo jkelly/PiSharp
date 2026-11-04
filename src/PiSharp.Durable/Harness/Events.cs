@@ -3,6 +3,10 @@
 // errors and ends with session_failed (area b); the snapshot carries compactionFailure and compaction_end its error (area j); tool events
 // carry their call's taskId and, for a nested call, parentToolCallId and parentTaskId, the snapshot carries nestedTools, and a nested call's
 // tool_execution_end its result from the caller's NestedCallDoc (area a).
+// Pi v1.5.0 sync (area watches, 42cb822f1 and d8d99950a): the stream is Chord's NativeWatch (Chord/Watch.cs) on the Session line's
+// scheduler: every event batch is its own call, in order (folding would drop events), and past 100 undelivered batches one snapshot of
+// the newest view replaces them; it ends as Chord's watches do (aborted, ended, failed). The stream's listener keeps its (events, context)
+// shape. The citation stays on v1.2.0 until the file's other areas land.
 //
 // Mappings: each AgentEvent variant is a sealed record whose ToJson() is upstream's object with upstream's key order, so a JSON-mode host
 // prints what upstream prints. pi-ai messages, usage, tool slots, compaction statuses and the pi.agent / pi.usage states are wire JSON, as
@@ -472,37 +476,39 @@ public static class AgentEvents
             var completing = await HarnessUtil.ScanAll(cursor => storage.ScanTasksAsync(query, 100, cursor, context)).ConfigureAwait(false);
             var held = new HashSet<TaskId>(completing.Select(record => record.Id));
             var current = initial;
-            // Batches are the watch's values; an overflow delivers a snapshot of the newest view instead.
-            var watch = new CommittedWatch<IReadOnlyList<AgentEvent>>([], release, views.Schedule, views.Report, () => [SnapshotOf(current)],
-                events => JsonValue.Array(events.Select(item => (JsonValue)item.ToJson())));
+            // Batches are the watch's values, each delivered (folding would drop events); an overflow delivers a snapshot of the newest view
+            // instead.
+            var watch = new NativeWatch<IReadOnlyList<AgentEvent>>([], release, views.Report, () => [SnapshotOf(current)], views.Schedule);
             var observer = new EventsObserver(watch, (before, after, ops, publication, commitContext) =>
             {
                 current = after;
                 var events = Translate(conversationId, before, after, ops, publication, held);
-                if (events.Count > 0) watch.Advance(events, [], commitContext);
+                if (events.Count > 0) watch.Advance(events, commitContext);
             });
             return (new EventStream(SnapshotOf(initial), watch), (ViewObserver)observer);
         }, context).ConfigureAwait(false);
         // Like a watch, the acquisition context governs the stream's lifetime.
         if (context.IsCancellationRequested)
         {
-            stream.Watch.Cancel();
+            stream.Watch.Abort();
             context.ThrowIfCancellationRequested();
         }
-        if (context.HasCancellation) stream.Watch.ObserveCancellation(context);
+        if (context.HasCancellation) stream.Watch.ObserveAbort(context.CancellationToken);
         return stream;
     }
 
-    private sealed class EventStream(SnapshotEvent snapshot, CommittedWatch<IReadOnlyList<AgentEvent>> watch) : IAgentEventStream
+    private sealed class EventStream(SnapshotEvent snapshot, NativeWatch<IReadOnlyList<AgentEvent>> watch) : IAgentEventStream
     {
-        public CommittedWatch<IReadOnlyList<AgentEvent>> Watch { get; } = watch;
+        public NativeWatch<IReadOnlyList<AgentEvent>> Watch { get; } = watch;
 
         public SnapshotEvent Snapshot { get; } = snapshot;
 
         public void Start(Func<IReadOnlyList<AgentEvent>, DurableContext, Task> listener)
         {
             ArgumentNullException.ThrowIfNull(listener);
-            Watch.Start((events, _, deliveryContext) => listener(events, deliveryContext));
+            // The stream's batches are value calls only: it never fails a call.
+            Watch.Start((call, deliveryContext) =>
+                call is NativeWatchValueCall<IReadOnlyList<AgentEvent>> batch ? listener(batch.Value, deliveryContext) : Task.CompletedTask);
         }
 
         public Task<WatchEnd> StopAsync() => Watch.StopAsync();
@@ -510,13 +516,13 @@ public static class AgentEvents
         public Task<WatchEnd> Closed => Watch.Closed;
     }
 
-    private sealed class EventsObserver(CommittedWatch<IReadOnlyList<AgentEvent>> watch,
+    private sealed class EventsObserver(NativeWatch<IReadOnlyList<AgentEvent>> watch,
         Action<ConversationView, ConversationView, ImmutableArray<Op>, CommitPublication, DurableContext> publication) : ViewObserver
     {
         public override void Publication(ConversationView before, ConversationView after, ImmutableArray<Op> ops, CommitPublication commit,
             DurableContext context) => publication(before, after, ops, commit, context);
 
-        public override void CloseSession(Exception? failure) => watch.CloseSession(failure);
+        public override void End(Exception? failure) => watch.End(Session.CloseEnd(failure));
     }
 
     // ─── The typed parts of a view the events read ──────────────────────────

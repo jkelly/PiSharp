@@ -28,7 +28,7 @@ public sealed class AgentEventFeed : IAsyncDisposable
         var stream = await harness.WatchEventsAsync(conversation, DurableContext.Background).ConfigureAwait(false);
         var feed = new AgentEventFeed(stream, capacity);
         stream.Start((events, context) => feed.channel.Writer.WriteAsync(events, context.CancellationToken).AsTask());
-        _ = stream.Closed.ContinueWith(closed => feed.channel.Writer.TryComplete(closed.IsCompletedSuccessfully ? closed.Result.Error : closed.Exception),
+        _ = stream.Closed.ContinueWith(closed => feed.channel.Writer.TryComplete(closed.IsCompletedSuccessfully ? closed.Result.Error as Exception : closed.Exception),
             CancellationToken.None, TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
         return feed;
     }
@@ -69,9 +69,9 @@ public sealed class TaskGraphFeed : IAsyncDisposable
     {
         var feed = new TaskGraphFeed(await harness.WatchTaskGraphAsync(DurableContext.Background).ConfigureAwait(false));
         var initial = feed.watch.Value;
-        feed.watch.Start((graph, _, _) =>
+        feed.watch.Start((call, _) =>
         {
-            feed.channel.Writer.TryWrite(graph);
+            if (call is WatchValueCall<TaskGraph> graph) feed.channel.Writer.TryWrite(graph.Value);
             return Task.CompletedTask;
         });
         _ = feed.watch.Closed.ContinueWith(_ => feed.channel.Writer.TryComplete(), CancellationToken.None, TaskContinuationOptions.ExecuteSynchronously,

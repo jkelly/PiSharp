@@ -304,9 +304,9 @@ internal sealed class SignalStep<TData, TSignal>(string name, string signal, Act
         {
             if (watch is not null)
             {
-                watch.Start((value, _, _) =>
+                watch.Start((call, _) =>
                 {
-                    if (First(value) is not null) arrived.TrySetResult();
+                    if (call is WatchValueCall<JsonObjectValue?> change && First(change.Value) is not null) arrived.TrySetResult();
                     return Task.CompletedTask;
                 });
                 if (First(watch.Value) is not null) arrived.TrySetResult();

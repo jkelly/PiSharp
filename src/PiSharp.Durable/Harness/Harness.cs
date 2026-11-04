@@ -20,6 +20,8 @@
 // submissions (submit spans); without it every span is a no-op. safeReport counts each report in pi.durable.reports by type and records
 // pi.durable.report on the reporting context's span with its fixed attributes (type, reason, extension, task.id), never the error; both are
 // contained, as the report is the last place an error goes. Reports carry the context of what raised them (ReportSink).
+// Pi v1.5.0 sync (area watches, 92ab53602): the state getters Conversation.viewState() and Harness.taskGraph() are removed; their watches
+// stay (Conversation.watch(), Harness.watchTaskGraph()).
 using System.Collections.Immutable;
 using PiSharp.AI;
 using PiSharp.Durable.Chord;
@@ -329,8 +331,6 @@ internal sealed class DurableHarness : Session, IHarness
         return total;
     }
 
-    public Task<AttachedReplicatedState<TaskGraph>> TaskGraphAsync(DurableContext context) => taskGraph.StateAsync(context);
-
     public Task<IWatchHandle<TaskGraph>> WatchTaskGraphAsync(DurableContext context) => taskGraph.WatchAsync(context);
 
     public Task<IConversation> RootAsync(DurableContext context, AgentChange? agent = null, ConversationInit? init = null) =>
@@ -483,8 +483,6 @@ internal sealed class ConversationImpl(ConversationId id, DurableHarness harness
         harness.Scheduler.Resume();
         await harness.Scheduler.WaitForIdleAsync(Id, context).ConfigureAwait(false);
     }
-
-    public Task<AttachedReplicatedState<ConversationView>> ViewStateAsync(DurableContext context) => harness.Views.StateAsync(Id, context);
 
     public Task<IWatchHandle<ConversationView>> WatchAsync(DurableContext context) => harness.Views.WatchAsync(Id, context);
 

@@ -10,7 +10,10 @@
 // listener's throw listener_error, the default. Pi v1.5.0 sync (area telemetry, 2ec55d808 and v1.5.0's fix): a stored commit's publication
 // records its committed entries (pi.durable.entry) and settled submissions (pi.durable.submission) on the commit context's span first,
 // listeners or not; a throwing telemetry adapter is reported host_error telemetry with that context and the commit stands. A listener's
-// report, and the Session's failure from a commit, carry the commit context, so the Harness records them on its span.
+// report, and the Session's failure from a commit, carry the commit context, so the Harness records them on its span. Pi v1.5.0 sync
+// (area watches, 92ab53602 and 42cb822f1): a document watch is Chord's Watch (Chord/Watch.cs) on the Session line's scheduler; the Session
+// ends it ended at close, failed with its failure, and delivers a retirement as its last call (a null value, [["r", null]] and retired),
+// after which it ends ended (Chord's endAfterDelivery). documentState() is removed, and Durable no longer uses Chord's replicatedState().
 //
 // Concurrency model. Upstream relies on one JavaScript thread: `#enqueue` chains every mutation and cold load onto one promise, and
 // listeners run in later microtasks. Here .NET callers may be on any thread, so:
@@ -22,8 +25,8 @@
 //   an OrderedLineDelivery (the scheduler's abort invocations) gets its results through that delivery instead, off the line too: in line
 //   order, each continuation running until it next suspends before the next, as upstream's microtasks resume them.
 // - Every commit callback, preparation, Storage settlement, adoption and publication runs inside one job. Commit listeners run
-//   synchronously in it, after adoption. Document-state and watch deliveries that a publication schedules (upstream's microtasks) run in
-//   the same job right after publication, before the commit's task completes; a listener that awaits continues later on its own.
+//   synchronously in it, after adoption. Watch deliveries that a publication schedules (upstream's microtasks) run in the same job right
+//   after publication, before the commit's task completes; a listener that awaits continues later on its own.
 // - A job must not wait for a later job (a commit callback that awaits another commit deadlocks, as upstream's does). Session APIs called
 //   from a listener only enqueue, so they never block the line.
 // - The loaded-document cache, its retention bookkeeping and the listener sets are guarded by short locks so snapshot's fast path can read
@@ -57,8 +60,8 @@ namespace PiSharp.Durable;
 /// committed publication. Only committed state is observable.
 /// </summary>
 /// <remarks>
-/// <para>The cache is bounded by use: a document with no watch or document state attached leaves it once it was not read or written for the
-/// retention period, and the next access loads it from Storage. Eviction runs as a job on the mutation line, so no transaction ever holds a
+/// <para>The cache is bounded by use: a document with no watch attached leaves it once it was not read or written for the retention
+/// period, and the next access loads it from Storage. Eviction runs as a job on the mutation line, so no transaction ever holds a
 /// tracker that leaves.</para>
 /// <para>Storage failures are final. Every Storage call goes through one guard: the first exception a Storage method throws, other than for
 /// a cancelled caller, fails the Session, as does a commit it cannot adopt. That call gets the exception; every later call and every Storage
@@ -396,60 +399,6 @@ public class Session : ISession
         }).ConfigureAwait(false);
     }
 
-    // ─── Document states ────────────────────────────────────────────────────
-
-    /// <inheritdoc/>
-    public Task<AttachedReplicatedState<JsonObjectValue?>?> DocumentStateAsync(SessionDocToken token, DurableContext context) =>
-        DocumentState(token, null, null, context);
-    /// <inheritdoc/>
-    public Task<AttachedReplicatedState<JsonObjectValue?>?> DocumentStateAsync(ConversationDocToken token, ConversationId conversationId,
-        DurableContext context) => DocumentState(token, conversationId.Value, null, context);
-    /// <inheritdoc/>
-    public Task<AttachedReplicatedState<JsonObjectValue?>?> DocumentStateAsync(TaskDocToken token, TaskId taskId, DurableContext context) =>
-        DocumentState(token, taskId.Value, null, context);
-    /// <inheritdoc/>
-    public Task<AttachedReplicatedState<JsonObjectValue?>?> DocumentStateAsync(SessionDocFamilyToken token, string key, DurableContext context) =>
-        DocumentState(token, null, key, context);
-    /// <inheritdoc/>
-    public Task<AttachedReplicatedState<JsonObjectValue?>?> DocumentStateAsync(ConversationDocFamilyToken token, ConversationId conversationId,
-        string key, DurableContext context) => DocumentState(token, conversationId.Value, key, context);
-    /// <inheritdoc/>
-    public Task<AttachedReplicatedState<JsonObjectValue?>?> DocumentStateAsync(TaskDocFamilyToken token, TaskId taskId, string key,
-        DurableContext context) => DocumentState(token, taskId.Value, key, context);
-
-    private Task<AttachedReplicatedState<JsonObjectValue?>?> DocumentState(DocumentToken token, long? owner, string? key, DurableContext context)
-    {
-        try
-        {
-            AssertUsable();
-            ArgumentNullException.ThrowIfNull(token);
-            ArgumentNullException.ThrowIfNull(context);
-            var definition = token.Definition;
-            var resolved = Documents.ResolveAddress(definition, owner, key);
-            return line.Enqueue<AttachedReplicatedState<JsonObjectValue?>?>(async () =>
-            {
-                AssertHealthy();
-                var loaded = await LoadDocumentAsync(definition, resolved.Id, resolved.Address, context).ConfigureAwait(false);
-                if (loaded is null) return null;
-                var (source, detach) = AttachDocument(definition, loaded,
-                    (value, release) => new CommittedStateSource<JsonObjectValue?>(value, release, Defer));
-                try
-                {
-                    return ReplicatedState.Attach<JsonObjectValue?>(source, new ReplicatedStateSourceOptions { OnError = Report });
-                }
-                catch
-                {
-                    detach();
-                    throw;
-                }
-            });
-        }
-        catch (Exception error)
-        {
-            return Task.FromException<AttachedReplicatedState<JsonObjectValue?>?>(error);
-        }
-    }
-
     // ─── Watches ────────────────────────────────────────────────────────────
 
     /// <inheritdoc/>
@@ -488,15 +437,15 @@ public class Session : ISession
                 var loaded = await LoadDocumentAsync(definition, resolved.Id, resolved.Address, context).ConfigureAwait(false);
                 if (Volatile.Read(ref flag.Value) != 0) context.ThrowIfCancellationRequested();
                 if (loaded is null) return null;
-                return AttachDocument(definition, loaded, (value, release) => new CommittedWatch<JsonObjectValue?>(value, release, Defer, Report)).Observer;
+                return AttachDocument(definition, loaded);
             }).ConfigureAwait(false);
             if (watch is null) return null;
             if (Volatile.Read(ref flag.Value) != 0)
             {
-                watch.Cancel();
+                watch.Abort();
                 context.ThrowIfCancellationRequested();
             }
-            if (context.HasCancellation) watch.ObserveCancellation(context);
+            if (context.HasCancellation) watch.ObserveAbort(context.CancellationToken);
             return watch;
         }
         finally
@@ -1069,18 +1018,22 @@ public class Session : ISession
             TaskScheduler.Default);
     }
 
+    /// <summary>The end of what follows a Session that closed (upstream <c>end(failure)</c>): <c>ended</c>, or <c>failed</c> with the error
+    /// that failed it.</summary>
+    internal static WatchEnd CloseEnd(Exception? failure) => failure is null ? WatchEnd.Ended : WatchEnd.Failed(failure);
+
     /// <summary>
-    /// Attaches an observer to one committed incarnation: checks the definition, pins the incarnation in the cache, then forwards this
-    /// incarnation's committed changes and close. The returned detach removes both subscriptions and the pin.
+    /// Attaches a watch to one committed incarnation: checks the definition, pins the incarnation in the cache, then forwards this
+    /// incarnation's committed changes, its retirement and close (upstream <c>#attachDocument</c>). The watch's detach removes both
+    /// subscriptions and the pin.
     /// </summary>
-    private (TObserver Observer, Action Detach) AttachDocument<TObserver>(DocDefinition definition, LoadedDocument loaded,
-        Func<JsonObjectValue, Action, TObserver> create) where TObserver : ICommittedObserver<JsonObjectValue?>
+    private Watch<JsonObjectValue?> AttachDocument(DocDefinition definition, LoadedDocument loaded)
     {
         Documents.CheckRecordScope(definition, loaded.Record);
         Documents.CheckRecordVersion(definition, loaded.Record, loaded.StoredVersion);
         IDisposable? commitSubscription = null;
         IDisposable? closeSubscription = null;
-        // Attached, the incarnation stays cached; once its last observer detaches, or it retires, it is idle again.
+        // Attached, the incarnation stays cached; once its watch detaches, or it retires, it is idle again.
         var unpin = PinDocument(loaded.AddressId, loaded.Record.Id);
         var detach = () =>
         {
@@ -1088,20 +1041,9 @@ public class Session : ISession
             closeSubscription?.Dispose();
             unpin();
         };
-        TObserver observer;
-        try
-        {
-            observer = create(loaded.Value, detach);
-        }
-        catch
-        {
-            unpin();
-            throw;
-        }
+        var watch = new Watch<JsonObjectValue?>(loaded.Value, detach, Report, schedule: Defer);
         var observedVersion = loaded.ValueVersion;
         var recordId = loaded.Record.Id;
-        // A document state's frames carry no caller cancellation; a watch observes its own cancellation.
-        var stripCancellation = observer is CommittedStateSource<JsonObjectValue?>;
         try
         {
             commitSubscription = ObserveCommits((publication, context) =>
@@ -1109,16 +1051,21 @@ public class Session : ISession
                 foreach (var change in publication.Changes)
                 {
                     if (change is not DocumentCommitChange document || document.Record.Id != recordId) continue;
-                    var frameContext = stripCancellation ? context.WithoutCancellation() : context;
+                    if (document.Value is null)
+                    {
+                        // A retired incarnation never changes again: its watch delivers the retirement but pins nothing, then ends.
+                        unpin();
+                        watch.Advance(Retirement, context);
+                        watch.EndAfterDelivery();
+                        continue;
+                    }
                     var ops = ObservedOperations(ref observedVersion, document);
                     // A migration-only base changes nothing for an observer of the new version.
                     if (ops.IsEmpty) continue;
-                    // A retired incarnation never changes again: its observers keep their last value but pin nothing.
-                    if (document.Value is null) unpin();
-                    observer.Advance(document.Value, ops, frameContext);
+                    watch.Advance(new WatchValueCall<JsonObjectValue?>(document.Value, ops), context);
                 }
             });
-            closeSubscription = SubscribeClose(() => observer.CloseSession(Failure));
+            closeSubscription = SubscribeClose(() => watch.End(CloseEnd(Failure)));
         }
         catch
         {
@@ -1126,7 +1073,7 @@ public class Session : ISession
             detach();
             throw;
         }
-        return (observer, detach);
+        return watch;
     }
 
     private async Task<LoadedDocument?> LoadDocumentAsync(DocDefinition definition, string addressId, DocumentAddress address, DurableContext context)
@@ -1174,16 +1121,19 @@ public class Session : ISession
         if (failure is { } failed) throw new SessionFailedException(failed.Error);
     }
 
+    /// <summary>The last call of a watch whose incarnation retired: a null value and <c>[["r", null]]</c> (upstream's
+    /// <c>RETIREMENT_OPERATIONS</c>), retired.</summary>
+    private static readonly WatchValueCall<JsonObjectValue?> Retirement = new(null, [new ReplaceOp(JsonValue.Null)], Retired: true);
+
     /// <summary>
-    /// Operations an observer applies for one committed change. An observer hydrated under another definition version holds a differently
-    /// shaped value, so it receives the new value as a root replacement instead of operations for that shape.
+    /// Operations a watch applies for one committed change of a live incarnation. A watch hydrated under another definition version holds a
+    /// differently shaped value, so it receives the new value as a root replacement instead of operations for that shape.
     /// </summary>
     private static ImmutableArray<Op> ObservedOperations(ref int observedVersion, DocumentCommitChange change)
     {
-        if (change.Value is null) return Observation.RetirementOperations;
         if (change.Version == observedVersion) return change.Ops;
         observedVersion = change.Version!.Value;
-        return [new ReplaceOp(change.Value)];
+        return [new ReplaceOp(change.Value!)];
     }
 
     private sealed record FailureBox(Exception Error);

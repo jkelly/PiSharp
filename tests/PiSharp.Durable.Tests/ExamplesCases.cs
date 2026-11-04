@@ -34,6 +34,9 @@ using PiSharp.Durable.Examples;
 // pi-schema's key order ("properties" before "required"), authored from the v1.2.0 capture (ToolsSchema150.cs), not captured.
 // Area sleep: 24-child-tasks's tree lines print the charged payments as sleeping, authored from f75b3240a's 24-child-tasks.ts (v1.5.0's
 // 23-child-tasks.ts, whose payments end their charge phase in runtime.sleepUntil), not captured; 13-recovery's lines are unchanged.
+// Area watches: 04-chord-state is gone, as upstream deleted it with Session.documentState() (92ab53602). 21-late-join's view is a watch
+// (Conversation.watch()), which makes no call at start, so the line the v1.2.0 state printed as it hydrated ("view output now" with the
+// first five lines) is gone; authored from 92ab53602's 21-late-join.ts (v1.5.0's 20-late-join.ts), not captured.
 internal static partial class Program
 {
     private static readonly string[] CodingToolsTranscript =
@@ -83,9 +86,6 @@ internal static partial class Program
         "supervisor task: 3",
         "child conversation: {\"id\":4,\"owner\":{\"conversationId\":2,\"taskId\":3}}",
         "registry: {\"agents\":{\"researcher\":{\"conversationId\":4,\"requestId\":\"researcher:first-message:3\"}}}",
-        "== 04-chord-state",
-        "Chord notes: hydrate 0 {\"text\":\"first\"}",
-        "Chord notes: update 1 {\"text\":\"published through Chord\"}",
         "== 05-watches",
         "watch baseline: {\"text\":\"first\"}",
         "watch update: {\"text\":\"observed asynchronously\"}",
@@ -169,7 +169,6 @@ internal static partial class Program
         // Upstream's util.inspect prints [ 'pi.user', 'pi.system', 'pi.assistant' ] and [ 'count running' ].
         """view entries: ["pi.user","pi.system","pi.assistant"]""",
         @"view tool slot: running ""1\n2\n3\n4\n5\n""",
-        @"view output now: ""1\n2\n3\n4\n5\n""",
         """snapshot tools: ["count running"]""",
         .. LateJoinOutput(6, "view output now: ", "event output now: "),
         "event: tool_execution_end",
@@ -427,7 +426,6 @@ internal static partial class Program
             "child conversation: {\"id\":4,\"owner\":{\"conversationId\":2,\"taskId\":3}}",
             "registry: {\"agents\":{\"researcher\":{\"conversationId\":4,\"requestId\":\"researcher:first-message:3\"}}}",
         ],
-        ["Chord notes: update 1 {\"text\":\"published through Chord\"}"] = ["Chord notes: hydrate 0 {\"text\":\"published through Chord\"}"],
         ["watch update: {\"text\":\"observed asynchronously\"}"] = ["watch baseline: {\"text\":\"observed asynchronously\"}"],
         [HarnessResolved] = ["root: 1 {\"text\":\"root notes\"}", "stored agent: {\"thinkingLevel\":\"low\"}"],
         // The last configure call selected exactly files and search, and cleared the tool selection.

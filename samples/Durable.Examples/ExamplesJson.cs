@@ -79,9 +79,10 @@ public static partial class Examples
         {
             var watch = await root.WatchAsync(Context);
             Print(JsonValue.Object([new("view", watch.Value.ToJson())]));
-            watch.Start((_, ops, _) =>
+            watch.Start((call, _) =>
             {
-                Print(JsonValue.Object([new("ops", JsonValue.Array(ops.Select(op => (JsonValue)op.ToJson())))]));
+                if (call is WatchValueCall<ConversationView> { Ops: var ops })
+                    Print(JsonValue.Object([new("ops", JsonValue.Array(ops.Select(op => (JsonValue)op.ToJson())))]));
                 return Task.CompletedTask;
             });
             stop = () => watch.StopAsync();

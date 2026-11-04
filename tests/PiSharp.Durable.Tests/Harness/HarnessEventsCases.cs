@@ -13,7 +13,6 @@ using System.Collections.Immutable;
 using JsonNode = System.Text.Json.Nodes.JsonNode;
 using PiSharp.Durable;
 using PiSharp.Durable.Chord;
-using WatchEnd = PiSharp.Durable.WatchEnd; // Durable's v1.2.0 watch end, beside Chord's (Chord/Watch.cs) until work list area watches moves onto it
 using PiSharp.Durable.Sqlite;
 using PiSharp.Durable.Storage;
 using PiSharp.Durable.Storage.Jsonl;
@@ -530,7 +529,7 @@ internal static partial class EventTests
             var (harness, root) = await OpenChat(await fresh(), Setup());
             var stream = await harness.WatchEventsAsync(root.Id, Context);
             await harness.CloseAsync(Context);
-            Equal(WatchEnd.SessionClosed, await stream.Closed, "stream end");
+            Equal(WatchEnd.Ended, await stream.Closed, "stream end");
         });
 
         yield return Case(prefix + "starts-a-message-at-the-first-committed-partial-and-ends-it-with-the-converted-entry-on-abort", async () =>
