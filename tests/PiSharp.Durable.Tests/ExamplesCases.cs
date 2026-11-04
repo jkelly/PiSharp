@@ -27,6 +27,10 @@ using PiSharp.Durable.Examples;
 // does (JsonModeEventsLines checks that identity on the capture's other assistant message_start lines).
 // Work list area h ran every example of the pinned Pi v1.2.0 under Node without API keys: each prints what is pinned here, but for
 // 23-subagent-background (see there).
+// Pi v1.5.0 sync (area harness-options): 09-context's "request messages" line and the position of 25-compaction's "(system prompt)" lines
+// are authored, not captured: under #10904 (5713c9507) the first pi.system entry after the head marker (or the transcript's first) is the
+// baseline and leads the context past assistant messages, where Pi v1.2.0 printed it after them. The lines follow v1.5.0's context.ts and
+// examples/24-compaction.ts's printing; no v1.5.0 run was captured.
 internal static partial class Program
 {
     private static readonly string[] CodingToolsTranscript =
@@ -96,7 +100,8 @@ internal static partial class Program
         "lookup: true",
         "== 09-context",
         """raw active entries: ["message","message","message","message","pi.system","message","message","edit","note"]""",
-        """request messages: ["user: read files a and b","assistant: reading call(a) call(b)","result(a)","result(b)","system: {\"cwd\":\"<cwd>/repo</cwd>\"}","assistant: a and b look fine"]""",
+        // Authored for Pi v1.5.0 (#10904, see the header): the baseline leads.
+        """request messages: ["system: {\"cwd\":\"<cwd>/repo</cwd>\"}","user: read files a and b","assistant: reading call(a) call(b)","result(a)","result(b)","assistant: a and b look fine"]""",
         """fork messages: ["user: read a and b","assistant: reading call(a) call(b)","result(a) error","result(b) error"]""",
         """after summary: summary ["user: Summary: a and b are fine."]""",
         """newest stored entries: ["summary","note","edit"] more: true""",
@@ -246,19 +251,19 @@ internal static partial class Program
         "  assistant A detailed answer to \"Which day trips?\": details details details detai",
         "after \"Any museums?\" (answered): 7 messages in context, 10 entries stored",
         "  (threshold compaction summary first)",
+        "  system    (system prompt)",
         "  user      The conversation history before this point was compacted into the foll",
         "  assistant A detailed answer to \"What should we eat?\": details details details de",
         "  user      Which day trips?",
         "  assistant A detailed answer to \"Which day trips?\": details details details detai",
         "  user      Any museums?",
-        "  system    (system prompt)",
         "  assistant A detailed answer to \"Any museums?\": details details details details d",
         "after \"Nightlife?\" (answered): 5 messages in context, 14 entries stored",
         "  (threshold compaction summary first)",
+        "  system    (system prompt)",
         "  user      The conversation history before this point was compacted into the foll",
         "  assistant A detailed answer to \"Any museums?\": details details details details d",
         "  user      Nightlife?",
-        "  system    (system prompt)",
         "  assistant A detailed answer to \"Nightlife?\": details details details details det",
         "manual compaction finished; its summary is queued",
         "after the answer, the summary is done",
@@ -270,18 +275,18 @@ internal static partial class Program
         "  assistant A detailed answer to \"How do we get around?\": details details details ",
         "after \"What should we pack?\" (answered): 7 messages in context, 20 entries stored",
         "  (manual compaction summary first)",
+        "  system    (system prompt)",
         "  user      The conversation history before this point was compacted into the foll",
         "  assistant A detailed answer to \"Nightlife?\": details details details details det",
         "  user      How do we get around?",
         "  assistant A detailed answer to \"How do we get around?\": details details details ",
         "  user      What should we pack?",
-        "  system    (system prompt)",
         "  assistant A detailed answer to \"What should we pack?\": details details details d",
         "after \"Summarize the plan for my partner\" (model_error): 4 messages in context, 24 entries stored",
         "  (threshold compaction summary first)",
+        "  system    (system prompt)",
         "  user      The conversation history before this point was compacted into the foll",
         "  assistant A detailed answer to \"What should we pack?\": details details details d",
-        "  user      Summarize the plan for my partner",
         CompactionLastLine,
         "== 26-coding-agent",
         // pwd prints the temporary workspace; both sides compare it as <workspace>.
@@ -324,8 +329,9 @@ internal static partial class Program
     private const string CodingToolsStorage = "storage: <dir>";
     private const string SubagentAnswer = "assistant: The subagent says: 2, 3, and 5.";
     private const string InboxTranscript = """transcript: ["pi.user","app.note","pi.assistant","pi.user","pi.user","pi.assistant"]""";
-    // Repeated within 25-compaction's output; the read-back follows its last occurrence, the example's last line.
-    private const string CompactionLastLine = "  system    (system prompt)";
+    // 25-compaction's last line; the read-back follows it. Pi v1.5.0 sync (area harness-options): the system prompt that ended the example
+    // under Pi v1.2.0 now leads its context (#10904, see the header).
+    private const string CompactionLastLine = "  user      Summarize the plan for my partner";
     private const string BobsSandbox = "bob's sandbox: from bob";
     private const string PythonConversation = "python conversation: venv: <project>/.venv";
     private const string TimedBashCalls = "timed bash calls: 2";
