@@ -35,8 +35,13 @@ public sealed class NativeObservation<T>
 {
     private readonly Action detach;
 
-    internal NativeObservation(T value, Action detach)
+    /// <summary>An observation starting at <paramref name="value"/> (upstream's is a plain <c>{ value, detach }</c>): public, so a native
+    /// watchable built outside Chord, such as a hand-built registry value, can give one.</summary>
+    /// <param name="value">The value the observer starts at.</param>
+    /// <param name="detach">Detaches the observer.</param>
+    public NativeObservation(T value, Action detach)
     {
+        ArgumentNullException.ThrowIfNull(detach);
         Value = value;
         this.detach = detach;
     }
