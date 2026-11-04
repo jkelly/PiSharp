@@ -140,8 +140,8 @@ internal static class PromptTests
             }));
             var reports = new List<Exception>();
             var shown = new Dictionary<string, string> { ["failing"] = "<failing>\nold\n</failing>", ["cwd"] = "stale" };
-            var agent = Agents.ResolveAgent(null, registry.Snapshot(), Agents.ResolveSettings(null), error => throw error);
-            var desired = await HarnessPrompt.RenderSectionsAsync(agent.Sections, Input, shown, reports.Add, Context);
+            var agent = Agents.ResolveAgent(null, registry.Snapshot(), Agents.ResolveSettings(null), (error, _) => throw error);
+            var desired = await HarnessPrompt.RenderSectionsAsync(agent.Sections, Input, shown, (error, _) => reports.Add(error), Context);
             SamePairs([Pair("preamble", "You are helpful."), Pair("cwd", "<cwd>\n/repo (git)\n</cwd>"), Pair("failing", "<failing>\nold\n</failing>")],
                 desired, "desired");
             Seq(["render failed", "also failed"], reports.Select(error => error.Message), "reports");
@@ -152,7 +152,7 @@ internal static class PromptTests
             var controller = Context.WithCancel();
             controller.Cancel(new InvalidOperationException("cancelled"));
             var failing = Section("a", (_, _) => throw new InvalidOperationException("cancelled"));
-            await RejectsAsync(() => HarnessPrompt.RenderSectionsAsync([failing], Input, new Dictionary<string, string>(), _ => { }, controller.Context),
+            await RejectsAsync(() => HarnessPrompt.RenderSectionsAsync([failing], Input, new Dictionary<string, string>(), (_, _) => { }, controller.Context),
                 "cancelled", "render");
         });
 

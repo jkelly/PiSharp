@@ -26,6 +26,8 @@
 //   of arguments, diagnostics and details has nothing to drop.
 // - Upstream's copyJson of a control drops undefined keys; a C# ToolControl has none, and an unset (null) Terminate is omitted. Pi v1.5.0
 //   sync (area harness-options): Terminate false is stored as given, as upstream's `terminate?: boolean` is (#10858).
+// - Pi v1.5.0 sync (area reports): a model-issued call's broken structured output is reported as the extension_error of the extension
+//   that provides or wraps the tool (toolExtension; a30c2a81d); a failed agent resolution leaves the name out.
 using System.Collections.Immutable;
 using System.Diagnostics;
 using System.Globalization;
@@ -482,7 +484,17 @@ internal static class ToolPhases
             {
                 // The model never sees structured output, so its call stands; the host learns of the broken tool.
                 final = rest;
-                runtime.Report(new InvalidOperationException(broken));
+                // Only names the extension: a failed resolution leaves the report without the name.
+                string? extension;
+                try
+                {
+                    extension = Agents.ToolExtension(await runtime.AgentAsync(context).ConfigureAwait(false), tool.Name);
+                }
+                catch (Exception)
+                {
+                    extension = null;
+                }
+                runtime.Report(new InvalidOperationException(broken), ReportFrom.FromExtension(extension));
             }
         }
         // Programs get the tool's own value: without a schema, its output. The model reads only `output`, so model-issued calls skip both.

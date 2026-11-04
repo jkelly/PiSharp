@@ -129,11 +129,11 @@ internal static class InspectTests
             Equal(HarnessScheduling.Paused, paused.Scheduling, "paused scheduling");
             Seq([ids.Gate, ids.Dependent, ids.Migrating, ids.NoMigration, ids.Failing, ids.TooOld, ids.Missing],
                 paused.Tasks.Select(entry => entry.Record.Id), "paused tasks");
-            SameState(new(TaskInspectionKind.Ready), StateOf(paused.Tasks, ids.Gate), "gate");
-            SameState(new(TaskInspectionKind.Ready), StateOf(paused.Tasks, ids.Dependent), "dependent");
-            SameState(new(TaskInspectionKind.Ready) { Migrates = true }, StateOf(paused.Tasks, ids.Migrating), "migrating");
+            SameState(new(TaskInspectionKind.Pending), StateOf(paused.Tasks, ids.Gate), "gate");
+            SameState(new(TaskInspectionKind.Pending), StateOf(paused.Tasks, ids.Dependent), "dependent");
+            SameState(new(TaskInspectionKind.Pending) { Migrates = true }, StateOf(paused.Tasks, ids.Migrating), "migrating");
             // A migration that was never tried is not run to find out.
-            SameState(new(TaskInspectionKind.Ready) { Migrates = true }, StateOf(paused.Tasks, ids.Failing), "failing");
+            SameState(new(TaskInspectionKind.Pending) { Migrates = true }, StateOf(paused.Tasks, ids.Failing), "failing");
             SameState(new(TaskInspectionKind.Blocked) { Reason = BlockedReason.MigrationFailed }, StateOf(paused.Tasks, ids.NoMigration), "no migration",
                 "Task test.no-migration version 2 has no migration from 1");
             SameState(new(TaskInspectionKind.Blocked) { Reason = BlockedReason.TaskTooOld }, StateOf(paused.Tasks, ids.TooOld), "too old");

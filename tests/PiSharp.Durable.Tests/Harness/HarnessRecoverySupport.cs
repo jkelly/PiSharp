@@ -90,9 +90,6 @@ internal static partial class HarnessRecoveryTests
         _ => JsonValue.DeepEquals(expected, actual),
     };
 
-    /// <summary>The <c>error.cause</c> a scheduler report carries.</summary>
-    private static object? Cause(Exception report) => report.Data["cause"];
-
     /// <summary>Upstream <c>String(error)</c>: the error's name and message.</summary>
     private static string Describe(Exception error) => $"{error.GetType().Name}: {error.Message}";
 

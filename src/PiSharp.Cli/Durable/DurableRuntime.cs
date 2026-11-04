@@ -151,7 +151,8 @@ internal static partial class DurableRuntime
                 Registry = registry,
                 Settings = harnessSettings,
                 Env = envs.EnvAsync,
-                OnReport = reports.Report,
+                // The CLI shows the error; what it is about (Report.Info) adds nothing it prints.
+                OnReport = report => reports.Report(report.Error),
             }, Context).ConfigureAwait(false);
             location.OnLockLost(((Session)harness).Fail);
             var initial = location.Created ? DurableHarnessSetup.FindInitialAgentModel(settings, models) : null;

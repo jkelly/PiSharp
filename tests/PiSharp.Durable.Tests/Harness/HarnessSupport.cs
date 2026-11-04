@@ -56,7 +56,7 @@ internal static partial class HarnessTests
         {
             Models = models ?? EmptyDurableModels.Instance,
             Registry = registry,
-            OnReport = onReport,
+            OnReport = onReport is null ? null : report => onReport(report.Error),
             Settings = settings,
         }, Context);
         return new OpenedHarness(harness, registry);
@@ -190,11 +190,15 @@ internal static partial class HarnessTests
     /// </summary>
     internal static Task InvocationEnded(IHarness harness, TaskId id) => ((DurableHarness)harness).Scheduler.InvocationDone(id);
 
-    /// <summary>A Harness, the registry it reads, and every failure passed to <c>OnReport</c>.</summary>
-    internal sealed record OpenedTasks(IHarness Harness, IRegistry Registry, SyncList<Exception> Reports);
+    /// <summary>A Harness, the registry it reads, and every failure passed to <c>OnReport</c>; <see cref="Infos"/> holds what each was
+    /// about, at the same index (upstream <c>infos</c>).</summary>
+    internal sealed record OpenedTasks(IHarness Harness, IRegistry Registry, SyncList<Exception> Reports)
+    {
+        public SyncList<ReportInfo> Infos { get; init; } = new();
+    }
 
-    /// <summary>Opens a Harness whose registry holds <paramref name="tasks"/>; failures passed to <c>OnReport</c> are collected (upstream
-    /// <c>openTasks</c>).</summary>
+    /// <summary>Opens a Harness whose registry holds <paramref name="tasks"/>; failures passed to <c>OnReport</c> are collected, their infos
+    /// in <c>Infos</c> (upstream <c>openTasks</c>).</summary>
     internal static async Task<OpenedTasks> OpenTasks(IStorage storage, IReadOnlyList<DurableTask> tasks, IRegistry? registry = null,
         Func<double>? now = null, HarnessSettings? settings = null, TimeProvider? timeProvider = null, IDurableModels? models = null,
         SetTimer? setTimer = null, Action<Wake>? onWake = null)
@@ -202,18 +206,26 @@ internal static partial class HarnessTests
         registry ??= Registry.Create();
         if (tasks.Count > 0) registry.Install(Define.Extension(new Extension { Name = "tasks", Tasks = [.. tasks] }));
         var reports = new SyncList<Exception>();
+        var infos = new SyncList<ReportInfo>();
         var harness = await Harness.OpenAsync(storage, new HarnessOptions
         {
             Models = models ?? EmptyDurableModels.Instance,
             Registry = registry,
-            OnReport = reports.Add,
+            OnReport = report =>
+            {
+                lock (reports)
+                {
+                    reports.Add(report.Error);
+                    infos.Add(report.Info);
+                }
+            },
             Now = now,
             Settings = settings,
             TimeProvider = timeProvider,
             SetTimer = setTimer,
             OnWake = onWake,
         }, Context);
-        return new OpenedTasks(harness, registry, reports);
+        return new OpenedTasks(harness, registry, reports) { Infos = infos };
     }
 
     /// <summary>Next state that completes a task with <paramref name="result"/> (upstream <c>completed</c>).</summary>
