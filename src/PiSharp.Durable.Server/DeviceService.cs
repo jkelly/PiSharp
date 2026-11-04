@@ -169,6 +169,7 @@ internal sealed class DeviceService(DurableDeviceHost host, DurableDeviceServerO
                 Conversations = [.. node.Conversations.Select(id => id.Value)],
                 Label = label,
                 CallId = callId,
+                Blocked = node.Blocked is { } blocked ? TaskInspectionState.ReasonName(blocked) : null,
             });
         }
         return nodes;
