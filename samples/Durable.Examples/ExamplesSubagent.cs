@@ -37,7 +37,7 @@ public static partial class Examples
                     Name = "subagent",
                     Description = "Delegate a self-contained task to a subagent and get its answer back.",
                     Parameters = (JsonObjectValue)JsonValue.Parse(
-                        """{"type":"object","required":["task"],"properties":{"task":{"type":"string","description":"What the subagent should do"}}}"""),
+                        """{"type":"object","properties":{"task":{"type":"string","description":"What the subagent should do"}},"required":["task"],"additionalProperties":false}"""),
                     // Safe to rerun after a crash: a rerun finds the child it already created and the submission it already made.
                     Replay = ToolReplay.Safe,
                     Execute = async (args, api, callContext) =>

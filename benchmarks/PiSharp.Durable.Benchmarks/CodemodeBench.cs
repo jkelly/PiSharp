@@ -30,10 +30,10 @@ public static class CodemodeBench
         text is null ? [100, 1000] : [.. text.Split(',').Select(size => int.Parse(size, CultureInfo.InvariantCulture))];
 
     private static readonly JsonObjectValue EchoParameters =
-        (JsonObjectValue)JsonValue.Parse("""{"type":"object","required":["i"],"properties":{"i":{"type":"number"}}}""");
+        (JsonObjectValue)JsonValue.Parse("""{"type":"object","properties":{"i":{"type":"number"}},"required":["i"],"additionalProperties":false}""");
 
     private static readonly JsonObjectValue PlainParameters =
-        (JsonObjectValue)JsonValue.Parse("""{"type":"object","required":["n","shape"],"properties":{"n":{"type":"number"},"shape":{"type":"string"}}}""");
+        (JsonObjectValue)JsonValue.Parse("""{"type":"object","properties":{"n":{"type":"number"},"shape":{"type":"string"}},"required":["n","shape"],"additionalProperties":false}""");
 
     private static JsonArrayValue Text(string text) => JsonValue.Array(JsonValue.Object(
         KeyValuePair.Create("type", (JsonValue)"text"), KeyValuePair.Create("text", (JsonValue)text)));

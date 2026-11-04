@@ -31,7 +31,7 @@ public static class NestedImagesBench
     public static IReadOnlyList<int> DefaultCounts { get; } = [50, 200];
 
     private static readonly JsonObjectValue ImageArgument = (JsonObjectValue)JsonValue.Parse(
-        """{"type":"object","required":["type","mimeType"],"properties":{"type":{"const":"image","type":"string"},"mimeType":{"type":"string"},"data":{"type":"string"},"source":{"type":"object","required":["taskId"],"properties":{"taskId":{"type":"number"}}}}}""");
+        """{"type":"object","properties":{"type":{"const":"image"},"mimeType":{"type":"string"},"data":{"type":"string"},"source":{"type":"object","properties":{"taskId":{"type":"number"}},"required":["taskId"],"additionalProperties":false}},"required":["type","mimeType"],"additionalProperties":false}""");
 
     /// <summary>Runs every backend and variant for each count; writes upstream's table and returns the rows.</summary>
     public static async Task<IReadOnlyList<(Scenario Scenario, Result Result)>> RunAsync(IReadOnlyList<int> counts, TextWriter output, int bytes = 1024 * 1024,
@@ -80,7 +80,7 @@ public static class NestedImagesBench
         {
             Name = "read_image",
             Description = "Read an image",
-            Parameters = (JsonObjectValue)JsonValue.Parse("""{"type":"object","required":["n"],"properties":{"n":{"type":"number"}}}"""),
+            Parameters = (JsonObjectValue)JsonValue.Parse("""{"type":"object","properties":{"n":{"type":"number"}},"required":["n"],"additionalProperties":false}"""),
             // One image, so programs get it as an ImageContent. Unique per call: base64 of random bytes.
             Execute = (_, _, _) => Task.FromResult(new ToolExecutionResult
             {
@@ -92,8 +92,8 @@ public static class NestedImagesBench
         {
             Name = "classify",
             Description = "Classify images",
-            Parameters = Object(("type", "object"), ("required", JsonValue.Array((JsonValue)"images")),
-                ("properties", Object(("images", Object(("type", "array"), ("items", ImageArgument)))))),
+            Parameters = Object(("type", "object"), ("properties", Object(("images", Object(("type", "array"), ("items", ImageArgument))))),
+                ("required", JsonValue.Array((JsonValue)"images")), ("additionalProperties", false)),
             Execute = async (args, api, callContext) =>
             {
                 foreach (var image in ((JsonArrayValue)((JsonObjectValue)args)["images"]).Cast<JsonObjectValue>())
@@ -123,7 +123,7 @@ public static class NestedImagesBench
         {
             Name = "script",
             Description = "Read and classify images",
-            Parameters = (JsonObjectValue)JsonValue.Parse("""{"type":"object","required":["count"],"properties":{"count":{"type":"number"}}}"""),
+            Parameters = (JsonObjectValue)JsonValue.Parse("""{"type":"object","properties":{"count":{"type":"number"}},"required":["count"],"additionalProperties":false}"""),
             Callers = [ToolCaller.Model],
             Execute = async (args, api, callContext) =>
             {
