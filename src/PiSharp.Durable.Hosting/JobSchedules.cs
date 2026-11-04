@@ -192,7 +192,7 @@ public sealed partial class HostedSession
 
     private static async Task<TaskRecord?> ActiveScheduledTaskAsync(ITx tx, ConversationId conversation, JobSchedule schedule)
     {
-        foreach (var status in new[] { DurableTaskStatus.Pending, DurableTaskStatus.Running, DurableTaskStatus.Waiting, DurableTaskStatus.Completing })
+        foreach (var status in new[] { DurableTaskStatus.Pending, DurableTaskStatus.Running, DurableTaskStatus.Waiting, DurableTaskStatus.Sleeping, DurableTaskStatus.Completing })
         {
             JsonObjectValue? cursor = null;
             do

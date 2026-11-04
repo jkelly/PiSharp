@@ -384,6 +384,9 @@ public interface IToolExecutionApi : IDocumentObserver, IDocumentReader
     IDurableModels Models { get; }
     /// <summary>Built by <c>HarnessOptions.Env</c> for this call; null without an environment.</summary>
     IExecutionEnv? Env { get; }
+    /// <summary>The Harness clock (<see cref="HarnessOptions.Now"/>), in milliseconds, for times a rerun after a restart compares against.
+    /// Throws once the tool task's invocation has ended.</summary>
+    double Now();
     /// <summary>
     /// Appends running output; it becomes the result's <c>Output</c> when the result omits it. <paramref name="skipped"/> counts output
     /// omitted before the chunk, as reported by an environment given <see cref="OutputWindow"/> (<c>ShellOutputInfo.skipped</c>). Throws once
@@ -802,11 +805,28 @@ public sealed record HarnessOptions
     /// throw <see cref="ReadAfterWriteException"/>; a throw fails the creating commit.
     /// </summary>
     public Func<ITx, ConversationRecord, Task>? ConversationCreated { get; init; }
-    /// <summary>The Harness clock in milliseconds; default <see cref="TimeProvider"/>'s wall clock.</summary>
+    /// <summary>The Harness clock in milliseconds; default <see cref="TimeProvider"/>'s wall clock. Sleeping tasks store deadlines on it, so
+    /// every process that opens the same storage must use the same clock.</summary>
     public Func<double>? Now { get; init; }
-    /// <summary>Timers for sleeps and idle context expiry (a .NET seam for upstream's <c>setTimeout</c>); default
-    /// <see cref="System.TimeProvider.System"/>.</summary>
+    /// <summary>The default clock, and the default timers of <see cref="SetTimer"/> (a .NET seam for upstream's <c>Date.now</c> and
+    /// <c>setTimeout</c>); default <see cref="System.TimeProvider.System"/>. A fake one drives both, as fake timers do.</summary>
     public TimeProvider? TimeProvider { get; init; }
+    /// <summary>
+    /// Arms the timers of the Session, the scheduler, and its tasks: pacing progress commits, freeing idle memory (background), and, without
+    /// <see cref="OnWake"/>, resuming sleeping tasks; and the timers of <see cref="ITaskRuntime.SetTimer"/>. The environment, file watcher
+    /// and image worker keep their own timers. Default: <see cref="TimeProvider"/>'s timers, which never keep the process alive and never
+    /// decline a background timer. Tests can pass fake timers; a host can keep timers off a process that should hibernate.
+    /// </summary>
+    public SetTimer? SetTimer { get; init; }
+    /// <summary>
+    /// Wakes the process for sleeping tasks instead of a <see cref="SetTimer"/> timer. Without it, while scheduling runs, a timer resumes
+    /// sleeping tasks when they are due. With it, the Harness arms no timer for them: it calls <c>OnWake</c> after open and whenever
+    /// <see cref="IHarness.Wake"/> changes, and the host arms its own wakeup and calls <see cref="IHarness.Resume"/> when it fires. Called on
+    /// the thread pool, never on the Session line, after the commit that changed the value was adopted, so a host arms a recovery wakeup
+    /// before calls that can start work; one call at a time. It may call <c>Wake</c> and <c>Resume</c>, and must not block. A throw is
+    /// reported, and the value is offered again at the next change.
+    /// </summary>
+    public Action<Wake>? OnWake { get; init; }
     /// <summary>
     /// Receives failures that do not fail the calling operation, such as a throwing hook or listener, and the error that fails the Session,
     /// once. Its own throw is dropped. (An <c>async void</c> handler's exception escapes to the thread pool, which no caller can contain.)
@@ -816,11 +836,21 @@ public sealed record HarnessOptions
     /// Opens for reading only, as a viewer of a session that another process drives, for example a synced copy on a device that only shows
     /// it (upstream <c>readOnly</c>). Open recovers nothing: a <c>running</c> task stays as committed. Every commit with writes throws
     /// <see cref="ReadOnlySessionException"/> before it reaches Storage, and so do <see cref="IHarness.Resume"/> and every call that enables
-    /// scheduling; the Harness stays usable for reads and watches. Reopen without it to write. Unrelated to the device host's read-only agent
-    /// switch, which removes writing tools from an agent that still runs.
+    /// scheduling; the Harness stays usable for reads and watches. <see cref="IHarness.Wake"/> is always inactive, and <see cref="OnWake"/> is
+    /// never called. Reopen without it to write. Unrelated to the device host's read-only agent switch, which removes writing tools from an
+    /// agent that still runs.
     /// </summary>
     public bool ReadOnly { get; init; }
 }
+
+/// <summary>
+/// When a Session next needs a running process (<see cref="IHarness.Wake"/>; upstream <c>Wake</c>). <see cref="Active"/>: some task can run
+/// now or is running, so a process that dies must be woken again soon, for example by a recovery alarm. <see cref="At"/>: the earliest
+/// sleep not yet due, when there is one, on the <see cref="HarnessOptions.Now"/> clock. Neither: nothing needs a process until new work is
+/// submitted. Tasks blocked on a missing or unmigratable definition, <c>completing</c> tasks, and waits on live tasks do not count; the
+/// work they wait for does.
+/// </summary>
+public sealed record Wake(bool Active, double? At = null);
 
 // ─── Inspection and context ─────────────────────────────────────────────
 
@@ -844,6 +874,8 @@ public enum TaskInspectionKind
     Ready,
     /// <summary>It waits for live tasks.</summary>
     Waiting,
+    /// <summary>It sleeps until the Harness clock reaches <see cref="TaskInspectionState.Until"/>.</summary>
+    Sleeping,
     /// <summary>Its outcome is held until its ordinary owned work drains.</summary>
     Completing,
     /// <summary>No registered definition can take it.</summary>
@@ -868,6 +900,8 @@ public sealed record TaskInspectionState(TaskInspectionKind Kind)
     public bool Migrates { get; init; }
     /// <summary>For <see cref="TaskInspectionKind.Waiting"/>: the live tasks it waits for.</summary>
     public ImmutableArray<TaskId> On { get; init; } = [];
+    /// <summary>For <see cref="TaskInspectionKind.Sleeping"/>: when it is due, on the Harness clock.</summary>
+    public double? Until { get; init; }
     /// <summary>For <see cref="TaskInspectionKind.Blocked"/>: why.</summary>
     public BlockedReason? Reason { get; init; }
     /// <summary>For a failed migration: the error.</summary>
@@ -1122,9 +1156,16 @@ public interface IHarness : ISession
     /// Enables task scheduling. Idempotent; throws after close, and <see cref="ReadOnlySessionException"/> on a read-only Harness
     /// (<see cref="HarnessOptions.ReadOnly"/>). Calls that ask for progress enable it too: <c>Conversation.SubmitAsync</c>,
     /// <c>CompactAsync</c>, <c>AbortAsync</c>, <c>Submission.WaitAsync</c>, <see cref="WaitForTaskAsync"/>, <see cref="WaitForIdleAsync"/>
-    /// and <c>Conversation.WaitForIdleAsync</c>. Read-only viewers never do.
+    /// and <c>Conversation.WaitForIdleAsync</c>. Read-only viewers never do. Sleeping tasks that are due become runnable, so a host wakeup,
+    /// such as an alarm, calls this.
     /// </summary>
     void Resume();
+    /// <summary>
+    /// When this Session next needs a running process, from the scheduler's memory: <c>Active</c> while some task can run now or is running,
+    /// <c>At</c> for the earliest sleep (upstream <c>wake()</c>). Answers also while scheduling is paused; throws after close. A host that
+    /// wakes the process itself arms from it and calls <see cref="Resume"/> when woken; see <see cref="HarnessOptions.OnWake"/>.
+    /// </summary>
+    Wake Wake();
 
     /// <summary>Returns the reserved root conversation, creating it with <paramref name="agent"/> and <paramref name="init"/> in one commit
     /// when absent.</summary>

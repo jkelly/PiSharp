@@ -29,15 +29,25 @@
 // - AbortController becomes CancellationSignal (a token plus its reason); an invocation's handler context is the scheduler context bound
 //   to that signal, so waits bound to it fail with the reason (the ended error, or OperationCanceledException for an abort mark or close,
 //   upstream's AbortError).
-// - setTimeout becomes HarnessOptions.TimeProvider timers: sleeps wait in Task.Delay steps and recheck the Harness clock; the idle context
-//   expiry is one ITimer. .NET timers never keep a process alive, so the expiry timer is always kept (upstream keeps it only where it can
-//   be unreferenced).
+// - setTimeout becomes the host timers of HarnessOptions.SetTimer (Timers.cs; by default TimeProvider timers, which never keep a process
+//   alive and never decline). The host's SetTimer, its disarm actions and OnWake are host code, so none runs under the lock: the sleep timer
+//   and the idle context expiry timer are armed and disarmed under a second lock of their own (timerGate), which may take the main lock
+//   briefly but is never taken under it. A timer's holder is installed before it is armed, so one that fires synchronously finds itself.
+//   Upstream's #scheduleWake microtask becomes one thread-pool job at a time (wakeRunning, wakeDirty): a change while it runs runs it
+//   again, so OnWake calls never overlap and none is lost.
 // - Walks up and down the ownership tree are loops, never recursion, as upstream's are: chains can be deeper than the stack.
 //
 // Pi v1.5.0 sync (area harness-options): the models are a function read at each access (7ec1f648e), and the readOnly option (be14d9732):
 // open loads live tasks as committed, running ones included, and schedules no reconcile; Resume throws ReadOnlySessionException; no
-// reconcile is ever scheduled. Upstream's #scheduleWake and wake() guards wait on area sleep. The citation stays on v1.2.0 until the file's
-// other areas land.
+// reconcile is ever scheduled. The citation stays on v1.2.0 until the file's other areas land.
+//
+// Pi v1.5.0 sync (area sleep): durable sleeps, host timers and wake() (f75b3240a, ec1be23eb). A sleeping task holds no invocation:
+// `sleeping` holds the sleeping live tasks, WakeDueLocked makes the due ones reservation candidates at resume, when the sleep timer fires
+// and at every reservation pass, and a pass skips a sleep not yet due (an abort mark ends a sleep). Without OnWake the earliest sleep keeps
+// a foreground timer while scheduling runs; with it, OnWake hears each change of Wake(). A read-only scheduler never schedules a wake and
+// answers inactive (be14d9732). runtime.SleepUntilAsync commits the sleep; runtime.SetTimer's timers are disarmed at the invocation's end;
+// the idle context expiry is a background timer. Each pass, inspection and wake reads the Harness clock once, outside the lock. Upstream's
+// reconcile work in wake() (440a5fcdb) and its idle index are other areas': Wake() scans the live tasks as f75b3240a's does.
 using System.Collections;
 using System.Collections.Immutable;
 using PiSharp.Durable.Chord;
@@ -72,7 +82,10 @@ internal sealed record DurableTaskSchedulerOptions
     /// <summary>Builds a conversation's environment with <c>HarnessOptions.Env</c>.</summary>
     public required Func<ConversationId, DurableContext, Task<IExecutionEnv?>> Env { get; init; }
     public required Func<double> Now { get; init; }
-    public required TimeProvider TimeProvider { get; init; }
+    /// <summary><see cref="HarnessOptions.OnWake"/>: replaces the timer for sleeping tasks.</summary>
+    public Action<Wake>? OnWake { get; init; }
+    /// <summary>The host's timers (<see cref="HarnessOptions.SetTimer"/>).</summary>
+    public required HostTimers Timers { get; init; }
     public required Action<Exception> Report { get; init; }
     /// <summary>Harness cleanup staged in the commit that makes an outcome the scheduler wrote itself terminal.</summary>
     public required SettleOutcome SettleOutcome { get; init; }
@@ -91,7 +104,7 @@ internal sealed record DurableTaskSchedulerOptions
 /// The durable task scheduler of one Harness (upstream <c>TaskScheduler</c>).
 /// </summary>
 /// <remarks>
-/// <para><c>live</c> mirrors every committed non-terminal task record: pending, running, waiting and completing. The synchronous commit
+/// <para><c>live</c> mirrors every committed non-terminal task record: pending, running, waiting, sleeping and completing. The synchronous commit
 /// listener updates it on the Session line, so code running on the line reads exactly the committed state from it.</para>
 /// <para>Tasks and conversations form one ownership tree (spec §5.5): a task's parent is its owner task, or its conversation; a conversation's
 /// parent is its owner task, if any. Walks up that tree decide what reaches one task: a cancelling owner, a scope. <c>below</c> lists the tree
@@ -109,10 +122,8 @@ internal sealed record DurableTaskSchedulerOptions
 internal sealed class DurableTaskScheduler
 {
     private const int ScanPageSize = 256;
-    /// <summary>Longest delay one timer step takes; longer sleeps wait in several steps.</summary>
-    private const double MaxTimerDelay = 2_147_483_647;
     private static readonly DurableTaskStatus[] LiveStatuses =
-        [DurableTaskStatus.Pending, DurableTaskStatus.Running, DurableTaskStatus.Waiting, DurableTaskStatus.Completing];
+        [DurableTaskStatus.Pending, DurableTaskStatus.Running, DurableTaskStatus.Waiting, DurableTaskStatus.Sleeping, DurableTaskStatus.Completing];
 
     private readonly Session session;
     private readonly IStorage storage;
@@ -122,7 +133,8 @@ internal sealed class DurableTaskScheduler
     private readonly Func<Settings> settings;
     private readonly Func<ConversationId, DurableContext, Task<IExecutionEnv?>> env;
     private readonly Func<double> now;
-    private readonly TimeProvider timeProvider;
+    private readonly Action<Wake>? onWake;
+    private readonly HostTimers timers;
     private readonly Action<Exception> report;
     private readonly SettleOutcome settleOutcome;
     private readonly Func<Transaction, ConversationId, Task> withdrawInputs;
@@ -139,8 +151,20 @@ internal sealed class DurableTaskScheduler
     /// <c>settings.ContextRetentionMs</c> of idleness, and at close.
     /// </summary>
     private readonly Dictionary<ConversationId, KeptContext> contexts = [];
-    /// <summary>Timer for the earliest expiry of an idle context.</summary>
-    private (double At, ITimer Timer)? expiry;
+    /// <summary>Guards the two timers below while they are armed or disarmed; taken before <see cref="gate"/>, never under it.</summary>
+    private readonly Lock timerGate = new();
+    /// <summary>Background timer for the earliest expiry of an idle context, unless the host declined it. Guarded by
+    /// <see cref="timerGate"/>.</summary>
+    private ArmedTimer? expiry;
+    /// <summary>When the earliest idle context expires, which <see cref="ApplyExpiry"/> arms <see cref="expiry"/> for.</summary>
+    private double? expiryDue;
+    /// <summary>Timer for the earliest sleep, without <c>OnWake</c> while scheduling runs. Guarded by <see cref="timerGate"/>.</summary>
+    private ArmedTimer? sleepTimer;
+    /// <summary>Last value given to <c>OnWake</c>, so an unchanged one is not repeated. Only the wake job reads and writes it.</summary>
+    private Wake? lastWake;
+    /// <summary>The wake job is queued or running; <see cref="wakeDirty"/> asks it for another round.</summary>
+    private bool wakeRunning;
+    private bool wakeDirty;
     private readonly Dictionary<TaskId, Invocation> invocations = [];
     private readonly Waiters<TaskId, TaskRecord> taskWaiters = new();
     /// <summary>Idle waiters by conversation; null waits for the whole Harness.</summary>
@@ -180,6 +204,8 @@ internal sealed class DurableTaskScheduler
     /// <c>restart</c>, so nothing of them or below them runs a phase again.
     /// </summary>
     private readonly OrderedSet<TaskId> abandoned;
+    /// <summary>Sleeping live tasks, due or not: the candidates of <see cref="WakeDueLocked"/>.</summary>
+    private readonly OrderedSet<TaskId> sleeping;
     /// <summary>Members iterated over the scheduler's sets, for tests that bound a pass's work (upstream's tests count
     /// <c>Set.prototype[Symbol.iterator]</c> entries).</summary>
     private readonly IterationCounter iterations = new();
@@ -213,7 +239,8 @@ internal sealed class DurableTaskScheduler
         settings = options.Settings;
         env = options.Env;
         now = options.Now;
-        timeProvider = options.TimeProvider;
+        onWake = options.OnWake;
+        timers = options.Timers;
         report = options.Report;
         settleOutcome = options.SettleOutcome;
         withdrawInputs = options.WithdrawInputs;
@@ -228,6 +255,7 @@ internal sealed class DurableTaskScheduler
         finalizeChecks = new(iterations);
         failFastChecks = new(iterations);
         abandoned = new(iterations);
+        sleeping = new(iterations);
     }
 
     /// <summary>Test probe: members iterated over the scheduler's sets so far (see <see cref="iterations"/>).</summary>
@@ -268,6 +296,7 @@ internal sealed class DurableTaskScheduler
             cascadePending = true;
             ScheduleReconcileLocked();
         }
+        ScheduleWake();
     }
 
     /// <summary>Test barrier: completes once the task has no live invocation, or its current invocation has fully ended.</summary>
@@ -304,13 +333,75 @@ internal sealed class DurableTaskScheduler
         }
     }
 
-    /// <summary>Enables scheduling. Idempotent; the kick does nothing once closing. A read-only scheduler throws
-    /// <see cref="ReadOnlySessionException"/>.</summary>
+    /// <summary>Enables scheduling, and makes sleeping tasks that are due runnable: a host wakeup, such as an alarm, calls this. Idempotent;
+    /// the kick does nothing once closing. A read-only scheduler throws <see cref="ReadOnlySessionException"/>.</summary>
     public void Resume()
     {
         if (readOnly) throw new ReadOnlySessionException("running tasks");
-        lock (gate) enabled = true;
+        var at = now();
+        lock (gate)
+        {
+            enabled = true;
+            WakeDueLocked(at);
+        }
         Kick();
+    }
+
+    /// <summary>
+    /// When the Session next needs a process (upstream <c>wake()</c>): <c>Active</c> while some task can run now or is running, <c>At</c> for
+    /// the earliest sleep not yet due. From memory; a task whose chain is not loaded yet counts as it would alone. A read-only scheduler runs
+    /// nothing, so it never needs a process.
+    /// </summary>
+    public Wake Wake()
+    {
+        if (readOnly) return new Wake(false);
+        var at = now();
+        double? earliest = null;
+        bool active;
+        var check = new List<TaskRecord>();
+        lock (gate)
+        {
+            active = invocations.Count > 0;
+            foreach (var record in live.Values)
+            {
+                var state = record.State;
+                if (state.Status == DurableTaskStatus.Completing) continue;
+                if (state is WaitingTaskState waiting && !record.AbortRequested && waiting.On.Any(live.ContainsKey)) continue;
+                if (state is SleepingTaskState asleep && !record.AbortRequested && asleep.Until > at)
+                {
+                    earliest = earliest is { } other ? Math.Min(other, asleep.Until) : asleep.Until;
+                    continue;
+                }
+                if (active) continue;
+                // An abort invocation waits for the live work below it, which counts itself.
+                if (record.AbortRequested && WaitingOnLocked(record, first: true).Count > 0) continue;
+                // An abort-marked task runs its handler or is orphaned; any other waits for a definition that can take it.
+                if (record.AbortRequested && record.AbortReason is null) active = true;
+                else check.Add(record);
+            }
+        }
+        if (!active && check.Count > 0) active = RunsNow(check);
+        return new Wake(active, earliest);
+    }
+
+    /// <summary>Whether a definition can take one of <paramref name="records"/>: the registry check <see cref="Wake"/> needs only while
+    /// nothing else is active. The snapshot is host code, so this runs outside the lock; a snapshot that throws is reported, and counts as
+    /// able.</summary>
+    private bool RunsNow(List<TaskRecord> records)
+    {
+        IRegistrySnapshot snapshot;
+        try
+        {
+            snapshot = registry.Snapshot();
+        }
+        catch (Exception error)
+        {
+            report(error);
+            return true;
+        }
+        foreach (var record in records)
+            if (Fit(record, snapshot.GetTask(record.Kind)).Reason is null) return true;
+        return false;
     }
 
     /// <summary>
@@ -558,28 +649,74 @@ internal sealed class DurableTaskScheduler
                 else if (retention > 0) kept.IdleSince ??= at;
                 else contexts.Remove(conversationId);
             }
-            ScheduleExpiryLocked(retention, at);
+            ComputeExpiryLocked(retention);
         }
+        ApplyExpiry();
     }
 
-    /// <summary>Runs <see cref="SettleIdle"/> when the earliest idle context expires.</summary>
-    private void ScheduleExpiryLocked(double retention, double at)
+    /// <summary>Records when the earliest idle context expires, for <see cref="ApplyExpiry"/>, which the caller runs once out of the
+    /// lock.</summary>
+    private void ComputeExpiryLocked(double retention)
     {
         double? due = null;
         foreach (var kept in contexts.Values)
             if (kept.IdleSince is { } since && (due is null || since + retention < due)) due = since + retention;
-        if (expiry is { } current && current.At == due) return;
-        expiry?.Timer.Dispose();
-        expiry = null;
-        if (due is not { } when || closing) return;
-        var holder = new StrongBoxTimer();
-        var timer = timeProvider.CreateTimer(_ =>
+        expiryDue = due;
+    }
+
+    /// <summary>
+    /// Runs <see cref="SettleIdle"/> when the earliest idle context expires, on a background timer, which never keeps the process alive.
+    /// Where the host declines it, none is kept: task changes alone check expiry. Never called under the lock.
+    /// </summary>
+    private void ApplyExpiry()
+    {
+        lock (timerGate)
         {
-            lock (gate) if (expiry is { } scheduled && ReferenceEquals(scheduled.Timer, holder.Timer)) expiry = null;
-            SettleIdle();
-        }, null, TimeSpan.FromMilliseconds(Math.Min(Math.Max(0, when - at), MaxTimerDelay)), Timeout.InfiniteTimeSpan);
-        holder.Timer = timer;
-        expiry = (when, timer);
+            double? due;
+            bool closingNow;
+            lock (gate)
+            {
+                due = expiryDue;
+                closingNow = closing;
+            }
+            if (expiry is { } current && current.At == due) return;
+            var replaced = expiry;
+            expiry = null;
+            Disarm(replaced);
+            if (due is not { } when || closingNow) return;
+            var armed = new ArmedTimer(when);
+            expiry = armed;
+            var disarm = timers.Background(() => Contained(() =>
+            {
+                lock (timerGate) if (ReferenceEquals(expiry, armed)) expiry = null;
+                SettleIdle();
+            }), when - now());
+            if (disarm is null)
+            {
+                if (ReferenceEquals(expiry, armed)) expiry = null;
+                return;
+            }
+            armed.Disarm = disarm;
+        }
+    }
+
+    /// <summary>Disarms a scheduler timer; the host's disarm is host code, and a throw is reported.</summary>
+    private void Disarm(ArmedTimer? armed)
+    {
+        if (armed?.Disarm is { } disarm) Contained(disarm);
+    }
+
+    /// <summary>Runs a timer callback or a host action, reporting a throw: on a timer thread it would end the process.</summary>
+    private void Contained(Action action)
+    {
+        try
+        {
+            action();
+        }
+        catch (Exception error)
+        {
+            report(error);
+        }
     }
 
     // ─── Ownership ───────────────────────────────────────────────────────────
@@ -928,6 +1065,7 @@ internal sealed class DurableTaskScheduler
         {
             var node = NodeOf(record);
             live.Remove(id);
+            sleeping.Remove(id);
             intent.Remove(id);
             runnable.Remove(id);
             finalizeChecks.Remove(id);
@@ -958,6 +1096,8 @@ internal sealed class DurableTaskScheduler
             runnable.Add(id);
         }
         if (record.State is WaitingTaskState waitingState) foreach (var on in waitingState.On) AddTo(waiters, on, id);
+        if (record.State.Status == DurableTaskStatus.Sleeping) sleeping.Add(id);
+        else sleeping.Remove(id);
     }
 
     /// <summary>The nearest live task above ended ordinary work may be free now: one holding its outcome, or an aborting one.</summary>
@@ -1254,8 +1394,7 @@ internal sealed class DurableTaskScheduler
             closing = true;
             sealedInvocations.AddRange(invocations.Values);
             contexts.Clear();
-            expiry?.Timer.Dispose();
-            expiry = null;
+            expiryDue = null;
             var error = HarnessUtil.ClosedError(session);
             taskWaiters.RejectAll(error);
             idleWaiters.RejectAll(error);
@@ -1268,7 +1407,110 @@ internal sealed class DurableTaskScheduler
         {
             report(error);
         }
+        lock (timerGate)
+        {
+            Disarm(expiry);
+            expiry = null;
+            Disarm(sleepTimer);
+            sleepTimer = null;
+        }
     }
+
+    /// <summary>
+    /// Recomputes the wake on the thread pool, never on the Session line (upstream <c>#scheduleWake</c>'s microtask): arms the built-in
+    /// timer, or tells <c>OnWake</c> of a change. One job runs at a time; a change while it runs makes it run again.
+    /// </summary>
+    private void ScheduleWake()
+    {
+        lock (gate)
+        {
+            if (closing || readOnly) return;
+            wakeDirty = true;
+            if (wakeRunning) return;
+            wakeRunning = true;
+        }
+        ThreadPool.UnsafeQueueUserWorkItem(static scheduler => scheduler.RunWake(), this, preferLocal: false);
+    }
+
+    private void RunWake()
+    {
+        while (true)
+        {
+            bool timer;
+            lock (gate)
+            {
+                if (!wakeDirty || closing)
+                {
+                    wakeRunning = false;
+                    return;
+                }
+                wakeDirty = false;
+                timer = enabled;
+            }
+            try
+            {
+                var wake = Wake();
+                if (onWake is null)
+                {
+                    ArmTimer(timer ? wake.At : null);
+                    continue;
+                }
+                if (lastWake == wake) continue;
+                try
+                {
+                    onWake(wake);
+                    // Only a delivered wake counts: after a throw, the next change or kick offers it again.
+                    lastWake = wake;
+                }
+                catch (Exception error)
+                {
+                    report(error);
+                }
+            }
+            catch (Exception error)
+            {
+                report(error);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Keeps the timer for the earliest sleep. It paces work, unlike the context expiry timer: a host that declines it gets the default
+    /// timer. Rechecks the clock when it fires, so a wake before its time only arms it again.
+    /// </summary>
+    private void ArmTimer(double? at)
+    {
+        lock (timerGate)
+        {
+            if (sleepTimer is { } current && current.At == at) return;
+            var replaced = sleepTimer;
+            sleepTimer = null;
+            Disarm(replaced);
+            bool closingNow;
+            lock (gate) closingNow = closing;
+            if (at is not { } when || closingNow) return;
+            var armed = new ArmedTimer(when);
+            sleepTimer = armed;
+            armed.Disarm = timers.Foreground(() => Contained(() =>
+            {
+                lock (timerGate) if (ReferenceEquals(sleepTimer, armed)) sleepTimer = null;
+                var due = now();
+                lock (gate) WakeDueLocked(due);
+                Kick();
+            }), when - now());
+        }
+    }
+
+    /// <summary>Makes every sleeping task whose time has come by <paramref name="at"/> a reservation candidate.</summary>
+    private void WakeDueLocked(double at)
+    {
+        foreach (var id in sleeping)
+            if (live.TryGetValue(id, out var record) && !NotDue(record, at)) runnable.Add(id);
+    }
+
+    /// <summary>A sleep whose time the clock has not reached at <paramref name="at"/>; an abort mark ends a sleep.</summary>
+    private static bool NotDue(TaskRecord record, double at) =>
+        record.State is SleepingTaskState asleep && !record.AbortRequested && asleep.Until > at;
 
     /// <summary>Schedules a reservation pass on the thread pool (upstream <c>#kick</c>).</summary>
     private void Kick() => Kick(onLine: false);
@@ -1288,6 +1530,7 @@ internal sealed class DurableTaskScheduler
     /// </summary>
     private void Kick(bool onLine)
     {
+        ScheduleWake();
         lock (gate)
         {
             if (!enabled || closing)
@@ -1439,10 +1682,17 @@ internal sealed class DurableTaskScheduler
                     }
                 }
                 await LoadScopesAsync(false).ConfigureAwait(false);
+                // Every pass picks up sleeps whose time has come: a pass started by any change may be the first to run after a deadline,
+                // and the wake it schedules no longer keeps a timer for a due sleep.
+                var at = now();
                 // Taken once per pass, and only when some task is a candidate.
                 IRegistrySnapshot? snapshot = null;
                 List<TaskId> candidates;
-                lock (gate) candidates = [.. runnable];
+                lock (gate)
+                {
+                    WakeDueLocked(at);
+                    candidates = [.. runnable];
+                }
                 foreach (var id in candidates)
                 {
                     TaskRecord record;
@@ -1454,8 +1704,9 @@ internal sealed class DurableTaskScheduler
                             runnable.Remove(id);
                             continue;
                         }
-                        // It returns once what it waits for ends, its record changes, or the work below it ends.
-                        if (WaitingOnLocked(found, first: true).Count > 0)
+                        // It returns once what it waits for ends, its record changes, or the work below it ends; a sleep at the first pass after
+                        // its time comes, which the timer, Resume(), or any change starts.
+                        if (WaitingOnLocked(found, first: true).Count > 0 || NotDue(found, at))
                         {
                             runnable.Remove(id);
                             continue;
@@ -1542,6 +1793,7 @@ internal sealed class DurableTaskScheduler
             TaskState next = state switch
             {
                 WaitingTaskState waiting => new WaitingTaskState(migrated.Checkpoint, waiting.On, waiting.Policy),
+                SleepingTaskState asleep => new SleepingTaskState(migrated.Checkpoint, asleep.Until),
                 RunningTaskState => new RunningTaskState(migrated.Checkpoint),
                 _ => new PendingTaskState(migrated.Checkpoint),
             };
@@ -1574,20 +1826,22 @@ internal sealed class DurableTaskScheduler
     public async Task<(HarnessScheduling Scheduling, ImmutableArray<TaskInspection> Tasks)> InspectAsync(IRegistrySnapshot snapshot)
     {
         await LoadScopesAsync(false).ConfigureAwait(false);
+        var at = now();
         lock (gate)
         {
-            var tasks = live.Values.Select(record => new TaskInspection(record, InspectTaskLocked(record, snapshot))).ToImmutableArray();
+            var tasks = live.Values.Select(record => new TaskInspection(record, InspectTaskLocked(record, snapshot, at))).ToImmutableArray();
             var scheduling = closing ? HarnessScheduling.Closing : enabled ? HarnessScheduling.Running : HarnessScheduling.Paused;
             return (scheduling, tasks);
         }
     }
 
-    private TaskInspectionState InspectTaskLocked(TaskRecord record, IRegistrySnapshot snapshot)
+    private TaskInspectionState InspectTaskLocked(TaskRecord record, IRegistrySnapshot snapshot, double at)
     {
         if (invocations.ContainsKey(record.Id)) return new TaskInspectionState(TaskInspectionKind.Running);
         if (record.State.Status == DurableTaskStatus.Completing) return new TaskInspectionState(TaskInspectionKind.Completing);
         var on = WaitingOnLocked(record);
         if (on.Count > 0) return new TaskInspectionState(TaskInspectionKind.Waiting) { On = [.. on] };
+        if (NotDue(record, at)) return new TaskInspectionState(TaskInspectionKind.Sleeping) { Until = ((SleepingTaskState)record.State).Until };
         var fit = Fit(record, snapshot.GetTask(record.Kind));
         if (fit.Reason is { } reason) return new TaskInspectionState(TaskInspectionKind.Blocked) { Reason = reason, Error = fit.Error };
         if (fit.Migrates && fit.Task!.Definition.Migrate is null)
@@ -1668,8 +1922,8 @@ internal sealed class DurableTaskScheduler
     }
 
     /// <summary>
-    /// Precedence rules for a run invocation, on the line. Rules 1 (terminal, <c>completing</c>, or <c>waiting</c>) and 2 (closing) are
-    /// applied by <see cref="StepAsync"/>. Returns whether the invocation continues with the next phase.
+    /// Precedence rules for a run invocation, on the line. Rules 1 (terminal, <c>completing</c>, <c>waiting</c>, or <c>sleeping</c>) and 2
+    /// (closing) are applied by <see cref="StepAsync"/>. Returns whether the invocation continues with the next phase.
     /// </summary>
     private Decision Decide(Transaction tx, RunningTask current, PhaseResult? previous, RunState state)
     {
@@ -1741,8 +1995,8 @@ internal sealed class DurableTaskScheduler
     }
 
     /// <summary>
-    /// One synchronous decision on the Session line. A task that is no longer running (rule 1: terminal, <c>completing</c>, or
-    /// <c>waiting</c>) or a closing Harness (rule 2) ends the invocation without a write; otherwise <paramref name="decide"/> may stage a write
+    /// One synchronous decision on the Session line. A task that is no longer running (rule 1: terminal, <c>completing</c>, <c>waiting</c>,
+    /// or <c>sleeping</c>) or a closing Harness (rule 2) ends the invocation without a write; otherwise <paramref name="decide"/> may stage a write
     /// and returns whether the invocation continues. Ending happens inside the callback, before a fault's Harness cleanup. A rejected step,
     /// such as admission after close, also ends the invocation.
     /// </summary>
@@ -1805,6 +2059,7 @@ internal sealed class DurableTaskScheduler
     {
         NextTaskState.Check(next);
         if (next is WaitingTaskState waiting) await ValidateWaitAsync(tx, invocation, current, waiting.On, waiting.Policy).ConfigureAwait(false);
+        if (next is SleepingTaskState asleep) ValidateSleep(invocation, current.Id, asleep.Until);
         if (next is TerminalTaskState terminal)
         {
             var overlay = OverlayOf(tx);
@@ -1901,10 +2156,12 @@ internal sealed class DurableTaskScheduler
         }
     }
 
-    /// <summary>Ends an invocation: its runtime operations reject from now on, its signal aborts, its watches stop, and its task is free.</summary>
+    /// <summary>Ends an invocation: its runtime operations reject from now on, its signal aborts, its watches stop, its timers are disarmed,
+    /// and its task is free.</summary>
     private void End(Invocation invocation)
     {
         List<IWatchHandle<JsonObjectValue?>> watches;
+        List<Action> disarms = [];
         lock (gate)
         {
             if (invocation.Ended) return;
@@ -1915,8 +2172,15 @@ internal sealed class DurableTaskScheduler
                 if (live.ContainsKey(invocation.TaskId)) runnable.Add(invocation.TaskId);
             }
             watches = [.. invocation.Watches];
+            foreach (var slot in invocation.Timers)
+            {
+                slot.Done = true;
+                if (slot.Disarm is { } disarm) disarms.Add(disarm);
+            }
+            invocation.Timers.Clear();
         }
         foreach (var watch in watches) _ = watch.StopAsync();
+        foreach (var disarm in disarms) Contained(disarm);
         // Pending waits bound to the invocation, such as a tool's WaitForTaskAsync, reject with it.
         Signal(invocation, EndedError(invocation));
     }
@@ -2038,6 +2302,8 @@ internal sealed class DurableTaskScheduler
         public DurableContext Context { get; } = context;
         /// <summary>Watches acquired through the runtime; stopped at invocation end. Guarded by the scheduler lock.</summary>
         public HashSet<IWatchHandle<JsonObjectValue?>> Watches { get; } = [];
+        /// <summary>Timers armed through the runtime; disarmed at invocation end. Guarded by the scheduler lock.</summary>
+        public HashSet<TimerSlot> Timers { get; } = [];
         private volatile bool ended;
         public bool Ended { get => ended; set => ended = value; }
         public TaskCompletionSource Done { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -2156,9 +2422,19 @@ internal sealed class DurableTaskScheduler
         public double? IdleSince { get; set; } = idleSince;
     }
 
-    private sealed class StrongBoxTimer
+    /// <summary>A scheduler timer: when it is due, and its disarm once armed.</summary>
+    private sealed class ArmedTimer(double at)
     {
-        public ITimer? Timer { get; set; }
+        public double At { get; } = at;
+        public Action? Disarm { get; set; }
+    }
+
+    /// <summary>A timer armed through a task runtime. Guarded by the scheduler lock: <see cref="Done"/> once disarmed, fired, or ended with
+    /// its invocation.</summary>
+    private sealed class TimerSlot
+    {
+        public Action? Disarm { get; set; }
+        public bool Done { get; set; }
     }
 
     /// <summary>Counts the members the scheduler's sets yield; they are iterated under the scheduler lock.</summary>
@@ -2235,9 +2511,8 @@ internal sealed class DurableTaskScheduler
     // ─── Invocation runtime ──────────────────────────────────────────────────
 
     /// <summary>The task runtime of one invocation (upstream <c>#runtime</c>).</summary>
-    private sealed class Runtime(DurableTaskScheduler scheduler, Invocation invocation, Phase phase) : ITaskRuntime, IHookRunner, ITaskTimeSource
+    private sealed class Runtime(DurableTaskScheduler scheduler, Invocation invocation, Phase phase) : ITaskRuntime, IHookRunner
     {
-        public TimeProvider TimeProvider => scheduler.timeProvider;
         public TaskId TaskId => invocation.TaskId;
         public ConversationId ConversationId => invocation.ConversationId;
         public CancellationToken Signal => invocation.Controller.Token;
@@ -2330,7 +2605,15 @@ internal sealed class DurableTaskScheduler
             }, context);
         }
 
-        public Task SleepAsync(double until, DurableContext context) => scheduler.SleepAsync(invocation, until, context);
+        public Task SleepUntilAsync(double until, JsonValue checkpoint, DurableContext context)
+        {
+            ArgumentNullException.ThrowIfNull(checkpoint);
+            return Gated(async (tx, current) =>
+            {
+                await scheduler.CommitStateAsync(tx, invocation, current, NextTaskState.Sleeping(checkpoint, until)).ConfigureAwait(false);
+                return true;
+            }, context);
+        }
 
         public Task<TaskRecord?> GetTaskAsync(TaskId id, DurableContext context) =>
             Read(() => scheduler.session.ReadOnLineAsync(() => scheduler.storage.GetTaskAsync(id, context)));
@@ -2425,6 +2708,7 @@ internal sealed class DurableTaskScheduler
                 .ConfigureAwait(false);
             var retention = scheduler.ContextRetentionMs();
             var stamp = scheduler.now();
+            var expires = false;
             lock (scheduler.gate)
             {
                 // Keep it unless the invocation ended or a concurrent read already kept a newer range. A task no longer running ends its
@@ -2439,10 +2723,12 @@ internal sealed class DurableTaskScheduler
                     else if (retention > 0)
                     {
                         scheduler.contexts[conversationId] = new KeptContext(range, kept?.IdleSince ?? stamp);
-                        scheduler.ScheduleExpiryLocked(retention, stamp);
+                        scheduler.ComputeExpiryLocked(retention);
+                        expires = true;
                     }
                 }
             }
+            if (expires) scheduler.ApplyExpiry();
             return view;
         });
 
@@ -2450,6 +2736,46 @@ internal sealed class DurableTaskScheduler
         {
             if (invocation.Ended) throw EndedError(invocation);
             return scheduler.now();
+        }
+
+        public Action SetTimer(Action callback, double delayMs)
+        {
+            ArgumentNullException.ThrowIfNull(callback);
+            var slot = new TimerSlot();
+            lock (scheduler.gate)
+            {
+                // An ended invocation's timers never fire.
+                if (invocation.Ended) return static () => { };
+                invocation.Timers.Add(slot);
+            }
+            var disarm = scheduler.timers.Foreground(() => scheduler.Contained(() =>
+            {
+                lock (scheduler.gate)
+                {
+                    slot.Done = true;
+                    invocation.Timers.Remove(slot);
+                }
+                if (!invocation.Ended) callback();
+            }), delayMs);
+            bool done;
+            lock (scheduler.gate)
+            {
+                done = slot.Done;
+                if (!done) slot.Disarm = disarm;
+            }
+            // Ended with its invocation, or fired, while it was armed: End found nothing to disarm.
+            if (done) scheduler.Contained(disarm);
+            return () =>
+            {
+                Action? armed;
+                lock (scheduler.gate)
+                {
+                    armed = slot.Done ? null : slot.Disarm;
+                    slot.Done = true;
+                    invocation.Timers.Remove(slot);
+                }
+                armed?.Invoke();
+            };
         }
 
         public void Report(Exception error)
@@ -2543,24 +2869,11 @@ internal sealed class DurableTaskScheduler
         }
     }
 
-    /// <summary>Waits until the Harness clock reaches <paramref name="until"/>, rechecking it after every timer.</summary>
-    private async Task SleepAsync(Invocation invocation, double until, DurableContext callContext)
+    /// <summary>A sleep's <c>until</c> is a time on the Harness clock; an abort handler cannot sleep (upstream <c>validateSleep</c>).</summary>
+    private static void ValidateSleep(Invocation invocation, TaskId task, double until)
     {
-        if (invocation.Ended) throw EndedError(invocation);
-        var signal = callContext.Signal is { } own ? CancellationSignal.Any(invocation.Controller, own) : invocation.Controller;
-        while (true)
-        {
-            if (signal.Token.IsCancellationRequested) throw signal.Error();
-            var remaining = until - now();
-            if (remaining <= 0) return;
-            try
-            {
-                await Task.Delay(TimeSpan.FromMilliseconds(Math.Min(remaining, MaxTimerDelay)), timeProvider, signal.Token).ConfigureAwait(false);
-            }
-            catch (OperationCanceledException) when (signal.Token.IsCancellationRequested)
-            {
-                throw signal.Error();
-            }
-        }
+        if (invocation.Mode == InvocationMode.Abort) throw new InvalidOperationException($"Abort handler of task {task} cannot sleep");
+        if (!double.IsFinite(until) || until < 0)
+            throw new ArgumentException($"Task {task} cannot sleep until {Internal.PiAi.Validation.Js.NumberToString(until)}: not a time in milliseconds");
     }
 }

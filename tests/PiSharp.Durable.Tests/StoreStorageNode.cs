@@ -8,7 +8,8 @@
 // lifecycle, ownership, structured, submissions, task-graph, tasks-recovery, tools-recovery, view); every one runs on the store fresh and,
 // where the group has reopen cases, across reopen. Not rerun: the groups of upstream's list that open their own SQLite file
 // (input-entries, nested-tools, nested-tools-restart, read-only, scheduler-indexes, scheduler-retention; ports that take no storage) and
-// the files later areas port (after-run, blocked, continue, restart-failure, sleep, tool-hooks, turn-limit).
+// the files later areas port (after-run, blocked, continue, restart-failure, tool-hooks, turn-limit). Area sleep adds harness.sleep.store.*:
+// its reopen case opens the file as a StoreStorage, and its MemoryStorage cases run on a fresh StoreStorage.
 using PiSharp.Durable;
 using PiSharp.Durable.Sqlite;
 
@@ -60,5 +61,6 @@ internal static partial class Program
         })),
         .. ToolsRecoveryTests.Cases("harness.tools-recovery.store.", () => StoreFile("tools-recovery-store")),
         .. ViewTests.Cases("harness.view.store.", () => Task.FromResult(FreshStore("view-store"))),
+        .. SleepTests.Cases("harness.sleep.store.", () => FreshStore("sleep-store"), path => OpenNodeSqliteStorageAsync(path)),
     ];
 }

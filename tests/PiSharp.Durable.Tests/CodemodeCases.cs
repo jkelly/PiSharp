@@ -16,6 +16,8 @@
 //   count of all journal commits (fewer than 10). The other commits only record acknowledged counts, and their number is timing: a commit
 //   here runs off the call's scheduler, so the VM acknowledges results while it is in flight, and those make one more commit after it (5 to
 //   54 journal commits in all, by VM and storage speed; 10 on a macOS runner).
+// - Pi v1.5.0 sync (area sleep): drops-a-global-s-result-that-arrives-after-the-script-finished is ec1be23eb's case; upstream's
+//   process.on("unhandledRejection") is TaskScheduler.UnobservedTaskException after a full collection.
 using System.Collections.Concurrent;
 using System.Text.RegularExpressions;
 using PiSharp.Codemode;
@@ -642,6 +644,33 @@ internal static partial class CodemodeTests
                 "const before = await nothing(); await tools.hold({}); return [before === undefined, (await nothing()) === undefined];");
             SameText(new("[true,true]", false), restarted.Result, "result");
             await restarted.Harness.CloseAsync(Context);
+        });
+
+        yield return Case(prefix + "drops-a-global-s-result-that-arrives-after-the-script-finished", async () =>
+        {
+            var late = new TaskCompletionSource<JsonValue?>(TaskCreationOptions.RunContinuationsAsynchronously);
+            var chat = new Chat([Global("slowly", _ => late.Task), Global("quickly", _ => Task.FromResult<JsonValue?>("quick"))]);
+            chat.Setup.Faux.SetResponses(Script("const pending = slowly(); await quickly(); return 1;"), Done);
+            var rejections = new ConcurrentQueue<Exception>();
+            EventHandler<UnobservedTaskExceptionEventArgs> onRejection = (_, args) => rejections.Enqueue(args.Exception);
+            TaskScheduler.UnobservedTaskException += onRejection;
+            try
+            {
+                var (harness, root) = await OpenChat(await SqliteStorage.OpenAsync(SqlitePath()), chat.Setup);
+                await (await root.SubmitAsync(SubmissionDraft.Input("go"), Context)).WaitAsync(Context);
+                SameText(new("1", false), await ResultOf(root), "result");
+                // The script's tool call has ended; its pending global resolves now.
+                late.SetResult("late");
+                await Task.Delay(20);
+                GC.Collect();
+                GC.WaitForPendingFinalizers();
+                Equal(0, rejections.Count, "unhandled rejections");
+                await harness.CloseAsync(Context);
+            }
+            finally
+            {
+                TaskScheduler.UnobservedTaskException -= onRejection;
+            }
         });
 
         yield return Case(prefix + "rejects-a-failed-tool-call-with-its-error-text-and-structured-output", async () =>

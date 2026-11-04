@@ -45,7 +45,7 @@ public interface ITaskRuntime : IDocumentObserver, IDocumentReader, IHookApi
 
     /// <summary>
     /// Commits on the Session line after rereading the task. Rejects when the task is terminal, the invocation ended, the Harness is
-    /// closing, or, in a run invocation, the task carries an abort mark. A returned state (running, waiting or terminal; see
+    /// closing, or, in a run invocation, the task carries an abort mark. A returned state (running, waiting, sleeping or terminal; see
     /// <see cref="NextTaskState"/>) replaces the task's state in the same commit; returning null leaves it unchanged.
     /// <c>tx.CreateTaskAsync()</c> defaults to the task's conversation, and appended entries carry the task as <c>byTaskId</c>. Inside the
     /// callback read only through the transaction: <c>SnapshotAsync</c>, <c>DocumentStateAsync</c>, <c>WatchDocAsync</c>,
@@ -91,9 +91,19 @@ public interface ITaskRuntime : IDocumentObserver, IDocumentReader, IHookApi
     Task<ContextView> ContextAsync(ConversationId conversationId, DurableContext context, EntryId? at = null);
     /// <summary>The Harness clock, in milliseconds.</summary>
     double Now();
+    /// <summary>
+    /// Calls <paramref name="callback"/> once after about <paramref name="delayMs"/> on the Harness's timer (<see cref="HarnessOptions.SetTimer"/>),
+    /// for pacing work inside a phase, such as throttled progress commits. Not durable: the invocation's end disarms it, and after its end
+    /// nothing is armed. Returns an action that disarms it. The callback runs on a timer thread; a throw from it is reported. Wait for time
+    /// between phases with <see cref="SleepUntilAsync"/>.
+    /// </summary>
+    Action SetTimer(Action callback, double delayMs);
     /// <summary>Forwards a non-fatal failure to <c>HarnessOptions.OnReport</c>.</summary>
     void Report(Exception error);
-    /// <summary>Resolves once the Harness clock reaches <paramref name="until"/>; rejects when the invocation or
-    /// <paramref name="context"/> is cancelled.</summary>
-    Task SleepAsync(double until, DurableContext context);
+    /// <summary>
+    /// Commits a sleep: the task holds no invocation until the Harness clock reaches <paramref name="until"/>, then resumes at
+    /// <paramref name="checkpoint"/>. Completes once the sleep is stored, not when the time comes; the phase returns right after. Returning
+    /// <see cref="NextTaskState.Sleeping"/> from <c>CommitAsync</c> is the same sleep, for one that must commit together with other writes.
+    /// </summary>
+    Task SleepUntilAsync(double until, JsonValue checkpoint, DurableContext context);
 }

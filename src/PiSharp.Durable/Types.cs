@@ -619,6 +619,9 @@ public enum DurableTaskStatus
     Running,
     /// <summary>Parked until every task it waits on is terminal.</summary>
     Waiting,
+    /// <summary>Parked without an invocation until the Harness clock reaches its time, then resumes at its checkpoint; an abort mark does
+    /// not wait for it.</summary>
+    Sleeping,
     /// <summary>Outcome decided; terminal once no ordinary owned work below is live.</summary>
     Completing,
     /// <summary>Permanently settled.</summary>
@@ -635,7 +638,7 @@ public enum JoinPolicy
 }
 
 /// <summary>Complete durable execution state of a task (upstream <c>TaskState</c>): a live state carries a checkpoint, a settling state
-/// an outcome. JSON key order: <c>status, checkpoint, on, policy</c> or <c>status, outcome</c>.</summary>
+/// an outcome. JSON key order: <c>status, checkpoint, on, policy</c>, <c>status, checkpoint, until</c> or <c>status, outcome</c>.</summary>
 public abstract class TaskState : DurableValue
 {
     private protected TaskState() { }
@@ -662,6 +665,10 @@ public abstract class TaskState : DurableValue
                 return new WaitingTaskState(RecordJson.Required(value, "checkpoint", what),
                     [.. RecordJson.Array(RecordJson.Required(value, "on", what), "on", what).Select(id => TaskId.FromNumber(RecordJson.Integer(id, "on", what)))],
                     RecordJson.Enum<JoinPolicy>(value, "policy", what));
+            case DurableTaskStatus.Sleeping:
+                RecordJson.OnlyKeys(value, what, "status", "checkpoint", "until");
+                return new SleepingTaskState(RecordJson.Required(value, "checkpoint", what),
+                    RecordJson.OptionalNumber(value, "until", what) ?? throw RecordJson.Invalid(what, "missing field \"until\""));
             default:
             {
                 RecordJson.OnlyKeys(value, what, "status", "outcome");
@@ -672,7 +679,7 @@ public abstract class TaskState : DurableValue
     }
 }
 
-/// <summary>A state that can still run: pending, running or waiting. It carries the complete durable state execution resumes from.</summary>
+/// <summary>A state that can still run: pending, running, waiting or sleeping. It carries the complete durable state execution resumes from.</summary>
 public abstract class LiveTaskState : TaskState
 {
     private protected LiveTaskState(JsonValue checkpoint) { Checkpoint = checkpoint ?? throw new ArgumentNullException(nameof(checkpoint)); }
@@ -720,6 +727,19 @@ public sealed class WaitingTaskState(JsonValue checkpoint, ImmutableArray<TaskId
     /// <inheritdoc/>
     public override JsonObjectValue ToJson() => new RecordJson.Writer().Add("status", "waiting").Add("checkpoint", Checkpoint)
         .Add("on", JsonValue.Array(On.Select(id => (JsonValue)id.ToJson()))).Add("policy", WireName.Of(Policy)).Build();
+}
+
+/// <summary><c>{status: "sleeping", checkpoint, until}</c>: parked without an invocation until the Harness clock reaches <see cref="Until"/>,
+/// then resumes at its checkpoint. An abort mark does not wait for it.</summary>
+public sealed class SleepingTaskState(JsonValue checkpoint, double until) : LiveTaskState(checkpoint)
+{
+    /// <inheritdoc/>
+    public override DurableTaskStatus Status => DurableTaskStatus.Sleeping;
+    /// <summary>Milliseconds on the <see cref="HarnessOptions.Now"/> clock.</summary>
+    public double Until { get; } = until;
+    /// <inheritdoc/>
+    public override JsonObjectValue ToJson() => new RecordJson.Writer().Add("status", "sleeping").Add("checkpoint", Checkpoint)
+        .Number("until", Until).Build();
 }
 
 /// <summary><c>{status: "completing", outcome}</c>: outcome decided, terminal once no ordinary owned work below is live.</summary>

@@ -13,6 +13,7 @@
 // - createModels() is EmptyDurableModels; pi-ai's faux provider is FauxModels in ChatSupport.cs.
 // - vi.useFakeTimers is ManualTimeProvider passed as HarnessOptions.TimeProvider (with Now reading it); it counts live timers as
 //   vi.getTimerCount() does.
+// - Pi v1.5.0 sync (area sleep): openTasks takes onWake and setTimer, as f75b3240a's task-support.ts does.
 using PiSharp.Durable;
 using PiSharp.Durable.Chord;
 using static Program;
@@ -195,7 +196,8 @@ internal static partial class HarnessTests
     /// <summary>Opens a Harness whose registry holds <paramref name="tasks"/>; failures passed to <c>OnReport</c> are collected (upstream
     /// <c>openTasks</c>).</summary>
     internal static async Task<OpenedTasks> OpenTasks(IStorage storage, IReadOnlyList<DurableTask> tasks, IRegistry? registry = null,
-        Func<double>? now = null, HarnessSettings? settings = null, TimeProvider? timeProvider = null, IDurableModels? models = null)
+        Func<double>? now = null, HarnessSettings? settings = null, TimeProvider? timeProvider = null, IDurableModels? models = null,
+        SetTimer? setTimer = null, Action<Wake>? onWake = null)
     {
         registry ??= Registry.Create();
         if (tasks.Count > 0) registry.Install(Define.Extension(new Extension { Name = "tasks", Tasks = [.. tasks] }));
@@ -208,6 +210,8 @@ internal static partial class HarnessTests
             Now = now,
             Settings = settings,
             TimeProvider = timeProvider,
+            SetTimer = setTimer,
+            OnWake = onWake,
         }, Context);
         return new OpenedTasks(harness, registry, reports);
     }

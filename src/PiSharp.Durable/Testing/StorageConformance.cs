@@ -43,6 +43,7 @@ public static class StorageConformance
             Case("scans tables in either ID order and continues a cursor in its order", ScansTablesInEitherOrder),
             Case("replaces complete task records and pages filtered task scans", ReplacesTaskRecords),
             Case("stores owners and scans waiting and completing tasks by status", StoresOwnersAndWaitingTasks),
+            Case("stores and scans sleeping tasks by status", StoresSleepingTasks),
             Case("indexes request IDs per conversation and replaces complete submission records", IndexesRequestIds),
             Case("stores passive write submissions without input-only lifecycle states", StoresPassiveWrites),
             Case("reconstructs rewindable documents and preserves half-open incarnations", ReconstructsRewindableDocuments),
@@ -455,6 +456,25 @@ public static class StorageConformance
         await Commit(storage, new TaskWrite(terminal));
         ItemsEqual([], await Scan(DurableTaskStatus.Completing), "completing scan after settlement");
         ItemsEqual([terminal], await Scan(DurableTaskStatus.Terminal), "terminal scan");
+    }
+
+    // Pi v1.5.0 sync (area sleep): upstream f75b3240a's sleeping case.
+    private static async Task StoresSleepingTasks(IStorage storage)
+    {
+        var rootId = await CreateRoot(storage);
+        var sleepingId = await storage.MintIdAsync<TaskId>();
+        var sleeping = PendingTask(sleepingId, rootId) with
+        {
+            State = new SleepingTaskState(O("{\"phase\":\"next\"}"), 61_000), Memos = O("{\"kept\":true}"),
+        };
+        await Commit(storage, new TaskWrite(sleeping));
+        Equal<TaskRecord?>(sleeping, await storage.GetTaskAsync(sleepingId, Context), "sleeping task");
+        async Task<ImmutableArray<TaskRecord>> Scan(DurableTaskStatus status) => (await storage.ScanTasksAsync(new() { Status = status }, 10, null, Context)).Items;
+        ItemsEqual([sleeping], await Scan(DurableTaskStatus.Sleeping), "sleeping scan");
+        var running = sleeping with { State = new RunningTaskState(O("{\"phase\":\"next\"}")) };
+        await Commit(storage, new TaskWrite(running));
+        ItemsEqual([], await Scan(DurableTaskStatus.Sleeping), "sleeping scan after waking");
+        ItemsEqual([running], await Scan(DurableTaskStatus.Running), "running scan");
     }
 
     private static async Task IndexesRequestIds(IStorage storage)

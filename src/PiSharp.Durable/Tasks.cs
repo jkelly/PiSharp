@@ -116,7 +116,7 @@ public sealed class RunningTask
 }
 
 /// <summary>
-/// Next states a task commits for itself (upstream <c>NextTaskState</c>): a replacement checkpoint, a wait, or its outcome. A terminal
+/// Next states a task commits for itself (upstream <c>NextTaskState</c>): a replacement checkpoint, a wait, a sleep, or its outcome. A terminal
 /// state is stored as <c>completing</c> while ordinary owned work below the task is live (spec §5.5).
 /// </summary>
 public static class NextTaskState
@@ -125,6 +125,9 @@ public static class NextTaskState
     public static RunningTaskState Running(JsonValue checkpoint) => new(checkpoint);
     /// <summary><c>{status: "waiting", checkpoint, on, policy}</c>: park until every task in <paramref name="on"/> is terminal.</summary>
     public static WaitingTaskState Waiting(JsonValue checkpoint, IEnumerable<TaskId> on, JoinPolicy policy) => new(checkpoint, [.. on], policy);
+    /// <summary><c>{status: "sleeping", checkpoint, until}</c>: hold no invocation until the Harness clock reaches <paramref name="until"/>,
+    /// then resume at <paramref name="checkpoint"/> (<see cref="ITaskRuntime.SleepUntilAsync"/> commits the same).</summary>
+    public static SleepingTaskState Sleeping(JsonValue checkpoint, double until) => new(checkpoint, until);
     /// <summary><c>{status: "terminal", outcome}</c>.</summary>
     public static TerminalTaskState Terminal(TaskOutcome outcome) => new(outcome);
     /// <summary><c>{status: "terminal", outcome: {status: "completed", result}}</c>.</summary>
@@ -134,10 +137,10 @@ public static class NextTaskState
     /// <summary><c>{status: "terminal", outcome: {status: "failed", error}}</c>.</summary>
     public static TerminalTaskState Failed(string message, JsonValue? detail = null) => new(new FailedTaskOutcome(new TaskOutcomeError(message, detail)));
 
-    /// <summary>Whether <paramref name="state"/> is a state a task may commit for itself: running, waiting or terminal.</summary>
+    /// <summary>Whether <paramref name="state"/> is a state a task may commit for itself: running, waiting, sleeping or terminal.</summary>
     internal static void Check(TaskState state)
     {
-        if (state.Status is not (DurableTaskStatus.Running or DurableTaskStatus.Waiting or DurableTaskStatus.Terminal))
-            throw new ArgumentException($"A task commits a running, waiting or terminal state, not {WireName.Of(state.Status)}");
+        if (state.Status is not (DurableTaskStatus.Running or DurableTaskStatus.Waiting or DurableTaskStatus.Sleeping or DurableTaskStatus.Terminal))
+            throw new ArgumentException($"A task commits a running, waiting, sleeping or terminal state, not {WireName.Of(state.Status)}");
     }
 }

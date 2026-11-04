@@ -263,7 +263,7 @@ public sealed partial class JobContext
         var submission = await handle.SubmitAsync(SubmissionDraft.Input(branch.Prompt, requestId: requestId), durable).ConfigureAwait(false);
         var waiting = submission.WaitAsync(durable);
         using var stop = new CancellationTokenSource();
-        var sleeping = runtime.SleepAsync(deadlineAt, durable.WithCancellation(stop.Token));
+        var sleeping = Jobs.DelayUntilAsync(runtime, deadlineAt, durable.WithCancellation(stop.Token));
         var expired = false;
         if (await Task.WhenAny(waiting, sleeping).ConfigureAwait(false) == sleeping && !waiting.IsCompleted)
         {

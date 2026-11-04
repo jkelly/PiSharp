@@ -19,20 +19,22 @@ namespace PiSharp.Durable;
 
 /// <summary>
 /// A live task's durable status without its checkpoint and outcome payloads (upstream <c>TaskGraphState</c>, spec §9.5). JSON form
-/// (<see cref="ToJson"/>): <c>{status, phase}</c> for pending and running, <c>{status: "waiting", phase, on, policy}</c>, or
-/// <c>{status: "completing", outcome}</c>.
+/// (<see cref="ToJson"/>): <c>{status, phase}</c> for pending and running, <c>{status: "waiting", phase, on, policy}</c>,
+/// <c>{status: "sleeping", phase, until}</c>, or <c>{status: "completing", outcome}</c>.
 /// </summary>
 public sealed class TaskGraphState : IEquatable<TaskGraphState>
 {
     private readonly JsonObjectValue json;
 
-    private TaskGraphState(DurableTaskStatus status, string? phase, ImmutableArray<TaskId> on, JoinPolicy? policy, TaskOutcomeStatus? outcome)
+    private TaskGraphState(DurableTaskStatus status, string? phase, ImmutableArray<TaskId> on, JoinPolicy? policy, TaskOutcomeStatus? outcome,
+        double? until = null)
     {
         Status = status;
         Phase = phase;
         On = on;
         Policy = policy;
         Outcome = outcome;
+        Until = until;
         var writer = new RecordJson.Writer().Add("status", WireName.Of(status));
         if (outcome is { } held) writer.Add("outcome", WireName.Of(held));
         else
@@ -40,12 +42,13 @@ public sealed class TaskGraphState : IEquatable<TaskGraphState>
             writer.Add("phase", phase);
             if (policy is { } join)
                 writer.Add("on", JsonValue.Array(on.Select(id => (JsonValue)id.ToJson()))).Add("policy", WireName.Of(join));
+            writer.Number("until", until);
         }
         json = writer.Build();
     }
 
-    /// <summary><see cref="DurableTaskStatus.Pending"/>, <see cref="DurableTaskStatus.Running"/>, <see cref="DurableTaskStatus.Waiting"/>
-    /// or <see cref="DurableTaskStatus.Completing"/>; terminal tasks leave the graph.</summary>
+    /// <summary><see cref="DurableTaskStatus.Pending"/>, <see cref="DurableTaskStatus.Running"/>, <see cref="DurableTaskStatus.Waiting"/>,
+    /// <see cref="DurableTaskStatus.Sleeping"/> or <see cref="DurableTaskStatus.Completing"/>; terminal tasks leave the graph.</summary>
     public DurableTaskStatus Status { get; }
 
     /// <summary>The checkpoint's phase; null for a completing task.</summary>
@@ -60,6 +63,9 @@ public sealed class TaskGraphState : IEquatable<TaskGraphState>
     /// <summary>For a completing task: the held outcome's status.</summary>
     public TaskOutcomeStatus? Outcome { get; }
 
+    /// <summary>For a sleeping task: when it is due, on the Harness clock.</summary>
+    public double? Until { get; }
+
     /// <summary>The state as upstream's JSON object.</summary>
     public JsonObjectValue ToJson() => json;
 
@@ -67,6 +73,7 @@ public sealed class TaskGraphState : IEquatable<TaskGraphState>
     internal static TaskGraphState Of(TaskState state) => state switch
     {
         WaitingTaskState waiting => new(DurableTaskStatus.Waiting, PhaseOf(waiting.Checkpoint), waiting.On, waiting.Policy, null),
+        SleepingTaskState sleeping => new(DurableTaskStatus.Sleeping, PhaseOf(sleeping.Checkpoint), [], null, null, sleeping.Until),
         LiveTaskState live => new(live.Status, PhaseOf(live.Checkpoint), [], null, null),
         // Terminal records never reach here: they leave the graph.
         SettlingTaskState settling => new(DurableTaskStatus.Completing, null, [], null, settling.Outcome.Status),
@@ -196,7 +203,7 @@ public sealed class TaskGraph
 internal sealed class TaskGraphView
 {
     private static readonly DurableTaskStatus[] LiveStatuses =
-        [DurableTaskStatus.Pending, DurableTaskStatus.Running, DurableTaskStatus.Waiting, DurableTaskStatus.Completing];
+        [DurableTaskStatus.Pending, DurableTaskStatus.Running, DurableTaskStatus.Waiting, DurableTaskStatus.Sleeping, DurableTaskStatus.Completing];
     private const int ScanPageSize = 256;
 
     private readonly DurableHarness session;

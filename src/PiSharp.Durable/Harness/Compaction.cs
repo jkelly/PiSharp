@@ -1,4 +1,6 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/src/harness/compaction.ts.
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/src/harness/compaction.ts. Pi v1.5.0 sync (area sleep): a retry
+// backoff sleeps instead of waiting in a running phase, and a retry run before its time (an early wake, or a record an earlier version
+// stored as running) sleeps again (f75b3240a); the citation stays on v1.2.0 until the file's other areas land.
 //
 // Mappings:
 // - Input, checkpoints and results are upstream's JSON in its key order: input {reason, instructions?}; checkpoints {phase: "select"},
@@ -255,7 +257,7 @@ internal static class Compaction
                         KeyValuePair.Create("at", (JsonValue)until),
                         KeyValuePair.Create("error", (JsonValue)(Str(message, "errorMessage") ?? "")),
                     ]));
-                return NextTaskState.Running(request.Checkpoint("retry", until));
+                return NextTaskState.Sleeping(request.Checkpoint("retry", until), until);
             }
             var text = SummaryFailure(message);
             Live.FailCompactionStatus(live, runtime.TaskId, text);
@@ -263,12 +265,18 @@ internal static class Compaction
         }, context).ConfigureAwait(false);
     }
 
-    /// <summary>Sleeps until <c>until</c>, then returns to <c>summarize</c> with the next attempt and the same pinned request.</summary>
+    /// <summary>After the backoff's sleep, returns to <c>summarize</c> with the next attempt and the same pinned request; a run before
+    /// <c>until</c> (an early wake, or a record of an earlier version) sleeps again.</summary>
     public static async Task RetryAsync(RunningTask task, ITaskRuntime runtime, DurableContext context)
     {
         var checkpoint = (JsonObjectValue)task.Checkpoint;
         var request = SummaryRequest.From(checkpoint);
-        await runtime.SleepAsync(((JsonNumberValue)checkpoint["until"]).Value, context).ConfigureAwait(false);
+        var until = ((JsonNumberValue)checkpoint["until"]).Value;
+        if (until > runtime.Now())
+        {
+            await runtime.SleepUntilAsync(until, checkpoint, context).ConfigureAwait(false);
+            return;
+        }
         var attempt = request.Attempt + 1;
         await runtime.CommitAsync(async (tx, _) =>
         {

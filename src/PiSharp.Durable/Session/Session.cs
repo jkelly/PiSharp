@@ -4,7 +4,8 @@
 // other areas land. Pi v1.5.0 sync (area storage-batches): a commit sends its writes as one batch of the batched Storage.commit and judges
 // the result, as session/writer.ts does for a call of one part: a refusal fails the Session and is the commit's error, as a rejection is.
 // Group commit (several parts per call) and the publication scope (Storage.publishing) follow with their own areas; GuardedStorage
-// already forwards both.
+// already forwards both. Pi v1.5.0 sync (area sleep): createSession's setTimer arms the document sweep as a background timer (upstream
+// f75b3240a, Timers.cs); a host that declines one leaves eviction to the end of each commit.
 //
 // Concurrency model. Upstream relies on one JavaScript thread: `#enqueue` chains every mutation and cold load onto one promise, and
 // listeners run in later microtasks. Here .NET callers may be on any thread, so:
@@ -22,8 +23,10 @@
 //   from a listener only enqueue, so they never block the line.
 // - The loaded-document cache, its retention bookkeeping and the listener sets are guarded by short locks so snapshot's fast path can read
 //   them off the line; the clock and the retention setting (host code) are read outside them. Eviction itself runs only on the line.
-// - Retention timers are .NET timers, which never keep a process alive, so upstream's fallback for timers that cannot be unreferenced
-//   (sweeping only at the end of commits) is never needed; each commit still sweeps at its end, as upstream's does.
+// - Retention timers are background timers of the host's SetTimer, by default .NET timers, which never keep a process alive and are never
+//   declined. A host that declines one gets upstream's fallback: no timer is kept, and the end of each commit sweeps, as it always does.
+//   The host's SetTimer and disarm are host code, so they run outside documentsGate: a sweep is installed first and armed after, and a
+//   timer armed for a sweep that was replaced, ran, or closed meanwhile is disarmed again.
 // - A failure is latched once (first wins) and closes the Session in the background; close listeners run synchronously in the call that
 //   failed it, as upstream's do. Listener callbacks are contained: a throw, or a faulted task an asynchronous overload's listener returns
 //   (upstream's rejected promise), is reported (or fails the Session, for the Harness's own listeners) and the others still run.
@@ -60,14 +63,12 @@ public class Session : ISession
 {
     /// <summary>Default document retention: ten minutes, as for kept contexts.</summary>
     private static double defaultRetention = 600_000;
-    /// <summary>Longest delay one retention timer waits; a longer retention waits in several steps.</summary>
-    private const double MaxTimerDelay = 2_147_483_647;
-
     private readonly IStorage storage;
     private readonly StorageGuard guard;
     private readonly Func<double> now;
     private readonly Func<double> clock;
     private readonly Func<double> documentRetentionMs;
+    private readonly HostTimers timers;
     /// <summary>Refuse every commit with writes (<see cref="HarnessOptions.ReadOnly"/>).</summary>
     private readonly bool readOnly;
     private readonly Lock documentsGate = new();
@@ -80,6 +81,9 @@ public class Session : ISession
     // The pending eviction: a timer for the oldest idle document, or a line job when it is already due. Guarded by documentsGate.
     private DocumentSweep? documentSweep;
     private int sweepJobs;
+    /// <summary>Set once the host declined a background timer: then none is kept, and the end of each commit evicts what expired. Guarded by
+    /// documentsGate.</summary>
+    private bool documentTimersUnavailable;
     private readonly Lock listenersGate = new();
     private readonly List<Action<CommitPublication, DurableContext>> commitListeners = [];
     // The Session's own listeners, such as its scheduler's: they keep memory in step with storage, so a throw fails it.
@@ -99,8 +103,10 @@ public class Session : ISession
 
     /// <summary>Opens a Session kernel over <paramref name="storage"/>; <paramref name="now"/> is the wall clock for task times in milliseconds
     /// (default: the system clock); <paramref name="documentRetentionMs"/> is read at each use (null: the default). A
-    /// <paramref name="readOnly"/> Session refuses every commit with writes before it reaches Storage.</summary>
-    internal Session(IStorage storage, Func<double>? now = null, Func<double?>? documentRetentionMs = null, bool readOnly = false)
+    /// <paramref name="readOnly"/> Session refuses every commit with writes before it reaches Storage. <paramref name="setTimer"/> arms the
+    /// timers that evict idle documents; default the timers of <paramref name="timeProvider"/>, or of the system.</summary>
+    internal Session(IStorage storage, Func<double>? now = null, Func<double?>? documentRetentionMs = null, bool readOnly = false,
+        SetTimer? setTimer = null, TimeProvider? timeProvider = null)
     {
         ArgumentNullException.ThrowIfNull(storage);
         this.readOnly = readOnly;
@@ -124,15 +130,17 @@ public class Session : ISession
             try { return DocumentRetention(retention()); }
             catch (Exception) { return DocumentRetention(null); }
         };
+        timers = new HostTimers(setTimer, timeProvider is null ? NativeTimer.System : NativeTimer.Of(timeProvider), error => Report(error));
         host = new Host(this);
     }
 
     /// <summary>Opens a Session kernel over one storage backend (upstream <c>createSession</c>). <paramref name="now"/> is the wall clock for
     /// task times in milliseconds; default the system clock. <paramref name="documentRetentionMs"/> is how long an unobserved document stays
-    /// cached after its last use (see <see cref="HarnessSettings.DocumentRetentionMs"/>); default ten minutes. The first exception a Storage
+    /// cached after its last use (see <see cref="HarnessSettings.DocumentRetentionMs"/>); default ten minutes. <paramref name="setTimer"/> arms
+    /// the timers that evict idle documents; default .NET timers (see <see cref="HarnessOptions.SetTimer"/>). The first exception a Storage
     /// method throws fails the Session (<see cref="SessionFailedException"/>).</summary>
-    public static ISession Create(IStorage storage, Func<double>? now = null, double? documentRetentionMs = null) =>
-        new Session(storage, now, documentRetentionMs is { } retention ? () => retention : null);
+    public static ISession Create(IStorage storage, Func<double>? now = null, double? documentRetentionMs = null, SetTimer? setTimer = null) =>
+        new Session(storage, now, documentRetentionMs is { } retention ? () => retention : null, setTimer: setTimer);
 
     /// <summary>Internal, for tests: the retention of every Session that keeps the default, as a suite run with eviction at once (upstream
     /// <c>setDefaultDocumentRetention</c>).</summary>
@@ -575,13 +583,13 @@ public class Session : ISession
     /// <summary>Runs the close listeners once, each on its own: one that fails is reported, and the rest still run.</summary>
     private void NotifyClose(Action[] listeners)
     {
-        DocumentSweep? sweep;
+        Action? disarm;
         lock (documentsGate)
         {
-            sweep = documentSweep;
+            disarm = documentSweep?.Disarm;
             documentSweep = null;
         }
-        sweep?.Timer?.Dispose();
+        if (disarm is not null) Contained(disarm, Report);
         foreach (var listener in listeners) Contained(listener, Report);
     }
 
@@ -712,35 +720,57 @@ public class Session : ISession
     }
 
     /// <summary>
-    /// Schedules the eviction of the oldest idle document: on the line at once when it is due, otherwise when it expires, by a timer that
-    /// never keeps the process alive.
+    /// Schedules the eviction of the oldest idle document: on the line at once when it is due, otherwise when it expires, by a background
+    /// timer (<see cref="HarnessOptions.SetTimer"/>), which never keeps the process alive. Where the host declines it, none is kept: the end
+    /// of each commit evicts what expired.
     /// </summary>
     private void ScheduleDocumentSweep()
     {
         var current = clock();
         var retention = documentRetentionMs();
+        DocumentSweep sweep;
+        Action? replaced;
+        bool arm;
+        double delay;
         lock (documentsGate)
         {
             if (closingStarted) return;
             if (idleDocuments.First is not { } oldest) return;
             var at = oldest.Value.Since + retention;
             if (documentSweep is { } pending && pending.At <= at) return;
-            documentSweep?.Timer?.Dispose();
+            replaced = documentSweep?.Disarm;
             // The pending sweep stays set until its job runs, so touches while the line is busy queue no more.
-            var sweep = new DocumentSweep(at);
+            sweep = new DocumentSweep(at);
             documentSweep = sweep;
-            var delay = at - current;
-            if (delay <= 0)
+            delay = at - current;
+            arm = false;
+            if (delay <= 0) QueueDocumentSweepLocked(sweep);
+            else if (documentTimersUnavailable) documentSweep = null;
+            else arm = true;
+        }
+        if (replaced is not null) Contained(replaced, Report);
+        if (!arm) return;
+        // A timer that fires early sweeps nothing and arms the next one.
+        var disarm = timers.Background(() =>
+        {
+            lock (documentsGate) QueueDocumentSweepLocked(sweep);
+        }, delay);
+        lock (documentsGate)
+        {
+            if (disarm is null)
             {
-                QueueDocumentSweepLocked(sweep);
+                documentTimersUnavailable = true;
+                if (ReferenceEquals(documentSweep, sweep)) documentSweep = null;
                 return;
             }
-            sweep.Timer = TimeProvider.System.CreateTimer(static state =>
+            if (ReferenceEquals(documentSweep, sweep) && !closingStarted)
             {
-                var (session, sweep) = ((Session, DocumentSweep))state!;
-                lock (session.documentsGate) session.QueueDocumentSweepLocked(sweep);
-            }, (this, sweep), TimeSpan.FromMilliseconds(Math.Min(delay, MaxTimerDelay)), Timeout.InfiniteTimeSpan);
+                sweep.Disarm = disarm;
+                return;
+            }
         }
+        // Replaced, swept or closed while it was armed.
+        Contained(disarm, Report);
     }
 
     /// <summary>Queues the sweep job on the line; called under <see cref="documentsGate"/>, and never runs the job inline.</summary>
@@ -755,7 +785,6 @@ public class Session : ISession
                 if (ReferenceEquals(documentSweep, sweep)) documentSweep = null;
                 sweepNow = !closingStarted;
             }
-            sweep.Timer?.Dispose();
             if (sweepNow) SweepDocuments();
             return Task.FromResult(true);
         }, inline: false);
@@ -1116,7 +1145,8 @@ public class Session : ISession
     private sealed class DocumentSweep(double at)
     {
         public double At { get; } = at;
-        public ITimer? Timer { get; set; }
+        /// <summary>Disarms its timer, once armed. Guarded by documentsGate.</summary>
+        public Action? Disarm { get; set; }
     }
 
     private sealed class Host(Session session) : ITransactionHost

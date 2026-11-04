@@ -1,7 +1,9 @@
 // Decision 0012: compiles a workflow onto one durable task definition, pisharp.workflow.<name>. Phases: "#start", one per action named
 // after it, "<step>#join" for composite steps, and "#end" for a Sleep before the end. Every phase commits exactly one state change; the
 // Data and the next step move together in that commit, so they are exactly once, while the action body that produced them is at least
-// once. Every phase but "#start" first waits for the checkpoint's wake time, so a Sleep holds whatever step comes next.
+// once. Every phase but "#start" first waits for the checkpoint's wake time, so a Sleep holds whatever step comes next. Pi v1.5.0 sync
+// (area sleep): a commit with a wake time commits a durable sleep, so the task holds no invocation until then; a phase run before its
+// wake time (an early wake) sleeps again.
 using System.Collections.Immutable;
 using PiSharp.CustomAgents.Workflows.Hosting;
 using PiSharp.Durable;
@@ -112,7 +114,11 @@ internal sealed partial class WorkflowEngine<TData> : IWorkflowEngine, IStepScop
     /// <summary>Runs <paramref name="phase"/> once the checkpoint's wake time (a Sleep, a Repeat or a retry delay) has passed.</summary>
     private static TaskPhaseHandler Waking(TaskPhaseHandler phase) => async (task, runtime, context) =>
     {
-        if (Checkpoint.Parse(task.Checkpoint).WakeAt is { } wake && wake > runtime.Now()) await runtime.SleepAsync(wake, context).ConfigureAwait(false);
+        if (Checkpoint.Parse(task.Checkpoint).WakeAt is { } wake && wake > runtime.Now())
+        {
+            await runtime.SleepUntilAsync(wake, task.Checkpoint, context).ConfigureAwait(false);
+            return;
+        }
         await phase(task, runtime, context).ConfigureAwait(false);
     };
 
@@ -201,7 +207,7 @@ internal sealed partial class WorkflowEngine<TData> : IWorkflowEngine, IStepScop
                 var doc = await RunDocs.RunAsync(tx, task.ConversationId, task.Id).ConfigureAwait(false);
                 RunDocs.Append(doc, "history", RunDocs.Object(("seq", checkpoint.Seq), ("action", action), ("attempt", checkpoint.Attempt),
                     ("outcome", "retry"), ("error", failure.Message), ("at", runtime.Now())), RunDocs.HistoryLimit);
-                return (TaskState?)NextTaskState.Running(next.ToJson());
+                return Next(next);
             }, context);
         }
         var attempts = checkpoint.Attempt == 1 ? "" : $" after {checkpoint.Attempt} attempts";
@@ -268,9 +274,13 @@ internal sealed partial class WorkflowEngine<TData> : IWorkflowEngine, IStepScop
                     ("outcome", outcome), ("next", resolved), ("at", runtime.Now())), RunDocs.HistoryLimit);
             doc.Set("status", wakeAt is null ? "running" : "sleeping");
             doc.Set("current", RunDocs.Object(("action", resolved), ("step", next.Visit), ("wakeAt", wakeAt is { } at ? at : null)));
-            return (TaskState?)NextTaskState.Running(next.ToJson());
+            return Next(next);
         }, context).ConfigureAwait(false);
     }
+
+    /// <summary>The next state for <paramref name="next"/>: asleep until its wake time when it has one, otherwise running.</summary>
+    private static TaskState Next(Checkpoint next) =>
+        next.WakeAt is { } wake ? NextTaskState.Sleeping(next.ToJson(), wake) : NextTaskState.Running(next.ToJson());
 
     /// <summary>Follows routers from <paramref name="target"/> to an action, a composite step, or the end.</summary>
     internal string Resolve(string target, TData data)

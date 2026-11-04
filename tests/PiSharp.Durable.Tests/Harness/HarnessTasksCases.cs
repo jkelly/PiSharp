@@ -3,7 +3,6 @@
 // - Upstream runs this file on MemoryStorage (ControlledStorage where it holds commits); here every case runs on the storage the group is
 //   given, wrapped in ControlledStorage where upstream uses it (HarnessBackendCases.cs adds JSONL and SQLite passes).
 // - "observes a failed agent resolution": the settings getter that throws is a HarnessSettings subclass overriding Extensions.
-// - "rejects a sleep ...": upstream's AbortError is OperationCanceledException.
 // - "reads committed documents ...": the flush that lets the step after the phase end the invocation is the InvocationEnded barrier.
 // - "resumes a waiting task ...": the flush after the third phase start is an Eventually for the waiting state it then asserts.
 // - "does not signal a running abort handler ...", "keeps a terminal outcome committed by an abort handler ...": the flush that lets the
@@ -13,6 +12,9 @@
 //   order; here the abort handler waits for a deferred released after that call, so the second call still sees a live task.
 // - Expectations upstream asserts inside handlers are collected and asserted by the test body, so a failure names itself instead of
 //   surfacing as a faulted task.
+// - Pi v1.5.0 sync (area sleep): f75b3240a replaces runtime.sleep with sleepUntil, so the ended-invocation check calls SleepUntilAsync and
+//   the two in-phase sleep cases are gone (HarnessSleepCases.cs covers durable sleep). The citation stays on v1.2.0 until the file's other
+//   areas land.
 using System.Collections.Concurrent;
 using PiSharp.Durable;
 using PiSharp.Durable.Chord;
@@ -558,7 +560,7 @@ internal static partial class HarnessTests
             await RejectsAsync(() => runtime.CommitAsync((_, _) => { }, Context), "invocation has ended", "commit");
             await RejectsAsync(() => runtime.MemoAsync("x", Context), "invocation has ended", "memo read");
             await RejectsAsync(() => runtime.MemoAsync("x", 1, Context), "invocation has ended", "memo write");
-            await RejectsAsync(() => runtime.SleepAsync(0, Context), "invocation has ended", "sleep");
+            await RejectsAsync(() => runtime.SleepUntilAsync(0, RunStep, Context), "invocation has ended", "sleep");
             await RejectsAsync(() => runtime.WatchDocAsync(notes, Context), "invocation has ended", "watch");
             // The handler's own context is cancelled by now; the ended invocation still wins.
             await RejectsAsync(() => runtime.AgentAsync(handlerContext!), "invocation has ended", "agent");
@@ -665,65 +667,6 @@ internal static partial class HarnessTests
             held.Release();
             Check((await watching!)?.ToString()?.Contains("invocation has ended") == true, "late watch rejects");
             Equal(TaskOutcomeStatus.Faulted, ((SettlingTaskState)(await harness.WaitForTaskAsync(id, Context)).State).Outcome.Status, "outcome");
-            await harness.CloseAsync(Context);
-        });
-
-        yield return Case(prefix + "task-runtime.sleeps-until-the-harness-clock-reaches-the-deadline-rechecking-after-each-timer", async () =>
-        {
-            double clock = 1_000;
-            var woke = new Deferred();
-            var sleeper = OneStep("test.sleeper", async (_, runtime, ctx) =>
-            {
-                await runtime.SleepAsync(900, ctx);
-                await runtime.SleepAsync(1_005, ctx);
-                woke.Resolve();
-                await runtime.CommitAsync((_, _) => Completed(null), ctx);
-            });
-            var (harness, _, _, root) = await OpenRoot(storage(), [sleeper], now: () => Volatile.Read(ref clock));
-            var id = await Start(root, sleeper);
-            harness.Resume();
-            // The clock stands still, so real timers keep firing without waking the task.
-            await Task.Delay(30);
-            Check(!await Settled(woke.Task), "still sleeping");
-            Volatile.Write(ref clock, 1_005);
-            await harness.WaitForTaskAsync(id, Context);
-            await harness.CloseAsync(Context);
-        });
-
-        yield return Case(prefix + "task-runtime.rejects-a-sleep-when-the-invocation-is-signalled-or-the-sleeps-own-context-is-cancelled", async () =>
-        {
-            var results = new SyncList<string>();
-            var sleeping = new Deferred();
-            double Later() => DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() + 60_000;
-            var signalled = OneStep("test.sleep-signalled", async (_, runtime, ctx) =>
-            {
-                sleeping.Resolve();
-                try { await runtime.SleepAsync(Later(), ctx); }
-                catch (Exception error)
-                {
-                    results.Add($"signalled:{error.GetType().Name}");
-                    throw;
-                }
-            });
-            var cancelledTask = OneStep("test.sleep-cancelled", async (_, runtime, ctx) =>
-            {
-                var controller = Context.WithCancel();
-                var pending = runtime.SleepAsync(Later(), controller.Context);
-                controller.Cancel(new InvalidOperationException("stop sleeping"));
-                try { await pending; }
-                catch (Exception error) { results.Add($"cancelled:{error.Message}"); }
-                await runtime.CommitAsync((_, _) => Completed(null), ctx);
-            });
-            var (harness, _, _, root) = await OpenRoot(storage(), [signalled, cancelledTask]);
-            var signalledId = await Start(root, signalled);
-            var cancelledId = await Start(root, cancelledTask);
-            harness.Resume();
-            await harness.WaitForTaskAsync(cancelledId, Context);
-            await sleeping.Task;
-            await harness.AbortTaskAsync(signalledId, Context);
-            SameJson("""{"status":"aborted","reason":"test"}""", Outcome(await harness.WaitForTaskAsync(signalledId, Context)), "outcome");
-            // Upstream's AbortError is OperationCanceledException.
-            Seq(["cancelled:stop sleeping", "signalled:OperationCanceledException"], results.Snapshot(), "results");
             await harness.CloseAsync(Context);
         });
 
