@@ -7,15 +7,16 @@ using PiSharp.Chord.State;
 using static ChordSupport;
 using static PiSharp.Chord.Contracts.Schemas;
 
-// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/chord/test/next/documents/documents.test.ts (its cases wait),
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/chord/test/next/documents/documents.test.ts,
 // packages/chord/src/next/documents/documents.ts and slot.ts (SlotDefinition), what the `pisharp-` cases check.
 //
 // Upstream's four cases (singleton documents read initial() until written and throw not_ready in the factory; keyed documents' get, keys
-// and retire; every use refused released once the owner ends) serve a local type through createHost (loaded, phase 6) and go through the
-// handles, slots and transactions of area cv2-documents-slots, so they wait for both. Until then the `pisharp-` cases check the engine this
-// area ported against hand-built parts: an owner (IDocumentsOwner), slots that log what the engine calls (IDeclaredSlot), transactions
-// holding the line (ILineHolder), and the residency's fake timers (FakeTimers.cs); and SlotDefinition's checks and version fence, which
-// upstream's slot.test.ts reaches through createHost.
+// and retire; every use refused released once the owner ends) serve app.owner through createHost (loaded, phase 6); here the object is the
+// hand-built host's (Documents/DocumentsHost.cs), its factory declaring list and drafts, and reference.release (the last reference gone)
+// is the object's end (EndAsync). A watch's frames are delivered between commits (host.Delivered()), as upstream delivers one per commit.
+// The `pisharp-` cases check the engine against hand-built parts: an owner (IDocumentsOwner), slots that log what the engine calls
+// (IDeclaredSlot), transactions holding the line (ILineHolder), and the residency's fake timers (FakeTimers.cs); and SlotDefinition's
+// checks and version fence, which upstream's slot.test.ts reaches through createHost.
 internal static partial class Program
 {
     private const string DocumentsReleased = """{"code":"released","reason":"ended","message":"app.owner(1): ended"}""";
@@ -112,8 +113,71 @@ internal static partial class Program
     /// <summary>Expects <paramref name="run"/> to throw a ChordError as <paramref name="expected"/> says.</summary>
     private static void DocumentsThrows(string expected, Action run, string what) => Json(expected, Throws<ChordError>(run, what).ToJson(), what);
 
+    private static readonly StateDefinition DocumentsList = DocumentsDefine("list", Obj(("items", Arr(Str()))), 1, () => new JsonObject { ["items"] = new JsonArray() });
+
+    private static readonly StateDefinition DocumentsDrafts = DocumentsDefine("drafts", Obj(("body", Str())), 1, () => new JsonObject { ["body"] = "" }, keyed: true);
+
+    /// <summary>app.owner(1) live, its factory declaring list and drafts (upstream <c>owner</c>).</summary>
+    private static async Task<(DocumentsObject Object, ISingletonHandle List, IKeyedHandle Drafts)> DocumentsOwner()
+    {
+        ISingletonHandle? list = null;
+        IKeyedHandle? drafts = null;
+        var made = await new DocumentsHost().GetAsync("app.owner", "app.owner(1)", (_, self) =>
+        {
+            list = self.State(DocumentsList);
+            drafts = self.KeyedState(DocumentsDrafts);
+        });
+        return (made, list!, drafts!);
+    }
+
     private static IEnumerable<(string, Func<Task>)> DocumentsDocumentsCases() =>
     [
+        Case("documents.documents.singleton-documents-read-initial-until-written-and-again-after-a-retire-whose-frame-replaces-the-root", async () =>
+        {
+            var (made, list, _) = await DocumentsOwner();
+            var initial = list.Value;
+            Json("""{"items":[]}""", initial, "initial");
+            var frames = FramesOf(await list.WatchAsync(DocumentsBg));
+            await list.ChangeAsync(draft => DocumentsArray(draft, "items").Add("a"), DocumentsBg);
+            Json("""{"items":["a"]}""", list.Value, "after the change");
+            made.Host.Delivered();
+            await list.RetireAsync(DocumentsBg);
+            Check(ReferenceEquals(initial, list.Value), "initial() again after the retire");
+            await list.RetireAsync(DocumentsBg);
+            made.Host.Delivered();
+            DocumentsFrames("""[[{"items":["a"]},[["p",["items"],0,0,["a"]]]],[{"items":[]},[["r",{"items":[]}]]]]""", frames, "the frames");
+        }),
+        Case("documents.documents.singleton-documents-throw-not-ready-when-read-in-the-factory", async () =>
+        {
+            var host = new DocumentsHost();
+            var rejected = await Rejection(host.GetAsync("app.owner", "app.owner(1)", (number, self) => _ = self.State(DocumentsList).Value));
+            DocumentsRejectsWith(rejected, "list: read before activation", "the activation");
+        }),
+        Case("documents.documents.keyed-documents-are-absent-until-written-get-keys-and-retire-by-key", async () =>
+        {
+            var (_, _, drafts) = await DocumentsOwner();
+            Check(await drafts.GetAsync("a", DocumentsBg) is null, "absent before a write");
+            await drafts.ChangeAsync("a", draft => { draft["body"] = "x"; }, DocumentsBg);
+            await drafts.ChangeAsync("b", draft => { draft["body"] = "y"; }, DocumentsBg);
+            await drafts.ChangeAsync("c", _ => { }, DocumentsBg);
+            Json("""{"body":"x"}""", await drafts.GetAsync("a", DocumentsBg), "a");
+            Sequence(["a", "b"], await DocumentsKeysOf(drafts), "the keys");
+            await drafts.RetireAsync("a", DocumentsBg);
+            await drafts.RetireAsync("missing", DocumentsBg);
+            Check(await drafts.GetAsync("a", DocumentsBg) is null, "absent after the retire");
+            Sequence(["b"], await DocumentsKeysOf(drafts), "the keys after the retire");
+        }),
+        Case("documents.documents.when-the-owner-ends-documents-are-dropped-every-use-throws-released-and-watches-end", async () =>
+        {
+            var (made, list, drafts) = await DocumentsOwner();
+            var watch = await list.WatchAsync(DocumentsBg);
+            await made.EndAsync();
+            Equal(WatchEnd.Ended, await watch.Closed, "the watch's end");
+            Check(DocumentsThrown(() => _ = list.Value) is JsonObject thrown && (string?)thrown["message"] == "app.owner(1): ended", "a read throws");
+            Json(DocumentsReleased, (JsonNode)await Rejection(drafts.GetAsync("a", DocumentsBg)), "a keyed read");
+            Json(DocumentsReleased, (JsonNode)await Rejection(DocumentsKeysOf(drafts)), "the keys");
+            Json(DocumentsReleased, (JsonNode)await Rejection(list.ChangeAsync(_ => { }, DocumentsBg)), "a change");
+        }),
         Case("documents.documents.pisharp-check-refuses-what-a-slot-refuses-and-changes-nothing", () =>
         {
             var (documents, _, log) = DocumentsEngine();
