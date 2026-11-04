@@ -1,6 +1,8 @@
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json.Nodes;
+using PiSharp.Chord;
+using PiSharp.Chord.Store;
 
 // Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/chord/test/next/schema/schema-switch.test.ts, the tests of the schema switch
 // from TypeBox to pi-schema: the same declarations give byte-identical fingerprints and normal forms, and data stored by the code before
@@ -9,7 +11,10 @@ using System.Text.Json.Nodes;
 // their git blob ids at the pinned commit. The fingerprint case compares the contracts and the profile's normal form; documents' and
 // tables' fingerprints, the job's and "stored data" (storedReads: a host reading stored/store.db and an import of stored/archive.jsonl)
 // wait for the layers they need (Proofs.cs). write-stored.ts, which wrote stored/ with the TypeBox helpers, is not ported: the fixtures
-// are kept as upstream wrote them and never rewritten (decision 0013).
+// are kept as upstream wrote them and never rewritten (decision 0013). Two PiSharp cases (area cv2-store-archive) read stored/ without
+// createHost, through the store alone: archive.jsonl decodes, imports and exports back byte for byte; a copy of store.db opens and exports
+// what archive.jsonl holds, but for the host's close that write-stored.ts ran after the export (an authored expectation, read off the
+// fixtures: one commit at seq 14 stores each job run stopped, a new base at revision 3).
 internal static partial class Program
 {
     /// <summary>A file of the schema switch's fixtures.</summary>
@@ -26,6 +31,23 @@ internal static partial class Program
         Convert.ToHexStringLower(SHA1.HashData([.. Encoding.ASCII.GetBytes($"blob {bytes.Length}\0"), .. bytes]));
 
     private static JsonNode SchemaRecorded() => JsonNode.Parse(File.ReadAllText(SchemaFixture("recorded.json")))!;
+
+    /// <summary>A fixture's bytes in chunks, as a file stream reads them (upstream's createReadStream).</summary>
+    private static async IAsyncEnumerable<ReadOnlyMemory<byte>> SchemaFileChunks(string path)
+    {
+        await using var file = File.OpenRead(path);
+        var buffer = new byte[4096];
+        int read;
+        while ((read = await file.ReadAsync(buffer)) > 0) yield return buffer.AsMemory(0, read).ToArray();
+    }
+
+    /// <summary>stored/archive.jsonl's parts.</summary>
+    private static async Task<List<JsonNode?>> SchemaStoredArchive()
+    {
+        var parts = new List<JsonNode?>();
+        await foreach (var part in Tables.DecodeJsonl(SchemaFileChunks(SchemaFixture("stored", "archive.jsonl")))) parts.Add(part);
+        return parts;
+    }
 
     private static IEnumerable<(string, Func<Task>)> SchemaSchemaSwitchCases() =>
     [
@@ -48,6 +70,54 @@ internal static partial class Program
             Json(recorded["contracts"]!.ToJsonString(), fingerprints["contracts"], "the contracts");
             Json(recorded["documents"]!["profile"]!["normal"]!.ToJsonString(), fingerprints["documents"]!["profile"]!["normal"], "the profile's normal form");
             Sequence(["everything", "account", "owner"], Keys(recorded["contracts"]), "recorded.json's contracts");
+        }),
+        Case("schema.schema-switch.stored-data-pisharp-the-stored-archive-imports-and-exports-back-byte-for-byte", async () =>
+        {
+            var context = ChordContext.Background;
+            var bytes = await File.ReadAllBytesAsync(SchemaFixture("stored", "archive.jsonl"));
+            await using var store = (ChordStore)await Tables.ImportStoreAsync(Tables.SqliteBackend(new TestSqliteDatabase(":memory:")),
+                Tables.DecodeJsonl(SchemaFileChunks(SchemaFixture("stored", "archive.jsonl"))), context);
+            Sequence(new[] { 13L, 12L }, new[] { store.LastSeq, store.NextId }, "the manifest's lastSeq and nextId");
+            var written = new List<byte>();
+            await foreach (var chunk in Tables.EncodeJsonl(store.Export(context))) written.AddRange(chunk.ToArray());
+            Check(bytes.AsSpan().SequenceEqual(written.ToArray()), $"the export is archive.jsonl's {bytes.Length} bytes: {written.Count} bytes, " +
+                $"first difference at {bytes.Zip(written).TakeWhile(pair => pair.First == pair.Second).Count()}");
+        }),
+        Case("schema.schema-switch.stored-data-pisharp-a-copy-of-the-stored-store-opens-and-exports-the-archive-after-the-host-s-close", async () =>
+        {
+            var context = ChordContext.Background;
+            var directory = Directory.CreateTempSubdirectory("chord-schema-switch-");
+            try
+            {
+                var path = Path.Combine(directory.FullName, "store.db");
+                File.Copy(SchemaFixture("stored", "store.db"), path);
+                List<JsonObject> parts;
+                await using (var store = await StoreOver(new TestSqliteDatabase(path))) parts = await Exported(store);
+                // The archive, then the host's close (authored, read off the fixtures): one more commit, at seq 14, and each job run's
+                // record at revision 3 with a new base there, its phase stopped.
+                var expected = await SchemaStoredArchive();
+                expected[0]!["lastSeq"] = 14;
+                var runs = new HashSet<long>();
+                foreach (var part in expected)
+                {
+                    if ((string)part!["kind"]! == "document.create" && (string)part["record"]!["namespace"]! == "chord.jobs")
+                    {
+                        part["record"]!["revision"] = 3;
+                        runs.Add((long)part["record"]!["id"]!);
+                    }
+                    else if ((string)part["kind"]! == "document.revision" && runs.Contains((long)part["id"]!))
+                    {
+                        part["seq"] = 14;
+                        part["content"]!["value"]!["phase"] = "stopped";
+                    }
+                }
+                Sequence(new[] { 4L, 7L, 10L }, runs.Order(), "the job runs");
+                SameParts(expected, parts, "store.db's export");
+            }
+            finally
+            {
+                directory.Delete(recursive: true);
+            }
         }),
     ];
 }

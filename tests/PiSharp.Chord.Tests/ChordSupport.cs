@@ -19,13 +19,13 @@ using static PiSharp.Chord.Contracts.Schemas;
 // area cv2-data added the counters (counted, metered) and rejection; area cv2-state the watch frames and changes (framesOf, changesOf,
 // valuesOf; delivered() flushes a host's scheduler, State/StateHost.cs); area cv2-store-engine the store helpers (memoryStore,
 // faultyDatabase, faultyStore, holdNextCommit, tableOwner, tableIn, ArchiveTables, archiveStore; the Program block at the end of this
-// file), over TestSqliteDatabase, which stands in for src/sqlite/node.ts's NodeSqliteDatabase (see its summary).
+// file), over TestSqliteDatabase, which stands in for src/sqlite/node.ts's NodeSqliteDatabase (see its summary); area cv2-store-archive
+// exported (with the store helpers), flushed and settledHeap (a macrotask turn and a settled heap, which the export cases use first).
 // Equal<A, B> is a type-level check with no C# counterpart. The rest needs layers later areas bring, and each comes with the first area
-// whose tests use it: exported and countInflated (export and import, area cv2-store-archive), the remaining declarations (NotesDoc; the
-// documents areas), and the hosts, links, relays and raw peers (failLive, restartable,
-// storeRestartable, loaded, loadedPlugins, fakeTimers, flushed, failures, linked, RawPeer, partValue, CODECS, forEachCodec, rawLinked,
+// whose tests use it: the remaining declarations (NotesDoc; the documents areas), and the hosts, links, relays and raw peers (failLive,
+// restartable, storeRestartable, loaded, loadedPlugins, fakeTimers, failures, linked, RawPeer, partValue, CODECS, forEachCodec, rawLinked,
 // transported, serveNotes, addNote, rawProvider, rawParent, statesOf, EDITOR, bindNext, bindHold, instancesOf, relayed, rawWorkers,
-// incarnationOf, settledHeap), which build on createHost and the link layer (phase 6).
+// incarnationOf, countInflated), which build on createHost and the link layer (phase 6).
 internal static class ChordSupport
 {
     /// <summary>Expects every referent to be collected once nothing else holds it (upstream runs gc() between macrotasks).</summary>
@@ -209,6 +209,23 @@ internal static class ChordSupport
         return (telemetry, ChordContext.WithTelemetry(span, ChordContext.Background), Counts);
     }
 
+    /// <summary>Lets pending continuations run (upstream <c>flushed</c>, one macrotask turn): continuations here run on the thread pool, so
+    /// a short delay stands in for setImmediate.</summary>
+    internal static Task Flushed() => Task.Delay(20);
+
+    /// <summary>The heap in use once garbage settled (upstream <c>settledHeap</c>, five rounds of a macrotask turn and gc() before
+    /// process.memoryUsage().heapUsed): the managed heap after full collections.</summary>
+    internal static async Task<long> SettledHeap()
+    {
+        for (var round = 0; round < 5; round++)
+        {
+            await Task.Yield();
+            GC.Collect();
+            GC.WaitForPendingFinalizers();
+        }
+        return GC.GetTotalMemory(forceFullCollection: true);
+    }
+
     /// <summary>The error <paramref name="task"/> fails with, as ChordError JSON when it is one (upstream <c>rejection</c>).</summary>
     internal static async Task<object> Rejection(Task task)
     {
@@ -356,6 +373,21 @@ internal static partial class Program
         await store.CommitAsync([Delta(b, 1, "b2")], fence, context);
         return store;
     }
+
+    /// <summary>Every part of <paramref name="store"/>'s export, in order (upstream <c>exported</c>).</summary>
+    internal static async Task<List<JsonObject>> Exported(IStore store)
+    {
+        var parts = new List<JsonObject>();
+        await foreach (var part in store.Export(ChordContext.Background)) parts.Add(part);
+        return parts;
+    }
+
+    /// <summary>toEqual on archives: the parts as one JSON array (copies of them), compared with <see cref="Json"/>.</summary>
+    internal static void SameParts(IEnumerable<JsonNode?> expected, IEnumerable<JsonNode?> actual, string what) =>
+        Json(PartsJson(expected).ToJsonString(), PartsJson(actual), what);
+
+    /// <summary>Archive parts as a JSON array of copies of them.</summary>
+    internal static JsonArray PartsJson(IEnumerable<JsonNode?> parts) => [.. parts.Select(part => part?.DeepClone())];
 
     /// <summary><paramref name="definition"/> prepared as <paramref name="table"/> in <paramref name="store"/>, and a handle to it (upstream
     /// <c>tableAt</c>).</summary>

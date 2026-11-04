@@ -4,11 +4,11 @@ using PiSharp.Chord.Sqlite;
 using PiSharp.Chord.Store;
 
 // Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/chord/test/next/store/engine.test.ts. Every case is ported, over ChordStore
-// on TestSqliteDatabase (ChordSupport.cs). The two "counters at the safe-integer limit" cases start from a store near the limit that
-// upstream makes with importStore (an export with the manifest's nextId, or a record's revision, edited); import comes with area
-// cv2-store-archive, so here the same state is written by hand: chord_meta's next_id before the store opens, the record's revision with
-// an UPDATE (the store keeps no document state in memory). What each case asserts after that is upstream's. A read's outcome as a value
-// (upstream's .then(() => "loaded", String)) is the error's message. toMatchObject on a record checks the fields it names.
+// on TestSqliteDatabase (ChordSupport.cs). The two "counters at the safe-integer limit" cases start from a store near the limit made as
+// upstream makes it, with reimported (an export with the manifest's nextId, or a record's revision, edited, imported into a fresh store;
+// area cv2-store-archive moved them there from a hand-written chord_meta row and an UPDATE); the stores exported are closed here. A read's
+// outcome as a value (upstream's .then(() => "loaded", String)) is the error's message. toMatchObject on a record checks the fields it
+// names.
 internal static partial class Program
 {
     /// <summary>The owner, namespace and kind of the engine cases' documents (upstream <c>OWNER</c>).</summary>
@@ -51,15 +51,11 @@ internal static partial class Program
     /// <summary>A store on <c>:memory:</c> (or <paramref name="on"/>) and its helpers (upstream <c>engine</c>).</summary>
     private static async Task<StoreEngineFixture> StoreEngine(ChordStore? on = null) => new(on ?? await MemoryStore());
 
-    /// <summary>A store on <c>:memory:</c> whose allocator stands at <paramref name="nextId"/>, as upstream's import of an empty store's
-    /// export with that nextId leaves it.</summary>
-    private static async Task<ChordStore> StoreEngineNear(long nextId)
-    {
-        var db = new TestSqliteDatabase(":memory:");
-        await StoreInternal.ApplyStoreSchemaAsync(db);
-        await db.RunAsync($"UPDATE {StoreInternal.StoreTables.Meta} SET next_id = ? WHERE singleton = 1", nextId);
-        return await StoreOver(db);
-    }
+    /// <summary><paramref name="store"/>'s archive with <paramref name="edit"/> applied to its parts, imported into a fresh <c>:memory:</c>
+    /// store (upstream <c>reimported</c>).</summary>
+    private static async Task<ChordStore> StoreEngineReimported(ChordStore store, Func<List<JsonObject>, IEnumerable<JsonNode?>> edit) =>
+        (ChordStore)await Tables.ImportStoreAsync(Tables.SqliteBackend(new TestSqliteDatabase(":memory:")), edit(await Exported(store)),
+            ChordContext.Background);
 
     /// <summary>A staged write applying <paramref name="apply"/> in the step (an adapter's composite; upstream <c>staged</c>).</summary>
     private static IStagedWrite StoreEngineStaged(Func<Step, Task> apply) => new StagedWrite(WriteOrder.Write, async step =>
@@ -236,13 +232,19 @@ internal static partial class Program
             }),
             Case("store.engine.counters-at-the-safe-integer-limit-allocate-document-ids-up-to-the-safe-range-after-an-import-near-it-past-it-the-commit-is-refused", async () =>
             {
-                var engine = await StoreEngine(await StoreEngineNear(StoreEngineLimit - 1));
+                await using var source = (await StoreEngine()).Store;
+                Task<ChordStore> Near(long next) => StoreEngineReimported(source, parts =>
+                {
+                    parts[0]["nextId"] = next;
+                    return parts;
+                });
+                var engine = await StoreEngine(await Near(StoreEngineLimit - 1));
                 Sequence([StoreEngineLimit - 1], await engine.Commit(StoreEngineFixture.Create("a", """{"n":0}""")), "the last id");
                 Equal(StoreEngineLimit, engine.Store.NextId, "the allocator at the bound");
                 var past = StoreText(await StoreRejection(engine.Commit(StoreEngineFixture.Create("b", """{"n":0}"""))));
                 Check(past.Contains("ID space is exhausted", StringComparison.Ordinal), $"past it: actual <{past}>");
                 // Two creations in one commit where only one id is left: nothing of it is written.
-                var both = await StoreEngine(await StoreEngineNear(StoreEngineLimit - 1));
+                var both = await StoreEngine(await Near(StoreEngineLimit - 1));
                 var two = StoreText(await StoreRejection(both.Commit(StoreEngineFixture.Create("a", """{"n":0}"""), StoreEngineFixture.Create("b", """{"n":0}"""))));
                 Check(two.Contains("ID space is exhausted", StringComparison.Ordinal), $"two creations: actual <{two}>");
                 Sequence([0L, StoreEngineLimit - 1], [both.Store.LastSeq, both.Store.NextId], "nothing written");
@@ -251,10 +253,14 @@ internal static partial class Program
             }),
             Case("store.engine.counters-at-the-safe-integer-limit-count-revisions-up-to-the-safe-range-after-an-import-near-it-a-change-past-it-is-refused", async () =>
             {
-                var db = new TestSqliteDatabase(":memory:");
-                var engine = await StoreEngine(await StoreOver(db));
-                var id = (await engine.Commit(StoreEngineFixture.Create("a", """{"n":0}""")))[0];
-                await db.RunAsync($"UPDATE {StoreInternal.StoreTables.Documents} SET revision = ? WHERE id = ?", StoreEngineLimit - 1, id);
+                var seed = await StoreEngine();
+                await using var source = seed.Store;
+                await seed.Commit(StoreEngineFixture.Create("a", """{"n":0}"""));
+                var engine = await StoreEngine(await StoreEngineReimported(source, parts =>
+                {
+                    foreach (var part in parts.Where(part => (string)part["kind"]! == "document.create")) part["record"]!["revision"] = StoreEngineLimit - 1;
+                    return parts;
+                }));
                 var found = (await engine.Read(e => DocumentEngine.FindDocumentAsync(e, StoreEngineFixture.At("a"))))!;
                 await engine.Commit(StoreEngineFixture.Delta(found.Id, StoreEngineLimit - 1, """[["s",["n"],1]]"""));
                 var past = StoreText(await StoreRejection(engine.Commit(StoreEngineFixture.Delta(found.Id, StoreEngineLimit, """[["s",["n"],2]]"""))));
