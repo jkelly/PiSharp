@@ -14,8 +14,8 @@
 //
 // Pi v1.5.0 sync (area harness-options): CompactionSettings.ModelOverrides and Settings.Compaction's overrides (upstream 6085986e4,
 // #10942), HarnessOptions.CurrentModels and CurrentSettings (upstream's function forms of models and settings, 7ec1f648e) and
-// HarnessOptions.ReadOnly (be14d9732). ToolControl.Terminate was already a bool. The citation stays on v1.2.0 until the file's other areas
-// land.
+// HarnessOptions.ReadOnly (be14d9732), and ToolControl.Terminate as a bool? that may be false (6085986e4, #10858). The citation stays on
+// v1.2.0 until the file's other areas land.
 using System.Collections.Immutable;
 using PiSharp.Durable.Chord;
 using PiSharp.Durable.Env;
@@ -227,8 +227,9 @@ public sealed record ToolControl
 {
     /// <summary>Tools to add to the agent's filter.</summary>
     public ImmutableArray<string>? AddTools { get; init; }
-    /// <summary>End the run after this round.</summary>
-    public bool Terminate { get; init; }
+    /// <summary>End the run without another model request when every result of the round sets it to true; false is a no-op and is stored as
+    /// given (upstream's <c>terminate?: boolean</c>, #10858).</summary>
+    public bool? Terminate { get; init; }
     /// <summary>Hand off to a new context with this text.</summary>
     public string? Handoff { get; init; }
 }
