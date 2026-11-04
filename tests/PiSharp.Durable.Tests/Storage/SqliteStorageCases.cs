@@ -7,6 +7,13 @@
 // - replays-detached-root-replacements-...: returned values are immutable, so instead of mutating the first read the case checks that a
 //   second read is equal.
 // storage.sqlite.native.* is authored: the bundled e_sqlite3 library is loaded, is at least 3.37.0 (STRICT tables) and has JSON functions.
+// Pi v1.5.0 (f9a26365568127461c47a07a37dcb42c140a3ac5, area sqlite) adds the table prefix: namespaces-tables-and-indexes-with-a-prefix-
+// across-reopen and rejects-an-invalid-prefix-before-creating-the-database are ports of its sqlite-storage.test.ts cases. Upstream tests the
+// prefix over an existing database only on its Cloudflare Durable Object adapter (sqlite-cloudflare.test.ts, out of scope); its four
+// cases and its prefixed conformance run are adapted as storage.sqlite.prefix.* and storage.sqlite.prefixed.conformance.<case> over
+// SqliteStorage.OpenAsync(ISqliteDatabase, options) on an in-memory database. Authored there: the prefixed conformance database first
+// holds a host table under every unprefixed name, with a column no Durable query reads, so a statement that missed the prefix fails, and
+// the rejection case also checks that the refused database is closed. The rest of the file follows v1.2.0 until area storage-batches.
 using Microsoft.Data.Sqlite;
 using PiSharp.Durable;
 using PiSharp.Durable.Chord;
@@ -43,6 +50,114 @@ internal static partial class Program
             }
         }))
             yield return Case("storage.sqlite.reopen.conformance." + testCase.Slug, testCase.Run);
+
+        foreach (var testCase in StorageConformance.Create(async use =>
+        {
+            var database = await SqliteConnectionDatabase.OpenAsync(":memory:");
+            foreach (var name in UnprefixedTableNames) await database.ExecAsync($"CREATE TABLE {name} (host_text TEXT)");
+            var storage = await SqliteStorage.OpenAsync(database, new SqliteStorageOptions { Prefix = "pi_" });
+            try
+            {
+                await use(storage);
+            }
+            finally
+            {
+                await storage.CloseAsync(SqliteContext);
+            }
+        }))
+            yield return Case("storage.sqlite.prefixed.conformance." + testCase.Slug, testCase.Run);
+
+        yield return Case("storage.sqlite.namespaces-tables-and-indexes-with-a-prefix-across-reopen", async () =>
+        {
+            await using var temp = new SqliteTemp();
+            var path = temp.NewPath();
+            using (var host = new SqliteConnection(new SqliteConnectionStringBuilder { DataSource = path, Pooling = false }.ToString()))
+            {
+                host.Open();
+                RawQuery(host, "CREATE TABLE tasks (text TEXT)");
+            }
+            var storage = await SqliteStorage.OpenAsync(path, new SqliteStorageOptions { Prefix = "pi_" });
+            Equal(Ids.SeqFromNumber(1), await CreateSqliteRoot(storage), "root sequence");
+            await storage.CloseAsync(SqliteContext);
+
+            var reopened = temp.Track(await SqliteStorage.OpenAsync(path, new SqliteStorageOptions { Prefix = "pi_" }));
+            Equal(new ConversationRecord(ConversationId.Root), await reopened.GetConversationAsync(ConversationId.Root, SqliteContext), "root after reopen");
+            using var database = RawSqlite(path, readOnly: true);
+            var names = SchemaObjectNames(database);
+            Equal("tasks", string.Join(",", names.Where(name => !name.StartsWith("pi_", StringComparison.Ordinal))), "names without the prefix");
+            Check(names.Contains("pi_tasks"), "pi_tasks exists");
+        });
+
+        yield return Case("storage.sqlite.rejects-an-invalid-prefix-before-creating-the-database", async () =>
+        {
+            await using var temp = new SqliteTemp();
+            var databaseDirectory = Path.Combine(Path.GetDirectoryName(temp.NewPath())!, "nested");
+            var error = await ThrowsAsync<ArgumentException>(() =>
+                SqliteStorage.OpenAsync(Path.Combine(databaseDirectory, "storage.sqlite"), new SqliteStorageOptions { Prefix = "bad-prefix" }), "open");
+            Check(error.Message.Contains("Invalid SQLite schema prefix", StringComparison.Ordinal), error.Message);
+            Check(!Directory.Exists(databaseDirectory), "the database directory was not created");
+        });
+
+        yield return Case("storage.sqlite.prefix.keeps-schema-names-unprefixed-by-default", async () =>
+        {
+            var database = await SqliteConnectionDatabase.OpenAsync(":memory:");
+            var storage = await SqliteStorage.OpenAsync(database);
+            Equal("{\"version\":2}", (await database.GetAsync("SELECT version FROM durable_schema"))?.ToString(), "schema version");
+            Equal<SqliteRow?>(null, await database.GetAsync("SELECT name FROM sqlite_master WHERE name = 'pi_durable_schema'"), "prefixed schema table");
+            await storage.CloseAsync(SqliteContext);
+        });
+
+        yield return Case("storage.sqlite.prefix.prefixes-the-tables-and-indexes-without-changing-host-tables", async () =>
+        {
+            var database = await SqliteConnectionDatabase.OpenAsync(":memory:");
+            await database.ExecAsync("CREATE TABLE host_notes (text TEXT)");
+            await database.ExecAsync("CREATE TABLE tasks (text TEXT)");
+            var storage = await SqliteStorage.OpenAsync(database, new SqliteStorageOptions { Prefix = "pi_" });
+            var names = (await database.AllAsync(
+                    "SELECT name FROM sqlite_master WHERE type IN ('table', 'index') AND name NOT LIKE 'sqlite_%' ORDER BY name"))
+                .Select(row => row.GetString("name")).ToList();
+            Check(names.Contains("host_notes"), "host_notes kept");
+            Check(names.Contains("tasks"), "tasks kept");
+            Check(!names.Contains("pi_host_notes"), "no pi_host_notes");
+            var piNames = names.Where(name => name is not "host_notes" and not "tasks").ToList();
+            Check(piNames.Count > 10, $"{piNames.Count} schema objects");
+            Check(piNames.All(name => name.StartsWith("pi_", StringComparison.Ordinal)), "every schema object is prefixed: " + string.Join(",", piNames));
+            Check(piNames.Contains("pi_tasks"), "pi_tasks exists");
+            Check(piNames.Contains("pi_durable_schema"), "pi_durable_schema exists");
+            await storage.CloseAsync(SqliteContext);
+        });
+
+        yield return Case("storage.sqlite.prefix.isolates-concurrently-opened-prefixes-on-one-database", async () =>
+        {
+            var database = await SqliteConnectionDatabase.OpenAsync(":memory:");
+            var opened = await Task.WhenAll(
+                SqliteStorage.OpenAsync(database, new SqliteStorageOptions { Prefix = "first_" }),
+                SqliteStorage.OpenAsync(database, new SqliteStorageOptions { Prefix = "second_" }));
+            var (first, second) = (opened[0], opened[1]);
+            var entryId = Ids.FromNumber<EntryId>(2);
+            IReadOnlyList<StorageWrite> Writes(string kind) =>
+            [
+                new ConversationWrite(new ConversationRecord(ConversationId.Root)),
+                new EntryWrite(new EntryRecord { Id = entryId, ConversationId = ConversationId.Root, Kind = kind }),
+            ];
+            await Task.WhenAll(first.CommitAsync(Writes("first"), SqliteContext), second.CommitAsync(Writes("second"), SqliteContext));
+            Equal("first", (await first.GetEntryAsync(entryId, SqliteContext))?.Entry.Kind, "first entry");
+            Equal("second", (await second.GetEntryAsync(entryId, SqliteContext))?.Entry.Kind, "second entry");
+            await Task.WhenAll(first.CloseAsync(SqliteContext), second.CloseAsync(SqliteContext));
+        });
+
+        yield return Case("storage.sqlite.prefix.rejects-invalid-and-reserved-prefixes-and-closes-the-database", async () =>
+        {
+            foreach (var (prefix, message) in new[] { ("", "Invalid"), ("bad-prefix", "Invalid"), ("sqlite_pi_", "reserved") })
+            {
+                var database = await SqliteConnectionDatabase.OpenAsync(":memory:");
+                var error = await ThrowsAsync<ArgumentException>(() => SqliteStorage.OpenAsync(database, new SqliteStorageOptions { Prefix = prefix }),
+                    $"prefix {JsonValue.String(prefix).ToJson()}");
+                Check(error.Message.Contains(message, StringComparison.Ordinal), error.Message);
+                var closed = await ThrowsAsync<InvalidOperationException>(() => database.GetAsync("SELECT 1 AS one"), "query after the refusal");
+                Equal("SQLite database is closed", closed.Message, "the refused database is closed");
+            }
+        });
 
         yield return Case("storage.sqlite.native.loads-e-sqlite3-with-strict-tables-and-json", async () =>
         {
@@ -383,6 +498,15 @@ internal static partial class Program
 
     private static long RawScalar(SqliteConnection connection, string sql) => RawQuery(connection, sql)[0].GetInt64("value");
 
+    /// <summary>The tables and indexes of a database, as upstream lists them.</summary>
+    private static List<string> SchemaObjectNames(SqliteConnection connection) =>
+        RawQuery(connection, "SELECT name FROM sqlite_master WHERE type IN ('table', 'index') AND name NOT LIKE 'sqlite_%'")
+            .Select(row => row.GetString("name")).ToList();
+
+    /// <summary>The unprefixed names of upstream's tables (TABLE_NAMES in packages/durable/src/storage/sqlite/schema.ts).</summary>
+    private static readonly string[] UnprefixedTableNames =
+        ["durable_schema", "durable_metadata", "record_ids", "conversations", "entries", "tasks", "submissions", "documents", "document_revisions"];
+
     /// <summary>Temporary storage files for one case: closes every tracked storage, then deletes the directories (upstream
     /// <c>afterEach</c>). A file still open would make the deletion fail on Windows.</summary>
     private sealed class SqliteTemp : IAsyncDisposable
@@ -476,6 +600,7 @@ internal static partial class Program
 
         public Task ExecAsync(string sql) => inner.ExecAsync(sql);
         public Task RunAsync(string sql, params object?[] parameters) => inner.RunAsync(sql, parameters);
+        public Task<long> RunCountedAsync(string sql, params object?[] parameters) => inner.RunCountedAsync(sql, parameters);
         public Task<SqliteRow?> GetAsync(string sql, params object?[] parameters) => inner.GetAsync(sql, parameters);
         public Task<IReadOnlyList<SqliteRow>> AllAsync(string sql, params object?[] parameters) => inner.AllAsync(sql, parameters);
         public Task<T> TransactionAsync<T>(Func<ISqliteExecutor, Task<T>> callback) =>
@@ -487,6 +612,8 @@ internal static partial class Program
             public Task ExecAsync(string sql) => inner.ExecAsync(sql);
             public Task RunAsync(string sql, params object?[] parameters) =>
                 fails(sql.TrimStart()) ? Task.FromException(new InvalidOperationException(Message)) : inner.RunAsync(sql, parameters);
+            public Task<long> RunCountedAsync(string sql, params object?[] parameters) =>
+                fails(sql.TrimStart()) ? Task.FromException<long>(new InvalidOperationException(Message)) : inner.RunCountedAsync(sql, parameters);
             public Task<SqliteRow?> GetAsync(string sql, params object?[] parameters) => inner.GetAsync(sql, parameters);
             public Task<IReadOnlyList<SqliteRow>> AllAsync(string sql, params object?[] parameters) => inner.AllAsync(sql, parameters);
         }
