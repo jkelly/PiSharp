@@ -57,10 +57,10 @@
     "repeatedBullets": 23,
     "byStatus": {
       "ported": 178,
-      "ported-with-deferral": 16,
+      "ported-with-deferral": 17,
       "already-ported": 12,
       "no-op": 25,
-      "port": 95
+      "port": 94
     },
     "byArea": {
       "ai": 58,
@@ -11181,7 +11181,7 @@
       "id": "chord.next-contracts-data",
       "area": "chord",
       "phase": 4,
-      "status": "port",
+      "status": "ported-with-deferral",
       "changelog": [
         "chord@1.5.0/Added#6",
         "chord@1.5.0/Changed#1"
@@ -11202,7 +11202,31 @@
       "pulledInBy": [
         "durable.store-storage"
       ],
-      "notes": "Depends on pi-schema (phase 2). Upstream records fingerprints, normal forms and stored records in a test and reads a store written before the pi-schema switch; the C# port should reuse those fixtures to show identical fingerprints."
+      "notes": "Depends on pi-schema (phase 2). Upstream records fingerprints, normal forms and stored records in a test and reads a store written before the pi-schema switch; the C# port should reuse those fixtures to show identical fingerprints.",
+      "evidence": {
+        "commits": [
+          "261aa78a",
+          "4501b9aa",
+          "9ac86c43"
+        ],
+        "tests": [
+          "tests/PiSharp.Chord.Tests/Data/ArgsCases.cs: data.args.check-args-checks-an-old-version-against-the-old-schema-then-maps-directly-to-the-current-shape",
+          "tests/PiSharp.Chord.Tests/Data/ArgsCases.cs: data.args.check-args-treats-format-as-an-annotation-a-contract-with-format-email-accepts-any-string",
+          "tests/PiSharp.Chord.Tests/Data/ArgsCases.cs: data.args.check-args-compiles-lazily-once-per-accepted-version-and-method-equal-schema-objects-share-a-validator",
+          "tests/PiSharp.Chord.Tests/Data/ArgsCases.cs: data.args.memory-a-dropped-binding-releases-its-dispatch-table-mappings-schemas-and-validators-after-the-last-call",
+          "tests/PiSharp.Chord.Tests/Data/ErrorsCases.cs: data.errors.round-trips-through-json-without-stack-or-cause",
+          "tests/PiSharp.Chord.Tests/Data/ErrorsCases.cs: data.errors.protocol-table-is-pinned-together-with-protocol-version",
+          "tests/PiSharp.Chord.Tests/Data/FailureCases.cs: data.failure.reaches-a-fixed-point-when-a-ring-of-waiting-attempts-passes-its-causes-round",
+          "tests/PiSharp.Chord.Tests/Data/ParamsCases.cs: data.params.check-params-refuses-missing-extra-and-wrong-fields-at-their-paths",
+          "tests/PiSharp.Chord.Tests/Data/ParamsCases.cs: contracts.host-kind.check-an-addresss-params-where-it-is-routed-with-the-kinds-compiled-check-invalid-host-address",
+          "tests/PiSharp.Chord.Tests/Data/PrincipalCases.cs: data.principal.principal-key-caches-custom-keys-per-function",
+          "tests/PiSharp.Chord.Tests/Data/ValidatorCases.cs: data.validator.failed-checks-escape-tilde-and-slash-in-keys-so-a-path-names-one-place",
+          "tests/PiSharp.Chord.Tests/Data/ValidatorCases.cs: data.validator.failed-checks-check-bytes-by-instanceof-and-length",
+          "tests/PiSharp.Chord.Tests/Schema/SchemaSwitchCases.cs: schema.schema-switch.fixtures-are-upstreams-files-byte-for-byte",
+          "tests/PiSharp.Chord.Tests/Schema/SchemaSwitchCases.cs: schema.schema-switch.keeps-every-fingerprint-and-normal-form-of-contracts"
+        ]
+      },
+      "deferred": "The data half is ported: all nine packages/chord/src/next/data files (src/PiSharp.Chord/Data) and all six data tests (73 new cases, every upstream case except the type-level ones). Left: (1) bindProvider's checkAccepts step. accepts.ts, the AcceptsTable type and evolve belong to area cv2-evolve and are not merged here, so BindProvider takes the table in the form checkAccepts leaves it (CheckedAccepts, args.ts's own view of it). args.test.ts runs against hand-built evolved contracts (ArgsDraft in ArgsCases.cs, materialized the way evolve's Draft.next does, so the fingerprints are evolve's). Once cv2-evolve is in: add BindProvider(contract, AcceptsTable) = CheckAccepts, then this BindProvider; switch ArgsCases to evolve; and port args.test.ts's one remaining assertion, bindProvider(NotesV3, { 1: {} }) refused with \"notes accepts[1].methods.add: missing mapping\". (2) The row's contracts half belongs to cv2-contracts (merged) and cv2-evolve (evolve, accepts, fingerprint, history and snapshot tests; in flight). (3) schema-switch.test.ts: the contracts' fingerprints and normal forms, and the profile's normal form, match recorded.json now. Documents' fingerprints wait for defineState (documents areas), tables' for defineTable/evolveTable/json (cv2-store-tables), and the job's for defineJob (jobs, phase 6). \"stored data\" (storedReads: a host reading stored/store.db and an import of stored/archive.jsonl) needs createHost and defineFacet (phase 6) plus the store engine and archive. (4) owner.ts waits for phase 6 (createHost, defineFacet). write-stored.ts is not ported: it rewrites the fixtures, which decision 0013 rules out."
     },
     {
       "id": "chord.next-documents-state",
