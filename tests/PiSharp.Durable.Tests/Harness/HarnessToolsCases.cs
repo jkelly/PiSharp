@@ -12,6 +12,10 @@
 // - "uses explicit null details": `details: null` is JsonValue.Null (a C# null is upstream's undefined).
 // - The two "coding tools" cases run CodingTools over a LocalExecutionEnv (upstream NodeExecutionEnv) in a fresh directory, on each backend
 //   (upstream: MemoryStorage only); the shell is Git Bash on Windows.
+// - Pi v1.5.0 sync (area model-requests): "gives tools and hooks the Harness's models" takes v1.5.0's form (adc5fa9f8): one view of the
+//   host's models that adds the Harness identity; `getProviders()` is compared through GetModel, as IDurableModels has no provider list.
+//   The two beforeProviderRequest cases are d280e1ffa's; upstream's report info names the throwing hook's extension, which waits on
+//   ReportInfo (area reports), so the C# case checks the report's message.
 using System.Collections.Immutable;
 using System.Text;
 using PiSharp.Durable;
@@ -150,8 +154,10 @@ internal static class ToolsTests
             var ran = await Run(fresh, setup, [Calls(("echo", Obj(), "c1")), Done]);
             Equal(SubmissionStatus.Done, ran.Status, "status");
             var models = seen.Snapshot();
+            // One view of the host's Models that adds the Harness identity, shared by tools and hooks.
             Equal(2, models.Count, "seen");
-            Check(models.All(each => ReferenceEquals(each, setup.Models)), "every models is the Harness's");
+            Check(ReferenceEquals(models[0], models[1]), "one view");
+            Equal(setup.Models.GetModel("faux", "faux-1")?.Descriptor, models[0].GetModel("faux", "faux-1")?.Descriptor, "the host's models");
             await ran.Harness.CloseAsync(Context);
         });
 
@@ -696,6 +702,75 @@ internal static class ToolsTests
             Seq(["pi.user", "pi.assistant", "pi.user", "pi.assistant"], ran.Entries.Select(entry => entry.Kind), "kinds");
             // The injected message was used for the request only.
             Check(!ran.Entries.Any(entry => TextOf(entry.Model?[0]) == "injected"), "no injected entry");
+            await ran.Harness.CloseAsync(Context);
+        });
+
+        yield return Case(prefix + "chains-beforeproviderrequest-over-every-provider-request-body", async () =>
+        {
+            var setup = Setup();
+            var seen = new SyncList<string>();
+            AddHooks(setup.Registry, HarnessTasks.GenerationTask, new GenerationHooks
+            {
+                BeforeProviderRequest = (model, payload, _, _) =>
+                {
+                    seen.Add($"first {model.Provider}/{model.Id} {payload.ToJson()}");
+                    return Task.FromResult<JsonValue?>(((JsonObjectValue)payload).SetItem("first", true));
+                },
+            });
+            AddHooks(setup.Registry, HarnessTasks.GenerationTask, new GenerationHooks
+            {
+                BeforeProviderRequest = (model, payload, _, _) =>
+                {
+                    seen.Add($"keep {model.Provider}/{model.Id} {payload.ToJson()}");
+                    return Task.FromResult<JsonValue?>(null);
+                },
+            });
+            AddHooks(setup.Registry, HarnessTasks.GenerationTask, new GenerationHooks
+            {
+                BeforeProviderRequest = (_, payload, _, _) => Task.FromResult<JsonValue?>(((JsonObjectValue)payload).SetItem("last", true)),
+            });
+            var sent = new SyncList<string?>();
+            // pi-ai builds a body per provider call, and again when it resends within one attempt.
+            FauxStep respond = new FauxResponseFactory(async request =>
+            {
+                sent.Add((await request.Options!.OnPayload!(Obj(("body", 1)), request.Model, request.Signal))?.ToJson());
+                sent.Add((await request.Options!.OnPayload!(Obj(("body", 2)), request.Model, request.Signal))?.ToJson());
+                return Done;
+            });
+            var ran = await Run(fresh, setup, [respond]);
+            Equal(SubmissionStatus.Done, ran.Status, "status");
+            Seq(["""{"body":1,"first":true,"last":true}""", """{"body":2,"first":true,"last":true}"""], sent.Snapshot(), "sent");
+            Seq(
+            [
+                """first faux/faux-1 {"body":1}""",
+                """keep faux/faux-1 {"body":1,"first":true}""",
+                """first faux/faux-1 {"body":2}""",
+                """keep faux/faux-1 {"body":2,"first":true}""",
+            ], seen.Snapshot(), "seen");
+            await ran.Harness.CloseAsync(Context);
+        });
+
+        yield return Case(prefix + "reports-a-throwing-beforeproviderrequest-hook-and-continues-the-chain", async () =>
+        {
+            var setup = Setup();
+            AddHooks(setup.Registry, HarnessTasks.GenerationTask, new GenerationHooks
+            {
+                BeforeProviderRequest = (_, _, _, _) => throw new InvalidOperationException("broken hook"),
+            }, "broken");
+            AddHooks(setup.Registry, HarnessTasks.GenerationTask, new GenerationHooks
+            {
+                BeforeProviderRequest = (_, payload, _, _) => Task.FromResult<JsonValue?>(((JsonObjectValue)payload).SetItem("after", true)),
+            });
+            string? sent = null;
+            FauxStep respond = new FauxResponseFactory(async request =>
+            {
+                sent = (await request.Options!.OnPayload!(Obj(("body", 1)), request.Model, request.Signal))?.ToJson();
+                return Done;
+            });
+            var ran = await Run(fresh, setup, [respond]);
+            Equal(SubmissionStatus.Done, ran.Status, "status");
+            Equal("""{"body":1,"after":true}""", sent, "sent");
+            Equal(1, setup.Reports.Snapshot().Count(error => error.Message == "broken hook"), "reports");
             await ran.Harness.CloseAsync(Context);
         });
 

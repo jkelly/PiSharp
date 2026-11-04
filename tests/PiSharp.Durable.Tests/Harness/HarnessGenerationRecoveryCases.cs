@@ -4,10 +4,14 @@
 //   every case reopening a JSONL directory.
 // - `aborted(ctx.abortSignal!)` in a section is Aborted(ctx.CancellationToken); `aborted(options!.signal!)` in a faux response is
 //   Aborted(request.Signal).
+// - Pi v1.5.0 sync (area model-requests): "polls a checkpoint stored without a thinking level and records none" (d5b3de22d). Upstream
+//   removes the field with SQLite's json_remove; here the task record is read from the closed storage and written back without it, so the
+//   case runs on both backends.
 using PiSharp.Durable;
 using PiSharp.Durable.Chord;
 using PiSharp.Durable.Sqlite;
 using PiSharp.Durable.Storage.Jsonl;
+using PiSharp.Durable.Testing;
 using static ChatTests;
 using static HarnessTests;
 using static Program;
@@ -231,6 +235,47 @@ internal static class GenerationRecoveryTests
             var answer = await opened.Root.CommitAsync(tx => tx.GetEntryAsync(Entries.AssistantEntry, settled.Answer!.Value), Context);
             Equal("deferred answer", TextOf(answer?.Model?[0]), "answer");
             Equal(1, setup.Faux.State.DeferredFetchCount, "fetches");
+            await opened.Harness.CloseAsync(Context);
+        });
+
+        yield return Case(prefix + "polls-a-checkpoint-stored-without-a-thinking-level-and-records-none", async () =>
+        {
+            var open = location();
+            var setup = Setup(new FauxOptions { PollAfterMs = 60_000 });
+            double now = 1_000;
+            setup.Now = () => Volatile.Read(ref now);
+            setup.Faux.SetResponses(FauxAssistantMessage("deferred answer"));
+            var opened = await OpenChat(open(), setup);
+            await opened.Root.ConfigureAsync(new AgentChange { ThinkingLevel = "high" }, Context);
+            opened.Harness.Resume();
+            setup.Stream = new ConversationStreamOptions { Deferred = true };
+            var id = (await Submit(opened.Root, "hi")).Id;
+            await Eventually(async () => Generation(await LiveOf(opened), "deferred") is not null);
+            var taskId = await RunTaskId(opened.Harness);
+            MatchJson("""{"phase":"poll","thinkingLevel":"high"}""", await Checkpoint(opened.Harness, taskId), "checkpoint");
+            await opened.Harness.CloseAsync(Context);
+            // Earlier versions stored poll checkpoints without the field.
+            var storage = open();
+            var record = (await storage.GetTaskAsync(taskId, Context))!;
+            var stored = ((JsonObjectValue)((LiveTaskState)record.State).Checkpoint).Remove("thinkingLevel");
+            TaskState state = record.State switch
+            {
+                PendingTaskState => new PendingTaskState(stored),
+                RunningTaskState => new RunningTaskState(stored),
+                var other => throw new InvalidOperationException($"unexpected state {other.Status}"),
+            };
+            await storage.CommitWritesAsync([new TaskWrite(record with { State = state })], Context);
+            await storage.CloseAsync(Context);
+
+            opened = await OpenChat(open(), setup);
+            Check(await Checkpoint(opened.Harness, taskId) is JsonObjectValue reopened && !reopened.ContainsKey("thinkingLevel"), "no stored thinking level");
+            Volatile.Write(ref now, 61_000);
+            opened.Harness.Resume();
+            var settled = await WaitFor(opened.Harness, id);
+            if (settled.Status != SubmissionStatus.Done || settled.Type != SubmissionType.Input) throw new InvalidOperationException($"Unexpected {settled.Status}");
+            var answer = (await opened.Root.CommitAsync(tx => tx.GetEntryAsync(Entries.AssistantEntry, settled.Answer!.Value), Context))?.Model?[0];
+            Equal("deferred answer", TextOf(answer), "answer");
+            Check(answer is JsonObjectValue message && !message.ContainsKey("thinkingLevel"), "no recorded thinking level");
             await opened.Harness.CloseAsync(Context);
         });
 

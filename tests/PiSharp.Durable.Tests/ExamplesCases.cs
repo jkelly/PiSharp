@@ -50,10 +50,12 @@ internal static partial class Program
     ];
 
     // Declared before ExamplesUpstreamOutput, which spreads them. Pi v1.5.0 (area tools-schema): authored forms of the capture, with the
-    // built-in tools declared in pi-schema's key order (ToolsSchema150.cs).
-    private static readonly string[] JsonModeEvents = [.. JsonModeEventsLines(JsonModeFixture("events", "v1.2.0")).Select(ToolsSchema150.AuthoredText)];
+    // built-in tools declared in pi-schema's key order (ToolsSchema150.cs); (area model-requests) and with the thinking level each classified
+    // message records (ModelRequests150.cs).
+    private static readonly string[] JsonModeEvents =
+        [.. JsonModeEventsLines(JsonModeFixture("events", "v1.2.0")).Select(line => ModelRequests150.AuthoredText(ToolsSchema150.AuthoredText(line)))];
     private static readonly string[] JsonModeOps =
-        [.. JsonModeOpsLines(JsonModeFixture("ops", "v1.2.0"), JsonModeFixture("ops")).Select(ToolsSchema150.AuthoredText)];
+        [.. JsonModeOpsLines(JsonModeFixture("ops", "v1.2.0"), JsonModeFixture("ops")).Select(line => ModelRequests150.AuthoredText(ToolsSchema150.AuthoredText(line)))];
     private static readonly string[] ReviewerTranscript =
     [
         "> Review user.ts.",

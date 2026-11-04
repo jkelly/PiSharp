@@ -16,6 +16,9 @@
 // with) and events (events.json: the root conversation's agent events, the snapshot first, from the run and from the resume).
 // Pi v1.5.0 sync (area tools-schema): their written cases compare with ToolsSchema150.cs's authored forms of the capture, not the capture
 // itself: v1.5.0 declares the built-in tools with pi-schema's key order and prints pi-schema's validation messages. Only those differ.
+// Pi v1.5.0 sync (area model-requests): every scenario's written, resume and upgrade resumed cases compare with ModelRequests150.cs's authored
+// forms, not the capture: v1.5.0 records the requested thinking level on each message it classifies, "off" here. A resume classifies only
+// the messages it adds, so the messages the resumed session already held keep their captured form.
 // - upgrade-from-v1.1.0: a v1.2.0 Harness opens copies of the v1.1.0 sessions (Fixtures/upstream-sessions) without resuming them, and
 //   resumes the resumable ones with their scenario's model, ending with the records upstream's v1.2.0 left (its v1 pi.tool tasks migrate to
 //   version 2 when they run).
@@ -244,21 +247,26 @@ internal static partial class CompatTests
                     {
                         var directory = CopyFixture(scenario.Name, backend);
                         await resume(() => OpenBackend(backend, directory));
-                        SameJson(Expected(scenario.Name, "resumed.json", backend), await Dump(await OpenBackend(backend, directory)), "resumed records");
+                        // Pi v1.5.0 (area model-requests): the messages the resume classifies record the thinking level (ModelRequests150.cs).
+                        SameJson(ModelRequests150.Authored(Expected(scenario.Name, "resumed.json", backend), Expected(scenario.Name, "records.json", backend)),
+                            await Dump(await OpenBackend(backend, directory)), "resumed records");
                     });
                 yield return Case(prefix + "written", async () =>
                 {
+                    // Pi v1.5.0 (area model-requests): the messages PiSharp classifies record the thinking level (ModelRequests150.cs).
                     var directory = Temp($"compat-written-{scenario.Name}-{backend}");
                     await scenario.Run(() => OpenBackend(backend, directory));
-                    SameJson(Expected(scenario.Name, "records.json", backend), await Dump(await OpenBackend(backend, directory)), "records");
+                    SameJson(ModelRequests150.Authored(Expected(scenario.Name, "records.json", backend)), await Dump(await OpenBackend(backend, directory)), "records");
                     var upstream = Path.Combine(Fixtures, scenario.Name, backend);
-                    if (backend == "jsonl") SameFiles(upstream, directory);
+                    if (backend == "jsonl") SameFiles(upstream, directory, ModelRequests150.AuthoredText);
                     // A copy: even a read-only connection to a WAL database leaves -wal and -shm files beside it.
-                    else SameColumns(Path.Combine(CopyFixture(scenario.Name, backend), "session.sqlite"), Path.Combine(directory, "session.sqlite"));
+                    else SameColumns(Path.Combine(CopyFixture(scenario.Name, backend), "session.sqlite"), Path.Combine(directory, "session.sqlite"),
+                        ModelRequests150.AuthoredText);
                     if (scenario.Resume is { } resume)
                     {
                         await resume(() => OpenBackend(backend, directory));
-                        SameJson(Expected(scenario.Name, "resumed.json", backend), await Dump(await OpenBackend(backend, directory)), "resumed records");
+                        SameJson(ModelRequests150.Authored(Expected(scenario.Name, "resumed.json", backend)), await Dump(await OpenBackend(backend, directory)),
+                            "resumed records");
                     }
                 });
             }
@@ -280,7 +288,9 @@ internal static partial class CompatTests
                     {
                         var directory = CopyFixture(scenario.Name, backend, Fixtures110);
                         await resume(() => OpenBackend(backend, directory));
-                        SameJson(Expected(upgrade, "resumed.json", backend), await Dump(await OpenBackend(backend, directory)), "resumed records");
+                        // Pi v1.5.0 (area model-requests): the messages the resume classifies record the thinking level (ModelRequests150.cs).
+                        SameJson(ModelRequests150.Authored(Expected(upgrade, "resumed.json", backend), Expected(upgrade, "opened.json", backend)),
+                            await Dump(await OpenBackend(backend, directory)), "resumed records");
                     });
             }
         }
@@ -327,9 +337,12 @@ internal static partial class CompatTests
                             await own(() => OpenBackend(backend, directory));
                             return;
                         }
-                        var events = CompatEvents.Expect(expectedEvents, "resume");
+                        // Pi v1.5.0 (area model-requests): the messages the resume classifies record the thinking level (ModelRequests150.cs).
+                        var held = Expected(scenario.Name, "records.json", backend, root);
+                        var events = CompatEvents.Expect(expectedEvents is null ? null : (JsonObjectValue)ModelRequests150.Authored(expectedEvents, held), "resume");
                         await CompatEvents.Record(events, () => resume(() => OpenBackend(backend, directory)));
-                        SameJson(Expected(scenario.Name, "resumed.json", backend, root), await Dump(await OpenBackend(backend, directory)), "resumed records");
+                        SameJson(ModelRequests150.Authored(Expected(scenario.Name, "resumed.json", backend, root), held), await Dump(await OpenBackend(backend, directory)),
+                            "resumed records");
                         events?.Check("resume events");
                     });
                 // A scenario whose run needs a later area's port (CompatScenarios120.cs) is read only.
@@ -337,20 +350,23 @@ internal static partial class CompatTests
                 yield return Case(prefix + "written", async () =>
                 {
                     // Pi v1.5.0 (area tools-schema): what PiSharp writes is compared with ToolsSchema150's authored forms of the capture, the
-                    // built-in tools' pi-schema declarations and pi-schema's validation messages.
-                    var writtenEvents = expectedEvents is null ? null : (JsonObjectValue)ToolsSchema150.Authored(expectedEvents);
+                    // built-in tools' pi-schema declarations and pi-schema's validation messages; (area model-requests) and ModelRequests150's, the
+                    // thinking level each classified message records.
+                    static JsonValue Authored(JsonValue capture) => ModelRequests150.Authored(ToolsSchema150.Authored(capture));
+                    static string AuthoredText(string text) => ModelRequests150.AuthoredText(ToolsSchema150.AuthoredText(text));
+                    var writtenEvents = expectedEvents is null ? null : (JsonObjectValue)Authored(expectedEvents);
                     var directory = Temp($"compat-written-{scenario.Name}-{backend}");
                     var runEvents = CompatEvents.Expect(writtenEvents, "run");
                     var observed = await CompatEvents.Record(runEvents, () => runScenario(() => OpenBackend(backend, directory)));
                     runEvents?.Check("run events");
-                    SameJson(ToolsSchema150.Authored(Expected(scenario.Name, "records.json", backend, root)), await Dump(await OpenBackend(backend, directory)), "records");
+                    SameJson(Authored(Expected(scenario.Name, "records.json", backend, root)), await Dump(await OpenBackend(backend, directory)), "records");
                     var upstream = Path.Combine(root, scenario.Name, backend);
-                    if (backend == "jsonl") SameFiles(upstream, directory, ToolsSchema150.AuthoredText);
+                    if (backend == "jsonl") SameFiles(upstream, directory, AuthoredText);
                     else SameColumns(Path.Combine(CopyFixture(scenario.Name, backend, root), "session.sqlite"), Path.Combine(directory, "session.sqlite"),
-                        ToolsSchema150.AuthoredText);
+                        AuthoredText);
                     var observedFile = Path.Combine(root, scenario.Name, "observed.json");
                     JsonObjectValue? expectedObserved = File.Exists(observedFile)
-                        ? (JsonObjectValue)ToolsSchema150.Authored(Expected(scenario.Name, "observed.json", backend, root)) : null;
+                        ? (JsonObjectValue)Authored(Expected(scenario.Name, "observed.json", backend, root)) : null;
                     if (expectedObserved?.TryGetValue("run", out var run) == true)
                         SameObserved(run, observed ?? throw new InvalidOperationException("the run observed nothing"), scenario.UnobservedFields, "observed run");
                     if (scenario.Resume is { } resume)
@@ -358,7 +374,7 @@ internal static partial class CompatTests
                         var resumeEvents = CompatEvents.Expect(writtenEvents, "resume");
                         var resumed = await CompatEvents.Record(resumeEvents, () => resume(() => OpenBackend(backend, directory)));
                         resumeEvents?.Check("resume events");
-                        SameJson(ToolsSchema150.Authored(Expected(scenario.Name, "resumed.json", backend, root)), await Dump(await OpenBackend(backend, directory)),
+                        SameJson(Authored(Expected(scenario.Name, "resumed.json", backend, root)), await Dump(await OpenBackend(backend, directory)),
                             "resumed records");
                         if (expectedObserved?.TryGetValue("resume", out var onResume) == true)
                             SameObserved(onResume, resumed ?? throw new InvalidOperationException("the resume observed nothing"), scenario.UnobservedFields,

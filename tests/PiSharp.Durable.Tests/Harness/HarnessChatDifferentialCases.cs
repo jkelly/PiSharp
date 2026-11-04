@@ -7,6 +7,8 @@
 // per-path key order (EntryRecord, SubmissionRecord and TaskRecord carry it), and Generation.ToWire restores pi-ai's assistant message order
 // (errorMessage before timestamp) over PiSharp.Contracts' writer. compat.* (Compat/CompatCases.cs) checks the same against sessions upstream
 // itself wrote.
+// Pi v1.5.0 sync (area model-requests): the cases compare with the capture's authored v1.5.0 form (ModelRequests150.cs), not the
+// capture itself: v1.5.0 records the requested thinking level on each message it classifies. A byte comparison needs a recapture.
 using PiSharp.Durable;
 using PiSharp.Durable.Chord;
 using PiSharp.Durable.Sqlite;
@@ -35,8 +37,9 @@ internal static class ChatDifferentialTests
     private const double T = 1000;
     private static readonly string[] Times = ["timestamp", "at", "until", "pollAt", "startedAt", "endedAt", "durationMs"];
 
-    private static readonly Lazy<JsonObjectValue> Upstream = new(() => (JsonObjectValue)JsonValue.Parse(
-        File.ReadAllText(Path.Combine(RepositoryRoot(), "tests", "PiSharp.Durable.Tests", "Fixtures", "v1.2.0", "chat-turns.upstream.json"))));
+    // Pi v1.5.0 (area model-requests): the capture's authored v1.5.0 form (see the file header).
+    private static readonly Lazy<JsonObjectValue> Upstream = new(() => (JsonObjectValue)ModelRequests150.Authored(JsonValue.Parse(
+        File.ReadAllText(Path.Combine(RepositoryRoot(), "tests", "PiSharp.Durable.Tests", "Fixtures", "v1.2.0", "chat-turns.upstream.json")))));
 
     internal static JsonValue Normalize(JsonValue value, string? key = null) => value switch
     {

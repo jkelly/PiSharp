@@ -14,7 +14,12 @@
 // calls for scripts' models.* (work list area d). Models of every type are pi-ai model JSON (AnyModel); classifier and image contexts and
 // results are pi-ai wire JSON (ClassifierContext, ClassifierResult, ImagesContext, AssistantImages). The members have defaults, so a host
 // that offers no classifier or image models implements nothing: no catalog entries, and every call an error result.
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/ai/src/types.ts (StreamOptions identity and onPayload) and
+// packages/ai/src/utils/identity.ts (withClientIdentity), which pi-durable 1.5.0's Harness identity and beforeProviderRequest hook use
+// (area model-requests). IDurableModels' deferred, classifier and image calls take no request options, so withClientIdentity reaches
+// its chat requests only.
 using System.Collections.Immutable;
+using PiSharp.AI;
 using PiSharp.Contracts;
 using PiSharp.Durable.Chord;
 
@@ -141,6 +146,17 @@ public sealed record DurableStreamOptions
     public double? MaxTokens { get; init; }
     /// <summary>PiSharp-only (decision 0007): the conversation's service tier (<c>ChatRequest.ServiceTier</c>).</summary>
     public string? ServiceTier { get; init; }
+    /// <summary>How the request identifies the app to the provider (pi-ai <c>identity</c>, Pi v1.5.0; <c>ChatRequest.Identity</c>): merged
+    /// field by field over the identity the model access was created with. A Harness sets it through
+    /// <see cref="DurableModelIdentity.WithClientIdentity"/>. Null: the model access's own identity.</summary>
+    public ClientIdentity? Identity { get; init; }
+    /// <summary>
+    /// Inspects or replaces each provider request body before it is sent (pi-ai <c>onPayload</c>, Pi v1.5.0): called with the body in the
+    /// provider API's own format and the model; a returned value replaces the body, null keeps it. It runs again whenever the body is
+    /// rebuilt, such as a retry within one attempt. <see cref="NativeDurableModels"/> applies it to JSON request bodies at the HTTP boundary
+    /// of its routes, its host routes included when the host's handler is wrapped for it; other model access may ignore it.
+    /// </summary>
+    public Func<JsonValue, DurableModel, CancellationToken, Task<JsonValue?>>? OnPayload { get; init; }
 }
 
 /// <summary>A provider-side deferred response (pi-ai <c>DeferredHandle</c>), kept as its wire JSON <c>{provider, modelId, api, id,
@@ -266,4 +282,57 @@ public sealed class EmptyDurableModels : IDurableModels
         Task.FromException(Unknown(model));
 
     private static InvalidOperationException Unknown(DurableModel model) => new($"Unknown provider: {model.Provider}");
+}
+
+/// <summary>pi-ai <c>withClientIdentity</c> over <see cref="IDurableModels"/> (Pi v1.5.0).</summary>
+public static class DurableModelIdentity
+{
+    /// <summary>
+    /// <paramref name="models"/> with <paramref name="identity"/> as the default identity of its requests (pi-ai <c>withClientIdentity</c>):
+    /// a request's <see cref="DurableStreamOptions.Identity"/> overrides it field by field, and it overrides the identity
+    /// <paramref name="models"/> was created with. Everything else is delegated unchanged. The deferred, classifier and image calls take no
+    /// request options, so they keep the identity <paramref name="models"/> gives them.
+    /// </summary>
+    public static IDurableModels WithClientIdentity(IDurableModels models, ClientIdentity identity)
+    {
+        ArgumentNullException.ThrowIfNull(models);
+        ArgumentNullException.ThrowIfNull(identity);
+        return new IdentityModels(models, identity);
+    }
+
+    private sealed class IdentityModels(IDurableModels inner, ClientIdentity identity) : IDurableModels
+    {
+        private DurableStreamOptions WithIdentity(DurableStreamOptions? options) =>
+            (options ?? new DurableStreamOptions()) with { Identity = ClientIdentities.Merge(identity, options?.Identity) };
+
+        public DurableModel? GetModel(string provider, string modelId) => inner.GetModel(provider, modelId);
+
+        public IAsyncEnumerable<StreamEvent> StreamSimple(DurableModel model, ImmutableArray<JsonValue> messages, DurableStreamOptions? options,
+            CancellationToken cancellationToken) => inner.StreamSimple(model, messages, WithIdentity(options), cancellationToken);
+
+        public Task<AssistantMessage> CompleteSimpleAsync(DurableModel model, ImmutableArray<JsonValue> messages, DurableStreamOptions? options,
+            CancellationToken cancellationToken) => inner.CompleteSimpleAsync(model, messages, WithIdentity(options), cancellationToken);
+
+        public IAsyncEnumerable<StreamEvent> StreamDeferred(DurableModel model, DurableDeferredHandle handle, CancellationToken cancellationToken) =>
+            inner.StreamDeferred(model, handle, cancellationToken);
+
+        public Task<AssistantMessage> FetchDeferredAsync(DurableModel model, DurableDeferredHandle handle, CancellationToken cancellationToken) =>
+            inner.FetchDeferredAsync(model, handle, cancellationToken);
+
+        public Task CancelDeferredAsync(DurableModel model, DurableDeferredHandle handle, CancellationToken cancellationToken) =>
+            inner.CancelDeferredAsync(model, handle, cancellationToken);
+
+        public ImmutableArray<JsonObjectValue> GetModelsOfType(string type, string? provider) => inner.GetModelsOfType(type, provider);
+
+        public Task<ImmutableArray<JsonObjectValue>> GetAvailableOfTypeAsync(string type, string? provider, CancellationToken cancellationToken) =>
+            inner.GetAvailableOfTypeAsync(type, provider, cancellationToken);
+
+        public JsonObjectValue? GetModelOfType(string type, string provider, string id) => inner.GetModelOfType(type, provider, id);
+
+        public Task<JsonObjectValue> ClassifyAsync(JsonObjectValue model, JsonObjectValue context, CancellationToken cancellationToken) =>
+            inner.ClassifyAsync(model, context, cancellationToken);
+
+        public Task<JsonObjectValue> GenerateImagesAsync(JsonObjectValue model, JsonObjectValue context, CancellationToken cancellationToken) =>
+            inner.GenerateImagesAsync(model, context, cancellationToken);
+    }
 }

@@ -11,6 +11,11 @@
 //   strict JSON either, and the detail contains Chord's "non-finite number".
 // - `expect(seen[0]!.signal).toBeInstanceOf(AbortSignal)` checks that the request's cancellation token can be cancelled.
 // - `toContainEqual(new Error(text))` checks for a report whose message is the text.
+// Pi v1.5.0 sync (area model-requests): "records the requested thinking level on answers, streamed and polled" (d5b3de22d) and "attributes
+// model requests to pi by default and merges the Harness identity over it" (adc5fa9f8), which is
+// sends-the-harness-default-identity-and-merges-the-harness-identity-over-it: upstream's default identity is { attribution: PI_ATTRIBUTION };
+// PiSharp's Harness.DefaultIdentity is empty, so a Harness without an identity sends none (pending core.client-identity-attribution).
+#pragma warning disable PISHARP_IDENTITY001 // PiSharp.AI's ClientIdentity (Pi v1.5.0) is experimental.
 using System.Collections.Immutable;
 using System.Text.RegularExpressions;
 using PiSharp.Contracts;
@@ -362,6 +367,50 @@ internal static class GenerationTests
             Equal(sessionId, second.SessionId, "second session");
             Check(second.Headers is null, "second headers");
             await harness.CloseAsync(Context);
+        });
+
+        yield return Case(prefix + "records-the-requested-thinking-level-on-answers-streamed-and-polled", async () =>
+        {
+            var setup = Setup(new FauxOptions { PendingFetches = 1, PollAfterMs = 1 });
+            setup.Faux.SetResponses(FauxAssistantMessage("streamed"), FauxAssistantMessage("polled"));
+            var (harness, root) = await OpenChat(fresh(), setup);
+            harness.Resume();
+            async Task<JsonValue?> Answer(string content)
+            {
+                var settled = await (await Submit(root, content)).WaitAsync(Context);
+                if (settled.Status != SubmissionStatus.Done || settled.Type != SubmissionType.Input) throw new InvalidOperationException($"Unexpected {settled.Status}");
+                return (await root.CommitAsync(tx => tx.GetEntryAsync(Entries.AssistantEntry, settled.Answer!.Value), Context))?.Model?[0];
+            }
+            await root.ConfigureAsync(new AgentChange { ThinkingLevel = "high" }, Context);
+            MatchJson("""{"thinkingLevel":"high"}""", await Answer("one"), "streamed answer");
+            setup.Stream = new ConversationStreamOptions { Deferred = true };
+            MatchJson("""{"thinkingLevel":"high"}""", await Answer("two"), "polled answer");
+            Equal(2, setup.Faux.State.DeferredFetchCount, "fetches");
+            await harness.CloseAsync(Context);
+        });
+
+        yield return Case(prefix + "sends-the-harness-default-identity-and-merges-the-harness-identity-over-it", async () =>
+        {
+            var seen = new SyncList<PiSharp.AI.ClientIdentity?>();
+            FauxStep Capture() => FauxStep.From(request =>
+            {
+                seen.Add(request.Options?.Identity);
+                return FauxAssistantMessage("ok");
+            });
+            var acme = new PiSharp.AI.ClientAttribution("acme", "https://acme.example");
+            foreach (var identity in new PiSharp.AI.ClientIdentity?[] { null, new() { UserAgent = PiSharp.AI.ClientUserAgent.Short, Attribution = acme } })
+            {
+                var setup = Setup();
+                setup.Identity = identity;
+                setup.Faux.SetResponses(Capture());
+                var (harness, root) = await OpenChat(fresh(), setup);
+                harness.Resume();
+                await (await Submit(root, "hi")).WaitAsync(Context);
+                await harness.CloseAsync(Context);
+            }
+            // Upstream's first is { attribution: PI_ATTRIBUTION }: PiSharp's default identity adds nothing.
+            Seq([new PiSharp.AI.ClientIdentity(), new PiSharp.AI.ClientIdentity { Attribution = acme, UserAgent = PiSharp.AI.ClientUserAgent.Short }],
+                seen.Snapshot(), "identities");
         });
 
         // Regression coverage for #10424.

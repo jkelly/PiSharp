@@ -7,7 +7,11 @@
 // settings, read at each use (7ec1f648e; currentModels and currentSettings), and HarnessOptions.ReadOnly (be14d9732). The calls that
 // resume the scheduler are async, so a read-only Harness's ReadOnlySessionException faults their task, as upstream made them async. The
 // citation stays on v1.2.0 until the file's other areas land.
+// Pi v1.5.0 sync (area model-requests): HarnessOptions.Identity over DEFAULT_HARNESS_IDENTITY, applied by currentModels through
+// withClientIdentity (adc5fa9f8, 04a93bad8). Upstream's default attributes requests to pi (PI_ATTRIBUTION); PiSharp's is empty and adds no
+// attribution, as PiSharp.Agent's DefaultIdentity, until the owner decides core.client-identity-attribution.
 using System.Collections.Immutable;
+using PiSharp.AI;
 using PiSharp.Durable.Chord;
 using PiSharp.Durable.Env;
 
@@ -16,6 +20,13 @@ namespace PiSharp.Durable;
 /// <summary>Opens a durable agent harness over one storage backend (upstream <c>Harness.open</c>).</summary>
 public static class Harness
 {
+    /// <summary>
+    /// The request identity under every Harness's <see cref="HarnessOptions.Identity"/> (upstream <c>DEFAULT_HARNESS_IDENTITY</c>).
+    /// Upstream's attributes requests to Pi (<c>{ attribution: PI_ATTRIBUTION }</c>); PiSharp's is empty, so the Harness adds no attribution
+    /// and requests keep PiSharp.AI's defaults (the default attribution is the owner's decision, core.client-identity-attribution).
+    /// </summary>
+    public static ClientIdentity DefaultIdentity { get; } = new();
+
     /// <summary>
     /// Opens a Harness over <paramref name="storage"/>: surviving <c>running</c> tasks become <c>pending</c>, and nothing runs until
     /// <see cref="IHarness.Resume"/> or a call that asks for progress. The registry may keep changing while the Harness runs. A read-only
@@ -135,12 +146,15 @@ internal sealed class DurableHarness : Session, IHarness
     /// <summary>The conversation view mounts (upstream <c>host.views</c>).</summary>
     internal ConversationViews Views => views;
 
-    /// <summary><c>HarnessOptions.Models</c> as a function (upstream <c>currentModels</c>): plain models are returned at every call.</summary>
+    /// <summary><c>HarnessOptions.Models</c> as a function with <see cref="HarnessOptions.Identity"/> applied (upstream <c>currentModels</c>):
+    /// plain models are wrapped once, so every call returns the same view; a function's result is wrapped at each call.</summary>
     private static Func<IDurableModels> CurrentModels(HarnessOptions options)
     {
-        if (options.CurrentModels is { } current) return current;
+        var merged = ClientIdentities.Merge(Harness.DefaultIdentity, options.Identity) ?? Harness.DefaultIdentity;
+        if (options.CurrentModels is { } current) return () => DurableModelIdentity.WithClientIdentity(current(), merged);
         var models = options.Models ?? throw new ArgumentException("HarnessOptions needs Models or CurrentModels", nameof(options));
-        return () => models;
+        var wrapped = DurableModelIdentity.WithClientIdentity(models, merged);
+        return () => wrapped;
     }
 
     /// <summary><c>HarnessOptions.Settings</c> as a function (upstream <c>currentSettings</c>): plain settings, or none, are returned at every

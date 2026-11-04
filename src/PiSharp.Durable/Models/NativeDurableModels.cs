@@ -7,8 +7,13 @@
 // The same file's getModelsOfType, getAvailableOfType, getModelOfType, classify and generateImages, which pi-durable 1.2.0's code mode calls
 // for scripts' models.* (work list area d), run over PiSharp.AI's ModelOperationsRegistry (the coding agent's port of the same functions) with
 // the registered providers' catalogs.
+// Pi v1.5.0 sync (area model-requests): a request's identity reaches its ChatRequest (pi-ai's StreamOptions.identity, adc5fa9f8), and its
+// onPayload (pi-ai's StreamOptions.onPayload, which pi-durable 1.5.0's beforeProviderRequest hook uses, d280e1ffa) applies to the JSON
+// request bodies of its native routes, and of its host routes whose HTTP handler is wrapped for it (PayloadHandler). PiSharp.AI's own
+// payload hooks are per transport and fixed when the transport is built, so they cannot carry a per-request callback.
 using System.Collections.Immutable;
 using System.Runtime.CompilerServices;
+using System.Text;
 using System.Text.Json;
 using PiSharp.AI;
 using PiSharp.AI.Catalogs;
@@ -124,7 +129,8 @@ public sealed class NativeDurableModels : IDurableModels, IDisposable
         environment = options.Environment ?? (_ => null);
         resolveApiKey = options.ResolveApiKey;
         hostTransport = options.HostTransport;
-        handler = options.HttpHandler ?? new SocketsHttpHandler { AllowAutoRedirect = false };
+        // Disposing the wrapper disposes the inner handler; a caller-owned handler's wrapper is never disposed.
+        handler = new PayloadHandler(options.HttpHandler ?? new SocketsHttpHandler { AllowAutoRedirect = false });
         ownsHandler = options.HttpHandler is null;
         time = options.TimeProvider ?? TimeProvider.System;
         var host = options.ModelOperations;
@@ -298,7 +304,10 @@ public sealed class NativeDurableModels : IDurableModels, IDisposable
         var idle = options?.TimeoutMs is { } milliseconds && double.IsFinite(milliseconds) && milliseconds > 0
             ? TimeSpan.FromMilliseconds(Math.Min(milliseconds, int.MaxValue)) : (TimeSpan?)null;
         var client = new ChatClient(prepared.Transport) { TimeProvider = time };
-        await using var run = await client.StartWithAbortSettlementAsync(prepared.Request, linked.Token, timestamp).ConfigureAwait(false);
+        // The run's producer starts here and carries the payload scope to every HTTP send of this request.
+        var started = PayloadHandler.Start(options?.OnPayload is { } onPayload ? new PayloadScope(onPayload, model) : null,
+            () => client.StartWithAbortSettlementAsync(prepared.Request, linked.Token, timestamp));
+        await using var run = await started.ConfigureAwait(false);
         await using var events = run.ReadEventsAsync().GetAsyncEnumerator(CancellationToken.None);
         while (true)
         {
@@ -337,7 +346,10 @@ public sealed class NativeDurableModels : IDurableModels, IDisposable
         {
             var levels = routed is IThinkingLevelTransport capability ? capability.GetSupportedThinkingLevels(model.Descriptor) : ["off"];
             var hosted = ThinkingLevels.Clamp(levels, options?.Reasoning ?? "off");
-            return new(routed, null, new ChatRequest(model.Descriptor, Transcript(messages), timestamp) { ThinkingLevel = hosted, SessionId = options?.SessionId, ServiceTier = options?.ServiceTier });
+            return new(routed, null, new ChatRequest(model.Descriptor, Transcript(messages), timestamp)
+            {
+                ThinkingLevel = hosted, SessionId = options?.SessionId, ServiceTier = options?.ServiceTier, Identity = options?.Identity,
+            });
         }
         if (!providers.ContainsKey(model.Provider)) throw new InvalidOperationException($"Unknown provider: {model.Provider}");
         var metadata = Metadata(model);
@@ -367,7 +379,10 @@ public sealed class NativeDurableModels : IDurableModels, IDisposable
                 provider.Dispose();
                 provider = NativeModelRoutes.Bind(descriptor, metadata, key, settings with { MaxTokens = thinkingCap }, handler);
             }
-            var request = new ChatRequest(descriptor, transcript, timestamp) { ThinkingLevel = level, SessionId = options?.SessionId, ServiceTier = options?.ServiceTier };
+            var request = new ChatRequest(descriptor, transcript, timestamp)
+            {
+                ThinkingLevel = level, SessionId = options?.SessionId, ServiceTier = options?.ServiceTier, Identity = options?.Identity,
+            };
             return new(provider.Transport, provider, request);
         }
         catch
@@ -490,5 +505,62 @@ public sealed class NativeDurableModels : IDurableModels, IDisposable
 
         public IReadOnlyList<DurableModel> Of(FrozenModelCatalog catalog) => cache.GetValue(catalog, owned =>
             [.. owned.Models.Where(model => model.Type == CatalogModelType.Chat).Select(FromCatalog)]);
+    }
+
+    /// <summary>The <see cref="DurableStreamOptions.OnPayload"/> of the request whose HTTP sends run in this scope, and its model.</summary>
+    internal sealed record PayloadScope(Func<Chord.JsonValue, DurableModel, CancellationToken, Task<Chord.JsonValue?>> OnPayload, DurableModel Model);
+
+    /// <summary>
+    /// Applies a request's <see cref="DurableStreamOptions.OnPayload"/> at the HTTP boundary, as PiSharp.Cli's extension provider hooks do:
+    /// a JSON request body sent inside the request's scope is the provider payload, and a replacement is sent in its place (a SigV4-signed
+    /// request is signed again over it). The body is read only when a scope is active; an unchanged payload sends the original bytes. Wrap a
+    /// host route's handler with <see cref="Wrap"/> so the same callback reaches it.
+    /// </summary>
+    internal sealed class PayloadHandler(HttpMessageHandler inner) : DelegatingHandler(inner)
+    {
+        private static readonly AsyncLocal<PayloadScope?> Current = new();
+        private static readonly HttpRequestOptionsKey<bool> Applied = new("PiSharp.Durable.PayloadApplied");
+
+        /// <summary><paramref name="inner"/> (null: a handler of its own that follows no redirects) with the request scope's payload
+        /// callback applied.</summary>
+        internal static HttpMessageHandler Wrap(HttpMessageHandler? inner) => new PayloadHandler(inner ?? new SocketsHttpHandler { AllowAutoRedirect = false });
+
+        /// <summary>Runs <paramref name="start"/> in <paramref name="scope"/>, so the work it starts carries it; a null scope clears an
+        /// enclosing one, so a request made inside a payload callback runs none.</summary>
+        internal static T Start<T>(PayloadScope? scope, Func<T> start)
+        {
+            var previous = Current.Value;
+            Current.Value = scope;
+            try { return start(); }
+            finally { Current.Value = previous; }
+        }
+
+        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            if (Current.Value is { } scope && request.Content is { } content && !request.Options.TryGetValue(Applied, out _) &&
+                content.Headers.ContentType?.MediaType?.EndsWith("json", StringComparison.OrdinalIgnoreCase) == true)
+            {
+                request.Options.Set(Applied, true);
+                // The callback and the send run outside the scope: a request the callback makes is not this request's payload.
+                Current.Value = null;
+                var text = await content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+                Chord.JsonValue? payload = null;
+                try { payload = Chord.JsonValue.Parse(text); }
+                catch (FormatException) { }
+                if (payload is not null && await scope.OnPayload(payload, scope.Model, cancellationToken).ConfigureAwait(false) is { } replaced &&
+                    !ReferenceEquals(replaced, payload))
+                {
+                    var body = new StringContent(replaced.ToJson(), Encoding.UTF8);
+                    foreach (var header in content.Headers)
+                        if (!header.Key.Equals("Content-Length", StringComparison.OrdinalIgnoreCase) && !header.Key.Equals("Content-Type", StringComparison.OrdinalIgnoreCase))
+                            body.Headers.TryAddWithoutValidation(header.Key, header.Value);
+                    body.Headers.ContentType = content.Headers.ContentType;
+                    request.Content = body;
+                    content.Dispose();
+                    if (request.Options.TryGetValue(ProviderRequestSigning.Resign, out var resign)) await resign(request, cancellationToken).ConfigureAwait(false);
+                }
+            }
+            return await base.SendAsync(request, cancellationToken).ConfigureAwait(false);
+        }
     }
 }
