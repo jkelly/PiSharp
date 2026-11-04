@@ -18,7 +18,8 @@
 // itself: v1.5.0 declares the built-in tools with pi-schema's key order and prints pi-schema's validation messages. Only those differ.
 // Pi v1.5.0 sync (area model-requests): every scenario's written, resume and upgrade resumed cases compare with ModelRequests150.cs's authored
 // forms, not the capture: v1.5.0 records the requested thinking level on each message it classifies, "off" here. A resume classifies only
-// the messages it adds, so the messages the resumed session already held keep their captured form.
+// the messages it adds, so the messages the resumed session already held keep their captured form. A case that compares with an authored
+// form is authored, not captured evidence: AuthoredOverCapture lists them, and the run reports them as authored.
 // - upgrade-from-v1.1.0: a v1.2.0 Harness opens copies of the v1.1.0 sessions (Fixtures/upstream-sessions) without resuming them, and
 //   resumes the resumable ones with their scenario's model, ending with the records upstream's v1.2.0 left (its v1 pi.tool tasks migrate to
 //   version 2 when they run).
@@ -221,6 +222,17 @@ internal static partial class CompatTests
 
     private static JsonValue Expected(string scenario, string file, string backend, string? root = null) => Load(Path.Combine(scenario, file), root)[backend];
 
+    /// <summary>The compat.* cases whose expectation is an authored Pi v1.5.0 form of a capture (ToolsSchema150.cs, ModelRequests150.cs), not
+    /// the capture itself; Program reports them as authored, never as captured evidence. Filled as the cases are listed.</summary>
+    internal static readonly HashSet<string> AuthoredOverCapture = new(StringComparer.Ordinal);
+
+    /// <summary>Lists <paramref name="id"/> in <see cref="AuthoredOverCapture"/>.</summary>
+    private static string AuthoredCase(string id)
+    {
+        AuthoredOverCapture.Add(id);
+        return id;
+    }
+
     internal static IEnumerable<(string, Func<Task>)> Cases()
     {
         // The scenarios both pins capture: those without `since`.
@@ -243,7 +255,7 @@ internal static partial class CompatTests
                 });
                 yield return Case(prefix + "harness", () => HarnessReads(scenario.Name, backend));
                 if (scenario.Resume is { } resume)
-                    yield return Case(prefix + "resume", async () =>
+                    yield return Case(AuthoredCase(prefix + "resume"), async () =>
                     {
                         var directory = CopyFixture(scenario.Name, backend);
                         await resume(() => OpenBackend(backend, directory));
@@ -251,7 +263,7 @@ internal static partial class CompatTests
                         SameJson(ModelRequests150.Authored(Expected(scenario.Name, "resumed.json", backend), Expected(scenario.Name, "records.json", backend)),
                             await Dump(await OpenBackend(backend, directory)), "resumed records");
                     });
-                yield return Case(prefix + "written", async () =>
+                yield return Case(AuthoredCase(prefix + "written"), async () =>
                 {
                     // Pi v1.5.0 (area model-requests): the messages PiSharp classifies record the thinking level (ModelRequests150.cs).
                     var directory = Temp($"compat-written-{scenario.Name}-{backend}");
@@ -284,7 +296,7 @@ internal static partial class CompatTests
                     SameJson(Expected(upgrade, "opened.json", backend), await Dump(await OpenBackend(backend, directory)), "opened records");
                 });
                 if (scenario.Resume is { } resume)
-                    yield return Case(prefix + "resumed", async () =>
+                    yield return Case(AuthoredCase(prefix + "resumed"), async () =>
                     {
                         var directory = CopyFixture(scenario.Name, backend, Fixtures110);
                         await resume(() => OpenBackend(backend, directory));
@@ -329,7 +341,7 @@ internal static partial class CompatTests
                 var eventsFile = Path.Combine(root, scenario.Name, "events.json");
                 JsonObjectValue? expectedEvents = File.Exists(eventsFile) ? (JsonObjectValue)Expected(scenario.Name, "events.json", backend, root) : null;
                 if (scenario.Resume is { } resume)
-                    yield return Case(prefix + "resume", async () =>
+                    yield return Case(scenario.ResumeUpstream is null ? AuthoredCase(prefix + "resume") : prefix + "resume", async () =>
                     {
                         var directory = CopyFixture(scenario.Name, backend, root);
                         if (scenario.ResumeUpstream is { } own)
@@ -347,7 +359,7 @@ internal static partial class CompatTests
                     });
                 // A scenario whose run needs a later area's port (CompatScenarios120.cs) is read only.
                 if (scenario.Run is not { } runScenario) continue;
-                yield return Case(prefix + "written", async () =>
+                yield return Case(AuthoredCase(prefix + "written"), async () =>
                 {
                     // Pi v1.5.0 (area tools-schema): what PiSharp writes is compared with ToolsSchema150's authored forms of the capture, the
                     // built-in tools' pi-schema declarations and pi-schema's validation messages; (area model-requests) and ModelRequests150's, the
