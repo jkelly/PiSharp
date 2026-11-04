@@ -174,7 +174,7 @@
       "upstreamChange": "modified",
       "previousBlobSha1": "2fcb8660682c0489f3083b6a68d131698838e475",
       "changedLines": 61,
-      "note": "Agents: AgentDoc (pi.agent, rewindable, fork asOf), DefaultRetryPolicy/DefaultCompactionPolicy/DefaultProgressPolicy, InstructionsKey, ResolveSettings, ConfigureAsync, AddToolsAsync, CreateAgentAsync, AgentHooks, ResolveAgent. The stored AgentState is the pi.agent JsonObjectValue; AgentChange fields are Patch<T>? (given, Clear, or unchanged). Tests: harness.registry.settings.*, harness.registry.agent-resolution.*, harness.tasks.task-phases.resolves-the-agent-* v1.2.0 (area a): modelTools (an array or {remove?, add?}) through FilterTools/OfferedTools, ToolRegistration.Callers and Deferred, Agent.Callable and Deferred, AddToolsAsync extending modelTools. Tests also harness.callers.*.",
+      "note": "Agents: AgentDoc (pi.agent, rewindable, fork asOf), DefaultRetryPolicy/DefaultCompactionPolicy/DefaultProgressPolicy, InstructionsKey, ResolveSettings, ConfigureAsync, AddToolsAsync, CreateAgentAsync, AgentHooks, ResolveAgent. The stored AgentState is the pi.agent JsonObjectValue; AgentChange fields are Patch<T>? (given, Clear, or unchanged). Tests: harness.registry.settings.*, harness.registry.agent-resolution.*, harness.tasks.task-phases.resolves-the-agent-* v1.2.0 (area a): modelTools (an array or {remove?, add?}) through FilterTools/OfferedTools, ToolRegistration.Callers and Deferred, Agent.Callable and Deferred, AddToolsAsync extending modelTools. Tests also harness.callers.*. v1.5.0 (work list area reports): settings.afterFailedRun resolves to keep (a30c2a81d); AgentHooks pairs each handler with the name of the extension that installed it, and ResolveAgent reports a failing hook or section as extension_error with that name (SectionExtension, ToolExtension). Tests: harness.registry.agent-resolution.collects-hooks-of-the-selected-extensions-in-extension-order-and-applies-field-defaults, harness.reports.*, harness.failed-run-inbox.*; waits on the file's other areas",
       "portedBlobSha1": "2fcb8660682c0489f3083b6a68d131698838e475"
     },
     {
@@ -317,12 +317,11 @@
       "lines": 158,
       "pisharp": "src/PiSharp.Durable/Harness/Prompt.cs",
       "phase": "P8",
-      "status": "needs-sync",
+      "status": "ported",
       "upstreamChange": "modified",
       "previousBlobSha1": "2adeef04396b7673cbabd3c82131458da41076b7",
       "changedLines": 4,
-      "note": "HarnessPrompt (internal): ReplaySections, RenderSectionsAsync, PlanSystemEntries (head rebaseline with omit edits, minimal or remove-all/re-add-all section patches, planTools over pi-ai declarations; tool changes ride on the last entry). Section maps are insertion-ordered like JavaScript Maps; patches are JSON objects in JavaScript key order. Tests: harness.prompt.* (memory, jsonl, sqlite)",
-      "portedBlobSha1": "2adeef04396b7673cbabd3c82131458da41076b7"
+      "note": "HarnessPrompt (internal): ReplaySections, RenderSectionsAsync, PlanSystemEntries (head rebaseline with omit edits, minimal or remove-all/re-add-all section patches, planTools over pi-ai declarations; tool changes ride on the last entry). Section maps are insertion-ordered like JavaScript Maps; patches are JSON objects in JavaScript key order. Tests: harness.prompt.* (memory, jsonl, sqlite) v1.5.0 (work list area reports): RenderSectionsAsync reports a failing section with the section, so the caller names the extension that installed it (a30c2a81d). Tests: harness.prompt.*, harness.reports.reports.name-the-extension-of-a-failing-section-or-hook-and-tell-them-from-a-failing-environment-builder"
     },
     {
       "upstream": "packages/durable/src/harness/provider.ts",
@@ -387,7 +386,7 @@
       "upstreamChange": "modified",
       "previousBlobSha1": "9e79aa61a090fe76d32d41d05626f5ce9a2ea241",
       "changedLines": 170,
-      "note": "TaskGraphView (internal: one mount built on the Session line by its first observer and dropped with its last, advanced from commit publications) and the typed TaskGraph, TaskGraphNode and TaskGraphState, whose ToJson() is upstream's {tasks} object keyed by decimal ID in ascending order; frames address that JSON. IHarness.TaskGraphAsync returns an AttachedReplicatedState<TaskGraph>, WatchTaskGraphAsync an IWatchHandle<TaskGraph>. Tests: harness.task-graph.* (memory, jsonl, sqlite), harness.task-graph-differential.* (Fixtures/task-graph.upstream.json from Fixtures/capture-task-graph.mjs, on memory, jsonl and sqlite) v1.2.0: the mount follows publications through ObserveCommits; observer throws in Advance and CloseSession are reported; states and watches report through the Harness; close ends observers with session_failed when the Session failed; ClosedError carries the failure. v1.5.0 (work list area sleep): TaskGraphState has the sleeping status with its phase and until (f75b3240a); waits on the file's other areas",
+      "note": "TaskGraphView (internal: one mount built on the Session line by its first observer and dropped with its last, advanced from commit publications) and the typed TaskGraph, TaskGraphNode and TaskGraphState, whose ToJson() is upstream's {tasks} object keyed by decimal ID in ascending order; frames address that JSON. IHarness.TaskGraphAsync returns an AttachedReplicatedState<TaskGraph>, WatchTaskGraphAsync an IWatchHandle<TaskGraph>. Tests: harness.task-graph.* (memory, jsonl, sqlite), harness.task-graph-differential.* (Fixtures/task-graph.upstream.json from Fixtures/capture-task-graph.mjs, on memory, jsonl and sqlite) v1.2.0: the mount follows publications through ObserveCommits; observer throws in Advance and CloseSession are reported; states and watches report through the Harness; close ends observers with session_failed when the Session failed; ClosedError carries the failure. v1.5.0 (work list area sleep): TaskGraphState has the sleeping status with its phase and until (f75b3240a) v1.5.0 (work list area reports): TaskGraphNode.Blocked (missing_task, task_too_old, migration_failed; JSON key blocked after conversations) from the scheduler's BlockedReasonOf, refreshed outside any commit when the registry changes or a migration fails (a30c2a81d, 440a5fcdb); 1.4.0's restart_limit is gone in 1.5.0. Tests: harness.blocked.tasks-that-cannot-run.*; waits on the file's other areas",
       "portedBlobSha1": "9e79aa61a090fe76d32d41d05626f5ce9a2ea241"
     },
     {
@@ -1104,7 +1103,7 @@
       "upstreamChange": "modified",
       "previousBlobSha1": "804e49ef19de37375d5b43873ee908f03c1cc2e2",
       "changedLines": 453,
-      "note": "Records and storage contract, split across Types.cs (conversation, entry, submission and task records; TaskOptions.AbandonOnRestart; TaskRecord.AbortReason and AbandonOnRestart, written only when set, abortReason appended by the mark that sets it), TypesDocuments.cs (document semantics, records, content), TypesStorage.cs (scans, cursors, writes, IStorage and its failure contract), TypesSession.cs (EntryDraft/EntryHead, TypedEntry/TypedEntryDraft, ICommitChange/CommitPublication/DocumentCommitChange, WatchEnd with session_failed, SessionEnd, IWatchHandle, IDocumentReader/IDocumentObserver, ISession with Closed, ITx), TypesTasks.cs (ITaskRuntime with AbortOwnedAsync and OwnedTasksAsync, IHookRunner) and Ids.cs; JSON via ToJson/FromJson in upstream's key order (EntryRecord, SubmissionRecord and TaskRecord keep the order they were created, decoded or marked with, KeyOrder), pinned against upstream-written sessions by compat.*. Intentional mapping: TypeScript's phantom type parameters are erased, as documents are JsonObjectValue-typed (Documents.cs row): TaskId<Result>, TaskRecord<Input, Checkpoint, Result> and SettledTask<Result> are TaskId and TaskRecord over JsonValue, so a task's result type, typed input and exhaustive phase map are not checked at compile time (types.test.ts row). The document definition and semantics types (CommonDocDefinition, DocFamilyDefinition, DocumentSemantics and its conversation variants) are Documents.cs's scope-typed tokens, DocumentWatch is IWatchHandle<JsonObjectValue?> and TableCommitChange is ICommitChange; ownedTasks returns the immutable committed records instead of copies. Tests: types.*, storage.*, session.*, harness.*, compat.* v1.5.0 (work list area sleep): DurableTaskStatus.Sleeping and SleepingTaskState {status, checkpoint, until}; NextTaskState.Sleeping; ITaskRuntime.SleepUntilAsync and SetTimer replace SleepAsync (f75b3240a); waits on the file's other areas",
+      "note": "Records and storage contract, split across Types.cs (conversation, entry, submission and task records; TaskOptions.AbandonOnRestart; TaskRecord.AbortReason and AbandonOnRestart, written only when set, abortReason appended by the mark that sets it), TypesDocuments.cs (document semantics, records, content), TypesStorage.cs (scans, cursors, writes, IStorage and its failure contract), TypesSession.cs (EntryDraft/EntryHead, TypedEntry/TypedEntryDraft, ICommitChange/CommitPublication/DocumentCommitChange, WatchEnd with session_failed, SessionEnd, IWatchHandle, IDocumentReader/IDocumentObserver, ISession with Closed, ITx), TypesTasks.cs (ITaskRuntime with AbortOwnedAsync and OwnedTasksAsync, IHookRunner) and Ids.cs; JSON via ToJson/FromJson in upstream's key order (EntryRecord, SubmissionRecord and TaskRecord keep the order they were created, decoded or marked with, KeyOrder), pinned against upstream-written sessions by compat.*. Intentional mapping: TypeScript's phantom type parameters are erased, as documents are JsonObjectValue-typed (Documents.cs row): TaskId<Result>, TaskRecord<Input, Checkpoint, Result> and SettledTask<Result> are TaskId and TaskRecord over JsonValue, so a task's result type, typed input and exhaustive phase map are not checked at compile time (types.test.ts row). The document definition and semantics types (CommonDocDefinition, DocFamilyDefinition, DocumentSemantics and its conversation variants) are Documents.cs's scope-typed tokens, DocumentWatch is IWatchHandle<JsonObjectValue?> and TableCommitChange is ICommitChange; ownedTasks returns the immutable committed records instead of copies. Tests: types.*, storage.*, session.*, harness.*, compat.* v1.5.0 (work list area sleep): DurableTaskStatus.Sleeping and SleepingTaskState {status, checkpoint, until}; NextTaskState.Sleeping; ITaskRuntime.SleepUntilAsync and SetTimer replace SleepAsync (f75b3240a) v1.5.0 (work list area reports): ReportTask, HostCallback, ReportInfo (one record tagged by Kind, with typed ReportReason), Report and ReportFrom in TypesReports.cs; ITaskRuntime.Report(error, from) (a30c2a81d, 440a5fcdb, 5ba1cbaf3, 91b33cab3, 5f312dac4). task_interrupted is area restarts', the telemetry callback area telemetry's. Tests: harness.reports.*; waits on the file's other areas",
       "portedBlobSha1": "804e49ef19de37375d5b43873ee908f03c1cc2e2"
     },
     {
@@ -1988,8 +1987,9 @@
       "lines": 513,
       "pisharp": "tests/PiSharp.Durable.Tests/HarnessBlockedCases.cs",
       "phase": "sync-1.5.0",
-      "status": "planned",
-      "upstreamChange": "added"
+      "status": "in-progress",
+      "upstreamChange": "added",
+      "note": "v1.5.0 (work list area reports): harness.blocked.* (4 of 12): recovery at open, and the migration-failed, abandoned and registry-change cases of tasks that cannot run, on a SQLite file and in the store pass as harness.blocked.store.* (StoreStorageNode.cs). The 8 restartLimit cases (crashLoop, openWith's kill()) are area restarts'; in progress until then"
     },
     {
       "upstream": "packages/durable/test/harness-callers.test.ts",
@@ -2098,8 +2098,9 @@
       "lines": 82,
       "pisharp": "tests/PiSharp.Durable.Tests/HarnessFailedRunInboxCases.cs",
       "phase": "sync-1.5.0",
-      "status": "planned",
-      "upstreamChange": "added"
+      "status": "ported",
+      "upstreamChange": "added",
+      "note": "v1.5.0 (work list area reports): harness.failed-run-inbox.* (4 of 4), verbatim on MemoryStorage with the faux model; ChatSetup.AfterFailedRun is the live settings.afterFailedRun"
     },
     {
       "upstream": "packages/durable/test/harness-generation-recovery.test.ts",
@@ -2358,7 +2359,7 @@
       "upstreamChange": "modified",
       "previousBlobSha1": "15f91148420435d0a44fd7934988d45500c9b624",
       "changedLines": 11,
-      "note": "harness.registry.* (10 cases): AppTool is a derived ToolRegistration record; stored agent states are pi.agent JSON; hook maps are the built-in hook classes v1.2.0: results are Output.",
+      "note": "harness.registry.* (10 cases): AppTool is a derived ToolRegistration record; stored agent states are pi.agent JSON; hook maps are the built-in hook classes v1.2.0: results are Output. v1.5.0 (work list area reports): hook handlers come with their extension's name, compared as (name, handlers) pairs (a30c2a81d); waits on the file's other areas",
       "portedBlobSha1": "15f91148420435d0a44fd7934988d45500c9b624"
     },
     {
@@ -2367,8 +2368,9 @@
       "lines": 229,
       "pisharp": "tests/PiSharp.Durable.Tests/HarnessReportsCases.cs",
       "phase": "sync-1.5.0",
-      "status": "planned",
-      "upstreamChange": "added"
+      "status": "ported",
+      "upstreamChange": "added",
+      "note": "v1.5.0 (work list area reports): harness.reports.* (4 of 4), verbatim with ReportInfo record equality; harness.observeCommits with a throwing advance is a throwing SubscribeCommits listener until area observers lands"
     },
     {
       "upstream": "packages/durable/test/harness-restart-failure.test.ts",
@@ -3094,7 +3096,7 @@
       "upstreamChange": "modified",
       "previousBlobSha1": "403fc40d76dfe60d382c5c49ab5b065c52da374b",
       "changedLines": 31,
-      "note": "HarnessTests: Deferred/Deferred<T>, Aborted, Flush, Eventually, Settled, InvocationEnded (barrier), OpenTasks, Completed, AbortedWith, CountingReader, SyncList v1.5.0 (work list area sleep): OpenTasks takes onWake and setTimer (f75b3240a); waits on the file's other areas",
+      "note": "HarnessTests: Deferred/Deferred<T>, Aborted, Flush, Eventually, Settled, InvocationEnded (barrier), OpenTasks, Completed, AbortedWith, CountingReader, SyncList v1.5.0 (work list area sleep): OpenTasks takes onWake and setTimer (f75b3240a) v1.5.0 (work list area reports): OpenTasks collects each report's ReportInfo in Infos, at the index of its error (5f312dac4); waits on the file's other areas",
       "portedBlobSha1": "403fc40d76dfe60d382c5c49ab5b065c52da374b"
     },
     {
