@@ -5658,7 +5658,11 @@
         "cv2-store-tables",
         "sqlite"
       ],
-      "commits": [],
+      "commits": [
+        "745f51b1",
+        "37682fd4",
+        "68a252f1"
+      ],
       "notes": "Durable's StoreStorage stores each Session commit call through commitSeries. The Durable Objects backend is Cloudflare (excluded). Phase 4, as decision 0013 says: durable's StoreStorage and registryReader need Chord v2's store, documents state, contract data and registries, and the rest of Chord v2 stays in phase 6. Nothing outside the Chord v2 areas depends on this area. Upstream builds v2 slice by slice and the API is still moving (slices 9 and 11 are still to come). New APIs carry [Experimental]. Location (decision 0013, phase 4): Chord v2 goes in a new src/PiSharp.Chord ([Experimental(\"PISHARP_CHORD001\")], not packable in phase 4), which references PiSharp.Contracts and no PiSharp.Durable project; its cases go in tests/PiSharp.Chord.Tests. The parts of StoreStorage and registryReader that need Chord v2 types go in a new adapter, src/PiSharp.Durable.Store (references PiSharp.Durable and PiSharp.Chord, not packable), so PiSharp.Durable keeps decision 0005 §4; a src/PiSharp.Durable/... path below that would need PiSharp.Chord moves there. The file names below are proposals. Many v2 tests build objects through createHost (chord/src/next/host, phase 6, excluded): those cases cannot be verified until the host is ported, or must run against hand-built values; say which in the evidence."
     },
     {

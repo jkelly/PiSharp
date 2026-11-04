@@ -57,10 +57,10 @@
     "repeatedBullets": 23,
     "byStatus": {
       "ported": 182,
-      "ported-with-deferral": 17,
+      "ported-with-deferral": 18,
       "already-ported": 12,
       "no-op": 25,
-      "port": 90
+      "port": 89
     },
     "byArea": {
       "ai": 58,
@@ -11402,7 +11402,7 @@
       "id": "chord.next-store",
       "area": "chord",
       "phase": 4,
-      "status": "port",
+      "status": "ported-with-deferral",
       "changelog": [
         "chord@1.5.0/Added#1",
         "chord@1.5.0/Added#2",
@@ -11424,7 +11424,71 @@
       "pulledInBy": [
         "durable.store-storage"
       ],
-      "notes": "Needed by phase 4: Durable's StoreStorage (durable@1.5.0/Added#1, group E) keeps a Session's records as store tables and stores each Session commit call through commitSeries, so StoreStorage cannot be ported without this row. 6,083 lines. The SQLite backend uses chord.sqlite and chord.sqlite-run-counted; the Durable Objects backend follows chord.sqlite-cloudflare."
+      "notes": "Needed by phase 4: Durable's StoreStorage (durable@1.5.0/Added#1, group E) keeps a Session's records as store tables and stores each Session commit call through commitSeries, so StoreStorage cannot be ported without this row. 6,083 lines. The SQLite backend uses chord.sqlite and chord.sqlite-run-counted; the Durable Objects backend follows chord.sqlite-cloudflare.",
+      "evidence": {
+        "commits": [
+          "745f51b1",
+          "37682fd4",
+          "68a252f1"
+        ],
+        "tests": [
+          "tests/PiSharp.Chord.Tests/Store/AllocatorCases.cs: store.allocator.the-allocator-mints-from-its-value-and-an-explicit-id-raises-it-above-itself-never-lowering-it",
+          "tests/PiSharp.Chord.Tests/Store/AllocatorCases.cs: store.allocator.the-allocator-saturates-at-number-max-safe-integer-that-id-may-be-written-every-later-mint-is-refused",
+          "tests/PiSharp.Chord.Tests/Store/ApplierCases.cs: store.applier.applied-writes-a-table-and-its-rows-as-recorded-null-for-absent-opt-cells-booleans-as-0-and-1-json-as-text",
+          "tests/PiSharp.Chord.Tests/Store/ApplyBatchCases.cs: store.apply-batch.replay-a-store-s-outbox-replayed-into-an-empty-store-gives-the-same-archive-manifest-included",
+          "tests/PiSharp.Chord.Tests/Store/ApplyBatchCases.cs: store.apply-batch.replay-restores-the-allocator-a-replica-mints-above-every-id-it-holds",
+          "tests/PiSharp.Chord.Tests/Store/ApplyBatchCases.cs: store.apply-batch.replay-writes-the-applied-commits-to-the-replica-s-own-outbox-when-it-has-one",
+          "tests/PiSharp.Chord.Tests/Store/ApplyBatchCases.cs: store.apply-batch.refusals-while-an-owner-holds-a-claim-on-the-store-its-memory-would-go-stale",
+          "tests/PiSharp.Chord.Tests/Store/ApplyBatchCases.cs: store.apply-batch.refusals-a-claim-taken-between-the-call-and-its-turn-in-the-queue-refuses-the-batch-a-claim-is-refused-while-it-applies",
+          "tests/PiSharp.Chord.Tests/Store/ApplyBatchCases.cs: store.apply-batch.refusals-a-batch-queued-behind-one-that-diverges-is-refused-at-its-turn",
+          "tests/PiSharp.Chord.Tests/Store/ApplyBatchCases.cs: store.apply-batch.refusals-a-commit-whose-next-id-is-not-above-a-document-it-creates-a-saturated-id-aside",
+          "tests/PiSharp.Chord.Tests/Store/ApplyBatchCases.cs: store.apply-batch.refusals-a-first-commit-that-does-not-follow-lastseq-or-one-that-does-not-follow-the-one-before-nothing-applied",
+          "tests/PiSharp.Chord.Tests/Store/ApplyBatchCases.cs: store.apply-batch.refusals-a-write-the-records-refuse-rolls-the-batch-back-and-the-store-goes-on",
+          "tests/PiSharp.Chord.Tests/Store/ApplyBatchCases.cs: store.apply-batch.refusals-a-recorded-count-the-store-does-not-reproduce-stops-applying-and-marks-the-store-diverged-s17",
+          "tests/PiSharp.Chord.Tests/Store/EngineCases.cs: store.engine.documents-load-as-their-base-with-the-deltas-after-it-applied-a-new-base-prunes-the-older-revisions",
+          "tests/PiSharp.Chord.Tests/Store/EngineCases.cs: store.engine.documents-list-live-keys-in-code-point-order-paging-after-a-key",
+          "tests/PiSharp.Chord.Tests/Store/EngineCases.cs: store.engine.documents-retire-a-none-record-with-its-row-and-revisions-r1-the-address-takes-a-new-incarnation",
+          "tests/PiSharp.Chord.Tests/Store/EngineCases.cs: store.engine.documents-refuse-two-live-records-at-one-address-and-a-delta-on-another-version-the-step-is-refused",
+          "tests/PiSharp.Chord.Tests/Store/EngineCases.cs: store.engine.history-rules-r1-and-reads-at-a-point-keep-a-retired-latest-record-s-row-without-revisions-and-every-revision-of-a-rewindable-one",
+          "tests/PiSharp.Chord.Tests/Store/EngineCases.cs: store.engine.history-rules-r1-and-reads-at-a-point-find-a-record-at-a-point-by-its-half-open-lifetime-and-load-a-rewindable-one-at-any-point-inside-it",
+          "tests/PiSharp.Chord.Tests/Store/EngineCases.cs: store.engine.history-rules-r1-and-reads-at-a-point-find-a-retired-latest-record-at-a-point-whose-content-is-gone",
+          "tests/PiSharp.Chord.Tests/Store/EngineCases.cs: store.engine.history-rules-r1-and-reads-at-a-point-insert-a-create-plus-retire-as-an-empty-lifetime-that-never-holds-the-live-address",
+          "tests/PiSharp.Chord.Tests/Store/EngineCases.cs: store.engine.counters-at-the-safe-integer-limit-allocate-document-ids-up-to-the-safe-range-after-an-import-near-it-past-it-the-commit-is-refused",
+          "tests/PiSharp.Chord.Tests/Store/EngineCases.cs: store.engine.counters-at-the-safe-integer-limit-count-revisions-up-to-the-safe-range-after-an-import-near-it-a-change-past-it-is-refused",
+          "tests/PiSharp.Chord.Tests/Store/OutboxCases.cs: store.outbox.the-outbox-is-off-for-a-new-store-on-from-the-seq-it-is-turned-on-at-kept-when-omitted-dropped-when-turned-off",
+          "tests/PiSharp.Chord.Tests/Store/OutboxCases.cs: store.outbox.the-outbox-records-creations-with-their-ids-and-seqs-trim-is-idempotent-and-refuses-beyond-lastseq",
+          "tests/PiSharp.Chord.Tests/Store/OutboxCases.cs: store.outbox.the-outbox-overlapping-trims-run-one-at-a-time-the-stored-floor-never-moves-back-and-equals-the-one-in-memory",
+          "tests/PiSharp.Chord.Tests/Store/OutboxCases.cs: store.outbox.the-outbox-a-read-waits-for-a-trim-whose-commit-has-not-returned-the-trimmed-floor-refuses-it-never-an-empty-page",
+          "tests/PiSharp.Chord.Tests/Store/OutboxCases.cs: store.outbox.the-outbox-a-trim-waits-for-a-read-in-flight-the-read-gets-the-commits-it-was-admitted-for",
+          "tests/PiSharp.Chord.Tests/Store/OutboxCases.cs: store.outbox.the-outbox-a-commit-stored-in-a-newer-format-is-refused-unavailable-the-data-stays",
+          "tests/PiSharp.Chord.Tests/Store/RefusalCases.cs: store.refusal.classification-a-check-failure-by-sqlite-s-extended-code-or-by-its-message-everything-else-broken-the-store-s-own-errors-pass",
+          "tests/PiSharp.Chord.Tests/Store/StoreCases.cs: store.store.opening-creates-a-new-store-at-seq-0-without-an-outbox-and-reopens-a-file-at-its-last-seq-and-ids",
+          "tests/PiSharp.Chord.Tests/Store/StoreCases.cs: store.store.opening-refuses-a-database-that-is-not-utf-8-closing-the-backend-rule-12",
+          "tests/PiSharp.Chord.Tests/Store/StoreCases.cs: store.store.the-commit-step-assigns-one-seq-per-commit-applies-retirements-before-creations-and-adopts-before-the-next-step",
+          "tests/PiSharp.Chord.Tests/Store/StoreCases.cs: store.store.the-commit-step-rejects-a-commit-its-fence-refuses-at-the-entry-released-writing-nothing-an-empty-commit-takes-no-seq",
+          "tests/PiSharp.Chord.Tests/Store/StoreCases.cs: store.store.the-commit-step-numbers-up-to-number-max-safe-integer-after-an-import-near-it-then-fails-storage-failed-no-seq-repeats",
+          "tests/PiSharp.Chord.Tests/Store/StoreCases.cs: store.store.the-commit-step-counts-one-commit-and-three-statements-for-a-delta-four-with-an-outbox-cost-guard",
+          "tests/PiSharp.Chord.Tests/Store/StoreCases.cs: store.store.refusals-and-unknown-outcomes-d4-a-step-whose-own-code-throws-is-refused-the-commit-rejects-with-that-error-nothing-is-adopted-the-store-goes-on",
+          "tests/PiSharp.Chord.Tests/Store/StoreCases.cs: store.store.refusals-and-unknown-outcomes-d4-an-adopt-that-throws-stops-the-store-an-empty-commit-s-too-a-conditional-update-on-another-revision-is-refused",
+          "tests/PiSharp.Chord.Tests/Store/StoreCases.cs: store.store.refusals-and-unknown-outcomes-d4-spare-a-read-whose-context-was-aborted-aborted-and-reject-a-read-that-settles-after-the-stop",
+          "tests/PiSharp.Chord.Tests/Store/StoreCases.cs: store.store.refusals-and-unknown-outcomes-d4-runs-a-read-transaction-s-queries-on-one-state-guarded-as-a-read",
+          "tests/PiSharp.Chord.Tests/Store/StoreCases.cs: store.store.the-id-allocator-d3-starts-at-2-takes-a-creation-s-id-as-it-applies-and-gives-a-mint-during-a-running-step-the-next-one",
+          "tests/PiSharp.Chord.Tests/Store/StoreCases.cs: store.store.the-id-allocator-d3-leaves-a-refused-step-s-ids-unused-and-keeps-the-raised-value",
+          "tests/PiSharp.Chord.Tests/Store/StoreCases.cs: store.store.the-id-allocator-d3-saturates-at-number-max-safe-integer-across-reopen-mints-and-chord-creations-are-refused-the-store-goes-on",
+          "tests/PiSharp.Chord.Tests/Store/StoreCases.cs: store.store.one-host-per-store-rule-7-refuses-a-second-attachment-until-the-first-detaches",
+          "tests/PiSharp.Chord.Tests/Store/StoreCases.cs: store.store.close-waits-for-the-running-step-rejects-queued-commits-and-later-reads-released-and-closes-the-backend",
+          "tests/PiSharp.Chord.Tests/Store/StoreCases.cs: store.store.a-commit-series-stores-its-commits-in-one-transaction-one-seq-each-each-checked-against-the-ones-before-it",
+          "tests/PiSharp.Chord.Tests/Store/StoreCases.cs: store.store.a-commit-series-stops-at-a-check-that-refuses-the-commits-before-it-are-stored-it-and-the-ones-after-are-not",
+          "tests/PiSharp.Chord.Tests/Store/StoreCases.cs: store.store.a-commit-series-rolls-the-whole-series-back-when-a-check-s-statement-fails-even-if-the-check-throws-its-own-error",
+          "tests/PiSharp.Chord.Tests/Store/StoreCases.cs: store.store.a-commit-series-rolls-the-whole-series-back-when-a-commit-s-writes-throw-the-store-going-on",
+          "tests/PiSharp.Chord.Tests/Store/StoreCases.cs: store.store.a-commit-series-writes-the-metadata-once-per-series-three-statements-per-delta-with-its-outbox-commit-plus-one-cost-guard",
+          "tests/PiSharp.Chord.Tests/Store/StoreCases.cs: store.store.a-commit-series-lets-a-later-commit-see-the-table-records-an-earlier-one-changed-a-rollback-leaves-the-catalog-as-it-was",
+          "tests/PiSharp.Chord.Tests/Store/StoreCases.cs: store.store.a-commit-series-runs-a-commit-queued-behind-a-series-after-the-series-receipts",
+          "tests/PiSharp.Chord.Tests/Store/StoreCases.cs: store.store.a-commit-series-counts-only-commits-with-writes-against-the-seq-bound-empty-ones-at-number-max-safe-integer-still-stand",
+          "tests/PiSharp.Chord.Tests/Store/StoreCases.cs: store.store.a-commit-series-stops-the-store-when-a-receipt-throws"
+        ]
+      },
+      "deferred": "Export and import (store.export, importStore, the archive format and parts, JSONL) are area cv2-store-archive's, later in this phase; Archive.cs already holds the write schema and checkWrite batch apply needs. refusal.test.ts's \"Chord's owners\" case serves an object on a host (createHost, phase 6). The Durable Objects backend (chord/sqlite/cloudflare) is Cloudflare, excluded. The production ISqliteDatabase over PiSharp.Durable.Sqlite comes with store-storage (PiSharp.Durable.Store), per the coordinator's decision."
     },
     {
       "id": "chord.next-registries",
