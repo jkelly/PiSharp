@@ -9,8 +9,9 @@
 // (upstream commitWrites) and sees its storage through ReceiptCheckedStorage (upstream checkReceipts), and the batch-commit cases are
 // ported: a receipt before resolving and none for a refusal, batches in order checked against the earlier ones, the prefix before the
 // first refusal, a refusal by a batch's own malformed actions, and a copy resolved against the earlier batches. A refusal is an exception
-// here, so upstream's String(refused) ("Error: <message>") is its Message. The sleeping, continue-submission and create-and-change cases
-// v1.5.0 adds follow with areas sleep, admission and store-storage; until then the rest of the file follows v1.2.0.
+// here, so upstream's String(refused) ("Error: <message>") is its Message. Area store-storage adds v1.5.0's create-and-change case
+// ("refuses a creation and a change of one document in one commit, in either order"). The sleeping and continue-submission cases v1.5.0
+// adds follow with areas sleep and admission; until then the rest of the file follows v1.2.0.
 using System.Collections.Immutable;
 using PiSharp.Durable.Chord;
 using PiSharp.Durable.Chord.Delta;
@@ -51,6 +52,7 @@ public static class StorageConformance
             Case("uses bases for version transitions and rejects historical reads of current-only documents", UsesBasesForVersionTransitions),
             Case("indexes logical addresses and exact-scope scans independently", IndexesLogicalAddresses),
             Case("keeps document lifecycle failures atomic and gives create-plus-retire an empty lifetime", KeepsDocumentLifecycleAtomic),
+            Case("refuses a creation and a change of one document in one commit, in either order", RefusesCreateAndChange),
             Case("rolls back record tables and secondary indexes when a document command fails", RollsBackOnDocumentFailure),
             Case("keeps indexed string identities lossless", KeepsStringIdentitiesLossless),
             Case("keeps one global record ID namespace and rejects exhausted ID minting", KeepsOneIdNamespace),
@@ -777,6 +779,21 @@ public static class StorageConformance
         Null(await storage.GetDocumentAsync(emptyId, DocumentPoint.Current, Context), "create-plus-retire now");
         Null(await storage.GetDocumentAsync(emptyId, emptyAt, Context), "create-plus-retire at its commit");
         Null(await storage.FindDocumentAsync(new(record.Kind, DocumentScope.Conversation(rootId), "empty"), emptyAt, Context), "create-plus-retire address");
+    }
+
+    private static async Task RefusesCreateAndChange(IStorage storage)
+    {
+        await CreateRoot(storage);
+        foreach (var order in (string[])["create first", "change first"])
+        {
+            var id = await storage.MintIdAsync<DocumentId>();
+            StorageWrite create = new DocumentCreateWrite(new() { Id = id, Kind = "twice", Key = order, Scope = DocumentScope.Session },
+                DocumentContent.Base(1, O("{\"x\":1}")));
+            StorageWrite change = new DocumentChangeWrite(id, DocumentContent.Delta(1, Ops("[[\"s\",[\"x\"],2]]")));
+            StorageWrite[] writes = order == "create first" ? [create, change] : [change, create];
+            await Rejects(() => Commit(storage, writes), "more than one content command", order);
+            Null(await storage.GetDocumentAsync(id, DocumentPoint.Current, Context), order + ": document");
+        }
     }
 
     private static async Task RollsBackOnDocumentFailure(IStorage storage)

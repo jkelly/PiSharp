@@ -57,10 +57,10 @@
     "repeatedBullets": 23,
     "byStatus": {
       "ported": 184,
-      "ported-with-deferral": 21,
+      "ported-with-deferral": 22,
       "already-ported": 12,
       "no-op": 25,
-      "port": 84
+      "port": 83
     },
     "byArea": {
       "ai": 58,
@@ -8141,7 +8141,7 @@
       "id": "durable.store-storage",
       "area": "durable",
       "phase": 4,
-      "status": "port",
+      "status": "ported-with-deferral",
       "changelog": [
         "durable@1.5.0/Added#1"
       ],
@@ -8164,7 +8164,28 @@
         "src/PiSharp.Durable/Storage/ (new)"
       ],
       "release": "1.5.0",
-      "notes": "Blocked on Chord v2's store (chord@1.5.0/Added#1 and Added#2, group F), which phase 4 ports with the parts of Chord v2 durable needs (decision 0013, Durable: src/PiSharp.Chord, with StoreStorage in the src/PiSharp.Durable.Store adapter). Depends on durable.storage-commit-batches."
+      "notes": "Blocked on Chord v2's store (chord@1.5.0/Added#1 and Added#2, group F), which phase 4 ports with the parts of Chord v2 durable needs (decision 0013, Durable: src/PiSharp.Chord, with StoreStorage in the src/PiSharp.Durable.Store adapter). Depends on durable.storage-commit-batches.",
+      "evidence": {
+        "commits": [
+          "3a4ce304",
+          "b095f17b",
+          "5137dff7",
+          "0cd3126c",
+          "21d74fb7"
+        ],
+        "tests": [
+          "tests/PiSharp.Durable.Tests/StoreStorageCases.cs: storage.store.claims.refuse-a-second-storestorage-on-one-owner-until-the-first-closed-two-owners-share-a-store",
+          "tests/PiSharp.Durable.Tests/StoreStorageCases.cs: storage.store.claims.waits-at-close-for-its-calls-underway-then-releases-its-claims",
+          "tests/PiSharp.Durable.Tests/StoreStorageCases.cs: storage.store.semantics.raises-the-allocator-above-every-id-it-holds-when-it-opens",
+          "tests/PiSharp.Durable.Tests/StoreStorageCases.cs: storage.store.archives.export-and-import-keep-rewindable-history-retired-records-and-another-owners-data",
+          "tests/PiSharp.Durable.Tests/StoreStorageCases.cs: storage.store.heads.a-head-entry-is-found-after-reopen-in-an-imported-archive-and-in-a-replayed-outbox",
+          "tests/PiSharp.Durable.Tests/StoreStorageCases.cs: storage.store.commits.publishes-inside-the-attached-hosts-batch-and-plainly-without-a-host",
+          "tests/PiSharp.Durable.Tests/StoreStorageCases.cs: storage.store.gc.a-closed-storestorage-is-collected-while-its-store-stays-open",
+          "tests/PiSharp.Durable.Tests/StoreStorageCommitCases.cs: storage.store.commit.stores-the-batches-in-one-backend-transaction-one-seq-and-one-outbox-commit-each-receipts-in-order",
+          "tests/PiSharp.Durable.Tests/StoreStorageCommitCases.cs: storage.store.commit.writes-the-metadata-once-per-call-three-statements-per-entry-append-plus-one-cost-guard"
+        ]
+      },
+      "deferred": "Examples 35 and 36 and store-storage.test.ts's 2 view cases need phase 6 (createHost, defineFacet, self.table/open/follow/derive), and the examples would also need an upstream run for expected output. store-storage-commit.test.ts's publication case waits on group-commit, publication-caches and phase 6; its 1.5-id case cannot be ported (PiSharp ids are longs). conversation-view-bench.ts is area view's. StoreStorage passes the conformance suite (storage.store.conformance.* and storage.store.reopen.conformance.*, generated case ids) and the store pass runs 322 harness.<group>.store.* cases."
     },
     {
       "id": "durable.durable-sleep",

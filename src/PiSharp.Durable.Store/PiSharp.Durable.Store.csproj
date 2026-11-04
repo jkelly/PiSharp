@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Decision 0013 (Pi 1.5.0 sync, phase 4): the adapter joining Chord v2 (PiSharp.Chord) with PiSharp.Durable: Durable's Storage on
+       Chord v2's store (upstream packages/durable/src/storage/store, StoreStorage). PiSharp.Durable keeps decision 0005 §4 (it references
+       only Contracts and AI), so everything of StoreStorage that needs Chord v2 types is here. Experimental: the assembly is
+       [Experimental("PISHARP_DURABLE001")], as the durable port's other projects are. Not packable in phase 4; whether it ships as a
+       package is settled at release. -->
+  <PropertyGroup>
+    <IsPackable>false</IsPackable>
+    <!-- Durable's, Chord v2's and pi-telemetry's experimental APIs. -->
+    <NoWarn>$(NoWarn);PISHARP_DURABLE001;PISHARP_CHORD001;PISHARP_TELEMETRY001</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="PiSharp.Durable.Tests" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="../PiSharp.Durable/PiSharp.Durable.csproj" />
+    <ProjectReference Include="../PiSharp.Chord/PiSharp.Chord.csproj" />
+    <!-- The production database for the store (Database.cs): PiSharp.Durable.Sqlite's, wrapped in Chord v2's database surface. -->
+    <ProjectReference Include="../PiSharp.Durable.Sqlite/PiSharp.Durable.Sqlite.csproj" />
+  </ItemGroup>
+</Project>

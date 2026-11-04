@@ -787,55 +787,61 @@
       "upstream": "packages/durable/src/storage/store/commit.ts",
       "blobSha1": "7f89e71306dfde9b1d13bd5db8bc2d87da9169a4",
       "lines": 345,
-      "pisharp": "src/PiSharp.Durable/Storage/Store/Commit.cs",
+      "pisharp": "src/PiSharp.Durable.Store/Commit.cs",
       "phase": "sync-1.5.0",
-      "status": "planned",
-      "upstreamChange": "added"
+      "status": "ported",
+      "upstreamChange": "added",
+      "note": "v1.5.0 (work list area store-storage): DurableCommit is one series commit of ChordStore.CommitSeriesAsync and its one staged write: a batch staged at construction (rows encoded, document commands grouped per id with upstream's staging refusals), checked in its turn against the state the batches before it left (record ids, documents and copies read through the step), then applied (record_ids claims, rows stamped with commit_seq, document changes and retirements, then creations). A batch whose staging throws is a RefusedCommit in its turn. Engine contents and record cells are nodes of the Durable value (StoreTables.Node), so a lone surrogate is escaped as JSON.stringify escapes it. Tests: storage.store.conformance.*, storage.store.reopen.conformance.*, storage.store.commit.*"
     },
     {
       "upstream": "packages/durable/src/storage/store/documents.ts",
       "blobSha1": "d81f94d2daa226b29a1eee351d5c63289119ed04",
       "lines": 143,
-      "pisharp": "src/PiSharp.Durable/Storage/Store/Documents.cs",
+      "pisharp": "src/PiSharp.Durable.Store/Documents.cs",
       "phase": "sync-1.5.0",
-      "status": "planned",
-      "upstreamChange": "added"
+      "status": "ported",
+      "upstreamChange": "added",
+      "note": "v1.5.0 (work list area store-storage): Durable addresses as engine addresses under the owner (the scope as the namespace, kind and key JSON-encoded), the Durable record in the engine record's meta, and a read at a point (a record whose history does not reach back is a tagged result, told after the guarded read). Upstream's DocumentRead union is a record with a CurrentOnly id. Tests: storage.store.conformance.* (the document cases), storage.store.archives.*"
     },
     {
       "upstream": "packages/durable/src/storage/store/index.ts",
       "blobSha1": "0ddf86cdc344ed59c9aee633ba8883705f6ddc8d",
       "lines": 1,
-      "pisharp": "src/PiSharp.Durable/Storage/Store/Store.cs",
+      "pisharp": "src/PiSharp.Durable.Store/Store.cs",
       "phase": "sync-1.5.0",
-      "status": "planned",
-      "upstreamChange": "added"
+      "status": "ported",
+      "upstreamChange": "added",
+      "note": "v1.5.0 (work list area store-storage): The entry point is the namespace PiSharp.Durable.Store of the adapter project src/PiSharp.Durable.Store (decision 0013, phase 4; not packable). PiSharp-only: StoreBackends.OpenSqliteAsync, the store's backend over PiSharp.Durable.Sqlite's connection database through StoreSqliteDatabase (Database.cs), as upstream's tests open sqliteBackend(openNodeSqliteDatabase(path)). Tests: every storage.store.* and harness.*.store.* case opens its store through it"
     },
     {
       "upstream": "packages/durable/src/storage/store/queries.ts",
       "blobSha1": "8491270b7b89b2f8c58e20624126161e8ed4ab12",
       "lines": 137,
-      "pisharp": "src/PiSharp.Durable/Storage/Store/Queries.cs",
+      "pisharp": "src/PiSharp.Durable.Store/Queries.cs",
       "phase": "sync-1.5.0",
-      "status": "planned",
-      "upstreamChange": "added"
+      "status": "ported",
+      "upstreamChange": "added",
+      "note": "v1.5.0 (work list area store-storage): Reads compiled once per shape from the store's query vocabulary (OwnerTable.Prepare, PrepareFirst, PrepareGet), selecting only the record cell (an entry's commit_seq too) and parsing one JSON text per record; a record column past version 1 reads through the column's reader. Tests: storage.store.conformance.* (the scan and cursor cases), storage.store.heads.*, storage.store.review.*"
     },
     {
       "upstream": "packages/durable/src/storage/store/storage.ts",
       "blobSha1": "bfbfb894c9ff401f4b949c5c130e0115ba6a1e7b",
       "lines": 575,
-      "pisharp": "src/PiSharp.Durable/Storage/Store/Storage.cs",
+      "pisharp": "src/PiSharp.Durable.Store/Storage.cs",
       "phase": "sync-1.5.0",
-      "status": "planned",
-      "upstreamChange": "added"
+      "status": "ported",
+      "upstreamChange": "added",
+      "note": "v1.5.0 (work list area store-storage): StoreStorage.OpenAsync(store, owner, context) claims the owner's tables and document namespaces (a second claim is refused invalid/args), prepares the tables and raises the allocator above every id they hold; CommitAsync is one CommitSeriesAsync per call; Publishing runs in the attached host's batch (Batch.Within) or plainly; reads are guarded, request errors told after the read; CloseAsync waits for its calls underway and releases its claims, the store staying open. The Chord surface it needs beyond the adapter API is public and narrow, not InternalsVisibleTo: ChordStore.Claims (Documents, Release) and ChordStore.Batch (Running, Within). PiSharp-only (Context.cs): the store's context is DurableContext's conversion, ChordContext.Background until area telemetry gives DurableContext a span; cancellation later (decision 0013). Tests: storage.store.conformance.*, storage.store.reopen.conformance.*, storage.store.claims.*, storage.store.semantics.*, storage.store.commits.*, storage.store.commit.*, storage.store.gc.*, harness.*.store.*"
     },
     {
       "upstream": "packages/durable/src/storage/store/tables.ts",
       "blobSha1": "49523292dc8c57565dc8a7147f0acb46f7097675",
       "lines": 122,
-      "pisharp": "src/PiSharp.Durable/Storage/Store/Tables.cs",
+      "pisharp": "src/PiSharp.Durable.Store/Tables.cs",
       "phase": "sync-1.5.0",
-      "status": "planned",
-      "upstreamChange": "added"
+      "status": "ported",
+      "upstreamChange": "added",
+      "note": "v1.5.0 (work list area store-storage): The table definitions (record_ids, conversations, entries, entry_heads, tasks, submissions, each at version 1) and rows: the indexed columns and the record as one json cell, indexed strings JSON-encoded, sentinels for absent index values. Tests: storage.store.conformance.keeps-indexed-string-identities-lossless and the rest of storage.store.conformance.*, storage.store.heads.*"
     },
     {
       "upstream": "packages/durable/src/tasks.ts",
@@ -2999,12 +3005,11 @@
       "lines": 241,
       "pisharp": "benchmarks/PiSharp.Durable.Benchmarks/StorageMemory.cs",
       "phase": "P2",
-      "status": "needs-sync",
+      "status": "ported",
       "upstreamChange": "modified",
       "previousBlobSha1": "0e105fdc8b042757ec3341363959be7162f8d2d8",
       "changedLines": 11,
-      "note": "benchmarks/PiSharp.Durable.Benchmarks `storage-memory`: one child process per backend and scale; heap is the GC heap after forced full collections, RSS the working set (Node's external has no .NET counterpart); SQLite pages/freelist and JSONL file counts as upstream. Report only (docs/durable-benchmarks.md). Tests: benchmarks.smoke (the worker in-process at a tiny scale)",
-      "portedBlobSha1": "0e105fdc8b042757ec3341363959be7162f8d2d8"
+      "note": "benchmarks/PiSharp.Durable.Benchmarks `storage-memory`: one child process per backend and scale; heap is the GC heap after forced full collections, RSS the working set (Node's external has no .NET counterpart); SQLite pages/freelist (the store's file too) and JSONL file counts as upstream. Report only (docs/durable-benchmarks.md). Tests: benchmarks.smoke (the worker in-process at a tiny scale). v1.5.0 (work list area store-storage): the store backend, measured on disk as SQLite is"
     },
     {
       "upstream": "packages/durable/test/storage-runtime-boundary.test.ts",
@@ -3021,12 +3026,11 @@
       "lines": 194,
       "pisharp": "benchmarks/PiSharp.Durable.Benchmarks/StorageBench.cs",
       "phase": "P13",
-      "status": "needs-sync",
+      "status": "ported",
       "upstreamChange": "modified",
       "previousBlobSha1": "f24e915eb3d4a478041ce1068a9d4314e811ad45",
       "changedLines": 15,
-      "note": "benchmarks/PiSharp.Durable.Benchmarks `storage`: every read, write and reopen scenario on memory, SQLite and JSONL with upstream's Vitest bench options, sampled by BenchLoop.cs (tinybench 2's loop; no benchmark library). Report only: docs/durable-benchmarks.md has the results next to upstream's under Node. Tests: benchmarks.smoke (one sample each at a tiny scale; completion only)",
-      "portedBlobSha1": "f24e915eb3d4a478041ce1068a9d4314e811ad45"
+      "note": "benchmarks/PiSharp.Durable.Benchmarks `storage`: every read, write and reopen scenario on memory, SQLite, the store and JSONL with upstream's Vitest bench options, sampled by BenchLoop.cs (tinybench 2's loop; no benchmark library). Report only: docs/durable-benchmarks.md has the results next to upstream's under Node. Tests: benchmarks.smoke (one sample each at a tiny scale; completion only). v1.5.0 (work list area store-storage): the store backend, StoreStorage on a store over one SQLite file whose close closes the store (StorageBench.OpenStoreStorageAsync, upstream openStoreStorage), in upstream's order memory, sqlite, store, jsonl; its reopen copies the file, as SQLite's does"
     },
     {
       "upstream": "packages/durable/test/store-storage-commit.test.ts",
@@ -3034,8 +3038,9 @@
       "lines": 769,
       "pisharp": "tests/PiSharp.Durable.Tests/StoreStorageCommitCases.cs",
       "phase": "sync-1.5.0",
-      "status": "planned",
-      "upstreamChange": "added"
+      "status": "in-progress",
+      "upstreamChange": "added",
+      "note": "v1.5.0 (work list area store-storage): 18 of its 20 cases as storage.store.commit.* over CountedStore, a counting, fault-injecting wrapper of the store's Chord ISqliteDatabase (upstream counted()); the cost guard's figures (5, then 3*4+1) and the audit's (29 and 23 statements, every statement failed in turn, then the COMMIT) are the backend's statement counts of the call's transaction, as DurableContext carries no telemetry span for chord.store.statements until area telemetry. Not portable: \"refuses a batch whose rows staging cannot encode\" (an id of 1.5; PiSharp's ids are longs). Not ported yet: \"publishes each commit of a call in a host batch of its own\" (a Session's group commit publishing through IStorage.Publishing in a host's batch: areas group-commit and publication-caches, and the host, phase 6). In progress until that lands"
     },
     {
       "upstream": "packages/durable/test/store-storage-node.ts",
@@ -3043,8 +3048,9 @@
       "lines": 23,
       "pisharp": "tests/PiSharp.Durable.Tests/StoreStorageNode.cs",
       "phase": "sync-1.5.0",
-      "status": "planned",
-      "upstreamChange": "added"
+      "status": "ported",
+      "upstreamChange": "added",
+      "note": "v1.5.0 (work list area store-storage): OpenNodeSqliteStorageAsync(path, options) opens StoreStorage on the file (a table prefix dropped) and is the store pass's opener. vitest.store.config.ts's pass is harness.<group>.store.*: the parameterized groups of its list rerun on StoreStorage, fresh and across reopen (compaction, conversations, generation-recovery, inbox, lifecycle, ownership, structured, submissions, task-graph, tasks-recovery, tools-recovery, view). Not rerun: the groups that open their own SQLite file (input-entries, nested-tools, nested-tools-restart, read-only, scheduler-indexes, scheduler-retention) and the files later areas port (after-run, blocked, continue, restart-failure, sleep, tool-hooks, turn-limit). Tests: harness.*.store.* (322 cases)"
     },
     {
       "upstream": "packages/durable/test/store-storage-support.ts",
@@ -3052,8 +3058,9 @@
       "lines": 46,
       "pisharp": "tests/PiSharp.Durable.Tests/StoreStorageSupport.cs",
       "phase": "sync-1.5.0",
-      "status": "planned",
-      "upstreamChange": "added"
+      "status": "ported",
+      "upstreamChange": "added",
+      "note": "v1.5.0 (work list area store-storage): OpenStoreStorageAsync(path, options): a store over the SQLite file and StoreStorage in it under durable.test, whose close closes the store too (StoreOwningStorage delegates every member, in place of upstream's Proxy). Tests: storage.store.conformance.*, storage.store.review.*, storage.store.commit.refuses-a-later-batch-*, harness.*.store.*"
     },
     {
       "upstream": "packages/durable/test/store-storage.test.ts",
@@ -3061,8 +3068,9 @@
       "lines": 611,
       "pisharp": "tests/PiSharp.Durable.Tests/StoreStorageCases.cs",
       "phase": "sync-1.5.0",
-      "status": "planned",
-      "upstreamChange": "added"
+      "status": "in-progress",
+      "upstreamChange": "added",
+      "note": "v1.5.0 (work list area store-storage): 18 of its 20 cases and both conformance runs: storage.store.conformance.* (:memory:) and storage.store.reopen.conformance.* (ReopeningStoreStorage), storage.store.claims.*, storage.store.semantics.*, storage.store.archives.*, storage.store.heads.*, storage.store.reads.*, storage.store.commits.*, storage.store.review.*, storage.store.gc.*. Hand-built, as Chord's host (createHost) is phase 6: the archive case's Chord data is another owner's StoreStorage document (app.memo) instead of a Chord object's state; the publishing case attaches a hand-built Batch (through InternalsVisibleTo) and calls Publishing itself, as the Session does not publish through IStorage.Publishing until areas group-commit and publication-caches; the statement count is the counted backend's (CountedStore in StoreStorageCommitCases.cs), as DurableContext carries no telemetry span until area telemetry. Not ported: the two cases of \"Durable's views as Chord sources on the store\" (createHost, defineFacet, self.open, self.follow, self.derive). In progress until phase 6's host runs those and the hand-built cases as upstream does"
     },
     {
       "upstream": "packages/durable/test/system-order-cache-e2e.test.ts",
