@@ -552,12 +552,11 @@
       "lines": 181,
       "pisharp": "src/PiSharp.Durable/Search.cs",
       "phase": "sync-1.2.0",
-      "status": "needs-sync",
+      "status": "ported",
       "upstreamChange": "modified",
       "previousBlobSha1": "eb89772a94a18a685cd499b3728828c94655f08c",
       "changedLines": 182,
-      "note": "Search (internal, as upstream does not export it): Tokenize and RankDocuments (Okapi BM25, k1 1.2, b 0.75, stable ties), with SearchDocument. JavaScript's toLowerCase() expands U+0130 to i + U+0307, which .NET's invariant lowercasing does not, so Search expands it first. Shared with code mode's searchTools() (area d). Tests: tool-search.search.* (upstream search.ts results printed under Node) and tool-search.ranking-differential.* (against main's ToolSearch/Bm25Ranker in PiSharp.Extensions.Abstractions, the same algorithm)",
-      "portedBlobSha1": "eb89772a94a18a685cd499b3728828c94655f08c"
+      "note": "Search (internal, as upstream does not export it): Tokenize and RankDocuments, with SearchDocument (Name, Text, NamespaceText). Okapi BM25 (k1 1.2, b 0.75) over the text with the name (3x IDF) and the namespace text (0.5x IDF, not length-normalized) as separate fields; coverage of the query terms ranks first, a query that is exactly a tool name or its suffix after __ ranks it before that, and a tool whose whole local name is in the query gets a bonus of one more match of every term; stable ties. Tokenize: NFC, camelCase splits, JavaScript lowercasing (U+0130 expanded first), letters, marks and digits of any script kept, ASCII split at spaces and other text through ICU word segmentation (the system ICU, a copy of main's UnicodeWordSegmenter; Intl.Segmenter's isWordLike is rule status >= 100), only ASCII words stemmed. Residuals: the system ICU version can differ from V8's bundled one, no ICU means no CJK/Thai split, invariant globalization makes NFC a no-op, final sigma is not reproduced. Shared with code mode searchTools() (area d). Tests: search.* (search.test.ts), tool-search.search.* (v1.2.0 results printed under Node, one authored for v1.5.0) and tool-search.ranking-differential.* (against main's ToolSearch/Bm25Ranker in PiSharp.Extensions.Abstractions, both at Pi 1.5.0, names and namespace texts included)"
     },
     {
       "upstream": "packages/durable/src/session/cached-storage.ts",
@@ -2766,8 +2765,9 @@
       "lines": 154,
       "pisharp": "tests/PiSharp.Durable.Tests/SearchCases.cs",
       "phase": "sync-1.5.0",
-      "status": "planned",
-      "upstreamChange": "added"
+      "status": "ported",
+      "upstreamChange": "added",
+      "note": "search.tokenize.* (5 tests; the it.each rows are one case each, named by script) and search.rank-documents.* (8 tests, it.each likewise), SearchCases.cs; authored after them: search.code-mode.* (searchTools() on namespace instructions and exact names)"
     },
     {
       "upstream": "packages/durable/test/session-adoption.test.ts",
