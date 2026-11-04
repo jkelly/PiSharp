@@ -565,9 +565,9 @@ internal static class CompactionTests
             Check(N(usage["input"]) > N(usageBefore["input"]), "the summary's input is counted");
             await Turn(chat, "next", "done");
             var agent = chat.Faux.AgentRequests.Snapshot()[^1].Messages;
-            // The next request: the summary, the kept turn, the new input, then one complete system baseline.
-            Seq(["user", "user", "assistant", "user", "system"], agent.Select(Role), "next request");
-            MatchJson("""{"sections":{"preamble":"You are helpful."}}""", agent[4], "baseline");
+            // The next request: one complete system baseline leading the summary, the kept turn, and the new input (#10904).
+            Seq(["system", "user", "user", "assistant", "user"], agent.Select(Role), "next request");
+            MatchJson("""{"sections":{"preamble":"You are helpful."}}""", agent[0], "baseline");
             await chat.Harness.CloseAsync(Context);
         });
 
@@ -630,9 +630,10 @@ internal static class CompactionTests
             await Result(chat, await Compact(chat.Root));
             gate.Resolve();
             Equal(SubmissionStatus.Done, (await input.WaitAsync(Context)).Status, "input");
-            // The continuation request starts with the summary.
+            // The continuation request starts with the new baseline, then the summary, ahead of the kept tool call (#10904).
             var continuation = chat.Faux.AgentRequests.Snapshot()[^1].Messages;
-            Check(UserText(continuation[0]).Contains("<summary>\nSUMMARY\n</summary>", StringComparison.Ordinal), "continuation starts with the summary");
+            Equal("system", Role(continuation[0]), "continuation starts with the baseline");
+            Check(UserText(continuation[1]).Contains("<summary>\nSUMMARY\n</summary>", StringComparison.Ordinal), "the summary follows it");
             Seq(["pi.tool-result", "pi.compaction", "pi.system", "pi.assistant"], (await KindsOf(chat.Root)).TakeLast(4), "kinds");
             await chat.Harness.CloseAsync(Context);
         });
@@ -1312,7 +1313,8 @@ internal static class CompactionTests
             var compaction = (await AllEntries(chat.Root)).First(record => record.Kind == "pi.compaction");
             MatchJson("""{"data":{"reason":"overflow"}}""", compaction.ToJson(), "summary");
             var retry = chat.Faux.AgentRequests.Snapshot()[^1].Messages;
-            Check(UserText(retry[0]).Contains("SUMMARY", StringComparison.Ordinal), "summary first");
+            Equal("system", Role(retry[0]), "the baseline first");
+            Check(UserText(retry[1]).Contains("SUMMARY", StringComparison.Ordinal), "summary after it");
             Check(!retry.Any(message => Role(message) == "assistant" && ((JsonObjectValue)message)["stopReason"] is JsonStringValue { Value: "error" }),
                 "the error is left out");
             await chat.Harness.CloseAsync(Context);
