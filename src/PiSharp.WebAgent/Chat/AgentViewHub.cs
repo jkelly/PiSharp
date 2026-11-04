@@ -365,7 +365,7 @@ public sealed class AgentViewHub : IAsyncDisposable
                 var usage = Transcript.Sum(DurableWire.Read<UsageTotals>(model.Usage));
                 var changedPanels = new JsonObject();
                 await PanelAsync(changedPanels, "notices", "~/Views/Chat/_ChatNotices.cshtml", new ChatNoticesView(model.Compactions.Count > 0,
-                    model.CompactionFailure, model.Retry?.At, model.Retry?.Error)).ConfigureAwait(false);
+                    model.CompactionFailure, model.Retry?.At, model.Retry?.Error) { RunFailure = ChatDisplay.RunFailure(model.RunFailure) }).ConfigureAwait(false);
                 if (!readOnly)
                 {
                     // The interactive panels: questions and approvals, the queue, the banners' actions and the session details.

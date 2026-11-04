@@ -16,6 +16,8 @@
 //   is not a ToolDiagnosticSeverity member, which makes the same commit throw while encoding the stored result.
 // - The cases upstream opens on SQLite through openNodeSqliteStorage use SqliteStorage in a fresh temporary directory.
 // - Upstream runs the others on MemoryStorage; so do they here.
+// Pi v1.5.0 sync (area run-failure, f3255de76): "aborts nested calls with their caller" expects the run's pi.live.runFailure (reason
+// aborted) where v1.2.0 expected an empty pi.live.
 using System.Collections.Immutable;
 using PiSharp.Durable;
 using PiSharp.Durable.Chord;
@@ -476,7 +478,10 @@ internal static class NestedToolsTests
             var tasks = await ToolTasks(harness);
             MatchJson("""{"status":"aborted","result":{"kind":"nested"}}""", OutcomeOf(tasks[1]), "child");
             MatchJson("""{"status":"aborted","result":{"kind":"model"}}""", OutcomeOf(tasks[0]), "parent");
-            SameJson("{}", await harness.SnapshotAsync(Live.LiveDoc, root.Id, Context), "live");
+            // Pi v1.5.0 (area run-failure): pi.live records the abort.
+            var live = (await harness.SnapshotAsync(Live.LiveDoc, root.Id, Context))!;
+            Seq(["runFailure"], live.Keys, "live");
+            MatchJson("""{"reason":"aborted"}""", live["runFailure"], "the run's failure");
             await harness.CloseAsync(Context);
         });
 

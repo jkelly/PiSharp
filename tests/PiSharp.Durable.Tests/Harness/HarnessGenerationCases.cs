@@ -22,6 +22,8 @@
 // Pi v1.5.0 sync (area deferred-commits, 6c2fd73b0): livePublications observes commits as memory adopts them (SessionTests.ObserveCommits,
 // upstream observeCommits), and "resolves settings over the built-in defaults" expects progress.persistWithinMs 1000, the default for -1,
 // and 0 kept. "stores partials as deltas ..." stores deferred partials within 100 ms, as e5c6182ba's does.
+// Pi v1.5.0 sync (area run-failure, f3255de76): the cases whose run ends without an answer expect f3255de76's pi.live.runFailure where
+// v1.2.0 expected an empty pi.live; the faulted run's detail contains "non-finite number" (see above).
 #pragma warning disable PISHARP_IDENTITY001 // PiSharp.AI's ClientIdentity (Pi v1.5.0) is experimental.
 using System.Collections.Immutable;
 using System.Text.RegularExpressions;
@@ -161,7 +163,8 @@ internal static class GenerationTests
             SameJson("""{"status":"aborted"}""", OutcomeJson(await harness.WaitForTaskAsync(taskId, Context)), "outcome");
             // The earlier settlement stays; the run's own settlement leaves it unchanged.
             MatchJson("""{"status":"unanswered","reason":"withdrawn"}""", (await submission.StatusAsync(Context)).ToJson(), "submission");
-            SameJson("{}", await LiveOf(harness, root), "live");
+            // Pi v1.5.0 (area run-failure): a run ends without an answer even when its inputs were settled already.
+            SameJson($$$"""{"runFailure":{"taskId":{{{taskId.Value}}},"inputs":[{{{submission.Id.Value}}}],"reason":"aborted"}}""", await LiveOf(harness, root), "live");
             await harness.CloseAsync(Context);
         });
 
@@ -181,8 +184,10 @@ internal static class GenerationTests
             var tasks = await TasksOf(harness, root);
             SameJson("""{"status":"terminal","outcome":{"status":"failed","error":{"message":"Model faux/missing is not available","detail":{"reason":"no_model"}}}}""",
                 tasks[0].State.ToJson(), "task state");
-            SameJson("{}", await LiveOf(harness, root), "root live");
-            SameJson("{}", await LiveOf(harness, plain), "plain live");
+            // Pi v1.5.0 (area run-failure): each conversation's pi.live records why its run ended without an answer.
+            MatchExactly($$$"""{"runFailure":{"taskId":{{{tasks[0].Id.Value}}},"inputs":["<number>"],"reason":"no_model","detail":"Model faux/missing is not available"}}""",
+                await LiveOf(harness, root), "root live");
+            MatchJson("""{"reason":"no_model","detail":"No model is configured"}""", (await LiveOf(harness, plain))?["runFailure"], "plain live");
             await harness.CloseAsync(Context);
         });
 
@@ -303,7 +308,7 @@ internal static class GenerationTests
             var converted = (JsonObjectValue)entries[1].Model![0];
             Equal("aborted", S(converted["stopReason"]), "stop reason");
             Check(TextOf(converted)!.StartsWith(TextOf(partial)!, StringComparison.Ordinal), "the converted entry extends the partial");
-            SameJson("{}", await LiveOf(harness, root), "live");
+            SameJson($$$"""{"runFailure":{"taskId":{{{taskId.Value}}},"inputs":[{{{submission.Id.Value}}}],"reason":"aborted"}}""", await LiveOf(harness, root), "live");
             SameJson("""{"status":"aborted"}""", OutcomeJson(await harness.WaitForTaskAsync(taskId, Context)), "outcome");
             await harness.CloseAsync(Context);
         });
@@ -321,7 +326,7 @@ internal static class GenerationTests
             await harness.AbortTaskAsync(taskId, Context);
             MatchJson("""{"status":"unanswered","reason":"aborted"}""", (await submission.WaitAsync(Context)).ToJson(), "settled");
             Equal(1, setup.Faux.State.CancelledDeferred.Count, "cancelled");
-            SameJson("{}", await LiveOf(harness, root), "live");
+            SameJson($$$"""{"runFailure":{"taskId":{{{taskId.Value}}},"inputs":[{{{submission.Id.Value}}}],"reason":"aborted"}}""", await LiveOf(harness, root), "live");
             await harness.CloseAsync(Context);
         });
 
@@ -343,7 +348,7 @@ internal static class GenerationTests
             await harness.AbortTaskAsync(taskId, Context);
             MatchJson("""{"status":"unanswered","reason":"aborted"}""", (await submission.WaitAsync(Context)).ToJson(), "settled");
             Check(setup.Reports.Snapshot().Any(error => error.Message == "cancel failed"), "the cancel failure is reported");
-            SameJson("{}", await LiveOf(harness, root), "live");
+            SameJson($$$"""{"runFailure":{"taskId":{{{taskId.Value}}},"inputs":[{{{submission.Id.Value}}}],"reason":"aborted"}}""", await LiveOf(harness, root), "live");
             await harness.CloseAsync(Context);
         });
 
@@ -599,7 +604,10 @@ internal static class GenerationTests
             Seq(["pi.user", "pi.assistant"], entries.Select(entry => entry.Kind), "kinds");
             MatchJson("""{"role":"assistant","stopReason":"aborted"}""", entries[1].Model![0], "converted");
             Equal("partial", TextOf(entries[1].Model![0]), "converted text");
-            SameJson("{}", await LiveOf(harness, root), "live");
+            // Pi v1.5.0 (area run-failure): the fault's detail names the value that is not strict JSON (see the header).
+            var live = await LiveOf(harness, root);
+            MatchExactly($$$"""{"runFailure":{"taskId":"<number>","inputs":[{{{submission.Id.Value}}}],"reason":"faulted","detail":"<string>"}}""", live, "live");
+            Rejects(new InvalidOperationException(S(((JsonObjectValue)live!["runFailure"])["detail"])), "non-finite number", "failure detail");
             var tasks = await TasksOf(harness, root);
             MatchJson("""{"status":"terminal","outcome":{"status":"faulted"}}""", tasks[0].State.ToJson(), "state");
             await harness.CloseAsync(Context);
@@ -633,7 +641,8 @@ internal static class GenerationTests
             SameJson("""{"status":"orphaned","reason":"task_too_old"}""", OutcomeJson(await harness.WaitForTaskAsync(taskId, Context)), "outcome");
             MatchJson("""{"status":"unanswered","reason":"task_too_old"}""",
                 (await (await harness.SubmissionAsync(submissionId, Context))!.StatusAsync(Context)).ToJson(), "submission");
-            SameJson("{}", await LiveOf(harness, root), "live");
+            SameJson($$$"""{"runFailure":{"taskId":{{{taskId.Value}}},"inputs":[{{{submissionId.Value}}}],"reason":"orphaned","detail":"task_too_old"}}""",
+                await LiveOf(harness, root), "live");
             await harness.CloseAsync(Context);
         });
     }

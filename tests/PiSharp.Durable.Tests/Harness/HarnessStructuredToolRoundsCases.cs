@@ -11,6 +11,9 @@
 // two tools' aborts with a barrier (see there).
 // Pi v1.5.0 sync (area deferred-commits, 6c2fd73b0): "... fails the Harness on a failed final commit" stores progress at once
 // (progress.persistWithinMs 0), as upstream's does.
+// Pi v1.5.0 sync (area run-failure, f3255de76): the aborted and the faulted run leave f3255de76's pi.live.runFailure where v1.2.0 expected
+// an empty pi.live. The faulted run's detail is Chord's "Value contains a non-finite number and is not strict JSON", where upstream's is
+// "Value contains a non-JSON function; expected strict JSON" (the invalid final message above).
 using PiSharp.Durable;
 using PiSharp.Durable.Chord;
 using static ChatTests;
@@ -104,7 +107,9 @@ internal static partial class StructuredTests
             MatchJson("""{"status":"unanswered","reason":"aborted"}""", (await submission.WaitAsync(Context)).ToJson(), "settled");
             var results = (await AllEntries(root)).Where(entry => entry.Kind == "pi.tool-result").ToList();
             Seq(["c1", "c2"], results.Select(entry => S(((JsonObjectValue)entry.Model![0])["toolCallId"])), "results");
-            SameJson("{}", await harness.SnapshotAsync(Live.LiveDoc, root.Id, Context), "live");
+            // Pi v1.5.0 (area run-failure): pi.live records the abort.
+            SameJson($$$"""{"runFailure":{"taskId":{{{generation.Value}}},"inputs":[{{{submission.Id.Value}}}],"reason":"aborted"}}""",
+                await harness.SnapshotAsync(Live.LiveDoc, root.Id, Context), "live");
             Equal(TaskOutcomeStatus.Aborted, ((SettlingTaskState)(await harness.WaitForTaskAsync(generation, Context)).State).Outcome.Status, "generation");
             await harness.CloseAsync(Context);
         });
@@ -186,7 +191,9 @@ internal static partial class StructuredTests
             opened = reopened;
             var again = (await reopened.SubmissionAsync(submission.Id, Context))!;
             MatchJson("""{"status":"unanswered","reason":"faulted"}""", (await again.WaitAsync(Context)).ToJson(), "settled");
-            SameJson("{}", await reopened.SnapshotAsync(Live.LiveDoc, reopenedRoot.Id, Context), "live");
+            // Pi v1.5.0 (area run-failure): pi.live records the fault, with the C# detail (see the header).
+            MatchExactly($$$"""{"runFailure":{"taskId":"<number>","inputs":[{{{submission.Id.Value}}}],"reason":"faulted","detail":"Value contains a non-finite number and is not strict JSON"}}""",
+                await reopened.SnapshotAsync(Live.LiveDoc, reopenedRoot.Id, Context), "live");
             Seq(["pi.user", "pi.assistant"], await Kinds(reopenedRoot), "kinds");
             await reopened.CloseAsync(Context);
             await controlled.Inner.CloseAsync(Context);

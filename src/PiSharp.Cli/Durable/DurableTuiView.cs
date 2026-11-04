@@ -9,6 +9,8 @@
 // the status says what the run waits for, the footer shows plan mode, and both tools have their own cards.
 // Pi v1.5.0 sync (area view): the transcript and the footer's context tokens come from DurableView.Transcript, the shown conversation's
 // active transcript; pi-durable 1.5.0's view entries are a window over the whole transcript.
+// Pi v1.5.0 sync (area run-failure): an alert says why the newest run ended without an answer (pi-durable 1.5.0 pi.live.runFailure) until
+// a later run starts; a stop (aborted) has none, as it has no notice. pi.live is no longer {} after such a run, and the status reads run.
 using System.Collections.Immutable;
 using System.Globalization;
 using System.Text.Json.Nodes;
@@ -274,8 +276,9 @@ internal sealed class DurableTuiView
         }
     }
 
-    /// <summary>What must stay on screen until it changes: the session failed, or the newest compaction failed (pi.live.compactionFailure,
-    /// kept until a compaction produces a summary).</summary>
+    /// <summary>What must stay on screen until it changes: the session failed, the newest compaction failed (pi.live.compactionFailure,
+    /// kept until a compaction produces a summary), or the newest run ended without an answer other than a stop (pi.live.runFailure, kept
+    /// until a later run starts).</summary>
     private void SyncAlerts(DurableView view, JsonObject live)
     {
         alerts.Clear();
@@ -283,6 +286,8 @@ internal sealed class DurableTuiView
         if (Obj(live, "compactionFailure") is { } compaction)
             alerts.AddChild(new TruncatedText(theme.Fg("error",
                 $"Compaction failed ({Str(compaction, "reason") ?? "undefined"}): {Str(compaction, "error") ?? "undefined"}"), 1, 0));
+        if (Obj(live, "runFailure") is { } run && Str(run, "reason") is { } reason && reason != "aborted")
+            alerts.AddChild(new TruncatedText(theme.Fg("error", $"No answer ({reason}){(Str(run, "detail") is { } detail ? ": " + detail : "")}"), 1, 0));
     }
 
     private void SyncTasks(TaskGraph? graph)

@@ -1,7 +1,7 @@
 // Authored for PiSharp: what the `pisharp durable` TUI shows of the pi-durable 1.2.0 library (durable work list area l; upstream deleted its
 // durable agent in v1.2.0, so these cases have no upstream twin): nested tool calls as rows under their caller's card, a tool result's
 // diagnostics as plain lines (a failed command's exit code as pi shows it), images as interactive mode shows them, and the alerts for a failed
-// session and for pi.live.compactionFailure.
+// session and for pi.live.compactionFailure. Pi v1.5.0 sync (area run-failure): the alert for pi-durable 1.5.0's pi.live.runFailure.
 using System.Collections.Immutable;
 using System.Text.Json.Nodes;
 using PiSharp.Cli.Durable;
@@ -193,6 +193,26 @@ internal static partial class Program
             // A compaction that produced a summary clears it.
             run.Source.Publish(View([UserEntry(1, "q")], live: "{}"));
             await run.WaitUntil(text => !text.Contains("Compaction failed", StringComparison.Ordinal), "cleared");
+            run.Send("\u0003");
+            Equal(0, await run.Exited(), "a healthy session exits with 0");
+        }),
+
+        Case("tui.alert.run-failure", async () =>
+        {
+            await using var run = await TuiRun.Start(View([UserEntry(1, "q")]));
+            run.Source.Publish(View([UserEntry(1, "q")],
+                live: """{"runFailure":{"taskId":3,"inputs":[1],"reason":"no_model","detail":"Model faux/gone is not available"}}"""));
+            await run.WaitFor("No answer (no_model): Model faux/gone is not available");
+            Check(run.Terminal.RawOutput.Contains(Themes.Current.Fg("error", "No answer (no_model): Model faux/gone is not available"), StringComparison.Ordinal),
+                "error color");
+            // The run is over: no working status.
+            Check(!Flat(run.Screen).Contains("Working...", StringComparison.Ordinal), "idle:\n" + run.Screen);
+            // A later run clears it; a stop has no alert.
+            run.Source.Publish(View([UserEntry(1, "q")], live: """{"run":{"taskId":5,"inputs":[2]}}"""));
+            await run.WaitUntil(text => !text.Contains("No answer", StringComparison.Ordinal), "cleared");
+            run.Source.Publish(View([UserEntry(1, "q")], live: """{"runFailure":{"taskId":5,"inputs":[2],"reason":"aborted"}}"""));
+            await run.WaitUntil(text => !text.Contains("Working...", StringComparison.Ordinal), "the stopped run is over");
+            Check(!Flat(run.Screen).Contains("No answer", StringComparison.Ordinal), "no alert for a stop:\n" + run.Screen);
             run.Send("\u0003");
             Equal(0, await run.Exited(), "a healthy session exits with 0");
         }),

@@ -6,6 +6,9 @@
 //   an untyped caller's entry" checks that what the inbox and the transcript keep is the kind and data alone, which the type makes the only
 //   thing a caller can pass.
 // - The reopen case reopens a SQLite file, as upstream does.
+// Pi v1.5.0 sync (area run-failure, f3255de76): "appends a data-only write while idle after a failed run ..." expects the run's
+// pi.live.runFailure where v1.2.0 expected an empty pi.live. (f3255de76's move of "shows a data-only write ..." from watchEvents to the
+// view is area events'.)
 using PiSharp.Durable;
 using PiSharp.Durable.Chord;
 using PiSharp.Durable.Sqlite;
@@ -337,7 +340,9 @@ internal static class InputEntriesTests
             await harness.WaitForIdleAsync(Context);
             Equal(SubmissionStatus.Queued, (await f.StatusAsync(Context)).Status, "f");
             Seq([(double)f.Id.Value], (await InboxItems(harness, root)).Select(item => N(((JsonObjectValue)item)["id"])), "inbox");
-            SameJson("{}", await harness.SnapshotAsync(Live.LiveDoc, root.Id, Context), "live");
+            // Pi v1.5.0 (area run-failure): pi.live records why the run ended without an answer.
+            MatchExactly($$$"""{"runFailure":{"taskId":"<number>","inputs":[{{{input.Id.Value}}}],"reason":"model_error","detail":"invalid request"}}""",
+                await harness.SnapshotAsync(Live.LiveDoc, root.Id, Context), "live");
             Equal(1, setup.Faux.State.CallCount, "calls");
             // The next input places the waiting mention first.
             var g = await Input(root, "g");
