@@ -1566,7 +1566,12 @@
         "04a93bad8",
         "adc5fa9f8",
         "d280e1ffa",
-        "d5b3de22d"
+        "d5b3de22d",
+        "ea2fde1c",
+        "c4ad6262",
+        "821fd66a",
+        "6dae14ea",
+        "b22c7d61"
       ],
       "notes": "ClientIdentity exists in PiSharp.AI (src/PiSharp.AI/ClientIdentity.cs, group B): pass HarnessOptions.Identity to NativeDurableModels and the CLI's DurableModels; PiSharp identifies as the Pi version it tracks (0013 'Identity'), never sends PI_ATTRIBUTION and never presents Pi's pi.dev OAuth client. The device host and the web agent (decisions 0008 and 0011) open Harnesses and should pass the same identity. before-provider-request: upstream passes the chain as pi-ai's onPayload; check what PiSharp.AI's payload hook already offers on every native route (the CLI's live routes included) before adding a durable stream option; the payload is the provider's body, so it never carries secrets into logs. thinking-level-recorded changes entry records the compat cases compare: the v1.2.0 captures have no thinkingLevel, so those written comparisons become authored expectations (labelled authored), not captures."
     },

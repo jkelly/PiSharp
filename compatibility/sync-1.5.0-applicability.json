@@ -56,11 +56,11 @@
     "changelogBullets": 477,
     "repeatedBullets": 23,
     "byStatus": {
-      "ported": 183,
-      "ported-with-deferral": 19,
+      "ported": 184,
+      "ported-with-deferral": 21,
       "already-ported": 12,
       "no-op": 25,
-      "port": 87
+      "port": 84
     },
     "byArea": {
       "ai": 58,
@@ -9191,7 +9191,7 @@
       "id": "durable.harness-identity",
       "area": "durable",
       "phase": 4,
-      "status": "port",
+      "status": "ported-with-deferral",
       "changelog": [
         "durable@1.4.0/Added#11"
       ],
@@ -9212,7 +9212,21 @@
         "src/PiSharp.Cli/Durable/DurableModels.cs"
       ],
       "release": "1.5.0",
-      "notes": "Depends on ai@1.4.0/Added#1 and agent@1.4.0/Added#1 (group B: ClientIdentity in PiSharp.AI). 0013 design point 'Identity': PiSharp identifies as the Pi version it tracks (user agent pi/<version> (<platform>; <runtime>; <arch>)). NativeDurableModels and the CLI's DurableModels stream over PiSharp.AI transports, so the identity must reach them; the device host and the web agent (decisions 0008 and 0011) open Harnesses and should pass the same identity."
+      "notes": "Depends on ai@1.4.0/Added#1 and agent@1.4.0/Added#1 (group B: ClientIdentity in PiSharp.AI). 0013 design point 'Identity': PiSharp identifies as the Pi version it tracks (user agent pi/<version> (<platform>; <runtime>; <arch>)). NativeDurableModels and the CLI's DurableModels stream over PiSharp.AI transports, so the identity must reach them; the device host and the web agent (decisions 0008 and 0011) open Harnesses and should pass the same identity.",
+      "evidence": {
+        "commits": [
+          "ea2fde1c",
+          "6dae14ea",
+          "b22c7d61"
+        ],
+        "tests": [
+          "tests/PiSharp.Durable.Tests/Harness/HarnessGenerationCases.cs: harness.generation.sends-the-harness-default-identity-and-merges-the-harness-identity-over-it",
+          "tests/PiSharp.Durable.Tests/Harness/HarnessToolsCases.cs: harness.tools.gives-tools-and-hooks-the-harness-s-models",
+          "tests/PiSharp.Durable.Tests/HarnessHostInputsCases.cs: harness.host-inputs.tools-read-the-current-models-at-each-access-of-api-models",
+          "tests/PiSharp.Durable.Tests/ModelsCases.cs: models.identity.a-request-identity-sets-the-user-agent"
+        ]
+      },
+      "deferred": "Upstream's DEFAULT_HARNESS_IDENTITY is { attribution: PI_ATTRIBUTION }; PiSharp's Harness.DefaultIdentity is empty and adds no attribution, pending the owner-blocked row core.client-identity-attribution (core.agent-identity likewise not landed through durable). The user-agent part is ported: a Harness without an identity sends PiSharp.AI's default pi/1.5.0 (<platform>; dotnet/<runtime>; <arch>) user agent, and a HarnessOptions.Identity is merged over the default into every chat request. No caller passes an identity yet (CLI, web agent, device host): there is no PiSharp app identity until the owner decides. IDurableModels' classify, generateImages and deferred fetch/cancel take no request options, so the Harness identity reaches chat requests only (upstream's withClientIdentity wraps every Models call); those calls send PiSharp.AI's default, which equals the Harness default today."
     },
     {
       "id": "durable.host-option-providers",
@@ -9575,7 +9589,7 @@
       "id": "durable.before-provider-request",
       "area": "durable",
       "phase": 4,
-      "status": "port",
+      "status": "ported-with-deferral",
       "changelog": [
         "durable@1.5.0/Added#16"
       ],
@@ -9596,13 +9610,26 @@
         "src/PiSharp.Cli/Durable/DurableModels.cs"
       ],
       "release": "1.5.0",
-      "notes": "Upstream passes the chain as pi-ai's onPayload stream option. IDurableModels streams over PiSharp.AI's native transports (decision 0005 'Model adapter'), which must hand the provider body to a callback on every route, the CLI's live routes included; check what PiSharp.AI's payload hook already offers before adding a durable stream option. No PiSharp-only surface is affected."
+      "notes": "Upstream passes the chain as pi-ai's onPayload stream option. IDurableModels streams over PiSharp.AI's native transports (decision 0005 'Model adapter'), which must hand the provider body to a callback on every route, the CLI's live routes included; check what PiSharp.AI's payload hook already offers before adding a durable stream option. No PiSharp-only surface is affected.",
+      "evidence": {
+        "commits": [
+          "ea2fde1c",
+          "6dae14ea",
+          "b22c7d61"
+        ],
+        "tests": [
+          "tests/PiSharp.Durable.Tests/Harness/HarnessToolsCases.cs: harness.tools.chains-beforeproviderrequest-over-every-provider-request-body",
+          "tests/PiSharp.Durable.Tests/Harness/HarnessToolsCases.cs: harness.tools.reports-a-throwing-beforeproviderrequest-hook-and-continues-the-chain",
+          "tests/PiSharp.Durable.Tests/ModelsCases.cs: models.payload.on-payload-replaces-the-json-request-body-and-null-keeps-it"
+        ]
+      },
+      "deferred": "Two parts wait: (1) upstream reports a throwing hook with ReportInfo naming the extension; ReportInfo is area reports', so the case checks the report's message. (2) The web agent's account routes (src/PiSharp.WebAgent/Routing/AccountRouter.cs via WebDurableModels, outside this area's files) build their transports on an unwrapped provider handler, so the hook reaches the web agent's native routes but not its account routes; wrapping that handler with NativeDurableModels.PayloadHandler.Wrap (internal today) is a follow-up."
     },
     {
       "id": "durable.thinking-level-recorded",
       "area": "durable",
       "phase": 4,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "durable@1.5.0/Fixed#6"
       ],
@@ -9618,7 +9645,19 @@
         "tests/PiSharp.Durable.Tests/Harness/HarnessGenerationRecoveryCases.cs"
       ],
       "release": "1.5.0",
-      "notes": "Generation.cs keeps thinkingLevel in the request checkpoint (:202, :218) but does not write it on the assistant message; PiSharp.Agent's loop does (src/PiSharp.Agent/TurnRunner.cs:85). Compat cases compare entry records with upstream's, so the field changes their expectations."
+      "notes": "Generation.cs keeps thinkingLevel in the request checkpoint (:202, :218) but does not write it on the assistant message; PiSharp.Agent's loop does (src/PiSharp.Agent/TurnRunner.cs:85). Compat cases compare entry records with upstream's, so the field changes their expectations.",
+      "evidence": {
+        "commits": [
+          "ea2fde1c",
+          "c4ad6262",
+          "6dae14ea"
+        ],
+        "tests": [
+          "tests/PiSharp.Durable.Tests/Harness/HarnessGenerationCases.cs: harness.generation.records-the-requested-thinking-level-on-answers-streamed-and-polled",
+          "tests/PiSharp.Durable.Tests/Harness/HarnessGenerationRecoveryCases.cs: harness.generation-recovery.polls-a-checkpoint-stored-without-a-thinking-level-and-records-none",
+          "tests/PiSharp.Durable.Tests/ExamplesCases.cs: examples.memory.upstream-output"
+        ]
+      }
     },
     {
       "id": "durable.partial-commit-appends",
