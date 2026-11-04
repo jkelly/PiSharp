@@ -459,10 +459,7 @@
       "size": "S",
       "dependsOn": [],
       "commits": [
-        "4a5d37291",
-        "50d9f823e",
-        "ec1be23eb",
-        "f75b3240a"
+        "94f62dda"
       ],
       "notes": "PiSharp keeps the module internal in PiSharp.Durable/Harness/Output.cs (the port map maps chord/src/output.ts there); the port is the re-citation plus the changes. Port output.ts whole at v1.5.0, including the ProgressClock of chord.output-progress-clock (a phase 6 row): durable.host-timers (area sleep) arms progress throttles through it, so phase 4 needs it; tell phase 6 the row's code landed here. Durable's env keeps ShellOutputSkip as an interface of OutputSkip's shape (env/index.ts at v1.5.0), so Env/Shell.cs and Harness/Tool.cs keep their names. harness-output*.test.ts were renamed into chord/test/output*.test.ts: move HarnessOutputCases.cs/HarnessOutputSkipCases.cs citations, keep the case ids."
     },

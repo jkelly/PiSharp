@@ -56,11 +56,11 @@
     "changelogBullets": 477,
     "repeatedBullets": 23,
     "byStatus": {
-      "ported": 162,
+      "ported": 165,
       "ported-with-deferral": 12,
       "already-ported": 13,
       "no-op": 25,
-      "port": 114
+      "port": 111
     },
     "byArea": {
       "ai": 58,
@@ -10297,7 +10297,7 @@
       "id": "chord.output",
       "area": "chord",
       "phase": 4,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "chord@1.3.0/Added#1"
       ],
@@ -10317,13 +10317,23 @@
         "durable.after-tool-every-result",
         "durable.read-structured-output"
       ],
-      "notes": "PiSharp has the behaviour, internal to PiSharp.Durable (Output.cs:1 cites durable/src/harness/output.ts at v1.2.0). Against that file, chord's output.ts renames ShellOutputSkip to OutputSkip, takes utf8ByteLength in from truncate.ts, and adds the clock and escape-sequence changes (chord.output-progress-clock, chord.output-sanitize-escapes). The port is the move and the re-citation; where the code lives follows the owner's PiSharp.Chord decision."
+      "notes": "PiSharp has the behaviour, internal to PiSharp.Durable (Output.cs:1 cites durable/src/harness/output.ts at v1.2.0). Against that file, chord's output.ts renames ShellOutputSkip to OutputSkip, takes utf8ByteLength in from truncate.ts, and adds the clock and escape-sequence changes (chord.output-progress-clock, chord.output-sanitize-escapes). The port is the move and the re-citation; where the code lives follows the owner's PiSharp.Chord decision.",
+      "evidence": {
+        "commits": [
+          "94f62dda"
+        ],
+        "tests": [
+          "tests/PiSharp.Durable.Tests/Harness/HarnessOutputCases.cs: harness.output.removes-whole-ansi-escape-sequences-not-only-their-esc-bytes",
+          "tests/PiSharp.Durable.Tests/Harness/HarnessOutputCases.cs: harness.output.paces-on-the-clock-it-is-given",
+          "tests/PiSharp.Durable.Tests/TruncateCases.cs: truncate.counts-utf-8-bytes-and-truncates-correctly-in-a-runtime-without-buffer"
+        ]
+      }
     },
     {
       "id": "chord.output-progress-clock",
       "area": "chord",
       "phase": 6,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "chord@1.4.0/Added#4"
       ],
@@ -10336,13 +10346,21 @@
         "src/PiSharp.Durable/Harness/Output.cs"
       ],
       "release": "1.5.0.x",
-      "notes": "PiSharp's Progress already paces on an injectable TimeProvider (Output.cs:340 and :345), the counterpart of ProgressClock. Missing: OnTimer (Output.cs:408) flushes at once instead of re-checking the clock through ScheduleLocked (Output.cs:399)."
+      "notes": "PiSharp's Progress already paces on an injectable TimeProvider (Output.cs:340 and :345), the counterpart of ProgressClock. Missing: OnTimer (Output.cs:408) flushes at once instead of re-checking the clock through ScheduleLocked (Output.cs:399).",
+      "evidence": {
+        "commits": [
+          "94f62dda"
+        ],
+        "tests": [
+          "tests/PiSharp.Durable.Tests/Harness/HarnessOutputCases.cs: harness.output.paces-on-the-clock-it-is-given"
+        ]
+      }
     },
     {
       "id": "chord.output-sanitize-escapes",
       "area": "chord",
       "phase": 4,
-      "status": "port",
+      "status": "ported",
       "changelog": [],
       "upstream": [
         "packages/chord/src/output.ts",
@@ -10356,7 +10374,15 @@
       "pulledInBy": [
         "durable.after-tool-every-result"
       ],
-      "notes": "PiSharp's SanitizeOutput (Output.cs:39-53) removes control characters only, as v1.2.0 did, so Durable tool output keeps the escape fragments. In no changelog. Users see it in Durable tool results, so phase 4 may want it."
+      "notes": "PiSharp's SanitizeOutput (Output.cs:39-53) removes control characters only, as v1.2.0 did, so Durable tool output keeps the escape fragments. In no changelog. Users see it in Durable tool results, so phase 4 may want it.",
+      "evidence": {
+        "commits": [
+          "94f62dda"
+        ],
+        "tests": [
+          "tests/PiSharp.Durable.Tests/Harness/HarnessOutputCases.cs: harness.output.removes-whole-ansi-escape-sequences-not-only-their-esc-bytes"
+        ]
+      }
     },
     {
       "id": "chord.sqlite",
