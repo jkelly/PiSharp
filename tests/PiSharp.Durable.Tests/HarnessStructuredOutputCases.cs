@@ -1,7 +1,7 @@
 // Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/test/harness-structured-output.test.ts ("structured output"), as
 // harness.structured-output.<case>. Verbatim apart from the adaptations in HarnessSupport.cs and ChatSupport.cs, and these:
-// - Schemas are the JSON TypeBox prints: `Type.Object({ count: Type.Number() })` is Count, `Type.Null()` is {"type":"null"}, and
-//   `Type.Object({})` is ToolRegistration.EmptyParameters.
+// - Schemas are the JSON pi-schema builds (Pi v1.5.0, area tools-schema): `obj({ count: num() })` is Count, `nul()` is {"type":"null"},
+//   and `obj({})` is ToolsSchema150.EmptyObject.
 // - A result's `toHaveProperty("structuredOutput")` is NestedToolExecutionResult.StructuredOutput being null (absent; a JSON null is
 //   JsonValue.Null), and a stored message's is its JSON key; toEqual and toMatchObject compare the result's JSON (ToJson), whose durationMs
 //   and taskId are matched as numbers.
@@ -29,7 +29,7 @@ internal static class StructuredOutputTests
 {
     private static readonly DurableContext Context = DurableContext.Background;
 
-    private static readonly JsonObjectValue Count = O("""{"type":"object","required":["count"],"properties":{"count":{"type":"number"}}}""");
+    private static readonly JsonObjectValue Count = O("""{"type":"object","properties":{"count":{"type":"number"}},"required":["count"],"additionalProperties":false}""");
 
     /// <summary>A tool that returns <paramref name="result"/>, with <paramref name="schema"/> as its structuredOutputSchema.</summary>
     private static ToolRegistration Returning(string name, ToolExecutionResult result, JsonObjectValue? schema = null,
@@ -37,7 +37,7 @@ internal static class StructuredOutputTests
     {
         var tool = Define.Tool(new ToolRegistration
         {
-            Name = name, Description = name, Parameters = ToolRegistration.EmptyParameters, StructuredOutputSchema = schema,
+            Name = name, Description = name, Parameters = ToolsSchema150.EmptyObject, StructuredOutputSchema = schema,
             Execute = (_, _, _) => Task.FromResult(result),
         });
         return extra is null ? tool : extra(tool);
@@ -53,7 +53,7 @@ internal static class StructuredOutputTests
     {
         Name = "probe",
         Description = "probe",
-        Parameters = ToolRegistration.EmptyParameters,
+        Parameters = ToolsSchema150.EmptyObject,
         Execute = async (_, api, callContext) =>
         {
             await calls(api, callContext);
@@ -182,7 +182,7 @@ internal static class StructuredOutputTests
             Check(!stored.ContainsKey("structuredOutput"), "no structuredOutput in the transcript");
         });
 
-        yield return Case(prefix + "turns-structured-output-that-breaks-the-schema-into-an-error-result-for-callers-and-a-report-for-the-model-s-calls", async () =>
+        yield return Case("harness.structured-output.turns-structured-output-that-breaks-the-schema-into-an-error-result-for-callers-and-a-report-for-the-model-s-calls", async () =>
         {
             (string Name, ToolExecutionResult Result, bool Schema, string Message)[] cases =
             [
@@ -249,7 +249,7 @@ internal static class StructuredOutputTests
             {
                 Name = "throws",
                 Description = "throws",
-                Parameters = ToolRegistration.EmptyParameters,
+                Parameters = ToolsSchema150.EmptyObject,
                 StructuredOutputSchema = Count,
                 Execute = (_, _, _) => throw new InvalidOperationException("permission denied"),
             }));

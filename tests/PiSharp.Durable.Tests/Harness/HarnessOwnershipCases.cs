@@ -823,14 +823,15 @@ internal static partial class OwnershipTests
 
     // ─── owned conversations from tools and supervisors ─────────────────────
 
-    /// <summary>Upstream's <c>Type.Object({})</c> tool with <paramref name="execute"/>.</summary>
+    /// <summary>Upstream's <c>obj({})</c> tool with <paramref name="execute"/>.</summary>
     private static ToolRegistration Delegating(string name, string description, ToolExecute execute, ToolReplay? replay = null,
         JsonObjectValue? parameters = null) =>
         Define.Tool(new ToolRegistration
         {
             Name = name,
             Description = description,
-            Parameters = parameters ?? ToolRegistration.EmptyParameters,
+            // pi-schema's `obj({})` (Pi v1.5.0, area tools-schema).
+            Parameters = parameters ?? ToolsSchema150.EmptyObject,
             Execute = execute,
             Replay = replay,
         });
@@ -1025,7 +1026,7 @@ internal static partial class OwnershipTests
                 toolRunning.Resolve();
                 await Aborted(callContext.CancellationToken);
                 throw new InvalidOperationException("unreachable");
-            }, parameters: O("""{"type":"object","properties":{"mode":{"type":"string"}},"required":["mode"]}""")));
+            }, parameters: O("""{"type":"object","properties":{"mode":{"type":"string"}},"required":["mode"],"additionalProperties":false}""")));
             JsonObjectValue Call(string mode, string id) => CallOf("spawn", Obj(("mode", mode)), id);
             setup.Faux.SetResponses(Call("throw", "c1"), FauxAssistantMessage("after throw"), Call("hang", "c2"));
             var opened = await OpenChat(await location(), setup);

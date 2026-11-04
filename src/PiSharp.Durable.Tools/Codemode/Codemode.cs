@@ -105,9 +105,9 @@ public static class DurableCodemode
     public static RewindableConversationDocToken StoreDoc { get; } = Documents.DefineRewindableConversationDoc("pi.codemode.store", 1, DocumentFork.AsOf,
         () => (JsonObjectValue)JsonValue.Parse("""{"values":{}}"""));
 
-    /// <summary><c>Type.Object({ code: Type.String({ description: "Raw JavaScript source." }) })</c>, as TypeBox prints it.</summary>
+    /// <summary><c>obj({ code: str({ description: "Raw JavaScript source." }) }, { open: true })</c>, as pi-schema builds it.</summary>
     internal static readonly JsonObjectValue Parameters = (JsonObjectValue)JsonValue.Parse(
-        """{"type":"object","required":["code"],"properties":{"code":{"type":"string","description":"Raw JavaScript source."}}}""");
+        """{"type":"object","properties":{"code":{"type":"string","description":"Raw JavaScript source."}},"required":["code"]}""");
 
     /// <summary>Outputs bounded by the script's own token budget; the Harness's limits only stop a runaway.</summary>
     internal static readonly CodemodeOutput.Limits OutputLimits = new(4 * 1024 * 1024, 100_000);

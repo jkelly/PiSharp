@@ -12,9 +12,9 @@ namespace PiSharp.Durable.Examples;
 
 public static partial class Examples
 {
-    /// <summary><c>Type.Object({ path: Type.String() })</c>, as TypeBox prints it.</summary>
+    /// <summary><c>obj({ path: str() })</c>, as pi-schema builds it (Pi v1.5.0).</summary>
     private static readonly JsonObjectValue PathParameters =
-        (JsonObjectValue)JsonValue.Parse("""{"type":"object","required":["path"],"properties":{"path":{"type":"string"}}}""");
+        (JsonObjectValue)JsonValue.Parse("""{"type":"object","properties":{"path":{"type":"string"}},"required":["path"],"additionalProperties":false}""");
 
     private static ToolExecutionResult TextResult(string text) => new()
     {
@@ -362,7 +362,7 @@ public static partial class Examples
                 {
                     Name = "todo",
                     Description = "Add an item to your todo list",
-                    Parameters = (JsonObjectValue)JsonValue.Parse("""{"type":"object","required":["item"],"properties":{"item":{"type":"string"}}}"""),
+                    Parameters = (JsonObjectValue)JsonValue.Parse("""{"type":"object","properties":{"item":{"type":"string"}},"required":["item"],"additionalProperties":false}"""),
                     Execute = async (args, api, callContext) =>
                     {
                         var item = StringArg(args, "item");

@@ -190,7 +190,7 @@ public static partial class Examples
             Name = "submit_plan",
             Description = "Submit the plan as a list of steps.",
             Parameters = (JsonObjectValue)JsonValue.Parse(
-                """{"type":"object","required":["steps"],"properties":{"steps":{"type":"array","items":{"type":"string"}}}}"""),
+                """{"type":"object","properties":{"steps":{"type":"array","items":{"type":"string"}}},"required":["steps"],"additionalProperties":false}"""),
             Execute = async (args, api, callContext) =>
             {
                 await api.CommitAsync(async tx => (await tx.DocAsync(PlanDoc, api.ConversationId)).Set("steps", ((JsonObjectValue)args)["steps"]),

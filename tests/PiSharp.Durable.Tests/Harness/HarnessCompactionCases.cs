@@ -84,7 +84,8 @@ internal static class CompactionTests
 
     private static readonly CompactionSettings Enabled = Manual with { Enabled = true };
 
-    private static readonly JsonObjectValue NoParameters = O("""{"type":"object","properties":{}}""");
+    // pi-schema's `obj({})` (Pi v1.5.0, area tools-schema).
+    private static readonly JsonObjectValue NoParameters = ToolsSchema150.EmptyObject;
 
     /// <summary>Text of about <paramref name="tokens"/> estimated tokens, starting with <paramref name="label"/>.</summary>
     internal static string Text(string label, int tokens) => $"{label} {new string('x', Math.Max(0, tokens * 4 - label.Length - 1))}";

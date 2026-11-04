@@ -104,7 +104,7 @@ public static partial class Examples
                 "followUp: true queues it after the current answer instead of steering), stop (name: aborts its current work), " +
                 "status (name, or all subagents without one). Answers are reported back to you when they arrive.",
             Parameters = (JsonObjectValue)JsonValue.Parse("""
-                {"type":"object","required":["action"],"properties":{"action":{"anyOf":[{"const":"spawn","type":"string"},{"const":"send","type":"string"},{"const":"stop","type":"string"},{"const":"status","type":"string"}]},"name":{"type":"string"},"message":{"type":"string"},"followUp":{"type":"boolean"}}}
+                {"type":"object","properties":{"action":{"enum":["spawn","send","stop","status"]},"name":{"type":"string"},"message":{"type":"string"},"followUp":{"type":"boolean"}},"required":["action"],"additionalProperties":false}
                 """),
             // A call interrupted by a crash is not rerun: repeating `stop` could stop newer work.
             Replay = ToolReplay.Unsafe,

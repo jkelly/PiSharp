@@ -21,10 +21,10 @@ public static class SchedulerFanoutBench
     private static readonly DurableContext Context = DurableContext.Background;
 
     private static readonly JsonObjectValue LeafParameters =
-        (JsonObjectValue)JsonValue.Parse("""{"type":"object","required":["n"],"properties":{"n":{"type":"number"}}}""");
+        (JsonObjectValue)JsonValue.Parse("""{"type":"object","properties":{"n":{"type":"number"}},"required":["n"],"additionalProperties":false}""");
 
     private static readonly JsonObjectValue FanParameters =
-        (JsonObjectValue)JsonValue.Parse("""{"type":"object","required":["count"],"properties":{"count":{"type":"number"}}}""");
+        (JsonObjectValue)JsonValue.Parse("""{"type":"object","properties":{"count":{"type":"number"}},"required":["count"],"additionalProperties":false}""");
 
     /// <summary>Runs each size; writes upstream's table and returns the rows.</summary>
     public static async Task<IReadOnlyList<Row>> RunAsync(IReadOnlyList<int> sizes, TextWriter output)

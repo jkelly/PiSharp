@@ -3,7 +3,7 @@
 // SpecNames below; SpecUsage.Examples() is never called, because those names have no values. Adaptations:
 // - TypeScript's type-level check (expectTypeOf(examples).returns.toHaveProperty("sequences")) is a reflection check of Examples()' return
 //   type; "compiles" is this file compiling.
-// - Spec names declared with `declare` are members of SpecNames that throw; pi-ai messages and tool calls are wire JSON; a TypeBox schema
+// - Spec names declared with `declare` are members of SpecNames that throw; pi-ai messages and tool calls are wire JSON; a pi-schema schema
 //   is its JSON Schema object.
 // - An onYield hook returns the continuing user input itself (GenerationHooks.OnYield), not upstream's { continue } wrapper, so
 //   requestSecondPass returns that input.
@@ -182,7 +182,7 @@ internal static class SpecUsage
                 {
                     Name = "subagent",
                     Description = "Delegate a self-contained task to a subagent and get its answer back.",
-                    Parameters = (JsonObjectValue)JsonValue.Parse("""{"type":"object","required":["task"],"properties":{"task":{"type":"string"}}}"""),
+                    Parameters = (JsonObjectValue)JsonValue.Parse("""{"type":"object","properties":{"task":{"type":"string"}},"required":["task"],"additionalProperties":false}"""),
                     Replay = ToolReplay.Safe,
                     Execute = async (args, api, callContext) =>
                     {

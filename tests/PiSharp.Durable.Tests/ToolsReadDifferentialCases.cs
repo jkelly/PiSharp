@@ -1,10 +1,12 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/test/tools-read-differential.test.ts, as tools.read-differential.<case>.
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/test/tools-read-differential.test.ts, as tools.read-differential.<case>.
 // The reference is upstream's: the read tool before bounded reads, which decodes the whole file, splits it into lines and truncates the
 // selection; the tool must give the same result while reading only a bounded part of the file. Offsets and limits are JavaScript numbers,
 // NaN included, so the cases call the tool's typed entry (ReadTool.ExecuteAsync) where upstream calls execute() with an object.
 // Added: Fixtures/v1.2.0/tools.upstream.json (Fixtures/capture-tools.mjs) records a digest of upstream's own outcome for every seed and
 // trial, and each case also matches those. v1.2.0's reference returns an image as one image block with an info diagnostic (read returns
-// images, work list area e); the fake api's agent names no model, as upstream's apiFor gives `agent: async () => ({})`.
+// images, work list area e); the fake api's agent names no model, as upstream's apiFor gives `agent: async () => ({})`. Since Pi v1.5.0 the
+// reference also returns its structured output, the text or the image block (area tools-schema), which both sides compare; the v1.2.0
+// digests hold no structured output, so they compare without it.
 using System.Collections.Immutable;
 using System.Text;
 using System.Text.Json;
@@ -65,7 +67,8 @@ internal static partial class Program
         if (ImageDetection.DetectSupportedImageMimeType(bytes) is { } mimeType)
             return new ToolExecutionResult
             {
-                Output = JsonValue.Array(JsonValue.Object([new("type", "image"), new("data", Convert.ToBase64String(bytes)), new("mimeType", mimeType)])),
+                Output = JsonValue.Array(Block(bytes, mimeType)),
+                StructuredOutput = Block(bytes, mimeType),
                 Diagnostics = [new ToolDiagnostic(ToolDiagnosticSeverity.Info, $"Read image file [{mimeType}].", "image")],
             };
         var textContent = TextDecoderDecode(bytes);
@@ -119,10 +122,14 @@ internal static partial class Program
         {
             Output = outputText.Length == 0 ? JsonArrayValue.Empty
                 : JsonValue.Array(JsonValue.Object([new("type", "text"), new("text", outputText)])),
+            StructuredOutput = outputText,
             Details = details,
             Diagnostics = diagnostics.ToImmutable(),
         };
     }
+
+    private static JsonObjectValue Block(byte[] bytes, string mimeType) =>
+        JsonValue.Object([new("type", "image"), new("data", Convert.ToBase64String(bytes)), new("mimeType", mimeType)]);
 
     /// <summary><c>new TextDecoder().decode(bytes)</c>: replacement characters, a leading byte-order mark dropped.</summary>
     private static string TextDecoderDecode(byte[] bytes)
@@ -131,11 +138,13 @@ internal static partial class Program
         return text.StartsWith('\uFEFF') ? text[1..] : text;
     }
 
-    private static async Task<string> ReadOutcome(Func<Task<ToolExecutionResult>> run)
+    /// <summary>The outcome as the v1.2.0 digests hold it; <paramref name="structured"/> gets a result's structured output.</summary>
+    private static async Task<string> ReadOutcome(Func<Task<ToolExecutionResult>> run, Action<JsonValue?>? structured = null)
     {
         ToolExecutionResult result;
         try { result = await run(); }
         catch (Exception error) { return "error\0" + error.Message; }
+        structured?.Invoke(result.StructuredOutput);
         var content = result.Output ?? JsonArrayValue.Empty;
         var parts = new List<string> { "result", result.IsError == true ? "true" : "undefined", content.Count.ToString(System.Globalization.CultureInfo.InvariantCulture) };
         // part.text of an image block is undefined, which join() prints as "".
@@ -181,10 +190,13 @@ internal static partial class Program
                 {
                     var offset = ReadOffsets[(int)Math.Floor(next() * ReadOffsets.Length)];
                     var limit = ReadLimits[(int)Math.Floor(next() * ReadLimits.Length)];
-                    var actual = await ReadOutcome(() => ReadTool.ExecuteAsync("f.txt", offset, limit, new FakeToolApi(env), ToolContext));
-                    var expected = await ReadOutcome(() => Task.FromResult(ReferenceRead(file, "f.txt", offset, limit)));
+                    JsonValue? actualStructured = null, expectedStructured = null;
+                    var actual = await ReadOutcome(() => ReadTool.ExecuteAsync("f.txt", offset, limit, new FakeToolApi(env), ToolContext),
+                        value => actualStructured = value);
+                    var expected = await ReadOutcome(() => Task.FromResult(ReferenceRead(file, "f.txt", offset, limit)), value => expectedStructured = value);
                     var what = $"seed {seed} offset {JsArg(offset)} limit {JsArg(limit)}";
                     Equal(expected, actual, what);
+                    Equal(expectedStructured?.ToJson(), actualStructured?.ToJson(), what + " structuredOutput");
                     Equal(upstream.GetProperty("trials")[trial].GetString(), LineScanDigest($"{JsArg(offset)}\0{JsArg(limit)}\0{actual}"), what + " (upstream)");
                 }
             }
@@ -197,8 +209,11 @@ internal static partial class Program
             byte[] png = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, .. Chunk("IHDR", 13), .. Chunk("iCCP", 200_000), .. Chunk("acTL", 8), .. Chunk("IDAT", 10)];
             await File.WriteAllBytesAsync(Path.Combine(cwd, "a.png"), png);
             var env = new LocalExecutionEnv(cwd);
-            var actual = await ReadOutcome(() => CodingTools.CreateReadTool().Execute(JsonValue.Object([new("path", "a.png")]), new FakeToolApi(env), ToolContext));
-            Equal(await ReadOutcome(() => Task.FromResult(ReferenceRead(png, "a.png", null, null))), actual, "outcome");
+            JsonValue? actualStructured = null, expectedStructured = null;
+            var actual = await ReadOutcome(() => CodingTools.CreateReadTool().Execute(JsonValue.Object([new("path", "a.png")]), new FakeToolApi(env), ToolContext),
+                value => actualStructured = value);
+            Equal(await ReadOutcome(() => Task.FromResult(ReferenceRead(png, "a.png", null, null)), value => expectedStructured = value), actual, "outcome");
+            Equal(expectedStructured?.ToJson(), actualStructured?.ToJson(), "structuredOutput");
             Check(!actual.Contains("is an image", StringComparison.Ordinal), "an animated PNG is not a supported image");
         }));
     }

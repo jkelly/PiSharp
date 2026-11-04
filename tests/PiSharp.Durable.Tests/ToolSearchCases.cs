@@ -1,6 +1,7 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/test/tool-search.test.ts ("deferred tools and tool_search"), as
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/test/tool-search.test.ts ("deferred tools and tool_search"), as
 // tool-search.<case>. Verbatim apart from the adaptations in HarnessSupport.cs and ChatSupport.cs, and these:
-// - `Type.Object({ number: Type.Optional(Type.Number({ description: "Issue number" })) })` is its JSON as TypeBox prints it.
+// - `obj({ number: opt(num({ description: "Issue number" })) })` is its JSON as pi-schema builds it, and `obj({})` is
+//   ToolsSchema150.EmptyObject.
 // - `expect.objectContaining({ toolsAdded: [expect.objectContaining({ name })] })` checks that toolsAdded holds exactly that one declaration.
 // Authored, after them:
 // - tool-search.errors.*: what the model gets for an empty query or a limit that is not a positive integer, a huge limit, and the first line
@@ -43,7 +44,7 @@ internal static class ToolSearchTests
     private static readonly DurableContext Context = DurableContext.Background;
 
     private static readonly JsonObjectValue IssueParameters =
-        O("""{"type":"object","properties":{"number":{"type":"number","description":"Issue number"}}}""");
+        O("""{"type":"object","properties":{"number":{"type":"number","description":"Issue number"}},"additionalProperties":false}""");
 
     private static ToolRegistration Tool(string name, string description, Func<ToolRegistration, ToolRegistration>? extra = null)
     {
@@ -155,7 +156,7 @@ internal static class ToolSearchTests
             {
                 Name = "grow",
                 Description = "grow",
-                Parameters = ToolRegistration.EmptyParameters,
+                Parameters = ToolsSchema150.EmptyObject,
                 Execute = (_, _, _) => Task.FromResult(new ToolExecutionResult
                 {
                     Output = JsonArrayValue.Empty, Control = new ToolControl { AddTools = ["github_get_issue", "alpha", "ghost"] },
@@ -267,7 +268,7 @@ internal static class ToolSearchTests
             Equal("# Tool discovery\n\nSearches over deferred tool metadata with BM25 and exposes matching tools for the next model call.\n\n" +
                 "Some of the tools, such as tools of MCP servers, may not have been provided to you upfront, and you should use this tool " +
                 "(`tool_search`) to search for the required tools. For MCP tool discovery, always use `tool_search`.", tool.Description, "description");
-            Equal("""{"type":"object","required":["query"],"properties":{"query":{"type":"string","description":"Search query for deferred tools."},"limit":{"type":"number","description":"Maximum number of tools to return. Defaults to 8."}}}""",
+            Equal("""{"type":"object","properties":{"query":{"type":"string","description":"Search query for deferred tools."},"limit":{"type":"number","description":"Maximum number of tools to return. Defaults to 8."}},"required":["query"]}""",
                 tool.Parameters.ToJson(), "parameters");
             Seq([ToolCaller.Model], tool.Callers!.Value, "callers");
             Equal(ToolReplay.Safe, tool.Replay, "replay");

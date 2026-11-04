@@ -25,7 +25,8 @@ internal static partial class Program
 internal static class InputEntriesTests
 {
     private static readonly DurableContext Context = DurableContext.Background;
-    private static readonly JsonObjectValue NoParameters = O("""{"type":"object","properties":{}}""");
+    // pi-schema's `obj({})` (Pi v1.5.0, area tools-schema).
+    private static readonly JsonObjectValue NoParameters = ToolsSchema150.EmptyObject;
 
     private static JsonObjectValue Answer(string text) => FauxAssistantMessage([FauxText(text)]);
 

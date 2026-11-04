@@ -3,7 +3,8 @@
 // pi.inbox, pi.usage, pi.agent and pi.provider documents) that the pinned pi-durable writes for the scenarios below with pi-ai's faux
 // provider on MemoryStorage, as printed by Fixtures/capture-tool-rounds.mjs. It is normalized as HarnessChatDifferentialCases.cs's fixture
 // is, and compared the same way: as JSON values and by their exact text. The scenarios run here on memory, JSONL and
-// SQLite and must produce the same records, IDs included. Parameters are the JSON TypeBox prints for the scenarios' schemas.
+// SQLite and must produce the same records, IDs included. Parameters are the JSON TypeBox prints for the scenarios' schemas. Pi v1.5.0
+// (area tools-schema): rejections expects pi-schema's validation message, authored from the capture (ToolsSchema150.cs), not captured.
 using PiSharp.Durable;
 using PiSharp.Durable.Chord;
 using PiSharp.Durable.Sqlite;
@@ -52,9 +53,13 @@ internal static class ToolsDifferentialTests
         }),
     });
 
-    private static void Same(string scenario, JsonValue actual, params string[] path)
+    private static void Same(string scenario, JsonValue actual, params string[] path) => Same(scenario, actual, null, path);
+
+    /// <summary><see cref="Same(string, JsonValue, string[])"/> against <paramref name="authored"/>'s form of the capture, when given.</summary>
+    private static void Same(string scenario, JsonValue actual, Func<JsonValue, JsonValue>? authored, params string[] path)
     {
         var expected = path.Aggregate((JsonValue)Upstream.Value[scenario], (value, key) => ((JsonObjectValue)value)[key]);
+        if (authored is not null) expected = authored(expected);
         Check(JsonValue.DeepEquals(expected, actual), $"{scenario}: expected {expected.ToJson()}, actual {actual.ToJson()}");
         Equal(expected.ToJson(), actual.ToJson(), $"{scenario}: key order");
         // The documents are built by the Harness, so their key order is upstream's too.
@@ -143,7 +148,8 @@ internal static class ToolsDifferentialTests
             var storage = fresh();
             var (harness, root) = await Open(setup, storage);
             await (await root.SubmitAsync(SubmissionDraft.Input("go"), Context)).WaitAsync(Context);
-            Same("rejections", await ChatDifferentialTests.Dump(harness, storage, root.Id));
+            // Pi v1.5.0 (area tools-schema): pi-schema's validation message, authored from the capture (ToolsSchema150.cs).
+            Same("rejections", await ChatDifferentialTests.Dump(harness, storage, root.Id), ToolsSchema150.Authored);
             await harness.CloseAsync(Context);
         });
 

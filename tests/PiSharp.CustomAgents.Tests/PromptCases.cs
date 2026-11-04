@@ -67,7 +67,8 @@ internal static partial class Program
         yield return Case("prompt.typed-repair", async () =>
         {
             var models = new FauxAgentModels()
-                .On(request => request.LastToolName == "submit_result" && request.LastToolResult!.Contains("must have required", StringComparison.Ordinal),
+                // pi-schema's message for a missing property (Pi v1.5.0; TypeBox said "must have required properties").
+                .On(request => request.LastToolName == "submit_result" && request.LastToolResult!.Contains("  - reason: missing", StringComparison.Ordinal),
                     _ => FauxReply.ToolCall("submit_result", """{"level":"low","reason":"repeat buyer","score":1}"""))
                 .On(request => request.AfterTools is false && request.LastUserText!.StartsWith("Assess", StringComparison.Ordinal),
                     _ => FauxReply.ToolCall("submit_result", """{"level":"low"}"""));

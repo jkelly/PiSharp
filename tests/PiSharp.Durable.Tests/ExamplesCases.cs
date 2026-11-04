@@ -30,7 +30,8 @@ using PiSharp.Durable.Examples;
 // Pi v1.5.0 sync (area harness-options): 09-context's "request messages" line and the position of 25-compaction's "(system prompt)" lines
 // are authored, not captured: under #10904 (5713c9507) the first pi.system entry after the head marker (or the transcript's first) is the
 // baseline and leads the context past assistant messages, where Pi v1.2.0 printed it after them. The lines follow v1.5.0's context.ts and
-// examples/24-compaction.ts's printing; no v1.5.0 run was captured.
+// examples/24-compaction.ts's printing; no v1.5.0 run was captured. Area tools-schema: 19's lines declare the built-in tools with
+// pi-schema's key order ("properties" before "required"), authored from the v1.2.0 capture (ToolsSchema150.cs), not captured.
 internal static partial class Program
 {
     private static readonly string[] CodingToolsTranscript =
@@ -48,9 +49,11 @@ internal static partial class Program
         "pi.assistant",
     ];
 
-    // Declared before ExamplesUpstreamOutput, which spreads them.
-    private static readonly string[] JsonModeEvents = JsonModeEventsLines(JsonModeFixture("events", "v1.2.0"));
-    private static readonly string[] JsonModeOps = JsonModeOpsLines(JsonModeFixture("ops", "v1.2.0"), JsonModeFixture("ops"));
+    // Declared before ExamplesUpstreamOutput, which spreads them. Pi v1.5.0 (area tools-schema): authored forms of the capture, with the
+    // built-in tools declared in pi-schema's key order (ToolsSchema150.cs).
+    private static readonly string[] JsonModeEvents = [.. JsonModeEventsLines(JsonModeFixture("events", "v1.2.0")).Select(ToolsSchema150.AuthoredText)];
+    private static readonly string[] JsonModeOps =
+        [.. JsonModeOpsLines(JsonModeFixture("ops", "v1.2.0"), JsonModeFixture("ops")).Select(ToolsSchema150.AuthoredText)];
     private static readonly string[] ReviewerTranscript =
     [
         "> Review user.ts.",
