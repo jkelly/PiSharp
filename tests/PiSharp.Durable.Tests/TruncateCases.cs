@@ -1,9 +1,10 @@
 using System.Text;
 using PiSharp.Durable;
 
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/test/env-truncate.test.ts. The "runtime without Buffer" case ran the
-// JavaScript fallback byte counter in a child process; Truncation.Utf8ByteLength is that counter, checked against .NET's UTF-8 encoder
-// (which, like TextEncoder, writes U+FFFD for a lone surrogate).
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/test/env-truncate.test.ts. The "runtime without Buffer" case ran the
+// JavaScript fallback byte counter in a child process (from workspace sources, `--conditions=source`); Truncation.Utf8ByteLength, which
+// forwards to the output module's counter as truncate.ts re-exports Chord's, is that counter, checked against .NET's UTF-8 encoder (which,
+// like TextEncoder, writes U+FFFD for a lone surrogate).
 internal static partial class Program
 {
     private static IEnumerable<(string, Func<Task>)> TruncateCases() =>

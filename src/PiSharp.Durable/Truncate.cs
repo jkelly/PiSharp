@@ -1,7 +1,8 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/src/truncate.ts.
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/src/truncate.ts.
 // Shared truncation utilities for tool outputs. Truncation is based on two independent limits, whichever is hit first: a line limit
-// (default 2000 lines) and a byte limit (default 50KB). Never returns partial lines. Tool output streams are bounded by the harness's
-// output buffer (P9) instead. Strings are UTF-16 as in JavaScript; byte counts are UTF-8, a lone surrogate counting as U+FFFD.
+// (default 2000 lines) and a byte limit (default 50KB). Never returns partial lines. Tool output streams are bounded by OutputBuffer from
+// Chord's output module (Harness/Output.cs) instead. Strings are UTF-16 as in JavaScript; byte counts are UTF-8, a lone surrogate counting
+// as U+FFFD.
 using System.Globalization;
 
 namespace PiSharp.Durable;
@@ -55,21 +56,9 @@ public static class Truncation
     /// <summary>The default byte limit, 50KB.</summary>
     public const int DefaultMaxBytes = 50 * 1024;
 
-    /// <summary>The UTF-8 byte length of <paramref name="content"/>, a lone surrogate counting three bytes (as U+FFFD).</summary>
-    public static long Utf8ByteLength(string content)
-    {
-        ArgumentNullException.ThrowIfNull(content);
-        long bytes = 0;
-        for (var index = 0; index < content.Length; index++)
-        {
-            var code = content[index];
-            if (code <= 0x7f) bytes += 1;
-            else if (code <= 0x7ff) bytes += 2;
-            else if (char.IsHighSurrogate(code) && index + 1 < content.Length && char.IsLowSurrogate(content[index + 1])) { bytes += 4; index++; }
-            else bytes += 3;
-        }
-        return bytes;
-    }
+    /// <summary>The UTF-8 byte length of <paramref name="content"/>, a lone surrogate counting three bytes (as U+FFFD). One implementation,
+    /// shared with the output buffer (upstream re-exports Chord's <c>utf8ByteLength</c>).</summary>
+    public static long Utf8ByteLength(string content) => ToolOutput.Utf8ByteLength(content);
 
     /// <summary>Formats a byte count as a human-readable size: <c>1023B</c>, <c>1.5KB</c>, <c>3.0MB</c>.</summary>
     public static string FormatSize(long bytes) => bytes < 1024 ? bytes.ToString(CultureInfo.InvariantCulture) + "B"
