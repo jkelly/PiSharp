@@ -2159,7 +2159,11 @@
       "commits": [
         "2ec55d808",
         "48909d987",
-        "92ab53602"
+        "92ab53602",
+        "deaaf7dc",
+        "0251bbac",
+        "395850fa",
+        "27a292eb"
       ],
       "notes": "Design point, telemetry: decision 0005 §4 lets PiSharp.Durable reference only Contracts and AI. PiSharp.AI references PiSharp.Telemetry, so Durable uses PiSharp.Telemetry's spans, links, metrics and propagation (phase 3) transitively through its PiSharp.AI reference, with no new ProjectReference and no change to 0005 §4. DurableContext (Chord/DurableContext.cs) gains a non-optional Telemetry span, default the no-op span, and WithTelemetry(span, context) that keeps cancellation and values. This area also wires pi.ai.poll into PiSharp's deferred polls: call AiTelemetry.ObserveModelRequest(model, span, reasoning, poll: true) (src/PiSharp.AI/Telemetry/AiTelemetry.cs) in NativeDurableModels.StreamDeferred/FetchDeferredAsync (src/PiSharp.Durable/Models/NativeDurableModels.cs:448,458), which closes phase 3's telemetry.ai-request-tracing deferral. Trace carriers are new fields of submission and task records: the v1.2.0 written captures have none, so the written comparisons that see them become authored expectations from upstream v1.5.0's harness-telemetry.test.ts (labelled authored); byte equality with upstream-written v1.5.0 records cannot be shown without a recapture. Spans stay content-free (no prompt, output or secret ever reaches an attribute). HostCallback gains telemetry: exhaustive switches need the case."
     },

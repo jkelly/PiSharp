@@ -56,11 +56,11 @@
     "changelogBullets": 477,
     "repeatedBullets": 23,
     "byStatus": {
-      "ported": 190,
-      "ported-with-deferral": 23,
+      "ported": 192,
+      "ported-with-deferral": 24,
       "already-ported": 12,
       "no-op": 25,
-      "port": 76
+      "port": 73
     },
     "byArea": {
       "ai": 58,
@@ -9168,7 +9168,7 @@
       "id": "durable.telemetry",
       "area": "durable",
       "phase": 4,
-      "status": "port",
+      "status": "ported-with-deferral",
       "changelog": [
         "durable@1.4.0/Added#2"
       ],
@@ -9207,13 +9207,51 @@
         "src/PiSharp.Durable/Harness/ (new)"
       ],
       "release": "1.5.0",
-      "notes": "No telemetry in PiSharp's durable port. Depends on the telemetry.* rows (phase 3: the pi-telemetry port with spans, links, metrics and propagation) and on pi-ai request tracing (ai@1.4.0/Added#4); Context.telemetry is chord@1.4.0/Added#2 and Breaking Changes#1 (group F), ported here in DurableContext. PiSharp.Durable may reference only Contracts and AI (decision 0005 §4), so the owner decides where the telemetry abstractions live for Durable to use them. Trace carriers are new fields of submission and task records, which the compat cases compare with upstream's. The device host (decision 0008) could export these spans later; nothing requires it."
+      "notes": "No telemetry in PiSharp's durable port. Depends on the telemetry.* rows (phase 3: the pi-telemetry port with spans, links, metrics and propagation) and on pi-ai request tracing (ai@1.4.0/Added#4); Context.telemetry is chord@1.4.0/Added#2 and Breaking Changes#1 (group F), ported here in DurableContext. PiSharp.Durable may reference only Contracts and AI (decision 0005 §4), so the owner decides where the telemetry abstractions live for Durable to use them. Trace carriers are new fields of submission and task records, which the compat cases compare with upstream's. The device host (decision 0008) could export these spans later; nothing requires it.",
+      "evidence": {
+        "commits": [
+          "deaaf7dc",
+          "0251bbac",
+          "27a292eb",
+          "395850fa"
+        ],
+        "tests": [
+          "tests/PiSharp.Durable.Tests/HarnessTelemetryCases.cs: harness.telemetry.records-content-free-submit-and-phase-spans-nested-parents-checkpoints-entry-events-and-metrics",
+          "tests/PiSharp.Durable.Tests/HarnessTelemetryCases.cs: harness.telemetry.returns-admission-results-without-re-reading-records-or-probing-root-link-targets",
+          "tests/PiSharp.Durable.Tests/HarnessTelemetryCases.cs: harness.telemetry.inherits-omitted-or-undefined-task-traces-and-stores-no-carrier-for-an-explicit-root",
+          "tests/PiSharp.Durable.Tests/HarnessTelemetryCases.cs: harness.telemetry.records-checkpoints-only-when-the-running-phase-changes",
+          "tests/PiSharp.Durable.Tests/HarnessTelemetryCases.cs: harness.telemetry.starts-each-queued-input-s-run-in-its-admission-trace-and-links-input-roots-to-their-caller",
+          "tests/PiSharp.Durable.Tests/HarnessTelemetryCases.cs: harness.telemetry.links-the-other-queued-inputs-to-the-first-invocation-of-their-shared-run",
+          "tests/PiSharp.Durable.Tests/HarnessTelemetryCases.cs: harness.telemetry.links-a-steer-admission-to-the-current-run-without-moving-its-work-into-the-steer-s-trace",
+          "tests/PiSharp.Durable.Tests/HarnessTelemetryCases.cs: harness.telemetry.keeps-a-public-write-admission-open-through-commit-as-a-child-of-its-caller",
+          "tests/PiSharp.Durable.Tests/HarnessTelemetryCases.cs: harness.telemetry.links-an-input-submitted-inside-a-turn-to-the-calling-phase-without-parenting-it",
+          "tests/PiSharp.Durable.Tests/HarnessTelemetryCases.cs: harness.telemetry.parents-background-compaction-to-the-prepare-phase-that-creates-it",
+          "tests/PiSharp.Durable.Tests/HarnessTelemetryCases.cs: harness.telemetry.marks-only-the-first-invocation-after-reopen-resumed-retaining-its-stored-parent",
+          "tests/PiSharp.Durable.Tests/HarnessTelemetryCases.cs: harness.telemetry.emits-entry-and-settlement-events-only-after-successful-storage-commits",
+          "tests/PiSharp.Durable.Tests/HarnessTelemetryCases.cs: harness.telemetry.records-internal-compaction-admissions-as-phase-events-without-a-submit-span",
+          "tests/PiSharp.Durable.Tests/HarnessTelemetryCases.cs: harness.telemetry.records-a-fixed-faulted-category-and-a-bounded-diagnostic",
+          "tests/PiSharp.Durable.Tests/HarnessTelemetryCases.cs: harness.telemetry.records-a-fixed-failed-category-and-a-bounded-diagnostic",
+          "tests/PiSharp.Durable.Tests/HarnessTelemetryCases.cs: harness.telemetry.records-a-fixed-orphaned-category-and-a-bounded-diagnostic",
+          "tests/PiSharp.Durable.Tests/HarnessTelemetryCases.cs: harness.telemetry.keeps-both-interrupted-runs-and-explicit-abort-handlers-at-status-ok",
+          "tests/PiSharp.Durable.Tests/HarnessTelemetryCases.cs: harness.telemetry.mirrors-runtime-reports-as-fixed-field-phase-events-and-type-only-counters",
+          "tests/PiSharp.Durable.Tests/HarnessTelemetryCases.cs: harness.telemetry.reports-hook-failures-on-the-phase-and-clock-failures-without-a-phase-context",
+          "tests/PiSharp.Durable.Tests/HarnessTelemetryCases.cs: harness.telemetry.counts-an-outside-span-session-failure-without-starting-a-span",
+          "tests/PiSharp.Durable.Tests/HarnessTelemetryCases.cs: harness.telemetry.counts-reports-raised-with-a-noop-span-without-creating-a-root",
+          "tests/PiSharp.Durable.Tests/HarnessTelemetryCases.cs: harness.telemetry.attaches-synchronous-commit-listener-reports-to-the-active-submission-span",
+          "tests/PiSharp.Durable.Tests/HarnessTelemetryCases.cs: harness.telemetry.preserves-async-listener-error-containment-and-report-counting",
+          "tests/PiSharp.Durable.Tests/HarnessTelemetryCases.cs: harness.telemetry.emits-replay-for-a-codemode-journal-result-without-rerunning-its-nested-tool",
+          "tests/PiSharp.Durable.Tests/HarnessTelemetryOptionsCases.cs: harness.telemetry-options.accepts-one-adapter-with-optional-propagation-and-metrics-capabilities",
+          "tests/PiSharp.Durable.Tests/ModelsCases.cs: models.telemetry.records-one-pi-ai-request-span-per-request-and-one-pi-ai-poll-span-per-deferred-poll",
+          "tests/PiSharp.Durable.Tests/ModelsCases.cs: models.telemetry.a-throwing-adapter-never-changes-the-request-and-its-span-settles"
+        ]
+      },
+      "deferred": "DurableTelemetry.Schema's closed sets hold only what this port raises today: area restarts adds the task_interrupted report kind and the restart_limit and interrupted reasons, area admission the continue submission type and submit(tx, draft)'s provisional pi.durable.submit span, area vocabulary its renames (harness/telemetry.ts stays in-progress until then). harness-telemetry.test.ts keeps SubscribeCommits for harness.observeCommits until area observers lands. Upstream README.md text is not mirrored (PiSharp keeps no copy)."
     },
     {
       "id": "durable.telemetry-host-error",
       "area": "durable",
       "phase": 4,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "durable@1.5.0/Breaking Changes#12",
         "durable@1.5.0/Fixed#9"
@@ -9232,7 +9270,17 @@
         "src/PiSharp.Durable/Harness/Types.cs"
       ],
       "release": "1.5.0",
-      "notes": "Depends on durable.telemetry and durable.reports: HostCallback arrives with 1.4.0's report info, which PiSharp lacks (OnReport is Action<Exception>). Exhaustive switches over the C# HostCallback enum need the case; PiSharp-only report handlers have none yet."
+      "notes": "Depends on durable.telemetry and durable.reports: HostCallback arrives with 1.4.0's report info, which PiSharp lacks (OnReport is Action<Exception>). Exhaustive switches over the C# HostCallback enum need the case; PiSharp-only report handlers have none yet.",
+      "evidence": {
+        "commits": [
+          "deaaf7dc",
+          "0251bbac"
+        ],
+        "tests": [
+          "tests/PiSharp.Durable.Tests/HarnessTelemetryCases.cs: harness.telemetry.reports-telemetry-adapters-that-throw-while-a-commit-is-published-and-the-commit-stands",
+          "tests/PiSharp.Durable.Tests/HarnessTelemetryCases.cs: harness.telemetry.drops-a-report-s-own-metric-that-throws-after-onreport-got-the-report"
+        ]
+      }
     },
     {
       "id": "durable.compaction-model-overrides",
@@ -10712,7 +10760,7 @@
       "id": "chord.context-telemetry",
       "area": "chord",
       "phase": 4,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "chord@1.5.0/Breaking Changes#2",
         "chord@1.4.0/Breaking Changes#1",
@@ -10731,7 +10779,18 @@
       "pulledInBy": [
         "durable.telemetry"
       ],
-      "notes": "PiSharp's DurableContext (DurableContext.cs:36) carries values and cancellation only. Depends on the telemetry area (phase 3) for TelemetrySpan and the no-op span. Needed by phase 4: pi-durable v1.5.0 imports withTelemetry from chord/context. The argument order change is TypeScript API; the port starts with the final order."
+      "notes": "PiSharp's DurableContext (DurableContext.cs:36) carries values and cancellation only. Depends on the telemetry area (phase 3) for TelemetrySpan and the no-op span. Needed by phase 4: pi-durable v1.5.0 imports withTelemetry from chord/context. The argument order change is TypeScript API; the port starts with the final order.",
+      "evidence": {
+        "commits": [
+          "deaaf7dc",
+          "0251bbac"
+        ],
+        "tests": [
+          "tests/PiSharp.Durable.Tests/Chord/ContextCases.cs: chord.context.provides-distinct-empty-root-contexts",
+          "tests/PiSharp.Durable.Tests/Chord/ContextCases.cs: chord.context.derives-telemetry-independently-from-values-and-cancellation",
+          "tests/PiSharp.Durable.Tests/Chord/ContextCases.cs: chord.context.isolates-concurrent-tracein-branches-and-preserves-callback-results-and-errors"
+        ]
+      }
     },
     {
       "id": "chord.output",
