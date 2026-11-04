@@ -3,7 +3,7 @@
 // Fingerprints: the normal form of a contract version and its portable 64-bit hash. Not a security boundary. The hash input is
 // JavaScript's JSON.stringify of the normal form (ChordJson.Stringify), so a contract declared here has the fingerprint the same
 // declaration has in TypeScript, and a C# host and a TypeScript peer agree on it. Area cv2-contracts added this file because every
-// declaration is materialized with its fingerprint; area cv2-evolve, which owns fingerprint.ts, ports fingerprint.test.ts.
+// declaration is materialized with its fingerprint; area cv2-evolve, which owns fingerprint.ts, ported fingerprint.test.ts (FingerprintCases.cs).
 using System.Globalization;
 using System.Text;
 using System.Text.Json.Nodes;

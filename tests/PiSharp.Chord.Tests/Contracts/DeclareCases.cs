@@ -12,7 +12,7 @@ using static PiSharp.Chord.Contracts.Schemas;
 // key, and a local declaration with `variants` or `hostAddress`. Every other refusal runs as upstream's does, with its message. The
 // @ts-expect-error lines are type-level: the C# declarations' required members refuse a remote declaration without a host address when it
 // compiles, and the cases check the run-time refusal of a null one; a member declaration is a Member in every position, so the D11 and
-// keyed refusals happen when the declaration runs. The evolve halves of the reserved-names and keyed cases come with area cv2-evolve.
+// keyed refusals happen when the declaration runs. The evolve halves of the reserved-names and keyed cases came with area cv2-evolve.
 //
 // The pins are authored expectations taken from upstream v1.5.0's tests: the fixed fingerprint of fingerprint.test.ts ("pin the normal
 // form"), and the fingerprints, params and normal form that test/next/schema/recorded.json records for the contracts of
@@ -114,7 +114,7 @@ internal static partial class Program
                     ["reader"] = new() { State = { ["notes"] = Arr(Obj(("text", Str()))) }, Methods = { ["m"] = Method(Str()) } },
                 },
             }), "redacted state per variant")),
-        .. new[] { "then", "release", "variant", "state", "retry" }.Select(name => Case($"contracts.declare.reserved-member-names-refuses-{name}-in-remote-and-local", () =>
+        .. new[] { "then", "release", "variant", "state", "retry" }.Select(name => Case($"contracts.declare.reserved-member-names-refuses-{name}-in-remote-local-and-evolve", () =>
         {
             Refuses(() => Contract.Remote("n", new()
             {
@@ -125,6 +125,8 @@ internal static partial class Program
             }), $"n.v.state.{name}: \"{name}\" is reserved: a reference has it");
             Refuses(() => Contract.Local("n", new() { Version = 1, Params = new(), Members = new() { [name] = Method() } }),
                 $"n.members.{name}: \"{name}\" is reserved: a reference has it");
+            var @base = Contract.Local("n", new() { Version = 1, Params = new(), Members = new() });
+            Refuses(() => Contract.Evolve(@base, e => e.AddState(name, Str())), $"n v2.members.{name}: \"{name}\" is reserved: a reference has it");
         })),
         Case("contracts.declare.keyed-members-declare-a-keyed-member-in-a-local-contract", () =>
         {
@@ -134,6 +136,9 @@ internal static partial class Program
             Sequence(["notes"], variant.Keyed.Keys, "keyed members");
             Sequence([], variant.State.Keys, "state members");
             Check(keyedStore.Fingerprint != stateStore.Fingerprint, "a keyed member is a node of its own in the fingerprint");
+            // Evolving the contract carries its keyed members over unchanged (their versions are slice 7's).
+            var next = Contract.Evolve(keyedStore, e => e.AddMethod("clear", Str(), Str()));
+            Check(ContractsInternal.CurrentVariants(next)[ContractsInternal.Local].Keyed.ContainsKey("notes"), "the keyed member is carried over");
         }),
         Case("contracts.declare.keyed-members-refuse-a-keyed-member-in-a-remote-contract", () =>
             Refuses(() => Contract.Remote("app.notes", new()
