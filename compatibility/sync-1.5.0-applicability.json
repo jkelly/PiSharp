@@ -56,11 +56,11 @@
     "changelogBullets": 477,
     "repeatedBullets": 23,
     "byStatus": {
-      "ported": 159,
-      "ported-with-deferral": 13,
+      "ported": 162,
+      "ported-with-deferral": 12,
       "already-ported": 13,
       "no-op": 25,
-      "port": 116
+      "port": 114
     },
     "byArea": {
       "ai": 58,
@@ -6929,7 +6929,7 @@
       "id": "tools.windows-shell-install-dirs",
       "area": "tools",
       "phase": 2,
-      "status": "ported-with-deferral",
+      "status": "ported",
       "changelog": [
         "coding-agent@1.4.0/Fixed#16"
       ],
@@ -6946,13 +6946,14 @@
       "notes": "ShellDiscovery.IsLegacyWslBashPath hard-codes c:/windows (ShellDiscovery.cs:38-41). PiSharp's CLI registers no powershell tool (PiHelp.cs:12), so the PowerShell lookup applies only to the durable powershell tool (durable phase), and PiToolsManager extracts archives in-process (PiToolsManager.cs:155-162), so the tar change does not apply.",
       "evidence": {
         "commits": [
-          "795448e3"
+          "795448e3",
+          "553c48fd"
         ],
         "tests": [
-          "tests/PiSharp.Tools.Tests/Sync150Cases.cs: sync150.windows-shell-install-dirs"
+          "tests/PiSharp.Tools.Tests/Sync150Cases.cs: sync150.windows-shell-install-dirs",
+          "tests/PiSharp.Durable.Tests/EnvNodeCases.cs: env.node.selects-command-transport-for-d-winnt-system32-bash-exe-systemroot-d-winnt"
         ]
-      },
-      "deferred": "PowerShell install-directory lookup: the CLI has no powershell tool; the durable powershell tool follows in the phase 4 durable re-sync. taskkill/tar SystemRoot change does not apply (PiSharp kills in-process and extracts archives in-process)."
+      }
     },
     {
       "id": "tools.fd-rg-unsupported-arch",
@@ -9694,7 +9695,7 @@
       "id": "durable.env-file-change",
       "area": "durable",
       "phase": 4,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "durable@1.5.0/Breaking Changes#11",
         "durable@1.5.0/Breaking Changes#26"
@@ -9717,13 +9718,21 @@
         "tests/PiSharp.Durable.Tests/EnvNodeConformanceCases.cs"
       ],
       "release": "1.5.0",
-      "notes": "PiSharp has WatchChange and IFileWatcher in Env/FileSystem.cs. PiSharp-only implementer: plan mode's PlanScope (PlanScope.cs:269 wraps WatchAsync). pi-env's RemoteWatcher follows the same shape (env@1.5.0/Breaking Changes#1, group F, phase 5), so phase 5 builds on this row."
+      "notes": "PiSharp has WatchChange and IFileWatcher in Env/FileSystem.cs. PiSharp-only implementer: plan mode's PlanScope (PlanScope.cs:269 wraps WatchAsync). pi-env's RemoteWatcher follows the same shape (env@1.5.0/Breaking Changes#1, group F, phase 5), so phase 5 builds on this row.",
+      "evidence": {
+        "commits": [
+          "553c48fd"
+        ],
+        "tests": [
+          "tests/PiSharp.Durable.Tests/EnvNodeConformanceCases.cs: env.node-conformance.watch-limits.refuses-a-tree-over-the-directory-budget-and-stops-with-an-error-when-one-grows-past-it"
+        ]
+      }
     },
     {
       "id": "durable.env-wsl-system-root",
       "area": "durable",
       "phase": 4,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "durable@1.4.0/Fixed#3"
       ],
@@ -9738,7 +9747,21 @@
         "tests/PiSharp.Durable.Tests/EnvNodeCases.cs"
       ],
       "release": "1.5.0",
-      "notes": "PiSharp's durable environment uses PiSharp.Tools' ShellDiscovery (LocalExecutionEnv.cs header), whose IsLegacyWslBashPath (ShellDiscovery.cs:38-41) hard-codes C:\\Windows. The coding agent's same fix is coding-agent@1.4.0/Fixed#16 (group B); its phase 2 row lands it in ShellDiscovery for both, and phase 4 then re-pins LocalExecutionEnv's citation and ports the env-node case. PiSharp kills through a job object, not taskkill, so that half has no counterpart."
+      "notes": "PiSharp's durable environment uses PiSharp.Tools' ShellDiscovery (LocalExecutionEnv.cs header), whose IsLegacyWslBashPath (ShellDiscovery.cs:38-41) hard-codes C:\\Windows. The coding agent's same fix is coding-agent@1.4.0/Fixed#16 (group B); its phase 2 row lands it in ShellDiscovery for both, and phase 4 then re-pins LocalExecutionEnv's citation and ports the env-node case. PiSharp kills through a job object, not taskkill, so that half has no counterpart.",
+      "evidence": {
+        "commits": [
+          "795448e3",
+          "553c48fd"
+        ],
+        "tests": [
+          "tests/PiSharp.Durable.Tests/EnvNodeCases.cs: env.node.selects-command-transport-for-c-windows-system32-bash-exe-systemroot-undefined",
+          "tests/PiSharp.Durable.Tests/EnvNodeCases.cs: env.node.selects-command-transport-for-d-winnt-system32-bash-exe-systemroot-d-winnt",
+          "tests/PiSharp.Durable.Tests/EnvNodeCases.cs: env.node.selects-command-transport-for-d-winnt-sysnative-bash-exe-systemroot-d-winnt",
+          "tests/PiSharp.Durable.Tests/EnvNodeCases.cs: env.node.selects-command-transport-for-d-winnt-system32-bash-exe-systemroot",
+          "tests/PiSharp.Durable.Tests/EnvNodeCases.cs: env.node.selects-command-transport-for-e-windows-system32-bash-exe-systemroot-d-winnt",
+          "tests/PiSharp.Tools.Tests/Sync150Cases.cs: sync150.windows-shell-install-dirs"
+        ]
+      }
     },
     {
       "id": "durable.context-system-baseline",

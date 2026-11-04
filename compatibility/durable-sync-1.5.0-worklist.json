@@ -878,9 +878,7 @@
       "size": "S",
       "dependsOn": [],
       "commits": [
-        "5f312dac4",
-        "61060ddf8",
-        "8b0caefc2"
+        "553c48fd"
       ],
       "notes": "Also home of tools.windows-shell-install-dirs (phase 2, ported-with-deferral: \"The durable powershell tool's install-directory lookup follows in phase 4\"): upstream 61060ddf8 resolves Windows shells from their installation directories in durable/src/env/node.ts too; LocalExecutionEnv.cs resolves through PiSharp.Tools' ShellDiscovery, which phase 2 changed, so this area wires the durable powershell lookup to it, ports the env-node.test.ts cases and re-pins LocalExecutionEnv.cs. env-wsl-system-root: phase 2 lands the ShellDiscovery fix for both (coding-agent@1.4.0/Fixed#16); check it is on the branch, then port the env-node case; PiSharp kills through Process.Kill(entireProcessTree), so the taskkill path half does not apply. PiSharp-only implementer of the watcher: plan mode's PlanScope (PlanScope.cs wraps WatchAsync). Phase 5's pi-env RemoteWatcher builds on this shape (env@1.5.0/Breaking Changes#1)."
     },
