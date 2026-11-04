@@ -17,6 +17,8 @@
 // harness.generation.sends-the-harness-default-identity-and-merges-the-harness-identity-over-it: upstream's default identity is
 // { attribution: PI_ATTRIBUTION }; PiSharp's Harness.DefaultIdentity is empty, so a Harness without an identity sends none (pending
 // core.client-identity-attribution). Both also run as harness.generation.jsonl.* and harness.generation.sqlite.*.
+// Pi v1.5.0 sync (area reports): "resolves settings over the built-in defaults" expects afterFailedRun: "keep" (a30c2a81d); its
+// restartLimit (area restarts) and progress.persistWithinMs default arrive with their areas.
 #pragma warning disable PISHARP_IDENTITY001 // PiSharp.AI's ClientIdentity (Pi v1.5.0) is experimental.
 using System.Collections.Immutable;
 using System.Text.RegularExpressions;
@@ -642,7 +644,7 @@ internal static class GenerationTests
                 {"stream":{},"retry":{"enabled":true,"maxRetries":3,"baseDelayMs":2000,"maxAgentDelayMs":60000},
                  "compaction":{"enabled":true,"reserveTokens":16384,"keepRecentTokens":20000,"backgroundTokens":32768},
                  "progress":{"partialIntervalMs":100,"outputIntervalMs":100},"toolExecution":"parallel","steeringMode":"one-at-a-time",
-                 "followUpMode":"one-at-a-time","contextRetentionMs":600000}
+                 "followUpMode":"one-at-a-time","contextRetentionMs":600000,"afterFailedRun":"keep"}
                 """, JsonObjectValue.From(resolved.Where(property => property.Key != "documentRetentionMs")), "defaults");
             MatchJson("""{"retry":{"enabled":false,"maxRetries":3,"baseDelayMs":2000},"compaction":{"enabled":true,"backgroundTokens":0}}""",
                 SettingsJson(Agents.ResolveSettings(new HarnessSettings
@@ -680,6 +682,12 @@ internal static class GenerationTests
             ("followUpMode", settings.FollowUpMode == QueueMode.All ? "all" : "one-at-a-time"),
             ("contextRetentionMs", settings.ContextRetentionMs),
             ("documentRetentionMs", settings.DocumentRetentionMs),
+            ("afterFailedRun", settings.AfterFailedRun switch
+            {
+                AfterFailedRun.Continue => "continue",
+                AfterFailedRun.Withdraw => "withdraw",
+                _ => "keep",
+            }),
         };
         return Obj([.. properties]);
     }
