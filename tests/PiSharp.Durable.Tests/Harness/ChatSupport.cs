@@ -18,6 +18,9 @@
 // Pi v1.5.0 sync (area telemetry): as the faux provider is registered in pi-ai's Models, whose streamSimple and deferred polls observe
 // each request (models.ts' observeModelRequest, 2ec55d808), a request whose options carry telemetry is one pi.ai.request span and a
 // deferred poll one pi.ai.poll span, through PiSharp.AI's AiTelemetry (Observed). openChat takes HarnessOptions.Telemetry.
+// Pi v1.5.0 sync (area partial-commits): the faux stream keeps a block's text so far in a StringBuilder and writes it into the partial
+// only when an abort reports it. Upstream's `text += chunk` is a V8 rope; a .NET `+=` copied the whole text per chunk, which the streamed
+// partials' cost case (HarnessEventsCases.cs) would count as the Harness's.
 #pragma warning disable PISHARP_IDENTITY001 // PiSharp.AI's ClientIdentity (Pi v1.5.0) is experimental.
 using System.Collections.Concurrent;
 using System.Collections.Immutable;
@@ -595,17 +598,18 @@ internal sealed class FauxModels : IDurableModels
                 var text = S(block[key]);
                 content.Add(Obj(("type", type), (key, "")));
                 yield return type == "text" ? new TextStarted(index, new TextContent("")) : new ThinkingStarted(index, new ThinkingContent(""));
-                var sofar = "";
+                // The text so far, written into the partial only when an abort reports it (area partial-commits).
+                var sofar = new System.Text.StringBuilder();
                 foreach (var chunk in Split(text))
                 {
                     await ScheduleChunk(chunk);
                     if (signal.IsCancellationRequested)
                     {
+                        content[index] = Obj(("type", type), (key, sofar.ToString()));
                         yield return AbortedEvent();
                         yield break;
                     }
-                    sofar += chunk;
-                    content[index] = Obj(("type", type), (key, sofar));
+                    sofar.Append(chunk);
                     yield return type == "text" ? new TextDelta(index, chunk) : new ThinkingDelta(index, chunk);
                 }
                 content[index] = block;

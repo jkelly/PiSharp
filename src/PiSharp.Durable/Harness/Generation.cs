@@ -13,6 +13,9 @@
 // builder's failure reports host_error env, a section's extension_error with its extension, and a deferred cancel's host_error models.
 // Pi v1.5.0 sync (area telemetry, 2ec55d808): a request, a deferred poll and a deferred cancel pass the phase's span as their telemetry
 // parent, and a run's generation is created with its inputs' submission IDs, so its trace is the first admission's and the others link.
+// Pi v1.5.0 sync (area partial-commits, da412b039): partial commits append what text and thinking grew by and apply the argument changes
+// of their own parse of the streamed argument text (PartialChanges), so a committed partial now carries a streaming tool call's parsed
+// arguments, as upstream's does.
 //
 // Mappings:
 // - Checkpoints, live state and results are upstream's JSON, built in upstream's key order: prepare {phase, attempt, compacted?, overflow?},
@@ -21,13 +24,15 @@
 //   {entryId}.
 // - Provider messages cross IDurableModels as PiSharp.Contracts values and are stored as pi-ai wire JSON (PiWireJson). Stream events are
 //   compact frames, not upstream's events carrying a `partial`; the partial is the snapshot of a PiSharp.AI AssistantStreamReducer fed
-//   every non-terminal event. A message with a non-finite usage count is not strict JSON and throws Chord's copyJson error, as upstream's
-//   copy does; PiWireJson alone would write it as null.
+//   every non-terminal event, which a partial commit converts only after a block starts or ends (PartialMessage: between those, text and
+//   thinking grow by appends, as upstream's copyJson shares the provider's strings). A message with a non-finite usage count is not strict
+//   JSON and throws Chord's copyJson error, as upstream's copy does; PiWireJson alone would write it as null.
 // - The partial throttle's timers are runtime.SetTimer's (HarnessOptions.SetTimer), so fake time drives them as vi fake timers would. Its
 //   one commit in flight is tracked under a lock: timer callbacks run on other threads.
 // - The invocation signal is ITaskRuntime.Signal: it is passed to the stream and polls as their cancellation token, and
 //   `signal.throwIfAborted()` throws OperationCanceledException.
 using System.Collections.Immutable;
+using System.Text;
 using PiSharp.AI;
 using PiSharp.Contracts;
 using PiSharp.Durable.Chord;
@@ -482,14 +487,22 @@ internal static class GenerationPhases
     /// <summary>
     /// Streams one request and returns the terminal message (upstream <c>streamResponse</c>). Partials commit as trailing writes at most
     /// every <c>progress.partialIntervalMs</c> (default 100 ms) with one commit in flight; <c>finally</c> stops the throttle and awaits that
-    /// commit, so no stale partial lands after the outcome.
+    /// commit, so no stale partial lands after the outcome. A commit appends what text and thinking grew by and applies the argument
+    /// changes since the last one (<see cref="PartialChanges"/>), so its cost follows the new text, not the strings' length.
     /// </summary>
     private static async Task<JsonObjectValue> StreamResponseAsync(ITaskRuntime runtime, DurableModel model, ImmutableArray<JsonValue> messages,
         DurableStreamOptions options, int attempt, DurableContext context)
     {
         var interval = runtime.Settings.Progress.PartialIntervalMs;
+        // Guards the reducer, the partial message and the throttle: the stream applies events on its thread, a flush reads them on the
+        // timer's.
         var gate = new Lock();
-        AssistantMessage? pending = null;
+        var reducer = new AssistantStreamReducer(new AssistantMessage(model.Api, model.Provider, model.Id, (long)runtime.Now(), [],
+            TokenUsage.Zero, StopReason.Pending));
+        var partial = new PartialMessage();
+        var changes = new PartialChanges();
+        // Whether the partial changed since the last flush took it.
+        var pending = false;
         // Disarms the armed timer.
         Action? timer = null;
         Task? inFlight = null;
@@ -504,25 +517,38 @@ internal static class GenerationPhases
             lock (gate)
             {
                 timer = null;
-                var partial = pending;
-                pending = null;
-                if (partial is null || stopped) return;
+                if (!pending || stopped) return;
+                pending = false;
+                // Taken now, as upstream copies the partial synchronously: the stream keeps changing it. The changes since the last commit
+                // belong to this one.
+                PartialCommit? taken = null;
+                Exception? failed = null;
+                try { taken = changes.Take(partial.Build(reducer)); }
+                catch (Exception error) { failed = error; }
                 // Started under the lock, so its completion (which takes the lock) always sees itself as the commit in flight.
-                inFlight = Task.Run(() => CommitPartialAsync(partial));
+                inFlight = Task.Run(() => CommitPartialAsync(taken, failed));
             }
         }
 
-        async Task CommitPartialAsync(AssistantMessage partial)
+        async Task CommitPartialAsync(PartialCommit? taken, Exception? failed)
         {
             try
             {
-                var message = ToWire(partial);
-                await runtime.CommitAsync(async (tx, _) =>
+                if (failed is not null) throw failed;
+                try
                 {
-                    var live = await tx.DocAsync(Live.LiveDoc, runtime.ConversationId).ConfigureAwait(false);
-                    if (!live.ContainsKey("generation")) live.Set("generation", GenerationState(attempt));
-                    HarnessJson.AssignJson(live.GetObject("generation"), "message", message);
-                }, context).ConfigureAwait(false);
+                    await runtime.CommitAsync(async (tx, _) =>
+                    {
+                        var live = await tx.DocAsync(Live.LiveDoc, runtime.ConversationId).ConfigureAwait(false);
+                        if (!live.ContainsKey("generation")) live.Set("generation", GenerationState(attempt));
+                        changes.Commit(live.GetObject("generation"), taken!);
+                    }, context).ConfigureAwait(false);
+                }
+                catch (Exception)
+                {
+                    changes.Restore(taken!);
+                    throw;
+                }
             }
             catch (Exception error)
             {
@@ -538,15 +564,13 @@ internal static class GenerationPhases
                 lock (gate)
                 {
                     inFlight = null;
-                    if (pending is not null && !stopped) Schedule();
+                    if (pending && !stopped) Schedule();
                 }
             }
         }
 
         try
         {
-            var reducer = new AssistantStreamReducer(new AssistantMessage(model.Api, model.Provider, model.Id, (long)runtime.Now(), [],
-                TokenUsage.Zero, StopReason.Pending));
             StreamTerminalEvent? terminal = null;
             await foreach (var item in runtime.Models.StreamSimple(model, messages, options, runtime.Signal).WithCancellation(runtime.Signal)
                 .ConfigureAwait(false))
@@ -556,14 +580,15 @@ internal static class GenerationPhases
                     terminal = end;
                     continue;
                 }
-                reducer.Apply(item);
-                var partial = reducer.Snapshot();
-                // A partial without content, such as the opening `start` event, shows nothing; a deferred response never gets past it, so
-                // it never leaves a partial.
-                if (partial.Content.IsEmpty) continue;
                 lock (gate)
                 {
-                    pending = partial;
+                    reducer.Apply(item);
+                    changes.Observe(item);
+                    partial.Observe(item);
+                    // A partial without content, such as the opening `start` event, shows nothing; a deferred response never gets past it,
+                    // so it never leaves a partial.
+                    if (!partial.HasContent) continue;
+                    pending = true;
                     if (timer is null && inFlight is null) Schedule();
                 }
             }
@@ -583,6 +608,67 @@ internal static class GenerationPhases
             }
             disarm?.Invoke();
             if (flushing is not null) await flushing.ConfigureAwait(false);
+        }
+    }
+
+    /// <summary>
+    /// The partial message a partial commit writes, as pi-ai wire JSON: PiSharp's counterpart of upstream's <c>copyJson(partial)</c>. That
+    /// copy shares the provider's strings, so it costs the message's nodes, not its characters; here the partial is an
+    /// <see cref="AssistantStreamReducer"/> snapshot converted with <see cref="ToWire"/>, which copies every string. So after events that
+    /// only grew text or thinking, the next message is the last one with the new text appended (a deferred concatenation, see
+    /// <see cref="JsonStringValue"/>), and it is built from a snapshot again after any other event: a block that starts or ends, or a
+    /// provider replacing what it streamed. A tool call's streamed argument text changes no snapshot (an unfinished call keeps the
+    /// arguments it started with; <see cref="PartialChanges"/> commits the parsed ones).
+    /// </summary>
+    private sealed class PartialMessage
+    {
+        private readonly Dictionary<int, (string Field, StringBuilder Text)> grown = [];
+        private JsonObjectValue? last;
+        private bool rebuild = true;
+
+        /// <summary>Whether the message has a block: every event but the opening one starts or changes one.</summary>
+        public bool HasContent { get; private set; }
+
+        /// <summary>Record what an event the reducer accepted changed.</summary>
+        public void Observe(StreamEvent item)
+        {
+            switch (item)
+            {
+                case StreamStarted: return;
+                case TextDelta delta: Grow(delta.ContentIndex, "text", delta.Delta); break;
+                case ThinkingDelta delta: Grow(delta.ContentIndex, "thinking", delta.Delta); break;
+                case ToolCallDelta or ToolCallCheckpoint: break;
+                default: rebuild = true; break;
+            }
+            HasContent = true;
+        }
+
+        private void Grow(int index, string field, string delta)
+        {
+            if (grown.TryGetValue(index, out var text)) text.Text.Append(delta);
+            else grown[index] = (field, new StringBuilder(delta));
+        }
+
+        /// <summary>The partial message now; called under the stream's lock.</summary>
+        public JsonObjectValue Build(AssistantStreamReducer reducer)
+        {
+            if (rebuild || last is null)
+            {
+                last = ToWire(reducer.Snapshot());
+                rebuild = false;
+                grown.Clear();
+                return last;
+            }
+            if (grown.Count == 0) return last;
+            var content = ((JsonArrayValue)last["content"]).Items;
+            foreach (var (index, (field, text)) in grown)
+            {
+                var block = (JsonObjectValue)content[index];
+                content = content.SetItem(index, block.SetItem(field, JsonStringValue.Concat((JsonStringValue)block[field], text.ToString())));
+            }
+            grown.Clear();
+            last = last.SetItem("content", JsonValue.Array(content));
+            return last;
         }
     }
 
