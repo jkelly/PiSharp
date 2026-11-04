@@ -26,6 +26,8 @@
 // v1.5.0's; the citation stays on v1.2.0 until the file's other areas land. Area sleep: "resumes a retry backoff after reopen" is
 // ec1be23eb's: the backoff is a durable sleep, and a retry an earlier version stored as a running phase sleeps again when reopened before
 // its time; upstream's SQL that turns the stored status back to running is a write of the record read from the closed storage.
+// Area view (f3255de76): "compacts a fork whose cut falls on a parent entry" checks the windowed view of v1.5.0, and "keeps the kept
+// entries mounted in the conversation view" is v1.5.0's "appends the summary to the conversation view in place, its head on a kept entry".
 using System.Collections.Immutable;
 using System.Text.RegularExpressions;
 using PiSharp.Contracts;
@@ -1506,9 +1508,12 @@ internal static class CompactionTests
             Seq([Text("u3", 100), Text("a3", 100)], view.Messages.Skip(1).Select(UserText), "kept");
             // The parent is untouched.
             Check(!(await KindsOf(chat.Root)).Contains("pi.compaction"), "parent untouched");
-            // The fork's view keeps the parent entries the summary kept.
+            // Pi v1.5.0 (area view, f3255de76): the fork's view shows the parent entries in ID order, the summary after them, its head on a
+            // parent entry.
             var watch = await fork.WatchAsync(Context);
-            SameEntries(view.Entries, watch.Value.Entries, "view entries");
+            SameEntries(await AllEntries(fork), watch.Value.Entries, "view entries");
+            SameEntries([view.Head!], [watch.Value.Entries[^1]], "the summary last");
+            Check(watch.Value.Entries.Any(entry => entry.Id == u3.Id), "u3 in the view");
             await watch.StopAsync();
             await chat.Harness.CloseAsync(Context);
         });
@@ -1947,16 +1952,23 @@ internal static class CompactionTests
             await chat.Harness.CloseAsync(Context);
         });
 
-        yield return Case(prefix + "keeps-the-kept-entries-mounted-in-the-conversation-view", async () =>
+        // Pi v1.5.0 (area view, f3255de76): v1.2.0's "keeps the kept entries mounted in the conversation view".
+        yield return Case(prefix + "appends-the-summary-to-the-conversation-view-in-place-its-head-on-a-kept-entry", async () =>
         {
             var chat = await Open(fresh);
             await History(chat);
             var watch = await chat.Root.WatchAsync(Context);
+            var before = watch.Value.Entries;
             watch.Start((_, _) => Task.CompletedTask);
             chat.Faux.Summaries.Push(Summary());
             await Result(chat, await Compact(chat.Root));
-            await Eventually(() => watch.Value.Entries is { Length: > 0 } entries && entries[0].Kind == "pi.compaction");
-            SameEntries((await chat.Root.ContextAsync(Context)).Entries, watch.Value.Entries, "mounted entries");
+            await Eventually(() => watch.Value.Entries is { Length: > 0 } entries && entries[^1].Kind == "pi.compaction");
+            // Nothing leaves the window: the summary is appended where it was written.
+            SameEntries(before, watch.Value.Entries.Take(before.Length), "the entries before");
+            SameEntries(await AllEntries(chat.Root), watch.Value.Entries, "every entry");
+            var head = (await chat.Root.ContextAsync(Context)).Head!;
+            SameEntries([head], [watch.Value.Entries[^1]], "the summary last");
+            Check(watch.Value.Entries.Any(entry => entry.Id == head.Head), "its head in the view");
             await watch.StopAsync();
             await chat.Harness.CloseAsync(Context);
         });

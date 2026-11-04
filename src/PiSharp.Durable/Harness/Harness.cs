@@ -26,6 +26,7 @@
 // settings.progress.persistWithinMs at each use, as the default window of a deferred commit.
 // Pi v1.5.0 sync (area observers, 8b0caefc2): Harness.observeConversation() and observeTaskGraph() check the Harness is usable, then
 // attach through the view and graph mounts (ConversationViews.ObserveAsync, TaskGraphView.ObserveAsync); a refusal faults the task.
+// Pi v1.5.0 sync (area view, f3255de76): Conversation.watch() and Harness.observeConversation() pass their ConversationWindow on.
 using System.Collections.Immutable;
 using PiSharp.AI;
 using PiSharp.Durable.Chord;
@@ -347,12 +348,12 @@ internal sealed class DurableHarness : Session, IHarness
     }
 
     public async Task<Observation<ConversationView>> ObserveConversationAsync(ConversationId id, Observer<ConversationView> observer,
-        DurableContext context)
+        DurableContext context, ConversationWindow? window = null)
     {
         AssertUsable();
         ArgumentNullException.ThrowIfNull(observer);
         ArgumentNullException.ThrowIfNull(context);
-        return await views.ObserveAsync(id, observer, context).ConfigureAwait(false);
+        return await views.ObserveAsync(id, observer, context, window).ConfigureAwait(false);
     }
 
     public Task<IConversation> RootAsync(DurableContext context, AgentChange? agent = null, ConversationInit? init = null) =>
@@ -506,7 +507,8 @@ internal sealed class ConversationImpl(ConversationId id, DurableHarness harness
         await harness.Scheduler.WaitForIdleAsync(Id, context).ConfigureAwait(false);
     }
 
-    public Task<IWatchHandle<ConversationView>> WatchAsync(DurableContext context) => harness.Views.WatchAsync(Id, context);
+    public Task<IWatchHandle<ConversationView>> WatchAsync(DurableContext context, ConversationWindow? window = null) =>
+        harness.Views.WatchAsync(Id, context, window);
 
     public override string ToString() => $"Conversation {Id}";
 }

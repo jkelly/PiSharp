@@ -11,6 +11,8 @@
 // tokens of Documents.cs (NestedCallDoc is HarnessTasks.NestedCallDoc); TableCommitChange is ICommitChange; SessionFailed and
 // StorageRequestError are SessionFailedException and StorageRequestException. Pi v1.5.0 sync (area observers, 8b0caefc2): the Observer
 // and Observation exports are the classes Observer<T> and Observation<T> (TypesSession.cs).
+// Area view (f3255de76): ConversationWindow is the record of View.cs; ConversationTranscript, ConversationTranscriptOptions and EntryLoader
+// keep their names, and TranscriptItem and TranscriptView are ConversationTranscriptItem and ConversationTranscriptView (Transcript.cs).
 namespace PiSharp.Durable;
 
 /// <summary>The upstream source this port follows (decision 0005): Pi's <c>packages/durable</c> and the Chord subset it uses, at the

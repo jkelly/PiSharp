@@ -10,6 +10,8 @@
 // - HarnessSettings getters are overridden properties of a HarnessSettings subclass.
 // - `delete live.generation` and `escaped!.generation = undefined` are DraftObject.Delete("generation").
 // - Upstream's `UserSettings implements HarnessSettings` stores the manager in a field; here it is a primary-constructor parameter.
+// Pi v1.5.0 sync (area view, f3255de76): the "transcript" example of Section 9.3 (a client's transcript over the windowed view) is
+// v1.5.0's; the citation stays on v1.2.0 until the file's other areas land.
 using System.Collections.Immutable;
 using PiSharp.Durable;
 using PiSharp.Durable.Chord;
@@ -64,6 +66,8 @@ internal static class SpecNames
     public static DurableTask Anchor => None<DurableTask>();
     public static DurableTask Reporter => None<DurableTask>();
     public static ToolRegistration SubagentTool => None<ToolRegistration>();
+    public static IConversation Conversation => None<IConversation>();
+    public static void Render(ConversationTranscriptView view) => None<object>();
 
     internal interface ISettingsManager
     {
@@ -355,6 +359,25 @@ internal static class SpecUsage
                 });
             },
 
+            // Section 9.3: a client's transcript over the windowed view.
+            Transcript = async () =>
+            {
+                var conversation = SpecNames.Conversation;
+                var transcript = new ConversationTranscript((query, limit, ctx) => conversation.EntriesAsync(query, limit, null, ctx));
+                var watch = await conversation.WatchAsync(context);
+                SpecNames.Render(transcript.Merge(watch.Value));
+                watch.Start((call, _) =>
+                {
+                    if (call is WatchValueCall<ConversationView> { Value: var value }) SpecNames.Render(transcript.Merge(value));
+                    return Task.CompletedTask;
+                });
+                // A marker scrolled into view:
+                SpecNames.Render(await transcript.LoadEarlierAsync(context));
+                // Reconnect after a drop:
+                var resumed = await conversation.WatchAsync(context, transcript.Resume);
+                return resumed;
+            },
+
             // Section 4: table reads before the first table write; documents stay usable.
             TableRules = async () =>
             {
@@ -404,6 +427,7 @@ internal sealed class SpecSequences
     public required Func<Task<IHarness>> ContainerEnv { get; init; }
     public required Func<Task<IHarness>> Host { get; init; }
     public required Func<ITx, Task> Spawn { get; init; }
+    public required Func<Task<IWatchHandle<ConversationView>>> Transcript { get; init; }
     public required Func<Task> TableRules { get; init; }
     public required Func<Task> RevokedDraft { get; init; }
 }

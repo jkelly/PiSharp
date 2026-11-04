@@ -129,7 +129,9 @@ internal static class HarnessObserverTests
             var delivered = watched.Snapshot();
             Equal(1, delivered.Count, "one watch call");
             var watchCall = Change(delivered[0]);
-            Same(call.Advance.Value, watchCall.Value, "the same value");
+            // Pi v1.5.0 (area view, f3255de76): each observer gets its own window's value, equal here (upstream's toEqual), no longer the
+            // one shared value.
+            SameJson(call.Advance.Value.ToJson().ToJson(), watchCall.Value.ToJson(), "the same value");
             Equal(OpsJson(call.Advance.Ops), OpsJson(watchCall.Ops), "the same ops");
             Equal(call.Advance.Retired, watchCall.Retired, "the same retired");
             // No task changed: the graph got nothing.

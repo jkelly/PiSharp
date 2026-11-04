@@ -7,6 +7,8 @@
 // settings, and alerts above the notices for a failed session and for pi.live.compactionFailure. PiSharp-only (decision 0005,
 // "PiSharp-only additions"): a pending ask_user_question or plan review replaces the editor with its form (the editor keeps its draft),
 // the status says what the run waits for, the footer shows plan mode, and both tools have their own cards.
+// Pi v1.5.0 sync (area view): the transcript and the footer's context tokens come from DurableView.Transcript, the shown conversation's
+// active transcript; pi-durable 1.5.0's view entries are a window over the whole transcript.
 using System.Collections.Immutable;
 using System.Globalization;
 using System.Text.Json.Nodes;
@@ -194,10 +196,10 @@ internal sealed class DurableTuiView
     public void Apply(DurableView view)
     {
         var live = Doc(view.Conversation, "pi.live", static () => []);
-        SyncTranscript(view.Conversation.Entries);
+        SyncTranscript(view.Transcript);
         var message = Obj(Obj(live, "generation"), "message");
         // A partial without its entry was dropped, for example by a retry: render the transcript again.
-        if (message is null && streaming is not null) Rebuild(view.Conversation.Entries);
+        if (message is null && streaming is not null) Rebuild(view.Transcript);
         if (message is not null) SyncStreaming(message);
         foreach (var slot in Arr(live, "tools"))
         {
@@ -438,7 +440,7 @@ internal sealed class DurableTuiView
             model.ModelId == current.ModelId)?.ContextWindow ?? 0;
         if (contextWindow > 0)
         {
-            var tokens = ContextTokens(view.Conversation.Entries);
+            var tokens = ContextTokens(view.Transcript);
             double? percent = tokens is null ? null : tokens.Value / contextWindow * 100;
             var text = $"{(percent is null ? "?" : percent.Value.ToString("F1", CultureInfo.InvariantCulture))}%/{FooterComponent.FormatTokens(contextWindow)}";
             stats.Add(percent is > 90 ? theme.Fg("error", text) : text);

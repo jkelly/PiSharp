@@ -14,6 +14,9 @@
 // carries no arguments. Upstream removed watchEvents before it deferred the running status (f3255de76, area events), so this is PiSharp's.
 // Pi v1.5.0 sync (area observers, 8b0caefc2): the stream's view observer gets WatchEnd ends, and the Session's close ends it as a watch
 // (ended, or failed with the Session's failure); 8b0caefc2's listener shape ({ value } per batch) is area events'.
+// Pi v1.5.0 sync (area view, f3255de76): the view's entries are a window over the transcript, so the stream keeps the active transcript
+// its snapshots show itself: read on the line at attachment (ActiveEntriesAsync) and advanced by each publication's entries
+// (AppendActive, v1.2.0's head-marker cut). Its view observer has a one-entry window.
 //
 // Mappings: each AgentEvent variant is a sealed record whose ToJson() is upstream's object with upstream's key order, so a JSON-mode host
 // prints what upstream prints. pi-ai messages, usage, tool slots, compaction statuses and the pi.agent / pi.usage states are wire JSON, as
@@ -479,6 +482,9 @@ public static class AgentEvents
         var views = ConversationViews.Of(harness);
         var (stream, _) = await views.AttachAsync(conversationId, async (initial, release, storage) =>
         {
+            // The active transcript the snapshots show, read on the line with the view.
+            var bounds = await ConversationContext.CaptureContextBoundsAsync(storage, conversationId, context).ConfigureAwait(false);
+            var active = await ConversationContext.ActiveEntriesAsync(storage, conversationId, bounds, context).ConfigureAwait(false);
             // Generations whose held outcome already ended their turn, read on the line with the snapshot.
             var query = new TaskQuery { ConversationId = conversationId, Kind = GenerationKind, Status = DurableTaskStatus.Completing };
             var completing = await HarnessUtil.ScanAll(cursor => storage.ScanTasksAsync(query, 100, cursor, context)).ConfigureAwait(false);
@@ -488,15 +494,17 @@ public static class AgentEvents
             var current = initial;
             // Batches are the watch's values, each delivered (folding would drop events); an overflow delivers a snapshot of the newest view
             // instead.
-            var watch = new NativeWatch<IReadOnlyList<AgentEvent>>([], release, views.Report, () => [SnapshotOf(current)], views.Schedule);
+            var watch = new NativeWatch<IReadOnlyList<AgentEvent>>([], release, views.Report, () => [SnapshotOf(current, active)], views.Schedule);
             var observer = new EventsObserver(watch, (before, after, ops, publication, commitContext) =>
             {
                 current = after;
+                foreach (var change in publication.Changes)
+                    if (change is EntryWrite { Value: var entry } && entry.ConversationId == conversationId) active = ConversationContext.AppendActive(active, entry);
                 var events = Translate(conversationId, before, after, ops, publication, held, intents);
                 if (events.Count > 0) watch.Advance(events, commitContext);
             });
-            return (new EventStream(SnapshotOf(initial), watch), (ViewObserver)observer);
-        }, context).ConfigureAwait(false);
+            return (new EventStream(SnapshotOf(initial, active), watch), (ViewObserver)observer);
+        }, context, new ConversationWindow { Min = 1 }).ConfigureAwait(false);
         // Like a watch, the acquisition context governs the stream's lifetime.
         if (context.IsCancellationRequested)
         {
@@ -550,12 +558,12 @@ public static class AgentEvents
     private static Parts PartsOf(ConversationView view) =>
         new(view.Doc("pi.live") ?? JsonObjectValue.Empty, view.Doc("pi.inbox"), view.Doc("pi.agent"), view.Doc("pi.usage"));
 
-    private static SnapshotEvent SnapshotOf(ConversationView view)
+    private static SnapshotEvent SnapshotOf(ConversationView view, ImmutableArray<EntryRecord> active)
     {
         var parts = PartsOf(view);
         return new SnapshotEvent
         {
-            Entries = view.Entries,
+            Entries = active,
             RunInputs = parts.Run is { } run ? Inputs(run) : null,
             Generation = parts.Generation,
             Tools = parts.Tools ?? JsonArrayValue.Empty,

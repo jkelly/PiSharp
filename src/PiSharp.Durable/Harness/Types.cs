@@ -27,6 +27,8 @@
 // ProgressPolicy and ProgressSettings PersistWithinMs: progress commits are deferred (CommitPersistence).
 // Pi v1.5.0 sync (area observers, 8b0caefc2): IHarness.ObserveConversationAsync and ObserveTaskGraphAsync, synchronous Observer<T>s of
 // the view and task graph mounts the watches share.
+// Pi v1.5.0 sync (area view, f3255de76): IConversation.WatchAsync and IHarness.ObserveConversationAsync take a ConversationWindow; the
+// view's entries are a window over the transcript.
 using System.Collections.Immutable;
 using PiSharp.AI;
 using PiSharp.Durable.Chord;
@@ -1188,9 +1190,11 @@ public interface IConversation
     /// </summary>
     Task WaitForIdleAsync(DurableContext context);
     /// <summary>The structural view (spec §9.3) as a serialized watch, Chord's <see cref="IWatchHandle{T}"/>; commits made while its
-    /// listener runs arrive folded; cancelling <paramref name="context"/> ends it aborted. Built on the same mount as
+    /// listener runs arrive folded; cancelling <paramref name="context"/> ends it aborted. Its <see cref="ConversationView.Entries"/> are a
+    /// window over the transcript, as <paramref name="window"/> says: the newest 50 by default, then appends, dropping the oldest past 100;
+    /// bounds out of range fault the task with <see cref="ArgumentOutOfRangeException"/>. Built on the same mount as
     /// <see cref="IHarness.ObserveConversationAsync"/>.</summary>
-    Task<IWatchHandle<ConversationView>> WatchAsync(DurableContext context);
+    Task<IWatchHandle<ConversationView>> WatchAsync(DurableContext context, ConversationWindow? window = null);
 }
 
 /// <summary>Bounds of <see cref="IConversation.EntriesAsync"/> (upstream <c>Omit&lt;EntryQuery, "conversationId"&gt;</c>).</summary>
@@ -1258,9 +1262,11 @@ public interface IHarness : ISession
     /// Attaches a synchronous <see cref="Observer{T}"/> to a conversation's structural view (spec §9.3), atomically on the Session line, for
     /// adapters: it gets each next revision with its operations as memory adopts the commit, at the publication once Storage stored a
     /// stored one and before it is stored for a deferred one, so it only records it. <paramref name="context"/> governs only the
-    /// attachment. A closed Harness or an unknown conversation faults the task; the call never throws.
+    /// attachment. <paramref name="window"/> as for <see cref="IConversation.WatchAsync"/>; each observer has its own. A closed Harness, an
+    /// unknown conversation or window bounds out of range fault the task; the call never throws.
     /// </summary>
-    Task<Observation<ConversationView>> ObserveConversationAsync(ConversationId id, Observer<ConversationView> observer, DurableContext context);
+    Task<Observation<ConversationView>> ObserveConversationAsync(ConversationId id, Observer<ConversationView> observer, DurableContext context,
+        ConversationWindow? window = null);
     /// <summary>
     /// Attaches a synchronous <see cref="Observer{T}"/> to the task graph (spec §9.5), as <see cref="ObserveConversationAsync"/> does to a
     /// view. A <c>blocked</c> reason that changes without a commit (a registry change, a failed migration) advances it on the Session line
