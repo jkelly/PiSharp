@@ -14,6 +14,8 @@
 // kept a state beside the watches use watches alone (renamed with them), a close ends a watch Ended and a listener takes one value call.
 // Chord's Watch folds the commits made while a listener is not yet started, so the 101-commit case takes upstream d8d99950a's expectation
 // (work list area watch-folding): one call whose ops reach the newest view.
+// Pi v1.5.0 sync (area deferred-commits, e5c6182ba's deferred attempt): "publishes one frame per touching commit ..." expects one frame
+// more than the stored commits that touch the view: the attempt is a deferred commit, stored with the answer.
 using System.Collections.Immutable;
 using PiSharp.Durable;
 using PiSharp.Durable.Chord;
@@ -185,7 +187,8 @@ internal static partial class ViewTests
             await harness.WaitForIdleAsync(Context);
             await Drained(harness);
             var all = frames.Snapshot();
-            Equal(touching(), all.Count, "frames");
+            // One frame per stored commit, and one for the attempt, a deferred commit stored with the answer.
+            Equal(touching() + 1, all.Count, "frames");
             SameView(Replay(initial, all), await Fresh(root), "replayed");
             Check(JsonValue.DeepEquals(Replay(initial, all), await Committed(harness, root, initial.Conversation)), "replay equals committed state");
             Check(all[0].Ops.Any(op => op is SpliceOp { Index: 0, Remove: 0, Items: [JsonObjectValue { } item] } splice &&

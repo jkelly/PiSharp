@@ -7,7 +7,11 @@
 // Spec sections (upstream packages/durable/docs/spec.md) each scenario covers:
 // - chat: §1 invariants 1-3 (atomic commit, commit before show, all visible progress durable); §8.3 generation recovery in each phase:
 //   prepare reruns, request resends the pinned request, a committed partial becomes an aborted entry, retry resumes its backoff, a
-//   committed answer is final. The turn finishes with exactly one answer and one user entry.
+//   committed answer is final. The turn finishes with exactly one answer and one user entry. Pi v1.5.0 sync (area deferred-commits):
+//   partials are deferred (durable@1.5.0 Breaking Changes#10, "visible progress" is now durable within settings.progress.persistWithinMs),
+//   so chat.stream kills while a partial is only in memory (the child's window never ends) and leaves no aborted entry, as upstream's
+//   harness-deferred-progress.test.ts "leaves no aborted entry for a stream that crashed before its first store" does; chat.stream-stored
+//   kills right after a stored partial (a short window) and converts it into exactly one aborted entry.
 // - tool-unsafe / tool-safe: §5.2 effect sandwich; §8.4 tool recovery: before intent the call phase reruns, after intent a non-replay-safe
 //   call is never rerun and settles with the interrupted result, a replay-safe call reruns exactly once; §8.5 the tools phase reruns
 //   before its commit and resumes after a result commit. The run continues to a final answer.
@@ -71,7 +75,8 @@ internal static class CrashTests
         // Generation phases of a chat turn: prepare, request, a streaming partial, retry, and either side of the answer commit.
         new("chat", "prepare", r => ChatTurn(r, fauxCalls: 1)),
         new("chat", "request", r => ChatTurn(r, fauxCalls: 1)),
-        new("chat", "stream", r => ChatTurn(r, fauxCalls: null)),
+        new("chat", "stream", r => ChatTurn(r, fauxCalls: 1, aborted: 0)),
+        new("chat", "stream-stored", r => ChatTurn(r, fauxCalls: 1, aborted: 1)),
         new("chat", "retry", r => ChatTurn(r, fauxCalls: 1, errors: 1)),
         new("chat", "answer-before", r => ChatTurn(r, fauxCalls: 1)),
         new("chat", "answer-after", r => ChatTurn(r, fauxCalls: 0)),
@@ -319,17 +324,16 @@ internal static class CrashTests
         }
     }
 
-    private static async Task ChatTurn(Recovery recovery, int? fauxCalls, int errors = 0)
+    private static async Task ChatTurn(Recovery recovery, int fauxCalls, int errors = 0, int aborted = 0)
     {
         await recovery.Idle();
         await Answered(recovery, "go");
         var (_, answers, all) = await Transcript(recovery);
         Equal("answer: go" + Padding, Text(answers[0]), "answer");
         Equal(errors, all.Count(entry => entry.Kind == "pi.assistant" && StopReason(entry) == "error"), "error entries");
-        // A partial committed before the kill is converted into at most one aborted entry.
-        Check(all.Count(entry => entry.Kind == "pi.assistant" && StopReason(entry) == "aborted") <= 1, "at most one converted partial");
-        if (fauxCalls is { } calls) Equal(calls, recovery.FauxCalls, "requests after reopen");
-        else Check(recovery.FauxCalls <= 1, "at most one request after reopen");
+        // A partial stored before the kill is converted into one aborted entry; one only in memory leaves none.
+        Equal(aborted, all.Count(entry => entry.Kind == "pi.assistant" && StopReason(entry) == "aborted"), "converted partials");
+        Equal(fauxCalls, recovery.FauxCalls, "requests after reopen");
     }
 
     private static async Task ToolTurn(Recovery recovery, int runs, bool interrupted, int fauxCalls)

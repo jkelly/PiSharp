@@ -30,6 +30,12 @@
 //   sync (area harness-options): Terminate false is stored as given, as upstream's `terminate?: boolean` is (#10858).
 // - Pi v1.5.0 sync (area reports): a model-issued call's broken structured output is reported as the extension_error of the extension
 //   that provides or wraps the tool (toolExtension; a30c2a81d); a failed agent resolution leaves the name out.
+// - Pi v1.5.0 sync (area deferred-commits, 6c2fd73b0): progress commits are deferred (Live.ProgressCommit), and api.CommitAsync takes
+//   CommitOptions; the intent's slot status and a nested slot's arguments (assigned whole) are a deferred commit of their own beside the
+//   state-only intent commit, and a safe rerun shows the slot running with its arguments again (e5c6182ba, durable@1.5.0 Changed#5).
+//   PiSharp-only order: the intent commits first and the slot commit follows (upstream's slot commit comes first), so the agent event
+//   projection (Events.cs, which upstream removed with watchEvents) has the arguments a tool_execution_start carries when the slot turns
+//   running. Storage gets the same either way: the intent at once, the held slot change with the next commit that reads or writes pi.live.
 using System.Collections.Immutable;
 using System.Diagnostics;
 using System.Globalization;
@@ -171,14 +177,11 @@ internal static class ToolPhases
             return;
         }
         var final = validated.Args!;
-        await runtime.CommitAsync(async (tx, _) =>
+        // The intent is durable before the tool runs; the slot's status and arguments are presentation, stored like progress
+        // (Live.ProgressCommit). Parallel calls of one round then share no immediate write to pi.live. Upstream commits the slot first; the
+        // intent goes first here so the agent events read its arguments when the slot turns running (see the file header).
+        await runtime.CommitAsync((_, _) =>
         {
-            var slot = Live.ToolSlot(await tx.DocAsync(Live.LiveDoc, runtime.ConversationId).ConfigureAwait(false), runtime.TaskId);
-            slot?.Set("status", "running");
-            // A nested slot shows the arguments the call runs with, which repair, hooks, and coercion may have changed. Compared with the
-            // input, which the slot got at admission.
-            var changed = input.Nested && !JsonValue.DeepEquals(input.Call!["arguments"], final);
-            if (changed && slot is not null && Live.IsNested(slot)) slot.Set("arguments", final);
             var intent = new RecordJson.Writer()
                 .Add("phase", "execute")
                 .Add("arguments", final)
@@ -186,6 +189,14 @@ internal static class ToolPhases
                 .Build();
             return (TaskState?)NextTaskState.Running(intent);
         }, context).ConfigureAwait(false);
+        await runtime.CommitAsync(async (tx, _) =>
+        {
+            var slot = Live.ToolSlot(await tx.DocAsync(Live.LiveDoc, runtime.ConversationId).ConfigureAwait(false), runtime.TaskId);
+            slot?.Set("status", "running");
+            // A nested slot shows the arguments the call runs with, which repair, hooks, and coercion may have changed. Assigned whole: an
+            // equal value records no change, and a rerun corrects what an earlier attempt showed.
+            if (slot is not null && Live.IsNested(slot)) slot.Set("arguments", final);
+        }, context, Live.ProgressCommit).ConfigureAwait(false);
         await RunAsync(runtime, input, call, tool, final, context).ConfigureAwait(false);
     }
 
@@ -201,11 +212,16 @@ internal static class ToolPhases
         var tool = await ResolveToolAsync(runtime, input, name, context).ConfigureAwait(false);
         if (replay == "safe" && tool?.Replay == ToolReplay.Safe)
         {
-            // The rerun reports from scratch; clear what the interrupted attempt published.
+            // The rerun reports from scratch: clear what the interrupted attempt published, and show the slot running with the arguments it
+            // runs with again, as the deferred commit that showed them may have been lost with the crash.
             await runtime.CommitAsync(async (tx, _) =>
             {
                 if (Live.ToolSlot(await tx.DocAsync(Live.LiveDoc, runtime.ConversationId).ConfigureAwait(false), runtime.TaskId) is { } slot)
+                {
                     Live.ClearProgress(slot);
+                    slot.Set("status", "running");
+                    if (Live.IsNested(slot)) slot.Set("arguments", args);
+                }
             }, context).ConfigureAwait(false);
             await RunAsync(runtime, input, call, tool, args, context).ConfigureAwait(false);
             return;
@@ -385,7 +401,8 @@ internal static class ToolPhases
     }
 
     /// <summary>Throttled commits of what the tool reported into its slot, in <c>pi.live.tools</c> or <c>pi.live.nestedTools</c>, each
-    /// writing only what changed since the last one; none when <paramref name="enabled"/> is false (upstream <c>publishProgress</c>).</summary>
+    /// writing only what changed since the last one, deferred (<see cref="Live.ProgressCommit"/>); none when <paramref name="enabled"/> is
+    /// false (upstream <c>publishProgress</c>).</summary>
     private static Progress PublishProgress(ITaskRuntime runtime, ToolReport reported, bool enabled, DurableContext context)
     {
         var written = (Text: "", Details: (JsonValue?)null, Diagnostics: 0);
@@ -429,7 +446,7 @@ internal static class ToolPhases
                         var diagnostics = slot.GetArray("diagnostics");
                         foreach (var diagnostic in added) diagnostics.Add(ToolResults.DiagnosticJson(diagnostic));
                     }
-                }, context).ConfigureAwait(false);
+                }, context, Live.ProgressCommit).ConfigureAwait(false);
                 written = (snapshot.Text, details, count);
                 return bytes;
             }
@@ -1162,18 +1179,18 @@ internal sealed class ToolExecutionApi : IToolExecutionApi
         }
     }
 
-    public async Task<T> CommitAsync<T>(Func<ITx, Task<T>> change, DurableContext context)
+    public async Task<T> CommitAsync<T>(Func<ITx, Task<T>> change, DurableContext context, CommitOptions? options = null)
     {
         ArgumentNullException.ThrowIfNull(change);
         T result = default!;
-        await runtime.CommitAsync(async (tx, _) => { result = await change(tx).ConfigureAwait(false); }, context).ConfigureAwait(false);
+        await runtime.CommitAsync(async (tx, _) => { result = await change(tx).ConfigureAwait(false); }, context, options).ConfigureAwait(false);
         return result;
     }
 
-    public Task CommitAsync(Func<ITx, Task> change, DurableContext context)
+    public Task CommitAsync(Func<ITx, Task> change, DurableContext context, CommitOptions? options = null)
     {
         ArgumentNullException.ThrowIfNull(change);
-        return runtime.CommitAsync(async (tx, _) => await change(tx).ConfigureAwait(false), context);
+        return runtime.CommitAsync(async (tx, _) => await change(tx).ConfigureAwait(false), context, options);
     }
 
     public Task<JsonValue?> MemoAsync(string name, DurableContext context) => runtime.MemoAsync(name, context);
@@ -1327,9 +1344,11 @@ public class DelegatingToolExecutionApi(IToolExecutionApi inner) : IToolExecutio
     /// <inheritdoc/>
     public virtual Task DetailsAsync(JsonValue value, DurableContext context) => Inner.DetailsAsync(value, context);
     /// <inheritdoc/>
-    public virtual Task<T> CommitAsync<T>(Func<ITx, Task<T>> change, DurableContext context) => Inner.CommitAsync(change, context);
+    public virtual Task<T> CommitAsync<T>(Func<ITx, Task<T>> change, DurableContext context, CommitOptions? options = null) =>
+        Inner.CommitAsync(change, context, options);
     /// <inheritdoc/>
-    public virtual Task CommitAsync(Func<ITx, Task> change, DurableContext context) => Inner.CommitAsync(change, context);
+    public virtual Task CommitAsync(Func<ITx, Task> change, DurableContext context, CommitOptions? options = null) =>
+        Inner.CommitAsync(change, context, options);
     /// <inheritdoc/>
     public virtual Task<JsonValue?> MemoAsync(string name, DurableContext context) => Inner.MemoAsync(name, context);
     /// <inheritdoc/>

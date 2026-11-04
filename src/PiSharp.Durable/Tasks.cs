@@ -11,7 +11,7 @@ using PiSharp.Durable.Internal;
 
 namespace PiSharp.Durable;
 
-/// <summary>Runs one checkpoint phase. It must commit a changed checkpoint or a terminal outcome through <see cref="ITaskRuntime.CommitAsync(Func{ITx, RunningTask, Task{TaskState?}}, DurableContext)"/>;
+/// <summary>Runs one checkpoint phase. It must commit a changed checkpoint or a terminal outcome through <see cref="ITaskRuntime.CommitAsync(Func{ITx, RunningTask, Task{TaskState?}}, DurableContext, CommitOptions?)"/>;
 /// returning without durable progress faults the task (upstream <c>PhaseHandler</c>).</summary>
 public delegate Task TaskPhaseHandler(RunningTask task, ITaskRuntime runtime, DurableContext context);
 

@@ -18,7 +18,14 @@
 // #observeDocument with createWatch and endWatch): a retirement is a retired call with the last value and no ops, a later incarnation
 // arrives as [["r", value]], the current incarnation is pinned (nothing while the address is absent), and a task document's watch ends
 // ended after the retirement call of the commit that makes its task terminal. Its value is never null. The synchronous observers
-// (observeDoc, area observers) and publication at adoption are not here yet.
+// (observeDoc, area observers) and publication at adoption are not here yet. Pi v1.5.0 sync (area deferred-commits, 6c2fd73b0): a commit
+// takes CommitOptions. A deferred one (CommitPersistence) that only changes existing latest, initial-fork conversation documents is held:
+// adopted in memory and shown to the Session's own observers (ObservedCommit "memory", which watches and views follow), its operations
+// queued per incarnation (Hold, Chord's PendingOps) and the document pinned in the cache. The first commit that reads or writes the document
+// stores them in front of its own (Transaction.TakeHeld); otherwise they are stored, every held document in one storage transaction, at the
+// earliest deadline (one foreground timer), at close after the writes at close, by UnloadDocumentsAsync, and before a token of another
+// definition version reloads the document. SubscribeCommits sees each storage transaction with exactly what it stored, so its seq has
+// gaps; a failed Session stores nothing more.
 //
 // Concurrency model. Upstream relies on one JavaScript thread: `#enqueue` chains every mutation and cold load onto one promise, and
 // listeners run in later microtasks. Here .NET callers may be on any thread, so:
@@ -83,6 +90,13 @@ public class Session : ISession
     private readonly Func<double> now;
     private readonly Func<double> clock;
     private readonly Func<double> documentRetentionMs;
+    private readonly Func<double> persistWithinMs;
+    // Documents with held changes, by incarnation (record ID), in the order they were first held; each is pinned in the cache until they are
+    // stored. Changed on the line only; guarded by holdsGate, as DocumentCacheSizes reads it off the line.
+    private readonly Lock holdsGate = new();
+    private readonly OrderedDictionary<DocumentId, Hold> holds = [];
+    // The armed store of held documents. Guarded by holdsGate.
+    private HoldTimer? holdTimer;
     private readonly HostTimers timers;
     /// <summary>Refuse every commit with writes (<see cref="HarnessOptions.ReadOnly"/>).</summary>
     private readonly bool readOnly;
@@ -102,7 +116,7 @@ public class Session : ISession
     private readonly Lock listenersGate = new();
     private readonly List<Action<CommitPublication, DurableContext>> commitListeners = [];
     // The Session's own listeners, such as its scheduler's: they keep memory in step with storage, so a throw fails it.
-    private readonly List<Action<CommitPublication, DurableContext>> internalListeners = [];
+    private readonly List<Action<ObservedCommit, DurableContext>> internalListeners = [];
     private readonly List<Action> closeListeners = [];
     private readonly SessionLine line = new();
     private readonly Host host;
@@ -119,9 +133,10 @@ public class Session : ISession
     /// <summary>Opens a Session kernel over <paramref name="storage"/>; <paramref name="now"/> is the wall clock for task times in milliseconds
     /// (default: the system clock); <paramref name="documentRetentionMs"/> is read at each use (null: the default). A
     /// <paramref name="readOnly"/> Session refuses every commit with writes before it reaches Storage. <paramref name="setTimer"/> arms the
-    /// timers that evict idle documents; default the timers of <paramref name="timeProvider"/>, or of the system.</summary>
+    /// timers that evict idle documents and store held commits; default the timers of <paramref name="timeProvider"/>, or of the system.
+    /// <paramref name="persistWithinMs"/> is the default window of a deferred commit, read at each use (null: 1,000 ms).</summary>
     internal Session(IStorage storage, Func<double>? now = null, Func<double?>? documentRetentionMs = null, bool readOnly = false,
-        SetTimer? setTimer = null, TimeProvider? timeProvider = null)
+        SetTimer? setTimer = null, TimeProvider? timeProvider = null, Func<double?>? persistWithinMs = null)
     {
         ArgumentNullException.ThrowIfNull(storage);
         this.readOnly = readOnly;
@@ -145,6 +160,12 @@ public class Session : ISession
             try { return DocumentRetention(retention()); }
             catch (Exception) { return DocumentRetention(null); }
         };
+        var within = persistWithinMs ?? (() => null);
+        this.persistWithinMs = () =>
+        {
+            try { return PersistWithin(within()); }
+            catch (Exception) { return PersistWithin(null); }
+        };
         timers = new HostTimers(setTimer, timeProvider is null ? NativeTimer.System : NativeTimer.Of(timeProvider),
             error => Report(error, ReportInfo.HostError(HostCallback.SetTimer)));
         host = new Host(this);
@@ -154,9 +175,12 @@ public class Session : ISession
     /// task times in milliseconds; default the system clock. <paramref name="documentRetentionMs"/> is how long an unobserved document stays
     /// cached after its last use (see <see cref="HarnessSettings.DocumentRetentionMs"/>); default ten minutes. <paramref name="setTimer"/> arms
     /// the timers that evict idle documents; default .NET timers (see <see cref="HarnessOptions.SetTimer"/>). The first exception a Storage
-    /// method throws fails the Session (<see cref="SessionFailedException"/>).</summary>
-    public static ISession Create(IStorage storage, Func<double>? now = null, double? documentRetentionMs = null, SetTimer? setTimer = null) =>
-        new Session(storage, now, documentRetentionMs is { } retention ? () => retention : null, setTimer: setTimer);
+    /// method throws fails the Session (<see cref="SessionFailedException"/>). <paramref name="persistWithinMs"/> is the default
+    /// <see cref="CommitPersistence.WithinMs"/> of a deferred commit; default 1,000 ms.</summary>
+    public static ISession Create(IStorage storage, Func<double>? now = null, double? documentRetentionMs = null, SetTimer? setTimer = null,
+        double? persistWithinMs = null) =>
+        new Session(storage, now, documentRetentionMs is { } retention ? () => retention : null, setTimer: setTimer,
+            persistWithinMs: () => persistWithinMs);
 
     /// <summary>Internal, for tests: the retention of every Session that keeps the default, as a suite run with eviction at once (upstream
     /// <c>setDefaultDocumentRetention</c>).</summary>
@@ -165,6 +189,14 @@ public class Session : ISession
     /// <summary>A retention as given, when it is a number of milliseconds, 0 or more (<see cref="double.PositiveInfinity"/> keeps documents);
     /// otherwise the default (upstream <c>documentRetention</c>).</summary>
     internal static double DocumentRetention(double? ms) => ms is { } value && value >= 0 ? value : Volatile.Read(ref defaultRetention);
+
+    /// <summary>Default <see cref="CommitPersistence.WithinMs"/> of a deferred commit, <see cref="ProgressSettings.PersistWithinMs"/>.</summary>
+    private const double DefaultPersistWithinMs = 1_000;
+
+    /// <summary>A deferred commit's default window as given, when it is a number of milliseconds, 0 or more
+    /// (<see cref="double.PositiveInfinity"/> waits for a reading or writing commit or close); otherwise the default (upstream
+    /// <c>persistWithin</c>).</summary>
+    internal static double PersistWithin(double? ms) => ms is { } value && value >= 0 ? value : DefaultPersistWithinMs;
 
     private static double SystemClock() => DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
 
@@ -233,70 +265,89 @@ public class Session : ISession
     // ─── Commits ────────────────────────────────────────────────────────────
 
     /// <inheritdoc/>
-    public Task<T> CommitAsync<T>(Func<ITx, Task<T>> change, DurableContext context)
+    public Task<T> CommitAsync<T>(Func<ITx, Task<T>> change, DurableContext context, CommitOptions? options = null)
     {
         ArgumentNullException.ThrowIfNull(change);
-        return CommitWithAsync(tx => change(tx), context);
+        return CommitWithAsync(tx => change(tx), context, null, options);
     }
 
     /// <inheritdoc/>
-    public Task CommitAsync(Func<ITx, Task> change, DurableContext context)
+    public Task CommitAsync(Func<ITx, Task> change, DurableContext context, CommitOptions? options = null)
     {
         ArgumentNullException.ThrowIfNull(change);
         return CommitWithAsync(async tx =>
         {
             await change(tx).ConfigureAwait(false);
             return true;
-        }, context);
+        }, context, null, options);
     }
 
     /// <inheritdoc/>
-    public Task<T> CommitAsync<T>(Func<ITx, T> change, DurableContext context)
+    public Task<T> CommitAsync<T>(Func<ITx, T> change, DurableContext context, CommitOptions? options = null)
     {
         ArgumentNullException.ThrowIfNull(change);
-        return CommitWithAsync(tx => Task.FromResult(change(tx)), context);
+        return CommitWithAsync(tx => Task.FromResult(change(tx)), context, null, options);
     }
 
     /// <inheritdoc/>
-    public Task CommitAsync(Action<ITx> change, DurableContext context)
+    public Task CommitAsync(Action<ITx> change, DurableContext context, CommitOptions? options = null)
     {
         ArgumentNullException.ThrowIfNull(change);
         return CommitWithAsync(tx =>
         {
             change(tx);
             return Task.FromResult(true);
-        }, context);
+        }, context, null, options);
     }
 
     /// <summary>
     /// Internal commit exposing the concrete transaction and its internal operations, such as the reserved-ID root bootstrap and task
     /// replacement (upstream <c>commitWith</c>). <paramref name="scope"/> sets the default <c>CreateTaskAsync</c> conversation and the task
-    /// attributed to appended entries.
+    /// attributed to appended entries. <paramref name="options"/> may defer storing it (<see cref="CommitPersistence"/>).
     /// </summary>
-    internal Task<T> CommitWithAsync<T>(Func<Transaction, Task<T>> change, DurableContext context, TransactionScope? scope = null)
+    internal Task<T> CommitWithAsync<T>(Func<Transaction, Task<T>> change, DurableContext context, TransactionScope? scope = null,
+        CommitOptions? options = null)
     {
         ArgumentNullException.ThrowIfNull(change);
         ArgumentNullException.ThrowIfNull(context);
-        try { AssertUsable(); }
+        double? withinMs;
+        try
+        {
+            AssertUsable();
+            withinMs = Deferral(options?.Persistence);
+        }
         catch (Exception error) { return Task.FromException<T>(error); }
-        return line.Enqueue(() => RunCommitAsync(change, context, scope));
+        return line.Enqueue(() => RunCommitAsync(change, context, scope, withinMs));
     }
 
     /// <summary>Internal: <see cref="CommitWithAsync{T}"/> for an asynchronous callback without a result.</summary>
-    internal Task CommitWithAsync(Func<Transaction, Task> change, DurableContext context, TransactionScope? scope = null) =>
+    internal Task CommitWithAsync(Func<Transaction, Task> change, DurableContext context, TransactionScope? scope = null,
+        CommitOptions? options = null) =>
         CommitWithAsync(async tx =>
         {
             await change(tx).ConfigureAwait(false);
             return true;
-        }, context, scope);
+        }, context, scope, options);
 
     /// <summary>Internal: <see cref="CommitWithAsync{T}"/> for a synchronous callback without a result.</summary>
-    internal Task CommitWithAsync(Action<Transaction> change, DurableContext context, TransactionScope? scope = null) =>
+    internal Task CommitWithAsync(Action<Transaction> change, DurableContext context, TransactionScope? scope = null,
+        CommitOptions? options = null) =>
         CommitWithAsync(tx =>
         {
             change(tx);
             return Task.FromResult(true);
-        }, context, scope);
+        }, context, scope, options);
+
+    /// <summary>How long a commit may stay in memory before it is stored; null when it is immediate (upstream <c>#deferral</c>).</summary>
+    private double? Deferral(CommitPersistence? persistence)
+    {
+        if (persistence is not { Kind: CommitPersistenceKind.Deferred }) return null;
+        if (persistence.WithinMs is not { } ms) return persistWithinMs();
+        // Public options: checked here, as the types cannot (upstream's TypeError).
+        if (!(ms >= 0))
+            throw new ArgumentOutOfRangeException(nameof(persistence), ms, "CommitPersistence.WithinMs must be a number of milliseconds, 0 or more");
+        return ms;
+    }
 
     /// <summary>Internal: runs a read-only job on the mutation line so multi-read derivations observe one committed state.</summary>
     internal Task<T> ReadOnLineAsync<T>(Func<Task<T>> job)
@@ -518,6 +569,15 @@ public class Session : ISession
             await BeforeCloseAsync().ConfigureAwait(false);
             await line.Enqueue(async () =>
             {
+                // Last, after the writes at close (BeforeCloseAsync), while the trackers are still here. A failed Session writes nothing; a
+                // failing store fails it, and the backend still closes.
+                ExceptionDispatchInfo? unstored = null;
+                // Only with something to store: otherwise the backend's close begins in this very job.
+                if (failure is null && HeldDocuments() is { Count: > 0 } held)
+                {
+                    try { await StoreHoldsAsync(held, cleanup).ConfigureAwait(false); }
+                    catch (Exception error) { unstored = ExceptionDispatchInfo.Capture(error); }
+                }
                 lock (listenersGate)
                 {
                     commitListeners.Clear();
@@ -530,6 +590,7 @@ public class Session : ISession
                     idleIndex.Clear();
                     attachedDocuments.Clear();
                 }
+                lock (holdsGate) holds.Clear();
                 try
                 {
                     await storage.CloseAsync(cleanup).ConfigureAwait(false);
@@ -540,6 +601,7 @@ public class Session : ISession
                     if (TrySetFailure(error)) Report(error, ReportInfo.StorageFailed);
                     throw;
                 }
+                unstored?.Throw();
                 return true;
             }).ConfigureAwait(false);
         }
@@ -559,6 +621,13 @@ public class Session : ISession
             documentSweep = null;
         }
         if (disarm is not null) Contained(disarm, SetTimerError);
+        Action? disarmHolds;
+        lock (holdsGate)
+        {
+            disarmHolds = holdTimer?.Disarm;
+            holdTimer = null;
+        }
+        if (disarmHolds is not null) Contained(disarmHolds, SetTimerError);
         foreach (var listener in listeners) Contained(listener, Report);
     }
 
@@ -587,21 +656,21 @@ public class Session : ISession
     }
 
     /// <summary>
-    /// Internal: <see cref="SubscribeCommits(Action{CommitPublication, DurableContext})"/> for the Session's own components, whose state follows
-    /// each commit (upstream <c>observeCommits</c>). A throw leaves that state behind storage, so it fails the Session instead of being
-    /// reported. They run before host listeners.
+    /// Internal: observes every commit as memory adopts it (<see cref="ObservedCommit"/>), for the Session's own components, whose state
+    /// follows memory (upstream <c>observeCommits</c>). A throw leaves that state behind, so it fails the Session instead of being reported.
+    /// They run before host listeners.
     /// </summary>
-    internal IDisposable ObserveCommits(Action<CommitPublication, DurableContext> listener)
+    internal IDisposable ObserveCommits(Action<ObservedCommit, DurableContext> listener)
     {
         ArgumentNullException.ThrowIfNull(listener);
         return Subscribe(internalListeners, listener);
     }
 
-    private Unsubscriber Subscribe(List<Action<CommitPublication, DurableContext>> listeners, Action<CommitPublication, DurableContext> listener)
+    private Unsubscriber Subscribe<TPublication>(List<Action<TPublication, DurableContext>> listeners, Action<TPublication, DurableContext> listener)
     {
         AssertUsable();
         // A distinct wrapper per subscription, so two subscriptions of one delegate are independent and removal is exact.
-        Action<CommitPublication, DurableContext> entry = (publication, context) => listener(publication, context);
+        Action<TPublication, DurableContext> entry = (publication, context) => listener(publication, context);
         lock (listenersGate) listeners.Add(entry);
         return new Unsubscriber(() =>
         {
@@ -636,25 +705,29 @@ public class Session : ISession
     /// </summary>
     internal StorageLease HoldStorageOpen() => guard.Lease();
 
-    /// <summary>Internal: drops every loaded tracker on the mutation line; later access cold-loads from Storage.</summary>
-    internal Task UnloadDocumentsAsync() => line.Enqueue(() =>
+    /// <summary>Internal: drops every loaded tracker on the mutation line, held changes stored first; later access cold-loads from
+    /// Storage.</summary>
+    internal Task UnloadDocumentsAsync() => line.Enqueue(async () =>
     {
+        if (failure is null) await StoreHoldsAsync(HeldDocuments(), DurableContext.Background).ConfigureAwait(false);
         lock (documentsGate)
         {
             documents.Clear();
             idleDocuments.Clear();
             idleIndex.Clear();
         }
-        return Task.FromResult(true);
+        return true;
     });
 
-    /// <summary>Internal, for tests: how many documents the cache holds, how many are idle, how many incarnations are pinned, and how many
-    /// sweep jobs were queued on the line so far (upstream <c>documentCacheSizes</c>).</summary>
-    internal (int Cached, int Idle, int Attached, int Sweeps) DocumentCacheSizes
+    /// <summary>Internal, for tests: how many documents the cache holds, how many are idle, how many incarnations are pinned, how many
+    /// sweep jobs were queued on the line so far, and how many documents have held changes (upstream <c>documentCacheSizes</c>).</summary>
+    internal (int Cached, int Idle, int Attached, int Sweeps, int Held) DocumentCacheSizes
     {
         get
         {
-            lock (documentsGate) return (documents.Count, idleDocuments.Count, attachedDocuments.Count, sweepJobs);
+            int held;
+            lock (holdsGate) held = holds.Count;
+            lock (documentsGate) return (documents.Count, idleDocuments.Count, attachedDocuments.Count, sweepJobs, held);
         }
     }
 
@@ -804,7 +877,7 @@ public class Session : ISession
 
     // ─── The commit ─────────────────────────────────────────────────────────
 
-    private async Task<T> RunCommitAsync<T>(Func<Transaction, Task<T>> change, DurableContext context, TransactionScope? scope)
+    private async Task<T> RunCommitAsync<T>(Func<Transaction, Task<T>> change, DurableContext context, TransactionScope? scope, double? withinMs)
     {
         AssertHealthy();
         context.ThrowIfCancellationRequested();
@@ -846,6 +919,14 @@ public class Session : ISession
             SweepDocuments();
             throw new ReadOnlySessionException("a commit with writes");
         }
+        if (withinMs is { } within && tx.Holdable() is { } held)
+        {
+            HoldCommit(tx, held, within, context);
+            SweepDocuments();
+            return result;
+        }
+        // The last step before Storage: held changes leave their queue only once nothing but Storage can fail.
+        var taken = HoldCount == 0 ? NoHolds : tx.TakeHeld<Hold>(id => holds.GetValueOrDefault(id));
         Seq? received = null;
         CommitResult committed;
         try
@@ -869,7 +950,7 @@ public class Session : ISession
             ExceptionDispatchInfo.Throw(refusal);
             throw refusal;
         }
-        List<ICommitChange> documentChanges;
+        AdoptedDocuments documentChanges;
         try
         {
             documentChanges = tx.Adopt(seq);
@@ -880,7 +961,8 @@ public class Session : ISession
             Fail(error);
             throw;
         }
-        foreach (var adopted in documentChanges)
+        if (taken.Count > 0) Release(taken);
+        foreach (var adopted in documentChanges.Stored)
         {
             var record = adopted switch
             {
@@ -895,7 +977,7 @@ public class Session : ISession
         return result;
     }
 
-    private void Publish(Seq seq, IReadOnlyList<StorageWrite> writes, List<ICommitChange> documentChanges, DurableContext context)
+    private void Publish(Seq seq, IReadOnlyList<StorageWrite> writes, AdoptedDocuments documentChanges, DurableContext context)
     {
         // Its telemetry events first, listeners or not.
         foreach (var write in writes)
@@ -910,7 +992,7 @@ public class Session : ISession
                     ["answer.entry_id"] = submission.Answer?.Value,
                 }, context);
         }
-        Action<CommitPublication, DurableContext>[] internals;
+        Action<ObservedCommit, DurableContext>[] internals;
         Action<CommitPublication, DurableContext>[] listeners;
         lock (listenersGate)
         {
@@ -921,19 +1003,195 @@ public class Session : ISession
         var changes = new List<ICommitChange>();
         foreach (var write in writes)
             if (write is ICommitChange change) changes.Add(change);
-        changes.AddRange(documentChanges);
-        var publication = new CommitPublication(seq, changes);
+        var tables = changes.Count;
+        changes.AddRange(documentChanges.Observed);
+        var observed = ObservedCommit.Stored(seq, changes);
+        // One list for both, unless the commit also stored held changes, which only durable listeners get.
+        var stored = ReferenceEquals(documentChanges.Stored, documentChanges.Observed)
+            ? new CommitPublication(seq, changes)
+            : new CommitPublication(seq, [.. changes.Take(tables), .. documentChanges.Stored]);
         lock (deferGate) deferred = [];
         try
         {
             // The commit is durable: a failing listener neither fails the commit nor skips the others.
-            foreach (var listener in internals) Contained(() => listener(publication, context), error => Fail(error, context));
-            foreach (var listener in listeners) Contained(() => listener(publication, context), error => Report(error, ReportInfo.ListenerError, context));
+            foreach (var listener in internals) Contained(() => listener(observed, context), error => Fail(error, context));
+            foreach (var listener in listeners) Contained(() => listener(stored, context), error => Report(error, ReportInfo.ListenerError, context));
         }
         finally
         {
             RunDeferred();
         }
+    }
+
+    // ─── Held commits ───────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Holds a deferred commit (<see cref="Transaction.Holdable"/>; upstream <c>#hold</c>): adopts it in memory, queues its changes per
+    /// document, pinned, by the earliest deadline of the document's held commits, and shows it to the Session's own observers.
+    /// </summary>
+    private void HoldCommit(Transaction tx, List<HeldChange> held, double withinMs, DurableContext context)
+    {
+        var documentChanges = tx.AdoptHeld();
+        var deadline = clock() + withinMs;
+        foreach (var (loaded, ops, isBase) in held)
+        {
+            var id = loaded.Record.Id;
+            if (!holds.TryGetValue(id, out var hold))
+            {
+                hold = new Hold(loaded, deadline, PinDocument(loaded.AddressId, id));
+                lock (holdsGate) holds.Add(id, hold);
+            }
+            hold.Pending.Push(ops);
+            if (isBase) hold.Base = true;
+            if (deadline < hold.Deadline) hold.Deadline = deadline;
+        }
+        ArmHoldTimer();
+        Action<ObservedCommit, DurableContext>[] internals;
+        lock (listenersGate) internals = [.. internalListeners];
+        if (internals.Length == 0) return;
+        var publication = ObservedCommit.Memory(documentChanges);
+        lock (deferGate) deferred = [];
+        try
+        {
+            foreach (var listener in internals) Contained(() => listener(publication, context), error => Fail(error, context));
+        }
+        finally
+        {
+            RunDeferred();
+        }
+    }
+
+    /// <summary>On the line: the held documents, in the order they were first held.</summary>
+    private List<Hold> HeldDocuments()
+    {
+        lock (holdsGate) return [.. holds.Values];
+    }
+
+    private int HoldCount
+    {
+        get { lock (holdsGate) return holds.Count; }
+    }
+
+    /// <summary>
+    /// Stores the held changes of <paramref name="held"/> in one storage transaction, on the line (upstream <c>#storeHolds</c>). Memory
+    /// already has them, so only <c>SubscribeCommits</c> listeners see it. A failure fails the Session, as every Storage failure does.
+    /// </summary>
+    private async Task StoreHoldsAsync(IReadOnlyList<Hold> held, DurableContext context)
+    {
+        if (held.Count == 0) return;
+        var writes = new List<StorageWrite>(held.Count);
+        var changes = new List<ICommitChange>(held.Count);
+        foreach (var hold in held)
+        {
+            var loaded = hold.Loaded;
+            var value = loaded.Value;
+            var version = loaded.ValueVersion;
+            var (content, ops) = Transaction.StoreHeld(hold, NoOperations, value, version);
+            writes.Add(new DocumentChangeWrite(loaded.Record.Id, content));
+            // Held documents are conversation documents.
+            changes.Add(new DocumentCommitChange(loaded.Record, loaded.Record.Scope.ConversationId, version, value, ops));
+        }
+        var adopted = false;
+        void Adopt()
+        {
+            adopted = true;
+            for (var index = 0; index < held.Count; index++)
+            {
+                var loaded = held[index].Loaded;
+                if (((DocumentChangeWrite)writes[index]).Content is DocumentBase) loaded.DeltasSinceBase = 0;
+                else loaded.DeltasSinceBase++;
+            }
+        }
+        Seq? received = null;
+        // The guard fails the Session when Storage throws.
+        var committed = await storage.CommitAsync([writes], (_, stored) =>
+        {
+            received = stored;
+            Adopt();
+        }, context.WithoutCancellation()).ConfigureAwait(false);
+        if (!adopted || received is not { } seq)
+        {
+            var refusal = committed.Refused ?? new InvalidOperationException("Storage committed without adopting the batch");
+            Fail(refusal);
+            ExceptionDispatchInfo.Throw(refusal);
+            return;
+        }
+        Release(held);
+        Action<CommitPublication, DurableContext>[] listeners;
+        lock (listenersGate) listeners = [.. commitListeners];
+        var publication = new CommitPublication(seq, changes);
+        foreach (var listener in listeners) Contained(() => listener(publication, context), error => Report(error, ReportInfo.ListenerError, context));
+    }
+
+    /// <summary>After their store: forgets <paramref name="held"/>, unpins their documents, and moves the timer to the next deadline (upstream
+    /// <c>#release</c>).</summary>
+    private void Release(IReadOnlyList<Hold> held)
+    {
+        lock (holdsGate)
+            foreach (var hold in held) holds.Remove(hold.Loaded.Record.Id);
+        foreach (var hold in held) hold.Unpin();
+        ArmHoldTimer();
+    }
+
+    /// <summary>
+    /// On the line: keeps a foreground timer (<see cref="HarnessOptions.SetTimer"/>) for the earliest deadline of the held documents (upstream
+    /// <c>#armHoldTimer</c>). When it fires, every held document is stored, in one storage transaction: a deadline is the latest time, and
+    /// the others cost little more in the same transaction. Once fired, it stays until its job ran.
+    /// </summary>
+    private void ArmHoldTimer()
+    {
+        HoldTimer? armedTimer = null;
+        Action? replaced;
+        var delay = 0.0;
+        // Host code, read outside the lock.
+        var current = clock();
+        lock (holdsGate)
+        {
+            if (closingStarted) return;
+            var at = double.PositiveInfinity;
+            foreach (var hold in holds.Values)
+                if (hold.Deadline < at) at = hold.Deadline;
+            var armed = holdTimer;
+            if (armed is not null && (armed.Fired || armed.At == at)) return;
+            replaced = armed?.Disarm;
+            holdTimer = null;
+            if (!double.IsPositiveInfinity(at))
+            {
+                armedTimer = new HoldTimer(at);
+                holdTimer = armedTimer;
+                delay = Math.Max(0, at - current);
+            }
+        }
+        if (replaced is not null) Contained(replaced, SetTimerError);
+        if (armedTimer is not { } timer) return;
+        void Run()
+        {
+            lock (holdsGate) timer.Fired = true;
+            var stored = line.Enqueue(async () =>
+            {
+                lock (holdsGate)
+                    if (ReferenceEquals(holdTimer, timer)) holdTimer = null;
+                // Close stores what is held itself.
+                if (closingStarted || failure is not null) return true;
+                await StoreHoldsAsync(HeldDocuments(), DurableContext.Background).ConfigureAwait(false);
+                return true;
+            }, inline: false);
+            _ = stored.ContinueWith(static task => _ = task.Exception, CancellationToken.None,
+                TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
+        }
+        var disarm = timers.Foreground(Run, delay);
+        lock (holdsGate)
+        {
+            // Still the armed timer: keep its disarm.
+            if (ReferenceEquals(holdTimer, timer) && !closingStarted)
+            {
+                timer.Disarm = disarm;
+                return;
+            }
+            // Fired already (its job owns it now), or replaced or closed meanwhile.
+            if (timer.Fired) return;
+        }
+        Contained(disarm, SetTimerError);
     }
 
     /// <summary>At publication: records one of a commit's telemetry events (upstream <c>#event</c>). A throwing adapter is reported, as
@@ -1044,20 +1302,20 @@ public class Session : ISession
 
     private async Task<LoadedDocument?> LoadDocumentAsync(DocDefinition definition, string addressId, DocumentAddress address, DurableContext context)
     {
-        LoadedDocument? hit = null;
-        lock (documentsGate)
-        {
-            if (documents.TryGetValue(addressId, out var cached))
-            {
-                // A tracker serves only tokens of the version its value was materialized for; others reload from Storage.
-                if (cached.ValueVersion == definition.Version) hit = cached;
-                else DropDocumentLocked(addressId);
-            }
-        }
-        if (hit is not null)
+        LoadedDocument? cached;
+        lock (documentsGate) cached = documents.GetValueOrDefault(addressId);
+        // A tracker serves only tokens of the version its value was materialized for; others reload from Storage.
+        if (cached is not null && cached.ValueVersion == definition.Version)
         {
             TouchDocument(addressId);
-            return hit;
+            return cached;
+        }
+        if (cached is not null)
+        {
+            // The reload must find what memory holds: held changes are stored before their tracker goes. On the line, as every load is.
+            if (holds.GetValueOrDefault(cached.Record.Id) is { } hold) await StoreHoldsAsync([hold], context).ConfigureAwait(false);
+            lock (documentsGate)
+                if (documents.TryGetValue(addressId, out var current) && ReferenceEquals(current, cached)) DropDocumentLocked(addressId);
         }
         var record = await storage.FindDocumentAsync(address, DocumentPoint.Current, context).ConfigureAwait(false);
         if (record is null) return null;
@@ -1177,7 +1435,7 @@ public class Session : ISession
 
         private void Close() => watch?.End(CloseEnd(session.Failure));
 
-        private void Follow(CommitPublication publication, DurableContext context)
+        private void Follow(ObservedCommit publication, DurableContext context)
         {
             Action? released = null;
             IDisposable? commits = null;
@@ -1264,6 +1522,27 @@ public class Session : ISession
     /// <summary>The ops of a retirement call (upstream <c>NO_OPERATIONS</c>).</summary>
     private static readonly ImmutableArray<Op> NoOperations = [];
 
+    /// <summary>No holds taken (upstream <c>NO_HOLDS</c>).</summary>
+    private static readonly List<Hold> NoHolds = [];
+
+    /// <summary>A held document (<see cref="HeldDocument"/>) as the Session keeps it: pinned in the cache until stored (upstream
+    /// <c>Hold</c>). Used on the line only.</summary>
+    private sealed class Hold(LoadedDocument loaded, double deadline, Action unpin) : HeldDocument(loaded)
+    {
+        /// <summary>When the earliest of its held commits must be stored, on the Session clock.</summary>
+        public double Deadline { get; set; } = deadline;
+        public Action Unpin { get; } = unpin;
+    }
+
+    /// <summary>The armed store of held documents (upstream <c>HoldTimer</c>): a foreground timer for the earliest deadline, <c>Fired</c> once
+    /// its job is queued. Guarded by holdsGate.</summary>
+    private sealed class HoldTimer(double at)
+    {
+        public double At { get; } = at;
+        public Action? Disarm { get; set; }
+        public bool Fired { get; set; }
+    }
+
     private sealed class DocumentSweep(double at)
     {
         public double At { get; } = at;
@@ -1301,6 +1580,33 @@ public class Session : ISession
         private Action? dispose = dispose;
         public void Dispose() => Interlocked.Exchange(ref dispose, null)?.Invoke();
     }
+}
+
+/// <summary>
+/// What the Session's own components observe of one commit (<c>Session.ObserveCommits</c>; upstream <c>ObservedCommit</c>): a stored commit
+/// with its own changes, or a deferred one adopted in memory only (<see cref="CommitPersistence"/>), which changes documents only. Memory is
+/// never behind: a later store of held changes is not observed again.
+/// </summary>
+internal sealed class ObservedCommit
+{
+    private ObservedCommit(bool memory, Seq? seq, IReadOnlyList<ICommitChange> changes)
+    {
+        IsMemory = memory;
+        Seq = seq;
+        Changes = changes;
+    }
+
+    /// <summary>Whether it is <c>{kind: "memory"}</c>: adopted in memory and held, not stored yet.</summary>
+    public bool IsMemory { get; }
+    /// <summary>The commit sequence of a stored commit; null for one held in memory.</summary>
+    public Seq? Seq { get; }
+    /// <summary>The changes: of a held commit, its document changes only.</summary>
+    public IReadOnlyList<ICommitChange> Changes { get; }
+
+    /// <summary><c>{kind: "stored", seq, changes}</c>.</summary>
+    public static ObservedCommit Stored(Seq seq, IReadOnlyList<ICommitChange> changes) => new(false, seq, changes);
+    /// <summary><c>{kind: "memory", changes}</c>.</summary>
+    public static ObservedCommit Memory(IReadOnlyList<ICommitChange> changes) => new(true, null, changes);
 }
 
 /// <summary>

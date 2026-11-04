@@ -4,7 +4,9 @@
 // modelTools filter (an array, or {remove?, add?}), ToolRegistration.Callers and Deferred, Agent.Callable and Deferred, addTools extending
 // modelTools, and settings.documentRetentionMs (area b). Pi v1.5.0 sync (area reports): agentHooks pairs each handler with its extension,
 // sectionExtension and toolExtension name the extension whose code a section or tool runs, a wrapper's failure is reported with its
-// extension's name, and settings.afterFailedRun (a30c2a81d, 5f312dac4, 91b33cab3). The file's other areas (restart limit, persistWithinMs,
+// extension's name, and settings.afterFailedRun (a30c2a81d, 5f312dac4, 91b33cab3). Pi v1.5.0 sync (area deferred-commits, 6c2fd73b0):
+// settings.progress.persistWithinMs, the window a deferred progress commit waits at most before it is stored (ProgressPolicy.PersistWithinMs,
+// default 1,000 ms; a value that is not a number of milliseconds, 0 or more, is the default). The file's other areas (restart limit,
 // maxTurns) keep the citation on v1.2.0.
 using System.Collections.Immutable;
 using PiSharp.Durable.Chord;
@@ -22,7 +24,7 @@ public static class Agents
     public static CompactionPolicy DefaultCompactionPolicy { get; } = new(true, 16384, 20000, 32768);
 
     /// <summary>Upstream <c>DEFAULT_PROGRESS_POLICY</c>.</summary>
-    public static ProgressPolicy DefaultProgressPolicy { get; } = new(100, 100);
+    public static ProgressPolicy DefaultProgressPolicy { get; } = new(100, 100, 1_000);
 
     /// <summary>The reserved section key of the agent's instructions (upstream <c>INSTRUCTIONS_KEY</c>).</summary>
     public const string InstructionsKey = "instructions";
@@ -53,7 +55,7 @@ public static class Agents
                 compaction?.BackgroundTokens ?? DefaultCompactionPolicy.BackgroundTokens) { ModelOverrides = compaction?.ModelOverrides },
             // Field by field, so an unset interval keeps its default.
             Progress = new ProgressPolicy(progress?.PartialIntervalMs ?? DefaultProgressPolicy.PartialIntervalMs,
-                progress?.OutputIntervalMs ?? DefaultProgressPolicy.OutputIntervalMs),
+                progress?.OutputIntervalMs ?? DefaultProgressPolicy.OutputIntervalMs, Session.PersistWithin(progress?.PersistWithinMs)),
             ToolExecution = settings?.ToolExecution ?? ToolExecutionMode.Parallel,
             SteeringMode = settings?.SteeringMode ?? QueueMode.OneAtATime,
             FollowUpMode = settings?.FollowUpMode ?? QueueMode.OneAtATime,

@@ -37,6 +37,9 @@
 //   again, so OnWake calls never overlap and none is lost.
 // - Walks up and down the ownership tree are loops, never recursion, as upstream's are: chains can be deeper than the stack.
 //
+// Pi v1.5.0 sync (area deferred-commits, 6c2fd73b0): the scheduler observes the Session's commits as memory adopts them
+// (Session.ObserveCommits) and skips a held one, which changes conversation documents only; ITaskRuntime.CommitAsync takes CommitOptions,
+// so a phase may defer a commit (Live.ProgressCommit).
 // Pi v1.5.0 sync (area harness-options): the models are a function read at each access (7ec1f648e), and the readOnly option (be14d9732):
 // open loads live tasks as committed, running ones included, and schedules no reconcile; Resume throws ReadOnlySessionException; no
 // reconcile is ever scheduled. The citation stays on v1.2.0 until the file's other areas land.
@@ -645,8 +648,10 @@ internal sealed class DurableTaskScheduler
 
     // ─── Scheduling ────────────────────────────────────────────────────────
 
-    private void Observe(CommitPublication publication)
+    private void Observe(ObservedCommit publication)
     {
+        // A commit held in memory changes documents only.
+        if (publication.IsMemory) return;
         var signal = new List<Invocation>();
         var changed = false;
         // Whether the commit created a task, and whether a running task that keeps running committed it; see Kick(bool).
@@ -2887,7 +2892,7 @@ internal sealed class DurableTaskScheduler
 
         public Task<IExecutionEnv?> EnvAsync(DurableContext context) => Read(() => scheduler.env(invocation.ConversationId, context));
 
-        public async Task CommitAsync(Func<ITx, RunningTask, Task<TaskState?>> change, DurableContext context)
+        public async Task CommitAsync(Func<ITx, RunningTask, Task<TaskState?>> change, DurableContext context, CommitOptions? options = null)
         {
             ArgumentNullException.ThrowIfNull(change);
             string? checkpoint = null;
@@ -2897,34 +2902,34 @@ internal sealed class DurableTaskScheduler
                 if (next is not null) await scheduler.CommitStateAsync(tx, invocation, current, next).ConfigureAwait(false);
                 if (next is RunningTaskState running && PhaseOf(running.Checkpoint) is { } phase && phase != current.Phase) checkpoint = phase;
                 return true;
-            }, context).ConfigureAwait(false);
+            }, context, options).ConfigureAwait(false);
             if (checkpoint is not null) invocation.Context.Telemetry.AddEvent("pi.durable.checkpoint", new SpanAttributes { ["phase"] = checkpoint });
         }
 
-        public Task CommitAsync(Func<ITx, RunningTask, Task> change, DurableContext context)
+        public Task CommitAsync(Func<ITx, RunningTask, Task> change, DurableContext context, CommitOptions? options = null)
         {
             ArgumentNullException.ThrowIfNull(change);
             return CommitAsync(async (tx, current) =>
             {
                 await change(tx, current).ConfigureAwait(false);
                 return (TaskState?)null;
-            }, context);
+            }, context, options);
         }
 
-        public Task CommitAsync(Func<ITx, RunningTask, TaskState?> change, DurableContext context)
+        public Task CommitAsync(Func<ITx, RunningTask, TaskState?> change, DurableContext context, CommitOptions? options = null)
         {
             ArgumentNullException.ThrowIfNull(change);
-            return CommitAsync((tx, current) => Task.FromResult(change(tx, current)), context);
+            return CommitAsync((tx, current) => Task.FromResult(change(tx, current)), context, options);
         }
 
-        public Task CommitAsync(Action<ITx, RunningTask> change, DurableContext context)
+        public Task CommitAsync(Action<ITx, RunningTask> change, DurableContext context, CommitOptions? options = null)
         {
             ArgumentNullException.ThrowIfNull(change);
             return CommitAsync((tx, current) =>
             {
                 change(tx, current);
                 return Task.FromResult<TaskState?>(null);
-            }, context);
+            }, context, options);
         }
 
         public Task<JsonValue?> MemoAsync(string name, DurableContext context) => Read(() =>
@@ -3191,8 +3196,8 @@ internal sealed class DurableTaskScheduler
             return await read().ConfigureAwait(false);
         }
 
-        /// <summary>Commits after rereading the task on the line and gating the invocation.</summary>
-        private Task<T> Gated<T>(Func<Transaction, RunningTask, Task<T>> change, DurableContext context)
+        /// <summary>Commits after rereading the task on the line and gating the invocation; <paramref name="options"/> may defer storing it.</summary>
+        private Task<T> Gated<T>(Func<Transaction, RunningTask, Task<T>> change, DurableContext context, CommitOptions? options = null)
         {
             ArgumentNullException.ThrowIfNull(context);
             if (invocation.Ended) return Task.FromException<T>(EndedError(invocation));
@@ -3211,7 +3216,7 @@ internal sealed class DurableTaskScheduler
                 if (invocation.Mode == InvocationMode.Run && found.AbortRequested)
                     throw new InvalidOperationException($"Task {invocation.TaskId} has a durable abort mark");
                 return await change(tx, new RunningTask(found)).ConfigureAwait(false);
-            }, context, new TransactionScope(invocation.ConversationId, invocation.TaskId));
+            }, context, new TransactionScope(invocation.ConversationId, invocation.TaskId), options);
         }
     }
 

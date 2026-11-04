@@ -14,6 +14,9 @@
 //   form; area view moves them with the file. Two of them pace the faux stream on commits instead of real time (EventTests.CommitPaced),
 //   and they count allocations with GC.GetTotalAllocatedBytes and the heap with GC.GetTotalMemory in place of V8's GCProfiler and heap
 //   statistics. The rest of this file still ports v1.2.0.
+// - Pi v1.5.0 sync (area deferred-commits): the cases that follow commits as views do (pacing the stream, or reading what a commit
+//   published) observe them as memory adopts them (SessionTests.ObserveCommits, upstream 6c2fd73b0's internal observeCommits), since
+//   SubscribeCommits now sees deferred commits only once they are stored.
 using System.Collections.Immutable;
 using JsonNode = System.Text.Json.Nodes.JsonNode;
 using PiSharp.Contracts;
@@ -134,7 +137,7 @@ internal static partial class EventTests
     private static SyncList<JsonObjectValue> PartialsOf(IHarness harness)
     {
         var partials = new SyncList<JsonObjectValue>();
-        harness.SubscribeCommits((publication, _) =>
+        ObserveCommits(harness, (publication, _) =>
         {
             foreach (var change in DocumentChanges(publication))
             {
@@ -179,7 +182,7 @@ internal static partial class EventTests
             var listening = await Listen(harness, root);
             MatchJson("""{"type":"snapshot","entries":[],"tools":[],"inbox":[]}""", listening.Stream.Snapshot.ToJson(), "snapshot");
             var partials = new SyncList<string>();
-            harness.SubscribeCommits((publication, _) =>
+            ObserveCommits(harness, (publication, _) =>
             {
                 foreach (var change in DocumentChanges(publication))
                 {
@@ -382,7 +385,7 @@ internal static partial class EventTests
                 FauxAssistantMessage([FauxText("done")]));
             var (harness, root) = await OpenChat(await fresh(), setup);
             var outputs = new SyncList<string>();
-            harness.SubscribeCommits((publication, _) =>
+            ObserveCommits(harness, (publication, _) =>
             {
                 foreach (var change in DocumentChanges(publication))
                 {
@@ -765,7 +768,7 @@ internal static partial class EventTests
                         stopReason: "toolUse"),
                     FauxAssistantMessage([FauxText("done")]));
                 var (harness, root) = await OpenChat(new MemoryStorage(), setup);
-                using var subscription = harness.SubscribeCommits((_, _) => paced.Committed());
+                using var subscription = ObserveCommits(harness, (_, _) => paced.Committed());
                 // Upstream's allocatedBytes: the bytes allocated meanwhile, on every thread.
                 GC.Collect();
                 var before = GC.GetTotalAllocatedBytes(precise: true);
@@ -793,7 +796,7 @@ internal static partial class EventTests
                 FauxAssistantMessage([FauxText(text), FauxToolCall("missing", Obj(("path", "a.ts"), ("content", content)), "c1")], stopReason: "toolUse"),
                 FauxAssistantMessage([FauxText("done")]));
             var (harness, root) = await OpenChat(new MemoryStorage(), setup);
-            using var subscription = harness.SubscribeCommits((_, _) => paced.Committed());
+            using var subscription = ObserveCommits(harness, (_, _) => paced.Committed());
             var listening = await Listen(harness, root);
             var before = await HeapInUse(harness);
             var submission = await root.SubmitAsync(SubmissionDraft.Input("go"), Context);

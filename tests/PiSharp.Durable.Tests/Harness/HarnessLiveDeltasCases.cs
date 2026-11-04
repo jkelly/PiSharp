@@ -12,6 +12,12 @@
 // - "starts calls the request did not offer ...": upstream's "bad" tool returns a function in `details`, which is not strict JSON, so its
 //   result commit throws. A C# result holds only JSON values; as in HarnessToolsRecoveryCases.cs, the result carries a null tool name in
 //   `control.addTools`, which is not strict JSON either and makes the same commit throw.
+// Pi v1.5.0 sync (area deferred-commits, 6c2fd73b0 and e5c6182ba's deferred attempt and running status): drive() and "streams partial
+// text as appends" observe commits as memory adopts them (LiveCommits, upstream observeCommits); "hands a generation over ..." and
+// "starts calls the request did not offer ..." record what was stored (StoredLiveCommits, upstream subscribeCommits), and the first takes
+// e5c6182ba's expectations without #11043's turn count (area turn-limit): the request's attempt and the tool's running status are stored
+// with the next commit. "stores a complete base exactly ..." stores deferred progress within each tool's run (persistWithinMs 50), as
+// e5c6182ba's does.
 using System.Collections.Immutable;
 using System.Threading.Channels;
 using PiSharp.Durable;
@@ -50,8 +56,20 @@ internal static partial class LiveDeltaTests
         Execute = execute,
     });
 
-    /// <summary>Records the operations of every <c>pi.live</c> commit that has some.</summary>
+    /// <summary>Records the operations of every <c>pi.live</c> commit that has some, deferred ones as memory adopts them.</summary>
     private static SyncList<ImmutableArray<Op>> LiveCommits(IHarness harness)
+    {
+        var commits = new SyncList<ImmutableArray<Op>>();
+        ObserveCommits(harness, (publication, _) =>
+        {
+            foreach (var change in DocumentChanges(publication))
+                if (change.Record.Kind == "pi.live" && change.Ops.Length > 0) commits.Add(change.Ops);
+        });
+        return commits;
+    }
+
+    /// <summary>Records the operations of every stored <c>pi.live</c> change that has some, held ones with the commit that stored them.</summary>
+    private static SyncList<ImmutableArray<Op>> StoredLiveCommits(IHarness harness)
     {
         var commits = new SyncList<ImmutableArray<Op>>();
         harness.SubscribeCommits((publication, _) =>
@@ -177,7 +195,7 @@ internal static partial class LiveDeltaTests
             setup.Faux.SetResponses(FauxAssistantMessage([FauxToolCall("noop", JsonObjectValue.Empty, "c1")], stopReason: "toolUse"),
                 FauxAssistantMessage([FauxText("done")]));
             var (harness, root) = await OpenChat(await fresh(), setup);
-            var commits = LiveCommits(harness);
+            var commits = StoredLiveCommits(harness);
             await (await root.SubmitAsync(SubmissionDraft.Input("go"), Context)).WaitAsync(Context);
             var tasks = (await harness.CommitAsync(tx => tx.ScanTasksAsync(new TaskQuery { ConversationId = root.Id }, 20), Context)).Items;
             List<long> Ids(string kind) => [.. tasks.Where(task => task.Kind == kind).Select(task => task.Id.Value).Order()];
@@ -185,25 +203,20 @@ internal static partial class LiveDeltaTests
             var tool = Ids("pi.tool")[0];
             var result = (await root.EntriesAsync(new EntryQueryBounds(), 10, null, Context)).Items.First(entry => entry.Kind == "pi.tool-result").Id.Value;
             var all = commits.Snapshot();
-            Equal(8, all.Count, "commits: " + string.Join(" | ", all.Select(ops => Json(ops))));
+            Equal(5, all.Count, "commits: " + string.Join(" | ", all.Select(ops => Json(ops))));
             // submission
             MatchExactly($$"""[["s",["run"],{"taskId":{{firstGeneration}},"inputs":["<number>"]}]]""", J(Json(all[0])), "submission");
-            // request
-            Equal("""[["s",["generation"],{"attempt":1}]]""", Json(all[1]), "request");
-            // the generation starts its tool round and keeps the run
-            ContainsAll(all[2], $$"""[["d",["generation"]],["s",["tools"],[{"callId":"c1","name":"noop","taskId":{{tool}},"status":"pending"}]]]""", "handover");
-            // intent
-            Equal("""[["s",["tools",0,"status"],"running"]]""", Json(all[3]), "intent");
-            // result
-            ContainsAll(all[4], $$"""[["s",["tools",0,"status"],"done"],["s",["tools",0,"entry"],{{result}}]]""", "result");
+            // the generation starts its tool round and keeps the run; the request's attempt is deferred, so it is stored here, its held
+            // operation first
+            Equal($$"""[["s",["generation"],{"attempt":1}],["s",["tools"],[{"callId":"c1","name":"noop","taskId":{{tool}},"status":"pending"}]],["d",["generation"]]]""",
+                Json(all[1]), "handover");
+            // result: the running status is deferred like progress, so it is stored with the result, folded into its write
+            Equal($$"""[["s",["tools",0,"status"],"done"],["s",["tools",0,"entry"],{{result}}]]""", Json(all[2]), "result");
             // the generation's tools phase hands the run to the next generation
-            ContainsAll(all[5], $$"""[["d",["tools"]],["s",["run","taskId"],{{secondGeneration}}]]""", "next generation");
-            Equal("""[["s",["generation"],{"attempt":1}]]""", Json(all[6]), "second request");
-            // the answer ends the run
-            ContainsAll(all[7], """[["d",["run"]],["d",["generation"]]]""", "run end");
-            Equal(2, all[2].Length, "handover length");
-            Equal(2, all[4].Length, "result length");
-            Equal(2, all[5].Length, "next generation length");
+            ContainsAll(all[3], $$"""[["d",["tools"]],["s",["run","taskId"],{{secondGeneration}}]]""", "next generation");
+            // the answer ends the run, with the second request's deferred attempt first
+            Equal("""[["s",["generation"],{"attempt":1}],["d",["run"]],["d",["generation"]]]""", Json(all[4]), "run end");
+            Equal(2, all[3].Length, "next generation length");
             await harness.CloseAsync(Context);
         });
 
@@ -313,6 +326,8 @@ internal static partial class LiveDeltaTests
             setup.Faux.SetResponses(FauxAssistantMessage([FauxToolCall("first", JsonObjectValue.Empty, "a"), FauxToolCall("second", JsonObjectValue.Empty, "b")],
                 stopReason: "toolUse"), FauxAssistantMessage([FauxText("done")]));
             setup.ToolExecution = ToolExecutionMode.Sequential;
+            // Store deferred progress within each tool's run, so running slots reach Storage as deltas.
+            setup.Progress = new ProgressSettings { PersistWithinMs = 50 };
             var (harness, root) = await OpenChat(storage, setup);
             var written = new SyncList<(string Kind, JsonObjectValue Value)>();
             harness.SubscribeCommits((publication, _) =>
@@ -345,7 +360,7 @@ internal static partial class LiveDeltaTests
             setup.Faux.SetResponses(FauxAssistantMessage([FauxToolCall("ghost", JsonObjectValue.Empty, "g"), FauxToolCall("bad", JsonObjectValue.Empty, "b")],
                 stopReason: "toolUse"), FauxAssistantMessage([FauxText("done")]));
             var (harness, root) = await OpenChat(await fresh(), setup);
-            var commits = LiveCommits(harness);
+            var commits = StoredLiveCommits(harness);
             await (await root.SubmitAsync(SubmissionDraft.Input("go"), Context)).WaitAsync(Context);
             var ghostResult = (await root.EntriesAsync(new EntryQueryBounds(), 10, null, Context)).Items.First(entry => entry.Kind == "pi.tool-result").Id.Value;
             var all = commits.Snapshot();

@@ -18,7 +18,10 @@
 // { attribution: PI_ATTRIBUTION }; PiSharp's Harness.DefaultIdentity is empty, so a Harness without an identity sends none (pending
 // core.client-identity-attribution). Both also run as harness.generation.jsonl.* and harness.generation.sqlite.*.
 // Pi v1.5.0 sync (area reports): "resolves settings over the built-in defaults" expects afterFailedRun: "keep" (a30c2a81d); its
-// restartLimit (area restarts) and progress.persistWithinMs default arrive with their areas.
+// restartLimit (area restarts) arrives with its area.
+// Pi v1.5.0 sync (area deferred-commits, 6c2fd73b0): livePublications observes commits as memory adopts them (SessionTests.ObserveCommits,
+// upstream observeCommits), and "resolves settings over the built-in defaults" expects progress.persistWithinMs 1000, the default for -1,
+// and 0 kept. "stores partials as deltas ..." stores deferred partials within 100 ms, as e5c6182ba's does.
 #pragma warning disable PISHARP_IDENTITY001 // PiSharp.AI's ClientIdentity (Pi v1.5.0) is experimental.
 using System.Collections.Immutable;
 using System.Text.RegularExpressions;
@@ -67,11 +70,11 @@ internal static class GenerationTests
         return taskId!.Value;
     }
 
-    /// <summary>Every published <c>pi.live</c> value (upstream <c>livePublications</c>).</summary>
+    /// <summary>Every published <c>pi.live</c> value, deferred ones as memory adopts them (upstream <c>livePublications</c>).</summary>
     private static SyncList<JsonObjectValue> LivePublications(IHarness harness)
     {
         var values = new SyncList<JsonObjectValue>();
-        harness.SubscribeCommits((publication, _) =>
+        ObserveCommits(harness, (publication, _) =>
         {
             foreach (var change in publication.Changes)
                 if (change is DocumentCommitChange { Record.Kind: "pi.live", Value: { } value }) values.Add(value);
@@ -129,6 +132,8 @@ internal static class GenerationTests
         {
             var setup = Setup(new FauxOptions { TokensPerSecond = 200, MinTokenSize = 1, MaxTokenSize = 1 });
             setup.Faux.SetResponses(FauxAssistantMessage(new string('w', 200)));
+            // Store deferred partials well within the stream, so some reach Storage before the answer.
+            setup.Progress = new ProgressSettings { PersistWithinMs = 100 };
             var storage = new ControlledStorage(fresh());
             var (harness, root) = await OpenChat(storage, setup);
             var record = await storage.FindDocumentAsync(new DocumentAddress("pi.live", DocumentScope.Conversation(root.Id)), DocumentPoint.Current, Context);
@@ -643,7 +648,7 @@ internal static class GenerationTests
             SameJson("""
                 {"stream":{},"retry":{"enabled":true,"maxRetries":3,"baseDelayMs":2000,"maxAgentDelayMs":60000},
                  "compaction":{"enabled":true,"reserveTokens":16384,"keepRecentTokens":20000,"backgroundTokens":32768},
-                 "progress":{"partialIntervalMs":100,"outputIntervalMs":100},"toolExecution":"parallel","steeringMode":"one-at-a-time",
+                 "progress":{"partialIntervalMs":100,"outputIntervalMs":100,"persistWithinMs":1000},"toolExecution":"parallel","steeringMode":"one-at-a-time",
                  "followUpMode":"one-at-a-time","contextRetentionMs":600000,"afterFailedRun":"keep"}
                 """, JsonObjectValue.From(resolved.Where(property => property.Key != "documentRetentionMs")), "defaults");
             MatchJson("""{"retry":{"enabled":false,"maxRetries":3,"baseDelayMs":2000},"compaction":{"enabled":true,"backgroundTokens":0}}""",
@@ -652,8 +657,13 @@ internal static class GenerationTests
                     Retry = new RetrySettings { Enabled = false },
                     Compaction = new CompactionSettings { BackgroundTokens = 0 },
                 })), "overrides");
-            SameJson("""{"partialIntervalMs":100,"outputIntervalMs":500}""",
+            SameJson("""{"partialIntervalMs":100,"outputIntervalMs":500,"persistWithinMs":1000}""",
                 SettingsJson(Agents.ResolveSettings(new HarnessSettings { Progress = new ProgressSettings { OutputIntervalMs = 500 } }))["progress"], "progress");
+            // Not a number of milliseconds, 0 or more: the default.
+            Check(Agents.ResolveSettings(new HarnessSettings { Progress = new ProgressSettings { PersistWithinMs = -1 } }).Progress.PersistWithinMs == 1000,
+                "persistWithinMs -1 resolves to the default");
+            Check(Agents.ResolveSettings(new HarnessSettings { Progress = new ProgressSettings { PersistWithinMs = 0 } }).Progress.PersistWithinMs == 0,
+                "persistWithinMs 0 is kept");
         });
 
         yield return Case(prefix + "rejects-a-registry-without-the-built-in-tasks", async () =>
@@ -676,7 +686,8 @@ internal static class GenerationTests
                 : Obj(("enabled", settings.Retry.Enabled), ("maxRetries", settings.Retry.MaxRetries), ("baseDelayMs", settings.Retry.BaseDelayMs))),
             ("compaction", Obj(("enabled", settings.Compaction.Enabled), ("reserveTokens", settings.Compaction.ReserveTokens),
                 ("keepRecentTokens", settings.Compaction.KeepRecentTokens), ("backgroundTokens", settings.Compaction.BackgroundTokens))),
-            ("progress", Obj(("partialIntervalMs", settings.Progress.PartialIntervalMs), ("outputIntervalMs", settings.Progress.OutputIntervalMs))),
+            ("progress", Obj(("partialIntervalMs", settings.Progress.PartialIntervalMs), ("outputIntervalMs", settings.Progress.OutputIntervalMs),
+                ("persistWithinMs", settings.Progress.PersistWithinMs))),
             ("toolExecution", settings.ToolExecution == ToolExecutionMode.Parallel ? "parallel" : "sequential"),
             ("steeringMode", settings.SteeringMode == QueueMode.All ? "all" : "one-at-a-time"),
             ("followUpMode", settings.FollowUpMode == QueueMode.All ? "all" : "one-at-a-time"),

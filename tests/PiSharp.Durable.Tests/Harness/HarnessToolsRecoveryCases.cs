@@ -9,6 +9,10 @@
 //   strict JSON either and makes the same commit throw.
 // - "answers a real bash command interrupted by close and reopen, then finishes the run" runs CodingTools' bash over a LocalExecutionEnv
 //   (upstream NodeExecutionEnv) in its own fresh directory (upstream: the SQLite file's directory); the shell is Git Bash on Windows.
+// - Pi v1.5.0 sync (area deferred-commits): e5c6182ba's "reruns a safe tool whose running slot a crash after its intent lost, or a sibling
+//   stored, and shows it running". Upstream's process death leaves the first Harness open while another opens the same SQLite file; here
+//   the first Harness fails (the internal Session.Fail, as harness.deferred-progress.* crashes), so nothing more of it reaches Storage and
+//   the case runs on both backends. The citation stays on v1.2.0 until the file's other areas land.
 using PiSharp.Durable;
 using PiSharp.Durable.Chord;
 using PiSharp.Durable.Env;
@@ -81,7 +85,7 @@ internal static class ToolsRecoveryTests
     private static async Task<SubmissionRecord> WaitFor(IHarness harness, SubmissionId id) => await (await harness.SubmissionAsync(id, Context))!.WaitAsync(Context);
 
     /// <summary>A tool that writes output, then blocks until its invocation is cancelled the first <c>Blocking</c> times it runs.
-    /// <c>Started</c> resolves once the output is durable.</summary>
+    /// <c>Started</c> resolves once the output is committed; a close stores it (Pi v1.5.0 sync, area deferred-commits).</summary>
     private sealed class BlockingTool
     {
         private int runs;
@@ -134,6 +138,69 @@ internal static class ToolsRecoveryTests
             Equal("run 1\n|<harness>\n[error] Tool work was interrupted and may have partially run\n</harness>", Text(result), "text");
             SameJson("{}", await opened.Harness.SnapshotAsync(Live.LiveDoc, opened.Root.Id, Context), "live");
             await opened.Harness.CloseAsync(Context);
+        });
+
+        yield return Case(prefix + "reruns-a-safe-tool-whose-running-slot-a-crash-after-its-intent-lost-or-a-sibling-stored-and-shows-it-running", async () =>
+        {
+            foreach (var sibling in new[] { false, true })
+            {
+                var open = location();
+                var setup = Setup();
+                // The running slot is presentation, held in memory; no deadline stores it before the crash.
+                setup.Progress = new ProgressSettings { PersistWithinMs = double.PositiveInfinity };
+                var started = new HarnessTests.Deferred();
+                var runs = 0;
+                IHarness? reopened = null;
+                var seen = new SyncList<string?>();
+                AddTool(setup.Registry, RecoveryTool("work", async (_, api, callContext) =>
+                {
+                    if (Interlocked.Increment(ref runs) == 1)
+                    {
+                        started.Resolve();
+                        await Aborted(callContext.CancellationToken);
+                    }
+                    var live = await reopened!.SnapshotAsync(Live.LiveDoc, ConversationId.Root, Context);
+                    var slots = live is not null && live.TryGetValue("tools", out var tools) ? ((JsonArrayValue)tools).Cast<JsonObjectValue>() : [];
+                    seen.Add(slots.FirstOrDefault(slot => slot.TryGetValue("taskId", out var taskId) && (long)N(taskId) == api.TaskId.Value) is { } found
+                        && found.TryGetValue("status", out var status) ? S(status) : null);
+                    return new ToolExecutionResult();
+                }, tool => tool with { Replay = ToolReplay.Safe }));
+                // A sibling that ends once `work` started: its result commit reads pi.live, which stores what is held there.
+                AddTool(setup.Registry, RecoveryTool("quick", async (_, _, _) =>
+                {
+                    await started.Task;
+                    return new ToolExecutionResult();
+                }));
+                var calls = new List<JsonObjectValue> { FauxToolCall("work", JsonObjectValue.Empty, "w") };
+                if (sibling) calls.Add(FauxToolCall("quick", JsonObjectValue.Empty, "q"));
+                setup.Faux.SetResponses(FauxAssistantMessage(calls, stopReason: "toolUse"), Done);
+                var crashed = await Open(open, setup);
+                var id = (await crashed.Root.SubmitAsync(SubmissionDraft.Input("go"), Context)).Id;
+                await started.Task;
+                async Task<JsonObjectValue?> Slot(IHarness harness, string name)
+                {
+                    var live = await harness.SnapshotAsync(Live.LiveDoc, crashed.Root.Id, Context);
+                    return live is not null && live.TryGetValue("tools", out var tools)
+                        ? ((JsonArrayValue)tools).Cast<JsonObjectValue>().FirstOrDefault(slot => S(slot["name"]) == name) : null;
+                }
+                static string? Status(JsonObjectValue? slot) => slot is not null && slot.TryGetValue("status", out var status) ? S(status) : null;
+                var workId = new TaskId((long)N((await Slot(crashed.Harness, "work"))!["taskId"]));
+                if (sibling) await Eventually(async () => Status(await Slot(crashed.Harness, "quick")) == "done");
+                // The process dies here: another one opens the same storage, without the held presentation.
+                ((Session)crashed.Harness).Fail(new InvalidOperationException("crash"));
+                await crashed.Harness.Closed;
+                var next = await OpenChat(open(), setup);
+                reopened = next.Harness;
+                MatchJson("""{"checkpoint":{"phase":"execute"}}""", (await next.Harness.GetTaskAsync(workId, Context))?.State.ToJson(), $"{sibling} state");
+                Equal(sibling ? "running" : "pending", Status(await Slot(next.Harness, "work")), $"{sibling} stored status");
+                next.Harness.Resume();
+                Equal(SubmissionStatus.Done, (await WaitFor(next.Harness, id)).Status, $"{sibling} status");
+                // The rerun shows the slot running again.
+                Seq(["running"], seen.Snapshot(), $"{sibling} seen");
+                var result = Results(await AllEntries(next.Root)).Single(message => S(message["toolCallId"]) == "w");
+                Check(result["isError"] is JsonBooleanValue { Value: false }, $"{sibling} isError");
+                await next.Harness.CloseAsync(Context);
+            }
         });
 
         yield return Case(prefix + "reruns-a-tool-only-when-both-the-stored-and-the-current-replay-policy-are-safe", async () =>

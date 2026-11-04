@@ -12,8 +12,10 @@
 // that is never held while observer code runs.
 //
 // Pi v1.5.0 sync (area watches, 92ab53602 and 42cb822f1): a view watch is Chord's Watch (Chord/Watch.cs) on the Session line's scheduler,
-// ViewObserver.closeSession is end(failure), and the view state getter (Conversation.viewState()) is removed. The citation stays on v1.2.0
-// until the file's other areas land.
+// ViewObserver.closeSession is end(failure), and the view state getter (Conversation.viewState()) is removed.
+// Pi v1.5.0 sync (area deferred-commits, 6c2fd73b0): views observe the Session's commits as memory adopts them (Session.ObserveCommits),
+// deferred ones included, so a view shows a held partial or tool output at once. The citation stays on v1.2.0 until the file's other areas
+// land.
 using System.Collections.Immutable;
 using PiSharp.Durable.Chord;
 using PiSharp.Durable.Chord.Delta;
@@ -83,7 +85,7 @@ internal abstract class ViewObserver
     public virtual void Advance(ConversationView value, ImmutableArray<Op> ops, DurableContext context) { }
 
     /// <summary>Every publication, after the mount took it; <paramref name="ops"/> are the mount's, possibly none.</summary>
-    public virtual void Publication(ConversationView before, ConversationView after, ImmutableArray<Op> ops, CommitPublication publication,
+    public virtual void Publication(ConversationView before, ConversationView after, ImmutableArray<Op> ops, ObservedCommit publication,
         DurableContext context) { }
 
     /// <summary>The Session closed, or failed with <paramref name="failure"/> (upstream <c>end</c>).</summary>
@@ -223,7 +225,7 @@ internal sealed class ConversationViews
 
     /// <summary>Derives the mount's operations from one publication, applies them, and hands the revision to every observer; one that throws
     /// is reported through <paramref name="report"/>, and the others still get it (upstream <c>advance</c>). Runs on the Session line.</summary>
-    private void AdvanceMount(ConversationId id, Mount mount, CommitPublication publication, DurableContext context, Action<Exception> report)
+    private void AdvanceMount(ConversationId id, Mount mount, ObservedCommit publication, DurableContext context, Action<Exception> report)
     {
         var docOps = new List<Op>();
         var entryOps = new List<Op>();

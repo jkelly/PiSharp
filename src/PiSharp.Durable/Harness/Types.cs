@@ -23,6 +23,8 @@
 // Pi v1.5.0 sync (area telemetry): HarnessOptions.Telemetry, the host-owned adapter of DURABLE_TELEMETRY_SCHEMA (2ec55d808, 48909d987).
 // Pi v1.5.0 sync (area watches, 92ab53602): Conversation.viewState() and Harness.taskGraph() are removed; the view and task graph watches
 // are Chord's IWatchHandle<T>. Area watch-folding (d8d99950a): their docs say commits made while a listener runs arrive folded.
+// Pi v1.5.0 sync (area deferred-commits, 6c2fd73b0): IConversation.CommitAsync and IToolExecutionApi.CommitAsync take CommitOptions, and
+// ProgressPolicy and ProgressSettings PersistWithinMs: progress commits are deferred (CommitPersistence).
 using System.Collections.Immutable;
 using PiSharp.AI;
 using PiSharp.Durable.Chord;
@@ -415,10 +417,11 @@ public interface IToolExecutionApi : IDocumentObserver, IDocumentReader
     /// <summary>Replaces the running details; the last value becomes the result details when the result omits <c>Details</c>. Resolves with
     /// the progress commit that includes it; cancelling <paramref name="context"/> stops the wait, not the update.</summary>
     Task DetailsAsync(JsonValue value, DurableContext context);
-    /// <summary>Commits on the Session line in the tool task's scope; appended entries carry the task as <c>byTaskId</c>.</summary>
-    Task<T> CommitAsync<T>(Func<ITx, Task<T>> change, DurableContext context);
+    /// <summary>Commits on the Session line in the tool task's scope; appended entries carry the task as <c>byTaskId</c>.
+    /// <paramref name="options"/> may defer storing it (<see cref="CommitPersistence"/>).</summary>
+    Task<T> CommitAsync<T>(Func<ITx, Task<T>> change, DurableContext context, CommitOptions? options = null);
     /// <summary>Commits on the Session line in the tool task's scope.</summary>
-    Task CommitAsync(Func<ITx, Task> change, DurableContext context);
+    Task CommitAsync(Func<ITx, Task> change, DurableContext context, CommitOptions? options = null);
     /// <summary>Reads a memo of the tool task.</summary>
     Task<JsonValue?> MemoAsync(string name, DurableContext context);
     /// <summary>Stores a memo of the tool task unless one exists; returns the winner.</summary>
@@ -666,8 +669,19 @@ public sealed record CompactionOverride
     public double? BackgroundTokens { get; init; }
 }
 
-/// <summary>How often running progress is committed (upstream <c>ProgressPolicy</c>).</summary>
-public sealed record ProgressPolicy(double PartialIntervalMs, double OutputIntervalMs);
+/// <summary>
+/// How often running progress is committed, and how long it may wait in memory before it is stored (upstream <c>ProgressPolicy</c>).
+/// Progress commits are deferred (<see cref="CommitPersistence"/>): watches see each at once, and Storage gets them together, at the run's
+/// next phase boundary or after <paramref name="PersistWithinMs"/>. A host can commit less often, so live answers and tool output appear in
+/// larger steps.
+/// </summary>
+/// <param name="PartialIntervalMs">Minimum pause between commits of the answer being generated.</param>
+/// <param name="OutputIntervalMs">Minimum pause between commits of running tool output; large commits also pause in proportion to their
+/// size.</param>
+/// <param name="PersistWithinMs">How long these commits, and other deferred commits without their own <see cref="CommitPersistence.WithinMs"/>,
+/// may stay in memory before they are stored; a crash loses at most about this much of an answer or of tool output. Default 1,000;
+/// <see cref="double.PositiveInfinity"/> stores them only at the next commit that reads or writes their document and at close.</param>
+public sealed record ProgressPolicy(double PartialIntervalMs, double OutputIntervalMs, double PersistWithinMs);
 
 /// <summary>Host overrides of <see cref="ConversationRetryPolicy"/> (upstream <c>Partial&lt;ConversationRetryPolicy&gt;</c>).</summary>
 public sealed record RetrySettings
@@ -708,6 +722,9 @@ public sealed record ProgressSettings
     public double? PartialIntervalMs { get; init; }
     /// <summary>Minimum pause between commits of running tool output.</summary>
     public double? OutputIntervalMs { get; init; }
+    /// <summary>How long progress commits may stay in memory before they are stored (<see cref="ProgressPolicy.PersistWithinMs"/>); 0 stores
+    /// each at once. Anything that is not a number of milliseconds, 0 or more (NaN, a negative value) means the default, 1,000.</summary>
+    public double? PersistWithinMs { get; init; }
 }
 
 /// <summary>
@@ -1139,14 +1156,15 @@ public interface IConversation
     /// </summary>
     Task<TaskId> CompactAsync(string? instructions, DurableContext context);
 
+    /// <summary>A Session commit whose <c>tx.CreateTaskAsync()</c> defaults to this conversation; <paramref name="options"/> as for
+    /// <see cref="ISession.CommitAsync{T}(Func{ITx, Task{T}}, DurableContext, CommitOptions?)"/>.</summary>
+    Task<T> CommitAsync<T>(Func<ITx, Task<T>> change, DurableContext context, CommitOptions? options = null);
     /// <summary>A Session commit whose <c>tx.CreateTaskAsync()</c> defaults to this conversation.</summary>
-    Task<T> CommitAsync<T>(Func<ITx, Task<T>> change, DurableContext context);
-    /// <summary>A Session commit whose <c>tx.CreateTaskAsync()</c> defaults to this conversation.</summary>
-    Task CommitAsync(Func<ITx, Task> change, DurableContext context);
+    Task CommitAsync(Func<ITx, Task> change, DurableContext context, CommitOptions? options = null);
     /// <summary>A synchronous Session commit whose <c>tx.CreateTaskAsync()</c> defaults to this conversation.</summary>
-    Task<T> CommitAsync<T>(Func<ITx, T> change, DurableContext context);
+    Task<T> CommitAsync<T>(Func<ITx, T> change, DurableContext context, CommitOptions? options = null);
     /// <summary>A synchronous Session commit whose <c>tx.CreateTaskAsync()</c> defaults to this conversation.</summary>
-    Task CommitAsync(Action<ITx> change, DurableContext context);
+    Task CommitAsync(Action<ITx> change, DurableContext context, CommitOptions? options = null);
     /// <summary>
     /// Committed raw active transcript and model context. With <paramref name="at"/>, the context as of that visible entry: the same view
     /// <c>ForkAsync(at)</c> would start with, without creating a conversation.
