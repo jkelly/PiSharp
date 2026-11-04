@@ -2433,7 +2433,10 @@
       "commits": [
         "5f312dac4",
         "8b0caefc2",
-        "d8d99950a"
+        "d8d99950a",
+        "e22a1463",
+        "90cf7adc",
+        "a92e7306"
       ],
       "notes": "PiSharp buffers one frame per commit with a 100-frame limit (Observation.cs); folding uses PendingOps from area chord-watch. PiSharp-only consumers that expect one call per commit: the device server's agent and document frames (Server AgentFrames.cs; decision 0008 says one batch per commit, which becomes one batch per delivery: state it in the decision when phase 8 updates the docs), the web agent's per-tab mux and pisharp durable's TUI. Address-following: PiSharp-only code that waits for a task-scoped document's end relies on the [[r, null]] retirement end today and must test retired and stop the watch, or it lives until the Session ends: ask_user_question and plan approval (UserInteraction.cs), job approvals (Hosting Apps/Jobs.cs), workflow runs (CustomAgents Workflows/Engine/Composition.cs) and team mailboxes (Teams/Messaging.cs). Session/Observation.cs was deleted by area watches (2cce573d); its committed-state observers are Chord's Watch (Chord/Watch.cs) and the view and task graph observers, so this area no longer edits it."
     },

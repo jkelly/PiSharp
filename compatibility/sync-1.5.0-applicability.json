@@ -56,11 +56,11 @@
     "changelogBullets": 477,
     "repeatedBullets": 23,
     "byStatus": {
-      "ported": 194,
+      "ported": 196,
       "ported-with-deferral": 24,
       "already-ported": 12,
       "no-op": 25,
-      "port": 71
+      "port": 69
     },
     "byArea": {
       "ai": 58,
@@ -8563,8 +8563,8 @@
           "tests/PiSharp.Durable.Tests/Session/SessionWatchesCases.cs: folds-101-pending-commits-of-one-field-into-one-set",
           "tests/PiSharp.Durable.Tests/Session/SessionWatchesCases.cs: replaces-the-root-once-more-than-10000-ops-are-pending-after-folding",
           "tests/PiSharp.Durable.Tests/Session/SessionWatchesCases.cs: never-folds-the-in-flight-frame-into-the-next-call",
-          "tests/PiSharp.Durable.Tests/Session/SessionWatchesCases.cs: folds-retirement-over-pending-commits-and-then-closes",
-          "tests/PiSharp.Durable.Tests/Session/SessionWatchesCases.cs: delivers-retirement-and-does-not-follow-recreation",
+          "tests/PiSharp.Durable.Tests/Session/SessionWatchesCases.cs: folds-a-retirement-into-the-pending-commits-call-which-reports-it-with-the-last-value-and-goes-on",
+          "tests/PiSharp.Durable.Tests/Session/SessionWatchesCases.cs: follows-its-address-across-a-retirement-and-a-recreation-in-one-commit-in-one-call",
           "tests/PiSharp.Durable.Tests/Session/SessionWatchesCases.cs: supports-idempotent-stop-and-rejects-repeated-or-late-start",
           "tests/PiSharp.Durable.Tests/Session/SessionWatchesCases.cs: cancels-acquisition-without-leaking-a-registered-watch",
           "tests/PiSharp.Durable.Tests/Session/SessionWatchesCases.cs: cancels-future-delivery-without-aborting-an-in-flight-callback",
@@ -8589,7 +8589,7 @@
       "id": "durable.document-watch-address",
       "area": "durable",
       "phase": 4,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "durable@1.5.0/Breaking Changes#7"
       ],
@@ -8610,13 +8610,38 @@
         "tests/PiSharp.Durable.Tests/SessionDocumentRetentionCases.cs"
       ],
       "release": "1.5.0",
-      "notes": "PiSharp ends a watch at retirement with a last [['r', null]] frame and reason retired (Observation.cs, RETIREMENT_OPERATIONS). PiSharp-only code waiting on task-scoped documents relies on that end: ask_user_question and plan approval (Durable.Tools Interaction/UserInteraction.cs:131; pisharp.interaction retires with the call), job approvals (Hosting Apps/Jobs.cs:780, pisharp.job-approval), workflow runs (CustomAgents Workflows/Engine/Composition.cs:300) and team mailboxes (CustomAgents Teams/Messaging.cs:293). Each must test retired and stop a watch whose document may stay retired, or the watch lives until the Session ends. Depends on durable.watch-handles."
+      "notes": "PiSharp ends a watch at retirement with a last [['r', null]] frame and reason retired (Observation.cs, RETIREMENT_OPERATIONS). PiSharp-only code waiting on task-scoped documents relies on that end: ask_user_question and plan approval (Durable.Tools Interaction/UserInteraction.cs:131; pisharp.interaction retires with the call), job approvals (Hosting Apps/Jobs.cs:780, pisharp.job-approval), workflow runs (CustomAgents Workflows/Engine/Composition.cs:300) and team mailboxes (CustomAgents Teams/Messaging.cs:293). Each must test retired and stop a watch whose document may stay retired, or the watch lives until the Session ends. Depends on durable.watch-handles.",
+      "evidence": {
+        "commits": [
+          "e22a1463",
+          "a92e7306"
+        ],
+        "tests": [
+          "tests/PiSharp.Durable.Tests/Session/SessionWatchesCases.cs: folds-a-retirement-into-the-pending-commits-call-which-reports-it-with-the-last-value-and-goes-on",
+          "tests/PiSharp.Durable.Tests/Session/SessionWatchesCases.cs: reports-a-change-and-a-retirement-in-one-commit-as-the-retirement-with-the-value-it-was-given-before",
+          "tests/PiSharp.Durable.Tests/Session/SessionWatchesCases.cs: follows-its-address-across-a-retirement-and-a-recreation-in-one-commit-in-one-call",
+          "tests/PiSharp.Durable.Tests/Session/SessionWatchesCases.cs: ignores-the-same-kind-in-another-conversation-and-under-another-family-key",
+          "tests/PiSharp.Durable.Tests/Session/SessionWatchesCases.cs: takes-the-version-of-a-recreation-written-by-a-newer-definition-then-its-ops",
+          "tests/PiSharp.Durable.Tests/Session/SessionWatchesCases.cs: keeps-no-earlier-incarnation-alive-after-a-retirement-and-a-recreation-while-it-goes-on",
+          "tests/PiSharp.Durable.Tests/Session/SessionWatchesCases.cs: keeps-a-watch-of-a-retired-conversation-document-until-it-is-stopped-then-nothing-of-it",
+          "tests/PiSharp.Durable.Tests/Session/SessionWatchesCases.cs: session-close-discards-retirement-buffered-before-start",
+          "tests/PiSharp.Durable.Tests/Session/SessionWatchesCases.cs: session-close-discards-retirement-behind-an-in-flight-callback",
+          "tests/PiSharp.Durable.Tests/SessionDocumentRetentionCases.cs: pins-only-what-is-at-the-address-a-watch-follows-nothing-while-retired-then-the-new-incarnation",
+          "tests/PiSharp.Durable.Tests/HarnessObserversCases.cs: a-watch-delivers-the-retirement-of-the-commit-that-ends-its-task-then-ends-ended",
+          "tests/PiSharp.Durable.Tests/HarnessObserversCases.cs: keeps-no-task-document-watch-alive-once-its-task-ended",
+          "tests/PiSharp.Durable.Tests/HarnessObserversCases.cs: a-watch-never-started-when-its-task-ends-still-ends-with-the-harnesss-close-keeping-nothing-of-it",
+          "tests/PiSharp.Durable.Tests/HarnessObserversCases.cs: a-watch-never-started-when-its-task-ends-fails-with-the-harness",
+          "tests/PiSharp.Durable.Tests/HarnessObserversCases.cs: a-watch-busy-in-an-earlier-call-when-its-task-ends-fails-with-the-harness-before-its-retirement-call",
+          "tests/PiSharp.Durable.Tests/HarnessObserversCases.cs: a-watch-whose-retirement-call-runs-when-its-task-ends-ends-only-after-that-call-returns",
+          "tests/PiSharp.Durable.Tests/Interaction/QuestionsCases.cs: retired-while-waiting"
+        ]
+      }
     },
     {
       "id": "durable.watch-folding",
       "area": "durable",
       "phase": 4,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "durable@1.5.0/Breaking Changes#8"
       ],
@@ -8640,7 +8665,26 @@
         "tests/PiSharp.Durable.Tests/Harness/HarnessViewCases.cs"
       ],
       "release": "1.5.0",
-      "notes": "PiSharp buffers one frame per commit with the 100-frame limit (Observation.cs header). Folding is Chord's PendingOps (chord@1.5.0/Added#12, group F), ported into PiSharp.Durable/Chord/Delta for phase 4. PiSharp-only consumers that expect one call per commit: the device server's agent and document frames (Server AgentFrames.cs, decision 0008: 'one batch of pi-durable events per commit'), the web agent's per-tab mux (decision 0011) and pisharp durable's TUI (DurableRuntime.cs). Depends on durable.watch-handles."
+      "notes": "PiSharp buffers one frame per commit with the 100-frame limit (Observation.cs header). Folding is Chord's PendingOps (chord@1.5.0/Added#12, group F), ported into PiSharp.Durable/Chord/Delta for phase 4. PiSharp-only consumers that expect one call per commit: the device server's agent and document frames (Server AgentFrames.cs, decision 0008: 'one batch of pi-durable events per commit'), the web agent's per-tab mux (decision 0011) and pisharp durable's TUI (DurableRuntime.cs). Depends on durable.watch-handles.",
+      "evidence": {
+        "commits": [
+          "e22a1463",
+          "90cf7adc",
+          "a92e7306"
+        ],
+        "tests": [
+          "tests/PiSharp.Durable.Tests/Session/SessionWatchesCases.cs: keeps-the-acquisition-revision-until-start-then-delivers-the-commits-since-in-one-call",
+          "tests/PiSharp.Durable.Tests/Session/SessionWatchesCases.cs: serializes-callbacks-and-folds-the-commits-made-while-one-is-in-flight-into-the-next",
+          "tests/PiSharp.Durable.Tests/Session/SessionWatchesCases.cs: folds-101-pending-commits-of-one-field-into-one-set",
+          "tests/PiSharp.Durable.Tests/Session/SessionWatchesCases.cs: replaces-the-root-once-more-than-10000-ops-are-pending-after-folding",
+          "tests/PiSharp.Durable.Tests/Session/SessionWatchesCases.cs: never-folds-the-in-flight-frame-into-the-next-call",
+          "tests/PiSharp.Durable.Tests/Session/SessionWatchesCases.cs: folds-a-retirement-into-the-pending-commits-call-which-reports-it-with-the-last-value-and-goes-on",
+          "tests/PiSharp.Durable.Tests/Session/SessionWatchesCases.cs: can-replay-every-delivered-exact-operation-batch-from-the-acquisition-revision",
+          "tests/PiSharp.Durable.Tests/Harness/HarnessViewCases.cs: folds-undelivered-commits-into-one-call-whose-ops-reach-the-newest-view",
+          "tests/PiSharp.Durable.Tests/Harness/HarnessEventsCases.cs: delivers-each-of-100-pending-batches-in-its-own-call-in-order-unlike-state-watches",
+          "tests/PiSharp.Durable.Tests/ExamplesCases.cs: examples.memory.upstream-output"
+        ]
+      }
     },
     {
       "id": "durable.state-getters-removed",
@@ -8682,7 +8726,7 @@
         ],
         "tests": [
           "tests/PiSharp.Durable.Tests/SessionDocumentRetentionCases.cs: never-evicts-a-document-a-watch-observes-and-evicts-it-once-the-last-watch-detaches",
-          "tests/PiSharp.Durable.Tests/SessionDocumentRetentionCases.cs: does-not-keep-a-replacement-cached-for-an-observer-of-the-retired-incarnation",
+          "tests/PiSharp.Durable.Tests/SessionDocumentRetentionCases.cs: pins-only-what-is-at-the-address-a-watch-follows-nothing-while-retired-then-the-new-incarnation",
           "tests/PiSharp.Durable.Tests/SessionDocumentRetentionCases.cs: evicts-on-its-timer-without-a-commit-and-tolerates-a-stop-called-twice",
           "tests/PiSharp.Durable.Tests/Harness/HarnessConversationsCases.cs: forwards-generic-session-document-apis",
           "tests/PiSharp.Durable.Tests/Harness/HarnessLifecycleCases.cs: rejects-conversation-and-harness-operations-once-close-begins-inspect-queued-before-reports-closing",
