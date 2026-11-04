@@ -1,19 +1,32 @@
-// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/chord/src/next/store/archive.ts (the write schema and checkWrite)
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/chord/src/next/store/archive.ts
 //
 // Archives and recorded commits as they cross a trust boundary (slice 6a §13, slice 6b §1.6; decisions "Export archives are operations",
-// "Writes carry their versions; archives are lossless"). Area cv2-store-engine added this file with the part batch apply needs: the
-// compiled schema every applied write is checked against first (upstream WRITE) and checkWrite. The archive's format, its parts and their
-// schema (ARCHIVE_FORMAT, ArchiveManifest, ArchivePart, PART, checkPart) come with export and import (area cv2-store-archive, which owns
-// archive.ts and brings this file to the whole of it). The schemas are built with Chord's schema helpers (Contracts/Schema.cs), as
-// upstream builds them with its own; a write is checked as JSON, the shape the outbox records.
+// "Writes carry their versions; archives are lossless"): the parts an export yields and an import takes, their order, and the compiled
+// schemas every imported part and every applied write is checked against first. Area cv2-store-engine added this file with the write
+// schema batch apply needs (WRITE, checkWrite); area cv2-store-archive, which owns archive.ts, adds the archive's format, its part schema
+// and checkPart. An archive part is its JSON here (a JsonObject in upstream's data form), as the outbox's recorded writes are: upstream's
+// ArchivePart and ArchiveManifest types describe that JSON, which export.ts builds and import.ts reads after checkPart (Export.cs,
+// Import.cs; Index.cs says so). The schemas are built with Chord's schema helpers (Contracts/Schema.cs), as upstream builds them with its
+// own.
 using System.Text.Json.Nodes;
 using PiSharp.Chord.Data;
 using static PiSharp.Chord.Contracts.Schemas;
 
 namespace PiSharp.Chord.Store;
 
+/// <summary>An archive's first part, as import reads it: the format, the store's schema version, its <c>lastSeq</c> and the allocator's
+/// next id (rule 24, D3; upstream <c>ArchiveManifest</c>, whose JSON is <c>{ kind: "manifest", format, schema, lastSeq, nextId }</c>).</summary>
+internal sealed record ArchiveManifest(long Format, long Schema, long LastSeq, long NextId)
+{
+    /// <summary><c>{ kind: "manifest", format, schema, lastSeq, nextId }</c>.</summary>
+    internal JsonObject ToJson() => new() { ["kind"] = "manifest", ["format"] = Format, ["schema"] = Schema, ["lastSeq"] = LastSeq, ["nextId"] = NextId };
+}
+
 internal static partial class StoreInternal
 {
+    /// <summary>The archive format export writes; import takes this one only (upstream <c>ARCHIVE_FORMAT</c>).</summary>
+    internal const long ArchiveFormat = 1;
+
     /// <summary>An integer from <paramref name="min"/> up to 2^53 - 1: seqs, ids, versions and counts stay exact (a seq after 2^53 would
     /// repeat; upstream <c>safe</c>).</summary>
     private static JsonObject Safe(double min) => Int(min: min, max: MaxSafeIntegerLong);
@@ -63,6 +76,31 @@ internal static partial class StoreInternal
         ("version", Safe(1)),
         ("fingerprint", Str()));
 
+    /// <summary>One part of an archive, in this order: the manifest; per table (by SQL name) its <c>table</c> write, its <c>put</c>s and
+    /// its <c>index</c> writes; per document record (by id, live and retired) its <c>document.create</c> without a base, then its kept
+    /// revisions in seq order; <c>end</c> with the count of the parts between (upstream <c>PART</c>, the schema of <c>ArchivePart</c>).</summary>
+    private static readonly JsonObject PartSchema = BuildPartSchema();
+
+    /// <summary>The owner of the part schema's compiled validator (upstream's <c>PART_SCHEMA</c> object).</summary>
+    private static readonly object PartSchemaOwner = new();
+
+    private static JsonObject BuildPartSchema()
+    {
+        var version = Safe(1);
+        // A delta's ops; their shapes are checked where they are applied.
+        var ops = Arr(Unknown());
+        return Union(
+            Obj(("kind", Lit("manifest")), ("format", Safe(1)), ("schema", Safe(1)), ("lastSeq", Safe(0)), ("nextId", Safe(1))),
+            ArchiveTable(),
+            ArchivePut(),
+            ArchiveIndex(),
+            Obj(("kind", Lit("document.create")), ("record", ArchiveRecord())),
+            Obj(("kind", Lit("document.revision")), ("id", Safe(1)), ("seq", Safe(1)), ("content", Union(
+                Obj(("kind", Lit("base")), ("version", version), ("value", Unknown())),
+                Obj(("kind", Lit("delta")), ("version", version), ("ops", ops))))),
+            Obj(("kind", Lit("end")), ("writes", Safe(0))));
+    }
+
     /// <summary>One recorded write of a commit (a batch's); <c>where</c> and <c>set</c> nodes are checked by the applier (upstream
     /// <c>WRITE</c>).</summary>
     private static readonly JsonObject WriteSchema = BuildWriteSchema();
@@ -99,6 +137,16 @@ internal static partial class StoreInternal
                 Obj(("kind", Lit("base")), ("version", version), ("fingerprint", Str()), ("value", Unknown())),
                 Obj(("kind", Lit("delta")), ("version", version), ("ops", ops))))),
             Obj(("kind", Lit("document.retire")), ("id", Safe(1)), ("revision", Safe(1))));
+    }
+
+    /// <summary>Checks one imported part against the archive schema (a trust boundary); <c>invalid/args</c> naming its
+    /// <paramref name="position"/> (upstream <c>checkPart</c>). The check establishes the shape; the part itself is returned.</summary>
+    internal static JsonObject CheckPart(JsonNode? part, long position, ChordContext context)
+    {
+        context.Count("chord.data.validations");
+        if (!DataInternal.ValidatorFor(PartSchemaOwner, PartSchema, context).Check(part))
+            throw DataInternal.Invalid("args", $"import: part {position}: not an archive part");
+        return (JsonObject)part!;
     }
 
     /// <summary>Checks one write of a batch's commit against the write schema (a trust boundary); <paramref name="what"/> names its place

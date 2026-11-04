@@ -9,11 +9,11 @@
 // Upstream runs on one JavaScript thread, each queued step a promise continuation. Here a continuation may run on any thread: the queue's
 // tail, the store's state and its counters are kept under a short lock, a queued step never starts inline (it yields first when nothing is
 // ahead of it, as a promise's then does), and the catalog is replaced, never changed in place, after a COMMIT. Upstream's Store interface
-// is IStore (also IAsyncDisposable, C#'s form of a resource the app owns and closes); its export(context) comes with archives (area
-// cv2-store-archive), as does importStore. ChordStore's members whose types are internal here (TableRecord, CommitFence, Claims, Batch)
-// are internal: table(), tables, commit(), claims, batch, attach() and replay(); its error for a seq past the safe range is an
-// InvalidOperationException, and a close's abort is the context's OperationCanceledException (upstream's awaitWithContext rejects with the
-// signal's reason).
+// is IStore (also IAsyncDisposable, C#'s form of a resource the app owns and closes); its export(context) is Export, whose StoreExport and
+// the parts it reads are in Export.cs (area cv2-store-archive, which added it here). ChordStore's members whose types are internal here
+// (TableRecord, CommitFence, Claims, Batch) are internal: table(), tables, commit(), claims, batch, attach() and replay(); its error for a
+// seq past the safe range is an InvalidOperationException, and a close's abort is the context's OperationCanceledException (upstream's
+// awaitWithContext rejects with the signal's reason).
 using PiSharp.Chord.Data;
 using PiSharp.Chord.Sqlite;
 using PiSharp.Chord.State;
@@ -28,6 +28,10 @@ public interface IStore : IAsyncDisposable
 
     /// <summary>The outbox the sync layer reads; null without one.</summary>
     Outbox? Outbox { get; }
+
+    /// <summary>The store's state after its <c>LastSeq</c> as archive parts (slice 6a §13), holding the commit queue from the first
+    /// <c>MoveNextAsync</c> until the iteration ends, throws, is disposed or <paramref name="context"/> aborts (Export.cs).</summary>
+    StoreExport Export(ChordContext context);
 
     /// <summary>Closes the store: waits for a running commit step, rejects queued commits and reads <c>released</c>, closes the backend.
     /// Idempotent, also after <c>storage_failed</c>; <paramref name="context"/> ends only this caller's wait (the close goes on).</summary>
@@ -388,6 +392,14 @@ public sealed class ChordStore : IStore, IChordStore
         {
             Settle();
         }
+    }
+
+    /// <inheritdoc/>
+    public StoreExport Export(ChordContext context)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+        AssertUsable();
+        return new StoreExport(this, context);
     }
 
     /// <inheritdoc/>
