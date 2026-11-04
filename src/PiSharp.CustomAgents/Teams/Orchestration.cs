@@ -29,7 +29,7 @@ internal static class Requests
 
     /// <summary><c>{state, kind, from, fromConversationId?, to, child, input, entry, messageId?, toolTaskId?, routed?}</c>, keyed by request ID.</summary>
     public static SessionDocFamilyToken Doc { get; } = Documents.DefineSessionDocFamily("pisharp.agents.request", 1,
-        seed => seed as JsonObjectValue ?? JsonObjectValue.Empty);
+        seed => seed as JsonObjectValue ?? JsonObjectValue.Empty, checkpointWhen: (_, _, _) => false);
 
     public static Task<DraftObject> OpenAsync(ITx tx, string id) => tx.DocAsync(Doc, id, JsonObjectValue.Empty);
 

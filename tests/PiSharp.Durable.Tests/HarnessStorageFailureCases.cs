@@ -306,7 +306,8 @@ internal static class StorageFailureTests
             var (harness, root, reports, _, _) = await Start(new MemoryStorage());
             var entry = await Note(root);
             // pi.live keeps no history; a rewindable token of its kind asks for it anyway (upstream `LiveDoc as never`).
-            var liveAsRewindable = Documents.DefineRewindableConversationDoc(Live.LiveDoc.Definition.Kind, 1, DocumentFork.AsOf, () => JsonObjectValue.Empty);
+            var liveAsRewindable = Documents.DefineRewindableConversationDoc(Live.LiveDoc.Definition.Kind, 1, DocumentFork.AsOf, () => JsonObjectValue.Empty,
+                checkpointWhen: (_, _, _) => false);
             var requests = new List<Func<Task>>
             {
                 () => root.EntriesAsync(new EntryQueryBounds(), 10, O("""{"after":"x"}"""), Context),

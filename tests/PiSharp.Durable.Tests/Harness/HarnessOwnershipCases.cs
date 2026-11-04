@@ -1093,7 +1093,8 @@ internal static partial class OwnershipTests
         yield return Case(prefix + "lets-a-background-supervisor-resubmit-after-a-restart-without-submitting-twice", async () =>
         {
             var location = reopenable();
-            var children = Documents.DefineConversationDoc("test.children", 1, DocumentFork.Initial, () => JsonObjectValue.Empty);
+            var children = Documents.DefineConversationDoc("test.children", 1, DocumentFork.Initial, () => JsonObjectValue.Empty,
+                checkpointWhen: (_, _, _) => false);
             var supervisor = Tasks.DefineTask(new TaskDefinition
             {
                 Name = "test.supervisor",

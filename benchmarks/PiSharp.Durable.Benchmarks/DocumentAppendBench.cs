@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/test/document-append-bench.ts
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/test/document-append-bench.ts
 // Appending to a list, one commit per item: one array in one document against one family member per item, as a journal can be stored.
 // Reports milliseconds and microseconds per append at each size. An append costs one copy of the array for the next immutable value;
 // the family's cost stays flat. Upstream's performance.now() is a Stopwatch.
@@ -16,10 +16,11 @@ public static class DocumentAppendBench
     public static IReadOnlyList<int> DefaultSizes { get; } = [1_000, 8_000, 16_000, 32_000];
 
     private static readonly SessionDocToken Journal = Documents.DefineSessionDoc("bench.journal", 1,
-        () => JsonValue.Object(KeyValuePair.Create("entries", (JsonValue)JsonValue.Array())));
+        () => JsonValue.Object(KeyValuePair.Create("entries", (JsonValue)JsonValue.Array())), checkpointWhen: (_, _, _) => false);
 
     private static readonly SessionDocFamilyToken Member = Documents.DefineSessionDocFamily("bench.member", 1,
-        _ => JsonValue.Object(KeyValuePair.Create("issued", (JsonValue)0), KeyValuePair.Create("at", (JsonValue)0)));
+        _ => JsonValue.Object(KeyValuePair.Create("issued", (JsonValue)0), KeyValuePair.Create("at", (JsonValue)0)),
+        checkpointWhen: (_, _, _) => false);
 
     /// <summary>One row: the array and family timings at <paramref name="N"/> appends.</summary>
     public sealed record Row(int N, double ArrayMs, double FamilyMs);

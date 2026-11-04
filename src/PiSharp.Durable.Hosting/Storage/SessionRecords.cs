@@ -8,21 +8,26 @@ namespace PiSharp.Durable.Hosting;
 internal static class SessionRecords
 {
     /// <summary>A judgment: <c>{judgment}</c>, keyed by judgment ID.</summary>
-    public static SessionDocFamilyToken JudgmentDoc { get; } = Documents.DefineSessionDocFamily("pisharp.judgment", 1, _ => JsonObjectValue.Empty);
+    public static SessionDocFamilyToken JudgmentDoc { get; } = Documents.DefineSessionDocFamily("pisharp.judgment", 1, _ => JsonObjectValue.Empty,
+        checkpointWhen: (_, _, _) => false);
 
     /// <summary>An artifact envelope: <c>{artifact}</c>, keyed by artifact ID; written once.</summary>
-    public static SessionDocFamilyToken ArtifactDoc { get; } = Documents.DefineSessionDocFamily("pisharp.artifact", 1, _ => JsonObjectValue.Empty);
+    public static SessionDocFamilyToken ArtifactDoc { get; } = Documents.DefineSessionDocFamily("pisharp.artifact", 1, _ => JsonObjectValue.Empty,
+        checkpointWhen: (_, _, _) => false);
 
     /// <summary>An evidence reference: <c>{evidence}</c>, keyed by evidence ID; written once.</summary>
-    public static SessionDocFamilyToken EvidenceDoc { get; } = Documents.DefineSessionDocFamily("pisharp.evidence", 1, _ => JsonObjectValue.Empty);
+    public static SessionDocFamilyToken EvidenceDoc { get; } = Documents.DefineSessionDocFamily("pisharp.evidence", 1, _ => JsonObjectValue.Empty,
+        checkpointWhen: (_, _, _) => false);
 
     /// <summary>An execution start receipt: <c>{kind, requestHash, taskId, agentId}</c>, keyed by the request's Idempotency-Key.</summary>
-    public static SessionDocFamilyToken OperationDoc { get; } = Documents.DefineSessionDocFamily("pisharp.operation", 1, _ => JsonObjectValue.Empty);
+    public static SessionDocFamilyToken OperationDoc { get; } = Documents.DefineSessionDocFamily("pisharp.operation", 1, _ => JsonObjectValue.Empty,
+        checkpointWhen: (_, _, _) => false);
 
     /// <summary>The newest records of a session, for lists: <c>{artifacts: [id], judgments: [id], evidence: [id]}</c>, each at most
     /// <see cref="MaxIndex"/>, newest first. The records themselves stay readable by ID after they leave the index.</summary>
     public static SessionDocToken IndexDoc { get; } = Documents.DefineSessionDoc("pisharp.records", 1,
-        () => JsonValue.Object([new("artifacts", JsonArrayValue.Empty), new("judgments", JsonArrayValue.Empty), new("evidence", JsonArrayValue.Empty)]));
+        () => JsonValue.Object([new("artifacts", JsonArrayValue.Empty), new("judgments", JsonArrayValue.Empty), new("evidence", JsonArrayValue.Empty)]),
+        checkpointWhen: (_, _, _) => false);
 
     /// <summary>How many IDs of each kind the index keeps.</summary>
     public const int MaxIndex = 500;

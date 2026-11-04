@@ -36,7 +36,8 @@ public static partial class Examples
     // what the document looked like when a particular entry was written. AsOf: a fork starts with the value these notes had at the fork
     // entry (see 02-forks).
     private static readonly RewindableConversationDocToken Notes =
-        Documents.DefineRewindableConversationDoc("example.notes", 1, DocumentFork.AsOf, () => JsonValue.Object([new("text", "")]));
+        Documents.DefineRewindableConversationDoc("example.notes", 1, DocumentFork.AsOf, () => JsonValue.Object([new("text", "")]),
+            checkpointWhen: (_, _, _) => false);
 
     private delegate Task Example(Func<Task<IStorage>> open, TextWriter output);
 
@@ -242,7 +243,7 @@ public static partial class Examples
         // Latest keeps only the current value. Initial means forks of this conversation start without a registry, so a child doesn't
         // inherit its parent's list of agents.
         var agentRegistry = Documents.DefineConversationDoc("example.agent-registry", 1, DocumentFork.Initial,
-            () => JsonValue.Object([new("agents", JsonValue.Object([]))]));
+            () => JsonValue.Object([new("agents", JsonValue.Object([]))]), checkpointWhen: (_, _, _) => false);
 
         var main = await session.CommitAsync(tx => tx.CreateConversationAsync(ConversationOwnership.Ownerless), Context);
 

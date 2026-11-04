@@ -35,7 +35,8 @@ public static class WorkflowTools
     public const string StatusToolName = "workflow_status";
 
     /// <summary><c>pisharp.workflow.start</c> (task scope, on the tool task): <c>{ taskId, conversationId }</c> of the run it started.</summary>
-    internal static TaskDocToken Receipt { get; } = Documents.DefineTaskDoc("pisharp.workflow.start", 1, () => JsonObjectValue.Empty);
+    internal static TaskDocToken Receipt { get; } = Documents.DefineTaskDoc("pisharp.workflow.start", 1, () => JsonObjectValue.Empty,
+        checkpointWhen: (_, _, _) => false);
 
     private static readonly JsonObjectValue StatusParameters = (JsonObjectValue)JsonValue.Parse(
         """{"type":"object","required":["task_id"],"properties":{"task_id":{"type":"integer","description":"The run's task ID"}}}""");

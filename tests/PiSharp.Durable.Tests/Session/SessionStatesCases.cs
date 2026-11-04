@@ -10,8 +10,10 @@ internal static partial class SessionTests
 {
     private static IEnumerable<(string, Func<Task>)> States(string prefix, Func<IStorage> storageFactory)
     {
-        var stateDoc = Documents.DefineSessionDoc("state.state", 1, () => O("{\"value\":0,\"retained\":{\"label\":\"stable\"}}"));
-        var familyDoc = Documents.DefineSessionDocFamily("state.family", 1, seed => Obj(("value", S(seed).Length)));
+        var stateDoc = Documents.DefineSessionDoc("state.state", 1, () => O("{\"value\":0,\"retained\":{\"label\":\"stable\"}}"),
+            checkpointWhen: (_, _, _) => false);
+        var familyDoc = Documents.DefineSessionDocFamily("state.family", 1, seed => Obj(("value", S(seed).Length)),
+            checkpointWhen: (_, _, _) => false);
         static double ValueOf(JsonObjectValue? value) => N(value!["value"]);
         static Task SetValue(Session session, SessionDocToken token, double value) =>
             session.CommitAsync(async tx => (await tx.DocAsync(token))["value"] = value, Context);
@@ -124,7 +126,8 @@ internal static partial class SessionTests
 
         yield return Case(prefix + "cold-loads-a-definition-free-fork-copy", async () =>
         {
-            var copied = Documents.DefineConversationDoc("state.copied", 1, DocumentFork.Current, () => O("{\"value\":0}"));
+            var copied = Documents.DefineConversationDoc("state.copied", 1, DocumentFork.Current, () => O("{\"value\":0}"),
+                checkpointWhen: (_, _, _) => false);
             var (storage, session, _) = Open(storageFactory);
             var parentId = await CreateConversation(session);
             var entry = await session.CommitAsync(async tx =>
@@ -143,8 +146,9 @@ internal static partial class SessionTests
 
         yield return Case(prefix + "hydrates-a-migrated-tracker-without-writing-and-skips-an-equal-version-base-update", async () =>
         {
-            var old = Documents.DefineSessionDoc("state.migration", 1, () => O("{\"value\":3}"));
+            var old = Documents.DefineSessionDoc("state.migration", 1, () => O("{\"value\":3}"), checkpointWhen: (_, _, _) => false);
             var current = Documents.DefineSessionDoc("state.migration", 2, () => O("{\"value\":0,\"migrated\":false}"),
+                checkpointWhen: (_, _, _) => false,
                 migrate: (value, _) => Obj(("value", value["value"]), ("migrated", true)));
             var (storage, session, _) = Open(storageFactory);
             await session.CommitAsync(tx => tx.DocAsync(old), Context);

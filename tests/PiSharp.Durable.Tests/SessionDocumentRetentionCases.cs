@@ -28,19 +28,24 @@ internal static class DocumentRetentionTests
     private static readonly DurableContext Context = DurableContext.Background;
 
     private static readonly ConversationDocToken CounterDoc =
-        Documents.DefineConversationDoc("test.retention.counter", 1, DocumentFork.Initial, () => O("""{"count":0}"""));
+        Documents.DefineConversationDoc("test.retention.counter", 1, DocumentFork.Initial, () => O("""{"count":0}"""),
+            checkpointWhen: (_, _, _) => false);
     private static readonly RewindableConversationDocToken RewindableDoc =
-        Documents.DefineRewindableConversationDoc("test.retention.rewindable", 1, DocumentFork.AsOf, () => O("""{"count":0}"""));
+        Documents.DefineRewindableConversationDoc("test.retention.rewindable", 1, DocumentFork.AsOf, () => O("""{"count":0}"""),
+            checkpointWhen: (_, _, _) => false);
     /// <summary>A third-party conversation family: one member per event.</summary>
     private static readonly ConversationDocFamilyToken EventDoc =
-        Documents.DefineConversationDocFamily("test.retention.event", 1, DocumentFork.Initial, seq => Obj(("seq", seq)));
-    private static readonly SessionDocToken SessionCounterDoc = Documents.DefineSessionDoc("test.retention.session-counter", 1, () => O("""{"count":0}"""));
+        Documents.DefineConversationDocFamily("test.retention.event", 1, DocumentFork.Initial, seq => Obj(("seq", seq)),
+            checkpointWhen: (_, _, _) => false);
+    private static readonly SessionDocToken SessionCounterDoc = Documents.DefineSessionDoc("test.retention.session-counter", 1, () => O("""{"count":0}"""),
+        checkpointWhen: (_, _, _) => false);
     /// <summary>A session document whose checkpoint predicate throws, so the commit that changes it fails while it settles.</summary>
     private static readonly SessionDocToken Failing = Documents.DefineSessionDoc("test.retention.failing", 1, () => O("""{"count":0}"""),
         checkpointWhen: (_, _, _) => throw new InvalidOperationException("checkpoint failed"));
     /// <summary>A conversation document any Harness test can read.</summary>
     private static readonly ConversationDocToken TestDoc =
-        Documents.DefineConversationDoc("test.retention.harness", 1, DocumentFork.Initial, () => O("""{"count":0}"""));
+        Documents.DefineConversationDoc("test.retention.harness", 1, DocumentFork.Initial, () => O("""{"count":0}"""),
+            checkpointWhen: (_, _, _) => false);
 
     /// <summary>The default retention of this run, as Program.cs set it from PI_DURABLE_DOCUMENT_RETENTION_MS.</summary>
     private static double DefaultForRun => SetupDocumentRetention.DefaultForRun;
@@ -359,9 +364,10 @@ internal static class DocumentRetentionTests
 
         yield return Case(prefix + "migrates-a-document-again-after-its-eviction", async () =>
         {
-            var v1 = Documents.DefineSessionDoc("test.retention.migrating", 1, () => O("""{"count":1}"""));
+            var v1 = Documents.DefineSessionDoc("test.retention.migrating", 1, () => O("""{"count":1}"""), checkpointWhen: (_, _, _) => false);
             var migrations = 0;
             var v2 = Documents.DefineSessionDoc("test.retention.migrating", 2, () => O("""{"count":0,"migrated":true}"""),
+                checkpointWhen: (_, _, _) => false,
                 migrate: (value, _) =>
                 {
                     Interlocked.Increment(ref migrations);
@@ -498,8 +504,9 @@ internal static class DocumentRetentionTests
 
         yield return Case(prefix + "keeps-a-reloaded-newer-version-cached-while-an-observer-of-the-older-one-is-attached", async () =>
         {
-            var v1 = Documents.DefineSessionDoc("test.retention.versioned", 1, () => O("""{"count":3}"""));
+            var v1 = Documents.DefineSessionDoc("test.retention.versioned", 1, () => O("""{"count":3}"""), checkpointWhen: (_, _, _) => false);
             var v2 = Documents.DefineSessionDoc("test.retention.versioned", 2, () => O("""{"count":0,"v2":true}"""),
+                checkpointWhen: (_, _, _) => false,
                 migrate: (value, _) => Obj(("count", value["count"]), ("v2", true)));
             var (_, session, _) = Open(0);
             await session.CommitAsync(async tx => await tx.DocAsync(v1), Context);

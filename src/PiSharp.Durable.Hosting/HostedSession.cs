@@ -33,7 +33,8 @@ public sealed partial class HostedSession
 
     /// <summary>A creation key's record (<c>{conversation, request}</c>), written in the commit that creates the conversation, so a retried
     /// creation finds the first one's agent (the device server's <c>Idempotency-Key</c>).</summary>
-    private static readonly SessionDocFamilyToken CreationKeys = Documents.DefineSessionDocFamily("pisharp.creation-key", 1, _ => JsonObjectValue.Empty);
+    private static readonly SessionDocFamilyToken CreationKeys = Documents.DefineSessionDocFamily("pisharp.creation-key", 1, _ => JsonObjectValue.Empty,
+        checkpointWhen: (_, _, _) => false);
 
     internal HostedSession(DurableDeviceHost host, CatalogSession row)
     {

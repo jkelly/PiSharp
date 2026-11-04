@@ -341,17 +341,19 @@ public static class Jobs
 
     /// <summary>The agent's job runs, newest first: <c>{items: [run], counters: {job: n}}</c>.</summary>
     public static ConversationDocToken RunsDoc { get; } = Documents.DefineConversationDoc("pisharp.job-runs", 1, DocumentFork.Initial,
-        () => JsonValue.Object([new("items", JsonArrayValue.Empty), new("counters", JsonObjectValue.Empty)]));
+        () => JsonValue.Object([new("items", JsonArrayValue.Empty), new("counters", JsonObjectValue.Empty)]), checkpointWhen: (_, _, _) => false);
 
     /// <summary>The decision an approval waits for: <c>{decision?: {approved, at}}</c>, on the approval task.</summary>
-    internal static TaskDocToken ApprovalDoc { get; } = Documents.DefineTaskDoc("pisharp.job-approval", 1, () => JsonObjectValue.Empty);
+    internal static TaskDocToken ApprovalDoc { get; } = Documents.DefineTaskDoc("pisharp.job-approval", 1, () => JsonObjectValue.Empty,
+        checkpointWhen: (_, _, _) => false);
 
     /// <summary>Which job a <c>run_durable_job</c> call started, so a rerun finds it.</summary>
-    private static readonly TaskDocToken StartReceipt = Documents.DefineTaskDoc("pisharp.job-start", 1, () => JsonObjectValue.Empty);
+    private static readonly TaskDocToken StartReceipt = Documents.DefineTaskDoc("pisharp.job-start", 1, () => JsonObjectValue.Empty,
+        checkpointWhen: (_, _, _) => false);
 
     /// <summary>The full run record, independent of the bounded conversation card window.</summary>
     internal static ConversationDocFamilyToken RecordDoc { get; } = Documents.DefineConversationDocFamily("pisharp.job-record", 1,
-        DocumentFork.Initial, _ => JsonObjectValue.Empty);
+        DocumentFork.Initial, _ => JsonObjectValue.Empty, checkpointWhen: (_, _, _) => false);
 
     /// <summary>The approval task every approval phase creates.</summary>
     internal static DurableTask ApprovalTask { get; } = Tasks.DefineTask(new TaskDefinition

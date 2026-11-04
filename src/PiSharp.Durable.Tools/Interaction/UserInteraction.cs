@@ -25,7 +25,8 @@ public static class UserInteraction
     /// approval: <c>{kind: "plan-approval", plan, planFile?, directory, createdAt, response?: {status: "approved"|"rejected"|"cancelled",
     /// stop?, feedback?, at}}</c>. A document without <c>kind</c> was never created by the tool.
     /// </summary>
-    public static TaskDocToken InteractionDoc { get; } = Documents.DefineTaskDoc("pisharp.interaction", 1, () => JsonObjectValue.Empty);
+    public static TaskDocToken InteractionDoc { get; } = Documents.DefineTaskDoc("pisharp.interaction", 1, () => JsonObjectValue.Empty,
+        checkpointWhen: (_, _, _) => false);
 
     /// <summary>The <c>user-interaction</c> extension. Hosts that cannot show the user a question (a subagent's child conversation, a
     /// headless run) should not select it.</summary>

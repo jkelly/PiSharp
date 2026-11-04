@@ -2,6 +2,7 @@
 // (expectTypeOf and @ts-expect-error) are compile-time checks here: TypeChecks below must compile, and each @ts-expect-error line is kept
 // as a comment naming the overload that does not exist. Their runtime parts (the snapshot calls of the first type case) run as upstream's
 // do. "version 1.5" cannot be written: versions are int.
+using System.Reflection;
 using PiSharp.Durable;
 using PiSharp.Durable.Chord;
 using PiSharp.Durable.Chord.Delta;
@@ -9,25 +10,56 @@ using static Program;
 
 internal static partial class SessionTests
 {
-    private static readonly SessionDocToken DefinitionsSessionDoc = Documents.DefineSessionDoc("t.session", 1, () => O("{\"value\":0}"));
+    private static readonly SessionDocToken DefinitionsSessionDoc = Documents.DefineSessionDoc("t.session", 1, () => O("{\"value\":0}"),
+        checkpointWhen: (_, _, _) => false);
     private static readonly ConversationDocToken DefinitionsLatestDoc =
-        Documents.DefineConversationDoc("t.latest", 1, DocumentFork.Current, () => O("{\"value\":0}"));
+        Documents.DefineConversationDoc("t.latest", 1, DocumentFork.Current, () => O("{\"value\":0}"), checkpointWhen: (_, _, _) => false);
     private static readonly RewindableConversationDocToken DefinitionsRewindableDoc =
-        Documents.DefineRewindableConversationDoc("t.rewindable", 1, DocumentFork.AsOf, () => O("{\"value\":0}"));
-    private static readonly TaskDocToken DefinitionsTaskDoc = Documents.DefineTaskDoc("t.task", 1, () => O("{\"value\":0}"));
+        Documents.DefineRewindableConversationDoc("t.rewindable", 1, DocumentFork.AsOf, () => O("{\"value\":0}"), checkpointWhen: (_, _, _) => false);
+    private static readonly TaskDocToken DefinitionsTaskDoc = Documents.DefineTaskDoc("t.task", 1, () => O("{\"value\":0}"),
+        checkpointWhen: (_, _, _) => false);
     private static readonly SessionDocFamilyToken DefinitionsSessionFamily =
-        Documents.DefineSessionDocFamily("t.session-family", 1, seed => Obj(("value", seed)));
+        Documents.DefineSessionDocFamily("t.session-family", 1, seed => Obj(("value", seed)), checkpointWhen: (_, _, _) => false);
     private static readonly RewindableConversationDocFamilyToken DefinitionsConversationFamily =
-        Documents.DefineRewindableConversationDocFamily("t.conversation-family", 1, DocumentFork.Initial, seed => Obj(("value", seed)));
-    private static readonly TaskDocFamilyToken DefinitionsTaskFamily = Documents.DefineTaskDocFamily("t.task-family", 1, seed => Obj(("value", seed)));
+        Documents.DefineRewindableConversationDocFamily("t.conversation-family", 1, DocumentFork.Initial, seed => Obj(("value", seed)),
+            checkpointWhen: (_, _, _) => false);
+    private static readonly TaskDocFamilyToken DefinitionsTaskFamily = Documents.DefineTaskDocFamily("t.task-family", 1, seed => Obj(("value", seed)),
+        checkpointWhen: (_, _, _) => false);
 
     private static IEnumerable<(string, Func<Task>)> Definitions(string prefix, Func<IStorage> storageFactory)
     {
+        // Pi v1.5.0 (area checkpoint-when). Upstream's two @ts-expect-error lines are compile-time checks here too, since checkpointWhen is a
+        // required, non-nullable parameter of every factory:
+        // @ts-expect-error document definitions require checkpointWhen:        Documents.DefineSessionDoc("t.missing-checkpoint", 1, initial)
+        // @ts-expect-error document family definitions require checkpointWhen: Documents.DefineSessionDocFamily("t.missing-family-checkpoint",
+        //                                                                       1, seed => ...)
+        // The case checks the same by reflection, and that a null predicate, which C# still lets a caller pass, is rejected.
+        yield return Case(prefix + "requires-an-explicit-checkpoint-predicate-for-documents-and-families", () =>
+        {
+            var factories = typeof(Documents).GetMethods(BindingFlags.Public | BindingFlags.Static)
+                .Where(method => method.Name.StartsWith("Define", StringComparison.Ordinal)).ToList();
+            Equal(8, factories.Count, "one factory per scope, singleton and family");
+            var nullability = new NullabilityInfoContext();
+            foreach (var factory in factories)
+            {
+                var parameter = factory.GetParameters().SingleOrDefault(parameter => parameter.Name == "checkpointWhen")
+                    ?? throw new InvalidOperationException($"{factory.Name} takes no checkpointWhen");
+                Check(!parameter.IsOptional && !parameter.HasDefaultValue, $"{factory.Name} requires checkpointWhen");
+                Equal(typeof(DocumentCheckpointPredicate), parameter.ParameterType, $"{factory.Name} predicate type");
+                Equal(NullabilityState.NotNull, nullability.Create(parameter).WriteState, $"{factory.Name} predicate nullability");
+            }
+            Program.Throws<ArgumentNullException>(() => Documents.DefineSessionDoc("t.missing-checkpoint", 1, () => O("{\"value\":0}"), null!),
+                "a document without a predicate");
+            Program.Throws<ArgumentNullException>(() => Documents.DefineSessionDocFamily("t.missing-family-checkpoint", 1,
+                seed => Obj(("value", seed)), null!), "a family without a predicate");
+        });
+
         yield return Case(prefix + "validates-persisted-version-semantics", () =>
         {
-            Rejects(Program.Throws<ArgumentException>(() => Documents.DefineSessionDoc("k", 0, () => O("{\"value\":0}")), "version 0"), "positive integer", "version 0");
+            Rejects(Program.Throws<ArgumentException>(() => Documents.DefineSessionDoc("k", 0, () => O("{\"value\":0}"),
+                checkpointWhen: (_, _, _) => false), "version 0"), "positive integer", "version 0");
             // Upstream: version 1.5 also rejects; a C# version is an int.
-            Equal("", Documents.DefineSessionDoc("", 1, () => O("{\"value\":0}")).Definition.Kind, "empty kind");
+            Equal("", Documents.DefineSessionDoc("", 1, () => O("{\"value\":0}"), checkpointWhen: (_, _, _) => false).Definition.Kind, "empty kind");
             Equal("t.session", DefinitionsSessionDoc.Definition.Kind, "kind");
         });
 

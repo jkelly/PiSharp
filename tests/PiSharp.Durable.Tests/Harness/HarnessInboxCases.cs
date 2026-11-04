@@ -242,7 +242,7 @@ internal static class InboxTests
             var f2 = await Submit(root, "f2");
             // Occupy the line, let the answer queue its boundary commit behind it, then change the mode.
             var held = storage.HoldCommits();
-            var marker = Documents.DefineSessionDoc("test.marker", 1, () => O("""{"n":0}"""));
+            var marker = Documents.DefineSessionDoc("test.marker", 1, () => O("""{"n":0}"""), checkpointWhen: (_, _, _) => false);
             var occupying = root.CommitAsync(async tx =>
             {
                 var doc = await tx.DocAsync(marker);

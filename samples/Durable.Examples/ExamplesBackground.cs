@@ -23,7 +23,7 @@ public static partial class Examples
     // document that maps subagent names to their conversations ({conversationId, reported: answers already reported}) and the reporter task
     // of each subagent tool call. A fork of the main conversation starts without subagents.
     private static readonly ConversationDocToken Subagents = Documents.DefineConversationDoc("app.subagents", 1, DocumentFork.Initial,
-        () => JsonValue.Object([new("agents", JsonObjectValue.Empty), new("reporters", JsonObjectValue.Empty)]));
+        () => JsonValue.Object([new("agents", JsonObjectValue.Empty), new("reporters", JsonObjectValue.Empty)]), checkpointWhen: (_, _, _) => false);
 
     private static TaskPhaseHandler Terminal(Func<TaskState> state) => (_, runtime, taskContext) => runtime.CommitAsync((_, _) => state(), taskContext);
 

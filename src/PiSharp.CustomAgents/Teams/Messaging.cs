@@ -96,7 +96,7 @@ internal static class Mailboxes
 
     /// <summary><c>{messages: [{id, from, to, kind, text, correlationId?, requestId?, at, ack?}]}</c>, keyed by address.</summary>
     public static SessionDocFamilyToken Doc { get; } = Documents.DefineSessionDocFamily("pisharp.agents.mailbox", 1,
-        seed => seed as JsonObjectValue ?? JsonObjectValue.Empty);
+        seed => seed as JsonObjectValue ?? JsonObjectValue.Empty, checkpointWhen: (_, _, _) => false);
 
     public static Task<DraftObject> OpenAsync(ITx tx, string address) => tx.DocAsync(Doc, address, JsonObjectValue.Empty);
 

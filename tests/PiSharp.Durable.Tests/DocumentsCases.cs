@@ -11,22 +11,28 @@ internal static partial class Program
         Case("documents.validates-definitions", () =>
         {
             Equal("Document notes version must be a positive integer",
-                Throws<ArgumentException>(() => Documents.DefineSessionDoc("notes", 0, () => JsonObjectValue.Empty), "version 0").Message, "message");
-            Throws<ArgumentException>(() => Documents.DefineConversationDoc("notes", 1, DocumentFork.AsOf, () => JsonObjectValue.Empty), "latest asOf");
-            var rewindable = Documents.DefineRewindableConversationDoc("notes", 2, DocumentFork.AsOf, () => JsonObjectValue.Empty);
+                Throws<ArgumentException>(() => Documents.DefineSessionDoc("notes", 0, () => JsonObjectValue.Empty,
+                    checkpointWhen: (_, _, _) => false), "version 0").Message, "message");
+            Throws<ArgumentException>(() => Documents.DefineConversationDoc("notes", 1, DocumentFork.AsOf, () => JsonObjectValue.Empty,
+                checkpointWhen: (_, _, _) => false), "latest asOf");
+            var rewindable = Documents.DefineRewindableConversationDoc("notes", 2, DocumentFork.AsOf, () => JsonObjectValue.Empty,
+                checkpointWhen: (_, _, _) => false);
             Check(rewindable is ConversationDocToken, "a rewindable token is a conversation token");
             Equal(DocumentHistory.Rewindable, rewindable.Definition.History, "history");
-            var family = Documents.DefineTaskDocFamily("cache", 1, seed => JsonObjectValue.From([KeyValuePair.Create("seed", seed)]));
+            var family = Documents.DefineTaskDocFamily("cache", 1, seed => JsonObjectValue.From([KeyValuePair.Create("seed", seed)]),
+                checkpointWhen: (_, _, _) => false);
             Check(family.Definition.Family, "family");
             Same("{\"seed\":7}", family.Definition.Initial(7), "family initial(seed)");
         }),
         Case("documents.resolves-addresses-by-scope-owner-and-key", () =>
         {
-            var conversationFamily = Documents.DefineConversationDocFamily("cache", 1, DocumentFork.Current, _ => JsonObjectValue.Empty);
+            var conversationFamily = Documents.DefineConversationDocFamily("cache", 1, DocumentFork.Current, _ => JsonObjectValue.Empty,
+                checkpointWhen: (_, _, _) => false);
             var resolved = Documents.ResolveAddress(conversationFamily.Definition, 3, "member");
             Equal(new DocumentAddress("cache", DocumentScope.Conversation(new(3)), "member"), resolved.Address, "address");
             Equal("[\"cache\",\"conversation\",3,\"member\"]", resolved.Id, "address ID");
-            var session = Documents.ResolveAddress(Documents.DefineSessionDoc("settings", 1, () => JsonObjectValue.Empty).Definition, null, null);
+            var session = Documents.ResolveAddress(Documents.DefineSessionDoc("settings", 1, () => JsonObjectValue.Empty,
+                checkpointWhen: (_, _, _) => false).Definition, null, null);
             Equal("[\"settings\",\"session\",null,null]", session.Id, "session address ID");
             Equal("Document cache requires a conversation ID",
                 Throws<ArgumentException>(() => Documents.ResolveAddress(conversationFamily.Definition, null, "member"), "missing owner").Message, "message");
@@ -41,15 +47,18 @@ internal static partial class Program
                 Id = new(9), Kind = "notes", Scope = DocumentScope.Conversation(ConversationId.Root), History = DocumentHistory.Latest,
                 Fork = DocumentFork.Current, CreatedAt = new(1),
             };
-            var noMigration = Documents.DefineConversationDoc("notes", 2, DocumentFork.Current, () => JsonObjectValue.Empty);
+            var noMigration = Documents.DefineConversationDoc("notes", 2, DocumentFork.Current, () => JsonObjectValue.Empty,
+                checkpointWhen: (_, _, _) => false);
             Equal("Document 9 (notes) requires migration from version 1",
                 Throws<InvalidOperationException>(() => Documents.MaterializeDocumentValue(noMigration.Definition, record, 1, JsonObjectValue.Empty), "older").Message, "message");
             Equal("Document 9 (notes) has newer version 3 than 2",
                 Throws<InvalidOperationException>(() => Documents.MaterializeDocumentValue(noMigration.Definition, record, 3, JsonObjectValue.Empty), "newer").Message, "message");
-            var initialFork = Documents.DefineConversationDoc("notes", 1, DocumentFork.Initial, () => JsonObjectValue.Empty);
+            var initialFork = Documents.DefineConversationDoc("notes", 1, DocumentFork.Initial, () => JsonObjectValue.Empty,
+                checkpointWhen: (_, _, _) => false);
             Equal("Document 9 (notes) does not match the supplied definition semantics",
                 Throws<ArgumentException>(() => Documents.MaterializeDocumentValue(initialFork.Definition, record, 1, JsonObjectValue.Empty), "fork").Message, "message");
             var migrating = Documents.DefineConversationDoc("notes", 2, DocumentFork.Current, () => JsonObjectValue.Empty,
+                checkpointWhen: (_, _, _) => false,
                 migrate: (value, fromVersion) => JsonObjectValue.From([KeyValuePair.Create("from", (JsonValue)fromVersion)]));
             Same("{\"from\":1}", Documents.MaterializeDocumentValue(migrating.Definition, record, 1, JsonObjectValue.Empty), "migrated");
             var current = (JsonObjectValue)J("{\"kept\":true}");

@@ -179,7 +179,8 @@ public static partial class Examples
 
     // The current plan of a conversation. A fork keeps the plan it had at the fork entry.
     private static readonly RewindableConversationDocToken PlanDoc =
-        Documents.DefineRewindableConversationDoc("app.plan", 1, DocumentFork.AsOf, () => JsonValue.Object([new("steps", JsonValue.Array())]));
+        Documents.DefineRewindableConversationDoc("app.plan", 1, DocumentFork.AsOf, () => JsonValue.Object([new("steps", JsonValue.Array())]),
+            checkpointWhen: (_, _, _) => false);
 
     private static async Task PlanModeAsync(Func<Task<IStorage>> open, TextWriter output)
     {

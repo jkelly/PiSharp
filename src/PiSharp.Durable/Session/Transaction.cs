@@ -676,7 +676,7 @@ internal sealed class Transaction : ITx
             {
                 var info = new CheckpointInfo(change.Loaded.DeltasSinceBase);
                 var value = (JsonObjectValue)change.Prepared.Value;
-                if (change.Definition?.CheckpointWhen?.Invoke(value, change.Prepared.Ops, info) == true)
+                if (change.Definition!.CheckpointWhen(value, change.Prepared.Ops, info))
                     plan.Content = write with { Content = DocumentContent.Base(change.Version, value) };
             }
             if (plan.Content is not null) writes.Add(plan.Content);

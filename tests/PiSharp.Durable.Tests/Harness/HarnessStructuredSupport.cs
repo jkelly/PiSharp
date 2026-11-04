@@ -61,7 +61,8 @@ internal static partial class StructuredTests
     });
 
     /// <summary>Upstream <c>TaskNotes</c>.</summary>
-    internal static readonly TaskDocToken TaskNotes = Documents.DefineTaskDoc("test.task-notes", 1, () => O("""{"text":""}"""));
+    internal static readonly TaskDocToken TaskNotes = Documents.DefineTaskDoc("test.task-notes", 1, () => O("""{"text":""}"""),
+        checkpointWhen: (_, _, _) => false);
 
     /// <summary>The input of a node named <paramref name="name"/>.</summary>
     internal static JsonObjectValue NodeInput(string name) => Obj(("name", name));

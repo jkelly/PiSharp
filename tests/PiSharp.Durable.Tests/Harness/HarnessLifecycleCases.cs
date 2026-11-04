@@ -364,7 +364,7 @@ internal static class LifecycleTests
 
         yield return Case(prefix + "publishes-no-frame-to-states-and-watches-from-a-commit-that-settles-during-close", async () =>
         {
-            var notes = Documents.DefineSessionDoc("test.close-frames", 1, () => O("""{"text":""}"""));
+            var notes = Documents.DefineSessionDoc("test.close-frames", 1, () => O("""{"text":""}"""), checkpointWhen: (_, _, _) => false);
             var storage = new ControlledStorage(await fresh());
             var (harness, _, _) = await OpenTasks(storage, []);
             var root = await harness.RootAsync(Context);
@@ -411,7 +411,7 @@ internal static class LifecycleTests
 
         yield return Case(prefix + "leaves-no-subscription-behind-a-watch-acquisition-cancelled-on-the-line", async () =>
         {
-            var notes = Documents.DefineSessionDoc("test.cancelled-watch", 1, () => O("""{"text":""}"""));
+            var notes = Documents.DefineSessionDoc("test.cancelled-watch", 1, () => O("""{"text":""}"""), checkpointWhen: (_, _, _) => false);
             var storage = new ControlledStorage(await fresh());
             var (harness, _, _) = await OpenTasks(storage, []);
             var root = await harness.RootAsync(Context);
@@ -505,8 +505,8 @@ internal static class LifecycleTests
 
         yield return Case(prefix + "completes-reads-queued-at-the-seal-and-rejects-queued-waits-and-acquisitions-that-would-follow-commits", async () =>
         {
-            var notes = Documents.DefineSessionDoc("test.queued-at-seal", 1, () => O("""{"text":""}"""));
-            var absent = Documents.DefineSessionDoc("test.queued-absent", 1, () => O("""{"text":""}"""));
+            var notes = Documents.DefineSessionDoc("test.queued-at-seal", 1, () => O("""{"text":""}"""), checkpointWhen: (_, _, _) => false);
+            var absent = Documents.DefineSessionDoc("test.queued-absent", 1, () => O("""{"text":""}"""), checkpointWhen: (_, _, _) => false);
             var pending = OneStep("test.queued-pending");
             var storage = new ControlledStorage(await fresh());
             var (harness, _, _) = await OpenTasks(storage, []);
@@ -578,7 +578,7 @@ internal static class LifecycleTests
         yield return Case(prefix + "never-schedules-from-a-read-only-viewer", async () =>
         {
             var (harness, root, id, submissionId, ran) = await Paused();
-            var notes = Documents.DefineSessionDoc("test.viewer-notes", 1, () => O("""{"text":""}"""));
+            var notes = Documents.DefineSessionDoc("test.viewer-notes", 1, () => O("""{"text":""}"""), checkpointWhen: (_, _, _) => false);
             await harness.CommitAsync(async tx => { await tx.DocAsync(notes); }, Context);
             await harness.InspectAsync(Context);
             await harness.GetTaskAsync(id, Context);
