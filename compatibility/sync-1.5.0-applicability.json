@@ -56,11 +56,11 @@
     "changelogBullets": 477,
     "repeatedBullets": 23,
     "byStatus": {
-      "ported": 180,
+      "ported": 182,
       "ported-with-deferral": 17,
       "already-ported": 12,
       "no-op": 25,
-      "port": 92
+      "port": 90
     },
     "byArea": {
       "ai": 58,
@@ -7829,7 +7829,7 @@
       "id": "durable.pi-schema-tools",
       "area": "durable",
       "phase": 4,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "durable@1.5.0/Breaking Changes#1"
       ],
@@ -7864,7 +7864,25 @@
         "tests/PiSharp.Durable.Tests/HarnessStructuredOutputCases.cs"
       ],
       "release": "1.5.0",
-      "notes": "PiSharp validates tool arguments and structured output with Internal/PiAi/Validation.cs, a verbatim copy of PiSharp.Agent/ToolArgumentValidation.cs (the TypeBox Compile port), because PiSharp.Durable references only Contracts and AI (decision 0005 §4). Depends on the schema.* rows (the pi-schema port) and on the row that moves PiSharp.Agent's validator to it: the durable copy follows, unless the owner lets PiSharp.Durable reference the pi-schema assembly (a change to 0005 §4). 0013 design point 'Tool argument validation' applies (pi-schema error texts; TypeBox-only features stop applying). ToolArgs<T>/Static typing is TypeScript-only; C# tools keep JSON Schema parameters. PiSharp-only tools that hand-write JSON Schema (Durable.Tools Interaction/, PlanMode/ and Media/, CustomAgents tools, Hosting Apps/AppTools.cs) see only the new error wording."
+      "notes": "PiSharp validates tool arguments and structured output with Internal/PiAi/Validation.cs, a verbatim copy of PiSharp.Agent/ToolArgumentValidation.cs (the TypeBox Compile port), because PiSharp.Durable references only Contracts and AI (decision 0005 §4). Depends on the schema.* rows (the pi-schema port) and on the row that moves PiSharp.Agent's validator to it: the durable copy follows, unless the owner lets PiSharp.Durable reference the pi-schema assembly (a change to 0005 §4). 0013 design point 'Tool argument validation' applies (pi-schema error texts; TypeBox-only features stop applying). ToolArgs<T>/Static typing is TypeScript-only; C# tools keep JSON Schema parameters. PiSharp-only tools that hand-write JSON Schema (Durable.Tools Interaction/, PlanMode/ and Media/, CustomAgents tools, Hosting Apps/AppTools.cs) see only the new error wording.",
+      "evidence": {
+        "commits": [
+          "2452620e",
+          "72c632a0",
+          "07347bfc"
+        ],
+        "tests": [
+          "tests/PiSharp.Durable.Tests/PiAiValidationCases.cs: piai.validation.lists-pi-schema-s-errors-then-the-arguments-it-received",
+          "tests/PiSharp.Durable.Tests/PiAiValidationCases.cs: piai.validation.reports-a-missing-required-property-at-the-property",
+          "tests/PiSharp.Durable.Tests/PiAiValidationCases.cs: piai.validation.reports-malformed-arguments-json-instead-of-validating-empty-arguments",
+          "tests/PiSharp.Durable.Tests/PiAiValidationCases.cs: piai.validation.coerces-serialized-plain-json-schemas-like-typebox-schemas",
+          "tests/PiSharp.Durable.Tests/PiAiValidationCases.cs: piai.validation.treats-null-as-omission-for-optional-non-nullable-properties",
+          "tests/PiSharp.Durable.Tests/PiAiValidationCases.cs: piai.validation.matches-pisharp-agent-s-port",
+          "tests/PiSharp.Durable.Tests/ToolArgsTypeboxCases.cs: tool-args-typebox.are-typed-by-the-schema-in-execute-and-prepare-arguments",
+          "tests/PiSharp.Durable.Tests/HarnessStructuredOutputCases.cs: harness.structured-output.turns-structured-output-that-breaks-the-schema-into-an-error-result-for-callers-and-a-report-for-the-model-s-calls",
+          "tests/PiSharp.Durable.Tests/ToolsNodeCases.cs: tools.node.declarations-match-upstream-byte-for-byte"
+        ]
+      }
     },
     {
       "id": "durable.sqlite-table-prefix",
@@ -9679,13 +9697,13 @@
       ],
       "release": "1.5.0",
       "notes": "Only the citation moves to v1.5.0, with the new tools-images.test.ts case ported as an authored check that a large image encodes.",
-      "evidence": "src/PiSharp.Durable.Tools/Tools/ImageProcessor.cs:55: ToBase64 is Convert.ToBase64String(bytes), which sizes the output once and builds no concatenation chain; its output is the same standard base64."
+      "evidence": "src/PiSharp.Durable.Tools/Tools/ImageProcessor.cs:56: ToBase64 is Convert.ToBase64String, one standard base64 pass sized once with no intermediate string, so upstream's b04299717 (btoa over 8 KiB binary strings, to fit a 3 MiB image in Node's 128 MB heap) has nothing to change; citation re-pinned to f9a26365"
     },
     {
       "id": "durable.read-structured-output",
       "area": "durable",
       "phase": 4,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "durable@1.5.0/Fixed#11"
       ],
@@ -9701,7 +9719,19 @@
         "tests/PiSharp.Durable.Tests/ToolsReadDifferentialCases.cs"
       ],
       "release": "1.5.0",
-      "notes": "Read.cs declares no StructuredOutputSchema today. At v1.5.0 the schema is built with pi-schema (durable.pi-schema-tools). No PiSharp-only surface is affected."
+      "notes": "Read.cs declares no StructuredOutputSchema today. At v1.5.0 the schema is built with pi-schema (durable.pi-schema-tools). No PiSharp-only surface is affected.",
+      "evidence": {
+        "commits": [
+          "2452620e",
+          "72c632a0",
+          "07347bfc"
+        ],
+        "tests": [
+          "tests/PiSharp.Durable.Tests/CodemodeCases.cs: codemode.output.resolves-the-built-in-read-with-an-image-s-block-which-image-shows-and-with-a-text-file-s-text",
+          "tests/PiSharp.Durable.Tests/ToolsReadDifferentialCases.cs: tools.read-differential.returns-exactly-what-reading-the-whole-file-returned",
+          "tests/PiSharp.Durable.Tests/ToolsNodeCases.cs: tools.node.declarations-match-upstream-byte-for-byte"
+        ]
+      }
     },
     {
       "id": "durable.codemode-harness-clock",

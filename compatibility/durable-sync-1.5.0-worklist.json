@@ -1281,7 +1281,11 @@
         "044148392",
         "6291b9bcc",
         "6536f8012",
-        "b04299717"
+        "b04299717",
+        "2452620e",
+        "72c632a0",
+        "73788d67",
+        "07347bfc"
       ],
       "notes": "Design point, differentials: this area sets ValidatorsDiffer (tests/PiSharp.Durable.Tests/PiAiValidationCases.cs:31) back to false. PiSharp.Durable may reference only Contracts and AI (decision 0005 §4); the pi-schema port lives in PiSharp.Contracts (src/PiSharp.Contracts/Schema, [Experimental(\"PISHARP_SCHEMA001\")]), so Internal/PiAi/Validation.cs moves from its verbatim TypeBox-Compile copy of PiSharp.Agent's validator to PiSharp.Contracts.Schema without a 0005 change, and the validation differential compares it with PiSharp.Agent again (which phase 2 moved to pi-schema). 0013 design point 'Tool argument validation' applies (pi-schema error texts; TypeBox-only features stop applying). ToolArgs<T>/Static typing is TypeScript only; C# tools keep JSON Schema parameters. PiSharp-only tools that hand-write JSON Schema (Durable.Tools Interaction/, PlanMode/, Media/, CustomAgents tools, Hosting Apps/AppTools.cs) see only the new error wording. durable.read-base64-encoding is already-ported and sits here as the nearest area (ImageProcessor.cs encodes with Convert.ToBase64String in one pass): port tools-images.test.ts's new large-image case as an authored check and re-pin."
     },
