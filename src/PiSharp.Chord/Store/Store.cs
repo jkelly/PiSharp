@@ -210,6 +210,15 @@ public sealed class ChordStore : IStore, IChordStore
     /// <c>holdNextCommit</c>): the next <see cref="CommitAsync"/> passes its writes through it, then clears it.</summary>
     internal Func<IReadOnlyList<IStagedWrite>, IReadOnlyList<IStagedWrite>>? NextCommit { get; set; }
 
+    /// <summary>A test seam standing for upstream's tests wrapping <c>store.commit</c>'s fence (the documents' seal fence tests): while set,
+    /// every <see cref="CommitAsync"/> commits under the fence it returns for the caller's.</summary>
+    internal Func<CommitFence, CommitFence>? CommitFences { get; set; }
+
+    /// <summary>A test seam standing for upstream's tests spying on or replacing <c>store.read</c> (<c>vi.spyOn(store, "read")</c>, the
+    /// documents tests' <c>holdNextRead</c>): while set, every <see cref="ReadAsync{T}"/> call hands it the read's task, and completes
+    /// once the task it returns did (with the read's outcome).</summary>
+    internal Func<Task, Task>? Reads { get; set; }
+
     /// <summary>Takes the next id from the allocator (Durable's <c>mintId</c>); refused once the store stopped or closed.</summary>
     public long MintId()
     {
@@ -315,6 +324,7 @@ public sealed class ChordStore : IStore, IChordStore
             NextCommit = null;
             writes = next(writes);
         }
+        if (CommitFences is { } wrap) fence = wrap(fence);
         try
         {
             AssertUsable();
@@ -357,7 +367,15 @@ public sealed class ChordStore : IStore, IChordStore
     {
         ArgumentNullException.ThrowIfNull(read);
         ArgumentNullException.ThrowIfNull(context);
-        return GuardedAsync(() => read(db), context);
+        var task = GuardedAsync(() => read(db), context);
+        return Reads is { } observe ? ObservedAsync(task, observe) : task;
+    }
+
+    /// <summary>A read <see cref="Reads"/> observes: done once the observer's task is, with the read's outcome.</summary>
+    private static async Task<T> ObservedAsync<T>(Task<T> read, Func<Task, Task> observe)
+    {
+        await observe(read).ConfigureAwait(false);
+        return await read.ConfigureAwait(false);
     }
 
     /// <summary><see cref="ReadAsync{T}"/> for several queries that must see one state (S4, a document from its record and revisions): one

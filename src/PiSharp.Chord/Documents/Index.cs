@@ -3,7 +3,7 @@
 // CommitPersistence, defineState (StateDefinition.Define, with StateOptions, CheckpointWhen and CheckpointInfo), JsonObject (the BCL's
 // System.Text.Json.Nodes.JsonObject) and StateDefinition. From handles.ts: SingletonHandle and KeyedHandle (ISingletonHandle and
 // IKeyedHandle); HandleOf is a conditional type, and a declaration's handle is the one its definition's Keyed calls for. From transaction.ts:
-// Tx, area cv2-documents-slots'.
+// Tx (ITx; area cv2-documents-slots), without its start (jobs, phase 6).
 //
 // The README's rules, as far as the ported parts go:
 // - defineState(name, { schema, version, initial, keyed?, migrate?, persist?, checkpointWhen? }): the root is a JSON object. initial() is

@@ -1,20 +1,21 @@
-// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/chord/src/next/documents/documents.ts (in part)
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/chord/src/next/documents/documents.ts
 //
 // An object's documents (§9, P2, slice 6a §1.2, §10): its slots across attempts, its line (its transactions and line jobs run one at a
 // time), the seal fence over the transaction holding the line, the factory's pins between attempts, the activation's loads and the
-// residency of keyed documents. Area cv2-documents-core ported the engine around the slots: check, hydrate, load, onLine, fence, the
-// liveness and admission checks, seal, settled, end and released. Three members make another area's classes and land with them (area
-// cv2-documents-slots): declare (slot.ts's SingletonSlot, keyed-slot.ts's KeyedSlot, persistence.ts's Persistence and the handles'
-// Singleton and Keyed), tx (transaction.ts's Transaction) and #persistence. Mappings:
+// residency of keyed documents. Areas cv2-documents-core (the engine around the slots: check, hydrate, load, onLine, fence, the liveness
+// and admission checks, seal, settled, end and released) and cv2-documents-slots (declare, tx and #persistence) ported it. Mappings:
 // - Upstream's slot union SingletonSlot | KeyedSlot is IDeclaredSlot, what the engine calls of either (its persisted !== undefined is
 //   IsPersisted). The transaction holding the line is an ILineHolder (its token and its cut); tx takes the line for it through Hold and
 //   gives it up through Unhold, upstream's two assignments of #holder. #add is Add, internal for declare and the tests.
+// - declare returns HandleOf<D>, a conditional type: here an object, the ISingletonHandle or IKeyedHandle its definition's Keyed picks.
+//   tx's callback is a Func returning a Task (upstream's R | Promise<R>: a synchronous callback returns a completed one).
 // - DocumentsOwner is IDocumentsOwner, its store { store, owner } a DocumentsStore. Promises are Tasks; load returns null for upstream's
 //   undefined (nothing persisted: an activation takes no extra turn). `released` is ChordError released/ended.
 // - The residency's clock and timers are a TimeProvider (the system's unless one is given), the C# form of upstream's fake timers.
 // - Threads: an object's documents belong to its host, which serializes the calls that reach them, as the state layer's do; the line, the
 //   seal tokens and the state flag are safe on any thread (an attempt may end on another one), and the residency's timer fires on the thread
-//   pool and only queues a sweep on the line.
+//   pool and only queues a sweep on the line. The holder is swapped atomically, and tx checks its token again once it holds the line: a seal
+//   on another thread either sees the holder and cuts it, or is seen by that check (upstream's single thread needs neither).
 using PiSharp.Chord.Data;
 using PiSharp.Chord.State;
 using PiSharp.Chord.Store;
@@ -135,6 +136,30 @@ internal sealed class Documents
     /// <summary>The token of the object's own transactions: sealed with the object (<see cref="Seal"/>).</summary>
     public SealToken Own { get; } = new();
 
+    /// <summary>
+    /// A handle to <paramref name="definition"/>'s slot for an attempt sealed by <paramref name="token"/>, whose at(key) pins
+    /// <paramref name="declarer"/> takes: an <see cref="ISingletonHandle"/>, or an <see cref="IKeyedHandle"/> for a keyed definition. The slot
+    /// is made by the first declaration of its name, and checked against the values for later ones (<see cref="SlotDefinition.Check"/>).
+    /// "Declared twice" is the attempt's check.
+    /// </summary>
+    public object Declare(StateDefinition definition, SealToken token, IKeyDeclarer declarer)
+    {
+        ArgumentNullException.ThrowIfNull(definition);
+        ArgumentNullException.ThrowIfNull(token);
+        ArgumentNullException.ThrowIfNull(declarer);
+        var slot = slots.GetValueOrDefault(definition.Name);
+        slot?.Definition.Check(definition);
+        var persistence = slot is null && definition.Persist ? PersistenceOf(definition.Name) : null;
+        // The definition's Keyed decides the slot's class and the handle's.
+        if (definition.Keyed)
+        {
+            var keyed = slot ?? Add(new KeyedSlot(this, definition, persistence));
+            return new Keyed((KeyedSlot)keyed, token, definition.Version, declarer);
+        }
+        var singleton = slot ?? Add(new SingletonSlot(this, definition, persistence));
+        return new Singleton((SingletonSlot)singleton, token, definition.Version);
+    }
+
     /// <summary>Checks a declaration of <paramref name="definition"/> as declare would, changing nothing (a reload's staging: a recording
     /// factory declares against the documents the object has).</summary>
     public void Check(StateDefinition definition)
@@ -213,13 +238,54 @@ internal sealed class Documents
         }, token);
     }
 
+    /// <summary>
+    /// Runs <paramref name="fn"/> as one transaction on the line under <paramref name="token"/> and commits what it drafted (§9): a throw, an
+    /// abort of <paramref name="context"/>, the token's seal or the object's end discards everything. <paramref name="persistence"/> defers
+    /// storing a run state's change (D8).
+    /// </summary>
+    public async Task<TResult> TxAsync<TResult>(Func<Transaction, Task<TResult>> fn, SealToken token, ChordContext context, CommitPersistence? persistence = null)
+    {
+        ArgumentNullException.ThrowIfNull(fn);
+        ArgumentNullException.ThrowIfNull(token);
+        ArgumentNullException.ThrowIfNull(context);
+        Batch.AssertOutside("tx");
+        AssertAdmitted(token);
+        var release = await Line.AcquireAsync().ConfigureAwait(false);
+        var tx = new Transaction(this, token, release, context, persistence);
+        try
+        {
+            AssertAdmitted(token);
+            Hold(tx);
+            // A seal on another thread between the check and the hold did not see the holder: seen here.
+            AssertAdmitted(token);
+            var result = await fn(tx).ConfigureAwait(false);
+            // In-memory-only commits are synchronous (W12): no await unless the store's step is taken.
+            var step = tx.Commit();
+            if (step is not null) await step.ConfigureAwait(false);
+            return result;
+        }
+        catch
+        {
+            tx.Discard();
+            throw;
+        }
+        finally
+        {
+            Unhold(tx);
+            release();
+            tx.Settle();
+        }
+    }
+
     /// <summary>Seals <paramref name="token"/> (the seal fence): its transactions are refused from now on, and the one holding the line is
     /// discarded and the line released.</summary>
     public void Fence(SealToken token)
     {
         ArgumentNullException.ThrowIfNull(token);
         token.Seal();
-        if (ReferenceEquals(holder?.Token, token)) Cut();
+        // Against tx's hold on another thread (Hold, then its check of the token): one of the two sees the other.
+        Interlocked.MemoryBarrier();
+        if (ReferenceEquals(Volatile.Read(ref holder)?.Token, token)) Cut();
     }
 
     /// <summary>Throws <c>released</c> once the object ended.</summary>
@@ -284,20 +350,26 @@ internal sealed class Documents
     internal void Hold(ILineHolder transaction)
     {
         ArgumentNullException.ThrowIfNull(transaction);
-        holder = transaction;
+        Interlocked.Exchange(ref holder, transaction);
     }
 
     /// <summary><paramref name="transaction"/> settled (tx's end): it no longer holds the line, unless a cut already let it go.</summary>
     internal void Unhold(ILineHolder transaction)
     {
-        if (ReferenceEquals(holder, transaction)) holder = null;
+        Interlocked.CompareExchange(ref holder, null, transaction);
     }
 
     /// <summary>Discards the transaction holding the line and releases the line.</summary>
     private void Cut()
     {
-        var cut = holder;
-        holder = null;
-        cut?.Cut();
+        Interlocked.Exchange(ref holder, null)?.Cut();
+    }
+
+    /// <summary>The store side of persisted documents named <paramref name="name"/> (upstream <c>#persistence</c>); the attempt checked the
+    /// store first (P3).</summary>
+    private Persistence PersistenceOf(string name)
+    {
+        var store = owner.Store ?? throw new InvalidOperationException($"{Label}: persisted documents need a store");
+        return new Persistence(store.Store, store.Owner, "chord", name);
     }
 }

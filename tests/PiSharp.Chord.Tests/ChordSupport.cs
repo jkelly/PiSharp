@@ -26,7 +26,9 @@ using static PiSharp.Chord.Contracts.Schemas;
 // restartable, storeRestartable, loaded, loadedPlugins, failures, linked, RawPeer, partValue, CODECS, forEachCodec, rawLinked,
 // transported, serveNotes, addNote, rawProvider, rawParent, statesOf, EDITOR, bindNext, bindHold, instancesOf, relayed, rawWorkers,
 // incarnationOf, countInflated), which build on createHost and the link layer (phase 6). Area cv2-documents-core ported fakeTimers
-// and flushed's timer half, a TimeProvider and a short delay (FakeTimers.cs).
+// and flushed's timer half, a TimeProvider and a short delay (FakeTimers.cs). Area cv2-documents-slots stands in for restartable,
+// storeRestartable, failLive, instancesOf and loaded's app.owner with a hand-built host (Documents/DocumentsHost.cs, which also holds the
+// documents cases' shared helpers, keyed-slot.test.ts's holdNextRead among them); createHost's own remain phase 6's.
 internal static class ChordSupport
 {
     /// <summary>Expects every referent to be collected once nothing else holds it (upstream runs gc() between macrotasks).</summary>
