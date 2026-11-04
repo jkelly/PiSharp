@@ -335,9 +335,9 @@ jobs:
         with:
           node-version: '22'
       - name: Fetch Pi at the pinned commit and the previous pin
-        # The map is built from git objects: Pi v1.2.0 (the pin) and Pi v1.1.0 (the previous pin it records changes against).
+        # The map is built from git objects: Pi v1.5.0 (the pin) and Pi v1.2.0 (the previous pin it records changes against).
         run: |
           git init -q "$RUNNER_TEMP/pi" && cd "$RUNNER_TEMP/pi"
-          git fetch -q --depth 1 https://github.com/earendil-works/pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff abe508e1b89912adde45528136c3221eb69acdd7
+          git fetch -q --depth 1 https://github.com/earendil-works/pi f9a26365568127461c47a07a37dcb42c140a3ac5 06a466935536f8c9bcacb2d5efc0fc021be1bdff
       - name: Check compatibility/durable-port-map.json
         run: node tools/DurablePortMap/build-port-map.mjs --upstream "$RUNNER_TEMP/pi" --check
