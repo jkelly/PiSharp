@@ -6,7 +6,9 @@
 // and the run notices (_ChatNotices). ChatDisplay holds the small formatting helpers the partials share. W3 (S5) adds the Spend Guard's
 // parts: the answers' cost marks from the ledger (ChatRenderContext.Spend), the composer's send estimate (ChatComposerView.Estimate), the
 // chat's spend in the session panel (ChatInfoView.Spend) and the banner of a call stopped at a cap (ChatBannersView.Spend). W4 fix 2:
-// ChatRenderContext.ReadOnly renders the items without their actions, for a read-only view (SessionViews).
+// ChatRenderContext.ReadOnly renders the items without their actions, for a read-only view (SessionViews). Pi v1.5.0 sync (area
+// run-failure): the run notices also say why the newest run ended without an answer (pi-durable 1.5.0 pi.live.runFailure, through
+// AgentModel.RunFailure) until a later run starts, except for a stop and a model error, which the transcript already shows.
 using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Nodes;
@@ -195,13 +197,18 @@ public sealed record ChatBannersView(bool NoProviders, string? ExpiredProvider =
     public ChatSpendStopView? Spend { get; init; }
 }
 
-/// <summary>The run notices above the composer (<c>Views/Chat/_ChatNotices.cshtml</c>): compacting, a compaction failure and an automatic
-/// retry's wait.</summary>
+/// <summary>The run notices above the composer (<c>Views/Chat/_ChatNotices.cshtml</c>): compacting, a compaction failure, an automatic
+/// retry's wait, and why the newest run ended without an answer.</summary>
 /// <param name="Compacting">A compaction runs.</param>
 /// <param name="CompactionFailure">The newest compaction failure since one last succeeded.</param>
 /// <param name="RetryAt">When the failed request is retried, in Unix milliseconds.</param>
 /// <param name="RetryError">Why it failed.</param>
-public sealed record ChatNoticesView(bool Compacting, string? CompactionFailure, double? RetryAt, string? RetryError);
+public sealed record ChatNoticesView(bool Compacting, string? CompactionFailure, double? RetryAt, string? RetryError)
+{
+    /// <summary>Why the newest run ended without an answer (<see cref="ChatDisplay.RunFailure"/>), until a later run starts; null when it
+    /// answered, or the transcript shows why.</summary>
+    public string? RunFailure { get; init; }
+}
 
 /// <summary>One entry of the session tree.</summary>
 public sealed class ChatTreeNode
@@ -397,6 +404,30 @@ public static class ChatDisplay
 
     /// <summary>A label for a thinking level.</summary>
     public static string ThinkingLabel(string level) => "Thinking: " + level;
+
+    /// <summary>
+    /// What the run notices say about a run that ended without an answer (pi-durable 1.5.0 <c>pi.live.runFailure</c>); null for none, for a
+    /// stop (<c>aborted</c>), and for a model error, whose failed answer shows its error in the transcript (or, for a compaction it needed,
+    /// the compaction failure notice does).
+    /// </summary>
+    public static string? RunFailure(RunFailureInfo? failure)
+    {
+        if (failure is null) return null;
+        var detail = failure.Detail is { Length: > 0 } text ? Cut(ChatFailures.Display(text), 300) : null;
+        return failure.Reason switch
+        {
+            "aborted" or "model_error" => null,
+            "no_model" => "No answer: " + (detail ?? "no model is available") + ".",
+            "reset" => "No answer: the reset started a new context before the agent answered.",
+            "faulted" => "No answer: the run failed" + (detail is null ? "." : ": " + detail),
+            "orphaned" => "No answer: this app cannot run the agent's task" + (detail is null ? "." : " (" + detail + ")."),
+            "interrupted" => "No answer: the app stopped while the model answered" + (detail is null ? "." : ": " + detail),
+            "restart_limit" => "No answer: the run was cut off too often" + (detail is null ? "." : ": " + detail),
+            "nothing_to_answer" => "No answer: there was nothing to answer.",
+            "turn_limit" => "No answer: the run reached its turn limit" + (detail is null ? "." : " (" + detail + ")."),
+            _ => "No answer (" + failure.Reason + ")" + (detail is null ? "." : ": " + detail),
+        };
+    }
 
     /// <summary>A whole number with thousands separators.</summary>
     public static string Count(double value) => value.ToString("#,0", CultureInfo.InvariantCulture);

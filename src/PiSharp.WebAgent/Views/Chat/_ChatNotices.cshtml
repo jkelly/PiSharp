@@ -1,5 +1,6 @@
 @* Decision 0011 (run W2, WU8): the run notices above the composer, from the stream (panel "notices"): a compaction that runs, a compaction
-   that failed, and an automatic retry waiting after a provider error. All text is encoded. *@
+   that failed, an automatic retry waiting after a provider error, and (Pi v1.5.0 sync, area run-failure) why the newest run ended without
+   an answer. All text is encoded. *@
 @model ChatNoticesView
 @if (Model.Compacting)
 {
@@ -12,4 +13,8 @@
 @if (Model.RetryAt is { } at)
 {
   <div class="run-note" role="status" data-notice="retry"><span class="spinner-border spinner-border-sm chip-spinner" aria-hidden="true"></span>Retrying at <time datetime="@ChatDisplay.Iso(at)">@ChatDisplay.Clock(at, true)</time>@(Model.RetryError is { Length: > 0 } error ? " after: " + ChatDisplay.Cut(ChatFailures.Display(error), 200) : "")</div>
+}
+@if (Model.RunFailure is { Length: > 0 } runFailure)
+{
+  <div class="run-note text-ps-warn" role="status" data-notice="run-failed"><i class="bi bi-exclamation-triangle" aria-hidden="true"></i>@runFailure</div>
 }

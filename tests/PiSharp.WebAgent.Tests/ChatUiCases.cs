@@ -331,6 +331,42 @@ internal static partial class Program
             Has(info, "2 user · 2 assistant · 6 tool", "the messages");
             Has(info, "title=\"ui-chat-0001-session\">ui-chat-</span>", "the short session id");
         }),
+        // Pi v1.5.0 sync (area run-failure): why the newest run ended without an answer, from pi-durable 1.5.0's pi.live.runFailure through
+        // the stream (the snapshot's runFailure, a run_end's failure) into AgentModel and the notices, until a later run starts.
+        Case("chat.ui.notices-say-why-the-newest-run-ended-without-an-answer", async () =>
+        {
+            var model = new AgentModel();
+            static JsonObject Frame(string json) => JsonNode.Parse(json)!.AsObject();
+            model.Apply(Frame("""{"type":"snapshot","snapshot":{"entries":[],"tools":[],"nestedTools":[],"compactions":[],"runFailure":{"taskId":4,"inputs":[2],"reason":"no_model","detail":"Model faux/gone is not available"},"agent":{},"usage":{}},"inbox":[]}"""));
+            Equal("no_model", model.RunFailure?.Reason, "from the snapshot");
+            Equal("Model faux/gone is not available", model.RunFailure?.Detail, "its detail");
+            Equal("2", string.Join(",", model.RunFailure!.Inputs), "its inputs");
+            // A run started by a later commit removes it; one that ends without an answer records its own.
+            model.Apply(Frame("""{"type":"batch","events":[{"type":"run_start","inputs":[3]}]}"""));
+            Equal<RunFailureInfo?>(null, model.RunFailure, "after a later run starts");
+            model.Apply(Frame("""{"type":"batch","events":[{"type":"run_end","inputs":[3],"failure":{"taskId":5,"inputs":[3],"reason":"faulted","detail":"boom <now>"}},{"type":"run_start","inputs":[6]}]}"""));
+            // The continue that started in the same commit keeps it.
+            Equal("faulted", model.RunFailure?.Reason, "kept by a run started in the same batch");
+            Check(model.Running, "the continue runs");
+            var notices = await RenderNotices(UiHost("chat-ui-run-failure"), model);
+            Has(notices, "data-notice=\"run-failed\"", "the notice");
+            Has(notices, "No answer: the run failed: boom &lt;now&gt;", "the fault, encoded");
+            model.Apply(Frame("""{"type":"batch","events":[{"type":"run_end","inputs":[6]}]}"""));
+            Equal("faulted", model.RunFailure?.Reason, "an answered run's end leaves the failure until a later run starts");
+            // A stop and a model error show in the transcript, not here.
+            Equal<string?>(null, ChatDisplay.RunFailure(new RunFailureInfo("aborted", null, [1])), "a stop");
+            Equal<string?>(null, ChatDisplay.RunFailure(new RunFailureInfo("model_error", "Invalid request", [1])), "a model error");
+            Equal("No answer: Model faux/gone is not available.", ChatDisplay.RunFailure(new RunFailureInfo("no_model", "Model faux/gone is not available", [1])), "no model");
+            Equal("No answer: the run reached its turn limit (2 turns).", ChatDisplay.RunFailure(new RunFailureInfo("turn_limit", "2 turns", [1])), "a turn limit");
+            Equal("", (await RenderNotices(UiHost("chat-ui-run-failure-none"), new AgentModel())).Trim(), "no notices without a failure");
+
+            static async Task<string> RenderNotices(RenderHost host, AgentModel model)
+            {
+                await using (host)
+                    return await host.Renderer.RenderAsync("~/Views/Chat/_ChatNotices.cshtml",
+                        new ChatNoticesView(false, null, null, null) { RunFailure = ChatDisplay.RunFailure(model.RunFailure) });
+            }
+        }),
         Case("chat.ui.session-tree", async () =>
         {
             await using var host = UiHost("chat-ui-tree");
