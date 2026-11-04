@@ -2638,7 +2638,11 @@
         "partial-commits"
       ],
       "commits": [
-        "6c2fd73b0"
+        "6c2fd73b0",
+        "add777be",
+        "6ce472a4",
+        "8508d178",
+        "4f2b7225"
       ],
       "notes": "PiSharp stores every throttled partial (one storage transaction each). A stream that crashes before its first store now leaves no aborted entry and its usage is not recorded: the crash cases at the streaming-partial checkpoint (decision 0005 'Crash tests') change their expectations. settings.progress.persistWithinMs: 0 restores per-partial stores. PiSharp-only: the device host notifies clients from SubscribeCommits (HostedSession.cs) and stops seeing partials; its agent stream comes from watches (area events)."
     },
