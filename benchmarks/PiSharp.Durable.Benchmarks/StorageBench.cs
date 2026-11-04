@@ -1,14 +1,20 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/test/storage.bench.ts
-// The timed storage benchmarks on memory, SQLite and JSONL: every read scenario against one seeded storage per backend, every write
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/test/storage.bench.ts
+// The timed storage benchmarks on memory, SQLite, the store (StoreStorage over one SQLite file, area store-storage) and JSONL: every read scenario against one seeded storage per backend, every write
 // scenario against a pool of freshly seeded storages (one per sample, so no sample sees an earlier sample's writes), and reopen plus the
 // first exact read against copies of one seeded file or directory. Each scenario's result is checked once before it is timed. Upstream's
 // Vitest bench options are kept: reads sample for at least 300 ms and 10 runs after a 75 ms / 3 run warmup; writes take exactly 20 samples
-// after 5 warmups; reopen 20 after 3.
+// after 5 warmups; reopen 20 after 3. The store backend opens a store over the file and Durable's storage in it under one owner, whose
+// close closes the store too (StoreOwningStorage, as upstream's openStoreStorage of test/store-storage-support.ts); its reopen copies the
+// file, as SQLite's does.
+using PiSharp.Chord;
 using PiSharp.Durable.Chord;
 using PiSharp.Durable.Sqlite;
 using PiSharp.Durable.Storage;
 using PiSharp.Durable.Storage.Jsonl;
+using PiSharp.Durable.Store;
 using PiSharp.Durable.Testing;
+using ChordTables = PiSharp.Chord.Store.Tables;
+using IStore = PiSharp.Chord.Store.IStore;
 
 namespace PiSharp.Durable.Benchmarks;
 
@@ -19,6 +25,8 @@ public enum BenchBackend
     Memory,
     /// <summary>SqliteStorage over one file.</summary>
     Sqlite,
+    /// <summary>StoreStorage on a store over one SQLite file.</summary>
+    Store,
     /// <summary>JsonlStorage over one directory.</summary>
     Jsonl,
 }
@@ -42,7 +50,7 @@ public sealed record StorageBenchOptions
 public static class StorageBench
 {
     private static readonly DurableContext Context = DurableContext.Background;
-    private static readonly BenchBackend[] Backends = [BenchBackend.Memory, BenchBackend.Sqlite, BenchBackend.Jsonl];
+    private static readonly BenchBackend[] Backends = [BenchBackend.Memory, BenchBackend.Sqlite, BenchBackend.Store, BenchBackend.Jsonl];
 
     /// <summary>The backend's name as upstream prints it.</summary>
     public static string Name(BenchBackend backend) => backend.ToString().ToLowerInvariant();
@@ -66,6 +74,7 @@ public static class StorageBench
             {
                 BenchBackend.Memory => new MemoryStorage(),
                 BenchBackend.Sqlite => await SqliteStorage.OpenAsync(Path.Combine(NewDirectory("pi-durable-benchmark-"), "storage.sqlite")),
+                BenchBackend.Store => await OpenStoreStorageAsync(Path.Combine(NewDirectory("pi-durable-benchmark-"), "storage.sqlite")),
                 _ => await JsonlStorage.OpenAsync(Path.Combine(NewDirectory("pi-durable-benchmark-"), "storage"), Context),
             };
             Storages.Add(storage);
@@ -163,14 +172,34 @@ public static class StorageBench
         return results;
     }
 
-    private static string Leaf(BenchBackend backend) => backend == BenchBackend.Sqlite ? "storage.sqlite" : "storage";
+    private static string Leaf(BenchBackend backend) => backend == BenchBackend.Jsonl ? "storage" : "storage.sqlite";
 
-    private static async Task<IStorage> OpenPersistentAsync(BenchBackend backend, string path) =>
-        backend == BenchBackend.Sqlite ? await SqliteStorage.OpenAsync(path) : await JsonlStorage.OpenAsync(path, Context);
+    private static async Task<IStorage> OpenPersistentAsync(BenchBackend backend, string path) => backend switch
+    {
+        BenchBackend.Sqlite => await SqliteStorage.OpenAsync(path),
+        BenchBackend.Store => await OpenStoreStorageAsync(path),
+        _ => await JsonlStorage.OpenAsync(path, Context),
+    };
+
+    /// <summary>A StoreStorage on a store over the SQLite file at <paramref name="path"/> whose close closes the store too (upstream
+    /// <c>openStoreStorage</c>, owner <c>durable.test</c>).</summary>
+    internal static async Task<IStorage> OpenStoreStorageAsync(string path)
+    {
+        var store = await ChordTables.OpenStoreAsync(await StoreBackends.OpenSqliteAsync(path), ChordContext.Background);
+        try
+        {
+            return new StoreOwningStorage(await StoreStorage.OpenAsync(store, "durable.test", Context), store);
+        }
+        catch
+        {
+            await store.CloseAsync(ChordContext.Background);
+            throw;
+        }
+    }
 
     private static void CopyPersistent(BenchBackend backend, string source, string destination)
     {
-        if (backend == BenchBackend.Sqlite) { File.Copy(source, destination); return; }
+        if (backend != BenchBackend.Jsonl) { File.Copy(source, destination); return; }
         Directory.CreateDirectory(destination);
         foreach (var file in Directory.EnumerateFiles(source, "*", SearchOption.AllDirectories))
         {
@@ -189,5 +218,51 @@ public static class StorageBench
     private static void Check(long actual, long expected, string scenario)
     {
         if (actual != expected) throw new InvalidOperationException($"Invalid benchmark result: {scenario}: expected {expected}, actual {actual}");
+    }
+}
+
+/// <summary>A StoreStorage whose close also closes its store, once (the store backend's storage).</summary>
+internal sealed class StoreOwningStorage(StoreStorage storage, IStore store) : IStorage
+{
+    private readonly Lock gate = new();
+    private Task? closing;
+
+    public Task<CommitResult> CommitAsync(IReadOnlyList<IReadOnlyList<StorageWrite>> batches, Action<int, Seq> receive, DurableContext context) =>
+        storage.CommitAsync(batches, receive, context);
+    public void Publishing(Action publish, DurableContext context) => storage.Publishing(publish, context);
+    public Task<TId> MintIdAsync<TId>() where TId : struct, IDurableId<TId> => storage.MintIdAsync<TId>();
+    public Task<ConversationRecord?> GetConversationAsync(ConversationId id, DurableContext context) => storage.GetConversationAsync(id, context);
+    public Task<Page<ConversationRecord>> ScanConversationsAsync(ConversationQuery query, int limit, JsonObjectValue? cursor, DurableContext context) =>
+        storage.ScanConversationsAsync(query, limit, cursor, context);
+    public Task<CommittedEntry?> GetEntryAsync(EntryId id, DurableContext context) => storage.GetEntryAsync(id, context);
+    public Task<CommittedEntry?> GetEntryAsync(ConversationId conversationId, EntryId id, DurableContext context) =>
+        storage.GetEntryAsync(conversationId, id, context);
+    public Task<EntryRecord?> FindLatestHeadMarkerAsync(ConversationId conversationId, EntryId? atOrBeforeEntryId, DurableContext context) =>
+        storage.FindLatestHeadMarkerAsync(conversationId, atOrBeforeEntryId, context);
+    public Task<Page<EntryRecord>> ScanEntriesAsync(EntryQuery query, int limit, JsonObjectValue? cursor, DurableContext context) =>
+        storage.ScanEntriesAsync(query, limit, cursor, context);
+    public Task<TaskRecord?> GetTaskAsync(TaskId id, DurableContext context) => storage.GetTaskAsync(id, context);
+    public Task<Page<TaskRecord>> ScanTasksAsync(TaskQuery query, int limit, JsonObjectValue? cursor, DurableContext context) =>
+        storage.ScanTasksAsync(query, limit, cursor, context);
+    public Task<SubmissionRecord?> GetSubmissionAsync(SubmissionId id, DurableContext context) => storage.GetSubmissionAsync(id, context);
+    public Task<Page<SubmissionRecord>> ScanSubmissionsAsync(SubmissionQuery query, int limit, JsonObjectValue? cursor, DurableContext context) =>
+        storage.ScanSubmissionsAsync(query, limit, cursor, context);
+    public Task<SubmissionRecord?> GetSubmissionByRequestAsync(ConversationId conversationId, string requestId, DurableContext context) =>
+        storage.GetSubmissionByRequestAsync(conversationId, requestId, context);
+    public Task<DocumentRecord?> FindDocumentAsync(DocumentAddress address, DocumentPoint at, DurableContext context) =>
+        storage.FindDocumentAsync(address, at, context);
+    public Task<StoredDocument?> GetDocumentAsync(DocumentId id, DocumentPoint at, DurableContext context) => storage.GetDocumentAsync(id, at, context);
+    public Task<Page<DocumentRecord>> ScanDocumentsAsync(DocumentQuery query, int limit, JsonObjectValue? cursor, DurableContext context) =>
+        storage.ScanDocumentsAsync(query, limit, cursor, context);
+
+    public Task CloseAsync(DurableContext context)
+    {
+        lock (gate) return closing ??= CloseBothAsync(context);
+    }
+
+    private async Task CloseBothAsync(DurableContext context)
+    {
+        await storage.CloseAsync(context);
+        await store.CloseAsync(ChordContext.Background);
     }
 }

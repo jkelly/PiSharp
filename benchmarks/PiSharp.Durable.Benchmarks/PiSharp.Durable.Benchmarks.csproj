@@ -8,12 +8,15 @@
     <AssemblyName>PiSharp.Durable.Benchmarks</AssemblyName>
     <RootNamespace>PiSharp.Durable.Benchmarks</RootNamespace>
     <IsPackable>false</IsPackable>
-    <NoWarn>$(NoWarn);PISHARP_DURABLE001</NoWarn>
+    <NoWarn>$(NoWarn);PISHARP_DURABLE001;PISHARP_CHORD001</NoWarn>
     <ServerGarbageCollection>false</ServerGarbageCollection>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../../src/PiSharp.Durable/PiSharp.Durable.csproj" />
     <ProjectReference Include="../../src/PiSharp.Durable.Sqlite/PiSharp.Durable.Sqlite.csproj" />
+    <!-- Area store-storage: the store backend of StorageBench.cs and StorageMemory.cs (StoreStorage on Chord v2's store; neither is packable). -->
+    <ProjectReference Include="../../src/PiSharp.Durable.Store/PiSharp.Durable.Store.csproj" />
+    <ProjectReference Include="../../src/PiSharp.Chord/PiSharp.Chord.csproj" />
     <ProjectReference Include="../../src/PiSharp.Durable.Tools/PiSharp.Durable.Tools.csproj" />
   </ItemGroup>
 </Project>

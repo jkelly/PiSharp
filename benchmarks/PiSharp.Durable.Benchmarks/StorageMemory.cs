@@ -1,8 +1,8 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/test/storage-memory.ts
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/test/storage-memory.ts
 // The storage footprint after the deterministic benchmark seed, per backend and scale, each measured in its own child process so one
 // measurement cannot inherit another's heap. Node's process.memoryUsage() becomes the .NET counterparts: heapUsed is the GC heap after three
 // forced full collections (GC.GetTotalMemory(true)), rss the working set. Node's "external" (ArrayBuffers outside the V8 heap) has no .NET
-// counterpart and is left out. The SQLite disk detail reads page_count and freelist_count as upstream does, over a read-only connection.
+// counterpart and is left out. The SQLite disk detail reads page_count and freelist_count as upstream does, over a read-only connection. The store backend (area store-storage) is StoreStorage over one SQLite file, measured as SQLite is.
 using System.Diagnostics;
 using System.Globalization;
 using System.Text.Json;
@@ -31,7 +31,7 @@ public static class StorageMemory
 {
     private static readonly DurableContext Context = DurableContext.Background;
     private static readonly JsonSerializerOptions Json = new() { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
-    private static readonly BenchBackend[] Backends = [BenchBackend.Memory, BenchBackend.Sqlite, BenchBackend.Jsonl];
+    private static readonly BenchBackend[] Backends = [BenchBackend.Memory, BenchBackend.Sqlite, BenchBackend.Store, BenchBackend.Jsonl];
 
     private static void CollectGarbage()
     {
@@ -85,8 +85,13 @@ public static class StorageMemory
         {
             directory = Directory.CreateDirectory(Path.Combine(tempRoot ?? Path.GetTempPath(),
                 $"pi-durable-{StorageBench.Name(backend)}-memory-{Guid.NewGuid().ToString("N")[..8]}")).FullName;
-            path = Path.Combine(directory, backend == BenchBackend.Sqlite ? "storage.sqlite" : "storage");
-            storage = backend == BenchBackend.Sqlite ? await SqliteStorage.OpenAsync(path) : await JsonlStorage.OpenAsync(path, Context);
+            path = Path.Combine(directory, backend == BenchBackend.Jsonl ? "storage" : "storage.sqlite");
+            storage = backend switch
+            {
+                BenchBackend.Sqlite => await SqliteStorage.OpenAsync(path),
+                BenchBackend.Store => await StorageBench.OpenStoreStorageAsync(path),
+                _ => await JsonlStorage.OpenAsync(path, Context),
+            };
         }
         try
         {
@@ -107,7 +112,7 @@ public static class StorageMemory
             if (checksum < 0) throw new InvalidOperationException("Storage memory read checksum is invalid");
             CollectGarbage();
             var postRead = Snapshot();
-            var disk = path is null ? null : backend == BenchBackend.Sqlite ? SqliteMetrics(path) : JsonlMetrics(path);
+            var disk = path is null ? null : backend != BenchBackend.Jsonl ? SqliteMetrics(path) : JsonlMetrics(path);
             return new(StorageBench.Name(backend), scale.Name, StorageBenchmark.PrimaryRecordCount(scale), baseline, postSeed, postRead, disk);
         }
         finally
