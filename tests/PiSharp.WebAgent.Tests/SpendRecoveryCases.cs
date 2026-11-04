@@ -169,8 +169,9 @@ internal static partial class Program
             });
             Equal(200, capped.Status, "the daily cap: " + capped.Text);
 
-            await app.WatchAsync(id, html => AssistantArticles(html).Any(answer => answer.Contains("w010", StringComparison.Ordinal) &&
-                !answer.Contains("w150", StringComparison.Ordinal)), "a committed partial answer");
+            // Past StoredWord, Storage has a partial (deferred partial commits, Pi v1.5.0 sync, area deferred-commits).
+            await app.WatchAsync(id, html => AssistantArticles(html).Any(answer => answer.Contains(StoredWord, StringComparison.Ordinal) &&
+                !answer.Contains("w150", StringComparison.Ordinal)), "a stored partial answer");
             Equal("reserved", LedgerText((await app.RowsAsync(id)).Single(), "state"), "the request is still running when the server dies");
             await app.KillAndRestartAsync();
 
