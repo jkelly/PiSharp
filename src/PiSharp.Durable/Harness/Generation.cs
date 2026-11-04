@@ -11,6 +11,8 @@
 // runtime.SetTimer. Pi v1.5.0 sync (area reports): settings.afterFailedRun decides the inputs queued behind a run that fails with
 // model_error or no_model (prepareFailure, read before the commit's first table write, and endFailedRun; a30c2a81d); the environment
 // builder's failure reports host_error env, a section's extension_error with its extension, and a deferred cancel's host_error models.
+// Pi v1.5.0 sync (area telemetry, 2ec55d808): a request, a deferred poll and a deferred cancel pass the phase's span as their telemetry
+// parent, and a run's generation is created with its inputs' submission IDs, so its trace is the first admission's and the others link.
 //
 // Mappings:
 // - Checkpoints, live state and results are upstream's JSON, built in upstream's key order: prepare {phase, attempt, compacted?, overflow?},
@@ -86,16 +88,24 @@ public static partial class HarnessTasks
     /// (upstream <c>startRun</c>).</summary>
     internal static async Task StartRunAsync(ITx tx, ConversationId conversationId, DraftObject live, IEnumerable<SubmissionId> inputs)
     {
-        var taskId = await CreateGenerationAsync(tx, conversationId).ConfigureAwait(false);
+        var ids = inputs as IReadOnlyList<SubmissionId> ?? [.. inputs];
+        inputs = ids;
+        var taskId = await CreateGenerationAsync(tx, conversationId, ids).ConfigureAwait(false);
         live.Set("run", JsonValue.Object([
             KeyValuePair.Create("taskId", (JsonValue)taskId.ToJson()),
             KeyValuePair.Create("inputs", (JsonValue)JsonValue.Array(inputs.Select(id => (JsonValue)id.ToJson()))),
         ]));
     }
 
-    /// <summary>A generation owned by its conversation (upstream <c>createGeneration</c>).</summary>
-    internal static Task<TaskId> CreateGenerationAsync(ITx tx, ConversationId conversationId) =>
-        tx.CreateTaskAsync(GenerationTask, JsonObjectValue.Empty, new TaskOptions(TaskOwnership.Conversation) { ConversationId = conversationId });
+    /// <summary>A generation owned by its conversation (upstream <c>createGeneration</c>); a run's generation is traced from its inputs'
+    /// admissions (<paramref name="submissionIds"/>, upstream <c>TaskCreationOptions.submissionIds</c>).</summary>
+    internal static Task<TaskId> CreateGenerationAsync(ITx tx, ConversationId conversationId, IReadOnlyList<SubmissionId>? submissionIds = null)
+    {
+        var options = new TaskOptions(TaskOwnership.Conversation) { ConversationId = conversationId };
+        return tx is Transaction transaction && submissionIds is not null
+            ? transaction.CreateTaskAsync(GenerationTask, JsonObjectValue.Empty, options, submissionIds)
+            : tx.CreateTaskAsync(GenerationTask, JsonObjectValue.Empty, options);
+    }
 
     /// <summary>Hands run control from <paramref name="from"/> to <paramref name="to"/>; the run's inputs move with it (upstream
     /// <c>handOver</c>).</summary>
@@ -255,6 +265,7 @@ internal static class GenerationPhases
             Reasoning = thinkingLevel == "off" ? null : thinkingLevel,
             ServiceTier = serviceTier,
             OnPayload = await ProviderPayloadAsync(runtime, context).ConfigureAwait(false),
+            Telemetry = context.Telemetry,
         };
         var message = await StreamResponseAsync(runtime, model, messages, request, attempt, context).ConfigureAwait(false);
         await ClassifyAsync(runtime, new Request(attempt, compacted, reference, thinkingLevel, cutoff) { Messages = view.Messages }, message, context)
@@ -298,7 +309,8 @@ internal static class GenerationPhases
             return;
         }
         var handle = new DurableDeferredHandle((JsonObjectValue)checkpoint["handle"]);
-        var fetched = await runtime.Models.FetchDeferredAsync(model, handle, runtime.Signal).ConfigureAwait(false);
+        var fetched = await runtime.Models.FetchDeferredAsync(model, handle, new DurableRequestOptions { Telemetry = context.Telemetry },
+            runtime.Signal).ConfigureAwait(false);
         // A checkpoint an earlier version wrote has no thinking level, and its answer records none.
         var thinkingLevel = checkpoint.TryGetValue("thinkingLevel", out var level) && level is JsonStringValue levelText ? levelText.Value : null;
         var request = new Request(Attempt(checkpoint), OptionalTask(checkpoint, "compacted"), reference, thinkingLevel,
@@ -352,8 +364,8 @@ internal static class GenerationPhases
         {
             try
             {
-                await runtime.Models.CancelDeferredAsync(model, new DurableDeferredHandle((JsonObjectValue)checkpoint["handle"]), runtime.Signal)
-                    .ConfigureAwait(false);
+                await runtime.Models.CancelDeferredAsync(model, new DurableDeferredHandle((JsonObjectValue)checkpoint["handle"]),
+                    new DurableRequestOptions { Telemetry = context.Telemetry }, runtime.Signal).ConfigureAwait(false);
             }
             catch (Exception error)
             {

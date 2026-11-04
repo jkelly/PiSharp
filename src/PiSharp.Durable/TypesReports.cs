@@ -2,9 +2,9 @@
 // split from Types.cs), ported in the Pi v1.5.0 sync (area reports: upstream a30c2a81d, 440a5fcdb, 5ba1cbaf3, 91b33cab3 and 5f312dac4's
 // report kinds). Upstream's ReportInfo is a union tagged by kind; here it is one record whose Kind says which of its optional fields are
 // set, as TaskInspectionState is. A Report is a ReportInfo and the error (upstream's `ReportInfo & { error }`); upstream's `error: unknown`
-// is an Exception, as HarnessOptions.OnReport took before. Two parts of v1.5.0's union arrive with later areas of the sync: the
-// task_interrupted kind with its restart_limit and interrupted reasons and its restart count (area restarts), and the telemetry host
-// callback (area telemetry).
+// is an Exception, as HarnessOptions.OnReport took before. One part of v1.5.0's union arrives with a later area of the sync: the
+// task_interrupted kind with its restart_limit and interrupted reasons and its restart count (area restarts). Pi v1.5.0 sync (area
+// telemetry): the telemetry host callback (2ec55d808).
 using PiSharp.Durable.Chord;
 using PiSharp.Durable.Internal;
 
@@ -41,6 +41,9 @@ public enum HostCallback
     SetTimer,
     /// <summary><c>onWake</c>: <see cref="HarnessOptions.OnWake"/>.</summary>
     OnWake,
+    /// <summary><c>telemetry</c>: <see cref="HarnessOptions.Telemetry"/>, or a context's span, threw while a commit was published (its
+    /// <c>pi.durable.entry</c> or <c>pi.durable.submission</c> event, or <c>pi.durable.tasks.active</c>). The commit stands.</summary>
+    Telemetry,
 }
 
 /// <summary>What a report to <see cref="HarnessOptions.OnReport"/> is about (upstream <c>ReportInfo["kind"]</c>).</summary>

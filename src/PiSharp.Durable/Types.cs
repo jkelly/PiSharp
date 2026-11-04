@@ -6,6 +6,11 @@
 // change after it is handed over. Each record has ToJson/FromJson with a fixed key order (see each type) and JavaScript number and
 // string formatting; FromJson enforces the discriminated shapes that upstream's types enforce at compile time. Record equality is
 // JavaScript deep equality of that JSON (vitest's toEqual).
+//
+// Pi v1.5.0 sync (area telemetry): submission and task records carry the adapter-owned trace carriers of 2ec55d808 (SubmissionRecord.Trace,
+// TaskRecord.Trace and Links; TaskOptions.Trace and Links, TaskTrace for upstream's `TelemetryCarrier | "root"`), written in upstream's key
+// order. Without propagation none is written, so such records stay byte-identical to v1.2.0's. The citation stays on v1.2.0 until the
+// file's other areas land.
 using System.Collections.Immutable;
 using PiSharp.Durable.Chord;
 using PiSharp.Durable.Internal;
@@ -119,6 +124,11 @@ public sealed record TaskOwnership
 /// <summary>Creation options for a durable task (upstream <c>TaskOptions</c>).</summary>
 public sealed record TaskOptions(TaskOwnership Ownership)
 {
+    /// <summary>The task's trace (upstream <c>trace</c>): null inherits the creating commit's context, <see cref="TaskTrace.Root"/> starts
+    /// at the adapter root without a stored carrier, and <see cref="TaskTrace.Of"/> stores a carrier.</summary>
+    public TaskTrace? Trace { get; init; }
+    /// <summary>Immutable creation-time links (upstream <c>links</c>), attached to the spans of the task's first invocation.</summary>
+    public IReadOnlyList<IReadOnlyDictionary<string, string>>? Links { get; init; }
     /// <summary>Default: the owner task's conversation, or the transaction's bound conversation.</summary>
     public ConversationId? ConversationId { get; init; }
     /// <summary>Conversation-owned tasks only: excluded from ordinary idle waits, conversation aborts and cascades.</summary>
@@ -129,6 +139,22 @@ public sealed record TaskOptions(TaskOwnership Ownership)
     /// cascades to its ordinary owned work, before any of it runs again (upstream <c>abandonOnRestart</c>).
     /// </summary>
     public bool? AbandonOnRestart { get; init; }
+}
+
+/// <summary>A task's trace at creation (upstream <c>TaskOptions["trace"]</c>, a <c>TelemetryCarrier | "root"</c>): a stored carrier, or the
+/// adapter root.</summary>
+public sealed record TaskTrace
+{
+    private TaskTrace(IReadOnlyDictionary<string, string>? carrier) { Carrier = carrier; }
+
+    /// <summary><c>"root"</c>: phases start at the adapter root, and the record stores no carrier.</summary>
+    public static TaskTrace Root { get; } = new((IReadOnlyDictionary<string, string>?)null);
+
+    /// <summary>A carrier to store, as propagation injected it.</summary>
+    public static TaskTrace Of(IReadOnlyDictionary<string, string> carrier) => new(carrier ?? throw new ArgumentNullException(nameof(carrier)));
+
+    /// <summary>The carrier; null for <see cref="Root"/>.</summary>
+    public IReadOnlyDictionary<string, string>? Carrier { get; }
 }
 
 /// <summary>Whether a context edit omits or replaces its target's model messages.</summary>
@@ -272,6 +298,8 @@ public interface ISubmissionFields
     ConversationId ConversationId { get; }
     /// <summary>Host-provided deduplication key, scoped to the conversation.</summary>
     string? RequestId { get; }
+    /// <summary>The adapter-owned carrier of the admission span (upstream <c>trace</c>); absent without propagation.</summary>
+    IReadOnlyDictionary<string, string>? Trace { get; }
     /// <summary>Input or passive write.</summary>
     SubmissionType Type { get; }
     /// <summary>The lifecycle status.</summary>
@@ -288,7 +316,7 @@ public interface ISubmissionFields
 
 /// <summary>Durable lifecycle of one admitted user input or passive entry write (upstream <c>SubmissionRecord</c>). Which fields a
 /// status allows follows upstream's union exactly; <see cref="Validate"/> and <see cref="FromJson"/> enforce it. JSON key order is
-/// upstream's: the Session creates <c>{ ...create, id }</c> (<c>conversationId, requestId, type, status, entry, answer, reason, detail</c>,
+/// upstream's: the Session creates <c>{ ...create, id }</c> (<c>conversationId, requestId, trace, type, status, entry, answer, reason, detail</c>,
 /// each when present, then <c>id</c>), and a placement or settlement spreads the current record, so a field it adds (a queued input's
 /// <c>entry</c>, an <c>answer</c>, a <c>reason</c>) follows <c>id</c>. <see cref="KeyOrder"/> carries the creation order, or the decoded
 /// JSON's, through <c>with</c>.</summary>
@@ -300,6 +328,8 @@ public sealed record SubmissionRecord : ISubmissionFields
     public required ConversationId ConversationId { get; init; }
     /// <inheritdoc/>
     public string? RequestId { get; init; }
+    /// <inheritdoc/>
+    public IReadOnlyDictionary<string, string>? Trace { get; init; }
     /// <inheritdoc/>
     public required SubmissionType Type { get; init; }
     /// <inheritdoc/>
@@ -328,7 +358,7 @@ public sealed record SubmissionRecord : ISubmissionFields
     {
         const string what = "submission record";
         var value = RecordJson.Object(json, what);
-        RecordJson.OnlyKeys(value, what, "id", "conversationId", "requestId", "type", "status", "entry", "answer", "reason", "detail");
+        RecordJson.OnlyKeys(value, what, "id", "conversationId", "requestId", "trace", "type", "status", "entry", "answer", "reason", "detail");
         var create = SubmissionShape.Read(value, what);
         return (create.WithId(RecordJson.Id<SubmissionId>(value, "id", what)) with { KeyOrder = RecordJson.KeysOf(value) }).Validate();
     }
@@ -349,6 +379,8 @@ public sealed record SubmissionCreate : ISubmissionFields
     /// <inheritdoc/>
     public string? RequestId { get; init; }
     /// <inheritdoc/>
+    public IReadOnlyDictionary<string, string>? Trace { get; init; }
+    /// <inheritdoc/>
     public required SubmissionType Type { get; init; }
     /// <inheritdoc/>
     public required SubmissionStatus Status { get; init; }
@@ -367,7 +399,7 @@ public sealed record SubmissionCreate : ISubmissionFields
     /// <summary>The record with <paramref name="id"/>: upstream's <c>{ ...create, id }</c>, whose later fields follow <c>id</c>.</summary>
     public SubmissionRecord WithId(SubmissionId id) => new()
     {
-        Id = id, ConversationId = ConversationId, RequestId = RequestId, Type = Type, Status = Status, Entry = Entry, Answer = Answer,
+        Id = id, ConversationId = ConversationId, RequestId = RequestId, Trace = Trace, Type = Type, Status = Status, Entry = Entry, Answer = Answer,
         Reason = Reason, Detail = Detail, KeyOrder = [.. ToJson().Keys, "id"],
     };
 
@@ -379,7 +411,7 @@ public sealed record SubmissionCreate : ISubmissionFields
     {
         const string what = "submission create";
         var value = RecordJson.Object(json, what);
-        RecordJson.OnlyKeys(value, what, "conversationId", "requestId", "type", "status", "entry", "answer", "reason", "detail");
+        RecordJson.OnlyKeys(value, what, "conversationId", "requestId", "trace", "type", "status", "entry", "answer", "reason", "detail");
         return SubmissionShape.Read(value, what).Validate();
     }
 
@@ -421,7 +453,8 @@ public sealed class SubmissionSettlement : DurableValue
 internal static class SubmissionShape
 {
     public static RecordJson.Writer Write(RecordJson.Writer writer, ISubmissionFields value) => writer
-        .Add("conversationId", value.ConversationId.ToJson()).Add("requestId", value.RequestId).Add("type", WireName.Of(value.Type))
+        .Add("conversationId", value.ConversationId.ToJson()).Add("requestId", value.RequestId).Add("trace", RecordJson.Carrier(value.Trace))
+        .Add("type", WireName.Of(value.Type))
         .Add("status", WireName.Of(value.Status)).Add("entry", value.Entry?.ToJson()).Add("answer", value.Answer?.ToJson())
         .Add("reason", value.Reason).Add("detail", value.Detail);
 
@@ -429,6 +462,7 @@ internal static class SubmissionShape
     {
         ConversationId = RecordJson.Id<ConversationId>(value, "conversationId", what),
         RequestId = RecordJson.OptionalString(value, "requestId", what),
+        Trace = RecordJson.OptionalCarrier(value, "trace", what),
         Type = RecordJson.Enum<SubmissionType>(value, "type", what),
         Status = RecordJson.Enum<SubmissionStatus>(value, "status", what),
         Entry = RecordJson.OptionalId<EntryId>(value, "entry", what),
@@ -758,7 +792,7 @@ public sealed class TerminalTaskState(TaskOutcome outcome) : SettlingTaskState(o
 
 /// <summary>Complete replacement record for one durable task state machine (upstream <c>TaskRecord&lt;JsonValue, JsonValue,
 /// JsonValue&gt;</c>; typed task views join with the runtime in P7). JSON key order is upstream's: <c>id, conversationId, kind, version, input,
-/// owner, background, abortRequested, abandonOnRestart, state</c> as the Session creates a record, then <c>startedAt</c> (stamped on the first
+/// trace, links, owner, background, abortRequested, abandonOnRestart, state</c> as the Session creates a record, then <c>startedAt</c> (stamped on the first
 /// change to running), <c>memos</c> (added by a running invocation, dropped with the outcome) and <c>endedAt</c>, each appended by a spread of
 /// the current record; <c>abortReason</c> is appended by the mark that sets it. <see cref="KeyOrder"/> keeps a decoded or marked record's own
 /// order through <c>with</c>.</summary>
@@ -774,6 +808,11 @@ public sealed record TaskRecord
     public required int Version { get; init; }
     /// <summary>Original task input retained while the task is live or terminal.</summary>
     public required JsonValue Input { get; init; }
+    /// <summary>The adapter-owned carrier of the context that created this task (upstream <c>trace</c>); its phase invocations extract it as
+    /// their parent. Absent without propagation, or for a task created with <see cref="TaskTrace.Root"/>. Immutable.</summary>
+    public IReadOnlyDictionary<string, string>? Trace { get; init; }
+    /// <summary>Creation-time links (upstream <c>links</c>), attached to the spans of the task's first invocation. Immutable.</summary>
+    public IReadOnlyList<IReadOnlyDictionary<string, string>>? Links { get; init; }
     /// <summary>Owning task of a child task; absent for a task its conversation owns. Immutable.</summary>
     public TaskId? Owner { get; init; }
     /// <summary>Whether this conversation-owned task is excluded from ordinary idle waits, conversation aborts and cascades.</summary>
@@ -809,7 +848,7 @@ public sealed record TaskRecord
     /// <summary>The persisted JSON.</summary>
     public JsonObjectValue ToJson() => RecordJson.Ordered(new RecordJson.Writer()
         .Add("id", Id.ToJson()).Add("conversationId", ConversationId.ToJson()).Add("kind", Kind).Number("version", Version).Add("input", Input)
-        .Add("owner", Owner?.ToJson()).Add("background", Background).Add("abortRequested", AbortRequested)
+        .Add("trace", RecordJson.Carrier(Trace)).Add("links", RecordJson.Carriers(Links)).Add("owner", Owner?.ToJson()).Add("background", Background).Add("abortRequested", AbortRequested)
         .Add("abandonOnRestart", AbandonOnRestart ? JsonValue.Boolean(true) : null).Add("state", State.ToJson())
         .Number("startedAt", StartedAt).Add("memos", Memos).Number("endedAt", EndedAt)
         .Add("abortReason", AbortReason is { } reason ? WireName.Of(reason) : null).Build(), KeyOrder);
@@ -819,7 +858,7 @@ public sealed record TaskRecord
     {
         const string what = "task record";
         var value = RecordJson.Object(json, what);
-        RecordJson.OnlyKeys(value, what, "id", "conversationId", "kind", "version", "input", "owner", "background", "abortRequested",
+        RecordJson.OnlyKeys(value, what, "id", "conversationId", "kind", "version", "input", "trace", "links", "owner", "background", "abortRequested",
             "abortReason", "abandonOnRestart", "state", "memos", "startedAt", "endedAt");
         return new TaskRecord
         {
@@ -828,6 +867,8 @@ public sealed record TaskRecord
             Kind = RecordJson.String(value, "kind", what),
             Version = RecordJson.Version(value, "version", what),
             Input = RecordJson.Required(value, "input", what),
+            Trace = RecordJson.OptionalCarrier(value, "trace", what),
+            Links = RecordJson.OptionalCarriers(value, "links", what),
             Owner = RecordJson.OptionalId<TaskId>(value, "owner", what),
             Background = RecordJson.Boolean(value, "background", what),
             AbortRequested = RecordJson.Boolean(value, "abortRequested", what),

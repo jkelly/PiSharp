@@ -19,8 +19,8 @@
 // Pi v1.5.0 sync (area model-requests): HarnessOptions.Identity (adc5fa9f8, 04a93bad8) and GenerationHooks.BeforeProviderRequest
 // (d280e1ffa).
 // Pi v1.5.0 sync (area reports): HarnessOptions.OnReport takes one Report (TypesReports.cs; a30c2a81d, 91b33cab3, 5f312dac4),
-// settings.afterFailedRun (AfterFailedRun, a30c2a81d), and TaskInspectionKind.Pending replaces Ready (TaskState's word). TelemetryOptions
-// and the report's telemetry context are area telemetry's.
+// settings.afterFailedRun (AfterFailedRun, a30c2a81d), and TaskInspectionKind.Pending replaces Ready (TaskState's word).
+// Pi v1.5.0 sync (area telemetry): HarnessOptions.Telemetry, the host-owned adapter of DURABLE_TELEMETRY_SCHEMA (2ec55d808, 48909d987).
 using System.Collections.Immutable;
 using PiSharp.AI;
 using PiSharp.Durable.Chord;
@@ -797,6 +797,13 @@ public sealed record EnvTarget(ConversationId ConversationId, string? Cwd, IDocu
 /// <summary>Options of <see cref="Harness.OpenAsync"/> (upstream <c>HarnessOptions</c>).</summary>
 public sealed record HarnessOptions
 {
+    /// <summary>
+    /// The host-owned adapter of the content-free admission and phase telemetry (upstream <c>telemetry</c>; <see cref="DurableTelemetry.Schema"/>):
+    /// public submissions start <c>pi.durable.submit</c> spans under it, and task phases <c>pi.durable.phase</c> spans under their stored
+    /// trace, or under it. Its propagation and metrics are optional: without propagation no trace carrier is stored on a record. Null: the
+    /// no-op context, which records and stores nothing. Spans, events and metrics never carry content, only record IDs and fixed categories.
+    /// </summary>
+    public PiSharp.Telemetry.ITelemetryContext? Telemetry { get; init; }
     /// <summary>pi-ai model access used by generation, compaction, hooks and tools. Set this or <see cref="CurrentModels"/>.</summary>
     public IDurableModels? Models { get; init; }
     /// <summary>

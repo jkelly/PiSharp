@@ -16,10 +16,15 @@
 // pi.durable.reports counter and event are area telemetry's), safeNow reports host_error now, and the scheduler's timers host_error
 // setTimer; an agent resolution names the conversation and the extension whose wrapper failed. The task graph reads blocked reasons from
 // the scheduler (440a5fcdb). One safeNow serves the Session and the Harness, as upstream's one `now` does, so a broken clock reports once.
+// Pi v1.5.0 sync (area telemetry, 2ec55d808): HarnessOptions.Telemetry reaches the scheduler (phase spans, durations, active tasks) and
+// submissions (submit spans); without it every span is a no-op. safeReport counts each report in pi.durable.reports by type and records
+// pi.durable.report on the reporting context's span with its fixed attributes (type, reason, extension, task.id), never the error; both are
+// contained, as the report is the last place an error goes. Reports carry the context of what raised them (ReportSink).
 using System.Collections.Immutable;
 using PiSharp.AI;
 using PiSharp.Durable.Chord;
 using PiSharp.Durable.Env;
+using PiSharp.Telemetry;
 
 namespace PiSharp.Durable;
 
@@ -79,6 +84,10 @@ public static class Harness
     }
 }
 
+/// <summary>Where the Harness's components send an error with what it is about and, when there is one, the context of the operation it came
+/// from, whose span records it (upstream <c>report(error, info, context?)</c>).</summary>
+internal delegate void ReportSink(Exception error, ReportInfo info, DurableContext? context = null);
+
 /// <summary>The Session kernel extended with conversation handles, a registry and the task scheduler (upstream <c>HarnessImpl</c>).</summary>
 internal sealed class DurableHarness : Session, IHarness
 {
@@ -87,24 +96,24 @@ internal sealed class DurableHarness : Session, IHarness
     private readonly IStorage storage;
     private readonly HarnessOptions options;
     private readonly Func<HarnessSettings?> hostSettings;
-    private readonly Action<Exception, ReportInfo> report;
+    private readonly ReportSink report;
     private readonly DurableTaskScheduler scheduler;
     private readonly Submissions submissions;
     private readonly ConversationViews views;
     private readonly TaskGraphView taskGraph;
 
     public DurableHarness(IStorage rawStorage, HarnessOptions options, DurableContext context)
-        : this(rawStorage, options, context, SafeReport(options.OnReport), CurrentSettings(options))
+        : this(rawStorage, options, context, SafeReport(options.OnReport, options.Telemetry), CurrentSettings(options))
     {
     }
 
-    private DurableHarness(IStorage rawStorage, HarnessOptions options, DurableContext context, Action<Exception, ReportInfo> report,
+    private DurableHarness(IStorage rawStorage, HarnessOptions options, DurableContext context, ReportSink report,
         Func<HarnessSettings?> hostSettings)
-        : this(rawStorage, options, context, report, hostSettings, SafeNow(Clock(options), options.Now is not null, report))
+        : this(rawStorage, options, context, report, hostSettings, SafeNow(Clock(options), options.Now is not null, (error, info) => report(error, info)))
     {
     }
 
-    private DurableHarness(IStorage rawStorage, HarnessOptions options, DurableContext context, Action<Exception, ReportInfo> report,
+    private DurableHarness(IStorage rawStorage, HarnessOptions options, DurableContext context, ReportSink report,
         Func<HarnessSettings?> hostSettings, Func<double> now)
         // Read at each use, as all settings are, but only this field: it is read on every commit.
         : base(rawStorage, now, () => hostSettings()?.DocumentRetentionMs, options.ReadOnly, options.SetTimer, options.TimeProvider)
@@ -130,6 +139,7 @@ internal sealed class DurableHarness : Session, IHarness
             Timers = new HostTimers(options.SetTimer, NativeTimer.Of(options.TimeProvider ?? TimeProvider.System),
                 error => report(error, ReportInfo.HostError(HostCallback.SetTimer))),
             Report = report,
+            Telemetry = options.Telemetry,
             SettleOutcome = (tx, record, outcome) => Live.SettleSchedulerOutcomeAsync(tx, record, outcome),
             WithdrawInputs = (tx, id) => Inbox.WithdrawQueuedInputsAsync(tx, id),
             Conversation = async (id, binding, callContext) =>
@@ -140,7 +150,7 @@ internal sealed class DurableHarness : Session, IHarness
             Context = context.WithoutCancellation(),
             ReadOnly = options.ReadOnly,
         });
-        submissions = new Submissions(this, storage, Now, () => Agents.ResolveSettings(hostSettings()), () => scheduler.Resume());
+        submissions = new Submissions(this, storage, Now, () => Agents.ResolveSettings(hostSettings()), () => scheduler.Resume(), options.Telemetry);
         views = new ConversationViews(this, storage);
         taskGraph = new TaskGraphView(this, storage, scheduler.BlockedReasonOf, scheduler.SubscribeBlocked);
     }
@@ -188,9 +198,28 @@ internal sealed class DurableHarness : Session, IHarness
     }
 
     /// <summary><c>OnReport</c> that cannot fail (upstream <c>safeReport</c>): it is the last place an error goes, so its own throw is
-    /// dropped. It hears one <see cref="Durable.Report"/>, the error with what it is about.</summary>
-    internal static Action<Exception, ReportInfo> SafeReport(Action<Report>? onReport) =>
-        (error, info) => Contained(() => onReport?.Invoke(new Report(info, error)), _ => { });
+    /// dropped. It hears one <see cref="Durable.Report"/>, the error with what it is about. Each report then counts in
+    /// <c>pi.durable.reports</c> by type and, with a context, is a <c>pi.durable.report</c> event on its span, with the report's fixed
+    /// attributes and never the error; a throwing telemetry adapter is dropped too.</summary>
+    internal static ReportSink SafeReport(Action<Report>? onReport, ITelemetryContext? telemetry = null)
+    {
+        var reports = TelemetrySchema.CreateTypedMetrics((telemetry ?? NoopTelemetry.Context).Metrics ?? NoopTelemetry.Metrics,
+            DurableTelemetry.Schema).Counter("pi.durable.reports");
+        return (error, info, context) =>
+        {
+            if (onReport is not null) Contained(() => onReport(new Report(info, error)), _ => { });
+            var attributes = DurableTelemetry.ReportAttributes(info);
+            try
+            {
+                reports.Add(1, new SpanAttributes { ["type"] = ReportInfo.KindName(info.Kind) });
+                context?.Telemetry.AddEvent("pi.durable.report", attributes);
+            }
+            catch (Exception)
+            {
+                // Dropped: see above.
+            }
+        };
+    }
 
     /// <summary>
     /// The host clock, falling back to the system clock when it throws (upstream <c>safeNow</c>): a broken clock must not stop commits. The
@@ -216,8 +245,9 @@ internal sealed class DurableHarness : Session, IHarness
         };
     }
 
-    /// <summary>The Session's failure and listener errors go to <c>OnReport</c>, with what they are about.</summary>
-    internal override void Report(Exception error, ReportInfo info) => report(error, info);
+    /// <summary>The Session's failure and listener errors go to <c>OnReport</c>, with what they are about and the context they came
+    /// from.</summary>
+    internal override void Report(Exception error, ReportInfo info, DurableContext? context = null) => report(error, info, context);
 
     /// <summary>Resolves a conversation's committed <c>pi.agent</c> against <paramref name="snapshot"/>, or the current one, and the current
     /// settings.</summary>
@@ -226,7 +256,7 @@ internal sealed class DurableHarness : Session, IHarness
         var registry = snapshot ?? options.Registry.Snapshot();
         var state = await SnapshotAsync(Agents.AgentDoc, id, context).ConfigureAwait(false);
         return Agents.ResolveAgent(state, registry, Agents.ResolveSettings(hostSettings()),
-            (error, extension) => report(error, new ReportInfo(ReportKind.ExtensionError) { ConversationId = id, Extension = extension }));
+            (error, extension) => report(error, new ReportInfo(ReportKind.ExtensionError) { ConversationId = id, Extension = extension }, context));
     }
 
     /// <summary>Builds a conversation's environment from its current <c>cwd</c>; null without an <c>Env</c> option.</summary>

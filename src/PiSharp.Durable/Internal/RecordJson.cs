@@ -101,6 +101,45 @@ internal static class RecordJson
         return builder.ToImmutable();
     }
 
+    /// <summary>A telemetry carrier (upstream <c>TelemetryCarrier</c>, an object of string values) as JSON, in its key order; null when
+    /// absent.</summary>
+    public static JsonObjectValue? Carrier(IReadOnlyDictionary<string, string>? carrier)
+    {
+        if (carrier is null) return null;
+        var builder = JsonObjectValue.CreateBuilder();
+        foreach (var (key, value) in carrier) builder[key] = JsonValue.String(value);
+        return builder.ToImmutable();
+    }
+
+    /// <summary>Reads an optional telemetry carrier: an object whose values are strings, in its key order.</summary>
+    public static IReadOnlyDictionary<string, string>? OptionalCarrier(JsonObjectValue value, string key, string what)
+    {
+        return Optional(value, key) is { } field ? CarrierOf(field, key, what) : null;
+    }
+
+    /// <summary>Telemetry carriers as a JSON array; null when absent.</summary>
+    public static JsonArrayValue? Carriers(IReadOnlyList<IReadOnlyDictionary<string, string>>? carriers) =>
+        carriers is null ? null : JsonValue.Array(carriers.Select(carrier => (JsonValue)Carrier(carrier)!));
+
+    /// <summary>Reads an optional array of telemetry carriers.</summary>
+    public static IReadOnlyList<IReadOnlyDictionary<string, string>>? OptionalCarriers(JsonObjectValue value, string key, string what)
+    {
+        if (Optional(value, key) is not { } field) return null;
+        if (field is not JsonArrayValue items) throw Invalid(what, $"\"{key}\" must be an array");
+        var carriers = new List<IReadOnlyDictionary<string, string>>(items.Count);
+        foreach (var item in items) carriers.Add(CarrierOf(item, key, what));
+        return carriers;
+    }
+
+    private static OrderedDictionary<string, string> CarrierOf(JsonValue field, string key, string what)
+    {
+        if (field is not JsonObjectValue fields) throw Invalid(what, $"\"{key}\" must hold carrier objects");
+        var carrier = new OrderedDictionary<string, string>(StringComparer.Ordinal);
+        foreach (var (name, item) in fields)
+            carrier.Add(name, item is JsonStringValue text ? text.Value : throw Invalid(what, $"\"{key}\" values must be strings"));
+        return carrier;
+    }
+
     /// <summary>The keys of a decoded object, as <see cref="Ordered"/> takes them.</summary>
     public static ImmutableArray<string> KeysOf(JsonObjectValue value) => [.. value.Keys];
 

@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/src/codemode/models.ts.
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/src/codemode/models.ts.
 // - pi-ai's Models (api.models) is IDurableModels' catalog, classifier and image members (GetModelsOfType, GetAvailableOfTypeAsync,
 //   GetModelOfType, ClassifyAsync, GenerateImagesAsync); models, contexts and results are pi-ai wire JSON. A host whose IDurableModels
 //   keeps the members' defaults has no classifier or image models: the catalog lists none, so scripts get upstream's "Unknown ... model"
@@ -7,6 +7,7 @@
 //   as the sandbox's JSON round trip leaves it. `typeof`, `Array.isArray` and the record check read the JSON kind.
 // - Pi v1.5.0 sync (area tools-schema): `obj({ model: unknown(), context: unknown() }, { open: true })` and `unknown()` are the JSON
 //   pi-schema builds for them (the same JSON Schema as v1.2.0's TypeBox, `required` after `properties`).
+// - Pi v1.5.0 sync (area telemetry, 2ec55d808): classify and generateImages pass the tool call's span as their telemetry parent.
 using System.Collections.Immutable;
 using System.Text.RegularExpressions;
 using PiSharp.Durable.Chord;
@@ -247,7 +248,8 @@ internal static partial class CodemodeModels
                 var args = (JsonObjectValue)arguments;
                 var model = ResolveModel("models.classify", "classifier", Get(args, "model"), api.Models);
                 var checkedContext = CheckClassifierContext(Get(args, "context"));
-                var result = await api.Models.ClassifyAsync(model, checkedContext, context.CancellationToken).ConfigureAwait(false);
+                var result = await api.Models.ClassifyAsync(model, checkedContext, new DurableRequestOptions { Telemetry = context.Telemetry },
+                    context.CancellationToken).ConfigureAwait(false);
                 return ModelResult(Label("classify", model), result);
             },
         }),
@@ -263,7 +265,8 @@ internal static partial class CodemodeModels
                 var args = (JsonObjectValue)arguments;
                 var model = ResolveModel("models.generateImages", "image", Get(args, "model"), api.Models);
                 var checkedContext = CheckImagesContext(Get(args, "context"));
-                var result = await api.Models.GenerateImagesAsync(model, checkedContext, context.CancellationToken).ConfigureAwait(false);
+                var result = await api.Models.GenerateImagesAsync(model, checkedContext, new DurableRequestOptions { Telemetry = context.Telemetry },
+                    context.CancellationToken).ConfigureAwait(false);
                 return ModelResult(Label("generateImages", model), result);
             },
         }),

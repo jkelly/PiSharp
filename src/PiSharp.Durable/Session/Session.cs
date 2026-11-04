@@ -7,7 +7,10 @@
 // already forwards both. Pi v1.5.0 sync (area sleep): createSession's setTimer arms the document sweep as a background timer (upstream
 // f75b3240a, Timers.cs); a host that declines one leaves eviction to the end of each commit. Pi v1.5.0 sync (area reports): a report
 // carries its ReportInfo (a30c2a81d): the Session's failure and a failing close are storage_failed, a host timer host_error setTimer, and a
-// listener's throw listener_error, the default.
+// listener's throw listener_error, the default. Pi v1.5.0 sync (area telemetry, 2ec55d808 and v1.5.0's fix): a stored commit's publication
+// records its committed entries (pi.durable.entry) and settled submissions (pi.durable.submission) on the commit context's span first,
+// listeners or not; a throwing telemetry adapter is reported host_error telemetry with that context and the commit stands. A listener's
+// report, and the Session's failure from a commit, carry the commit context, so the Harness records them on its span.
 //
 // Concurrency model. Upstream relies on one JavaScript thread: `#enqueue` chains every mutation and cold load onto one promise, and
 // listeners run in later microtasks. Here .NET callers may be on any thread, so:
@@ -44,6 +47,8 @@ using System.Runtime.CompilerServices;
 using System.Runtime.ExceptionServices;
 using PiSharp.Durable.Chord;
 using PiSharp.Durable.Chord.Delta;
+using PiSharp.Durable.Internal;
+using PiSharp.Telemetry;
 
 namespace PiSharp.Durable;
 
@@ -182,7 +187,10 @@ public class Session : ISession
     /// now; they read the error from <see cref="Failure"/>. The Storage guard calls this; the Harness also calls it for a throw in its
     /// scheduler's own commits.
     /// </summary>
-    internal void Fail(Exception error)
+    internal void Fail(Exception error) => Fail(error, null);
+
+    /// <summary><see cref="Fail(Exception)"/>, reported with the context of the operation that failed, when there is one.</summary>
+    internal void Fail(Exception error, DurableContext? context)
     {
         if (!TrySetFailure(error)) return;
         failedSource.TrySetException(new SessionFailedException(error));
@@ -191,7 +199,7 @@ public class Session : ISession
         var finishClose = BeginClose(DurableContext.Background);
         _ = closing!.ContinueWith(static task => _ = task.Exception, CancellationToken.None,
             TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
-        Report(error, ReportInfo.StorageFailed);
+        Report(error, ReportInfo.StorageFailed, context);
         // Upstream's next microtask: the join and the closing line job follow the listeners and the report. They start on the thread pool,
         // not inside the call that failed, which may be a line job or a Storage call.
         if (finishClose is not null) ThreadPool.UnsafeQueueUserWorkItem(static finish => finish(), finishClose, preferLocal: false);
@@ -210,9 +218,9 @@ public class Session : ISession
     /// <summary>Internal: errors of listeners, which never fail what ran them, reported as <c>listener_error</c>.</summary>
     internal void Report(Exception error) => Report(error, ReportInfo.ListenerError);
 
-    /// <summary>Internal: the Session's failure, and errors that never fail what ran them, with what they are about (upstream
-    /// <c>report(error, info)</c>). A plain Session drops them.</summary>
-    internal virtual void Report(Exception error, ReportInfo info) { }
+    /// <summary>Internal: the Session's failure, and errors that never fail what ran them, with what they are about and the context of the
+    /// operation they came from, if any (upstream <c>report(error, info, context)</c>). A plain Session drops them.</summary>
+    internal virtual void Report(Exception error, ReportInfo info, DurableContext? context = null) { }
 
     // ─── Commits ────────────────────────────────────────────────────────────
 
@@ -620,7 +628,8 @@ public class Session : ISession
     public IDisposable SubscribeCommits(Func<CommitPublication, DurableContext, Task> listener)
     {
         ArgumentNullException.ThrowIfNull(listener);
-        return Subscribe(commitListeners, (publication, context) => Observe(listener(publication, context), Report));
+        return Subscribe(commitListeners, (publication, context) =>
+            Observe(listener(publication, context), error => Report(error, ReportInfo.ListenerError, context)));
     }
 
     /// <summary>
@@ -934,6 +943,19 @@ public class Session : ISession
 
     private void Publish(Seq seq, IReadOnlyList<StorageWrite> writes, List<ICommitChange> documentChanges, DurableContext context)
     {
+        // Its telemetry events first, listeners or not.
+        foreach (var write in writes)
+        {
+            if (write is EntryWrite entry)
+                Event("pi.durable.entry", new SpanAttributes { ["entry.id"] = entry.Value.Id.Value, ["entry.kind"] = entry.Value.Kind }, context);
+            else if (write is SubmissionWrite { Value: { Status: SubmissionStatus.Done or SubmissionStatus.Unanswered } submission })
+                Event("pi.durable.submission", new SpanAttributes
+                {
+                    ["submission.id"] = submission.Id.Value,
+                    ["status"] = WireName.Of(submission.Status),
+                    ["answer.entry_id"] = submission.Answer?.Value,
+                }, context);
+        }
         Action<CommitPublication, DurableContext>[] internals;
         Action<CommitPublication, DurableContext>[] listeners;
         lock (listenersGate)
@@ -951,12 +973,26 @@ public class Session : ISession
         try
         {
             // The commit is durable: a failing listener neither fails the commit nor skips the others.
-            foreach (var listener in internals) Contained(() => listener(publication, context), Fail);
-            foreach (var listener in listeners) Contained(() => listener(publication, context), Report);
+            foreach (var listener in internals) Contained(() => listener(publication, context), error => Fail(error, context));
+            foreach (var listener in listeners) Contained(() => listener(publication, context), error => Report(error, ReportInfo.ListenerError, context));
         }
         finally
         {
             RunDeferred();
+        }
+    }
+
+    /// <summary>At publication: records one of a commit's telemetry events (upstream <c>#event</c>). A throwing adapter is reported, as
+    /// publication must not throw.</summary>
+    private void Event(string name, SpanAttributes attributes, DurableContext context)
+    {
+        try
+        {
+            context.Telemetry.AddEvent(name, attributes);
+        }
+        catch (Exception error)
+        {
+            Report(error, ReportInfo.HostError(HostCallback.Telemetry), context);
         }
     }
 

@@ -1,6 +1,11 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <!-- Decision 0005: experimental port of Pi's pi-durable. Packed as an EXPERIMENTAL NuGet library since 1.2.0.1 (owner decision 2026-10-16);
        every public type stays [Experimental("PISHARP_DURABLE001")]. -->
+  <PropertyGroup>
+    <!-- Pi 1.5.0 telemetry (area telemetry): contexts carry a pi-telemetry span (PiSharp.Telemetry, reached through PiSharp.AI), and the
+         Harness records DURABLE_TELEMETRY_SCHEMA through it. -->
+    <NoWarn>$(NoWarn);PISHARP_TELEMETRY001</NoWarn>
+  </PropertyGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="PiSharp.Durable.Sqlite" />
     <InternalsVisibleTo Include="PiSharp.Durable.Store" />

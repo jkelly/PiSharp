@@ -17,6 +17,8 @@
 //
 // Pi v1.5.0 sync (area harness-options): compactionPolicy() and select's per-model policy (upstream 6085986e4, #10942). Areas restarts,
 // sleep, telemetry and live-turns change this file again, so the citation stays on v1.2.0.
+// Pi v1.5.0 sync (area telemetry, 2ec55d808): the summarization request passes the phase's span as its telemetry parent; a
+// conversation-owned compaction's admission records no submit span, only the phase's events.
 using System.Collections.Immutable;
 using System.Text;
 using PiSharp.Durable.Chord;
@@ -234,6 +236,7 @@ internal static class Compaction
             MaxTokens = request.MaxTokens,
             SessionId = await ProviderIdentity.EnsureProviderSessionIdAsync(runtime, context).ConfigureAwait(false),
             Reasoning = request.ThinkingLevel == "off" ? null : request.ThinkingLevel,
+            Telemetry = context.Telemetry,
         };
         var answer = await runtime.Models.CompleteSimpleAsync(model, messages, options, runtime.Signal).ConfigureAwait(false);
         // An abort mark or close: the abort invocation or the reopened task handles the committed state.
@@ -539,8 +542,8 @@ internal static class Compaction
             Data = JsonValue.Object([KeyValuePair.Create("reason", (JsonValue)reason)]),
         };
         var result = current.Owner is null
-            ? new CompactionResult(SubmissionId: await Submissions.AdmitSubmissionAsync(tx, runtime.ConversationId,
-                SubmissionDraft.Write(entry, $"compaction:{runtime.TaskId}"), runtime.Now(), runtime.Settings).ConfigureAwait(false))
+            ? new CompactionResult(SubmissionId: (await Submissions.AdmitSubmissionAsync(tx, runtime.ConversationId,
+                SubmissionDraft.Write(entry, $"compaction:{runtime.TaskId}"), runtime.Now(), runtime.Settings).ConfigureAwait(false)).Id)
             : new CompactionResult(EntryId: (await tx.AppendEntryAsync(runtime.ConversationId, entry).ConfigureAwait(false)).Id);
         return NextTaskState.Completed(result.ToJson());
     }

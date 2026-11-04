@@ -1,7 +1,11 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/chord/src/context/index.ts (Context, ContextKey, BACKGROUND_CONTEXT,
-// TODO_CONTEXT, createContextKey, withContextValue, withAbortSignal, withoutAbortSignal, withCancel, awaitWithContext; v1.2.0 moved the
-// Context and ContextKey types here from types.ts). Named DurableContext so it is never mistaken for a conversation's context.
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/chord/src/context/index.ts (Context, ContextKey, BACKGROUND_CONTEXT,
+// TODO_CONTEXT, createContextKey, withContextValue, withTelemetry, traceIn, withAbortSignal, withoutAbortSignal, withCancel,
+// awaitWithContext; v1.2.0 moved the Context and ContextKey types here from types.ts). Named DurableContext so it is never mistaken for a
+// conversation's context. Pi v1.5.0 sync (area telemetry): Context.telemetry, always a span (48909d987, 2ec55d808), withTelemetry, and
+// traceIn with the context last (92ab53602). As every derivation here, withTelemetry and traceIn are instance methods of the context they
+// derive from (WithTelemetry, TraceInAsync).
 using System.Runtime.ExceptionServices;
+using PiSharp.Telemetry;
 
 namespace PiSharp.Durable.Chord;
 
@@ -36,6 +40,7 @@ public sealed class ContextKey<T>(string? description)
 public sealed class DurableContext
 {
     private static readonly ContextKey<CancellationSignal?> SignalKey = new("chord.abortSignal");
+    private static readonly ContextKey<ITelemetrySpan> TelemetryKey = new("chord.telemetry");
 
     private readonly DurableContext? parent;
     private readonly object? key;
@@ -43,6 +48,8 @@ public sealed class DurableContext
     private readonly string? name;
     // The innermost signal value on the chain, cached so token access does not walk the chain.
     private readonly CancellationSignal? signal;
+    // The innermost telemetry span on the chain, cached the same way; none reads as the no-op span.
+    private readonly ITelemetrySpan? telemetry;
 
     private DurableContext(string name) { this.name = name; }
 
@@ -52,6 +59,7 @@ public sealed class DurableContext
         this.key = key;
         this.value = value;
         signal = ReferenceEquals(key, SignalKey) ? (CancellationSignal?)value : parent.signal;
+        telemetry = ReferenceEquals(key, TelemetryKey) ? (ITelemetrySpan?)value : parent.telemetry;
     }
 
     /// <summary>The empty root context for work with no caller (<c>BACKGROUND_CONTEXT</c>). It never cancels.</summary>
@@ -72,6 +80,10 @@ public sealed class DurableContext
     /// <summary>The reason given to <see cref="DurableCancellation.Cancel"/> (upstream <c>abortSignal.reason</c>); null when not
     /// cancelled, cancelled without a reason, or cancelled through a plain token.</summary>
     public object? CancellationReason => signal is { Token.IsCancellationRequested: true } ? signal.Reason : null;
+
+    /// <summary>The telemetry parent of work under this context (upstream <c>telemetry</c>): the span of the innermost
+    /// <see cref="WithTelemetry"/>, else <see cref="NoopTelemetry.Context"/>. Never null.</summary>
+    public ITelemetrySpan Telemetry => telemetry ?? NoopTelemetry.Context;
 
     /// <summary>Throws the cancellation error when cancellation has been requested (upstream <c>abortSignal?.throwIfAborted()</c>).</summary>
     public void ThrowIfCancellationRequested()
@@ -101,6 +113,32 @@ public sealed class DurableContext
     {
         ArgumentNullException.ThrowIfNull(key);
         return new DurableContext(this, key, value);
+    }
+
+    /// <summary>Derives a context whose telemetry parent is <paramref name="span"/>, cancellation and every value kept
+    /// (<c>withTelemetry</c>). This context is unchanged.</summary>
+    public DurableContext WithTelemetry(ITelemetrySpan span)
+    {
+        ArgumentNullException.ThrowIfNull(span);
+        return new DurableContext(this, TelemetryKey, span);
+    }
+
+    /// <summary>
+    /// Runs <paramref name="callback"/> in a child span of <see cref="Telemetry"/>, with this context derived to that span
+    /// (<c>traceIn</c>). The callback's result and error are its own; under the no-op span it just runs.
+    /// </summary>
+    public Task<T> TraceInAsync<T>(SpanOptions options, Func<DurableContext, Task<T>> callback)
+    {
+        ArgumentNullException.ThrowIfNull(options);
+        ArgumentNullException.ThrowIfNull(callback);
+        return Telemetry.StartSpanAsync(options, span => callback(WithTelemetry(span)));
+    }
+
+    /// <inheritdoc cref="TraceInAsync{T}(SpanOptions, Func{DurableContext, Task{T}})"/>
+    public Task<T> TraceInAsync<T>(SpanOptions options, Func<DurableContext, T> callback)
+    {
+        ArgumentNullException.ThrowIfNull(callback);
+        return TraceInAsync(options, child => Task.FromResult(callback(child)));
     }
 
     /// <summary>
