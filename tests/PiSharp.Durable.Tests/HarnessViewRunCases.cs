@@ -403,6 +403,8 @@ internal static class ViewRunTests
             // Aborting the generation aborts its round: the tool ends with its aborted result first (spec §8.5).
             await harness.AbortTaskAsync(await RunTask(harness, root), Context);
             await submission.WaitAsync(Context);
+            // PiSharp: the submission can settle before the commit that ends the aborted tool reaches the observer, so wait for it.
+            await HarnessTests.Eventually(() => SlotsOf(history.Live(), "c2").Any(slot => Status(slot) == "done"));
             history.Detach();
             var states = history.Live();
             var views = history.Views;
@@ -466,6 +468,9 @@ internal static class ViewRunTests
             await HarnessTests.Eventually(() => history.Live().Any(state => Field(Generation(state), "message") is not null));
             await harness.AbortTaskAsync(await RunTask(harness, root), Context);
             await submission.WaitAsync(Context);
+            // PiSharp: the submission can settle before the commit that ends the run reaches the observer (seen under load), so wait for
+            // the value that ends it.
+            await HarnessTests.Eventually(() => history.Live().Skip(1).Any(state => !state.ContainsKey("run")));
             history.Detach();
             var states = history.Live();
             var views = history.Views;
