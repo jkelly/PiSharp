@@ -3244,7 +3244,9 @@
         "observers"
       ],
       "commits": [
-        "f3255de76"
+        "f3255de76",
+        "d18649e2",
+        "51406efc"
       ],
       "notes": "Design point, watchEvents: recommendation is to keep a PiSharp-only event projection on the v1.5.0 view and observers, in PiSharp.Durable.Hosting (AgentEvents.cs, moved from PiSharp.Durable/Harness/Events.cs), so PiSharp.Durable follows upstream (Events.cs and Harness.WatchEventsAsync go) and the device wire stays v1 and durable-pi compatible (decision 0008 §1). Only Hosting's Feeds.cs consumes the typed events (Feeds.cs:28 calls WatchEventsAsync); the server's agent frames (AgentFrames.cs), the client (Wire.cs passes AgentEvent.ToJson() through, Models.cs reduces it), the hub (Web Hub/StreamMux.cs, wwwroot/js/app.js), the web agent (AgentViewHub.cs, ChatStreamMux.cs) and pisharp durable attach (DurableAttach.cs) see only the JSON, so they need no change beyond a check run of their suites. Moving the protocol to view state plus ConversationTranscript instead would rewrite the server's agent frames, the client model, the hub and app.js, the web agent's hub and the CLI's attach (decisions 0008, 0010, 0011 change) and break durable-pi compatibility of the wire. With watch folding (area watch-folding) a batch covers one delivery rather than one commit. The owner decides. Tests: HarnessEventsCases.cs and HarnessStructuredEventsCases.cs move to the projection (tests/PiSharp.Durable.Hosting.Tests), keep their v1.2.0 expectations and are labelled authored PiSharp-only behaviour (upstream v1.5.0 has no events to compare); the compat cases that compare agent events with the v1.2.0 events.json captures keep comparing the projection with those captures, which stays honest only while the projection reproduces v1.2.0's events; say so in the evidence. The examples (18-json, 20-late-join, 21/22 subagents) follow upstream to the view."
     },

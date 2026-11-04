@@ -56,11 +56,11 @@
     "changelogBullets": 477,
     "repeatedBullets": 23,
     "byStatus": {
-      "ported": 201,
+      "ported": 202,
       "ported-with-deferral": 25,
       "already-ported": 12,
       "no-op": 25,
-      "port": 63
+      "port": 62
     },
     "byArea": {
       "ai": 58,
@@ -8681,7 +8681,7 @@
           "tests/PiSharp.Durable.Tests/Session/SessionWatchesCases.cs: folds-a-retirement-into-the-pending-commits-call-which-reports-it-with-the-last-value-and-goes-on",
           "tests/PiSharp.Durable.Tests/Session/SessionWatchesCases.cs: can-replay-every-delivered-exact-operation-batch-from-the-acquisition-revision",
           "tests/PiSharp.Durable.Tests/Harness/HarnessViewCases.cs: folds-undelivered-commits-into-one-call-whose-ops-reach-the-newest-view",
-          "tests/PiSharp.Durable.Tests/Harness/HarnessEventsCases.cs: delivers-each-of-100-pending-batches-in-its-own-call-in-order-unlike-state-watches",
+          "tests/PiSharp.Durable.Tests/AgentEventsCases.cs: delivers-each-of-100-pending-batches-in-its-own-call-in-order-unlike-state-watches",
           "tests/PiSharp.Durable.Tests/ExamplesCases.cs: examples.memory.upstream-output"
         ]
       }
@@ -9274,7 +9274,7 @@
       "id": "durable.watch-events-removed",
       "area": "durable",
       "phase": 4,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "durable@1.5.0/Breaking Changes#16"
       ],
@@ -9308,7 +9308,33 @@
         "samples/Durable.Examples/ExamplesLateJoin.cs"
       ],
       "release": "1.5.0",
-      "notes": "The largest collision with PiSharp-only surfaces. The device protocol (decisions 0008 and 0010) is built on watchEvents: Hosting's AgentEventFeed (Feeds.cs:28) feeds the server's agent stream, which sends a snapshot and one batch of pi-durable events per commit verbatim (AgentFrames.cs); the client reduces them (Client Models.cs; Wire.cs passes AgentEvent.ToJson() through), the hub multiplexes them (Web Hub/StreamMux.cs), and so do the web agent (AgentViewHub.cs, decision 0011) and pisharp durable attach. The owner decides: move the device protocol to view state (conversation watch frames plus ConversationTranscript), or keep a PiSharp-only event projection derived from view operations so the wire protocol stays. The compat cases compare agent events with the v1.2.0 events.json captures (decision 0005), which v1.5.0 has no counterpart for. Depends on durable.conversation-window, durable.conversation-transcript and durable.run-failure."
+      "notes": "The largest collision with PiSharp-only surfaces. The device protocol (decisions 0008 and 0010) is built on watchEvents: Hosting's AgentEventFeed (Feeds.cs:28) feeds the server's agent stream, which sends a snapshot and one batch of pi-durable events per commit verbatim (AgentFrames.cs); the client reduces them (Client Models.cs; Wire.cs passes AgentEvent.ToJson() through), the hub multiplexes them (Web Hub/StreamMux.cs), and so do the web agent (AgentViewHub.cs, decision 0011) and pisharp durable attach. The owner decides: move the device protocol to view state (conversation watch frames plus ConversationTranscript), or keep a PiSharp-only event projection derived from view operations so the wire protocol stays. The compat cases compare agent events with the v1.2.0 events.json captures (decision 0005), which v1.5.0 has no counterpart for. Depends on durable.conversation-window, durable.conversation-transcript and durable.run-failure.",
+      "evidence": {
+        "commits": [
+          "d18649e2",
+          "51406efc"
+        ],
+        "tests": [
+          "tests/PiSharp.Durable.Tests/AgentEventsCases.cs: streams-a-run-as-lifecycle-events-and-text-deltas-that-rebuild-the-answer",
+          "tests/PiSharp.Durable.Tests/AgentEventsCases.cs: delivers-each-of-100-pending-batches-in-its-own-call-in-order-unlike-state-watches",
+          "tests/PiSharp.Durable.Tests/AgentEventsCases.cs: replaces-undelivered-batches-with-one-snapshot-after-100-pending-batches",
+          "tests/PiSharp.Durable.Tests/AgentEventsCases.cs: emits-one-turn-end-per-generation-also-for-a-stream-attached-while-it-holds",
+          "tests/PiSharp.Durable.Tests/Harness/HarnessStructuredCases.cs: hands-run-control-to-the-successor-while-the-generation-holds-and-keeps-it-in-the-graph-until-it-ends",
+          "tests/PiSharp.Durable.Tests/Harness/HarnessStructuredCases.cs: shows-a-held-generation-as-completing-to-an-observer-attached-while-it-holds",
+          "tests/PiSharp.Durable.Tests/Harness/HarnessStructuredCases.cs: holds-a-faulted-tools-slot-and-its-graph-node-until-the-work-it-owns-drained",
+          "tests/PiSharp.Durable.Tests/Harness/HarnessCompactionCases.cs: records-a-failure-in-pi-live-in-the-commit-that-ends-the-compaction-until-a-summary-is-produced",
+          "tests/PiSharp.Durable.Tests/Harness/HarnessCompactionCases.cs: lists-a-compaction-from-start-to-end-with-its-retry-backoff-in-a-late-joiners-view",
+          "tests/PiSharp.Durable.Tests/Harness/HarnessCompactionCases.cs: shows-a-late-joiner-a-compaction-that-is-summarizing",
+          "tests/PiSharp.Durable.Tests/HarnessNestedToolsCases.cs: reports-nested-calls-in-pi-live-nestedtools-with-their-parent",
+          "tests/PiSharp.Durable.Tests/HarnessInputEntriesCases.cs: appends-a-data-only-write-while-idle-after-a-failed-run-without-placing-the-queued-items",
+          "tests/PiSharp.Durable.Tests/SessionDocumentRetentionCases.cs: gives-the-same-views-with-documents-evicted-right-after-use-as-with-documents-kept",
+          "tests/PiSharp.Durable.Tests/HarnessStorageFailureCases.cs: ends-everything-with-the-first-error-the-call-later-calls-waits-watches-streams-running-tasks",
+          "tests/PiSharp.Durable.Tests/ExamplesCases.cs: examples.memory.upstream-output",
+          "tests/PiSharp.Durable.Tests/Harness/HarnessViewsDifferentialCases.cs: aborted-round",
+          "tests/PiSharp.Durable.Hosting.Tests/StreamCases.cs: streams.an-agent-feed-starts-with-a-snapshot",
+          "tests/PiSharp.Durable.Server.Tests/AgentFramesCases.cs: agent-frames.match-what-the-http-stream-sends"
+        ]
+      }
     },
     {
       "id": "durable.live-compaction-trigger",
