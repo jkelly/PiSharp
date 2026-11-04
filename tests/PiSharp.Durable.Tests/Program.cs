@@ -4,11 +4,14 @@ using System.Text.Json;
 using PiSharp.Durable;
 
 // The experimental pi-durable port (decision 0005). Cases are ported from Pi packages/durable/test and the Chord tests it relies on, by
-// reading, at the pinned commit (DurableUpstream.Commit, v1.2.0; the port began at v1.1.0); compatibility/durable-port-map.json records which upstream test each case group covers. Every static
+// reading, at the pinned commit (DurableUpstream.Commit, v1.5.0; the port began at v1.1.0, and the groups the v1.5.0 sync has not reached yet
+// still port v1.2.0); compatibility/durable-port-map.json records which upstream test each case group covers. Every static
 // method of Program whose name ends in "Cases" and returns IEnumerable<(string, Func<Task>)> is a case group.
 internal static partial class Program
 {
-    internal const string Upstream = DurableUpstream.Commit;
+    // The report's source label stays on Pi v1.2.0 while the v1.5.0 sync (compatibility/durable-sync-1.5.0-worklist.json) is under way: the
+    // cases check v1.2.0 behaviour and the compat.* captures are v1.2.0's (Fixtures/v1.2.0). The port map follows DurableUpstream.Commit.
+    internal const string Upstream = "06a466935536f8c9bcacb2d5efc0fc021be1bdff";
 
     private static async Task<int> Main(string[] args)
     {
