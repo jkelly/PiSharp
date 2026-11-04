@@ -57,10 +57,10 @@
     "repeatedBullets": 23,
     "byStatus": {
       "ported": 180,
-      "ported-with-deferral": 16,
+      "ported-with-deferral": 17,
       "already-ported": 12,
       "no-op": 25,
-      "port": 93
+      "port": 92
     },
     "byArea": {
       "ai": 58,
@@ -11400,7 +11400,7 @@
       "id": "chord.next-registries",
       "area": "chord",
       "phase": 4,
-      "status": "port",
+      "status": "ported-with-deferral",
       "changelog": [
         "chord@1.5.0/Added#3"
       ],
@@ -11418,7 +11418,64 @@
       "pulledInBy": [
         "durable.registry-reader"
       ],
-      "notes": "Durable's registryReader reads a RegistryValue (durable@1.5.0/Added#15, group E), so phase 4 needs at least the RegistryValue shape. Not v1's registries (chord.registries-v1)."
+      "notes": "Durable's registryReader reads a RegistryValue (durable@1.5.0/Added#15, group E), so phase 4 needs at least the RegistryValue shape. Not v1's registries (chord.registries-v1).",
+      "evidence": {
+        "commits": [
+          "86b69943",
+          "4e35b89a",
+          "ea4cbc81"
+        ],
+        "tests": [
+          "tests/PiSharp.Chord.Tests/Registries/EntriesCases.cs: registries.entries.keyed-entries-maps-every-entrys-keys-with-their-plugin-a-duplicate-is-reported-and-the-first-by-plugin-name-keeps-it",
+          "tests/PiSharp.Chord.Tests/Registries/EntriesCases.cs: registries.entries.keyed-entries-reads-an-entrys-keys-in-object-entries-order-pisharp",
+          "tests/PiSharp.Chord.Tests/Registries/EntriesCases.cs: registries.entries.ordered-entries-lists-every-entrys-items-in-table-order-with-their-plugin-and-type",
+          "tests/PiSharp.Chord.Tests/Registries/EntriesCases.cs: registries.entries.ordered-entries-sorts-by-order-of-table-order-kept-among-equals",
+          "tests/PiSharp.Chord.Tests/Registries/RegistryCases.cs: registries.registry.tokens-carry-a-name-a-version-and-the-types-only-names-and-versions-are-checked-at-declaration",
+          "tests/PiSharp.Chord.Tests/Registries/RegistryCases.cs: registries.registry.providers-a-provider-without-compose-is-refused-when-its-setup-serves-it-plugin-code-is-not-type-checked",
+          "tests/PiSharp.Chord.Tests/Registries/RegistryCases.cs: registries.registry.providers-a-registry-whose-provider-comes-with-load-heals-a-host-registry-made-before-it",
+          "tests/PiSharp.Chord.Tests/Registries/RecordCases.cs: registries.record.the-table-is-sorted-by-plugin-name-then-type-a-facet-first-never-load-order",
+          "tests/PiSharp.Chord.Tests/Registries/RecordCases.cs: registries.record.the-table-adapts-an-older-contribution-once-per-value-a-newer-one-or-an-older-one-without-an-adapter-is-left-out-and-reported-once",
+          "tests/PiSharp.Chord.Tests/Registries/RecordCases.cs: registries.record.the-table-takes-a-contribution-declared-before-its-providers-setup-into-the-first-composition",
+          "tests/PiSharp.Chord.Tests/Registries/RecordCases.cs: registries.record.compose-composes-every-served-registry-once-at-the-end-of-loads-setups-an-empty-table-too-before-any-object-activates",
+          "tests/PiSharp.Chord.Tests/Registries/RecordCases.cs: registries.record.compose-is-lazy-a-change-marks-the-table-a-read-composes-it-once-no-compose-for-an-unchanged-table",
+          "tests/PiSharp.Chord.Tests/Registries/RecordCases.cs: registries.record.compose-composes-a-watched-registry-in-the-batch-of-the-commit-that-changed-a-contribution-once-per-batch",
+          "tests/PiSharp.Chord.Tests/Registries/RecordCases.cs: registries.record.compose-reports-a-conflict-once-per-episode",
+          "tests/PiSharp.Chord.Tests/Registries/RecordCases.cs: registries.record.compose-a-throwing-compose-reported-once-a-failed-call-value-keeps-the-last-good-composition-the-next-good-one-heals",
+          "tests/PiSharp.Chord.Tests/Registries/RecordCases.cs: registries.record.compose-before-any-good-composition-value-throws-the-error-and-host-registry-rejects-with-it-at-its-ready-timeout",
+          "tests/PiSharp.Chord.Tests/Registries/RecordCases.cs: registries.record.contributions-a-watchable-contribution-that-fails-is-left-out-and-reported-once-and-is-back-once-it-heals",
+          "tests/PiSharp.Chord.Tests/Registries/RecordCases.cs: registries.record.contributions-a-contribution-adapter-that-throws-leaves-that-contribution-out-contribution-failed",
+          "tests/PiSharp.Chord.Tests/Registries/RecordCases.cs: registries.record.contributions-catches-a-ring-of-registries-at-its-first-composition-the-contributors-go-live-the-rest-works-audit-a2",
+          "tests/PiSharp.Chord.Tests/Registries/RecordCases.cs: registries.record.contributions-keeps-a-rings-later-recompositions-bounded-a-change-composes-each-registry-once-then-nothing-audit-a2",
+          "tests/PiSharp.Chord.Tests/Registries/RecordCases.cs: registries.record.contributions-catches-a-ring-through-a-derive-and-one-declared-within-one-factory-the-same-way-audit-a2",
+          "tests/PiSharp.Chord.Tests/Registries/RecordCases.cs: registries.record.contributions-follows-only-chord-watchables-anything-else-is-a-plain-value-whatever-methods-it-has-sol",
+          "tests/PiSharp.Chord.Tests/Registries/RecordCases.cs: registries.record.contributions-keeps-an-undefined-contribution-in-the-table-sol-astra",
+          "tests/PiSharp.Chord.Tests/Registries/RecordCases.cs: registries.record.contributions-leaves-out-a-registrys-value-contributed-to-another-while-that-registrys-compose-throws-sol-astra",
+          "tests/PiSharp.Chord.Tests/Registries/RecordCases.cs: registries.record.contributions-an-objects-contribution-is-in-the-table-from-live-until-it-fails-again-once-retried-until-it-ends",
+          "tests/PiSharp.Chord.Tests/Registries/RecordCases.cs: registries.record.the-last-good-composition-decision-5-is-dropped-when-a-contribution-it-was-built-from-leaves-value-throws-until-compose-succeeds",
+          "tests/PiSharp.Chord.Tests/Registries/RecordCases.cs: registries.record.the-tables-memory-keeps-nothing-of-a-closed-host-records-tables-and-followed-contributions-go-with-it",
+          "tests/PiSharp.Chord.Tests/Registries/RecordCases.cs: registries.record.a-reloads-new-contribution-adapter-fix-round-1-remaps-an-unchanged-contributor-with-the-new-providers-adapter",
+          "tests/PiSharp.Chord.Tests/Registries/RecordCases.cs: registries.record.pisharp-a-contribution-that-is-no-value-of-the-providers-type-is-left-out-contribution-failed",
+          "tests/PiSharp.Chord.Tests/Registries/ValueCases.cs: registries.value.older-readers-s2-get-the-composition-mapped-back-with-accepts-old-value-once-per-composition",
+          "tests/PiSharp.Chord.Tests/Registries/ValueCases.cs: registries.value.older-readers-s2-without-a-value-mapping-and-for-a-reader-newer-than-the-provider-park-readers-failed-waiting-contract-mismatch",
+          "tests/PiSharp.Chord.Tests/Registries/ValueCases.cs: registries.value.older-readers-s2-drops-an-older-readers-last-good-mapping-after-a-contributor-it-was-built-from-failed-live-fix-round-1-astra-2",
+          "tests/PiSharp.Chord.Tests/Registries/ValueCases.cs: registries.value.older-readers-s2-never-hands-out-a-mapped-native-whose-contributor-failed-and-closed-it-fix-round-1-sol-2",
+          "tests/PiSharp.Chord.Tests/Registries/ValueCases.cs: registries.value.older-readers-s2-maps-an-undefined-composition-sol-astra",
+          "tests/PiSharp.Chord.Tests/Registries/ValueCases.cs: registries.value.older-readers-s2-a-failed-mapping-heals-when-the-composition-is-the-one-mapped-before-astra",
+          "tests/PiSharp.Chord.Tests/Registries/ValueCases.cs: registries.value.readers-s3-activate-once-the-registry-has-a-value-a-reader-of-a-registry-nobody-serves-parks-failed-waiting-load-waits-for-nothing",
+          "tests/PiSharp.Chord.Tests/Registries/ValueCases.cs: registries.value.readers-s3-a-reader-parked-on-a-first-compose-that-threw-goes-on-at-the-first-good-composition",
+          "tests/PiSharp.Chord.Tests/Registries/ValueCases.cs: registries.value.readers-s3-host-registry-before-the-publication-waits-for-it-then-resolves-with-the-provider-it-served",
+          "tests/PiSharp.Chord.Tests/Registries/ValueCases.cs: registries.value.readers-s3-host-registry-waits-through-no-value-until-a-first-good-composition-woken-by-it-its-wait-then-gone",
+          "tests/PiSharp.Chord.Tests/Registries/ValueCases.cs: registries.value.readers-s3-once-live-a-later-throwing-compose-changes-nothing-for-the-reader-value-keeps-the-last-good-one",
+          "tests/PiSharp.Chord.Tests/Registries/ValueCases.cs: registries.value.readers-memory-an-ended-reader-is-collected-while-the-registry-lives-its-derive-and-its-read-leave-the-value",
+          "tests/PiSharp.Chord.Tests/Registries/ValueCases.cs: registries.value.values-memory-drops-an-older-versions-mapping-once-its-last-reader-ended-sol",
+          "tests/PiSharp.Chord.Tests/Registries/ValueCases.cs: registries.value.values-memory-keeps-no-old-composition-once-its-readers-stopped-waiting-and-nobody-follows-it-opus",
+          "tests/PiSharp.Chord.Tests/Registries/ValueCases.cs: registries.value.values-memory-a-value-an-app-keeps-after-host-close-keeps-no-closed-host-and-reads-its-last-composition-sol-astra",
+          "tests/PiSharp.Chord.Tests/Registries/ValueCases.cs: registries.value.observe-calls-a-synchronous-observer-inside-the-batch-that-composed-it-counts-as-watching",
+          "tests/PiSharp.Chord.Tests/Registries/ValueCases.cs: registries.value.a-reloads-new-value-adapter-fix-round-1-uses-a-new-value-adapter-even-when-compose-returns-the-same-primitive",
+          "tests/PiSharp.Chord.Tests/Registries/ValueCases.cs: registries.value.pisharp-a-version-is-read-as-one-type-a-composition-of-another-type-fails-it-contract-mismatch"
+        ]
+      },
+      "deferred": "Every file of packages/chord/src/next/registries is ported (src/PiSharp.Chord/Registries, namespace PiSharp.Chord.Registries), and 44 of the 47 upstream cases of test/next/registries run on a hand-built host (tests/PiSharp.Chord.Tests/Registries/RegistryHost.cs), plus 3 PiSharp cases. The row also names packages/chord/src/next/host, which is chord.next-host-objects' (phase 6, excluded in the work list), and what only createHost has waits for it: (1) registry.test.ts 'one per host' (a second serve leaves its plugin out at load) and 'are served only while the setup runs'; (2) the load-failure half of 'a provider without compose' (staging prefixes the refusal with 'plugin \"@app/a\": ' and leaves the plugin out; the refusal itself, checkProvider, is ported); (3) record.test.ts 'a followed contribution whose runtime ended its observer stays with its last value' (self.follow's source, host/follow.ts); (4) assertions on host state inside ported cases: a parked attempt's state and retryAt (the 'waiting for registry <name>: ' prefix), objects' reachability ({ kind: \"live\" }), failures(errors) (activation_failed), the publication promise host.registry waits for, and getEventListeners. packages/chord/docs/next/slice-8.md is design prose; the README's rules are summarised in Registries/Index.cs."
     },
     {
       "id": "chord.next-plugins",
