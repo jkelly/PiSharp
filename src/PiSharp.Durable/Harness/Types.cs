@@ -769,8 +769,7 @@ public sealed record HarnessOptions
     /// <summary>
     /// A function returning the current model access, called at each use (generation and compaction requests,
     /// <c>ITaskRuntime.Models</c>, and <c>Models</c> of hooks and tools at each access), so a host can replace its model configuration
-    /// without reopening the Harness (upstream's <c>models</c> as a function). Set this or <see cref="Models"/>. Until reports are ported, a
-    /// throw fails the call that read it.
+    /// without reopening the Harness (upstream's <c>models</c> as a function). Set this or <see cref="Models"/>.
     /// </summary>
     public Func<IDurableModels>? CurrentModels { get; init; }
     /// <summary>The registry; it may keep changing while the Harness runs.</summary>
