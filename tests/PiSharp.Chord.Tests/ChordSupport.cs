@@ -1,18 +1,20 @@
+using System.Collections.Immutable;
 using System.Runtime.CompilerServices;
 using System.Text.Json.Nodes;
 using PiSharp.Chord;
 using PiSharp.Chord.Contracts;
 using PiSharp.Chord.Data;
+using PiSharp.Chord.Delta;
 using PiSharp.Telemetry;
 using static PiSharp.Chord.Contracts.Schemas;
 
 // Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/chord/test/next/support.ts, the test support every Chord v2 test imports.
 // Ported here: the GC check (expectCollected) and the shared declarations of the slice tests (Server, SERVER_ADDRESS, Notes and its
 // variants, Session, PlacedNotes, NoteStore, Restartable, StoreRestartable), and wireNames without its `named` (which reads link parts);
-// area cv2-data added the counters (counted, metered) and rejection.
+// area cv2-data added the counters (counted, metered) and rejection; area cv2-state the watch frames and changes (framesOf, changesOf,
+// valuesOf; delivered() flushes a host's scheduler, State/StateHost.cs).
 // Equal<A, B> is a type-level check with no C# counterpart. The rest needs layers later areas bring, and each comes with the first area
-// whose tests use it: watch frames and changes (delivered, framesOf,
-// changesOf, valuesOf; the state layer, cv2-state), the store helpers (memoryStore, faultyDatabase, faultyStore, holdNextCommit,
+// whose tests use it: the store helpers (memoryStore, faultyDatabase, faultyStore, holdNextCommit,
 // tableOwner, tableIn, ArchiveTables, archiveStore, exported, countInflated; the store areas), the remaining declarations (NotesDoc; the
 // documents areas), and the hosts, links, relays and raw peers (failLive, restartable,
 // storeRestartable, loaded, loadedPlugins, fakeTimers, flushed, failures, linked, RawPeer, partValue, CODECS, forEachCodec, rawLinked,
@@ -36,6 +38,57 @@ internal static class ChordSupport
     /// <summary>WeakReferences to the values <paramref name="make"/> returns, made in a frame of its own so no local keeps them alive.</summary>
     [MethodImpl(MethodImplOptions.NoInlining)]
     internal static WeakReference[] Weakly(Func<object[]> make) => [.. make().Select(value => new WeakReference(value))];
+
+    /// <summary>Starts <paramref name="watch"/> and collects its frames as <c>(value, ops)</c> (upstream <c>framesOf</c>).</summary>
+    internal static List<(T Value, ImmutableArray<Op> Ops)> FramesOf<T>(IWatchHandle<T> watch)
+    {
+        var frames = new List<(T, ImmutableArray<Op>)>();
+        watch.Start((call, _) =>
+        {
+            if (call is WatchValueCall<T> value) frames.Add((value.Value, value.Ops));
+            return Task.CompletedTask;
+        });
+        return frames;
+    }
+
+    /// <summary>Starts <paramref name="watch"/> and collects every call it gets: values (the retired flag included) and failures (upstream
+    /// <c>changesOf</c>).</summary>
+    internal static List<WatchCall<T>> ChangesOf<T>(IWatchHandle<T> watch)
+    {
+        var calls = new List<WatchCall<T>>();
+        watch.Start((call, _) =>
+        {
+            calls.Add(call);
+            return Task.CompletedTask;
+        });
+        return calls;
+    }
+
+    /// <summary>The values of <paramref name="calls"/>, a failure as <c>{ failed: message }</c> (upstream <c>valuesOf</c>).</summary>
+    internal static List<object?> ValuesOf<T>(IEnumerable<WatchCall<T>> calls) =>
+        [.. calls.Select(call => call is WatchValueCall<T> value ? value.Value : (object)new { failed = ((Exception)((WatchFailedCall<T>)call).Error!).Message })];
+
+    /// <summary>A watch call as upstream's tests compare it: <c>{"kind":"value","value":…,"ops":[…],"retired":…}</c>, or
+    /// <c>{"kind":"failed","error":"&lt;message&gt;"}</c> (toEqual on an Error compares its message).</summary>
+    internal static string CallJson(WatchCall<JsonNode?> call) => call switch
+    {
+        WatchValueCall<JsonNode?> value => ChordJson.Stringify(new JsonObject
+        {
+            ["kind"] = "value",
+            ["value"] = value.Value?.DeepClone(),
+            ["ops"] = OpsJson(value.Ops),
+            ["retired"] = value.Retired,
+        }),
+        WatchFailedCall<JsonNode?> failed => ChordJson.Stringify(new JsonObject { ["kind"] = "failed", ["error"] = ((Exception)failed.Error!).Message }),
+        _ => throw new InvalidOperationException("an unknown call"),
+    };
+
+    /// <summary>A frame as upstream's tests compare it: <c>[value, ops]</c>.</summary>
+    internal static string FrameJson((JsonNode? Value, ImmutableArray<Op> Ops) frame) =>
+        ChordJson.Stringify(new JsonArray(frame.Value?.DeepClone(), OpsJson(frame.Ops)));
+
+    /// <summary>Ops as their JSON tuples.</summary>
+    internal static JsonArray OpsJson(ImmutableArray<Op> ops) => [.. ops.Select(op => (JsonNode)op.ToJson())];
 
     /// <summary>The variants of the notes types: an editor variant for owners, a reader one for guests.</summary>
     private static OrderedDictionary<string, VariantDeclaration> NotesVariants() => new()
