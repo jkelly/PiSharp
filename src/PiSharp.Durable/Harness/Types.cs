@@ -11,6 +11,11 @@
 // A ToolHookCall is the call's wire JSON with, for a nested call, a `parent` object {taskId, callId}; a NestedToolExecutionResult is a
 // record whose JSON (ToJson, in upstream's key order) is what NestedCallDoc stores and tool events carry. A JSON field upstream leaves
 // undefined is a C# null; an explicit JSON null is JsonValue.Null.
+//
+// Pi v1.5.0 sync (area harness-options): CompactionSettings.ModelOverrides and Settings.Compaction's overrides (upstream 6085986e4,
+// #10942), HarnessOptions.CurrentModels and CurrentSettings (upstream's function forms of models and settings, 7ec1f648e) and
+// HarnessOptions.ReadOnly (be14d9732). ToolControl.Terminate was already a bool. The citation stays on v1.2.0 until the file's other areas
+// land.
 using System.Collections.Immutable;
 using PiSharp.Durable.Chord;
 using PiSharp.Durable.Env;
@@ -371,7 +376,7 @@ public interface IToolExecutionApi : IDocumentObserver, IDocumentReader
     IRegistrySnapshot Registry { get; }
     /// <summary>The calling conversation's agent, as the tool task's phase resolved it.</summary>
     Task<Agent> AgentAsync(DurableContext context);
-    /// <summary><c>HarnessOptions.Models</c>: the catalog, credentials and request transforms generation uses.</summary>
+    /// <summary>The current <c>HarnessOptions.Models</c>, read at each access: the catalog, credentials and request transforms.</summary>
     IDurableModels Models { get; }
     /// <summary>Built by <c>HarnessOptions.Env</c> for this call; null without an environment.</summary>
     IExecutionEnv? Env { get; }
@@ -758,12 +763,24 @@ public sealed record EnvTarget(ConversationId ConversationId, string? Cwd, IDocu
 /// <summary>Options of <see cref="Harness.OpenAsync"/> (upstream <c>HarnessOptions</c>).</summary>
 public sealed record HarnessOptions
 {
-    /// <summary>pi-ai model access used by generation.</summary>
-    public required IDurableModels Models { get; init; }
+    /// <summary>pi-ai model access used by generation, compaction, hooks and tools. Set this or <see cref="CurrentModels"/>.</summary>
+    public IDurableModels? Models { get; init; }
+    /// <summary>
+    /// A function returning the current model access, called at each use (generation and compaction requests,
+    /// <c>ITaskRuntime.Models</c>, and <c>Models</c> of hooks and tools at each access), so a host can replace its model configuration
+    /// without reopening the Harness (upstream's <c>models</c> as a function). Set this or <see cref="Models"/>. Until reports are ported, a
+    /// throw fails the call that read it.
+    /// </summary>
+    public Func<IDurableModels>? CurrentModels { get; init; }
     /// <summary>The registry; it may keep changing while the Harness runs.</summary>
     public required IRegistryReader Registry { get; init; }
-    /// <summary>Harness-wide run policy.</summary>
+    /// <summary>Harness-wide run policy, read at each use. Set this or <see cref="CurrentSettings"/>, or neither.</summary>
     public HarnessSettings? Settings { get; init; }
+    /// <summary>
+    /// A function returning the current run policy, or null for the defaults, called at each use as <see cref="Settings"/> is read (upstream's
+    /// <c>settings</c> as a function), so a host can replace its settings without reopening the Harness. Set this or <see cref="Settings"/>.
+    /// </summary>
+    public Func<HarnessSettings?>? CurrentSettings { get; init; }
     /// <summary>Builds a conversation's environment at each use. Never called on the Session line.</summary>
     public Func<EnvTarget, DurableContext, Task<IExecutionEnv?>>? Env { get; init; }
     /// <summary>
@@ -782,6 +799,14 @@ public sealed record HarnessOptions
     /// once. Its own throw is dropped. (An <c>async void</c> handler's exception escapes to the thread pool, which no caller can contain.)
     /// </summary>
     public Action<Exception>? OnReport { get; init; }
+    /// <summary>
+    /// Opens for reading only, as a viewer of a session that another process drives, for example a synced copy on a device that only shows
+    /// it (upstream <c>readOnly</c>). Open recovers nothing: a <c>running</c> task stays as committed. Every commit with writes throws
+    /// <see cref="ReadOnlySessionException"/> before it reaches Storage, and so do <see cref="IHarness.Resume"/> and every call that enables
+    /// scheduling; the Harness stays usable for reads and watches. Reopen without it to write. Unrelated to the device host's read-only agent
+    /// switch, which removes writing tools from an agent that still runs.
+    /// </summary>
+    public bool ReadOnly { get; init; }
 }
 
 // ─── Inspection and context ─────────────────────────────────────────────
@@ -1081,7 +1106,8 @@ public sealed record EntryQueryBounds
 public interface IHarness : ISession
 {
     /// <summary>
-    /// Enables task scheduling. Idempotent; throws after close. Calls that ask for progress enable it too: <c>Conversation.SubmitAsync</c>,
+    /// Enables task scheduling. Idempotent; throws after close, and <see cref="ReadOnlySessionException"/> on a read-only Harness
+    /// (<see cref="HarnessOptions.ReadOnly"/>). Calls that ask for progress enable it too: <c>Conversation.SubmitAsync</c>,
     /// <c>CompactAsync</c>, <c>AbortAsync</c>, <c>Submission.WaitAsync</c>, <see cref="WaitForTaskAsync"/>, <see cref="WaitForIdleAsync"/>
     /// and <c>Conversation.WaitForIdleAsync</c>. Read-only viewers never do.
     /// </summary>
@@ -1141,7 +1167,7 @@ public interface IHookApi : IDocumentReader
     TaskId TaskId { get; }
     /// <summary>Its conversation.</summary>
     ConversationId ConversationId { get; }
-    /// <summary><c>HarnessOptions.Models</c>.</summary>
+    /// <summary>The current <c>HarnessOptions.Models</c>, read at each access (a task runtime's too).</summary>
     IDurableModels Models { get; }
     /// <summary>Reads a memo of the asking task.</summary>
     Task<JsonValue?> MemoAsync(string name, DurableContext context);

@@ -1,7 +1,8 @@
 // Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/src/errors.ts. Upstream's Error subclasses (checked by `name`) are
 // exception types here; the messages are upstream's. errorMessage() is DurableErrors.MessageOf: a .NET throw is always an Exception, but a
 // derived exception's Message getter can throw as JavaScript's String() can, and its fallback is the type name where upstream's is
-// Object.prototype.toString().
+// Object.prototype.toString(). Pi v1.5.0 sync (area harness-options): ReadOnlySession (upstream be14d9732); area admission brings the
+// rest of the file to v1.5.0.
 namespace PiSharp.Durable;
 
 /// <summary>Error formatting that never throws (upstream <c>errorMessage</c>).</summary>
@@ -50,6 +51,12 @@ public sealed class SessionFailedException(Exception cause)
     /// <summary>The error that failed the Session (upstream <c>cause</c>).</summary>
     public Exception Cause { get; } = cause;
 }
+
+/// <summary>
+/// The Harness was opened read-only (<see cref="HarnessOptions.ReadOnly"/>): a commit with writes, or a call that would run tasks, was
+/// refused (upstream <c>ReadOnlySession</c>). Nothing was written, and the Harness stays usable for reads.
+/// </summary>
+public sealed class ReadOnlySessionException(string what) : InvalidOperationException($"Read-only Harness: {what} refused");
 
 /// <summary>A submission reached a busy conversation and was not admitted (upstream <c>ConversationBusy</c>).</summary>
 public sealed class ConversationBusyException(ConversationId conversationId)

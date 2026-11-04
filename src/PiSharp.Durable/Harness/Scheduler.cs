@@ -33,6 +33,11 @@
 //   expiry is one ITimer. .NET timers never keep a process alive, so the expiry timer is always kept (upstream keeps it only where it can
 //   be unreferenced).
 // - Walks up and down the ownership tree are loops, never recursion, as upstream's are: chains can be deeper than the stack.
+//
+// Pi v1.5.0 sync (area harness-options): the models are a function read at each access (7ec1f648e), and the readOnly option (be14d9732):
+// open loads live tasks as committed, running ones included, and schedules no reconcile; Resume throws ReadOnlySessionException; no
+// reconcile is ever scheduled. Upstream's #scheduleWake and wake() guards wait on area sleep. The citation stays on v1.2.0 until the file's
+// other areas land.
 using System.Collections;
 using System.Collections.Immutable;
 using PiSharp.Durable.Chord;
@@ -58,7 +63,8 @@ internal sealed record DurableTaskSchedulerOptions
     public required Session Session { get; init; }
     public required IStorage Storage { get; init; }
     public required IRegistryReader Registry { get; init; }
-    public required IDurableModels Models { get; init; }
+    /// <summary>The Harness's models, read at each access (upstream <c>currentModels</c>).</summary>
+    public required Func<IDurableModels> Models { get; init; }
     /// <summary>Resolves a conversation's agent against a snapshot; the runtime calls it at most once per phase.</summary>
     public required Func<ConversationId, IRegistrySnapshot, DurableContext, Task<Agent>> Agent { get; init; }
     /// <summary>Resolves the settings; read at each access.</summary>
@@ -76,6 +82,9 @@ internal sealed record DurableTaskSchedulerOptions
     public required Func<ConversationId, InvocationBinding, DurableContext, Task<IConversationHandle?>> Conversation { get; init; }
     /// <summary>Context for scheduler commits and invocations; carries no caller cancellation.</summary>
     public required DurableContext Context { get; init; }
+    /// <summary><see cref="HarnessOptions.ReadOnly"/>: open loads live tasks as committed, <c>running</c> ones included, and the scheduler
+    /// never commits or runs anything.</summary>
+    public bool ReadOnly { get; init; }
 }
 
 /// <summary>
@@ -108,7 +117,7 @@ internal sealed class DurableTaskScheduler
     private readonly Session session;
     private readonly IStorage storage;
     private readonly IRegistryReader registry;
-    private readonly IDurableModels models;
+    private readonly Func<IDurableModels> models;
     private readonly Func<ConversationId, IRegistrySnapshot, DurableContext, Task<Agent>> agent;
     private readonly Func<Settings> settings;
     private readonly Func<ConversationId, DurableContext, Task<IExecutionEnv?>> env;
@@ -119,6 +128,7 @@ internal sealed class DurableTaskScheduler
     private readonly Func<Transaction, ConversationId, Task> withdrawInputs;
     private readonly Func<ConversationId, InvocationBinding, DurableContext, Task<IConversationHandle?>> conversation;
     private readonly DurableContext context;
+    private readonly bool readOnly;
 
     private readonly Lock gate = new();
     // Insertion-ordered like a JavaScript Map: replacing a record keeps its position.
@@ -209,6 +219,7 @@ internal sealed class DurableTaskScheduler
         withdrawInputs = options.WithdrawInputs;
         conversation = options.Conversation;
         context = options.Context;
+        readOnly = options.ReadOnly;
         dropQueue = new(iterations);
         roots = new(iterations);
         unloaded = new(iterations);
@@ -222,7 +233,8 @@ internal sealed class DurableTaskScheduler
     /// <summary>Test probe: members iterated over the scheduler's sets so far (see <see cref="iterations"/>).</summary>
     internal long SetEntries => Interlocked.Read(ref iterations.Entries);
 
-    /// <summary>Loads live tasks and changes surviving <c>running</c> tasks back to <c>pending</c>. Dispatches nothing.</summary>
+    /// <summary>Loads live tasks and changes surviving <c>running</c> tasks back to <c>pending</c>. Dispatches nothing. Read-only, it only
+    /// loads them as committed.</summary>
     public async Task OpenAsync(DurableContext openContext)
     {
         session.ObserveCommits((publication, _) => Observe(publication));
@@ -241,6 +253,7 @@ internal sealed class DurableTaskScheduler
                     foreach (var record in records)
                     {
                         TrackLocked(null, record);
+                        if (readOnly) continue;
                         if (record.AbandonOnRestart) abandoned.Add(record.Id);
                         if (record.State is RunningTaskState running) tx.SetTask(WithState(record, new PendingTaskState(running.Checkpoint)));
                         if (record.State is WaitingTaskState { Policy: JoinPolicy.FailFast }) failFastChecks.Add(record.Id);
@@ -248,6 +261,7 @@ internal sealed class DurableTaskScheduler
                 }
             }
         }, openContext).ConfigureAwait(false);
+        if (readOnly) return;
         // Derive abort marks a crash left unapplied below cancelled owners, and finalize held outcomes.
         lock (gate)
         {
@@ -290,9 +304,11 @@ internal sealed class DurableTaskScheduler
         }
     }
 
-    /// <summary>Enables scheduling. Idempotent; the kick does nothing once closing.</summary>
+    /// <summary>Enables scheduling. Idempotent; the kick does nothing once closing. A read-only scheduler throws
+    /// <see cref="ReadOnlySessionException"/>.</summary>
     public void Resume()
     {
+        if (readOnly) throw new ReadOnlySessionException("running tasks");
         lock (gate) enabled = true;
         Kick();
     }
@@ -570,7 +586,7 @@ internal sealed class DurableTaskScheduler
 
     private void ScheduleReconcileLocked()
     {
-        if (reconcileScheduled || closing) return;
+        if (reconcileScheduled || closing || readOnly) return;
         reconcileScheduled = true;
         ThreadPool.UnsafeQueueUserWorkItem(static scheduler => _ = scheduler.ReconcileAsync(), this, preferLocal: false);
     }
@@ -2227,7 +2243,7 @@ internal sealed class DurableTaskScheduler
         public CancellationToken Signal => invocation.Controller.Token;
         public IRegistrySnapshot Registry => phase.Snapshot();
         public Settings Settings => scheduler.settings();
-        public IDurableModels Models => scheduler.models;
+        public IDurableModels Models => scheduler.models();
         public IHookRunner Hooks => this;
 
         /// <summary>Resolved at most once per phase handler, at first use, with the invocation's context; fixed for the phase.</summary>
