@@ -64,7 +64,7 @@
       "upstreamChange": "modified",
       "previousBlobSha1": "047d400622d7a54bc8df8b6d383851113258b16a",
       "changedLines": 10,
-      "note": "CodemodeModels (internal): the catalog globals, the classify/generateImages internal tools (callers tools, structured output {}), context checks and model resolution with upstream's messages. pi-ai Models is IDurableModels' new GetModelsOfType, GetAvailableOfTypeAsync, GetModelOfType, ClassifyAsync and GenerateImagesAsync over pi-ai wire JSON (default members: no models, error results; Harness/Models.cs, DurableModelOperations for the error results); NativeDurableModels serves them through PiSharp.AI's ModelOperationsRegistry. Tests: codemode.models.* (7, over a test provider) and the authored codemode.models.native-*",
+      "note": "CodemodeModels (internal): the catalog globals, the classify/generateImages internal tools (callers tools, structured output {}), context checks and model resolution with upstream's messages. pi-ai Models is IDurableModels' new GetModelsOfType, GetAvailableOfTypeAsync, GetModelOfType, ClassifyAsync and GenerateImagesAsync over pi-ai wire JSON (default members: no models, error results; Harness/Models.cs, DurableModelOperations for the error results); NativeDurableModels serves them through PiSharp.AI's ModelOperationsRegistry. Tests: codemode.models.* (7, over a test provider) and the authored codemode.models.native-* v1.5.0 (work list area tools-schema): ModelCallParameters is pi-schema's obj({ model: unknown(), context: unknown() }, { open: true }) JSON; waits on area telemetry",
       "portedBlobSha1": "047d400622d7a54bc8df8b6d383851113258b16a"
     },
     {
@@ -957,12 +957,11 @@
       "lines": 93,
       "pisharp": "src/PiSharp.Durable.Tools/ToolSearch/ToolSearch.cs",
       "phase": "sync-1.2.0",
-      "status": "needs-sync",
+      "status": "ported",
       "upstreamChange": "modified",
       "previousBlobSha1": "ca600ae5ed2d1268de32327dc061106d7ddbd747",
       "changedLines": 19,
-      "note": "ToolSearch.CreateTool and CreateExtension: tool_search (callers model, replay safe, fixed description) ranks Agent.Deferred by name, name with spaces, description and schema text (SearchText) with Search.RankDocuments and loads the matches through control.addTools; the extension is tool-search. Tests: tool-search.*, compat.deferred-tool-search.* (run on SQLite and JSONL: records byte for byte, events and observed)",
-      "portedBlobSha1": "ca600ae5ed2d1268de32327dc061106d7ddbd747"
+      "note": "ToolSearch.CreateTool and CreateExtension: tool_search (callers model, replay safe, fixed description) ranks Agent.Deferred by name, name with spaces, description and schema text (SearchText) with Search.RankDocuments and loads the matches through control.addTools; the extension is tool-search. Tests: tool-search.*, compat.deferred-tool-search.* (run on SQLite and JSONL: records byte for byte, events and observed) v1.5.0 (work list area tools-schema): parameters are the JSON pi-schema's obj({ query: str(...), limit: opt(num(...)) }, { open: true }) builds; the search text and ranking are area tool-search's. Tests: tool-search.declaration, compat.deferred-tool-search.*.written (authored key order)"
     },
     {
       "upstream": "packages/durable/src/tools/bash.ts",
@@ -970,12 +969,11 @@
       "lines": 194,
       "pisharp": "src/PiSharp.Durable.Tools/Tools/Bash.cs",
       "phase": "P9",
-      "status": "needs-sync",
+      "status": "ported",
       "upstreamChange": "modified",
       "previousBlobSha1": "21d1e1d03376f7a6d9a9bf836e8dbc2b4073f819",
       "changedLines": 40,
-      "note": "CodingTools.CreateBashTool/CreatePowerShellTool with BashToolOptions/PowerShellToolOptions, BashExecution and the BashPrepare delegate (ValueTask). Output streams to api.Output(text, info.Skipped) with api.OutputWindow as ShellExecOptions.Window, OutputLimits { Retain = Tail }, spill at the default limits reported as a full_output diagnostic; replay unset (unsafe) as upstream. On Windows LocalExecutionEnv runs bash through Git Bash. Tests: tools.* (tools.test.ts), tools.read-differential.*, tools.node.* (Fixtures/tools.upstream.json) v1.2.0: StructuredOutputSchema {output, truncated, fullOutputPath?, exitCode} (RetainedOutput), and a nonzero exit is an error result with an exit_code diagnostic.",
-      "portedBlobSha1": "21d1e1d03376f7a6d9a9bf836e8dbc2b4073f819"
+      "note": "CodingTools.CreateBashTool/CreatePowerShellTool with BashToolOptions/PowerShellToolOptions, BashExecution and the BashPrepare delegate (ValueTask). Output streams to api.Output(text, info.Skipped) with api.OutputWindow as ShellExecOptions.Window, OutputLimits { Retain = Tail }, spill at the default limits reported as a full_output diagnostic; replay unset (unsafe) as upstream. On Windows LocalExecutionEnv runs bash through Git Bash. Tests: tools.* (tools.test.ts), tools.read-differential.*, tools.node.* (Fixtures/tools.upstream.json) v1.2.0: StructuredOutputSchema {output, truncated, fullOutputPath?, exitCode} (RetainedOutput), and a nonzero exit is an error result with an exit_code diagnostic. v1.5.0 (work list area tools-schema): bash's and powershell's parameters and shellStructuredOutputSchema are the JSON pi-schema's obj(..., { open: true }) builds (properties before required). Tests: tools.node.declarations-match-upstream-byte-for-byte (authored key order)"
     },
     {
       "upstream": "packages/durable/src/tools/edit-diff.ts",
@@ -992,12 +990,11 @@
       "lines": 150,
       "pisharp": "src/PiSharp.Durable.Tools/Tools/Edit.cs",
       "phase": "P9",
-      "status": "needs-sync",
+      "status": "ported",
       "upstreamChange": "modified",
       "previousBlobSha1": "8021501527bbfee18f75cf830d8ed1e3023dfbe4",
       "changedLines": 36,
-      "note": "CodingTools.CreateEditTool: prepareArguments repairs (JSON-string edits, single edit object, top-level oldText/newText) over immutable JSON, file mutation queue, BOM and CRLF preservation, details {diff, patch, firstChangedLine?}; \"Operation aborted\" is an OperationCanceledException. Tests: tools.* (tools.test.ts), tools.read-differential.*, tools.node.* (Fixtures/tools.upstream.json) v1.2.0: the result's content is Output.",
-      "portedBlobSha1": "8021501527bbfee18f75cf830d8ed1e3023dfbe4"
+      "note": "CodingTools.CreateEditTool: prepareArguments repairs (JSON-string edits, single edit object, top-level oldText/newText) over immutable JSON, file mutation queue, BOM and CRLF preservation, details {diff, patch, firstChangedLine?}; \"Operation aborted\" is an OperationCanceledException. Tests: tools.* (tools.test.ts), tools.read-differential.*, tools.node.* (Fixtures/tools.upstream.json) v1.2.0: the result's content is Output. v1.5.0 (work list area tools-schema): parameters, and each edit's object, are the JSON pi-schema's obj(..., { open: true }) builds (properties before required). Tests: tools.node.declarations-match-upstream-byte-for-byte (authored key order)"
     },
     {
       "upstream": "packages/durable/src/tools/env.ts",
@@ -1023,12 +1020,11 @@
       "lines": 58,
       "pisharp": "src/PiSharp.Durable.Tools/Tools/ImageProcessor.cs",
       "phase": "sync-1.2.0",
-      "status": "needs-sync",
+      "status": "ported",
       "upstreamChange": "modified",
       "previousBlobSha1": "9781dffe7b01044e8c439dfd3921bbd6bc37dfcf",
       "changedLines": 27,
-      "note": "ImageLimits (Default: 2000x2000, 4.5 MiB of base64; CodingTools.DefaultImageLimits), PreparedImage { Data, MimeType, Resized?, ConvertedFrom? } with ImageResize/ImageSize, IImageProcessor.PrepareAsync, and ImageFormats (internal: INLINE_IMAGE_TYPES, toBase64 as Convert.ToBase64String, base64Length). Tests: tools.images.* (tools-images.test.ts), images.wasm-module.*, tools.*, tools.read-differential.*, tools.node.* (Fixtures/v1.2.0/tools.upstream.json), compat.read-image.*",
-      "portedBlobSha1": "9781dffe7b01044e8c439dfd3921bbd6bc37dfcf"
+      "note": "ImageLimits (Default: 2000x2000, 4.5 MiB of base64; CodingTools.DefaultImageLimits), PreparedImage { Data, MimeType, Resized?, ConvertedFrom? } with ImageResize/ImageSize, IImageProcessor.PrepareAsync, and ImageFormats (internal: INLINE_IMAGE_TYPES, toBase64 as Convert.ToBase64String, base64Length). Tests: tools.images.* (tools-images.test.ts), images.wasm-module.*, tools.*, tools.read-differential.*, tools.node.* (Fixtures/v1.2.0/tools.upstream.json), compat.read-image.* v1.5.0 (work list area tools-schema): toBase64 (btoa over 8 KiB binary strings, b04299717, so a 3 MiB image fits a 128 MB heap) stays Convert.ToBase64String, the same standard base64 sized once. Tests: tools.images.to-base64.matches-standard-base64-for-every-remainder-length, tools.images.to-base64.encodes-a-3-mib-image-within-a-128-mb-heap (allocation measured on the thread: .NET has no per-call heap limit)"
     },
     {
       "upstream": "packages/durable/src/tools/image.ts",
@@ -1063,12 +1059,11 @@
       "lines": 327,
       "pisharp": "src/PiSharp.Durable.Tools/Tools/Read.cs",
       "phase": "P9",
-      "status": "needs-sync",
+      "status": "ported",
       "upstreamChange": "modified",
       "previousBlobSha1": "bea5c812ce751fc43f213ed30d9a478278bf22bb",
       "changedLines": 33,
-      "note": "CodingTools.CreateReadTool over IBinaryReader scans: bounded reads, offsets and limits as JavaScript numbers (NaN, fractions, negatives, 1e20) with JavaScript number formatting, truncation diagnostics and details {truncation} in upstream key order, and the concurrent-writer retry (an image must be whole: one that grew is read again). v1.2.0: images within the conversation model's limits (api.AgentAsync + api.Models.GetModel, DurableModel.InputLimits.Images.Resize over DEFAULT_IMAGE_LIMITS; no model counts as one that sees images) are one image block with an info \"image\" diagnostic; with a processor they are prepared and the diagnostic notes conversion and resize (toFixed(2) scale); a model without image input gets the placeholder note; otherwise an unsupported_image error result. DurableModel.InputLimits (pi-ai 1.2.0 ModelInputLimits) is read from the catalog entry by NativeDurableModels and the CLI's DurableModels (models.catalog.input-limits-come-from-the-catalog-entry). Tests: tools.images.* (tools-images.test.ts), images.wasm-module.*, tools.*, tools.read-differential.*, tools.node.* (Fixtures/v1.2.0/tools.upstream.json), compat.read-image.*",
-      "portedBlobSha1": "bea5c812ce751fc43f213ed30d9a478278bf22bb"
+      "note": "CodingTools.CreateReadTool over IBinaryReader scans: bounded reads, offsets and limits as JavaScript numbers (NaN, fractions, negatives, 1e20) with JavaScript number formatting, truncation diagnostics and details {truncation} in upstream key order, and the concurrent-writer retry (an image must be whole: one that grew is read again). v1.2.0: images within the conversation model's limits (api.AgentAsync + api.Models.GetModel, DurableModel.InputLimits.Images.Resize over DEFAULT_IMAGE_LIMITS; no model counts as one that sees images) are one image block with an info \"image\" diagnostic; with a processor they are prepared and the diagnostic notes conversion and resize (toFixed(2) scale); a model without image input gets the placeholder note; otherwise an unsupported_image error result. DurableModel.InputLimits (pi-ai 1.2.0 ModelInputLimits) is read from the catalog entry by NativeDurableModels and the CLI's DurableModels (models.catalog.input-limits-come-from-the-catalog-entry). Tests: tools.images.* (tools-images.test.ts), images.wasm-module.*, tools.*, tools.read-differential.*, tools.node.* (Fixtures/v1.2.0/tools.upstream.json), compat.read-image.* v1.5.0 (work list area tools-schema): parameters are the JSON pi-schema's obj({ path, offset: opt(...), limit: opt(...) }, { open: true }) builds (properties before required), and read declares readStructuredOutputSchema (a text file's text, or an image's block) and returns it as structuredOutput, so code mode's tools.read() of an image resolves to the block image() shows (#11606). Tests: codemode.output.resolves-the-built-in-read-with-an-image-s-block-which-image-shows-and-with-a-text-file-s-text, tools.read-differential.*, tools.node.declarations-match-upstream-byte-for-byte (the v1.2.0 capture in pi-schema's key order, authored)"
     },
     {
       "upstream": "packages/durable/src/tools/write.ts",
@@ -1076,12 +1071,11 @@
       "lines": 42,
       "pisharp": "src/PiSharp.Durable.Tools/Tools/Write.cs",
       "phase": "P9",
-      "status": "needs-sync",
+      "status": "ported",
       "upstreamChange": "modified",
       "previousBlobSha1": "ee9f724cb68e430ad1b95092d5f147d56adf4e5a",
       "changedLines": 13,
-      "note": "CodingTools.CreateWriteTool through the file mutation queue. Tests: tools.* (tools.test.ts), tools.read-differential.*, tools.node.* (Fixtures/tools.upstream.json) v1.2.0: the result's content is Output.",
-      "portedBlobSha1": "ee9f724cb68e430ad1b95092d5f147d56adf4e5a"
+      "note": "CodingTools.CreateWriteTool through the file mutation queue. Tests: tools.* (tools.test.ts), tools.read-differential.*, tools.node.* (Fixtures/tools.upstream.json) v1.2.0: the result's content is Output. v1.5.0 (work list area tools-schema): parameters are the JSON pi-schema's obj(..., { open: true }) builds (properties before required). Tests: tools.node.declarations-match-upstream-byte-for-byte (authored key order)"
     },
     {
       "upstream": "packages/durable/src/truncate.ts",
@@ -1345,12 +1339,11 @@
       "lines": 100,
       "pisharp": "tests/PiSharp.Durable.Tests/CodemodeDescribeCases.cs",
       "phase": "sync-1.2.0",
-      "status": "needs-sync",
+      "status": "ported",
       "upstreamChange": "modified",
       "previousBlobSha1": "99ced0465dbc70279d64e6d9e6da0ba11f8be89d",
       "changedLines": 5,
-      "note": "codemode.describe.* (5 cases)",
-      "portedBlobSha1": "99ced0465dbc70279d64e6d9e6da0ba11f8be89d"
+      "note": "codemode.describe.* (5 cases) v1.5.0 (work list area tools-schema): the tools' parameters are pi-schema's obj({ path: str(...) }). Tests: codemode.describe.*"
     },
     {
       "upstream": "packages/durable/test/codemode-imports.test.ts",
@@ -1381,7 +1374,7 @@
       "upstreamChange": "modified",
       "previousBlobSha1": "84d7f2a30d2a73f53268c3ca91fed6c625067032",
       "changedLines": 93,
-      "note": "codemode.* (32 cases of \"durable code mode\") and codemode.output.* (8 of \"durable code mode output and tool search\"); the sandbox is CodemodeSandbox with engines on threads, upstream's sandbox.start wrapper is CodemodeToolOptions.OnRunStarted",
+      "note": "codemode.* (32 cases of \"durable code mode\") and codemode.output.* (8 of \"durable code mode output and tool search\"); the sandbox is CodemodeSandbox with engines on threads, upstream's sandbox.start wrapper is CodemodeToolOptions.OnRunStarted v1.5.0 (work list area tools-schema): the shared Parameters, Exit and caption schemas are pi-schema's obj() JSON, and the read-image case is ported (codemode.output.resolves-the-built-in-read-with-an-image-s-block-which-image-shows-and-with-a-text-file-s-text); waits on areas sleep, codemode and vocabulary",
       "portedBlobSha1": "84d7f2a30d2a73f53268c3ca91fed6c625067032"
     },
     {
@@ -1552,7 +1545,7 @@
       "renamedFrom": "packages/durable/test/examples/06-harness.ts",
       "previousBlobSha1": "141e8e667093577a70738aceee986941eed774b8",
       "changedLines": 8,
-      "note": "Ported in P11: runs on memory, JSONL and SQLite storage; tests/PiSharp.Durable.Tests/ExamplesCases.cs pins the output the pinned upstream prints under Node, as JSON in place of util.inspect. On a file backend the storage is reopened and the root notes and stored agent read back. v1.2.0 (work list area h): the tool result's content is output (ToolExecutionResult.Output since area a); its Node output under v1.2.0 is unchanged.",
+      "note": "Ported in P11: runs on memory, JSONL and SQLite storage; tests/PiSharp.Durable.Tests/ExamplesCases.cs pins the output the pinned upstream prints under Node, as JSON in place of util.inspect. On a file backend the storage is reopened and the root notes and stored agent read back. v1.2.0 (work list area h): the tool result's content is output (ToolExecutionResult.Output since area a); its Node output under v1.2.0 is unchanged. v1.5.0 (work list area tools-schema): the tool's parameters are pi-schema's obj({ path: str() }); waits on area checkpoint-when",
       "portedBlobSha1": "141e8e667093577a70738aceee986941eed774b8"
     },
     {
@@ -1561,13 +1554,12 @@
       "lines": 100,
       "pisharp": "samples/Durable.Examples/ExamplesHarness.cs",
       "phase": "P13",
-      "status": "needs-sync",
+      "status": "ported",
       "upstreamChange": "renamed",
       "renamedFrom": "packages/durable/test/examples/07-configuration.ts",
       "previousBlobSha1": "1d6a7c0190a413b6e31d8d63d32f7b769722ed64",
       "changedLines": 7,
-      "note": "Ported in P11: runs on memory, JSONL and SQLite storage; tests/PiSharp.Durable.Tests/ExamplesCases.cs pins the output the pinned upstream prints under Node, as JSON in place of util.inspect. Live settings are a HarnessSettings subclass overriding Stream; on a file backend the stored agent is read back (checked against upstream's final snapshot under Node). v1.2.0 (work list area h): the tool result's content is output (ToolExecutionResult.Output since area a); its Node output under v1.2.0 is unchanged.",
-      "portedBlobSha1": "1d6a7c0190a413b6e31d8d63d32f7b769722ed64"
+      "note": "Ported in P11: runs on memory, JSONL and SQLite storage; tests/PiSharp.Durable.Tests/ExamplesCases.cs pins the output the pinned upstream prints under Node, as JSON in place of util.inspect. Live settings are a HarnessSettings subclass overriding Stream; on a file backend the stored agent is read back (checked against upstream's final snapshot under Node). v1.2.0 (work list area h): the tool result's content is output (ToolExecutionResult.Output since area a); its Node output under v1.2.0 is unchanged. v1.5.0 (work list area tools-schema): the tool's parameters are pi-schema's obj({ path: str() }) (ExamplesHarness.cs PathParameters); the renumbering (b9fb2b854) changes only comments. Tests: examples.*"
     },
     {
       "upstream": "packages/durable/test/examples/07-harness-conversations.ts",
@@ -1603,13 +1595,12 @@
       "lines": 49,
       "pisharp": "samples/Durable.Examples/ExamplesHarness.cs",
       "phase": "P13",
-      "status": "needs-sync",
+      "status": "ported",
       "upstreamChange": "renamed",
       "renamedFrom": "packages/durable/test/examples/10-registry-reload.ts",
       "previousBlobSha1": "97c668be0aff16fada99e490b80cc795a7182f00",
       "changedLines": 7,
-      "note": "Ported in P11: runs on memory, JSONL and SQLite storage; tests/PiSharp.Durable.Tests/ExamplesCases.cs pins the output the pinned upstream prints under Node, as JSON in place of util.inspect. v1.2.0 (work list area h): the tool result's content is output (ToolExecutionResult.Output since area a); its Node output under v1.2.0 is unchanged.",
-      "portedBlobSha1": "97c668be0aff16fada99e490b80cc795a7182f00"
+      "note": "Ported in P11: runs on memory, JSONL and SQLite storage; tests/PiSharp.Durable.Tests/ExamplesCases.cs pins the output the pinned upstream prints under Node, as JSON in place of util.inspect. v1.2.0 (work list area h): the tool result's content is output (ToolExecutionResult.Output since area a); its Node output under v1.2.0 is unchanged. v1.5.0 (work list area tools-schema): the tool's parameters are pi-schema's obj({ path: str() }) (ExamplesHarness.cs PathParameters); the renumbering (b9fb2b854) changes only comments. Tests: examples.*"
     },
     {
       "upstream": "packages/durable/test/examples/10-extension-state.ts",
@@ -1622,7 +1613,7 @@
       "renamedFrom": "packages/durable/test/examples/11-extension-state.ts",
       "previousBlobSha1": "a75a7ef4acf48dee9e346c2d2b3d49e1f4be1728",
       "changedLines": 8,
-      "note": "Ported in P11: runs on memory, JSONL and SQLite storage; tests/PiSharp.Durable.Tests/ExamplesCases.cs pins the output the pinned upstream prints under Node, as JSON in place of util.inspect. The faux provider is ScriptedModels; on a file backend the todos are read back. v1.2.0 (work list area h): the tool result's content is output (ToolExecutionResult.Output since area a); its Node output under v1.2.0 is unchanged.",
+      "note": "Ported in P11: runs on memory, JSONL and SQLite storage; tests/PiSharp.Durable.Tests/ExamplesCases.cs pins the output the pinned upstream prints under Node, as JSON in place of util.inspect. The faux provider is ScriptedModels; on a file backend the todos are read back. v1.2.0 (work list area h): the tool result's content is output (ToolExecutionResult.Output since area a); its Node output under v1.2.0 is unchanged. v1.5.0 (work list area tools-schema): the tool's parameters are pi-schema's obj({ item: str() }); waits on area checkpoint-when",
       "portedBlobSha1": "a75a7ef4acf48dee9e346c2d2b3d49e1f4be1728"
     },
     {
@@ -1790,7 +1781,7 @@
       "renamedFrom": "packages/durable/test/examples/23-subagent-background.ts",
       "previousBlobSha1": "261a4e7e45c4b93f3060c43544ba59a423d40cc6",
       "changedLines": 33,
-      "note": "samples/Durable.Examples 23-subagent-background with PacedModels (upstream's faux route at 50 tokens/s, token size 4) on an ExampleClock driven like Node's event loop; it restarts on its own storage (a temporary SQLite file on the memory run, as upstream; the runner's JSONL directory or SQLite file otherwise). Printed without ANSI colors, as upstream prints when stdout is not a terminal; examples.* pins upstream's Node output. v1.2.0 (work list area h): upstream's file is unchanged and still returns the tool replies as content, which v1.2.0 renamed to output, so under v1.2.0 Node prints them empty; the C# tool returns them as Output and examples.* keeps the replies (intentional difference, decision 0005)",
+      "note": "samples/Durable.Examples 23-subagent-background with PacedModels (upstream's faux route at 50 tokens/s, token size 4) on an ExampleClock driven like Node's event loop; it restarts on its own storage (a temporary SQLite file on the memory run, as upstream; the runner's JSONL directory or SQLite file otherwise). Printed without ANSI colors, as upstream prints when stdout is not a terminal; examples.* pins upstream's Node output. v1.2.0 (work list area h): upstream's file is unchanged and still returns the tool replies as content, which v1.2.0 renamed to output, so under v1.2.0 Node prints them empty; the C# tool returns them as Output and examples.* keeps the replies (intentional difference, decision 0005) v1.5.0 (work list area tools-schema): the tool's parameters are pi-schema's obj({ action: oneOf([...]), ... }) (an enum); waits on areas checkpoint-when, observers, events and vocabulary",
       "portedBlobSha1": "261a4e7e45c4b93f3060c43544ba59a423d40cc6"
     },
     {
@@ -1846,7 +1837,7 @@
       "renamedFrom": "packages/durable/test/examples/27-plan-mode.ts",
       "previousBlobSha1": "ebd6438daf8e86ca9d76d6a4b07764d2cbf7c4ce",
       "changedLines": 8,
-      "note": "samples/Durable.Examples 27-plan-mode with ScriptedModels; plan mode as an AgentChange selecting the plan extension and read+submit_plan, left with Clear patches; memory, JSONL and SQLite with reopen (the plan document read back); the system lines print as JSON (util.inspect's `removed: undefined` is dropped); examples.* pins upstream's Node output. v1.2.0 (work list area h): the tool result's content is output (ToolExecutionResult.Output since area a); its Node output under v1.2.0 is unchanged.",
+      "note": "samples/Durable.Examples 27-plan-mode with ScriptedModels; plan mode as an AgentChange selecting the plan extension and read+submit_plan, left with Clear patches; memory, JSONL and SQLite with reopen (the plan document read back); the system lines print as JSON (util.inspect's `removed: undefined` is dropped); examples.* pins upstream's Node output. v1.2.0 (work list area h): the tool result's content is output (ToolExecutionResult.Output since area a); its Node output under v1.2.0 is unchanged. v1.5.0 (work list area tools-schema): submit_plan's parameters are pi-schema's obj({ steps: arr(str()) }); waits on area checkpoint-when",
       "portedBlobSha1": "ebd6438daf8e86ca9d76d6a4b07764d2cbf7c4ce"
     },
     {
@@ -1897,13 +1888,12 @@
       "lines": 92,
       "pisharp": "samples/Durable.Examples/ExamplesReload.cs",
       "phase": "P13",
-      "status": "needs-sync",
+      "status": "ported",
       "upstreamChange": "renamed",
       "renamedFrom": "packages/durable/test/examples/31-reload-and-restart.ts",
       "previousBlobSha1": "3da03b0b2d428b17f89c7d831f2ea495c51cab1d",
       "changedLines": 8,
-      "note": "samples/Durable.Examples 31-reload-and-restart with ScriptedModels in place of the faux provider; it restarts on its own storage (a temporary SQLite file on the memory run, as upstream; a JSONL directory or SQLite file otherwise); examples.* pins upstream's Node output. v1.2.0 (work list area h): the tool result's content is output (ToolExecutionResult.Output since area a); its Node output under v1.2.0 is unchanged.",
-      "portedBlobSha1": "3da03b0b2d428b17f89c7d831f2ea495c51cab1d"
+      "note": "samples/Durable.Examples 31-reload-and-restart with ScriptedModels in place of the faux provider; it restarts on its own storage (a temporary SQLite file on the memory run, as upstream; a JSONL directory or SQLite file otherwise); examples.* pins upstream's Node output. v1.2.0 (work list area h): the tool result's content is output (ToolExecutionResult.Output since area a); its Node output under v1.2.0 is unchanged. v1.5.0 (work list area tools-schema): the version tool declares pi-schema's obj({}); the renumbering (b9fb2b854) changes only comments. Tests: examples.*"
     },
     {
       "upstream": "packages/durable/test/examples/31-transcript.ts",
@@ -2010,12 +2000,11 @@
       "lines": 145,
       "pisharp": "tests/PiSharp.Durable.Tests/HarnessCallersCases.cs",
       "phase": "sync-1.2.0",
-      "status": "needs-sync",
+      "status": "ported",
       "upstreamChange": "modified",
       "previousBlobSha1": "ff9a8311e6c5bdfee2ee909ec5099c06f4f6a2ab",
       "changedLines": 7,
-      "note": "harness.callers.* (5 cases) and the authored harness.callers.deferred.* (3: deferred tools without tool_search; tool_search's own cases are tool-search.*, ToolSearchCases.cs)",
-      "portedBlobSha1": "ff9a8311e6c5bdfee2ee909ec5099c06f4f6a2ab"
+      "note": "harness.callers.* (5 cases) and the authored harness.callers.deferred.* (3: deferred tools without tool_search; tool_search's own cases are tool-search.*, ToolSearchCases.cs) v1.5.0 (work list area tools-schema): obj({}) is the closed empty object (ToolsSchema150.EmptyObject). Tests: harness.callers.*"
     },
     {
       "upstream": "packages/durable/test/harness-cancellation-barrier.test.ts",
@@ -2167,7 +2156,7 @@
       "phase": "sync-1.5.0",
       "status": "in-progress",
       "upstreamChange": "added",
-      "note": "v1.5.0 sync (area harness-options): harness.host-inputs.* (the 4 upstream cases, plus 3 PiSharp-only checks that Models or CurrentModels, and Settings or CurrentSettings, are exclusive) on MemoryStorage. The tools case checks api.Models by a lookup of the second Models' extra provider, as v1.5.0 does. In progress until tools-schema and model-requests, which also change the file, land"
+      "note": "v1.5.0 sync (area harness-options): harness.host-inputs.* (the 4 upstream cases, plus 3 PiSharp-only checks that Models or CurrentModels, and Settings or CurrentSettings, are exclusive) on MemoryStorage. The tools case checks api.Models by a lookup of the second Models' extra provider, as v1.5.0 does. In progress until tools-schema and model-requests, which also change the file, land v1.5.0 (work list area tools-schema): the probe tool declares pi-schema's obj({}) (ToolsSchema150.EmptyObject); in progress until area model-requests lands"
     },
     {
       "upstream": "packages/durable/test/harness-idle-scopes.test.ts",
@@ -2337,12 +2326,11 @@
       "lines": 275,
       "pisharp": "tests/PiSharp.Durable.Tests/Harness/HarnessPromptCases.cs",
       "phase": "P8",
-      "status": "needs-sync",
+      "status": "ported",
       "upstreamChange": "modified",
       "previousBlobSha1": "40ef2e09e6351a1c89220d43677c6fb118927428",
       "changedLines": 5,
-      "note": "9 of 9 tests: harness.prompt.* (9) on MemoryStorage, plus harness.prompt.jsonl.* and harness.prompt.sqlite.* (6 each: the three storage-free cases run once). Section maps compare as ordered (key, text) pairs v1.2.0: the agent has Callable and Deferred.",
-      "portedBlobSha1": "40ef2e09e6351a1c89220d43677c6fb118927428"
+      "note": "9 of 9 tests: harness.prompt.* (9) on MemoryStorage, plus harness.prompt.jsonl.* and harness.prompt.sqlite.* (6 each: the three storage-free cases run once). Section maps compare as ordered (key, text) pairs v1.2.0: the agent has Callable and Deferred. v1.5.0 (work list area tools-schema): declarations carry pi-schema's obj({}). Tests: harness.prompt.*"
     },
     {
       "upstream": "packages/durable/test/harness-read-only.test.ts",
@@ -2461,7 +2449,7 @@
       "upstreamChange": "modified",
       "previousBlobSha1": "92ef991a51ce7daca1e16e151d9f7287e193d627",
       "changedLines": 52,
-      "note": "harness.structured-output.* (10 cases, MemoryStorage; bash over LocalExecutionEnv). Schemas are the JSON TypeBox prints",
+      "note": "harness.structured-output.* (10 cases, MemoryStorage; bash over LocalExecutionEnv). Schemas are the JSON TypeBox prints v1.5.0 (work list area tools-schema): Count is pi-schema's obj({ count: num() }) and the empty parameters obj({}); waits on areas observers, events and vocabulary",
       "portedBlobSha1": "92ef991a51ce7daca1e16e151d9f7287e193d627"
     },
     {
@@ -2706,7 +2694,7 @@
       "upstreamChange": "modified",
       "previousBlobSha1": "4cb8545202a0bd17ec3bcc27f01e8dd201425902",
       "changedLines": 27,
-      "note": "NestedImagesBench (benchmarks: nested-images [count]); the heap is the managed heap. Report only (docs/durable-benchmarks.md); benchmarks.smoke runs the four variants with two 1 KiB images",
+      "note": "NestedImagesBench (benchmarks: nested-images [count]); the heap is the managed heap. Report only (docs/durable-benchmarks.md); benchmarks.smoke runs the four variants with two 1 KiB images v1.5.0 (work list area tools-schema): the schemas are pi-schema's obj() JSON (ImageArgument's type is lit(\"image\")); waits on areas watches and group-commit-scheduler",
       "portedBlobSha1": "4cb8545202a0bd17ec3bcc27f01e8dd201425902"
     },
     {
@@ -2744,7 +2732,7 @@
       "upstreamChange": "modified",
       "previousBlobSha1": "6976cb8d6ffc9c845ce9416f80f0af2ce53cfc26",
       "changedLines": 13,
-      "note": "SchedulerFanoutBench (benchmarks: scheduler-fanout [N,...]). Report only (docs/durable-benchmarks.md); benchmarks.smoke runs four calls",
+      "note": "SchedulerFanoutBench (benchmarks: scheduler-fanout [N,...]). Report only (docs/durable-benchmarks.md); benchmarks.smoke runs four calls v1.5.0 (work list area tools-schema): the schemas are pi-schema's obj() JSON; waits on areas watches and group-commit-scheduler",
       "portedBlobSha1": "6976cb8d6ffc9c845ce9416f80f0af2ce53cfc26"
     },
     {
@@ -3115,8 +3103,9 @@
       "lines": 61,
       "pisharp": "tests/PiSharp.Durable.Tests/ToolArgsTypeboxCases.cs",
       "phase": "sync-1.5.0",
-      "status": "planned",
-      "upstreamChange": "added"
+      "status": "ported",
+      "upstreamChange": "added",
+      "note": "v1.5.0 (work list area tools-schema): upstream's type-level check (expectTypeOf) has no C# counterpart; tool-args-typebox.are-typed-by-the-schema-in-execute-and-prepare-arguments checks at run time that a TypeBox-shaped schema (its ~kind and ~optional keys) validates and coerces what prepareArguments returns before execute, and rejects a call without a required property"
     },
     {
       "upstream": "packages/durable/test/tool-output-bench.ts",
@@ -3137,12 +3126,11 @@
       "lines": 205,
       "pisharp": "tests/PiSharp.Durable.Tests/ToolSearchCases.cs",
       "phase": "sync-1.2.0",
-      "status": "needs-sync",
+      "status": "ported",
       "upstreamChange": "modified",
       "previousBlobSha1": "895240bbb3dff937452d8ef8c70bac25607625fa",
       "changedLines": 7,
-      "note": "tool-search.* (6 cases), and the authored tool-search.errors.* (6, upstream results printed under Node), tool-search.declaration, tool-search.search.* (27) and tool-search.ranking-differential.* (3)",
-      "portedBlobSha1": "895240bbb3dff937452d8ef8c70bac25607625fa"
+      "note": "tool-search.* (6 cases), and the authored tool-search.errors.* (6, upstream results printed under Node), tool-search.declaration, tool-search.search.* (27) and tool-search.ranking-differential.* (3) v1.5.0 (work list area tools-schema): the tools' parameters are pi-schema's obj({ number: opt(num(...)) }) and obj({}). Tests: tool-search.*"
     },
     {
       "upstream": "packages/durable/test/tools-images.test.ts",
@@ -3150,12 +3138,11 @@
       "lines": 565,
       "pisharp": "tests/PiSharp.Durable.Tests/ToolsImagesCases.cs",
       "phase": "sync-1.2.0",
-      "status": "needs-sync",
+      "status": "ported",
       "upstreamChange": "modified",
       "previousBlobSha1": "a495a5926521b92ecad024bae493be0dea66be65",
       "changedLines": 17,
-      "note": "tools.images.* (33 cases). Adapted: Photon is SkiaImageCodec (fixtures built and prepared images decoded with SkiaSharp); the processor is ImageProcessors.CreateThreaded(SkiaImageCodec.Instance); the api is ImageToolApi; readEnv is ObservedReadEnv. \"prepares in a worker thread, leaving the event loop free\" (timer-gap thresholds) uses a gated codec instead: inline the work is done before PrepareAsync returns, threaded it returns while the codec is held on another thread; \"starts a new worker after the idle one exited\" waits until the worker exited (bounded) and also checks that a new one started",
-      "portedBlobSha1": "a495a5926521b92ecad024bae493be0dea66be65"
+      "note": "tools.images.* (33 cases). Adapted: Photon is SkiaImageCodec (fixtures built and prepared images decoded with SkiaSharp); the processor is ImageProcessors.CreateThreaded(SkiaImageCodec.Instance); the api is ImageToolApi; readEnv is ObservedReadEnv. \"prepares in a worker thread, leaving the event loop free\" (timer-gap thresholds) uses a gated codec instead: inline the work is done before PrepareAsync returns, threaded it returns while the codec is held on another thread; \"starts a new worker after the idle one exited\" waits until the worker exited (bounded) and also checks that a new one started v1.5.0 (work list area tools-schema): toBase64 runs for lengths around its 8 KiB chunk (8191, 8192, 8193, 16385), and a 3 MiB image encodes allocating under 128 MiB (upstream runs Node with --max-heap-size=128; .NET has no per-call heap limit, so the case measures the thread's allocation). Tests: tools.images.to-base64.*"
     },
     {
       "upstream": "packages/durable/test/tools-read-differential.test.ts",
@@ -3163,12 +3150,11 @@
       "lines": 207,
       "pisharp": "tests/PiSharp.Durable.Tests/ToolsReadDifferentialCases.cs",
       "phase": "P9",
-      "status": "needs-sync",
+      "status": "ported",
       "upstreamChange": "modified",
       "previousBlobSha1": "f105a171eeffb2e068c123025480b02b1ad0933f",
       "changedLines": 7,
-      "note": "tools.read-differential.* (2 tests): the whole-file reference ported (v1.2.0: an image is an image block with an info diagnostic); NaN offsets and limits go through ReadTool.ExecuteAsync (JSON arguments cannot carry NaN). Each of the 1600 trials also matches a digest of upstream's own outcome (Fixtures/v1.2.0/tools.upstream.json, read)",
-      "portedBlobSha1": "f105a171eeffb2e068c123025480b02b1ad0933f"
+      "note": "tools.read-differential.* (2 tests): the whole-file reference ported (v1.2.0: an image is an image block with an info diagnostic); NaN offsets and limits go through ReadTool.ExecuteAsync (JSON arguments cannot carry NaN). Each of the 1600 trials also matches a digest of upstream's own outcome (Fixtures/v1.2.0/tools.upstream.json, read) v1.5.0 (work list area tools-schema): the reference returns its structured output (the text, or the image block) and both sides compare it; the v1.2.0 digests hold none. Tests: tools.read-differential.*"
     },
     {
       "upstream": "packages/durable/test/tools.test.ts",
