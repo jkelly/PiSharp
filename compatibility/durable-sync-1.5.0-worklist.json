@@ -2025,7 +2025,12 @@
         "5ba1cbaf3",
         "5f312dac4",
         "91b33cab3",
-        "a30c2a81d"
+        "a30c2a81d",
+        "1d0b14ee",
+        "e0cf6d70",
+        "8a75cae0",
+        "b95e2c36",
+        "a56d978c"
       ],
       "notes": "Port 1.5.0's one-argument Report directly: 1.4.0's (error, info) form and its crash-loop parking (a30c2a81d, 440a5fcdb) were replaced before 1.5.0 and get no C# surface (area restarts ports the 1.5.0 restart limit). OnReport is Action<Exception> today (Harness/Types.cs) and ITaskRuntime.Report(Exception) (TypesTasks.cs); every PiSharp-only consumer moves to Report or unwraps report.Error: the device host (HostedSession.cs, DurableDeviceOptions.cs, DurableDeviceHost.cs), pisharp durable and durable serve, custom agent teams, workflows and JavaScript authoring, the job schedules and the web agent. The pi.durable.report telemetry event is area telemetry; task_interrupted is area restarts. task-inspection-states: TaskGraphNode gains blocked (TaskGraph.cs); the device server's task graph stream (Server DeviceStreams.cs through Hosting Feeds.cs's TaskGraphFeed) passes it through, and showing it in the web UI is optional. after-failed-run: in 1.5.0 the policy also governs turn_limit (area live-turns) and a continue submission places a failed run's queue first (area admission)."
     },

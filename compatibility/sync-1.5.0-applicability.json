@@ -56,11 +56,11 @@
     "changelogBullets": 477,
     "repeatedBullets": 23,
     "byStatus": {
-      "ported": 188,
-      "ported-with-deferral": 22,
+      "ported": 190,
+      "ported-with-deferral": 23,
       "already-ported": 12,
       "no-op": 25,
-      "port": 79
+      "port": 76
     },
     "byArea": {
       "ai": 58,
@@ -9061,7 +9061,7 @@
       "id": "durable.task-inspection-states",
       "area": "durable",
       "phase": 4,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "durable@1.5.0/Breaking Changes#25",
         "durable@1.4.0/Added#10"
@@ -9083,13 +9083,29 @@
         "tests/PiSharp.Durable.Tests/Harness/HarnessInspectCases.cs"
       ],
       "release": "1.5.0",
-      "notes": "PiSharp has BlockedReason and TaskInspectionKind.Ready for inspect() (Harness/Types.cs) but no blocked field on TaskGraphNode (TaskGraph.cs:95). PiSharp-only graph readers, the device server's task graph stream (Server DeviceStreams.cs:54 through Hosting Feeds.cs's TaskGraphFeed) and the web UI, gain a blocked reason to show. The sleeping state is durable.durable-sleep."
+      "notes": "PiSharp has BlockedReason and TaskInspectionKind.Ready for inspect() (Harness/Types.cs) but no blocked field on TaskGraphNode (TaskGraph.cs:95). PiSharp-only graph readers, the device server's task graph stream (Server DeviceStreams.cs:54 through Hosting Feeds.cs's TaskGraphFeed) and the web UI, gain a blocked reason to show. The sleeping state is durable.durable-sleep.",
+      "evidence": {
+        "commits": [
+          "1d0b14ee",
+          "e0cf6d70",
+          "a56d978c"
+        ],
+        "tests": [
+          "tests/PiSharp.Durable.Tests/HarnessBlockedCases.cs: recovery-at-open.keeps-the-host-s-wake-active-until-open-s-recovery-pass-has-landed",
+          "tests/PiSharp.Durable.Tests/HarnessBlockedCases.cs: tasks-that-cannot-run.tells-the-graph-and-the-host-when-a-migration-fails",
+          "tests/PiSharp.Durable.Tests/HarnessBlockedCases.cs: tasks-that-cannot-run.shows-an-abandoned-task-waiting-for-its-definition-as-blocked",
+          "tests/PiSharp.Durable.Tests/HarnessBlockedCases.cs: tasks-that-cannot-run.shows-a-task-without-a-definition-as-blocked-and-wakes-the-host-once-a-registry-change-unblocks-it",
+          "tests/PiSharp.Durable.Tests/Harness/HarnessInspectCases.cs: derives-every-live-tasks-state-without-running-task-code",
+          "tests/PiSharp.Durable.Tests/Harness/HarnessLifecycleCases.cs: runs-what-the-registry-holds-at-resume-a-definition-installed-or-replaced-after-open",
+          "tests/PiSharp.Durable.Server.Tests/StreamCases.cs: streams.session-tasks-say-why-a-task-cannot-run"
+        ]
+      }
     },
     {
       "id": "durable.reports",
       "area": "durable",
       "phase": 4,
-      "status": "port",
+      "status": "ported-with-deferral",
       "changelog": [
         "durable@1.5.0/Breaking Changes#22",
         "durable@1.5.0/Breaking Changes#28",
@@ -9129,7 +9145,24 @@
         "src/PiSharp.WebAgent/Chat/DeviceHostService.cs"
       ],
       "release": "1.5.0",
-      "notes": "PiSharp's OnReport is Action<Exception> (Harness/Types.cs:754) and ITaskRuntime.Report(Exception) (TypesTasks.cs:95), the v1.2.0 shape. Port 1.5.0's one-argument Report directly; 1.4.0's (error, info) form never reached PiSharp. PiSharp-only consumers pass the exception through and must move to Report or unwrap it: the device host's OnReport(sessionId, Exception) (HostedSession.cs:729, DurableDeviceOptions.cs:66), pisharp durable (DurableRuntime.cs:154), pisharp durable serve (DurableServe.cs:164), custom agent teams (AgentTeam.cs:94) and the web agent (DeviceHostService.cs:77). The pi.durable.report telemetry event is durable.telemetry; task_interrupted is durable.restart-limit."
+      "notes": "PiSharp's OnReport is Action<Exception> (Harness/Types.cs:754) and ITaskRuntime.Report(Exception) (TypesTasks.cs:95), the v1.2.0 shape. Port 1.5.0's one-argument Report directly; 1.4.0's (error, info) form never reached PiSharp. PiSharp-only consumers pass the exception through and must move to Report or unwrap it: the device host's OnReport(sessionId, Exception) (HostedSession.cs:729, DurableDeviceOptions.cs:66), pisharp durable (DurableRuntime.cs:154), pisharp durable serve (DurableServe.cs:164), custom agent teams (AgentTeam.cs:94) and the web agent (DeviceHostService.cs:77). The pi.durable.report telemetry event is durable.telemetry; task_interrupted is durable.restart-limit.",
+      "evidence": {
+        "commits": [
+          "1d0b14ee"
+        ],
+        "tests": [
+          "tests/PiSharp.Durable.Tests/HarnessReportsCases.cs: reports.say-which-task-reported-a-failure-or-faulted",
+          "tests/PiSharp.Durable.Tests/HarnessReportsCases.cs: reports.name-the-extension-whose-definition-ran-also-after-another-one-replaced-it",
+          "tests/PiSharp.Durable.Tests/HarnessReportsCases.cs: reports.name-the-extension-of-a-failing-section-or-hook-and-tell-them-from-a-failing-environment-builder",
+          "tests/PiSharp.Durable.Tests/HarnessReportsCases.cs: reports.tell-extension-listener-wake-and-timer-failures-from-a-failed-session",
+          "tests/PiSharp.Durable.Tests/Harness/HarnessTasksRecoveryCases.cs: definition-handover.hands-over-to-a-newer-version-whose-migration-fails-and-leaves-the-task-blocked",
+          "tests/PiSharp.Durable.Tests/Harness/HarnessTasksRecoveryCases.cs: definition-handover.keeps-running-under-the-old-definition-when-the-replacement-is-missing-or-cannot-take-the-task",
+          "tests/PiSharp.Durable.Tests/Harness/HarnessTasksRecoveryCases.cs: definition-handover.reports-a-replacement-older-than-the-running-task-as-task_too_old-and-keeps-the-old-definition",
+          "tests/PiSharp.Durable.Tests/Harness/HarnessToolsCases.cs: reports-a-throwing-beforeproviderrequest-hook-and-continues-the-chain",
+          "tests/PiSharp.Durable.Tests/Harness/HarnessRegistryCases.cs: agent-resolution.collects-hooks-of-the-selected-extensions-in-extension-order-and-applies-field-defaults"
+        ]
+      },
+      "deferred": "The task_interrupted kind (its restart_limit and interrupted reasons and restart count) is area restarts' (durable.restart-limit); the telemetry HostCallback, the report's telemetry context and the pi.durable.report event are area telemetry's (durable.telemetry). Upstream README.md and docs/spec.md text is not mirrored (PiSharp keeps no copy; the website's embed/durable.md OnReport row still reads as before)."
     },
     {
       "id": "durable.telemetry",
@@ -9241,7 +9274,7 @@
       "id": "durable.after-failed-run",
       "area": "durable",
       "phase": 4,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "durable@1.4.0/Added#9"
       ],
@@ -9264,7 +9297,20 @@
         "tests/PiSharp.Durable.Tests/Harness/HarnessInboxCases.cs"
       ],
       "release": "1.5.0",
-      "notes": "PiSharp has no such setting. In 1.5.0 the policy also governs turn_limit (durable.turn-limit), and a continue submission places a failed run's queue first (durable.continue-submissions). The device host and web UI (decisions 0008 and 0011) read queued inputs from pi.inbox and could expose the setting per session."
+      "notes": "PiSharp has no such setting. In 1.5.0 the policy also governs turn_limit (durable.turn-limit), and a continue submission places a failed run's queue first (durable.continue-submissions). The device host and web UI (decisions 0008 and 0011) read queued inputs from pi.inbox and could expose the setting per session.",
+      "evidence": {
+        "commits": [
+          "1d0b14ee",
+          "b95e2c36"
+        ],
+        "tests": [
+          "tests/PiSharp.Durable.Tests/HarnessFailedRunInboxCases.cs: inputs-queued-behind-a-failed-run.stay-queued-by-default",
+          "tests/PiSharp.Durable.Tests/HarnessFailedRunInboxCases.cs: inputs-queued-behind-a-failed-run.start-the-next-run-with-continue",
+          "tests/PiSharp.Durable.Tests/HarnessFailedRunInboxCases.cs: inputs-queued-behind-a-failed-run.place-queued-writes-and-keep-them-with-withdraw",
+          "tests/PiSharp.Durable.Tests/HarnessFailedRunInboxCases.cs: inputs-queued-behind-a-failed-run.settle-unanswered-with-run_failed-with-withdraw",
+          "tests/PiSharp.Durable.Tests/Harness/HarnessGenerationCases.cs: resolves-settings-over-the-built-in-defaults"
+        ]
+      }
     },
     {
       "id": "durable.harness-identity",
