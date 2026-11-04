@@ -92,10 +92,11 @@ public sealed record SessionCompactionChange
     public double? KeepRecentTokens { get; init; }
 }
 
-/// <summary>A session's Harness settings: the host's settings with the session's compaction, read at every use. Without a host extension
-/// selection, every installed extension but the optional ones is selected. With <paramref name="streamMetadata"/>, every read of
-/// <see cref="Stream"/> carries a new <c>metadata.pisharp</c> object; generation and compaction read it once per prepared request and pin
-/// it in the request's checkpoint.</summary>
+/// <summary>A session's Harness settings: the host's settings with the session's compaction, read at every use. The session's compaction is
+/// the harness-wide policy, and the host's per-model <see cref="CompactionSettings.ModelOverrides"/> still apply over it for their models.
+/// Without a host extension selection, every installed extension but the optional ones is selected. With <paramref name="streamMetadata"/>,
+/// every read of <see cref="Stream"/> carries a new <c>metadata.pisharp</c> object; generation and compaction read it once per prepared
+/// request and pin it in the request's checkpoint.</summary>
 internal sealed class SessionHarnessSettings(HarnessSettings? inner, Func<SessionCompaction> compaction, Func<IReadOnlyList<Extension>>? defaultExtensions = null,
     Func<JsonObjectValue>? streamMetadata = null)
     : HarnessSettings
@@ -103,7 +104,7 @@ internal sealed class SessionHarnessSettings(HarnessSettings? inner, Func<Sessio
     public override IReadOnlyList<Extension>? Extensions => inner?.Extensions ?? defaultExtensions?.Invoke();
     public override ConversationStreamOptions? Stream => streamMetadata is null ? inner?.Stream : SessionStreamMetadata.Attach(inner?.Stream, streamMetadata());
     public override RetrySettings? Retry => inner?.Retry;
-    public override CompactionSettings? Compaction => compaction().ToSettings();
+    public override CompactionSettings? Compaction => compaction().ToSettings() with { ModelOverrides = inner?.Compaction?.ModelOverrides };
     public override ProgressSettings? Progress => inner?.Progress;
     public override ToolExecutionMode? ToolExecution => inner?.ToolExecution;
     public override QueueMode? SteeringMode => inner?.SteeringMode;

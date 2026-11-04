@@ -24,7 +24,8 @@
 // - A ToolExecutionResult field left null is upstream's undefined: Output null takes the retained output, Details null the last running
 //   details; JsonValue.Null is an explicit null. A C# JsonValue cannot hold undefined, so upstream's copyJson(..., {omitUndefinedProperties})
 //   of arguments, diagnostics and details has nothing to drop.
-// - Upstream's copyJson of a control drops undefined keys; a C# ToolControl has none, and an unset Terminate is omitted.
+// - Upstream's copyJson of a control drops undefined keys; a C# ToolControl has none, and an unset (null) Terminate is omitted. Pi v1.5.0
+//   sync (area harness-options): Terminate false is stored as given, as upstream's `terminate?: boolean` is (#10858).
 using System.Collections.Immutable;
 using System.Diagnostics;
 using System.Globalization;
@@ -1398,7 +1399,7 @@ internal static class ToolResults
         if (control.AddTools is { } names)
             writer.Add("addTools", JsonValue.Array(names.Select(name => (JsonValue)JsonValue.String(name ??
                 throw new ArgumentException("Tool control addTools contains null and is not strict JSON")))));
-        if (control.Terminate) writer.Add("terminate", true);
+        if (control.Terminate is { } terminate) writer.Add("terminate", terminate);
         return writer.Add("handoff", control.Handoff).Build();
     }
 

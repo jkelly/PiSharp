@@ -17,6 +17,13 @@
 //   advances the clock after its steps: a deterministic barrier in place of the real-time window.
 // - `hookContext.abortSignal` is the hook context's CancellationToken.
 // - `expect.any(Number)` is the "<number>" placeholder of MatchJson/MatchExactly.
+//
+// Pi v1.5.0 sync (area harness-options): the context baseline expectations of #10904 (5713c9507; for one,
+// harness.compaction.manual-compaction.places-the-summary-at-once-when-idle-and-keeps-raw-history) and the per-model compaction overrides
+// cases (6085986e4: harness.compaction.per-model-compaction-overrides.applies-the-current-model-s-override-to-the-blocking-threshold,
+// harness.compaction.per-model-compaction-overrides.applies-the-request-model-s-override-on-a-context-overflow and
+// harness.compaction.per-model-compaction-overrides.applies-the-model-s-override-when-a-compaction-selects-and-sizes-its-summary) are
+// v1.5.0's; the citation stays on v1.2.0 until the file's other areas land.
 using System.Collections.Immutable;
 using System.Text.RegularExpressions;
 using PiSharp.Contracts;
@@ -512,6 +519,7 @@ internal static class CompactionTests
         foreach (var item in TogetherCases(prefix + "blocking-and-manual-compaction-together.", fresh)) yield return item;
         foreach (var item in PinningCases(prefix + "compaction-pinning-silent-overflow-and-late-policy-changes.", fresh)) yield return item;
         foreach (var item in ContributionCases(prefix + "context-contributions.", fresh)) yield return item;
+        foreach (var item in ModelOverrideCases(prefix + "per-model-compaction-overrides.", fresh)) yield return item;
     }
 
     // ─── Manual compaction ────────────────────────────────────────────────────
@@ -565,9 +573,9 @@ internal static class CompactionTests
             Check(N(usage["input"]) > N(usageBefore["input"]), "the summary's input is counted");
             await Turn(chat, "next", "done");
             var agent = chat.Faux.AgentRequests.Snapshot()[^1].Messages;
-            // The next request: the summary, the kept turn, the new input, then one complete system baseline.
-            Seq(["user", "user", "assistant", "user", "system"], agent.Select(Role), "next request");
-            MatchJson("""{"sections":{"preamble":"You are helpful."}}""", agent[4], "baseline");
+            // The next request: one complete system baseline leading the summary, the kept turn, and the new input (#10904).
+            Seq(["system", "user", "user", "assistant", "user"], agent.Select(Role), "next request");
+            MatchJson("""{"sections":{"preamble":"You are helpful."}}""", agent[0], "baseline");
             await chat.Harness.CloseAsync(Context);
         });
 
@@ -630,9 +638,10 @@ internal static class CompactionTests
             await Result(chat, await Compact(chat.Root));
             gate.Resolve();
             Equal(SubmissionStatus.Done, (await input.WaitAsync(Context)).Status, "input");
-            // The continuation request starts with the summary.
+            // The continuation request starts with the new baseline, then the summary, ahead of the kept tool call (#10904).
             var continuation = chat.Faux.AgentRequests.Snapshot()[^1].Messages;
-            Check(UserText(continuation[0]).Contains("<summary>\nSUMMARY\n</summary>", StringComparison.Ordinal), "continuation starts with the summary");
+            Equal("system", Role(continuation[0]), "continuation starts with the baseline");
+            Check(UserText(continuation[1]).Contains("<summary>\nSUMMARY\n</summary>", StringComparison.Ordinal), "the summary follows it");
             Seq(["pi.tool-result", "pi.compaction", "pi.system", "pi.assistant"], (await KindsOf(chat.Root)).TakeLast(4), "kinds");
             await chat.Harness.CloseAsync(Context);
         });
@@ -1312,7 +1321,8 @@ internal static class CompactionTests
             var compaction = (await AllEntries(chat.Root)).First(record => record.Kind == "pi.compaction");
             MatchJson("""{"data":{"reason":"overflow"}}""", compaction.ToJson(), "summary");
             var retry = chat.Faux.AgentRequests.Snapshot()[^1].Messages;
-            Check(UserText(retry[0]).Contains("SUMMARY", StringComparison.Ordinal), "summary first");
+            Equal("system", Role(retry[0]), "the baseline first");
+            Check(UserText(retry[1]).Contains("SUMMARY", StringComparison.Ordinal), "summary after it");
             Check(!retry.Any(message => Role(message) == "assistant" && ((JsonObjectValue)message)["stopReason"] is JsonStringValue { Value: "error" }),
                 "the error is left out");
             await chat.Harness.CloseAsync(Context);
@@ -2447,6 +2457,65 @@ internal static class CompactionTests
             await Result(chat, await Compact(chat.Root));
             var prompt = UserText(chat.Faux.SummaryRequests[0].Messages[1]);
             Check(prompt.Contains("<conversation>\n[User]: H\n\n[User]: a\n</conversation>", StringComparison.Ordinal), $"prompt: {prompt[..Math.Min(prompt.Length, 120)]}");
+            await chat.Harness.CloseAsync(Context);
+        });
+    }
+
+    // ─── Per-model compaction overrides ───────────────────────────────────────
+
+    // Pi v1.5.0 sync (area harness-options): upstream's v1.5.0 cases (6085986e4, settings.compaction.modelOverrides).
+    private static IEnumerable<(string, Func<Task>)> ModelOverrideCases(string prefix, Func<IStorage> fresh)
+    {
+        yield return Case(prefix + "applies-the-current-model-s-override-to-the-blocking-threshold", async () =>
+        {
+            foreach (var key in new[] { "faux/faux-1", "faux/other" })
+            {
+                var chat = await Open(fresh, contextWindow: 1000);
+                await History(chat);
+                // Harness-wide: blocking only above the full window; the override for faux-1 blocks above 700.
+                chat.Setup.Compaction = Blocking with
+                {
+                    ReserveTokens = 0,
+                    ModelOverrides = new Dictionary<string, CompactionOverride> { [key] = new() { ReserveTokens = 300 } },
+                };
+                chat.Faux.Summaries.Push(Summary());
+                await Turn(chat, Text("u4", 200), "a4");
+                Equal(key == "faux/faux-1" ? 1 : 0, chat.Faux.SummaryRequests.Count, $"summary requests for {key}");
+                await chat.Harness.CloseAsync(Context);
+            }
+        });
+
+        yield return Case(prefix + "applies-the-request-model-s-override-on-a-context-overflow", async () =>
+        {
+            var chat = await Open(fresh);
+            await History(chat);
+            chat.Setup.Compaction = Manual with
+            {
+                ModelOverrides = new Dictionary<string, CompactionOverride> { ["faux/faux-1"] = new() { Enabled = true } },
+            };
+            chat.Faux.Summaries.Push(Summary());
+            chat.Faux.Agent.Push(Failure(Overflow), Answer("fits"));
+            var input = await Submit(chat, Text("u4", 100));
+            Equal(SubmissionStatus.Done, (await input.WaitAsync(Context)).Status, "input");
+            Equal(1, chat.Faux.SummaryRequests.Count, "summary requests");
+            await chat.Harness.CloseAsync(Context);
+        });
+
+        yield return Case(prefix + "applies-the-model-s-override-when-a-compaction-selects-and-sizes-its-summary", async () =>
+        {
+            var chat = await Open(fresh);
+            await History(chat);
+            chat.Setup.Compaction = Manual with
+            {
+                KeepRecentTokens = 100_000,
+                ModelOverrides = new Dictionary<string, CompactionOverride> { ["faux/faux-1"] = new() { KeepRecentTokens = 150, ReserveTokens = 500 } },
+            };
+            chat.Faux.Summaries.Push(Summary());
+            Equal("completed", S((await Result(chat, await Compact(chat.Root)))["status"]), "status");
+            // 0.8 * 500 from the override, below the model's 900.
+            Equal(400.0, chat.Faux.SummaryRequests[0].Options?.MaxTokens, "maxTokens");
+            var messages = (await chat.Root.ContextAsync(Context)).Messages;
+            Seq([Text("u3", 100), Text("a3", 100)], messages.Skip(1).Select(UserText), "kept messages");
             await chat.Harness.CloseAsync(Context);
         });
     }

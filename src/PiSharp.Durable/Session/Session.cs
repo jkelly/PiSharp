@@ -1,5 +1,7 @@
 // Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/src/session/session.ts (createSession, setDefaultDocumentRetention,
-// documentRetention, SessionImpl, contained, GuardedStorage, observedOperations, cancellationError).
+// documentRetention, SessionImpl, contained, GuardedStorage, observedOperations, cancellationError). Pi v1.5.0 sync (area
+// harness-options): a read-only Session refuses commits with writes (upstream be14d9732); the citation stays on v1.2.0 until the file's
+// other areas land.
 //
 // Concurrency model. Upstream relies on one JavaScript thread: `#enqueue` chains every mutation and cold load onto one promise, and
 // listeners run in later microtasks. Here .NET callers may be on any thread, so:
@@ -62,6 +64,8 @@ public class Session : ISession
     private readonly Func<double> now;
     private readonly Func<double> clock;
     private readonly Func<double> documentRetentionMs;
+    /// <summary>Refuse every commit with writes (<see cref="HarnessOptions.ReadOnly"/>).</summary>
+    private readonly bool readOnly;
     private readonly Lock documentsGate = new();
     private readonly Dictionary<string, LoadedDocument> documents = new(StringComparer.Ordinal);
     // Cached documents with no observer attached, by address, oldest use first, with the time of that use. Guarded by documentsGate.
@@ -90,10 +94,12 @@ public class Session : ISession
     private List<Action>? deferred;
 
     /// <summary>Opens a Session kernel over <paramref name="storage"/>; <paramref name="now"/> is the wall clock for task times in milliseconds
-    /// (default: the system clock); <paramref name="documentRetentionMs"/> is read at each use (null: the default).</summary>
-    internal Session(IStorage storage, Func<double>? now = null, Func<double?>? documentRetentionMs = null)
+    /// (default: the system clock); <paramref name="documentRetentionMs"/> is read at each use (null: the default). A
+    /// <paramref name="readOnly"/> Session refuses every commit with writes before it reaches Storage.</summary>
+    internal Session(IStorage storage, Func<double>? now = null, Func<double?>? documentRetentionMs = null, bool readOnly = false)
     {
         ArgumentNullException.ThrowIfNull(storage);
+        this.readOnly = readOnly;
         // Waits race it; none has to.
         _ = failedSource.Task.ContinueWith(static task => _ = task.Exception, CancellationToken.None,
             TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
@@ -826,6 +832,13 @@ public class Session : ISession
             tx.Discard();
             SweepDocuments();
             return result;
+        }
+        if (readOnly)
+        {
+            // Refused before Storage: the Session stays healthy, and the caller sees why.
+            tx.Discard();
+            SweepDocuments();
+            throw new ReadOnlySessionException("a commit with writes");
         }
         Seq seq;
         try

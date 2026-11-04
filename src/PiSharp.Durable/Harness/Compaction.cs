@@ -12,6 +12,9 @@
 // - The beforeCompact hook receives a CompactionRequest (upstream's `compaction` object) and returns a CompactionDecision
 //   (upstream's `{decline: true} | {summary}`).
 // - JSON.stringify of a tool call argument is JsonValue.ToJson (JavaScript formatting); String.prototype.trim is Js.Trim.
+//
+// Pi v1.5.0 sync (area harness-options): compactionPolicy() and select's per-model policy (upstream 6085986e4, #10942). Areas restarts,
+// sleep, telemetry and live-turns change this file again, so the citation stays on v1.2.0.
 using System.Collections.Immutable;
 using System.Text;
 using PiSharp.Durable.Chord;
@@ -139,7 +142,7 @@ internal static class Compaction
             await FailNoModelAsync(runtime, reference, context).ConfigureAwait(false);
             return;
         }
-        var policy = settings.Compaction;
+        var policy = PolicyFor(settings, reference);
         var view = await runtime.ContextAsync(conversationId, context).ConfigureAwait(false);
         if (SelectCut(view, policy.KeepRecentTokens) is not { } cut)
         {
@@ -305,6 +308,17 @@ internal static class Compaction
             .Number("attempt", 1).Build();
         Live.AddCompactionStatus(await tx.DocAsync(Live.LiveDoc, conversationId).ConfigureAwait(false), status);
         return id;
+    }
+
+    /// <summary>The compaction policy for <paramref name="model"/>: its <c>ModelOverrides</c> entry over the harness-wide policy, field by
+    /// field (upstream <c>compactionPolicy</c>).</summary>
+    public static CompactionPolicy PolicyFor(Settings settings, ModelRef model)
+    {
+        var policy = settings.Compaction;
+        CompactionOverride? entry = null;
+        policy.ModelOverrides?.TryGetValue($"{model.Provider}/{model.ModelId}", out entry);
+        return new CompactionPolicy(entry?.Enabled ?? policy.Enabled, entry?.ReserveTokens ?? policy.ReserveTokens,
+            entry?.KeepRecentTokens ?? policy.KeepRecentTokens, entry?.BackgroundTokens ?? policy.BackgroundTokens);
     }
 
     /// <summary>

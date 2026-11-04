@@ -643,6 +643,22 @@ internal static class ToolsTests
             await first.Harness.CloseAsync(Context);
         });
 
+        // Pi v1.5.0 sync (area harness-options): upstream's v1.5.0 case (#10858), harness.tools.does-not-terminate-on-terminate-false. The
+        // stored control check is PiSharp's: Terminate false is kept as given, as upstream's copyJson keeps `terminate: false`.
+        yield return Case(prefix + "does-not-terminate-on-terminate-false", async () =>
+        {
+            var setup = Setup();
+            var keep = Tool("keep", (_, _, _) => Result(NoContent with { Control = new ToolControl { Terminate = false } }));
+            AddTool(setup.Registry, keep);
+            var (harness, root, entries, status) = await Run(fresh, setup, [Calls(("keep", Obj(), "c1")), Done], (_, conversation) =>
+                conversation.ConfigureAsync(new AgentChange { Tools = ToolSelection.Only(keep) }, Context));
+            Equal(SubmissionStatus.Done, status, "status");
+            Equal("pi.assistant", entries[^1].Kind, "last kind");
+            MatchJson("""{"status":"completed","result":{"control":{"terminate":false}}}""",
+                OutcomeJson((await Tasks(harness, root.Id, "pi.tool")).Single()), "stored control");
+            await harness.CloseAsync(Context);
+        });
+
         // ─── generation hooks ───────────────────────────────────────────────
 
         yield return Case(prefix + "replaces-request-messages-observes-responses-and-continues-on-yield", async () =>

@@ -1,7 +1,9 @@
 // Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/src/harness/generation.ts. v1.2.0: the prepare checkpoint's
 // threshold flag and a failed blocking threshold compaction failing the run with model_error (area j), and tool task v2 (area a): a round's
 // tool tasks take {kind: "model", assistant, callId}, a round reads controls only from model-issued results (a version 1 result has no
-// kind), and handing a round over removes pi.live.nestedTools with its slots.
+// kind), and handing a round over removes pi.live.nestedTools with its slots. Pi v1.5.0 sync (area harness-options): the threshold check
+// and overflow recovery use the per-model compaction policy (upstream 6085986e4, #10942); the citation stays on v1.2.0 until the file's
+// other areas land.
 //
 // Mappings:
 // - Checkpoints, live state and results are upstream's JSON, built in upstream's key order: prepare {phase, attempt, compacted?, overflow?},
@@ -175,7 +177,7 @@ internal static class GenerationPhases
         var input = new PromptInput { ConversationId = conversationId, Agent = agent, Env = env, Shown = shown, Read = runtime };
         var desired = await HarnessPrompt.RenderSectionsAsync(agent.Sections, input, shown, Report, context).ConfigureAwait(false);
         var entries = HarnessPrompt.PlanSystemEntries(view, desired, agent.Tools, runtime.Now());
-        var threshold = compacted is null ? ThresholdCompaction(view, entries, resolved.ContextWindow, settings.Compaction) : null;
+        var threshold = compacted is null ? ThresholdCompaction(view, entries, resolved.ContextWindow, Compaction.PolicyFor(settings, model)) : null;
         if (threshold == "blocking")
         {
             // Compact first and prepare again; the transcript is unchanged until the compaction appends.
@@ -561,9 +563,9 @@ internal static class GenerationPhases
         // The retry and compaction policies govern the next attempt, so they are read now rather than pinned at preparation.
         var settings = runtime.Settings;
         var overflow = stopReason == "error" && PiAiOverflow.IsContextOverflow(message);
-        if (overflow && compacted is null && settings.Compaction.Enabled)
+        var policy = Compaction.PolicyFor(settings, reference);
+        if (overflow && compacted is null && policy.Enabled)
         {
-            var policy = settings.Compaction;
             var view = await runtime.ContextAsync(conversationId, context, cutoff).ConfigureAwait(false);
             if (Compaction.SelectCut(view, policy.KeepRecentTokens) is not null)
             {

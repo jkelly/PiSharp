@@ -1,6 +1,9 @@
 // Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/src/harness/context.ts. Messages are pi-ai wire JSON. Records and
 // JSON values are immutable here, so upstream's freezeJson has no counterpart; a kept range is shared as is, and every returned view has
-// its own arrays because ImmutableArray values are never shared mutably.
+// its own arrays because ImmutableArray values are never shared mutably. Pi v1.5.0 sync (area harness-options): the harness baseline
+// leads the context past assistant messages (upstream 5713c9507, #10904); upstream's `system !== baseline` is reference equality of the
+// stored message, which Contribute passes through unchanged and an edit's replacement never is. Group commit and the windowed view
+// change this file again (areas publication-caches, group-commit and view), so the citation stays on v1.2.0.
 using System.Collections.Immutable;
 using PiSharp.Durable.Chord;
 
@@ -17,7 +20,21 @@ internal sealed record ContextBounds(EntryRecord? Head, EntryId Tail);
 /// marker extends both.
 /// </summary>
 internal sealed record ContextRange(ContextBounds Bounds, ImmutableArray<EntryRecord> Entries, ContextView View, ImmutableHashSet<EntryId> Edited,
-    ImmutableArray<JsonValue> Settled, ImmutableArray<JsonValue> Open);
+    ImmutableArray<JsonValue> Settled, ImmutableArray<JsonValue> Open, ContextBaseline Baseline);
+
+/// <summary>
+/// The baseline's system message of a range (upstream <c>Baseline</c>; see <c>FindBaseline</c>): <see cref="Message"/> once found, null in a
+/// settled baseline when the range cannot have one (upstream <c>null</c>), or not <see cref="Settled"/> while a later entry may be one
+/// (upstream <c>undefined</c>).
+/// </summary>
+internal readonly record struct ContextBaseline(bool Settled, JsonValue? Message)
+{
+    /// <summary>A later entry may still be the baseline (upstream <c>undefined</c>).</summary>
+    public static ContextBaseline Pending => default;
+
+    /// <summary>The range cannot have a baseline (upstream <c>null</c>).</summary>
+    public static ContextBaseline None => new(true, null);
+}
 
 /// <summary>Context reads and model context derivation (upstream <c>context.ts</c>).</summary>
 internal static class ConversationContext
@@ -116,9 +133,10 @@ internal static class ConversationContext
         var active = SelectActive(bounds.Head, entries);
         var contributions = active.Select(entry => Contribute(entry, edits.GetValueOrDefault(entry.Id))).ToImmutableArray();
         var (settled, open) = Settle([], [.. contributions.SelectMany(messages => messages)]);
-        var messages = LeadWithSystem([.. settled, .. OrderToolResults(open)]);
+        var baseline = FindBaseline(bounds.Head, active);
+        var messages = LeadWithSystem([.. settled, .. OrderToolResults(open)], baseline);
         var view = new ContextView { Head = bounds.Head, Entries = active, Contributions = contributions, Messages = messages };
-        return new ContextRange(bounds, entries, view, [.. edits.Keys], settled, open);
+        return new ContextRange(bounds, entries, view, [.. edits.Keys], settled, open, baseline);
     }
 
     /// <summary>
@@ -131,28 +149,60 @@ internal static class ConversationContext
         if (added.Any(entry => entry.Edits is not null || entry.Head is not null || previous.Edited.Contains(entry.Id))) return DeriveRange(bounds, entries);
         var contributions = added.Select(entry => Contribute(entry, null)).ToImmutableArray();
         var (settled, open) = Settle(previous.Settled, [.. previous.Open, .. contributions.SelectMany(messages => messages)]);
+        var baseline = previous.Baseline.Settled ? previous.Baseline : FindBaseline(bounds.Head, added);
         var view = new ContextView
         {
             Head = bounds.Head,
             Entries = previous.View.Entries.AddRange(added),
             Contributions = previous.View.Contributions.AddRange(contributions),
-            Messages = LeadWithSystem([.. settled, .. OrderToolResults(open)]),
+            Messages = LeadWithSystem([.. settled, .. OrderToolResults(open)], baseline),
         };
-        return new ContextRange(bounds, entries, view, previous.Edited, settled, open);
+        return new ContextRange(bounds, entries, view, previous.Edited, settled, open, baseline);
     }
 
     /// <summary>
-    /// Moves a system message that only user messages precede to the front (upstream <c>leadWithSystem</c>). A run's input is committed
-    /// before generation renders the system prompt, so a transcript, or the range after a compaction or reset, starts with user messages
-    /// followed by the baseline system message. Providers treat only a leading system message as the initial prompt and tool set.
+    /// The baseline among <paramref name="entries"/>, oldest first (upstream <c>findBaseline</c>): the system message of the first
+    /// <c>pi.system</c> entry after the head marker, or of the transcript without one, when generation wrote it with every section and tool in
+    /// effect. After a head marker it always does, and omits the retained <c>pi.system</c> entries. Without one it does when it saw no system
+    /// message before, which holds unless an earlier entry carries one, even if an edit omits it later. An edit that targets the baseline
+    /// contributes other messages, or none, so none leads; a later entry does not take its place.
     /// </summary>
-    private static ImmutableArray<JsonValue> LeadWithSystem(ImmutableArray<JsonValue> messages)
+    private static ContextBaseline FindBaseline(EntryRecord? head, IEnumerable<EntryRecord> entries)
+    {
+        foreach (var entry in entries)
+        {
+            if (head is not null && entry.Id.Value <= head.Id.Value) continue;
+            if (Entries.SystemEntry.Is(entry))
+                return new ContextBaseline(true, (entry.Model ?? JsonArrayValue.Empty).FirstOrDefault(message => Role(message) == "system"));
+            if (head is null && CarriesSystemMessage(entry)) return ContextBaseline.None;
+        }
+        return ContextBaseline.Pending;
+    }
+
+    /// <summary>Whether an entry's own messages, or the replacement messages of its edits, include a system message (upstream
+    /// <c>carriesSystemMessage</c>).</summary>
+    private static bool CarriesSystemMessage(EntryRecord entry) =>
+        (entry.Model?.Any(message => Role(message) == "system") ?? false) ||
+        (entry.Edits?.Any(edit => edit.Action == ContextEditAction.Replace && edit.Messages!.Any(message => Role(message) == "system")) ?? false);
+
+    /// <summary>
+    /// Moves the first system message to the front when only user messages precede it, or when it is the baseline's (upstream
+    /// <c>leadWithSystem</c>). A run's input is committed before generation renders the system prompt, so a transcript starts with the input
+    /// followed by the baseline, and the range after a compaction with the kept history, assistant messages included. Providers treat only a
+    /// leading system message as the initial prompt and tool set; without it, a later tool change rewrites the request's tool list and
+    /// invalidates the whole prompt cache. Only the first system message moves, so replaying system messages in order gives the same sections
+    /// and tools. Any other system message, before an assistant message, stays where it was committed: moving it would change what it means
+    /// to the model.
+    /// </summary>
+    private static ImmutableArray<JsonValue> LeadWithSystem(ImmutableArray<JsonValue> messages, ContextBaseline baseline)
     {
         var index = -1;
         for (var at = 0; at < messages.Length; at++)
-            if (Role(messages[at]) != "user") { index = at; break; }
-        if (index <= 0 || Role(messages[index]) != "system") return messages;
-        return [messages[index], .. messages.Take(index), .. messages.Skip(index + 1)];
+            if (Role(messages[at]) == "system") { index = at; break; }
+        if (index <= 0) return messages;
+        var system = messages[index];
+        if (!ReferenceEquals(system, baseline.Message) && messages.Take(index).Any(message => Role(message) != "user")) return messages;
+        return [system, .. messages.Take(index), .. messages.Skip(index + 1)];
     }
 
     /// <summary>One active entry's model messages after its edit and excluded stop reasons, before tool result ordering.</summary>
