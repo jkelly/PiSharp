@@ -19,6 +19,9 @@
 //   one synchronous stretch enqueue their admission commits back to back, while the Harness admits calls a tool makes after an await one at
 //   a time. Script arguments that are not an object reach the nested call as they are (ToolExecutionApi.ExecuteToolAsync over a JsonValue).
 // - Date.now() is the system clock in whole milliseconds; crypto.getRandomValues is RandomNumberGenerator.
+// - Pi v1.5.0 sync (area sleep): the call's clock is the Harness clock (api.now(), IToolExecutionApi.Now; f75b3240a), and a result that
+//   arrives after the outcome is decided is dropped instead of reading the ended call's clock (ec1be23eb). The citation stays on v1.2.0
+//   until the file's other areas land.
 using System.Collections.Immutable;
 using System.Runtime.ExceptionServices;
 using System.Security.Cryptography;
@@ -259,7 +262,7 @@ internal sealed class DurableCodemodeCall
         this.context = context;
     }
 
-    private static double Now() => DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+    private double Now() => api.Now();
 
     /// <summary>Runs <paramref name="action"/> on the call's scheduler, after what is queued there.</summary>
     private void Post(Action action) => Task.Factory.StartNew(() =>
@@ -918,6 +921,8 @@ internal sealed class DurableCodemodeCall
             else Diverge($"call {call.Id} is {Describe(call)}: {DurableErrors.MessageOf(error)}");
             return;
         }
+        // A result after the outcome is decided has nowhere to go, and the call's API has ended.
+        if (Stopped) return;
         queue.Add(new Finished(call.Id, Now(), outcome, global));
         _ = Pump();
     }
