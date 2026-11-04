@@ -643,6 +643,20 @@ internal static class ToolsTests
             await first.Harness.CloseAsync(Context);
         });
 
+        // Pi v1.5.0 sync (area harness-options): upstream's v1.5.0 case (#10858), harness.tools.does-not-terminate-on-terminate-false.
+        // ToolControl.Terminate is a bool? here, so the port already terminated only on true.
+        yield return Case(prefix + "does-not-terminate-on-terminate-false", async () =>
+        {
+            var setup = Setup();
+            var keep = Tool("keep", (_, _, _) => Result(NoContent with { Control = new ToolControl { Terminate = false } }));
+            AddTool(setup.Registry, keep);
+            var (harness, _, entries, status) = await Run(fresh, setup, [Calls(("keep", Obj(), "c1")), Done], (_, root) =>
+                root.ConfigureAsync(new AgentChange { Tools = ToolSelection.Only(keep) }, Context));
+            Equal(SubmissionStatus.Done, status, "status");
+            Equal("pi.assistant", entries[^1].Kind, "last kind");
+            await harness.CloseAsync(Context);
+        });
+
         // ─── generation hooks ───────────────────────────────────────────────
 
         yield return Case(prefix + "replaces-request-messages-observes-responses-and-continues-on-yield", async () =>
