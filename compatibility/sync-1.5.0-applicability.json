@@ -56,11 +56,11 @@
     "changelogBullets": 477,
     "repeatedBullets": 23,
     "byStatus": {
-      "ported": 177,
+      "ported": 178,
       "ported-with-deferral": 16,
       "already-ported": 12,
       "no-op": 25,
-      "port": 96
+      "port": 95
     },
     "byArea": {
       "ai": 58,
@@ -9621,7 +9621,7 @@
       "pisharp": [],
       "release": "1.5.0",
       "notes": "The Chord half is chord@1.5.0/Added#13 and Fixed#3 (group F). Task span error messages arrive with durable.telemetry; cut them with a range there too.",
-      "evidence": "V8-specific retention: a .NET string is never a view of another, and a string range allocates a copy of just those characters. PiSharp's append ops (src/PiSharp.Durable/Chord/Delta/Diff.cs:79 and :89, src/PiSharp.Durable/Chord/Delta/Tracker.cs:499 and :506), the nested call summary bound (src/PiSharp.Durable/Harness/Tool.cs:707) and code mode's previews (src/PiSharp.Durable.Tools/Codemode/Codemode.cs:985 and :996 through JsString.Cut, src/PiSharp.Durable.Tools/Codemode/Describe.cs:174) already hold only the characters they keep."
+      "evidence": "V8-specific retention: a .NET string is never a view of another, and a range copies just its characters. Append ops: src/PiSharp.Durable/Chord/Delta/Diff.cs:81 and :91, src/PiSharp.Durable/Chord/Delta/Tracker.cs:507 and :514 cut with ranges; Tracker.cs:377 emits AppendText's own text and Draft.cs:251 builds the new value by concatenation, holding no larger string. Nested call summary: src/PiSharp.Durable/Harness/Tool.cs:707 (error[..MaxSummaryErrorChars]). Code mode previews: src/PiSharp.Durable.Tools/Codemode/Codemode.cs:985 and :996 through JsString.Cut (src/PiSharp.Durable.Tools/Codemode/Describe.cs:174). Test: tests/PiSharp.Durable.Tests/Chord/DeltaAppendTextCases.cs: chord.delta-append-text.keeps-an-op-text-that-does-not-hold-a-larger-string-it-was-cut-from-alive."
     },
     {
       "id": "durable.partial-merge-proto",
@@ -10318,7 +10318,7 @@
       "id": "chord.delta-append-text",
       "area": "chord",
       "phase": 4,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "chord@1.5.0/Added#14"
       ],
@@ -10337,7 +10337,25 @@
       "pulledInBy": [
         "durable.partial-commit-appends"
       ],
-      "notes": "PiSharp's tracker finds appends by comparing strings at prepare (Tracker.cs:495-506). Needed by phase 4: Durable v1.5.0's partial commits append with appendText (durable@1.5.0/Fixed#5, group E). `StringKeys<T>` is a TypeScript type; the C# check is the run-time one."
+      "notes": "PiSharp's tracker finds appends by comparing strings at prepare (Tracker.cs:495-506). Needed by phase 4: Durable v1.5.0's partial commits append with appendText (durable@1.5.0/Fixed#5, group E). `StringKeys<T>` is a TypeScript type; the C# check is the run-time one.",
+      "evidence": {
+        "commits": [
+          "e88e572d",
+          "8cedc406"
+        ],
+        "tests": [
+          "tests/PiSharp.Durable.Tests/Chord/DeltaAppendTextCases.cs: chord.delta-append-text.records-an-append-op-and-the-appended-value",
+          "tests/PiSharp.Durable.Tests/Chord/DeltaAppendTextCases.cs: chord.delta-append-text.joins-several-appends-to-one-key-in-one-change-into-one-op-next-to-other-changes",
+          "tests/PiSharp.Durable.Tests/Chord/DeltaAppendTextCases.cs: chord.delta-append-text.falls-back-to-the-string-comparison-when-the-same-key-is-also-assigned-or-deleted",
+          "tests/PiSharp.Durable.Tests/Chord/DeltaAppendTextCases.cs: chord.delta-append-text.appends-inside-a-block-the-same-change-inserted-or-replaced",
+          "tests/PiSharp.Durable.Tests/Chord/DeltaAppendTextCases.cs: chord.delta-append-text.rejects-what-a-javascript-caller-can-get-wrong",
+          "tests/PiSharp.Durable.Tests/Chord/DeltaAppendTextCases.cs: chord.delta-append-text.accepts-only-keys-whose-type-is-exactly-string",
+          "tests/PiSharp.Durable.Tests/Chord/DeltaAppendTextCases.cs: chord.delta-append-text.keeps-an-op-text-that-does-not-hold-a-larger-string-it-was-cut-from-alive",
+          "tests/PiSharp.Durable.Tests/Chord/DeltaAppendTextCases.cs: chord.delta-append-text.cost.costs-o-chunk-per-change-beyond-the-copy-a-dotnet-string-makes",
+          "tests/PiSharp.Durable.Tests/Chord/DeltaPendingCases.cs: chord.delta-pending.folding.is-invisible-to-a-replica-tracker-edits-anywhere-appends-splices-and-reorders",
+          "tests/PiSharp.Durable.Tests/Chord/DeltaPendingCases.cs: chord.delta-pending.folding.is-invisible-to-a-replica-leaf-edits-of-list-elements-between-splices-and-reorders"
+        ]
+      }
     },
     {
       "id": "chord.delta-owned-slice",

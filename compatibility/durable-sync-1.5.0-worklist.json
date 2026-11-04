@@ -369,8 +369,8 @@
       "size": "S",
       "dependsOn": [],
       "commits": [
-        "da412b039",
-        "f715a15c1"
+        "e88e572d",
+        "8cedc406"
       ],
       "notes": "durable.owned-slices is no-op and sits here as the nearest area: ownedSlice works around V8 sliced strings keeping their source alive, and a .NET Substring already copies; Durable's callers (append ops, nested call error summaries, task span errors, code mode previews) need no change. tracker.ts and delta/index.ts also carry phase 6 changes (a92283056: the open change without a WeakRef; d0aa218cb: cheaper container copies, chord.delta-container-copies no-op) and diff.ts the incremental-argument fix of f715a15c1 (chord.delta-owned-slice, phase 6, already-ported): port appendText only, keep the port map rows needs-sync for phase 6, and leave the citations on v1.2.0 unless the file matches v1.5.0 everywhere it cites. StringKeys<T> is TypeScript typing; the C# check is the run-time one (a string field)."
     },
