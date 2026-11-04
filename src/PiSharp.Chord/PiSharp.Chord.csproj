@@ -6,6 +6,8 @@
        whether it ships as a package is settled at release. -->
   <PropertyGroup>
     <IsPackable>false</IsPackable>
+    <!-- Chord's context carries a pi-telemetry span (PiSharp.Telemetry, [Experimental("PISHARP_TELEMETRY001")]), as upstream's does. -->
+    <NoWarn>$(NoWarn);PISHARP_TELEMETRY001</NoWarn>
   </PropertyGroup>
   <ItemGroup>
     <!-- Upstream's tests import each layer's internal.ts; the suite reaches the same surface. -->
@@ -13,5 +15,7 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../PiSharp.Contracts/PiSharp.Contracts.csproj" />
+    <!-- Upstream's chord depends on @earendil-works/pi-telemetry: its Context carries a telemetry span. -->
+    <ProjectReference Include="../PiSharp.Telemetry/PiSharp.Telemetry.csproj" />
   </ItemGroup>
 </Project>

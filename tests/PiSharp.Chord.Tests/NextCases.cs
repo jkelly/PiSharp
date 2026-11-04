@@ -5,7 +5,8 @@ using PiSharp.Chord;
 // Authored for applicability row chord.next-entry-point (Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/chord/src/next/
 // index.ts and packages/chord/package.json's "./next" export, which upstream does not test): the assembly is the @earendil-works/chord/next
 // entry point, experimental, its public surface under PiSharp.Chord namespaces, and it references PiSharp.Contracts and no PiSharp.Durable
-// project (decision 0013).
+// project (decision 0013). Area cv2-data added PiSharp.Telemetry: upstream's chord depends on pi-telemetry, whose span Chord's context
+// carries.
 internal static partial class Program
 {
     private static IEnumerable<(string, Func<Task>)> NextIndexCases() =>
@@ -25,7 +26,7 @@ internal static partial class Program
         Case("next.index.references-pisharp-contracts-and-no-durable-project", () =>
         {
             var references = typeof(ChordNext).Assembly.GetReferencedAssemblies().Select(name => name.Name!).Where(name => name.StartsWith("PiSharp.", StringComparison.Ordinal));
-            Sequence(["PiSharp.Contracts"], references, "the PiSharp assemblies PiSharp.Chord references");
+            Sequence(["PiSharp.Contracts", "PiSharp.Telemetry"], references.Order(StringComparer.Ordinal), "the PiSharp assemblies PiSharp.Chord references");
         }),
     ];
 }

@@ -127,7 +127,7 @@ The pi-schema suite (`tests/PiSharp.Schema.Tests`, a test project, never packed 
 
 ## Pi v1.5.0 Chord v2 (@earendil-works/chord/next)
 
-`src/PiSharp.Chord/` (decision 0013; not packed or shipped) ports Chord v2 from Pi v1.5.0 `packages/chord/src/next/`, the `@earendil-works/chord/next` entry point (commit `f9a26365568127461c47a07a37dcb42c140a3ac5`), under the Pi MIT notice above. It references only `PiSharp.Contracts` and bundles no Node package; its suite (`tests/PiSharp.Chord.Tests`, a test project, never packed or shipped) ports the matching tests from `packages/chord/test/next/`.
+`src/PiSharp.Chord/` (decision 0013; not packed or shipped) ports Chord v2 from Pi v1.5.0 `packages/chord/src/next/`, the `@earendil-works/chord/next` entry point (commit `f9a26365568127461c47a07a37dcb42c140a3ac5`), under the Pi MIT notice above. It references only `PiSharp.Contracts` and `PiSharp.Telemetry` and bundles no Node package; its suite (`tests/PiSharp.Chord.Tests`, a test project, never packed or shipped) ports the matching tests from `packages/chord/test/next/` and holds upstream's schema-switch fixtures (`packages/chord/test/next/schema/recorded.json` and `stored/`) unchanged, as test input.
 
 ## Anthropic SDK reviewed development oracle
 
