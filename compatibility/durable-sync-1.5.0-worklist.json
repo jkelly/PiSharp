@@ -1449,7 +1449,11 @@
       "size": "S",
       "dependsOn": [],
       "commits": [
-        "5c1736f82"
+        "5c1736f82",
+        "c22424dc",
+        "ba46956c",
+        "aab14967",
+        "b39b10ab"
       ],
       "notes": "Wide and mechanical, so land it early, before the areas that edit the same consumers. Every Documents.DefineXDoc takes checkpointWhen = null today (Documents.cs:110-158); make it required and give every PiSharp-only definition a policy: () => false keeps today's deltas-only behaviour (custom agents, decision 0012; device host, apps and jobs, decisions 0008-0010; ask_user_question and plan mode, decision 0005). Code mode's store gets the every-64-deltas base and upstream's new codemode-checkpoints.test.ts (CodemodeCheckpointsCases.cs). Stored formats do not change, so the compat captures stay as they are."
     },

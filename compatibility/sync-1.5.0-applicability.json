@@ -56,11 +56,11 @@
     "changelogBullets": 477,
     "repeatedBullets": 23,
     "byStatus": {
-      "ported": 182,
+      "ported": 183,
       "ported-with-deferral": 18,
       "already-ported": 12,
       "no-op": 25,
-      "port": 89
+      "port": 88
     },
     "byArea": {
       "ai": 58,
@@ -8380,7 +8380,7 @@
       "id": "durable.checkpoint-when-required",
       "area": "durable",
       "phase": 4,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "durable@1.4.0/Breaking Changes#6"
       ],
@@ -8420,7 +8420,20 @@
         "tests/PiSharp.Durable.Tests/Session/SessionDefinitionsCases.cs"
       ],
       "release": "1.5.0",
-      "notes": "Every Documents.DefineXDoc takes checkpointWhen = null (Documents.cs:110-158). Making it required breaks every PiSharp-only definition listed (custom agents, decision 0012; device host, apps and jobs, decisions 0008-0010; ask_user_question and plan mode, decision 0005), and each must choose a policy (() => false keeps today's deltas-only behaviour). Upstream's code mode checkpoint test is new (codemode-checkpoints.test.ts)."
+      "notes": "Every Documents.DefineXDoc takes checkpointWhen = null (Documents.cs:110-158). Making it required breaks every PiSharp-only definition listed (custom agents, decision 0012; device host, apps and jobs, decisions 0008-0010; ask_user_question and plan mode, decision 0005), and each must choose a policy (() => false keeps today's deltas-only behaviour). Upstream's code mode checkpoint test is new (codemode-checkpoints.test.ts).",
+      "evidence": {
+        "commits": [
+          "c22424dc",
+          "ba46956c",
+          "b39b10ab",
+          "aab14967"
+        ],
+        "tests": [
+          "tests/PiSharp.Durable.Tests/Session/SessionDefinitionsCases.cs: session.definitions.requires-an-explicit-checkpoint-predicate-for-documents-and-families",
+          "tests/PiSharp.Durable.Tests/CodemodeCheckpointsCases.cs: codemode-checkpoints.keeps-task-scoped-documents-as-deltas-until-their-task-retires",
+          "tests/PiSharp.Durable.Tests/CodemodeCheckpointsCases.cs: codemode-checkpoints.checkpoints-the-codemode-store-after-64-deltas-without-changing-historical-reads-or-forks"
+        ]
+      }
     },
     {
       "id": "durable.watch-handles",
