@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/src/codemode/codemode.ts and codemode/index.ts, the
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/src/codemode/codemode.ts and codemode/index.ts, the
 // `@earendil-works/pi-durable/codemode` entry point. Upstream's CODEMODE_MODULE_VERSION, CODEMODE_TOOL_NAME, createCodemodeTool,
 // createCodemodeExtension, CodemodeStoreDoc, CodemodeRunDoc and CodemodeJournalDoc are DurableCodemode.ModuleVersion, ToolName, CreateTool,
 // CreateExtension, StoreDoc, RunDoc and JournalDoc; CodemodeToolOptions, CodemodeGlobal and CodemodeNamespace keep their names; the
@@ -18,10 +18,12 @@
 // - The calls launchCovered() launches together are admitted together (ToolExecutionApi.AdmitTogether): upstream's executeTool() calls of
 //   one synchronous stretch enqueue their admission commits back to back, while the Harness admits calls a tool makes after an await one at
 //   a time. Script arguments that are not an object reach the nested call as they are (ToolExecutionApi.ExecuteToolAsync over a JsonValue).
-// - Date.now() is the system clock in whole milliseconds; crypto.getRandomValues is RandomNumberGenerator.
-// - Pi v1.5.0 sync (area sleep): the call's clock is the Harness clock (api.now(), IToolExecutionApi.Now; f75b3240a), and a result that
-//   arrives after the outcome is decided is dropped instead of reading the ended call's clock (ec1be23eb). The citation stays on v1.2.0
-//   until the file's other areas land.
+// - api.now(), the Harness clock (HarnessOptions.Now), is IToolExecutionApi.Now: the script's start, its deadline, its results' times and
+//   its wall time read it (Pi v1.5.0, f75b3240a), and a result that arrives after the outcome is decided is dropped instead of reading the
+//   ended call's clock (ec1be23eb). crypto.getRandomValues is RandomNumberGenerator.
+// - toCodemodeIdentifier, which upstream imports from pi-codemode/declarations so that loading the extension leaves the WASM QuickJS runtime
+//   unloaded (bb65e3e49), is PiSharp.Codemode's CodemodeIdentifier.ToIdentifier, which starts no engine. cut()'s ownedSlice is JsString.Cut's
+//   substring, which .NET always copies.
 using System.Collections.Immutable;
 using System.Runtime.ExceptionServices;
 using System.Security.Cryptography;
