@@ -344,14 +344,14 @@ internal static partial class Program
         /// <summary>Commits the backend completed.</summary>
         public int Commits => Volatile.Read(ref commits);
 
-        public Task<Seq> CommitAsync(IReadOnlyList<StorageWrite> writes, DurableContext context) =>
-            fail ? Task.FromException<Seq>(new IOException("disk is full")) : CountedAsync(inner.CommitAsync(writes, context));
+        public Task<CommitResult> CommitAsync(IReadOnlyList<IReadOnlyList<StorageWrite>> batches, Action<int, Seq> receive, DurableContext context) =>
+            fail ? Task.FromException<CommitResult>(new IOException("disk is full")) : CountedAsync(inner.CommitAsync(batches, receive, context));
 
-        private async Task<Seq> CountedAsync(Task<Seq> commit)
+        private async Task<CommitResult> CountedAsync(Task<CommitResult> commit)
         {
-            var seq = await commit;
-            Interlocked.Increment(ref commits);
-            return seq;
+            var result = await commit;
+            Interlocked.Add(ref commits, result.Stored);
+            return result;
         }
         public Task<TId> MintIdAsync<TId>() where TId : struct, IDurableId<TId> => inner.MintIdAsync<TId>();
         public Task<ConversationRecord?> GetConversationAsync(ConversationId id, DurableContext context) => inner.GetConversationAsync(id, context);

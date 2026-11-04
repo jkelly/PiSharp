@@ -126,7 +126,8 @@ internal static partial class HarnessConversationTests
             return MapScan is { } map ? map(page) : page;
         }
 
-        public Task<Seq> CommitAsync(IReadOnlyList<StorageWrite> writes, DurableContext context) => inner.CommitAsync(writes, context);
+        public Task<CommitResult> CommitAsync(IReadOnlyList<IReadOnlyList<StorageWrite>> batches, Action<int, Seq> receive, DurableContext context) =>
+            inner.CommitAsync(batches, receive, context);
         public Task<TId> MintIdAsync<TId>() where TId : struct, IDurableId<TId> => inner.MintIdAsync<TId>();
         public Task<StoredDocument?> GetDocumentAsync(DocumentId id, DocumentPoint at, DurableContext context) => inner.GetDocumentAsync(id, at, context);
         public Task<DocumentRecord?> FindDocumentAsync(DocumentAddress address, DocumentPoint at, DurableContext context) =>

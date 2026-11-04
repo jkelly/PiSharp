@@ -171,12 +171,13 @@ public sealed class ExampleClock(DateTimeOffset start) : TimeProvider
 
     private sealed class ObservedStorage(IStorage inner, ExampleClock clock) : IStorage
     {
-        public async Task<Seq> CommitAsync(IReadOnlyList<StorageWrite> writes, DurableContext context)
+        public async Task<CommitResult> CommitAsync(IReadOnlyList<IReadOnlyList<StorageWrite>> batches, Action<int, Seq> receive, DurableContext context)
         {
             Interlocked.Increment(ref clock.commitsInFlight);
-            try { return await inner.CommitAsync(writes, context).ConfigureAwait(false); }
+            try { return await inner.CommitAsync(batches, receive, context).ConfigureAwait(false); }
             finally { Interlocked.Decrement(ref clock.commitsInFlight); }
         }
+        public void Publishing(Action publish, DurableContext context) => inner.Publishing(publish, context);
         public Task<TId> MintIdAsync<TId>() where TId : struct, IDurableId<TId> => inner.MintIdAsync<TId>();
         public Task<ConversationRecord?> GetConversationAsync(ConversationId id, DurableContext context) => inner.GetConversationAsync(id, context);
         public Task<Page<ConversationRecord>> ScanConversationsAsync(ConversationQuery query, int limit, JsonObjectValue? cursor, DurableContext context) =>

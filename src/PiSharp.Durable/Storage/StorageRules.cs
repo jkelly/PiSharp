@@ -27,6 +27,28 @@ internal readonly record struct DocumentCheckState(DocumentRecord Record, int? L
 
 internal static class StorageRules
 {
+    /// <summary>Rejects null batches, writes or receipt callback before a backend commits anything: an argument error, not a refusal.</summary>
+    public static void CheckCommitArguments(IReadOnlyList<IReadOnlyList<StorageWrite>> batches, Action<int, Seq> receive)
+    {
+        ArgumentNullException.ThrowIfNull(batches);
+        ArgumentNullException.ThrowIfNull(receive);
+        foreach (var writes in batches)
+        {
+            ArgumentNullException.ThrowIfNull(writes, nameof(batches));
+            foreach (var write in writes) ArgumentNullException.ThrowIfNull(write, nameof(batches));
+        }
+    }
+
+    /// <summary>The next ID after <paramref name="candidate"/> and every ID <paramref name="writes"/> claims (upstream <c>candidateNextId</c>).</summary>
+    public static long CandidateNextId(long candidate, IReadOnlyList<StorageWrite> writes)
+    {
+        foreach (var write in writes)
+        {
+            if (Claim(write) is { } claim) candidate = Math.Max(candidate, claim.Id + 1);
+        }
+        return candidate;
+    }
+
     /// <summary>The table and ID a write claims; document changes and retirements claim none.</summary>
     public static (StorageTable Table, long Id)? Claim(StorageWrite write) => write switch
     {

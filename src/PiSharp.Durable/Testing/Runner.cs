@@ -1,5 +1,5 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/src/testing/runner.ts, and testing/index.ts, which only re-exports
-// the kits (the PiSharp.Durable.Testing namespace is that subpath here). Upstream registers the cases with a Vitest/Jest-compatible runner's
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/src/testing/runner.ts, and testing/index.ts, which only re-exports
+// the kits and commitWrites (the PiSharp.Durable.Testing namespace is that subpath here; commitWrites is CommitWrites.CommitWritesAsync). Upstream registers the cases with a Vitest/Jest-compatible runner's
 // describe/it/expect; a .NET runner implements IConformanceTestRunner.
 namespace PiSharp.Durable.Testing;
 

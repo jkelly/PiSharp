@@ -143,10 +143,11 @@ internal sealed class HookedStorage(IStorage inner) : DelegatingStorage(inner)
     public Action<TaskId>? OnTask { get; set; }
     public Action<SubmissionQuery>? OnScanSubmissions { get; set; }
 
-    public override async Task<Seq> CommitAsync(IReadOnlyList<StorageWrite> writes, DurableContext context)
+    public override async Task<CommitResult> CommitAsync(IReadOnlyList<IReadOnlyList<StorageWrite>> batches, Action<int, Seq> receive, DurableContext context)
     {
-        if (OnCommit is { } hook) await hook(writes);
-        return await base.CommitAsync(writes, context);
+        if (OnCommit is { } hook)
+            foreach (var writes in batches) await hook(writes);
+        return await base.CommitAsync(batches, receive, context);
     }
 
     public override async Task<ConversationRecord?> GetConversationAsync(ConversationId id, DurableContext context)

@@ -24,6 +24,7 @@ using static ChatTests;
 using static HarnessTests;
 using static Program;
 using static SessionTests;
+using PiSharp.Durable.Testing;
 
 internal static partial class Program
 {
@@ -119,7 +120,7 @@ internal static class LifecycleTests
             AbortRequested = false,
             State = NextTaskState.Running(O("""{"phase":"run"}""")),
         };
-        await storage.CommitAsync([new ConversationWrite(new ConversationRecord(conversationId)), new TaskWrite(task)], Context);
+        await storage.CommitWritesAsync([new ConversationWrite(new ConversationRecord(conversationId)), new TaskWrite(task)], Context);
     }
 
     /// <summary>How many commit listeners the Harness's Session holds.</summary>
@@ -677,7 +678,8 @@ internal sealed class FailingCloseStorage(ControlledStorage inner) : IStorage
         throw new InvalidOperationException("close failed");
     }
 
-    public Task<Seq> CommitAsync(IReadOnlyList<StorageWrite> writes, DurableContext context) => inner.CommitAsync(writes, context);
+    public Task<CommitResult> CommitAsync(IReadOnlyList<IReadOnlyList<StorageWrite>> batches, Action<int, Seq> receive, DurableContext context) =>
+        inner.CommitAsync(batches, receive, context);
     public Task<TId> MintIdAsync<TId>() where TId : struct, IDurableId<TId> => inner.MintIdAsync<TId>();
     public Task<StoredDocument?> GetDocumentAsync(DocumentId id, DocumentPoint at, DurableContext context) => inner.GetDocumentAsync(id, at, context);
     public Task<DocumentRecord?> FindDocumentAsync(DocumentAddress address, DocumentPoint at, DurableContext context) =>

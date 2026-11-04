@@ -1,7 +1,10 @@
 // Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/src/session/session.ts (createSession, setDefaultDocumentRetention,
 // documentRetention, SessionImpl, contained, GuardedStorage, observedOperations, cancellationError). Pi v1.5.0 sync (area
 // harness-options): a read-only Session refuses commits with writes (upstream be14d9732); the citation stays on v1.2.0 until the file's
-// other areas land.
+// other areas land. Pi v1.5.0 sync (area storage-batches): a commit sends its writes as one batch of the batched Storage.commit and judges
+// the result, as session/writer.ts does for a call of one part: a refusal fails the Session and is the commit's error, as a rejection is.
+// Group commit (several parts per call) and the publication scope (Storage.publishing) follow with their own areas; GuardedStorage
+// already forwards both.
 //
 // Concurrency model. Upstream relies on one JavaScript thread: `#enqueue` chains every mutation and cold load onto one promise, and
 // listeners run in later microtasks. Here .NET callers may be on any thread, so:
@@ -33,6 +36,7 @@
 //   failure starts them on the thread pool after its report, never inside the call that failed.
 using System.Collections.Immutable;
 using System.Runtime.CompilerServices;
+using System.Runtime.ExceptionServices;
 using PiSharp.Durable.Chord;
 using PiSharp.Durable.Chord.Delta;
 
@@ -840,17 +844,28 @@ public class Session : ISession
             SweepDocuments();
             throw new ReadOnlySessionException("a commit with writes");
         }
-        Seq seq;
+        Seq? received = null;
+        CommitResult committed;
         try
         {
             // Once admitted, caller cancellation does not interrupt Storage settlement.
-            seq = await storage.CommitAsync(writes, context.WithoutCancellation()).ConfigureAwait(false);
+            committed = await storage.CommitAsync([writes], (_, stored) => received = stored, context.WithoutCancellation()).ConfigureAwait(false);
         }
         catch
         {
             // The guard has failed the Session.
             tx.Discard();
             throw;
+        }
+        if (received is not { } seq)
+        {
+            // Refused by Storage's own checks: nothing is stored. Like a rejection, it fails the Session first, and it is the commit's
+            // error (upstream writer.ts: a part the call did not receive has the refusal as its outcome, and stops the Session).
+            var refusal = committed.Refused ?? new InvalidOperationException("Storage committed without adopting the batch");
+            Fail(refusal);
+            tx.Discard();
+            ExceptionDispatchInfo.Throw(refusal);
+            throw refusal;
         }
         List<ICommitChange> documentChanges;
         try
@@ -1547,9 +1562,13 @@ internal sealed class GuardedStorage(StorageGuard guard, StorageLease? lease) : 
 {
     private IStorage Inner => guard.Storage;
 
-    /// <summary>Never exempt, whatever it throws: once admitted, whether a failed batch committed is unknown.</summary>
-    public Task<Seq> CommitAsync(IReadOnlyList<StorageWrite> writes, DurableContext context) =>
-        guard.CallAsync(null, lease, () => Inner.CommitAsync(writes, context));
+    /// <summary>Never exempt, whatever it throws: once admitted, whether a failed batch committed is unknown. A refusal is part of the
+    /// result, not a throw: the Session judges it (<see cref="CommitResult.Refused"/>).</summary>
+    public Task<CommitResult> CommitAsync(IReadOnlyList<IReadOnlyList<StorageWrite>> batches, Action<int, Seq> receive, DurableContext context) =>
+        guard.CallAsync(null, lease, () => Inner.CommitAsync(batches, receive, context));
+
+    /// <summary>The backend's own publication scope (upstream <c>scopeOf</c>); not a call to guard.</summary>
+    public void Publishing(Action publish, DurableContext context) => Inner.Publishing(publish, context);
 
     public Task<TId> MintIdAsync<TId>() where TId : struct, IDurableId<TId> => guard.CallAsync(null, lease, Inner.MintIdAsync<TId>);
 

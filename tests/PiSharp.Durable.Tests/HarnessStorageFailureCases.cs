@@ -741,7 +741,9 @@ internal class DelegatingStorage(IStorage inner) : IStorage
 {
     public IStorage Inner { get; } = inner;
 
-    public virtual Task<Seq> CommitAsync(IReadOnlyList<StorageWrite> writes, DurableContext context) => Inner.CommitAsync(writes, context);
+    public virtual Task<CommitResult> CommitAsync(IReadOnlyList<IReadOnlyList<StorageWrite>> batches, Action<int, Seq> receive, DurableContext context) =>
+        Inner.CommitAsync(batches, receive, context);
+    public virtual void Publishing(Action publish, DurableContext context) => Inner.Publishing(publish, context);
     public virtual Task<TId> MintIdAsync<TId>() where TId : struct, IDurableId<TId> => Inner.MintIdAsync<TId>();
     public virtual Task<ConversationRecord?> GetConversationAsync(ConversationId id, DurableContext context) => Inner.GetConversationAsync(id, context);
     public virtual Task<Page<ConversationRecord>> ScanConversationsAsync(ConversationQuery query, int limit, JsonObjectValue? cursor, DurableContext context) =>

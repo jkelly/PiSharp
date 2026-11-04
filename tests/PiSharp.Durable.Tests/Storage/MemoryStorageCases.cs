@@ -3,9 +3,11 @@ using PiSharp.Durable.Chord;
 using PiSharp.Durable.Storage;
 using PiSharp.Durable.Testing;
 
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/test/memory-storage.test.ts. The storage conformance kit runs
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/test/memory-storage.test.ts. The storage conformance kit runs
 // against MemoryStorage as storage.memory.conformance.<case>; the prepared-commit case follows upstream's, with immutability standing in
-// for upstream's frozen writes. The storage.memory.prepare-* cases are authored for the prepare/apply split JSONL builds on (P4).
+// for upstream's frozen writes. The storage.memory.prepare-* cases are authored for the prepare/apply split JSONL builds on (P4); the
+// recorded-sequence case commits a conversation where it committed no writes, as upstream's JSONL reopen case does since a batch always
+// has one. Upstream's subclass whose prepared apply throws is MemoryStorage.BeforeApply here, a test seam that throws before the apply.
 internal static partial class Program
 {
     private static IEnumerable<(string, Func<Task>)> StorageMemoryCases()
@@ -16,7 +18,7 @@ internal static partial class Program
         yield return Case("storage.memory.does-not-expose-retained-state-through-a-prepared-commit", async () =>
         {
             var storage = new MemoryStorage();
-            await storage.CommitAsync([new ConversationWrite(new(ConversationId.Root))], DurableContext.Background);
+            await storage.CommitWritesAsync([new ConversationWrite(new(ConversationId.Root))], DurableContext.Background);
             var entryId = Ids.FromNumber<EntryId>(2);
             var prepared = storage.PrepareCommit([new EntryWrite(new()
             {
@@ -36,7 +38,7 @@ internal static partial class Program
         yield return Case("storage.memory.prepare-validates-without-changing-state", async () =>
         {
             var storage = new MemoryStorage();
-            await storage.CommitAsync([new ConversationWrite(new(ConversationId.Root))], DurableContext.Background);
+            await storage.CommitWritesAsync([new ConversationWrite(new(ConversationId.Root))], DurableContext.Background);
             var entry = new EntryRecord { Id = new EntryId(5), ConversationId = ConversationId.Root, Kind = "note" };
             var prepared = storage.PrepareCommit([new EntryWrite(entry)]);
             Equal(Ids.SeqFromNumber(2), prepared.Seq, "prepared sequence");
@@ -57,26 +59,54 @@ internal static partial class Program
             Equal(Ids.SeqFromNumber(7), storage.PrepareCommit([new ConversationWrite(new(ConversationId.Root))], Ids.SeqFromNumber(7)).Apply(), "replayed sequence");
             Equal("Commit sequence 7 does not strictly increase",
                 Throws<InvalidOperationException>(() => storage.PrepareCommit([], Ids.SeqFromNumber(7)), "repeated sequence").Message, "message");
-            Equal(Ids.SeqFromNumber(8), await storage.CommitAsync([], DurableContext.Background), "the next commit follows the replayed one");
+            Equal(Ids.SeqFromNumber(8), await storage.CommitWritesAsync([new ConversationWrite(new(new ConversationId(2)))], DurableContext.Background),
+                "the next commit follows the replayed one");
         });
 
         yield return Case("storage.memory.prepared-copies-resolve-to-creates-of-the-stored-base", async () =>
         {
             var storage = new MemoryStorage();
             var context = DurableContext.Background;
-            await storage.CommitAsync([new ConversationWrite(new(ConversationId.Root)), new ConversationWrite(new(new ConversationId(2)))], context);
+            await storage.CommitWritesAsync([new ConversationWrite(new(ConversationId.Root)), new ConversationWrite(new(new ConversationId(2)))], context);
             var source = new DocumentCreate
             {
                 Id = new DocumentId(3), Kind = "notes", Scope = DocumentScope.Conversation(ConversationId.Root),
                 History = DocumentHistory.Rewindable, Fork = DocumentFork.AsOf,
             };
-            await storage.CommitAsync([new DocumentCreateWrite(source, DocumentContent.Base(2, (JsonObjectValue)J("{\"n\":1}")))], context);
-            await storage.CommitAsync([new DocumentChangeWrite(source.Id, DocumentContent.Delta(2, Ops("[[\"s\",[\"n\"],2]]")))], context);
+            await storage.CommitWritesAsync([new DocumentCreateWrite(source, DocumentContent.Base(2, (JsonObjectValue)J("{\"n\":1}")))], context);
+            await storage.CommitWritesAsync([new DocumentChangeWrite(source.Id, DocumentContent.Delta(2, Ops("[[\"s\",[\"n\"],2]]")))], context);
             var copy = source with { Id = new DocumentId(4), Scope = DocumentScope.Conversation(new ConversationId(2)) };
             var prepared = storage.PrepareCommit([new DocumentCopyWrite(copy, new(source.Id, DocumentPoint.Current))]);
             var create = prepared.Writes[0] as DocumentCreateWrite ?? throw new InvalidOperationException("Expected a resolved create");
             Equal(copy, create.Record, "copied record");
             Equal("{\"version\":2,\"kind\":\"base\",\"value\":{\"n\":2}}", create.Content.ToJson().ToJson(), "copied base");
+        });
+
+        yield return Case("storage.memory.delivers-the-receipts-of-the-batches-applied-before-one-whose-apply-throws-then-rejects", async () =>
+        {
+            var failure = new InvalidOperationException("apply failed");
+            Seq? failAt = null;
+            var storage = new MemoryStorage
+            {
+                BeforeApply = prepared =>
+                {
+                    if (prepared.Seq == failAt) throw failure;
+                },
+            };
+            var root = await storage.CommitWritesAsync([new ConversationWrite(new(ConversationId.Root))], DurableContext.Background);
+            var first = await storage.MintIdAsync<EntryId>();
+            var second = await storage.MintIdAsync<EntryId>();
+            failAt = Ids.SeqFromNumber(root.Value + 2);
+            var receipts = new List<(int Index, Seq Seq)>();
+            var rejected = await ThrowsAsync<Exception>(() => storage.CommitAsync(
+                [.. new[] { first, second }.Select(IReadOnlyList<StorageWrite> (id) =>
+                    [new EntryWrite(new() { Id = id, ConversationId = ConversationId.Root, Kind = "m" })])],
+                (index, seq) => receipts.Add((index, seq)), DurableContext.Background), "a commit whose second apply throws");
+            Check(ReferenceEquals(failure, rejected), "rejects with the apply's own error");
+            Equal(1, receipts.Count, "receipts");
+            Equal((0, Ids.SeqFromNumber(root.Value + 1)), receipts[0], "receipt of the applied batch");
+            Equal<Seq?>(Ids.SeqFromNumber(root.Value + 1), (await storage.GetEntryAsync(first, DurableContext.Background))?.CommitSeq, "first entry's seq");
+            Equal<CommittedEntry?>(null, await storage.GetEntryAsync(second, DurableContext.Background), "second entry");
         });
     }
 }

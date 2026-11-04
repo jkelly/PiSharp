@@ -14,6 +14,7 @@ using static Program;
 using static SchedulerTests;
 using static SessionTests;
 using Deferred = HarnessTests.Deferred;
+using PiSharp.Durable.Testing;
 
 internal static partial class Program
 {
@@ -107,7 +108,7 @@ internal static partial class SchedulerTests
             var owner = (await storage.GetTaskAsync(parent, Context))!;
             var failedRecord = (await storage.GetTaskAsync(failed, Context))!;
             var waiting = NextTaskState.Waiting(O("""{"phase":"work"}"""), [failed, child], JoinPolicy.FailFast);
-            await storage.CommitAsync(
+            await storage.CommitWritesAsync(
             [
                 new TaskWrite(owner with { AbortRequested = true, AbortReason = TaskAbortReason.Restart, State = waiting }),
                 new TaskWrite(failedRecord with { State = NextTaskState.Failed("failed") }),
@@ -170,7 +171,7 @@ internal static partial class SchedulerTests
                 tx.CreateTaskAsync(dormant, JsonValue.Null, OwnConversation(conversation.Id, abandonOnRestart: true)), Context);
             var child = await session.CommitAsync(tx => tx.CreateTaskAsync(dormant, JsonValue.Null, OwnedBy(holder)), Context);
             var record = (await storage.GetTaskAsync(holder, Context))!;
-            await storage.CommitAsync([new TaskWrite(record with { State = new CompletingTaskState(new CompletedTaskOutcome(JsonValue.Null)) })], Context);
+            await storage.CommitWritesAsync([new TaskWrite(record with { State = new CompletingTaskState(new CompletedTaskOutcome(JsonValue.Null)) })], Context);
             var (harness, _, _) = await OpenTasks(storage, [dormant]);
             try
             {

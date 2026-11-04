@@ -201,8 +201,9 @@ internal static partial class DurableRuntime
 /// does. It covers the commits the Harness makes while it opens, before the loss can fail its Session directly.</summary>
 internal sealed class LockGuardedStorage(IStorage inner, DurableSessionLocation location) : IStorage
 {
-    public Task<Seq> CommitAsync(IReadOnlyList<StorageWrite> writes, DurableContext context) =>
-        location.LockLost is { } lost ? Task.FromException<Seq>(lost) : inner.CommitAsync(writes, context);
+    public Task<CommitResult> CommitAsync(IReadOnlyList<IReadOnlyList<StorageWrite>> batches, Action<int, Seq> receive, DurableContext context) =>
+        location.LockLost is { } lost ? Task.FromException<CommitResult>(lost) : inner.CommitAsync(batches, receive, context);
+    public void Publishing(Action publish, DurableContext context) => inner.Publishing(publish, context);
     public Task<TId> MintIdAsync<TId>() where TId : struct, IDurableId<TId> => inner.MintIdAsync<TId>();
     public Task<ConversationRecord?> GetConversationAsync(ConversationId id, DurableContext context) => inner.GetConversationAsync(id, context);
     public Task<Page<ConversationRecord>> ScanConversationsAsync(ConversationQuery query, int limit, JsonObjectValue? cursor, DurableContext context) =>

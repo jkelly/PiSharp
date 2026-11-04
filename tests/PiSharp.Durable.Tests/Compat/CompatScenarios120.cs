@@ -168,10 +168,10 @@ internal static class CompatScenarios120
             set => Volatile.Write(ref failNext, value);
         }
 
-        public override Task<Seq> CommitAsync(IReadOnlyList<StorageWrite> writes, DurableContext context)
+        public override Task<CommitResult> CommitAsync(IReadOnlyList<IReadOnlyList<StorageWrite>> batches, Action<int, Seq> receive, DurableContext context)
         {
             var error = Interlocked.Exchange(ref failNext, null);
-            return error is not null ? Task.FromException<Seq>(error) : base.CommitAsync(writes, context);
+            return error is not null ? Task.FromException<CommitResult>(error) : base.CommitAsync(batches, receive, context);
         }
     }
 

@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/src/testing/storage-benchmark.ts
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/src/testing/storage-benchmark.ts
 // The deterministic storage benchmark workloads: a seeded dataset written only through the public IStorage contract, the read scenarios
 // timed against it, and the write scenarios timed against a small baseline. The scenarios return a number the caller checks against
 // Expected before timing, so a backend that answers wrongly cannot report a fast time. benchmarks/PiSharp.Durable.Benchmarks times them
@@ -104,7 +104,7 @@ public static class StorageBenchmark
     {
         ArgumentNullException.ThrowIfNull(storage);
         scale ??= TimingScale;
-        await storage.CommitAsync([new ConversationWrite(new(ConversationId.Root))], Context);
+        await storage.CommitWritesAsync([new ConversationWrite(new(ConversationId.Root))], Context);
 
         EntryId? firstEntryId = null;
         for (var start = 0; start < scale.EntryCount; start += BatchSize)
@@ -120,7 +120,7 @@ public static class StorageBenchmark
                     Data = Obj(("index", index), ("text", $"entry-{index}-{new string('x', 96)}")),
                 }));
             }
-            await storage.CommitAsync(writes, Context);
+            await storage.CommitWritesAsync(writes, Context);
         }
 
         for (var start = 0; start < scale.TaskCount; start += BatchSize)
@@ -128,7 +128,7 @@ public static class StorageBenchmark
             var writes = new List<StorageWrite>();
             for (var index = start; index < Math.Min(start + BatchSize, scale.TaskCount); index++)
                 writes.Add(new TaskWrite(Task(await storage.MintIdAsync<TaskId>(), index)));
-            await storage.CommitAsync(writes, Context);
+            await storage.CommitWritesAsync(writes, Context);
         }
 
         DocumentId? exactDocumentId = null;
@@ -143,12 +143,12 @@ public static class StorageBenchmark
                     new DocumentCreate { Id = id, Kind = "benchmark.family", Key = $"key-{index}", Scope = DocumentScope.Session },
                     DocumentContent.Base(1, Obj(("index", index), ("text", new string('x', 128))))));
             }
-            await storage.CommitAsync(writes, Context);
+            await storage.CommitWritesAsync(writes, Context);
         }
 
         var replayEntries = new List<(int Tail, DocumentId Id)>();
         foreach (var tail in ReplayTails) replayEntries.Add((tail, await storage.MintIdAsync<DocumentId>()));
-        await storage.CommitAsync([.. replayEntries.Select(StorageWrite (replay) => new DocumentCreateWrite(
+        await storage.CommitWritesAsync([.. replayEntries.Select(StorageWrite (replay) => new DocumentCreateWrite(
             new DocumentCreate
             {
                 Id = replay.Id, Kind = "benchmark.replay", Key = replay.Tail.ToString(System.Globalization.CultureInfo.InvariantCulture),
@@ -156,7 +156,7 @@ public static class StorageBenchmark
             },
             DocumentContent.Base(1, Obj(("count", 0), ("text", new string('x', 64))))))], Context);
         for (var count = 1; count <= ReplayTails[^1]; count++)
-            await storage.CommitAsync([.. replayEntries.Where(replay => count <= replay.Tail)
+            await storage.CommitWritesAsync([.. replayEntries.Where(replay => count <= replay.Tail)
                 .Select(StorageWrite (replay) => new DocumentChangeWrite(replay.Id, SetCount(count)))], Context);
 
         var historicalDocumentId = await storage.MintIdAsync<DocumentId>();
@@ -165,15 +165,15 @@ public static class StorageBenchmark
             Id = historicalDocumentId, Kind = "benchmark.history", Scope = DocumentScope.Conversation(ConversationId.Root),
             History = DocumentHistory.Rewindable, Fork = DocumentFork.AsOf,
         };
-        await storage.CommitAsync([new DocumentCreateWrite(historicalRecord, DocumentContent.Base(1, Obj(("count", 0))))], Context);
+        await storage.CommitWritesAsync([new DocumentCreateWrite(historicalRecord, DocumentContent.Base(1, Obj(("count", 0))))], Context);
         Seq? ancientAt = null;
         for (var count = 1; count <= HistorySegmentLength; count++)
-            ancientAt = await storage.CommitAsync([new DocumentChangeWrite(historicalDocumentId, SetCount(count))], Context);
-        await storage.CommitAsync([new DocumentChangeWrite(historicalDocumentId, DocumentContent.Base(1, Obj(("count", HistorySegmentLength))))], Context);
+            ancientAt = await storage.CommitWritesAsync([new DocumentChangeWrite(historicalDocumentId, SetCount(count))], Context);
+        await storage.CommitWritesAsync([new DocumentChangeWrite(historicalDocumentId, DocumentContent.Base(1, Obj(("count", HistorySegmentLength))))], Context);
         if (ancientAt is not { } ancient) throw new InvalidOperationException("Benchmark history seed produced no commits");
         var recentAt = ancient;
         for (var count = HistorySegmentLength + 1; count <= HistorySegmentLength * 2; count++)
-            recentAt = await storage.CommitAsync([new DocumentChangeWrite(historicalDocumentId, SetCount(count))], Context);
+            recentAt = await storage.CommitWritesAsync([new DocumentChangeWrite(historicalDocumentId, SetCount(count))], Context);
 
         if (firstEntryId is not { } first) throw new InvalidOperationException("Benchmark scale must create entries");
         var parentConversationId = ConversationId.Root;
@@ -182,10 +182,10 @@ public static class StorageBenchmark
         for (var depth = 0; depth < ForkDepth; depth++)
         {
             var conversationId = await storage.MintIdAsync<ConversationId>();
-            await storage.CommitAsync([new ConversationWrite(new(conversationId, new ConversationParent(parentConversationId, parentAt)))], Context);
+            await storage.CommitWritesAsync([new ConversationWrite(new(conversationId, new ConversationParent(parentConversationId, parentAt)))], Context);
             var ids = new EntryId[EntriesPerFork];
             for (var index = 0; index < ids.Length; index++) ids[index] = await storage.MintIdAsync<EntryId>();
-            await storage.CommitAsync([.. ids.Select(StorageWrite (id, index) => new EntryWrite(new()
+            await storage.CommitWritesAsync([.. ids.Select(StorageWrite (id, index) => new EntryWrite(new()
             {
                 Id = id, ConversationId = conversationId, Kind = "benchmark.fork", Data = Obj(("depth", depth), ("index", index)),
             }))], Context);
@@ -248,14 +248,14 @@ public static class StorageBenchmark
     public static async Task SeedWriteAsync(IStorage storage)
     {
         ArgumentNullException.ThrowIfNull(storage);
-        await storage.CommitAsync([new ConversationWrite(new(ConversationId.Root))], Context);
+        await storage.CommitWritesAsync([new ConversationWrite(new(ConversationId.Root))], Context);
         var writes = new List<StorageWrite>();
         for (var index = 0; index < 100; index++)
             writes.Add(new EntryWrite(new()
             {
                 Id = await storage.MintIdAsync<EntryId>(), ConversationId = ConversationId.Root, Kind = "benchmark.baseline", Data = Obj(("index", index)),
             }));
-        await storage.CommitAsync(writes, Context);
+        await storage.CommitWritesAsync(writes, Context);
     }
 
     /// <summary>The timed write scenarios (upstream <c>STORAGE_WRITE_BENCHMARKS</c>).</summary>
@@ -264,7 +264,7 @@ public static class StorageBenchmark
         new("commit one entry", 1, async storage =>
         {
             var id = await storage.MintIdAsync<EntryId>();
-            await storage.CommitAsync([new EntryWrite(new()
+            await storage.CommitWritesAsync([new EntryWrite(new()
             {
                 Id = id, ConversationId = ConversationId.Root, Kind = "benchmark.write", Data = Obj(("text", new string('x', 128))),
             })], Context);
@@ -279,7 +279,7 @@ public static class StorageBenchmark
                     Id = await storage.MintIdAsync<EntryId>(), ConversationId = ConversationId.Root, Kind = "benchmark.write",
                     Data = Obj(("index", index), ("text", new string('x', 128))),
                 }));
-            await storage.CommitAsync(writes, Context);
+            await storage.CommitWritesAsync(writes, Context);
             return writes.Count;
         }),
         new("commit mixed entry/task/submission/document", 4, async storage =>
@@ -305,7 +305,7 @@ public static class StorageBenchmark
                     },
                     DocumentContent.Base(1, Obj(("entryId", entryId.Value), ("taskId", taskId.Value)))),
             ];
-            await storage.CommitAsync(writes, Context);
+            await storage.CommitWritesAsync(writes, Context);
             return writes.Length;
         }),
     ];

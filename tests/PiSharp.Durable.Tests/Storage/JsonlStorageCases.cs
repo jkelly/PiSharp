@@ -6,8 +6,8 @@ using PiSharp.Durable.Env.Local;
 using PiSharp.Durable.Storage.Jsonl;
 using PiSharp.Durable.Testing;
 
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/test/jsonl-storage.test.ts. Cases keep upstream's names (as
-// storage.jsonl.<slug>), inputs and expected values. The storage conformance kit runs on JsonlStorage directly
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/test/jsonl-storage.test.ts. Cases keep upstream's names (as
+// storage.jsonl.<slug>, and storage.jsonl.batches.<slug> for the "JsonlStorage batches" group), inputs and expected values. The storage conformance kit runs on JsonlStorage directly
 // (storage.jsonl.conformance.*) and through a storage that closes and reopens the directory after every commit
 // (storage.jsonl.reopen.conformance.*). Adapted: "serializes the complete candidate before I/O" injects a preparation failure (a write that
 // reuses the root conversation's ID), because a BigInt that JSON.stringify rejects cannot occur in a JsonValue; upstream's for-loops over
@@ -97,6 +97,29 @@ internal static partial class Program
             var reopened = await fixture.Open(directory);
             Check(await reopened.GetTaskAsync(taskId, JsonlContext) is null, "the unconfirmed task is not recovered");
             Equal(0L, new FileInfo(Path.Combine(directory, $"task-{taskId}.jsonl")).Length, "truncated sidecar size");
+        });
+
+        yield return JsonlFixtureCase("storage.jsonl.poisons-the-storage-when-an-append-fails-after-its-batches-applied-before-a-waiting-read-goes-on-review", async fixture =>
+        {
+            var directory = fixture.NewDirectory();
+            var gate = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var fs = new FailingJoin(directory, gate.Task);
+            var storage = await fixture.Open(directory, fs);
+            fs.Fail = true;
+            var conversationId = new ConversationId(100);
+            var committing = storage.CommitAsync(
+            [
+                [new ConversationWrite(new(conversationId))],
+                [new DocumentCreateWrite(new DocumentCreate { Id = new DocumentId(101), Kind = "state", Scope = DocumentScope.Session }, DocumentContent.Base(1, JO("{}")))],
+            ], (_, _) => { }, JsonlContext);
+            // Started while the batches are in memory and the append waits.
+            var read = storage.GetConversationAsync(conversationId, JsonlContext);
+            gate.SetResult();
+            await RejectsPoisoned(() => committing, "the commit whose append fails");
+            await RejectsPoisoned(() => read, "the read that waited on the append");
+            await storage.CloseAsync(JsonlContext);
+            var reopened = await fixture.Open(directory);
+            Check(await reopened.GetConversationAsync(conversationId, JsonlContext) is null, "the batches of the failed append are not stored");
         });
 
         yield return JsonlCase("serializes-the-complete-candidate-before-io-and-leaves-preparation-failures-usable", async fixture =>
@@ -450,7 +473,8 @@ internal static partial class Program
             var reopened = await fixture.Open(directory);
             Check(!PathExists(sidecarPath), "the unconfirmed sidecar is removed");
             Equal<TaskRecord?>(TerminalTask(taskId), await reopened.GetTaskAsync(taskId, JsonlContext), "terminal task");
-            Equal(Ids.SeqFromNumber(4), await Commit(reopened), "next sequence");
+            var next = await reopened.MintIdAsync<ConversationId>();
+            Equal(Ids.SeqFromNumber(4), await Commit(reopened, new ConversationWrite(new(next))), "next sequence");
         });
 
         yield return JsonlCase("fails-open-when-confirmed-sidecar-data-is-missing", async fixture =>
@@ -569,7 +593,66 @@ internal static partial class Program
         });
     }
 
-    private static (string, Func<Task>) JsonlCase(string slug, Func<JsonlFixture, Task> body) => Case("storage.jsonl." + slug, async () =>
+    private static IEnumerable<(string, Func<Task>)> StorageJsonlBatchesCases()
+    {
+        yield return JsonlFixtureCase("storage.jsonl.batches.appends-a-batch-s-markers-in-one-write-and-recovers-a-shorter-prefix-from-a-torn-one", async fixture =>
+        {
+            var directory = fixture.NewDirectory();
+            var storage = await fixture.Open(directory);
+            await CreateRoot(storage);
+            var documentId = await storage.MintIdAsync<DocumentId>();
+            await Commit(storage, new DocumentCreateWrite(SessionDocument(documentId), DocumentContent.Base(1, JO("{\"n\":0}"))));
+            var mainPath = Path.Combine(directory, "main.jsonl");
+            var before = File.ReadAllText(mainPath).Length;
+            EntryId[] entries = [await storage.MintIdAsync<EntryId>(), await storage.MintIdAsync<EntryId>(), await storage.MintIdAsync<EntryId>()];
+            IReadOnlyList<IReadOnlyList<StorageWrite>> batches = [.. entries.Select(IReadOnlyList<StorageWrite> (id, index) =>
+            [
+                new EntryWrite(new() { Id = id, ConversationId = ConversationId.Root, Kind = "note" }),
+                new DocumentChangeWrite(documentId, DocumentContent.Delta(1, Ops($"[[\"s\",[\"n\"],{index + 1}]]"))),
+            ])];
+            // Reads wait for the append: a read started while it runs sees every batch durable.
+            var result = storage.CommitAsync(batches, (_, _) => { }, JsonlContext);
+            var read = storage.GetEntryAsync(entries[2], JsonlContext);
+            Equal(new CommitResult(3), await result, "result");
+            Check(await read is not null, "the read started during the append sees the last batch");
+            var main = File.ReadAllText(mainPath);
+            var markers = main[before..].Split('\n').Where(line => line.Length > 0).ToArray();
+            Equal(3, markers.Length, "markers appended");
+            await storage.CloseAsync(JsonlContext);
+
+            // Torn inside the last marker: the two complete ones survive, and the third's sidecar record is unconfirmed.
+            var tornAt = main.Length - markers[2].Length / 2;
+            File.WriteAllText(mainPath, main[..tornAt]);
+            var reopened = await fixture.Open(directory);
+            Check(await reopened.GetEntryAsync(entries[0], JsonlContext) is not null, "the first batch's entry");
+            Check(await reopened.GetEntryAsync(entries[1], JsonlContext) is not null, "the second batch's entry");
+            Check(await reopened.GetEntryAsync(entries[2], JsonlContext) is null, "the torn batch's entry");
+            Equal("{\"n\":2}", (await reopened.GetDocumentAsync(documentId, DocumentPoint.Current, JsonlContext))?.Value.ToJson(), "document after the torn batch");
+            var seq = await Commit(reopened, new DocumentChangeWrite(documentId, DocumentContent.Delta(1, Ops("[[\"s\",[\"n\"],9]]"))));
+            Equal(Ids.SeqFromNumber(5), seq, "the torn batch's sequence is reused");
+            var again = await fixture.Open(directory);
+            Equal("{\"n\":9}", (await again.GetDocumentAsync(documentId, DocumentPoint.Current, JsonlContext))?.Value.ToJson(), "document after reopening");
+        });
+    }
+
+    /// <summary>The local file system whose path joins, once <see cref="Fail"/> is set, wait for <paramref name="gate"/> and then fail
+    /// (upstream's <c>FailingJoin</c>, a NodeExecutionEnv subclass).</summary>
+    private sealed class FailingJoin(string directory, Task gate) : LocalFileSystem(directory)
+    {
+        public bool Fail { get; set; }
+
+        public override async Task<Result<string, FileError>> JoinPathAsync(IReadOnlyList<string> parts, DurableContext context)
+        {
+            if (!Fail) return await base.JoinPathAsync(parts, context);
+            await gate;
+            return new FileError(FileErrorCode.Unknown, "injected path resolution failure");
+        }
+    }
+
+    private static (string, Func<Task>) JsonlCase(string slug, Func<JsonlFixture, Task> body) => JsonlFixtureCase("storage.jsonl." + slug, body);
+
+    /// <summary>A case with its whole id, so the id appears in this file as the port's evidence names it.</summary>
+    private static (string, Func<Task>) JsonlFixtureCase(string id, Func<JsonlFixture, Task> body) => Case(id, async () =>
     {
         await using var fixture = new JsonlFixture();
         await body(fixture);
@@ -577,7 +660,7 @@ internal static partial class Program
 
     private static string Mode(Failure failure) => failure.Mode.ToString().ToLowerInvariant();
 
-    private static Task<Seq> Commit(IStorage storage, params StorageWrite[] writes) => storage.CommitAsync(writes, JsonlContext);
+    private static Task<Seq> Commit(IStorage storage, params StorageWrite[] writes) => storage.CommitWritesAsync(writes, JsonlContext);
 
     private static Task CreateRoot(IStorage storage) => Commit(storage, new ConversationWrite(new(ConversationId.Root)));
 
@@ -665,10 +748,10 @@ internal static partial class Program
         private JsonlStorage current = current;
         private bool closed;
 
-        public async Task<Seq> CommitAsync(IReadOnlyList<StorageWrite> writes, DurableContext context)
+        public async Task<CommitResult> CommitAsync(IReadOnlyList<IReadOnlyList<StorageWrite>> batches, Action<int, Seq> receive, DurableContext context)
         {
-            if (closed) return await current.CommitAsync(writes, context);
-            try { return await current.CommitAsync(writes, context); }
+            if (closed) return await current.CommitAsync(batches, receive, context);
+            try { return await current.CommitAsync(batches, receive, context); }
             finally
             {
                 await current.CloseAsync(JsonlContext);
