@@ -113,6 +113,8 @@ internal sealed class Transaction : ITx, ILineHolder
     private Dictionary<TableHandle, TableChanges>? tables;
     // tx reads underway: a callback settling with one is refused (rule 3, as Durable's).
     private int pending;
+    // tx reads started so far: a callback that completed without yielding after starting one awaited none (Documents.TxAsync, rule 3).
+    private int started;
     private TxState state = TxState.Open;
     // Failed by Cut while the commit waits in the store's queue: its caller is told at once (rule 3).
     private TaskCompletionSource? queued;
@@ -416,7 +418,7 @@ internal sealed class Transaction : ITx, ILineHolder
 
     private async Task<JsonObject> ColdDraftAsync(Entry entry, IPersistedSlot persisted, string key)
     {
-        lock (gate) pending++;
+        lock (gate) { pending++; started++; }
         try
         {
             // As in Track: a load that settled already still counts until a later turn.
@@ -617,11 +619,28 @@ internal sealed class Transaction : ITx, ILineHolder
         return changes;
     }
 
+    /// <summary>The tx reads started so far (Documents.TxAsync).</summary>
+    internal int Started
+    {
+        get { lock (gate) return started; }
+    }
+
+    /// <summary>
+    /// Refuses a callback that completed without yielding after it started a tx read (rule 3). Each tracked read yields at least once (Track,
+    /// ColdDraftAsync), so the callback awaited none of them: they are pending as it settles, as a promise's are, however soon the thread pool
+    /// settles them. Without this, a read that settled at once could finish its yield on another thread before Commit counts it.
+    /// </summary>
+    internal void AssertNoReadsStartedSince(int before)
+    {
+        lock (gate)
+            if (started != before) throw new InvalidOperationException($"{documents.Label}: the callback settled before its pending tx operations");
+    }
+
     /// <summary>Counts <paramref name="read"/> as pending until it settles (rule 3); a read that settled already still counts until a later
     /// turn, as awaiting a settled promise takes one.</summary>
     private async Task<T> Track<T>(Task<T> read)
     {
-        lock (gate) pending++;
+        lock (gate) { pending++; started++; }
         try
         {
             if (read.IsCompleted) await Task.Yield();

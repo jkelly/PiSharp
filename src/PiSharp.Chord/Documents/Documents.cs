@@ -258,7 +258,11 @@ internal sealed class Documents
             Hold(tx);
             // A seal on another thread between the check and the hold did not see the holder: seen here.
             AssertAdmitted(token);
-            var result = await fn(tx).ConfigureAwait(false);
+            var started = tx.Started;
+            var call = fn(tx);
+            // A callback that completed without yielding awaited none of the reads it started: pending as it settles (rule 3).
+            if (call.IsCompletedSuccessfully) tx.AssertNoReadsStartedSince(started);
+            var result = await call.ConfigureAwait(false);
             // In-memory-only commits are synchronous (W12): no await unless the store's step is taken.
             var step = tx.Commit();
             if (step is not null) await step.ConfigureAwait(false);
