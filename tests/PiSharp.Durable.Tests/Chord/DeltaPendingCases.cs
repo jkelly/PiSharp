@@ -6,8 +6,7 @@ using PiSharp.Durable.Chord.Delta;
 // Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/chord/test/delta-pending.test.ts. Adaptations:
 // - The fuzz cases keep upstream's seeded generator (the same LCG, so each sequence reproduces from its seed), its edit mix and its run
 //   counts, written with the explicit draft API (decision 0005, as in TrackerCases.cs). JSON sort's localeCompare is an ordinal comparison.
-//   appendText is work list area chord-append-text, which has not landed: DraftObject.AppendString stands in for it (the draft records a
-//   string set, and the tracker emits the append), so the queue still folds appends.
+//   appendText is DraftObject.AppendText.
 // - Object.freeze is unnecessary: Op records and ImmutableArray batches cannot be written to. The check that the received ops are
 //   unchanged stays; "toBe" on a batch is the same underlying array (ImmutableArray's ==).
 // - The cost case counts PendingOps.PathKeys (the queue's path keys) instead of spying on JSON.stringify.
@@ -428,8 +427,8 @@ internal static partial class Program
 
     private static int PendingJsonOrder(JsonValue left, JsonValue right) => string.CompareOrdinal(left.ToJson(), right.ToJson());
 
-    /// <summary>Appends through the draft's append (upstream appendText, area chord-append-text).</summary>
-    private static void PendingAppendToDraft(DraftObject parent, string key, string text) => parent.AppendString(key, text);
+    /// <summary>Appends through <see cref="DraftObject.AppendText"/> (upstream appendText), which a draft records without comparing strings.</summary>
+    private static void PendingAppendToDraft(DraftObject parent, string key, string text) => parent.AppendText(key, text);
 
     private static void PendingAppendToValue(DraftObject parent, string key, string text) =>
         parent.Set(key, ((JsonStringValue)parent.Get(key)!).Value + text);

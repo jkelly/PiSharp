@@ -108,6 +108,9 @@ public sealed class DraftObject : Draft
     internal OrderedDictionary<string, bool>? Deletes { get; private set; }
     /// <summary>Base keys deleted and then written again: replay must delete before setting so the key moves to the end.</summary>
     internal OrderedDictionary<string, bool>? Readded { get; private set; }
+    /// <summary>Keys whose only changes in this change are <see cref="AppendText"/> calls, with the text appended so far: emission records
+    /// each as one append op without comparing the old and new strings.</summary>
+    internal Dictionary<string, string>? Appends { get; private set; }
 
     /// <inheritdoc/>
     public override JsonValueKind Kind => JsonValueKind.Object;
@@ -187,6 +190,7 @@ public sealed class DraftObject : Draft
         Context.AssertWritable();
         var wasDeleted = Deletes?.ContainsKey(key) == true;
         if (!wasDeleted && !JsonIdentity.IsContainer(value) && TryRaw(key, out var existing) && JsonIdentity.Strict(existing, value)) return;
+        Appends?.Remove(key);
         Writes ??= new OrderedDictionary<string, JsonValue>(StringComparer.Ordinal);
         Writes[key] = value;
         if (wasDeleted && baseValue.ContainsKey(key)) (Readded ??= new OrderedDictionary<string, bool>(StringComparer.Ordinal)).TryAdd(key, true);
@@ -201,6 +205,7 @@ public sealed class DraftObject : Draft
         ArgumentNullException.ThrowIfNull(key);
         Context.AssertWritable();
         if (!Has(key)) return false;
+        Appends?.Remove(key);
         Writes?.Remove(key);
         Readded?.Remove(key);
         (Deletes ??= new OrderedDictionary<string, bool>(StringComparer.Ordinal)).TryAdd(key, true);
@@ -209,12 +214,43 @@ public sealed class DraftObject : Draft
         return true;
     }
 
-    /// <summary>Appends to a string property (emitted as <c>["a", path, text]</c>).</summary>
+    /// <summary>
+    /// Appends to a string property as <c>draft[key] += text</c> does: it sets the concatenation, and <see cref="Change.Prepare"/> emits
+    /// <c>["a", path, text]</c> after checking that the new string extends the old one, which reads the whole string on every change.
+    /// A writer that appends across many changes uses <see cref="AppendText"/>.
+    /// </summary>
     public void AppendString(string key, string text)
     {
         ArgumentNullException.ThrowIfNull(text);
         if (Get(key) is not JsonStringValue existing) throw new InvalidOperationException($"Property '{key}' is not a string.");
         Set(key, existing.Value + text);
+    }
+
+    /// <summary>
+    /// Upstream's <c>appendText(draft, key, text)</c>: appends <paramref name="text"/> to the string at <paramref name="key"/> and records
+    /// the change as one append op (several appends to the key in one change join into one op), so <see cref="Change.Prepare"/> does not
+    /// compare the old and new strings. A <see cref="Set"/> or <see cref="Delete"/> of the key in the same change, or an append after a
+    /// <see cref="Set"/>, falls back to that comparison. The new value is still a .NET concatenation, which copies the whole string where
+    /// V8 builds a rope.
+    /// </summary>
+    /// <exception cref="InvalidOperationException">The key holds no string, or the change is settled.</exception>
+    public void AppendText(string key, string text)
+    {
+        ArgumentNullException.ThrowIfNull(key);
+        ArgumentNullException.ThrowIfNull(text);
+        Context.AssertWritable();
+        // Upstream's StringKeys<T> is compile-time only; this is its run-time check. An array draft has no AppendText.
+        if (!Has(key) || Raw(key) is not JsonStringValue current)
+            throw new InvalidOperationException($"AppendText() needs a string at {JsonValue.String(key).ToJson()}");
+        if (text.Length == 0) return;
+        string? appended = null;
+        if (Appends is not null && Appends.TryGetValue(key, out var sofar)) appended = sofar;
+        else if (Writes?.ContainsKey(key) != true) appended = "";
+        // A .NET string is never a view of a larger one, so the op and the new value keep only these characters (upstream's ownedSlice).
+        Writes ??= new OrderedDictionary<string, JsonValue>(StringComparer.Ordinal);
+        Writes[key] = current.Value + text;
+        MarkDirty();
+        if (appended is not null) (Appends ??= new Dictionary<string, string>(StringComparer.Ordinal))[key] = appended + text;
     }
 
     internal bool Has(string key) => Deletes?.ContainsKey(key) != true && (Writes?.ContainsKey(key) == true || baseValue.ContainsKey(key));
@@ -524,7 +560,8 @@ public sealed class DraftArray : Draft
         Reordered();
     }
 
-    /// <summary>Appends to a string element (emitted as <c>["a", path, text]</c>).</summary>
+    /// <summary>Appends to a string element as <c>draft[index] += text</c> does (emitted as <c>["a", path, text]</c> after the prepare-time
+    /// comparison; upstream's <c>appendText</c> takes object keys only).</summary>
     public void AppendString(int index, string text)
     {
         ArgumentNullException.ThrowIfNull(text);
