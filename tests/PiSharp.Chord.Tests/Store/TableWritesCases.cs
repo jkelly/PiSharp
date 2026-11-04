@@ -5,7 +5,7 @@ using static PiSharp.Chord.Contracts.Schemas;
 using static PiSharp.Chord.Store.Expressions;
 
 // Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/chord/test/next/store/table-writes.test.ts. Every case is ported, over
-// TestStore (TableSupport.cs) with its outbox for upstream's memoryStore({ outbox: true }); each case closes its store (upstream's
+// ChordStore and support.ts's memoryStore({ outbox: true }) (ChordSupport.cs); each case closes its store (upstream's
 // afterEach). The outbox's writes are compared as JSON, ignoring key order as toEqual does. Upstream's set callback returns note:
 // undefined to clear the column, which is Operand.Undefined here (StorePatch).
 internal static partial class Program
@@ -24,18 +24,18 @@ internal static partial class Program
     });
 
     /// <summary>A store with an outbox and the edits table.</summary>
-    private static async Task<(TestStore Store, TableHandle Handle)> StoreWritesOpened()
+    private static async Task<(ChordStore Store, TableHandle Handle)> StoreWritesOpened()
     {
         var store = await MemoryStore(outbox: true);
         return (store, await TableIn(store, StoreWritesEdits));
     }
 
     /// <summary>Applies <paramref name="edits"/> to the edits table as the migration to version 3 does, one commit.</summary>
-    private static Task StoreWritesAltered(TestStore store, params TableEdit[] edits) =>
+    private static Task StoreWritesAltered(ChordStore store, params TableEdit[] edits) =>
         store.CommitAsync([.. edits.Select(edit => StoreInternal.StageEdit("app.store:edits", 3, edit))], CommitFence.Open, ChordContext.Background);
 
     /// <summary>The physical columns of the edits table.</summary>
-    private static async Task<List<string>> StoreWritesPhysical(TestStore store)
+    private static async Task<List<string>> StoreWritesPhysical(ChordStore store)
     {
         var rows = await store.ReadAsync(executor => executor.AllAsync("SELECT name FROM pragma_table_info('app.store:edits')"), ChordContext.Background);
         return [.. rows.Select(row => (string)row["name"]!)];
@@ -53,7 +53,7 @@ internal static partial class Program
             {
                 var (store, _) = await StoreWritesOpened();
                 await using var __ = store;
-                var commit = (await store.OutboxAsync(0, 1, context))[0];
+                var commit = (await StoreOutbox(store, 0, 1, context))[0];
                 var expected = new JsonArray(
                     new JsonObject
                     {
@@ -94,7 +94,7 @@ internal static partial class Program
                     changes.Delete(StoreValue("""{"id":"b"}"""));
                     changes.Delete(StoreValue("""{"id":"b"}"""));
                 });
-                var commit = (await store.OutboxAsync(0, 10, context))[1];
+                var commit = (await StoreOutbox(store, 0, 10, context))[1];
                 Json("""
                     [
                         {"kind":"put","table":"app.store:edits","row":{"id":"a","path":"x/1","hits":0,"meta":{}},"version":2,"columns":{"meta":3}},
@@ -130,7 +130,7 @@ internal static partial class Program
                 }, counting);
                 // The two bulk writes, the outbox commit, lastSeq.
                 Equal(4d, counts()["chord.store.statements"], "the step's statements");
-                var commit = (await store.OutboxAsync(0, 10, context))[2];
+                var commit = (await StoreOutbox(store, 0, 10, context))[2];
                 Json("""
                     [
                         {"kind":"updateWhere","table":"app.store:edits","where":{"prefix":["path","a/"]},"set":{"path":{"replacePrefix":[{"col":"path"},"a/","c/"]}},"columns":{},"count":3},
@@ -181,7 +181,7 @@ internal static partial class Program
                 await using var __ = store;
                 var seq = store.LastSeq;
                 await StoreWritesAltered(store, new TableEdit.DropIndex("by_path"), new AlterEdit.Drop("path"));
-                var commit = (await store.OutboxAsync(seq, 1, context))[0];
+                var commit = (await StoreOutbox(store, seq, 1, context))[0];
                 Json("""
                     [
                         {"kind":"dropIndex","table":"app.store:edits","name":"by_path"},

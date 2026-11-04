@@ -6,8 +6,8 @@ using PiSharp.Chord.Store;
 using static PiSharp.Chord.Contracts.Schemas;
 using static PiSharp.Chord.Store.Expressions;
 
-// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/chord/test/next/store/table-migration.test.ts, over TestStore
-// (TableSupport.cs) with its outbox for upstream's memoryStore({ outbox: true }); each case closes its store (upstream's afterEach); the
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/chord/test/next/store/table-migration.test.ts, over ChordStore
+// and support.ts's memoryStore({ outbox: true }) (ChordSupport.cs); each case closes its store (upstream's afterEach); the
 // it.each rows of "refusals" are a case each. Ported: every case but the chunk yield's first, "yields between chunks without Node's
 // setImmediate (Workers, browsers), through a message, not a timer", which deletes globalThis.setImmediate to take the MessageChannel path
 // of upstream's macrotask: .NET has one yield (Task.Yield, TableMigration.cs) and no runtime without it. The chunk yield's second, the
@@ -40,14 +40,14 @@ internal static partial class Program
     private static readonly TableDefinition StoreMigrationEditsV3 = Tables.EvolveTable(StoreMigrationEditsV2, t => t.Drop("dir").Index("by_path", ["path", "at"]));
 
     /// <summary>Prepares <paramref name="definition"/> as the edits table of <paramref name="store"/>; a handle to it.</summary>
-    private static async Task<TableHandle> StoreMigrationPrepared(TestStore store, TableDefinition definition)
+    private static async Task<TableHandle> StoreMigrationPrepared(ChordStore store, TableDefinition definition)
     {
         await StoreInternal.PrepareTablesAsync([new DeclaredTable(definition, StoreMigrationTable)], store, CommitFence.Open, "app.store", ChordContext.Background);
         return new TableHandle(definition, StoreMigrationTable, store, TableOwner());
     }
 
     /// <summary>A store whose edits table is at version 1 with <paramref name="count"/> rows e000.. (file d&lt;i % 3&gt;/f&lt;i&gt;, at i).</summary>
-    private static async Task<TestStore> StoreMigrationFilled(int count)
+    private static async Task<ChordStore> StoreMigrationFilled(int count)
     {
         var store = await MemoryStore(outbox: true);
         var edits = await StoreMigrationPrepared(store, StoreMigrationEditsV1);
@@ -61,9 +61,9 @@ internal static partial class Program
     private static string StoreMigrationId(int i) => "e" + i.ToString("000", CultureInfo.InvariantCulture);
 
     /// <summary>The kinds of the writes of every commit after <paramref name="seq"/>, each kind with its count.</summary>
-    private static async Task<List<string>> StoreMigrationCommitsAfter(TestStore store, long seq)
+    private static async Task<List<string>> StoreMigrationCommitsAfter(ChordStore store, long seq)
     {
-        var commits = await store.OutboxAsync(seq, 100, ChordContext.Background);
+        var commits = await StoreOutbox(store, seq, 100, ChordContext.Background);
         return [.. commits.Select(commit => string.Join(", ", commit["writes"]!.AsArray()
             .GroupBy(write => (string)write!["kind"]!)
             .Select(group => group.Count() == 1 ? group.Key : $"{group.Key} x{group.Count()}")))];
@@ -142,7 +142,7 @@ internal static partial class Program
                 await using var store = await StoreMigrationFilled(1);
                 var seq = store.LastSeq;
                 await StoreMigrationPrepared(store, v2);
-                var writes = (await store.OutboxAsync(seq, 10, context))[1]["writes"]!.AsArray();
+                var writes = (await StoreOutbox(store, seq, 10, context))[1]["writes"]!.AsArray();
                 Equal(2, writes.Count, "two writes");
                 Json("""{"kind":"update","table":"app.store:edits","key":{"id":"e000"},"set":{"dir":"d0"},"columns":{},"count":1,"version":2}""", writes[0], "the patch");
                 Equal("table 2 ready", StoreMigrationWriteHead(writes[1]), "the ready record");
@@ -160,7 +160,7 @@ internal static partial class Program
                 var dropped = Tables.EvolveTable(v1, t => t.Drop("file"));
                 var seq = store.LastSeq;
                 var edits = await StoreMigrationPrepared(store, dropped);
-                var writes = (await store.OutboxAsync(seq, 10, context))[0]["writes"]!.AsArray();
+                var writes = (await StoreOutbox(store, seq, 10, context))[0]["writes"]!.AsArray();
                 Json("""
                     [
                         {"kind":"dropIndex","table":"app.store:edits","name":"by_file"},
@@ -178,7 +178,7 @@ internal static partial class Program
                 var bumped = Tables.EvolveTable(v1, t => t.Update(StoreValue("""{"file":"old"}"""), e => Lt(e["at"], 3)));
                 var seq = store.LastSeq;
                 var edits = await StoreMigrationPrepared(store, bumped);
-                var commits = await store.OutboxAsync(seq, 10, context);
+                var commits = await StoreOutbox(store, seq, 10, context);
                 Sequence(["table", "updateWhere, table"],
                     commits.Select(commit => string.Join(", ", commit["writes"]!.AsArray().Select(write => (string)write!["kind"]!))), "the commits");
                 var update = commits[1]["writes"]![0]!;
@@ -209,7 +209,7 @@ internal static partial class Program
                 await StoreCommitWith(store, first, changes => changes.Put(StoreValue("""{"id":"a","meta":{"a":1}}""")));
                 var seq = store.LastSeq;
                 var second = await StoreMigrationPrepared(store, notes2);
-                var writes = (await store.OutboxAsync(seq, 10, context))[0]["writes"]!.AsArray();
+                var writes = (await StoreOutbox(store, seq, 10, context))[0]["writes"]!.AsArray();
                 Equal(2, writes.Count, "two writes");
                 var alter = writes[0]!;
                 Equal("alter app.store:edits 2", $"{alter["kind"]} {alter["table"]} {alter["version"]}", "the alter write");
