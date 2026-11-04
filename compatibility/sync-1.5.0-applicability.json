@@ -56,11 +56,11 @@
     "changelogBullets": 477,
     "repeatedBullets": 23,
     "byStatus": {
-      "ported": 178,
-      "ported-with-deferral": 17,
+      "ported": 180,
+      "ported-with-deferral": 16,
       "already-ported": 12,
       "no-op": 25,
-      "port": 94
+      "port": 93
     },
     "byArea": {
       "ai": 58,
@@ -7972,7 +7972,7 @@
       "id": "durable.sqlite-chord-drivers",
       "area": "durable",
       "phase": 4,
-      "status": "ported-with-deferral",
+      "status": "ported",
       "changelog": [
         "durable@1.5.0/Breaking Changes#2",
         "durable@1.4.0/Changed#5"
@@ -8003,22 +8003,24 @@
       "notes": "PiSharp's ISqliteExecutor (Database.cs:19) has no RunCounted; Microsoft.Data.Sqlite's ExecuteNonQuery already returns the change count. The driver stays in PiSharp.Durable.Sqlite for phase 4. The Chord-side bullets (chord@1.4.0/Added#3, chord@1.5.0/Breaking Changes#4 and Fixed#2) are group F, phase 6, which decides whether a PiSharp Chord SQLite layer later takes it over; the public C# names stay where they are, as upstream's re-exports do.",
       "evidence": {
         "commits": [
-          "6dd9ef3f"
+          "6dd9ef3f",
+          "da020d5b",
+          "290dec63"
         ],
         "tests": [
-          "tests/PiSharp.Durable.Tests/Storage/SqliteFacadeCases.cs: chord.sqlite.node.reports-the-rows-a-statement-changed-without-index-writes",
+          "tests/PiSharp.Durable.Tests/Storage/SqliteStorageCases.cs: storage.sqlite.batches.rejects-a-batch-call-whose-check-read-fails-in-the-database-with-an-error-rejection-and-refuses-only-for-its-own-checks",
+          "tests/PiSharp.Durable.Tests/Storage/SqliteStorageCases.cs: storage.sqlite.batches.rejects-a-batch-call-whose-check-read-fails-in-the-database-with-a-synchronous-throw-and-refuses-only-for-its-own-checks",
           "tests/PiSharp.Durable.Tests/Storage/SqliteFacadeCases.cs: storage.sqlite.facade.reads-storage-commits-in-call-order",
-          "tests/PiSharp.Durable.Tests/Storage/SqliteMigrationsCases.cs: chord.sqlite.migrations.tracks-independent-histories-and-skips-migrations-already-applied",
+          "tests/PiSharp.Durable.Tests/Storage/SqliteFacadeCases.cs: chord.sqlite.node.reports-the-rows-a-statement-changed-without-index-writes",
           "tests/PiSharp.Durable.Tests/Storage/SqliteMigrationsCases.cs: storage.sqlite.migrations.creates-the-current-schema-and-can-be-applied-repeatedly"
         ]
-      },
-      "deferred": "Durable's storage forwarding runCounted through its watched executor (storage.ts watchCalls, e5c6182ba) and storage's own use of runCounted are in packages/durable/src/storage/sqlite/storage.ts, which area storage-batches ports; the facade and migrations test rows (alsoChangedBy storage-batches) stay needs-sync for the same reason."
+      }
     },
     {
       "id": "durable.storage-commit-batches",
       "area": "durable",
       "phase": 4,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "durable@1.5.0/Breaking Changes#3",
         "durable@1.5.0/Breaking Changes#4"
@@ -8058,7 +8060,24 @@
         "tests/PiSharp.Durable.Tests/Storage/SqlServerStorageCases.cs"
       ],
       "release": "1.5.0",
-      "notes": "PiSharp's IStorage.CommitAsync(writes, context) returns one Seq (TypesStorage.cs:291); upstream's intermediate adopt callback (92ab53602) never reached PiSharp, so go straight to the batch form. Every IStorage implementation changes: the bundled ones, PiSharp-only SqlServerStorage (decision 0007; SqlServerStorage.cs:144, one transaction per call and a refusal per batch), pisharp durable's LockGuardedStorage (DurableRuntime.cs:202), the examples' ObservedStorage (ExampleClock.cs:172) and about ten test decorators (CrashStorage, CountingStorage, FailNextStorage and others). Tests that seed a storage use the new testing helper commitWrites (testing/commit-writes.ts). The mintId narrowing only weakens the contract: every PiSharp storage meets the stronger wording at TypesStorage.cs:293, which follows upstream's. durable.group-commit builds on this row."
+      "notes": "PiSharp's IStorage.CommitAsync(writes, context) returns one Seq (TypesStorage.cs:291); upstream's intermediate adopt callback (92ab53602) never reached PiSharp, so go straight to the batch form. Every IStorage implementation changes: the bundled ones, PiSharp-only SqlServerStorage (decision 0007; SqlServerStorage.cs:144, one transaction per call and a refusal per batch), pisharp durable's LockGuardedStorage (DurableRuntime.cs:202), the examples' ObservedStorage (ExampleClock.cs:172) and about ten test decorators (CrashStorage, CountingStorage, FailNextStorage and others). Tests that seed a storage use the new testing helper commitWrites (testing/commit-writes.ts). The mintId narrowing only weakens the contract: every PiSharp storage meets the stronger wording at TypesStorage.cs:293, which follows upstream's. durable.group-commit builds on this row.",
+      "evidence": {
+        "commits": [
+          "da020d5b",
+          "290dec63"
+        ],
+        "tests": [
+          "tests/PiSharp.Durable.Tests/Storage/MemoryStorageCases.cs: storage.memory.delivers-the-receipts-of-the-batches-applied-before-one-whose-apply-throws-then-rejects",
+          "tests/PiSharp.Durable.Tests/Storage/JsonlStorageCases.cs: storage.jsonl.poisons-the-storage-when-an-append-fails-after-its-batches-applied-before-a-waiting-read-goes-on-review",
+          "tests/PiSharp.Durable.Tests/Storage/JsonlStorageCases.cs: storage.jsonl.batches.appends-a-batch-s-markers-in-one-write-and-recovers-a-shorter-prefix-from-a-torn-one",
+          "tests/PiSharp.Durable.Tests/Storage/SqliteStorageCases.cs: storage.sqlite.batches.rejects-the-whole-call-the-batches-before-it-included-when-a-later-batch-s-check-read-fails-with-a-undefined-rejection",
+          "tests/PiSharp.Durable.Tests/Storage/SqliteStorageCases.cs: storage.sqlite.batches.rejects-the-whole-call-the-batches-before-it-included-when-a-later-batch-s-check-read-fails-with-a-synchronous-throw",
+          "tests/PiSharp.Durable.Tests/Storage/SqliteStorageCases.cs: storage.sqlite.batches.rejects-a-batch-call-whose-check-read-fails-in-the-database-with-an-error-rejection-and-refuses-only-for-its-own-checks",
+          "tests/PiSharp.Durable.Tests/Storage/SqliteStorageCases.cs: storage.sqlite.batches.rejects-a-batch-call-whose-check-read-fails-in-the-database-with-a-synchronous-throw-and-refuses-only-for-its-own-checks",
+          "tests/PiSharp.Durable.Tests/Storage/SqliteStorageCases.cs: storage.sqlite.batches.rejects-a-batch-call-whose-check-read-fails-in-the-database-with-a-primitive-rejection-and-refuses-only-for-its-own-checks",
+          "tests/PiSharp.Durable.Tests/Storage/SqliteStorageCases.cs: storage.sqlite.batches.rejects-a-batch-call-whose-check-read-fails-in-the-database-with-an-undefined-rejection-and-refuses-only-for-its-own-checks"
+        ]
+      }
     },
     {
       "id": "durable.storage-request-errors",

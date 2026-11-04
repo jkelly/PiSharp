@@ -774,7 +774,9 @@
         "92ab53602",
         "c268154ca",
         "e5c6182ba",
-        "f7e3cb543"
+        "f7e3cb543",
+        "da020d5b",
+        "290dec63"
       ],
       "notes": "IStorage.CommitAsync(writes, context) returns one Seq (TypesStorage.cs); upstream's intermediate adopt callback (92ab53602) never reached PiSharp, so go straight to the batch form. Every IStorage implementation changes: Memory, JSONL and SQLite, the PiSharp-only SqlServerStorage (decision 0007: one transaction per call and a refusal per batch), pisharp durable's LockGuardedStorage (DurableRuntime.cs), the examples' ObservedStorage (ExampleClock.cs) and about ten test decorators (CrashStorage, CountingStorage, FailNextStorage and others). Tests that seed a storage use the new commitWrites helper. The Session still sends one batch per call until area group-commit groups them. JSONL needs no format change; the record formats are unchanged, so the compat captures hold."
     },
