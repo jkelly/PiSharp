@@ -8541,7 +8541,7 @@
       "change": "Document, conversation view and task graph watches are Chord's WatchHandle, built on Chord's one Watch implementation, and Durable re-exports WatchHandle, WatchEnd, WatchCall and NativeWatchCall. A listener takes one tagged call before the context, { kind: 'value', value, ops, retired } (Chord's { kind: 'failed' } call never comes from Durable); WatchEnd is tagged by kind: stopped, aborted (was cancelled), ended (was session_closed), listener_error and failed (was session_failed), retired is no longer an end, and an ended watch drops its listener and every reference into its Session.",
       "pisharp": [
         "src/PiSharp.Durable/TypesSession.cs",
-        "src/PiSharp.Durable/Session/Observation.cs",
+        "src/PiSharp.Durable/Chord/Watch.cs",
         "src/PiSharp.Durable/Session/Session.cs",
         "src/PiSharp.Durable/Harness/View.cs",
         "src/PiSharp.Durable/Harness/TaskGraph.cs",
@@ -8604,7 +8604,7 @@
       "change": "A document watch follows its address (kind, scope and key) instead of one incarnation: DocumentWatch<T> is WatchHandle<Readonly<T>> without null, a retirement arrives as the next call with retired: true, the last value and no ops, and a document created at the address later arrives on the same watch as [['r', value]]. A task document's watch ends ended once the retirement call of the commit that makes its task terminal has returned, and a watch pins the incarnation at its address, nothing while it is absent.",
       "pisharp": [
         "src/PiSharp.Durable/Session/Session.cs",
-        "src/PiSharp.Durable/Session/Observation.cs",
+        "src/PiSharp.Durable/Chord/Watch.cs",
         "src/PiSharp.Durable/TypesSession.cs",
         "tests/PiSharp.Durable.Tests/Session/SessionWatchesCases.cs",
         "tests/PiSharp.Durable.Tests/SessionDocumentRetentionCases.cs"
@@ -8632,7 +8632,7 @@
       ],
       "change": "Document, conversation view and task graph watches deliver the commits made while their listener runs (or before start()) in one callback: the newest value, the commits' operations folded (appends to one string join, sets of one field keep the last) and the newest commit's Context. Past 10,000 pending operations the callback gets one root replacement; before, each commit was its own callback and more than 100 pending commits became a root replacement.",
       "pisharp": [
-        "src/PiSharp.Durable/Session/Observation.cs",
+        "src/PiSharp.Durable/Chord/Watch.cs",
         "src/PiSharp.Durable/Harness/View.cs",
         "src/PiSharp.Durable/Harness/TaskGraph.cs",
         "src/PiSharp.Durable/Chord/Delta/ (new)",
@@ -8721,7 +8721,7 @@
       "change": "Session.observeDoc(), Harness.observeConversation() and Harness.observeTaskGraph() attach a synchronous Observer<T> atomically on the Session line and return an Observation<T> (value, detach()); advance(call, context) gets every change unfolded as memory adopts it (a stored commit once its storage call settled, a deferred one before it is stored), so it may only record it: no awaits, Session calls or throws. end(end) takes the watch's WatchEnd shapes and comes once, a throwing observer (or one whose advance rejects) is reported as listener_error and detached, and a Session close ends observers failed with 'session closed' (ended stays for a task document retired with its task). Document, view and task graph watches are built on them (spec §9.1).",
       "pisharp": [
         "src/PiSharp.Durable/Session/Session.cs",
-        "src/PiSharp.Durable/Session/Observation.cs",
+        "src/PiSharp.Durable/Chord/Watch.cs",
         "src/PiSharp.Durable/TypesSession.cs",
         "src/PiSharp.Durable/Harness/Harness.cs",
         "src/PiSharp.Durable/Harness/View.cs",
@@ -8914,7 +8914,7 @@
       "change": "A stored commit is published after its storage call settled, in line order, the commits of one call a macrotask apart and inside the storage's publishing() scope: the read caches and memory adopt it, then its telemetry events and Durable's own observers (watches, views, the task graph, the scheduler, waits) run, and observeCommits() observers run one microtask later, before the waits it resolves and the abort signals it fires. A throwing Durable observer fails the Session after commit() returned while the commit stands, a commit Storage rejects after adopting it (a failed JSONL reclaim) is still published and its waits resolve before the Session fails, commit listeners are read when the dispatch runs, and a newly marked running task's abort signal fires after them.",
       "pisharp": [
         "src/PiSharp.Durable/Session/Session.cs",
-        "src/PiSharp.Durable/Session/Observation.cs",
+        "src/PiSharp.Durable/Chord/Watch.cs",
         "src/PiSharp.Durable/Harness/Scheduler.cs",
         "src/PiSharp.Durable/TypesStorage.cs",
         "tests/PiSharp.Durable.Tests/HarnessStorageFailureCases.cs",
@@ -10538,7 +10538,7 @@
       "change": "Chord now owns the one watch API Durable used to define: `Watchable<T>` (`value`, `watch(context)`), `WatchHandle<T>` (`value`, `start(listener)`, `stop()`, `closed`) and its implementation `Watch<T>`, which a source feeds with `advance(call, context)`, `fail(error, context)`, `end(end)` and `endAfterDelivery()`. Listeners get a tagged `WatchCall<T>` (`{ kind: \"value\", value, ops, retired }` or `{ kind: \"failed\", error }`) and the context; frames that arrive while the listener runs fold into one call through `PendingOps` (past 10,000 ops one `[[\"r\", newest]]`), a failure keeps the watch open, and a retirement is a flag on the next value call, not an end. `WatchEnd` is tagged by `kind` (`stopped`, `aborted`, `ended`, `listener_error`, `failed`), with `abort()` and `observeAbort(signal)` in place of `cancel()` and `observeCancellation(signal)`.",
       "pisharp": [
         "src/PiSharp.Durable/TypesSession.cs",
-        "src/PiSharp.Durable/Session/Observation.cs",
+        "src/PiSharp.Durable/Chord/Watch.cs",
         "src/PiSharp.Chord/ (new)"
       ],
       "release": "1.5.0",
