@@ -3,6 +3,9 @@
 // for the v1.1.0 scenarios, and observed (what calls returned or rejected with, observed.json) and events (the root conversation's agent
 // events, events.json). Keep each scenario in step with its upstream twin: same faux responses, same calls in the same order.
 //
+// Pi v1.5.0 sync (area events, f3255de76): v1.5.0 removed watchEvents. The recorder attaches PiSharp's event projection
+// (PiSharp.Durable.Hosting's AgentEvents.cs, PiSharp-only), so the events comparisons stay honest only while the projection reproduces
+// v1.2.0's events; they check the projection, not v1.5.0, which has no events.
 // Events: scenarios.mjs `open()` attaches watchEvents to the root conversation when the capture records events, pushes the snapshot and
 // then every event delivered, and its wrapped close() waits a macrotask and stops the stream before closing. Here Open attaches a
 // CompatEvents recorder when the case expects events, and Close waits until the expected number of events arrived (bounded), lets the
@@ -32,6 +35,7 @@
 using PiSharp.Durable;
 using PiSharp.Durable.Chord;
 using PiSharp.Durable.Env;
+using PiSharp.Durable.Hosting;
 using PiSharp.Durable.Tools;
 using static ChatTests;
 using static SessionTests;

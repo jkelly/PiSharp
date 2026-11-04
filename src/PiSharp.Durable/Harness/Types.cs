@@ -1254,7 +1254,7 @@ public interface IHarness : ISession
     Task WaitForIdleAsync(DurableContext context);
     /// <summary>Session total: every conversation's <c>pi.usage</c> summed (upstream <c>UsageState</c> JSON).</summary>
     Task<JsonObjectValue> UsageAsync(DurableContext context);
-    /// <summary>Every live task with its owner edge, status, and owned conversations (spec §9.5), as a serialized watch, Chord's
+    /// <summary>Every live task with its owner edge, status, and owned conversations (spec §9.4), as a serialized watch, Chord's
     /// <see cref="IWatchHandle{T}"/>, whose operations address <see cref="TaskGraph.ToJson"/>; commits made while its listener runs arrive
     /// folded; cancelling <paramref name="context"/> ends it aborted. Reads only: it does not enable scheduling.</summary>
     Task<IWatchHandle<TaskGraph>> WatchTaskGraphAsync(DurableContext context);
@@ -1268,7 +1268,7 @@ public interface IHarness : ISession
     Task<Observation<ConversationView>> ObserveConversationAsync(ConversationId id, Observer<ConversationView> observer, DurableContext context,
         ConversationWindow? window = null);
     /// <summary>
-    /// Attaches a synchronous <see cref="Observer{T}"/> to the task graph (spec §9.5), as <see cref="ObserveConversationAsync"/> does to a
+    /// Attaches a synchronous <see cref="Observer{T}"/> to the task graph (spec §9.4), as <see cref="ObserveConversationAsync"/> does to a
     /// view. A <c>blocked</c> reason that changes without a commit (a registry change, a failed migration) advances it on the Session line
     /// outside any commit, with the background context. Reads only: it does not enable scheduling.
     /// </summary>

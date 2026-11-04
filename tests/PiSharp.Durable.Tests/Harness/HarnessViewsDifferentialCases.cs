@@ -13,8 +13,11 @@
 // (50), so no frame drops entries or sets "before".
 // Pi v1.5.0 sync (area run-failure, f3255de76): and with RunFailure150.cs's: abortedRound's frame that ends the run sets
 // pi.live.runFailure before it removes run, its final view holds it, and its run_end event carries it (PiSharp's event projection).
+// Pi v1.5.0 sync (area events, f3255de76): v1.5.0 removed watchEvents; the event half compares PiSharp's projection (PiSharp.Durable.Hosting's
+// AgentEvents.cs, PiSharp-only) with the v1.2.0 capture, which stays honest only while the projection reproduces v1.2.0's events.
 using PiSharp.Durable;
 using PiSharp.Durable.Chord;
+using PiSharp.Durable.Hosting;
 using PiSharp.Durable.Sqlite;
 using PiSharp.Durable.Storage;
 using PiSharp.Durable.Storage.Jsonl;

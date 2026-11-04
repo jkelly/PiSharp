@@ -1,4 +1,6 @@
 using System.Text.RegularExpressions;
+using PiSharp.Durable.Chord;
+using PiSharp.Durable.Chord.Delta;
 using PiSharp.Durable.Examples;
 
 // Milestone M0 (decision 0005): samples/Durable.Examples ports Pi packages/durable/test/examples 00-05; P8 adds 14-chat and
@@ -43,6 +45,14 @@ using PiSharp.Durable.Examples;
 // Area view (f3255de76): 32-transcript is v1.5.0's 31-transcript.ts; its lines are authored from that example and the windowed view's
 // rules (a watch starts with the newest min entries, a resume from the entry after the newest held), not captured. Its file backends count
 // the stored chat entries.
+// Area events (f3255de76): v1.5.0 removed watchEvents, and the examples that printed agent events print the view, as upstream's do. 19-json
+// runs v1.5.0's two modes (18-json.ts), ops on the runner's storage and state on MemoryStorage: the ops lines stay the v1.2.0 capture's
+// authored forms (JsonModeOpsLines), and the state lines are authored from them, not captured: JsonModeStateLines replays each frame's ops
+// on the view and prints each value as 18-json.ts's --state mode does (the entries appended since the newest seen, and pi.live). The v1.2.0
+// events capture (examples-19-json-events.upstream.jsonl) is no longer compared. 21-late-join is v1.5.0's 20-late-join.ts (view lines
+// only: the tool's output while it runs, the answer's partial as its text changes, the entries once the run ended), and 22- and
+// 23-subagent follow the view (v1.5.0's 21- and 22-subagent); their lines are authored from those examples and the v1.2.0 lines, which
+// showed the same output and partial texts as events, not captured.
 internal static partial class Program
 {
     private static readonly string[] CodingToolsTranscript =
@@ -62,11 +72,10 @@ internal static partial class Program
 
     // Declared before ExamplesUpstreamOutput, which spreads them. Pi v1.5.0 (area tools-schema): authored forms of the capture, with the
     // built-in tools declared in pi-schema's key order (ToolsSchema150.cs); (area model-requests) and with the thinking level each classified
-    // message records (ModelRequests150.cs).
-    private static readonly string[] JsonModeEvents =
-        [.. JsonModeEventsLines(JsonModeFixture("events", "v1.2.0")).Select(line => ModelRequests150.AuthoredText(ToolsSchema150.AuthoredText(line)))];
+    // message records (ModelRequests150.cs). (Area events) the state mode's lines are authored from the ops lines (JsonModeStateLines).
     private static readonly string[] JsonModeOps =
         [.. JsonModeOpsLines(JsonModeFixture("ops", "v1.2.0"), JsonModeFixture("ops")).Select(line => ModelRequests150.AuthoredText(ToolsSchema150.AuthoredText(line)))];
+    private static readonly string[] JsonModeState = JsonModeStateLines(JsonModeOps);
     private static readonly string[] ReviewerTranscript =
     [
         "> Review user.ts.",
@@ -158,10 +167,10 @@ internal static partial class Program
         "== 18-print",
         PrintAnswer,
         "== 19-json",
-        "mode: events",
-        .. JsonModeEvents,
         "mode: ops",
         .. JsonModeOps,
+        "mode: state",
+        .. JsonModeState,
         "== 20-inbox",
         "rejected: Conversation 1 is busy",
         "withdraw: aborted",
@@ -178,20 +187,12 @@ internal static partial class Program
         // Upstream's util.inspect prints [ 'pi.user', 'pi.system', 'pi.assistant' ] and [ 'count running' ].
         """view entries: ["pi.user","pi.system","pi.assistant"]""",
         @"view tool slot: running ""1\n2\n3\n4\n5\n""",
-        """snapshot tools: ["count running"]""",
-        .. LateJoinOutput(6, "view output now: ", "event output now: "),
-        "event: tool_execution_end",
-        "event: message_start",
-        "event: message_end",
-        "event: turn_end",
-        "event: turn_start",
-        "event: message_start",
-        "event text delta: \"en, and this ans\"",
-        "event text delta: \"wer streams slow\"",
-        "event: message_end",
-        "event: turn_end",
-        "event: run_end",
-        "event: submission",
+        .. LateJoinOutput(6, "view output now: "),
+        // The answer's committed partials: Pi v1.2.0's event lines here streamed them as message_start ("Counted to t") and the text deltas
+        // "en, and this ans" and "wer streams slow".
+        "view answer now: \"Counted to t\"",
+        "view answer now: \"Counted to ten, and this ans\"",
+        "view answer now: \"Counted to ten, and this answer streams slow\"",
         LateJoinLastLine,
         "== 22-subagent-foreground",
         "tool subagent({\"task\":\"Name three prime numbers.\"})",
@@ -367,22 +368,34 @@ internal static partial class Program
         [RepositoryRoot(), "tests", "PiSharp.Durable.Tests", "Fixtures", .. version is null ? Array.Empty<string>() : [version],
             $"examples-19-json-{mode}.upstream.jsonl"]));
 
-    /// <summary>The v1.2.0 events of 19 with a pending message_start carrying its final message (see the file header).</summary>
-    private static string[] JsonModeEventsLines(string[] v120)
+    /// <summary>
+    /// The state mode's lines of 19 (v1.5.0's 18-json.ts --state, area events), authored from the ops lines (see the file header): the first
+    /// view's entries and pi.live, then for each frame the view its ops rebuild, as the entries appended since the newest seen (left out
+    /// when none were) and its pi.live (left out when it has none, as JSON.stringify leaves out undefined).
+    /// </summary>
+    private static string[] JsonModeStateLines(string[] ops)
     {
-        var lines = v120.ToArray();
-        for (var index = 0; index < lines.Length; index++)
+        static JsonArrayValue EntriesOf(JsonObjectValue view) => (JsonArrayValue)view["entries"];
+        static long IdOf(JsonValue entry) => (long)((JsonNumberValue)((JsonObjectValue)entry)["id"]).Value;
+        static string Line(JsonValue? entries, JsonObjectValue view)
         {
-            using var start = System.Text.Json.JsonDocument.Parse(lines[index]);
-            if (start.RootElement.GetProperty("type").GetString() != "message_start" ||
-                !start.RootElement.GetProperty("message").TryGetProperty("stopReason", out var stopReason)) continue;
-            var end = lines.Skip(index + 1).First(line => line.StartsWith("{\"type\":\"message_end\",", StringComparison.Ordinal));
-            using var endDocument = System.Text.Json.JsonDocument.Parse(end);
-            var final = "{\"type\":\"message_start\",\"message\":" + endDocument.RootElement.GetProperty("entry").GetProperty("model")[0].GetRawText() + "}";
-            if (stopReason.GetString() == "pending") lines[index] = final;
-            else Equal(lines[index], final, "example 19 events: a completed message_start carries its message_end's message");
+            var properties = new List<KeyValuePair<string, JsonValue>>();
+            if (entries is not null) properties.Add(new("entries", entries));
+            if (((JsonObjectValue)view["docs"]).TryGetValue("pi.live", out var live)) properties.Add(new("live", live));
+            return JsonValue.Object(properties).ToJson();
         }
-        return lines;
+        var view = (JsonObjectValue)((JsonObjectValue)JsonValue.Parse(ops[0]))["view"];
+        var newest = EntriesOf(view) is { Count: > 0 } first ? IdOf(first[^1]) : 0;
+        var lines = new List<string> { Line(EntriesOf(view), view) };
+        foreach (var line in ops.Skip(1))
+        {
+            var frame = (JsonArrayValue)((JsonObjectValue)JsonValue.Parse(line))["ops"];
+            view = (JsonObjectValue)DeltaApply.Apply(view, frame.Select(Op.FromJson));
+            var appended = EntriesOf(view).Where(entry => IdOf(entry) > newest).ToList();
+            if (EntriesOf(view) is { Count: > 0 } entries) newest = IdOf(entries[^1]);
+            lines.Add(Line(appended.Count == 0 ? null : JsonValue.Array(appended), view));
+        }
+        return [.. lines];
     }
 
     /// <summary>The v1.2.0 ops of 19 without the progress commits of a partial streaming message (see the file header); what remains has as many
@@ -400,16 +413,16 @@ internal static partial class Program
         return lines;
     }
 
-    private const string LateJoinLastLine = "event: usage_changed";
+    // 21-late-join's last line: the view's entries once the run ended (v1.5.0's 20-late-join.ts, area events).
+    private const string LateJoinLastLine = """view entries: ["pi.user","pi.system","pi.assistant","pi.tool-result","pi.assistant"]""";
 
-    // The output lines 21-late-join prints once the client joined: each committed line, first from the view, then from the event stream.
-    private static IEnumerable<string> LateJoinOutput(int from, string view, string events)
+    // The output lines 21-late-join prints once the client joined: each committed line, from the view.
+    private static IEnumerable<string> LateJoinOutput(int from, string view)
     {
         for (var n = from; n <= 10; n++)
         {
             var text = string.Concat(Enumerable.Range(1, n).Select(line => line + @"\n"));
             yield return $"{view}\"{text}\"";
-            yield return $"{events}\"{text}\"";
         }
     }
 
@@ -468,7 +481,7 @@ internal static partial class Program
         [BobsSandbox] = ["alice's write: Successfully wrote to note.txt", "bob's write: Successfully wrote to note.txt"],
         [TimedBashCalls] = [PythonConversation],
         [PrintAnswer] = [PrintAnswer],
-        [JsonModeOps[^1]] = ["""transcript: ["pi.user","pi.system","pi.assistant","pi.tool-result","pi.assistant"]"""],
+        [JsonModeState[^1]] = ["""transcript: ["pi.user","pi.system","pi.assistant","pi.tool-result","pi.assistant"]"""],
         [LateJoinLastLine] = ["""transcript: ["pi.user","pi.system","pi.assistant","pi.tool-result","pi.assistant"]"""],
         [CodingAgentLastLine] = ["bash ran in: <workspace>", CodingAgentLastLine],
         [PlanModeLastLine] = [PlanSteps],

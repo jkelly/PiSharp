@@ -7,12 +7,14 @@
 //   commit evicts what expired, before any timer could fire.
 // - "writes after a reload continue the stored deltas and bases": the batches are ControlledStorage.Commits, as upstream's patched commit
 //   records them.
-// - "gives the same events ...": the run flushes the Session line before it stops the event stream, as the inbox cases do (a C# wait
+// - "gives the same views ...": the run flushes the Session line before it detaches the view history, as the inbox cases do (a C# wait
 //   resumes on its own listener, upstream's after all listeners and the deliveries they queued).
 // Pi v1.5.0 sync (area watches, 92ab53602): Session.documentState() is gone, so the cases that held a state hold a watch, started where its
 // value must stay current (two cases renamed with them). Area watch-folding (8b0caefc2): a watch follows its address and its value is
 // never null, so "does not keep a replacement cached for an observer of the retired incarnation" is 8b0caefc2's "pins only what is at the
-// address a watch follows". The citation stays on v1.2.0: the file's later upstream changes wait on areas events and group-commit.
+// address a watch follows". Area events (f3255de76): "gives the same events with documents evicted right after use as with documents
+// kept" is v1.5.0's "gives the same views ...": it compares the view history (LiveSupport.cs's viewHistory) where v1.2.0 compared
+// watchEvents' events (removed). The citation stays on v1.2.0: the file's later upstream changes wait on area group-commit.
 using PiSharp.Durable;
 using PiSharp.Durable.Chord;
 using PiSharp.Durable.Storage;
@@ -465,7 +467,7 @@ internal static class DocumentRetentionTests
             }
         });
 
-        yield return Case(prefix + "gives-the-same-events-with-documents-evicted-right-after-use-as-with-documents-kept", async () =>
+        yield return Case(prefix + "gives-the-same-views-with-documents-evicted-right-after-use-as-with-documents-kept", async () =>
         {
             static async Task<List<string>> Run(double documentRetentionMs)
             {
@@ -490,26 +492,26 @@ internal static class DocumentRetentionTests
                 setup.Faux.SetResponses(FauxAssistantMessage([FauxToolCall("steps", JsonObjectValue.Empty, "s1")], stopReason: "toolUse"),
                     FauxAssistantMessage([FauxText("done")]));
                 var (harness, root) = await OpenChat(new MemoryStorage(), setup);
-                var stream = await harness.WatchEventsAsync(root.Id, Context);
-                var events = new SyncList<AgentEvent>();
-                stream.Start((batch, _) =>
-                {
-                    foreach (var item in batch) events.Add(item);
-                    return Task.CompletedTask;
-                });
+                var history = await LiveTests.ViewHistory(harness, root.Id);
                 await (await root.SubmitAsync(SubmissionDraft.Input("go"), Context)).WaitAsync(Context);
                 await harness.WaitForIdleAsync(Context);
                 // A C# wait resumes on its own listener, upstream's after all listeners and the deliveries they queued: flush the line so
-                // the last commit's events are delivered before the stream stops.
+                // the last commit's views are recorded before the history detaches.
                 await ((Session)harness).FlushLineAsync();
-                await stream.StopAsync();
+                history.Detach();
                 await harness.CloseAsync(Context);
-                // Ids and times differ between runs; the sequence of event types and tool outputs must not.
-                return [.. events.Snapshot().Select(item => item.Type == "tool_execution_update"
-                    ? "update:" + (item.ToJson().TryGetValue("output", out var output) ? output.ToJson() : "undefined")
-                    : item.Type)];
+                // Ids and times differ between runs; the sequence of entries, run states, and tool outputs must not.
+                static string Field(JsonObjectValue slot, string name) => slot.TryGetValue(name, out var value) ? S(value) : "";
+                return [.. history.Views.Select(view =>
+                {
+                    var live = LiveTests.LiveOf(view);
+                    var tools = live.TryGetValue("tools", out var slots) ? ((JsonArrayValue)slots).OfType<JsonObjectValue>()
+                        .Select(slot => $"{Field(slot, "callId")}:{Field(slot, "status")}:{Field(slot, "output")}") : [];
+                    var kinds = string.Join(",", view.Entries.Select(entry => entry.Kind));
+                    return $"{kinds} run:{(live.ContainsKey("run") ? "true" : "false")} generation:{(live.ContainsKey("generation") ? "true" : "false")} {string.Join(" ", tools)}";
+                })];
             }
-            Seq(await Run(600_000), await Run(0), "events");
+            Seq(await Run(0), await Run(600_000), "views");
         });
 
         yield return Case(prefix + "keeps-a-reloaded-newer-version-cached-while-an-observer-of-the-older-one-is-attached", async () =>

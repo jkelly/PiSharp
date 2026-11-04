@@ -9,10 +9,11 @@
 // - The tool's parameters are pi-schema's obj({}) (6536f8012), the JSON Schema of an object without properties.
 // PiSharp-only cases, authored: harness.run-failure.pisharp.reads-and-writes-every-reason-in-upstream-spelling (RunFailureReason declares every
 // v1.5.0 value once, the work list's rule), and harness.run-failure.pisharp.the-event-stream-carries-the-run-failure: the PiSharp-only event
-// projection (Events.cs, which area events moves to PiSharp.Durable.Hosting) carries pi.live.runFailure in its snapshot and on the run_end
+// projection (PiSharp.Durable.Hosting's AgentEvents.cs since area events) carries pi.live.runFailure in its snapshot and on the run_end
 // of a run that ended without an answer, a continue's run_start in the same batch.
 using PiSharp.Durable;
 using PiSharp.Durable.Chord;
+using PiSharp.Durable.Hosting;
 using PiSharp.Durable.Storage;
 using static ChatTests;
 using static HarnessTests;

@@ -10,7 +10,9 @@
 // (input-entries, nested-tools, nested-tools-restart, read-only, scheduler-indexes, scheduler-retention; ports that take no storage) and
 // the files later areas port (after-run, continue, restart-failure, tool-hooks, turn-limit). Area sleep adds harness.sleep.store.*:
 // its reopen case opens the file as a StoreStorage, and its MemoryStorage cases run on a fresh StoreStorage. Area reports adds
-// harness.blocked.store.*, opening every file as a StoreStorage.
+// harness.blocked.store.*, opening every file as a StoreStorage. Area events (f3255de76) keeps the store run of the structured group's
+// v1.2.0 event tests, which moved to the PiSharp-only projection's cases (AgentEventsCases.cs): agent-events.store.tool-rounds.* and
+// agent-events.store.tool-rounds-and-events.* (harness.structured.store.tool-rounds(-and-events).* before).
 using PiSharp.Durable;
 using PiSharp.Durable.Sqlite;
 
@@ -48,6 +50,7 @@ internal static partial class Program
         .. LifecycleTests.Cases("harness.lifecycle.store.", () => StoreLocation("lifecycle-store")(), () => StoreLocation("lifecycle-store-reopen")),
         .. OwnershipTests.Cases("harness.ownership.store.", () => StoreLocation("ownership-store")(), () => StoreLocation("ownership-store-reopen")),
         .. StructuredTests.Cases("harness.structured.store.", () => StoreLocation("structured-store")(), () => StoreLocation("structured-store-reopen")),
+        .. StructuredTests.EventCases("agent-events.store.", () => StoreLocation("events-store")()),
         .. SubmissionsTests.Cases("harness.submissions.store.", () => FreshStore("submissions-store"), () => StoreFile("submissions-store-reopen")),
         .. TaskGraphTests.Cases("harness.task-graph.store.", () => Task.FromResult(FreshStore("task-graph-store")),
             new TaskGraphTests.Reopenable("store", () =>

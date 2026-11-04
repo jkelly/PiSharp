@@ -10,7 +10,7 @@
 // - views abortedRound: the aborted generation's run, reason aborted, in the frame that ends it and in the final view.
 // - compat compaction-failure: the blocking turn's run fails with model_error, detail "Compaction failed: Summarization failed: still bad";
 //   the pi.live document's stored value (records, the JSONL document line and the SQLite revision) holds it.
-// PiSharp-only, not upstream's: the agent event projection (Harness/Events.cs; upstream removed watchEvents in f3255de76) carries the
+// PiSharp-only, not upstream's: the agent event projection (PiSharp.Durable.Hosting's AgentEvents.cs; upstream removed watchEvents in f3255de76) carries the
 // failure on run_end ("failure", the runFailure value), so the authored events add it to the run_end of each run above.
 using PiSharp.Durable.Chord;
 

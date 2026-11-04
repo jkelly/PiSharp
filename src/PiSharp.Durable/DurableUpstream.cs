@@ -13,6 +13,8 @@
 // and Observation exports are the classes Observer<T> and Observation<T> (TypesSession.cs).
 // Area view (f3255de76): ConversationWindow is the record of View.cs; ConversationTranscript, ConversationTranscriptOptions and EntryLoader
 // keep their names, and TranscriptItem and TranscriptView are ConversationTranscriptItem and ConversationTranscriptView (Transcript.cs).
+// Area events (f3255de76): watchEvents and its types (AgentEvent, AgentEventStream, SnapshotEvent, MessageChange, ToolEventCall) are no
+// longer exported, as upstream removed them; PiSharp.Durable.Hosting keeps the projection, PiSharp-only, for the device wire (AgentEvents.cs).
 namespace PiSharp.Durable;
 
 /// <summary>The upstream source this port follows (decision 0005): Pi's <c>packages/durable</c> and the Chord subset it uses, at the

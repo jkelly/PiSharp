@@ -1,12 +1,15 @@
 // PiSharp-only (decision 0008): IAsyncEnumerable adapters over pi-durable's callback watches, for the device server's SSE streams. Each
 // listener writes into a bounded channel and waits while it is full, so a slow reader slows the watch, and the watch's own overflow rule
-// (spec §9.4: undelivered batches beyond its limit become one snapshot) takes over. Nothing is replayed: a new feed starts from a snapshot.
+// (Pi v1.2.0's spec §9.4: undelivered batches beyond its limit become one snapshot) takes over. Nothing is replayed: a new feed starts from a
+// snapshot. Pi v1.5.0 sync (area events): pi-durable 1.5.0 removed watchEvents; the agent feed reads Hosting's projection of v1.2.0's
+// events (AgentEvents.cs), the only consumer of the typed events.
 using System.Threading.Channels;
 using PiSharp.Durable.Chord;
 
 namespace PiSharp.Durable.Hosting;
 
-/// <summary>One agent's event batches: a snapshot at attachment, then one batch per commit (pi-durable <c>watchEvents</c>).</summary>
+/// <summary>One agent's event batches: a snapshot at attachment, then one batch per commit (<see cref="AgentEvents.WatchEventsAsync"/>, Pi
+/// v1.2.0's <c>watchEvents</c>).</summary>
 public sealed class AgentEventFeed : IAsyncDisposable
 {
     private readonly IAgentEventStream stream;

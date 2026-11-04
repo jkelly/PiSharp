@@ -7,6 +7,8 @@
 //   and taskId are matched as numbers.
 // - `new NodeExecutionEnv({ cwd })` is LocalExecutionEnv (Git Bash on Windows).
 // - Upstream runs these on MemoryStorage; so do they here.
+// Pi v1.5.0 sync (area events, f3255de76): "stores exactly what callers and events get ..." no longer compares watchEvents' nested tool
+// ends (removed): a client reads a live caller's nested results from the same documents the stored results come from.
 using System.Collections.Immutable;
 using PiSharp.Durable;
 using PiSharp.Durable.Chord;
@@ -146,26 +148,16 @@ internal static class StructuredOutputTests
                     if (document.Value is { } value && value.TryGetValue("result", out var result) && document.Ops.Length > 0) stored.Add(result);
                 }
             });
-            var stream = await harness.WatchEventsAsync(root.Id, Context);
-            var ends = new SyncList<NestedToolExecutionResult>();
-            stream.Start((batch, _) =>
-            {
-                foreach (var item in batch)
-                    if (item is ToolExecutionEndEvent { ParentToolCallId: not null } end) ends.Add(end.Result!);
-                return Task.CompletedTask;
-            });
             await (await root.SubmitAsync(SubmissionDraft.Input("go"), Context)).WaitAsync(Context);
             await harness.WaitForIdleAsync(Context);
-            await stream.StopAsync();
             await harness.CloseAsync(Context);
 
             var results = received.Snapshot();
             MatchJson("""{"structuredOutput":"a","isError":false}""", results[0].ToJson(), "plain");
             MatchJson("""{"structuredOutput":null,"isError":false}""", results[1].ToJson(), "nothing");
             Check(!results[0].ToJson().ContainsKey("output"), "no output");
+            // A client reads a live caller's nested results from the same documents.
             Equal(JsonValue.Array(results.Select(result => (JsonValue)result.ToJson())).ToJson(), JsonValue.Array(stored.Snapshot()).ToJson(), "stored");
-            Equal(JsonValue.Array(results.Select(result => (JsonValue)result.ToJson())).ToJson(),
-                JsonValue.Array(ends.Snapshot().Select(result => (JsonValue)result.ToJson())).ToJson(), "ends");
         });
 
         yield return Case(prefix + "gives-callers-a-schema-tool-s-validated-structured-output-which-the-transcript-does-not-store", async () =>

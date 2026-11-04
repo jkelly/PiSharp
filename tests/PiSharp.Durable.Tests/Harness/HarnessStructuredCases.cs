@@ -18,9 +18,13 @@
 // until its owned work drains, and retries a rejected final commit" (generation, P8) and the three tests the tool task unblocks (P9): "owns
 // its tool tasks, waits for them, and hands the run to a conversation-owned generation"; "aborts a parallel round with its generation: tools
 // first, then the generation, with every result written"; "answers the unstarted calls of an aborted sequential round with aborted results,
-// in call order". HarnessStructuredEventsCases.cs ports the tests that listen to agent events (watchEvents, P10): "ends a turn at the
-// generation's hold, before its successor's turn starts" (harness.structured.tool-rounds.*) and the four tests of describe "tool rounds
-// and events" (harness.structured.tool-rounds-and-events.*).
+// in call order".
+// Pi v1.5.0 sync (area events, f3255de76): upstream's tests that listened to agent events (watchEvents, P10) read the view and the task graph
+// instead (LiveSupport.cs): "hands run control to the successor while the generation holds, and keeps it in the graph until it ends" (was
+// "ends a turn at the generation's hold, before its successor's turn starts", harness.structured.tool-rounds.*) and describe "tool rounds
+// as the view shows them" (was "tool rounds and events", harness.structured.tool-rounds-as-the-view-shows-them.*), at the end of this file.
+// A Session line barrier (ViewTests.Drained) lets the synchronous observers record the publications of the commits a wait returned after,
+// where upstream reads them at once. The v1.2.0 event forms run against PiSharp's event projection (AgentEventsCases.cs, agent-events.*).
 // "reopens a checkout waiting on live payments and finishes it", the last test of upstream's recovery describe (just before "tool rounds"),
 // needs no model and is ported.
 using PiSharp.Durable;
@@ -28,6 +32,7 @@ using PiSharp.Durable.Chord;
 using PiSharp.Durable.Sqlite;
 using PiSharp.Durable.Storage;
 using PiSharp.Durable.Storage.Jsonl;
+using static ChatTests;
 using static HarnessTests;
 using static Program;
 using static SessionTests;
@@ -73,8 +78,8 @@ internal static partial class StructuredTests
             .. AbortOrder(prefix + "abort-order.", fresh),
             .. Boundaries(prefix + "boundaries.", fresh),
             .. ToolRounds(prefix + "tool-rounds.", fresh),
-            .. ToolRoundTurns(prefix + "tool-rounds.", fresh),
-            .. ToolRoundsAndEvents(prefix + "tool-rounds-and-events.", fresh),
+            .. ToolRoundHandOff(prefix + "tool-rounds.", fresh),
+            .. ToolRoundsInTheView(prefix + "tool-rounds-as-the-view-shows-them.", fresh),
             .. DefinitionsAndWaits(prefix + "definitions-and-waits.", fresh),
             .. ConversationAbort(prefix + "conversation-abort-and-boundaries.", fresh),
         ];
@@ -1426,6 +1431,241 @@ internal static partial class StructuredTests
             await opened.Root.AbortAsync(Context, new ConversationAbortOptions { Background = true });
             Equal("aborted", await OutcomeOf(opened.Harness, below), "below outcome");
             await opened.Harness.CloseAsync(Context);
+        });
+    }
+
+    // ─── Tool rounds as the view and the task graph show them (Pi v1.5.0, area events) ──────────
+
+    private static ToolRegistration Noop() => Define.Tool(new ToolRegistration
+    {
+        Name = "noop",
+        Description = "Does nothing",
+        Execute = (_, _, _) => Task.FromResult(new ToolExecutionResult { Output = JsonArrayValue.Empty }),
+    });
+
+    /// <summary>Installs the hook that starts work owned by the generation after its tools, which the generation then holds.</summary>
+    private static void HookedAfterTools(ChatSetup setup, Nodes nodes, Func<IHarness> opened) =>
+        AddHooks(setup.Registry, HarnessTasks.GenerationTask, new GenerationHooks
+        {
+            AfterTools = async (_, _, api, callContext) =>
+                await opened().CommitAsync(tx => tx.CreateTaskAsync(nodes.Node, NodeInput("hooked"), Owned(api.TaskId)), callContext),
+        });
+
+    private static async Task<TaskId> FirstGeneration(IHarness harness) =>
+        (await harness.CommitAsync(tx => tx.ScanTasksAsync(new TaskQuery { Kind = "pi.generation" }, 1), Context)).Items[0].Id;
+
+    private static long? RunTaskOf(JsonObjectValue live) =>
+        live.TryGetValue("run", out var run) && run is JsonObjectValue state && state.TryGetValue("taskId", out var id) && id is JsonNumberValue number
+            ? (long)number.Value : null;
+
+    private static string? StatusOfSlot(JsonObjectValue? slot) =>
+        slot is not null && slot.TryGetValue("status", out var status) && status is JsonStringValue { Value: var text } ? text : null;
+
+    private static IEnumerable<(string, Func<Task>)> ToolRoundHandOff(string prefix, Func<Task<IStorage>> fresh)
+    {
+        yield return Case(prefix + "hands-run-control-to-the-successor-while-the-generation-holds-and-keeps-it-in-the-graph-until-it-ends", async () =>
+        {
+            var nodes = new Nodes();
+            var setup = Setup();
+            AddTask(setup.Registry, nodes.Node);
+            AddTool(setup.Registry, Noop());
+            // An extension's hook starts work owned by the generation, which holds it while the next turn runs.
+            IHarness? opened = null;
+            HookedAfterTools(setup, nodes, () => opened!);
+            setup.Faux.SetResponses(ToolCalls(("noop", "c1")), FauxAssistantMessage("done"));
+            var (harness, root) = await OpenChat(await fresh(), setup);
+            opened = harness;
+            var graph = await LiveTests.GraphHistoryOf(harness);
+            var history = await LiveTests.ViewHistory(harness, root.Id);
+            await (await root.SubmitAsync(SubmissionDraft.Input("go"), Context)).WaitAsync(Context);
+            var first = await FirstGeneration(harness);
+            Equal(DurableTaskStatus.Completing, await StatusOf(harness, first), "first generation");
+            await ViewTests.Drained(harness);
+            // The first generation's outcome is committed at its hold: the successor already runs the run, and the graph shows the first one
+            // completing beside it.
+            var handed = graph.Graphs.First(value => LiveTests.Generations(value).Count == 2);
+            var generations = LiveTests.Generations(handed);
+            var (held, successor) = (generations[0], generations[1]);
+            Equal(first, held.Id, "held generation");
+            Equal(DurableTaskStatus.Completing, held.State.Status, "held status");
+            Check(successor.State.Status != DurableTaskStatus.Completing, "the successor is not completing");
+            Check(history.Live().Any(live => RunTaskOf(live) == successor.Id.Value), "the successor runs the run");
+            nodes.Open("hooked");
+            Equal("completed", await OutcomeOf(harness, first), "first outcome");
+            await Eventually(() => graph.Graphs[^1].Node(first) is null);
+            graph.Detach();
+            history.Detach();
+            await harness.CloseAsync(Context);
+        });
+    }
+
+    /// <summary>The tool result entries of a view, by call ID, in transcript order (upstream <c>resultsOf</c>).</summary>
+    private static List<string> ResultsOf(ConversationView view) => [.. view.Entries.Select(ResultCallId).OfType<string>()];
+
+    /// <summary>The call ID of a tool result entry; null for any other entry.</summary>
+    private static string? ResultCallId(EntryRecord entry) =>
+        entry.Model is { Count: > 0 } model && model[0] is JsonObjectValue message && message.TryGetValue("role", out var role) &&
+        role is JsonStringValue { Value: "toolResult" } ? S(message["toolCallId"]) : null;
+
+    private static IEnumerable<(string, Func<Task>)> ToolRoundsInTheView(string prefix, Func<Task<IStorage>> fresh)
+    {
+        yield return Case(prefix + "ends-an-aborted-sequential-rounds-unstarted-calls-with-their-result-entries-right-before-them", async () =>
+        {
+            var setup = Setup();
+            var one = BlockingRoundTool("one");
+            AddTool(setup.Registry, one.Registration);
+            AddTool(setup.Registry, BlockingRoundTool("two").Registration with { Name = "two" });
+            setup.Faux.SetResponses(ToolCalls(("one", "c1"), ("two", "c2"), ("two", "c3")));
+            var (harness, root) = await OpenChat(await fresh(), setup);
+            var history = await LiveTests.ViewHistory(harness, root.Id);
+            var submission = await root.SubmitAsync(SubmissionDraft.Input("go"), Context);
+            await one.Started;
+            await harness.AbortTaskAsync(new TaskId(RunTaskOf((await harness.SnapshotAsync(Live.LiveDoc, root.Id, Context))!)!.Value), Context);
+            await submission.WaitAsync(Context);
+            await ViewTests.Drained(harness);
+            history.Detach();
+            // The started call ends with its result entry; the commit that ends the run appends the unstarted calls' results, in call order,
+            // and removes the round.
+            var states = history.Live();
+            var views = history.Views;
+            var c1Done = LiveTests.SlotsOf(states, "c1").FirstOrDefault(slot => StatusOfSlot(slot) == "done");
+            var last = views[^1];
+            Seq(["c1", "c2", "c3"], ResultsOf(last), "results");
+            var c1Result = last.Entries.FirstOrDefault(entry => ResultCallId(entry) == "c1");
+            Check(c1Done is not null && c1Result is not null, "c1 is done with a result entry");
+            Equal(c1Result!.Id.ToJson().ToJson(), c1Done!["entry"].ToJson(), "c1's entry");
+            var ending = views.FindIndex(view => ResultsOf(view).Contains("c2"));
+            Seq(["c1", "c2", "c3"], ResultsOf(views[ending]), "results at the end");
+            Check(!states[ending].ContainsKey("run"), "no run at the end");
+            Check(!states[ending].ContainsKey("tools"), "no round at the end");
+            Seq(["c1:done", "c2:pending", "c3:pending"],
+                ((JsonArrayValue)states[ending - 1]["tools"]).OfType<JsonObjectValue>().Select(slot => $"{S(slot["callId"])}:{StatusOfSlot(slot)}"),
+                "the round before the end");
+            await harness.CloseAsync(Context);
+        });
+
+        yield return Case(prefix + "shows-a-held-generation-as-completing-to-an-observer-attached-while-it-holds", async () =>
+        {
+            var nodes = new Nodes();
+            var setup = Setup();
+            AddTask(setup.Registry, nodes.Node);
+            AddTool(setup.Registry, Noop());
+            IHarness? opened = null;
+            HookedAfterTools(setup, nodes, () => opened!);
+            setup.Faux.SetResponses(ToolCalls(("noop", "c1")), FauxAssistantMessage("done"));
+            var (harness, root) = await OpenChat(await fresh(), setup);
+            opened = harness;
+            var early = await LiveTests.GraphHistoryOf(harness);
+            await (await root.SubmitAsync(SubmissionDraft.Input("go"), Context)).WaitAsync(Context);
+            var late = await LiveTests.GraphHistoryOf(harness);
+            nodes.Open("hooked");
+            var first = await FirstGeneration(harness);
+            await harness.WaitForTaskAsync(first, Context);
+            await ViewTests.Drained(harness);
+            // The early observer saw both generations; the late one starts with the held one, completing, and sees it leave.
+            static int Seen(IEnumerable<TaskGraph> graphs) =>
+                graphs.SelectMany(graph => LiveTests.Generations(graph).Select(node => node.Id)).Distinct().Count();
+            Equal(2, Seen(early.Graphs), "early generations");
+            var attached = LiveTests.Generations(late.Graphs[0]);
+            Equal(1, attached.Count, "late generations at attachment");
+            Equal(first, attached[0].Id, "the held generation");
+            Equal(DurableTaskStatus.Completing, attached[0].State.Status, "held status");
+            Check(late.Graphs[^1].Node(first) is null, "the held generation left the graph");
+            early.Detach();
+            late.Detach();
+            await harness.CloseAsync(Context);
+        });
+
+        yield return Case(prefix + "lets-a-tool-that-owns-live-work-finish-its-call-at-the-hold-while-the-generation-waits-for-its-final-commit", async () =>
+        {
+            var nodes = new Nodes();
+            var setup = Setup();
+            AddTask(setup.Registry, nodes.Node);
+            AddTool(setup.Registry, Define.Tool(new ToolRegistration
+            {
+                Name = "delegate",
+                Description = "Starts work in a conversation it owns",
+                Execute = async (_, api, callContext) =>
+                {
+                    await api.CommitAsync(async tx =>
+                    {
+                        var child = await tx.CreateConversationAsync(ConversationOwnership.Task(api.TaskId));
+                        await tx.CreateTaskAsync(nodes.Node, NodeInput("sub"), In(child.Id));
+                    }, callContext);
+                    return new ToolExecutionResult { Output = JsonValue.Array(Obj(("type", "text"), ("text", "started"))) };
+                },
+            }));
+            setup.Faux.SetResponses(ToolCalls(("delegate", "c1")), FauxAssistantMessage("done"));
+            var (harness, root) = await OpenChat(await fresh(), setup);
+            var submission = await root.SubmitAsync(SubmissionDraft.Input("go"), Context);
+            async Task<JsonObjectValue?> FirstSlot() =>
+                await harness.SnapshotAsync(Live.LiveDoc, root.Id, Context) is { } live && live.TryGetValue("tools", out var tools) &&
+                tools is JsonArrayValue { Count: > 0 } slots ? (JsonObjectValue)slots[0] : null;
+            await Eventually(async () => StatusOfSlot(await FirstSlot()) == "done");
+            var live = (await harness.SnapshotAsync(Live.LiveDoc, root.Id, Context))!;
+            var slot = (JsonObjectValue)((JsonArrayValue)live["tools"])[0];
+            var tool = new TaskId((long)N(slot["taskId"]));
+            Check(slot.ContainsKey("entry"), "the slot has its entry");
+            Equal(DurableTaskStatus.Completing, await StatusOf(harness, tool), "tool status");
+            Equal(DurableTaskStatus.Waiting, await StatusOf(harness, new TaskId(RunTaskOf(live)!.Value)), "generation status");
+            Check(!await Settled(submission.WaitAsync(Context)), "the submission waits");
+            nodes.Open("sub");
+            Equal(SubmissionStatus.Done, (await submission.WaitAsync(Context)).Status, "status");
+            Equal("completed", await OutcomeOf(harness, tool), "tool outcome");
+            await harness.CloseAsync(Context);
+        });
+
+        yield return Case(prefix + "holds-a-faulted-tools-slot-and-its-graph-node-until-the-work-it-owns-drained", async () =>
+        {
+            var nodes = new Nodes();
+            var setup = Setup();
+            AddTask(setup.Registry, nodes.Node);
+            nodes.Script("held", new Behavior
+            {
+                Abort = async (runtime, ctx) =>
+                {
+                    await nodes.Gate("abort.held").Task;
+                    await runtime.CommitAsync((_, _) => NextTaskState.Aborted(), ctx);
+                },
+            });
+            // Upstream's result returns a function in `details`, which is not strict JSON; a null tool name in control.addTools makes the
+            // same result commit throw here (see HarnessToolsRecoveryCases.cs).
+            AddTool(setup.Registry, Define.Tool(new ToolRegistration
+            {
+                Name = "broken",
+                Description = "Starts owned work, then returns a result that is not strict JSON",
+                Execute = async (_, api, callContext) =>
+                {
+                    await api.CommitAsync(tx => tx.CreateTaskAsync(nodes.Node, NodeInput("held"), Owned(api.TaskId)), callContext);
+                    return new ToolExecutionResult { Output = JsonArrayValue.Empty, Control = new ToolControl { AddTools = [null!] } };
+                },
+            }));
+            setup.Faux.SetResponses(ToolCalls(("broken", "c1")), FauxAssistantMessage("done"));
+            var (harness, root) = await OpenChat(await fresh(), setup);
+            var history = await LiveTests.ViewHistory(harness, root.Id);
+            var graph = await LiveTests.GraphHistoryOf(harness);
+            var submission = await root.SubmitAsync(SubmissionDraft.Input("go"), Context);
+            await Eventually(() => nodes.Logged("abort:held"));
+            var live = (await harness.SnapshotAsync(Live.LiveDoc, root.Id, Context))!;
+            var slot = (JsonObjectValue)((JsonArrayValue)live["tools"])[0];
+            var tool = new TaskId((long)N(slot["taskId"]));
+            MatchJson("""{"status":"completing","outcome":{"status":"faulted"}}""", (await State(harness, tool)).ToJson(), "tool state");
+            Check(StatusOfSlot(slot) != "done", "the slot is not done");
+            // The graph shows the held fault; the task is not terminal yet.
+            await ViewTests.Drained(harness);
+            SameJson("""{"status":"completing","outcome":"faulted"}""", (JsonValue?)graph.Graphs[^1].Node(tool)?.State.ToJson() ?? JsonValue.Null, "graph state");
+            nodes.Open("abort.held");
+            Equal(SubmissionStatus.Done, (await submission.WaitAsync(Context)).Status, "status");
+            Equal("faulted", await OutcomeOf(harness, tool), "tool outcome");
+            await Eventually(() => graph.Graphs[^1].Node(tool) is null);
+            await ViewTests.Drained(harness);
+            // The slot ends done without a result entry.
+            var done = LiveTests.SlotsOf(history.Live(), "c1").FirstOrDefault(each => StatusOfSlot(each) == "done");
+            Check(done is not null, "the slot ends done");
+            Check(!done!.ContainsKey("entry"), "without a result entry");
+            history.Detach();
+            graph.Detach();
+            await harness.CloseAsync(Context);
         });
     }
 }

@@ -20,7 +20,7 @@
 // deferred poll one pi.ai.poll span, through PiSharp.AI's AiTelemetry (Observed). openChat takes HarnessOptions.Telemetry.
 // Pi v1.5.0 sync (area partial-commits): the faux stream keeps a block's text so far in a StringBuilder and writes it into the partial
 // only when an abort reports it. Upstream's `text += chunk` is a V8 rope; a .NET `+=` copied the whole text per chunk, which the streamed
-// partials' cost case (HarnessEventsCases.cs) would count as the Harness's.
+// partials' cost case (HarnessViewRunCases.cs) would count as the Harness's.
 #pragma warning disable PISHARP_IDENTITY001 // PiSharp.AI's ClientIdentity (Pi v1.5.0) is experimental.
 using System.Collections.Concurrent;
 using System.Collections.Immutable;
