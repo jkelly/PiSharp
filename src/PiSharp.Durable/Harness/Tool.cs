@@ -20,6 +20,8 @@
 // - Upstream chains each nested call's admission on the attempt's madeNestedCalls memo, so admissions commit in call order, back to back
 //   once the memo committed. NestedCalls queues them behind the memo and enqueues their commits in call order under one lock, so the
 //   commits (and the task and document IDs they allocate) are upstream's on any thread.
+// - Pi v1.5.0 sync (area telemetry, 2ec55d808): reading the call sets the phase span's tool.name and tool.call_id, and a nested call
+//   answered from its stored result adds pi.durable.replay with the tool name; neither records arguments or output.
 // - performance.now() is a Stopwatch; Math.round is round half up.
 // - A ToolExecutionResult field left null is upstream's undefined: Output null takes the retained output, Details null the last running
 //   details; JsonValue.Null is an explicit null. A C# JsonValue cannot hold undefined, so upstream's copyJson(..., {omitUndefinedProperties})
@@ -242,10 +244,13 @@ internal static class ToolPhases
     private static async Task<JsonObjectValue> ReadCallAsync(ITaskRuntime runtime, ToolInput input, DurableContext context)
     {
         if (input.Nested)
+        {
+            TraceCall(context, input.Call!);
             return input.Call!.SetItem("parent", JsonValue.Object([
                 KeyValuePair.Create("taskId", (JsonValue)input.Parent.ToJson()),
                 KeyValuePair.Create("callId", (JsonValue)input.ParentCallId),
             ]));
+        }
         var entry = await runtime.EntryAsync(Entries.AssistantEntry, input.Assistant, context).ConfigureAwait(false);
         var message = entry?.Model is { Count: > 0 } model ? model[0] as JsonObjectValue : null;
         var call = message is not null && message.TryGetValue("role", out var role) && role is JsonStringValue { Value: "assistant" } &&
@@ -254,8 +259,18 @@ internal static class ToolPhases
                 block.TryGetValue("type", out var type) && type is JsonStringValue { Value: "toolCall" } &&
                 block.TryGetValue("id", out var id) && id is JsonStringValue { Value: var value } && value == input.CallId)
             : null;
-        return call ?? throw new InvalidOperationException($"Entry {input.Assistant.Value} has no tool call {input.CallId}");
+        if (call is null) throw new InvalidOperationException($"Entry {input.Assistant.Value} has no tool call {input.CallId}");
+        TraceCall(context, call);
+        return call;
     }
+
+    /// <summary>The called tool's name and the call ID on the phase span; nothing of the arguments.</summary>
+    private static void TraceCall(DurableContext context, JsonObjectValue call) =>
+        context.Telemetry.SetAttributes(new PiSharp.Telemetry.SpanAttributes
+        {
+            ["tool.name"] = call.TryGetValue("name", out var name) && name is JsonStringValue nameText ? nameText.Value : null,
+            ["tool.call_id"] = call.TryGetValue("id", out var id) && id is JsonStringValue idText ? idText.Value : null,
+        });
 
     private static string Name(JsonObjectValue call) => ((JsonStringValue)call["name"]).Value;
 
@@ -634,6 +649,7 @@ internal static class ToolPhases
             .Add("arguments", args)
             .Build();
         TaskId id = default;
+        var replayed = false;
         await runtime.CommitAsync(async (tx, current) =>
         {
             // Upstream admits a nested call only once the memo committed.
@@ -649,6 +665,7 @@ internal static class ToolPhases
                     JsonValue.DeepEquals(made["arguments"], args);
                 if (!same) throw new InvalidOperationException($"Nested call {parentCallId}/{key} was already made with another tool or other arguments");
                 id = existingId;
+                replayed = state.ContainsKey("result");
                 return;
             }
             var input = new RecordJson.Writer()
@@ -674,6 +691,7 @@ internal static class ToolPhases
                 .Build());
             id = created;
         }, context).ConfigureAwait(false);
+        if (replayed) context.Telemetry.AddEvent("pi.durable.replay", new PiSharp.Telemetry.SpanAttributes { ["tool.name"] = name });
         return id;
     }
 

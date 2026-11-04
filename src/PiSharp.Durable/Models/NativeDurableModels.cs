@@ -11,6 +11,11 @@
 // onPayload (pi-ai's StreamOptions.onPayload, which pi-durable 1.5.0's beforeProviderRequest hook uses, d280e1ffa) applies to the JSON
 // request bodies of its native routes, and of its host routes whose HTTP handler is wrapped for it (PayloadHandler). PiSharp.AI's own
 // payload hooks are per transport and fixed when the transport is built, so they cannot carry a per-request callback.
+// Pi v1.5.0 sync (area telemetry): as pi-ai's Models does (models.ts' observeModelRequest around lazyStream, 2ec55d808), a request with
+// telemetry records one pi.ai.request span around the whole stream, setup failures included, and a deferred poll (streamDeferred,
+// fetchDeferred) one pi.ai.poll span, through PiSharp.AI's AiTelemetry; cancelDeferred records none. The request's ChatRequest carries no
+// span, so the chat run does not record a second one. A failing telemetry adapter never changes a request: observation stops and its span
+// settles. Classifier and image calls forward the span with their options; as pi-ai's, they record no span of their own.
 using System.Collections.Immutable;
 using System.Runtime.CompilerServices;
 using System.Text;
@@ -23,6 +28,7 @@ using PiSharp.Contracts;
 using PiSharp.Contracts.ModelOperations;
 using PiSharp.Durable.Chord;
 using PiSharp.Durable.Internal.PiAi;
+using PiSharp.Telemetry;
 
 namespace PiSharp.Durable;
 
@@ -234,7 +240,12 @@ public sealed class NativeDurableModels : IDurableModels, IDisposable
         operations.Value.GetModelOfType(TypeOf(type), provider, id) is { } model ? Json(model) : null;
 
     /// <inheritdoc/>
-    public async Task<JsonObjectValue> ClassifyAsync(JsonObjectValue model, JsonObjectValue context, CancellationToken cancellationToken)
+    public Task<JsonObjectValue> ClassifyAsync(JsonObjectValue model, JsonObjectValue context, CancellationToken cancellationToken) =>
+        ClassifyAsync(model, context, null, cancellationToken);
+
+    /// <inheritdoc/>
+    public async Task<JsonObjectValue> ClassifyAsync(JsonObjectValue model, JsonObjectValue context, DurableRequestOptions? options,
+        CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(model);
         ArgumentNullException.ThrowIfNull(context);
@@ -249,12 +260,18 @@ public sealed class NativeDurableModels : IDurableModels, IDisposable
         {
             return DurableModelOperations.ClassifierError(model, error.Message, cancellationToken.IsCancellationRequested);
         }
-        var result = await operations.Value.ClassifyAsync(classifier, parsed, null, cancellationToken).ConfigureAwait(false);
+        var request = options?.Telemetry is { } telemetry ? new ClassifierOptions { Telemetry = telemetry } : null;
+        var result = await operations.Value.ClassifyAsync(classifier, parsed, request, cancellationToken).ConfigureAwait(false);
         return (JsonObjectValue)Chord.JsonValue.FromData(ModelOperationJson.WriteClassifierResult(result));
     }
 
     /// <inheritdoc/>
-    public async Task<JsonObjectValue> GenerateImagesAsync(JsonObjectValue model, JsonObjectValue context, CancellationToken cancellationToken)
+    public Task<JsonObjectValue> GenerateImagesAsync(JsonObjectValue model, JsonObjectValue context, CancellationToken cancellationToken) =>
+        GenerateImagesAsync(model, context, null, cancellationToken);
+
+    /// <inheritdoc/>
+    public async Task<JsonObjectValue> GenerateImagesAsync(JsonObjectValue model, JsonObjectValue context, DurableRequestOptions? options,
+        CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(model);
         ArgumentNullException.ThrowIfNull(context);
@@ -269,7 +286,8 @@ public sealed class NativeDurableModels : IDurableModels, IDisposable
         {
             return DurableModelOperations.ImagesError(model, error.Message, cancellationToken.IsCancellationRequested);
         }
-        var result = await operations.Value.GenerateImagesAsync(image, parsed, null, cancellationToken).ConfigureAwait(false);
+        var request = options?.Telemetry is { } telemetry ? new ImagesOptions { Telemetry = telemetry } : null;
+        var result = await operations.Value.GenerateImagesAsync(image, parsed, request, cancellationToken).ConfigureAwait(false);
         return (JsonObjectValue)Chord.JsonValue.FromData(ModelOperationJson.WriteAssistantImages(result));
     }
 
@@ -279,7 +297,47 @@ public sealed class NativeDurableModels : IDurableModels, IDisposable
     {
         ArgumentNullException.ThrowIfNull(model);
         ObjectDisposedException.ThrowIf(Volatile.Read(ref disposed) != 0, this);
-        return StreamAsync(model, messages, options, cancellationToken);
+        var stream = StreamAsync(model, messages, options, cancellationToken);
+        return options?.Telemetry is { } telemetry ? ObserveAsync(stream, model, telemetry, options.Reasoning, poll: false) : stream;
+    }
+
+    /// <summary>pi-ai's <c>observeModelRequest</c> around a lazy stream: a <c>pi.ai.request</c> (<c>pi.ai.poll</c>) span under
+    /// <paramref name="telemetry"/> from the stream's start to its end, fed every event and the final message, or none when the reader stops
+    /// early. A throwing adapter ends the observation and settles the span; the stream is unchanged.</summary>
+    private async IAsyncEnumerable<StreamEvent> ObserveAsync(IAsyncEnumerable<StreamEvent> events, DurableModel model, ITelemetrySpan telemetry,
+        string? reasoning, bool poll, [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    {
+        AiRequestObserver? observer;
+        try { observer = AiTelemetry.ObserveModelRequest(model.Descriptor, telemetry, reasoning, poll, time); }
+        catch (Exception) { observer = null; }
+        AssistantMessage? final = null;
+        try
+        {
+            await foreach (var value in events.WithCancellation(cancellationToken).ConfigureAwait(false))
+            {
+                if (observer is not null)
+                {
+                    try { observer.OnEvent(value); }
+                    catch (Exception)
+                    {
+                        Settle(observer, null);
+                        observer = null;
+                    }
+                }
+                if (value is StreamTerminalEvent terminal) final = terminal.Message;
+                yield return value;
+            }
+        }
+        finally
+        {
+            if (observer is not null) Settle(observer, final);
+        }
+
+        static void Settle(AiRequestObserver observer, AssistantMessage? message)
+        {
+            try { observer.OnResult(message); }
+            catch (Exception) { /* The span settled in OnResult's own finally; the failure is the adapter's. */ }
+        }
     }
 
     private async IAsyncEnumerable<StreamEvent> StreamAsync(DurableModel model, ImmutableArray<Chord.JsonValue> messages, DurableStreamOptions? options,
@@ -460,27 +518,50 @@ public sealed class NativeDurableModels : IDurableModels, IDisposable
 
     /// <summary>pi-ai <c>streamDeferred</c>: no PiSharp.AI transport implements deferred responses (nor does any pi-ai 1.2.0 provider but the faux test provider), so the
     /// stream ends with an error message naming the gap, as pi-ai's does for a provider without <c>fetchDeferred</c>.</summary>
-    public async IAsyncEnumerable<StreamEvent> StreamDeferred(DurableModel model, DurableDeferredHandle handle,
-        [EnumeratorCancellation] CancellationToken cancellationToken)
+    public IAsyncEnumerable<StreamEvent> StreamDeferred(DurableModel model, DurableDeferredHandle handle, CancellationToken cancellationToken) =>
+        StreamDeferred(model, handle, null, cancellationToken);
+
+    /// <summary><see cref="StreamDeferred(DurableModel, DurableDeferredHandle, CancellationToken)"/>; with telemetry, the poll is a
+    /// <c>pi.ai.poll</c> span.</summary>
+    public IAsyncEnumerable<StreamEvent> StreamDeferred(DurableModel model, DurableDeferredHandle handle, DurableRequestOptions? options,
+        CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(model);
         ArgumentNullException.ThrowIfNull(handle);
+        var stream = DeferredAsync(model, cancellationToken);
+        return options?.Telemetry is { } telemetry ? ObserveAsync(stream, model, telemetry, null, poll: true) : stream;
+    }
+
+    private async IAsyncEnumerable<StreamEvent> DeferredAsync(DurableModel model, [EnumeratorCancellation] CancellationToken cancellationToken)
+    {
         await Task.CompletedTask.ConfigureAwait(false);
         yield return new StreamError(StopReason.Error, ErrorMessage(model, time.GetUtcNow().ToUnixTimeMilliseconds(), StopReason.Error, DeferredGap(model)));
     }
 
-    /// <summary>pi-ai <c>fetchDeferred</c>: the error message of <see cref="StreamDeferred"/>.</summary>
-    public async Task<AssistantMessage> FetchDeferredAsync(DurableModel model, DurableDeferredHandle handle, CancellationToken cancellationToken)
+    /// <summary>pi-ai <c>fetchDeferred</c>: the error message of <see cref="StreamDeferred(DurableModel, DurableDeferredHandle, CancellationToken)"/>.</summary>
+    public Task<AssistantMessage> FetchDeferredAsync(DurableModel model, DurableDeferredHandle handle, CancellationToken cancellationToken) =>
+        FetchDeferredAsync(model, handle, null, cancellationToken);
+
+    /// <summary><see cref="FetchDeferredAsync(DurableModel, DurableDeferredHandle, CancellationToken)"/>; with telemetry, the poll is a
+    /// <c>pi.ai.poll</c> span.</summary>
+    public async Task<AssistantMessage> FetchDeferredAsync(DurableModel model, DurableDeferredHandle handle, DurableRequestOptions? options,
+        CancellationToken cancellationToken)
     {
         AssistantMessage? final = null;
-        await foreach (var value in StreamDeferred(model, handle, cancellationToken).ConfigureAwait(false))
+        await foreach (var value in StreamDeferred(model, handle, options, cancellationToken).ConfigureAwait(false))
             if (value is StreamTerminalEvent terminal) final = terminal.Message;
         return final!;
     }
 
     /// <summary>pi-ai <c>cancelDeferred</c>: throws <see cref="NotSupportedException"/>, as pi-ai throws for a provider without
     /// <c>cancelDeferred</c>.</summary>
-    public Task CancelDeferredAsync(DurableModel model, DurableDeferredHandle handle, CancellationToken cancellationToken)
+    public Task CancelDeferredAsync(DurableModel model, DurableDeferredHandle handle, CancellationToken cancellationToken) =>
+        CancelDeferredAsync(model, handle, null, cancellationToken);
+
+    /// <summary><see cref="CancelDeferredAsync(DurableModel, DurableDeferredHandle, CancellationToken)"/>; as pi-ai's, it records no
+    /// span.</summary>
+    public Task CancelDeferredAsync(DurableModel model, DurableDeferredHandle handle, DurableRequestOptions? options,
+        CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(model);
         ArgumentNullException.ThrowIfNull(handle);

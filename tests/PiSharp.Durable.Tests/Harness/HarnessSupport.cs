@@ -14,6 +14,7 @@
 // - vi.useFakeTimers is ManualTimeProvider passed as HarnessOptions.TimeProvider (with Now reading it); it counts live timers as
 //   vi.getTimerCount() does.
 // - Pi v1.5.0 sync (area sleep): openTasks takes onWake and setTimer, as f75b3240a's task-support.ts does.
+// - Pi v1.5.0 sync (area telemetry): openTasks takes HarnessOptions.Telemetry, as 8b0caefc2's task-support.ts does.
 using PiSharp.Durable;
 using PiSharp.Durable.Chord;
 using static Program;
@@ -201,7 +202,7 @@ internal static partial class HarnessTests
     /// in <c>Infos</c> (upstream <c>openTasks</c>).</summary>
     internal static async Task<OpenedTasks> OpenTasks(IStorage storage, IReadOnlyList<DurableTask> tasks, IRegistry? registry = null,
         Func<double>? now = null, HarnessSettings? settings = null, TimeProvider? timeProvider = null, IDurableModels? models = null,
-        SetTimer? setTimer = null, Action<Wake>? onWake = null)
+        SetTimer? setTimer = null, Action<Wake>? onWake = null, PiSharp.Telemetry.ITelemetryContext? telemetry = null)
     {
         registry ??= Registry.Create();
         if (tasks.Count > 0) registry.Install(Define.Extension(new Extension { Name = "tasks", Tasks = [.. tasks] }));
@@ -224,6 +225,7 @@ internal static partial class HarnessTests
             TimeProvider = timeProvider,
             SetTimer = setTimer,
             OnWake = onWake,
+            Telemetry = telemetry,
         }, Context);
         return new OpenedTasks(harness, registry, reports) { Infos = infos };
     }

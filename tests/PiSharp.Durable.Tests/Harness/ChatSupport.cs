@@ -15,13 +15,18 @@
 // - `new Proxy(models, { get })` overriding streamSimple or cancelDeferred is ModelsOverride, a decorator.
 // - waitFor (a 5 ms poll for at most 5 s) is Eventually (a bounded poll of about 20 s): only how long a slow machine may take differs.
 // Pi v1.5.0 sync (area model-requests): ChatSetup.Identity, the setup's HarnessOptions.Identity (upstream adc5fa9f8).
+// Pi v1.5.0 sync (area telemetry): as the faux provider is registered in pi-ai's Models, whose streamSimple and deferred polls observe
+// each request (models.ts' observeModelRequest, 2ec55d808), a request whose options carry telemetry is one pi.ai.request span and a
+// deferred poll one pi.ai.poll span, through PiSharp.AI's AiTelemetry (Observed). openChat takes HarnessOptions.Telemetry.
 #pragma warning disable PISHARP_IDENTITY001 // PiSharp.AI's ClientIdentity (Pi v1.5.0) is experimental.
 using System.Collections.Concurrent;
 using System.Collections.Immutable;
 using System.Runtime.CompilerServices;
+using PiSharp.AI;
 using PiSharp.Contracts;
 using PiSharp.Durable;
 using PiSharp.Durable.Chord;
+using PiSharp.Telemetry;
 using static HarnessTests;
 using static SessionTests;
 
@@ -78,10 +83,12 @@ internal static class ChatTests
     /// <summary>Opens a Harness over <paramref name="storage"/> and returns its root, configured with the faux model on first creation
     /// (upstream <c>openChat</c>).</summary>
     internal static async Task<OpenedChat> OpenChat(IStorage storage, ChatSetup setup,
-        Func<EnvTarget, DurableContext, Task<PiSharp.Durable.Env.IExecutionEnv?>>? env = null, TimeProvider? timeProvider = null)
+        Func<EnvTarget, DurableContext, Task<PiSharp.Durable.Env.IExecutionEnv?>>? env = null, TimeProvider? timeProvider = null,
+        ITelemetryContext? telemetry = null)
     {
         var harness = await Harness.OpenAsync(storage, new HarnessOptions
         {
+            Telemetry = telemetry,
             TimeProvider = timeProvider,
             Models = setup.Models,
             Identity = setup.Identity,
@@ -415,8 +422,41 @@ internal sealed class FauxModels : IDurableModels
             if (step is not null) pending.RemoveAt(0);
         }
         State.Called();
-        return StreamAsync(model, messages, options, step, cancellationToken);
+        var stream = StreamAsync(model, messages, options, step, cancellationToken);
+        return options?.Telemetry is { } telemetry ? Observed(stream, model, telemetry, options.Reasoning, poll: false) : stream;
     }
+
+    /// <summary>pi-ai Models' <c>observeModelRequest</c> around a request: a <c>pi.ai.request</c> (<c>pi.ai.poll</c>) span under
+    /// <paramref name="telemetry"/>, fed every event and the final message.</summary>
+    internal static async IAsyncEnumerable<StreamEvent> Observed(IAsyncEnumerable<StreamEvent> events, DurableModel model, ITelemetrySpan telemetry,
+        string? reasoning, bool poll, [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    {
+        var observer = AiTelemetry.ObserveModelRequest(model.Descriptor, telemetry, reasoning, poll);
+        AssistantMessage? final = null;
+        try
+        {
+            await foreach (var value in events.WithCancellation(cancellationToken))
+            {
+                observer.OnEvent(value);
+                if (value is StreamTerminalEvent terminal) final = terminal.Message;
+                yield return value;
+            }
+        }
+        finally
+        {
+            observer.OnResult(final);
+        }
+    }
+
+    public IAsyncEnumerable<StreamEvent> StreamDeferred(DurableModel model, DurableDeferredHandle handle, DurableRequestOptions? options,
+        CancellationToken cancellationToken)
+    {
+        var stream = StreamDeferred(model, handle, cancellationToken);
+        return options?.Telemetry is { } telemetry ? Observed(stream, model, telemetry, null, poll: true) : stream;
+    }
+
+    public async Task<AssistantMessage> FetchDeferredAsync(DurableModel model, DurableDeferredHandle handle, DurableRequestOptions? options,
+        CancellationToken cancellationToken) => await TerminalOf(StreamDeferred(model, handle, options, cancellationToken));
 
     private async IAsyncEnumerable<StreamEvent> StreamAsync(DurableModel model, ImmutableArray<JsonValue> messages, DurableStreamOptions? options,
         FauxStep? step, [EnumeratorCancellation] CancellationToken cancellationToken)

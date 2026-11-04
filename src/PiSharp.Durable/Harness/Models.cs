@@ -16,12 +16,18 @@
 // that offers no classifier or image models implements nothing: no catalog entries, and every call an error result.
 // Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/ai/src/types.ts (StreamOptions identity and onPayload) and
 // packages/ai/src/utils/identity.ts (withClientIdentity), which pi-durable 1.5.0's Harness identity and beforeProviderRequest hook use
-// (area model-requests). IDurableModels' deferred, classifier and image calls take no request options, so withClientIdentity reaches
-// its chat requests only.
+// (area model-requests). IDurableModels' deferred, classifier and image calls take no identity, so withClientIdentity reaches its chat
+// requests only.
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/ai/src/types.ts (StreamOptions.telemetry) and packages/ai/src/models.ts
+// (ModelsDeferredFetchOptions, ModelsDeferredCancelOptions, ModelsClassifierOptions, ModelsImagesOptions: their telemetry), which
+// pi-durable 1.5.0 passes a phase's span through (area telemetry, 2ec55d808). DurableStreamOptions.Telemetry rides with a chat request;
+// the deferred, classifier and image calls take a DurableRequestOptions in overloads whose defaults drop it, so a host's IDurableModels
+// written before them keeps working and records nothing. pi-ai's Models records pi.ai.request and pi.ai.poll spans under it.
 using System.Collections.Immutable;
 using PiSharp.AI;
 using PiSharp.Contracts;
 using PiSharp.Durable.Chord;
+using PiSharp.Telemetry;
 
 namespace PiSharp.Durable;
 
@@ -157,6 +163,18 @@ public sealed record DurableStreamOptions
     /// of its routes, its host routes included when the host's handler is wrapped for it; other model access may ignore it.
     /// </summary>
     public Func<JsonValue, DurableModel, CancellationToken, Task<JsonValue?>>? OnPayload { get; init; }
+    /// <summary>The parent span of the request's <c>pi.ai.request</c> span (pi-ai <c>telemetry</c>, Pi v1.5.0); a Harness passes the phase's
+    /// span. Null: nothing is recorded.</summary>
+    public ITelemetrySpan? Telemetry { get; init; }
+}
+
+/// <summary>Options of a deferred, classifier or image call (pi-ai <c>ModelsDeferredFetchOptions</c>, <c>ModelsDeferredCancelOptions</c>,
+/// <c>ModelsClassifierOptions</c> and <c>ModelsImagesOptions</c>, the field durable sets; the signal is the call's cancellation token).</summary>
+public sealed record DurableRequestOptions
+{
+    /// <summary>The parent span of the call's telemetry (pi-ai <c>telemetry</c>, Pi v1.5.0): a deferred poll records a <c>pi.ai.poll</c> span
+    /// under it. Null: nothing is recorded.</summary>
+    public ITelemetrySpan? Telemetry { get; init; }
 }
 
 /// <summary>A provider-side deferred response (pi-ai <c>DeferredHandle</c>), kept as its wire JSON <c>{provider, modelId, api, id,
@@ -195,6 +213,22 @@ public interface IDurableModels
     /// <summary>Best-effort cancellation of a deferred response (pi-ai <c>cancelDeferred</c>).</summary>
     Task CancelDeferredAsync(DurableModel model, DurableDeferredHandle handle, CancellationToken cancellationToken);
 
+    /// <summary><see cref="StreamDeferred(DurableModel, DurableDeferredHandle, CancellationToken)"/> with request options (pi-ai
+    /// <c>streamDeferred(model, handle, options)</c>): a poll records <c>pi.ai.poll</c> under <see cref="DurableRequestOptions.Telemetry"/>.
+    /// Default: the options are dropped.</summary>
+    IAsyncEnumerable<StreamEvent> StreamDeferred(DurableModel model, DurableDeferredHandle handle, DurableRequestOptions? options,
+        CancellationToken cancellationToken) => StreamDeferred(model, handle, cancellationToken);
+
+    /// <summary><see cref="FetchDeferredAsync(DurableModel, DurableDeferredHandle, CancellationToken)"/> with request options (pi-ai
+    /// <c>fetchDeferred(model, handle, options)</c>). Default: the options are dropped.</summary>
+    Task<AssistantMessage> FetchDeferredAsync(DurableModel model, DurableDeferredHandle handle, DurableRequestOptions? options,
+        CancellationToken cancellationToken) => FetchDeferredAsync(model, handle, cancellationToken);
+
+    /// <summary><see cref="CancelDeferredAsync(DurableModel, DurableDeferredHandle, CancellationToken)"/> with request options (pi-ai
+    /// <c>cancelDeferred(model, handle, options)</c>, which records no span). Default: the options are dropped.</summary>
+    Task CancelDeferredAsync(DurableModel model, DurableDeferredHandle handle, DurableRequestOptions? options,
+        CancellationToken cancellationToken) => CancelDeferredAsync(model, handle, cancellationToken);
+
     /// <summary>pi-ai <c>getModelsOfType(type, provider?)</c>: the catalog's models of one type (<c>"chat"</c>, <c>"image"</c> or
     /// <c>"classifier"</c>) as pi-ai model JSON, of <paramref name="provider"/> or of every provider. Default: none.</summary>
     ImmutableArray<JsonObjectValue> GetModelsOfType(string type, string? provider) => [];
@@ -216,12 +250,22 @@ public interface IDurableModels
         Task.FromResult(DurableModelOperations.ClassifierError(model,
             $"Provider {DurableModelOperations.Field(model, "provider")} does not support classification", cancellationToken.IsCancellationRequested));
 
+    /// <summary><see cref="ClassifyAsync(JsonObjectValue, JsonObjectValue, CancellationToken)"/> with request options (pi-ai
+    /// <c>classify(model, context, { signal, telemetry })</c>). Default: the options are dropped.</summary>
+    Task<JsonObjectValue> ClassifyAsync(JsonObjectValue model, JsonObjectValue context, DurableRequestOptions? options,
+        CancellationToken cancellationToken) => ClassifyAsync(model, context, cancellationToken);
+
     /// <summary>pi-ai <c>generateImages(model, context, { signal })</c>: an <c>AssistantImages</c>. Never throws for a request failure: it
     /// returns an error result (<see cref="DurableModelOperations.ImagesError"/>), as pi-ai does. Default: the error of a provider without
     /// image generation.</summary>
     Task<JsonObjectValue> GenerateImagesAsync(JsonObjectValue model, JsonObjectValue context, CancellationToken cancellationToken) =>
         Task.FromResult(DurableModelOperations.ImagesError(model,
             $"Provider {DurableModelOperations.Field(model, "provider")} does not support image generation", cancellationToken.IsCancellationRequested));
+
+    /// <summary><see cref="GenerateImagesAsync(JsonObjectValue, JsonObjectValue, CancellationToken)"/> with request options (pi-ai
+    /// <c>generateImages(model, context, { signal, telemetry })</c>). Default: the options are dropped.</summary>
+    Task<JsonObjectValue> GenerateImagesAsync(JsonObjectValue model, JsonObjectValue context, DurableRequestOptions? options,
+        CancellationToken cancellationToken) => GenerateImagesAsync(model, context, cancellationToken);
 }
 
 /// <summary>pi-ai's model operation results (<c>utils/model-operations.ts</c>) as wire JSON.</summary>
@@ -291,7 +335,7 @@ public static class DurableModelIdentity
     /// <paramref name="models"/> with <paramref name="identity"/> as the default identity of its requests (pi-ai <c>withClientIdentity</c>):
     /// a request's <see cref="DurableStreamOptions.Identity"/> overrides it field by field, and it overrides the identity
     /// <paramref name="models"/> was created with. Everything else is delegated unchanged. The deferred, classifier and image calls take no
-    /// request options, so they keep the identity <paramref name="models"/> gives them.
+    /// identity, so they keep the identity <paramref name="models"/> gives them.
     /// </summary>
     public static IDurableModels WithClientIdentity(IDurableModels models, ClientIdentity identity)
     {
@@ -321,6 +365,21 @@ public static class DurableModelIdentity
 
         public Task CancelDeferredAsync(DurableModel model, DurableDeferredHandle handle, CancellationToken cancellationToken) =>
             inner.CancelDeferredAsync(model, handle, cancellationToken);
+
+        public IAsyncEnumerable<StreamEvent> StreamDeferred(DurableModel model, DurableDeferredHandle handle, DurableRequestOptions? options,
+            CancellationToken cancellationToken) => inner.StreamDeferred(model, handle, options, cancellationToken);
+
+        public Task<AssistantMessage> FetchDeferredAsync(DurableModel model, DurableDeferredHandle handle, DurableRequestOptions? options,
+            CancellationToken cancellationToken) => inner.FetchDeferredAsync(model, handle, options, cancellationToken);
+
+        public Task CancelDeferredAsync(DurableModel model, DurableDeferredHandle handle, DurableRequestOptions? options,
+            CancellationToken cancellationToken) => inner.CancelDeferredAsync(model, handle, options, cancellationToken);
+
+        public Task<JsonObjectValue> ClassifyAsync(JsonObjectValue model, JsonObjectValue context, DurableRequestOptions? options,
+            CancellationToken cancellationToken) => inner.ClassifyAsync(model, context, options, cancellationToken);
+
+        public Task<JsonObjectValue> GenerateImagesAsync(JsonObjectValue model, JsonObjectValue context, DurableRequestOptions? options,
+            CancellationToken cancellationToken) => inner.GenerateImagesAsync(model, context, options, cancellationToken);
 
         public ImmutableArray<JsonObjectValue> GetModelsOfType(string type, string? provider) => inner.GetModelsOfType(type, provider);
 

@@ -6,6 +6,11 @@
 // thread completed them), so its shared state is guarded by one lock that is never held across an await or a user callback. Document
 // values are immutable JsonValue trees: upstream's copyJson of initializer, migration and table values is not needed, because an
 // immutable value cannot be changed by its caller after it is handed over and cannot hold anything but strict JSON.
+//
+// Pi v1.5.0 sync (area telemetry, 2ec55d808): a created task records its trace: the option's carrier, none for "root", else the carrier
+// the commit context's span injects (none without propagation); a run's generation (CreateTaskAsync with submission IDs) takes the
+// first submission's carrier as its trace and links the others'. Once settled, the transaction drops its commit context (and with it the
+// caller's span) for the background context. The citation stays on v1.2.0 until the file's other areas land.
 using System.Collections.Immutable;
 using PiSharp.Durable.Chord;
 using PiSharp.Durable.Chord.Delta;
@@ -68,7 +73,8 @@ internal sealed class Transaction : ITx
 
     private readonly Lock gate = new();
     private readonly ITransactionHost host;
-    private readonly DurableContext context;
+    // The commit context; the background context once settled, so a finished commit keeps no caller span alive.
+    private volatile DurableContext context;
     private readonly TransactionScope scope;
     private readonly HashSet<Task> pendingOperations = [];
     private volatile bool sealedState;
@@ -244,13 +250,33 @@ internal sealed class Transaction : ITx
         return record;
     });
 
-    public Task<TaskId> CreateTaskAsync(DurableTask task, JsonValue input, TaskOptions options)
+    public Task<TaskId> CreateTaskAsync(DurableTask task, JsonValue input, TaskOptions options) => CreateTaskAsync(task, input, options, null);
+
+    /// <summary>Internal: <see cref="CreateTaskAsync(DurableTask, JsonValue, TaskOptions)"/> for a run's generation (upstream
+    /// <c>TaskCreationOptions.submissionIds</c>): the first submission's carrier is its trace, or none (<c>"root"</c>), and the others'
+    /// carriers its links. Submissions are read staged first, then from storage.</summary>
+    internal Task<TaskId> CreateTaskAsync(DurableTask task, JsonValue input, TaskOptions options, IReadOnlyList<SubmissionId>? submissionIds)
     {
         ArgumentNullException.ThrowIfNull(task);
         ArgumentNullException.ThrowIfNull(input);
         ArgumentNullException.ThrowIfNull(options);
         return Write(async () =>
         {
+            if (submissionIds is not null)
+            {
+                TaskTrace? runTrace = null;
+                List<IReadOnlyDictionary<string, string>>? links = null;
+                for (var index = 0; index < submissionIds.Count; index++)
+                {
+                    var submissionId = submissionIds[index];
+                    SubmissionRecord? staged;
+                    lock (gate) staged = submissions.GetValueOrDefault(submissionId);
+                    var submission = staged ?? await host.Storage.GetSubmissionAsync(submissionId, context).ConfigureAwait(false);
+                    if (index == 0) runTrace = submission?.Trace is { } first ? TaskTrace.Of(first) : TaskTrace.Root;
+                    else if (submission?.Trace is { } carrier) (links ??= []).Add(carrier);
+                }
+                options = options with { Trace = runTrace, Links = links };
+            }
             TaskRecord? owner = null;
             if (options.Ownership.TaskId is { } ownerId)
             {
@@ -270,9 +296,12 @@ internal sealed class Transaction : ITx
             var checkpoint = definition.Initial(input) ?? throw new InvalidOperationException($"Task {definition.Name} initial() must return JSON");
             var id = await host.Storage.MintIdAsync<TaskId>().ConfigureAwait(false);
             AssertOpen();
+            var telemetry = context.Telemetry;
+            var trace = options.Trace is { } explicitTrace ? explicitTrace.Carrier : telemetry.Propagation?.Inject(telemetry);
             var record = new TaskRecord
             {
-                Id = id, ConversationId = conversationId, Kind = definition.Name, Version = definition.Version, Input = input, Owner = owner?.Id,
+                Id = id, ConversationId = conversationId, Kind = definition.Name, Version = definition.Version, Input = input,
+                Trace = trace, Links = options.Links, Owner = owner?.Id,
                 Background = options.Background ?? false, AbortRequested = false, AbandonOnRestart = options.AbandonOnRestart == true,
                 State = new PendingTaskState(checkpoint),
             };
@@ -518,6 +547,7 @@ internal sealed class Transaction : ITx
         sealedState = true;
         AbortChanges();
         await DrainPendingAsync().ConfigureAwait(false);
+        context = DurableContext.Background;
     }
 
     /// <summary>Seals after callback success, prepares every open change and assembles the atomic batch. Any failure aborts every change
@@ -531,6 +561,7 @@ internal sealed class Transaction : ITx
         {
             AbortChanges();
             await DrainPendingAsync().ConfigureAwait(false);
+            context = DurableContext.Background;
             throw new InvalidOperationException("Session commit callback settled before its pending Tx operations");
         }
         try
@@ -544,6 +575,10 @@ internal sealed class Transaction : ITx
         {
             AbortChanges();
             throw;
+        }
+        finally
+        {
+            context = DurableContext.Background;
         }
     }
 

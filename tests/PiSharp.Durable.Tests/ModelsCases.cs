@@ -5,6 +5,7 @@ using System.Text.Json;
 using PiSharp.Contracts;
 using PiSharp.Durable;
 using PiSharp.Durable.Chord;
+using PiSharp.Telemetry;
 
 // NativeDurableModels (decision 0005, P8): the production IDurableModels over PiSharp.AI. Authored native cases, fully offline: every
 // request goes to a recording HttpMessageHandler that serves recorded SSE, every environment is an injected dictionary (never the process
@@ -12,6 +13,10 @@ using PiSharp.Durable.Chord;
 // Pi v1.5.0 sync (area model-requests): models.payload.on-payload-replaces-the-json-request-body-and-null-keeps-it (pi-ai's onPayload,
 // which pi-durable 1.5.0's beforeProviderRequest uses, d280e1ffa) and models.identity.a-request-identity-sets-the-user-agent (pi-ai's
 // StreamOptions.identity, which the Harness identity sets, adc5fa9f8).
+// Pi v1.5.0 sync (area telemetry): models.telemetry.* pin NativeDurableModels' observation, as pi-ai's Models observes each request
+// (models.ts' observeModelRequest around lazyStream, 2ec55d808): a request with telemetry is one pi.ai.request span, a deferred poll one
+// pi.ai.poll span, a cancel none, all under the caller's span and content-free; a throwing adapter never changes the request. Every
+// span is recorded in process by InMemoryTelemetryContext.
 #pragma warning disable PISHARP_IDENTITY001 // PiSharp.AI's ClientIdentity (Pi v1.5.0) is experimental.
 internal static partial class Program
 {
@@ -389,7 +394,97 @@ internal static partial class Program
             var thrown = await ThrowsAsync<NotSupportedException>(() => models.CancelDeferredAsync(model, handle, CancellationToken.None), "cancel gap");
             Check(thrown.Message.Contains("deferred", StringComparison.Ordinal), "names deferred");
         }),
+        Case("models.telemetry.records-one-pi-ai-request-span-per-request-and-one-pi-ai-poll-span-per-deferred-poll", async () =>
+        {
+            using var models = Models(new() { ["OPENAI_API_KEY"] = "test-openai-key" }, new RecordingHandler(_ => Sse(ResponsesText)));
+            var model = models.GetModel("openai", "gpt-4.1")!;
+            var handle = new DurableDeferredHandle(JsonValue.Object([new("provider", "openai"), new("modelId", "gpt-4.1"), new("api", "openai-responses"), new("id", "d1")]));
+            var telemetry = new InMemoryTelemetryContext();
+            await telemetry.StartSpanAsync("phase", async span =>
+            {
+                var answer = await models.CompleteSimpleAsync(model, UserTurn("private-prompt"), new DurableStreamOptions { Telemetry = span }, CancellationToken.None);
+                Equal(StopReason.Stop, answer.StopReason, "request answered");
+                var options = new DurableRequestOptions { Telemetry = span };
+                Equal(StopReason.Error, (await models.FetchDeferredAsync(model, handle, options, CancellationToken.None)).StopReason, "fetch gap");
+                Check((await Collect(models.StreamDeferred(model, handle, options, CancellationToken.None))).Single() is StreamError, "stream gap");
+                await ThrowsAsync<NotSupportedException>(() => models.CancelDeferredAsync(model, handle, options, CancellationToken.None), "cancel gap");
+                return 0;
+            });
+            var spans = telemetry.GetSpans();
+            var phase = spans.Single(span => span.Name == "phase");
+            var requests = spans.Where(span => span.Name == PiSharp.AI.AiTelemetry.RequestSpanName).ToList();
+            var polls = spans.Where(span => span.Name == PiSharp.AI.AiTelemetry.PollSpanName).ToList();
+            Equal(1, requests.Count, "one pi.ai.request span: the chat run records none of its own");
+            Equal(2, polls.Count, "one pi.ai.poll span per deferred poll");
+            Equal(4, spans.Count, "the cancel records no span");
+            foreach (var span in spans.Where(span => span.Id != phase.Id))
+            {
+                Equal(phase.Id, span.ParentId, span.Name + " parent");
+                Check(span.Settled, span.Name + " settled");
+                Check(span.Attributes["provider"] is { } provider && provider.Equals((AttributeValue)"openai"), span.Name + " provider");
+                Check(span.Attributes["model"] is { } id && id.Equals((AttributeValue)"gpt-4.1"), span.Name + " model");
+            }
+            Check(!requests[0].Status.IsError, "the answered request is ok");
+            foreach (var poll in polls) Equal("provider_error", poll.Status.Error?.Name, "a poll that ends in an error message");
+            var recorded = JsonSerializer.Serialize(spans);
+            Check(!recorded.Contains("private-prompt", StringComparison.Ordinal) && !recorded.Contains("Hello world", StringComparison.Ordinal),
+                "no prompt or output recorded: " + recorded);
+        }),
+        Case("models.telemetry.a-throwing-adapter-never-changes-the-request-and-its-span-settles", async () =>
+        {
+            using var models = Models(new() { ["OPENAI_API_KEY"] = "test-openai-key" }, new RecordingHandler(_ => Sse(ResponsesText)));
+            var model = models.GetModel("openai", "gpt-4.1")!;
+            var refused = await models.CompleteSimpleAsync(model, UserTurn("hi"), new DurableStreamOptions { Telemetry = new RefusingSpans() }, CancellationToken.None);
+            Equal(StopReason.Stop, refused.StopReason, "a span that cannot start");
+            var telemetry = new InMemoryTelemetryContext();
+            await telemetry.StartSpanAsync("phase", async span =>
+            {
+                var events = await Collect(models.StreamSimple(model, UserTurn("hi"), new DurableStreamOptions { Telemetry = new ThrowingChildEvents(span) },
+                    CancellationToken.None));
+                Equal("Hello world", string.Concat(events.OfType<TextDelta>().Select(delta => delta.Delta)), "every delta still arrives");
+                Equal(StopReason.Stop, ((StreamDone)events[^1]).Reason, "the stream still ends done");
+                return 0;
+            });
+            var request = telemetry.GetSpans().Single(span => span.Name == PiSharp.AI.AiTelemetry.RequestSpanName);
+            Check(request.Settled, "the observed span settles once observation stops");
+        }),
     ];
+
+    /// <summary>A telemetry parent whose spans cannot start.</summary>
+    private sealed class RefusingSpans : ITelemetrySpan
+    {
+        public ITelemetryMetrics? Metrics => NoopTelemetry.Metrics;
+        public ITelemetryPropagation? Propagation => NoopTelemetry.Propagation;
+        public Task<T> StartSpanAsync<T>(SpanOptions options, Func<ITelemetrySpan, Task<T>> callback) => throw new InvalidOperationException("telemetry down");
+        public void AddLink(SpanLink link) { }
+        public void AddEvent(string name, SpanAttributes? attributes = null) { }
+        public void SetAttributes(SpanAttributes attributes) { }
+        public void SetStatus(SpanStatus status) { }
+    }
+
+    /// <summary>A recorded telemetry parent whose child spans throw on every event.</summary>
+    private sealed class ThrowingChildEvents(ITelemetrySpan inner) : ITelemetrySpan
+    {
+        public ITelemetryMetrics? Metrics => inner.Metrics;
+        public ITelemetryPropagation? Propagation => inner.Propagation;
+        public Task<T> StartSpanAsync<T>(SpanOptions options, Func<ITelemetrySpan, Task<T>> callback) =>
+            inner.StartSpanAsync(options, child => callback(new ThrowingEvents(child)));
+        public void AddLink(SpanLink link) => inner.AddLink(link);
+        public void AddEvent(string name, SpanAttributes? attributes = null) => inner.AddEvent(name, attributes);
+        public void SetAttributes(SpanAttributes attributes) => inner.SetAttributes(attributes);
+        public void SetStatus(SpanStatus status) => inner.SetStatus(status);
+
+        private sealed class ThrowingEvents(ITelemetrySpan span) : ITelemetrySpan
+        {
+            public ITelemetryMetrics? Metrics => span.Metrics;
+            public ITelemetryPropagation? Propagation => span.Propagation;
+            public Task<T> StartSpanAsync<T>(SpanOptions options, Func<ITelemetrySpan, Task<T>> callback) => span.StartSpanAsync(options, callback);
+            public void AddLink(SpanLink link) => span.AddLink(link);
+            public void AddEvent(string name, SpanAttributes? attributes = null) => throw new InvalidOperationException("telemetry down");
+            public void SetAttributes(SpanAttributes attributes) => span.SetAttributes(attributes);
+            public void SetStatus(SpanStatus status) => span.SetStatus(status);
+        }
+    }
 
     // ── Helpers ─────────────────────────────────────────────────────────
 
