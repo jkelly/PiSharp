@@ -13,6 +13,8 @@
 // - TypeScript type-level assertions are compile-time overload checks here (see SessionDefinitionsCases.cs).
 // - A watch listener's destructured call, ({ value, ops, retired }, context), is Change(call): a Durable watch delivers value calls only
 //   (Pi v1.5.0 sync, area watches).
+// - ControlledStorage.Adopting is v1.5.0's adopting (Pi v1.5.0 sync, area observers): set while Storage runs a commit's receive. PiSharp
+//   publishes a stored commit after its Storage call returned, so observers see it unset, as v1.5.0's do.
 using System.Collections.Immutable;
 using PiSharp.Durable;
 using PiSharp.Durable.Chord;
@@ -193,12 +195,16 @@ internal sealed class ControlledStorage(IStorage inner) : IStorage
     private Exception? commitFailure;
     private int mintCount;
     private int documentReadCount;
+    private bool adopting;
 
     /// <summary>Exact borrowed batches admitted by the Session.</summary>
     public List<IReadOnlyList<StorageWrite>> AdmittedCommits { get; } = [];
     /// <summary>Detached batches for value assertions.</summary>
     public List<ImmutableArray<StorageWrite>> Commits { get; } = [];
     public int MintCount => Volatile.Read(ref mintCount);
+    /// <summary>Set while a receipt runs, Storage's synchronous step: code that sees it set runs inside the commit's <c>receive</c> (upstream
+    /// v1.5.0 <c>adopting</c>, area observers).</summary>
+    public bool Adopting => Volatile.Read(ref adopting);
     public int DocumentReadCount => Volatile.Read(ref documentReadCount);
     public IStorage Inner { get; } = inner;
 
@@ -270,7 +276,12 @@ internal sealed class ControlledStorage(IStorage inner) : IStorage
             commitFailure = null;
         }
         if (failure is not null) return new CommitResult(0, failure);
-        return await Inner.CommitAsync(batches, receive, context);
+        return await Inner.CommitAsync(batches, (index, seq) =>
+        {
+            Volatile.Write(ref adopting, true);
+            try { receive(index, seq); }
+            finally { Volatile.Write(ref adopting, false); }
+        }, context);
     }
 
     public Task<TId> MintIdAsync<TId>() where TId : struct, IDurableId<TId>

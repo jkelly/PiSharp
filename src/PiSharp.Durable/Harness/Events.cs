@@ -12,6 +12,8 @@
 // so the stream remembers each intent's arguments (by tool task, until the slot turns running or the task ends) for the
 // tool_execution_start the slot's commit causes. A stream attached between the two commits has not seen the intent, and its start
 // carries no arguments. Upstream removed watchEvents before it deferred the running status (f3255de76, area events), so this is PiSharp's.
+// Pi v1.5.0 sync (area observers, 8b0caefc2): the stream's view observer gets WatchEnd ends, and the Session's close ends it as a watch
+// (ended, or failed with the Session's failure); 8b0caefc2's listener shape ({ value } per batch) is area events'.
 //
 // Mappings: each AgentEvent variant is a sealed record whose ToJson() is upstream's object with upstream's key order, so a JSON-mode host
 // prints what upstream prints. pi-ai messages, usage, tool slots, compaction statuses and the pi.agent / pi.usage states are wire JSON, as
@@ -530,7 +532,7 @@ public static class AgentEvents
         public override void Publication(ConversationView before, ConversationView after, ImmutableArray<Op> ops, ObservedCommit commit,
             DurableContext context) => publication(before, after, ops, commit, context);
 
-        public override void End(Exception? failure) => watch.End(Session.CloseEnd(failure));
+        public override void End(WatchEnd end) => watch.End(end);
     }
 
     // ─── The typed parts of a view the events read ──────────────────────────

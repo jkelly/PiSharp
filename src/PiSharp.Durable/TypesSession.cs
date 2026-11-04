@@ -7,8 +7,10 @@
 // state getters and their type are removed (Session.documentState(), DocumentState). Area watch-folding (8b0caefc2 and d8d99950a): a
 // document watch follows its address and its value is never null (DocumentWatch<T> = WatchHandle<Readonly<T>>), so WatchDocAsync returns
 // IWatchHandle<JsonObjectValue>. Area deferred-commits (6c2fd73b0): a commit takes CommitOptions, whose CommitPersistence may defer storing
-// it (spec §4.1), and a CommitPublication is what one storage transaction stored. The citation stays on v1.2.0 until the file's other areas
-// land.
+// it (spec §4.1), and a CommitPublication is what one storage transaction stored. Area observers (8b0caefc2, with v1.5.0's shapes):
+// Observer<T> and Observation<T>, and ISession.ObserveDocAsync; Observer<T> is a sealed class over two callbacks (a synchronous advance,
+// or one returning a task, whose fault counts as upstream's rejected promise) instead of a structural type. The citation stays on v1.2.0
+// until the file's other areas land.
 using System.Collections.Immutable;
 using PiSharp.Durable.Chord;
 using PiSharp.Durable.Chord.Delta;
@@ -280,11 +282,122 @@ public interface IDocumentObserver
 }
 
 /// <summary>
+/// A synchronous observer of committed Durable state, for adapters such as a Chord source (upstream <c>Observer&lt;T&gt;</c>):
+/// <see cref="ISession.ObserveDocAsync(SessionDocToken, Observer{JsonObjectValue}, DurableContext)"/>,
+/// <see cref="IHarness.ObserveConversationAsync"/> and <see cref="IHarness.ObserveTaskGraphAsync"/>, with the shapes of Chord's watch: the
+/// advance callback gets a <see cref="WatchCall{T}"/>, the end callback a <see cref="WatchEnd"/>. Advance gets every change, unfolded, as
+/// memory adopts it: for a stored commit at its publication once its Storage call settled, for a deferred one
+/// (<see cref="CommitPersistence"/>) before it is stored. A view or the graph gets at most one call per commit, a document observer one per
+/// change at its address (two for a commit that retires and recreates it); the task graph also advances outside any commit's publication,
+/// on the Session line, when a registry change or a failed migration changes a <c>blocked</c> reason. Durable's failures are final, so
+/// every call is a <see cref="WatchValueCall{T}"/>; a failure ends the observer. Calls may come before the attaching task completes; their
+/// ops apply from <see cref="Observation{T}.Value"/>.
+/// </summary>
+/// <remarks>
+/// <para>Advance must only record the call, synchronously and quickly: never block, wait, call the Session, or throw. A throw (or, for the
+/// <see cref="Observer{T}(Func{WatchCall{T}, DurableContext, Task}, Action{WatchEnd})"/> form, a task that faults or is cancelled: upstream's
+/// rejected promise) is reported as <see cref="ReportKind.ListenerError"/>, detaches the observer, and ends it
+/// <see cref="WatchEndKind.ListenerError"/> with the error. End is called once: <see cref="WatchEndKind.Ended"/> when the observed scope's
+/// owner ends (a task document's task, right after its retirement call), <see cref="WatchEndKind.Failed"/> with the error "session closed"
+/// when the Session closes (an adapter follows the next Session) or with the error that failed the Session; never after
+/// <see cref="Observation{T}.Detach"/>. A throwing end is reported.</para>
+/// <para>PiSharp: the Session line is not one event loop, so a detach from another thread while a call runs on the line does not interrupt
+/// that call; no call starts once the detach returned.</para>
+/// </remarks>
+public sealed class Observer<T>
+{
+    private readonly Action<WatchCall<T>, DurableContext>? advance;
+    private readonly Func<WatchCall<T>, DurableContext, Task>? advanceAsync;
+    private readonly Action<WatchEnd> end;
+
+    /// <summary>An observer of synchronous callbacks.</summary>
+    public Observer(Action<WatchCall<T>, DurableContext> advance, Action<WatchEnd> end)
+    {
+        ArgumentNullException.ThrowIfNull(advance);
+        ArgumentNullException.ThrowIfNull(end);
+        this.advance = advance;
+        this.end = end;
+    }
+
+    /// <summary>An observer whose advance returns a task, as upstream's may return a promise: it still runs synchronously, the task is never
+    /// awaited, and one that faults or is cancelled counts as a throw, after the fact.</summary>
+    public Observer(Func<WatchCall<T>, DurableContext, Task> advance, Action<WatchEnd> end)
+    {
+        ArgumentNullException.ThrowIfNull(advance);
+        ArgumentNullException.ThrowIfNull(end);
+        advanceAsync = advance;
+        this.end = end;
+    }
+
+    /// <summary>Runs the advance callback; the task of the task-returning form, null for the synchronous one.</summary>
+    internal Task? Advance(WatchCall<T> call, DurableContext context)
+    {
+        if (advance is not null)
+        {
+            advance(call, context);
+            return null;
+        }
+        return advanceAsync!(call, context);
+    }
+
+    /// <summary>Runs the end callback.</summary>
+    internal void End(WatchEnd watchEnd) => end(watchEnd);
+}
+
+/// <summary>An attached <see cref="Observer{T}"/> (upstream <c>Observation&lt;T&gt;</c>): the value at attachment, which every later call starts
+/// from, and how to detach it.</summary>
+public sealed class Observation<T>
+{
+    private readonly IDetachable guarded;
+
+    internal Observation(T value, IDetachable guarded)
+    {
+        Value = value;
+        this.guarded = guarded;
+    }
+
+    /// <summary>The value at attachment.</summary>
+    public T Value { get; }
+
+    /// <summary>Detaches the observer. Idempotent: no advance or end follows it, not even for the rest of a commit underway.</summary>
+    public void Detach() => guarded.Detach();
+}
+
+/// <summary>Internal: what an <see cref="Observation{T}"/> detaches (upstream <c>{ detach(): void }</c>).</summary>
+internal interface IDetachable
+{
+    void Detach();
+}
+
+/// <summary>
 /// Owner of one mutation line, its records and its tracked documents (upstream <c>Session</c>). Every commit runs on one FIFO line;
 /// only committed state is observable.
 /// </summary>
 public interface ISession : IDocumentObserver, IDocumentReader
 {
+    /// <summary>
+    /// Attaches a synchronous <see cref="Observer{T}"/> to a Session singleton's address, atomically on the Session line, as
+    /// <see cref="IDocumentObserver.WatchDocAsync(SessionDocToken, DurableContext)"/> acquires a watch: the observation's value includes
+    /// every commit before it, and the observer gets every later one, retirements and later incarnations included. Null when the address
+    /// is absent. <paramref name="context"/> governs only the attachment: cancelled while attaching, the task faults with the cancellation
+    /// error and nothing stays attached. A closed Session or an invalid argument faults the task; the call never throws.
+    /// </summary>
+    Task<Observation<JsonObjectValue>?> ObserveDocAsync(SessionDocToken token, Observer<JsonObjectValue> observer, DurableContext context);
+    /// <summary>Observes a conversation singleton's address.</summary>
+    Task<Observation<JsonObjectValue>?> ObserveDocAsync(ConversationDocToken token, ConversationId conversationId, Observer<JsonObjectValue> observer,
+        DurableContext context);
+    /// <summary>Observes a task singleton's address.</summary>
+    Task<Observation<JsonObjectValue>?> ObserveDocAsync(TaskDocToken token, TaskId taskId, Observer<JsonObjectValue> observer, DurableContext context);
+    /// <summary>Observes a Session family member's address.</summary>
+    Task<Observation<JsonObjectValue>?> ObserveDocAsync(SessionDocFamilyToken token, string key, Observer<JsonObjectValue> observer,
+        DurableContext context);
+    /// <summary>Observes a conversation family member's address.</summary>
+    Task<Observation<JsonObjectValue>?> ObserveDocAsync(ConversationDocFamilyToken token, ConversationId conversationId, string key,
+        Observer<JsonObjectValue> observer, DurableContext context);
+    /// <summary>Observes a task family member's address.</summary>
+    Task<Observation<JsonObjectValue>?> ObserveDocAsync(TaskDocFamilyToken token, TaskId taskId, string key, Observer<JsonObjectValue> observer,
+        DurableContext context);
+
     /// <summary>Runs one atomic transaction on the Session mutation line and returns the callback's result. Inside the callback read only
     /// through the transaction: <c>SnapshotAsync</c>, <c>WatchDocAsync</c> and the other Session and runtime reads may queue on the line the
     /// callback holds, and then never complete. <paramref name="options"/> may defer storing it (<see cref="CommitPersistence"/>).</summary>

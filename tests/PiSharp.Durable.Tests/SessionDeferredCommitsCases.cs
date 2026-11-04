@@ -10,9 +10,10 @@
 // - flush() is Flush(session) (see SessionSupport.cs); readOnLine(async () => {}) is ReadOnLineAsync.
 // - "retains a held revision only until it is stored" uses WeakReference and GC.Collect in place of WeakRef and --expose-gc, taking the
 //   reference in a method of its own so no local keeps the revision.
-// The v1.5.0 blob (7de47e659) differs only by later areas: observers renames subscribeCommits to observeCommits and the internal
-// observeCommits to followCommits (here SubscribeCommits and SessionTests.ObserveCommits, upstream 6c2fd73b0's names), and vocabulary
-// (5f312dac4) spells a Session end's reason and a document change as kinds (here SessionEnd.Reason and DocumentCommitChange).
+// The v1.5.0 blob (7de47e659) differs only by later areas: 8b0caefc2 (area observers) has the watch listener read value.text, a watch's
+// value being never null, which the publications case does here; vocabulary (5f312dac4) renames subscribeCommits to observeCommits and the
+// internal observeCommits to followCommits (here SubscribeCommits and SessionTests.ObserveCommits, upstream 6c2fd73b0's names), and spells a
+// Session end's reason and a document change as kinds (here SessionEnd.Reason and DocumentCommitChange).
 using System.Runtime.CompilerServices;
 using PiSharp.Durable;
 using PiSharp.Durable.Chord;
