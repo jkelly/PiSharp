@@ -725,12 +725,11 @@
       "lines": 1,
       "pisharp": "src/PiSharp.Durable.Sqlite/Database.cs",
       "phase": "P5",
-      "status": "needs-sync",
+      "status": "ported",
       "upstreamChange": "modified",
       "previousBlobSha1": "64edf8a0c5e8efc00a3b8afbef0b9e519a3f31aa",
       "changedLines": 39,
-      "note": "ISqliteExecutor/ISqliteDatabase (async facade; TransactionAsync holds the queue) and SqliteRow (ordered column map). Bindings are null/long/int/double/string/byte[]. Tests: storage.sqlite.facade.*",
-      "portedBlobSha1": "64edf8a0c5e8efc00a3b8afbef0b9e519a3f31aa"
+      "note": "v1.5.0 (work list area sqlite): the file re-exports Chord's SQLite interfaces; in C# they are the same types (Database.cs), with no re-export"
     },
     {
       "upstream": "packages/durable/src/storage/sqlite/index.ts",
@@ -738,12 +737,11 @@
       "lines": 8,
       "pisharp": "src/PiSharp.Durable.Sqlite/Storage.cs",
       "phase": "P5",
-      "status": "needs-sync",
+      "status": "ported",
       "upstreamChange": "modified",
       "previousBlobSha1": "6665418685444cbe585e99fabd232efce547e78a",
       "changedLines": 4,
-      "note": "No barrel file in C#: the exports are the public types of PiSharp.Durable.Sqlite (ISqliteDatabase, ISqliteExecutor, SqliteRow, SqliteMigration, SqliteMigrations, SqliteStorage, SqliteStorageOptions, SqliteConnectionDatabase)",
-      "portedBlobSha1": "6665418685444cbe585e99fabd232efce547e78a"
+      "note": "v1.5.0 (work list area sqlite): no barrel file in C#; the exports are the public types of PiSharp.Durable.Sqlite (ISqliteDatabase, ISqliteExecutor, SqliteRow, SqliteMigration, SqliteMigrations, SqliteStorage, SqliteStorageOptions, SqliteConnectionDatabase, SqliteSchemaPrefix)"
     },
     {
       "upstream": "packages/durable/src/storage/sqlite/migrations.ts",
@@ -751,25 +749,23 @@
       "lines": 138,
       "pisharp": "src/PiSharp.Durable.Sqlite/Migrations.cs",
       "phase": "P5",
-      "status": "needs-sync",
+      "status": "ported",
       "upstreamChange": "modified",
       "previousBlobSha1": "541422d534286f03b25cd8e0690a150cc35ca141",
       "changedLines": 237,
-      "note": "SqliteMigrations.Migrations/CurrentSchemaVersion/ApplyAsync. Schema v1 statements are upstream text verbatim (whitespace included; SHA-256 pinned by storage.sqlite.migrations.initial-schema-is-upstream-text-verbatim). Tests: storage.sqlite.migrations.*",
-      "portedBlobSha1": "541422d534286f03b25cd8e0690a150cc35ca141"
+      "note": "v1.5.0 (work list area sqlite): createSqliteMigrations(schema) is the internal SqliteMigrations.Create(SqliteSchema); SQLITE_MIGRATIONS is SqliteMigrations.Migrations, CURRENT_SQLITE_SCHEMA_VERSION is CurrentSchemaVersion (2), applySqliteMigrations(database, migrations?) is ApplyAsync(database, migrations?) over durable_schema. Version 1 and version 2 (sleepingStatus: tasks_v2 copy, drop, rename, the five task indexes recreated) are upstream text verbatim, whitespace included; SHA-256 pinned for the default and pi_ schemas by storage.sqlite.migrations.initial-schema-is-upstream-text-verbatim and storage.sqlite.migrations.prefixed-schema-is-upstream-text-verbatim. A database version 2 migrated cannot be opened by PiSharp 1.2.0.x. Tests: storage.sqlite.migrations.*"
     },
     {
       "upstream": "packages/durable/src/storage/sqlite/node.ts",
       "blobSha1": "210478ae58d23e3b97acb48029295b325332a7cd",
       "lines": 22,
-      "pisharp": "src/PiSharp.Durable.Sqlite/ConnectionDatabase.cs",
+      "pisharp": "src/PiSharp.Durable.Sqlite/Storage.cs",
       "phase": "P5",
-      "status": "needs-sync",
+      "status": "ported",
       "upstreamChange": "modified",
       "previousBlobSha1": "eabfa31fe243b692d538a72794349fcd81ad2715",
       "changedLines": 216,
-      "note": "SqliteConnectionDatabase over Microsoft.Data.Sqlite 10.0.12 (decision 0005): serial operation queue, per-connection statement cache, WAL, synchronous=NORMAL, busy_timeout 5000, wal_autocheckpoint 1000, wal_checkpoint(TRUNCATE) on close, Pooling=False, SQLite >= 3.37 check. Unnamed ? parameters are numbered for the binding. SqliteStorage.OpenAsync(path) is openNodeSqliteStorage. Tests: storage.sqlite.facade.*, storage.sqlite.native.*",
-      "portedBlobSha1": "eabfa31fe243b692d538a72794349fcd81ad2715"
+      "note": "v1.5.0 (work list area sqlite): openNodeSqliteStorage(path, { prefix, ...connection settings }) is SqliteStorage.OpenAsync(path, SqliteStorageOptions), which checks the prefix before the file or its directory is created and forwards it; NodeSqliteStorageOptions is SqliteStorageOptions (BusyTimeoutMs, WalAutoCheckpointPages, Prefix); the driver it re-exports is SqliteConnectionDatabase (row packages/chord/src/sqlite/node.ts). Tests: storage.sqlite.namespaces-tables-and-indexes-with-a-prefix-across-reopen, storage.sqlite.rejects-an-invalid-prefix-before-creating-the-database"
     },
     {
       "upstream": "packages/durable/src/storage/sqlite/schema.ts",
@@ -777,8 +773,9 @@
       "lines": 63,
       "pisharp": "src/PiSharp.Durable.Sqlite/Schema.cs",
       "phase": "sync-1.5.0",
-      "status": "planned",
-      "upstreamChange": "added"
+      "status": "ported",
+      "upstreamChange": "added",
+      "note": "v1.5.0 (work list area sqlite): TABLE_NAMES, INDEX_NAMES and createSqliteSchema(prefix) are the internal SqliteSchema, SqliteTableNames and SqliteIndexNames; DEFAULT_SQLITE_SCHEMA is SqliteSchema.Default. SqliteStorage renders every table name from one SqliteSchema. Tests: storage.sqlite.prefix.*, storage.sqlite.prefixed.conformance.*, storage.sqlite.migrations.prefixed-schema-is-upstream-text-verbatim"
     },
     {
       "upstream": "packages/durable/src/storage/sqlite/storage.ts",
@@ -1242,8 +1239,9 @@
       "lines": 41,
       "pisharp": "src/PiSharp.Durable.Sqlite/Database.cs",
       "phase": "sync-1.5.0",
-      "status": "planned",
-      "upstreamChange": "added"
+      "status": "ported",
+      "upstreamChange": "added",
+      "note": "v1.5.0 (work list area sqlite): Chord's portable SQLite interfaces are ISqliteExecutor (ExecAsync, RunAsync, RunCountedAsync, GetAsync, AllAsync) and ISqliteDatabase (TransactionAsync, CloseAsync) with SqliteRow, kept in PiSharp.Durable.Sqlite under their names (phase 6 decides whether a PiSharp Chord SQLite layer takes them over). SqliteValue is the binding set null/long/int/double/string/byte[]. RunCountedAsync (runCounted) resolves with SQLite's changes() as a long; index and trigger writes do not count. Tests: chord.sqlite.node.reports-the-rows-a-statement-changed-without-index-writes, chord.sqlite.node.counts-no-rows-that-triggers-change (authored, pins the documented trigger rule), chord.sqlite.node.transaction-outcome.*, storage.sqlite.facade.*"
     },
     {
       "upstream": "packages/chord/src/sqlite/index.ts",
@@ -1251,8 +1249,9 @@
       "lines": 3,
       "pisharp": "src/PiSharp.Durable.Sqlite/Database.cs",
       "phase": "sync-1.5.0",
-      "status": "planned",
-      "upstreamChange": "added"
+      "status": "ported",
+      "upstreamChange": "added",
+      "note": "v1.5.0 (work list area sqlite): no barrel file in C#; the exports are public types of PiSharp.Durable.Sqlite: ISqliteDatabase, ISqliteExecutor and SqliteRow (database.ts), SqliteMigration and SqliteMigrations.ApplyAsync(database, migrations, table) (migrations.ts), SqliteSchemaPrefix.Validate (schema.ts)"
     },
     {
       "upstream": "packages/chord/src/sqlite/migrations.ts",
@@ -1260,8 +1259,9 @@
       "lines": 43,
       "pisharp": "src/PiSharp.Durable.Sqlite/Migrations.cs",
       "phase": "sync-1.5.0",
-      "status": "planned",
-      "upstreamChange": "added"
+      "status": "ported",
+      "upstreamChange": "added",
+      "note": "v1.5.0 (work list area sqlite): applySqliteMigrations(database, migrations, { table }) is SqliteMigrations.ApplyAsync(database, migrations, table): contiguous versions from 1 checked before the database is touched, the table name validated as a schema identifier, bootstrap and every pending migration in one BEGIN IMMEDIATE transaction, upstream's messages. Tests: chord.sqlite.migrations.*, storage.sqlite.migrations.rolls-initial-bootstrap-and-every-pending-migration-back-together"
     },
     {
       "upstream": "packages/chord/src/sqlite/node.ts",
@@ -1269,8 +1269,9 @@
       "lines": 219,
       "pisharp": "src/PiSharp.Durable.Sqlite/ConnectionDatabase.cs",
       "phase": "sync-1.5.0",
-      "status": "planned",
-      "upstreamChange": "added"
+      "status": "in-progress",
+      "upstreamChange": "added",
+      "note": "v1.5.0 (work list area sqlite): SqliteConnectionDatabase is the Node driver: connection defaults (busy_timeout 5000, wal_autocheckpoint 1000, synchronous=NORMAL), RunCountedAsync, the transaction outcome (slice 6b D4) and the serial queue are v1.5.0, tested by chord.sqlite.node.* and storage.sqlite.facade.*. Still v1.2.0: its statement cache keeps every SQL text it prepared, where v1.5.0 keeps the 256 most recently used (db14038bd, applicability row chord.sqlite-statement-cache, phase 6), so the row and the ConnectionDatabase.cs citation wait on that row"
     },
     {
       "upstream": "packages/chord/src/sqlite/schema.ts",
@@ -1278,8 +1279,9 @@
       "lines": 9,
       "pisharp": "src/PiSharp.Durable.Sqlite/Schema.cs",
       "phase": "sync-1.5.0",
-      "status": "planned",
-      "upstreamChange": "added"
+      "status": "ported",
+      "upstreamChange": "added",
+      "note": "v1.5.0 (work list area sqlite): validateSqliteSchemaPrefix is SqliteSchemaPrefix.Validate, throwing ArgumentException with upstream's messages; the identifier check compares characters, so a trailing newline is refused as upstream's anchored regular expression refuses it. Tests: chord.sqlite.migrations.validates-prefixes-and-migration-table-identifiers-before-executing-sql, chord.sqlite.migrations.names-the-refused-prefix-and-a-reserved-one"
     },
     {
       "upstream": "packages/chord/src/state.ts",
@@ -2996,7 +2998,7 @@
       "upstreamChange": "modified",
       "previousBlobSha1": "c3db8991006decfd3e51330b77ecd4ece41efd4d",
       "changedLines": 191,
-      "note": "All 11 cases as storage.sqlite.facade.*. Microtask observations use gates; prepare counting uses the adapter counter instead of subclassing DatabaseSync v1.2.0: \"does not preserve the callback error when rollback itself fails\" throws a plain exception.",
+      "note": "All 11 cases as storage.sqlite.facade.*. Microtask observations use gates; prepare counting uses the adapter counter instead of subclassing DatabaseSync v1.2.0: \"does not preserve the callback error when rollback itself fails\" throws a plain exception. v1.5.0 (work list area sqlite): v1.5.0 moved the driver cases to packages/chord/test/sqlite/node.test.ts; they keep their storage.sqlite.facade.* ids, and its new cases are chord.sqlite.node.* in the same file (not ported: the re-export identity case and the 256-statement cache case, phase 6). The commit half of the call-order case is storage.sqlite.facade.reads-storage-commits-in-call-order. Waits on area storage-batches (commitWrites).",
       "portedBlobSha1": "c3db8991006decfd3e51330b77ecd4ece41efd4d"
     },
     {
@@ -3009,7 +3011,7 @@
       "upstreamChange": "modified",
       "previousBlobSha1": "c55117ea655b39ea02cdd00e908001f9b23e98d3",
       "changedLines": 97,
-      "note": "All 4 cases as storage.sqlite.migrations.*, plus authored initial-schema-is-upstream-text-verbatim, initial-schema-creates-upstream-tables-and-indexes and rejects-migrations-without-contiguous-versions",
+      "note": "All 4 cases as storage.sqlite.migrations.*, plus authored initial-schema-is-upstream-text-verbatim, initial-schema-creates-upstream-tables-and-indexes and rejects-migrations-without-contiguous-versions v1.5.0 (work list area sqlite): the version 2 cases are ported (storage.sqlite.migrations.migrates-a-version-1-database-to-store-sleeping-tasks-keeping-its-tasks-and-indexes, the v1.5.0 hashes), and the cases v1.5.0 moved to packages/chord/test/sqlite/migrations.test.ts are chord.sqlite.migrations.* plus the kept rolls-initial-bootstrap id; the commit there still uses CommitAsync, so the row waits on area storage-batches (commitWrites).",
       "portedBlobSha1": "c55117ea655b39ea02cdd00e908001f9b23e98d3"
     },
     {
