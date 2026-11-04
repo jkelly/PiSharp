@@ -4,7 +4,7 @@
 // form (the fingerprint input). A schema is a JsonNode tree: an object, or a boolean. JsonNode trees have no cycles (a node has one
 // parent), symbol keys, accessors or non-enumerable keys, so those refusals of upstream's walk have nothing to refuse here; anything that is
 // no JsonNode (a MethodDeclaration, an Optional) is "expected a schema". Area cv2-contracts added this file because every declaration
-// snapshots its schemas; area cv2-evolve, which owns snapshot.ts, ports snapshot.test.ts.
+// snapshots its schemas; area cv2-evolve, which owns snapshot.ts, ported snapshot.test.ts (SnapshotCases.cs).
 using System.Text.Json.Nodes;
 
 namespace PiSharp.Chord.Contracts;
