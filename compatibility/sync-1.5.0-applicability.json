@@ -56,11 +56,11 @@
     "changelogBullets": 477,
     "repeatedBullets": 23,
     "byStatus": {
-      "ported": 173,
-      "ported-with-deferral": 14,
-      "already-ported": 13,
+      "ported": 177,
+      "ported-with-deferral": 15,
+      "already-ported": 12,
       "no-op": 25,
-      "port": 101
+      "port": 97
     },
     "byArea": {
       "ai": 58,
@@ -9076,7 +9076,7 @@
       "id": "durable.compaction-model-overrides",
       "area": "durable",
       "phase": 4,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "durable@1.4.0/Added#3"
       ],
@@ -9095,7 +9095,18 @@
         "tests/PiSharp.Durable.Tests/Harness/HarnessCompactionCases.cs"
       ],
       "release": "1.5.0",
-      "notes": "PiSharp's HarnessSettings.Compaction is a plain CompactionPolicy. PiSharp-only per-session compaction in the device host (Hosting SessionCompaction.cs, decision 0008) sets the harness-wide policy; check that it composes with overrides instead of replacing them. Settings can be a provider after durable.host-option-providers."
+      "notes": "PiSharp's HarnessSettings.Compaction is a plain CompactionPolicy. PiSharp-only per-session compaction in the device host (Hosting SessionCompaction.cs, decision 0008) sets the harness-wide policy; check that it composes with overrides instead of replacing them. Settings can be a provider after durable.host-option-providers.",
+      "evidence": {
+        "commits": [
+          "ddf61871"
+        ],
+        "tests": [
+          "tests/PiSharp.Durable.Tests/Harness/HarnessCompactionCases.cs: harness.compaction.per-model-compaction-overrides.applies-the-current-model-s-override-to-the-blocking-threshold",
+          "tests/PiSharp.Durable.Tests/Harness/HarnessCompactionCases.cs: harness.compaction.per-model-compaction-overrides.applies-the-request-model-s-override-on-a-context-overflow",
+          "tests/PiSharp.Durable.Tests/Harness/HarnessCompactionCases.cs: harness.compaction.per-model-compaction-overrides.applies-the-model-s-override-when-a-compaction-selects-and-sizes-its-summary",
+          "tests/PiSharp.Durable.Hosting.Tests/SettingsCases.cs: settings.session-compaction-keeps-the-hosts-model-overrides"
+        ]
+      }
     },
     {
       "id": "durable.after-failed-run",
@@ -9157,7 +9168,7 @@
       "id": "durable.host-option-providers",
       "area": "durable",
       "phase": 4,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "durable@1.4.0/Added#12"
       ],
@@ -9179,13 +9190,26 @@
         "tests/PiSharp.Durable.Tests/Harness/ (new)"
       ],
       "release": "1.5.0",
-      "notes": "HarnessOptions.Models is a required IDurableModels and Settings a HarnessSettings (Harness/Types.cs:733-736); a C# shape is Func<IDurableModels> and Func<HarnessSettings?> alternatives. A throwing provider is reported as host_error with callback models or settings (durable.reports). The device host (decision 0008, HostedSession.cs) changes a session's model and settings by committing or reopening; record whether it moves to providers."
+      "notes": "HarnessOptions.Models is a required IDurableModels and Settings a HarnessSettings (Harness/Types.cs:733-736); a C# shape is Func<IDurableModels> and Func<HarnessSettings?> alternatives. A throwing provider is reported as host_error with callback models or settings (durable.reports). The device host (decision 0008, HostedSession.cs) changes a session's model and settings by committing or reopening; record whether it moves to providers.",
+      "evidence": {
+        "commits": [
+          "27cd98c6",
+          "e24c70fd"
+        ],
+        "tests": [
+          "tests/PiSharp.Durable.Tests/HarnessHostInputsCases.cs: harness.host-inputs.generation-uses-the-current-return-value-of-a-models-function-at-each-request",
+          "tests/PiSharp.Durable.Tests/HarnessHostInputsCases.cs: harness.host-inputs.still-accepts-a-plain-models-object",
+          "tests/PiSharp.Durable.Tests/HarnessHostInputsCases.cs: harness.host-inputs.tools-read-the-current-models-at-each-access-of-api-models",
+          "tests/PiSharp.Durable.Tests/HarnessHostInputsCases.cs: harness.host-inputs.generation-reads-the-current-return-value-of-a-settings-function",
+          "tests/PiSharp.Durable.Tests/HarnessHostInputsCases.cs: harness.host-inputs.rejects-a-models-value-and-a-function-together"
+        ]
+      }
     },
     {
       "id": "durable.read-only-harness",
       "area": "durable",
       "phase": 4,
-      "status": "port",
+      "status": "ported-with-deferral",
       "changelog": [
         "durable@1.5.0/Added#8"
       ],
@@ -9209,7 +9233,19 @@
         "src/PiSharp.Durable/Session/Session.cs"
       ],
       "release": "1.5.0",
-      "notes": "No counterpart. Name collision: the device host's 'read-only switch' (HostedSession.cs:356, DurableDeviceOptions.cs:58) removes tools from an agent and is unrelated; keep the two apart in names and docs. PiSharp-only places that could use a viewer Harness: a second process watching a pisharp durable session, and the device host's doctor and backup tools (Hosting Storage/DeviceDoctor.cs, DeviceBackup.cs)."
+      "notes": "No counterpart. Name collision: the device host's 'read-only switch' (HostedSession.cs:356, DurableDeviceOptions.cs:58) removes tools from an agent and is unrelated; keep the two apart in names and docs. PiSharp-only places that could use a viewer Harness: a second process watching a pisharp durable session, and the device host's doctor and backup tools (Hosting Storage/DeviceDoctor.cs, DeviceBackup.cs).",
+      "evidence": {
+        "commits": [
+          "27cd98c6"
+        ],
+        "tests": [
+          "tests/PiSharp.Durable.Tests/HarnessReadOnlyCases.cs: harness.read-only.opens-a-session-with-work-running-elsewhere-without-writing",
+          "tests/PiSharp.Durable.Tests/HarnessReadOnlyCases.cs: harness.read-only.refuses-writes-and-scheduling-and-stays-usable",
+          "tests/PiSharp.Durable.Tests/HarnessReadOnlyCases.cs: harness.read-only.refuses-to-create-the-root-of-an-empty-storage",
+          "tests/PiSharp.Durable.Tests/HarnessReadOnlyCases.cs: harness.read-only.leaves-recovery-to-the-next-writable-open"
+        ]
+      },
+      "deferred": "Harness.wake() returning {active: false} and onWake staying silent for a read-only Harness wait on area sleep, which adds wake()/onWake; the scheduler's #scheduleWake guard goes in with them. The `restarts` assertion of leaves-recovery-to-the-next-writable-open waits on area restarts (TaskRecord has no Restarts yet); the case checks the pending status. Session's read-only CachedStorage/ConversationTails skips belong to the areas that add those."
     },
     {
       "id": "durable.continue-submissions",
@@ -9842,7 +9878,7 @@
       "id": "durable.context-system-baseline",
       "area": "durable",
       "phase": 4,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "durable@1.3.0/Fixed#1"
       ],
@@ -9859,13 +9895,24 @@
         "tests/PiSharp.Durable.Tests/Harness/HarnessCompactionCases.cs"
       ],
       "release": "1.5.0",
-      "notes": "Context.cs:149 LeadWithSystem keeps v1.2.0's rule, so after a compaction that keeps an assistant message, Anthropic and OpenAI Codex requests lead with the kept history and no initial prompt or tool set. context.ts changes again for group commit (durable.group-commit) and the windowed view (durable.conversation-window); this fix is self-contained, so land it first."
+      "notes": "Context.cs:149 LeadWithSystem keeps v1.2.0's rule, so after a compaction that keeps an assistant message, Anthropic and OpenAI Codex requests lead with the kept history and no initial prompt or tool set. context.ts changes again for group commit (durable.group-commit) and the windowed view (durable.conversation-window); this fix is self-contained, so land it first.",
+      "evidence": {
+        "commits": [
+          "98cdf495",
+          "437f98bc"
+        ],
+        "tests": [
+          "tests/PiSharp.Durable.Tests/Harness/HarnessContextCases.cs: harness.context.leads-with-the-baseline-after-a-compaction-that-keeps-assistant-messages",
+          "tests/PiSharp.Durable.Tests/Harness/HarnessContextCases.cs: harness.context.finds-the-baseline-among-the-entries-an-extended-read-adds",
+          "tests/PiSharp.Durable.Tests/Harness/HarnessCompactionCases.cs: harness.compaction.manual-compaction.places-the-summary-at-once-when-idle-and-keeps-raw-history"
+        ]
+      }
     },
     {
       "id": "durable.tool-control-terminate",
       "area": "durable",
       "phase": 4,
-      "status": "already-ported",
+      "status": "ported",
       "changelog": [
         "durable@1.4.0/Changed#6"
       ],
@@ -9882,7 +9929,15 @@
       ],
       "release": "1.5.0",
       "notes": "Port the terminate: false regression case from harness-tools.test.ts with the citation re-pin.",
-      "evidence": "src/PiSharp.Durable/Harness/Types.cs:226 declares ToolControl.Terminate as bool; src/PiSharp.Durable/Harness/Tool.cs:1401 writes terminate only when true, and src/PiSharp.Durable/Harness/Generation.cs:721-723 ends the round only when every slot's control has terminate: true, so false is a no-op."
+      "evidence": {
+        "commits": [
+          "41ba7e04",
+          "8bdccaea"
+        ],
+        "tests": [
+          "tests/PiSharp.Durable.Tests/Harness/HarnessToolsCases.cs: harness.tools.does-not-terminate-on-terminate-false"
+        ]
+      }
     },
     {
       "id": "durable.registry-reader",

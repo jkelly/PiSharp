@@ -166,12 +166,14 @@
       "size": "M",
       "dependsOn": [],
       "commits": [
-        "5713c9507",
-        "6085986e4",
-        "790271cd0",
-        "7ec1f648e",
-        "be14d9732",
-        "c4cf7957b"
+        "98cdf495",
+        "ddf61871",
+        "27cd98c6",
+        "41ba7e04",
+        "a6026f62",
+        "8bdccaea",
+        "e24c70fd",
+        "437f98bc"
       ],
       "notes": "Land durable.context-system-baseline first: it is self-contained (Context.cs LeadWithSystem) and context.ts changes again in group-commit and view. host-option-providers: a C# shape is Func<IDurableModels>/Func<HarnessSettings?> alternatives next to the plain values, so existing callers keep compiling; a throwing provider is reported as host_error with callback models or settings once area reports lands (until then it fails the call). compaction-model-overrides: check that the device host's per-session compaction (Hosting SessionCompaction.cs, decision 0008) composes with overrides instead of replacing them. read-only-harness: keep it apart from the device host's unrelated read-only tool switch (HostedSession.cs, DurableDeviceOptions.cs) in names and docs; a read-only Harness's wake() is inactive (area sleep adds wake()). tool-control-terminate is already-ported (Generation.cs ends a round only when every result sets terminate true): port the terminate: false regression case from harness-tools.test.ts with the citation re-pin."
     },
