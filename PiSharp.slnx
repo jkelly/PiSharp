@@ -2,6 +2,7 @@
   <Folder Name="/src/">
     <Project Path="src/PiSharp.Contracts/PiSharp.Contracts.csproj" />
     <Project Path="src/PiSharp.Telemetry/PiSharp.Telemetry.csproj" />
+    <Project Path="src/PiSharp.Chord/PiSharp.Chord.csproj" />
     <Project Path="src/PiSharp.AI/PiSharp.AI.csproj" />
     <Project Path="src/PiSharp.Agent/PiSharp.Agent.csproj" />
     <Project Path="src/PiSharp.Sessions/PiSharp.Sessions.csproj" />
@@ -168,6 +169,9 @@
   </Folder>
   <Folder Name="/tests/sync-1.5.0/PiSharp.Telemetry.Tests/">
     <Project Path="tests/PiSharp.Telemetry.Tests/PiSharp.Telemetry.Tests.csproj" />
+  </Folder>
+  <Folder Name="/tests/sync-1.5.0/PiSharp.Chord.Tests/">
+    <Project Path="tests/PiSharp.Chord.Tests/PiSharp.Chord.Tests.csproj" />
   </Folder>
   <Folder Name="/tests/parity/PiSharp.Classifiers.Tests/">
     <Project Path="tests/PiSharp.Classifiers.Tests/PiSharp.Classifiers.Tests.csproj" />

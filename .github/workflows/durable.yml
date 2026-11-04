@@ -6,6 +6,7 @@ name: Durable
 # (decision 0007) runs the SQL Server storage groups against a SQL Server container.
 # Decision 0011 (run W2): PiSharp Web Agent and the model runtime it shares with the CLI run here too, on feature/web-agent as well; their
 # suites start the app with --faux, so nothing reaches a provider.
+# Decision 0013 (Pi 1.5.0 sync): Chord v2's suite, PiSharp.Chord.Tests, runs in the test job on every OS.
 on:
   push:
     branches: [main, feature/pi-durable, feature/durable-network, feature/web-agent]
@@ -55,6 +56,17 @@ jobs:
         run: |
           if [ "$RUNNER_OS" = "macOS" ]; then export TMPDIR="$(cd "$TMPDIR" && pwd -P)/"; fi
           dotnet run --project tests/PiSharp.Durable.Tests/PiSharp.Durable.Tests.csproj -c Release             -p:RestoreSources=https://api.nuget.org/v3/index.json -p:RestoreLockedMode=false             -- --report "$RUNNER_TEMP/durable-retention-0-${{ matrix.os }}.json"
+
+      # Decision 0013 (Pi 1.5.0 sync, phase 4): Chord v2 (@earendil-works/chord/next) in PiSharp.Chord, not packable yet; offline, on
+      # hand-built values only.
+      - name: Run PiSharp.Chord.Tests
+        if: ${{ !cancelled() }}
+        shell: bash
+        run: |
+          if [ "$RUNNER_OS" = "macOS" ]; then export TMPDIR="$(cd "$TMPDIR" && pwd -P)/"; fi
+          dotnet run --project tests/PiSharp.Chord.Tests/PiSharp.Chord.Tests.csproj -c Release \
+            -p:RestoreSources=https://api.nuget.org/v3/index.json -p:RestoreLockedMode=false \
+            -- --report "$RUNNER_TEMP/chord-${{ matrix.os }}.json"
 
       - name: Run PiSharp.DurableCli.Tests
         if: ${{ !cancelled() }}
@@ -159,6 +171,13 @@ jobs:
         with:
           name: durable-retention-0-report-${{ matrix.os }}
           path: ${{ runner.temp }}/durable-retention-0-${{ matrix.os }}.json
+          if-no-files-found: ignore
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: chord-report-${{ matrix.os }}
+          path: ${{ runner.temp }}/chord-${{ matrix.os }}.json
           if-no-files-found: ignore
 
   # Decision 0007: the SQL Server storage groups need a server, so they run here against a throwaway SQL Server container (Linux runners
