@@ -35,8 +35,13 @@ public sealed class NativeObservation<T>
 {
     private readonly Action detach;
 
-    internal NativeObservation(T value, Action detach)
+    /// <summary>An observation starting at <paramref name="value"/> (upstream's is a plain <c>{ value, detach }</c>): public, so a native
+    /// watchable built outside Chord, such as a hand-built registry value, can give one.</summary>
+    /// <param name="value">The value the observer starts at.</param>
+    /// <param name="detach">Detaches the observer.</param>
+    public NativeObservation(T value, Action detach)
     {
+        ArgumentNullException.ThrowIfNull(detach);
         Value = value;
         this.detach = detach;
     }
@@ -89,6 +94,9 @@ internal abstract class NativeSource
 
     /// <summary>The current value, as a derive reads it (<c>.value</c>).</summary>
     public abstract object? UntypedValue { get; }
+
+    /// <summary>Its value now as a registry contribution reads it (<c>current()</c>): throws its failure while it is failed.</summary>
+    public abstract object? UntypedCurrent();
 }
 
 /// <summary>
@@ -119,6 +127,9 @@ internal abstract class NativeSource<T> : NativeSource, INativeWatchable<T>
     /// for readers (a registry whose <c>compose</c> threw).
     /// </summary>
     public virtual T Current() => Value;
+
+    /// <inheritdoc/>
+    public override object? UntypedCurrent() => Current();
 
     /// <summary>The host's batch, null once the source ended (an ended source keeps no host).</summary>
     protected Batch? Batch { get; private set; }
