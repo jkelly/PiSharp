@@ -24,7 +24,7 @@ internal static partial class HarnessConversationTests
         new("^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$");
 
     private static readonly RewindableConversationDocToken NoteDoc = Documents.DefineRewindableConversationDoc("test.note", 1, DocumentFork.AsOf,
-        () => O("""{"text":""}"""));
+        () => O("""{"text":""}"""), checkpointWhen: (_, _, _) => false);
 
     private static readonly Entry MessageEntry = Entries.DefineEntry("message");
 

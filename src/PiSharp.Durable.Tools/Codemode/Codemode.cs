@@ -91,19 +91,23 @@ public static class DurableCodemode
     public const int DefaultInlineBudget = CodemodeDescribe.DefaultInlineBudget;
 
     /// <summary><c>pi.codemode.run</c> (task scope): <c>{ start?, outputDir?, result? }</c>.</summary>
-    internal static TaskDocToken RunDoc { get; } = Documents.DefineTaskDoc("pi.codemode.run", 1, () => JsonObjectValue.Empty);
+    internal static TaskDocToken RunDoc { get; } = Documents.DefineTaskDoc("pi.codemode.run", 1, () => JsonObjectValue.Empty,
+        // The document retires with its task.
+        checkpointWhen: (_, _, _) => false);
 
     /// <summary><c>pi.codemode.journal</c> (task scope): <c>{ entries: [{ id, at, issuedAfter?, global? }], firstIssued? }</c>.</summary>
     internal static TaskDocToken JournalDoc { get; } =
-        Documents.DefineTaskDoc("pi.codemode.journal", 1, () => (JsonObjectValue)JsonValue.Parse("""{"entries":[]}"""));
+        Documents.DefineTaskDoc("pi.codemode.journal", 1, () => (JsonObjectValue)JsonValue.Parse("""{"entries":[]}"""),
+            // The document retires with its task.
+            checkpointWhen: (_, _, _) => false);
 
     /// <summary>
     /// What scripts keep with <c>store()</c> and read with <c>load()</c>, per conversation (upstream <c>CodemodeStoreDoc</c>,
     /// <c>pi.codemode.store</c>, <c>{ values }</c>). Rewindable and copied as of the fork point, so a fork sees the values as they were when its
-    /// entry was committed.
+    /// entry was committed. A change made once 64 deltas follow the newest base is stored as a base, bounding replay.
     /// </summary>
     public static RewindableConversationDocToken StoreDoc { get; } = Documents.DefineRewindableConversationDoc("pi.codemode.store", 1, DocumentFork.AsOf,
-        () => (JsonObjectValue)JsonValue.Parse("""{"values":{}}"""));
+        () => (JsonObjectValue)JsonValue.Parse("""{"values":{}}"""), checkpointWhen: (_, _, info) => info.DeltasSinceBase >= 64);
 
     /// <summary><c>obj({ code: str({ description: "Raw JavaScript source." }) }, { open: true })</c>, as pi-schema builds it.</summary>
     internal static readonly JsonObjectValue Parameters = (JsonObjectValue)JsonValue.Parse(

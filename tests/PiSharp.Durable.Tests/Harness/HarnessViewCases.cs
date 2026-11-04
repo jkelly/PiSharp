@@ -357,7 +357,8 @@ internal static partial class ViewTests
         yield return Case(prefix + "publishes-one-frame-for-a-commit-that-appends-several-entries-and-edits-a-document", async () =>
         {
             var (harness, root) = await OpenChat(await fresh(), Setup());
-            var other = Documents.DefineConversationDoc("app.other", 1, DocumentFork.Initial, () => O("{\"n\":0}"));
+            var other = Documents.DefineConversationDoc("app.other", 1, DocumentFork.Initial, () => O("{\"n\":0}"),
+                checkpointWhen: (_, _, _) => false);
             var (initial, frames, stop) = await Record(root);
             await root.CommitAsync(async tx =>
             {

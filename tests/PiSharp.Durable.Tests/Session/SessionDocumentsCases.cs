@@ -23,16 +23,18 @@ internal static partial class SessionTests
         {
             Interlocked.Increment(ref liveInitCount);
             return O(liveInitial);
-        });
-        var rewindableLiveDoc = Documents.DefineRewindableConversationDoc("test.live", 1, DocumentFork.AsOf, () => O(liveInitial));
-        var liveDocV2 = Documents.DefineConversationDoc("test.live", 2, DocumentFork.Initial, () => O(liveInitial));
-        var counterDoc = Documents.DefineSessionDoc("test.counter", 1, () => O("{\"count\":0}"));
+        }, checkpointWhen: (_, _, _) => false);
+        var rewindableLiveDoc = Documents.DefineRewindableConversationDoc("test.live", 1, DocumentFork.AsOf, () => O(liveInitial),
+            checkpointWhen: (_, _, _) => false);
+        var liveDocV2 = Documents.DefineConversationDoc("test.live", 2, DocumentFork.Initial, () => O(liveInitial),
+            checkpointWhen: (_, _, _) => false);
+        var counterDoc = Documents.DefineSessionDoc("test.counter", 1, () => O("{\"count\":0}"), checkpointWhen: (_, _, _) => false);
         var seeds = new List<string>();
         var memberDoc = Documents.DefineSessionDocFamily("test.member", 1, seed =>
         {
             lock (seeds) seeds.Add(S(seed));
             return Obj(("seed", seed), ("hits", 0));
-        });
+        }, checkpointWhen: (_, _, _) => false);
 
         async Task<(ControlledStorage Storage, Session Session, List<CommitPublication> Publications, ConversationId ConversationId)> SetupLive()
         {
@@ -287,7 +289,7 @@ internal static partial class SessionTests
             {
                 initialized++;
                 return O("{\"count\":0}");
-            });
+            }, checkpointWhen: (_, _, _) => false);
             var gate = storage.HoldFindDocument();
             var mints = storage.MintCount;
             Task? pending = null;
@@ -340,7 +342,7 @@ internal static partial class SessionTests
         {
             var (storage, session, _) = Open(storageFactory);
             var conversationId = await CreateConversation(session);
-            var nullDoc = Documents.DefineSessionDoc("test.date", 1, () => null!);
+            var nullDoc = Documents.DefineSessionDoc("test.date", 1, () => null!, checkpointWhen: (_, _, _) => false);
             await RejectsAsync(() => session.CommitAsync(tx => tx.DocAsync(nullDoc), Context), "must return a JSON object", "initializer");
             var commits = storage.CommitCount;
             await ThrowsAsync<ArgumentNullException>(() => session.CommitAsync(async tx =>

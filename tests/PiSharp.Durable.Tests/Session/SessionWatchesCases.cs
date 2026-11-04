@@ -17,7 +17,8 @@ internal static partial class SessionTests
 {
     private static IEnumerable<(string, Func<Task>)> Watches(string prefix, Func<IStorage> storageFactory)
     {
-        var stateDoc = Documents.DefineSessionDoc("watch.state", 1, () => O("{\"value\":0,\"items\":[\"a\",\"b\"],\"retained\":{\"label\":\"stable\"}}"));
+        var stateDoc = Documents.DefineSessionDoc("watch.state", 1, () => O("{\"value\":0,\"items\":[\"a\",\"b\"],\"retained\":{\"label\":\"stable\"}}"),
+            checkpointWhen: (_, _, _) => false);
         static double ValueOf(JsonObjectValue? value) => value is null ? -1 : N(value["value"]);
         Task SetValue(Session session, double value) => session.CommitAsync(async tx => (await tx.DocAsync(stateDoc))["value"] = value, Context);
 
@@ -442,8 +443,9 @@ internal static partial class SessionTests
 
         yield return Case(prefix + "hydrates-migration-without-writing-and-observes-the-later-exact-edit", async () =>
         {
-            var old = Documents.DefineSessionDoc("watch.migration", 1, () => O("{\"value\":3}"));
+            var old = Documents.DefineSessionDoc("watch.migration", 1, () => O("{\"value\":3}"), checkpointWhen: (_, _, _) => false);
             var current = Documents.DefineSessionDoc("watch.migration", 2, () => O("{\"value\":0,\"migrated\":false}"),
+                checkpointWhen: (_, _, _) => false,
                 migrate: (value, _) => Obj(("value", value["value"]), ("migrated", true)));
             var (storage, session, _) = Open(storageFactory);
             await session.CommitAsync(tx => tx.DocAsync(old), Context);

@@ -346,7 +346,7 @@ public static partial class Examples
 
     // A todo list per conversation. Rewindable with AsOf, so a fork starts with the todos its parent had at the fork entry.
     private static readonly RewindableConversationDocToken Todos = Documents.DefineRewindableConversationDoc("example.todos", 1, DocumentFork.AsOf,
-        () => JsonValue.Object([new("items", JsonValue.Array([]))]));
+        () => JsonValue.Object([new("items", JsonValue.Array([]))]), checkpointWhen: (_, _, _) => false);
 
     // 11: an extension that keeps its own per-conversation document.
     private static async Task ExtensionStateAsync(Func<Task<IStorage>> open, TextWriter output)

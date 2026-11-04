@@ -196,7 +196,7 @@ internal static partial class HarnessTests
 
         yield return Case(prefix + "task-phases.commits-results-with-entries-atomically-keeps-memos-until-terminal-and-retires-task-documents", async () =>
         {
-            var progress = Documents.DefineTaskDoc("test.task-progress", 1, () => O("""{"lines":[]}"""));
+            var progress = Documents.DefineTaskDoc("test.task-progress", 1, () => O("""{"lines":[]}"""), checkpointWhen: (_, _, _) => false);
             var answer = Entries.DefineEntry("answer");
             var child = OneStep("test.child", async (_, runtime, ctx) => await runtime.CommitAsync((_, _) => Completed(null), ctx));
             TaskId? childId = null;
@@ -522,11 +522,11 @@ internal static partial class HarnessTests
 
         yield return Case(prefix + "task-runtime.rejects-runtime-operations-after-the-invocation-ends-and-stops-its-watches", async () =>
         {
-            var notes = Documents.DefineSessionDoc("test.task-notes", 1, () => O("""{"text":""}"""));
+            var notes = Documents.DefineSessionDoc("test.task-notes", 1, () => O("""{"text":""}"""), checkpointWhen: (_, _, _) => false);
             ITaskRuntime? captured = null;
             Task<WatchEnd>? watchClosed = null;
             var delivered = new SyncList<string>();
-            var absentDoc = Documents.DefineSessionDoc("test.task-absent", 1, () => O("""{"text":""}"""));
+            var absentDoc = Documents.DefineSessionDoc("test.task-absent", 1, () => O("""{"text":""}"""), checkpointWhen: (_, _, _) => false);
             object? absent = "unset";
             DurableContext? handlerContext = null;
             var watcher = OneStep("test.watcher", async (_, runtime, ctx) =>
@@ -569,7 +569,8 @@ internal static partial class HarnessTests
 
         yield return Case(prefix + "task-runtime.reads-committed-documents-and-context-through-the-runtime-and-forwards-the-clock-and-reports", async () =>
         {
-            var notes = Documents.DefineRewindableConversationDoc("test.runtime-notes", 1, DocumentFork.AsOf, () => O("""{"text":""}"""));
+            var notes = Documents.DefineRewindableConversationDoc("test.runtime-notes", 1, DocumentFork.AsOf, () => O("""{"text":""}"""),
+                checkpointWhen: (_, _, _) => false);
             ITaskRuntime? captured = null;
             var seen = new SyncList<JsonValue?>();
             var reader = OneStep("test.reader", async (_, runtime, ctx) =>
@@ -640,7 +641,7 @@ internal static partial class HarnessTests
 
         yield return Case(prefix + "task-runtime.stops-a-watch-whose-acquisition-finishes-after-the-invocation-ended", async () =>
         {
-            var notes = Documents.DefineSessionDoc("test.late-watch", 1, () => O("""{"text":""}"""));
+            var notes = Documents.DefineSessionDoc("test.late-watch", 1, () => O("""{"text":""}"""), checkpointWhen: (_, _, _) => false);
             var controlled = Controlled();
             Task<object?>? watching = null;
             Gate? held = null;
@@ -1224,7 +1225,7 @@ internal static partial class HarnessTests
 
         yield return Case(prefix + "task-close.seals-admission-before-signalling-handlers-and-stops-watches-before-joining-them", async () =>
         {
-            var notes = Documents.DefineSessionDoc("test.close-notes", 1, () => O("""{"text":""}"""));
+            var notes = Documents.DefineSessionDoc("test.close-notes", 1, () => O("""{"text":""}"""), checkpointWhen: (_, _, _) => false);
             var reached = new Deferred();
             Task? fromListener = null;
             IHarness? harnessRef = null;

@@ -69,15 +69,15 @@ internal static class RunDocs
 
     /// <summary><c>{workflow, version, status, started?, current?, history[], log[], error?, calls{}, signals{}}</c>.</summary>
     public static ConversationDocFamilyToken Run { get; } = Documents.DefineConversationDocFamily("pisharp.workflow.run", 1, DocumentFork.Initial,
-        seed => seed as JsonObjectValue ?? JsonObjectValue.Empty);
+        seed => seed as JsonObjectValue ?? JsonObjectValue.Empty, checkpointWhen: (_, _, _) => false);
 
     /// <summary>Run keys: <c>{taskId, conversationId}</c> keyed by <c>workflow:runKey</c>.</summary>
     public static SessionDocFamilyToken Keys { get; } = Documents.DefineSessionDocFamily("pisharp.workflow.key", 1,
-        seed => seed as JsonObjectValue ?? JsonObjectValue.Empty);
+        seed => seed as JsonObjectValue ?? JsonObjectValue.Empty, checkpointWhen: (_, _, _) => false);
 
     /// <summary>Every run of the Session, newest last: <c>{runs: [{taskId, conversationId, workflow}]}</c> (bounded).</summary>
     public static SessionDocToken Index { get; } = Documents.DefineSessionDoc("pisharp.workflow.index", 1,
-        () => JsonValue.Object([KeyValuePair.Create("runs", (JsonValue)JsonValue.Array())]));
+        () => JsonValue.Object([KeyValuePair.Create("runs", (JsonValue)JsonValue.Array())]), checkpointWhen: (_, _, _) => false);
 
     public const int IndexLimit = 1000;
 

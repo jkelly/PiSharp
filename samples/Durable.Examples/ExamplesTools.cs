@@ -115,7 +115,7 @@ public static partial class Examples
     // function looks it up for every tool call. Here a sandbox is a directory; a hosted product would return an environment that runs inside
     // the conversation's container.
     private static readonly ConversationDocToken Sandbox =
-        Documents.DefineConversationDoc("app.sandbox", 1, DocumentFork.Initial, () => JsonObjectValue.Empty);
+        Documents.DefineConversationDoc("app.sandbox", 1, DocumentFork.Initial, () => JsonObjectValue.Empty, checkpointWhen: (_, _, _) => false);
 
     private static async Task SandboxPerConversationAsync(Func<Task<IStorage>> open, TextWriter output)
     {

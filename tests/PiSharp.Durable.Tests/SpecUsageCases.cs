@@ -152,7 +152,7 @@ internal static class SpecUsage
         // ─── Section 7.2: hooks reading extension state ──────────────────────────────
 
         var planModeDoc = Documents.DefineConversationDoc("app.plan-mode", 1, DocumentFork.Current,
-            () => JsonValue.Object([KeyValuePair.Create("enabled", (JsonValue)JsonValue.Boolean(false))]));
+            () => JsonValue.Object([KeyValuePair.Create("enabled", (JsonValue)JsonValue.Boolean(false))]), checkpointWhen: (_, _, _) => false);
         var planMode = new Extension
         {
             Name = "plan-mode",
@@ -288,7 +288,7 @@ internal static class SpecUsage
                 // Absent: the conversation runs locally. Only conversations with this document run in a container.
                 // Subagents do not copy it: their creator writes it too when they should run in the container.
                 var containerDoc = Documents.DefineConversationDoc("app.container", 1, DocumentFork.Current,
-                    () => JsonValue.Object([KeyValuePair.Create("image", (JsonValue)"node:22")]));
+                    () => JsonValue.Object([KeyValuePair.Create("image", (JsonValue)"node:22")]), checkpointWhen: (_, _, _) => false);
                 var harness = await Harness.OpenAsync(SpecNames.Storage, new HarnessOptions
                 {
                     Models = SpecNames.Models,

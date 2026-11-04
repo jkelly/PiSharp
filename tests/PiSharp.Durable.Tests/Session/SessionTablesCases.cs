@@ -22,9 +22,10 @@ internal static partial class SessionTests
 
     private static IEnumerable<(string, Func<Task>)> Tables(string prefix, Func<IStorage> storageFactory)
     {
-        var progressDoc = Documents.DefineTaskDoc("test.progress", 1, () => O("{\"lines\":[]}"));
-        var stepDoc = Documents.DefineTaskDocFamily("test.step", 1, _ => O("{\"lines\":[]}"));
-        var notesDoc = Documents.DefineRewindableConversationDoc("test.notes", 1, DocumentFork.AsOf, () => O("{\"text\":\"\"}"));
+        var progressDoc = Documents.DefineTaskDoc("test.progress", 1, () => O("{\"lines\":[]}"), checkpointWhen: (_, _, _) => false);
+        var stepDoc = Documents.DefineTaskDocFamily("test.step", 1, _ => O("{\"lines\":[]}"), checkpointWhen: (_, _, _) => false);
+        var notesDoc = Documents.DefineRewindableConversationDoc("test.notes", 1, DocumentFork.AsOf, () => O("{\"text\":\"\"}"),
+            checkpointWhen: (_, _, _) => false);
 
         async Task<TaskId> CreateTask(Session session, ConversationId conversationId, bool withDocument = false) =>
             await session.CommitAsync(async tx =>

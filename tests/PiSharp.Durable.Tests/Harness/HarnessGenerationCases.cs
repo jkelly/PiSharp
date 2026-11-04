@@ -472,7 +472,8 @@ internal static class GenerationTests
 
         yield return Case(prefix + "renders-sections-that-read-conversation-documents-through-input-read", async () =>
         {
-            var agentDoc = Documents.DefineConversationDoc("test.agent", 1, DocumentFork.Current, () => O("""{"cwd":"/","kind":"main"}"""));
+            var agentDoc = Documents.DefineConversationDoc("test.agent", 1, DocumentFork.Current, () => O("""{"cwd":"/","kind":"main"}"""),
+                checkpointWhen: (_, _, _) => false);
             var setup = Setup();
             AddSection(setup.Registry, "cwd", async (input, ctx) =>
                 (await input.Read.SnapshotAsync(agentDoc, input.ConversationId, ctx)) is { } state ? S(state["cwd"]) : null);

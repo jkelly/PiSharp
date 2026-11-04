@@ -473,7 +473,7 @@ internal static partial class HarnessRecoveryTests
 
         yield return Case(prefix + "blocked-tasks.settles-an-aborted-blocked-task-as-orphaned-and-retires-its-documents", async () =>
         {
-            var scratch = Documents.DefineTaskDoc("test.orphan-scratch", 1, () => O("""{"n":0}"""));
+            var scratch = Documents.DefineTaskDoc("test.orphan-scratch", 1, () => O("""{"n":0}"""), checkpointWhen: (_, _, _) => false);
             var (harness, _, _) = await OpenTasks(backend.Fresh(), []);
             var root = await harness.RootAsync(Context);
             var id = await root.CommitAsync(async tx =>

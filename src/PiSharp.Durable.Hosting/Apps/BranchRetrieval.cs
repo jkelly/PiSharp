@@ -42,7 +42,7 @@ public static class BranchRetrieval
     /// <summary>A branch's allowance and fetches, on its child conversation: <c>{allowance, fetches: {toolTaskId: {url, status,
     /// evidenceId?, error?}}}</c>. A fork of the conversation starts without either.</summary>
     internal static ConversationDocToken AllowanceDoc { get; } = Documents.DefineConversationDoc("pisharp.branch-retrieval", 1, DocumentFork.Initial,
-        () => JsonObjectValue.Empty);
+        () => JsonObjectValue.Empty, checkpointWhen: (_, _, _) => false);
 
     internal static Extension Create(DurableDeviceHost host, string sessionId) => Define.Extension(new Extension
     {

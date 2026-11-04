@@ -72,7 +72,9 @@ public static partial class HarnessTasks
     /// (<see cref="NestedToolExecutionResult.ToJson"/>), absent for a call the scheduler faulted or orphaned. One document per call, so no
     /// commit rewrites the others. Retires with the caller.
     /// </summary>
-    public static TaskDocFamilyToken NestedCallDoc { get; } = Documents.DefineTaskDocFamily("pi.tool.nested-call", 1, _ => JsonObjectValue.Empty);
+    public static TaskDocFamilyToken NestedCallDoc { get; } = Documents.DefineTaskDocFamily("pi.tool.nested-call", 1, _ => JsonObjectValue.Empty,
+        // The document retires with its task.
+        checkpointWhen: (_, _, _) => false);
 }
 
 /// <summary>The tool task's phases and helpers (upstream <c>tool.ts</c>).</summary>

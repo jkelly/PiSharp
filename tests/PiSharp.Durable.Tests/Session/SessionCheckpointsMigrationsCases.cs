@@ -43,7 +43,7 @@ internal static partial class SessionTests
                 checkpointWhen: (value, ops, _) => { calls.Add((value, ops)); return true; });
             var deltaDoc = Documents.DefineSessionDoc("checkpoint.delta", 1, () => O("{\"count\":0}"),
                 checkpointWhen: (value, ops, _) => { falseCalls.Add((value, ops)); return false; });
-            var defaultDoc = Documents.DefineSessionDoc("checkpoint.default", 1, () => O("{\"count\":0}"));
+            var defaultDoc = Documents.DefineSessionDoc("checkpoint.default", 1, () => O("{\"count\":0}"), checkpointWhen: (_, _, _) => false);
             var (storage, session, publications) = Open(storageFactory);
 
             await session.CommitAsync(async tx =>
@@ -238,10 +238,11 @@ internal static partial class SessionTests
 
         yield return Case(prefix + "migrates-read-only-once-per-cold-load-copies-the-callback-result-and-writes-nothing", async () =>
         {
-            var old = Documents.DefineSessionDoc("migration.read-only", 1, () => O("{\"count\":2}"));
+            var old = Documents.DefineSessionDoc("migration.read-only", 1, () => O("{\"count\":2}"), checkpointWhen: (_, _, _) => false);
             var calls = 0;
             JsonObjectValue? retained = null;
-            var current = Documents.DefineSessionDoc("migration.read-only", 3, () => O("{\"count\":0,\"labels\":[]}"), migrate: (value, fromVersion) =>
+            var current = Documents.DefineSessionDoc("migration.read-only", 3, () => O("{\"count\":0,\"labels\":[]}"),
+                checkpointWhen: (_, _, _) => false, migrate: (value, fromVersion) =>
             {
                 Equal(1, fromVersion, "fromVersion");
                 calls++;
@@ -270,7 +271,7 @@ internal static partial class SessionTests
 
         yield return Case(prefix + "writes-the-required-base-on-the-first-successful-transaction-then-writes-deltas", async () =>
         {
-            var old = Documents.DefineSessionDoc("migration.transition", 1, () => O("{\"count\":4}"));
+            var old = Documents.DefineSessionDoc("migration.transition", 1, () => O("{\"count\":4}"), checkpointWhen: (_, _, _) => false);
             var checkpoints = 0;
             var current = Documents.DefineSessionDoc("migration.transition", 3, () => O("{\"count\":0}"),
                 migrate: (value, fromVersion) => Obj(("count", N(value["count"]) + fromVersion - 1)),
@@ -320,9 +321,10 @@ internal static partial class SessionTests
 
         yield return Case(prefix + "rolls-migration-and-edits-back-with-the-callback-then-coalesces-later-edits-into-one-base", async () =>
         {
-            var old = Documents.DefineSessionDoc("migration.rollback", 1, () => O("{\"count\":1}"));
+            var old = Documents.DefineSessionDoc("migration.rollback", 1, () => O("{\"count\":1}"), checkpointWhen: (_, _, _) => false);
             var migrations = 0;
-            var current = Documents.DefineSessionDoc("migration.rollback", 2, () => O("{\"count\":0,\"migrated\":false}"), migrate: (value, _) =>
+            var current = Documents.DefineSessionDoc("migration.rollback", 2, () => O("{\"count\":0,\"migrated\":false}"),
+                checkpointWhen: (_, _, _) => false, migrate: (value, _) =>
             {
                 migrations++;
                 return Obj(("count", value["count"]), ("migrated", true));
@@ -362,9 +364,10 @@ internal static partial class SessionTests
 
         yield return Case(prefix + "strict-checks-migration-results-before-tracker-ownership-and-remains-usable-after-rejection", async () =>
         {
-            var old = Documents.DefineSessionDoc("migration.invalid", 1, () => O("{\"count\":1}"));
-            var invalid = Documents.DefineSessionDoc("migration.invalid", 2, () => O("{}"), migrate: (_, _) => null!);
-            var other = Documents.DefineSessionDoc("migration.invalid.other", 1, () => O("{\"ok\":true}"));
+            var old = Documents.DefineSessionDoc("migration.invalid", 1, () => O("{\"count\":1}"), checkpointWhen: (_, _, _) => false);
+            var invalid = Documents.DefineSessionDoc("migration.invalid", 2, () => O("{}"),
+                checkpointWhen: (_, _, _) => false, migrate: (_, _) => null!);
+            var other = Documents.DefineSessionDoc("migration.invalid.other", 1, () => O("{\"ok\":true}"), checkpointWhen: (_, _, _) => false);
             var (storage, session, _) = Open(storageFactory);
             await session.CommitAsync(tx => tx.DocAsync(old), Context);
             await session.UnloadDocumentsAsync();
@@ -378,9 +381,10 @@ internal static partial class SessionTests
 
         yield return Case(prefix + "rejects-newer-stored-versions-and-older-versions-without-migration-for-snapshots-and-transactions", async () =>
         {
-            var v2 = Documents.DefineSessionDoc("migration.compatibility", 2, () => O("{\"count\":2}"));
-            var v1 = Documents.DefineSessionDoc("migration.compatibility", 1, () => O("{\"count\":1}"));
-            var v3WithoutMigration = Documents.DefineSessionDoc("migration.compatibility", 3, () => O("{\"count\":3}"));
+            var v2 = Documents.DefineSessionDoc("migration.compatibility", 2, () => O("{\"count\":2}"), checkpointWhen: (_, _, _) => false);
+            var v1 = Documents.DefineSessionDoc("migration.compatibility", 1, () => O("{\"count\":1}"), checkpointWhen: (_, _, _) => false);
+            var v3WithoutMigration = Documents.DefineSessionDoc("migration.compatibility", 3, () => O("{\"count\":3}"),
+                checkpointWhen: (_, _, _) => false);
             var (storage, session, _) = Open(storageFactory);
             await session.CommitAsync(tx => tx.DocAsync(v2), Context);
             await session.UnloadDocumentsAsync();
@@ -395,7 +399,7 @@ internal static partial class SessionTests
 
         yield return Case(prefix + "persists-a-required-migration-base-before-retirement-without-consulting-the-checkpoint-predicate", async () =>
         {
-            var old = Documents.DefineSessionDoc("migration.retire", 1, () => O("{\"count\":1}"));
+            var old = Documents.DefineSessionDoc("migration.retire", 1, () => O("{\"count\":1}"), checkpointWhen: (_, _, _) => false);
             var current = Documents.DefineSessionDoc("migration.retire", 2, () => O("{\"count\":0}"), migrate: (value, _) => Obj(("count", value["count"])),
                 checkpointWhen: (_, _, _) => throw new InvalidOperationException("must not run"));
             var (storage, session, _) = Open(storageFactory);
@@ -413,11 +417,13 @@ internal static partial class SessionTests
 
         yield return Case(prefix + "leaves-unaccessed-older-documents-and-unavailable-definitions-untouched", async () =>
         {
-            var firstV1 = Documents.DefineSessionDoc("migration.lazy.first", 1, () => O("{\"count\":1}"));
-            var secondV1 = Documents.DefineSessionDoc("migration.lazy.second", 1, () => O("{\"count\":2}"));
+            var firstV1 = Documents.DefineSessionDoc("migration.lazy.first", 1, () => O("{\"count\":1}"), checkpointWhen: (_, _, _) => false);
+            var secondV1 = Documents.DefineSessionDoc("migration.lazy.second", 1, () => O("{\"count\":2}"), checkpointWhen: (_, _, _) => false);
             var secondMigrations = 0;
-            var firstV2 = Documents.DefineSessionDoc("migration.lazy.first", 2, () => O("{\"count\":0}"), migrate: (value, _) => Obj(("count", value["count"])));
-            _ = Documents.DefineSessionDoc("migration.lazy.second", 2, () => O("{\"count\":0}"), migrate: (value, _) =>
+            var firstV2 = Documents.DefineSessionDoc("migration.lazy.first", 2, () => O("{\"count\":0}"),
+                checkpointWhen: (_, _, _) => false, migrate: (value, _) => Obj(("count", value["count"])));
+            _ = Documents.DefineSessionDoc("migration.lazy.second", 2, () => O("{\"count\":0}"),
+                checkpointWhen: (_, _, _) => false, migrate: (value, _) =>
             {
                 secondMigrations++;
                 return Obj(("count", value["count"]));
@@ -441,10 +447,13 @@ internal static partial class SessionTests
 
         yield return Case(prefix + "migrates-current-and-historical-rewindable-values-independently-and-follows-fork-ancestry", async () =>
         {
-            var v1 = Documents.DefineRewindableConversationDoc("history.migration", 1, DocumentFork.AsOf, () => O("{\"count\":0}"));
-            var family = Documents.DefineRewindableConversationDocFamily("history.family", 1, DocumentFork.AsOf, seed => Obj(("seed", seed), ("count", 0)));
+            var v1 = Documents.DefineRewindableConversationDoc("history.migration", 1, DocumentFork.AsOf, () => O("{\"count\":0}"),
+                checkpointWhen: (_, _, _) => false);
+            var family = Documents.DefineRewindableConversationDocFamily("history.family", 1, DocumentFork.AsOf, seed => Obj(("seed", seed), ("count", 0)),
+                checkpointWhen: (_, _, _) => false);
             var migrations = new List<int>();
             var v3 = Documents.DefineRewindableConversationDoc("history.migration", 3, DocumentFork.AsOf, () => O("{\"count\":0,\"version\":3}"),
+                checkpointWhen: (_, _, _) => false,
                 migrate: (value, fromVersion) =>
                 {
                     lock (migrations) migrations.Add(fromVersion);
@@ -492,7 +501,8 @@ internal static partial class SessionTests
 
         yield return Case(prefix + "selects-the-incarnation-alive-at-the-entry-commit-across-retirement-and-recreation", async () =>
         {
-            var doc = Documents.DefineRewindableConversationDoc("history.incarnation", 1, DocumentFork.AsOf, () => O("{\"value\":\"initial\"}"));
+            var doc = Documents.DefineRewindableConversationDoc("history.incarnation", 1, DocumentFork.AsOf, () => O("{\"value\":\"initial\"}"),
+                checkpointWhen: (_, _, _) => false);
             var (_, session, _) = Open(storageFactory);
             var conversationId = await CreateConversation(session);
             var beforeCreation = await session.CommitAsync(async tx => (await tx.AppendEntryAsync(conversationId, new EntryDraft { Kind = "before" })).Id, Context);
@@ -523,8 +533,9 @@ internal static partial class SessionTests
 
         // ─── Session tracker cache across definition versions ─────────────────
 
-        var v1Doc = Documents.DefineSessionDoc("cache.versioned", 1, () => O("{\"name\":\"first\"}"));
-        var v2Doc = Documents.DefineSessionDoc("cache.versioned", 2, () => O("{\"names\":[]}"), migrate: (value, _) => Obj(("names", JsonValue.Array(value["name"]))));
+        var v1Doc = Documents.DefineSessionDoc("cache.versioned", 1, () => O("{\"name\":\"first\"}"), checkpointWhen: (_, _, _) => false);
+        var v2Doc = Documents.DefineSessionDoc("cache.versioned", 2, () => O("{\"names\":[]}"),
+            checkpointWhen: (_, _, _) => false, migrate: (value, _) => Obj(("names", JsonValue.Array(value["name"]))));
 
         yield return Case(prefix + "migrates-a-document-cached-by-an-older-token-without-unloading", async () =>
         {

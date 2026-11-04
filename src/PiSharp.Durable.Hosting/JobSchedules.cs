@@ -155,7 +155,7 @@ public sealed partial class DurableDeviceHost
 public sealed partial class HostedSession
 {
     private static readonly ConversationDocFamilyToken ScheduleReceipts = Documents.DefineConversationDocFamily(
-        "pisharp.schedule-receipt", 1, DocumentFork.Initial, _ => JsonObjectValue.Empty);
+        "pisharp.schedule-receipt", 1, DocumentFork.Initial, _ => JsonObjectValue.Empty, checkpointWhen: (_, _, _) => false);
 
     internal async Task<ScheduleTick> StartScheduledJobAsync(JobSchedule schedule, long slot, CancellationToken cancellationToken)
     {
