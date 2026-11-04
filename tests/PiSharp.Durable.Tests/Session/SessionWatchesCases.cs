@@ -10,7 +10,8 @@
 // the context (Change(call)); a Session close ends a watch Ended, a cancellation Aborted, a listener failure ListenerError; a retirement is
 // the last call, (null, [["r", null]], Retired), and then the watch ends Ended. 92ab53602's case "retains neither its Session nor its
 // listener once stopped" is here, with WeakReference and GC.Collect for WeakRef and --expose-gc, the watch built in a method the JIT does
-// not inline. Chord's Watch folds the commits made while a listener is busy or not yet started, so the folding cases take the expectations
+// not inline; as upstream's collect() waits a timer tick before each gc(), each round waits one, so a line job or I/O completion that is
+// still unwinding on another thread (SQL Server's) has let go first. Chord's Watch folds the commits made while a listener is busy or not yet started, so the folding cases take the expectations
 // of upstream d8d99950a (work list area watch-folding), with its root-replacement case; address-following (8b0caefc2, also watch-folding)
 // is not here, so a retirement still ends the watch and a recreation is not followed. The citation stays on v1.2.0 until watch-folding.
 using System.Collections.Immutable;
@@ -573,12 +574,12 @@ internal static partial class SessionTests
         {
             // Control: a running watch keeps its Session, so the collection below is real.
             var running = await UnreferencedWatch(storageFactory, stateDoc, stop: false);
-            CollectGarbage();
+            await CollectGarbage();
             Check(running.Session.IsAlive, "a running watch keeps its Session");
             await running.Watch.StopAsync();
 
             var stopped = await UnreferencedWatch(storageFactory, stateDoc, stop: true);
-            CollectGarbage();
+            await CollectGarbage();
             Check(!stopped.Session.IsAlive, "the stopped watch released its Session");
             Check(!stopped.Listener.IsAlive, "the stopped watch released its listener");
             // What it delivered last stays readable.
@@ -610,11 +611,12 @@ internal static partial class SessionTests
         return (watch, new WeakReference(session), new WeakReference(listener));
     }
 
-    /// <summary>Upstream's <c>collect()</c>: rounds of a full collection.</summary>
-    private static void CollectGarbage()
+    /// <summary>Upstream's <c>collect()</c>: rounds of a timer tick (its <c>setTimeout(resolve, 0)</c>) and a full collection.</summary>
+    private static async Task CollectGarbage()
     {
         for (var round = 0; round < 5; round++)
         {
+            await Task.Delay(1);
             GC.Collect();
             GC.WaitForPendingFinalizers();
         }
