@@ -89,6 +89,9 @@ internal abstract class NativeSource
 
     /// <summary>The current value, as a derive reads it (<c>.value</c>).</summary>
     public abstract object? UntypedValue { get; }
+
+    /// <summary>Its value now as a registry contribution reads it (<c>current()</c>): throws its failure while it is failed.</summary>
+    public abstract object? UntypedCurrent();
 }
 
 /// <summary>
@@ -119,6 +122,9 @@ internal abstract class NativeSource<T> : NativeSource, INativeWatchable<T>
     /// for readers (a registry whose <c>compose</c> threw).
     /// </summary>
     public virtual T Current() => Value;
+
+    /// <inheritdoc/>
+    public override object? UntypedCurrent() => Current();
 
     /// <summary>The host's batch, null once the source ended (an ended source keeps no host).</summary>
     protected Batch? Batch { get; private set; }
