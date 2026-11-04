@@ -918,8 +918,8 @@
       "size": "M",
       "dependsOn": [],
       "commits": [
-        "79006f061",
-        "c7372af42"
+        "fcd500c9",
+        "4d859250"
       ],
       "notes": "Design point, differentials: this area sets RankersDiffer (tests/PiSharp.Durable.Tests/ToolSearchCases.cs:95) back to false. PiSharp.Durable keeps its own ranker (Search.cs, decision 0005 'tool_search') because it may not reference main's ToolSearchRanker; phase 2 ported the coding agent's same fix in src/PiSharp.Extensions.Abstractions/Mcp/Discovery/ToolSearchRanker.cs with ICU-based segmentation and recorded its residual differences, so Search.cs copies that approach (no new dependency) and the tool-search.ranking-differential.* cases compare the two again, with the same recorded residuals for CJK and Thai. Code mode's searchTools() calls the same ranking (c7372af42 touches codemode.ts; area codemode owns that file)."
     },

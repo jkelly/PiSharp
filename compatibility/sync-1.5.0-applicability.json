@@ -56,11 +56,11 @@
     "changelogBullets": 477,
     "repeatedBullets": 23,
     "byStatus": {
-      "ported": 171,
+      "ported": 173,
       "ported-with-deferral": 14,
       "already-ported": 13,
       "no-op": 25,
-      "port": 103
+      "port": 101
     },
     "byArea": {
       "ai": 58,
@@ -9690,7 +9690,7 @@
       "id": "durable.tool-search-ranking",
       "area": "durable",
       "phase": 4,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "durable@1.5.0/Fixed#13"
       ],
@@ -9709,13 +9709,30 @@
         "tests/PiSharp.Durable.Tests/ToolSearchCases.cs"
       ],
       "release": "1.5.0",
-      "notes": "PiSharp.Durable keeps its own port of the ranking (Search.cs) because it may not reference main's ToolSearch and Bm25Ranker (decision 0005 'tool_search'). The coding agent's same fix is coding-agent@1.5.0/Fixed#28 (group D1, tools area, phase 2); tool-search.ranking-differential.* compares the two rankers, so both follow the same rules and the differential moves with them. If the merged table maps D1's bullet sameAs this one, this row must also cover main's ranker."
+      "notes": "PiSharp.Durable keeps its own port of the ranking (Search.cs) because it may not reference main's ToolSearch and Bm25Ranker (decision 0005 'tool_search'). The coding agent's same fix is coding-agent@1.5.0/Fixed#28 (group D1, tools area, phase 2); tool-search.ranking-differential.* compares the two rankers, so both follow the same rules and the differential moves with them. If the merged table maps D1's bullet sameAs this one, this row must also cover main's ranker.",
+      "evidence": {
+        "commits": [
+          "fcd500c9",
+          "4d859250"
+        ],
+        "tests": [
+          "tests/PiSharp.Durable.Tests/SearchCases.cs: search.rank-documents.ranks-by-term-relevance-and-respects-the-limit",
+          "tests/PiSharp.Durable.Tests/SearchCases.cs: search.rank-documents.searches-the-namespace-text",
+          "tests/PiSharp.Durable.Tests/SearchCases.cs: search.rank-documents.ranks-a-tool-first-when-the-query-is-its-name",
+          "tests/PiSharp.Durable.Tests/SearchCases.cs: search.rank-documents.ranks-a-name-match-above-mentions-in-descriptions",
+          "tests/PiSharp.Durable.Tests/SearchCases.cs: search.rank-documents.ranks-a-tool-first-when-the-query-contains-its-whole-name",
+          "tests/PiSharp.Durable.Tests/SearchCases.cs: search.rank-documents.ranks-a-tool-matching-more-query-terms-first-whatever-the-scores",
+          "tests/PiSharp.Durable.Tests/SearchCases.cs: search.code-mode.search-tools-searches-namespace-instructions-and-ranks-a-named-tool-first",
+          "tests/PiSharp.Durable.Tests/ToolSearchCases.cs: tool-search.search.loads-the-tool-the-query-names",
+          "tests/PiSharp.Durable.Tests/ToolSearchCases.cs: tool-search.ranking-differential.rank-fields"
+        ]
+      }
     },
     {
       "id": "durable.tool-search-unicode",
       "area": "durable",
       "phase": 4,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "durable@1.5.0/Fixed#14"
       ],
@@ -9729,7 +9746,25 @@
         "tests/PiSharp.Durable.Tests/ToolSearchCases.cs"
       ],
       "release": "1.5.0",
-      "notes": "Search.cs keeps only ASCII letters and digits after its U+0130 expansion (decision 0005 'tool_search'). .NET has no Intl.Segmenter counterpart: dictionary-based word breaking for CJK and Thai needs ICU's word break iterator, which .NET does not expose, or a library, a new dependency the owner must approve; results should match V8's ICU segmentation for the ranking differential. Shared with coding-agent@1.5.0/Fixed#29 (group D1), whose ranker needs the same segmenter; settle it once."
+      "notes": "Search.cs keeps only ASCII letters and digits after its U+0130 expansion (decision 0005 'tool_search'). .NET has no Intl.Segmenter counterpart: dictionary-based word breaking for CJK and Thai needs ICU's word break iterator, which .NET does not expose, or a library, a new dependency the owner must approve; results should match V8's ICU segmentation for the ranking differential. Shared with coding-agent@1.5.0/Fixed#29 (group D1), whose ranker needs the same segmenter; settle it once.",
+      "evidence": {
+        "commits": [
+          "fcd500c9",
+          "4d859250"
+        ],
+        "tests": [
+          "tests/PiSharp.Durable.Tests/SearchCases.cs: search.tokenize.segments-unicode-words-in-chinese",
+          "tests/PiSharp.Durable.Tests/SearchCases.cs: search.tokenize.segments-unicode-words-in-japanese",
+          "tests/PiSharp.Durable.Tests/SearchCases.cs: search.tokenize.segments-unicode-words-in-thai",
+          "tests/PiSharp.Durable.Tests/SearchCases.cs: search.tokenize.segments-unicode-words-in-hindi",
+          "tests/PiSharp.Durable.Tests/SearchCases.cs: search.tokenize.preserves-non-ascii-words-and-splits-mixed-language-identifiers",
+          "tests/PiSharp.Durable.Tests/SearchCases.cs: search.tokenize.normalizes-canonically-equivalent-unicode-text",
+          "tests/PiSharp.Durable.Tests/SearchCases.cs: search.tokenize.ignores-whitespace-punctuation-and-emoji",
+          "tests/PiSharp.Durable.Tests/SearchCases.cs: search.rank-documents.matches-unicode-queries-against-chinese",
+          "tests/PiSharp.Durable.Tests/SearchCases.cs: search.rank-documents.matches-unicode-queries-against-thai",
+          "tests/PiSharp.Durable.Tests/SearchCases.cs: search.rank-documents.matches-unicode-queries-against-french"
+        ]
+      }
     },
     {
       "id": "durable.env-file-change",
