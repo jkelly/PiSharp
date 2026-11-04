@@ -1002,7 +1002,7 @@ internal static partial class CodemodeTests
 
         // Pi v1.5.0 (area tools-schema, #11015): read declares a structuredOutputSchema, so a script gets an image's block and a text
         // file's text.
-        yield return Case(prefix + "resolves-the-built-in-read-with-an-image-s-block-which-image-shows-and-with-a-text-file-s-text", async () =>
+        yield return Case("codemode.output.resolves-the-built-in-read-with-an-image-s-block-which-image-shows-and-with-a-text-file-s-text", async () =>
         {
             const string png = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==";
             var files = Temp("codemode-read");

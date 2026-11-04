@@ -578,7 +578,7 @@ internal static partial class Program
             return Task.CompletedTask;
         });
 
-        yield return ImagesCase("to-base64.encodes-a-3-mib-image-within-a-128-mb-heap", () =>
+        yield return Case("tools.images.to-base64.encodes-a-3-mib-image-within-a-128-mb-heap", () =>
         {
             var bytes = Enumerable.Range(0, 3147295).Select(index => (byte)(index * 37 % 256)).ToArray();
             var before = GC.GetAllocatedBytesForCurrentThread();

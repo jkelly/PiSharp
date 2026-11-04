@@ -16,7 +16,7 @@ using static SessionTests;
 
 internal static partial class Program
 {
-    private static IEnumerable<(string, Func<Task>)> ToolArgsTypeboxCases() => ToolArgsTypeboxTests.Cases("tool-args-typebox.");
+    private static IEnumerable<(string, Func<Task>)> ToolArgsTypeboxCases() => ToolArgsTypeboxTests.Cases();
 }
 
 /// <summary>The tool-args-typebox.* cases (upstream tool-args-typebox.test.ts).</summary>
@@ -29,9 +29,9 @@ internal static class ToolArgsTypeboxTests
         {"~kind":"Object","type":"object","properties":{"path":{"~kind":"String","type":"string"},"offset":{"~kind":"Integer","type":"integer","~optional":true},"tags":{"~kind":"Array","type":"array","items":{"~kind":"String","type":"string"}}},"required":["path","tags"]}
         """);
 
-    internal static IEnumerable<(string, Func<Task>)> Cases(string prefix)
+    internal static IEnumerable<(string, Func<Task>)> Cases()
     {
-        yield return Case(prefix + "are-typed-by-the-schema-in-execute-and-prepare-arguments", async () =>
+        yield return Case("tool-args-typebox.are-typed-by-the-schema-in-execute-and-prepare-arguments", async () =>
         {
             var executed = new ConcurrentQueue<string>();
             var tool = Define.Tool(new ToolRegistration

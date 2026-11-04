@@ -17,7 +17,7 @@ using AgentValidation = PiSharp.Agent.ToolArgumentValidation;
 
 internal static partial class Program
 {
-    private static IEnumerable<(string, Func<Task>)> PiAiValidationCases() => PiAiValidationTests.Cases("piai.validation.");
+    private static IEnumerable<(string, Func<Task>)> PiAiValidationCases() => PiAiValidationTests.Cases();
 }
 
 /// <summary>The piai.validation.* cases.</summary>
@@ -46,15 +46,15 @@ internal static class PiAiValidationTests
         Program.Check(result.ErrorMessage?.Contains(text, StringComparison.Ordinal) == true, $"{what}: expected an error containing {text}, got {result.ErrorMessage ?? result.ArgumentsJson}");
     }
 
-    internal static IEnumerable<(string, Func<Task>)> Cases(string prefix)
+    internal static IEnumerable<(string, Func<Task>)> Cases()
     {
-        yield return Program.Case(prefix + "still-validates-when-function-constructor-is-unavailable", () =>
+        yield return Program.Case("piai.validation.still-validates-when-function-constructor-is-unavailable", () =>
         {
             Accepts("""{"type":"object","required":["count"],"properties":{"count":{"type":"number"}}}""", """{"count":"42"}""", """{"count":42}""", "count");
             return Task.CompletedTask;
         });
 
-        yield return Program.Case(prefix + "coerces-serialized-plain-json-schemas-like-typebox-schemas", () =>
+        yield return Program.Case("piai.validation.coerces-serialized-plain-json-schemas-like-typebox-schemas", () =>
         {
             (string Schema, string Input, string Expected)[] passing =
             [
@@ -85,7 +85,7 @@ internal static class PiAiValidationTests
             return Task.CompletedTask;
         });
 
-        yield return Program.Case(prefix + "treats-null-as-omission-for-optional-non-nullable-properties", () =>
+        yield return Program.Case("piai.validation.treats-null-as-omission-for-optional-non-nullable-properties", () =>
         {
             // Type.Object({ path: Type.String(), offset: Type.Optional(Type.Number()), nullable: Type.Optional(Type.Union([Type.String(),
             // Type.Null()])), metadata: Type.Object({ enabled: Type.Optional(Type.Boolean()) }) }).
@@ -96,39 +96,39 @@ internal static class PiAiValidationTests
             return Task.CompletedTask;
         });
 
-        yield return Program.Case(prefix + "preserves-optional-nulls-whose-referenced-schema-is-nullable", () =>
+        yield return Program.Case("piai.validation.preserves-optional-nulls-whose-referenced-schema-is-nullable", () =>
         {
             Accepts("""{"type":"object","properties":{"value":{"$ref":"#/$defs/value"}},"$defs":{"value":{"anyOf":[{"type":"number"},{"type":"null"}]}}}""",
                 """{"value":null}""", """{"value":null}""", "arguments");
             return Task.CompletedTask;
         });
 
-        yield return Program.Case(prefix + "preserves-a-value-that-already-matches-a-nullable-union-arm", () =>
+        yield return Program.Case("piai.validation.preserves-a-value-that-already-matches-a-nullable-union-arm", () =>
         {
             Accepts("""{"type":"object","required":["value"],"properties":{"value":{"anyOf":[{"type":"number"},{"type":"null"}]}}}""",
                 """{"value":null}""", """{"value":null}""", "arguments");
             return Task.CompletedTask;
         });
 
-        yield return Program.Case(prefix + "preserves-a-value-that-already-matches-a-oneof-nullable-union-arm", () =>
+        yield return Program.Case("piai.validation.preserves-a-value-that-already-matches-a-oneof-nullable-union-arm", () =>
         {
             Accepts(Plain("""{"oneOf":[{"type":"number"},{"type":"null"}]}"""), """{"value":null}""", """{"value":null}""", "arguments");
             return Task.CompletedTask;
         });
 
-        yield return Program.Case(prefix + "still-coerces-nullable-unions-when-the-original-value-does-not-match-any-arm", () =>
+        yield return Program.Case("piai.validation.still-coerces-nullable-unions-when-the-original-value-does-not-match-any-arm", () =>
         {
             Accepts(Plain("""{"anyOf":[{"type":"number"},{"type":"null"}]}"""), """{"value":"42"}""", """{"value":42}""", "arguments");
             return Task.CompletedTask;
         });
 
-        yield return Program.Case(prefix + "accepts-null-for-nullable-array-schemas-with-items", () =>
+        yield return Program.Case("piai.validation.accepts-null-for-nullable-array-schemas-with-items", () =>
         {
             Accepts(Plain("""{"type":["array","null"],"items":{"type":"string"}}"""), """{"value":null}""", """{"value":null}""", "arguments");
             return Task.CompletedTask;
         });
 
-        yield return Program.Case(prefix + "rejects-invalid-coercions-for-serialized-plain-json-schemas", () =>
+        yield return Program.Case("piai.validation.rejects-invalid-coercions-for-serialized-plain-json-schemas", () =>
         {
             (string Schema, string Input)[] failing =
             [
@@ -141,20 +141,20 @@ internal static class PiAiValidationTests
             return Task.CompletedTask;
         });
 
-        yield return Program.Case(prefix + "lists-pi-schema-s-errors-then-the-arguments-it-received", () =>
+        yield return Program.Case("piai.validation.lists-pi-schema-s-errors-then-the-arguments-it-received", () =>
         {
             Throws(Plain("""{"type":"number"}"""), """{"value":"many"}""",
                 "Validation failed for tool \"echo\":\n  - value: expected number, got string\n\nReceived arguments:\n{\n  \"value\": \"many\"\n}", "message");
             return Task.CompletedTask;
         });
 
-        yield return Program.Case(prefix + "reports-a-missing-required-property-at-the-property", () =>
+        yield return Program.Case("piai.validation.reports-a-missing-required-property-at-the-property", () =>
         {
             Throws(Plain("""{"type":"string"}"""), "{}", "  - value: missing", "message");
             return Task.CompletedTask;
         });
 
-        yield return Program.Case(prefix + "returns-a-copy-of-the-arguments-also-when-nothing-is-coerced", () =>
+        yield return Program.Case("piai.validation.returns-a-copy-of-the-arguments-also-when-nothing-is-coerced", () =>
         {
             var arguments = JsonValue.Parse("""{"value":"x"}""");
             var result = DurableValidation.Validate("echo", (JsonObjectValue)JsonValue.Parse(Plain("""{"type":"string"}""")), arguments);
@@ -164,7 +164,7 @@ internal static class PiAiValidationTests
         });
 
         // #10897
-        yield return Program.Case(prefix + "reports-malformed-arguments-json-instead-of-validating-empty-arguments", () =>
+        yield return Program.Case("piai.validation.reports-malformed-arguments-json-instead-of-validating-empty-arguments", () =>
         {
             var result = DurableValidation.Validate("echo", (JsonObjectValue)JsonValue.Parse("""{"type":"object","properties":{"value":{"type":"string"}}}"""),
                 JsonObjectValue.Empty, argumentsError: "Unexpected token");
@@ -172,7 +172,7 @@ internal static class PiAiValidationTests
             return Task.CompletedTask;
         });
 
-        yield return Program.Case(prefix + "matches-pisharp-agent-s-port", () =>
+        yield return Program.Case("piai.validation.matches-pisharp-agent-s-port", () =>
         {
             var count = 0;
             foreach (var (schema, origin, arguments) in Rows())

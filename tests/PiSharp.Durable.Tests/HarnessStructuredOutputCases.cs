@@ -182,7 +182,7 @@ internal static class StructuredOutputTests
             Check(!stored.ContainsKey("structuredOutput"), "no structuredOutput in the transcript");
         });
 
-        yield return Case(prefix + "turns-structured-output-that-breaks-the-schema-into-an-error-result-for-callers-and-a-report-for-the-model-s-calls", async () =>
+        yield return Case("harness.structured-output.turns-structured-output-that-breaks-the-schema-into-an-error-result-for-callers-and-a-report-for-the-model-s-calls", async () =>
         {
             (string Name, ToolExecutionResult Result, bool Schema, string Message)[] cases =
             [
