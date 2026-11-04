@@ -6,65 +6,22 @@
 // back the very node it passed. The dispatch table is held per provider in a weak table, as upstream's WeakMap, so a dropped binding
 // releases its table, mappings, schemas and validators. ArgsOf and the typed CheckedArgs<C, M> are TypeScript types.
 //
-// Upstream's bindProvider(contract, accepts) first runs checkAccepts (contracts/accepts.ts, area cv2-evolve, which also owns the
-// AcceptsTable type and evolve). Until it lands, BindProvider takes the accepts table as checkAccepts leaves it, upstream's own
-// CheckedAccepts view of it: per accepted older version, its method mappings ("refuse", { call } or { args?, result? }). Joining the two
-// is BindProvider(contract, accepts) = CheckAccepts, then this BindProvider; the provider then keeps the app's table in Accepts, as upstream
-// does for the state mappings of an older consumer's binding.
+// bindProvider checks the app's AcceptsTable with ContractsInternal.CheckAccepts (contracts/accepts.ts), then reads it as upstream's
+// private CheckedAccepts view does: per accepted version, its MethodMapping by method. A table's mappings are untyped (object?, the data
+// layer's values), so an args mapping gets the caller's JsonNode and must return a value: a JsonNode or null. Upstream trusts a mapping's
+// output, which its types establish; here CheckArgs refuses an output that is no JsonNode (a PiSharp-only refusal, the run-time half of
+// those types). The result mapping and a call replacement are handed back as the table holds them, never called here.
 using System.Runtime.CompilerServices;
 using System.Text.Json.Nodes;
 using PiSharp.Chord.Contracts;
 
 namespace PiSharp.Chord.Data;
 
-/// <summary>A method mapping of an accepted version after <c>checkAccepts</c> (upstream <c>CheckedMethodMapping</c>): refused, served by
-/// the provider's own replacement (<c>{ call }</c>), or mapped (<c>{ args?, result? }</c>: old arguments to current, the current result
-/// back to the old).</summary>
-internal sealed class CheckedMethodMapping
-{
-    private CheckedMethodMapping(bool refuses, Func<JsonNode?, ChordContext, Task<JsonNode?>>? call, Func<JsonNode?, JsonNode?>? args,
-        Func<JsonNode?, JsonNode?>? result)
-    {
-        Refuses = refuses;
-        Call = call;
-        Args = args;
-        Result = result;
-    }
-
-    /// <summary><c>"refuse"</c>.</summary>
-    internal static CheckedMethodMapping Refuse { get; } = new(true, null, null, null);
-
-    /// <summary><c>{ call }</c>: the provider's own function serves old callers with their old arguments.</summary>
-    internal static CheckedMethodMapping Replace(Func<JsonNode?, ChordContext, Task<JsonNode?>> call) =>
-        new(false, call ?? throw new ArgumentNullException(nameof(call)), null, null);
-
-    /// <summary><c>{ args?, result? }</c>: the direct mappings of the method's changed sides.</summary>
-    internal static CheckedMethodMapping Map(Func<JsonNode?, JsonNode?>? args = null, Func<JsonNode?, JsonNode?>? result = null) => new(false, null, args, result);
-
-    internal bool Refuses { get; }
-
-    internal Func<JsonNode?, ChordContext, Task<JsonNode?>>? Call { get; }
-
-    internal Func<JsonNode?, JsonNode?>? Args { get; }
-
-    internal Func<JsonNode?, JsonNode?>? Result { get; }
-}
-
-/// <summary>An accepts table after <c>checkAccepts</c>, as the binding reads it (upstream <c>CheckedAccepts</c>): per accepted older
-/// version, the method mappings its later edits require.</summary>
-internal sealed class CheckedAccepts(IReadOnlyDictionary<long, IReadOnlyDictionary<string, CheckedMethodMapping>> versions)
-{
-    /// <summary>An empty table (<c>{}</c>): no older version is accepted.</summary>
-    internal static CheckedAccepts None { get; } = new(new Dictionary<long, IReadOnlyDictionary<string, CheckedMethodMapping>>());
-
-    /// <summary>The accepted older versions and their method mappings.</summary>
-    internal IReadOnlyDictionary<long, IReadOnlyDictionary<string, CheckedMethodMapping>> Versions { get; } = versions;
-}
-
-/// <summary>A provider's binding of a contract with the older versions it accepts and their mappings (upstream <c>Provider</c>).</summary>
+/// <summary>A provider's binding of a contract with the older versions it accepts and their mappings (upstream <c>Provider</c>): the
+/// table as checked, kept as it is, for the state mappings of an older consumer's binding.</summary>
 internal sealed class Provider
 {
-    internal Provider(Contract contract, IReadOnlyList<(long Version, string Fingerprint)> accepted, CheckedAccepts accepts)
+    internal Provider(Contract contract, IReadOnlyList<AcceptedVersion> accepted, AcceptsTable accepts)
     {
         Contract = contract;
         Accepted = accepted;
@@ -74,22 +31,23 @@ internal sealed class Provider
     /// <summary>The bound contract.</summary>
     internal Contract Contract { get; }
 
-    /// <summary>The accepted older versions with their fingerprints, oldest first (upstream's <c>AcceptedVersion[]</c>).</summary>
-    internal IReadOnlyList<(long Version, string Fingerprint)> Accepted { get; }
+    /// <summary>The accepted older versions with their fingerprints, in the table's order (<c>checkAccepts</c>'s).</summary>
+    internal IReadOnlyList<AcceptedVersion> Accepted { get; }
 
-    /// <summary>The accepts table as checked.</summary>
-    internal CheckedAccepts Accepts { get; }
+    /// <summary>The app's accepts table, as checked.</summary>
+    internal AcceptsTable Accepts { get; }
 }
 
 /// <summary>Checked arguments (upstream <c>CheckedArgs</c>): a method's arguments in the current shape with the result mapping back to the
 /// caller's version, or the old arguments for the provider's own replacement (the host dispatches it).</summary>
 internal abstract record CheckedArgs(JsonNode? Args)
 {
-    /// <summary><c>{ kind: "method", args, result? }</c>.</summary>
-    internal sealed record Method(JsonNode? Args, Func<JsonNode?, JsonNode?>? Result) : CheckedArgs(Args);
+    /// <summary><c>{ kind: "method", args, result? }</c>: <paramref name="Result"/> is the table's own result mapping.</summary>
+    internal sealed record Method(JsonNode? Args, Func<object?, object?>? Result) : CheckedArgs(Args);
 
-    /// <summary><c>{ kind: "call", args, call }</c>: <paramref name="Replacement"/> is the provider's <c>call</c>.</summary>
-    internal sealed record Call(JsonNode? Args, Func<JsonNode?, ChordContext, Task<JsonNode?>> Replacement) : CheckedArgs(Args);
+    /// <summary><c>{ kind: "call", args, call }</c>: <paramref name="Replacement"/> is the table's own <c>call</c>, taking the old
+    /// arguments and the call's context.</summary>
+    internal sealed record Call(JsonNode? Args, Func<object?, object, Task<object?>> Replacement) : CheckedArgs(Args);
 }
 
 internal static partial class DataInternal
@@ -97,11 +55,11 @@ internal static partial class DataInternal
     private enum DispatchKind { Refuse, Call, Method }
 
     /// <summary>A method of an accepted version: refused, a replacement, or a method with its mappings; its validator compiles on first use.</summary>
-    private sealed class DispatchEntry(DispatchKind kind, Snapshot args, CheckedMethodMapping? mapping)
+    private sealed class DispatchEntry(DispatchKind kind, Snapshot args, MethodMapping? mapping)
     {
         internal DispatchKind Kind { get; } = kind;
         internal Snapshot Args { get; } = args;
-        internal CheckedMethodMapping? Mapping { get; } = mapping;
+        internal MethodMapping? Mapping { get; } = mapping;
         internal Validator? Validator { get; set; }
     }
 
@@ -110,22 +68,20 @@ internal static partial class DataInternal
 
     private static readonly ConditionalWeakTable<Provider, Dispatch> DispatchTables = new();
 
-    /// <summary>Binds a contract and its checked accepts table (kept as it is) into a provider (upstream <c>bindProvider</c>, after
-    /// <c>checkAccepts</c>). Builds the dispatch table: accepted version -> method -> schema and mapping; nothing is compiled yet.</summary>
-    internal static Provider BindProvider(Contract contract, CheckedAccepts accepts)
+    /// <summary>Binds a contract and the app's accepts table (validated once by <c>checkAccepts</c>, kept as it is) into a provider
+    /// (upstream <c>bindProvider</c>). Builds the dispatch table: accepted version -> method -> schema and mapping; nothing is compiled
+    /// and no mapping is called. A table <c>checkAccepts</c> refuses throws its <see cref="ArgumentException"/>.</summary>
+    internal static Provider BindProvider(Contract contract, AcceptsTable accepts)
     {
-        ArgumentNullException.ThrowIfNull(accepts);
+        var accepted = ContractsInternal.CheckAccepts(contract, accepts).Versions;
         var versions = ContractsInternal.DataOf(contract).Versions;
         var current = versions[^1];
         var table = new Dispatch { [current.Version] = DispatchEntries(current, null) };
-        var accepted = new List<(long Version, string Fingerprint)>();
-        // checkAccepts lists the accepted versions in the order of the table's keys: integer keys, ascending.
-        foreach (var (version, mappings) in accepts.Versions.OrderBy(entry => entry.Key))
+        foreach (var (version, _) in accepted)
         {
-            var data = versions.FirstOrDefault(candidate => candidate.Version == version);
-            if (data is null || ReferenceEquals(data, current)) throw new ArgumentException($"{contract.Name} accepts[{version}]: not an older version");
-            accepted.Add((version, data.Fingerprint));
-            table[version] = DispatchEntries(data, mappings);
+            var data = versions.First(candidate => candidate.Version == version);
+            // checkAccepts established this shape: an accepted version's mappings are an object.
+            table[version] = DispatchEntries(data, accepts[version]!.Methods);
         }
         var provider = new Provider(contract, accepted, accepts);
         DispatchTables.Add(provider, table);
@@ -142,7 +98,7 @@ internal static partial class DataInternal
         return provider.Accepted.Any(accepted => accepted.Version == version && accepted.Fingerprint == fingerprint);
     }
 
-    private static Dictionary<string, DispatchEntry> DispatchEntries(VersionData version, IReadOnlyDictionary<string, CheckedMethodMapping>? mappings)
+    private static Dictionary<string, DispatchEntry> DispatchEntries(VersionData version, OrderedDictionary<string, MethodMapping?>? mappings)
     {
         var entries = new Dictionary<string, DispatchEntry>(StringComparer.Ordinal);
         // A method has one signature in every variant that has it.
@@ -174,9 +130,17 @@ internal static partial class DataInternal
         if (entry.Kind == DispatchKind.Refuse) throw new ChordError("contract_mismatch", $"{name} v{boundVersion} refuses \"{method}\"");
         entry.Validator ??= ValidatorFor(entry.Args, context);
         Check(entry.Validator, raw, "args", context);
-        // The check above establishes the argument type; mapping output is trusted.
+        // The check above establishes the argument type; mapping output is trusted (once it is a value).
         if (entry.Kind == DispatchKind.Call) return new CheckedArgs.Call(raw, entry.Mapping!.Call!);
         var mapArgs = entry.Mapping?.Args;
-        return new CheckedArgs.Method(mapArgs is null ? raw : mapArgs(raw), entry.Mapping?.Result);
+        return new CheckedArgs.Method(mapArgs is null ? raw : MappedArgs(mapArgs(raw), name, boundVersion, method), entry.Mapping?.Result);
     }
+
+    /// <summary>An args mapping's output as a value: a JsonNode or null. Anything else is refused, as upstream's types refuse it.</summary>
+    private static JsonNode? MappedArgs(object? mapped, string name, long version, string method) => mapped switch
+    {
+        null => null,
+        JsonNode node => node,
+        _ => throw new InvalidOperationException($"{name} accepts[{version}].methods.{method}.args: returned a {mapped.GetType().Name}, not a JsonNode"),
+    };
 }

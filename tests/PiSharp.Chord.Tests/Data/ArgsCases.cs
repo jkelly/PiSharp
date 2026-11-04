@@ -6,74 +6,14 @@ using PiSharp.Chord.Data;
 using static ChordSupport;
 using static PiSharp.Chord.Contracts.Schemas;
 
-// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/chord/test/next/data/args.test.ts, against hand-built values. Upstream evolves
-// its contracts with evolve and binds them with an AcceptsTable that bindProvider checks with checkAccepts: evolve.ts and accepts.ts are
-// area cv2-evolve's and not here yet. So the evolved versions are built by hand (ArgsDraft below: the edits evolve's draft makes, the
-// version materialized as its Draft.next does, unchanged members keeping their snapshot objects), and the tables are given as checkAccepts
-// leaves them (CheckedAccepts). The fingerprints are computed, never pinned, so they are the ones evolve gives. Not ported until accepts.ts
-// lands: the refusal of an accepts table missing a mapping ("notes accepts[1].methods.add: missing mapping", checkAccepts's message). The
-// type-level checks (expectTypeOf of CheckedArgs and of a call replacement's arguments) have no C# counterpart. A Uint8Array is a
-// JsonValue holding a byte[]; vi.fn is a call counter. The memory case's mapping captures a local, so it is a fresh delegate the compiler
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/chord/test/next/data/args.test.ts. The contracts evolve with Contract.Evolve
+// and bind with an AcceptsTable, which BindProvider checks with checkAccepts. A table's mappings are untyped (object?): an args mapping
+// gets the caller's JsonNode and returns one. The type-level checks (expectTypeOf of CheckedArgs and of a call replacement's arguments)
+// have no C# counterpart. A Uint8Array is a JsonValue holding a byte[]; vi.fn is a call counter; `as never` (a table missing a mapping) needs
+// no cast, since a table's sections are optional in C#. The memory case's mapping captures a local, so it is a fresh delegate the compiler
 // does not cache, like the arrow function upstream makes.
 internal static partial class Program
 {
-    /// <summary>evolve's draft of the next version, by hand: the method edits args.test.ts makes (args, result, removeMethod).</summary>
-    private sealed class ArgsDraft
-    {
-        private readonly ContractData data;
-        private readonly OrderedDictionary<string, OrderedDictionary<string, MethodData>> methods = new(StringComparer.Ordinal);
-        private readonly List<Change> changes = [];
-
-        internal ArgsDraft(Contract previous)
-        {
-            data = ContractsInternal.DataOf(previous);
-            foreach (var (name, variant) in data.Versions[^1].Variants) methods[name] = new(variant.Methods, StringComparer.Ordinal);
-        }
-
-        /// <summary><c>e.args(member, schema)</c>: new arguments in every variant that has the method.</summary>
-        internal ArgsDraft Args(string member, JsonNode schema)
-        {
-            var args = ContractsInternal.SnapshotArguments(schema, $"{data.Name}.{member}.args");
-            foreach (var (variant, map) in methods.Where(entry => entry.Value.ContainsKey(member)))
-            {
-                map[member] = map[member] with { Args = args };
-                changes.Add(new Change(variant, member, ChangeSide.Args));
-            }
-            return this;
-        }
-
-        /// <summary><c>e.result(member, schema)</c>: a new result in every variant that has the method.</summary>
-        internal ArgsDraft Result(string member, JsonNode schema)
-        {
-            var result = ContractsInternal.SnapshotSchema(schema, $"{data.Name}.{member}.result");
-            foreach (var (variant, map) in methods.Where(entry => entry.Value.ContainsKey(member)))
-            {
-                map[member] = map[member] with { Result = result };
-                changes.Add(new Change(variant, member, ChangeSide.Result));
-            }
-            return this;
-        }
-
-        /// <summary><c>e.removeMethod(member)</c>: the method leaves every variant; no change is recorded.</summary>
-        internal ArgsDraft RemoveMethod(string member)
-        {
-            foreach (var map in methods.Values) map.Remove(member);
-            return this;
-        }
-
-        /// <summary>The evolved contract: the next version materialized with the edited variants and the changes.</summary>
-        internal Contract Next()
-        {
-            var current = data.Versions[^1];
-            var variants = new OrderedDictionary<string, VariantData>(StringComparer.Ordinal);
-            foreach (var (name, variant) in current.Variants) variants[name] = variant with { Methods = methods[name] };
-            var version = ContractsInternal.Materialize(data.Kind, data.Params, current.Version + 1, variants, changes);
-            return Contract.Create(data with { Versions = [.. data.Versions, version] });
-        }
-    }
-
-    private static Contract ArgsEvolve(Contract previous, Func<ArgsDraft, ArgsDraft> edit) => edit(new ArgsDraft(previous)).Next();
-
     private static readonly Contract ArgsNotesV1 = Contract.Remote("notes", new()
     {
         Version = 1,
@@ -90,40 +30,36 @@ internal static partial class Program
         },
     });
 
-    private static readonly Contract ArgsNotesV2 = ArgsEvolve(ArgsNotesV1, e => e.Args("add", Obj(("text", Str()), ("tag", Str()))).Result("add", Int()));
+    private static readonly Contract ArgsNotesV2 = Contract.Evolve(ArgsNotesV1, e => e.Args("add", Obj(("text", Str()), ("tag", Str()))).Result("add", Int()));
 
-    private static readonly Contract ArgsNotesV3 = ArgsEvolve(ArgsNotesV2, e => e.RemoveMethod("attach"));
+    private static readonly Contract ArgsNotesV3 = Contract.Evolve(ArgsNotesV2, e => e.RemoveMethod("attach"));
 
     /// <summary>vi.fn's call count of <see cref="ArgsToV2"/>.</summary>
     private static int argsToV2Calls;
 
     /// <summary><c>(old) => ({ ...old, tag: "v1" })</c>, counted.</summary>
-    private static readonly Func<JsonNode?, JsonNode?> ArgsToV2 = old =>
+    private static readonly Func<object?, object?> ArgsToV2 = old =>
     {
         argsToV2Calls++;
-        var current = old!.DeepClone().AsObject();
+        var current = ((JsonNode)old!).DeepClone().AsObject();
         current["tag"] = "v1";
         return current;
     };
 
     /// <summary><c>(current) => String(current)</c>.</summary>
-    private static readonly Func<JsonNode?, JsonNode?> ArgsResultToOld = current => ChordJson.ToJavaScriptString(current);
+    private static readonly Func<object?, object?> ArgsResultToOld = current => (JsonNode)ChordJson.ToJavaScriptString((JsonNode?)current);
 
     /// <summary><c>async () => null</c>.</summary>
-    private static readonly Func<JsonNode?, ChordContext, Task<JsonNode?>> ArgsAttach = (_, _) => Task.FromResult<JsonNode?>(null);
+    private static readonly Func<object?, object, Task<object?>> ArgsAttach = (_, _) => Task.FromResult<object?>(null);
 
     /// <summary><c>{ 1: { methods: { add: { args: toV2, result: resultToOld }, attach: { call: attach } } }, 2: { methods: { attach: "refuse" } } }</c>.</summary>
-    private static CheckedAccepts ArgsAccepts() => new(new Dictionary<long, IReadOnlyDictionary<string, CheckedMethodMapping>>
+    private static readonly AcceptsTable ArgsAccepts = new()
     {
-        [1] = new Dictionary<string, CheckedMethodMapping>
-        {
-            ["add"] = CheckedMethodMapping.Map(ArgsToV2, ArgsResultToOld),
-            ["attach"] = CheckedMethodMapping.Replace(ArgsAttach),
-        },
-        [2] = new Dictionary<string, CheckedMethodMapping> { ["attach"] = CheckedMethodMapping.Refuse },
-    });
+        [1] = new() { Methods = { ["add"] = new MethodMapping { Args = ArgsToV2, Result = ArgsResultToOld }, ["attach"] = new MethodMapping { Call = ArgsAttach } } },
+        [2] = new() { Methods = { ["attach"] = MethodMapping.Refuse } },
+    };
 
-    private static readonly Provider ArgsProvider = DataInternal.BindProvider(ArgsNotesV3, ArgsAccepts());
+    private static readonly Provider ArgsProvider = DataInternal.BindProvider(ArgsNotesV3, ArgsAccepts);
 
     /// <summary>The error a refused check throws, as JSON.</summary>
     private static JsonObject ArgsRefusal(Action run)
@@ -147,16 +83,17 @@ internal static partial class Program
 
     private static IEnumerable<(string, Func<Task>)> DataArgsCases() =>
     [
-        Case("data.args.bind-provider-lists-the-accepted-versions", () =>
+        Case("data.args.bind-provider-checks-the-accepts-table-once-and-lists-the-accepted-versions", () =>
         {
             Check(ReferenceEquals(ArgsNotesV3, ArgsProvider.Contract), "the provider's contract");
-            Sequence([(1L, ArgsNotesV1.Fingerprint), (2L, ArgsNotesV2.Fingerprint)], ArgsProvider.Accepted, "the accepted versions");
-            Sequence([1L, 2L, 3L], ContractsInternal.DataOf(ArgsNotesV3).Versions.Select(version => version.Version), "the hand-built history");
+            Sequence([new AcceptedVersion(1, ArgsNotesV1.Fingerprint), new AcceptedVersion(2, ArgsNotesV2.Fingerprint)], ArgsProvider.Accepted,
+                "the accepted versions");
+            Refuses(() => DataInternal.BindProvider(ArgsNotesV3, new() { [1] = new() }), "notes accepts[1].methods.add: missing mapping");
         }),
         Case("data.args.bind-provider-compiles-nothing-and-calls-no-mapping", async () =>
         {
             var calls = argsToV2Calls;
-            Equal(new Counts(0, 0, 0), await Counted(_ => DataInternal.BindProvider(ArgsNotesV3, ArgsAccepts())), "the counts");
+            Equal(new Counts(0, 0, 0), await Counted(_ => DataInternal.BindProvider(ArgsNotesV3, ArgsAccepts)), "the counts");
             Equal(calls, argsToV2Calls, "toV2 is not called");
         }),
         Case("data.args.check-args-returns-current-version-arguments-as-passed-no-copy-never-mapped", () =>
@@ -197,7 +134,7 @@ internal static partial class Program
                 Version = 1,
                 Params = new(),
                 Members = new() { ["m"] = Method(Obj(("a", Obj(("b", Str()))))) },
-            }), CheckedAccepts.None);
+            }), new AcceptsTable());
             ArgsMatches("""{"details":{"path":"/a/c"}}""", ArgsRefusal(() =>
                 DataInternal.CheckArgs(nested, "m", Parse("""{"a":{"b":"x","c":1}}"""), 1, ChordContext.Background)), "a nested unknown field");
         }),
@@ -214,7 +151,7 @@ internal static partial class Program
                 Version = 1,
                 Params = new(),
                 Members = new() { ["save"] = Method(Obj(("title", Str())), Nul()) },
-            }), CheckedAccepts.None);
+            }), new AcceptsTable());
             Json("""{"title":"t"}""", DataInternal.CheckArgs(info, "save", Parse("""{"title":"t"}"""), 1, ChordContext.Background).Args, "the arguments");
             ArgsMatches("""{"message":"args/title: expected string, got integer"}""",
                 ArgsRefusal(() => DataInternal.CheckArgs(info, "save", Parse("""{"title":1}"""), 1, ChordContext.Background)), "a wrong field");
@@ -226,7 +163,7 @@ internal static partial class Program
                 Version = 1,
                 Params = new(),
                 Members = new() { ["send"] = Method(Obj(("to", Parse("""{"type":"string","format":"email"}"""))), Nul()) },
-            }), CheckedAccepts.None);
+            }), new AcceptsTable());
             Json("""{"to":"nope"}""", DataInternal.CheckArgs(mail, "send", Parse("""{"to":"nope"}"""), 1, ChordContext.Background).Args, "no email");
         }),
         Case("data.args.check-args-refuses-an-unknown-method-an-unaccepted-version-and-a-refused-method", () =>
@@ -238,7 +175,7 @@ internal static partial class Program
             Json("""{"code":"contract_mismatch","message":"notes v4 is not accepted"}""",
                 ArgsRefusal(() => DataInternal.CheckArgs(ArgsProvider, "add", Parse("""{"text":"t"}"""), 4, ChordContext.Background)), "an unknown version");
             ArgsMatches("""{"code":"contract_mismatch"}""", ArgsRefusal(() =>
-                DataInternal.CheckArgs(DataInternal.BindProvider(ArgsNotesV3, CheckedAccepts.None), "add", Parse("""{"text":"t"}"""), 1, ChordContext.Background)),
+                DataInternal.CheckArgs(DataInternal.BindProvider(ArgsNotesV3, new AcceptsTable()), "add", Parse("""{"text":"t"}"""), 1, ChordContext.Background)),
                 "a version not accepted");
             Json("""{"code":"contract_mismatch","message":"notes v2 refuses \"attach\""}""", ArgsRefusal(() =>
                 DataInternal.CheckArgs(ArgsProvider, "attach", new JsonObject { ["data"] = JsonValue.Create(Array.Empty<byte>()) }, 2, ChordContext.Background)),
@@ -252,19 +189,25 @@ internal static partial class Program
                 Params = new(),
                 Members = new() { ["m"] = Method(Obj(("a", Str()))), ["clear"] = Method() },
             });
-            var v2 = ArgsEvolve(v1, e => e.Args("m", Obj(("a", Str()), ("b", Str()))));
-            var fresh = DataInternal.BindProvider(v2, new(new Dictionary<long, IReadOnlyDictionary<string, CheckedMethodMapping>>
+            var v2 = Contract.Evolve(v1, e => e.Args("m", Obj(("a", Str()), ("b", Str()))));
+            var fresh = DataInternal.BindProvider(v2, new()
             {
-                [1] = new Dictionary<string, CheckedMethodMapping>
+                [1] = new()
                 {
-                    ["m"] = CheckedMethodMapping.Map(args: old =>
+                    Methods =
                     {
-                        var current = old!.DeepClone().AsObject();
-                        current["b"] = "";
-                        return current;
-                    }),
+                        ["m"] = new MethodMapping
+                        {
+                            Args = old =>
+                            {
+                                var current = ((JsonNode)old!).DeepClone().AsObject();
+                                current["b"] = "";
+                                return current;
+                            },
+                        },
+                    },
                 },
-            }));
+            });
             Action<ChordContext>[] calls =
             [
                 context => DataInternal.CheckArgs(fresh, "clear", null, 2, context),
@@ -281,6 +224,17 @@ internal static partial class Program
         }),
         Case("data.args.check-args-counts-one-validation-per-call-and-no-walk", async () =>
             Equal(new Counts(0, 1, 0), await Counted(context => DataInternal.CheckArgs(ArgsProvider, "add", Parse("""{"text":"t"}"""), 1, context)), "the counts")),
+        Case("data.args.check-args-refuses-an-args-mapping-output-that-is-no-json-node", () =>
+        {
+            // Authored, PiSharp-only: a table's mappings are object?, so CheckArgs refuses what upstream's types rule out.
+            var v1 = Contract.Local("typed", new() { Version = 1, Params = new(), Members = new() { ["m"] = Method(Obj(("a", Str()))) } });
+            var v2 = Contract.Evolve(v1, e => e.Args("m", Obj(("a", Str()), ("b", Str()))));
+            var bound = DataInternal.BindProvider(v2, new() { [1] = new() { Methods = { ["m"] = new MethodMapping { Args = _ => "not a node" } } } });
+            var error = Throws<InvalidOperationException>(() => DataInternal.CheckArgs(bound, "m", Parse("""{"a":"x"}"""), 1, ChordContext.Background), "a string");
+            Equal("typed accepts[1].methods.m.args: returned a String, not a JsonNode", error.Message, "the message");
+            var nulled = DataInternal.BindProvider(v2, new() { [1] = new() { Methods = { ["m"] = new MethodMapping { Args = _ => null } } } });
+            Equal(new CheckedArgs.Method(null, null), DataInternal.CheckArgs(nulled, "m", Parse("""{"a":"x"}"""), 1, ChordContext.Background), "null is a value");
+        }),
         Case("data.args.binds-the-current-version-and-the-accepted-ones-with-their-fingerprints", () =>
         {
             // Authored from args.ts's binds (R6, Q10): upstream's args.test.ts does not call it.
@@ -288,7 +242,7 @@ internal static partial class Program
             Check(DataInternal.Binds(ArgsProvider, 1, ArgsNotesV1.Fingerprint) && DataInternal.Binds(ArgsProvider, 2, ArgsNotesV2.Fingerprint), "the accepted versions");
             Check(!DataInternal.Binds(ArgsProvider, 3, ArgsNotesV2.Fingerprint), "the current version with another fingerprint");
             Check(!DataInternal.Binds(ArgsProvider, 1, ArgsNotesV2.Fingerprint), "an accepted version with another fingerprint");
-            Check(!DataInternal.Binds(DataInternal.BindProvider(ArgsNotesV3, CheckedAccepts.None), 1, ArgsNotesV1.Fingerprint), "a version not accepted");
+            Check(!DataInternal.Binds(DataInternal.BindProvider(ArgsNotesV3, new AcceptsTable()), 1, ArgsNotesV1.Fingerprint), "a version not accepted");
         }),
         Case("data.args.memory-a-dropped-binding-releases-its-dispatch-table-mappings-schemas-and-validators-after-the-last-call", async () =>
             await ExpectCollected(await ArgsDroppedBinding())),
@@ -297,23 +251,20 @@ internal static partial class Program
     [MethodImpl(MethodImplOptions.NoInlining)]
     private static async Task<WeakReference[]> ArgsDroppedBinding()
     {
-        var contract = ArgsEvolve(Contract.Local("gc", new()
+        var contract = Contract.Evolve(Contract.Local("gc", new()
         {
             Version = 1,
             Params = new(),
             Members = new() { ["m"] = Method(Obj(("a", Str()))) },
         }), e => e.Args("m", Obj(("a", Str()), ("b", Str()))));
         var filler = "";
-        Func<JsonNode?, JsonNode?> mapping = old =>
+        Func<object?, object?> mapping = old =>
         {
-            var current = old!.DeepClone().AsObject();
+            var current = ((JsonNode)old!).DeepClone().AsObject();
             current["b"] = filler;
             return current;
         };
-        var bound = DataInternal.BindProvider(contract, new(new Dictionary<long, IReadOnlyDictionary<string, CheckedMethodMapping>>
-        {
-            [1] = new Dictionary<string, CheckedMethodMapping> { ["m"] = CheckedMethodMapping.Map(args: mapping) },
-        }));
+        var bound = DataInternal.BindProvider(contract, new() { [1] = new() { Methods = { ["m"] = new MethodMapping { Args = mapping } } } });
         await Task.FromResult(DataInternal.CheckArgs(bound, "m", Parse("""{"a":"x"}"""), 1, ChordContext.Background));
         return [new WeakReference(contract), new WeakReference(bound), new WeakReference(mapping)];
     }
