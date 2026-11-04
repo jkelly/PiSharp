@@ -1173,8 +1173,9 @@
       "lines": 173,
       "pisharp": "src/PiSharp.Durable/Chord/Delta/Pending.cs",
       "phase": "sync-1.5.0",
-      "status": "planned",
-      "upstreamChange": "added"
+      "status": "ported",
+      "upstreamChange": "added",
+      "note": "PendingOps (Push, Take, Size, MaxPendingOps) and PendingTake (Ops or Replace). Op records and ImmutableArray batches are immutable, so a batch kept alone is handed over by identity and a merge makes a new op; a leaf that folds many appends keeps the appended text in a StringBuilder and builds the merged op once in Take, as .NET strings copy on every concatenation. Tests: chord.delta-pending.* (the fuzz cases use AppendString until work list area chord-append-text lands appendText)"
     },
     {
       "upstream": "packages/chord/src/delta/revision-validator.ts",
@@ -1302,8 +1303,9 @@
       "lines": 492,
       "pisharp": "src/PiSharp.Durable/Chord/Watch.cs",
       "phase": "sync-1.5.0",
-      "status": "planned",
-      "upstreamChange": "added"
+      "status": "ported",
+      "upstreamChange": "added",
+      "note": "Chord's watch API beside Durable's v1.2.0 one: IWatchHandle/IWatchable/INativeWatchHandle/INativeWatchable, WatchEnd tagged by WatchEndKind, the value and failed call records, WatchLifecycle and its Watch<T> (PendingOps folding, a lone call passed on by identity, a failure followed by values delivered as a root replacement) and NativeWatch<T> (100 pending values, then the newest or replace()). Delivery is posted to a scheduler, the thread pool by default, in place of a microtask; no lock is held while a listener runs; an abort signal is a CancellationToken (ObserveAbort); Watch<T> of a non-JSON value takes a json function for its root replacement. Durable's own watches (Session/Observation.cs, TypesSession.cs) are unchanged until work list area watches moves them onto this. Tests: chord.watch.*"
     },
     {
       "upstream": "packages/durable/test/chat-support.ts",

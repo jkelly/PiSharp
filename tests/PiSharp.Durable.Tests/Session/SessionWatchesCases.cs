@@ -9,6 +9,7 @@
 using System.Collections.Immutable;
 using PiSharp.Durable;
 using PiSharp.Durable.Chord;
+using WatchEnd = PiSharp.Durable.WatchEnd; // Durable's v1.2.0 watch end, beside Chord's (Chord/Watch.cs) until work list area watches moves onto it
 using PiSharp.Durable.Chord.Delta;
 using static Program;
 
