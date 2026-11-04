@@ -56,11 +56,11 @@
     "changelogBullets": 477,
     "repeatedBullets": 23,
     "byStatus": {
-      "ported": 198,
+      "ported": 200,
       "ported-with-deferral": 25,
       "already-ported": 12,
       "no-op": 25,
-      "port": 66
+      "port": 64
     },
     "byArea": {
       "ai": 58,
@@ -9089,7 +9089,7 @@
       "id": "durable.conversation-window",
       "area": "durable",
       "phase": 4,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "durable@1.5.0/Breaking Changes#13",
         "durable@1.5.0/Breaking Changes#14"
@@ -9118,13 +9118,45 @@
         "tests/PiSharp.Durable.Tests/Harness/HarnessViewCases.cs"
       ],
       "release": "1.5.0",
-      "notes": "PiSharp's view carries the active transcript (cut at the head marker). PiSharp-only readers that treat it as the model's context: pisharp durable's TUI (DurableTuiView.cs:197-200 sync and rebuild the transcript from it, :441 counts context tokens), the device service's entries read (DeviceService.cs:391) and the client transcript builder (decision 0008). They move to Conversation.context() for what the model sees and to ConversationTranscript for rendering. Depends on durable.observers; land with durable.conversation-transcript and before durable.watch-events-removed."
+      "notes": "PiSharp's view carries the active transcript (cut at the head marker). PiSharp-only readers that treat it as the model's context: pisharp durable's TUI (DurableTuiView.cs:197-200 sync and rebuild the transcript from it, :441 counts context tokens), the device service's entries read (DeviceService.cs:391) and the client transcript builder (decision 0008). They move to Conversation.context() for what the model sees and to ConversationTranscript for rendering. Depends on durable.observers; land with durable.conversation-transcript and before durable.watch-events-removed.",
+      "evidence": {
+        "commits": [
+          "acbc7690",
+          "67870c12",
+          "539349bd",
+          "5a915f65",
+          "05697ed7"
+        ],
+        "tests": [
+          "tests/PiSharp.Durable.Tests/Harness/HarnessViewCases.cs: hydrates-the-newest-entries-and-the-built-in-documents",
+          "tests/PiSharp.Durable.Tests/Harness/HarnessViewCases.cs: keeps-head-markers-in-place-a-summary-and-a-reset-are-appended-entries",
+          "tests/PiSharp.Durable.Tests/Harness/HarnessViewCases.cs: shows-a-forks-inherited-entries-in-id-order-its-head-markers-in-place",
+          "tests/PiSharp.Durable.Tests/Harness/HarnessViewCases.cs: starts-with-the-newest-min-entries-and-the-entry-before-them-or-the-whole-short-transcript",
+          "tests/PiSharp.Durable.Tests/Harness/HarnessViewCases.cs: takes-appends-up-to-max-then-drops-its-oldest-in-one-splice-down-to-min",
+          "tests/PiSharp.Durable.Tests/Harness/HarnessViewCases.cs: keeps-the-newest-min-of-a-commit-that-appends-more-than-max-at-once",
+          "tests/PiSharp.Durable.Tests/Harness/HarnessViewCases.cs: starts-at-from-when-the-entries-since-fit-in-max-otherwise-at-the-newest-min",
+          "tests/PiSharp.Durable.Tests/Harness/HarnessViewCases.cs: advances-a-resumed-window-by-appends-from-its-start",
+          "tests/PiSharp.Durable.Tests/Harness/HarnessViewCases.cs: uses-from-only-for-the-first-value-a-from-past-the-newest-entry-starts-empty-and-takes-every-append",
+          "tests/PiSharp.Durable.Tests/Harness/HarnessViewCases.cs: rejects-window-bounds-that-are-not-integers-or-put-max-below-min",
+          "tests/PiSharp.Durable.Tests/Harness/HarnessViewCases.cs: gives-each-observer-its-own-window-over-one-mount",
+          "tests/PiSharp.Durable.Tests/Harness/HarnessViewCases.cs: bounds-an-overflow-replacement-by-max",
+          "tests/PiSharp.Durable.Tests/Harness/HarnessViewCases.cs: lets-a-long-lived-watch-drop-the-entries-that-left-its-window",
+          "tests/PiSharp.Durable.Tests/HarnessViewRunCases.cs: streams-the-answer-as-operations-that-rebuild-every-committed-partial-then-appends-it",
+          "tests/PiSharp.Durable.Tests/HarnessViewRunCases.cs: shows-a-tool-calls-slot-from-pending-through-its-running-output-to-its-result-entry",
+          "tests/PiSharp.Durable.Tests/HarnessViewRunCases.cs: ends-a-run-and-starts-the-queued-follow-ups-in-one-value",
+          "tests/PiSharp.Durable.Tests/HarnessViewRunCases.cs: applies-later-operations-to-an-overflow-replacement-that-holds-an-in-flight-partial",
+          "tests/PiSharp.Durable.Tests/Harness/HarnessCompactionCases.cs: appends-the-summary-to-the-conversation-view-in-place-its-head-on-a-kept-entry",
+          "tests/PiSharp.Durable.Tests/BenchmarksCases.cs: benchmarks.smoke",
+          "tests/PiSharp.DurableCli.Tests/RuntimeLibraryCases.cs: runtime.transcript.keeps-the-active-transcript-past-the-view-window",
+          "tests/PiSharp.DurableCli.Tests/RuntimeLibraryCases.cs: runtime.transcript.starts-at-the-summary-after-a-compaction"
+        ]
+      }
     },
     {
       "id": "durable.conversation-transcript",
       "area": "durable",
       "phase": 4,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "durable@1.5.0/Added#4"
       ],
@@ -9142,7 +9174,35 @@
         "samples/Durable.Examples/ (new)"
       ],
       "release": "1.5.0",
-      "notes": "New upstream file with no PiSharp counterpart. Name collision: PiSharp.Durable.Client's Transcript.cs (PiSharp-only, decision 0008) already builds renderable transcript items from entries and pi.live for the device's /transcript route, the hub and terminals. The owner decides whether it is rebuilt on ConversationTranscript (gaps, paging, resume) or stays the client layer above it. Depends on durable.conversation-window."
+      "notes": "New upstream file with no PiSharp counterpart. Name collision: PiSharp.Durable.Client's Transcript.cs (PiSharp-only, decision 0008) already builds renderable transcript items from entries and pi.live for the device's /transcript route, the hub and terminals. The owner decides whether it is rebuilt on ConversationTranscript (gaps, paging, resume) or stays the client layer above it. Depends on durable.conversation-window.",
+      "evidence": {
+        "commits": [
+          "acbc7690",
+          "67870c12",
+          "539349bd",
+          "5a915f65",
+          "05697ed7"
+        ],
+        "tests": [
+          "tests/PiSharp.Durable.Tests/ConversationTranscriptCases.cs: shows-a-first-window-under-an-earlier-marker-or-alone-when-it-starts-the-transcript",
+          "tests/PiSharp.Durable.Tests/ConversationTranscriptCases.cs: appends-keeps-entries-the-window-dropped-and-returns-the-same-items-when-nothing-is-added",
+          "tests/PiSharp.Durable.Tests/ConversationTranscriptCases.cs: opens-a-gap-when-a-window-does-not-continue-the-transcript-and-fills-it-page-by-page",
+          "tests/PiSharp.Durable.Tests/ConversationTranscriptCases.cs: shrinks-a-gap-from-its-start-while-more-than-a-page-is-missing",
+          "tests/PiSharp.Durable.Tests/ConversationTranscriptCases.cs: loads-earlier-pages-until-the-start-then-drops-the-marker",
+          "tests/PiSharp.Durable.Tests/ConversationTranscriptCases.cs: shares-one-load-between-concurrent-calls-of-loadearlier-and-of-fillgap-for-one-gap",
+          "tests/PiSharp.Durable.Tests/ConversationTranscriptCases.cs: resumes-after-newest-an-empty-window-right-after-it-adds-nothing-one-past-it-opens-a-gap",
+          "tests/PiSharp.Durable.Tests/ConversationTranscriptCases.cs: fills-a-gap-from-a-window-that-covers-it",
+          "tests/PiSharp.Durable.Tests/ConversationTranscriptCases.cs: rejects-loadearlier-before-the-first-merge-and-returns-the-view-for-a-gap-that-is-gone",
+          "tests/PiSharp.Durable.Tests/ConversationTranscriptCases.cs: retries-a-load-whose-loader-threw-synchronously-for-loadearlier-and-fillgap",
+          "tests/PiSharp.Durable.Tests/ConversationTranscriptCases.cs: retries-a-load-that-rejected",
+          "tests/PiSharp.Durable.Tests/ConversationTranscriptCases.cs: keeps-one-gap-for-an-empty-window-whose-before-lies-inside-it",
+          "tests/PiSharp.Durable.Tests/ConversationTranscriptCases.cs: shares-one-load-between-a-stale-gap-descriptor-and-the-gap-it-shrank-into",
+          "tests/PiSharp.Durable.Tests/ConversationTranscriptCases.cs: treats-an-empty-page-with-a-next-cursor-as-the-end-of-the-range",
+          "tests/PiSharp.Durable.Tests/ConversationTranscriptCases.cs: resumes-with-resume-undefined-before-a-merge-for-an-empty-transcript-from-after-the-newest",
+          "tests/PiSharp.Durable.Tests/ConversationTranscriptCases.cs: follows-the-walkthrough-live-appends-a-stall-fillgap-loadearlier-and-a-resume-with-from",
+          "tests/PiSharp.Durable.Tests/ExamplesCases.cs: 32-transcript"
+        ]
+      }
     },
     {
       "id": "durable.run-failure",
@@ -10068,9 +10128,9 @@
           "tests/PiSharp.Durable.Tests/HarnessPartialChangesCases.cs: harness.partial-changes.drops-thinking-appends-when-a-thinking-checkpoint-replaces-the-text",
           "tests/PiSharp.Durable.Tests/HarnessPartialChangesCases.cs: harness.partial-changes.ends-blocks-at-content-block-finalized",
           "tests/PiSharp.Durable.Tests/HarnessPartialChangesCases.cs: harness.partial-changes.tracks-a-tool-call-from-its-provisional-start",
-          "tests/PiSharp.Durable.Tests/Harness/HarnessEventsCases.cs: streams-a-tool-call-partial-as-toolcall-delta-appends-at-its-argument-paths",
-          "tests/PiSharp.Durable.Tests/Harness/HarnessEventsCases.cs: commits-a-growing-text-and-tool-call-at-a-cost-that-follows-the-new-text-not-the-string-lengths",
-          "tests/PiSharp.Durable.Tests/Harness/HarnessEventsCases.cs: keeps-a-watchers-memory-proportional-to-a-long-streamed-text-and-tool-call-not-to-their-commits",
+          "tests/PiSharp.Durable.Tests/HarnessViewRunCases.cs: streams-a-tool-call-partial-as-appends-at-its-argument-paths",
+          "tests/PiSharp.Durable.Tests/HarnessViewRunCases.cs: commits-a-growing-text-and-tool-call-at-a-cost-that-follows-the-new-text-not-the-string-lengths",
+          "tests/PiSharp.Durable.Tests/HarnessViewRunCases.cs: keeps-a-watchers-memory-proportional-to-a-long-streamed-text-and-tool-call-not-to-their-commits",
           "tests/PiSharp.Durable.Tests/HarnessJsonCases.cs: harness.json.appends-a-planned-text-to-a-string-member-whose-new-length-it-explains",
           "tests/PiSharp.Durable.Tests/HarnessJsonCases.cs: harness.json.leaves-a-kept-member-to-the-caller-and-assigns-the-rest",
           "tests/PiSharp.Durable.Tests/HarnessJsonCases.cs: harness.json.ignores-an-append-plan-for-an-array-item",

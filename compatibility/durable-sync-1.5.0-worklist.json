@@ -2936,7 +2936,12 @@
         "observers"
       ],
       "commits": [
-        "f3255de76"
+        "f3255de76",
+        "acbc7690",
+        "67870c12",
+        "539349bd",
+        "5a915f65",
+        "05697ed7"
       ],
       "notes": "PiSharp's view carries the active transcript cut at the head marker; PiSharp-only readers that treat it as the model's context move to Conversation.context() for what the model sees and to ConversationTranscript for rendering: pisharp durable's TUI (DurableTuiView.cs syncs and rebuilds its transcript from it and counts context tokens), the device service's entries read (DeviceService.cs) and the user interaction tools. Name collision: PiSharp.Durable.Client's Transcript.cs (PiSharp-only, decision 0008) already builds renderable items for the device's /transcript route, the hub and terminals; recommendation: keep it as the client layer and do not rebuild it on ConversationTranscript in phase 4 (the device protocol stays, see area events); the owner decides. The view differential (views.upstream.json, v1.2.0) no longer describes the windowed view: those cases become authored expectations from upstream v1.5.0's harness-view.test.ts and harness-view-run.test.ts. conversation-view-bench.ts becomes ConversationViewBench.cs."
     },
