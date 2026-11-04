@@ -2,8 +2,8 @@
 // HarnessSupport.cs and ChatSupport.cs, and these:
 // - Backends. Upstream opens every case on MemoryStorage. harness.tools.* does the same; harness.tools.jsonl.* and harness.tools.sqlite.*
 //   rerun every case on a fresh JSONL directory and a fresh SQLite file.
-// - EchoParameters is the JSON TypeBox prints for `Type.Object({ text: Type.Optional(Type.String()) })`; ToolRegistration.ParametersOrigin
-//   stays TypeBox, so validation converts as pi-ai does for it.
+// - EchoParameters is the JSON pi-schema builds for `obj({ text: opt(str()) })` (Pi v1.5.0, area tools-schema); validation coerces as
+//   pi-ai's does for every schema.
 // - `new NodeExecutionEnv({ cwd })`, read only for `env.cwd`, is ToolTestEnv (ToolEnvSupport.cs).
 // - A `.then(push)` on a details() promise is a continuation that runs when the promise settles; Progress settles waiters inline and in order,
 //   as promise reactions run, so the recorded order is upstream's.
@@ -44,8 +44,8 @@ internal static class ToolsTests
 {
     private static readonly DurableContext Context = DurableContext.Background;
 
-    /// <summary><c>Type.Object({ text: Type.Optional(Type.String()) })</c>.</summary>
-    internal static readonly JsonObjectValue EchoParameters = O("""{"type":"object","properties":{"text":{"type":"string"}}}""");
+    /// <summary><c>obj({ text: opt(str()) })</c>.</summary>
+    internal static readonly JsonObjectValue EchoParameters = O("""{"type":"object","properties":{"text":{"type":"string"}},"additionalProperties":false}""");
 
     internal static ToolRegistration Tool(string name, ToolExecute execute, Func<ToolRegistration, ToolRegistration>? extra = null)
     {

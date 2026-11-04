@@ -8,10 +8,10 @@
 // - NestedCallDoc (pi.tool.nested-call, a task-scoped family of the caller) holds {taskId?, result?}, the result being
 //   NestedToolExecutionResult.ToJson.
 // - Calls are pi-ai ToolCall wire JSON; a nested call's hook call adds `parent: {taskId, callId}`. Arguments are validated by
-//   Internal/PiAi/Validation.cs, an internal copy of PiSharp.Agent's ToolArgumentValidation (the agent's port of pi-ai's
-//   validateToolArguments, packages/ai/src/utils/validation.ts; the core does not reference PiSharp.Agent), with the tool's ParametersOrigin
-//   (default TypeBox, as upstream tools declare TypeBox schemas). Structured output is checked with the same file's TypeBox Compile port
-//   (Check, and the first of Errors for the message).
+//   Internal/PiAi/Validation.cs, the port of pi-ai's validateToolArguments (packages/ai/src/utils/validation.ts) on pi-schema
+//   (PiSharp.Contracts.Schema), with the call's argumentsError. Pi v1.5.0 sync (area tools-schema): structured output is checked with
+//   pi-schema too, compiled with the standard formats and unresolved references rejected in place (Check, and the first of Errors for the
+//   message, its JSON Pointer path dotted).
 // - `runtime.signal.aborted` is ITaskRuntime.Signal; an abort reaches a running tool as its context's cancellation, so the tool rejects
 //   with an OperationCanceledException (upstream's AbortError) or the reason.
 // - The tool reports from any thread; what it reported (output buffer, diagnostics, details, the ended flag) sits behind one lock, and the
@@ -128,7 +128,7 @@ internal static class ToolPhases
             return;
         }
         var prepared = Prepare(tool, call["arguments"]);
-        var checkedArgs = prepared.Error is null ? Validate(tool, prepared.Args!) : prepared;
+        var checkedArgs = prepared.Error is null ? Validate(tool, call, prepared.Args!) : prepared;
         if (checkedArgs.Error is { } invalid)
         {
             await SettleAsync(runtime, input, call, Ending.Completed, _ => Invalid(invalid), context).ConfigureAwait(false);
@@ -158,7 +158,7 @@ internal static class ToolPhases
             await SettleAsync(runtime, input, call, Ending.Completed, _ => blocked, context).ConfigureAwait(false);
             return;
         }
-        var validated = Validate(tool, args);
+        var validated = Validate(tool, call, args);
         if (validated.Error is { } rejected)
         {
             await SettleAsync(runtime, input, call, Ending.Completed, _ => Invalid(rejected), context).ConfigureAwait(false);
@@ -269,14 +269,16 @@ internal static class ToolPhases
         }
     }
 
-    /// <summary>Arguments validated and coerced against the implementation's schema (upstream <c>validate</c>).</summary>
-    private static Checked Validate(ToolRegistration tool, JsonValue args)
+    /// <summary>Arguments validated and coerced against the implementation's schema (upstream <c>validate</c>): the call with these
+    /// arguments, so a call whose argument text was malformed fails with its <c>argumentsError</c>.</summary>
+    private static Checked Validate(ToolRegistration tool, JsonObjectValue call, JsonValue args)
     {
         try
         {
-            var result = ToolArgumentValidation.ValidateJson(tool.Name, tool.Parameters.ToJson(), args.ToJson(), tool.ParametersOrigin);
+            var argumentsError = call.TryGetValue("argumentsError", out var error) && error is JsonStringValue text ? text.Value : null;
+            var result = ToolArgumentValidation.Validate(Name(call), tool.Parameters, args, tool.ParametersOrigin, argumentsError);
             if (!result.IsValid) return new Checked(null, result.ErrorMessage);
-            return new Checked(result.ArgumentsJson is { } json ? JsonValue.Parse(json) : JsonValue.Null, null);
+            return new Checked(result.Value, null);
         }
         catch (Exception error)
         {
@@ -476,7 +478,7 @@ internal static class ToolPhases
         return final with { Output = bounded.Content, Diagnostics = [.. final.Diagnostics ?? [], .. harness] };
     }
 
-    private static readonly ConditionalWeakTable<JsonObjectValue, Validator> StructuredValidators = new();
+    private static readonly ConditionalWeakTable<JsonObjectValue, StructuredOutputValidator> StructuredValidators = new();
 
     /// <summary>Why a result's structured output breaks the tool's contract, or null when it keeps it (upstream
     /// <c>structuredOutputError</c>).</summary>
@@ -487,13 +489,9 @@ internal static class ToolPhases
         if (schema is null)
             return value is null ? null : $"Tool {tool.Name} returned structuredOutput but declares no structuredOutputSchema";
         if (value is null) return result.IsError == true ? null : $"Tool {tool.Name} returned no structuredOutput";
-        var validator = StructuredValidators.GetValue(schema, static key => Validator.Compile(Js.Parse(key.ToJson())));
-        var candidate = Js.Parse(value.ToJson());
-        if (validator.Check(candidate)) return null;
-        var first = validator.Errors(candidate).FirstOrDefault();
-        var path = first is null ? "" : (first.InstancePath.StartsWith('/') ? first.InstancePath[1..] : first.InstancePath).Replace('/', '.');
-        if (path.Length == 0) path = "root";
-        return $"Tool {tool.Name} returned structuredOutput that does not match its schema: {path}: {first?.Message ?? "invalid"}";
+        var validator = StructuredValidators.GetValue(schema, StructuredOutputValidator.Compile);
+        if (validator.FirstError(value) is not { } first) return null;
+        return $"Tool {tool.Name} returned structuredOutput that does not match its schema: {first.Path}: {first.Message}";
     }
 
     /// <summary>
@@ -751,7 +749,7 @@ internal static class ToolPhases
     {
         if (key.Length == 0 || key.Contains('/', StringComparison.Ordinal) || key == "__proto__" || IsPositiveInteger(key))
             throw new InvalidOperationException(
-                $"Nested call key {Js.Stringify(key, 0)} must be non-empty, without \"/\", not \"__proto__\", and not a positive integer");
+                $"Nested call key {((JsonValue)key).ToJson()} must be non-empty, without \"/\", not \"__proto__\", and not a positive integer");
     }
 
     private static bool IsPositiveInteger(string key) => key.Length > 0 && key[0] is >= '1' and <= '9' && key.All(c => c is >= '0' and <= '9');

@@ -4,7 +4,7 @@
 //   harness.inbox.jsonl.* and harness.inbox.sqlite.* rerun every case on a fresh JSONL directory and a fresh SQLite file, and
 //   harness.inbox.jsonl.* reopens a JSONL directory for the reopen cases (harness.inbox.sqlite.* leaves them to harness.inbox.*).
 // - Inbox items `[id, mode]` compare as the strings "id mode".
-// - `Type.Object({})` is NoParameters, the JSON TypeBox prints for it.
+// - `obj({})` is NoParameters, the JSON pi-schema builds for it (Pi v1.5.0, area tools-schema).
 // - "reads queue modes when the final boundary's commit runs on the Session line": upstream waits for onYield and then flushes once, so the
 //   answer's boundary commit has queued behind the held commit before the test changes the mode. Here the onYield hook records the Session
 //   line's backlog, and the test waits (a deterministic barrier) until a further job, the boundary commit, waits on the line.
@@ -53,8 +53,8 @@ internal static class InboxTests
 {
     private static readonly DurableContext Context = DurableContext.Background;
 
-    /// <summary><c>Type.Object({})</c>.</summary>
-    private static readonly JsonObjectValue NoParameters = O("""{"type":"object","properties":{}}""");
+    /// <summary><c>obj({})</c>.</summary>
+    private static readonly JsonObjectValue NoParameters = ToolsSchema150.EmptyObject;
 
     private static readonly JsonObjectValue Usage1 =
         O("""{"input":1,"output":2,"cacheRead":3,"cacheWrite":4,"totalTokens":10,"cost":{"input":0.1,"output":0.2,"cacheRead":0.3,"cacheWrite":0.4,"total":1}}""");

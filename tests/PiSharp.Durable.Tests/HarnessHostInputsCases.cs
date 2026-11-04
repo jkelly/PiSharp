@@ -6,6 +6,7 @@
 //   of a second FauxModels. getProvider("second-only") is GetModel("second-only", "faux-1"): IDurableModels has no provider lookup.
 // - "rejects a Models value and a function together" and the two cases after it are PiSharp-only: TypeScript's union type makes a value and
 //   a function exclusive; two C# properties are checked at open.
+// - `obj({})` is ToolsSchema150.EmptyObject (area tools-schema).
 using System.Collections.Immutable;
 using PiSharp.Contracts;
 using PiSharp.Durable;
@@ -95,7 +96,7 @@ internal static class HostInputsTests
                     {
                         Name = "probe",
                         Description = "Records api.models before and after the host swaps it",
-                        Parameters = O("""{"type":"object","properties":{}}"""),
+                        Parameters = ToolsSchema150.EmptyObject,
                         Execute = (_, api, _) =>
                         {
                             seen.Add(api.Models);

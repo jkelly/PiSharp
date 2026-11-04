@@ -6,8 +6,9 @@
 // - The sandbox is PiSharp.Codemode's CodemodeSandbox (64 MiB, engines on threads as the test host sets no worker launcher, as upstream's run
 //   on worker threads). Upstream's wrapper of `sandbox.start`, which counts runs and hands each to `vm.onStart`, is
 //   CodemodeToolOptions.OnRunStarted.
-// - The tools' Parameters are the JSON TypeBox prints for `Type.Object({ text: Type.Optional(Type.String()), id: Type.Optional(Type.Number())
-//   })`; a test's own Exit schema likewise.
+// - The tools' Parameters are the JSON pi-schema builds for `obj({ text: opt(str()), id: opt(num()) })`; a test's own Exit schema
+//   likewise (Pi v1.5.0, area tools-schema). A tool upstream declares with `obj({})` and calls with `{}` keeps the default,
+//   ToolRegistration.EmptyParameters.
 // - toMatchObject of the details' calls checks the listed fields; `harness.close(context).catch(() => {})` ignores the close's failure.
 // - The journal and run documents (CodemodeJournalDoc, CodemodeRunDoc) are DurableCodemode.JournalDoc and RunDoc; a test's
 //   `journal.entries[0]!.issuedAfter = 7` and the like are draft writes in a Harness commit.
@@ -40,8 +41,8 @@ internal static partial class CodemodeTests
 {
     private static readonly DurableContext Context = DurableContext.Background;
 
-    /// <summary><c>Type.Object({ text: Type.Optional(Type.String()), id: Type.Optional(Type.Number()) })</c>.</summary>
-    internal static readonly JsonObjectValue Parameters = O("""{"type":"object","properties":{"text":{"type":"string"},"id":{"type":"number"}}}""");
+    /// <summary><c>obj({ text: opt(str()), id: opt(num()) })</c>.</summary>
+    internal static readonly JsonObjectValue Parameters = O("""{"type":"object","properties":{"text":{"type":"string"},"id":{"type":"number"}},"additionalProperties":false}""");
 
     internal static ToolRegistration Tool(string name, ToolExecute execute, ToolReplay replay = ToolReplay.Unsafe) =>
         Define.Tool(new ToolRegistration { Name = name, Description = name, Parameters = Parameters, Execute = execute, Replay = replay });
@@ -658,7 +659,7 @@ internal static partial class CodemodeTests
         yield return Case(prefix + "resolves-a-schema-tool-s-error-result-that-carries-its-value-and-rejects-one-without-with-its-text", async () =>
         {
             var chat = new Chat();
-            var exit = O("""{"type":"object","required":["output","exitCode"],"properties":{"output":{"type":"string"},"exitCode":{"type":"number"}}}""");
+            var exit = O("""{"type":"object","properties":{"output":{"type":"string"},"exitCode":{"type":"number"}},"required":["output","exitCode"],"additionalProperties":false}""");
             AddTool(chat.Setup.Registry, Define.Tool(new ToolRegistration
             {
                 Name = "run",
@@ -697,7 +698,7 @@ internal static partial class CodemodeTests
             {
                 Name = "picture",
                 Description = "picture",
-                Parameters = O("""{"type":"object","required":["caption"],"properties":{"caption":{"type":"boolean"}}}"""),
+                Parameters = O("""{"type":"object","properties":{"caption":{"type":"boolean"}},"required":["caption"],"additionalProperties":false}"""),
                 Execute = (args, _, _) => Task.FromResult(new ToolExecutionResult
                 {
                     Output = JsonValue.Array(
@@ -997,6 +998,31 @@ internal static partial class CodemodeTests
             Check(saved.Success, "saved: " + ran.Text);
             Equal(png, Convert.ToBase64String(await File.ReadAllBytesAsync(saved.Groups[1].Value)), "file");
             Check(((JsonArrayValue)ran.Message["content"]).Cast<JsonObjectValue>().Any(item => S(item["type"]) == "image"), "image block");
+        });
+
+        // Pi v1.5.0 (area tools-schema, #11015): read declares a structuredOutputSchema, so a script gets an image's block and a text
+        // file's text.
+        yield return Case(prefix + "resolves-the-built-in-read-with-an-image-s-block-which-image-shows-and-with-a-text-file-s-text", async () =>
+        {
+            const string png = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==";
+            var files = Temp("codemode-read");
+            await File.WriteAllBytesAsync(Path.Combine(files, "pixel.png"), Convert.FromBase64String(png));
+            await File.WriteAllTextAsync(Path.Combine(files, "note.txt"), "hello");
+            var chat = new Chat();
+            AddTool(chat.Setup.Registry, CodingTools.CreateReadTool());
+            var picture = JsonValue.String(Path.Combine(files, "pixel.png")).ToJson();
+            var note = JsonValue.String(Path.Combine(files, "note.txt")).ToJson();
+            var ran = await RunScript($$"""
+                const picture = await tools.read({ path: {{picture}} });
+                text([picture.type, picture.mimeType, picture.data.length].join(" "));
+                image(picture);
+                text(await tools.read({ path: {{note}} }));
+                """, chat);
+            Check(!ran.IsError, "isError: " + ran.Text);
+            Contains(ran.Text, $"image image/png {png.Length}", "image block");
+            Check(Regex.IsMatch(ran.Text, @"\[Image saved to \S+ \(image/png, \d+ bytes\)\]", RegexOptions.CultureInvariant), "saved: " + ran.Text);
+            Contains(ran.Text, "hello", "text file");
+            Check(((JsonArrayValue)ran.Message["content"]).Cast<JsonObjectValue>().Any(item => S(item["type"]) == "image"), "image content");
         });
 
         yield return Case(prefix + "calls-a-deferred-tool-the-model-is-not-offered-and-finds-it-in-all-tools", async () =>

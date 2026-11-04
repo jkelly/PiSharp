@@ -1,7 +1,9 @@
 // Node differentials of the coding tools against Fixtures/v1.2.0/tools.upstream.json, which Fixtures/capture-tools.mjs prints by running the
 // pinned upstream tools (Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff, packages/durable/src/tools) under Node, as tools.node.<case>:
 // - declarations: the name, description and parameters JSON each tool declares to models, its output limits, replay, structuredOutputSchema,
-//   callers and deferred, byte for byte (read's description names the image formats since v1.2.0);
+//   callers and deferred, byte for byte (read's description names the image formats since v1.2.0). Pi v1.5.0 (area tools-schema): the
+//   tools build their schemas with pi-schema, so the parameters and structuredOutputSchema compare with the captured ones in pi-schema's
+//   key order, and read's v1.5.0 structuredOutputSchema is authored from read.ts (ToolsSchema150.cs); none of that is captured;
 // - diffs: generateDiffString and generateUnifiedPatch (jsdiff 8.0.4 underneath) for 600 seeded old/new texts;
 // - edits: the edit tool over a real file for authored cases (exact, CRLF, BOM, fuzzy, errors): text, details, the file afterwards;
 // - bash: the bash tool for authored commands: streamed output, error, isError, structured output (long output digested, spill path masked)
@@ -64,6 +66,10 @@ internal static partial class Program
     private static string? OptionalString(JsonElement element, string name) =>
         element.TryGetProperty(name, out var value) && value.ValueKind == System.Text.Json.JsonValueKind.String ? value.GetString() : null;
 
+    /// <summary>Pi v1.5.0's readStructuredOutputSchema (packages/durable/src/tools/read.ts) as pi-schema builds it: authored, not captured.</summary>
+    private const string ReadStructuredOutputSchema150 =
+        """{"anyOf":[{"type":"string"},{"type":"object","properties":{"type":{"const":"image"},"data":{"type":"string"},"mimeType":{"type":"string"}},"required":["type","data","mimeType"]}]}""";
+
     /// <summary>capture-tools.mjs's IMAGE_CASES.</summary>
     private static IEnumerable<(string Name, byte[] Bytes)> ToolsImageCases()
     {
@@ -105,7 +111,8 @@ internal static partial class Program
                 var upstream = declarations[index];
                 Equal(upstream.GetProperty("name").GetString(), tool.Name, "name");
                 Equal(upstream.GetProperty("description").GetString(), tool.Description, tool.Name + " description");
-                Equal(upstream.GetProperty("parameters").GetString(), tool.Parameters.ToJson(), tool.Name + " parameters");
+                // Pi v1.5.0 (area tools-schema): pi-schema's obj() order of the captured parameters, authored (ToolsSchema150.cs).
+                Equal(ToolsSchema150.PiSchemaOrder(upstream.GetProperty("parameters").GetString()!), tool.Parameters.ToJson(), tool.Name + " parameters");
                 Equal(PiSharp.Contracts.ToolSchemaOrigin.TypeBox, tool.ParametersOrigin, tool.Name + " parameters origin");
                 var limits = tool.OutputLimits is null ? null
                     : "{" + string.Join(",", new[] { tool.OutputLimits.MaxBytes is { } bytes ? $"\"maxBytes\":{bytes}" : null,
@@ -115,7 +122,11 @@ internal static partial class Program
                 // Upstream sets no replay on any coding tool: the default, unsafe.
                 Equal(OptionalString(upstream, "replay"), tool.Replay?.ToString().ToLowerInvariant(), tool.Name + " replay");
                 Equal(upstream.GetProperty("prepareArguments").GetBoolean(), tool.PrepareArguments is not null, tool.Name + " prepareArguments");
-                Equal(OptionalString(upstream, "structuredOutputSchema"), tool.StructuredOutputSchema?.ToJson(), tool.Name + " structuredOutputSchema");
+                // Pi v1.5.0: read declares readStructuredOutputSchema, union([str(), obj({ type: lit("image"), data: str(), mimeType: str() },
+                // { open: true })]) as pi-schema builds it (authored); bash's and powershell's are the captured ones in pi-schema's order.
+                Equal(tool.Name == "read" ? ReadStructuredOutputSchema150
+                    : OptionalString(upstream, "structuredOutputSchema") is { } schema ? ToolsSchema150.PiSchemaOrder(schema) : null,
+                    tool.StructuredOutputSchema?.ToJson(), tool.Name + " structuredOutputSchema");
                 Equal(upstream.GetProperty("callers").ValueKind == System.Text.Json.JsonValueKind.Null ? null
                     : upstream.GetProperty("callers").GetRawText(), tool.Callers is { } callers
                     ? JsonValue.Array(callers.Select(caller => (JsonValue)(caller == ToolCaller.Model ? "model" : "tools"))).ToJson() : null, tool.Name + " callers");

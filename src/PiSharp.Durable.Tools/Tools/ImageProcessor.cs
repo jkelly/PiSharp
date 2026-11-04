@@ -1,5 +1,6 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/src/tools/image-processor.ts
-// toBase64 is upstream's own encoder because it may not use Buffer or btoa; .NET's Convert.ToBase64String is the same standard base64.
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/src/tools/image-processor.ts
+// toBase64 is btoa over a binary string built 8 KiB at a time (v1.3.0: so a 3 MiB image no longer takes about 140 MB of V8 heap); .NET's
+// Convert.ToBase64String is the same standard base64, sized once, with no intermediate string.
 using System.Collections.Frozen;
 
 namespace PiSharp.Durable.Tools;

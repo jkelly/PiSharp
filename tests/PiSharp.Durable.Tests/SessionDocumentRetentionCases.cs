@@ -460,7 +460,7 @@ internal static class DocumentRetentionTests
                 {
                     Name = "steps",
                     Description = "Streams three steps",
-                    Parameters = O("""{"type":"object","properties":{}}"""),
+                    Parameters = ToolsSchema150.EmptyObject,
                     Execute = async (_, api, _) =>
                     {
                         foreach (var step in new[] { "a\n", "b\n", "c\n" })

@@ -1,8 +1,8 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/test/codemode-describe.test.ts ("code mode description and section"),
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/test/codemode-describe.test.ts ("code mode description and section"),
 // as codemode.describe.<case>. Verbatim apart from the adaptations in HarnessSupport.cs and ChatSupport.cs, and these:
 // - codemodeDescription and codemodeSection are CodemodeDescribe.Description and Section (internal, as upstream's tests import them from the
 //   source file); an undefined section is null.
-// - The tools' Parameters are the JSON TypeBox prints for `Type.Object({ path: Type.String({ description: "File path" }) })`.
+// - The tools' Parameters are the JSON pi-schema builds for `obj({ path: str({ description: "File path" }) })`.
 // - CODEMODE_SOURCE_GRAMMAR is PiSharp.Codemode's CodemodeSource.Grammar.
 using PiSharp.Codemode;
 using PiSharp.Durable;
@@ -23,7 +23,7 @@ internal static class CodemodeDescribeTests
     private static readonly DurableContext Context = DurableContext.Background;
 
     private static readonly JsonObjectValue PathParameters =
-        O("""{"type":"object","required":["path"],"properties":{"path":{"type":"string","description":"File path"}}}""");
+        O("""{"type":"object","properties":{"path":{"type":"string","description":"File path"}},"required":["path"],"additionalProperties":false}""");
 
     private static ToolRegistration Tool(string name, string description, Func<ToolRegistration, ToolRegistration>? extra = null)
     {

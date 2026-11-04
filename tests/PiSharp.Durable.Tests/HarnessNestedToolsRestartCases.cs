@@ -1,7 +1,7 @@
 // Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/test/harness-nested-tools-restart.test.ts ("nested tool calls across
 // a restart"), as harness.nested-tools-restart.<case>. Verbatim apart from the adaptations in HarnessSupport.cs and ChatSupport.cs, and these:
 // - `openNodeSqliteStorage(path)` is SqliteStorage.OpenAsync over a file in a fresh temporary directory.
-// - The tools' Parameters are the JSON TypeBox prints for `Type.Object({ text: Type.Optional(Type.String()) })` (NestedToolsTests).
+// - The tools' Parameters are the JSON pi-schema builds for `obj({ text: opt(str()) })` (NestedToolsTests; Pi v1.5.0, area tools-schema).
 // - A beforeTool hook's `aborted(hookContext.abortSignal!)` waits on the hook context's cancellation, which close aborts.
 // - A record's `abortReason` toBeUndefined is a null TaskRecord.AbortReason, `abandonOnRestart` toBeUndefined a false one (written only when
 //   true).

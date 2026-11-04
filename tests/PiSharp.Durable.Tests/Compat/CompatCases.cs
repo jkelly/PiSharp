@@ -14,6 +14,8 @@
 // wall time, clock and seed; and, PiSharp's own, code mode's engine fingerprint (QuickJS upstream, Jint here: decision 0005).
 // The scenarios new in Pi v1.2.0 (CompatScenarios120.cs) run the same checks, plus observed (observed.json: what calls returned or rejected
 // with) and events (events.json: the root conversation's agent events, the snapshot first, from the run and from the resume).
+// Pi v1.5.0 sync (area tools-schema): their written cases compare with ToolsSchema150.cs's authored forms of the capture, not the capture
+// itself: v1.5.0 declares the built-in tools with pi-schema's key order and prints pi-schema's validation messages. Only those differ.
 // - upgrade-from-v1.1.0: a v1.2.0 Harness opens copies of the v1.1.0 sessions (Fixtures/upstream-sessions) without resuming them, and
 //   resumes the resumable ones with their scenario's model, ending with the records upstream's v1.2.0 left (its v1 pi.tool tasks migrate to
 //   version 2 when they run).
@@ -334,24 +336,30 @@ internal static partial class CompatTests
                 if (scenario.Run is not { } runScenario) continue;
                 yield return Case(prefix + "written", async () =>
                 {
+                    // Pi v1.5.0 (area tools-schema): what PiSharp writes is compared with ToolsSchema150's authored forms of the capture, the
+                    // built-in tools' pi-schema declarations and pi-schema's validation messages.
+                    var writtenEvents = expectedEvents is null ? null : (JsonObjectValue)ToolsSchema150.Authored(expectedEvents);
                     var directory = Temp($"compat-written-{scenario.Name}-{backend}");
-                    var runEvents = CompatEvents.Expect(expectedEvents, "run");
+                    var runEvents = CompatEvents.Expect(writtenEvents, "run");
                     var observed = await CompatEvents.Record(runEvents, () => runScenario(() => OpenBackend(backend, directory)));
                     runEvents?.Check("run events");
-                    SameJson(Expected(scenario.Name, "records.json", backend, root), await Dump(await OpenBackend(backend, directory)), "records");
+                    SameJson(ToolsSchema150.Authored(Expected(scenario.Name, "records.json", backend, root)), await Dump(await OpenBackend(backend, directory)), "records");
                     var upstream = Path.Combine(root, scenario.Name, backend);
-                    if (backend == "jsonl") SameFiles(upstream, directory);
-                    else SameColumns(Path.Combine(CopyFixture(scenario.Name, backend, root), "session.sqlite"), Path.Combine(directory, "session.sqlite"));
+                    if (backend == "jsonl") SameFiles(upstream, directory, ToolsSchema150.AuthoredText);
+                    else SameColumns(Path.Combine(CopyFixture(scenario.Name, backend, root), "session.sqlite"), Path.Combine(directory, "session.sqlite"),
+                        ToolsSchema150.AuthoredText);
                     var observedFile = Path.Combine(root, scenario.Name, "observed.json");
-                    JsonObjectValue? expectedObserved = File.Exists(observedFile) ? (JsonObjectValue)Expected(scenario.Name, "observed.json", backend, root) : null;
+                    JsonObjectValue? expectedObserved = File.Exists(observedFile)
+                        ? (JsonObjectValue)ToolsSchema150.Authored(Expected(scenario.Name, "observed.json", backend, root)) : null;
                     if (expectedObserved?.TryGetValue("run", out var run) == true)
                         SameObserved(run, observed ?? throw new InvalidOperationException("the run observed nothing"), scenario.UnobservedFields, "observed run");
                     if (scenario.Resume is { } resume)
                     {
-                        var resumeEvents = CompatEvents.Expect(expectedEvents, "resume");
+                        var resumeEvents = CompatEvents.Expect(writtenEvents, "resume");
                         var resumed = await CompatEvents.Record(resumeEvents, () => resume(() => OpenBackend(backend, directory)));
                         resumeEvents?.Check("resume events");
-                        SameJson(Expected(scenario.Name, "resumed.json", backend, root), await Dump(await OpenBackend(backend, directory)), "resumed records");
+                        SameJson(ToolsSchema150.Authored(Expected(scenario.Name, "resumed.json", backend, root)), await Dump(await OpenBackend(backend, directory)),
+                            "resumed records");
                         if (expectedObserved?.TryGetValue("resume", out var onResume) == true)
                             SameObserved(onResume, resumed ?? throw new InvalidOperationException("the resume observed nothing"), scenario.UnobservedFields,
                                 "observed resume");
@@ -529,14 +537,15 @@ internal static partial class CompatTests
 
     // ─── written ────────────────────────────────────────────────────────────────
 
-    /// <summary>The JSONL session PiSharp wrote is upstream's, byte for byte, apart from the varying fields.</summary>
-    private static void SameFiles(string upstream, string pisharp)
+    /// <summary>The JSONL session PiSharp wrote is upstream's, byte for byte, apart from the varying fields; <paramref name="authored"/>, when
+    /// given, turns each captured line into its authored form.</summary>
+    private static void SameFiles(string upstream, string pisharp, Func<string, string>? authored = null)
     {
         static List<string> Names(string directory) => [.. Directory.GetFiles(directory).Select(path => Path.GetFileName(path)).Order(StringComparer.Ordinal)];
         Equal(string.Join(",", Names(upstream)), string.Join(",", Names(pisharp)), "JSONL files");
         foreach (var name in Names(upstream))
         {
-            var expected = NormalizeText(File.ReadAllText(Path.Combine(upstream, name))).Split('\n');
+            var expected = NormalizeText(string.Join('\n', File.ReadAllText(Path.Combine(upstream, name)).Split('\n').Select(authored ?? (line => line)))).Split('\n');
             var actual = NormalizeText(File.ReadAllText(Path.Combine(pisharp, name))).Split('\n');
             for (var index = 0; index < Math.Max(expected.Length, actual.Length); index++)
                 Equal(index < expected.Length ? expected[index] : "<end>", index < actual.Length ? actual[index] : "<end>", $"{name} line {index + 1}");
@@ -555,8 +564,9 @@ internal static partial class CompatTests
         "SELECT document_id, seq, kind, version, content FROM document_revisions ORDER BY document_id, seq",
     ];
 
-    /// <summary>The SQLite session PiSharp wrote holds upstream's rows and JSON text, apart from the varying fields.</summary>
-    private static void SameColumns(string upstream, string pisharp)
+    /// <summary>The SQLite session PiSharp wrote holds upstream's rows and JSON text, apart from the varying fields; <paramref name="authored"/>,
+    /// when given, turns each captured column into its authored form.</summary>
+    private static void SameColumns(string upstream, string pisharp, Func<string, string>? authored = null)
     {
         using var left = ReadOnly(upstream);
         using var right = ReadOnly(pisharp);
@@ -565,7 +575,7 @@ internal static partial class CompatTests
             var expected = Rows(left, sql);
             var actual = Rows(right, sql);
             for (var index = 0; index < Math.Max(expected.Count, actual.Count); index++)
-                Equal(index < expected.Count ? NormalizeText(string.Join(" | ", expected[index])) : "<end>",
+                Equal(index < expected.Count ? NormalizeText(string.Join(" | ", expected[index].Select(authored ?? (cell => cell)))) : "<end>",
                     index < actual.Count ? NormalizeText(string.Join(" | ", actual[index])) : "<end>", $"{sql} row {index + 1}");
         }
     }

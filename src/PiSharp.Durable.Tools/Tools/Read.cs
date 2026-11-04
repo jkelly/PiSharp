@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/src/tools/read.ts
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/src/tools/read.ts
 // Line numbers, offsets and limits are JavaScript numbers here too (doubles): the model may send 2.5, a negative number or 1e20, and the
 // result, its notices and its errors are upstream's for each, numbers printed as JavaScript prints them.
 // The conversation's model comes from api.AgentAsync() and api.Models.GetModel(), and its image limits from DurableModel.InputLimits (pi-ai
@@ -22,16 +22,24 @@ public sealed record ReadToolOptions
 /// <summary>Upstream <c>createReadTool</c>.</summary>
 internal static class ReadTool
 {
-    /// <summary><c>Type.Object({ path, offset?, limit? })</c> as TypeBox prints it.</summary>
+    /// <summary><c>obj({ path, offset: opt(...), limit: opt(...) }, { open: true })</c> as pi-schema builds it.</summary>
     internal static readonly JsonObjectValue Parameters = (JsonObjectValue)JsonValue.Parse(
-        """{"type":"object","required":["path"],"properties":{"path":{"type":"string","description":"Path to the file to read (relative or absolute)"},"offset":{"type":"number","description":"Line number to start reading from (1-indexed)"},"limit":{"type":"number","description":"Maximum number of lines to read"}}}""");
+        """{"type":"object","properties":{"path":{"type":"string","description":"Path to the file to read (relative or absolute)"},"offset":{"type":"number","description":"Line number to start reading from (1-indexed)"},"limit":{"type":"number","description":"Maximum number of lines to read"}},"required":["path"]}""");
+
+    /// <summary>
+    /// What programs such as code mode scripts get: the text of a text file, or the image block of an image, which code mode's <c>image()</c>
+    /// shows (upstream <c>readStructuredOutputSchema</c>: <c>union([str(), obj({ type: lit("image"), data: str(), mimeType: str() }, { open:
+    /// true })])</c>).
+    /// </summary>
+    internal static readonly JsonObjectValue StructuredOutputSchema = (JsonObjectValue)JsonValue.Parse(
+        """{"anyOf":[{"type":"string"},{"type":"object","properties":{"type":{"const":"image"},"data":{"type":"string"},"mimeType":{"type":"string"}},"required":["type","data","mimeType"]}]}""");
 
     private const int ReadChunk = 64 * 1024;
     private static readonly UTF8Encoding Utf8 = new(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: false);
 
     /// <summary>
     /// Reads text files and images. Remarks about truncation, continuation, and image processing are diagnostics; the content is only file
-    /// text, or one image, which programs get as its image content.
+    /// text, or one image. Programs get the text, or the image's image content.
     /// </summary>
     public static ToolRegistration Create(ReadToolOptions? options = null)
     {
@@ -42,6 +50,7 @@ internal static class ReadTool
             Name = "read",
             Description = $"Read the contents of a file. Supports text files and images ({formats}). Images are sent as attachments. For text files, output is truncated to {Truncation.DefaultMaxLines} lines or {Truncation.DefaultMaxBytes / 1024}KB (whichever is hit first). Use offset/limit for large files. When you need the full file, continue with offset until complete.",
             Parameters = Parameters,
+            StructuredOutputSchema = StructuredOutputSchema,
             Execute = (arguments, api, context) =>
             {
                 var args = (JsonObjectValue)arguments;
@@ -126,9 +135,11 @@ internal static class ReadTool
             (data, imageMimeType) = (ImageFormats.ToBase64(bytes), mimeType);
         }
         if (!model.Vision) notes.Add("The current model does not support images; it sees a placeholder instead.");
+        var block = JsonValue.Object([new("type", "image"), new("data", data), new("mimeType", imageMimeType)]);
         return new ToolExecutionResult
         {
-            Output = JsonValue.Array(JsonValue.Object([new("type", "image"), new("data", data), new("mimeType", imageMimeType)])),
+            Output = JsonValue.Array(block),
+            StructuredOutput = block,
             Diagnostics = [new ToolDiagnostic(ToolDiagnosticSeverity.Info, string.Join(" ", [$"Read image file [{imageMimeType}].", .. notes]), "image")],
         };
     }
@@ -269,6 +280,7 @@ internal static class ReadTool
         return new ToolExecutionResult
         {
             Output = outputText.Length == 0 ? JsonArrayValue.Empty : ToolContent.Text(outputText),
+            StructuredOutput = outputText,
             Details = details,
             Diagnostics = diagnostics.ToImmutable(),
         };

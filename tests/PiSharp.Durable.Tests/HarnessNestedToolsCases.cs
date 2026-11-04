@@ -1,6 +1,6 @@
 // Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/test/harness-nested-tools.test.ts ("nested tool calls", "tool task
 // version 1 records"), as harness.nested-tools.<case>. Verbatim apart from the adaptations in HarnessSupport.cs and ChatSupport.cs, and these:
-// - Parameters is the JSON TypeBox prints for `Type.Object({ text: Type.Optional(Type.String()) })`; `text()` reads a result's text as
+// - Parameters is the JSON pi-schema builds for `obj({ text: opt(str()) })` (Pi v1.5.0, area tools-schema); `text()` reads a result's text as
 //   upstream's does. A result's toEqual/toMatchObject compare its JSON (NestedToolExecutionResult.ToJson), with "<number>" for
 //   expect.any(Number); `not.toHaveProperty("structuredOutput")` is a null StructuredOutput (absent).
 // - "stores one document per nested call": upstream patches storage.commit; here a DelegatingStorage records the document creations.
@@ -39,8 +39,8 @@ internal static class NestedToolsTests
 {
     private static readonly DurableContext Context = DurableContext.Background;
 
-    /// <summary><c>Type.Object({ text: Type.Optional(Type.String()) })</c>.</summary>
-    internal static readonly JsonObjectValue Parameters = O("""{"type":"object","properties":{"text":{"type":"string"}}}""");
+    /// <summary><c>obj({ text: opt(str()) })</c>.</summary>
+    internal static readonly JsonObjectValue Parameters = O("""{"type":"object","properties":{"text":{"type":"string"}},"additionalProperties":false}""");
 
     internal static ToolRegistration Tool(string name, ToolExecute execute, Func<ToolRegistration, ToolRegistration>? extra = null)
     {
@@ -315,7 +315,7 @@ internal static class NestedToolsTests
             {
                 Name = "pair",
                 Description = "pair",
-                Parameters = O("""{"type":"object","required":["a","b"],"properties":{"a":{"type":"string"},"b":{"type":"string"}}}"""),
+                Parameters = O("""{"type":"object","properties":{"a":{"type":"string"},"b":{"type":"string"}},"required":["a","b"],"additionalProperties":false}"""),
                 Execute = (args, _, _) =>
                 {
                     Interlocked.Increment(ref runs);

@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/test/tools-images.test.ts, as tools.images.<case>, on LocalExecutionEnv
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/test/tools-images.test.ts, as tools.images.<case>, on LocalExecutionEnv
 // (upstream NodeExecutionEnv). Verbatim apart from these adaptations:
 // - Photon is PiSharp.Tools.Skia's SkiaImageCodec (Images.cs in PiSharp.Durable.Tools/Images maps the two): the fixtures are built, and the
 //   prepared images decoded, with SkiaSharp where upstream builds and decodes them with Photon; the processor is
@@ -11,6 +11,10 @@
 //   PrepareAsync returns; threaded, PrepareAsync returns while the codec is still held, on another thread, and resolves once it is released.
 // - "starts a new worker after the idle one exited" waits until the worker has exited (bounded) instead of 100 ms, and also checks that the
 //   next image started a new worker.
+// - "encodes a 3 MiB image within a 128 MB heap" (#10923) runs toBase64 in a Node child process limited to a 128 MB heap. .NET has no
+//   per-call heap limit to run under, so the case measures what the encoding allocates on its thread instead
+//   (GC.GetAllocatedBytesForCurrentThread) and expects less than 128 MiB, with the same 3,147,295 bytes and the same comparison with
+//   standard base64.
 using System.Collections.Immutable;
 using System.Reflection;
 using System.Runtime.InteropServices;
@@ -563,7 +567,7 @@ internal static partial class Program
         // ─── toBase64 ───────────────────────────────────────────────────────
         yield return ImagesCase("to-base64.matches-standard-base64-for-every-remainder-length", () =>
         {
-            foreach (var length in new[] { 0, 1, 2, 3, 4, 5, 10_000 })
+            foreach (var length in new[] { 0, 1, 2, 3, 4, 5, 8191, 8192, 8193, 10_000, 16_385 })
             {
                 var bytes = Enumerable.Range(0, length).Select(index => (byte)(index * 37 % 256)).ToArray();
                 var utf8 = new byte[System.Buffers.Text.Base64.GetMaxEncodedToUtf8Length(length)];
@@ -571,6 +575,17 @@ internal static partial class Program
                 Equal(System.Text.Encoding.ASCII.GetString(utf8, 0, written), ImageFormats.ToBase64(bytes), $"length {length}");
                 Equal((long)written, ImageFormats.Base64Length(length), $"base64Length {length}");
             }
+            return Task.CompletedTask;
+        });
+
+        yield return ImagesCase("to-base64.encodes-a-3-mib-image-within-a-128-mb-heap", () =>
+        {
+            var bytes = Enumerable.Range(0, 3147295).Select(index => (byte)(index * 37 % 256)).ToArray();
+            var before = GC.GetAllocatedBytesForCurrentThread();
+            var encoded = ImageFormats.ToBase64(bytes);
+            var allocated = GC.GetAllocatedBytesForCurrentThread() - before;
+            Check(allocated < 128L * 1024 * 1024, $"toBase64 allocated {allocated} bytes");
+            Check(encoded == Convert.ToBase64String(bytes), "mismatch");
             return Task.CompletedTask;
         });
 

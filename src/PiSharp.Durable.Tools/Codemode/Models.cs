@@ -5,7 +5,8 @@
 //   errors.
 // - A script's argument list is JSON: an `undefined` the script passed is absent (a C# null) at the end of the list and JSON null inside it,
 //   as the sandbox's JSON round trip leaves it. `typeof`, `Array.isArray` and the record check read the JSON kind.
-// - `Type.Object({ model: Type.Unknown(), context: Type.Unknown() })` and `Type.Unknown()` are the JSON TypeBox prints for them.
+// - Pi v1.5.0 sync (area tools-schema): `obj({ model: unknown(), context: unknown() }, { open: true })` and `unknown()` are the JSON
+//   pi-schema builds for them (the same JSON Schema as v1.2.0's TypeBox, `required` after `properties`).
 using System.Collections.Immutable;
 using System.Text.RegularExpressions;
 using PiSharp.Durable.Chord;
@@ -207,9 +208,10 @@ internal static partial class CodemodeModels
             : $"Unknown {type} model \"{provider.Value}/{id.Value}\". {listHint}");
     }
 
-    /// <summary><c>Type.Object({ model: Type.Unknown(), context: Type.Unknown() })</c>, as TypeBox prints it.</summary>
+    /// <summary><c>obj({ model: unknown(), context: unknown() }, { open: true })</c>, as pi-schema builds it; the structured output schema is
+    /// <c>unknown()</c>, <c>{}</c>.</summary>
     private static readonly JsonObjectValue ModelCallParameters =
-        (JsonObjectValue)JsonValue.Parse("""{"type":"object","required":["model","context"],"properties":{"model":{},"context":{}}}""");
+        (JsonObjectValue)JsonValue.Parse("""{"type":"object","properties":{"model":{},"context":{}},"required":["model","context"]}""");
 
     /// <summary>The result of a model call as the tool returns it: the whole result for the script, usage counted by the Harness.</summary>
     private static ToolExecutionResult ModelResult(string label, JsonObjectValue result)

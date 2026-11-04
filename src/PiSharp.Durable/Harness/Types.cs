@@ -456,7 +456,8 @@ public record ToolRegistration
     public required string Name { get; init; }
     /// <summary>The description shown to the model.</summary>
     public required string Description { get; init; }
-    /// <summary>JSON Schema of the arguments.</summary>
+    /// <summary>JSON Schema of the arguments: any JSON Schema object, which the Harness validates and coerces them against (pi-schema)
+    /// before <see cref="Execute"/>.</summary>
     public JsonObjectValue Parameters { get; init; } = EmptyParameters;
     /// <summary>pi-ai <c>Tool.constrainedSampling</c> (wire JSON: <c>false</c> or a <c>ConstrainedSamplingConfig</c> such as
     /// <c>{type: "grammar", variants: {...}}</c>): how providers that support it constrain the tool's input. Enters the transcript with the
@@ -466,8 +467,9 @@ public record ToolRegistration
     public ToolReplay? Replay { get; init; }
     /// <summary>Default: the settings' <c>ToolExecution</c>. One sequential call makes its whole round sequential.</summary>
     public ToolExecutionMode? ExecutionMode { get; init; }
-    /// <summary>How <see cref="Parameters"/> was built, which decides how arguments are converted and coerced before validation (pi-ai
-    /// <c>validateToolArguments</c>). Default <see cref="PiSharp.Contracts.ToolSchemaOrigin.TypeBox"/>: upstream tools declare TypeBox schemas.</summary>
+    /// <summary>How <see cref="Parameters"/> was built. Up to Pi v1.2.0 it decided how arguments were converted and coerced before
+    /// validation; since Pi v1.5.0 every schema is validated and coerced the same way (pi-schema), so it no longer changes a result. Default
+    /// <see cref="PiSharp.Contracts.ToolSchemaOrigin.TypeBox"/>.</summary>
     public PiSharp.Contracts.ToolSchemaOrigin ParametersOrigin { get; init; } = PiSharp.Contracts.ToolSchemaOrigin.TypeBox;
     /// <summary>
     /// Repairs arguments models commonly get wrong before validation, such as a JSON string where an array belongs. Must be pure: it runs
@@ -475,7 +477,8 @@ public record ToolRegistration
     /// makes the arguments invalid.
     /// </summary>
     public Func<JsonValue, JsonValue>? PrepareArguments { get; init; }
-    /// <summary>JSON Schema (TypeBox-shaped) of <see cref="ToolExecutionResult.StructuredOutput"/>, which programs that call the tool receive.
+    /// <summary>JSON Schema (any JSON Schema object, checked with pi-schema) of <see cref="ToolExecutionResult.StructuredOutput"/>, which
+    /// programs that call the tool receive.
     /// Null: they receive the result's bounded output, success or error, as <see cref="NestedToolExecutionResult.StructuredOutput"/>
     /// describes.</summary>
     public JsonObjectValue? StructuredOutputSchema { get; init; }
