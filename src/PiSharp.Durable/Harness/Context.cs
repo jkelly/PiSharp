@@ -4,8 +4,9 @@
 // leads the context past assistant messages (upstream 5713c9507, #10904); upstream's `system !== baseline` is reference equality of the
 // stored message, which Contribute passes through unchanged and an edit's replacement never is. Group commit and the windowed view
 // change this file again (areas publication-caches, group-commit and view), so the citation stays on v1.2.0. Area view (f3255de76): the
-// windowed view no longer reads the active transcript, and upstream removed activeEntries with watchEvents; ActiveEntriesAsync and
-// AppendActive stay for PiSharp's readers of the active transcript (the events stream until area events, the durable TUI).
+// windowed view no longer reads the active transcript. Area events (f3255de76): activeEntries is gone with watchEvents, as upstream removed
+// it; AppendActive stays for PiSharp's readers of the active transcript (Hosting's event projection, which reads its first one from the
+// context, and the durable TUI).
 using System.Collections.Immutable;
 using PiSharp.Durable.Chord;
 
@@ -116,14 +117,6 @@ internal static class ConversationContext
     {
         if (bounds is null) return ContextView.Empty;
         return DeriveRange(bounds, await ScanRangeAsync(storage, conversationId, RangeQuery(conversationId, bounds), context).ConfigureAwait(false)).View;
-    }
-
-    /// <summary>The raw active entries within captured bounds, without deriving model context (upstream v1.2.0 <c>activeEntries</c>).</summary>
-    public static async Task<ImmutableArray<EntryRecord>> ActiveEntriesAsync(IStorage storage, ConversationId conversationId, ContextBounds? bounds,
-        DurableContext context)
-    {
-        if (bounds is null) return [];
-        return SelectActive(bounds.Head, await ScanRangeAsync(storage, conversationId, RangeQuery(conversationId, bounds), context).ConfigureAwait(false));
     }
 
     /// <summary>Derives the context view from the entries scanned within <paramref name="bounds"/>.</summary>

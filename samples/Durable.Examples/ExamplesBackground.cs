@@ -7,6 +7,9 @@
 // holds on the memory run, and a file backend restarts on the runner's storage. The transcript prints without ANSI colors, as upstream does
 // when stdout is not a terminal. Intentional difference (decision 0005): upstream's tool still returns its replies as v1.1.0's `content`,
 // which v1.2.0 renamed to `output`, so under v1.2.0 its replies are empty; Reply returns them as Output, as the example means.
+// Pi v1.5.0 sync (area events, f3255de76): follow() watches the main conversation's view and prints the entries appended since the newest
+// it saw, as v1.5.0's 22-subagent-background.ts does, where v1.2.0 printed the message_end events of watchEvents (removed). The rest of
+// the file still ports v1.2.0.
 using System.Collections.Immutable;
 using System.Text.RegularExpressions;
 using PiSharp.Durable.Chord;
@@ -248,12 +251,16 @@ public static partial class Examples
         // Prints the main conversation's messages as they are committed. Subagents work in their own conversations.
         async Task Follow(IHarness harness, ConversationId id)
         {
-            var stream = await harness.WatchEventsAsync(id, Context);
-            stream.Start(async (events, _) =>
+            var watch = await (await harness.ConversationAsync(id, Context))!.WatchAsync(Context);
+            var newest = watch.Value.Entries.IsEmpty ? 0 : watch.Value.Entries[^1].Id.Value;
+            watch.Start(async (call, _) =>
             {
-                foreach (var agentEvent in events)
+                if (call is not WatchValueCall<ConversationView> { Value: var value }) return;
+                var entries = value.Entries.Where(entry => entry.Id.Value > newest).ToList();
+                if (!value.Entries.IsEmpty) newest = value.Entries[^1].Id.Value;
+                foreach (var entry in entries)
                 {
-                    if (agentEvent is not MessageEndEvent end || end.Entry.Model?[0] is not JsonObjectValue message) continue;
+                    if (entry.Model?[0] is not JsonObjectValue message) continue;
                     switch (Str(message, "role"))
                     {
                         case "user":

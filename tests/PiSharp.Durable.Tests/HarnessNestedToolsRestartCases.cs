@@ -5,6 +5,9 @@
 // - A beforeTool hook's `aborted(hookContext.abortSignal!)` waits on the hook context's cancellation, which close aborts.
 // - A record's `abortReason` toBeUndefined is a null TaskRecord.AbortReason, `abandonOnRestart` toBeUndefined a false one (written only when
 //   true).
+// Pi v1.5.0 sync (area events, f3255de76): the nested calls' results come from the view's pi.live history and the nested results
+// (LiveSupport.cs: viewHistory, nestedResults, nestedResultOf) where v1.2.0 collected watchEvents' tool ends (removed); a Session line
+// barrier (ViewTests.Drained) lets the synchronous observers record what the commits the waits returned after published.
 // Authored, first: the hook that gives api.createTask() children and nested calls of a caller that does not resume abandonOnRestart
 // (ToolExecutionApi.ChildTaskOptions), as upstream's `{ abandonOnRestart: true, ...options }` does.
 using PiSharp.Durable;
@@ -30,21 +33,14 @@ internal static partial class SchedulerTests
 
     private static async Task<List<TaskRecord>> NestedTasks(IHarness harness) => [.. (await ToolTasks(harness)).Where(IsNested)];
 
-    /// <summary>Tool end events from now on.</summary>
-    private static async Task<(SyncList<ToolExecutionEndEvent> Ends, Func<Task> Stop)> CollectEnds(IHarness harness, ConversationId conversation)
-    {
-        var ends = new SyncList<ToolExecutionEndEvent>();
-        var stream = await harness.WatchEventsAsync(conversation, Context);
-        stream.Start((batch, _) =>
-        {
-            foreach (var item in batch) if (item is ToolExecutionEndEvent end) ends.Add(end);
-            return Task.CompletedTask;
-        });
-        return (ends, async () => await stream.StopAsync());
-    }
-
     private static List<string> CodesOf(NestedToolExecutionResult? result) =>
         [.. (result?.Diagnostics ?? []).Where(diagnostic => diagnostic.Code is not null).Select(diagnostic => diagnostic.Code!)];
+
+    /// <summary>The codes of a nested result's diagnostics, read from its JSON (upstream <c>codes</c>).</summary>
+    private static List<string> CodesOf(JsonValue? result) =>
+        result is JsonObjectValue value && value.TryGetValue("diagnostics", out var diagnostics) && diagnostics is JsonArrayValue array
+            ? [.. array.OfType<JsonObjectValue>().Where(diagnostic => diagnostic.ContainsKey("code")).Select(diagnostic => S(diagnostic["code"]))]
+            : [];
 
     private static string? ReasonOf(TaskRecord? record) => record?.AbortReason is { } reason ? StructuredTests.Wire(reason) : null;
 
@@ -141,21 +137,23 @@ internal static partial class SchedulerTests
             await opened.Harness.CloseAsync(Context);
 
             opened = await OpenRestart(path, setup);
-            var (ends, stop) = await CollectEnds(opened.Harness, opened.Root.Id);
+            var history = await LiveTests.ViewHistory(opened.Harness, opened.Root.Id);
+            var nested = LiveTests.NestedResults(opened.Harness);
             opened.Harness.Resume();
             Equal(SubmissionStatus.Done, (await (await opened.Harness.SubmissionAsync(id, Context))!.WaitAsync(Context)).Status, "status");
             await opened.Harness.WaitForIdleAsync(Context);
-            await stop();
+            await ViewTests.Drained(opened.Harness);
+            history.Detach();
             Equal("1 0", $"{runs[0]} {runs[1]}", "runs");
             foreach (var task in await NestedTasks(opened.Harness))
             {
                 Check(task.AbandonOnRestart && task.AbortRequested && ReasonOf(task) == "restart", $"task {task.Id}: {task.ToJson().ToJson()}");
                 MatchJson("""{"status":"terminal","outcome":{"status":"aborted"}}""", task.State.ToJson(), $"task {task.Id} state");
             }
-            NestedToolExecutionResult? End(string callId) => ends.Snapshot().FirstOrDefault(end => end.ToolCallId == callId)?.Result;
+            JsonValue? End(string callId) => LiveTests.NestedResultOf(history.Live(), nested, callId);
             Seq(["interrupted"], CodesOf(End("c1/1")), "started codes");
-            MatchJson("""{"isError":true,"details":{"step":1}}""", End("c1/1")!.ToJson(), "started");
-            Equal<JsonValue?>(null, End("c1/1")!.StructuredOutput, "no structuredOutput");
+            MatchJson("""{"isError":true,"details":{"step":1}}""", End("c1/1"), "started");
+            Check(End("c1/1") is JsonObjectValue started && !started.ContainsKey("structuredOutput"), "no structuredOutput");
             Seq(["abandoned"], CodesOf(End("c1/2")), "gated codes");
             // The caller reports the interruption.
             MatchJson("""{"toolCallId":"c1","isError":true}""", Results(await AllEntries(opened.Root))[0], "result");

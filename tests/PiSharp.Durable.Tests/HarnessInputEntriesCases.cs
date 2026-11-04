@@ -7,8 +7,9 @@
 //   thing a caller can pass.
 // - The reopen case reopens a SQLite file, as upstream does.
 // Pi v1.5.0 sync (area run-failure, f3255de76): "appends a data-only write while idle after a failed run ..." expects the run's
-// pi.live.runFailure where v1.2.0 expected an empty pi.live. (f3255de76's move of "shows a data-only write ..." from watchEvents to the
-// view is area events'.)
+// pi.live.runFailure where v1.2.0 expected an empty pi.live.
+// Pi v1.5.0 sync (area events, f3255de76): "appends a data-only write mid-run ..." reads the view's history (LiveSupport.cs's viewHistory)
+// where v1.2.0 listened to watchEvents (removed): the first view that shows the write ends with it while pi.live's run still holds the input.
 using PiSharp.Durable;
 using PiSharp.Durable.Chord;
 using PiSharp.Durable.Sqlite;
@@ -229,13 +230,7 @@ internal static class InputEntriesTests
             var requests = new SyncList<List<string>>();
             setup.Faux.SetResponses(RequestLog(requests, Hold), RequestLog(requests, Answer("done")));
             var (harness, root) = await OpenChat(new MemoryStorage(), setup);
-            var events = new SyncList<AgentEvent>();
-            var stream = await harness.WatchEventsAsync(root.Id, Context);
-            stream.Start((batch, _) =>
-            {
-                foreach (var item in batch) events.Add(item);
-                return Task.CompletedTask;
-            });
+            var history = await LiveTests.ViewHistory(harness, root.Id);
             var input = await Input(root, "a");
             await ToolRunning(harness, root);
             var chat = new EntryDraft { Kind = "chat.message", Data = Obj(("author", "bob"), ("text", "lunch?")) };
@@ -246,11 +241,13 @@ internal static class InputEntriesTests
             Equal(0, (await InboxItems(harness, root)).Count, "inbox");
             SameJson("""[["pi.user","a"],["pi.assistant"],["chat.message",{"author":"bob","text":"lunch?"}]]""", Transcript(await AllEntries(root)),
                 "transcript while busy");
-            await Eventually(() => events.Snapshot().Any(item => item is EntryAppendedEvent));
-            var appended = (EntryAppendedEvent)events.Snapshot().First(item => item is EntryAppendedEvent);
-            Equal("chat.message", appended.Entry.Kind, "appended kind");
-            Equal(settled.Entry, appended.Entry.Id, "appended entry");
-            Check(!events.Snapshot().Any(item => item.Type == "run_end"), "run still going");
+            // The view shows it while the run goes on.
+            await ViewTests.Drained(harness);
+            var shown = history.Views.FirstOrDefault(view => view.Entries.Any(entry => entry.Kind == "chat.message"));
+            Check(shown is not null, "a view shows the write");
+            Equal("chat.message", shown!.Entries[^1].Kind, "shown kind");
+            Equal(settled.Entry, shown.Entries[^1].Id, "shown entry");
+            MatchExactly($"[{input.Id.Value}]", ((JsonObjectValue)LiveTests.LiveOf(shown)["run"])["inputs"], "the run's inputs");
             // A repeated request ID returns the same write without a second entry.
             Equal(write.Id, (await Write(root, chat, "bob:1")).Id, "deduplicated");
 
@@ -263,7 +260,7 @@ internal static class InputEntriesTests
             Equal(2, seen.Count, "requests");
             Seq(["system:", "user:a"], seen[0], "first request");
             Seq(["system:", "user:a", "assistant:", "toolResult:held"], seen[1], "second request");
-            await stream.StopAsync();
+            history.Detach();
             await harness.CloseAsync(Context);
         });
 

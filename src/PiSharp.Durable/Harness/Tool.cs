@@ -34,7 +34,7 @@
 //   CommitOptions; the intent's slot status and a nested slot's arguments (assigned whole) are a deferred commit of their own beside the
 //   state-only intent commit, and a safe rerun shows the slot running with its arguments again (e5c6182ba, durable@1.5.0 Changed#5).
 //   PiSharp-only order: the intent commits first and the slot commit follows (upstream's slot commit comes first), so the agent event
-//   projection (Events.cs, which upstream removed with watchEvents) has the arguments a tool_execution_start carries when the slot turns
+//   projection (PiSharp.Durable.Hosting's AgentEvents.cs; upstream removed watchEvents) has the arguments a tool_execution_start carries when the slot turns
 //   running. Storage gets the same either way: the intent at once, the held slot change with the next commit that reads or writes pi.live.
 using System.Collections.Immutable;
 using System.Diagnostics;

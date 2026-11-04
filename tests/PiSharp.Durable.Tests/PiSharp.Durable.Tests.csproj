@@ -13,6 +13,10 @@
     <!-- Decision 0007: the storage.mssql.* groups (Storage/SqlServerStorageCases.cs). -->
     <ProjectReference Include="../../src/PiSharp.Durable.MSSQL/PiSharp.Durable.MSSQL.csproj" />
     <ProjectReference Include="../../src/PiSharp.Durable.Tools/PiSharp.Durable.Tools.csproj" />
+    <!-- Area events (f3255de76): v1.2.0's watchEvents projection moved to PiSharp.Durable.Hosting (AgentEvents.cs), PiSharp-only; its cases
+         (AgentEventsCases.cs) and the v1.2.0 capture comparisons (CompatScenarios120.cs) run it here, on this suite's harness support.
+         Hosting is not packable, nor is this project. -->
+    <ProjectReference Include="../../src/PiSharp.Durable.Hosting/PiSharp.Durable.Hosting.csproj" />
     <!-- Work list area e: the image processor's cases decode, encode and prepare images with the coding agent's Skia codec, as upstream's
          tools-images.test.ts does with Photon (ToolsImagesCases.cs). -->
     <ProjectReference Include="../../src/PiSharp.Tools.Skia/PiSharp.Tools.Skia.csproj" />

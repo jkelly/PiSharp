@@ -18,9 +18,17 @@
 // - Upstream runs the others on MemoryStorage; so do they here.
 // Pi v1.5.0 sync (area run-failure, f3255de76): "aborts nested calls with their caller" expects the run's pi.live.runFailure (reason
 // aborted) where v1.2.0 expected an empty pi.live.
+// Pi v1.5.0 sync (area events, f3255de76): the cases that listened to agent events (watchEvents, removed) read the view's pi.live history
+// and the nested results (LiveSupport.cs: viewHistory, slotsOf, startOrder, endedAt, nestedResults, nestedResultOf), and the late
+// subscriber's case replays each value's operations (DeltaApply on the previous value's JSON) and collects the nested slots' outputs; a
+// mismatch is recorded and checked after the run, since an assertion inside the listener would end the watch, not the case. "reports
+// nested calls in pi.live.nestedTools and as tool events with their parent" is v1.5.0's "reports nested calls in pi.live.nestedTools with
+// their parent". "shows a nested call's arguments in its slot ..." no longer checks a start event. A Session line barrier
+// (ViewTests.Drained) lets the synchronous observers record what the commits a wait returned after published.
 using System.Collections.Immutable;
 using PiSharp.Durable;
 using PiSharp.Durable.Chord;
+using PiSharp.Durable.Chord.Delta;
 using PiSharp.Durable.Sqlite;
 using PiSharp.Durable.Storage;
 using static ChatTests;
@@ -359,26 +367,24 @@ internal static class NestedToolsTests
             }));
             setup.Faux.SetResponses(Call("batch"), Done);
             var (harness, root) = await OpenChat(new MemoryStorage(), setup);
-            var stream = await harness.WatchEventsAsync(root.Id, Context);
-            var ends = new SyncList<ToolExecutionEndEvent>();
-            stream.Start((batch, _) =>
-            {
-                foreach (var item in batch) if (item is ToolExecutionEndEvent end) ends.Add(end);
-                return Task.CompletedTask;
-            });
+            var history = await LiveTests.ViewHistory(harness, root.Id);
+            var nested = LiveTests.NestedResults(harness);
             var settled = await (await root.SubmitAsync(SubmissionDraft.Input("go"), Context)).WaitAsync(Context);
             Equal(SubmissionStatus.Done, settled.Status, "status");
             await harness.WaitForIdleAsync(Context);
-            await stream.StopAsync();
+            await ViewTests.Drained(harness);
+            history.Detach();
             Equal("returned early", Text(Results(await AllEntries(root))[0]), "result");
             var child = (await ToolTasks(harness))[1];
             MatchJson("""{"status":"terminal","outcome":{"status":"aborted","result":{"kind":"nested"}}}""", child.State.ToJson(), "child state");
             // The aborted call's result keeps its details; programs get no partial output, which only the model read.
-            var childEnd = ends.Snapshot().First(end => end.ToolCallId == "c1/1");
-            MatchJson("""{"result":{"isError":true,"details":{"step":1}}}""", childEnd.ToJson(), "child end");
-            Equal<JsonValue?>(null, childEnd.Result!.StructuredOutput, "no structuredOutput");
-            // The nested call ends, with its result, before its caller.
-            Seq(["c1/1 True", "c1 False"], ends.Snapshot().Select(end => $"{end.ToolCallId} {end.ToJson().ContainsKey("result")}"), "ends");
+            var childResult = LiveTests.NestedResultOf(history.Live(), nested, "c1/1");
+            MatchJson("""{"isError":true,"details":{"step":1}}""", childResult, "child result");
+            Check(childResult is JsonObjectValue { } withoutOutput && !withoutOutput.ContainsKey("structuredOutput"), "no structuredOutput");
+            // The nested call ends before its caller.
+            var live = history.Live();
+            Check(LiveTests.EndedAt(live, "c1/1") > 0, "the nested call ended");
+            Check(LiveTests.EndedAt(live, "c1/1") < LiveTests.EndedAt(live, "c1"), "the nested call ends first");
             SameJson("{}", await harness.SnapshotAsync(Live.LiveDoc, root.Id, Context), "live");
             await harness.CloseAsync(Context);
         });
@@ -398,7 +404,7 @@ internal static class NestedToolsTests
             await ran.Harness.CloseAsync(Context);
         });
 
-        yield return Case(prefix + "reports-nested-calls-in-pi-live-nestedtools-and-as-tool-events-with-their-parent", async () =>
+        yield return Case(prefix + "reports-nested-calls-in-pi-live-nestedtools-with-their-parent", async () =>
         {
             var setup = Setup();
             var release = new Deferred();
@@ -418,14 +424,9 @@ internal static class NestedToolsTests
             }));
             setup.Faux.SetResponses(Call("batch"), Done);
             var (harness, root) = await OpenChat(new MemoryStorage(), setup);
-            var stream = await harness.WatchEventsAsync(root.Id, Context);
-            SameJson("[]", stream.Snapshot.NestedTools, "snapshot nestedTools");
-            var events = new SyncList<AgentEvent>();
-            stream.Start((batch, _) =>
-            {
-                foreach (var item in batch) events.Add(item);
-                return Task.CompletedTask;
-            });
+            var history = await LiveTests.ViewHistory(harness, root.Id);
+            Check(!history.Live()[0].ContainsKey("nestedTools"), "no nestedTools at attachment");
+            var nested = LiveTests.NestedResults(harness);
             var submission = await root.SubmitAsync(SubmissionDraft.Input("go"), Context);
             await running.Task;
             var live = await harness.SnapshotAsync(Live.LiveDoc, root.Id, Context);
@@ -434,22 +435,19 @@ internal static class NestedToolsTests
             release.Resolve();
             await submission.WaitAsync(Context);
             await harness.WaitForIdleAsync(Context);
-            await stream.StopAsync();
-            var all = events.Snapshot();
-            Seq(["tool_execution_start c1 undefined", "tool_execution_start c1/1 c1", "tool_execution_end c1/1 c1", "tool_execution_end c1 undefined"],
-                all.OfType<ToolEvent>().Where(item => item is not ToolExecutionUpdateEvent)
-                    .Select(item => $"{item.Type} {item.ToolCallId} {item.ParentToolCallId ?? "undefined"}"), "tool events");
-            var nestedEnd = all.OfType<ToolExecutionEndEvent>().First(item => item.ToolCallId == "c1/1");
-            MatchJson("""{"result":{"structuredOutput":"slow done","isError":false}}""", nestedEnd.ToJson(), "nested end");
-            // Events name the call's task and, for a nested call, the calling one.
+            await ViewTests.Drained(harness);
+            history.Detach();
+            var states = history.Live();
+            Seq(["c1", "c1/1"], LiveTests.StartOrder(states), "start order");
+            Check(LiveTests.EndedAt(states, "c1/1") < LiveTests.EndedAt(states, "c1"), "the nested call ends first");
+            MatchJson("""{"structuredOutput":"slow done","isError":false}""", LiveTests.NestedResultOf(states, nested, "c1/1"), "nested result");
+            // Slots name the call's task and, for a nested call, the calling one.
             var tasks = await ToolTasks(harness);
             var (parent, child) = (tasks[0], tasks[1]);
-            var parentEnd = all.OfType<ToolExecutionEndEvent>().First(item => item.ToolCallId == "c1");
-            Equal<TaskId?>(child.Id, nestedEnd.TaskId, "nested end taskId");
-            Equal<TaskId?>(parent.Id, nestedEnd.ParentTaskId, "nested end parentTaskId");
-            Equal<TaskId?>(parent.Id, parentEnd.TaskId, "parent end taskId");
-            Check(!parentEnd.ToJson().ContainsKey("parentTaskId"), "parent end has no parentTaskId");
-            Check(all.OfType<ToolExecutionUpdateEvent>().Any(item => item.ToolCallId == "c1/1" && item.ParentToolCallId == "c1"), "a nested update");
+            MatchJson($$"""{"taskId":{{child.Id.Value}},"parentCallId":"c1","parentTaskId":{{parent.Id.Value}}}""",
+                LiveTests.SlotsOf(states, "c1/1").FirstOrDefault(slot => slot is not null), "nested slot");
+            MatchJson($$"""{"taskId":{{parent.Id.Value}}}""", LiveTests.SlotsOf(states, "c1").FirstOrDefault(slot => slot is not null && slot.ContainsKey("taskId")),
+                "caller slot");
             SameJson("{}", await harness.SnapshotAsync(Live.LiveDoc, root.Id, Context), "live");
             await harness.CloseAsync(Context);
         });
@@ -748,34 +746,22 @@ internal static class NestedToolsTests
             }));
             setup.Faux.SetResponses(Call("outer"), Done);
             var (harness, root) = await OpenChat(new MemoryStorage(), setup);
-            var stream = await harness.WatchEventsAsync(root.Id, Context);
-            var tools = new SyncList<string>();
-            stream.Start((batch, _) =>
-            {
-                foreach (var item in batch)
-                    if (item is ToolExecutionStartEvent or ToolExecutionEndEvent)
-                    {
-                        var tool = (ToolEvent)item;
-                        tools.Add($"{tool.Type} {tool.ToolCallId} {tool.ParentToolCallId ?? "undefined"}");
-                    }
-                return Task.CompletedTask;
-            });
+            var history = await LiveTests.ViewHistory(harness, root.Id);
             await (await root.SubmitAsync(SubmissionDraft.Input("go"), Context)).WaitAsync(Context);
             await harness.WaitForIdleAsync(Context);
-            await stream.StopAsync();
+            await ViewTests.Drained(harness);
+            history.Detach();
             Equal("echo deep", Text(Results(await AllEntries(root))[0]), "result");
             var tasks = await ToolTasks(harness);
             var (outer, inner, deep) = (tasks[0], tasks[1], tasks[2]);
             Equal(outer.Id, inner.Owner, "inner owner");
             Equal(inner.Id, deep.Owner, "deep owner");
-            Seq([
-                "tool_execution_start c1 undefined",
-                "tool_execution_start c1/1 c1",
-                "tool_execution_start c1/1/x c1/1",
-                "tool_execution_end c1/1/x c1/1",
-                "tool_execution_end c1/1 c1",
-                "tool_execution_end c1 undefined",
-            ], tools.Snapshot(), "tool events");
+            var states = history.Live();
+            Seq(["c1", "c1/1", "c1/1/x"], LiveTests.StartOrder(states), "start order");
+            MatchJson("""{"parentCallId":"c1/1"}""", LiveTests.SlotsOf(states, "c1/1/x").FirstOrDefault(slot => slot is not null), "deep slot");
+            // Children end first.
+            Check(LiveTests.EndedAt(states, "c1/1/x") < LiveTests.EndedAt(states, "c1/1"), "the deep call ends first");
+            Check(LiveTests.EndedAt(states, "c1/1") < LiveTests.EndedAt(states, "c1"), "the inner call ends before the outer one");
             SameJson("{}", await harness.SnapshotAsync(Live.LiveDoc, root.Id, Context), "live");
             await harness.CloseAsync(Context);
         });
@@ -806,25 +792,35 @@ internal static class NestedToolsTests
             var (harness, root) = await OpenChat(new MemoryStorage(), setup);
             var submission = await root.SubmitAsync(SubmissionDraft.Input("go"), Context);
             await Task.WhenAll(running["one"].Task, running["two"].Task);
-            var stream = await harness.WatchEventsAsync(root.Id, Context);
-            Seq(["c1/1 running", "c1/2 running"], stream.Snapshot.NestedTools.Cast<JsonObjectValue>().Select(slot => $"{S(slot["callId"])} {S(slot["status"])}"),
-                "snapshot nestedTools");
-            var updates = new SyncList<string>();
-            stream.Start((batch, _) =>
+            var watch = await root.WatchAsync(Context);
+            static List<JsonObjectValue> NestedOf(ConversationView view) =>
+                view.Doc("pi.live") is { } live && live.TryGetValue("nestedTools", out var slots) && slots is JsonArrayValue array ? [.. array.OfType<JsonObjectValue>()] : [];
+            Seq(["c1/1 running", "c1/2 running"], NestedOf(watch.Value).Select(slot => $"{S(slot["callId"])} {S(slot["status"])}"), "late value's nestedTools");
+            // Each value's operations rebuild the next one, the late subscriber's starting value included.
+            JsonValue replayed = watch.Value.ToJson();
+            var mismatches = new SyncList<string>();
+            var outputs = new SyncList<(string? One, string? Two)>();
+            static string? OutputOf(JsonObjectValue? slot) => slot is not null && slot.TryGetValue("output", out var output) ? S(output) : null;
+            watch.Start((call, _) =>
             {
-                foreach (var item in batch)
-                    if (item is ToolExecutionUpdateEvent { Output: { } output } update) updates.Add($"{update.ToolCallId} {output.ToJson().ToJson()}");
+                if (call is not WatchValueCall<ConversationView> { Value: var value, Ops: var ops }) return Task.CompletedTask;
+                replayed = DeltaApply.Apply(replayed, ops);
+                if (!JsonValue.DeepEquals(replayed, value.ToJson())) mismatches.Add($"{replayed.ToJson()} != {value.ToJson().ToJson()}");
+                var nested = NestedOf(value);
+                outputs.Add((OutputOf(nested.ElementAtOrDefault(0)), OutputOf(nested.ElementAtOrDefault(1))));
                 return Task.CompletedTask;
             });
             // The second slot writes first, so a wrong slot index in the update path would show.
             wrote["two"].Resolve();
-            await Eventually(() => updates.Count == 1);
+            await Eventually(() => outputs.Snapshot() is { Count: > 0 } seen && seen[^1].Two == "two\n");
+            Equal((null, "two\n"), outputs.Snapshot()[^1], "after two wrote");
             wrote["one"].Resolve();
-            await Eventually(() => updates.Count == 2);
+            await Eventually(() => outputs.Snapshot() is { Count: > 0 } seen && seen[^1].One == "one\n");
+            Equal(("one\n", "two\n"), outputs.Snapshot()[^1], "after one wrote");
             release.Resolve();
             await submission.WaitAsync(Context);
-            await stream.StopAsync();
-            Seq(["c1/2 {\"set\":\"two\\n\"}", "c1/1 {\"set\":\"one\\n\"}"], updates.Snapshot(), "updates");
+            await watch.StopAsync();
+            Seq([], mismatches.Snapshot(), "replayed values");
             await harness.CloseAsync(Context);
         });
 
@@ -883,22 +879,18 @@ internal static class NestedToolsTests
             }));
             setup.Faux.SetResponses(Call("batch"), Done);
             var (harness, root) = await OpenChat(new MemoryStorage(), setup);
-            var stream = await harness.WatchEventsAsync(root.Id, Context);
-            var ends = new SyncList<ToolExecutionEndEvent>();
-            stream.Start((batch, _) =>
-            {
-                foreach (var item in batch) if (item is ToolExecutionEndEvent end) ends.Add(end);
-                return Task.CompletedTask;
-            });
+            var history = await LiveTests.ViewHistory(harness, root.Id);
+            var nested = LiveTests.NestedResults(harness);
             await (await root.SubmitAsync(SubmissionDraft.Input("go"), Context)).WaitAsync(Context);
             await harness.WaitForIdleAsync(Context);
-            await stream.StopAsync();
+            await ViewTests.Drained(harness);
+            history.Detach();
             // The abort's result is built from the slot, which never got the output.
-            var result = ends.Snapshot().First(end => end.ToolCallId == "c1/1").Result!;
-            Equal(true, result.IsError, "isError");
-            Equal<JsonValue?>(null, result.StructuredOutput, "structuredOutput");
-            Equal<JsonValue?>(null, result.Details, "details");
-            Seq(["aborted"], result.Diagnostics.Select(diagnostic => diagnostic.Code), "codes");
+            var result = (JsonObjectValue)LiveTests.NestedResultOf(history.Live(), nested, "c1/1")!;
+            MatchJson("""{"isError":true}""", result, "isError");
+            Check(!result.ContainsKey("structuredOutput"), "no structuredOutput");
+            Check(!result.ContainsKey("details"), "no details");
+            Seq(["aborted"], ((JsonArrayValue)result["diagnostics"]).OfType<JsonObjectValue>().Select(diagnostic => S(diagnostic["code"])), "codes");
             await harness.CloseAsync(Context);
         });
 
@@ -933,13 +925,6 @@ internal static class NestedToolsTests
             }));
             setup.Faux.SetResponses(Call("batch"), Done);
             var (harness, root) = await OpenChat(new MemoryStorage(), setup);
-            var stream = await harness.WatchEventsAsync(root.Id, Context);
-            var starts = new SyncList<ToolExecutionStartEvent>();
-            stream.Start((batch, _) =>
-            {
-                foreach (var item in batch) if (item is ToolExecutionStartEvent start) starts.Add(start);
-                return Task.CompletedTask;
-            });
             var submission = await root.SubmitAsync(SubmissionDraft.Input("go"), Context);
             async Task<JsonValue> Slot() => ((JsonArrayValue)(await harness.SnapshotAsync(Live.LiveDoc, root.Id, Context))!["nestedTools"])[0];
             await hookEntered.Task;
@@ -950,10 +935,7 @@ internal static class NestedToolsTests
             release.Resolve();
             await submission.WaitAsync(Context);
             await harness.WaitForIdleAsync(Context);
-            await stream.StopAsync();
-            // The start event carries the arguments the call runs with; the task input keeps the ones it was made with.
-            var start = starts.Snapshot().First(item => item.ToolCallId == "c1/1");
-            SameJson(Obj(("text", large)).ToJson(), start.Args, "start args");
+            // The slot showed the arguments the call runs with; the task input keeps the ones it was made with.
             var nested = (await ToolTasks(harness)).First(IsNested);
             MatchJson("""{"call":{"arguments":{"text":"asked"}}}""", nested.Input, "input");
             await harness.CloseAsync(Context);

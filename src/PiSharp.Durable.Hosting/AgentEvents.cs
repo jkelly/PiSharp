@@ -1,25 +1,31 @@
 // Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/src/harness/events.ts (AgentEvent, ToolEventCall, MessageChange,
-// SnapshotEvent, AgentEventStream, watchEvents, translate, messageChanges, callOf, toolUpdate). v1.2.0: the stream's watch reports listener
-// errors and ends with session_failed (area b); the snapshot carries compactionFailure and compaction_end its error (area j); tool events
-// carry their call's taskId and, for a nested call, parentToolCallId and parentTaskId, the snapshot carries nestedTools, and a nested call's
-// tool_execution_end its result from the caller's NestedCallDoc (area a).
-// Pi v1.5.0 sync (area watches, 42cb822f1 and d8d99950a): the stream is Chord's NativeWatch (Chord/Watch.cs) on the Session line's
-// scheduler: every event batch is its own call, in order (folding would drop events), and past 100 undelivered batches one snapshot of
-// the newest view replaces them; it ends as Chord's watches do (aborted, ended, failed). The stream's listener keeps its (events, context)
-// shape. The citation stays on v1.2.0 until the file's other areas land.
-// Pi v1.5.0 sync (area deferred-commits, 6c2fd73b0 and e5c6182ba): the stream translates what views observe, deferred commits included,
-// as memory adopts them. A model-issued call's slot now turns running in a deferred commit after its state-only intent commit (Tool.cs),
-// so the stream remembers each intent's arguments (by tool task, until the slot turns running or the task ends) for the
-// tool_execution_start the slot's commit causes. A stream attached between the two commits has not seen the intent, and its start
-// carries no arguments. Upstream removed watchEvents before it deferred the running status (f3255de76, area events), so this is PiSharp's.
-// Pi v1.5.0 sync (area observers, 8b0caefc2): the stream's view observer gets WatchEnd ends, and the Session's close ends it as a watch
-// (ended, or failed with the Session's failure); 8b0caefc2's listener shape ({ value } per batch) is area events'.
-// Pi v1.5.0 sync (area view, f3255de76): the view's entries are a window over the transcript, so the stream keeps the active transcript
-// its snapshots show itself: read on the line at attachment (ActiveEntriesAsync) and advanced by each publication's entries
-// (AppendActive, v1.2.0's head-marker cut). Its view observer has a one-entry window.
-// Pi v1.5.0 sync (area run-failure, f3255de76; PiSharp-only, as the stream is): the snapshot carries pi.live.runFailure, and a run_end
-// whose commit recorded the run's failure carries it as failure, so a device client shows why a run ended without an answer (decision 0008
-// keeps the frames; both fields are additive). Area events carries them into the projection that replaces this file.
+// SnapshotEvent, AgentEventStream, watchEvents, translate, messageChanges, callOf, toolUpdate), which Pi v1.5.0 removed with spec §9.4
+// (f3255de76). PiSharp-only since the Pi v1.5.0 sync (area events; decision 0013, Durable's watchEvents point): PiSharp.Durable drops
+// watchEvents and its types as upstream does, and this projection keeps v1.2.0's agent events for the device wire, which stays at v1 and
+// durable-pi compatible (decision 0008 §1), the web hub (0010), the web agent (0011) and `pisharp durable attach`. Only Feeds.cs consumes
+// the typed events; everything past it sees their JSON. It is built on the v1.5.0 view and its observers: a ViewObserver of the
+// conversation's mount, whose publication hook (PiSharp.Durable's, internal, which upstream's view no longer has) hands it each commit as
+// memory adopts it, and Chord's NativeWatch on the Session line's scheduler. Its events are v1.2.0's, so the compat, views and examples
+// captures of v1.2.0's events still compare with it; that holds only while the projection reproduces v1.2.0's events.
+// v1.2.0: the stream's watch reports listener errors and ends with session_failed (area b); the snapshot carries compactionFailure and
+// compaction_end its error (area j); tool events carry their call's taskId and, for a nested call, parentToolCallId and parentTaskId, the
+// snapshot carries nestedTools, and a nested call's tool_execution_end its result from the caller's NestedCallDoc (area a).
+// Pi v1.5.0 sync, the changes the projection follows:
+// - Area watches (42cb822f1, d8d99950a): every event batch is its own call, in order (folding would drop events), and past 100 undelivered
+//   batches one snapshot of the newest view replaces them; it ends as Chord's watches do (aborted, ended, failed). The listener keeps its
+//   (events, context) shape (area events: upstream's {value} per batch, 8b0caefc2, has no events left to carry). A batch is one
+//   publication: one commit as memory adopts it, so a deferred commit's batch comes before it is stored.
+// - Area deferred-commits (6c2fd73b0, e5c6182ba): it translates what views observe, deferred commits included. A model-issued call's slot
+//   turns running in a deferred commit after its state-only intent commit (Tool.cs), so the stream remembers each intent's arguments (by
+//   tool task, until the slot turns running or the task ends) for the tool_execution_start the slot's commit causes. A stream attached
+//   between the two commits has not seen the intent, and its start carries no arguments.
+// - Area observers (8b0caefc2): its view observer gets WatchEnd ends, and the Session's close ends it as a watch (ended, or failed with the
+//   Session's failure).
+// - Area view (f3255de76): the view's entries are a window over the transcript, so the projection keeps the active transcript its
+//   snapshots show (v1.2.0's view entries): the conversation's context entries, derived on the line at attachment, then advanced by each
+//   publication's entries (AppendActive, v1.2.0's head-marker cut). Its view observer has a one-entry window.
+// - Area run-failure (f3255de76; PiSharp-only fields): the snapshot carries pi.live.runFailure, and a run_end whose commit recorded the
+//   run's failure carries it as failure, so a device client shows why a run ended without an answer (both fields are additive).
 //
 // Mappings: each AgentEvent variant is a sealed record whose ToJson() is upstream's object with upstream's key order, so a JSON-mode host
 // prints what upstream prints. pi-ai messages, usage, tool slots, compaction statuses and the pi.agent / pi.usage states are wire JSON, as
@@ -30,11 +36,11 @@ using PiSharp.Durable.Chord;
 using PiSharp.Durable.Chord.Delta;
 using PiSharp.Durable.Internal;
 
-namespace PiSharp.Durable;
+namespace PiSharp.Durable.Hosting;
 
 /// <summary>
-/// Experimental agent event of one conversation, shaped like the coding agent's session events (upstream <c>AgentEvent</c>, spec §9.4). Its
-/// protocol may change without notice. <see cref="ToJson"/> is upstream's JSON object.
+/// Experimental agent event of one conversation, shaped like the coding agent's session events: PiSharp's projection of Pi v1.2.0's
+/// <c>AgentEvent</c> (spec §9.4 at v1.2.0), which Pi v1.5.0 removed. Its protocol may change without notice. <see cref="ToJson"/> is upstream's JSON object.
 /// </summary>
 public abstract record AgentEvent
 {
@@ -456,7 +462,8 @@ public sealed record WholeMessageChange(JsonObjectValue Message) : MessageChange
     public override JsonObjectValue ToJson() => new RecordJson.Writer().Add("type", Type).Add("message", Message).Build();
 }
 
-/// <summary>Serialized stream of one conversation's event batches, one per commit (upstream <c>AgentEventStream</c>).</summary>
+/// <summary>Serialized stream of one conversation's event batches, one per commit as memory adopts it (Pi v1.2.0's
+/// <c>AgentEventStream</c>).</summary>
 public interface IAgentEventStream
 {
     /// <summary>The <c>snapshot</c> event at attachment.</summary>
@@ -472,7 +479,8 @@ public interface IAgentEventStream
     Task<WatchEnd> Closed { get; }
 }
 
-/// <summary>The experimental agent event adapter (upstream <c>events.ts</c>, spec §9.4).</summary>
+/// <summary>The experimental agent event projection (Pi v1.2.0's <c>events.ts</c>, spec §9.4 at v1.2.0), PiSharp-only since Pi v1.5.0 removed
+/// it: the device protocol's agent events (decision 0008).</summary>
 public static class AgentEvents
 {
     private const string GenerationKind = "pi.generation";
@@ -481,7 +489,7 @@ public static class AgentEvents
     private static readonly ImmutableArray<PathSegment> PartialPath = Path("docs", "pi.live", "generation", "message");
 
     /// <summary>
-    /// Experimental: attaches to one conversation's agent events (upstream <c>watchEvents</c>). The snapshot and the registration for later
+    /// Experimental: attaches to one conversation's agent events (Pi v1.2.0's <c>watchEvents</c>). The snapshot and the registration for later
     /// commits are captured atomically on the Session line; overflow replaces undelivered batches with one snapshot. Like a watch, cancelling
     /// <paramref name="context"/> stops the stream.
     /// </summary>
@@ -492,9 +500,9 @@ public static class AgentEvents
         var views = ConversationViews.Of(harness);
         var (stream, _) = await views.AttachAsync(conversationId, async (initial, release, storage) =>
         {
-            // The active transcript the snapshots show, read on the line with the view.
+            // The active transcript the snapshots show (the context's entries), read on the line with the view.
             var bounds = await ConversationContext.CaptureContextBoundsAsync(storage, conversationId, context).ConfigureAwait(false);
-            var active = await ConversationContext.ActiveEntriesAsync(storage, conversationId, bounds, context).ConfigureAwait(false);
+            var active = (await ConversationContext.DeriveContextAsync(storage, conversationId, bounds, context).ConfigureAwait(false)).Entries;
             // Generations whose held outcome already ended their turn, read on the line with the snapshot.
             var query = new TaskQuery { ConversationId = conversationId, Kind = GenerationKind, Status = DurableTaskStatus.Completing };
             var completing = await HarnessUtil.ScanAll(cursor => storage.ScanTasksAsync(query, 100, cursor, context)).ConfigureAwait(false);
@@ -603,7 +611,7 @@ public static class AgentEvents
         FirstMessage(entry) is { } message && Field(message, "role") is JsonStringValue { Value: "toolResult" } &&
         Field(message, "toolCallId") is JsonStringValue id && id.Value == callId);
 
-    /// <summary>Every event one publication causes, in the order of spec §9.4.</summary>
+    /// <summary>Every event one publication causes, in the order of spec §9.4 at v1.2.0.</summary>
     private static List<AgentEvent> Translate(ConversationId conversationId, ConversationView before, ConversationView after,
         ImmutableArray<Op> viewOps, ObservedCommit publication, HashSet<TaskId> held, Dictionary<TaskId, JsonObjectValue> intents)
     {

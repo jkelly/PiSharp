@@ -25,6 +25,9 @@
 // after a held one move down a seq, and the held changes are stored with a later commit. A resume after the run reads the moved seqs.
 // Pi v1.5.0 sync (area run-failure): the written cases also compare with RunFailure150.cs's authored forms: v1.5.0's pi.live keeps the
 // runFailure of a newest run that ended without an answer (compaction-failure's blocking turn), and PiSharp's run_end event carries it.
+// Pi v1.5.0 sync (area events, f3255de76): v1.5.0 removed watchEvents with its events; the events comparisons check PiSharp's projection
+// (PiSharp.Durable.Hosting's AgentEvents.cs) against the v1.2.0 events.json captures, which stays honest only while the projection
+// reproduces v1.2.0's events. They are evidence for the projection, not for v1.5.0.
 // - upgrade-from-v1.1.0: a v1.2.0 Harness opens copies of the v1.1.0 sessions (Fixtures/upstream-sessions) without resuming them, and
 //   resumes the resumable ones with their scenario's model, ending with the records upstream's v1.2.0 left (its v1 pi.tool tasks migrate to
 //   version 2 when they run).

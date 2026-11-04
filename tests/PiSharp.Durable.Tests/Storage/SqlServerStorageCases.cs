@@ -4,8 +4,9 @@
 // database when the run ends.
 // - storage.mssql.conformance.* and storage.mssql.reopen.conformance.* run the storage conformance kit directly and through a storage that
 //   closes and reopens the store after every commit, as the SQLite groups do.
-// - session.mssql.*, harness.tasks.mssql.*, harness.events.mssql.*, harness.ownership.mssql.* and harness.tools-recovery.mssql.* rerun
-//   those storage-agnostic suites on a fresh store per case; the ownership and recovery suites also reopen the same store.
+// - session.mssql.*, harness.tasks.mssql.*, agent-events.mssql.*, harness.ownership.mssql.* and harness.tools-recovery.mssql.* rerun
+//   those storage-agnostic suites on a fresh store per case; the ownership and recovery suites also reopen the same store. agent-events.*
+//   (AgentEventsCases.cs) was harness.events.* until the Pi v1.5.0 sync (area events) moved the event projection to PiSharp.Durable.Hosting.
 // - storage.mssql.* cover what is particular to the backend: persistence across reopen, rollback of a statement failure inside a commit,
 //   corrupt rows, the store lock, store and schema isolation, deletion, schema versions, and records that SQL Server's JSON functions refuse.
 //   Schema version 2 (Pi v1.5.0 sync, area sqlite) adds the sleeping task status, as the SQLite schema's version 2 does; the migration case
@@ -457,8 +458,8 @@ internal static partial class Program
     private static IEnumerable<(string, Func<Task>)> HarnessMssqlCases() =>
         MssqlServer.Configured ? HarnessTests.TaskCases("harness.tasks.mssql.", () => MssqlServer.OpenAsync().GetAwaiter().GetResult()) : [];
 
-    private static IEnumerable<(string, Func<Task>)> HarnessEventsMssqlCases() =>
-        MssqlServer.Configured ? EventTests.Cases("harness.events.mssql.", async () => await MssqlServer.OpenAsync()) : [];
+    private static IEnumerable<(string, Func<Task>)> AgentEventsMssqlCases() =>
+        MssqlServer.Configured ? EventTests.Cases("agent-events.mssql.", async () => await MssqlServer.OpenAsync()) : [];
 
     private static IEnumerable<(string, Func<Task>)> HarnessOwnershipMssqlCases() =>
         MssqlServer.Configured ? OwnershipTests.Cases("harness.ownership.mssql.", () => MssqlLocation()(), MssqlLocation) : [];

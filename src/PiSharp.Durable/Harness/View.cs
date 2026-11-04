@@ -17,8 +17,8 @@
 // deferred ones included, so a view shows a held partial or tool output at once.
 // Pi v1.5.0 sync (area observers, 8b0caefc2 with v1.5.0's shapes): Harness.observeConversation() attaches a host's Observer<T> to a mount
 // behind GuardedObserver<T> (ObserveAsync, upstream observe); a mount's observers are SyncObserver<ConversationView>s, watches
-// (WatchObserver<T>), guarded host observers, and ViewObservers (the events stream, which keeps upstream 8b0caefc2's publication hook until
-// area events), and each publication hands all of them one value call. The Session's close ends a watch or a ViewObserver ended and a host
+// (WatchObserver<T>), guarded host observers, and ViewObservers (PiSharp.Durable.Hosting's event projection, which keeps upstream
+// 8b0caefc2's publication hook), and each publication hands all of them one value call. The Session's close ends a watch or a ViewObserver ended and a host
 // observer failed with "session closed" (CloseEnds).
 // Pi v1.5.0 sync (area view, f3255de76 with v1.5.0's shapes): ConversationView.Entries is a window over the fork-aware transcript
 // (IConversation.EntriesAsync), in entry ID order, head markers in place, with Before the entry just before it. Each observer has its own
@@ -26,7 +26,9 @@
 // documents. A publication hands each observer its own value call: the documents' operations, one splice for the entries it appended, and
 // past Max one splice that drops its oldest down to Min with a set of ["before"]. Bounds that are not integers cannot be expressed here
 // (int and EntryId); Min below 1, Max below Min and a From beyond JavaScript's safe integers reject with ArgumentOutOfRangeException
-// (upstream RangeError). The events stream (a ViewObserver until area events removes it) keeps its own active transcript (Events.cs).
+// (upstream RangeError). Area events (f3255de76): upstream removed watchEvents and with it the publication hook of its ViewObserver; PiSharp
+// keeps the hook, internal, for PiSharp.Durable.Hosting's PiSharp-only event projection (AgentEvents.cs, decision 0013), which keeps its own
+// active transcript.
 // The citation stays on v1.2.0 until the file's other areas land (vocabulary, group-commit-scheduler, registry-reader).
 using System.Collections.Immutable;
 using PiSharp.Durable.Chord;
@@ -128,9 +130,10 @@ public sealed record ConversationWindow
 }
 
 /// <summary>
-/// A mount's observer that also gets every publication (upstream 8b0caefc2's <c>ViewObserver</c> with its <c>publication</c> hook): the
-/// events stream. Its next revisions come as one value call per publication that changed its window; the Session's close ends it as a
-/// watch (<c>ended</c>, or <c>failed</c> with the error that failed the Session).
+/// A mount's observer that also gets every publication (upstream 8b0caefc2's <c>ViewObserver</c> with its <c>publication</c> hook, which
+/// f3255de76 removed with watchEvents; PiSharp-only since): PiSharp.Durable.Hosting's agent event projection. Its next revisions come as
+/// one value call per publication that changed its window; the Session's close ends it as a watch (<c>ended</c>, or <c>failed</c> with the
+/// error that failed the Session).
 /// </summary>
 internal abstract class ViewObserver : SyncObserver<ConversationView>
 {

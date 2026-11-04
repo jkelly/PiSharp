@@ -22,6 +22,7 @@
 // behind GuardedObserver<T> (ObserveAsync, upstream observe); the mount's observers are SyncObserver<TaskGraph>s, watches (WatchObserver<T>)
 // and guarded host observers, which a publication hands one value call. The Session's close ends a watch ended and a host observer failed
 // with "session closed" (CloseEnds). The citation stays on v1.2.0 until the file's other areas land.
+// Pi v1.5.0 sync (area events, f3255de76): the task graph view is spec §9.4, renumbered from §9.5 with the agent events' section removed.
 using System.Collections.Immutable;
 using PiSharp.Durable.Chord;
 using PiSharp.Durable.Chord.Delta;
@@ -30,7 +31,7 @@ using PiSharp.Durable.Internal;
 namespace PiSharp.Durable;
 
 /// <summary>
-/// A live task's durable status without its checkpoint and outcome payloads (upstream <c>TaskGraphState</c>, spec §9.5). JSON form
+/// A live task's durable status without its checkpoint and outcome payloads (upstream <c>TaskGraphState</c>, spec §9.4). JSON form
 /// (<see cref="ToJson"/>): <c>{status, phase}</c> for pending and running, <c>{status: "waiting", phase, on, policy}</c>,
 /// <c>{status: "sleeping", phase, until}</c>, or <c>{status: "completing", outcome}</c>.
 /// </summary>
@@ -186,7 +187,7 @@ public sealed class TaskGraphNode : IEquatable<TaskGraphNode>
 }
 
 /// <summary>
-/// Every live task of the Session (upstream <c>TaskGraph</c>, spec §9.5). JSON form (<see cref="ToJson"/>): <c>{tasks}</c>, keyed by decimal
+/// Every live task of the Session (upstream <c>TaskGraph</c>, spec §9.4). JSON form (<see cref="ToJson"/>): <c>{tasks}</c>, keyed by decimal
 /// task ID in ascending order.
 /// </summary>
 public sealed class TaskGraph

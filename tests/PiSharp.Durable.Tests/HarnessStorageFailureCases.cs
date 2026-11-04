@@ -15,6 +15,8 @@
 // - running(): upstream polls on timers, so by the time it sees the record `running` the reservation's continuations (the invocation's first
 //   step commit and its phase's start) have run as microtasks. Here they continue on the thread pool and can queue behind the next commit the
 //   test makes, so Running also awaits Waiting's phase start.
+// Pi v1.5.0 sync (area events, f3255de76): "ends everything with the first error ..." ends a conversation view watch where v1.2.0 ended an
+// agent event stream (watchEvents, removed).
 using PiSharp.Durable;
 using PiSharp.Durable.Chord;
 using PiSharp.Durable.Storage;
@@ -115,8 +117,8 @@ internal static class StorageFailureTests
             var task = harness.WaitForTaskAsync(id, Context);
             var idle = harness.WaitForIdleAsync(Context);
             var watch = (await harness.WatchDocAsync(Live.LiveDoc, root.Id, Context))!;
-            var stream = await harness.WatchEventsAsync(root.Id, Context);
-            stream.Start((_, _) => Task.CompletedTask);
+            var view = await root.WatchAsync(Context);
+            view.Start((_, _) => Task.CompletedTask);
 
             var failure = new IOException("disk gone");
             storage.FailNextCommit(failure);
@@ -126,7 +128,7 @@ internal static class StorageFailureTests
             await FailedWith(failure, () => task, "task wait");
             await FailedWith(failure, () => idle, "idle wait");
             Equal(WatchEnd.Failed(failure), await watch.Closed, "watch");
-            Equal(WatchEnd.Failed(failure), await stream.Closed, "stream");
+            Equal(WatchEnd.Failed(failure), await view.Closed, "view");
             // Every later call, and a wait that starts now.
             await FailedWith(failure, () => harness.GetTaskAsync(id, Context), "getTask");
             await FailedWith(failure, () => harness.WaitForIdleAsync(Context), "waitForIdle");

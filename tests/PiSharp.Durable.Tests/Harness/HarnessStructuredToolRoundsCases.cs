@@ -4,7 +4,7 @@
 // aborted sequential round with aborted results, in call order", and the one generation alone (P8) unblocked, "keeps run control with a
 // faulted generation until its owned work drains, and retries a rejected final commit", which Pi v1.2.0 turned into "... and fails the
 // Harness on a failed final commit" (area b of the sync). "ends a turn at the generation's hold, before its
-// successor's turn starts" and the "tool rounds and events" tests listen to agent events and are in HarnessStructuredEventsCases.cs.
+// successor's turn starts" and the "tool rounds and events" tests listen to agent events; area events (f3255de76) moved them to AgentEventsCases.cs, and HarnessStructuredCases.cs has v1.5.0's view forms.
 // Adaptations beyond those of HarnessStructuredSupport.cs and ChatSupport.cs: invalidFinalStream is GenerationTests.InvalidFinalStream (a
 // non-finite usage count instead of a function, see HarnessGenerationCases.cs); upstream's module-level blockingTool and toolCalls are
 // BlockingRoundTool and ToolCalls below; `Promise.all([one.started, two.started])` is Task.WhenAll; "aborts a parallel round ..." orders the
