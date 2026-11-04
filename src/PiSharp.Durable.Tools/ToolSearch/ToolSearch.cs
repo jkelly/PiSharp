@@ -101,10 +101,10 @@ public static class ToolSearch
                 foreach (var variant in list) SchemaText(variant, parts);
     }
 
-    /// <summary>Search text of a tool: its name, the name with <c>_</c> as spaces, its description, and its parameters' text.</summary>
+    /// <summary>Search text of a tool: its description and its parameters' names and descriptions; the ranker reads the name.</summary>
     internal static string SearchText(ToolRegistration tool)
     {
-        var parts = new List<string> { tool.Name, tool.Name.Replace('_', ' '), tool.Description };
+        var parts = new List<string> { tool.Description };
         SchemaText(tool.Parameters, parts);
         return string.Join(" ", parts.Where(part => Js.Trim(part).Length != 0));
     }

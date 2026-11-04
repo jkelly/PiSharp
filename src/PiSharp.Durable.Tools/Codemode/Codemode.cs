@@ -1092,8 +1092,9 @@ internal sealed class DurableCodemodeCall
         {
             var own = NamespaceOfTool(tool.Name);
             if (inNamespace is JsonStringValue wanted && (own is null || !MatchesNamespace(own, wanted.Value))) return [];
-            string[] text = [tool.Name, tool.Name.Replace('_', ' '), tool.Description, own?.Name ?? "", own?.Description ?? ""];
-            return new[] { new SearchDocument(tool.Name, string.Join(" ", text)) };
+            var namespaceText = own is null ? "" : string.Join(" ", own.Name, own.Description ?? "", own.Instructions ?? "");
+            // `Description` is the tool's sample: its description and declaration, with the parameters' names and descriptions.
+            return new[] { new SearchDocument(tool.Name, tool.Description, namespaceText) };
         }).ToList();
         return JsonValue.Array(Search.RankDocuments(query.Value, documents, max >= int.MaxValue ? int.MaxValue : (int)max).Select(name =>
         {
