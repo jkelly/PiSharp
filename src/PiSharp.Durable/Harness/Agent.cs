@@ -47,7 +47,7 @@ public static class Agents
                 retry?.BaseDelayMs ?? DefaultRetryPolicy.BaseDelayMs, retry?.MaxAgentDelayMs ?? DefaultRetryPolicy.MaxAgentDelayMs),
             Compaction = new CompactionPolicy(compaction?.Enabled ?? DefaultCompactionPolicy.Enabled,
                 compaction?.ReserveTokens ?? DefaultCompactionPolicy.ReserveTokens, compaction?.KeepRecentTokens ?? DefaultCompactionPolicy.KeepRecentTokens,
-                compaction?.BackgroundTokens ?? DefaultCompactionPolicy.BackgroundTokens),
+                compaction?.BackgroundTokens ?? DefaultCompactionPolicy.BackgroundTokens) { ModelOverrides = compaction?.ModelOverrides },
             // Field by field, so an unset interval keeps its default.
             Progress = new ProgressPolicy(progress?.PartialIntervalMs ?? DefaultProgressPolicy.PartialIntervalMs,
                 progress?.OutputIntervalMs ?? DefaultProgressPolicy.OutputIntervalMs),

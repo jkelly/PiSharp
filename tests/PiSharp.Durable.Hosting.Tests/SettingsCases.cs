@@ -60,6 +60,22 @@ internal static partial class Program
             Equal(null, (SessionCompaction.PiDurableDefaults with { BackgroundTokens = 0 }).AutoAt(128_000), "background compaction off");
         }),
 
+        // Pi v1.5.0 sync (area harness-options): the session's compaction is the harness-wide policy, and the host's per-model overrides
+        // (pi-durable 1.4.0's settings.compaction.modelOverrides) still reach the Harness over it.
+        Case("settings.session-compaction-keeps-the-hosts-model-overrides", () =>
+        {
+            var overrides = new Dictionary<string, CompactionOverride> { ["faux/echo-small"] = new() { ReserveTokens = 4096 } };
+            var host = new HarnessSettings { Compaction = new CompactionSettings { ReserveTokens = 1, ModelOverrides = overrides } };
+            var session = new SessionCompaction(true, 20000, 0, 20000);
+            var settings = new SessionHarnessSettings(host, () => session);
+            Equal(new CompactionSettings { Enabled = true, ReserveTokens = 20000, BackgroundTokens = 0, KeepRecentTokens = 20000, ModelOverrides = overrides },
+                settings.Compaction, "the session's fields with the host's overrides");
+            var resolved = Agents.ResolveSettings(settings).Compaction;
+            Equal(20000.0, resolved.ReserveTokens, "harness-wide reserve");
+            Check(ReferenceEquals(overrides, resolved.ModelOverrides), "the overrides reach the resolved settings");
+            Equal(null, new SessionHarnessSettings(null, () => session).Compaction?.ModelOverrides, "no host settings, no overrides");
+        }),
+
         Case("settings.compaction-updates-persist-and-refit", async () =>
         {
             await using var device = await TestDevice.OpenAsync("settings-compaction");

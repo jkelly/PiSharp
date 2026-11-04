@@ -622,7 +622,29 @@ public sealed record ConversationRetryPolicy(bool Enabled, int MaxRetries, doubl
 
 /// <summary>Automatic compaction thresholds (spec §8.7); manual compaction ignores <see cref="Enabled"/> (upstream
 /// <c>CompactionPolicy</c>).</summary>
-public sealed record CompactionPolicy(bool Enabled, double ReserveTokens, double KeepRecentTokens, double BackgroundTokens);
+public sealed record CompactionPolicy(bool Enabled, double ReserveTokens, double KeepRecentTokens, double BackgroundTokens)
+{
+    /// <summary>
+    /// In <see cref="Settings.Compaction"/>: the host's per-model entries, keyed by exact <c>"provider/modelId"</c> (upstream
+    /// <c>Settings.compaction.modelOverrides</c>). The readers that know their model apply its entry over this policy, field by field; null
+    /// in a policy resolved for one model.
+    /// </summary>
+    public IReadOnlyDictionary<string, CompactionOverride>? ModelOverrides { get; init; }
+}
+
+/// <summary>One model's compaction fields (upstream <c>Partial&lt;CompactionPolicy&gt;</c> in <c>modelOverrides</c>); each field it sets
+/// replaces the harness-wide one for that model.</summary>
+public sealed record CompactionOverride
+{
+    /// <summary>Threshold and overflow compaction.</summary>
+    public bool? Enabled { get; init; }
+    /// <summary>Room kept free for the answer.</summary>
+    public double? ReserveTokens { get; init; }
+    /// <summary>Approximate size of the recent context a summary keeps verbatim.</summary>
+    public double? KeepRecentTokens { get; init; }
+    /// <summary>Background compaction starts this far below the blocking threshold; 0 disables it.</summary>
+    public double? BackgroundTokens { get; init; }
+}
 
 /// <summary>How often running progress is committed (upstream <c>ProgressPolicy</c>).</summary>
 public sealed record ProgressPolicy(double PartialIntervalMs, double OutputIntervalMs);
@@ -640,7 +662,7 @@ public sealed record RetrySettings
     public double? MaxAgentDelayMs { get; init; }
 }
 
-/// <summary>Host overrides of <see cref="CompactionPolicy"/>.</summary>
+/// <summary>Harness-wide host overrides of <see cref="CompactionPolicy"/> (upstream <c>CompactionSettings</c>).</summary>
 public sealed record CompactionSettings
 {
     /// <summary>Threshold and overflow compaction.</summary>
@@ -651,6 +673,12 @@ public sealed record CompactionSettings
     public double? KeepRecentTokens { get; init; }
     /// <summary>Background compaction starts this far below the blocking threshold; 0 disables it.</summary>
     public double? BackgroundTokens { get; init; }
+    /// <summary>
+    /// Per-model entries keyed by exact <c>"provider/modelId"</c>; each field an entry sets replaces the one above for that model, so small-
+    /// and large-window models can share a harness. The conversation's current model picks the entry at the threshold check and when a
+    /// compaction selects what to summarize, and the request's model after a context overflow.
+    /// </summary>
+    public IReadOnlyDictionary<string, CompactionOverride>? ModelOverrides { get; init; }
 }
 
 /// <summary>Host overrides of <see cref="ProgressPolicy"/>.</summary>
@@ -704,7 +732,8 @@ public sealed record Settings
     public required ConversationStreamOptions Stream { get; init; }
     /// <summary>Retry policy.</summary>
     public required ConversationRetryPolicy Retry { get; init; }
-    /// <summary>Compaction policy.</summary>
+    /// <summary>Harness-wide compaction policy over the defaults, with the host's per-model overrides, which apply where the model is
+    /// known.</summary>
     public required CompactionPolicy Compaction { get; init; }
     /// <summary>Progress policy.</summary>
     public required ProgressPolicy Progress { get; init; }
