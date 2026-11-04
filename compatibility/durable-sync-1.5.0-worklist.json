@@ -2523,7 +2523,11 @@
         "1e42501bb",
         "89c921d8b",
         "da412b039",
-        "f715a15c1"
+        "f715a15c1",
+        "117b14d8",
+        "7607b93e",
+        "d200a3c3",
+        "175b6a99"
       ],
       "notes": "AssignJson (Json.cs) assigns the partial message leaf by leaf and the tracker compares each string with its previous value, so a growing string is read in full on every commit, as upstream before the fix. The incremental argument parse is PiSharp.AI's StreamingJsonParser (ai@1.5.0/Added#2, phase 1/2); use it, do not copy it. durable.partial-merge-proto is no-op (C# JSON objects have no prototype) and sits here as the nearest area: port harness-json.test.ts's case as an authored check that a __proto__ member round-trips as a plain member. harness-events.test.ts changes here (89 lines of f715a15c1, 3 of 1e42501bb) are on a file upstream later deleted (area events)."
     },

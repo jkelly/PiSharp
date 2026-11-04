@@ -56,11 +56,11 @@
     "changelogBullets": 477,
     "repeatedBullets": 23,
     "byStatus": {
-      "ported": 196,
+      "ported": 197,
       "ported-with-deferral": 24,
       "already-ported": 12,
       "no-op": 25,
-      "port": 69
+      "port": 68
     },
     "byArea": {
       "ai": 58,
@@ -9934,7 +9934,7 @@
       "id": "durable.partial-commit-appends",
       "area": "durable",
       "phase": 4,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "durable@1.5.0/Fixed#5"
       ],
@@ -9957,7 +9957,39 @@
         "benchmarks/PiSharp.Durable.Benchmarks/ToolOutputBench.cs"
       ],
       "release": "1.5.0",
-      "notes": "PiSharp's AssignJson (Json.cs:17) assigns the partial message leaf by leaf, and the tracker compares each string with its previous value (Tracker.cs:499), so a growing string is read in full on every commit, as upstream before the fix. appendText is chord@1.5.0/Added#14 (group F), ported here in PiSharp's Chord subset; the incremental argument parse is StreamingJsonParser (ai@1.5.0/Added#2, group C). durable.deferred-commits reworks the same files; land this first."
+      "notes": "PiSharp's AssignJson (Json.cs:17) assigns the partial message leaf by leaf, and the tracker compares each string with its previous value (Tracker.cs:499), so a growing string is read in full on every commit, as upstream before the fix. appendText is chord@1.5.0/Added#14 (group F), ported here in PiSharp's Chord subset; the incremental argument parse is StreamingJsonParser (ai@1.5.0/Added#2, group C). durable.deferred-commits reworks the same files; land this first.",
+      "evidence": {
+        "commits": [
+          "117b14d8",
+          "7607b93e",
+          "d200a3c3",
+          "175b6a99"
+        ],
+        "tests": [
+          "tests/PiSharp.Durable.Tests/HarnessPartialChangesCases.cs: harness.partial-changes.commits-tool-call-arguments-equal-to-the-final-parse-at-every-piece-size-and-commit-rhythm",
+          "tests/PiSharp.Durable.Tests/HarnessPartialChangesCases.cs: harness.partial-changes.handles-a-number-ending-and-a-string-starting-in-one-piece-and-escapes-split-across-pieces",
+          "tests/PiSharp.Durable.Tests/HarnessPartialChangesCases.cs: harness.partial-changes.appends-growing-argument-and-text-strings-instead-of-reassigning-them",
+          "tests/PiSharp.Durable.Tests/HarnessPartialChangesCases.cs: harness.partial-changes.applies-the-changes-of-a-failed-commit-in-the-next-one",
+          "tests/PiSharp.Durable.Tests/HarnessPartialChangesCases.cs: harness.partial-changes.re-applies-a-failed-commits-changes-even-when-it-would-have-added-the-call",
+          "tests/PiSharp.Durable.Tests/HarnessPartialChangesCases.cs: harness.partial-changes.falls-back-to-the-snapshot-when-the-committed-message-lost-a-call-whose-changes-were-committed",
+          "tests/PiSharp.Durable.Tests/HarnessPartialChangesCases.cs: harness.partial-changes.commits-the-final-arguments-after-the-call-ends-and-drops-text-appends-when-a-block-ends",
+          "tests/PiSharp.Durable.Tests/HarnessPartialChangesCases.cs: harness.partial-changes.reads-a-tool-call-checkpoint-that-continues-the-argument-text-as-the-missing-piece",
+          "tests/PiSharp.Durable.Tests/HarnessPartialChangesCases.cs: harness.partial-changes.commits-a-parse-of-a-tool-call-checkpoint-that-starts-over-even-after-a-failed-commit",
+          "tests/PiSharp.Durable.Tests/HarnessPartialChangesCases.cs: harness.partial-changes.drops-thinking-appends-when-a-thinking-checkpoint-replaces-the-text",
+          "tests/PiSharp.Durable.Tests/HarnessPartialChangesCases.cs: harness.partial-changes.ends-blocks-at-content-block-finalized",
+          "tests/PiSharp.Durable.Tests/HarnessPartialChangesCases.cs: harness.partial-changes.tracks-a-tool-call-from-its-provisional-start",
+          "tests/PiSharp.Durable.Tests/Harness/HarnessEventsCases.cs: streams-a-tool-call-partial-as-toolcall-delta-appends-at-its-argument-paths",
+          "tests/PiSharp.Durable.Tests/Harness/HarnessEventsCases.cs: commits-a-growing-text-and-tool-call-at-a-cost-that-follows-the-new-text-not-the-string-lengths",
+          "tests/PiSharp.Durable.Tests/Harness/HarnessEventsCases.cs: keeps-a-watchers-memory-proportional-to-a-long-streamed-text-and-tool-call-not-to-their-commits",
+          "tests/PiSharp.Durable.Tests/HarnessJsonCases.cs: harness.json.appends-a-planned-text-to-a-string-member-whose-new-length-it-explains",
+          "tests/PiSharp.Durable.Tests/HarnessJsonCases.cs: harness.json.leaves-a-kept-member-to-the-caller-and-assigns-the-rest",
+          "tests/PiSharp.Durable.Tests/HarnessJsonCases.cs: harness.json.ignores-an-append-plan-for-an-array-item",
+          "tests/PiSharp.Durable.Tests/Chord/DeltaAppendTextCases.cs: chord.delta-append-text.builds-a-long-appended-string-once-and-keeps-each-revisions-value",
+          "tests/PiSharp.Durable.Tests/Chord/DeltaAppendTextCases.cs: chord.delta-append-text.reads-a-deep-chain-of-deferred-appends-without-recursion-from-several-threads",
+          "tests/PiSharp.Durable.Tests/Chord/DeltaAppendTextCases.cs: chord.delta-append-text.cost.costs-o-chunk-per-change-a-500-kb-stream-allocates-linearly",
+          "tests/PiSharp.Durable.Tests/BenchmarksCases.cs: benchmarks.smoke"
+        ]
+      }
     },
     {
       "id": "durable.owned-slices",
@@ -9999,7 +10031,7 @@
       "pisharp": [],
       "release": "1.5.0",
       "notes": "Port upstream's harness-json.test.ts case as an authored check that a __proto__ member round-trips as a plain member.",
-      "evidence": "JavaScript prototype pollution has no .NET counterpart: PiSharp's AssignJson reads a member only when the draft contains it (src/PiSharp.Durable/Harness/Json.cs:19, target.ContainsKey(key)), and a DraftObject is a keyed map with no prototype chain, so __proto__ is an ordinary key."
+      "evidence": "JavaScript prototype pollution has no .NET counterpart: HarnessJson.AssignJson reads a member only when the draft has it (src/PiSharp.Durable/Harness/Json.cs:47, target.ContainsKey(key)), and a DraftObject is a keyed map with no prototype chain, so __proto__ is an ordinary key. tests/PiSharp.Durable.Tests/HarnessJsonCases.cs: harness.json.does-not-merge-a-new-proto-member-into-object-prototype ports harness-json.test.ts's case (89c921d8b) as an authored check: after {args:{path:\"x\"}}, assigning {args:{path:\"xy\",\"__proto__\":{polluted:true}}} leaves exactly that document, the __proto__ member a plain member."
     },
     {
       "id": "durable.read-base64-encoding",
@@ -10734,7 +10766,7 @@
           "tests/PiSharp.Durable.Tests/Chord/DeltaAppendTextCases.cs: chord.delta-append-text.rejects-what-a-javascript-caller-can-get-wrong",
           "tests/PiSharp.Durable.Tests/Chord/DeltaAppendTextCases.cs: chord.delta-append-text.accepts-only-keys-whose-type-is-exactly-string",
           "tests/PiSharp.Durable.Tests/Chord/DeltaAppendTextCases.cs: chord.delta-append-text.keeps-an-op-text-that-does-not-hold-a-larger-string-it-was-cut-from-alive",
-          "tests/PiSharp.Durable.Tests/Chord/DeltaAppendTextCases.cs: chord.delta-append-text.cost.costs-o-chunk-per-change-beyond-the-copy-a-dotnet-string-makes",
+          "tests/PiSharp.Durable.Tests/Chord/DeltaAppendTextCases.cs: chord.delta-append-text.cost.costs-o-chunk-per-change-a-500-kb-stream-allocates-linearly",
           "tests/PiSharp.Durable.Tests/Chord/DeltaPendingCases.cs: chord.delta-pending.folding.is-invisible-to-a-replica-tracker-edits-anywhere-appends-splices-and-reorders",
           "tests/PiSharp.Durable.Tests/Chord/DeltaPendingCases.cs: chord.delta-pending.folding.is-invisible-to-a-replica-leaf-edits-of-list-elements-between-splices-and-reorders"
         ]
