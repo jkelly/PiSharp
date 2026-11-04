@@ -56,11 +56,11 @@
     "changelogBullets": 477,
     "repeatedBullets": 23,
     "byStatus": {
-      "ported": 200,
+      "ported": 201,
       "ported-with-deferral": 25,
       "already-ported": 12,
       "no-op": 25,
-      "port": 64
+      "port": 63
     },
     "byArea": {
       "ai": 58,
@@ -9208,7 +9208,7 @@
       "id": "durable.run-failure",
       "area": "durable",
       "phase": 4,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "durable@1.5.0/Breaking Changes#15",
         "durable@1.5.0/Added#5"
@@ -9233,7 +9233,42 @@
         "tests/PiSharp.Durable.Tests/Harness/HarnessViewCases.cs"
       ],
       "release": "1.5.0",
-      "notes": "PiSharp learns of an unanswered run only from run_end events. RunFailureReason also gains interrupted and restart_limit (durable.interrupted-request, durable.restart-limit), nothing_to_answer (durable.continue-submissions) and turn_limit (durable.turn-limit); declare the C# enum once with every 1.5.0 value. PiSharp-only code that shows failures from events or tests idleness as an empty pi.live (pisharp durable's notices, the client model and the web agent's chat views, decisions 0008 and 0011) should read runFailure and run."
+      "notes": "PiSharp learns of an unanswered run only from run_end events. RunFailureReason also gains interrupted and restart_limit (durable.interrupted-request, durable.restart-limit), nothing_to_answer (durable.continue-submissions) and turn_limit (durable.turn-limit); declare the C# enum once with every 1.5.0 value. PiSharp-only code that shows failures from events or tests idleness as an empty pi.live (pisharp durable's notices, the client model and the web agent's chat views, decisions 0008 and 0011) should read runFailure and run.",
+      "evidence": {
+        "commits": [
+          "bbc30b23",
+          "4b82c868",
+          "990a2f61"
+        ],
+        "tests": [
+          "tests/PiSharp.Durable.Tests/HarnessRunFailureCases.cs: records-a-model-error-with-its-text-and-a-later-run-clears-it",
+          "tests/PiSharp.Durable.Tests/HarnessRunFailureCases.cs: records-a-missing-model-with-which-one",
+          "tests/PiSharp.Durable.Tests/HarnessRunFailureCases.cs: records-an-abort",
+          "tests/PiSharp.Durable.Tests/HarnessRunFailureCases.cs: records-a-reset-that-cut-the-run-before-an-answer-kept-by-the-run-its-queued-input-starts",
+          "tests/PiSharp.Durable.Tests/HarnessRunFailureCases.cs: keeps-the-failure-while-a-run-continues-the-queue-in-the-same-commit-and-replaces-it-with-the-next",
+          "tests/PiSharp.Durable.Tests/HarnessRunFailureCases.cs: pisharp.the-event-stream-carries-the-run-failure",
+          "tests/PiSharp.Durable.Tests/HarnessRunFailureCases.cs: pisharp.reads-and-writes-every-reason-in-upstream-spelling",
+          "tests/PiSharp.Durable.Tests/HarnessViewRunCases.cs: ends-a-call-that-never-runs-with-its-result-at-once-and-a-tool-aborted-with-its-generation",
+          "tests/PiSharp.Durable.Tests/HarnessViewRunCases.cs: converts-the-streamed-partial-into-one-aborted-answer-entry-when-the-run-is-aborted",
+          "tests/PiSharp.Durable.Tests/Harness/HarnessGenerationCases.cs: still-ends-a-run-whose-input-something-else-already-settled",
+          "tests/PiSharp.Durable.Tests/Harness/HarnessGenerationCases.cs: fails-with-no-model-when-no-model-is-configured-or-the-model-is-unknown",
+          "tests/PiSharp.Durable.Tests/Harness/HarnessGenerationCases.cs: converts-the-committed-partial-when-aborted-during-streaming",
+          "tests/PiSharp.Durable.Tests/Harness/HarnessGenerationCases.cs: cancels-a-deferred-response-when-aborted-during-polling",
+          "tests/PiSharp.Durable.Tests/Harness/HarnessGenerationCases.cs: reports-a-failed-deferred-cancellation-and-still-ends-the-run-aborted",
+          "tests/PiSharp.Durable.Tests/Harness/HarnessGenerationCases.cs: faults-a-run-task-settling-its-inputs-and-converting-the-committed-partial",
+          "tests/PiSharp.Durable.Tests/Harness/HarnessGenerationCases.cs: orphans-a-blocked-run-task-with-full-run-cleanup",
+          "tests/PiSharp.Durable.Tests/HarnessInputEntriesCases.cs: appends-a-data-only-write-while-idle-after-a-failed-run-without-placing-the-queued-items",
+          "tests/PiSharp.Durable.Tests/HarnessNestedToolsCases.cs: aborts-nested-calls-with-their-caller",
+          "tests/PiSharp.Durable.Tests/Harness/HarnessOwnershipCases.cs: aborts-a-subagent-run-with-its-parents-conversation-rejecting-the-waiting-tool",
+          "tests/PiSharp.Durable.Tests/Harness/HarnessStructuredToolRoundsCases.cs: aborts-a-parallel-round-with-its-generation-tools-first-then-the-generation-with-every-result-written",
+          "tests/PiSharp.Durable.Tests/Harness/HarnessStructuredToolRoundsCases.cs: keeps-run-control-with-a-faulted-generation-until-its-owned-work-drains-and-fails-the-harness-on-a-failed-final-commit",
+          "tests/PiSharp.Durable.Tests/Harness/HarnessChatDifferentialCases.cs: no-model",
+          "tests/PiSharp.Durable.Tests/Harness/HarnessCompactionDifferentialCases.cs: blocking-failure",
+          "tests/PiSharp.Durable.Tests/Harness/HarnessViewsDifferentialCases.cs: aborted-round",
+          "tests/PiSharp.WebAgent.Tests/ChatUiCases.cs: chat.ui.notices-say-why-the-newest-run-ended-without-an-answer",
+          "tests/PiSharp.DurableCli.Tests/TuiLibraryCases.cs: tui.alert.run-failure"
+        ]
+      }
     },
     {
       "id": "durable.watch-events-removed",

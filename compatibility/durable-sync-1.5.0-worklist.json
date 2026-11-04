@@ -3023,7 +3023,10 @@
       "size": "M",
       "dependsOn": [],
       "commits": [
-        "f3255de76"
+        "f3255de76",
+        "bbc30b23",
+        "4b82c868",
+        "990a2f61"
       ],
       "notes": "Declare the C# RunFailureReason once with every 1.5.0 value: interrupted and restart_limit (area restarts), nothing_to_answer (area admission) and turn_limit (area live-turns) use it later. PiSharp-only code that shows failures from run_end events or tests idleness as an empty pi.live (pisharp durable's notices, the client model, the web agent's chat views, decisions 0008 and 0011) should read runFailure and run. pi.live changes shape here; its version chain (v2, v3) is area live-turns."
     },
