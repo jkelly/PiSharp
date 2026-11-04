@@ -674,12 +674,11 @@
       "lines": 907,
       "pisharp": "src/PiSharp.Durable/Storage/Jsonl/JsonlStorage.cs",
       "phase": "P4",
-      "status": "needs-sync",
+      "status": "ported",
       "upstreamChange": "modified",
       "previousBlobSha1": "4b03fd5beff465841ec3dc069d32fd90241604eb",
       "changedLines": 111,
-      "note": "JsonlStorage over IFileSystem on MemoryStorage's PrepareCommit/Apply (replay passes the recorded sequence). JsonlCorruptionError/JsonlStoragePoisonedError are exceptions with upstream's messages; file failures are IOExceptions. File names and lines are byte-for-byte upstream's (checked against Pi v1.1.0 writing, fsync-writing, reopening and recovering the same commits); a resolved document copy keeps upstream's {kind, version, value} base. Tests: storage.jsonl.* P13: compat.*.jsonl.* open, read, resume and rewrite JSONL sessions the pinned upstream wrote (tests/PiSharp.Durable.Tests/Fixtures/upstream-sessions, tools/DurableFixtures/capture.mjs): PiSharp writes the same files byte for byte, and upstream reads PiSharp's (compat.reverse.*). v1.2.0: invalid read requests are the in-memory store's StorageRequestExceptions; upstream's own StorageRequestError, \"Storage.entry() requires an entry ID\", has no counterpart because the C# GetEntryAsync overloads are typed.",
-      "portedBlobSha1": "4b03fd5beff465841ec3dc069d32fd90241604eb"
+      "note": "JsonlStorage over IFileSystem on MemoryStorage's PrepareCommit/Apply (replay passes the recorded sequence). JsonlCorruptionError/JsonlStoragePoisonedError are exceptions with upstream's messages; file failures are IOExceptions. File names and lines are byte-for-byte upstream's (checked against Pi v1.1.0 writing, fsync-writing, reopening and recovering the same commits); a resolved document copy keeps upstream's {kind, version, value} base. Tests: storage.jsonl.* P13: compat.*.jsonl.* open, read, resume and rewrite JSONL sessions the pinned upstream wrote (tests/PiSharp.Durable.Tests/Fixtures/upstream-sessions, tools/DurableFixtures/capture.mjs): PiSharp writes the same files byte for byte, and upstream reads PiSharp's (compat.reverse.*). v1.2.0: invalid read requests are the in-memory store's StorageRequestExceptions; upstream's own StorageRequestError, \"Storage.entry() requires an entry ID\", has no counterpart because the C# GetEntryAsync overloads are typed. v1.5.0 (work list area storage-batches): commit(batches, receive, context) is CommitAsync(batches, receive, context) resolving with a CommitResult (Stored, Refused): the batches apply to memory in order, each checked against what the earlier ones left, the first refused one and everything after it is not stored; the call appends the sidecar contents (merged per file) and then every marker in one write; reads started during an append wait for it; a failure after a batch applied poisons the storage; the receipts follow the append, before reclamation. Tests: storage.jsonl.poisons-the-storage-when-an-append-fails-after-its-batches-applied-before-a-waiting-read-goes-on-review, storage.jsonl.batches.*, storage.jsonl.conformance.* and storage.jsonl.reopen.conformance.*"
     },
     {
       "upstream": "packages/durable/src/storage/memory.ts",
@@ -691,7 +690,7 @@
       "upstreamChange": "modified",
       "previousBlobSha1": "d6e3b80c4eac28565cf1d7fc1516ffc768bfa029",
       "changedLines": 34,
-      "note": "MemoryStorage with the prepare/apply split (PrepareCommit -> PreparedMemoryCommit.Apply). Immutable records replace clone/freeze; one lock per operation. Tests: storage.memory.* v1.2.0: unknown conversations, malformed cursors and history a document does not keep throw StorageRequestException; a rejected document copy throws a plain exception (StorageRejected is gone).",
+      "note": "MemoryStorage with the prepare/apply split (PrepareCommit -> PreparedMemoryCommit.Apply). Immutable records replace clone/freeze; one lock per operation. Tests: storage.memory.* v1.2.0: unknown conversations, malformed cursors and history a document does not keep throw StorageRequestException; a rejected document copy throws a plain exception (StorageRejected is gone). v1.5.0 (work list area storage-batches): the batched commit is ported (CommitAsync applies the batches in order under one lock, stops at the first one prepareCommit refuses, and delivers the receipts of the applied ones also when an apply throws; BeforeApply is the test seam for upstream's throwing subclass; test storage.memory.delivers-the-receipts-of-the-batches-applied-before-one-whose-apply-throws-then-rejects). The sleeping task status waits on area sleep.",
       "portedBlobSha1": "d6e3b80c4eac28565cf1d7fc1516ffc768bfa029"
     },
     {
@@ -779,12 +778,11 @@
       "lines": 1049,
       "pisharp": "src/PiSharp.Durable.Sqlite/Storage.cs",
       "phase": "P5",
-      "status": "needs-sync",
+      "status": "ported",
       "upstreamChange": "modified",
       "previousBlobSha1": "c524246ef15d85ca8e34744496cfce4267209127",
       "changedLines": 281,
-      "note": "SqliteStorage: upstream queries, orderings and JSON columns; one SQL transaction per commit; next_id TEXT. Batch validation, addressing and paging rules are shared with MemoryStorage in src/PiSharp.Durable/Storage/StorageRules.cs. Tests: storage.sqlite.* P13: compat.*.sqlite.* open, read, resume and rewrite SQLite sessions the pinned upstream wrote (Fixtures/upstream-sessions); PiSharp's rows and JSON columns are upstream's text, and upstream reads PiSharp's (compat.reverse.*). v1.2.0: unknown conversations, malformed cursors and history a document does not keep throw StorageRequestException; rejected document copies throw plain exceptions; busy statements are retried by the connection's busy timeout (SqliteConnectionDatabase, 5 s by default), the storage's own transient retry.",
-      "portedBlobSha1": "c524246ef15d85ca8e34744496cfce4267209127"
+      "note": "SqliteStorage: upstream queries, orderings and JSON columns; one SQL transaction per commit; next_id TEXT. Batch validation, addressing and paging rules are shared with MemoryStorage in src/PiSharp.Durable/Storage/StorageRules.cs. Tests: storage.sqlite.* P13: compat.*.sqlite.* open, read, resume and rewrite SQLite sessions the pinned upstream wrote (Fixtures/upstream-sessions); PiSharp's rows and JSON columns are upstream's text, and upstream reads PiSharp's (compat.reverse.*). v1.2.0: unknown conversations, malformed cursors and history a document does not keep throw StorageRequestException; rejected document copies throw plain exceptions; busy statements are retried by the connection's busy timeout (SqliteConnectionDatabase, 5 s by default), the storage's own transient retry. v1.5.0 (work list area storage-batches): CommitAsync(batches, receive, context) runs the call in one SQL transaction: each batch's checks read the state the earlier batches left, a batch a check refuses ends the call with the earlier ones committed, and a driver failure (WatchedExecutor watches ExecAsync, RunAsync, RunCountedAsync, GetAsync and AllAsync, upstream watchCalls) rejects the whole call; document copies resolve before the writes, so no savepoint is needed. The table prefix rendering is area sqlite's. Tests: storage.sqlite.batches.*, storage.sqlite.conformance.*, storage.sqlite.reopen.conformance.*"
     },
     {
       "upstream": "packages/durable/src/storage/store/commit.ts",
@@ -864,8 +862,9 @@
       "lines": 18,
       "pisharp": "src/PiSharp.Durable/Testing/CommitWrites.cs",
       "phase": "sync-1.5.0",
-      "status": "planned",
-      "upstreamChange": "added"
+      "status": "ported",
+      "upstreamChange": "added",
+      "note": "v1.5.0 (work list area storage-batches): commitWrites(storage, writes, context) is the CommitWrites.CommitWritesAsync extension method: one batch, its seq returned, its refusal rethrown. Used by the conformance kit, StorageBenchmark and every storage.* case that commits one batch"
     },
     {
       "upstream": "packages/durable/src/testing/env-conformance.ts",
@@ -885,12 +884,11 @@
       "lines": 28,
       "pisharp": "src/PiSharp.Durable/Testing/Runner.cs",
       "phase": "P9",
-      "status": "needs-sync",
+      "status": "ported",
       "upstreamChange": "modified",
       "previousBlobSha1": "fdaa421f5c39c21a215e1f283d9dbda1b7e7d567",
       "changedLines": 1,
-      "note": "Only re-exports; the PiSharp.Durable.Testing namespace is the subpath (header in Runner.cs)",
-      "portedBlobSha1": "fdaa421f5c39c21a215e1f283d9dbda1b7e7d567"
+      "note": "Only re-exports; the PiSharp.Durable.Testing namespace is the subpath (header in Runner.cs) v1.5.0 (work list area storage-batches): the new commitWrites export is CommitWrites.CommitWritesAsync in PiSharp.Durable.Testing (header in Runner.cs)"
     },
     {
       "upstream": "packages/durable/src/testing/runner.ts",
@@ -907,12 +905,11 @@
       "lines": 500,
       "pisharp": "src/PiSharp.Durable/Testing/StorageBenchmark.cs",
       "phase": "P2",
-      "status": "needs-sync",
+      "status": "ported",
       "upstreamChange": "modified",
       "previousBlobSha1": "28c7a37d10f2e66a65eaea88df18bbcb53b31bd8",
       "changedLines": 45,
-      "note": "StorageBenchmark: StorageBenchmarkScale, MemoryScales (STORAGE_MEMORY_SCALES), TimingScale, PrimaryRecordCount, SeedAsync, ReadBenchmarks (12 checked read scenarios), SeedWriteAsync and WriteBenchmarks (3), seeding only through IStorage. Timed by benchmarks/PiSharp.Durable.Benchmarks; tests: benchmarks.smoke",
-      "portedBlobSha1": "28c7a37d10f2e66a65eaea88df18bbcb53b31bd8"
+      "note": "StorageBenchmark: StorageBenchmarkScale, MemoryScales (STORAGE_MEMORY_SCALES), TimingScale, PrimaryRecordCount, SeedAsync, ReadBenchmarks (12 checked read scenarios), SeedWriteAsync and WriteBenchmarks (3), seeding only through IStorage. Timed by benchmarks/PiSharp.Durable.Benchmarks; tests: benchmarks.smoke v1.5.0 (work list area storage-batches): every seeding and timed write goes through commitWrites (CommitWritesAsync). Tests: benchmarks.smoke"
     },
     {
       "upstream": "packages/durable/src/testing/storage-conformance.ts",
@@ -924,7 +921,7 @@
       "upstreamChange": "modified",
       "previousBlobSha1": "ad0f58aadc468748048ed846fb99f8ffc3d8081c",
       "changedLines": 570,
-      "note": "Public kit: StorageConformance.Create(StorageConformanceProvider) returns 24 named cases that assert themselves (no injected runner assertions). Two detachment cases adapted for immutable values. Tests: storage.memory.conformance.* v1.2.0: the two rejected copy batches only need to fail without effect (any exception), as StorageRejected is gone.",
+      "note": "Public kit: StorageConformance.Create(StorageConformanceProvider) returns 24 named cases that assert themselves (no injected runner assertions). Two detachment cases adapted for immutable values. Tests: storage.memory.conformance.* v1.2.0: the two rejected copy batches only need to fail without effect (any exception), as StorageRejected is gone. v1.5.0 (work list area storage-batches): every case commits through CommitWritesAsync and sees its storage through ReceiptCheckedStorage (upstream checkReceipts); the five batch cases are ported (receives a durable commit once before resolving, and never a refused one; commits batches in order...; stores the batches before the first one refused...; refuses a later batch its own malformed actions fail...; resolves a batched copy...), 29 of v1.5.0's 32 cases. \"stores and scans sleeping tasks by status\" waits on area sleep, \"stores continue submissions, which have no entry and are never queued\" on area admission, \"refuses a creation and a change of one document in one commit, in either order\" on area store-storage.",
       "portedBlobSha1": "ad0f58aadc468748048ed846fb99f8ffc3d8081c"
     },
     {
@@ -2673,12 +2670,11 @@
       "lines": 1303,
       "pisharp": "tests/PiSharp.Durable.Tests/Storage/JsonlStorageCases.cs",
       "phase": "P4",
-      "status": "needs-sync",
+      "status": "ported",
       "upstreamChange": "modified",
       "previousBlobSha1": "cebfb0a69ec892669e3a03cdecbac489d5873a35",
       "changedLines": 249,
-      "note": "All cases as storage.jsonl.<case> (one case per failure point), with InstrumentedFileSystem (Storage/InstrumentedFileSystem.cs) as the fault-injecting InstrumentedEnv, the conformance kit directly (storage.jsonl.conformance.*) and across reopen (storage.jsonl.reopen.conformance.*). Adapted: the BigInt serialization failure becomes a PrepareCommit rejection. Authored: storage.jsonl.writes-upstream-line-formats",
-      "portedBlobSha1": "cebfb0a69ec892669e3a03cdecbac489d5873a35"
+      "note": "All cases as storage.jsonl.<case> (one case per failure point), with InstrumentedFileSystem (Storage/InstrumentedFileSystem.cs) as the fault-injecting InstrumentedEnv, the conformance kit directly (storage.jsonl.conformance.*) and across reopen (storage.jsonl.reopen.conformance.*). Adapted: the BigInt serialization failure becomes a PrepareCommit rejection. Authored: storage.jsonl.writes-upstream-line-formats v1.5.0 (work list area storage-batches): the commits go through commitWrites, the reopen case commits a minted conversation (a batch always has writes), and the two new cases are storage.jsonl.poisons-the-storage-when-an-append-fails-after-its-batches-applied-before-a-waiting-read-goes-on-review (FailingJoin overrides LocalFileSystem.JoinPathAsync) and storage.jsonl.batches.appends-a-batch-s-markers-in-one-write-and-recovers-a-shorter-prefix-from-a-torn-one"
     },
     {
       "upstream": "packages/durable/test/live-support.ts",
@@ -2695,12 +2691,11 @@
       "lines": 71,
       "pisharp": "tests/PiSharp.Durable.Tests/Storage/MemoryStorageCases.cs",
       "phase": "P2",
-      "status": "needs-sync",
+      "status": "ported",
       "upstreamChange": "modified",
       "previousBlobSha1": "f01af3ed30928b74220633915f263cc14696b632",
       "changedLines": 43,
-      "note": "Conformance on MemoryStorage as storage.memory.conformance.<case> plus storage.memory.does-not-expose-retained-state-through-a-prepared-commit; storage.memory.prepare-* are authored for the prepare/apply split",
-      "portedBlobSha1": "f01af3ed30928b74220633915f263cc14696b632"
+      "note": "Conformance on MemoryStorage as storage.memory.conformance.<case> plus storage.memory.does-not-expose-retained-state-through-a-prepared-commit; storage.memory.prepare-* are authored for the prepare/apply split v1.5.0 (work list area storage-batches): the commits go through commitWrites, the recorded-sequence case commits a conversation where it committed no writes, and the new case is storage.memory.delivers-the-receipts-of-the-batches-applied-before-one-whose-apply-throws-then-rejects (MemoryStorage.BeforeApply for upstream's subclass)"
     },
     {
       "upstream": "packages/durable/test/nested-images-bench.ts",
@@ -2989,12 +2984,11 @@
       "lines": 253,
       "pisharp": "tests/PiSharp.Durable.Tests/Storage/SqliteFacadeCases.cs",
       "phase": "P5",
-      "status": "needs-sync",
+      "status": "ported",
       "upstreamChange": "modified",
       "previousBlobSha1": "c3db8991006decfd3e51330b77ecd4ece41efd4d",
       "changedLines": 191,
-      "note": "All 11 cases as storage.sqlite.facade.*. Microtask observations use gates; prepare counting uses the adapter counter instead of subclassing DatabaseSync v1.2.0: \"does not preserve the callback error when rollback itself fails\" throws a plain exception. v1.5.0 (work list area sqlite): v1.5.0 moved the driver cases to packages/chord/test/sqlite/node.test.ts; they keep their storage.sqlite.facade.* ids, and its new cases are chord.sqlite.node.* in the same file (not ported: the re-export identity case and the 256-statement cache case, phase 6). The commit half of the call-order case is storage.sqlite.facade.reads-storage-commits-in-call-order. Waits on area storage-batches (commitWrites).",
-      "portedBlobSha1": "c3db8991006decfd3e51330b77ecd4ece41efd4d"
+      "note": "All 11 cases as storage.sqlite.facade.*. Microtask observations use gates; prepare counting uses the adapter counter instead of subclassing DatabaseSync v1.2.0: \"does not preserve the callback error when rollback itself fails\" throws a plain exception. v1.5.0 (work list area sqlite): v1.5.0 moved the driver cases to packages/chord/test/sqlite/node.test.ts; they keep their storage.sqlite.facade.* ids, and its new cases are chord.sqlite.node.* in the same file (not ported: the re-export identity case and the 256-statement cache case, phase 6). The commit half of the call-order case is storage.sqlite.facade.reads-storage-commits-in-call-order. Waits on area storage-batches (commitWrites). v1.5.0 (work list area storage-batches): the storage commits go through commitWrites (CommitWritesAsync), which completes the row."
     },
     {
       "upstream": "packages/durable/test/sqlite-migrations.test.ts",
@@ -3002,12 +2996,11 @@
       "lines": 179,
       "pisharp": "tests/PiSharp.Durable.Tests/Storage/SqliteMigrationsCases.cs",
       "phase": "P5",
-      "status": "needs-sync",
+      "status": "ported",
       "upstreamChange": "modified",
       "previousBlobSha1": "c55117ea655b39ea02cdd00e908001f9b23e98d3",
       "changedLines": 97,
-      "note": "All 4 cases as storage.sqlite.migrations.*, plus authored initial-schema-is-upstream-text-verbatim, initial-schema-creates-upstream-tables-and-indexes and rejects-migrations-without-contiguous-versions v1.5.0 (work list area sqlite): the version 2 cases are ported (storage.sqlite.migrations.migrates-a-version-1-database-to-store-sleeping-tasks-keeping-its-tasks-and-indexes, the v1.5.0 hashes), and the cases v1.5.0 moved to packages/chord/test/sqlite/migrations.test.ts are chord.sqlite.migrations.* plus the kept rolls-initial-bootstrap id; the commit there still uses CommitAsync, so the row waits on area storage-batches (commitWrites).",
-      "portedBlobSha1": "c55117ea655b39ea02cdd00e908001f9b23e98d3"
+      "note": "All 4 cases as storage.sqlite.migrations.*, plus authored initial-schema-is-upstream-text-verbatim, initial-schema-creates-upstream-tables-and-indexes and rejects-migrations-without-contiguous-versions v1.5.0 (work list area sqlite): the version 2 cases are ported (storage.sqlite.migrations.migrates-a-version-1-database-to-store-sleeping-tasks-keeping-its-tasks-and-indexes, the v1.5.0 hashes), and the cases v1.5.0 moved to packages/chord/test/sqlite/migrations.test.ts are chord.sqlite.migrations.* plus the kept rolls-initial-bootstrap id; the commit there still uses CommitAsync, so the row waits on area storage-batches (commitWrites). v1.5.0 (work list area storage-batches): the commit goes through commitWrites (CommitWritesAsync), which completes the row."
     },
     {
       "upstream": "packages/durable/test/sqlite-storage.test.ts",
@@ -3015,12 +3008,11 @@
       "lines": 817,
       "pisharp": "tests/PiSharp.Durable.Tests/Storage/SqliteStorageCases.cs",
       "phase": "P5",
-      "status": "needs-sync",
+      "status": "ported",
       "upstreamChange": "modified",
       "previousBlobSha1": "f68dc0a3cacadc82a2fbe2eddaa8b804fe0f5a24",
       "changedLines": 262,
-      "note": "Conformance kit on SqliteStorage (storage.sqlite.conformance.*) and across reopen after every commit (storage.sqlite.reopen.conformance.*); all 11 cases as storage.sqlite.*, two adapted for immutable values (failing-statement wrapper instead of a circular input; equal second read instead of mutation); authored storage.sqlite.native.*",
-      "portedBlobSha1": "f68dc0a3cacadc82a2fbe2eddaa8b804fe0f5a24"
+      "note": "Conformance kit on SqliteStorage (storage.sqlite.conformance.*) and across reopen after every commit (storage.sqlite.reopen.conformance.*); all 11 cases as storage.sqlite.*, two adapted for immutable values (failing-statement wrapper instead of a circular input; equal second read instead of mutation); authored storage.sqlite.native.* v1.5.0 (work list area storage-batches): the commits go through commitWrites, and the \"SqliteStorage batches\" group is storage.sqlite.batches.*, one case per failure kind of upstream's loops (the later-batch check read: undefined rejection, synchronous throw; the check read: Error rejection, synchronous throw, primitive rejection, undefined rejection). .NET has no non-Error rejection: an Error rejection is a faulted task, a primitive one a faulted task whose exception is InvalidOperationException, an undefined one a canceled task. The prefix cases are area sqlite's"
     },
     {
       "upstream": "packages/durable/test/storage-memory.ts",
