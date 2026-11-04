@@ -57,6 +57,32 @@ internal static partial class Program
     internal static async Task<List<JsonObject>> StoreOutbox(ChordStore store, long afterSeq, long limit, ChordContext context) =>
         [.. (await store.Outbox!.ReadAsync(afterSeq, limit, context)).Select(commit => commit.ToJson())];
 
+    /// <summary>SQL rows as JSON (integers as numbers, NULL as null), for toEqual on <c>executor.all(...)</c>'s result.</summary>
+    internal static JsonArray StoreSqlJson(IEnumerable<IReadOnlyDictionary<string, object?>> rows) =>
+        new([.. rows.Select(row => (JsonNode?)StoreSqlJson(row))]);
+
+    /// <summary>One SQL row as JSON (see <see cref="StoreSqlJson(IEnumerable{IReadOnlyDictionary{string, object?}})"/>); null for none.</summary>
+    internal static JsonObject? StoreSqlJson(IReadOnlyDictionary<string, object?>? row)
+    {
+        if (row is null) return null;
+        var json = new JsonObject();
+        foreach (var (column, value) in row)
+        {
+            json[column] = value switch
+            {
+                null => null,
+                long integer => JsonValue.Create(integer),
+                double number => JsonValue.Create(number),
+                string text => JsonValue.Create(text),
+                _ => throw new InvalidOperationException($"an SQL value of type {value.GetType().Name}"),
+            };
+        }
+        return json;
+    }
+
+    /// <summary>String(rejection): a ChordError's message (its JSON's), an exception's type and message.</summary>
+    internal static string StoreText(object rejection) => rejection is Exception error ? $"{error.GetType().Name}: {error.Message}" : (string?)((JsonObject)rejection)["message"] ?? "";
+
     /// <summary>A rows step's result: column values as operands (<see cref="Operand.Undefined"/> clears).</summary>
     internal static Dictionary<string, Operand> StorePatch(params (string Column, Operand Value)[] values) =>
         values.ToDictionary(value => value.Column, value => value.Value, StringComparer.Ordinal);

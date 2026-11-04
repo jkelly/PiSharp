@@ -383,9 +383,6 @@ internal sealed class TestTableOwner : ITableOwner
     public void Fail(ChordError error) => Failures.Add(error);
 }
 
-/// <summary>A claimant of a test (upstream's <c>{ label: "an object" }</c>).</summary>
-internal sealed record TestClaimant(string Label) : IClaimant;
-
 /// <summary>An <see cref="ISqliteDatabase"/> over Microsoft.Data.Sqlite on a file or <c>:memory:</c>, as src/sqlite/node.ts's
 /// NodeSqliteDatabase is over node:sqlite: one operation or transaction at a time, in call order; a transaction is <c>BEGIN
 /// IMMEDIATE</c>, the callback and <c>COMMIT</c>, and on a throw <c>ROLLBACK</c> and the throw (both failing: an AggregateException of
