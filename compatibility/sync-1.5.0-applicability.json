@@ -9290,7 +9290,7 @@
       ],
       "change": "watchEvents() and its types AgentEvent, AgentEventStream, SnapshotEvent, MessageChange and ToolEventCall are removed with spec §9.4 (src/harness/events.ts and test/harness-events.test.ts are deleted): a renderer renders the conversation view, whose operations carry the same deltas the events did. The changelog maps every event to its state: pi.live.run, generation.message and retry, the tools and nestedTools slots, compactions, runFailure, pi.inbox, pi.agent, pi.usage and Submission.status().",
       "pisharp": [
-        "src/PiSharp.Durable/Harness/Events.cs",
+        "src/PiSharp.Durable.Hosting/AgentEvents.cs",
         "src/PiSharp.Durable/Harness/Harness.cs",
         "src/PiSharp.Durable/DurableUpstream.cs",
         "src/PiSharp.Durable.Hosting/Feeds.cs",
@@ -9302,8 +9302,7 @@
         "src/PiSharp.Durable.Web/Hub/StreamMux.cs",
         "src/PiSharp.WebAgent/Chat/AgentViewHub.cs",
         "src/PiSharp.Cli/Durable/DurableAttach.cs",
-        "tests/PiSharp.Durable.Tests/Harness/HarnessEventsCases.cs",
-        "tests/PiSharp.Durable.Tests/Harness/HarnessStructuredEventsCases.cs",
+        "tests/PiSharp.Durable.Tests/AgentEventsCases.cs",
         "tests/PiSharp.Durable.Tests/Compat/CompatCases.cs",
         "samples/Durable.Examples/ExamplesJson.cs",
         "samples/Durable.Examples/ExamplesLateJoin.cs"
