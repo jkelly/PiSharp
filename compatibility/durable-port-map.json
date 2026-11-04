@@ -82,12 +82,11 @@
       "lines": 208,
       "pisharp": "src/PiSharp.Durable/Documents.cs",
       "phase": "P2",
-      "status": "needs-sync",
+      "status": "ported",
       "upstreamChange": "modified",
       "previousBlobSha1": "92753d0194bed12f3e6b11173fd1701e54e0e6fa",
       "changedLines": 2,
-      "note": "defineDoc/defineDocFamily as one factory per scope (Documents.DefineSessionDoc ... DefineTaskDocFamily) returning scope-typed tokens; DocDefinition is the erased definition; address, scope, version and migration checks are internal for the Session (P3). Values are JsonObjectValue (no static T). Tests: documents.* (authored); Session-level coverage: session.definitions.* and session.checkpoints-migrations.*",
-      "portedBlobSha1": "92753d0194bed12f3e6b11173fd1701e54e0e6fa"
+      "note": "defineDoc/defineDocFamily as one factory per scope (Documents.DefineSessionDoc ... DefineTaskDocFamily) returning scope-typed tokens; DocDefinition is the erased definition; address, scope, version and migration checks are internal for the Session (P3). Values are JsonObjectValue (no static T). Tests: documents.* (authored); Session-level coverage: session.definitions.* and session.checkpoints-migrations.* v1.5.0 (work list area checkpoint-when): checkpointWhen has no default: every factory takes a DocumentCheckpointPredicate after initial (before the optional migrate), a null one throws ArgumentNullException, and DocDefinition.CheckpointWhen is non-nullable; the Session calls it without a null check. Tests: session.definitions.requires-an-explicit-checkpoint-predicate-for-documents-and-families (reflection over the eight factories for upstream's @ts-expect-error lines, and the null rejection), session.checkpoints-migrations.*"
     },
     {
       "upstream": "packages/durable/src/entries.ts",
@@ -1330,8 +1329,9 @@
       "lines": 61,
       "pisharp": "tests/PiSharp.Durable.Tests/CodemodeCheckpointsCases.cs",
       "phase": "sync-1.5.0",
-      "status": "planned",
-      "upstreamChange": "added"
+      "status": "ported",
+      "upstreamChange": "added",
+      "note": "codemode-checkpoints.* (2 cases), verbatim on MemoryStorage as upstream: HarnessTasks.NestedCallDoc and DurableCodemode.RunDoc and JournalDoc never select a base (task documents retire with their task); DurableCodemode.StoreDoc writes a base once 64 deltas follow the newest one, and as-of reads and forks at an earlier entry still see the old value."
     },
     {
       "upstream": "packages/durable/test/codemode-describe.test.ts",
@@ -1401,12 +1401,11 @@
       "lines": 54,
       "pisharp": "benchmarks/PiSharp.Durable.Benchmarks/DocumentAppendBench.cs",
       "phase": "sync-1.2.0",
-      "status": "needs-sync",
+      "status": "ported",
       "upstreamChange": "modified",
       "previousBlobSha1": "a2c160d7d3ff40f73016c0038a5c437b273ffbb4",
       "changedLines": 2,
-      "note": "Report only: DocumentAppendBench (PiSharp.Durable.Benchmarks document-append [N,...]), run at a tiny size by benchmarks.smoke; results in docs/durable-benchmarks.md.",
-      "portedBlobSha1": "a2c160d7d3ff40f73016c0038a5c437b273ffbb4"
+      "note": "Report only: DocumentAppendBench (PiSharp.Durable.Benchmarks document-append [N,...]), run at a tiny size by benchmarks.smoke; results in docs/durable-benchmarks.md. v1.5.0 (work list area checkpoint-when): the journal and the member family state checkpointWhen (_, _, _) => false."
     },
     {
       "upstream": "packages/durable/test/env-line-scan.test.ts",
@@ -1477,12 +1476,11 @@
       "lines": 46,
       "pisharp": "samples/Durable.Examples/Examples.cs",
       "phase": "P13",
-      "status": "needs-sync",
+      "status": "ported",
       "upstreamChange": "modified",
       "previousBlobSha1": "d6638eba699e3fc56bf562cc9bed47dad38cbfcb",
       "changedLines": 1,
-      "note": "Milestone M0: runs on memory, JSONL and SQLite storage and reads back after reopen; tests/PiSharp.Durable.Tests/ExamplesCases.cs pins the output the pinned upstream prints under Node.",
-      "portedBlobSha1": "d6638eba699e3fc56bf562cc9bed47dad38cbfcb"
+      "note": "Milestone M0: runs on memory, JSONL and SQLite storage and reads back after reopen; tests/PiSharp.Durable.Tests/ExamplesCases.cs pins the output the pinned upstream prints under Node. v1.5.0 (work list area checkpoint-when): the shared example.notes document states checkpointWhen (_, _, _) => false; the output is unchanged."
     },
     {
       "upstream": "packages/durable/test/examples/02-forks.ts",
@@ -1490,12 +1488,11 @@
       "lines": 56,
       "pisharp": "samples/Durable.Examples/Examples.cs",
       "phase": "P13",
-      "status": "needs-sync",
+      "status": "ported",
       "upstreamChange": "modified",
       "previousBlobSha1": "ef51a84a5d775e75d81c487ecc69e84499e72c76",
       "changedLines": 1,
-      "note": "Milestone M0: runs on memory, JSONL and SQLite storage and reads back after reopen; tests/PiSharp.Durable.Tests/ExamplesCases.cs pins the output the pinned upstream prints under Node.",
-      "portedBlobSha1": "ef51a84a5d775e75d81c487ecc69e84499e72c76"
+      "note": "Milestone M0: runs on memory, JSONL and SQLite storage and reads back after reopen; tests/PiSharp.Durable.Tests/ExamplesCases.cs pins the output the pinned upstream prints under Node. v1.5.0 (work list area checkpoint-when): the shared example.notes document states checkpointWhen (_, _, _) => false; the output is unchanged."
     },
     {
       "upstream": "packages/durable/test/examples/03-owned-conversations.ts",
@@ -1503,12 +1500,11 @@
       "lines": 70,
       "pisharp": "samples/Durable.Examples/Examples.cs",
       "phase": "P13",
-      "status": "needs-sync",
+      "status": "ported",
       "upstreamChange": "modified",
       "previousBlobSha1": "cdf3240f614c653e516aab41ca2bc9b484663a7b",
       "changedLines": 3,
-      "note": "Milestone M0: runs on memory, JSONL and SQLite storage and reads back after reopen; tests/PiSharp.Durable.Tests/ExamplesCases.cs pins the output the pinned upstream prints under Node.",
-      "portedBlobSha1": "cdf3240f614c653e516aab41ca2bc9b484663a7b"
+      "note": "Milestone M0: runs on memory, JSONL and SQLite storage and reads back after reopen; tests/PiSharp.Durable.Tests/ExamplesCases.cs pins the output the pinned upstream prints under Node. v1.5.0 (work list area checkpoint-when): example.agent-registry states checkpointWhen (_, _, _) => false; the output is unchanged. Upstream's other change renumbers a comment (11-tasks.ts), which the C# does not carry."
     },
     {
       "upstream": "packages/durable/test/examples/04-chord-state.ts",
@@ -1540,13 +1536,12 @@
       "lines": 68,
       "pisharp": "samples/Durable.Examples/ExamplesHarness.cs",
       "phase": "P13",
-      "status": "needs-sync",
+      "status": "ported",
       "upstreamChange": "renamed",
       "renamedFrom": "packages/durable/test/examples/06-harness.ts",
       "previousBlobSha1": "141e8e667093577a70738aceee986941eed774b8",
       "changedLines": 8,
-      "note": "Ported in P11: runs on memory, JSONL and SQLite storage; tests/PiSharp.Durable.Tests/ExamplesCases.cs pins the output the pinned upstream prints under Node, as JSON in place of util.inspect. On a file backend the storage is reopened and the root notes and stored agent read back. v1.2.0 (work list area h): the tool result's content is output (ToolExecutionResult.Output since area a); its Node output under v1.2.0 is unchanged. v1.5.0 (work list area tools-schema): the tool's parameters are pi-schema's obj({ path: str() }); waits on area checkpoint-when",
-      "portedBlobSha1": "141e8e667093577a70738aceee986941eed774b8"
+      "note": "Ported in P11: runs on memory, JSONL and SQLite storage; tests/PiSharp.Durable.Tests/ExamplesCases.cs pins the output the pinned upstream prints under Node, as JSON in place of util.inspect. On a file backend the storage is reopened and the root notes and stored agent read back. v1.2.0 (work list area h): the tool result's content is output (ToolExecutionResult.Output since area a); its Node output under v1.2.0 is unchanged. v1.5.0 (work list area tools-schema): the tool's parameters are pi-schema's obj({ path: str() }) v1.5.0 (work list area checkpoint-when): example.notes states checkpointWhen (_, _, _) => false; the output is unchanged."
     },
     {
       "upstream": "packages/durable/test/examples/06-configuration.ts",
@@ -1608,13 +1603,12 @@
       "lines": 88,
       "pisharp": "samples/Durable.Examples/ExamplesHarness.cs",
       "phase": "P13",
-      "status": "needs-sync",
+      "status": "ported",
       "upstreamChange": "renamed",
       "renamedFrom": "packages/durable/test/examples/11-extension-state.ts",
       "previousBlobSha1": "a75a7ef4acf48dee9e346c2d2b3d49e1f4be1728",
       "changedLines": 8,
-      "note": "Ported in P11: runs on memory, JSONL and SQLite storage; tests/PiSharp.Durable.Tests/ExamplesCases.cs pins the output the pinned upstream prints under Node, as JSON in place of util.inspect. The faux provider is ScriptedModels; on a file backend the todos are read back. v1.2.0 (work list area h): the tool result's content is output (ToolExecutionResult.Output since area a); its Node output under v1.2.0 is unchanged. v1.5.0 (work list area tools-schema): the tool's parameters are pi-schema's obj({ item: str() }); waits on area checkpoint-when",
-      "portedBlobSha1": "a75a7ef4acf48dee9e346c2d2b3d49e1f4be1728"
+      "note": "Ported in P11: runs on memory, JSONL and SQLite storage; tests/PiSharp.Durable.Tests/ExamplesCases.cs pins the output the pinned upstream prints under Node, as JSON in place of util.inspect. The faux provider is ScriptedModels; on a file backend the todos are read back. v1.2.0 (work list area h): the tool result's content is output (ToolExecutionResult.Output since area a); its Node output under v1.2.0 is unchanged. v1.5.0 (work list area tools-schema): the tool's parameters are pi-schema's obj({ item: str() }) v1.5.0 (work list area checkpoint-when): example.todos states checkpointWhen (_, _, _) => false; the output is unchanged."
     },
     {
       "upstream": "packages/durable/test/examples/11-tasks.ts",
@@ -1781,7 +1775,7 @@
       "renamedFrom": "packages/durable/test/examples/23-subagent-background.ts",
       "previousBlobSha1": "261a4e7e45c4b93f3060c43544ba59a423d40cc6",
       "changedLines": 33,
-      "note": "samples/Durable.Examples 23-subagent-background with PacedModels (upstream's faux route at 50 tokens/s, token size 4) on an ExampleClock driven like Node's event loop; it restarts on its own storage (a temporary SQLite file on the memory run, as upstream; the runner's JSONL directory or SQLite file otherwise). Printed without ANSI colors, as upstream prints when stdout is not a terminal; examples.* pins upstream's Node output. v1.2.0 (work list area h): upstream's file is unchanged and still returns the tool replies as content, which v1.2.0 renamed to output, so under v1.2.0 Node prints them empty; the C# tool returns them as Output and examples.* keeps the replies (intentional difference, decision 0005) v1.5.0 (work list area tools-schema): the tool's parameters are pi-schema's obj({ action: oneOf([...]), ... }) (an enum); waits on areas checkpoint-when, observers, events and vocabulary",
+      "note": "samples/Durable.Examples 23-subagent-background with PacedModels (upstream's faux route at 50 tokens/s, token size 4) on an ExampleClock driven like Node's event loop; it restarts on its own storage (a temporary SQLite file on the memory run, as upstream; the runner's JSONL directory or SQLite file otherwise). Printed without ANSI colors, as upstream prints when stdout is not a terminal; examples.* pins upstream's Node output. v1.2.0 (work list area h): upstream's file is unchanged and still returns the tool replies as content, which v1.2.0 renamed to output, so under v1.2.0 Node prints them empty; the C# tool returns them as Output and examples.* keeps the replies (intentional difference, decision 0005) v1.5.0 (work list area tools-schema): the tool's parameters are pi-schema's obj({ action: oneOf([...]), ... }) (an enum); waits on areas observers, events and vocabulary v1.5.0 (work list area checkpoint-when): app.subagents states checkpointWhen (_, _, _) => false.",
       "portedBlobSha1": "261a4e7e45c4b93f3060c43544ba59a423d40cc6"
     },
     {
@@ -1832,13 +1826,12 @@
       "lines": 117,
       "pisharp": "samples/Durable.Examples/ExamplesAgents.cs",
       "phase": "P13",
-      "status": "needs-sync",
+      "status": "ported",
       "upstreamChange": "renamed",
       "renamedFrom": "packages/durable/test/examples/27-plan-mode.ts",
       "previousBlobSha1": "ebd6438daf8e86ca9d76d6a4b07764d2cbf7c4ce",
       "changedLines": 8,
-      "note": "samples/Durable.Examples 27-plan-mode with ScriptedModels; plan mode as an AgentChange selecting the plan extension and read+submit_plan, left with Clear patches; memory, JSONL and SQLite with reopen (the plan document read back); the system lines print as JSON (util.inspect's `removed: undefined` is dropped); examples.* pins upstream's Node output. v1.2.0 (work list area h): the tool result's content is output (ToolExecutionResult.Output since area a); its Node output under v1.2.0 is unchanged. v1.5.0 (work list area tools-schema): submit_plan's parameters are pi-schema's obj({ steps: arr(str()) }); waits on area checkpoint-when",
-      "portedBlobSha1": "ebd6438daf8e86ca9d76d6a4b07764d2cbf7c4ce"
+      "note": "samples/Durable.Examples 27-plan-mode with ScriptedModels; plan mode as an AgentChange selecting the plan extension and read+submit_plan, left with Clear patches; memory, JSONL and SQLite with reopen (the plan document read back); the system lines print as JSON (util.inspect's `removed: undefined` is dropped); examples.* pins upstream's Node output. v1.2.0 (work list area h): the tool result's content is output (ToolExecutionResult.Output since area a); its Node output under v1.2.0 is unchanged. v1.5.0 (work list area tools-schema): submit_plan's parameters are pi-schema's obj({ steps: arr(str()) }) v1.5.0 (work list area checkpoint-when): app.plan states checkpointWhen (_, _, _) => false; the output is unchanged."
     },
     {
       "upstream": "packages/durable/test/examples/27-reviewer.ts",
@@ -1860,13 +1853,12 @@
       "lines": 83,
       "pisharp": "samples/Durable.Examples/ExamplesTools.cs",
       "phase": "P13",
-      "status": "needs-sync",
+      "status": "ported",
       "upstreamChange": "renamed",
       "renamedFrom": "packages/durable/test/examples/29-sandbox-per-conversation.ts",
       "previousBlobSha1": "792e328cb4d39a3065dfa83264643eb1cfb1a414",
       "changedLines": 3,
-      "note": "samples/Durable.Examples 29-sandbox-per-conversation: the app.sandbox document chooses each conversation's LocalExecutionEnv; on memory, JSONL and SQLite with reopen; examples.* pins upstream's Node output",
-      "portedBlobSha1": "792e328cb4d39a3065dfa83264643eb1cfb1a414"
+      "note": "samples/Durable.Examples 29-sandbox-per-conversation: the app.sandbox document chooses each conversation's LocalExecutionEnv; on memory, JSONL and SQLite with reopen; examples.* pins upstream's Node output v1.5.0 (work list area checkpoint-when): app.sandbox states checkpointWhen (_, _, _) => false; the output is unchanged. The runner keeps the v1.2.0 name 29-sandbox-per-conversation, as the other renamed examples do until the close-out."
     },
     {
       "upstream": "packages/durable/test/examples/29-tool-override.ts",
@@ -2813,7 +2805,7 @@
       "upstreamChange": "modified",
       "previousBlobSha1": "ddc791187926619044dc139f0c39e1fdad7415f7",
       "changedLines": 55,
-      "note": "session.definitions.* (4 cases). The expectTypeOf/@ts-expect-error cases are compile-time overload checks (TypeChecks/ObservationTypeChecks); version 1.5 cannot be written (int); one authored case runs the typed-entry overloads",
+      "note": "session.definitions.* (4 cases). The expectTypeOf/@ts-expect-error cases are compile-time overload checks (TypeChecks/ObservationTypeChecks); version 1.5 cannot be written (int); one authored case runs the typed-entry overloads v1.5.0 (work list area checkpoint-when): every definition states checkpointWhen (_, _, _) => false, and session.definitions.requires-an-explicit-checkpoint-predicate-for-documents-and-families ports the new case (reflection for its @ts-expect-error lines); waits on area watches",
       "portedBlobSha1": "ddc791187926619044dc139f0c39e1fdad7415f7"
     },
     {
@@ -2861,7 +2853,7 @@
       "upstreamChange": "modified",
       "previousBlobSha1": "cef7c7938b6014ce901c499ae6a69fffd3d0153d",
       "changedLines": 25,
-      "note": "session.forks.* (14 cases), verbatim; v1.2.0's \"fails the Session on a rejected fork commit, which leaves no effect\" reopens through ControlledStorage.KeepOpenForReopen/Reopen (upstream's reopen() clears MemoryStorage's closed flag), on every backend",
+      "note": "session.forks.* (14 cases), verbatim; v1.2.0's \"fails the Session on a rejected fork commit, which leaves no effect\" reopens through ControlledStorage.KeepOpenForReopen/Reopen (upstream's reopen() clears MemoryStorage's closed flag), on every backend v1.5.0 (work list area checkpoint-when): every definition states checkpointWhen (_, _, _) => false; waits on area vocabulary",
       "portedBlobSha1": "cef7c7938b6014ce901c499ae6a69fffd3d0153d"
     },
     {
