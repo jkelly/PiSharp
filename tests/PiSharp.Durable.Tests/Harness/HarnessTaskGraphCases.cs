@@ -11,6 +11,9 @@
 // - An aborted controller is a DurableCancellation cancelled with Exception("cancelled"), which is what the acquisition rejects with.
 // Pi v1.5.0 sync (area watches, 92ab53602): Harness.taskGraph() is gone, so the cases observe through watchTaskGraph(), started where its
 // value must stay current; a listener takes one value call (Change(call)).
+// Pi v1.5.0 sync (area observers, 8b0caefc2): "advances with the conversation view at the publication of the one commit that changes both"
+// (v1.5.0's wording: 8b0caefc2 published inside the storage's adopt, which area publication-caches settles) observes through
+// observeConversation() and observeTaskGraph() on ControlledStorage over each backend.
 using System.Collections.Immutable;
 using PiSharp.Durable;
 using PiSharp.Durable.Chord;
@@ -428,6 +431,28 @@ internal static class TaskGraphTests
             SameGraph(last.ToJson(), rebuilt.Value, "rebuilt");
             Check(!ReferenceEquals(rebuilt.Value, last), "a new revision");
             await rebuilt.StopAsync();
+            await harness.CloseAsync(Context);
+        });
+
+        yield return Case(prefix + "advances-with-the-conversation-view-at-the-publication-of-the-one-commit-that-changes-both", async () =>
+        {
+            var storage = new ControlledStorage(await fresh());
+            var (parent, child) = GatesNever();
+            var (harness, _, _) = await OpenTasks(storage, [parent, child]);
+            var root = await harness.RootAsync(Context);
+            var seen = new SyncList<string>();
+            Observer<T> Record<T>(string name) => new((_, _) => seen.Add($"{name} adopting={storage.Adopting.ToString().ToLowerInvariant()}"), _ => { });
+            var view = await harness.ObserveConversationAsync(root.Id, Record<ConversationView>("view"), Context);
+            var graph = await harness.ObserveTaskGraphAsync(Record<TaskGraph>("graph"), Context);
+            await root.CommitAsync(async tx =>
+            {
+                await tx.AppendEntryAsync(root.Id, new EntryDraft { Kind = "note" });
+                await tx.CreateTaskAsync(parent, JsonValue.Null, new TaskOptions(TaskOwnership.Conversation));
+            }, Context);
+            // Both at the one publication, after Storage stored it, in no promised order.
+            Seq(["graph adopting=false", "view adopting=false"], seen.Snapshot().Order(StringComparer.Ordinal), "seen");
+            view.Detach();
+            graph.Detach();
             await harness.CloseAsync(Context);
         });
     }

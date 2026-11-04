@@ -17,6 +17,8 @@
 //   areas land.
 // - Pi v1.5.0 sync (area telemetry): upstream's withSignal derives through withAbortSignal(signal, context) since 2ec55d808, which keeps
 //   the context's values and telemetry span; DurableContext.WithCancel() already derives the same way, so the cases are unchanged.
+// - Pi v1.5.0 sync (area observers, 8b0caefc2): the ended-invocation watch listener records value.text, a watch's value being never null.
+//   8b0caefc2's "publication at adoption" block waits on area publication-caches, which ports the final publication order.
 using System.Collections.Concurrent;
 using PiSharp.Durable;
 using PiSharp.Durable.Chord;
@@ -540,8 +542,7 @@ internal static partial class HarnessTests
                 var watch = await runtime.WatchDocAsync(notes, ctx);
                 watch!.Start((call, _) =>
                 {
-                    var (value, _, retired) = Change(call);
-                    delivered.Add(retired ? "retired" : S(value!["text"]));
+                    delivered.Add(S(Change(call).Value["text"]));
                     return Task.CompletedTask;
                 });
                 watchClosed = watch.Closed;
