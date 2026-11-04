@@ -2,10 +2,10 @@
 //
 // Table definitions (slice 6a §5, §9; decisions "Flat columns", "Restricted names", "Index definitions are recorded"):
 // Tables.DefineTable(name, { Version, Columns, Key, Indexes }), checked and materialized once at declaration: its columns, its key, its
-// indexes, its fingerprint and the compiled row codec its writes and reads use. Area cv2-store-sql added this file because the query layer
-// compiles over a table definition; it ports table.ts except the evolution (upstream's Evolution, a version's link to the one before it
-// and the migration between them, which needs table-history.ts). Area cv2-store-tables, which owns table.ts, adds it and ports
-// table.test.ts (TableCases.cs). Upstream's TableDefinition<C, K, V> and KeyOf<C, K> carry TypeScript types of the columns, key and
+// indexes, its fingerprint and the compiled row codec its writes and reads use. A version Tables.EvolveTable appends links to the one
+// before it and to the migration between them (Evolution; TableEvolve.cs, TableHistory.cs). Area cv2-store-sql added this file without the
+// evolution, because the query layer compiles over a table definition; area cv2-store-tables, which owns table.ts, added the evolution and
+// ports table.test.ts (TableCases.cs). Upstream's TableDefinition<C, K, V> and KeyOf<C, K> carry TypeScript types of the columns, key and
 // version; the C# class is untyped, and a key is an object of the key columns (Rows.cs).
 using System.Globalization;
 using System.Text.Json.Nodes;
@@ -31,9 +31,16 @@ public sealed class TableOptions
     public OrderedDictionary<string, IReadOnlyList<string>> Indexes { get; init; } = new(StringComparer.Ordinal);
 }
 
+/// <summary>How a version came about: the version before it and the migration from there, for one <c>EvolveTable</c> (upstream
+/// <c>Evolution</c>).</summary>
+/// <param name="Previous">The version before.</param>
+/// <param name="Migration">The migration from <paramref name="Previous"/>.</param>
+internal sealed record Evolution(TableDefinition Previous, Migration Migration);
+
 public static partial class Tables
 {
-    /// <summary>Declares a table: a base version written in full, the first of its history (upstream <c>defineTable</c>).</summary>
+    /// <summary>Declares a table: a base version written in full, the first of its history; later versions come from
+    /// <see cref="EvolveTable"/>, and a new base starts a new history (upstream <c>defineTable</c>).</summary>
     public static TableDefinition DefineTable(string name, TableOptions options) => new(name, options);
 }
 
@@ -41,7 +48,7 @@ public static partial class Tables
 /// they are rendered), the fingerprint of all of it and the row codec (upstream <c>TableDefinition</c>).</summary>
 public sealed class TableDefinition
 {
-    internal TableDefinition(string name, TableOptions options)
+    internal TableDefinition(string name, TableOptions options, Evolution? evolution = null)
     {
         ContractsInternal.CheckName(name, "table");
         ArgumentNullException.ThrowIfNull(options);
@@ -69,6 +76,7 @@ public sealed class TableDefinition
         Fingerprint = StoreInternal.TableFingerprint(Record, Key, Indexes);
         Rows = new RowCodec(Columns, Key, name);
         Refs = StoreInternal.ColumnRefs(Columns);
+        Evolution = evolution;
     }
 
     /// <summary>The table's name.</summary>
@@ -77,7 +85,7 @@ public sealed class TableDefinition
     /// <summary>The table's version.</summary>
     public long Version { get; }
 
-    /// <summary>The column schemas as declared, which the next version's edits start from.</summary>
+    /// <summary>The column schemas as declared, which <c>EvolveTable</c> edits into the next version's.</summary>
     internal IReadOnlyDictionary<string, Property> ColumnSchemas { get; }
 
     /// <summary>The columns in declaration order.</summary>
@@ -103,6 +111,9 @@ public sealed class TableDefinition
 
     /// <summary>One reference per column, for the <c>t =&gt; ...</c> callbacks of queries and writes.</summary>
     public IReadOnlyDictionary<string, ColumnRef> Refs { get; }
+
+    /// <summary>The version before this one and the migration from it; null for a base.</summary>
+    internal Evolution? Evolution { get; }
 
     /// <summary>The column <paramref name="name"/>; an unknown one throws (<paramref name="what"/> names the use).</summary>
     internal Column Column(string name, string what) =>
