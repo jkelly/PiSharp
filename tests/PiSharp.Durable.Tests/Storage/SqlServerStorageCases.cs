@@ -8,6 +8,8 @@
 //   those storage-agnostic suites on a fresh store per case; the ownership and recovery suites also reopen the same store.
 // - storage.mssql.* cover what is particular to the backend: persistence across reopen, rollback of a statement failure inside a commit,
 //   corrupt rows, the store lock, store and schema isolation, deletion, schema versions, and records that SQL Server's JSON functions refuse.
+//   Schema version 2 (Pi v1.5.0 sync, area sqlite) adds the sleeping task status, as the SQLite schema's version 2 does; the migration case
+//   builds a version 1 schema with migration 1 alone and opens storage on it.
 using Microsoft.Data.SqlClient;
 using PiSharp.Durable;
 using PiSharp.Durable.Chord;
@@ -397,6 +399,55 @@ internal static partial class Program
                 new SqlServerStorageOptions { Schema = new string('s', 129) }), "long schema name");
             await ThrowsAsync<ArgumentOutOfRangeException>(() => SqlServerStorage.OpenAsync(connectionString, "store",
                 new SqlServerStorageOptions { LockTimeoutMs = -1 }), "negative lock timeout");
+        });
+
+        yield return Case("storage.mssql.migrates-a-version-1-schema-to-store-sleeping-tasks", async () =>
+        {
+            var schema = MssqlServer.NewSchema() + " o'brien]";
+            var quoted = MssqlServer.Quote(schema);
+            var database = await SqlServerDatabase.OpenAsync(await MssqlServer.ConnectionStringAsync());
+            try
+            {
+                await SqlServerMigrations.ApplyAsync(database, schema, 5_000, [SqlServerMigrations.Migrations[0]]);
+            }
+            finally
+            {
+                await database.CloseAsync();
+            }
+            Equal(1L, await MssqlServer.ScalarAsync($"SELECT version FROM {quoted}.durable_schema"), "version before the migration");
+            var insert = $"""
+                INSERT INTO {quoted}.durable_tasks (store_id, id, conversation_id, kind, status, abort_requested, background, record)
+                VALUES (999, @p0, 0, N'"test.task"', @p1, 0, 0, N'{"{}"}')
+                """;
+            await MssqlServer.ExecAsync(insert, 5L, "waiting");
+            var refused = await ThrowsAsync<SqlException>(() => MssqlServer.ExecAsync(insert, 6L, "sleeping"), "sleeping task in version 1");
+            Check(refused.Message.Contains("CHECK constraint", StringComparison.Ordinal), refused.Message);
+
+            var storage = await MssqlServer.OpenAsync(MssqlServer.NewStore(), new SqlServerStorageOptions { Schema = schema });
+            try
+            {
+                Equal(2L, await MssqlServer.ScalarAsync($"SELECT version FROM {quoted}.durable_schema"), "version after the migration");
+                Equal(1L, await MssqlServer.ScalarAsync($"SELECT count(*) FROM {quoted}.durable_tasks WHERE id = 5 AND status = N'waiting'"),
+                    "the version 1 task is kept");
+                await MssqlServer.ExecAsync(insert, 6L, "sleeping");
+                Equal(1L, await MssqlServer.ScalarAsync($"SELECT count(*) FROM {quoted}.durable_tasks WHERE id = 6 AND status = N'sleeping'"),
+                    "a sleeping task");
+                await ThrowsAsync<SqlException>(() => MssqlServer.ExecAsync(insert, 7L, "asleep"), "an unknown status");
+                // Version 1's only check on the tasks table is the status check, so one check remains: the named one.
+                Equal(1L, await MssqlServer.ScalarAsync("SELECT count(*) FROM sys.check_constraints WHERE parent_object_id = OBJECT_ID(@p0)",
+                    quoted + ".durable_tasks"), "checks on the tasks table");
+                Equal(1L, await MssqlServer.ScalarAsync("""
+                    SELECT count(*) FROM sys.check_constraints WHERE parent_object_id = OBJECT_ID(@p0) AND name = N'durable_tasks_status'
+                    """, quoted + ".durable_tasks"), "the named status check");
+                var taskId = await storage.MintIdAsync<TaskId>();
+                await storage.CommitAsync([new ConversationWrite(new ConversationRecord(ConversationId.Root)),
+                    new TaskWrite(PendingMssqlTask(taskId))], MssqlContext);
+                Equal(taskId, (await storage.GetTaskAsync(taskId, MssqlContext))?.Id, "a task committed after the migration");
+            }
+            finally
+            {
+                await storage.CloseAsync(MssqlContext);
+            }
         });
     }
 
