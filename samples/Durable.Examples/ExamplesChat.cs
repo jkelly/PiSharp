@@ -167,7 +167,7 @@ public static partial class Examples
         public Task<Result<Unit, FileError>> CreateDirAsync(string path, CreateDirOptions? options, DurableContext context) =>
             files.CreateDirAsync(path, options, context);
         public Task<Result<Unit, FileError>> RemoveAsync(string path, RemoveOptions? options, DurableContext context) => files.RemoveAsync(path, options, context);
-        public Task<Result<IFileWatcher, FileError>> WatchAsync(IReadOnlyList<WatchTarget> targets, Action<WatchChange> onChange, DurableContext context) =>
+        public Task<Result<IFileWatcher, FileError>> WatchAsync(IReadOnlyList<WatchTarget> targets, Action<FileChange> onChange, DurableContext context) =>
             files.WatchAsync(targets, onChange, context);
         public Task<Result<string, FileError>> CreateTempDirAsync(string? prefix, DurableContext context) => files.CreateTempDirAsync(prefix, context);
         public Task<Result<string, FileError>> CreateTempFileAsync(TempFileOptions? options, DurableContext context) => files.CreateTempFileAsync(options, context);

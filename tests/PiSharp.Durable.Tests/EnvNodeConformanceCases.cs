@@ -4,7 +4,7 @@ using PiSharp.Durable.Env.Local;
 using PiSharp.Durable.Testing;
 using PiSharp.Durable.Tools.Env;
 
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/test/env-node-conformance.test.ts, as env.node-conformance.<suite>.<case>.
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/test/env-node-conformance.test.ts, as env.node-conformance.<suite>.<case>.
 // The environment conformance kit registers through ConformanceRunner (upstream registerEnvConformance) on LocalExecutionEnv twice: with the
 // platform's watch mode (suite "conformance"; polling on Windows) and with polling watches every 100 ms (suite "polling"). As upstream, Windows
 // runs the kit's shell cases through Git Bash with symbolic links off (Git Bash's `ln -s` copies unless native links are enabled). The watch
@@ -46,19 +46,19 @@ internal static partial class Program
                 Check(!refused.IsOk && refused.Error.Code == FileErrorCode.Invalid, "a tree over the budget: " + refused);
 
                 (await env.RemoveAsync("tree/c", new RemoveOptions { Recursive = true }, context)).GetOrThrow();
-                var changes = new List<WatchChange>();
+                var changes = new List<FileChange>();
                 var watcher = (await env.WatchAsync([new WatchTarget("tree") { Recursive = true }], change => { lock (changes) changes.Add(change); }, context))
                     .GetOrThrow();
                 (await env.CreateDirAsync("tree/d", null, context)).GetOrThrow();
                 var deadline = Environment.TickCount64 + 3000;
                 while (Environment.TickCount64 < deadline)
                 {
-                    lock (changes) if (changes.Any(change => change is WatchErrorChange)) break;
+                    lock (changes) if (changes.Any(change => change.Kind == FileChangeKind.Failed)) break;
                     await Task.Delay(20);
                 }
-                lock (changes) Check(changes.LastOrDefault() is WatchErrorChange { Error.Code: FileErrorCode.Invalid }, "the last change is the budget error: " +
-                    string.Join(", ", changes));
-                await watcher.CloseAsync(context);
+                lock (changes) Check(changes.LastOrDefault() is FileFailedChange { Kind: FileChangeKind.Failed, Error.Code: FileErrorCode.Invalid },
+                    "the last change is the budget failure: " + string.Join(", ", changes));
+                await watcher.StopAsync(context);
             }));
 
         yield return Case("env.node-conformance.readers.reads-ranges-spanning-several-internal-chunks-exactly", () => WithEnvRoot(async cwd =>

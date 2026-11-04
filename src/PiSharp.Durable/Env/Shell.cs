@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/src/env/index.ts (the portable Shell capability and ExecutionEnv,
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/src/env/index.ts (the portable Shell capability and ExecutionEnv,
 // FileSystem & Shell). Upstream's `string | readonly string[]` command is ShellCommand, which converts implicitly from either; its
 // `onOutput(text, context, info)` callback is ShellOutputHandler; timeouts stay in seconds.
 using System.Collections.Immutable;
@@ -78,7 +78,8 @@ public sealed record ShellExecResult(int ExitCode, string? SpillPath = null);
 public sealed record ShellOutputWindow(long MaxBytes, long MaxLines, double MinIntervalMs, double BytesPerSecond);
 
 /// <summary>Output an environment omitted, measured on the decoded text the callback would have received: every U+FFFD counts as three bytes,
-/// and no sanitizing is applied (upstream <c>ShellOutputSkip</c>).</summary>
+/// and no sanitizing is applied (upstream <c>ShellOutputSkip</c>). It has the shape of Chord output's <c>OutputSkip</c>, which the output
+/// buffer accepts.</summary>
 /// <param name="Bytes">UTF-8 byte length of the omitted text.</param>
 /// <param name="Newlines">Newlines (U+000A) in the omitted text.</param>
 /// <param name="EndsWithNewline">Whether the omitted text ends with a newline.</param>

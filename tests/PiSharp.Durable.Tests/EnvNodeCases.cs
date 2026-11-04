@@ -5,7 +5,7 @@ using PiSharp.Durable.Chord;
 using PiSharp.Durable.Env;
 using PiSharp.Durable.Tools.Env;
 
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/test/env-node.test.ts, as env.node.<case>, on LocalExecutionEnv (upstream
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/test/env-node.test.ts, as env.node.<case>, on LocalExecutionEnv (upstream
 // NodeExecutionEnv). Adapted:
 // - Truncation sizes a long cannot hold (1.5, NaN, Infinity) are dropped.
 // - Spies on Node's FileHandle become LocalFileSystem's internal seams: "syncs through an opened handle" overrides SyncFile, and "rejects a
@@ -13,9 +13,9 @@ using PiSharp.Durable.Tools.Env;
 // - Commands that upstream runs through `node -e` (split UTF-8, raw bytes, large output, a detached descendant holding stdio) use the shell's
 //   printf, head and tr, so the cases need no Node; "settles after the shell exits when a detached descendant retains inherited stdio" runs on
 //   every OS (upstream: Windows only), with a background `sleep` in the command's job or process group.
-// - "uses stdin command transport for legacy WSL bash paths" needs no platform override: the WSL path pattern is recognized on every OS, so the
-//   POSIX run creates a file of that name on PATH as upstream does. On Windows that name is the real inbox launcher, so it is skipped there,
-//   as upstream skips it.
+// - "selects command transport for %s (SystemRoot=%j)" needs no platform override: legacy WSL paths are recognized on every OS, so the POSIX
+//   run creates a file of each row's name on PATH as upstream does, with the row's SystemRoot in this process's environment. On Windows those
+//   names are real launchers or missing, so the rows are skipped there, as upstream skips them.
 // - "ignores asynchronous taskkill spawn errors during abort" fakes win32 so Node's taskkill spawn fails; no taskkill exists here (jobs and
 //   process groups are killed directly), so the case keeps its observable claim: an abort reports aborted although the command's process was
 //   killed by another hand. POSIX only, as upstream ($$ is an MSYS pid under Git Bash).
@@ -363,31 +363,7 @@ internal static partial class Program
             finally { Environment.SetEnvironmentVariable(inheritedKey, previous); }
         }),
 
-        EnvCase("uses-stdin-command-transport-for-legacy-wsl-bash-paths", async (root, env) =>
-        {
-            // On Windows this path is the real inbox WSL launcher (upstream skips the case there too).
-            if (OperatingSystem.IsWindows()) return;
-            const string shellPath = "C:\\Windows\\System32\\bash.exe";
-            (await env.WriteFileAsync(shellPath, "#!/bin/sh\nprintf 'args:%s\\n' \"$*\" >&2\nexec /bin/bash \"$@\"\n", EnvContext)).GetOrThrow();
-            File.SetUnixFileMode(Path.Combine(root, shellPath), (UnixFileMode)0b111_101_101);
-            var originalCwd = Environment.CurrentDirectory;
-            var originalPath = Environment.GetEnvironmentVariable("PATH");
-            try
-            {
-                Environment.CurrentDirectory = root;
-                Environment.SetEnvironmentVariable("PATH", root + Path.PathSeparator + originalPath);
-                var wsl = new LocalExecutionEnv(new LocalExecutionEnvOptions { Cwd = root, ShellPath = shellPath });
-                var (result, output) = await CollectShellOutput(wsl, "name='World'; echo \"Hello, ${name}!\"", null, EnvContext);
-                Check(output.Contains("Hello, World!", StringComparison.Ordinal), "output: " + output);
-                Check(output.Contains("args:-s", StringComparison.Ordinal), "output: " + output);
-                Equal(0, result.GetOrThrow().ExitCode, "exit code");
-            }
-            finally
-            {
-                Environment.CurrentDirectory = originalCwd;
-                Environment.SetEnvironmentVariable("PATH", originalPath);
-            }
-        }),
+        .. LegacyWslCommandTransport(),
 
         EnvCase("settles-after-the-shell-exits-when-a-detached-descendant-retains-inherited-stdio", async (root, env) =>
         {
@@ -615,6 +591,52 @@ internal static partial class Program
             (await env.RemoveAsync("held.txt", null, EnvContext)).GetOrThrow();
         }),
     ];
+
+    /// <summary>Upstream's it.each "selects command transport for %s (SystemRoot=%j)" (#9490: legacy WSL detection must also handle a custom
+    /// Windows directory): a shell path is the legacy WSL launcher, run with <c>-s</c> and the command on standard input, only as
+    /// <c>System32\bash.exe</c> or <c>Sysnative\bash.exe</c> under SystemRoot, or under <c>&lt;drive&gt;:\Windows</c> when SystemRoot is unset;
+    /// an empty SystemRoot counts as unset. The rows' SystemRoot is set in this process's environment, which the shell discovery reads, and
+    /// restored afterwards (null: unset, as <c>vi.stubEnv(name, undefined)</c>).</summary>
+    private static IEnumerable<(string, Func<Task>)> LegacyWslCommandTransport()
+    {
+        (string Id, string ShellPath, string? SystemRoot, string ExpectedArg)[] rows =
+        [
+            ("env.node.selects-command-transport-for-c-windows-system32-bash-exe-systemroot-undefined", @"C:\Windows\System32\bash.exe", null, "-s"),
+            ("env.node.selects-command-transport-for-d-winnt-system32-bash-exe-systemroot-d-winnt", @"D:\WinNT\System32\bash.exe", @"D:\WinNT", "-s"),
+            ("env.node.selects-command-transport-for-d-winnt-sysnative-bash-exe-systemroot-d-winnt", @"D:\WinNT\Sysnative\bash.exe", @"D:\WinNT", "-s"),
+            ("env.node.selects-command-transport-for-d-winnt-system32-bash-exe-systemroot", @"D:\WinNT\System32\bash.exe", "", "-c"),
+            ("env.node.selects-command-transport-for-e-windows-system32-bash-exe-systemroot-d-winnt", @"E:\Windows\System32\bash.exe", @"D:\WinNT", "-c"),
+        ];
+        foreach (var (id, shellPath, systemRoot, expectedArg) in rows)
+            yield return Case(id, () => WithEnvRoot(async root =>
+            {
+                // On Windows these paths name real launchers or nothing (upstream skips the case there too).
+                if (OperatingSystem.IsWindows()) return;
+                var env = new LocalExecutionEnv(root);
+                (await env.WriteFileAsync(shellPath, "#!/bin/sh\nprintf 'args:%s\\n' \"$*\" >&2\nexec /bin/bash \"$@\"\n", EnvContext)).GetOrThrow();
+                File.SetUnixFileMode(Path.Combine(root, shellPath), (UnixFileMode)0b111_101_101);
+                var originalCwd = Environment.CurrentDirectory;
+                var originalPath = Environment.GetEnvironmentVariable("PATH");
+                var originalSystemRoot = Environment.GetEnvironmentVariable("SystemRoot");
+                try
+                {
+                    Environment.CurrentDirectory = root;
+                    Environment.SetEnvironmentVariable("PATH", root + Path.PathSeparator + originalPath);
+                    Environment.SetEnvironmentVariable("SystemRoot", systemRoot);
+                    var wsl = new LocalExecutionEnv(new LocalExecutionEnvOptions { Cwd = root, ShellPath = shellPath });
+                    var (result, output) = await CollectShellOutput(wsl, "name='World'; echo \"Hello, ${name}!\"", null, EnvContext);
+                    Check(output.Contains("Hello, World!", StringComparison.Ordinal), "output: " + output);
+                    Check(output.Contains("args:" + expectedArg, StringComparison.Ordinal), "output: " + output);
+                    Equal(0, result.GetOrThrow().ExitCode, "exit code");
+                }
+                finally
+                {
+                    Environment.CurrentDirectory = originalCwd;
+                    Environment.SetEnvironmentVariable("PATH", originalPath);
+                    Environment.SetEnvironmentVariable("SystemRoot", originalSystemRoot);
+                }
+            }));
+    }
 
     /// <summary>Upstream's it.each "applies string shell environment overrides when %s".</summary>
     private static IEnumerable<(string, Func<Task>)> ShellEnvironmentOverrides()
