@@ -15,6 +15,8 @@
 //   "finalizes many held siblings ..." starts counting before the leaves' commit, so its count also covers the tracking that upstream's
 //   leaves out, and first waits until every sibling holds.
 // - "tracks ownership chains deeper than the call stack" (20,000 tasks in one commit) runs on MemoryStorage only, as upstream's does.
+// Pi v1.5.0 sync (area run-failure, f3255de76): "aborts a subagent run with its parent's conversation ..." expects the child's
+// pi.live.runFailure (reason aborted) where v1.2.0 expected an empty pi.live.
 using PiSharp.Durable;
 using PiSharp.Durable.Chord;
 using PiSharp.Durable.Sqlite;
@@ -972,7 +974,10 @@ internal static partial class OwnershipTests
             Check(!string.IsNullOrEmpty(await toolWait.Task), "tool wait rejected");
             var childConversation = (await harness.ConversationAsync(child.Id!.Value, Context))!;
             await childConversation.WaitForIdleAsync(Context);
-            SameJson("{}", await harness.SnapshotAsync(Live.LiveDoc, child.Id!.Value, Context), "child live");
+            // Pi v1.5.0 (area run-failure): the child's pi.live records the abort.
+            var childLive = (await harness.SnapshotAsync(Live.LiveDoc, child.Id!.Value, Context))!;
+            Seq(["runFailure"], childLive.Keys, "child live");
+            MatchJson("""{"reason":"aborted"}""", childLive["runFailure"], "the child run's failure");
             Equal(0, (await harness.InspectAsync(Context)).Submissions.Count(record => record.ConversationId == child.Id), "child inputs");
             await harness.WaitForIdleAsync(Context);
             await harness.CloseAsync(Context);

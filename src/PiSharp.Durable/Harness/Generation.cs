@@ -17,6 +17,9 @@
 // of their own parse of the streamed argument text (PartialChanges), so a committed partial now carries a streaming tool call's parsed
 // arguments, as upstream's does. Pi v1.5.0 sync (area deferred-commits, 6c2fd73b0): partial commits are deferred (Live.ProgressCommit),
 // and so is the request phase's attempt commit unless it converts an interrupted attempt's partial (e5c6182ba, durable@1.5.0 Changed#5).
+// Pi v1.5.0 sync (area run-failure, f3255de76): a run that ends without an answer records pi.live.runFailure (Live.EndRun with a RunEnd):
+// model_error with the error text, no_model naming the missing model (its inputs' settlement keeps no detail), aborted and reset;
+// StartRunAsync removes it, except for the run afterFailedRun: continue or a reset's queued input starts in the same commit (keepFailure).
 //
 // Mappings:
 // - Checkpoints, live state and results are upstream's JSON, built in upstream's key order: prepare {phase, attempt, compacted?, overflow?},
@@ -91,8 +94,10 @@ public static partial class HarnessTasks
     }
 
     /// <summary>Starts a run for <paramref name="inputs"/>, placed input submissions: a new generation takes <c>pi.live.run</c>
-    /// (upstream <c>startRun</c>).</summary>
-    internal static async Task StartRunAsync(ITx tx, ConversationId conversationId, DraftObject live, IEnumerable<SubmissionId> inputs)
+    /// (upstream <c>startRun</c>). Removes <c>runFailure</c>, unless <paramref name="keepFailure"/>: a run started in the commit that ended
+    /// the failed one keeps its failure.</summary>
+    internal static async Task StartRunAsync(ITx tx, ConversationId conversationId, DraftObject live, IEnumerable<SubmissionId> inputs,
+        bool keepFailure = false)
     {
         var ids = inputs as IReadOnlyList<SubmissionId> ?? [.. inputs];
         inputs = ids;
@@ -101,6 +106,7 @@ public static partial class HarnessTasks
             KeyValuePair.Create("taskId", (JsonValue)taskId.ToJson()),
             KeyValuePair.Create("inputs", (JsonValue)JsonValue.Array(inputs.Select(id => (JsonValue)id.ToJson()))),
         ]));
+        if (!keepFailure) live.Delete("runFailure");
     }
 
     /// <summary>A generation owned by its conversation (upstream <c>createGeneration</c>); a run's generation is traced from its inputs'
@@ -395,7 +401,7 @@ internal static class GenerationPhases
                 var result = ToolResults.HarnessError("aborted", $"Tool {((JsonStringValue)call["name"]).Value} was aborted");
                 await ToolResults.AppendToolResultAsync(tx, conversationId, call, result, runtime.Now()).ConfigureAwait(false);
             }
-            Live.EndRun(tx, live, runtime.TaskId, SubmissionSettlement.Unanswered("aborted"));
+            Live.EndRun(tx, live, runtime.TaskId, RunEnd.Unanswered(RunFailureReason.Aborted));
             return (TaskState?)NextTaskState.Aborted();
         }, context).ConfigureAwait(false);
     }
@@ -442,11 +448,12 @@ internal static class GenerationPhases
         {
             var failure = await PrepareFailureAsync(tx, runtime).ConfigureAwait(false);
             var live = await tx.DocAsync(Live.LiveDoc, runtime.ConversationId).ConfigureAwait(false);
-            await EndFailedRunAsync(tx, runtime, live, failure, SubmissionSettlement.Unanswered("model_error", text)).ConfigureAwait(false);
+            await EndFailedRunAsync(tx, runtime, live, failure, RunEnd.Unanswered(RunFailureReason.ModelError, text)).ConfigureAwait(false);
             return (TaskState?)NextTaskState.Failed(text, Reason("model_error"));
         }, context);
 
-    /// <summary>Settles the run's inputs <c>unanswered</c> with <c>no_model</c> and fails (upstream <c>failNoModel</c>).</summary>
+    /// <summary>Settles the run's inputs <c>unanswered</c> with <c>no_model</c> and fails (upstream <c>failNoModel</c>); the run's failure
+    /// names the missing model, and the settlement stays without a detail.</summary>
     private static Task FailNoModelAsync(ITaskRuntime runtime, ModelRef? reference, DurableContext context)
     {
         var message = reference is null ? "No model is configured" : $"Model {reference.Provider}/{reference.ModelId} is not available";
@@ -454,7 +461,8 @@ internal static class GenerationPhases
         {
             var failure = await PrepareFailureAsync(tx, runtime).ConfigureAwait(false);
             var live = await tx.DocAsync(Live.LiveDoc, runtime.ConversationId).ConfigureAwait(false);
-            await EndFailedRunAsync(tx, runtime, live, failure, SubmissionSettlement.Unanswered("no_model")).ConfigureAwait(false);
+            await EndFailedRunAsync(tx, runtime, live, failure,
+                RunEnd.Unanswered(RunFailureReason.NoModel, message, SubmissionSettlement.Unanswered("no_model"))).ConfigureAwait(false);
             return (TaskState?)NextTaskState.Failed(message, Reason("no_model"));
         }, context);
     }
@@ -473,18 +481,18 @@ internal static class GenerationPhases
     }
 
     /// <summary>
-    /// Ends a failed run, settling its inputs with <paramref name="settlement"/>, and does with the inputs queued behind it what
-    /// <c>settings.afterFailedRun</c> says (upstream <c>endFailedRun</c>, spec §6): keep them, start the next run with them, or withdraw
-    /// them. A withdrawal leaves queued writes for later placement.
+    /// Ends a failed run as <paramref name="end"/> says, and does with the inputs queued behind it what <c>settings.afterFailedRun</c> says
+    /// (upstream <c>endFailedRun</c>, spec §6): keep them, start the next run with them, or withdraw them. A withdrawal leaves queued writes
+    /// for later placement. A run <c>continue</c> starts here keeps the failure, which a later run start removes.
     /// </summary>
-    private static async Task EndFailedRunAsync(ITx tx, ITaskRuntime runtime, DraftObject live, Failure failure, SubmissionSettlement settlement)
+    private static async Task EndFailedRunAsync(ITx tx, ITaskRuntime runtime, DraftObject live, Failure failure, RunEnd end)
     {
         var conversationId = runtime.ConversationId;
-        Live.EndRun(tx, live, runtime.TaskId, settlement);
+        Live.EndRun(tx, live, runtime.TaskId, end);
         if (failure.Policy == AfterFailedRun.Withdraw) await Inbox.WithdrawQueuedInputsAsync(tx, conversationId, "run_failed").ConfigureAwait(false);
         if (failure.Boundary is not { } boundary) return;
         var (users, _) = await Inbox.ApplyBoundaryAsync(tx, boundary, true, runtime.Now()).ConfigureAwait(false);
-        if (!users.IsEmpty) await HarnessTasks.StartRunAsync(tx, conversationId, live, users).ConfigureAwait(false);
+        if (!users.IsEmpty) await HarnessTasks.StartRunAsync(tx, conversationId, live, users, keepFailure: true).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -766,7 +774,7 @@ internal static class GenerationPhases
                 return (TaskState?)NextTaskState.Sleeping(checkpoint, until);
             }
             var text = Str(message, "errorMessage") ?? $"Model response ended with stop reason {stopReason ?? "undefined"}";
-            await EndFailedRunAsync(tx, runtime, live, failure, SubmissionSettlement.Unanswered("model_error", text)).ConfigureAwait(false);
+            await EndFailedRunAsync(tx, runtime, live, failure, RunEnd.Unanswered(RunFailureReason.ModelError, text)).ConfigureAwait(false);
             return (TaskState?)NextTaskState.Failed(text, Reason("model_error"));
         }, context).ConfigureAwait(false);
     }
@@ -806,7 +814,7 @@ internal static class GenerationPhases
                 live.Delete("generation");
                 return (TaskState?)result;
             }
-            Live.EndRun(tx, live, runtime.TaskId, SubmissionSettlement.Done(entry.Id));
+            Live.EndRun(tx, live, runtime.TaskId, RunEnd.Done(entry.Id));
             if (!users.IsEmpty) await HarnessTasks.StartRunAsync(tx, conversationId, live, users).ConfigureAwait(false);
             return (TaskState?)result;
         }, context).ConfigureAwait(false);
@@ -912,7 +920,7 @@ internal static class GenerationPhases
                     boundary.Head = entry.Id;
                 }
                 var (users, _) = await Inbox.ApplyBoundaryAsync(tx, boundary, true, now).ConfigureAwait(false);
-                Live.EndRun(tx, state, runtime.TaskId, SubmissionSettlement.Done(assistant));
+                Live.EndRun(tx, state, runtime.TaskId, RunEnd.Done(assistant));
                 if (!users.IsEmpty) await HarnessTasks.StartRunAsync(tx, conversationId, state, users).ConfigureAwait(false);
             }
             else
@@ -921,8 +929,8 @@ internal static class GenerationPhases
                 if (reset)
                 {
                     // The queued reset cut the run's context before an answer.
-                    Live.EndRun(tx, state, runtime.TaskId, SubmissionSettlement.Unanswered("reset"));
-                    if (!users.IsEmpty) await HarnessTasks.StartRunAsync(tx, conversationId, state, users).ConfigureAwait(false);
+                    Live.EndRun(tx, state, runtime.TaskId, RunEnd.Unanswered(RunFailureReason.Reset));
+                    if (!users.IsEmpty) await HarnessTasks.StartRunAsync(tx, conversationId, state, users, keepFailure: true).ConfigureAwait(false);
                 }
                 else
                 {

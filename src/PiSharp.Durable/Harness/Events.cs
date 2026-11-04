@@ -17,6 +17,9 @@
 // Pi v1.5.0 sync (area view, f3255de76): the view's entries are a window over the transcript, so the stream keeps the active transcript
 // its snapshots show itself: read on the line at attachment (ActiveEntriesAsync) and advanced by each publication's entries
 // (AppendActive, v1.2.0's head-marker cut). Its view observer has a one-entry window.
+// Pi v1.5.0 sync (area run-failure, f3255de76; PiSharp-only, as the stream is): the snapshot carries pi.live.runFailure, and a run_end
+// whose commit recorded the run's failure carries it as failure, so a device client shows why a run ended without an answer (decision 0008
+// keeps the frames; both fields are additive). Area events carries them into the projection that replaces this file.
 //
 // Mappings: each AgentEvent variant is a sealed record whose ToJson() is upstream's object with upstream's key order, so a JSON-mode host
 // prints what upstream prints. pi-ai messages, usage, tool slots, compaction statuses and the pi.agent / pi.usage states are wire JSON, as
@@ -58,7 +61,7 @@ public sealed record QueuedItem(SubmissionId Id, string Mode)
 
 /// <summary>
 /// The current state at attachment, or after an overflow (upstream <c>SnapshotEvent</c>): <c>{type, entries, run?, generation?, tools,
-/// nestedTools, compactions, compactionFailure?, inbox, agent, usage}</c>. Every other event applies on top of it.
+/// nestedTools, compactions, compactionFailure?, runFailure?, inbox, agent, usage}</c>. Every other event applies on top of it.
 /// </summary>
 public sealed record SnapshotEvent : AgentEvent
 {
@@ -80,6 +83,9 @@ public sealed record SnapshotEvent : AgentEvent
     /// <summary><c>pi.live.compactionFailure</c> <c>{taskId, reason, error}</c>: the newest compaction failure since a compaction last produced
     /// a summary; null when there is none.</summary>
     public JsonObjectValue? CompactionFailure { get; init; }
+    /// <summary><c>pi.live.runFailure</c> <c>{taskId, inputs, reason, detail?}</c>: why the newest run ended without an answer, until a later
+    /// run starts (PiSharp-only, Pi v1.5.0); null when there is none.</summary>
+    public JsonObjectValue? RunFailure { get; init; }
     /// <summary>The queued inbox items.</summary>
     public required ImmutableArray<QueuedItem> Inbox { get; init; }
     /// <summary><c>pi.agent</c>; <c>{}</c> when absent.</summary>
@@ -92,7 +98,7 @@ public sealed record SnapshotEvent : AgentEvent
         .Add("entries", JsonValue.Array(Entries.Select(entry => (JsonValue)entry.ToJson())))
         .Add("run", RunInputs is { } inputs ? JsonValue.Object([KeyValuePair.Create("inputs", (JsonValue)Ids(inputs))]) : null)
         .Add("generation", Generation).Add("tools", Tools).Add("nestedTools", NestedTools).Add("compactions", Compactions)
-        .Add("compactionFailure", CompactionFailure)
+        .Add("compactionFailure", CompactionFailure).Add("runFailure", RunFailure)
         .Add("inbox", JsonValue.Array(Inbox.Select(item => (JsonValue)item.ToJson()))).Add("agent", Agent).Add("usage", Usage).Build();
 }
 
@@ -105,13 +111,17 @@ public sealed record RunStartEvent(ImmutableArray<SubmissionId> Inputs) : AgentE
     public override JsonObjectValue ToJson() => Writer().Add("inputs", Ids(Inputs)).Build();
 }
 
-/// <summary><c>{type: "run_end", inputs}</c>: <c>pi.live.run</c> is removed or replaced by a successor run with another first input.</summary>
+/// <summary><c>{type: "run_end", inputs, failure?}</c>: <c>pi.live.run</c> is removed or replaced by a successor run with another first
+/// input.</summary>
 public sealed record RunEndEvent(ImmutableArray<SubmissionId> Inputs) : AgentEvent
 {
     /// <inheritdoc/>
     public override string Type => "run_end";
+    /// <summary>The run's <c>pi.live.runFailure</c> when it ended without an answer: the failure the ending commit recorded (PiSharp-only,
+    /// Pi v1.5.0); null for a run that answered.</summary>
+    public JsonObjectValue? Failure { get; init; }
     /// <inheritdoc/>
-    public override JsonObjectValue ToJson() => Writer().Add("inputs", Ids(Inputs)).Build();
+    public override JsonObjectValue ToJson() => Writer().Add("inputs", Ids(Inputs)).Add("failure", Failure).Build();
 }
 
 /// <summary><c>{type: "turn_start"}</c>: a <c>pi.generation</c> task is created and takes the run.</summary>
@@ -553,6 +563,7 @@ public static class AgentEvents
         public JsonArrayValue? NestedTools => Live.TryGetValue("nestedTools", out var nested) ? nested as JsonArrayValue : null;
         public JsonArrayValue? Compactions => Live.TryGetValue("compactions", out var compactions) ? compactions as JsonArrayValue : null;
         public JsonObjectValue? CompactionFailure => Live.TryGetValue("compactionFailure", out var failure) ? failure as JsonObjectValue : null;
+        public JsonObjectValue? RunFailure => Live.TryGetValue("runFailure", out var failure) ? failure as JsonObjectValue : null;
     }
 
     private static Parts PartsOf(ConversationView view) =>
@@ -570,6 +581,7 @@ public static class AgentEvents
             NestedTools = parts.NestedTools ?? JsonArrayValue.Empty,
             Compactions = parts.Compactions ?? JsonArrayValue.Empty,
             CompactionFailure = parts.CompactionFailure,
+            RunFailure = parts.RunFailure,
             Inbox = Queued(parts.Inbox),
             Agent = parts.Agent ?? Agents.AgentDoc.Definition.Initial(),
             Usage = parts.Usage ?? UsageLedger.UsageDoc.Definition.Initial(),
@@ -793,7 +805,12 @@ public static class AgentEvents
         var run = now.Run;
         var runBefore = was.Run;
         var runChanged = !Same(FirstInput(run), FirstInput(runBefore));
-        if (runBefore is not null && runChanged) events.Add(new RunEndEvent(Inputs(runBefore)));
+        if (runBefore is not null && runChanged)
+        {
+            // A failure this commit recorded is the ending run's: a run that started in the same commit keeps it.
+            var recorded = now.RunFailure is { } runFailure && !ReferenceEquals(runFailure, was.RunFailure) ? runFailure : null;
+            events.Add(new RunEndEvent(Inputs(runBefore)) { Failure = recorded });
+        }
 
         // Submissions, document state, then what began.
         foreach (var record in sortedSubmissions) events.Add(new SubmissionEvent(record));

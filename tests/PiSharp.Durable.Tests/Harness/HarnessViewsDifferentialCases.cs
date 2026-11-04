@@ -11,6 +11,8 @@
 // commit's entries in one splice (["p",["entries"],length,0,inserted]), where v1.2.0 spliced each entry in on its own; Splices150 joins
 // each run of consecutive entry splices of a captured frame into that one splice. The scenarios hold fewer entries than the default window
 // (50), so no frame drops entries or sets "before".
+// Pi v1.5.0 sync (area run-failure, f3255de76): and with RunFailure150.cs's: abortedRound's frame that ends the run sets
+// pi.live.runFailure before it removes run, its final view holds it, and its run_end event carries it (PiSharp's event projection).
 using PiSharp.Durable;
 using PiSharp.Durable.Chord;
 using PiSharp.Durable.Sqlite;
@@ -39,8 +41,8 @@ internal static class ViewsDifferentialTests
     private const double T = 1000;
 
     // Pi v1.5.0 (area model-requests): the capture's authored v1.5.0 form (see the file header).
-    private static readonly Lazy<JsonObjectValue> Upstream = new(() => Splices150((JsonObjectValue)ModelRequests150.Authored(JsonValue.Parse(
-        File.ReadAllText(Path.Combine(RepositoryRoot(), "tests", "PiSharp.Durable.Tests", "Fixtures", "v1.2.0", "views.upstream.json"))))));
+    private static readonly Lazy<JsonObjectValue> Upstream = new(() => RunFailure150.Views(Splices150((JsonObjectValue)ModelRequests150.Authored(JsonValue.Parse(
+        File.ReadAllText(Path.Combine(RepositoryRoot(), "tests", "PiSharp.Durable.Tests", "Fixtures", "v1.2.0", "views.upstream.json")))))));
 
     /// <summary>Pi v1.5.0 (area view): every scenario's frames with each run of consecutive entry splices joined into one (see the file
     /// header).</summary>

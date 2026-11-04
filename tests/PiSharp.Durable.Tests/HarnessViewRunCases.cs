@@ -3,8 +3,8 @@
 // operations alone. describe("a run as the conversation view shows it") is harness.view-run.a-run-as-the-conversation-view-shows-it.* and
 // describe("streamed partials") harness.view-run.streamed-partials.*, on MemoryStorage as upstream. Verbatim apart from the adaptations in
 // ChatSupport.cs, HarnessSupport.cs and SessionSupport.cs, and these:
-// - live-support.ts's viewHistory and slotsOf are ViewHistory and SlotsOf below (LiveSupport.cs is area run-failure's); pi.live states and
-//   their slots are JSON objects, a missing slot is null. followCommits and documentValues are SessionTests.ObserveCommits and
+// - live-support.ts's viewHistory and slotsOf are LiveTests.ViewHistory and SlotsOf (LiveSupport.cs, area run-failure); pi.live states
+//   and their slots are JSON objects, a missing slot is null. followCommits and documentValues are SessionTests.ObserveCommits and
 //   DocumentChanges with a value (commits as memory adopts them, upstream 6c2fd73b0's observeCommits).
 // - listen() checks each frame's operations as JSON values (JsonValue.DeepEquals) where upstream compares JSON.stringify texts; replays use
 //   DeltaApply.Apply. drained() (setTimeout(0)) is ViewTests.Drained, a Session line barrier; waitFor is Eventually. A distinct partial is
@@ -13,8 +13,8 @@
 //   does. An aborted controller is a DurableCancellation cancelled with Exception("cancelled").
 // - Not yet v1.5.0, each left to the area that ports it: a run's pi.live.run is f3255de76's { taskId, inputs } without turns and first (area
 //   live-turns); "ends a call that never runs ..." is f3255de76's form, the call not offered listed done with its result at once (v1.5.0's
-//   "ends a call that never runs through its own task, ..." lists it pending with its task, #11043: area tool-tasks); and the two runFailure
-//   checks are left out (pi.live.runFailure: area run-failure).
+//   "ends a call that never runs through its own task, ..." lists it pending with its task, #11043: area tool-tasks). Area run-failure added
+//   the two pi.live.runFailure checks.
 // - Streamed partials (#9265): the cases moved here from HarnessEventsCases.cs (area partial-commits ported them in harness-events.test.ts's
 //   form, on the event stream); here they read the view's operations, as upstream's v1.5.0 form does. Two of them pace the faux stream on
 //   commits instead of real time (CommitPaced: .NET's timers on Windows tick every 15.6 ms), and they count allocations with
@@ -26,6 +26,7 @@ using PiSharp.Durable.Chord;
 using PiSharp.Durable.Chord.Delta;
 using PiSharp.Durable.Storage;
 using static ChatTests;
+using static LiveTests;
 using static Program;
 using static SessionTests;
 
@@ -62,52 +63,6 @@ internal static class ViewRunTests
         });
         return new Listening(watch, frames, () => Volatile.Read(ref mismatches));
     }
-
-    /// <summary>Every view of a conversation from the observation on, one per commit that changes it (upstream live-support.ts's
-    /// <c>viewHistory</c>).</summary>
-    internal sealed class History
-    {
-        private readonly List<ConversationView> views = [];
-        private Observation<ConversationView>? observation;
-
-        internal void Add(ConversationView view) { lock (views) views.Add(view); }
-
-        internal void Start(Observation<ConversationView> attached)
-        {
-            observation = attached;
-            lock (views) views.Insert(0, attached.Value);
-        }
-
-        public List<ConversationView> Views { get { lock (views) return [.. views]; } }
-
-        /// <summary>The <c>pi.live</c> value of each view.</summary>
-        public List<JsonObjectValue> Live() => [.. Views.Select(LiveOf)];
-
-        public void Detach() => observation!.Detach();
-    }
-
-    /// <summary>A synchronous observer of <paramref name="conversationId"/>'s view, so no transition is skipped (upstream
-    /// <c>viewHistory</c>).</summary>
-    internal static async Task<History> ViewHistory(IHarness harness, ConversationId conversationId)
-    {
-        var history = new History();
-        history.Start(await harness.ObserveConversationAsync(conversationId, new Observer<ConversationView>((call, _) =>
-        {
-            if (call is WatchValueCall<ConversationView> value) history.Add(value.Value);
-        }, _ => { }), Context));
-        return history;
-    }
-
-    /// <summary>The slots of tool call <paramref name="callId"/>, model-issued or nested, in each <c>pi.live</c> value; null where it is
-    /// absent (upstream <c>slotsOf</c>).</summary>
-    internal static List<JsonObjectValue?> SlotsOf(IEnumerable<JsonObjectValue> history, string callId) =>
-    [
-        .. history.Select(live => new[] { "tools", "nestedTools" }
-            .SelectMany(key => live.TryGetValue(key, out var slots) && slots is JsonArrayValue array ? array.OfType<JsonObjectValue>() : [])
-            .FirstOrDefault(slot => slot.TryGetValue("callId", out var id) && id is JsonStringValue { Value: var value } && value == callId)),
-    ];
-
-    private static JsonObjectValue LiveOf(ConversationView view) => view.Doc("pi.live") as JsonObjectValue ?? JsonObjectValue.Empty;
 
     private static JsonValue? Field(JsonObjectValue? value, string key) => value is not null && value.TryGetValue(key, out var item) ? item : null;
 
@@ -403,8 +358,10 @@ internal static class ViewRunTests
             // Aborting the generation aborts its round: the tool ends with its aborted result first (spec §8.5).
             await harness.AbortTaskAsync(await RunTask(harness, root), Context);
             await submission.WaitAsync(Context);
-            // PiSharp: the submission can settle before the commit that ends the aborted tool reaches the observer, so wait for it.
+            // PiSharp: the submission can settle before the commit that ends the aborted tool reaches the observer, so wait for it, and for
+            // the commit that ends the run.
             await HarnessTests.Eventually(() => SlotsOf(history.Live(), "c2").Any(slot => Status(slot) == "done"));
+            await HarnessTests.Eventually(() => !history.Live()[^1].ContainsKey("run"));
             history.Detach();
             var states = history.Live();
             var views = history.Views;
@@ -420,7 +377,7 @@ internal static class ViewRunTests
             var waits = SlotsOf(states, "c2");
             var done = waits.FindIndex(slot => Status(slot) == "done");
             Equal((double)views[done].Entries[^1].Id.Value, N(waits[done]!["entry"]), "the aborted tool's result entry");
-            // Upstream then checks pi.live.runFailure (area run-failure).
+            MatchJson($$"""{"inputs":[{{submission.Id.Value}}],"reason":"aborted"}""", Field(states[^1], "runFailure"), "the run's failure");
             await harness.CloseAsync(Context);
         });
 
@@ -479,7 +436,7 @@ internal static class ViewRunTests
             var appended = views[ended].Entries.Skip(views[ended - 1].Entries.Length).ToList();
             Seq(["pi.assistant"], appended.Select(entry => entry.Kind), "appended");
             MatchJson("""{"role":"assistant","stopReason":"aborted"}""", appended[0].Model![0], "the aborted answer");
-            // Upstream then checks pi.live.runFailure (area run-failure).
+            MatchJson("""{"reason":"aborted"}""", Field(states[ended], "runFailure"), "the run's failure");
             await harness.CloseAsync(Context);
         });
 

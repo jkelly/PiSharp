@@ -23,6 +23,8 @@
 // Pi v1.5.0 sync (area deferred-commits): the written cases also compare with DeferredCommits150.cs's authored forms: v1.5.0 holds the
 // commits that only show progress in pi.live and stores them with the next commit that reads or writes it, or at close, so the commits
 // after a held one move down a seq, and the held changes are stored with a later commit. A resume after the run reads the moved seqs.
+// Pi v1.5.0 sync (area run-failure): the written cases also compare with RunFailure150.cs's authored forms: v1.5.0's pi.live keeps the
+// runFailure of a newest run that ended without an answer (compaction-failure's blocking turn), and PiSharp's run_end event carries it.
 // - upgrade-from-v1.1.0: a v1.2.0 Harness opens copies of the v1.1.0 sessions (Fixtures/upstream-sessions) without resuming them, and
 //   resumes the resumable ones with their scenario's model, ending with the records upstream's v1.2.0 left (its v1 pi.tool tasks migrate to
 //   version 2 when they run).
@@ -372,8 +374,10 @@ internal static partial class CompatTests
                     // thinking level each classified message records.
                     // (area deferred-commits) and DeferredCommits150's, the commits v1.5.0 holds and stores later (records only: no event,
                     // frame or observed value holds a seq).
-                    static JsonValue Authored(JsonValue capture) => ModelRequests150.Authored(ToolsSchema150.Authored(capture));
-                    static string AuthoredText(string text) => ModelRequests150.AuthoredText(ToolsSchema150.AuthoredText(text));
+                    // (area run-failure) and RunFailure150's, the runFailure a scenario's failed newest run leaves in pi.live.
+                    var runFailure = RunFailure150.For(scenario.Name);
+                    JsonValue Authored(JsonValue capture) => runFailure.Authored(ModelRequests150.Authored(ToolsSchema150.Authored(capture)));
+                    string AuthoredText(string text) => runFailure.AuthoredText(ModelRequests150.AuthoredText(ToolsSchema150.AuthoredText(text)));
                     var deferred = DeferredCommits150.For(Path.Combine(root, scenario.Name));
                     var writtenEvents = expectedEvents is null ? null : (JsonObjectValue)Authored(expectedEvents);
                     var directory = Temp($"compat-written-{scenario.Name}-{backend}");
