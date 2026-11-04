@@ -416,8 +416,9 @@
       "lines": 285,
       "pisharp": "src/PiSharp.Durable/Harness/Transcript.cs",
       "phase": "sync-1.5.0",
-      "status": "planned",
-      "upstreamChange": "added"
+      "status": "ported",
+      "upstreamChange": "added",
+      "note": "v1.5.0 (work list area view, f3255de76): ConversationTranscript (Merge, LoadEarlierAsync, FillGapAsync, Newest, Resume), EntryLoader, ConversationTranscriptOptions (PageSize, default 50) and the items ConversationTranscriptEntry, ConversationTranscriptGap and ConversationTranscriptEarlier (sealed records whose ToJson() is upstream's TranscriptItem), with ConversationTranscriptView for TranscriptView; gapOf and mergeById are private. A load in flight is shared by its callers, as upstream's promise. Experimental with the assembly (PISHARP_DURABLE001). Tests: conversation-transcript.*, conversation-transcript.loads.*, conversation-transcript.over-a-harness.*, and example 32-transcript (examples.*)"
     },
     {
       "upstream": "packages/durable/src/harness/types.ts",
@@ -464,7 +465,7 @@
       "upstreamChange": "modified",
       "previousBlobSha1": "c109c1629bd1d21204a6ff3c34f5cfcdfc43fe79",
       "changedLines": 316,
-      "note": "ConversationView is a typed immutable class (Conversation, Entries, Docs, Doc(kind/token)) whose ToJson() is upstream's {conversation, entries, docs}; frame operations address that JSON shape, and revisions share unchanged parts by reference. ConversationViews (internal; DurableHarness.Views, conversationViews is ConversationViews.Of): at most one mount per conversation, built on the Session line by its first observer and dropped with its last; advance/prefixed derive the mount's operations from each commit publication (entry splices, head-marker cuts, document ops under [\"docs\", kind], whole sets for a new incarnation or version, deletes on retirement). IConversation.ViewStateAsync (AttachedReplicatedState<ConversationView>) and WatchAsync (IWatchHandle<ConversationView>, overflow replaces with [[\"r\", view.ToJson()]]). The mount table is lock-guarded because close and detach run off the line. Tests: harness.view.* (memory, jsonl, sqlite), harness.views-differential.* (Fixtures/views.upstream.json, captured by Fixtures/capture-views.mjs: watch frames and event batches of a tool turn and an aborted round, identical on memory, JSONL and SQLite) v1.2.0: the mount table follows publications through ObserveCommits (a throw fails the Session); an observer that throws in Advance, Publication or CloseSession is reported and the others still get the revision; states report through the Harness (ReplicatedStateSourceOptions.OnError), watches report listener errors; close ends observers with session_failed when the Session failed; ClosedError carries the failure. v1.5.0 (work list area deferred-commits, 6c2fd73b0): views follow memory adoption (Session.ObserveCommits), deferred commits included. Tests: harness.deferred-progress.stores-the-held-partial-a-third-party-task-s-commit-read-with-what-it-derived, streams.an-agent-feed-shows-deferred-partials-before-they-are-stored; waits on the file's other areas v1.5.0 (work list area observers, 8b0caefc2): ConversationViews.ObserveAsync attaches a guarded Observer<ConversationView> to the mount, and WatchAsync is a watch observer on the same mount; close ends both through CloseEnds. Tests: harness.observers.*; waits on the file's other areas",
+      "note": "ConversationView is a typed immutable class (Conversation, Entries, Docs, Doc(kind/token)) whose ToJson() is upstream's {conversation, entries, docs}; frame operations address that JSON shape, and revisions share unchanged parts by reference. ConversationViews (internal; DurableHarness.Views, conversationViews is ConversationViews.Of): at most one mount per conversation, built on the Session line by its first observer and dropped with its last; advance/prefixed derive the mount's operations from each commit publication (entry splices, head-marker cuts, document ops under [\"docs\", kind], whole sets for a new incarnation or version, deletes on retirement). IConversation.ViewStateAsync (AttachedReplicatedState<ConversationView>) and WatchAsync (IWatchHandle<ConversationView>, overflow replaces with [[\"r\", view.ToJson()]]). The mount table is lock-guarded because close and detach run off the line. Tests: harness.view.* (memory, jsonl, sqlite), harness.views-differential.* (Fixtures/views.upstream.json, captured by Fixtures/capture-views.mjs: watch frames and event batches of a tool turn and an aborted round, identical on memory, JSONL and SQLite) v1.2.0: the mount table follows publications through ObserveCommits (a throw fails the Session); an observer that throws in Advance, Publication or CloseSession is reported and the others still get the revision; states report through the Harness (ReplicatedStateSourceOptions.OnError), watches report listener errors; close ends observers with session_failed when the Session failed; ClosedError carries the failure. v1.5.0 (work list area deferred-commits, 6c2fd73b0): views follow memory adoption (Session.ObserveCommits), deferred commits included. Tests: harness.deferred-progress.stores-the-held-partial-a-third-party-task-s-commit-read-with-what-it-derived, streams.an-agent-feed-shows-deferred-partials-before-they-are-stored; waits on the file's other areas v1.5.0 (work list area observers, 8b0caefc2): ConversationViews.ObserveAsync attaches a guarded Observer<ConversationView> to the mount, and WatchAsync is a watch observer on the same mount; close ends both through CloseEnds. Tests: harness.observers.*; waits on the file's other areas v1.5.0 (work list area view, f3255de76): ConversationView.Entries is a window over the fork-aware transcript (ConversationWindow: From, Min 50, Max 2*Min) with Before, the entry before it; appends are one splice, past Max the window drops its oldest with a before set; each observer and watch has its own value; more than 10,000 pending operations replace with [\"r\", value]. The active transcript stays for the CLI (ConversationContext.AppendActive). Tests: harness.view.*, harness.view.window.*, harness.view-run.*, conversation-transcript.over-a-harness.*, harness.views-differential.* (v1.2.0 captures with consecutive entry splices joined); waits on the file's other areas",
       "portedBlobSha1": "c109c1629bd1d21204a6ff3c34f5cfcdfc43fe79"
     },
     {
@@ -1386,8 +1387,9 @@
       "lines": 358,
       "pisharp": "tests/PiSharp.Durable.Tests/ConversationTranscriptCases.cs",
       "phase": "sync-1.5.0",
-      "status": "planned",
-      "upstreamChange": "added"
+      "status": "in-progress",
+      "upstreamChange": "added",
+      "note": "v1.5.0 (work list area view, f3255de76): conversation-transcript.* (9), conversation-transcript.loads.* (6, plus the PiSharp-only rejects-a-page-size-below-one) and conversation-transcript.over-a-harness.* (1) pass. Area vocabulary renames what the file names; in progress until then"
     },
     {
       "upstream": "packages/durable/test/conversation-view-bench.ts",
@@ -1395,8 +1397,9 @@
       "lines": 233,
       "pisharp": "benchmarks/PiSharp.Durable.Benchmarks/ConversationViewBench.cs",
       "phase": "sync-1.5.0",
-      "status": "planned",
-      "upstreamChange": "added"
+      "status": "in-progress",
+      "upstreamChange": "added",
+      "note": "v1.5.0 (work list area view, f3255de76): `PiSharp.Durable.Benchmarks conversation-view [sqlite|store|both]`, each scenario in its own child process, numbers in docs/durable-benchmarks.md (Conversation view); benchmarks.smoke runs six tiny scenarios on both storages. SQLite stands for upstream's openSqlite; the store column runs on StoreStorageNode's store. Areas vocabulary and store-storage change the file; in progress until then"
     },
     {
       "upstream": "packages/durable/test/document-append-bench.ts",
@@ -1893,8 +1896,9 @@
       "lines": 110,
       "pisharp": "samples/Durable.Examples/ExamplesTranscript.cs",
       "phase": "sync-1.5.0",
-      "status": "planned",
-      "upstreamChange": "added"
+      "status": "in-progress",
+      "upstreamChange": "added",
+      "note": "v1.5.0 (work list area view, f3255de76): example 32-transcript (PiSharp's examples keep their v1.2.0 numbers, and 31 is 31-reload-and-restart) prints upstream's lines; it waits for the watch to deliver where upstream waits one setTimeout(0). Tests: examples.* (ExamplesCases.cs, with its read-back on a reopened file backend). Area vocabulary renames what it names; in progress until then"
     },
     {
       "upstream": "packages/durable/test/examples/32-tests-after-edits.ts",
@@ -2086,7 +2090,7 @@
       "phase": "P10",
       "status": "removed-upstream",
       "upstreamChange": "removed",
-      "note": "harness.events.* (14 cases) on MemoryStorage, harness.events.jsonl.* and harness.events.sqlite.* (14 each). Adapted: events compare by ToJson(); drained() is a Session line barrier; waitFor is Eventually; applyChanges works on System.Text.Json nodes; tools sleep with Task.Delay in real time where upstream uses setTimeout v1.2.0: tool_execution_start carries taskId. v1.5.0 (work list area watch-folding, d8d99950a): \"delivers each of 100 pending batches in its own call, in order, unlike state watches\" is here (harness.events.*): the event stream is a NativeWatch, so it does not fold. v1.5.0 (work list area partial-commits; f715a15c1, da412b039, 1e42501bb): the \"streamed partials\" cases are harness.events.streamed-partials.* (memory only, in their harness-events.test.ts form; at v1.5.0 they are in harness-view-run.test.ts, area view). The cost and memory cases pace the faux stream on commits instead of real time (.NET timers on Windows tick every 15.6 ms) and measure with GC.GetTotalAllocatedBytes and GC.GetTotalMemory."
+      "note": "harness.events.* (14 cases) on MemoryStorage, harness.events.jsonl.* and harness.events.sqlite.* (14 each). Adapted: events compare by ToJson(); drained() is a Session line barrier; waitFor is Eventually; applyChanges works on System.Text.Json nodes; tools sleep with Task.Delay in real time where upstream uses setTimeout v1.2.0: tool_execution_start carries taskId. v1.5.0 (work list area watch-folding, d8d99950a): \"delivers each of 100 pending batches in its own call, in order, unlike state watches\" is here (harness.events.*): the event stream is a NativeWatch, so it does not fold. v1.5.0 (work list area partial-commits; f715a15c1, da412b039, 1e42501bb): the \"streamed partials\" cases are harness.view-run.streamed-partials.* (HarnessViewRunCases.cs, area view moved them where v1.5.0 has them, harness-view-run.test.ts; memory only). The cost and memory cases pace the faux stream on commits instead of real time (.NET timers on Windows tick every 15.6 ms) and measure with GC.GetTotalAllocatedBytes and GC.GetTotalMemory."
     },
     {
       "upstream": "packages/durable/test/harness-failed-run-inbox.test.ts",
@@ -2608,8 +2612,9 @@
       "lines": 619,
       "pisharp": "tests/PiSharp.Durable.Tests/HarnessViewRunCases.cs",
       "phase": "sync-1.5.0",
-      "status": "planned",
-      "upstreamChange": "added"
+      "status": "in-progress",
+      "upstreamChange": "added",
+      "note": "v1.5.0 (work list area view, f3255de76): harness.view-run.a-run-as-the-conversation-view-shows-it.* (10) and harness.view-run.streamed-partials.* (3, moved from harness.events.streamed-partials.*) pass, on MemoryStorage. Not asserted yet: the run's turns and first (area live-turns), runFailure (area run-end), and v1.5.0's form of the call that never runs (unoffered, area tool-tasks; the f3255de76 form is here); areas tools-schema and vocabulary also change the file; in progress until then"
     },
     {
       "upstream": "packages/durable/test/harness-view.test.ts",
@@ -2621,7 +2626,7 @@
       "upstreamChange": "modified",
       "previousBlobSha1": "ce05d4c2a8b82219a086f751aecf32c2eef8bed4",
       "changedLines": 383,
-      "note": "harness.view.* (14 cases) on MemoryStorage, harness.view.jsonl.* and harness.view.sqlite.* (14 each). Adapted: views compare by ToJson() (toBe is ReferenceEquals, ImmutableArray equality for entries); replay applies frame ops to ToJson(); drained() is a Session line barrier; an aborted controller is a DurableCancellation",
+      "note": "harness.view.* (14 cases) on MemoryStorage, harness.view.jsonl.* and harness.view.sqlite.* (14 each). Adapted: views compare by ToJson() (toBe is ReferenceEquals, ImmutableArray equality for entries); replay applies frame ops to ToJson(); drained() is a Session line barrier; an aborted controller is a DurableCancellation v1.5.0 (work list area view, f3255de76): the view is a window over the transcript: harness.view.* compare entries with the transcript, and harness.view.window.* cover the window (a start, From, appends past Max, before, compaction, forks and the overflow replacement); waits on the file's other areas",
       "portedBlobSha1": "ce05d4c2a8b82219a086f751aecf32c2eef8bed4"
     },
     {
