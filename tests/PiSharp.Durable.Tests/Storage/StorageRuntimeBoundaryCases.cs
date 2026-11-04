@@ -34,10 +34,17 @@ internal static partial class Program
         Case("storage.runtime-boundary.keeps-the-package-root-limited-to-portable-core-storage", () =>
         {
             var references = typeof(MemoryStorage).Assembly.GetReferencedAssemblies().Select(name => name.Name!).ToArray();
+            // Pi v1.5.0 sync (area telemetry): the core's contexts and Harness carry pi-telemetry spans. PiSharp.Telemetry is PiSharp.AI's
+            // own reference, which the core reaches through its PiSharp.AI reference, so its metadata may name PiSharp.Telemetry only
+            // while PiSharp.AI references it, and the project file still references only Contracts and AI (decision 0005, Packages).
+            var throughAi = typeof(PiSharp.AI.AiTelemetry).Assembly.GetReferencedAssemblies().Select(name => name.Name!).ToHashSet(StringComparer.Ordinal);
             foreach (var name in references)
-                Check(name is "PiSharp.Contracts" or "PiSharp.AI" or "netstandard" || name.StartsWith("System", StringComparison.Ordinal),
-                    "PiSharp.Durable references " + name);
+                Check(name is "PiSharp.Contracts" or "PiSharp.AI" or "netstandard" || name.StartsWith("System", StringComparison.Ordinal) ||
+                    name == "PiSharp.Telemetry" && throughAi.Contains(name), "PiSharp.Durable references " + name);
             var root = DurableSourceRoot();
+            var projectReferences = Regex.Matches(File.ReadAllText(Path.Combine(root, "PiSharp.Durable.csproj")), @"<ProjectReference\s+Include=""([^""]+)""")
+                .Select(match => Path.GetFileNameWithoutExtension(match.Groups[1].Value)).Order(StringComparer.Ordinal).ToArray();
+            Check(projectReferences.SequenceEqual(["PiSharp.AI", "PiSharp.Contracts"]), "PiSharp.Durable project references: " + string.Join(", ", projectReferences));
             foreach (var file in BoundaryCoreSources(root, excluded: ["Env", Path.Combine("Storage", "Jsonl"), "Testing"]))
             {
                 var source = File.ReadAllText(file);
