@@ -223,13 +223,19 @@ internal sealed class ControlledStorage(IStorage inner) : IStorage
         get { lock (gate) return Commits.Count; }
     }
 
-    public async Task<Seq> CommitAsync(IReadOnlyList<StorageWrite> writes, DurableContext context)
+    /// <summary>Records each batch and holds the call, then refuses its first batch if a failure is set (upstream v1.5.0: a refusal,
+    /// nothing stored; the Session fails with it as it did with v1.2.0's thrown failure), or commits the batches through
+    /// <see cref="Inner"/>. The batches are recorded before the hold, as v1.2.0's are, until the areas that move it land.</summary>
+    public async Task<CommitResult> CommitAsync(IReadOnlyList<IReadOnlyList<StorageWrite>> batches, Action<int, Seq> receive, DurableContext context)
     {
         Gate? held;
         lock (gate)
         {
-            AdmittedCommits.Add(writes);
-            Commits.Add([.. writes]);
+            foreach (var writes in batches)
+            {
+                AdmittedCommits.Add(writes);
+                Commits.Add([.. writes]);
+            }
             held = commitGate;
         }
         if (held is not null)
@@ -244,8 +250,8 @@ internal sealed class ControlledStorage(IStorage inner) : IStorage
             failure = commitFailure;
             commitFailure = null;
         }
-        if (failure is not null) throw failure;
-        return await Inner.CommitAsync(writes, context);
+        if (failure is not null) return new CommitResult(0, failure);
+        return await Inner.CommitAsync(batches, receive, context);
     }
 
     public Task<TId> MintIdAsync<TId>() where TId : struct, IDurableId<TId>

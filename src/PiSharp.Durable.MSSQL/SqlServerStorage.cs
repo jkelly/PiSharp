@@ -5,7 +5,10 @@
 // - A store is one named partition of a schema (SqlServerMigrations); every statement filters on its store_id.
 // - Opening a store takes a session-owned application lock that close releases, so one storage owns a store at a time (a SQLite file has
 //   no lock of its own; the CLI's session lock covers it).
-// - Commits lock the store's allocator row (UPDLOCK) first, and global ID ownership is read in one query per commit.
+// - Commits lock the store's allocator row (UPDLOCK) first, and global ID ownership is read in one query per batch.
+// - A batch commit (upstream v1.5.0's Storage.commit, as SqliteStorage ports it) is one transaction per call: each batch's checks, copy
+//   resolution included, run before it writes anything, and a check fails as a refusal only when no database call failed
+//   (SqlServerExecutor.CallFailed); XACT_ABORT rolls back every batch of the call on a database failure.
 // - Inserts that SQLite writes with INSERT OR IGNORE or ON CONFLICT DO UPDATE are IF NOT EXISTS ... INSERT and UPDATE ... IF @@ROWCOUNT = 0
 //   INSERT, which the allocator lock keeps race-free.
 using System.Collections.Immutable;
@@ -140,33 +143,62 @@ public sealed class SqlServerStorage : IStorage
         }
     }
 
-    /// <inheritdoc/>
-    public async Task<Seq> CommitAsync(IReadOnlyList<StorageWrite> writes, DurableContext context)
+    /// <summary>
+    /// Commits <paramref name="batches"/> in one transaction, each with its own seq. Each batch is checked before it writes anything, against
+    /// the state the earlier ones left, and the first one refused ends the batch: the transaction commits the ones before it. As in
+    /// SqliteStorage, the checks run before the writes, with no savepoints.
+    /// </summary>
+    public async Task<CommitResult> CommitAsync(IReadOnlyList<IReadOnlyList<StorageWrite>> batches, Action<int, Seq> receive, DurableContext context)
     {
-        ArgumentNullException.ThrowIfNull(writes);
-        foreach (var write in writes) ArgumentNullException.ThrowIfNull(write, nameof(writes));
+        StorageRules.CheckCommitArguments(batches, receive);
         long candidateNextId;
         lock (gate)
         {
             AssertOpen();
-            candidateNextId = CandidateNextId(writes);
+            candidateNextId = nextId;
         }
-        var documentActions = StorageRules.PrepareDocumentActions(writes);
-        var seq = await db.TransactionAsync(async transaction =>
+        var seqs = new List<Seq>();
+        Exception? refused = null;
+        await db.TransactionAsync(async transaction =>
         {
             var metadata = await transaction.GetAsync(Sql("SELECT next_id, next_seq FROM {schema}.durable_stores WITH (UPDLOCK, HOLDLOCK) WHERE store_id = @p0"),
                 storeId).ConfigureAwait(false) ?? throw new InvalidOperationException("Durable SQL Server store metadata is missing");
-            var committedSeq = Ids.SeqFromNumber(metadata.GetInt64("next_seq"));
-            await CheckGlobalIds(transaction, writes).ConfigureAwait(false);
-            await CheckDocumentActions(transaction, documentActions).ConfigureAwait(false);
-            foreach (var write in writes) await ApplyTableWrite(transaction, write, committedSeq).ConfigureAwait(false);
-            await ApplyDocumentActions(transaction, documentActions, committedSeq).ConfigureAwait(false);
-            await transaction.RunAsync(Sql("UPDATE {schema}.durable_stores SET next_id = @p1, next_seq = @p2 WHERE store_id = @p0"),
-                storeId, Math.Max(metadata.GetInt64("next_id"), candidateNextId), committedSeq.Value + 1).ConfigureAwait(false);
-            return committedSeq;
+            var next = metadata.GetInt64("next_seq");
+            foreach (var writes in batches)
+            {
+                OrderedDictionary<long, DocumentBatchAction> documentActions;
+                // Only Durable's own checks refuse a batch, before it wrote anything: the ones before it stand. A failure of the database
+                // rejects the call, and rolls back the batches before it with the transaction.
+                transaction.CallFailed = false;
+                try
+                {
+                    documentActions = StorageRules.PrepareDocumentActions(writes);
+                    await CheckGlobalIds(transaction, writes).ConfigureAwait(false);
+                    await CheckDocumentActions(transaction, documentActions).ConfigureAwait(false);
+                    await ResolveCopies(transaction, documentActions).ConfigureAwait(false);
+                }
+                catch (Exception error) when (!transaction.CallFailed)
+                {
+                    refused = error;
+                    break;
+                }
+                var seq = Ids.SeqFromNumber(next++);
+                foreach (var write in writes) await ApplyTableWrite(transaction, write, seq).ConfigureAwait(false);
+                await ApplyDocumentActions(transaction, documentActions, seq).ConfigureAwait(false);
+                seqs.Add(seq);
+                candidateNextId = StorageRules.CandidateNextId(candidateNextId, writes);
+            }
+            if (seqs.Count > 0)
+            {
+                await transaction.RunAsync(Sql("UPDATE {schema}.durable_stores SET next_id = @p1, next_seq = @p2 WHERE store_id = @p0"),
+                    storeId, Math.Max(metadata.GetInt64("next_id"), candidateNextId), next).ConfigureAwait(false);
+            }
+            return true;
         }).ConfigureAwait(false);
         lock (gate) nextId = Math.Max(nextId, candidateNextId);
-        return seq;
+        // COMMIT returned: the stored batches are durable.
+        for (var index = 0; index < seqs.Count; index++) receive(index, seqs[index]);
+        return new CommitResult(seqs.Count, refused);
     }
 
     /// <inheritdoc/>
@@ -543,16 +575,6 @@ public sealed class SqlServerStorage : IStorage
         return new StoredDocument(record, baseVersion, value, tail.Count);
     }
 
-    private long CandidateNextId(IReadOnlyList<StorageWrite> writes)
-    {
-        var candidate = nextId;
-        foreach (var write in writes)
-        {
-            if (StorageRules.Claim(write) is { } claim) candidate = Math.Max(candidate, claim.Id + 1);
-        }
-        return candidate;
-    }
-
     private async Task CheckGlobalIds(SqlServerExecutor executor, IReadOnlyList<StorageWrite> writes)
     {
         var owners = new Dictionary<long, StorageTable?>();
@@ -645,22 +667,29 @@ public sealed class SqlServerStorage : IStorage
         }
     }
 
+    /// <summary>Resolves each copy to a base of its source's state before this batch, which may not change the source.</summary>
+    private async Task ResolveCopies(SqlServerExecutor executor, OrderedDictionary<long, DocumentBatchAction> actions)
+    {
+        foreach (var (id, action) in actions)
+        {
+            if (action.Copy is not { } copy) continue;
+            try
+            {
+                var stored = await MaterializeDocument(executor, copy.Id, copy.At).ConfigureAwait(false) ??
+                    throw new InvalidOperationException($"Fork source document {copy.Id} cannot be read");
+                StorageRules.CheckCopySource(stored, action.Create!);
+                action.Content = DocumentContent.Base(stored.Version, stored.Value);
+            }
+            catch (Exception error) { throw new InvalidOperationException($"Document copy {id} was rejected", error); }
+        }
+    }
+
     private async Task ApplyDocumentActions(SqlServerExecutor executor, OrderedDictionary<long, DocumentBatchAction> actions, Seq seq)
     {
         foreach (var (id, action) in actions)
         {
+            // Copies are resolved to their content by ResolveCopies.
             var content = action.Content;
-            if (action.Copy is { } copy)
-            {
-                try
-                {
-                    var stored = await MaterializeDocument(executor, copy.Id, copy.At).ConfigureAwait(false) ??
-                        throw new InvalidOperationException($"Fork source document {copy.Id} cannot be read");
-                    StorageRules.CheckCopySource(stored, action.Create!);
-                    content = DocumentContent.Base(stored.Version, stored.Value);
-                }
-                catch (Exception error) { throw new InvalidOperationException($"Document copy {id} was rejected", error); }
-            }
             DocumentRecord record;
             if (action.Create is not null)
             {

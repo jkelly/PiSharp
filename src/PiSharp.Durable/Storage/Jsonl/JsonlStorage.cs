@@ -1,13 +1,14 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/src/storage/jsonl/storage.ts (and its index.ts exports).
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/src/storage/jsonl/storage.ts (and its index.ts exports).
 //
 // Invalid read requests (an unknown conversation, a malformed or foreign cursor, history a document does not keep) are the in-memory
 // store's StorageRequestExceptions; upstream's own StorageRequestError, "Storage.entry() requires an entry ID", has no counterpart, since
 // the C# overloads of GetEntryAsync are typed. Every other exception, file failures included, fails the owning Session.
 //
 // Portable JSONL storage over IFileSystem (spec §11.3). The directory holds main.jsonl, with one commit marker line per commit, and
-// sidecars doc-<id>.jsonl (one document incarnation's bases and deltas) and task-<id>.jsonl (live task replacements). A commit appends
-// complete records to every affected sidecar, optionally flushes them, appends one marker to main.jsonl and only then publishes in memory;
-// an uncertain append failure poisons the open storage. Opening removes torn final lines, ignores and truncates unconfirmed sidecar tails,
+// sidecars doc-<id>.jsonl (one document incarnation's bases and deltas) and task-<id>.jsonl (live task replacements). A batch commit applies
+// each batch in memory as it is checked, appends the batches' complete records to every affected sidecar, optionally flushes them, then
+// appends their markers to main.jsonl in one write; reads wait until the appends are done, and any failure once a batch applied poisons the
+// open storage. Opening removes torn final lines, ignores and truncates unconfirmed sidecar tails,
 // replays confirmed records, and reclaims sidecar records that a later latest base, retirement or terminal task made unnecessary.
 // main.jsonl is never compacted. Lines are byte-for-byte what upstream writes: the same file names, key orders and JSON text, so Pi and
 // PiSharp open each other's directories. This file uses no local runtime API; JsonlStorage.Local.cs adds the local-file-system opener.
@@ -59,6 +60,9 @@ public sealed partial class JsonlStorage : IStorage
     private readonly HashSet<long> liveTaskSidecars = [];
     private bool closed;
     private JsonlStoragePoisonedException? poisonError;
+    private readonly Lock readGate = new();
+    /// <summary>Completes once the batches being appended are; they are in memory already (<see cref="CommitAsync"/>).</summary>
+    private Task? writing;
 
     private JsonlStorage(IFileSystem fs, string directory, string mainPath, JsonlStorageOptions options)
     {
@@ -85,16 +89,78 @@ public sealed partial class JsonlStorage : IStorage
         return storage;
     }
 
-    /// <inheritdoc/>
-    public async Task<Seq> CommitAsync(IReadOnlyList<StorageWrite> writes, DurableContext context)
+    /// <summary>
+    /// Commits <paramref name="batches"/> with one append per affected file: every batch's sidecar records first, then their markers in one
+    /// write of main.jsonl. Each batch is checked against the state the earlier ones left, so memory applies each one as it passes, and reads
+    /// wait until the appends are done; the first batch refused ends the batch. A torn append of the markers recovers a shorter complete
+    /// prefix; any failure once a batch applied poisons the storage.
+    /// </summary>
+    public async Task<CommitResult> CommitAsync(IReadOnlyList<IReadOnlyList<StorageWrite>> batches, Action<int, Seq> receive, DurableContext context)
     {
-        ArgumentNullException.ThrowIfNull(writes);
+        StorageRules.CheckCommitArguments(batches, receive);
         AssertUsable();
-        var prepared = memory.PrepareCommit(writes);
-        var encoded = EncodeCommit(prepared.Seq, prepared.Writes, writes);
-        var reclamations = PlanReclamations(prepared.Writes, encoded);
+        var seqs = new List<Seq>();
+        var encoded = new List<EncodedCommit>();
+        var reclamations = new OrderedDictionary<string, string>(StringComparer.Ordinal);
+        Exception? refused = null;
+        var writing = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        lock (readGate) this.writing = writing.Task;
+        try
+        {
+            foreach (var writes in batches)
+            {
+                PreparedMemoryCommit prepared;
+                try
+                {
+                    prepared = memory.PrepareCommit(writes);
+                }
+                catch (Exception error)
+                {
+                    refused = error;
+                    break;
+                }
+                var commit = EncodeCommit(prepared.Seq, prepared.Writes, writes);
+                // A sidecar an earlier batch replaces keeps what the later ones append, unless they replace it again.
+                foreach (var (file, content) in commit.Sidecars)
+                    if (reclamations.TryGetValue(file, out var replacement)) reclamations[file] = replacement + content;
+                foreach (var (file, content) in PlanReclamations(prepared.Writes, commit)) reclamations[file] = content;
+                seqs.Add(prepared.Apply());
+                AdoptSidecarState(prepared.Writes);
+                encoded.Add(commit);
+            }
+            if (encoded.Count > 0) await AppendAsync(encoded, context);
+        }
+        catch (Exception error)
+        {
+            // Memory runs ahead of the file: once a batch applied, any failure poisons the storage before the reads waiting on the append
+            // go on, so none of them returns what is not stored.
+            if (seqs.Count == 0) throw;
+            throw Poison(error);
+        }
+        finally
+        {
+            lock (readGate) if (this.writing == writing.Task) this.writing = null;
+            writing.SetResult();
+        }
+        // The markers are appended: the batches are durable. Reclaiming sidecars comes after the receipts.
+        for (var index = 0; index < seqs.Count; index++) receive(index, seqs[index]);
+        await ReclaimSidecarsAsync(reclamations, context);
+        return new CommitResult(seqs.Count, refused);
+    }
+
+    /// <summary>Appends the sidecar records of <paramref name="commits"/>, flushed when <see cref="JsonlStorageOptions.Fsync"/> is set, then
+    /// their markers in one write of main.jsonl.</summary>
+    private async Task AppendAsync(List<EncodedCommit> commits, DurableContext context)
+    {
+        var contents = new OrderedDictionary<string, string>(StringComparer.Ordinal);
+        foreach (var commit in commits)
+            foreach (var (file, content) in commit.Sidecars) contents[file] = contents.GetValueOrDefault(file, "") + content;
+        var resolving = new List<Task<string>>();
+        foreach (var (file, _) in contents) resolving.Add(ResolveFileAsync(file, context));
+        var paths = await Task.WhenAll(resolving);
         var sidecars = new List<(string File, byte[] Content, string Path)>();
-        foreach (var (file, content) in encoded.Sidecars) sidecars.Add((file, Utf8.GetBytes(content), await ResolveFileAsync(file, context)));
+        var at = 0;
+        foreach (var (file, content) in contents) sidecars.Add((file, Utf8.GetBytes(content), paths[at++]));
 
         foreach (var sidecar in sidecars)
         {
@@ -109,12 +175,9 @@ public sealed partial class JsonlStorage : IStorage
                 if (!result.IsOk) throw Poison(ErrorFromFile($"flush of {sidecar.File}", result.Error));
             }
         }
-        var marker = await fs.AppendFileAsync(mainPath, Utf8.GetBytes(encoded.Marker), context);
+        var markers = commits.Count == 1 ? commits[0].Marker : string.Concat(commits.Select(commit => commit.Marker));
+        var marker = await fs.AppendFileAsync(mainPath, Utf8.GetBytes(markers), context);
         if (!marker.IsOk) throw Poison(ErrorFromFile($"append to {MainFile}", marker.Error));
-        var seq = prepared.Apply();
-        AdoptSidecarState(prepared.Writes);
-        await ReclaimSidecarsAsync(reclamations, context);
-        return seq;
     }
 
     /// <inheritdoc/>
@@ -122,57 +185,57 @@ public sealed partial class JsonlStorage : IStorage
 
     /// <inheritdoc/>
     public Task<ConversationRecord?> GetConversationAsync(ConversationId id, DurableContext context) =>
-        Store(store => store.GetConversationAsync(id, context));
+        Readable(store => store.GetConversationAsync(id, context));
 
     /// <inheritdoc/>
     public Task<Page<ConversationRecord>> ScanConversationsAsync(ConversationQuery query, int limit, JsonObjectValue? cursor, DurableContext context) =>
-        Store(store => store.ScanConversationsAsync(query, limit, cursor, context));
+        Readable(store => store.ScanConversationsAsync(query, limit, cursor, context));
 
     /// <inheritdoc/>
-    public Task<CommittedEntry?> GetEntryAsync(EntryId id, DurableContext context) => Store(store => store.GetEntryAsync(id, context));
+    public Task<CommittedEntry?> GetEntryAsync(EntryId id, DurableContext context) => Readable(store => store.GetEntryAsync(id, context));
 
     /// <inheritdoc/>
     public Task<CommittedEntry?> GetEntryAsync(ConversationId conversationId, EntryId id, DurableContext context) =>
-        Store(store => store.GetEntryAsync(conversationId, id, context));
+        Readable(store => store.GetEntryAsync(conversationId, id, context));
 
     /// <inheritdoc/>
     public Task<EntryRecord?> FindLatestHeadMarkerAsync(ConversationId conversationId, EntryId? atOrBeforeEntryId, DurableContext context) =>
-        Store(store => store.FindLatestHeadMarkerAsync(conversationId, atOrBeforeEntryId, context));
+        Readable(store => store.FindLatestHeadMarkerAsync(conversationId, atOrBeforeEntryId, context));
 
     /// <inheritdoc/>
     public Task<Page<EntryRecord>> ScanEntriesAsync(EntryQuery query, int limit, JsonObjectValue? cursor, DurableContext context) =>
-        Store(store => store.ScanEntriesAsync(query, limit, cursor, context));
+        Readable(store => store.ScanEntriesAsync(query, limit, cursor, context));
 
     /// <inheritdoc/>
-    public Task<TaskRecord?> GetTaskAsync(TaskId id, DurableContext context) => Store(store => store.GetTaskAsync(id, context));
+    public Task<TaskRecord?> GetTaskAsync(TaskId id, DurableContext context) => Readable(store => store.GetTaskAsync(id, context));
 
     /// <inheritdoc/>
     public Task<Page<TaskRecord>> ScanTasksAsync(TaskQuery query, int limit, JsonObjectValue? cursor, DurableContext context) =>
-        Store(store => store.ScanTasksAsync(query, limit, cursor, context));
+        Readable(store => store.ScanTasksAsync(query, limit, cursor, context));
 
     /// <inheritdoc/>
     public Task<SubmissionRecord?> GetSubmissionAsync(SubmissionId id, DurableContext context) =>
-        Store(store => store.GetSubmissionAsync(id, context));
+        Readable(store => store.GetSubmissionAsync(id, context));
 
     /// <inheritdoc/>
     public Task<Page<SubmissionRecord>> ScanSubmissionsAsync(SubmissionQuery query, int limit, JsonObjectValue? cursor, DurableContext context) =>
-        Store(store => store.ScanSubmissionsAsync(query, limit, cursor, context));
+        Readable(store => store.ScanSubmissionsAsync(query, limit, cursor, context));
 
     /// <inheritdoc/>
     public Task<SubmissionRecord?> GetSubmissionByRequestAsync(ConversationId conversationId, string requestId, DurableContext context) =>
-        Store(store => store.GetSubmissionByRequestAsync(conversationId, requestId, context));
+        Readable(store => store.GetSubmissionByRequestAsync(conversationId, requestId, context));
 
     /// <inheritdoc/>
     public Task<DocumentRecord?> FindDocumentAsync(DocumentAddress address, DocumentPoint at, DurableContext context) =>
-        Store(store => store.FindDocumentAsync(address, at, context));
+        Readable(store => store.FindDocumentAsync(address, at, context));
 
     /// <inheritdoc/>
     public Task<StoredDocument?> GetDocumentAsync(DocumentId id, DocumentPoint at, DurableContext context) =>
-        Store(store => store.GetDocumentAsync(id, at, context));
+        Readable(store => store.GetDocumentAsync(id, at, context));
 
     /// <inheritdoc/>
     public Task<Page<DocumentRecord>> ScanDocumentsAsync(DocumentQuery query, int limit, JsonObjectValue? cursor, DurableContext context) =>
-        Store(store => store.ScanDocumentsAsync(query, limit, cursor, context));
+        Readable(store => store.ScanDocumentsAsync(query, limit, cursor, context));
 
     /// <inheritdoc/>
     public async Task CloseAsync(DurableContext context)
@@ -576,6 +639,26 @@ public sealed partial class JsonlStorage : IStorage
         try { AssertUsable(); }
         catch (Exception error) { return Task.FromException<T>(error); }
         return read(memory);
+    }
+
+    /// <summary>Reads once no batch is being appended: memory runs ahead of the file while one is (upstream <c>readable()</c>). Memory
+    /// reads complete synchronously under its lock, so a read that starts while nothing is appending finishes before a commit applies a
+    /// batch.</summary>
+    private Task<T> Readable<T>(Func<MemoryStorage, Task<T>> read)
+    {
+        Task? pending;
+        lock (readGate)
+        {
+            pending = writing;
+            if (pending is null) return Store(read);
+        }
+        return ReadAfterAsync(pending, read);
+    }
+
+    private async Task<T> ReadAfterAsync<T>(Task pending, Func<MemoryStorage, Task<T>> read)
+    {
+        await pending.ConfigureAwait(false);
+        return await Readable(read).ConfigureAwait(false);
     }
 
     private JsonlStoragePoisonedException Poison(Exception cause) => poisonError ??= new JsonlStoragePoisonedException(cause);

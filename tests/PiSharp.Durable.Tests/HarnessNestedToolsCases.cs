@@ -27,6 +27,7 @@ using static Program;
 using static SessionTests;
 using static OwnershipTests;
 using Deferred = HarnessTests.Deferred;
+using PiSharp.Durable.Testing;
 
 internal static partial class Program
 {
@@ -111,11 +112,11 @@ internal static class NestedToolsTests
     {
         public SyncList<(string Kind, string? Key)> Created { get; } = new();
 
-        public override Task<Seq> CommitAsync(IReadOnlyList<StorageWrite> writes, DurableContext context)
+        public override Task<CommitResult> CommitAsync(IReadOnlyList<IReadOnlyList<StorageWrite>> batches, Action<int, Seq> receive, DurableContext context)
         {
-            foreach (var write in writes)
+            foreach (var write in batches.SelectMany(writes => writes))
                 if (write is DocumentCreateWrite create) Created.Add((create.Record.Kind, create.Record.Key));
-            return base.CommitAsync(writes, context);
+            return base.CommitAsync(batches, receive, context);
         }
     }
 
@@ -1185,7 +1186,7 @@ internal static class NestedToolsTests
             RunningTaskState => new RunningTaskState(checkpoint),
             var other => throw new InvalidOperationException($"unexpected state {other.Status}"),
         };
-        await storage.CommitAsync([new TaskWrite(record with { Version = 1, Input = input.Remove("kind"), State = state })], Context);
+        await storage.CommitWritesAsync([new TaskWrite(record with { Version = 1, Input = input.Remove("kind"), State = state })], Context);
         await storage.CloseAsync(Context);
         return (path, id);
     }

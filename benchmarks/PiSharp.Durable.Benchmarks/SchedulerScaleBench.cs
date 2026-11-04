@@ -138,10 +138,10 @@ public static class SchedulerScaleBench
 
         public int Commits => Volatile.Read(ref commits);
 
-        public Task<Seq> CommitAsync(IReadOnlyList<StorageWrite> writes, DurableContext context)
+        public Task<CommitResult> CommitAsync(IReadOnlyList<IReadOnlyList<StorageWrite>> batches, Action<int, Seq> receive, DurableContext context)
         {
-            Interlocked.Increment(ref commits);
-            return inner.CommitAsync(writes, context);
+            Interlocked.Add(ref commits, batches.Count);
+            return inner.CommitAsync(batches, receive, context);
         }
 
         public Task<TId> MintIdAsync<TId>() where TId : struct, IDurableId<TId> => inner.MintIdAsync<TId>();

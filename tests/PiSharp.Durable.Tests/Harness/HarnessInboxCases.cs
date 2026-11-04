@@ -940,9 +940,9 @@ internal static class InboxTests
         }
         public SyncList<string> Written { get; } = new();
 
-        public Task<Seq> CommitAsync(IReadOnlyList<StorageWrite> writes, DurableContext context)
+        public Task<CommitResult> CommitAsync(IReadOnlyList<IReadOnlyList<StorageWrite>> batches, Action<int, Seq> receive, DurableContext context)
         {
-            foreach (var write in writes)
+            foreach (var write in batches.SelectMany(writes => writes))
             {
                 if (write is not DocumentChangeWrite change || change.Id != InboxId) continue;
                 Written.Add(change.Content switch
@@ -952,7 +952,7 @@ internal static class InboxTests
                     _ => "delta",
                 });
             }
-            return inner.CommitAsync(writes, context);
+            return inner.CommitAsync(batches, receive, context);
         }
 
         public Task<TId> MintIdAsync<TId>() where TId : struct, IDurableId<TId> => inner.MintIdAsync<TId>();

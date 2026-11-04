@@ -76,22 +76,22 @@ internal sealed class CrashStorage(IStorage inner, Func<IReadOnlyList<StorageWri
     /// <summary>What a failing batch throws.</summary>
     public static IOException Failure(string checkpoint) => new($"crash: injected storage failure at {checkpoint}");
 
-    public async Task<Seq> CommitAsync(IReadOnlyList<StorageWrite> writes, DurableContext context)
+    public async Task<CommitResult> CommitAsync(IReadOnlyList<IReadOnlyList<StorageWrite>> batches, Action<int, Seq> receive, DurableContext context)
     {
-        var hit = Volatile.Read(ref fired) == 0 && matches(writes) && Interlocked.Exchange(ref fired, 1) == 0;
+        var hit = Volatile.Read(ref fired) == 0 && batches.Any(matches) && Interlocked.Exchange(ref fired, 1) == 0;
         if (hit && fail) throw Failure(checkpoint);
         if (hit && !after)
         {
             CrashGate.Emit("CHECKPOINT " + checkpoint);
             await CrashGate.Never();
         }
-        var seq = await inner.CommitAsync(writes, context);
+        var result = await inner.CommitAsync(batches, receive, context);
         if (hit)
         {
             CrashGate.Emit("CHECKPOINT " + checkpoint);
             await CrashGate.Never();
         }
-        return seq;
+        return result;
     }
 
     public Task<TId> MintIdAsync<TId>() where TId : struct, IDurableId<TId> => inner.MintIdAsync<TId>();

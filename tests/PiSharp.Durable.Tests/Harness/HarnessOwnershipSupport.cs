@@ -236,13 +236,14 @@ internal sealed class MarkFailingStorage(IStorage inner) : IStorage
         set => Interlocked.Exchange(ref fail, value?.Value ?? -1);
     }
 
-    public Task<Seq> CommitAsync(IReadOnlyList<StorageWrite> writes, DurableContext context)
+    public Task<CommitResult> CommitAsync(IReadOnlyList<IReadOnlyList<StorageWrite>> batches, Action<int, Seq> receive, DurableContext context)
     {
         var target = Fail;
-        var marks = target is { } id && writes.Any(write => write is TaskWrite task && task.Value.Id == id && task.Value.AbortRequested);
+        var marks = target is { } id &&
+            batches.SelectMany(writes => writes).Any(write => write is TaskWrite task && task.Value.Id == id && task.Value.AbortRequested);
         if (marks && Interlocked.CompareExchange(ref fail, -1, target!.Value.Value) == target.Value.Value)
-            return Task.FromException<Seq>(Failure);
-        return inner.CommitAsync(writes, context);
+            return Task.FromException<CommitResult>(Failure);
+        return inner.CommitAsync(batches, receive, context);
     }
 
     public Task<TId> MintIdAsync<TId>() where TId : struct, IDurableId<TId> => inner.MintIdAsync<TId>();

@@ -380,10 +380,10 @@ public static class ToolOutputBench
     /// <summary>Measures every storage commit (upstream <c>timed()</c>, a Proxy over <c>commit</c>).</summary>
     private sealed class TimedStorage(IStorage inner, List<double> latencies) : IStorage
     {
-        public async Task<Seq> CommitAsync(IReadOnlyList<StorageWrite> writes, DurableContext context)
+        public async Task<CommitResult> CommitAsync(IReadOnlyList<IReadOnlyList<StorageWrite>> batches, Action<int, Seq> receive, DurableContext context)
         {
             var started = Stopwatch.GetTimestamp();
-            try { return await inner.CommitAsync(writes, context); }
+            try { return await inner.CommitAsync(batches, receive, context); }
             finally { var elapsed = Stopwatch.GetElapsedTime(started).TotalMilliseconds; lock (latencies) latencies.Add(elapsed); }
         }
         public Task<TId> MintIdAsync<TId>() where TId : struct, IDurableId<TId> => inner.MintIdAsync<TId>();

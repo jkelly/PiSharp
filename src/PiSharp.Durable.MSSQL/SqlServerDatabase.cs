@@ -85,40 +85,77 @@ internal sealed class SqlServerExecutor
 
     internal bool Active { get; set; } = true;
 
+    /// <summary>Whether a call of this handle failed since the flag was last reset. SqlServerStorage's batch commit resets it before each
+    /// batch's checks: a failing check is then the database's, an unknown outcome, rather than one of Durable's own refusals (the watched
+    /// executor of SQLite storage, upstream <c>watchCalls</c>).</summary>
+    internal bool CallFailed { get; set; }
+
     /// <summary>Runs one batch, which may hold several statements, with positional bindings @p0, @p1, ...: null, <see cref="long"/>,
     /// <see cref="int"/>, <see cref="bool"/> or <see cref="string"/>.</summary>
     public async Task RunAsync(string sql, params object?[] parameters)
     {
-        await using var command = Command(sql, parameters);
-        await command.ExecuteNonQueryAsync().ConfigureAwait(false);
+        try
+        {
+            await using var command = Command(sql, parameters);
+            await command.ExecuteNonQueryAsync().ConfigureAwait(false);
+        }
+        catch
+        {
+            CallFailed = true;
+            throw;
+        }
     }
 
     /// <summary>Runs one batch and returns the first row of its first result set, or null when it returns none.</summary>
     public async Task<SqlServerRow?> GetAsync(string sql, params object?[] parameters)
     {
-        await using var command = Command(sql, parameters);
-        await using var reader = await command.ExecuteReaderAsync(CommandBehavior.SingleResult).ConfigureAwait(false);
-        return await reader.ReadAsync().ConfigureAwait(false) ? ReadRow(reader) : null;
+        try
+        {
+            await using var command = Command(sql, parameters);
+            await using var reader = await command.ExecuteReaderAsync(CommandBehavior.SingleResult).ConfigureAwait(false);
+            return await reader.ReadAsync().ConfigureAwait(false) ? ReadRow(reader) : null;
+        }
+        catch
+        {
+            CallFailed = true;
+            throw;
+        }
     }
 
     /// <summary><see cref="GetAsync"/> with a command timeout of <paramref name="timeoutSeconds"/> instead of the connection's, for a batch
     /// that waits on the server for longer (a lock wait).</summary>
     public async Task<SqlServerRow?> GetWaitingAsync(int timeoutSeconds, string sql, params object?[] parameters)
     {
-        await using var command = Command(sql, parameters);
-        command.CommandTimeout = timeoutSeconds;
-        await using var reader = await command.ExecuteReaderAsync(CommandBehavior.SingleResult).ConfigureAwait(false);
-        return await reader.ReadAsync().ConfigureAwait(false) ? ReadRow(reader) : null;
+        try
+        {
+            await using var command = Command(sql, parameters);
+            command.CommandTimeout = timeoutSeconds;
+            await using var reader = await command.ExecuteReaderAsync(CommandBehavior.SingleResult).ConfigureAwait(false);
+            return await reader.ReadAsync().ConfigureAwait(false) ? ReadRow(reader) : null;
+        }
+        catch
+        {
+            CallFailed = true;
+            throw;
+        }
     }
 
     /// <summary>Runs one batch and returns every row of its first result set.</summary>
     public async Task<IReadOnlyList<SqlServerRow>> AllAsync(string sql, params object?[] parameters)
     {
-        await using var command = Command(sql, parameters);
-        await using var reader = await command.ExecuteReaderAsync(CommandBehavior.SingleResult).ConfigureAwait(false);
-        var rows = new List<SqlServerRow>();
-        while (await reader.ReadAsync().ConfigureAwait(false)) rows.Add(ReadRow(reader));
-        return rows;
+        try
+        {
+            await using var command = Command(sql, parameters);
+            await using var reader = await command.ExecuteReaderAsync(CommandBehavior.SingleResult).ConfigureAwait(false);
+            var rows = new List<SqlServerRow>();
+            while (await reader.ReadAsync().ConfigureAwait(false)) rows.Add(ReadRow(reader));
+            return rows;
+        }
+        catch
+        {
+            CallFailed = true;
+            throw;
+        }
     }
 
     private SqlCommand Command(string sql, object?[] parameters)

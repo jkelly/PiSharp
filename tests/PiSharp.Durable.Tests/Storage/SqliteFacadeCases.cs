@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/test/sqlite-facade.test.ts, against SqliteConnectionDatabase (the
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/test/sqlite-facade.test.ts, against SqliteConnectionDatabase (the
 // node:sqlite adapter's counterpart). Upstream observes microtask timing with `await Promise.resolve()`; these cases use explicit gates and
 // check that the queued task has not completed. Adapted: upstream counts prepare() calls by subclassing DatabaseSync; here the adapter
 // counts the statements it prepares (SqliteConnectionDatabase.PrepareCounts).
@@ -9,11 +9,12 @@
 // connection already began, COMMIT on a deferred foreign key violation, and ROLLBACK after the callback committed. Not ported: upstream's
 // re-export identity case (the C# types are the same types, with no re-export) and the 256-statement cache case (row
 // chord.sqlite-statement-cache, phase 6). The authored chord.sqlite.node.counts-no-rows-that-triggers-change pins that trigger writes do
-// not count. The citation stays on v1.2.0 until area storage-batches moves these cases to v1.5.0's commitWrites.
+// not count. The storage commits go through v1.5.0's commitWrites (CommitWritesAsync, area storage-batches).
 using Microsoft.Data.Sqlite;
 using PiSharp.Durable;
 using PiSharp.Durable.Chord;
 using PiSharp.Durable.Sqlite;
+using PiSharp.Durable.Testing;
 
 internal static partial class Program
 {
@@ -23,15 +24,15 @@ internal static partial class Program
         {
             var connection = await SqliteConnectionDatabase.OpenAsync(":memory:");
             var storage = await SqliteStorage.OpenAsync(connection);
-            await storage.CommitAsync([new ConversationWrite(new(ConversationId.Root))], SqliteContext);
-            await storage.CommitAsync([.. Enumerable.Range(0, 100).Select(index =>
+            await storage.CommitWritesAsync([new ConversationWrite(new(ConversationId.Root))], SqliteContext);
+            await storage.CommitWritesAsync([.. Enumerable.Range(0, 100).Select(index =>
                 (StorageWrite)new EntryWrite(new() { Id = new EntryId(index + 2), ConversationId = ConversationId.Root, Kind = "cached" }))], SqliteContext);
-            await storage.CommitAsync([new EntryWrite(new() { Id = new EntryId(102), ConversationId = ConversationId.Root, Kind = "cached-again" })],
+            await storage.CommitWritesAsync([new EntryWrite(new() { Id = new EntryId(102), ConversationId = ConversationId.Root, Kind = "cached-again" })],
                 SqliteContext);
             Equal("cached", (await storage.GetEntryAsync(new EntryId(2), SqliteContext))?.Entry.Kind, "first entry");
             Equal("cached-again", (await storage.GetEntryAsync(new EntryId(102), SqliteContext))?.Entry.Kind, "last entry");
             Equal("ID 1 already belongs to conversation", (await ThrowsAsync<InvalidOperationException>(
-                () => storage.CommitAsync([new ConversationWrite(new(ConversationId.Root))], SqliteContext), "duplicate root")).Message, "message");
+                () => storage.CommitWritesAsync([new ConversationWrite(new(ConversationId.Root))], SqliteContext), "duplicate root")).Message, "message");
             Equal("cached", (await storage.GetEntryAsync(new EntryId(2), SqliteContext))?.Entry.Kind, "entry after the rejection");
             var repeated = connection.PrepareCounts.Where(pair => pair.Value > 1).Select(pair => pair.Key).ToArray();
             Check(repeated.Length == 0, "statements prepared more than once: " + string.Join(" | ", repeated));
@@ -105,7 +106,7 @@ internal static partial class Program
         yield return Case("storage.sqlite.facade.reads-storage-commits-in-call-order", async () =>
         {
             var storage = await SqliteStorage.OpenAsync(await SqliteConnectionDatabase.OpenAsync(":memory:"));
-            var commit = storage.CommitAsync([new ConversationWrite(new(ConversationId.Root))], SqliteContext);
+            var commit = storage.CommitWritesAsync([new ConversationWrite(new(ConversationId.Root))], SqliteContext);
             var read = storage.GetConversationAsync(ConversationId.Root, SqliteContext);
             await commit;
             Equal(new ConversationRecord(ConversationId.Root), await read, "read queued after the commit");
@@ -162,7 +163,7 @@ internal static partial class Program
         {
             var storage = await SqliteStorage.OpenAsync(await SqliteConnectionDatabase.OpenAsync(":memory:"));
             var entryId = new EntryId(2);
-            await storage.CommitAsync([new ConversationWrite(new(ConversationId.Root)),
+            await storage.CommitWritesAsync([new ConversationWrite(new(ConversationId.Root)),
                 new EntryWrite(new() { Id = entryId, ConversationId = ConversationId.Root, Kind = "probe" })], SqliteContext);
             var scan = storage.ScanEntriesAsync(new EntryQuery(ConversationId.Root), 10, null, SqliteContext);
             var entry = storage.GetEntryAsync(ConversationId.Root, entryId, SqliteContext);
@@ -354,7 +355,7 @@ internal static partial class Program
             var storage = await opening;
 
             database.ControlNextSettlement(SettlementMode.Delay);
-            var committing = storage.CommitAsync([new EntryWrite(new() { Id = new EntryId(100), ConversationId = ConversationId.Root, Kind = "settled" })],
+            var committing = storage.CommitWritesAsync([new EntryWrite(new() { Id = new EntryId(100), ConversationId = ConversationId.Root, Kind = "settled" })],
                 SqliteContext);
             await Task.Delay(20);
             Check(!committing.IsCompleted, "the commit waits for its settlement");
@@ -364,7 +365,7 @@ internal static partial class Program
             Equal(101L, (await storage.MintIdAsync<EntryId>()).Value, "minting after settlement");
 
             database.ControlNextSettlement(SettlementMode.Reject);
-            var rejected = storage.CommitAsync([new EntryWrite(new() { Id = new EntryId(200), ConversationId = ConversationId.Root, Kind = "rejected" })],
+            var rejected = storage.CommitWritesAsync([new EntryWrite(new() { Id = new EntryId(200), ConversationId = ConversationId.Root, Kind = "rejected" })],
                 SqliteContext);
             Equal(102L, (await storage.MintIdAsync<EntryId>()).Value, "minting before the rejection");
             database.Settle();
@@ -381,11 +382,11 @@ internal static partial class Program
             for (var yields = 0; yields < 16; yields++)
             {
                 var storage = await SqliteStorage.OpenAsync(await SqliteConnectionDatabase.OpenAsync(":memory:"));
-                await storage.CommitAsync([new DocumentCreateWrite(new DocumentCreate { Id = id, Kind = "replaced", Scope = DocumentScope.Session },
+                await storage.CommitWritesAsync([new DocumentCreateWrite(new DocumentCreate { Id = id, Kind = "replaced", Scope = DocumentScope.Session },
                     DocumentContent.Base(1, (JsonObjectValue)J("{\"value\":1}")))], SqliteContext);
                 var read = storage.GetDocumentAsync(id, DocumentPoint.Current, SqliteContext);
                 for (var index = 0; index < yields; index++) await Task.Yield();
-                var replace = storage.CommitAsync([new DocumentChangeWrite(id, DocumentContent.Base(1, (JsonObjectValue)J("{\"value\":2}")))], SqliteContext);
+                var replace = storage.CommitWritesAsync([new DocumentChangeWrite(id, DocumentContent.Base(1, (JsonObjectValue)J("{\"value\":2}")))], SqliteContext);
                 await Task.WhenAll(read, replace);
                 var value = (await read)?.Value;
                 Check(value is not null && (JsonValue.DeepEquals(J("{\"value\":1}"), value) || JsonValue.DeepEquals(J("{\"value\":2}"), value)),

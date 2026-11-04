@@ -1,7 +1,7 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/test/sqlite-migrations.test.ts. Pi v1.5.0
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/test/sqlite-migrations.test.ts. Pi v1.5.0
 // (f9a26365568127461c47a07a37dcb42c140a3ac5): its version 1 to 2 migration case, and packages/chord/test/sqlite/migrations.test.ts (Chord's
 // generic runner, as chord.sqlite.migrations.*, with rolls-initial-bootstrap-and-every-pending-migration-back-together, which v1.5.0 moved
-// there). The citation stays on v1.2.0 until area storage-batches moves the retry case to v1.5.0's commitWrites.
+// there). The retry case commits through v1.5.0's commitWrites (CommitWritesAsync, area storage-batches).
 // The storage.sqlite.migrations.*-schema-* and contiguous-version cases are authored: the schema text must stay upstream's verbatim (the
 // hashes were computed from upstream v1.5.0's createSqliteMigrations and Chord's applySqliteMigrations source text, with the table and
 // index names of schema.ts substituted; no upstream code ran), a newly created file must hold exactly upstream's tables and indexes, and a
@@ -12,6 +12,7 @@ using System.Text;
 using Microsoft.Data.Sqlite;
 using PiSharp.Durable;
 using PiSharp.Durable.Sqlite;
+using PiSharp.Durable.Testing;
 
 internal static partial class Program
 {
@@ -165,7 +166,7 @@ internal static partial class Program
             await using var temp = new SqliteTemp();
             var path = temp.NewPath();
             var storage = await SqliteStorage.OpenAsync(path);
-            await storage.CommitAsync([new ConversationWrite(new(ConversationId.Root)), new EntryWrite(new()
+            await storage.CommitWritesAsync([new ConversationWrite(new(ConversationId.Root)), new EntryWrite(new()
             {
                 Id = Ids.FromNumber<EntryId>(2), ConversationId = ConversationId.Root, Kind = "retained", Data = J("{\"retained\":true}"),
             })], SqliteContext);
