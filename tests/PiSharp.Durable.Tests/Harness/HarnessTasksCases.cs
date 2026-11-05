@@ -36,11 +36,12 @@
 //   here it is on the thread pool, so the case waits for it before it counts the task documents its end drops (a busy runner read 1).
 // - PiSharp's own case, no upstream counterpart: "stores a host listener's own commit before the reconcile commit while a busy pool holds
 //   the scheduler's work" is the case above with the interleaving a loaded runner gave it on SQL Server. Two holds: HeldPool, set as the
-//   scheduler's Dispatch, keeps every piece of work the scheduler hands the thread pool from the parent's `completing` commit on, and
-//   ControlledStorage.HoldCommits holds the child's terminal commit in its storage call; the pool's work then runs (HeldPool.Release), and
-//   the commit lands. Upstream enqueues the reconcile pass the `completing` commit asks for in a microtask, before anything the test does
-//   next; a pass that reaches the line only while the child's terminal commit is stored waits at its gate ahead of the host listener's
-//   commit, and stores the parent's terminal record first.
+//   scheduler's Dispatch, keeps every piece of work the scheduler hands the thread pool from just before the parent's `completing` commit
+//   on, and ControlledStorage.HoldCommits holds the child's terminal commit in its storage call; the pool's work then runs
+//   (HeldPool.Release), and the commit lands. The case waits for the scheduler to quiesce before it sets the hold, so no pass is pending
+//   then, and asks for an idle wait right after, whose reconcile pass a busy pool would keep pending with the `completing` commit's request.
+//   Upstream enqueues a pass in a microtask, before anything the test does next; a pass that reaches the line only while the child's
+//   terminal commit is stored waits at its gate ahead of the host listener's commit, and stores the parent's terminal record first.
 using System.Collections.Concurrent;
 using PiSharp.Durable;
 using PiSharp.Durable.Chord;
@@ -1729,9 +1730,14 @@ internal static partial class HarnessTests
             harness.Resume();
             var childId = await created.Task;
             await Eventually(async () => (await harness.GetTaskAsync(childId, Context))?.State.Status == DurableTaskStatus.Running);
-            // From the parent's `completing` commit on, the pool starts nothing the scheduler hands it.
+            // No pass is pending, so none the pool started on its own takes the requests below.
+            var scheduler = ((DurableHarness)harness).Scheduler;
+            await scheduler.QuiesceAsync();
+            // From here on, the pool starts nothing the scheduler hands it. An idle wait asks for a reconcile pass outside a publication,
+            // so the pass is pending when the parent's `completing` commit asks for one.
             var pool = new HeldPool();
-            ((DurableHarness)harness).Scheduler.Dispatch = pool.Post;
+            scheduler.Dispatch = pool.Post;
+            var idle = harness.WaitForIdleAsync(Context);
             finish.Resolve();
             await Eventually(async () => (await harness.GetTaskAsync(parentId, Context))?.State.Status == DurableTaskStatus.Completing);
             await InvocationEnded(harness, parentId);
@@ -1749,6 +1755,7 @@ internal static partial class HarnessTests
             pool.Release();
             storing.Release();
             await harness.WaitForTaskAsync(parentId, Context);
+            await idle;
             await harness.CloseAsync(Context);
             var kinds = controlled.Commits.Skip(before).Select(writes =>
             {
