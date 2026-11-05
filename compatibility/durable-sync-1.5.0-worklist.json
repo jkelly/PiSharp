@@ -4132,7 +4132,8 @@
       "commits": [
         "38ff99177",
         "65fba65b2",
-        "7e15f9601"
+        "7e15f9601",
+        "c261eeb2"
       ],
       "notes": "IHookApi has no entry reads and ITaskRuntime no ranged one (TypesTasks.cs); after-run-tasks needs them (run.first, answer, last) and submit-in-commit (area admission). Generation.cs ends the run on terminate or handoff (v1.2.0); terminate is unchanged and plan mode's exit tool uses terminate, so no PiSharp-only handoff user changes. Upstream's example 32 (tests after edits) is a ready demo. Custom agent workflows (decision 0012) and recurring job runs (decision 0009) implement their own after-run steps as tasks; record whether they move to afterRun."
     },

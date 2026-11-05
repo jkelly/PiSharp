@@ -56,11 +56,11 @@
     "changelogBullets": 477,
     "repeatedBullets": 23,
     "byStatus": {
-      "ported": 216,
-      "ported-with-deferral": 23,
+      "ported": 220,
+      "ported-with-deferral": 22,
       "already-ported": 12,
       "no-op": 25,
-      "port": 50
+      "port": 47
     },
     "byArea": {
       "ai": 58,
@@ -9980,7 +9980,7 @@
       "id": "durable.turn-limit",
       "area": "durable",
       "phase": 4,
-      "status": "ported-with-deferral",
+      "status": "ported",
       "changelog": [
         "durable@1.5.0/Breaking Changes#32",
         "durable@1.5.0/Breaking Changes#33",
@@ -10009,7 +10009,8 @@
       "notes": "No turn limit in PiSharp. Depends on durable.run-failure, durable.after-failed-run and durable.live-compaction-trigger (pi.live version 2; the migrate chain to version 3 lands once). PiSharp-only: custom agent subagents and workflows (decision 0012) bound their own loops and could set maxTurns; the device host's agent settings could expose it.",
       "evidence": {
         "commits": [
-          "e45e2a9e"
+          "e45e2a9e",
+          "c261eeb2"
         ],
         "tests": [
           "tests/PiSharp.Durable.Tests/HarnessTurnLimitCases.cs: ends-a-run-after-the-tool-round-that-reaches-the-limit-like-a-failure",
@@ -10031,8 +10032,7 @@
           "tests/PiSharp.Durable.Tests/Harness/HarnessViewsDifferentialCases.cs: tool-turn",
           "tests/PiSharp.Durable.Tests/Compat/CompatScenarios.cs: tool-interrupted"
         ]
-      },
-      "deferred": "Upstream's \"lets terminate settle done at the limit, and writes a handoff's reset before ending\" expects the handoff's run to end turn_limit, because v1.5.0 continues a run after a handoff (area run-end, 38ff99177). PiSharp still ends a run done at a handoff (Pi v1.2.0), ahead of the limit, so harness.turn-limit.lets-terminate-settle-done-at-the-limit-and-writes-a-handoff-s-reset-before-ending asserts done for the handoff half; area run-end flips it to turn_limit and moves harness-turn-limit.test.ts to ported. LiveRun's first and afterRun are run-end's too."
+      }
     },
     {
       "id": "durable.when-idle-reject",
@@ -10140,7 +10140,7 @@
       "id": "durable.entry-reads",
       "area": "durable",
       "phase": 4,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "durable@1.5.0/Added#13"
       ],
@@ -10162,13 +10162,25 @@
         "src/PiSharp.Durable/TypesTasks.cs"
       ],
       "release": "1.5.0",
-      "notes": "PiSharp's ITaskRuntime has EntryAsync and ContextAsync (TypesTasks.cs:85-91) and IConversation has EntriesAsync (Harness/Types.cs:1020), but IHookApi has no entry reads and ITaskRuntime no ranged one. durable.after-run-tasks depends on it (run.first, answer, last)."
+      "notes": "PiSharp's ITaskRuntime has EntryAsync and ContextAsync (TypesTasks.cs:85-91) and IConversation has EntriesAsync (Harness/Types.cs:1020), but IHookApi has no entry reads and ITaskRuntime no ranged one. durable.after-run-tasks depends on it (run.first, answer, last).",
+      "evidence": {
+        "commits": [
+          "c261eeb2"
+        ],
+        "tests": [
+          "tests/PiSharp.Durable.Tests/HarnessHookReadsCases.cs: reads-raw-history-and-single-entries-from-a-hook",
+          "tests/PiSharp.Durable.Tests/HarnessHookReadsCases.cs: pages-a-task-s-conversation-history-by-entry-id-range",
+          "tests/PiSharp.Durable.Tests/HarnessAfterRunCases.cs: lets-a-hook-read-the-run-s-history-tool-results-included",
+          "tests/PiSharp.Durable.Tests/HarnessAfterRunCases.cs: lets-a-hook-read-the-run-s-history-after-a-compaction-summarized-the-start-of-the-run",
+          "tests/PiSharp.Durable.Tests/HarnessAfterRunCases.cs: starts-a-continue-s-history-at-its-first-tool-round-when-nothing-failed-and-nothing-was-placed"
+        ]
+      }
     },
     {
       "id": "durable.after-run-tasks",
       "area": "durable",
       "phase": 4,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "durable@1.5.0/Added#14"
       ],
@@ -10199,13 +10211,55 @@
         "samples/Durable.Examples/ (new)"
       ],
       "release": "1.5.0",
-      "notes": "No counterpart. Depends on durable.entry-reads, durable.submit-in-commit and durable.run-failure. Upstream's example 32 (tests after edits) is a ready demo. PiSharp-only: custom agent workflows (decision 0012) and recurring job runs (decision 0009) implement their own after-run steps as tasks; record whether they move to afterRun."
+      "notes": "No counterpart. Depends on durable.entry-reads, durable.submit-in-commit and durable.run-failure. Upstream's example 32 (tests after edits) is a ready demo. PiSharp-only: custom agent workflows (decision 0012) and recurring job runs (decision 0009) implement their own after-run steps as tasks; record whether they move to afterRun.",
+      "evidence": {
+        "commits": [
+          "c261eeb2"
+        ],
+        "tests": [
+          "tests/PiSharp.Durable.Tests/HarnessAfterRunCases.cs: waits-for-the-tasks-an-answer-s-hooks-ask-for-inputs-done-at-the-answer-the-run-busy-until-they-end",
+          "tests/PiSharp.Durable.Tests/HarnessAfterRunCases.cs: asks-after-a-terminate-round-the-run-s-last-entry-its-newest-result-or-its-handoff-s-reset",
+          "tests/PiSharp.Durable.Tests/HarnessAfterRunCases.cs: ends-the-run-in-one-commit-without-an-afterrun-hook-and-after-the-hook-when-it-asks-for-nothing",
+          "tests/PiSharp.Durable.Tests/HarnessAfterRunCases.cs: queues-input-during-the-tasks-and-places-it-after-them-writes-first-then-steers-and-follow-ups",
+          "tests/PiSharp.Durable.Tests/HarnessAfterRunCases.cs: places-a-reset-queued-during-the-tasks-after-them",
+          "tests/PiSharp.Durable.Tests/HarnessAfterRunCases.cs: asks-once-a-run-really-ends-not-while-onyield-continues-it-and-when-a-queued-steer-drops-the-continuation",
+          "tests/PiSharp.Durable.Tests/HarnessAfterRunCases.cs: asks-the-hooks-again-after-a-crash-before-the-tasks-exist-and-never-once-they-do",
+          "tests/PiSharp.Durable.Tests/HarnessAfterRunCases.cs: ends-an-answered-run-without-a-failure-when-stop-comes-while-the-hooks-run-or-the-tasks-run",
+          "tests/PiSharp.Durable.Tests/HarnessAfterRunCases.cs: ends-the-run-normally-when-one-of-its-tasks-is-aborted-on-its-own",
+          "tests/PiSharp.Durable.Tests/HarnessAfterRunCases.cs: reports-broken-requests-and-hooks-and-creates-the-rest",
+          "tests/PiSharp.Durable.Tests/HarnessAfterRunCases.cs: creates-a-requested-task-from-the-installed-definition-calling-its-initial-once-off-the-line",
+          "tests/PiSharp.Durable.Tests/HarnessAfterRunCases.cs: lets-a-hook-read-the-run-s-history-tool-results-included",
+          "tests/PiSharp.Durable.Tests/HarnessAfterRunCases.cs: lets-a-hook-read-the-run-s-history-after-a-compaction-summarized-the-start-of-the-run",
+          "tests/PiSharp.Durable.Tests/HarnessAfterRunCases.cs: ends-an-answered-run-completed-without-a-failure-once-finish-was-cut-off-restartlimit-times",
+          "tests/PiSharp.Durable.Tests/HarnessAfterRunCases.cs: keeps-the-run-busy-while-an-after-run-task-cannot-run-until-stop-orphans-it",
+          "tests/PiSharp.Durable.Tests/HarnessAfterRunCases.cs: starts-a-fix-run-with-a-follow-up-a-task-admits-after-the-tasks",
+          "tests/PiSharp.Durable.Tests/HarnessAfterRunCases.cs: gives-a-continue-after-a-failed-run-the-failed-run-s-history",
+          "tests/PiSharp.Durable.Tests/HarnessAfterRunCases.cs: ends-the-run-without-asking-when-the-hooks-are-deselected-before-finish-runs",
+          "tests/PiSharp.Durable.Tests/HarnessAfterRunCases.cs: starts-a-fork-of-a-conversation-running-its-after-run-tasks-idle",
+          "tests/PiSharp.Durable.Tests/HarnessAfterRunCases.cs: gives-a-run-without-a-recorded-first-entry-its-answer-as-first",
+          "tests/PiSharp.Durable.Tests/HarnessAfterRunCases.cs: ends-the-run-normally-when-its-after-run-task-is-cut-off-restartlimit-times",
+          "tests/PiSharp.Durable.Tests/HarnessAfterRunCases.cs: reports-no-task-interrupted-for-a-task-that-ends-normally-after-the-limit-was-lowered",
+          "tests/PiSharp.Durable.Tests/HarnessAfterRunCases.cs: reports-no-task-interrupted-for-a-generation-that-ends-normally-after-the-limit-was-lowered-in-finish",
+          "tests/PiSharp.Durable.Tests/HarnessAfterRunCases.cs: asks-after-a-terminate-round-at-the-turn-limit-terminate-wins",
+          "tests/PiSharp.Durable.Tests/HarnessAfterRunCases.cs: starts-a-continue-s-history-at-its-first-tool-round-when-nothing-failed-and-nothing-was-placed",
+          "tests/PiSharp.Durable.Tests/HarnessAfterRunCases.cs: leaves-a-summary-queued-during-the-tasks-stale-behind-a-terminate-round-s-handoff",
+          "tests/PiSharp.Durable.Tests/HarnessAfterRunCases.cs: stores-the-answer-s-held-progress-with-commit-a-and-asks-again-after-an-orderly-close-in-finish",
+          "tests/PiSharp.Durable.Tests/HarnessAfterRunCases.cs: end-run.leaves-a-run-it-does-not-own-alone-and-ends-an-answered-run-without-a-failure",
+          "tests/PiSharp.Durable.Tests/HarnessAfterRunCases.cs: end-run.copies-a-failed-run-s-first-entry-into-runfailure",
+          "tests/PiSharp.Durable.Tests/StoreStorageNode.cs: harness.after-run.store.",
+          "tests/PiSharp.Durable.Tests/ExamplesCases.cs: 33-tests-after-edits",
+          "tests/PiSharp.Durable.Tests/ExamplesCases.cs: examples.memory.upstream-output",
+          "tests/PiSharp.Durable.Tests/HarnessRunFailureCases.cs: records-a-model-error-with-its-text-and-a-later-run-clears-it",
+          "tests/PiSharp.Durable.Tests/HarnessRunFailureCases.cs: records-an-abort",
+          "tests/PiSharp.Durable.Tests/HarnessViewRunCases.cs: streams-the-answer-as-operations-that-rebuild-every-committed-partial-then-appends-it"
+        ]
+      }
     },
     {
       "id": "durable.handoff-continues-run",
       "area": "durable",
       "phase": 4,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "durable@1.5.0/Fixed#1"
       ],
@@ -10223,7 +10277,23 @@
         "tests/PiSharp.Durable.Tests/Harness/HarnessInboxCases.cs"
       ],
       "release": "1.5.0",
-      "notes": "Generation.cs:735 ends the run on terminate or handoff (v1.2.0). Plan mode's exit tool (Durable.Tools PlanMode/ExitPlanModeTool.cs) uses terminate, which is unchanged; no PiSharp-only handoff user was found."
+      "notes": "Generation.cs:735 ends the run on terminate or handoff (v1.2.0). Plan mode's exit tool (Durable.Tools PlanMode/ExitPlanModeTool.cs) uses terminate, which is unchanged; no PiSharp-only handoff user was found.",
+      "evidence": {
+        "commits": [
+          "c261eeb2"
+        ],
+        "tests": [
+          "tests/PiSharp.Durable.Tests/Harness/HarnessInboxCases.cs: continues-the-run-in-a-new-context-when-a-tool-requests-a-handoff",
+          "tests/PiSharp.Durable.Tests/Harness/HarnessInboxCases.cs: places-queued-writes-and-steers-after-the-handoff-text-and-adds-the-steers-to-the-continuing-run",
+          "tests/PiSharp.Durable.Tests/Harness/HarnessInboxCases.cs: holds-a-follow-up-queued-across-a-handoff-until-the-continuing-run-s-final-boundary",
+          "tests/PiSharp.Durable.Tests/Harness/HarnessInboxCases.cs: ends-a-handed-off-run-at-a-queued-reset-and-runs-earlier-follow-ups-after-it",
+          "tests/PiSharp.Durable.Tests/Harness/HarnessInboxCases.cs: hands-off-again-in-a-later-round-of-the-same-run",
+          "tests/PiSharp.Durable.Tests/Harness/HarnessInboxCases.cs: ends-the-run-after-the-handoff-when-the-round-also-terminates",
+          "tests/PiSharp.Durable.Tests/Harness/HarnessInboxCases.cs: writes-only-the-last-handoff-in-call-order-and-runs-queued-follow-ups-after-the-continuing-run",
+          "tests/PiSharp.Durable.Tests/HarnessTurnLimitCases.cs: lets-terminate-settle-done-at-the-limit-and-writes-a-handoff-s-reset-before-ending",
+          "tests/PiSharp.Durable.Tests/HarnessAfterRunCases.cs: asks-after-a-terminate-round-the-run-s-last-entry-its-newest-result-or-its-handoff-s-reset"
+        ]
+      }
     },
     {
       "id": "durable.unoffered-tool-calls",
