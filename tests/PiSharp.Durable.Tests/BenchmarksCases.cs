@@ -10,9 +10,9 @@ using PiSharp.Durable.Testing;
 // This smoke case runs each of them at a tiny size so they cannot rot: one sample per storage scenario on every backend (each scenario's
 // result is checked before it is timed), the footprint worker on every backend in-process, a short rate round closed mid-round and
 // replayed, a firehose, a repetitive firehose, a bash cat of 1 MiB, 20 document appends of each kind, three conversations at each
-// document retention, three subagent cycles under a live parent, a fan-out of four child tasks and a chain of five, four nested calls, two
-// tiny nested-tools scenarios, the four nested-images variants of two images, the four code mode rows of three echo calls, and a 2,000
-// character partial-commits answer (PartialCommitsBench.cs, Pi v1.5.0 sync area partial-commits), and every conversation-view scenario
+// document retention, three subagent cycles under a live parent, a fan-out of four child tasks, a chain of five and the 128 one-tool runs
+// over two kept conversations (area scheduler-idle), four nested calls, two tiny nested-tools scenarios, the four nested-images variants
+// of two images, the four code mode rows of three echo calls, and a 2,000 character partial-commits answer (PartialCommitsBench.cs, Pi v1.5.0 sync area partial-commits), and every conversation-view scenario
 // over 120 entries on SQLite and the store (ConversationViewBench.cs, area view: test/conversation-view-bench.ts), and storage-throughput
 // with two conversations and no round trip on memory and SQLite (StorageBench.cs, area group-commit). It asserts completion,
 // the number of results and the scheduler's bounded indexes, never a timing.
@@ -83,9 +83,11 @@ internal static partial class Program
             Check(memoryOutput.ToString().StartsWith("cycles | ms", StringComparison.Ordinal), "scheduler-memory table: " + memoryOutput);
             Equal(SchedulerMemoryBench.DefaultSizes, SchedulerMemoryBench.ParseSizes(null), "scheduler-memory default sizes");
             var scaleOutput = new StringWriter();
-            var scaleRows = await SchedulerScaleBench.RunAsync([4], [5], scaleOutput);
-            Check(scaleRows is [{ Scenario: "fanout", Size: 4, Commits: > 0 }, { Scenario: "chain", Size: 5, Commits: > 0 }], "scheduler-scale rows");
+            var scaleRows = await SchedulerScaleBench.RunAsync([4], [5], [2], scaleOutput);
+            Check(scaleRows is [{ Scenario: "fanout", Size: 4, Commits: > 0 }, { Scenario: "chain", Size: 5, Commits: > 0 },
+                { Scenario: "conversations", Size: 2, Commits: > 0 }], "scheduler-scale rows");
             Check(scaleOutput.ToString().StartsWith("fanout | ms", StringComparison.Ordinal), "scheduler-scale table: " + scaleOutput);
+            Check(scaleOutput.ToString().Contains("conversations | runs", StringComparison.Ordinal), "scheduler-scale conversations table: " + scaleOutput);
 
             var fanoutOutput = new StringWriter();
             var fanoutRows = await SchedulerFanoutBench.RunAsync([4], fanoutOutput);
