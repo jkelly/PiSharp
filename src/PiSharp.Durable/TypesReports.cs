@@ -2,9 +2,9 @@
 // split from Types.cs), ported in the Pi v1.5.0 sync (area reports: upstream a30c2a81d, 440a5fcdb, 5ba1cbaf3, 91b33cab3 and 5f312dac4's
 // report kinds). Upstream's ReportInfo is a union tagged by kind; here it is one record whose Kind says which of its optional fields are
 // set, as TaskInspectionState is. A Report is a ReportInfo and the error (upstream's `ReportInfo & { error }`); upstream's `error: unknown`
-// is an Exception, as HarnessOptions.OnReport took before. One part of v1.5.0's union arrives with a later area of the sync: the
-// task_interrupted kind with its restart_limit and interrupted reasons and its restart count (area restarts). Pi v1.5.0 sync (area
-// telemetry): the telemetry host callback (2ec55d808).
+// is an Exception, as HarnessOptions.OnReport took before. Pi v1.5.0 sync (area telemetry): the telemetry host callback (2ec55d808).
+// Pi v1.5.0 sync (area restarts, b3a29f111): the task_interrupted kind with its restart_limit and interrupted reasons and its restart
+// count, and task_faulted's restart_limit reason.
 using PiSharp.Durable.Chord;
 using PiSharp.Durable.Internal;
 
@@ -51,8 +51,17 @@ public enum ReportKind
 {
     /// <summary><c>storage_failed</c>: the error failed the Session, which closes: a Storage error, often a platform reset.</summary>
     StorageFailed,
-    /// <summary><c>task_faulted</c>: the task ended <c>faulted</c>; its phase threw (<see cref="ReportReason.Threw"/>).</summary>
+    /// <summary><c>task_faulted</c>: the task ended <c>faulted</c>: its phase threw (<see cref="ReportReason.Threw"/>), or its abort handler
+    /// was cut off <see cref="HarnessSettings.RestartLimit"/> times (<see cref="ReportReason.RestartLimit"/>), as was a phase of a task of an
+    /// extension's kind.</summary>
     TaskFaulted,
+    /// <summary>
+    /// <c>task_interrupted</c>: crashes ended the task: it ended itself after being cut off <see cref="HarnessSettings.RestartLimit"/> times in
+    /// a row (<see cref="ReportReason.RestartLimit"/>; a tool call, a compaction, a generation), or a generation's run ended because the host
+    /// kept stopping while the model answered (<see cref="ReportReason.Interrupted"/>). <see cref="ReportInfo.Restarts"/> is the task's count
+    /// when it ended.
+    /// </summary>
+    TaskInterrupted,
     /// <summary><c>migration_failed</c>: the task's stored state could not be migrated; it is blocked until the registry changes.</summary>
     MigrationFailed,
     /// <summary>
@@ -72,11 +81,17 @@ public enum ReportKind
     ListenerError,
 }
 
-/// <summary>Why a task faulted or is outdated (upstream <c>ReportInfo["reason"]</c>).</summary>
+/// <summary>Why a task faulted, was interrupted or is outdated (upstream <c>ReportInfo["reason"]</c>).</summary>
 public enum ReportReason
 {
     /// <summary><c>threw</c>: a <see cref="ReportKind.TaskFaulted"/> task's phase threw.</summary>
     Threw,
+    /// <summary><c>restart_limit</c>: a <see cref="ReportKind.TaskFaulted"/> or <see cref="ReportKind.TaskInterrupted"/> task was cut off
+    /// <see cref="HarnessSettings.RestartLimit"/> times in a row.</summary>
+    RestartLimit,
+    /// <summary><c>interrupted</c>: a <see cref="ReportKind.TaskInterrupted"/> generation's run ended because the host kept stopping while the
+    /// model answered, until no retry was left.</summary>
+    Interrupted,
     /// <summary><c>missing_task</c>: no definition has the outdated task's kind.</summary>
     MissingTask,
     /// <summary><c>task_too_old</c>: the replacement definition is older than the task.</summary>
@@ -90,7 +105,7 @@ public enum ReportReason
 /// depends on the kind: <see cref="Task"/> for the task kinds, and for an extension or host error a task ran; <see cref="Extension"/>, where
 /// present, names the extension whose code failed, when known (for a task's own code, the one that installed the definition the task ran);
 /// <see cref="ConversationId"/> for an extension error outside a task; <see cref="Callback"/> for a host error; <see cref="Reason"/> for a
-/// faulted or outdated task. Equality is record equality, as upstream's tests compare infos with <c>toEqual</c>.
+/// faulted, interrupted or outdated task; <see cref="Restarts"/> for an interrupted one. Equality is record equality, as upstream's tests compare infos with <c>toEqual</c>.
 /// </summary>
 /// <param name="Kind">What happened.</param>
 public sealed record ReportInfo(ReportKind Kind)
@@ -113,8 +128,13 @@ public sealed record ReportInfo(ReportKind Kind)
     /// <summary>For <see cref="ReportKind.HostError"/>: the host callback that threw.</summary>
     public HostCallback? Callback { get; init; }
 
-    /// <summary>For <see cref="ReportKind.TaskFaulted"/> and <see cref="ReportKind.TaskOutdated"/>: why.</summary>
+    /// <summary>For <see cref="ReportKind.TaskFaulted"/>, <see cref="ReportKind.TaskInterrupted"/> and <see cref="ReportKind.TaskOutdated"/>:
+    /// why.</summary>
     public ReportReason? Reason { get; init; }
+
+    /// <summary>For <see cref="ReportKind.TaskInterrupted"/>: the task's <see cref="TaskRecord.Restarts"/> when it ended (0 when it had
+    /// none).</summary>
+    public int? Restarts { get; init; }
 
     /// <summary><c>{kind: "host_error", callback}</c>, with the task that called it, if one did.</summary>
     public static ReportInfo HostError(HostCallback callback, ReportTask? task = null) => new(ReportKind.HostError) { Callback = callback, Task = task };
@@ -124,6 +144,7 @@ public sealed record ReportInfo(ReportKind Kind)
     {
         ReportKind.StorageFailed => "storage_failed",
         ReportKind.TaskFaulted => "task_faulted",
+        ReportKind.TaskInterrupted => "task_interrupted",
         ReportKind.MigrationFailed => "migration_failed",
         ReportKind.TaskOutdated => "task_outdated",
         ReportKind.TaskError => "task_error",
@@ -133,11 +154,13 @@ public sealed record ReportInfo(ReportKind Kind)
         _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, "Invalid ReportKind"),
     };
 
-    /// <summary>Upstream's spelling of <paramref name="reason"/> (<c>threw</c>, <c>missing_task</c>, <c>task_too_old</c>,
-    /// <c>migration_failed</c>).</summary>
+    /// <summary>Upstream's spelling of <paramref name="reason"/> (<c>threw</c>, <c>restart_limit</c>, <c>interrupted</c>,
+    /// <c>missing_task</c>, <c>task_too_old</c>, <c>migration_failed</c>).</summary>
     public static string ReasonName(ReportReason reason) => reason switch
     {
         ReportReason.Threw => "threw",
+        ReportReason.RestartLimit => "restart_limit",
+        ReportReason.Interrupted => "interrupted",
         ReportReason.MissingTask => "missing_task",
         ReportReason.TaskTooOld => "task_too_old",
         ReportReason.MigrationFailed => "migration_failed",
@@ -147,7 +170,8 @@ public sealed record ReportInfo(ReportKind Kind)
     /// <summary>Upstream's spelling of <paramref name="callback"/>: its <see cref="HarnessOptions"/> name (<c>now</c>, <c>setTimer</c>, ...).</summary>
     public static string CallbackName(HostCallback callback) => WireName.Of(callback);
 
-    /// <summary>The info as upstream's JSON object, without the error: <c>{kind, task?, extension?, conversationId?, callback?, reason?}</c>.</summary>
+    /// <summary>The info as upstream's JSON object, without the error: <c>{kind, task?, extension?, conversationId?, callback?, reason?,
+    /// restarts?}</c>.</summary>
     public JsonObjectValue ToJson() => new RecordJson.Writer()
         .Add("kind", KindName(Kind))
         .Add("task", Task?.ToJson())
@@ -155,6 +179,7 @@ public sealed record ReportInfo(ReportKind Kind)
         .Add("conversationId", ConversationId?.ToJson())
         .Add("callback", Callback is { } callback ? CallbackName(callback) : null)
         .Add("reason", Reason is { } reason ? ReasonName(reason) : null)
+        .Number("restarts", Restarts)
         .Build();
 
     /// <inheritdoc/>
@@ -181,6 +206,8 @@ public sealed record Report(ReportInfo Info, Exception Error)
     public HostCallback? Callback => Info.Callback;
     /// <summary><see cref="ReportInfo.Reason"/>.</summary>
     public ReportReason? Reason => Info.Reason;
+    /// <summary><see cref="ReportInfo.Restarts"/>.</summary>
+    public int? Restarts => Info.Restarts;
 }
 
 /// <summary>Whose code a task's <see cref="ITaskRuntime.Report"/> is about (upstream <c>ReportFrom["kind"]</c>).</summary>

@@ -769,6 +769,15 @@ public class HarnessSettings
     /// <see cref="Durable.AfterFailedRun.Keep"/>.
     /// </summary>
     public virtual AfterFailedRun? AfterFailedRun { get; init; }
+    /// <summary>
+    /// How many times in a row a task may be cut off by a crash, eviction or reset (a close does not count) without changing its state before
+    /// it ends instead of running again: a tool call with an error result, a compaction failed into <c>pi.live.compactionFailure</c>, a run
+    /// with <c>pi.live.runFailure</c> reason <c>restart_limit</c>, any other task <c>faulted</c> with detail <c>{reason: "restart_limit"}</c>.
+    /// A generation's request or poll the host died during is a failed attempt under <see cref="Retry"/> first; the limit bounds it only when
+    /// charging that attempt keeps being cut off. A number of restarts, 1 or more, rounded down; anything else means the default, 5.
+    /// <see cref="double.PositiveInfinity"/> never ends a task for it.
+    /// </summary>
+    public virtual double? RestartLimit { get; init; }
 }
 
 /// <summary>What a failed run does with the inputs queued behind it (<see cref="HarnessSettings.AfterFailedRun"/>; upstream
@@ -809,6 +818,9 @@ public sealed record Settings
     public required double DocumentRetentionMs { get; init; }
     /// <summary>What a failed run does with the inputs queued behind it.</summary>
     public AfterFailedRun AfterFailedRun { get; init; }
+    /// <summary>How many times in a row a task may be cut off before it ends (<see cref="HarnessSettings.RestartLimit"/>): a whole number, 1
+    /// or more, or <see cref="double.PositiveInfinity"/>.</summary>
+    public double RestartLimit { get; init; } = Agents.DefaultRestartLimit;
 }
 
 /// <summary>What <c>HarnessOptions.Env</c> builds an environment for (upstream <c>EnvTarget</c>).</summary>

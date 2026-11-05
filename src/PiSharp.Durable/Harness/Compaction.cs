@@ -17,6 +17,9 @@
 //
 // Pi v1.5.0 sync (area harness-options): compactionPolicy() and select's per-model policy (upstream 6085986e4, #10942). Areas restarts,
 // sleep, telemetry and live-turns change this file again, so the citation stays on v1.2.0.
+// Pi v1.5.0 sync (area restarts, b3a29f111): select, summarize and retry first fail a compaction cut off settings.restartLimit times in a
+// row (TaskRecord.Restarts) into pi.live.compactionFailure, "Compaction was interrupted once" or "N times in a row", with detail
+// {reason: "restart_limit"} (FailCutOffAsync), instead of running it again.
 // Pi v1.5.0 sync (area telemetry, 2ec55d808): the summarization request passes the phase's span as its telemetry parent; a
 // conversation-owned compaction's admission records no submit span, only the phase's events.
 using System.Collections.Immutable;
@@ -136,6 +139,11 @@ internal static class Compaction
     /// </summary>
     public static async Task SelectAsync(RunningTask task, ITaskRuntime runtime, DurableContext context)
     {
+        if (Live.CutOffTooOften(task, runtime))
+        {
+            await FailCutOffAsync(runtime, task, context).ConfigureAwait(false);
+            return;
+        }
         var conversationId = runtime.ConversationId;
         var agent = await runtime.AgentAsync(context).ConfigureAwait(false);
         var settings = runtime.Settings;
@@ -195,6 +203,11 @@ internal static class Compaction
     /// <summary>Sends the pinned summarization request and classifies its answer in one commit that also records its usage.</summary>
     public static async Task SummarizeAsync(RunningTask task, ITaskRuntime runtime, DurableContext context)
     {
+        if (Live.CutOffTooOften(task, runtime))
+        {
+            await FailCutOffAsync(runtime, task, context).ConfigureAwait(false);
+            return;
+        }
         var request = SummaryRequest.From((JsonObjectValue)task.Checkpoint);
         var model = runtime.Models.GetModel(request.Model.Provider, request.Model.ModelId);
         if (model is null)
@@ -275,6 +288,11 @@ internal static class Compaction
         var checkpoint = (JsonObjectValue)task.Checkpoint;
         var request = SummaryRequest.From(checkpoint);
         var until = ((JsonNumberValue)checkpoint["until"]).Value;
+        if (Live.CutOffTooOften(task, runtime))
+        {
+            await FailCutOffAsync(runtime, task, context).ConfigureAwait(false);
+            return;
+        }
         if (until > runtime.Now())
         {
             await runtime.SleepUntilAsync(until, checkpoint, context).ConfigureAwait(false);
@@ -555,6 +573,18 @@ internal static class Compaction
             Live.RemoveCompactionStatus(await tx.DocAsync(Live.LiveDoc, runtime.ConversationId).ConfigureAwait(false), runtime.TaskId);
             return (TaskState?)NextTaskState.Completed(JsonObjectValue.Empty);
         }, context);
+
+    /// <summary>Fails a compaction cut off <c>settings.RestartLimit</c> times in a row (spec §5.4) instead of running it again (upstream
+    /// <c>failCutOff</c>).</summary>
+    private static Task FailCutOffAsync(ITaskRuntime runtime, RunningTask task, DurableContext context)
+    {
+        var message = $"Compaction was interrupted {Live.CutOffCount(task)}";
+        return runtime.CommitAsync(async (tx, _) =>
+        {
+            Live.FailCompactionStatus(await tx.DocAsync(Live.LiveDoc, runtime.ConversationId).ConfigureAwait(false), runtime.TaskId, message);
+            return (TaskState?)NextTaskState.Failed(message, Reason("restart_limit"));
+        }, context);
+    }
 
     private static Task FailNoModelAsync(ITaskRuntime runtime, ModelRef? reference, DurableContext context)
     {

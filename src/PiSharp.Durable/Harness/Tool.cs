@@ -36,6 +36,10 @@
 //   PiSharp-only order: the intent commits first and the slot commit follows (upstream's slot commit comes first), so the agent event
 //   projection (PiSharp.Durable.Hosting's AgentEvents.cs; upstream removed watchEvents) has the arguments a tool_execution_start carries when the slot turns
 //   running. Storage gets the same either way: the intent at once, the held slot change with the next commit that reads or writes pi.live.
+// - Pi v1.5.0 sync (area restarts, b3a29f111): a call cut off settings.restartLimit times in a row (TaskRecord.Restarts) ends with an
+//   error result built from its slot, diagnostic code restart_limit, instead of running again (EndCutOffAsync): checked in the call phase
+//   once the call is read, and before a safe rerun. The task fails with detail {reason: "restart_limit"}, which the scheduler reports as
+//   task_interrupted. 87eff524f's afterTool hooks on Harness-written results, and their skip past the limit, are another area's.
 using System.Collections.Immutable;
 using System.Diagnostics;
 using System.Globalization;
@@ -99,11 +103,12 @@ internal static class ToolPhases
 
     /// <summary>How a tool task ends; the result is settled either way. <c>failed</c> (execution threw or was interrupted) records
     /// cancellation intent for the conversations the call owns; a result with <c>IsError</c> still completes (upstream <c>Ending</c>).</summary>
-    private sealed record Ending(TaskOutcomeStatus Status, string? Message = null)
+    private sealed record Ending(TaskOutcomeStatus Status, string? Message = null, string? Reason = null)
     {
         public static Ending Completed { get; } = new(TaskOutcomeStatus.Completed);
         public static Ending Aborted { get; } = new(TaskOutcomeStatus.Aborted);
-        public static Ending Failed(string message) => new(TaskOutcomeStatus.Failed, message);
+        /// <summary>A failure; <paramref name="reason"/>, when given, is its error's <c>detail.reason</c>.</summary>
+        public static Ending Failed(string message, string? reason = null) => new(TaskOutcomeStatus.Failed, message, reason);
     }
 
     /// <summary>Arguments, or why they are invalid (upstream <c>Checked</c>).</summary>
@@ -131,6 +136,11 @@ internal static class ToolPhases
     {
         var input = ToolInput.Parse(task.Input);
         var call = await ReadCallAsync(runtime, input, context).ConfigureAwait(false);
+        if (Live.CutOffTooOften(task, runtime))
+        {
+            await EndCutOffAsync(runtime, task, input, call, context).ConfigureAwait(false);
+            return;
+        }
         var name = Name(call);
         var tool = await ResolveToolAsync(runtime, input, name, context).ConfigureAwait(false);
         if (tool is null)
@@ -212,6 +222,11 @@ internal static class ToolPhases
         var tool = await ResolveToolAsync(runtime, input, name, context).ConfigureAwait(false);
         if (replay == "safe" && tool?.Replay == ToolReplay.Safe)
         {
+            if (Live.CutOffTooOften(task, runtime))
+            {
+                await EndCutOffAsync(runtime, task, input, call, context).ConfigureAwait(false);
+                return;
+            }
             // The rerun reports from scratch: clear what the interrupted attempt published, and show the slot running with the arguments it
             // runs with again, as the deferred commit that showed them may have been lost with the crash.
             await runtime.CommitAsync(async (tx, _) =>
@@ -229,6 +244,17 @@ internal static class ToolPhases
         var message = $"Tool {name} was interrupted and may have partially run";
         // `failed` records cancellation intent, so the call's owned conversations, left unsupervised, are aborted.
         await SettleAsync(runtime, input, call, Ending.Failed(message), slot => FromSlot(slot, "interrupted", message), context).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Ends a call cut off <c>settings.RestartLimit</c> times in a row (spec §5.4) with an error result, built from the slot like an
+    /// interrupted call's, instead of running it again (upstream <c>endCutOff</c>). <c>failed</c>, like an interruption, so its owned work
+    /// is aborted.
+    /// </summary>
+    private static Task EndCutOffAsync(ITaskRuntime runtime, RunningTask task, ToolInput input, JsonObjectValue call, DurableContext context)
+    {
+        var message = $"Tool {Name(call)} was interrupted {Live.CutOffCount(task)}; it is not run again";
+        return SettleAsync(runtime, input, call, Ending.Failed(message, "restart_limit"), slot => FromSlot(slot, "restart_limit", message), context);
     }
 
     public static async Task AbortAsync(RunningTask task, ITaskRuntime runtime, DurableContext context)
@@ -619,7 +645,10 @@ internal static class ToolPhases
             if (madeNested) Live.RemoveNestedSlots(live, runtime.TaskId);
             if (ending.Status == TaskOutcomeStatus.Aborted) return (TaskState?)NextTaskState.Terminal(new AbortedTaskOutcome(null, settled));
             if (ending.Status == TaskOutcomeStatus.Failed)
-                return NextTaskState.Terminal(new FailedTaskOutcome(new TaskOutcomeError(ending.Message!), settled));
+            {
+                var detail = ending.Reason is { } reason ? new RecordJson.Writer().Add("reason", reason).Build() : null;
+                return NextTaskState.Terminal(new FailedTaskOutcome(new TaskOutcomeError(ending.Message!, detail), settled));
+            }
             return NextTaskState.Completed(settled);
         }, context).ConfigureAwait(false);
     }

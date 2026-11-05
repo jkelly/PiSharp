@@ -57,8 +57,8 @@
 // once the fault is durable, task_outdated with outdatedReason's reason in place of v1.2.0's cause, migration_failed; a hook names its own
 // extension, runtime.Report(error, from) the code it names. BlockedReasonOf and SubscribeBlocked serve the task graph (440a5fcdb): a registry
 // change and a failed migration notify the graph, and a failed migration schedules a wake. Wake() counts a reconcile pass with work, one
-// underway or one due (reconcileWork), so open's recovery pass keeps the host's wake active until it lands (5ba1cbaf3). The restart limit,
-// task_interrupted and the telemetry context of a report are other areas' (restarts, telemetry). Host timer callbacks the scheduler runs
+// underway or one due (reconcileWork), so open's recovery pass keeps the host's wake active until it lands (5ba1cbaf3). The telemetry
+// context of a report is area telemetry's. Host timer callbacks the scheduler runs
 // are contained, as a throw on a timer thread would end the process: a task's own SetTimer callback reports task_error, a host disarm
 // host_error setTimer, and the scheduler's own callbacks listener_error.
 //
@@ -74,6 +74,17 @@
 // load included), -1 when it ends, every live one at close; the deltas are taken under the lock and counted outside it, a throwing adapter
 // reported host_error telemetry. Reports and the Session's failure from a step carry the invocation's context. The citation stays on v1.2.0
 // until the file's other areas land.
+//
+// Pi v1.5.0 sync (area restarts, b3a29f111 over a30c2a81d's crash-loop guard, without 1.4.0's parking): open counts a restart of each task
+// it finds running (TaskRecord.Restarts); a state the task commits that differs from its current one is progress and drops the count, the
+// same state committed again (intent before an effect) keeps it, and an outcome or an abort mark drops it (the count then counts cut-offs
+// of the abort handler). A close is not a crash: the join writes the tasks it stopped back as pending, uncounted (Session.WriteAtCloseAsync),
+// read on the line after the commits admitted before the seal, so an abort mark queued before the close survives. At
+// settings.restartLimit a reservation pass faults an abort handler's task, or a task of a kind that does not end itself at the limit
+// (LimitsRestarts: the built-in generation, tool and compaction tasks end themselves), with detail {reason: "restart_limit"}, and
+// reports task_faulted with reason restart_limit; the settings are read only for a task that was cut off at all. A runtime commit that
+// ends its task failed with detail reason restart_limit or interrupted reports task_interrupted with the task's count. Run-end's
+// endedByCrashes (7e15f9601) is that area's.
 using System.Collections;
 using System.Collections.Immutable;
 using PiSharp.Durable.Chord;
@@ -139,6 +150,9 @@ internal sealed record DurableTaskSchedulerOptions
     /// <summary><see cref="HarnessOptions.ReadOnly"/>: open loads live tasks as committed, <c>running</c> ones included, and the scheduler
     /// never commits or runs anything.</summary>
     public bool ReadOnly { get; init; }
+    /// <summary>Task kinds whose run phases end the task themselves once it was cut off <c>settings.RestartLimit</c> times (the built-in
+    /// tasks, from <see cref="TaskRecord.Restarts"/>); the scheduler ends a task of any other kind <c>faulted</c> instead. Null: none.</summary>
+    public Func<string, bool>? LimitsRestarts { get; init; }
 }
 
 /// <summary>
@@ -191,6 +205,7 @@ internal sealed class DurableTaskScheduler
     private readonly Func<ConversationId, InvocationBinding, DurableContext, Task<IConversationHandle?>> conversation;
     private readonly DurableContext context;
     private readonly bool readOnly;
+    private readonly Func<string, bool> limitsRestarts;
 
     private readonly Lock gate = new();
     // Insertion-ordered like a JavaScript Map: replacing a record keeps its position.
@@ -309,6 +324,7 @@ internal sealed class DurableTaskScheduler
         conversation = options.Conversation;
         context = options.Context;
         readOnly = options.ReadOnly;
+        limitsRestarts = options.LimitsRestarts ?? (static _ => false);
         dropQueue = new(iterations);
         roots = new(iterations);
         unloaded = new(iterations);
@@ -323,8 +339,9 @@ internal sealed class DurableTaskScheduler
     /// <summary>Test probe: members iterated over the scheduler's sets so far (see <see cref="iterations"/>).</summary>
     internal long SetEntries => Interlocked.Read(ref iterations.Entries);
 
-    /// <summary>Loads live tasks and changes surviving <c>running</c> tasks back to <c>pending</c>. Dispatches nothing. Read-only, it only
-    /// loads them as committed.</summary>
+    /// <summary>Loads live tasks and changes surviving <c>running</c> tasks back to <c>pending</c>, counting the restart. Dispatches nothing;
+    /// a task cut off <c>settings.RestartLimit</c> times ends when it is next reserved. Read-only, it only loads them as committed: a
+    /// <c>running</c> task stays as committed, running in another process.</summary>
     public async Task OpenAsync(DurableContext openContext)
     {
         session.ObserveCommits((publication, _) => Observe(publication));
@@ -350,7 +367,8 @@ internal sealed class DurableTaskScheduler
                         resumed.Add(record.Id);
                         if (readOnly) continue;
                         if (record.AbandonOnRestart) abandoned.Add(record.Id);
-                        if (record.State is RunningTaskState running) tx.SetTask(WithState(record, new PendingTaskState(running.Checkpoint)));
+                        if (record.State is RunningTaskState running)
+                            tx.SetTask(WithState(record, new PendingTaskState(running.Checkpoint)) with { Restarts = (record.Restarts ?? 0) + 1 });
                         if (record.State is WaitingTaskState { Policy: JoinPolicy.FailFast }) failFastChecks.Add(record.Id);
                     }
                 }
@@ -528,21 +546,46 @@ internal sealed class DurableTaskScheduler
     }
 
     /// <summary>
-    /// Signals every invocation and waits for them; writes nothing. Close calls this after every close listener has run, so waits, watches and
-    /// streams a task holds end with the Session's reason, not as cancelled by its signal.
+    /// Signals every invocation and waits for them, then writes the tasks they ran back as <c>pending</c> (<see cref="Session.WriteAtCloseAsync"/>),
+    /// as a close is not a crash. Close calls this after every close listener has run, so waits, watches and streams a task holds end with the
+    /// Session's reason, not as cancelled by its signal. Never fails.
     /// </summary>
-    public Task JoinAsync()
+    public async Task JoinAsync()
     {
         List<Invocation> signal;
         lock (gate)
         {
             // Also those Seal saw: a close listener can end an invocation (a watch it awaited closes), and it leaves the map before End
             // signals it, while upstream's join runs before any such continuation.
-            signal = [.. sealedInvocations.Union(invocations.Values)];
+            signal = [.. sealedInvocations.Union(invocations.Values).OrderBy(invocation => invocation.Started)];
             sealedInvocations.Clear();
         }
         foreach (var invocation in signal) Signal(invocation, null);
-        return Task.WhenAll(signal.Select(invocation => invocation.Done.Task));
+        await Task.WhenAll(signal.Select(invocation => invocation.Done.Task)).ConfigureAwait(false);
+        if (signal.Count == 0) return;
+        // A close is not a crash: a task it stopped is pending again, so the next open counts no restart for it. Read on the line after
+        // commits admitted before the seal, such as an abort mark, so the write keeps them. A failure leaves them running, counted as if cut
+        // off; the Storage guard fails the Session and reports it.
+        try
+        {
+            await session.WriteAtCloseAsync(() =>
+            {
+                var writes = new List<StorageWrite>();
+                lock (gate)
+                {
+                    foreach (var invocation in signal)
+                    {
+                        if (live.GetValueOrDefault(invocation.TaskId) is not { State: RunningTaskState running } record) continue;
+                        writes.Add(new TaskWrite(WithState(record, new PendingTaskState(running.Checkpoint))));
+                    }
+                }
+                return writes;
+            }).ConfigureAwait(false);
+        }
+        catch
+        {
+            // Reported by the Session's failure.
+        }
     }
 
     /// <summary>
@@ -756,6 +799,20 @@ internal sealed class DurableTaskScheduler
         {
             report(error, SettingsError);
             return 0;
+        }
+    }
+
+    /// <summary><c>settings.RestartLimit</c>, or the default when the host's settings throw (upstream <c>#restartLimit</c>).</summary>
+    private double RestartLimit()
+    {
+        try
+        {
+            return settings().RestartLimit;
+        }
+        catch (Exception error)
+        {
+            report(error, SettingsError);
+            return Agents.DefaultRestartLimit;
         }
     }
 
@@ -1838,6 +1895,7 @@ internal sealed class DurableTaskScheduler
     {
         var reservations = new List<Reservation>();
         List<TaskId> marked = [];
+        List<(TaskRecord Record, string Message)> faulted = [];
         var begun = false;
         try
         {
@@ -1898,6 +1956,17 @@ internal sealed class DurableTaskScheduler
                             continue;
                         }
                     }
+                    // Work cut off restartLimit times in a row would run forever: an abort handler, or a phase of a kind that does not end
+                    // itself at the limit, ends the task faulted instead. The settings are read only for a task that was cut off at all.
+                    if (record.Restarts is { } restarts && restarts >= RestartLimit() && (mode == InvocationMode.Abort || !limitsRestarts(record.Kind)))
+                    {
+                        var message = mode == InvocationMode.Abort
+                            ? $"Abort handler of task {id} ({record.Kind}) was cut off {restarts} times"
+                            : $"Task {id} ({record.Kind}) was cut off {restarts} times without progress";
+                        await TerminateAsync(tx, record, new FaultedTaskOutcome(new TaskOutcomeError(message, RestartLimitDetail))).ConfigureAwait(false);
+                        faulted.Add((record, message));
+                        continue;
+                    }
                     snapshot ??= registry.Snapshot();
                     var resolution = Resolve(record, snapshot);
                     if (resolution.Blocked is { } reason)
@@ -1931,6 +2000,8 @@ internal sealed class DurableTaskScheduler
             }
             throw;
         }
+        foreach (var (record, message) in faulted)
+            report(new InvalidOperationException(message), AboutRecord(ReportKind.TaskFaulted, record) with { Reason = ReportReason.RestartLimit });
         // Marked, or already marked or gone: done with them. Reserve again, now seeing the marks.
         lock (gate)
         {
@@ -2357,11 +2428,14 @@ internal sealed class DurableTaskScheduler
             lock (gate) owned = HasOwnedLiveLocked(current.Id, overlay, null);
             if (owned)
             {
-                tx.SetTask(WithState(current.Record, new CompletingTaskState(terminal.Outcome)));
+                tx.SetTask(WithState(Progressed(current.Record), new CompletingTaskState(terminal.Outcome)));
                 return;
             }
         }
-        tx.SetTask(WithState(current.Record, next));
+        // A state the task committed that differs from its current one is progress: its restart count starts over. The same checkpoint
+        // committed again, for example as intent before an effect, is not.
+        var same = JsonValue.DeepEquals(current.State.ToJson(), next.ToJson());
+        tx.SetTask(WithState(same ? current.Record : Progressed(current.Record), next));
     }
 
     /// <summary>
@@ -2504,12 +2578,13 @@ internal sealed class DurableTaskScheduler
     // ─── Helpers ─────────────────────────────────────────────────────────────
 
     /// <summary>The record with an abort mark: <c>restart</c> for an abandonment; without a reason, a request, which replaces <c>restart</c>.
-    /// As upstream's <c>{ ...rest, abortRequested: true, abortReason }</c>, a set reason is the record's last key.</summary>
+    /// As upstream's <c>{ ...rest, abortRequested: true, abortReason }</c>, a set reason is the record's last key. The restart count starts
+    /// over: it now counts cut-offs of the abort handler.</summary>
     private static TaskRecord WithAbortMark(TaskRecord record, bool restart)
     {
-        if (!restart) return record with { AbortRequested = true, AbortReason = null };
-        var keys = record.ToJson().Keys.Where(key => key != "abortReason").Append("abortReason").ToImmutableArray();
-        return record with { AbortRequested = true, AbortReason = TaskAbortReason.Restart, KeyOrder = keys };
+        if (!restart) return record with { AbortRequested = true, AbortReason = null, Restarts = null };
+        var keys = record.ToJson().Keys.Where(key => key is not "abortReason" and not "restarts").Append("abortReason").ToImmutableArray();
+        return record with { AbortRequested = true, AbortReason = TaskAbortReason.Restart, Restarts = null, KeyOrder = keys };
     }
 
     /// <summary>A live owner's durable cancellation intent: its abort mark, or a held outcome other than completed.</summary>
@@ -2560,9 +2635,22 @@ internal sealed class DurableTaskScheduler
 
     private static InvalidOperationException EndedError(Invocation invocation) => new($"Task {invocation.TaskId} invocation has ended");
 
-    /// <summary>Replaces a live record's state; memos disappear once an outcome is decided.</summary>
+    /// <summary>Replaces a live record's state; memos and the restart count disappear once an outcome is decided.</summary>
     private static TaskRecord WithState(TaskRecord record, TaskState state) =>
-        state is SettlingTaskState ? record with { State = state, Memos = null } : record with { State = state };
+        state is SettlingTaskState ? record with { State = state, Memos = null, Restarts = null } : record with { State = state };
+
+    /// <summary>The record without its restart count, as after a state the task committed (upstream <c>progressed</c>).</summary>
+    private static TaskRecord Progressed(TaskRecord record) => record.Restarts is null ? record : record with { Restarts = null };
+
+    /// <summary><c>{reason: "restart_limit"}</c>, the detail of an outcome that ends a task cut off <c>settings.RestartLimit</c> times.</summary>
+    internal static JsonObjectValue RestartLimitDetail { get; } = new RecordJson.Writer().Add("reason", "restart_limit").Build();
+
+    /// <summary>Why a failed outcome's error says crashes ended the task (its detail's <c>reason</c>), if it does (upstream
+    /// <c>interruptionOf</c>).</summary>
+    private static ReportReason? InterruptionOf(TaskOutcomeError error) =>
+        error.Detail is JsonObjectValue detail && detail.TryGetValue("reason", out var reason) && reason is JsonStringValue name
+            ? name.Value switch { "restart_limit" => ReportReason.RestartLimit, "interrupted" => ReportReason.Interrupted, _ => null }
+            : null;
 
     /// <summary>Whether a definition can take the task at reservation: same version, or newer with a migration.</summary>
     private static bool CanReserve(DurableTask task, TaskRecord record)
@@ -2586,6 +2674,23 @@ internal sealed class DurableTaskScheduler
     /// extension that installed the definition it runs.</summary>
     private static ReportInfo AboutTask(ReportKind kind, Invocation invocation) =>
         new(kind) { Task = ReportTaskOf(invocation), Extension = invocation.Extension };
+
+    /// <summary>What a report about a stored task says of it (upstream <c>#aboutTask(recordTask(record))</c>): the task, and the extension
+    /// that installed its current definition; none when the registry throws, which is reported where it is read for scheduling.</summary>
+    private ReportInfo AboutRecord(ReportKind kind, TaskRecord record)
+    {
+        string? extension = null;
+        try
+        {
+            var snapshot = registry.Snapshot();
+            extension = InstallerOf(snapshot, snapshot.GetTask(record.Kind));
+        }
+        catch
+        {
+            // A report goes out without the name.
+        }
+        return new ReportInfo(kind) { Task = ReportTaskOf(record), Extension = extension };
+    }
 
     /// <summary>The task an invocation's report is about (upstream <c>reportTask</c>).</summary>
     private static ReportTask ReportTaskOf(Invocation invocation) => new(invocation.TaskId, invocation.Kind, invocation.ConversationId);
@@ -2622,6 +2727,10 @@ internal sealed class DurableTaskScheduler
     private sealed class Invocation(TaskId taskId, string kind, ConversationId conversationId, string? extension, InvocationMode mode,
         CancellationSignal controller, DurableContext context)
     {
+        private static long started;
+        /// <summary>When it started, among all invocations: the join writes back in this order, as upstream's insertion-ordered
+        /// <c>#invocations</c> Map lists them (a Dictionary reuses the slots of removed entries).</summary>
+        public long Started { get; } = Interlocked.Increment(ref started);
         public TaskId TaskId { get; } = taskId;
         public string Kind { get; } = kind;
         public ConversationId ConversationId { get; } = conversationId;
@@ -2896,13 +3005,23 @@ internal sealed class DurableTaskScheduler
         {
             ArgumentNullException.ThrowIfNull(change);
             string? checkpoint = null;
+            (string Message, ReportReason Reason, int Restarts)? interrupted = null;
             await Gated(async (tx, current) =>
             {
                 var next = await change(tx, current).ConfigureAwait(false);
                 if (next is not null) await scheduler.CommitStateAsync(tx, invocation, current, next).ConfigureAwait(false);
                 if (next is RunningTaskState running && PhaseOf(running.Checkpoint) is { } phase && phase != current.Phase) checkpoint = phase;
+                // A task that ends for crashes says so (task_interrupted), so a host keeps a crash-loop signal.
+                interrupted = next is TerminalTaskState { Outcome: FailedTaskOutcome failed } && InterruptionOf(failed.Error) is { } reason
+                    ? (failed.Error.Message, reason, current.Record.Restarts ?? 0)
+                    : null;
                 return true;
             }, context, options).ConfigureAwait(false);
+            if (interrupted is { } ended)
+            {
+                scheduler.report(new InvalidOperationException(ended.Message),
+                    AboutTask(ReportKind.TaskInterrupted, invocation) with { Reason = ended.Reason, Restarts = ended.Restarts }, invocation.Context);
+            }
             if (checkpoint is not null) invocation.Context.Telemetry.AddEvent("pi.durable.checkpoint", new SpanAttributes { ["phase"] = checkpoint });
         }
 

@@ -27,6 +27,9 @@
 // Pi v1.5.0 sync (area observers, 8b0caefc2): Harness.observeConversation() and observeTaskGraph() check the Harness is usable, then
 // attach through the view and graph mounts (ConversationViews.ObserveAsync, TaskGraphView.ObserveAsync); a refusal faults the task.
 // Pi v1.5.0 sync (area view, f3255de76): Conversation.watch() and Harness.observeConversation() pass their ConversationWindow on.
+// Pi v1.5.0 sync (area restarts, b3a29f111): the scheduler learns which built-in kinds end themselves at settings.restartLimit
+// (Live.LimitsRestarts), and its join writes at close through Session.WriteAtCloseAsync; safeReport records task_interrupted's reason,
+// extension and task ID, as task_faulted's.
 using System.Collections.Immutable;
 using PiSharp.AI;
 using PiSharp.Durable.Chord;
@@ -157,6 +160,7 @@ internal sealed class DurableHarness : Session, IHarness
             },
             Context = context.WithoutCancellation(),
             ReadOnly = options.ReadOnly,
+            LimitsRestarts = Live.LimitsRestarts.Contains,
         });
         submissions = new Submissions(this, storage, Now, () => Agents.ResolveSettings(hostSettings()), () => scheduler.Resume(), options.Telemetry);
         views = new ConversationViews(this, storage);
