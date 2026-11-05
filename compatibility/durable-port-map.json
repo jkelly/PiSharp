@@ -2859,9 +2859,9 @@
       "lines": 1017,
       "pisharp": "tests/PiSharp.Durable.Tests/SessionGroupCommitCases.cs",
       "phase": "sync-1.5.0",
-      "status": "ported",
+      "status": "in-progress",
       "upstreamChange": "added",
-      "note": "v1.5.0 (work list area group-commit, e5c6182ba): 37 of 40 tests. Deterministic holds where upstream relies on Node's single-threaded order: BatchStorage.Hold, the line tick (Session.LineTickAsync), the Session's gate-hit count (GateHits), Session.PublicationHop for the macrotask between two parts, and SettleOrder, which watches the tasks themselves (see the file header). Upstream's undefined and null rejection and refusal values are one case each (2 tests for 4). 'fails the Session for a throw in the read caches' write-through, and leaves the later parts unpublished' waits on area publication-caches (CachedStorage). Tests: session.group-commit.*"
+      "note": "v1.5.0 (work list area group-commit, e5c6182ba): 37 of 40 tests. Deterministic holds where upstream relies on Node's single-threaded order: BatchStorage.Hold, the line tick (Session.LineTickAsync), the Session's gate-hit count (GateHits), Session.PublicationHop for the macrotask between two parts, and SettleOrder, which watches the tasks themselves (see the file header). Upstream's undefined and null rejection and refusal values are one case each (2 tests for 4). 'fails the Session for a throw in the read caches' write-through, and leaves the later parts unpublished' waits on area publication-caches (CachedStorage). In progress until that case lands. Tests: session.group-commit.*"
     },
     {
       "upstream": "packages/durable/test/session-observers.test.ts",
