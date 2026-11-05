@@ -31,6 +31,9 @@
 // view's entries are a window over the transcript.
 // Pi v1.5.0 sync (area tool-tasks, 87eff524f, 1c6928b30): ToolHooks.AfterTool runs on every result a tool task writes, the Harness's own error
 // results included, and its doc says which (#11043).
+// Pi v1.5.0 sync (area admission): SubmissionDraft.Continue, a run on the context as it is (fb524dd2e, #11043), and IConversationHandle's
+// SubmitAsync takes any draft, as IConversation's does; WhenIdle.Reject on input (6a2825113, #11149); and SubmitAsync(tx, draft) on both,
+// admission inside the caller's commit (cc9c52310, #11149). settings.afterFailedRun's doc names nothing_to_answer.
 using System.Collections.Immutable;
 using PiSharp.AI;
 using PiSharp.Durable.Chord;
@@ -765,10 +768,10 @@ public class HarnessSettings
     /// </summary>
     public virtual double? DocumentRetentionMs { get; init; }
     /// <summary>
-    /// What a run that fails (<c>model_error</c>, <c>no_model</c>) does with the inputs queued behind it: <see cref="Durable.AfterFailedRun.Keep"/>
-    /// leaves them queued until the next input or queued write, <see cref="Durable.AfterFailedRun.Continue"/> starts the next run with them, as an
-    /// answer would, and <see cref="Durable.AfterFailedRun.Withdraw"/> settles them <c>unanswered</c> with reason <c>run_failed</c>. Default
-    /// <see cref="Durable.AfterFailedRun.Keep"/>.
+    /// What a run that fails (<c>model_error</c>, <c>no_model</c>, <c>interrupted</c>, <c>restart_limit</c>, <c>nothing_to_answer</c>) does
+    /// with the inputs queued behind it: <see cref="Durable.AfterFailedRun.Keep"/> leaves them queued until the next input or queued write,
+    /// <see cref="Durable.AfterFailedRun.Continue"/> starts the next run with them, as an answer would, and <see cref="Durable.AfterFailedRun.Withdraw"/> settles them <c>unanswered</c> with
+    /// reason <c>run_failed</c>. Default <see cref="Durable.AfterFailedRun.Keep"/>.
     /// </summary>
     public virtual AfterFailedRun? AfterFailedRun { get; init; }
     /// <summary>
@@ -1034,6 +1037,15 @@ public sealed record ConversationAbortOptions
     public bool Background { get; init; }
 }
 
+/// <summary>What an idle conversation (one without a run) does with user input (upstream <c>whenIdle</c>); without it, idle input starts a
+/// run.</summary>
+public enum WhenIdle
+{
+    /// <summary><c>reject</c>: rejected with <see cref="ConversationIdleException"/> and nothing is written, so the input never starts a run.
+    /// With <see cref="WhenBusy.Steer"/> it steers the current run or is refused, in one admission.</summary>
+    Reject,
+}
+
 /// <summary>When a busy conversation queues user input.</summary>
 public enum WhenBusy
 {
@@ -1053,19 +1065,31 @@ public enum WhenBusy
 /// <param name="Data">The entry data; null omits it (JSON <c>null</c> is <see cref="JsonValue.Null"/>).</param>
 public sealed record InputEntry(string Kind, JsonValue? Data = null);
 
-/// <summary>A host submission: user input that may start a run, or a passive entry write (upstream <c>SubmissionDraft</c>). A request ID
-/// deduplicates within one conversation before any write; reusing one for the other submission type rejects.</summary>
+/// <summary>A host submission: user input that may start a run, a passive entry write, or a continue: a run without a new user message, for
+/// an idle conversation whose context the model still owes an answer (it ends in a user message or tool results, for example after a run
+/// that ended without an answer) (upstream <c>SubmissionDraft</c>). A request ID deduplicates within one conversation before any write;
+/// reusing one for another submission type rejects.</summary>
 public sealed record SubmissionDraft
 {
     private SubmissionDraft() { }
     /// <summary>User input (pi-ai <c>UserMessage["content"]</c>, wire JSON), placed as <paramref name="entry"/> when given, else as
-    /// <c>pi.user</c> without data.</summary>
-    public static SubmissionDraft Input(JsonValue content, WhenBusy? whenBusy = null, string? requestId = null, InputEntry? entry = null) =>
-        new() { Type = SubmissionType.Input, Content = content, WhenBusy = whenBusy, RequestId = requestId, InputEntry = entry };
+    /// <c>pi.user</c> without data. <paramref name="whenIdle"/> <see cref="Durable.WhenIdle.Reject"/> refuses it on an idle
+    /// conversation.</summary>
+    public static SubmissionDraft Input(JsonValue content, WhenBusy? whenBusy = null, string? requestId = null, InputEntry? entry = null,
+        WhenIdle? whenIdle = null) =>
+        new() { Type = SubmissionType.Input, Content = content, WhenBusy = whenBusy, WhenIdle = whenIdle, RequestId = requestId, InputEntry = entry };
     /// <summary>A passive entry write.</summary>
     public static SubmissionDraft Write(EntryDraft entry, string? requestId = null) =>
         new() { Type = SubmissionType.Write, Entry = entry, RequestId = requestId };
-    /// <summary>Input or write.</summary>
+    /// <summary>
+    /// Starts a run on the context as it is, without a user message (upstream <c>{ type: "continue" }</c>). Only when idle: a busy conversation
+    /// rejects it with <see cref="ConversationBusyException"/>, and it never queues. Items kept in <c>pi.inbox</c> are placed first and join
+    /// the run. A context with nothing to answer (empty, or ending in an answer, also a text answer cut off at its output limit) ends the run
+    /// without a request, <c>unanswered</c> with <c>nothing_to_answer</c>. A cut-off answer with tool calls is continued: its calls never ran,
+    /// and the context ends in their error results (<c>missing_result</c>).
+    /// </summary>
+    public static SubmissionDraft Continue(string? requestId = null) => new() { Type = SubmissionType.Continue, RequestId = requestId };
+    /// <summary>Input, write or continue.</summary>
     public SubmissionType Type { get; private init; }
     /// <summary>Host deduplication key, scoped to the conversation.</summary>
     public string? RequestId { get; private init; }
@@ -1073,6 +1097,8 @@ public sealed record SubmissionDraft
     public JsonValue? Content { get; private init; }
     /// <summary>What a busy conversation does with the input.</summary>
     public WhenBusy? WhenBusy { get; private init; }
+    /// <summary>What an idle conversation does with the input (upstream <c>whenIdle</c>); null starts a run.</summary>
+    public WhenIdle? WhenIdle { get; private init; }
     /// <summary>The written entry.</summary>
     public EntryDraft? Entry { get; private init; }
     /// <summary>The entry an input is placed as (upstream <c>entry</c> of an input); null places it as <c>pi.user</c>.</summary>
@@ -1102,21 +1128,27 @@ public interface ISubmission
     /// <summary>Resolves with the settled record (status <c>done</c> or <c>unanswered</c>; upstream <c>SettledSubmissionRecord</c>); cancelling
     /// <paramref name="context"/> cancels only this wait, and close rejects it.</summary>
     Task<SubmissionRecord> WaitAsync(DurableContext context);
-    /// <summary>Withdraws a queued submission: <c>aborted</c>; <c>already_placed</c> for a placed input and <c>settled</c> for a settled
-    /// submission.</summary>
+    /// <summary>Withdraws a queued submission: <c>aborted</c>; <c>already_placed</c> for a placed input or continue and <c>settled</c> for a
+    /// settled submission.</summary>
     Task<SubmissionAbortResult> AbortAsync(DurableContext context);
 }
 
 /// <summary>
-/// Invocation-bound conversation operations for tasks and tools (upstream <c>ConversationHandle</c>). Rejects after the invocation ends;
-/// passive entries are written with ordinary transaction writes instead.
+/// Invocation-bound conversation operations for tasks and tools (upstream <c>ConversationHandle</c>). Rejects after the invocation ends.
+/// <c>SubmitAsync</c> takes any submission, in both forms of <see cref="IConversation.SubmitAsync(SubmissionDraft, DurableContext)"/>: a
+/// subagent's conversation is an ordinary one, so a tool may also continue it, and a task may admit a submission in the same commit as its
+/// own writes (<c>runtime.CommitAsync()</c>); entries the admission appends there carry the task's <c>byTaskId</c>. The transaction form also
+/// rejects once the invocation is aborted.
 /// </summary>
 public interface IConversationHandle
 {
     /// <summary>The conversation.</summary>
     ConversationId Id { get; }
-    /// <summary>Admits user input; the returned submission's operations are bound to the invocation too.</summary>
+    /// <summary>Admits a submission; the returned submission's operations are bound to the invocation too.</summary>
     Task<ISubmission> SubmitAsync(SubmissionDraft submission, DurableContext context);
+    /// <summary><see cref="IConversation.SubmitAsync(ITx, SubmissionDraft)"/> inside a commit of the task or tool (<c>runtime.CommitAsync()</c>,
+    /// <c>api.CommitAsync()</c>), or any commit of the Harness; rejects once the invocation is aborted or ended.</summary>
+    Task<SubmissionId> SubmitAsync(ITx tx, SubmissionDraft submission);
     /// <summary><c>Conversation.AbortAsync()</c>: withdraw queued inputs, abort the ordinary ownership scope, and wait until it is idle.</summary>
     Task AbortAsync(DurableContext context, ConversationAbortOptions? options = null);
     /// <summary>Resolves when the conversation's ordinary ownership scope has no live non-background task.</summary>
@@ -1157,13 +1189,28 @@ public interface IConversation
     Task ConfigureAsync(AgentChange change, DurableContext context);
 
     /// <summary>
-    /// Durably admits user input or a passive entry write. A busy conversation, or one with queued items, queues input and writes that affect
-    /// model context in <c>pi.inbox</c>; <see cref="WhenBusy.Reject"/> rejects input with <see cref="ConversationBusyException"/> instead and
-    /// writes nothing. A write of only <c>Kind</c> and <c>Data</c> (no <c>Model</c>, <c>Head</c> or <c>Edits</c>) is appended at once, even
-    /// mid-run, as it changes nothing the model sees. Idle input places its entry (<c>pi.user</c>, or its <see cref="InputEntry"/>) and starts
-    /// a run; an idle write appends its entry.
+    /// Durably admits user input, a passive entry write, or a continue. A busy conversation, or one with queued items, queues input and
+    /// writes that affect model context in <c>pi.inbox</c>; <see cref="WhenBusy.Reject"/> rejects input with
+    /// <see cref="ConversationBusyException"/> instead and writes nothing. An idle conversation rejects <see cref="WhenIdle.Reject"/> input
+    /// with <see cref="ConversationIdleException"/> and writes nothing. A write of only <c>Kind</c> and <c>Data</c> (no <c>Model</c>,
+    /// <c>Head</c> or <c>Edits</c>) is appended at once, even mid-run, as it changes nothing the model sees. Idle input places its entry
+    /// (<c>pi.user</c>, or its <see cref="InputEntry"/>) and starts a run; an idle write appends its entry. A continue starts a run on the
+    /// context as it is, after placing queued items; a busy conversation rejects it with <see cref="ConversationBusyException"/>, as it
+    /// never queues.
     /// </summary>
     Task<ISubmission> SubmitAsync(SubmissionDraft submission, DurableContext context);
+    /// <summary>
+    /// Admits a submission inside the caller's commit <paramref name="tx"/> (the Harness's <c>CommitAsync()</c>, <see cref="CommitAsync{T}(Func{ITx,
+    /// Task{T}}, DurableContext, CommitOptions?)"/>, a task's <c>runtime.CommitAsync()</c>), with the same rules, and returns its ID: the
+    /// admission is stored with that commit, or not at all when the callback throws later or the commit fails (upstream
+    /// <c>submit(tx, draft)</c>). Call it before the commit's first table write (<c>AppendEntryAsync()</c>, <c>CreateTaskAsync()</c>,
+    /// <c>CreateSubmissionAsync()</c>, another admission): otherwise it throws <see cref="ReadAfterWriteException"/>, on every path. Documents
+    /// may be read and written before and after it. A rejection (<see cref="ConversationBusyException"/>, <see cref="ConversationIdleException"/>)
+    /// throws before any write, so the callback may catch it. Do not call <see cref="ISubmission"/> or other Harness reads inside the callback:
+    /// they wait for the commit holding the line. Its <c>pi.durable.submit</c> span covers the admission only, so its <c>result</c> is
+    /// provisional. Throws for a transaction of another Session.
+    /// </summary>
+    Task<SubmissionId> SubmitAsync(ITx tx, SubmissionDraft submission);
     /// <summary>Admits a write of a <c>pi.reset</c> entry that starts a new context, carrying <paramref name="handoff"/> as a user message
     /// when given.</summary>
     Task ResetAsync(string? handoff, DurableContext context);

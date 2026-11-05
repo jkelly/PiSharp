@@ -38,6 +38,8 @@
 // (CloseEnds, as v1.5.0 ends every synchronous observer) or with the error that failed the Session. The internal observeCommits is
 // FollowCommits (upstream followCommits); Closed settles a SessionEnd tagged by Kind, and a document change is a DocumentValueChange or a
 // DocumentRetireChange.
+// Pi v1.5.0 sync (area admission, cc9c52310): OwnsTransaction (upstream ownsTransaction) tells whether a transaction is one of this
+// Session's commits, for submit(tx, draft).
 //
 // Concurrency model. Upstream relies on one JavaScript thread: `#enqueue` chains every mutation and cold load onto one promise, and
 // listeners run in later microtasks. Here .NET callers may be on any thread, so:
@@ -361,6 +363,9 @@ public class Session : ISession
             throw new ArgumentOutOfRangeException(nameof(persistence), ms, "CommitPersistence.WithinMs must be a number of milliseconds, 0 or more");
         return ms;
     }
+
+    /// <summary>Internal: whether <paramref name="tx"/> is the transaction of one of this Session's commits.</summary>
+    internal bool OwnsTransaction(ITx tx) => Transaction.OwnedBy(tx, host);
 
     /// <summary>Internal: runs a read-only job on the mutation line so multi-read derivations observe one committed state.</summary>
     internal Task<T> ReadOnLineAsync<T>(Func<Task<T>> job)

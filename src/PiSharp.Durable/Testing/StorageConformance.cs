@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/src/testing/storage-conformance.ts.
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/src/testing/storage-conformance.ts, every v1.5.0 case (see below).
 // The semantic conformance suite every backend runs (spec §10), directly and after reopen. Cases keep upstream's names, inputs and
 // expected values. Two cases are adapted because records and JSON values are immutable here: "detaches retained writes and every returned
 // record" and "detaches prototype-like JSON keys ..." change the caller's own builders (and builders made from read results) where
@@ -10,8 +10,9 @@
 // ported: a receipt before resolving and none for a refusal, batches in order checked against the earlier ones, the prefix before the
 // first refusal, a refusal by a batch's own malformed actions, and a copy resolved against the earlier batches. A refusal is an exception
 // here, so upstream's String(refused) ("Error: <message>") is its Message. Area store-storage adds v1.5.0's create-and-change case
-// ("refuses a creation and a change of one document in one commit, in either order"). The sleeping and continue-submission cases v1.5.0
-// adds follow with areas sleep and admission; until then the rest of the file follows v1.2.0.
+// ("refuses a creation and a change of one document in one commit, in either order"). The sleeping case v1.5.0 adds came with area sleep,
+// and area admission adds the continue-submission case ("stores continue submissions, which have no entry and are never queued",
+// fb524dd2e), so every v1.5.0 case is here, in upstream's order, and the citation moves to v1.5.0.
 using System.Collections.Immutable;
 using PiSharp.Durable.Chord;
 using PiSharp.Durable.Chord.Delta;
@@ -46,6 +47,7 @@ public static class StorageConformance
             Case("stores and scans sleeping tasks by status", StoresSleepingTasks),
             Case("indexes request IDs per conversation and replaces complete submission records", IndexesRequestIds),
             Case("stores passive write submissions without input-only lifecycle states", StoresPassiveWrites),
+            Case("stores continue submissions, which have no entry and are never queued", StoresContinueSubmissions),
             Case("reconstructs rewindable documents and preserves half-open incarnations", ReconstructsRewindableDocuments),
             Case("streams long document tails across root replacement deltas", StreamsLongDocumentTails),
             Case("copies stored document bases independently and rejects ambiguous sources", CopiesDocumentBases),
@@ -543,6 +545,34 @@ public static class StorageConformance
         Equal<SubmissionRecord?>(done, await storage.GetSubmissionByRequestAsync(rootId, "passive-done", Context), "done write by request");
         Equal<SubmissionRecord?>(unanswered, await storage.GetSubmissionAsync(failedId, Context), "unanswered write");
         Equal<SubmissionRecord?>(unanswered, await storage.GetSubmissionByRequestAsync(rootId, "passive-failed", Context), "unanswered write by request");
+    }
+
+    private static async Task StoresContinueSubmissions(IStorage storage)
+    {
+        var rootId = await CreateRoot(storage);
+        var doneId = await storage.MintIdAsync<SubmissionId>();
+        var failedId = await storage.MintIdAsync<SubmissionId>();
+        var placedDone = new SubmissionRecord
+        {
+            Id = doneId, ConversationId = rootId, RequestId = "continue-done", Type = SubmissionType.Continue, Status = SubmissionStatus.Placed,
+        };
+        var placedFailed = new SubmissionRecord
+        {
+            Id = failedId, ConversationId = rootId, RequestId = "continue-failed", Type = SubmissionType.Continue, Status = SubmissionStatus.Placed,
+        };
+        await Commit(storage, new SubmissionWrite(placedDone), new SubmissionWrite(placedFailed));
+        Equal<SubmissionRecord?>(placedDone, await storage.GetSubmissionAsync(doneId, Context), "placed continue");
+        ItemsEqual([placedDone, placedFailed], (await storage.ScanSubmissionsAsync(new() { Status = SubmissionStatus.Placed }, 10, null, Context)).Items,
+            "placed continues");
+
+        var done = placedDone with { Status = SubmissionStatus.Done, Answer = await storage.MintIdAsync<EntryId>() };
+        var unanswered = placedFailed with { Status = SubmissionStatus.Unanswered, Reason = "nothing_to_answer" };
+        await Commit(storage, new SubmissionWrite(done), new SubmissionWrite(unanswered));
+        Equal<SubmissionRecord?>(done, await storage.GetSubmissionAsync(doneId, Context), "done continue");
+        Equal<SubmissionRecord?>(done, await storage.GetSubmissionByRequestAsync(rootId, "continue-done", Context), "done continue by request");
+        Equal<SubmissionRecord?>(unanswered, await storage.GetSubmissionAsync(failedId, Context), "unanswered continue");
+        Equal<SubmissionRecord?>(unanswered, await storage.GetSubmissionByRequestAsync(rootId, "continue-failed", Context),
+            "unanswered continue by request");
     }
 
     private static async Task ReconstructsRewindableDocuments(IStorage storage)

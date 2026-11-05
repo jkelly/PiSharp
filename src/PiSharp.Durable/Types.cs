@@ -11,6 +11,10 @@
 // TaskRecord.Trace and Links; TaskOptions.Trace and Links, TaskTrace for upstream's `TelemetryCarrier | "root"`), written in upstream's key
 // order. Without propagation none is written, so such records stay byte-identical to v1.2.0's. The citation stays on v1.2.0 until the
 // file's other areas land.
+//
+// Pi v1.5.0 sync (area admission, fb524dd2e, #11043): SubmissionRecord gains the continue variant (SubmissionType.Continue: placed without
+// an entry, done with an answer, unanswered with a reason), so a record's status alone no longer says whether it has an entry: check its
+// type too. Its JSON writes `type` as every record does (`"continue"`); input and write records are unchanged.
 using System.Collections.Immutable;
 using PiSharp.Durable.Chord;
 using PiSharp.Durable.Internal;
@@ -269,13 +273,15 @@ public sealed record EntryRecord
     public override string ToString() => ToJson().ToJson();
 }
 
-/// <summary>Whether a submission is user input or a passive entry write.</summary>
+/// <summary>Whether a submission is user input, a passive entry write, or a continue (a run started without a user message).</summary>
 public enum SubmissionType
 {
     /// <summary><c>"input"</c>.</summary>
     Input,
     /// <summary><c>"write"</c>.</summary>
     Write,
+    /// <summary><c>"continue"</c>: a run started without a user message; it places no entry and is never queued (Pi v1.5.0).</summary>
+    Continue,
 }
 
 /// <summary>The lifecycle status of a submission.</summary>
@@ -283,9 +289,9 @@ public enum SubmissionStatus
 {
     /// <summary>Admitted but not yet represented in the transcript.</summary>
     Queued,
-    /// <summary>An input added to the transcript and owned by an active run.</summary>
+    /// <summary>An input added to the transcript, or a continue, owned by an active run.</summary>
     Placed,
-    /// <summary>An answered input or an appended passive write.</summary>
+    /// <summary>An answered input or continue, or an appended passive write.</summary>
     Done,
     /// <summary>Terminal: the submission can no longer be answered or placed.</summary>
     Unanswered,
@@ -300,13 +306,14 @@ public interface ISubmissionFields
     string? RequestId { get; }
     /// <summary>The adapter-owned carrier of the admission span (upstream <c>trace</c>); absent without propagation.</summary>
     IReadOnlyDictionary<string, string>? Trace { get; }
-    /// <summary>Input or passive write.</summary>
+    /// <summary>Input, passive write or continue.</summary>
     SubmissionType Type { get; }
     /// <summary>The lifecycle status.</summary>
     SubmissionStatus Status { get; }
-    /// <summary>The transcript entry; required when placed or done, optional for an unanswered input, otherwise absent.</summary>
+    /// <summary>The transcript entry; required when an input or write is placed or done, optional for an unanswered input, otherwise absent
+    /// (a continue never has one).</summary>
     EntryId? Entry { get; }
-    /// <summary>The answer entry of a done input; otherwise absent.</summary>
+    /// <summary>The answer entry of a done input or continue; otherwise absent.</summary>
     EntryId? Answer { get; }
     /// <summary>Why an unanswered submission was not answered; otherwise absent.</summary>
     string? Reason { get; }
@@ -314,8 +321,9 @@ public interface ISubmissionFields
     JsonValue? Detail { get; }
 }
 
-/// <summary>Durable lifecycle of one admitted user input or passive entry write (upstream <c>SubmissionRecord</c>). Which fields a
-/// status allows follows upstream's union exactly; <see cref="Validate"/> and <see cref="FromJson"/> enforce it. JSON key order is
+/// <summary>Durable lifecycle of one admitted user input, passive entry write, or continue (upstream <c>SubmissionRecord</c>). Which fields
+/// a type and status allow follows upstream's union exactly (narrow by <see cref="Type"/> and <see cref="Status"/>: a placed or done
+/// continue has no <see cref="Entry"/>); <see cref="Validate"/> and <see cref="FromJson"/> enforce it. JSON key order is
 /// upstream's: the Session creates <c>{ ...create, id }</c> (<c>conversationId, requestId, trace, type, status, entry, answer, reason, detail</c>,
 /// each when present, then <c>id</c>), and a placement or settlement spreads the current record, so a field it adds (a queued input's
 /// <c>entry</c>, an <c>answer</c>, a <c>reason</c>) follows <c>id</c>. <see cref="KeyOrder"/> carries the creation order, or the decoded
@@ -429,7 +437,7 @@ public sealed class SubmissionSettlement : DurableValue
         Status = status; Answer = answer; Reason = reason; Detail = detail;
     }
 
-    /// <summary>An answered input.</summary>
+    /// <summary>An answered input or continue.</summary>
     public static SubmissionSettlement Done(EntryId answer) => new(SubmissionStatus.Done, answer, null, null);
 
     /// <summary>A submission that can no longer be answered.</summary>
@@ -484,6 +492,10 @@ internal static class SubmissionShape
             (SubmissionType.Write, SubmissionStatus.Queued) => (Field.Forbidden, Field.Forbidden, Field.Forbidden, Field.Forbidden),
             (SubmissionType.Write, SubmissionStatus.Done) => (Field.Required, Field.Forbidden, Field.Forbidden, Field.Forbidden),
             (SubmissionType.Write, SubmissionStatus.Unanswered) => (Field.Forbidden, Field.Forbidden, Field.Required, Field.Optional),
+            // Never queued; placed and settled without an entry of its own.
+            (SubmissionType.Continue, SubmissionStatus.Placed) => (Field.Forbidden, Field.Forbidden, Field.Forbidden, Field.Forbidden),
+            (SubmissionType.Continue, SubmissionStatus.Done) => (Field.Forbidden, Field.Required, Field.Forbidden, Field.Forbidden),
+            (SubmissionType.Continue, SubmissionStatus.Unanswered) => (Field.Forbidden, Field.Forbidden, Field.Required, Field.Optional),
             _ => throw RecordJson.Invalid(what, $"a {WireName.Of(value.Type)} submission cannot be {WireName.Of(value.Status)}"),
         };
         Check(entry, value.Entry is not null, "entry");

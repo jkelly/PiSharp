@@ -217,7 +217,8 @@ public sealed class AgentSession : IAsyncDisposable
         conversation ??= Orchestrator ?? throw new InvalidOperationException("The team has no orchestrator; pass a conversation.");
         var submission = await conversation.SubmitAsync(SubmissionDraft.Input(text, requestId: requestId), context).ConfigureAwait(false);
         var settled = await submission.WaitAsync(context).ConfigureAwait(false);
-        if (settled.Status != SubmissionStatus.Done || settled.Answer is not { } answer)
+        // The input's own record: answered inputs and continues carry an answer, a done write none (Pi v1.5.0 adds continue submissions).
+        if (settled.Status != SubmissionStatus.Done || settled.Type != SubmissionType.Input || settled.Answer is not { } answer)
             throw new InvalidOperationException($"The agent did not answer ({settled.Status.ToString().ToLowerInvariant()}" +
                 (settled.Reason is null ? "" : ": " + settled.Reason) + ")" +
                 settled.Detail switch { null => "", JsonStringValue detail => ": " + detail.Value, var detail => ": " + detail.ToJson() } + ".");

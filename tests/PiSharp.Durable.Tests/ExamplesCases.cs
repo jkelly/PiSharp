@@ -45,6 +45,9 @@ using PiSharp.Durable.Examples;
 // Area view (f3255de76): 32-transcript is v1.5.0's 31-transcript.ts; its lines are authored from that example and the windowed view's
 // rules (a watch starts with the newest min entries, a resume from the entry after the newest held), not captured. Its file backends count
 // the stored chat entries.
+// Area admission (cc9c52310): 35-submit-in-commit is v1.5.0's 34-submit-in-commit.ts; its lines are authored from that example, not
+// captured: the submission ID is the one this port mints, and the recorded visitors print as JSON in place of util.inspect. Its file
+// backends read the host's record back.
 // Area events (f3255de76): v1.5.0 removed watchEvents, and the examples that printed agent events print the view, as upstream's do. 19-json
 // runs v1.5.0's two modes (18-json.ts), ops on the runner's storage and state on MemoryStorage: the ops lines stay the v1.2.0 capture's
 // authored forms (JsonModeOpsLines), and the state lines are authored from them, not captured: JsonModeStateLines replays each frame's ops
@@ -342,7 +345,18 @@ internal static partial class Program
         "fill gap                     [load earlier] 171..255",
         "resume after 3 missed        window: 3 entries",
         TranscriptLastLine,
+        // Pi v1.5.0 sync (area admission): v1.5.0's 34-submit-in-commit.ts, authored (see the file header).
+        "== 35-submit-in-commit",
+        "ana: the agent isn't working now",
+        "ana's message is submission 14",
+        "bob is muted",
+        "> Build the project.",
+        "> ana: Add a test for the build.",
+        "agent: Built, and I added the test Ana asked for.",
+        SubmitInCommitRecorded,
     ];
+
+    private const string SubmitInCommitRecorded = """recorded: [{"from":"ana","text":"Add a test for the build."}]""";
 
     private const string TranscriptLastLine = "                             [load earlier] 171..258";
 
@@ -487,6 +501,7 @@ internal static partial class Program
         [PlanModeLastLine] = [PlanSteps],
         [ReviewerTranscript[^1]] = ReviewerTranscript,
         [TranscriptLastLine] = ["stored: 258 chat entries, the newest \"line 258\""],
+        [SubmitInCommitRecorded] = [SubmitInCommitRecorded],
     };
 
     private static IEnumerable<(string, Func<Task>)> ExamplesCases()

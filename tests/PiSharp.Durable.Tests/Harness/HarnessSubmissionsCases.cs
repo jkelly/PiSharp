@@ -7,6 +7,8 @@
 // - `{ ...context, abortSignal: controller.signal }` is a DurableContext.WithCancel() context; `controller.abort(new Error(text))` cancels it
 //   with that exception as the reason.
 // - `defineEntry<{ n: number }>` is a JsonObjectValue-typed entry kind; `const n: number = counter.data.n` reads the number.
+// Pi v1.5.0 sync (area admission, fb524dd2e): the idle-input case narrows the record by type too, as continue submissions are placed
+// without an entry. The citation stays on v1.2.0 until the file's other areas land (publication-caches, group-commit-scheduler).
 using System.Collections.Immutable;
 using PiSharp.Durable;
 using PiSharp.Durable.Chord;
@@ -87,7 +89,7 @@ internal static class SubmissionsTests
             var submission = await Submit(root, "hi");
             await busy.Reached;
             var record = await submission.StatusAsync(Context);
-            if (record.Status != SubmissionStatus.Placed) throw new InvalidOperationException($"Unexpected {record.Status}");
+            if (record.Type != SubmissionType.Input || record.Status != SubmissionStatus.Placed) throw new InvalidOperationException($"Unexpected {record.Status}");
             var entry = await root.CommitAsync(tx => tx.GetEntryAsync(Entries.UserEntry, record.Entry!.Value), Context);
             SameJson("""[{"role":"user","content":"hi","timestamp":42}]""", entry?.Model, "user entry");
             var live = await harness.SnapshotAsync(Live.LiveDoc, root.Id, Context);

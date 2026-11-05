@@ -17,6 +17,8 @@
 // settings.restartLimit times, and the helpers their phases read (cutOffTooOften, salvageable, cutOffCount). The scheduler faults only an
 // abort handler of theirs for the limit, with detail {reason: "restart_limit"}: SettleSchedulerOutcomeAsync then ends its run aborted with
 // the limit as detail and without converting the partial, and removes a compaction's status without recording a failure.
+// Pi v1.5.0 sync (area admission, fb524dd2e): the Harness produces nothing_to_answer, a continue's run on a context with nothing to answer
+// (Generation.cs), and RunFailureReason's doc says only turn_limit waits.
 // Pi v1.5.0 sync (area tool-tasks, 1c6928b30): a ToolSlot's taskId is absent only for a call not started yet (a sequential round's
 // pending); a call its request did not offer starts pending with its task, flagged unoffered: true, instead of done with the entry
 // generation wrote. ToolSlotOf finds a slot in a snapshot, which a tool task's results rebuilt from the slot read before their commit.
@@ -301,8 +303,7 @@ public static class Live
 
 /// <summary>
 /// Why a run ended without an answer (upstream <c>RunFailureReason</c>; <see cref="RunFailure.ReasonName"/> is the persisted spelling).
-/// Every Pi v1.5.0 value is declared; the Harness produces <see cref="Interrupted"/>, <see cref="RestartLimit"/>,
-/// <see cref="NothingToAnswer"/> and <see cref="TurnLimit"/> once the Pi v1.5.0 sync areas that port them land.
+/// Every Pi v1.5.0 value is declared; the Harness produces <see cref="TurnLimit"/> once the Pi v1.5.0 sync area that ports it lands.
 /// </summary>
 public enum RunFailureReason
 {

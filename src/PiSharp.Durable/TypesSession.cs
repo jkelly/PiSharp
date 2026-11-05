@@ -599,7 +599,7 @@ public interface ITx
     Task<TaskId> CreateTaskAsync(DurableTask task, JsonValue input, TaskOptions options);
     /// <summary>Creates a raw submission record with a fresh ID. No admission rules apply: no busy check, inbox queueing or placement.</summary>
     Task<SubmissionRecord> CreateSubmissionAsync(SubmissionCreate create);
-    /// <summary>Settles a queued or placed submission; only a placed input can be answered and a settled submission stays unchanged.
+    /// <summary>Settles a queued or placed submission; only a placed input or continue can be answered and a settled submission stays unchanged.
     /// Resolved against this transaction's latest record of the submission, so it works after table writes.</summary>
     void SettleSubmission(SubmissionId id, SubmissionSettlement settlement);
     /// <summary>Places a queued submission at <paramref name="entry"/>: an input becomes placed, a write done. Resolved like
