@@ -18,6 +18,9 @@
 // - Pi v1.5.0 sync (area vocabulary, 5f312dac4): openTestSession attaches with ObserveCommits (a CommitObserver; was SubscribeCommits),
 //   the internal follower helper is FollowCommits (upstream followCommits, was observeCommits), DocumentValues is upstream's
 //   documentValues (the document changes of kind change), and onValue is Change(call) above.
+// - Pi v1.5.0 sync (area group-commit, e5c6182ba): RefusingAt is upstream's refusingAt. ControlledStorage still records every batch of a
+//   call before its hold, where v1.5.0's records them after it, and only the first one of a call it refuses: the cases that read
+//   Commits right after Entered rely on it (SessionGroupCommitCases.cs counts its own calls in BatchStorage).
 using System.Collections.Immutable;
 using PiSharp.Durable;
 using PiSharp.Durable.Chord;
@@ -74,6 +77,28 @@ internal static partial class SessionTests
 
     /// <summary>Upstream <c>flush()</c>; see the file header.</summary>
     internal static Task Flush(Session session) => session.FlushLineAsync();
+
+    /// <summary>
+    /// Commits <paramref name="batches"/> through <paramref name="commit"/> up to the first one <paramref name="refuses"/> matches, which it
+    /// refuses with <paramref name="error"/>: what a storage does whose own check refuses that batch (upstream v1.5.0 <c>refusingAt</c>, Pi
+    /// v1.5.0 sync, area group-commit).
+    /// </summary>
+    internal static async Task<CommitResult> RefusingAt(
+        Func<IReadOnlyList<IReadOnlyList<StorageWrite>>, Action<int, Seq>, DurableContext, Task<CommitResult>> commit,
+        IReadOnlyList<IReadOnlyList<StorageWrite>> batches, Action<int, Seq> receive, DurableContext context,
+        Func<IReadOnlyList<StorageWrite>, bool> refuses, Exception error)
+    {
+        var at = -1;
+        for (var index = 0; index < batches.Count; index++)
+        {
+            if (!refuses(batches[index])) continue;
+            at = index;
+            break;
+        }
+        if (at < 0) return await commit(batches, receive, context);
+        var result = await commit([.. batches.Take(at)], receive, context);
+        return result.Stored < at ? result : new CommitResult(at, error);
+    }
 
     internal static List<DocumentCommitChange> DocumentChanges(CommitPublication publication) =>
         [.. publication.Changes.OfType<DocumentCommitChange>()];

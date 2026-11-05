@@ -3,8 +3,8 @@
 // harness-options): a read-only Session refuses commits with writes (upstream be14d9732); the citation stays on v1.2.0 until the file's
 // other areas land. Pi v1.5.0 sync (area storage-batches): a commit sends its writes as one batch of the batched Storage.commit and judges
 // the result, as session/writer.ts does for a call of one part: a refusal fails the Session and is the commit's error, as a rejection is.
-// Group commit (several parts per call) and the publication scope (Storage.publishing) follow with their own areas; GuardedStorage
-// already forwards both. Pi v1.5.0 sync (area sleep): createSession's setTimer arms the document sweep as a background timer (upstream
+// Group commit (several parts per call) and the publication scope (Storage.publishing) came with area group-commit (below); GuardedStorage
+// forwards both. Pi v1.5.0 sync (area sleep): createSession's setTimer arms the document sweep as a background timer (upstream
 // f75b3240a, Timers.cs); a host that declines one leaves eviction to the end of each commit. Pi v1.5.0 sync (area reports): a report
 // carries its ReportInfo (a30c2a81d): the Session's failure and a failing close are storage_failed, a host timer host_error setTimer, and a
 // listener's throw listener_error, the default. Pi v1.5.0 sync (area telemetry, 2ec55d808 and v1.5.0's fix): a stored commit's publication
@@ -31,8 +31,8 @@
 // definition version reloads the document. ObserveCommits sees each storage transaction with exactly what it stored, so its seq has
 // gaps; a failed Session stores nothing more.
 // Pi v1.5.0 sync (area restarts, b3a29f111): WriteAtCloseAsync (upstream writeAtClose), for the scheduler's join, writes on the line,
-// after the commits admitted before the seal, straight to Storage; a failed Session writes nothing. Upstream admits it to its group-commit
-// writer; here it is one storage call of one batch. Pi v1.5.0 sync (area vocabulary, 5f312dac4): SubscribeCommits(listener) is
+// after the commits admitted before the seal, straight to Storage; a failed Session writes nothing. Since area group-commit it is a part of
+// the writer, as upstream's. Pi v1.5.0 sync (area vocabulary, 5f312dac4): SubscribeCommits(listener) is
 // ObserveCommits(CommitObserver), each observer behind the generic guard (ObserverGuard<CommitPublication>, Observers.cs): a throw is
 // reported, detaches it and ends it listener_error, and close ends the rest after its last publication, failed with "session closed"
 // (CloseEnds, as v1.5.0 ends every synchronous observer) or with the error that failed the Session. The internal observeCommits is
@@ -40,19 +40,38 @@
 // DocumentRetireChange.
 // Pi v1.5.0 sync (area admission, cc9c52310): OwnsTransaction (upstream ownsTransaction) tells whether a transaction is one of this
 // Session's commits, for submit(tx, draft).
+// Pi v1.5.0 sync (area group-commit, e5c6182ba's Session half; docs/group-commit.md): a Session no longer holds its line while a commit
+// is stored. A job's line part runs its callback and settlement and admits its commit to the writer (Session/Writer.cs) as a part; the
+// writer sends every part admitted while a call is in flight together in the next storage call, each with its own seq and outcome, and
+// publishes them in line order. A job runs while earlier commits are being stored until it touches a key one of them wrote (Session/Keys.cs:
+// every Storage read of a job goes through GatedStorage, a document load touches its address, a retirement its address and a terminal task's
+// scope); then it waits for that commit's publication. Outcomes are delivered in line order (fences); an exempt internal commit
+// (CommitInternalAsync) that writes nothing and waited at no gate is delivered at once; every job after the one a failure is the outcome
+// of gets SessionFailed, except the other parts of a call that rejected. At most 256 jobs wait for their outcome. Held commits, the
+// held-store path (StoreHoldsAsync), the writes at close and close itself go through the writer; a stored commit is published inside the
+// Storage's publication scope (IStorage.Publishing). Upkeep (sweeps, hold timers, close, the writes at close) runs as maintain jobs, with
+// no outcome fence. The read caches, conversation tails and the task-document index (upstream CachedStorage, ConversationTails,
+// #taskDocuments) are area publication-caches'; the scheduler half (decision regions, membership keys) is area group-commit-scheduler's,
+// so until it lands a Harness keeps every line job behind the publication of what was admitted before it (LineWaitsForPublication),
+// which is the old serialized line. The citation stays on v1.2.0: areas publication-caches and registry-reader change this file too.
 //
-// Concurrency model. Upstream relies on one JavaScript thread: `#enqueue` chains every mutation and cold load onto one promise, and
-// listeners run in later microtasks. Here .NET callers may be on any thread, so:
+// Concurrency model. Upstream relies on one JavaScript thread: `#enqueue` chains every mutation and cold load onto one promise, the writer
+// publishes between line jobs, and listeners run in later microtasks. Here .NET callers may be on any thread, so:
 // - The line (SessionLine) is a FIFO queue of jobs run one at a time. Enqueue order, taken under a short lock, is the order jobs run in,
 //   so ordering is deterministic. An enqueue on an idle line runs the job inline on the caller's thread until its first incomplete await
 //   (an async method's usual start); later jobs run on the thread that completed the previous one. No lock is held while a job runs.
-//   Jobs one thread enqueues in SessionLine.Together queue back to back, as upstream's enqueues in one synchronous stretch do.
-//   Job results complete with RunContinuationsAsynchronously, so a caller's continuation never runs on, or blocks, the line. A flow with
-//   an OrderedLineDelivery (the scheduler's abort invocations) gets its results through that delivery instead, off the line too: in line
-//   order, each continuation running until it next suspends before the next, as upstream's microtasks resume them.
-// - Every commit callback, preparation, Storage settlement, adoption and publication runs inside one job. Commit listeners run
-//   synchronously in it, after adoption. Watch deliveries that a publication schedules (upstream's microtasks) run in the same job right
-//   after publication, before the commit's task completes; a listener that awaits continues later on its own.
+//   Jobs one thread enqueues in SessionLine.Together queue back to back, as upstream's enqueues in one synchronous stretch do. A job's
+//   line index, its outcome fence and the job on the line (current) are taken when it starts, so on the line, in line order.
+//   Outcomes complete with RunContinuationsAsynchronously, so a caller's continuation never runs on, or blocks, the line or the writer. A
+//   flow with an OrderedLineDelivery (the scheduler's abort invocations) gets its outcomes through that delivery instead, off the line too:
+//   in line order, each continuation running until it next suspends before the next, as upstream's microtasks resume them.
+// - A job's callback, preparation and settlement run in its line part; storing and publication run in the writer, which may run on
+//   another thread while later jobs run. What publication changes that a later job reads is keyed (the gates above), and memory adopts a
+//   part before its keys leave (Writer.cs), so a job that passed a gate sees the commit adopted. Every other structure publication and jobs
+//   share is guarded: the document cache by documentsGate, the held documents and their timer by holdsGate (TakeHeld's lookups included),
+//   the listener sets by listenersGate. Commit listeners run synchronously in the publication, after adoption. Watch deliveries that a
+//   publication schedules (upstream's microtasks) run in that publication right after its listeners (a thread-static scope, so a job on
+//   another thread never joins it), before the commit's gate opens and its outcome completes; a listener that awaits continues later.
 // - A job must not wait for a later job (a commit callback that awaits another commit deadlocks, as upstream's does). Session APIs called
 //   from a listener only enqueue, so they never block the line.
 // - The loaded-document cache, its retention bookkeeping and the listener sets are guarded by short locks so snapshot's fast path can read
@@ -141,9 +160,29 @@ public class Session : ISession
     private volatile FailureBox? failure;
     private readonly TaskCompletionSource failedSource = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private readonly TaskCompletionSource<SessionEnd> closedSource = new(TaskCreationOptions.RunContinuationsAsynchronously);
-    // Deliveries scheduled while a job publishes; run by that job right after publication. Guarded by deferGate.
-    private readonly Lock deferGate = new();
-    private List<Action>? deferred;
+    // Deliveries scheduled while this thread publishes one of this Session's commits; run by that publication right after its listeners.
+    [ThreadStatic] private static (Session Owner, List<Action> Work)? publishing;
+    // The writer and the Storage jobs on the line read through (Keys.cs, Writer.cs).
+    private readonly Writer writer;
+    private readonly GatedStorage gated;
+    // Line state, changed on the line only, except where noted: the next job's index, the job on the line, and the fence the next job's
+    // outcome waits behind (the delivery of every earlier outcome).
+    private long nextIndex;
+    private volatile Job? current;
+    private Task fence = Task.CompletedTask;
+    // Jobs that started on the line and have no outcome delivered yet (MaxOutstanding), and the wait for room. Guarded by outcomesGate,
+    // as deliveries run off the line.
+    private readonly Lock outcomesGate = new();
+    private int outstanding;
+    private TaskCompletionSource? room;
+    private long lastDelivered = -1;
+    // The line index whose outcome the failure is: every later job's outcome is SessionFailed, except ownOutcomes. Guarded by closingGate.
+    private long? failAt;
+    private readonly HashSet<long> ownOutcomes = [];
+
+    /// <summary>Jobs admitted to the line whose outcome is not delivered yet, beyond which the line waits (upstream <c>MAX_OUTSTANDING</c>):
+    /// a count, not bytes.</summary>
+    internal const int MaxOutstanding = 256;
 
     /// <summary>Opens a Session kernel over <paramref name="storage"/>; <paramref name="now"/> is the wall clock for task times in milliseconds
     /// (default: the system clock); <paramref name="documentRetentionMs"/> is read at each use (null: the default). A
@@ -160,6 +199,8 @@ public class Session : ISession
             TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
         guard = new StorageGuard(storage, this);
         this.storage = new GuardedStorage(guard, null);
+        gated = new GatedStorage(this.storage, Touch);
+        writer = new Writer(new WriterHost(this));
         var hostNow = now ?? SystemClock;
         this.now = hostNow;
         // Cache bookkeeping must never change the outcome of the operation it follows: a clock or a retention setting that throws counts as
@@ -245,9 +286,16 @@ public class Session : ISession
     internal void Fail(Exception error) => Fail(error, null);
 
     /// <summary><see cref="Fail(Exception)"/>, reported with the context of the operation that failed, when there is one.</summary>
-    internal void Fail(Exception error, DurableContext? context)
+    internal void Fail(Exception error, DurableContext? context) => Fail(error, context, null, null);
+
+    /// <summary>
+    /// <see cref="Fail(Exception, DurableContext?)"/> with the line index <paramref name="at"/> of the job whose outcome the failure is, by
+    /// default the job on the line (else the last delivered one): later jobs' outcomes become SessionFailed, except <paramref name="own"/>,
+    /// whose outcome is still their own error (upstream <c>fail(error, context, at, own)</c>).
+    /// </summary>
+    internal void Fail(Exception error, DurableContext? context, long? at, IReadOnlyCollection<long>? own)
     {
-        if (!TrySetFailure(error)) return;
+        if (!TrySetFailure(error, at, own)) return;
         failedSource.TrySetException(new SessionFailedException(error));
         // Seal first, so a report handler that calls back finds the Session failed. Closing runs the close listeners synchronously; a
         // failing backend close is the caller's to see, and here nobody waits.
@@ -260,14 +308,26 @@ public class Session : ISession
         if (finishClose is not null) ThreadPool.UnsafeQueueUserWorkItem(static finish => finish(), finishClose, preferLocal: false);
     }
 
-    private bool TrySetFailure(Exception error)
+    private bool TrySetFailure(Exception error, long? at = null, IReadOnlyCollection<long>? own = null)
     {
         lock (closingGate)
         {
             if (failure is not null) return false;
+            // The job that caused it keeps its own outcome; without one, every outcome not delivered yet is SessionFailed.
+            long lastDeliveredIndex;
+            lock (outcomesGate) lastDeliveredIndex = lastDelivered;
+            failAt = at ?? current?.Index ?? lastDeliveredIndex;
+            if (own is not null) ownOutcomes.UnionWith(own);
             failure = new FailureBox(error);
             return true;
         }
+    }
+
+    /// <summary>Whether job <paramref name="index"/> comes after the failure's boundary without an outcome of its own: it gets SessionFailed
+    /// (upstream <c>#poisoned</c>).</summary>
+    private bool Poisoned(long index)
+    {
+        lock (closingGate) return failAt is { } at && index > at && !ownOutcomes.Contains(index);
     }
 
     /// <summary>Internal: errors of listeners, which never fail what ran them, reported as <c>listener_error</c>.</summary>
@@ -332,8 +392,124 @@ public class Session : ISession
             withinMs = Deferral(options?.Persistence);
         }
         catch (Exception error) { return Task.FromException<T>(error); }
-        return line.Enqueue(() => RunCommitAsync(change, context, scope, withinMs));
+        return Enqueue(index => RunCommitAsync(change, context, scope, withinMs, index));
     }
+
+    /// <summary>
+    /// Internal: <see cref="CommitWithAsync{T}"/> for a commit of the scheduler's own whose outcome goes only to scheduler code (upstream
+    /// <c>commitInternal</c>). When it writes nothing and waited at no gate, it is equivalent to having run before every unpublished commit, so
+    /// its outcome is delivered at once, ahead of theirs. One that writes is never exempt: its outcome waits for its own publication and every
+    /// earlier outcome, so no invocation starts on a reservation that is not durable.
+    /// </summary>
+    internal Task<T> CommitInternalAsync<T>(Func<Transaction, Task<T>> change, DurableContext context)
+    {
+        ArgumentNullException.ThrowIfNull(change);
+        ArgumentNullException.ThrowIfNull(context);
+        try { AssertUsable(); }
+        catch (Exception error) { return Task.FromException<T>(error); }
+        return Enqueue(index => RunCommitAsync(change, context, null, null, index), exempt: true);
+    }
+
+    /// <summary>
+    /// Internal, on the line: calls <paramref name="end"/> once the outcome of the job on the line settles, its commit published or never to
+    /// be; at once off the line (upstream <c>onJobEnd</c>).
+    /// </summary>
+    internal void OnJobEnd(Action end)
+    {
+        ArgumentNullException.ThrowIfNull(end);
+        if (current is not { } job)
+        {
+            end();
+            return;
+        }
+        lock (job) (job.Ends ??= []).Add(end);
+    }
+
+    /// <summary>Internal: the Storage jobs on the line read through (upstream <c>lineStorage</c>); off the line, use
+    /// <see cref="GuardedStorage"/>.</summary>
+    internal IStorage LineStorage => gated;
+
+    /// <summary>
+    /// Internal, on the line: waits, while <paramref name="key"/> has an unpublished writer (for <see cref="LineKeys.All"/>, while anything is
+    /// unpublished), until it is published, then checks that the Session is healthy; null when there is nothing to wait for (upstream
+    /// <c>touch</c>). A job's every read touches its key first, so it never observes state an earlier job admitted and the writer has not
+    /// published.
+    /// </summary>
+    internal Task? Touch(string key)
+    {
+        var gate = key == LineKeys.All ? writer.Drained() : writer.Gate(key);
+        if (gate is null) return null;
+        if (current is { } job) job.Hit = true;
+        Interlocked.Increment(ref gateHits);
+        return AfterGateAsync(gate);
+    }
+
+    private int gateHits;
+
+    /// <summary>Internal, for tests: how many touches so far found an unpublished writer and waited for it. A test that holds a commit in
+    /// flight waits for this count to grow to know that a job is at a gate, where upstream's tests let a macrotask pass.</summary>
+    internal int GateHits => Volatile.Read(ref gateHits);
+
+    private async Task AfterGateAsync(Task gate)
+    {
+        await gate.ConfigureAwait(false);
+        AssertHealthy();
+    }
+
+    /// <summary>On the line: waits for what an unpublished commit wrote of a conversation's entries, its appends and its creation, as reading
+    /// them from Storage fails for a conversation not stored yet (upstream <c>#touchEntries</c>).</summary>
+    private Task? TouchEntries(ConversationId conversationId)
+    {
+        var created = Touch(LineKeys.Conversation(conversationId));
+        var appended = Touch(LineKeys.Append(conversationId));
+        if (created is null) return appended;
+        return appended is null ? created : Task.WhenAll(created, appended);
+    }
+
+    /// <summary>Internal, on the Session line: the newest entry ID visible from <paramref name="conversationId"/> (upstream
+    /// <c>latestEntryId</c>; the conversation tails that save its Storage read are area publication-caches').</summary>
+    internal async Task<EntryId?> LatestEntryIdAsync(ConversationId conversationId, DurableContext context)
+    {
+        if (TouchEntries(conversationId) is { } gate) await gate.ConfigureAwait(false);
+        var page = await storage.ScanEntriesAsync(new EntryQuery(conversationId), 1, null, context).ConfigureAwait(false);
+        return page.Items is [var newest, ..] ? newest.Id : null;
+    }
+
+    /// <summary>Internal, on the Session line: the newest visible head marker of <paramref name="conversationId"/> at or before
+    /// <paramref name="atOrBefore"/>, any when null (upstream <c>latestHeadMarker</c>).</summary>
+    internal async Task<EntryRecord?> LatestHeadMarkerAsync(ConversationId conversationId, EntryId? atOrBefore, DurableContext context)
+    {
+        if (TouchEntries(conversationId) is { } gate) await gate.ConfigureAwait(false);
+        return await storage.FindLatestHeadMarkerAsync(conversationId, atOrBefore, context).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Keys a commit writes besides its records' (<see cref="Transaction.WriteKeys"/>), at its admission, on the line (upstream
+    /// <c>membershipKeys</c>): a Harness adds the ownership memberships its task changes write (area group-commit-scheduler). A plain Session
+    /// adds none.
+    /// </summary>
+    internal virtual ValueTask<IReadOnlyList<string>> MembershipKeysAsync(Transaction tx) => new([]);
+
+    /// <summary>
+    /// Whether every line job waits, before it starts, for the publication of every commit admitted before it: the serialized line of a
+    /// Session without group commit. A Harness sets it until its scheduler records the keys its decisions read (area
+    /// group-commit-scheduler): its decisions read scheduler memory that only a commit's publication brings up to date.
+    /// </summary>
+    internal virtual bool LineWaitsForPublication => false;
+
+    /// <summary>Internal, for tests: the writer's wait between two parts of one call (see Writer.cs).</summary>
+    internal Func<Writer.Part, Task>? PublicationHop
+    {
+        get => writer.Hop;
+        set => writer.Hop = value;
+    }
+
+    /// <summary>Internal, for tests: a fault to throw from the next adoption of a stored commit, or of a held one (upstream's spies on
+    /// <c>Transaction.adopt</c> and <c>adoptHeld</c>); each returns the fault to throw, or null.</summary>
+    internal Func<Exception?>? AdoptFault { get; set; }
+
+    /// <inheritdoc cref="AdoptFault"/>
+    internal Func<Exception?>? AdoptHeldFault { get; set; }
 
     /// <summary>Internal: <see cref="CommitWithAsync{T}"/> for an asynchronous callback without a result.</summary>
     internal Task CommitWithAsync(Func<Transaction, Task> change, DurableContext context, TransactionScope? scope = null,
@@ -368,14 +544,18 @@ public class Session : ISession
     internal bool OwnsTransaction(ITx tx) => Transaction.OwnedBy(tx, host);
 
     /// <summary>Internal: runs a read-only job on the mutation line so multi-read derivations observe one committed state.</summary>
-    internal Task<T> ReadOnLineAsync<T>(Func<Task<T>> job)
+    internal Task<T> ReadOnLineAsync<T>(Func<Task<T>> job) => ReadOnLineAsync(_ => job());
+
+    /// <summary>Internal: <see cref="ReadOnLineAsync{T}(Func{Task{T}})"/> reading through the line's Storage, whose reads wait for what an
+    /// unpublished commit wrote (upstream <c>readOnLine</c>).</summary>
+    internal Task<T> ReadOnLineAsync<T>(Func<IStorage, Task<T>> job)
     {
         try { AssertUsable(); }
         catch (Exception error) { return Task.FromException<T>(error); }
-        return line.Enqueue(() =>
+        return Enqueue(async _ =>
         {
             AssertHealthy();
-            return job();
+            return new Ran<T>(await job(gated).ConfigureAwait(false));
         });
     }
 
@@ -395,12 +575,266 @@ public class Session : ISession
         return (loaded.Record, loaded.ValueVersion, loaded.Value);
     }
 
-    /// <summary>Internal test and Harness barrier: completes once every job enqueued before it, and the deliveries those jobs scheduled,
-    /// have run. It works on a closed or failed Session.</summary>
-    internal Task FlushLineAsync() => line.Enqueue(() => Task.FromResult(true));
+    /// <summary>Internal test and Harness barrier: completes once every job enqueued before it has run, every commit they admitted is
+    /// published or never will be, and the deliveries those publications scheduled have run. It works on a closed or failed Session.</summary>
+    internal Task FlushLineAsync() => Maintain(async _ =>
+    {
+        await DrainedAsync().ConfigureAwait(false);
+        return true;
+    });
+
+    /// <summary>Internal test barrier: completes once every job enqueued before it has run its line part (its callback, up to admission),
+    /// without waiting for their commits to be stored (upstream's <c>flush()</c>, a macrotask). A Harness's line waits for publication
+    /// anyway (<see cref="LineWaitsForPublication"/>).</summary>
+    internal Task LineTickAsync() => Maintain(_ => Task.FromResult(true));
 
     /// <summary>Internal test barrier: how many jobs wait on the line behind the running one.</summary>
     internal int LineBacklog => line.Waiting;
+
+    /// <summary>Internal, for tests that bound memory: jobs whose outcome is not delivered yet, keys with an unpublished writer, and record
+    /// reads in flight in the read cache, which is area publication-caches' (0). All three are 0 once the line is idle (upstream
+    /// <c>lineSizes</c>).</summary>
+    internal (int Outstanding, int Unpublished, int Reads) LineSizes
+    {
+        get
+        {
+            lock (outcomesGate) return (outstanding, writer.Unpublished, 0);
+        }
+    }
+
+    // ─── The line ───────────────────────────────────────────────────────────
+
+    /// <summary>A line job's result: its value, delivered once <see cref="After"/>, the publication of its commit, settles, if it has one
+    /// (upstream <c>Ran</c>).</summary>
+    private readonly record struct Ran<T>(T Value, Task? After = null);
+
+    /// <summary>A job on the line (upstream <c>Job</c>): its index in line order, whether a touch of it waited for an unpublished writer, and
+    /// what runs once its outcome settles (<see cref="OnJobEnd"/>; guarded by the job itself).</summary>
+    private sealed class Job(long index)
+    {
+        public long Index { get; } = index;
+        public volatile bool Hit;
+        public List<Action>? Ends;
+    }
+
+    /// <summary>
+    /// How a line result completes its caller's task (see the file header): at once, with RunContinuationsAsynchronously; or, for a flow with
+    /// an <see cref="OrderedLineDelivery"/>, through that delivery, in line order, unless it runs inline in the caller outside the delivery's
+    /// segments, where nothing orders it.
+    /// </summary>
+    private sealed class LineResult<T>
+    {
+        private readonly OrderedLineDelivery? ordered = OrderedLineDelivery.Current;
+        private readonly int caller = Environment.CurrentManagedThreadId;
+
+        public LineResult()
+        {
+            // An ordered result is set by the delivery, which runs its continuation until it next suspends.
+            Completion = new TaskCompletionSource<T>(ordered is null ? TaskCreationOptions.RunContinuationsAsynchronously : TaskCreationOptions.None);
+        }
+
+        public TaskCompletionSource<T> Completion { get; }
+
+        /// <summary>Set while the line runs the job inline in the caller.</summary>
+        public StrongBox<bool> InCaller { get; } = new(false);
+
+        public void Complete(T value) => Set(() => Completion.TrySetResult(value));
+
+        public void Fail(Exception error) => Set(() => Completion.TrySetException(error));
+
+        private void Set(Action set)
+        {
+            if (ordered is null) set();
+            else if (Volatile.Read(ref InCaller.Value) && Environment.CurrentManagedThreadId == caller && !ordered.Executing) set();
+            else ordered.Post(set);
+        }
+    }
+
+    /// <summary>
+    /// Runs <paramref name="work"/> on the line, after the jobs before it, and delivers its outcome in line order: once the jobs before it
+    /// have theirs, and once its commit, if it admitted one, is published (upstream <c>#enqueue</c>). With <paramref name="exempt"/>, a job
+    /// that admitted no commit and waited at no gate is delivered as soon as it has its outcome. A job whose outcome comes after the one a
+    /// failure is gets SessionFailed instead. At most <see cref="MaxOutstanding"/> jobs wait for their delivery; beyond it the line waits.
+    /// </summary>
+    private Task<T> Enqueue<T>(Func<long, Task<Ran<T>>> work, bool exempt = false, bool inline = true)
+    {
+        var result = new LineResult<T>();
+        async Task Run()
+        {
+            // A job runs on whatever thread starts or continues the line, possibly inside an ordered flow: what it enqueues is not part of it.
+            if (OrderedLineDelivery.Current is not null) OrderedLineDelivery.Current = null;
+            await WaitForRoomAsync().ConfigureAwait(false);
+            // On the line, so in line order: the index, and the fence the outcome is delivered behind.
+            var job = new Job(Interlocked.Increment(ref nextIndex) - 1);
+            var previous = fence;
+            var delivered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            fence = delivered.Task;
+            Ran<T> ran = default;
+            Exception? error = null;
+            try
+            {
+                if (LineWaitsForPublication) await DrainedAsync().ConfigureAwait(false);
+                current = job;
+                ran = await work(job.Index).ConfigureAwait(false);
+            }
+            catch (Exception thrown)
+            {
+                error = thrown;
+            }
+            finally
+            {
+                current = null;
+            }
+            _ = DeliverAsync(job, ran, error, previous, delivered, exempt, result);
+        }
+        line.Enqueue(Run, inline, result.InCaller);
+        return result.Completion.Task;
+    }
+
+    /// <summary>Delivers job <paramref name="job"/>'s outcome: after its publication, and, fenced, after every earlier outcome; then opens the
+    /// next job's fence. Never faults.</summary>
+    private async Task DeliverAsync<T>(Job job, Ran<T> ran, Exception? error, Task previous, TaskCompletionSource delivered, bool exempt,
+        LineResult<T> result)
+    {
+        // Only a job without writes is exempt: one with writes waits for its own publication and the outcomes before it.
+        var fenced = !exempt || job.Hit || (error is null && ran.After is not null);
+        try
+        {
+            if (error is null && ran.After is { } after)
+            {
+                try { await after.ConfigureAwait(false); }
+                catch (Exception failed) { error = failed; }
+            }
+            Ended(job);
+            if (fenced) await previous.ConfigureAwait(false);
+            Delivered(job.Index, fenced);
+            if (Poisoned(job.Index) && failure is { } failed2) error = new SessionFailedException(failed2.Error);
+            if (error is null) result.Complete(ran.Value);
+            else result.Fail(error);
+        }
+        catch (Exception unexpected)
+        {
+            result.Fail(unexpected);
+        }
+        finally
+        {
+            if (!fenced) await previous.ConfigureAwait(false);
+            delivered.TrySetResult();
+        }
+    }
+
+    /// <summary>The job's outcome settled: runs what waited for it (<see cref="OnJobEnd"/>).</summary>
+    private static void Ended(Job job)
+    {
+        List<Action>? ends;
+        lock (job)
+        {
+            ends = job.Ends;
+            job.Ends = null;
+        }
+        if (ends is null) return;
+        foreach (var end in ends) Run(end);
+    }
+
+    /// <summary>Waits, on the line, until fewer than <see cref="MaxOutstanding"/> outcomes are undelivered, and counts this job's.</summary>
+    private Task WaitForRoomAsync()
+    {
+        Task wait;
+        lock (outcomesGate)
+        {
+            if (outstanding < MaxOutstanding)
+            {
+                outstanding++;
+                return Task.CompletedTask;
+            }
+            room ??= new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            wait = room.Task;
+        }
+        return WaitThenRetryAsync(wait);
+    }
+
+    private async Task WaitThenRetryAsync(Task wait)
+    {
+        await wait.ConfigureAwait(false);
+        await WaitForRoomAsync().ConfigureAwait(false);
+    }
+
+    /// <summary>Job <paramref name="index"/> has its outcome: lets the line go on past <see cref="MaxOutstanding"/> (upstream
+    /// <c>#delivered</c>).</summary>
+    private void Delivered(long index, bool fenced)
+    {
+        TaskCompletionSource? open = null;
+        lock (outcomesGate)
+        {
+            if (fenced) lastDelivered = index;
+            outstanding--;
+            if (room is not null && outstanding < MaxOutstanding)
+            {
+                open = room;
+                room = null;
+            }
+        }
+        open?.TrySetResult();
+    }
+
+    /// <summary>Runs a job of the Session's own upkeep on the line: no outcome to deliver, so no fence and no SessionFailed (upstream
+    /// <c>#maintain</c>).</summary>
+    private Task<T> Maintain<T>(Func<long, Task<T>> work, bool inline = true)
+    {
+        var result = new LineResult<T>();
+        async Task Run()
+        {
+            if (OrderedLineDelivery.Current is not null) OrderedLineDelivery.Current = null;
+            var job = new Job(Interlocked.Increment(ref nextIndex) - 1);
+            T value;
+            try
+            {
+                if (LineWaitsForPublication) await DrainedAsync().ConfigureAwait(false);
+                current = job;
+                value = await work(job.Index).ConfigureAwait(false);
+            }
+            catch (Exception error)
+            {
+                current = null;
+                result.Fail(error);
+                return;
+            }
+            current = null;
+            result.Complete(value);
+        }
+        line.Enqueue(Run, inline, result.InCaller);
+        return result.Completion.Task;
+    }
+
+    /// <summary>A <see cref="LineKeys.All"/> barrier: once every part admitted so far is published, or never will be.</summary>
+    private Task DrainedAsync() => writer.Drained() ?? Task.CompletedTask;
+
+    /// <summary>
+    /// Runs one commit's publication inside the Storage's own scope (<see cref="IStorage.Publishing"/>), such as a store host's batch; null
+    /// when it ran at once, else completes once it ran (upstream <c>#publishing</c>). A Storage that throws instead of running it is
+    /// reported, and the publication runs directly: the commit is stored, so it must be published.
+    /// </summary>
+    private Task? PublishingScope(Action publish, DurableContext context)
+    {
+        var done = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var ran = 0;
+        void Once()
+        {
+            if (Interlocked.Exchange(ref ran, 1) != 0) return;
+            try { publish(); }
+            finally { done.TrySetResult(); }
+        }
+        try
+        {
+            storage.Publishing(Once, context);
+        }
+        catch (Exception error)
+        {
+            Report(error, ReportInfo.ListenerError, context);
+            Once();
+        }
+        return done.Task.IsCompleted ? null : done.Task;
+    }
 
     // ─── Reads ──────────────────────────────────────────────────────────────
 
@@ -431,10 +865,10 @@ public class Session : ISession
         if (cached?.ValueVersion == definition.Version) TouchDocument(resolved.Id);
         var loaded = cached?.ValueVersion == definition.Version
             ? cached
-            : await line.Enqueue(async () =>
+            : await Enqueue(async _ =>
             {
                 AssertHealthy();
-                return await LoadDocumentAsync(definition, resolved.Id, resolved.Address, context).ConfigureAwait(false);
+                return new Ran<LoadedDocument?>(await LoadDocumentAsync(definition, resolved.Id, resolved.Address, context).ConfigureAwait(false));
             }).ConfigureAwait(false);
         if (loaded is null) return null;
         Documents.CheckRecordScope(definition, loaded.Record);
@@ -459,17 +893,17 @@ public class Session : ISession
         var resolved = Documents.ResolveAddress(definition, conversationId.Value, key);
         if (resolved.Address.Scope.Kind != DocumentScopeKind.Conversation)
             throw new ArgumentException("Session.snapshotAsOf() requires a conversation document");
-        return await line.Enqueue(async () =>
+        return await Enqueue(async _ =>
         {
             AssertHealthy();
-            var storedEntry = await storage.GetEntryAsync(conversationId, at, context).ConfigureAwait(false) ??
+            var storedEntry = await gated.GetEntryAsync(conversationId, at, context).ConfigureAwait(false) ??
                 throw new InvalidOperationException($"Entry {at} is not visible from conversation {conversationId}");
             var address = resolved.Address with { Scope = DocumentScope.Conversation(storedEntry.Entry.ConversationId) };
-            var record = await storage.FindDocumentAsync(address, storedEntry.CommitSeq, context).ConfigureAwait(false);
-            if (record is null) return null;
-            var stored = await storage.GetDocumentAsync(record.Id, storedEntry.CommitSeq, context).ConfigureAwait(false) ??
+            var record = await gated.FindDocumentAsync(address, storedEntry.CommitSeq, context).ConfigureAwait(false);
+            if (record is null) return new Ran<JsonObjectValue?>(null);
+            var stored = await gated.GetDocumentAsync(record.Id, storedEntry.CommitSeq, context).ConfigureAwait(false) ??
                 throw new InvalidOperationException($"Historical document {record.Id} ({record.Kind}) cannot be read");
-            return Documents.MaterializeDocument(definition, stored);
+            return new Ran<JsonObjectValue?>(Documents.MaterializeDocument(definition, stored));
         }).ConfigureAwait(false);
     }
 
@@ -558,13 +992,13 @@ public class Session : ISession
         var registration = context.CancellationToken.UnsafeRegister(static state => Volatile.Write(ref ((StrongBox<int>)state!).Value, 1), flag);
         try
         {
-            var attached = await line.Enqueue(async () =>
+            var attached = await Enqueue(async _ =>
             {
                 AssertHealthy();
                 if (Volatile.Read(ref flag.Value) != 0) context.ThrowIfCancellationRequested();
                 var loaded = await LoadDocumentAsync(definition, resolved.Id, resolved.Address, context).ConfigureAwait(false);
                 if (Volatile.Read(ref flag.Value) != 0) context.ThrowIfCancellationRequested();
-                return loaded is null ? null : attach(loaded);
+                return new Ran<TAttached?>(loaded is null ? null : attach(loaded));
             }).ConfigureAwait(false);
             if (attached is null) return null;
             if (Volatile.Read(ref flag.Value) != 0)
@@ -637,15 +1071,17 @@ public class Session : ISession
         try
         {
             await BeforeCloseAsync().ConfigureAwait(false);
-            await line.Enqueue(async () =>
+            await Maintain(async _ =>
             {
+                // After every commit admitted before the seal is published or never will be.
+                await DrainedAsync().ConfigureAwait(false);
                 // Last, after the writes at close (BeforeCloseAsync), while the trackers are still here. A failed Session writes nothing; a
                 // failing store fails it, and the backend still closes.
                 ExceptionDispatchInfo? unstored = null;
                 // Only with something to store: otherwise the backend's close begins in this very job.
-                if (failure is null && HeldDocuments() is { Count: > 0 } held)
+                if (failure is null && HoldCount > 0)
                 {
-                    try { await StoreHoldsAsync(held, cleanup).ConfigureAwait(false); }
+                    try { await StoreHoldsAsync(HeldDocuments, cleanup).ConfigureAwait(false); }
                     catch (Exception error) { unstored = ExceptionDispatchInfo.Capture(error); }
                 }
                 ObserverGuard<CommitPublication>[] observers;
@@ -717,25 +1153,20 @@ public class Session : ISession
     internal virtual Task BeforeCloseAsync() => Task.CompletedTask;
 
     /// <summary>
-    /// Internal, for <see cref="BeforeCloseAsync"/>: on the line, after every commit admitted before the seal has settled, writes what
-    /// <paramref name="writes"/> returns then straight to Storage, in one batch (upstream <c>writeAtClose</c>). Nothing is published, since
-    /// the Session is closing; a failed Session writes nothing. A Storage that throws or refuses the batch fails the Session, and the returned
-    /// task faults with that error.
+    /// Internal, for <see cref="BeforeCloseAsync"/>: on the line, after every commit admitted before the seal is published or never will be,
+    /// writes what <paramref name="writes"/> returns then to Storage, in one batch, through the writer (upstream <c>writeAtClose</c>). Nothing
+    /// is published, since the Session is closing; a failed Session writes nothing. A Storage that throws or refuses the batch fails the
+    /// Session, and the returned task faults with that error.
     /// </summary>
-    internal Task WriteAtCloseAsync(Func<IReadOnlyList<StorageWrite>> writes) => line.Enqueue(async () =>
+    internal Task WriteAtCloseAsync(Func<IReadOnlyList<StorageWrite>> writes) => Maintain(async index =>
     {
+        await DrainedAsync().ConfigureAwait(false);
         if (failure is not null) return true;
         var batch = writes();
         if (batch.Count == 0) return true;
-        Seq? received = null;
-        // The guard fails the Session when Storage throws.
-        var committed = await storage.CommitAsync([batch], (_, stored) => received = stored, DurableContext.Background).ConfigureAwait(false);
-        if (received is null)
-        {
-            var refusal = committed.Refused ?? new InvalidOperationException("Storage committed without adopting the batch");
-            Fail(refusal);
-            ExceptionDispatchInfo.Throw(refusal);
-        }
+        // Through the writer, as its own part: a refusal or a rejection fails the Session there, and is this task's error.
+        await writer.Admit(new PartSpec(index, batch, [], DurableContext.Background, static (_, _) => null, static () => { })).Outcome
+            .ConfigureAwait(false);
         return true;
     });
 
@@ -800,9 +1231,9 @@ public class Session : ISession
 
     /// <summary>Internal: drops every loaded tracker on the mutation line, held changes stored first; later access cold-loads from
     /// Storage.</summary>
-    internal Task UnloadDocumentsAsync() => line.Enqueue(async () =>
+    internal Task UnloadDocumentsAsync() => Maintain(async _ =>
     {
-        if (failure is null) await StoreHoldsAsync(HeldDocuments(), DurableContext.Background).ConfigureAwait(false);
+        if (failure is null) await StoreHoldsAsync(HeldDocuments, DurableContext.Background).ConfigureAwait(false);
         lock (documentsGate)
         {
             documents.Clear();
@@ -871,7 +1302,10 @@ public class Session : ISession
         lock (documentsGate)
         {
             if (closingStarted) return;
-            if (idleDocuments.First is not { } oldest) return;
+            // Documents with unpublished changes are not swept: their publication touches them again.
+            var oldest = idleDocuments.First;
+            while (oldest is not null && writer.Gate(LineKeys.Document(oldest.Value.AddressId)) is not null) oldest = oldest.Next;
+            if (oldest is null) return;
             var at = oldest.Value.Since + retention;
             if (documentSweep is { } pending && pending.At <= at) return;
             replaced = documentSweep?.Disarm;
@@ -916,7 +1350,7 @@ public class Session : ISession
     private void QueueDocumentSweepLocked(DocumentSweep sweep)
     {
         sweepJobs++;
-        _ = line.Enqueue(() =>
+        _ = Maintain(_ =>
         {
             bool sweepNow;
             lock (documentsGate)
@@ -935,7 +1369,13 @@ public class Session : ISession
         var expired = clock() - documentRetentionMs();
         lock (documentsGate)
         {
-            while (idleDocuments.First is { } oldest && oldest.Value.Since <= expired) DropDocumentLocked(oldest.Value.AddressId);
+            for (var node = idleDocuments.First; node is not null && node.Value.Since <= expired;)
+            {
+                var next = node.Next;
+                // A document with an unpublished change stays until its publication touches it.
+                if (writer.Gate(LineKeys.Document(node.Value.AddressId)) is null) DropDocumentLocked(node.Value.AddressId);
+                node = next;
+            }
         }
         ScheduleDocumentSweep();
     }
@@ -970,9 +1410,11 @@ public class Session : ISession
 
     // ─── The commit ─────────────────────────────────────────────────────────
 
-    private async Task<T> RunCommitAsync<T>(Func<Transaction, Task<T>> change, DurableContext context, TransactionScope? scope, double? withinMs)
+    private async Task<Ran<T>> RunCommitAsync<T>(Func<Transaction, Task<T>> change, DurableContext context, TransactionScope? scope,
+        double? withinMs, long index)
     {
         AssertHealthy();
+        // Cancellation is checked when the job starts (changelog 1.5.0, Changed#7): a job may start while earlier commits are stored.
         context.ThrowIfCancellationRequested();
         var tx = new Transaction(host, context, scope);
         T result;
@@ -1003,7 +1445,7 @@ public class Session : ISession
         {
             tx.Discard();
             SweepDocuments();
-            return result;
+            return new Ran<T>(result);
         }
         if (readOnly)
         {
@@ -1014,47 +1456,57 @@ public class Session : ISession
         }
         if (withinMs is { } within && tx.Holdable() is { } held)
         {
-            HoldCommit(tx, held, within, context);
+            // Adopted in memory when the commits before it are published, as a part of no storage call.
+            var heldPart = writer.Admit(new PartSpec(index, null, tx.WriteKeys(), context,
+                (_, unregister) => HoldCommit(tx, held, within, context, unregister), tx.Discard));
             SweepDocuments();
-            return result;
+            return new Ran<T>(result, heldPart.Outcome);
         }
-        // The last step before Storage: held changes leave their queue only once nothing but Storage can fail.
-        var taken = HoldCount == 0 ? NoHolds : tx.TakeHeld<Hold>(id => holds.GetValueOrDefault(id));
-        Seq? received = null;
-        CommitResult committed;
+        IReadOnlyList<string> membership;
         try
         {
-            // Once admitted, caller cancellation does not interrupt Storage settlement.
-            committed = await storage.CommitAsync([writes], (_, stored) => received = stored, context.WithoutCancellation()).ConfigureAwait(false);
+            membership = await MembershipKeysAsync(tx).ConfigureAwait(false);
         }
         catch
         {
-            // The guard has failed the Session.
             tx.Discard();
+            SweepDocuments();
             throw;
         }
-        if (received is not { } seq)
-        {
-            // Refused by Storage's own checks: nothing is stored. Like a rejection, it fails the Session first, and it is the commit's
-            // error (upstream writer.ts: a part the call did not receive has the refusal as its outcome, and stops the Session).
-            var refusal = committed.Refused ?? new InvalidOperationException("Storage committed without adopting the batch");
-            Fail(refusal);
-            tx.Discard();
-            ExceptionDispatchInfo.Throw(refusal);
-            throw refusal;
-        }
+        // Logical admission. Held changes leave their queue only here, once nothing but Storage can fail; a commit never stores a hold adopted
+        // after it in line order. Taken before the keys, so the documents it stores held changes of are its writes too: a later job that reads
+        // one waits for it instead of storing them again.
+        List<Hold> taken;
+        lock (holdsGate) taken = holds.Count == 0 ? NoHolds : tx.TakeHeld<Hold>(id => holds.GetValueOrDefault(id));
+        var keys = tx.WriteKeys();
+        keys.AddRange(membership);
+        var part = writer.Admit(new PartSpec(index, writes, keys, context,
+            (seq, unregister) => AdoptCommit(tx, writes, taken, seq!.Value, context, unregister), tx.Discard));
+        SweepDocuments();
+        return new Ran<T>(result, part.Outcome);
+    }
+
+    /// <summary>
+    /// Publishes a stored commit (Writer.cs; upstream <c>#adopt</c>): adopts it in memory, drops its keys, and runs its publication. A throw
+    /// of the adoption leaves memory behind durable state; the writer fails the Session with it.
+    /// </summary>
+    private PublishFailure? AdoptCommit(Transaction tx, IReadOnlyList<StorageWrite> writes, List<Hold> taken, Seq seq, DurableContext context,
+        Action unregister)
+    {
         AdoptedDocuments documentChanges;
         try
         {
+            if (AdoptFault?.Invoke() is { } fault) throw fault;
             documentChanges = tx.Adopt(seq);
         }
         catch (Exception error)
         {
-            // Storage already committed; a failed adoption leaves memory behind durable state.
-            Fail(error);
-            throw;
+            return PublishFailure.OfAdoption(error);
         }
+        // Before the keys leave: a job that then touches a document whose held changes this commit stored must not find them held.
         if (taken.Count > 0) Release(taken);
+        unregister();
+        var failure = Publish(seq, writes, documentChanges, context);
         foreach (var adopted in documentChanges.Stored)
         {
             var record = adopted switch
@@ -1065,12 +1517,15 @@ public class Session : ISession
             };
             if (record is not null) TouchDocument(Documents.AddressId(DocumentAddress.Of(record)));
         }
-        Publish(seq, writes, documentChanges, context);
-        SweepDocuments();
-        return result;
+        return failure is null ? null : PublishFailure.OfListener(failure);
     }
 
-    private void Publish(Seq seq, IReadOnlyList<StorageWrite> writes, AdoptedDocuments documentChanges, DurableContext context)
+    /// <summary>
+    /// At publication: publishes a stored commit (upstream <c>#publish</c>). Its telemetry events first, listeners or not, then the Session's
+    /// own observers, then host observers, then the watch deliveries they scheduled. Never throws: returns the first error of an own observer,
+    /// which fails the Session once its storage call settled.
+    /// </summary>
+    private Exception? Publish(Seq seq, IReadOnlyList<StorageWrite> writes, AdoptedDocuments documentChanges, DurableContext context)
     {
         // Its telemetry events first, listeners or not.
         foreach (var write in writes)
@@ -1092,7 +1547,7 @@ public class Session : ISession
             internals = [.. internalListeners];
             observers = [.. commitListeners];
         }
-        if (internals.Length == 0 && observers.Length == 0) return;
+        if (internals.Length == 0 && observers.Length == 0) return null;
         var changes = new List<ICommitChange>();
         foreach (var write in writes)
             if (write is ICommitChange change) changes.Add(change);
@@ -1103,59 +1558,88 @@ public class Session : ISession
         var stored = ReferenceEquals(documentChanges.Stored, documentChanges.Observed)
             ? new CommitPublication(seq, changes)
             : new CommitPublication(seq, [.. changes.Take(tables), .. documentChanges.Stored]);
-        lock (deferGate) deferred = [];
-        try
+        Exception? failure = null;
+        RunPublishing(() =>
         {
             // The commit is durable: a failing listener neither fails the commit nor skips the others. A host observer's guard reports its
             // throw, detaches it and ends it listener_error.
-            foreach (var listener in internals) Contained(() => listener(observed, context), error => Fail(error, context));
+            foreach (var listener in internals) Contained(() => listener(observed, context), error => failure ??= error);
             foreach (var observer in observers) observer.Advance(stored, context);
+        });
+        return failure;
+    }
+
+    /// <summary>Runs <paramref name="publish"/> as this thread's publication: the deliveries it schedules (<see cref="Defer"/>) run right
+    /// after it, before it returns.</summary>
+    private void RunPublishing(Action publish)
+    {
+        var outer = publishing;
+        publishing = (this, []);
+        try
+        {
+            publish();
         }
         finally
         {
             RunDeferred();
+            publishing = outer;
         }
     }
 
     // ─── Held commits ───────────────────────────────────────────────────────
 
     /// <summary>
-    /// Holds a deferred commit (<see cref="Transaction.Holdable"/>; upstream <c>#hold</c>): adopts it in memory, queues its changes per
-    /// document, pinned, by the earliest deadline of the document's held commits, and shows it to the Session's own observers.
+    /// Holds a deferred commit at its publication (<see cref="Transaction.Holdable"/>; upstream <c>#hold</c>): adopts it in memory, queues its
+    /// changes per document, pinned, by the earliest deadline of the document's held commits, and shows it to the Session's own observers.
+    /// A throw of the adoption is the writer's to fail the Session with, as a stored commit's.
     /// </summary>
-    private void HoldCommit(Transaction tx, List<HeldChange> held, double withinMs, DurableContext context)
+    private PublishFailure? HoldCommit(Transaction tx, List<HeldChange> held, double withinMs, DurableContext context, Action unregister)
     {
-        var documentChanges = tx.AdoptHeld();
+        List<ICommitChange> documentChanges;
+        try
+        {
+            if (AdoptHeldFault?.Invoke() is { } fault) throw fault;
+            documentChanges = tx.AdoptHeld();
+        }
+        catch (Exception error)
+        {
+            return PublishFailure.OfAdoption(error);
+        }
         var deadline = clock() + withinMs;
         foreach (var (loaded, ops, isBase) in held)
         {
             var id = loaded.Record.Id;
-            if (!holds.TryGetValue(id, out var hold))
+            Hold? hold;
+            lock (holdsGate) hold = holds.GetValueOrDefault(id);
+            if (hold is null)
             {
-                hold = new Hold(loaded, deadline, PinDocument(loaded.AddressId, id));
+                // Host code (the pin may arm a timer), outside holdsGate.
+                var unpin = PinDocument(loaded.AddressId, id);
+                hold = new Hold(loaded, deadline, unpin);
                 lock (holdsGate) holds.Add(id, hold);
             }
-            hold.Pending.Push(ops);
-            if (isBase) hold.Base = true;
-            if (deadline < hold.Deadline) hold.Deadline = deadline;
+            lock (holdsGate)
+            {
+                hold.Pending.Push(ops);
+                if (isBase) hold.Base = true;
+                if (deadline < hold.Deadline) hold.Deadline = deadline;
+            }
         }
+        unregister();
         ArmHoldTimer();
         Action<ObservedCommit, DurableContext>[] internals;
         lock (listenersGate) internals = [.. internalListeners];
-        if (internals.Length == 0) return;
+        if (internals.Length == 0) return null;
         var publication = ObservedCommit.Memory(documentChanges);
-        lock (deferGate) deferred = [];
-        try
+        Exception? failure = null;
+        RunPublishing(() =>
         {
-            foreach (var listener in internals) Contained(() => listener(publication, context), error => Fail(error, context));
-        }
-        finally
-        {
-            RunDeferred();
-        }
+            foreach (var listener in internals) Contained(() => listener(publication, context), error => failure ??= error);
+        });
+        return failure is null ? null : PublishFailure.OfListener(failure);
     }
 
-    /// <summary>On the line: the held documents, in the order they were first held.</summary>
+    /// <summary>The held documents, in the order they were first held.</summary>
     private List<Hold> HeldDocuments()
     {
         lock (holdsGate) return [.. holds.Values];
@@ -1167,55 +1651,56 @@ public class Session : ISession
     }
 
     /// <summary>
-    /// Stores the held changes of <paramref name="held"/> in one storage transaction, on the line (upstream <c>#storeHolds</c>). Memory
-    /// already has them, so only <c>ObserveCommits</c> observers see it. A failure fails the Session, as every Storage failure does.
+    /// Stores the held changes <paramref name="select"/> returns in one storage transaction, through the writer, from a job on the line
+    /// (upstream <c>#storeHolds</c>). A barrier: they are selected once every commit admitted before is published. Memory already has them, so
+    /// only <c>ObserveCommits</c> observers see it, published as the writer publishes it. A failure fails the Session, as every Storage failure
+    /// does, and is this task's error.
     /// </summary>
-    private async Task StoreHoldsAsync(IReadOnlyList<Hold> held, DurableContext context)
+    private async Task StoreHoldsAsync(Func<List<Hold>> select, DurableContext context)
     {
+        await DrainedAsync().ConfigureAwait(false);
+        var held = select();
         if (held.Count == 0) return;
         var writes = new List<StorageWrite>(held.Count);
         var changes = new List<ICommitChange>(held.Count);
+        var keys = new List<string>(held.Count * 2);
         foreach (var hold in held)
         {
             var loaded = hold.Loaded;
             var value = loaded.Value;
             var version = loaded.ValueVersion;
-            var (content, ops) = Transaction.StoreHeld(hold, NoOperations, value, version);
-            writes.Add(new DocumentChangeWrite(loaded.Record.Id, content));
+            (DocumentContent content, ImmutableArray<Op> ops) stored;
+            lock (holdsGate) stored = Transaction.StoreHeld(hold, NoOperations, value, version);
+            writes.Add(new DocumentChangeWrite(loaded.Record.Id, stored.content));
+            keys.Add(LineKeys.Document(loaded.AddressId));
+            keys.Add(LineKeys.Incarnation(loaded.Record.Id));
             // Held documents are conversation documents.
-            changes.Add(new DocumentValueChange(loaded.Record, loaded.Record.Scope.ConversationId, version, value, ops));
+            changes.Add(new DocumentValueChange(loaded.Record, loaded.Record.Scope.ConversationId, version, value, stored.ops));
         }
-        var adopted = false;
-        void Adopt()
+        PublishFailure? Publish(Seq? seq, Action unregister)
         {
-            adopted = true;
             for (var index = 0; index < held.Count; index++)
             {
                 var loaded = held[index].Loaded;
                 if (((DocumentChangeWrite)writes[index]).Content is DocumentBase) loaded.DeltasSinceBase = 0;
                 else loaded.DeltasSinceBase++;
             }
+            Release(held);
+            unregister();
+            ObserverGuard<CommitPublication>[] observers;
+            lock (listenersGate) observers = [.. commitListeners];
+            if (observers.Length == 0) return null;
+            var publication = new CommitPublication(seq!.Value, changes);
+            // Their guards report a throw.
+            RunPublishing(() =>
+            {
+                foreach (var observer in observers) observer.Advance(publication, context);
+            });
+            return null;
         }
-        Seq? received = null;
-        // The guard fails the Session when Storage throws.
-        var committed = await storage.CommitAsync([writes], (_, stored) =>
-        {
-            received = stored;
-            Adopt();
-        }, context.WithoutCancellation()).ConfigureAwait(false);
-        if (!adopted || received is not { } seq)
-        {
-            var refusal = committed.Refused ?? new InvalidOperationException("Storage committed without adopting the batch");
-            Fail(refusal);
-            ExceptionDispatchInfo.Throw(refusal);
-            return;
-        }
-        Release(held);
-        ObserverGuard<CommitPublication>[] observers;
-        lock (listenersGate) observers = [.. commitListeners];
-        var publication = new CommitPublication(seq, changes);
-        // Their guards report a throw.
-        foreach (var observer in observers) observer.Advance(publication, context);
+        // Run from a job on the line, which a failure it causes is the outcome of.
+        var index = current?.Index ?? Interlocked.Read(ref nextIndex) - 1;
+        await writer.Admit(new PartSpec(index, writes, keys, context, Publish, static () => { })).Outcome.ConfigureAwait(false);
     }
 
     /// <summary>After their store: forgets <paramref name="held"/>, unpins their documents, and moves the timer to the next deadline (upstream
@@ -1229,9 +1714,9 @@ public class Session : ISession
     }
 
     /// <summary>
-    /// On the line: keeps a foreground timer (<see cref="HarnessOptions.SetTimer"/>) for the earliest deadline of the held documents (upstream
+    /// Keeps a foreground timer (<see cref="HarnessOptions.SetTimer"/>) for the earliest deadline of the held documents (upstream
     /// <c>#armHoldTimer</c>). When it fires, every held document is stored, in one storage transaction: a deadline is the latest time, and
-    /// the others cost little more in the same transaction. Once fired, it stays until its job ran.
+    /// the others cost little more in the same transaction. Once fired, it stays until its job ran. Called on the line and at publication.
     /// </summary>
     private void ArmHoldTimer()
     {
@@ -1262,13 +1747,13 @@ public class Session : ISession
         void Run()
         {
             lock (holdsGate) timer.Fired = true;
-            var stored = line.Enqueue(async () =>
+            var stored = Maintain(async _ =>
             {
                 lock (holdsGate)
                     if (ReferenceEquals(holdTimer, timer)) holdTimer = null;
                 // Close stores what is held itself.
                 if (closingStarted || failure is not null) return true;
-                await StoreHoldsAsync(HeldDocuments(), DurableContext.Background).ConfigureAwait(false);
+                await StoreHoldsAsync(HeldDocuments, DurableContext.Background).ConfigureAwait(false);
                 return true;
             }, inline: false);
             _ = stored.ContinueWith(static task => _ = task.Exception, CancellationToken.None,
@@ -1304,20 +1789,17 @@ public class Session : ISession
     }
 
     /// <summary>
-    /// Schedules observer delivery work (upstream <c>queueMicrotask</c>). During a publication it runs in that commit's job right after the
-    /// publication; otherwise it becomes its own line job, so it never runs inline in the caller.
+    /// Schedules observer delivery work (upstream <c>queueMicrotask</c>). During a publication on this thread it runs in that publication right
+    /// after its listeners; otherwise it becomes its own line job, so it never runs inline in the caller.
     /// </summary>
     internal void Defer(Action work)
     {
-        lock (deferGate)
+        if (publishing is { } scope && ReferenceEquals(scope.Owner, this))
         {
-            if (deferred is not null)
-            {
-                deferred.Add(work);
-                return;
-            }
+            scope.Work.Add(work);
+            return;
         }
-        line.Enqueue(() =>
+        _ = Maintain(_ =>
         {
             Run(work);
             return Task.FromResult(true);
@@ -1326,21 +1808,9 @@ public class Session : ISession
 
     private void RunDeferred()
     {
-        var index = 0;
-        while (true)
-        {
-            Action work;
-            lock (deferGate)
-            {
-                if (deferred is null || index == deferred.Count)
-                {
-                    deferred = null;
-                    return;
-                }
-                work = deferred[index++];
-            }
-            Run(work);
-        }
+        if (publishing is not { } scope || !ReferenceEquals(scope.Owner, this)) return;
+        // Deliveries may schedule more deliveries; they join the list.
+        for (var index = 0; index < scope.Work.Count; index++) Run(scope.Work[index]);
     }
 
     private static void Run(Action work)
@@ -1394,6 +1864,8 @@ public class Session : ISession
 
     private async Task<LoadedDocument?> LoadDocumentAsync(DocDefinition definition, string addressId, DocumentAddress address, DurableContext context)
     {
+        // What an unpublished commit wrote at the address is in neither the cache nor what Storage shows yet.
+        if (Touch(LineKeys.Document(addressId)) is { } gate) await gate.ConfigureAwait(false);
         LoadedDocument? cached;
         lock (documentsGate) cached = documents.GetValueOrDefault(addressId);
         // A tracker serves only tokens of the version its value was materialized for; others reload from Storage.
@@ -1404,8 +1876,13 @@ public class Session : ISession
         }
         if (cached is not null)
         {
-            // The reload must find what memory holds: held changes are stored before their tracker goes. On the line, as every load is.
-            if (holds.GetValueOrDefault(cached.Record.Id) is { } hold) await StoreHoldsAsync([hold], context).ConfigureAwait(false);
+            // The reload must find what memory holds: held changes are stored before their tracker goes, after a barrier. On the line, as
+            // every load is.
+            var id = cached.Record.Id;
+            await StoreHoldsAsync(() =>
+            {
+                lock (holdsGate) return holds.GetValueOrDefault(id) is { } hold ? [hold] : NoHolds;
+            }, context).ConfigureAwait(false);
             lock (documentsGate)
                 if (documents.TryGetValue(addressId, out var current) && ReferenceEquals(current, cached)) DropDocumentLocked(addressId);
         }
@@ -1663,7 +2140,16 @@ public class Session : ISession
 
     private sealed class Host(Session session) : ITransactionHost
     {
-        public IStorage Storage => session.storage;
+        /// <summary>Reads wait while their key has an unpublished writer (<see cref="GatedStorage"/>).</summary>
+        public IStorage Storage => session.gated;
+        public Task? Touch(string key) => session.Touch(key);
+        public Task<EntryId?> LatestEntryIdAsync(ConversationId conversationId, DurableContext context) =>
+            session.LatestEntryIdAsync(conversationId, context);
+        public Task<EntryRecord?> LatestHeadMarkerAsync(ConversationId conversationId, DurableContext context) =>
+            session.LatestHeadMarkerAsync(conversationId, null, context);
+        /// <summary>The Session's index of live tasks' documents is area publication-caches'; until then every terminal task's documents are
+        /// scanned.</summary>
+        public IEnumerable<DocumentRecord>? TaskDocuments(TaskId taskId) => null;
         public double Now() => session.now();
         public LoadedDocument? Cached(string addressId)
         {
@@ -1684,6 +2170,25 @@ public class Session : ISession
                 if (session.documents.TryGetValue(addressId, out var cached) && cached.Record.Id == recordId) session.DropDocumentLocked(addressId);
         }
         public Task ConversationCreatedAsync(Transaction tx, ConversationRecord record) => session.ConversationCreatedAsync(tx, record);
+    }
+
+    /// <summary>What the writer needs of its Session (upstream's <c>new Writer({...})</c> in the SessionImpl constructor).</summary>
+    private sealed class WriterHost(Session session) : IWriterHost
+    {
+        public Task<CommitResult> CommitAsync(IReadOnlyList<IReadOnlyList<StorageWrite>> batches, Action<int, Seq> receive,
+            DurableContext context) => session.storage.CommitAsync(batches, receive, context);
+
+        /// <summary>The read caches are area publication-caches'.</summary>
+        public void Stored(IReadOnlyList<StorageWrite> writes) { }
+
+        public Task? Publishing(Action publish, DurableContext context) => session.PublishingScope(publish, context);
+
+        public Exception? Failure => session.failure?.Error;
+
+        public void Fail(Exception error, long? at, IReadOnlyCollection<long> own, DurableContext? context) =>
+            session.Fail(error, context, at, own);
+
+        public void Report(Exception error, DurableContext context) => session.Report(error, ReportInfo.ListenerError, context);
     }
 
     private sealed class Unsubscriber(Action dispose) : IDisposable
@@ -1739,60 +2244,32 @@ internal sealed class SessionLine
     }
 
     /// <summary>
-    /// Enqueues <paramref name="job"/>. On an idle line it starts inline when <paramref name="inline"/> is true, else on the thread pool.
-    /// The returned task completes asynchronously, after the job has fully settled. Enqueued from a flow with an
-    /// <see cref="OrderedLineDelivery"/>, it completes through that delivery, in line order.
+    /// Enqueues <paramref name="job"/>, a job's line part. On an idle line it starts inline when <paramref name="inline"/> is true, else on
+    /// the thread pool; <paramref name="inCaller"/>, when given, is set while it runs inline in the caller. The Session delivers outcomes
+    /// (Session.Enqueue and Session.Maintain): the line only runs the line parts, one at a time.
     /// </summary>
-    public Task<T> Enqueue<T>(Func<Task<T>> job, bool inline = true)
+    public void Enqueue(Func<Task> job, bool inline = true, StrongBox<bool>? inCaller = null)
     {
-        var ordered = OrderedLineDelivery.Current;
-        // An ordered result is set by the delivery, which runs its continuation until it next suspends.
-        var completion = new TaskCompletionSource<T>(ordered is null ? TaskCreationOptions.RunContinuationsAsynchronously : TaskCreationOptions.None);
-        var caller = Environment.CurrentManagedThreadId;
-        var inCaller = false;
-        void Complete(Action set)
-        {
-            if (ordered is null) set();
-            // Run inline by a flow outside the delivery's segments: nothing orders it, and its caller goes on at once, as without one.
-            else if (Volatile.Read(ref inCaller) && Environment.CurrentManagedThreadId == caller && !ordered.Executing) set();
-            else ordered.Post(set);
-        }
-        async Task Run()
-        {
-            // A job runs on whatever thread starts or continues the line, possibly inside an ordered flow: what it enqueues is not part of it.
-            if (OrderedLineDelivery.Current is not null) OrderedLineDelivery.Current = null;
-            T result;
-            try { result = await job().ConfigureAwait(false); }
-            catch (Exception error)
-            {
-                Complete(() => completion.TrySetException(error));
-                return;
-            }
-            Complete(() => completion.TrySetResult(result));
-        }
         if (held is { } together)
         {
-            together.Add((this, Run, inline));
-            return completion.Task;
+            together.Add((this, job, inline));
+            return;
         }
         bool start;
         lock (gate)
         {
-            jobs.Enqueue(Run);
+            jobs.Enqueue(job);
             start = !running;
             running = true;
         }
-        if (start)
+        if (!start) return;
+        if (inline)
         {
-            if (inline)
-            {
-                Volatile.Write(ref inCaller, true);
-                Pump();
-                Volatile.Write(ref inCaller, false);
-            }
-            else ThreadPool.UnsafeQueueUserWorkItem(static line => line.Pump(), this, preferLocal: false);
+            if (inCaller is not null) Volatile.Write(ref inCaller.Value, true);
+            Pump();
+            if (inCaller is not null) Volatile.Write(ref inCaller.Value, false);
         }
-        return completion.Task;
+        else ThreadPool.UnsafeQueueUserWorkItem(static line => line.Pump(), this, preferLocal: false);
     }
 
     /// <summary>
@@ -2046,7 +2523,7 @@ internal sealed class StorageGuard(IStorage storage, Session session)
     /// fails the Session ends with <see cref="SessionFailedException"/> too, whatever it returns: nothing it read or wrote is used.
     /// <paramref name="lease"/> admits its first call even while closing; its later calls are refused once the Session is closing.
     /// </summary>
-    public async Task<T> CallAsync<T>(DurableContext? read, StorageLease? lease, Func<Task<T>> run)
+    public async Task<T> CallAsync<T>(DurableContext? read, StorageLease? lease, Func<Task<T>> run, bool failsSession = true)
     {
         AssertHealthy();
         var done = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -2073,7 +2550,7 @@ internal sealed class StorageGuard(IStorage storage, Session session)
                 AssertHealthy();
                 // An invalid read, or one its caller cancelled, says nothing about the Storage; it fails that call only.
                 var exempt = read is not null && (error is StorageRequestException || read.IsCancellationRequested);
-                if (!exempt) session.Fail(error);
+                if (!exempt && failsSession) session.Fail(error);
                 throw;
             }
             AssertHealthy();
@@ -2131,10 +2608,10 @@ internal sealed class GuardedStorage(StorageGuard guard, StorageLease? lease) : 
 {
     private IStorage Inner => guard.Storage;
 
-    /// <summary>Never exempt, whatever it throws: once admitted, whether a failed batch committed is unknown. A refusal is part of the
-    /// result, not a throw: the Session judges it (<see cref="CommitResult.Refused"/>).</summary>
+    /// <summary>Guarded like every call, but its outcome is the Session writer's to judge: it publishes the batches received first, then fails
+    /// the Session for a refusal (<see cref="CommitResult.Refused"/>) or a rejection, and for a Session that failed meanwhile.</summary>
     public Task<CommitResult> CommitAsync(IReadOnlyList<IReadOnlyList<StorageWrite>> batches, Action<int, Seq> receive, DurableContext context) =>
-        guard.CallAsync(null, lease, () => Inner.CommitAsync(batches, receive, context));
+        guard.CallAsync(null, lease, () => Inner.CommitAsync(batches, receive, context), failsSession: false);
 
     /// <summary>The backend's own publication scope (upstream <c>scopeOf</c>); not a call to guard.</summary>
     public void Publishing(Action publish, DurableContext context) => Inner.Publishing(publish, context);
