@@ -94,7 +94,7 @@ Archiving closes the session, commits its unique archive destination, moves the 
 - Kinds: a conversation with a parent is a fork; one owned by a task is a subagent; anything else is a root.
 - Custom names are trimmed, at most 100 characters, cannot be all digits, and only conversation 1 may be called `main`.
 
-**Busy** (as durable-pi): an agent is busy while the task graph has a live non-background task of its conversation. The `background` count is its live background tasks.
+**Busy** (as durable-pi): an agent is busy while the task graph has a live non-background task of its conversation. The `background` count is its live background tasks. Since the Pi v1.5.0 sync an idle conversation's `pi.live` is not always empty: after a run that ended without an answer it keeps `runFailure` until the next run starts. Idleness means no run (`pi.live.run` absent), never an empty `pi.live`.
 
 **Sending.**
 - Every send needs a request ID, which pi-durable deduplicates per conversation.
@@ -123,11 +123,11 @@ Archiving closes the session, commits its unique archive destination, moves the 
 - An agent reports read-only when it is offered no writer.
 
 **Streams.** The host turns the callback-based watches into `IAsyncEnumerable`s for the server:
-- agent event batches over `WatchEventsAsync`;
+- agent event batches over `WatchEventsAsync`, PiSharp.Durable.Hosting's own event projection since Pi v1.5.0 removed `watchEvents` from pi-durable ([0013](0013-pi-1.5.0-sync.md)). A batch is one publication, that is one commit as memory adopts it, and batches are never folded together;
 - task graph values;
 - device changes (session commits and catalog changes, coalesced).
 
-Each runs through a bounded channel whose writer waits, so a slow reader pushes back on the harness watch, which then replaces undelivered batches with one snapshot (pi-durable's own overflow rule). Nothing is replayed.
+Each runs through a bounded channel whose writer waits, so a slow reader pushes back on the harness watch, which then replaces undelivered batches with one snapshot (pi-durable v1.2.0's overflow rule, which the event projection keeps: past 100 undelivered batches, one snapshot of the newest view). Nothing is replayed.
 
 **Faux model.** `FauxDurableModels` answers without a provider for zero-cost tests and UI work. Its prompt grammar adapts durable-pi's `faux.ts`:
 - `!command` calls `bash`;
@@ -173,7 +173,7 @@ Phase 3 lives in `src/PiSharp.Durable.Hosting/Apps`, not in the released `PiShar
 - **Auth.** `Authorization: Bearer` or `X-DPI-Token`, compared as SHA-256 hashes in constant time. Tokens are `dpi_` plus 32 random bytes in base64url; `pisharp durable token [--rotate]` prints or replaces it, stored readable by the user only.
 - **Errors.** `{error: {code, message}}` with durable-pi's codes; bodies are JSON objects of at most 256 KB.
 - **Idempotency.** `Idempotency-Key` makes session, agent and fork creation exactly once. Sessions use the catalog's spawn keys and persist the parsed creation request identity independently of subsequent renames or configuration changes; agents and forks record the key in a session document family (`pisharp.creation-key`) inside the commit that creates the conversation, so a retry after a crash finds the first one. A key reused for another request is `invalid`. HTTP keys from catalogs older than version 3 have no recorded request identity and are refused rather than silently accepting an unverifiable retry. Tool spawn keys retain their key-only replay behavior.
-- **Streams.** `id`/`event`/`data` frames, `hello` first, a `: ping` after 15 s idle, a 2 MB backlog cut-off, coalescing at 250 ms (device, session) and 150 ms (agent documents), and validation before the headers. Agent events are PiSharp.Durable's own JSON, so 1.2.0's nested tool fields pass through.
+- **Streams.** `id`/`event`/`data` frames, `hello` first, a `: ping` after 15 s idle, a 2 MB backlog cut-off, coalescing at 250 ms (device, session) and 150 ms (agent documents), and validation before the headers. Agent events are the Hosting projection's JSON in PiSharp.Durable 1.2.0's forms, so 1.2.0's nested tool fields pass through and the device wire stays v1 through the Pi v1.5.0 sync. That sync only adds fields: the snapshot carries `runFailure`, `run_end` its `failure`, and `agent_changed` and the snapshot's agent may carry `maxTurns`.
 - **PiSharp additions** (in `capabilities`): `/state` and `/jobs` aliases of `/demo/*`, `GET .../jobs`, `GET/POST .../interactions` (question forms and plan reviews), `GET/PATCH .../plan-mode`, tool effects and deferral in the agent detail, Main's provider in session summaries. Agent documents are `pisharp.job-runs` and `pisharp.system-prompts`; durable-pi's `demo.job-runs` shape is not reproduced.
 - **CLI.** `pisharp durable serve [--port --host --name --start-dirs --data-dir --provider faux --model --save]` uses the CLI's own models (auth.json, models.json, the environment) through a catalog adapter, or the faux model. The device directory defaults to `~/.pi/agent/experimental/durable-device` (`device.json`, `token`, the catalog and sessions). It binds `127.0.0.1` unless `--host` says otherwise, and warns when it does not. The two commands are not listed in `pisharp --help` (pinned by `PiSharp.DurableCli.Tests`); `pisharp durable help` lists them and the device commands.
 
