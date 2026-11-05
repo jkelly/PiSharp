@@ -3707,7 +3707,13 @@
       ],
       "commits": [
         "1c6928b30",
-        "87eff524f"
+        "87eff524f",
+        "b84fea3d",
+        "628bfa1e",
+        "b38808ed",
+        "76631edd",
+        "fcda6f35",
+        "271eb75a"
       ],
       "notes": "Design point, formats: pi.tool v3 migrates a v1 task to kind model and v2 is the identity (unoffered absent); pi.generation v2's migrate is the identity (the v1 checkpoint is kept). An older Harness, PiSharp 1.2.0.x included, leaves v3/v2 tasks blocked (task_too_old): no rollback; record it in decision 0005 and the release notes (phase 8). Both migrate chains read the v1.2.0 corpus's tool tasks (compat.tool-interrupted, compat.nested-tools*, compat.subagent) as migration input; their written comparisons become authored where the stored version changes. PiSharp runs afterTool only for executed calls today; no PiSharp-only afterTool hooks exist outside the core, so extensions must check result diagnostics before casting arguments."
     },

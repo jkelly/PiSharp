@@ -56,11 +56,11 @@
     "changelogBullets": 477,
     "repeatedBullets": 23,
     "byStatus": {
-      "ported": 209,
+      "ported": 211,
       "ported-with-deferral": 23,
       "already-ported": 12,
       "no-op": 25,
-      "port": 57
+      "port": 55
     },
     "byArea": {
       "ai": 58,
@@ -9341,7 +9341,7 @@
           "tests/PiSharp.Durable.Tests/HarnessRunFailureCases.cs: keeps-the-failure-while-a-run-continues-the-queue-in-the-same-commit-and-replaces-it-with-the-next",
           "tests/PiSharp.Durable.Tests/HarnessRunFailureCases.cs: pisharp.the-event-stream-carries-the-run-failure",
           "tests/PiSharp.Durable.Tests/HarnessRunFailureCases.cs: pisharp.reads-and-writes-every-reason-in-upstream-spelling",
-          "tests/PiSharp.Durable.Tests/HarnessViewRunCases.cs: ends-a-call-that-never-runs-with-its-result-at-once-and-a-tool-aborted-with-its-generation",
+          "tests/PiSharp.Durable.Tests/HarnessViewRunCases.cs: ends-a-call-that-never-runs-through-its-own-task-and-a-tool-aborted-with-its-generation",
           "tests/PiSharp.Durable.Tests/HarnessViewRunCases.cs: converts-the-streamed-partial-into-one-aborted-answer-entry-when-the-run-is-aborted",
           "tests/PiSharp.Durable.Tests/Harness/HarnessGenerationCases.cs: still-ends-a-run-whose-input-something-else-already-settled",
           "tests/PiSharp.Durable.Tests/Harness/HarnessGenerationCases.cs: fails-with-no-model-when-no-model-is-configured-or-the-model-is-unknown",
@@ -10111,7 +10111,7 @@
       "id": "durable.unoffered-tool-calls",
       "area": "durable",
       "phase": 4,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "durable@1.5.0/Breaking Changes#30"
       ],
@@ -10133,13 +10133,37 @@
         "tests/PiSharp.Durable.Tests/Compat/CompatCases.cs"
       ],
       "release": "1.5.0",
-      "notes": "PiSharp has pi.tool version 2 and pi.generation version 1 (Tool.cs:54, Generation.cs:39), and Generation.cs:720 still answers unoffered calls without a task. Both version bumps are record compatibility changes: PiSharp 1.2.0.x leaves such tasks blocked. Depends on durable.after-tool-every-result."
+      "notes": "PiSharp has pi.tool version 2 and pi.generation version 1 (Tool.cs:54, Generation.cs:39), and Generation.cs:720 still answers unoffered calls without a task. Both version bumps are record compatibility changes: PiSharp 1.2.0.x leaves such tasks blocked. Depends on durable.after-tool-every-result.",
+      "evidence": {
+        "commits": [
+          "b84fea3d",
+          "628bfa1e",
+          "b38808ed",
+          "fcda6f35"
+        ],
+        "tests": [
+          "tests/PiSharp.Durable.Tests/HarnessToolHooksCases.cs: run-aftertool-inside-their-own-tool-task",
+          "tests/PiSharp.Durable.Tests/HarnessToolHooksCases.cs: count-toward-a-round-s-terminate",
+          "tests/PiSharp.Durable.Tests/HarnessToolHooksCases.cs: take-their-turn-in-a-sequential-round-and-the-last-handoff-in-call-order-wins",
+          "tests/PiSharp.Durable.Tests/HarnessToolHooksCases.cs: each-get-a-tool-task-in-a-parallel-round-of-only-such-calls",
+          "tests/PiSharp.Durable.Tests/HarnessToolHooksCases.cs: keep-their-flag-in-a-version-2-generation-s-sequential-round-also-one-migrated-from-version-1",
+          "tests/PiSharp.Durable.Tests/HarnessToolHooksCases.cs: settle-unavailable-not-aborted-when-their-sequential-round-is-aborted-before-they-start",
+          "tests/PiSharp.Durable.Tests/Harness/HarnessToolsCases.cs: answers-calls-to-tools-the-request-did-not-offer-through-a-flagged-tool-task",
+          "tests/PiSharp.Durable.Tests/Harness/HarnessToolsCases.cs: never-runs-a-tool-the-request-did-not-offer-even-when-the-agent-has-it",
+          "tests/PiSharp.Durable.Tests/Harness/HarnessLiveDeltasCases.cs: starts-calls-the-request-did-not-offer-as-flagged-tasks-and-marks-a-faulted-tools-slot-done-without-an-entry",
+          "tests/PiSharp.Durable.Tests/HarnessViewRunCases.cs: ends-a-call-that-never-runs-through-its-own-task-and-a-tool-aborted-with-its-generation",
+          "tests/PiSharp.Durable.Tests/HarnessNestedToolsCases.cs: keeps-version-2-tool-task-input-as-it-is",
+          "tests/PiSharp.Durable.Tests/HarnessNestedToolsCases.cs: reserves-a-stored-version-2-task-under-version-3-and-runs-it-as-a-model-issued-call",
+          "tests/PiSharp.Durable.Tests/Harness/HarnessChatDifferentialCases.cs: unavailable-tool",
+          "tests/PiSharp.Durable.Tests/Harness/HarnessToolsDifferentialCases.cs: round"
+        ]
+      }
     },
     {
       "id": "durable.after-tool-every-result",
       "area": "durable",
       "phase": 4,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "durable@1.5.0/Breaking Changes#29"
       ],
@@ -10158,7 +10182,28 @@
         "tests/PiSharp.Durable.Tests/Harness/HarnessToolsCases.cs"
       ],
       "release": "1.5.0",
-      "notes": "PiSharp runs afterTool only for executed calls (v1.2.0). No PiSharp-only afterTool hooks exist outside the core, so the collision is limited to tests and to user extensions, which must check result diagnostics before casting arguments. Depends on durable.restart-limit (restart_limit results); pairs with durable.unoffered-tool-calls."
+      "notes": "PiSharp runs afterTool only for executed calls (v1.2.0). No PiSharp-only afterTool hooks exist outside the core, so the collision is limited to tests and to user extensions, which must check result diagnostics before casting arguments. Depends on durable.restart-limit (restart_limit results); pairs with durable.unoffered-tool-calls.",
+      "evidence": {
+        "commits": [
+          "b84fea3d",
+          "628bfa1e"
+        ],
+        "tests": [
+          "tests/PiSharp.Durable.Tests/HarnessToolHooksCases.cs: sees-and-replaces-unavailable-invalid-and-blocked-results-with-the-raw-arguments",
+          "tests/PiSharp.Durable.Tests/HarnessToolHooksCases.cs: bounds-a-replacement-output-with-the-tool-s-limits-or-the-defaults-for-an-unresolved-tool",
+          "tests/PiSharp.Durable.Tests/HarnessToolHooksCases.cs: lets-a-hook-s-terminate-on-a-blocked-call-count-toward-the-round",
+          "tests/PiSharp.Durable.Tests/HarnessToolHooksCases.cs: runs-on-nested-invalid-and-blocked-calls-the-caller-gets-diagnostics-and-details-not-output",
+          "tests/PiSharp.Durable.Tests/HarnessToolHooksCases.cs: gives-a-nested-call-a-hook-turns-into-a-success-its-output-as-value-unless-the-tool-has-a-schema",
+          "tests/PiSharp.Durable.Tests/HarnessToolHooksCases.cs: runs-on-an-interrupted-call-a-replaced-output-loses-the-slot-s-truncation-diagnostic",
+          "tests/PiSharp.Durable.Tests/HarnessToolHooksCases.cs: runs-on-an-abort-result-but-not-on-the-aborted-results-of-calls-that-never-started",
+          "tests/PiSharp.Durable.Tests/HarnessToolHooksCases.cs: reports-a-throwing-hook-on-an-abort-result-and-settles-the-result-as-built",
+          "tests/PiSharp.Durable.Tests/HarnessToolHooksCases.cs: settles-an-abort-without-the-hooks-in-the-abort-handler-s-last-attempt",
+          "tests/PiSharp.Durable.Tests/HarnessToolHooksCases.cs: sees-the-held-progress-of-an-aborted-call-and-the-result-stores-it",
+          "tests/PiSharp.Durable.Tests/HarnessToolHooksCases.cs: runs-on-an-abandoned-nested-call-s-result",
+          "tests/PiSharp.Durable.Tests/HarnessToolHooksCases.cs: runs-on-a-restart-limit-result-at-the-limit-and-not-once-the-hooks-themselves-were-cut-off",
+          "tests/PiSharp.Durable.Tests/Harness/HarnessToolsCases.cs: rejects-details-still-waiting-when-the-call-is-aborted-during-aftertool"
+        ]
+      }
     },
     {
       "id": "durable.before-provider-request",
