@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/test/harness-submissions.test.ts. Verbatim apart from the adaptations in
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/test/harness-submissions.test.ts. Verbatim apart from the adaptations in
 // HarnessSupport.cs and ChatSupport.cs, and these:
 // - Backends. Upstream runs these on ControlledStorage over memory and reopens a SQLite file for the reopen case. harness.submissions.*
 //   does the same; harness.submissions.jsonl.* and harness.submissions.sqlite.* rerun the storage-agnostic cases on ControlledStorage over a
@@ -8,10 +8,13 @@
 //   with that exception as the reason.
 // - `defineEntry<{ n: number }>` is a JsonObjectValue-typed entry kind; `const n: number = counter.data.n` reads the number.
 // Pi v1.5.0 sync (area admission, fb524dd2e): the idle-input case narrows the record by type too, as continue submissions are placed
-// without an entry. The citation stays on v1.2.0 until the file's other areas land (publication-caches, group-commit-scheduler).
+// without an entry.
 // Pi v1.5.0 sync (area group-commit-scheduler, e5c6182ba): "rejects a wait whose submission read spans the start of close" reads the
 // submission through a reopened Harness, as only a reopened one reads it from Storage once the Session caches the submissions it writes
 // (area publication-caches); the ControlledStorage stays open for the reopen (KeepOpenForReopen).
+// Pi v1.5.0 sync (area publication-caches, e5c6182ba): "resumes a wait only once observeCommits() observers saw the commit that settled it"
+// runs on LateResolvingStorage (SessionSupport.cs) over the group's storage; `new Set<SubmissionId>()` is a ConcurrentDictionary, as the
+// observer runs on the publishing thread.
 using System.Collections.Immutable;
 using PiSharp.Durable;
 using PiSharp.Durable.Chord;
@@ -290,6 +293,23 @@ internal static class SubmissionsTests
             Check(counterKind.Is(counter.Record), "counter guard");
             Check(!Entries.AssistantEntry.Is(counter.Record), "assistant guard");
             Seq(["pi.user", "pi.assistant"], new[] { Entries.UserEntry.Kind, Entries.AssistantEntry.Kind }, "built-in kinds");
+            await harness.CloseAsync(Context);
+        });
+
+        yield return Case(prefix + "resumes-a-wait-only-once-observecommits-observers-saw-the-commit-that-settled-it", async () =>
+        {
+            var setup = Setup();
+            setup.Faux.SetResponses(FauxAssistantMessage("hi"));
+            var (harness, root) = await OpenChat(new LateResolvingStorage(fresh()), setup);
+            var settled = new System.Collections.Concurrent.ConcurrentDictionary<SubmissionId, bool>();
+            harness.ObserveCommits(new CommitObserver((publication, _) =>
+            {
+                foreach (var change in publication.Changes)
+                    if (change is SubmissionWrite { Value: { Status: SubmissionStatus.Done } record }) settled[record.Id] = true;
+            }, _ => { }));
+            var submission = await Submit(root, "hello");
+            await submission.WaitAsync(Context);
+            Equal(true, settled.ContainsKey(submission.Id), "settled before the wait resumed");
             await harness.CloseAsync(Context);
         });
     }

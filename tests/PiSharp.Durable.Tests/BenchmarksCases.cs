@@ -77,7 +77,9 @@ internal static partial class Program
 
             var memoryOutput = new StringWriter();
             var memoryRows = await SchedulerMemoryBench.RunAsync([3], memoryOutput, tempRoot: root);
-            Check(memoryRows is [{ Cycles: 3, Settled: 0, Edges: <= 1, LateReads: > 0 }], "one scheduler-memory row with bounded indexes");
+            // Pi v1.5.0 (area publication-caches): the record cache serves the old conversation and its ended tool task, which the Session
+            // wrote, so a later message reads nothing while they are kept (CachedStorage's capacities).
+            Check(memoryRows is [{ Cycles: 3, Settled: 0, Edges: <= 1, LateReads: 0 }], "one scheduler-memory row with bounded indexes");
             Check(memoryOutput.ToString().StartsWith("cycles | ms", StringComparison.Ordinal), "scheduler-memory table: " + memoryOutput);
             Equal(SchedulerMemoryBench.DefaultSizes, SchedulerMemoryBench.ParseSizes(null), "scheduler-memory default sizes");
             var scaleOutput = new StringWriter();

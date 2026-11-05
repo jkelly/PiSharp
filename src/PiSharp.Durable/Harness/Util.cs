@@ -50,6 +50,22 @@ internal sealed class Waiters<TKey, T>
         lock (gate) return [.. sets.Keys.Select(key => key.Value)];
     }
 
+    /// <summary>Removes every wait for <paramref name="key"/> and returns their resolution with <paramref name="value"/>, for the caller to
+    /// run later (once host observers saw the commit that settled them); null when none waits.</summary>
+    public Action? Take(TKey key, T value)
+    {
+        List<TaskCompletionSource<T>>? taken = null;
+        lock (gate)
+        {
+            if (sets.Remove(new Key(key), out var set)) taken = [.. set];
+        }
+        if (taken is null) return null;
+        return () =>
+        {
+            foreach (var waiter in taken) waiter.TrySetResult(value);
+        };
+    }
+
     /// <summary>Resolves every wait for <paramref name="key"/>.</summary>
     public void Resolve(TKey key, T value)
     {

@@ -18,9 +18,11 @@
 // - Pi v1.5.0 sync (area vocabulary, 5f312dac4): openTestSession attaches with ObserveCommits (a CommitObserver; was SubscribeCommits),
 //   the internal follower helper is FollowCommits (upstream followCommits, was observeCommits), DocumentValues is upstream's
 //   documentValues (the document changes of kind change), and onValue is Change(call) above.
-// - Pi v1.5.0 sync (area group-commit, e5c6182ba): RefusingAt is upstream's refusingAt. ControlledStorage still records every batch of a
-//   call before its hold, where v1.5.0's records them after it, and only the first one of a call it refuses: the cases that read
-//   Commits right after Entered rely on it (SessionGroupCommitCases.cs counts its own calls in BatchStorage).
+// - Pi v1.5.0 sync (area group-commit, e5c6182ba): RefusingAt is upstream's refusingAt.
+// - Pi v1.5.0 sync (area publication-caches, e5c6182ba): ControlledStorage records a call's batches after its hold, and only the first one
+//   of a call it refuses, as v1.5.0's does; AfterAdopt is upstream's afterAdopt, run once after the next commit's first receipt.
+//   LateResolvingStorage is upstream's, a subclass as there (ControlledStorage's CommitAsync, GetTaskAsync and ScanEntriesAsync are virtual for
+//   it and for counting or pausing subclasses); its flush() is a short delay, as the thread pool has no macrotask turn.
 using System.Collections.Immutable;
 using PiSharp.Durable;
 using PiSharp.Durable.Chord;
@@ -224,7 +226,7 @@ internal sealed class Gate
 
 /// <summary>Storage with observable commits, held calls and injected commit failures over any backend (upstream
 /// <c>ControlledStorage</c>).</summary>
-internal sealed class ControlledStorage(IStorage inner) : IStorage
+internal class ControlledStorage(IStorage inner) : IStorage
 {
     private readonly Lock gate = new();
     private Gate? commitGate;
@@ -285,21 +287,23 @@ internal sealed class ControlledStorage(IStorage inner) : IStorage
         get { lock (gate) return Commits.Count; }
     }
 
-    /// <summary>Records each batch and holds the call, then refuses its first batch if a failure is set (upstream v1.5.0: a refusal,
-    /// nothing stored; the Session fails with it as it did with v1.2.0's thrown failure), or commits the batches through
-    /// <see cref="Inner"/>. The batches are recorded before the hold, as v1.2.0's are, until the areas that move it land.</summary>
-    public async Task<CommitResult> CommitAsync(IReadOnlyList<IReadOnlyList<StorageWrite>> batches, Action<int, Seq> receive, DurableContext context)
+    /// <summary>Runs once, in the next commit's receipts right after its first receipt returned (upstream <c>afterAdopt</c>).</summary>
+    public Action? AfterAdopt
+    {
+        get { lock (gate) return afterAdopt; }
+        set { lock (gate) afterAdopt = value; }
+    }
+
+    private Action? afterAdopt;
+
+    /// <summary>Holds the call, then records its batches and refuses the first one if a failure is set (upstream v1.5.0: a refusal, nothing
+    /// stored, and only that batch recorded; the Session fails with it), or records them all and commits them through <see cref="Inner"/>,
+    /// <see cref="Adopting"/> set while each receipt runs and <see cref="AfterAdopt"/> run after the first one.</summary>
+    public virtual async Task<CommitResult> CommitAsync(IReadOnlyList<IReadOnlyList<StorageWrite>> batches, Action<int, Seq> receive,
+        DurableContext context)
     {
         Gate? held;
-        lock (gate)
-        {
-            foreach (var writes in batches)
-            {
-                AdmittedCommits.Add(writes);
-                Commits.Add([.. writes]);
-            }
-            held = commitGate;
-        }
+        lock (gate) held = commitGate;
         if (held is not null)
         {
             held.Enter();
@@ -311,6 +315,11 @@ internal sealed class ControlledStorage(IStorage inner) : IStorage
         {
             failure = commitFailure;
             commitFailure = null;
+            foreach (var writes in failure is null ? batches : batches.Take(1))
+            {
+                AdmittedCommits.Add(writes);
+                Commits.Add([.. writes]);
+            }
         }
         if (failure is not null) return new CommitResult(0, failure);
         return await Inner.CommitAsync(batches, (index, seq) =>
@@ -318,6 +327,13 @@ internal sealed class ControlledStorage(IStorage inner) : IStorage
             Volatile.Write(ref adopting, true);
             try { receive(index, seq); }
             finally { Volatile.Write(ref adopting, false); }
+            Action? after;
+            lock (gate)
+            {
+                after = afterAdopt;
+                afterAdopt = null;
+            }
+            after?.Invoke();
         }, context);
     }
 
@@ -354,9 +370,9 @@ internal sealed class ControlledStorage(IStorage inner) : IStorage
         Inner.GetEntryAsync(conversationId, id, context);
     public Task<EntryRecord?> FindLatestHeadMarkerAsync(ConversationId conversationId, EntryId? atOrBeforeEntryId, DurableContext context) =>
         Inner.FindLatestHeadMarkerAsync(conversationId, atOrBeforeEntryId, context);
-    public Task<Page<EntryRecord>> ScanEntriesAsync(EntryQuery query, int limit, JsonObjectValue? cursor, DurableContext context) =>
+    public virtual Task<Page<EntryRecord>> ScanEntriesAsync(EntryQuery query, int limit, JsonObjectValue? cursor, DurableContext context) =>
         Inner.ScanEntriesAsync(query, limit, cursor, context);
-    public Task<TaskRecord?> GetTaskAsync(TaskId id, DurableContext context) => Inner.GetTaskAsync(id, context);
+    public virtual Task<TaskRecord?> GetTaskAsync(TaskId id, DurableContext context) => Inner.GetTaskAsync(id, context);
     public Task<Page<TaskRecord>> ScanTasksAsync(TaskQuery query, int limit, JsonObjectValue? cursor, DurableContext context) =>
         Inner.ScanTasksAsync(query, limit, cursor, context);
     public Task<SubmissionRecord?> GetSubmissionAsync(SubmissionId id, DurableContext context) => Inner.GetSubmissionAsync(id, context);
@@ -387,5 +403,52 @@ internal sealed class ControlledStorage(IStorage inner) : IStorage
     {
         Interlocked.Increment(ref closeCount);
         return KeepOpenForReopen ? Task.CompletedTask : Inner.CloseAsync(context);
+    }
+}
+
+/// <summary>
+/// Controlled storage whose commits resolve a macrotask after they adopted the batch, as a storage with work after durability does (JSONL
+/// reclaims sidecars): code woken inside the receipt runs before the commit resolves (upstream <c>LateResolvingStorage</c>). <see cref="Gap"/>
+/// runs in that work, a turn after adoption, and <see cref="RejectAfterAdopt"/> makes a commit it matches reject there, durable and adopted,
+/// as a failed reclaim does; each fires once. Upstream's flush() (a macrotask) is a short delay here, as the thread pool has no turn to
+/// wait for: what the receipt woke runs on other threads meanwhile.
+/// </summary>
+internal sealed class LateResolvingStorage(IStorage inner) : ControlledStorage(inner)
+{
+    private volatile bool committing;
+
+    /// <summary>Set from a commit's start until it resolves.</summary>
+    public bool Committing => committing;
+
+    public Func<IReadOnlyList<StorageWrite>, bool>? Gap { get; set; }
+
+    public Func<IReadOnlyList<StorageWrite>, bool>? RejectAfterAdopt { get; set; }
+
+    public override async Task<CommitResult> CommitAsync(IReadOnlyList<IReadOnlyList<StorageWrite>> batches, Action<int, Seq> receive,
+        DurableContext context)
+    {
+        committing = true;
+        try
+        {
+            var result = await base.CommitAsync(batches, receive, context);
+            var stored = batches.Take(result.Stored).ToList();
+            await Task.Delay(10);
+            if (Gap is { } gap && stored.Any(gap))
+            {
+                Gap = null;
+                // What the gap started runs before the commit resolves.
+                await Task.Delay(10);
+            }
+            if (RejectAfterAdopt is { } reject && stored.Any(reject))
+            {
+                RejectAfterAdopt = null;
+                throw new InvalidOperationException("reclaim failed");
+            }
+            return result;
+        }
+        finally
+        {
+            committing = false;
+        }
     }
 }

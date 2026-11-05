@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/test/harness-context.test.ts. Verbatim apart from the adaptations in
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/test/harness-context.test.ts. Verbatim apart from the adaptations in
 // HarnessSupport.cs and HarnessConversationsSupport.cs, and these:
 // - Every case runs on the storage the group is given; countingSetup's Proxy is CountingStorage, which decorates that storage.
 // - toEqual on views is SameView (deep JSON equality of head, entries, contributions and messages).
@@ -15,9 +15,10 @@
 //   is asserted.
 // - Pi v1.5.0 sync (area harness-options): upstream 5713c9507's baseline cases (#10904), among them
 //   harness.context.leads-with-the-baseline-after-a-compaction-that-keeps-assistant-messages and
-//   harness.context.finds-the-baseline-among-the-entries-an-extended-read-adds, and its changes to the pseudo-random transcript. Their
-//   scanned-row counts are 5713c9507's; group commit (e5c6182ba, area publication-caches) changes them, with the other row counts here,
-//   to v1.5.0's.
+//   harness.context.finds-the-baseline-among-the-entries-an-extended-read-adds, and its changes to the pseudo-random transcript.
+// - Pi v1.5.0 sync (area publication-caches, e5c6182ba): the scanned-row counts are v1.5.0's. The Session knows each conversation's
+//   bounds (ConversationTails) and a kept range takes each entry as it is committed (Scheduler.Observe), so an extended read and a
+//   bounds probe scan nothing.
 using System.Collections.Concurrent;
 using PiSharp.Durable;
 using PiSharp.Durable.Chord;
@@ -359,18 +360,18 @@ internal static partial class HarnessConversationTests
                 var initial = await Read();
                 SameView(await root.ContextAsync(ctx), initial.View, "initial");
 
-                // Three new entries: the bounds probe reads one row, the extension the three new ones.
+                // Three new entries: the kept range took them as they were committed, so the read scans nothing.
                 await Write(Message(User("new")));
                 await Write(new EntryDraft { Kind = "note", Data = O("""{"text":"display only"}""") });
                 await Write(Message(Assistant("answer")));
                 var extended = await Read();
-                Equal(4, extended.Rows, "extended rows");
+                Equal(0, extended.Rows, "extended rows");
                 SameView(await root.ContextAsync(ctx), extended.View, "extended");
 
                 // A newer edit of an older entry applies to the extended range.
                 await Write(Edit(ContextEdit.Omit(first.Id)));
                 var edited = await Read();
-                Equal(2, edited.Rows, "edited rows");
+                Equal(0, edited.Rows, "edited rows");
                 SameView(await root.ContextAsync(ctx), edited.View, "edited");
                 Check(!Described(edited.View.Messages).Contains("user:first"), "the omitted entry is gone");
 
@@ -459,9 +460,9 @@ internal static partial class HarnessConversationTests
             await Probe("idle");
             Volatile.Write(ref clock, clock + 600_000);
             await Probe("expired");
-            // Bounds probes read one row each. The child scans its own new entry; the waiting parent's later invocation and the probe
-            // within the retention period scan nothing new. After it, the probe reads the whole transcript again.
-            SameRows([("parent", 22), ("child", 2), ("after", 1), ("idle", 1), ("expired", 23)], rows, "rows");
+            // The Session knows the bounds, and the kept range takes each committed entry, so only a first read scans: the parent's,
+            // and the probe's after the retention period, which reads the whole transcript again.
+            SameRows([("parent", 21), ("child", 0), ("after", 0), ("idle", 0), ("expired", 22)], rows, "rows");
             await harness.CloseAsync(Context);
         });
 
@@ -593,8 +594,7 @@ internal static partial class HarnessConversationTests
             await harness.CloseAsync(Context);
         });
 
-        // #10904. Rows as of upstream 5713c9507: the bounds probe reads one row and the extension the added one. Group commit (e5c6182ba,
-        // area publication-caches) lets the kept range take committed entries, and upstream v1.5.0 expects 0 there.
+        // #10904
         yield return Case(prefix + "finds-the-baseline-among-the-entries-an-extended-read-adds", async () =>
         {
             var (harness, registry, root, first, scanned) = await CountingSetup(storage());
@@ -617,7 +617,8 @@ internal static partial class HarnessConversationTests
                 Equal("user:first", (await Read(root)).Messages[0], "cached range");
                 await Append(root.Id, new EntryDraft { Kind = "pi.system", Model = Messages(SystemMessage(("plan", "Plan."))) });
                 var read = await Read(root);
-                Equal(2, read.Rows, "extended rows");
+                // Nothing: the kept range took the added entry as it was committed.
+                Equal(0, read.Rows, "extended rows");
                 Seq(["system:plan", "user:first", "assistant:old 0"], read.Messages.Take(3), "baseline leads");
 
                 // A system message the cached range already has keeps a later first `pi.system` entry in place.
@@ -627,7 +628,7 @@ internal static partial class HarnessConversationTests
                 Seq(["user:first", "assistant:answer", "system:note"], (await Read(fork)).Messages, "fork");
                 await Append(fork.Id, new EntryDraft { Kind = "pi.system", Model = Messages(SystemMessage(("note", null))) });
                 read = await Read(fork);
-                Equal(2, read.Rows, "fork extended rows");
+                Equal(0, read.Rows, "fork extended rows");
                 Seq(["user:first", "assistant:answer", "system:note", "system:note"], read.Messages, "fork extended");
 
                 // An omitted system message still rules out a later baseline; the extended read keeps that.
@@ -642,7 +643,7 @@ internal static partial class HarnessConversationTests
                 Seq(["user:first", "assistant:answer"], (await Read(omitted)).Messages, "omitted");
                 await Append(omitted.Id, new EntryDraft { Kind = "pi.system", Model = Messages(SystemMessage(("legacy", null))) });
                 read = await Read(omitted);
-                Equal(2, read.Rows, "omitted extended rows");
+                Equal(0, read.Rows, "omitted extended rows");
                 Seq(["user:first", "assistant:answer", "system:legacy"], read.Messages, "omitted extended");
 
                 // A first `pi.system` entry without a system message leaves no baseline for a later one to take.
@@ -652,7 +653,7 @@ internal static partial class HarnessConversationTests
                 Seq(["user:first", "assistant:answer"], (await Read(empty)).Messages, "empty");
                 await Append(empty.Id, new EntryDraft { Kind = "pi.system", Model = Messages(SystemMessage(("s", "Delta."))) });
                 read = await Read(empty);
-                Equal(2, read.Rows, "empty extended rows");
+                Equal(0, read.Rows, "empty extended rows");
                 Seq(["user:first", "assistant:answer", "system:s"], read.Messages, "empty extended");
                 await runtime.CommitAsync((_, _) => Done(), ctx);
             }));
@@ -750,7 +751,7 @@ internal static partial class HarnessConversationTests
             await late!;
             probeStart.Resolve();
             SameJson(DoneOutcome, OutcomeOf(await harness.WaitForTaskAsync(probeId, Context)), "probe outcome");
-            SameRows([("probe", 22)], rows, "rows");
+            SameRows([("probe", 21)], rows, "rows");
             await harness.CloseAsync(Context);
         });
 
@@ -782,7 +783,7 @@ internal static partial class HarnessConversationTests
             time.Advance(TimeSpan.FromMilliseconds(1_000));
             Equal(idle, time.TimerCount, "timers after expiry");
             await Probe("second");
-            SameRows([("first", 22), ("second", 22)], rows, "rows");
+            SameRows([("first", 21), ("second", 21)], rows, "rows");
             await harness.CloseAsync(Context);
         });
 
@@ -804,7 +805,7 @@ internal static partial class HarnessConversationTests
                 SameJson(DoneOutcome, OutcomeOf(await harness.WaitForTaskAsync(id, Context)), name + " outcome");
                 await root.WaitForIdleAsync(Context);
             }
-            SameRows([("first", 22), ("second", 22)], rows, "rows");
+            SameRows([("first", 21), ("second", 21)], rows, "rows");
             await harness.CloseAsync(Context);
         });
     }
