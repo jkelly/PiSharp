@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/test/harness-generation.test.ts. Verbatim apart from the adaptations in
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/test/harness-generation.test.ts. Verbatim apart from the adaptations in
 // HarnessSupport.cs and ChatSupport.cs, and these:
 // - Backends. Upstream runs this file on MemoryStorage (ControlledStorage over memory where it inspects commits). harness.generation.* does
 //   the same; harness.generation.jsonl.* and harness.generation.sqlite.* rerun every storage-backed case on a fresh JSONL directory and a
@@ -15,10 +15,11 @@
 // harness.generation.records-the-requested-thinking-level-on-answers-streamed-and-polled, and "attributes model requests to pi by default
 // and merges the Harness identity over it" (adc5fa9f8), which is
 // harness.generation.sends-the-harness-default-identity-and-merges-the-harness-identity-over-it: upstream's default identity is
-// { attribution: PI_ATTRIBUTION }; PiSharp's Harness.DefaultIdentity is empty, so a Harness without an identity sends none (pending
-// core.client-identity-attribution). Both also run as harness.generation.jsonl.* and harness.generation.sqlite.*.
-// Pi v1.5.0 sync (area reports): "resolves settings over the built-in defaults" expects afterFailedRun: "keep" (a30c2a81d); its
-// restartLimit (area restarts) arrives with its area.
+// { attribution: PI_ATTRIBUTION }; PiSharp's Harness.DefaultIdentity is empty, so a Harness without an identity sends none (the owner's
+// choice: no attribution, decision 0013, core.client-identity-attribution). Both also run as harness.generation.jsonl.* and
+// harness.generation.sqlite.*.
+// Pi v1.5.0 sync (area reports): "resolves settings over the built-in defaults" expects afterFailedRun: "keep" (a30c2a81d); the closeout
+// added its restartLimit assertions (area restarts' default 5, 0 resolving to 5 and infinity kept, a30c2a81d).
 // Pi v1.5.0 sync (area deferred-commits, 6c2fd73b0): livePublications observes commits as memory adopts them, and "resolves settings over
 // the built-in defaults" expects progress.persistWithinMs 1000, the default for -1, and 0 kept. "stores partials as deltas ..." stores
 // deferred partials within 100 ms, as e5c6182ba's does.
@@ -664,8 +665,11 @@ internal static class GenerationTests
                 {"stream":{},"retry":{"enabled":true,"maxRetries":3,"baseDelayMs":2000,"maxAgentDelayMs":60000},
                  "compaction":{"enabled":true,"reserveTokens":16384,"keepRecentTokens":20000,"backgroundTokens":32768},
                  "progress":{"partialIntervalMs":100,"outputIntervalMs":100,"persistWithinMs":1000},"toolExecution":"parallel","steeringMode":"one-at-a-time",
-                 "followUpMode":"one-at-a-time","contextRetentionMs":600000,"afterFailedRun":"keep"}
+                 "followUpMode":"one-at-a-time","contextRetentionMs":600000,"afterFailedRun":"keep","restartLimit":5}
                 """, JsonObjectValue.From(resolved.Where(property => property.Key != "documentRetentionMs")), "defaults");
+            Equal(5d, Agents.ResolveSettings(new HarnessSettings { RestartLimit = 0 }).RestartLimit, "restartLimit 0");
+            Equal(double.PositiveInfinity, Agents.ResolveSettings(new HarnessSettings { RestartLimit = double.PositiveInfinity }).RestartLimit,
+                "restartLimit infinity");
             MatchJson("""{"retry":{"enabled":false,"maxRetries":3,"baseDelayMs":2000},"compaction":{"enabled":true,"backgroundTokens":0}}""",
                 SettingsJson(Agents.ResolveSettings(new HarnessSettings
                 {
@@ -714,6 +718,7 @@ internal static class GenerationTests
                 AfterFailedRun.Withdraw => "withdraw",
                 _ => "keep",
             }),
+            ("restartLimit", settings.RestartLimit),
         };
         return Obj([.. properties]);
     }

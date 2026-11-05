@@ -5,6 +5,9 @@
 // 28, so they run offline. Tools reach files and processes through LocalExecutionEnv (upstream NodeExecutionEnv); on Windows its shell is
 // Git Bash. Each prints what upstream's console.log prints, with JSON in place of util.inspect (JSON.stringify drops an undefined field).
 // Upstream runs them on MemoryStorage; here they run on the runner's storage, and a file backend is reopened and read back.
+// Pi v1.5.0 sync (closeout, b9fb2b854): the examples carry v1.5.0's names, 15-real-model, 17-print, 25-coding-agent, 26-plan-mode and
+// 27-reviewer (the numbers above are v1.2.0's). The citation stays on v1.2.0: 15-real-model streams through NativeDurableModels, which does
+// not take v1.5.0's client identity option yet (adc5fa9f8).
 using PiSharp.Durable.Chord;
 using PiSharp.Durable.Env;
 using PiSharp.Durable.Tools;
@@ -17,7 +20,7 @@ public static partial class Examples
     // The process environment by default; the tests pass one without OPENAI_API_KEY.
     private static Func<string, string?> environment = Environment.GetEnvironmentVariable;
 
-    // 16: a real model: stream an answer from OpenAI.
+    // 15: a real model: stream an answer from OpenAI.
     private static async Task RealModelAsync(Func<Task<IStorage>> open, TextWriter output)
     {
         // Production code passes model access with real providers; the Harness never talks to a provider any other way. NativeDurableModels
@@ -68,7 +71,7 @@ public static partial class Examples
         await harness.CloseAsync(Context);
     }
 
-    // 18: print mode: submit one prompt and print its answer, like `pi -p`. The host awaits its own submission, not global idle.
+    // 17: print mode: submit one prompt and print its answer, like `pi -p`. The host awaits its own submission, not global idle.
     private static async Task PrintAsync(Func<Task<IStorage>> open, TextWriter output)
     {
         const string prompt = "What is in this directory?";
@@ -118,7 +121,7 @@ public static partial class Examples
         public override RetrySettings? Retry { get => new() { MaxRetries = MaxRetries }; init { } }
     }
 
-    // 26: a small coding agent: the built-in coding tools, a prompt that knows the working directory, settings backed by the app's settings
+    // 25: a small coding agent: the built-in coding tools, a prompt that knows the working directory, settings backed by the app's settings
     // file, and an environment that follows the conversation's directory.
     private static async Task CodingAgentAsync(Func<Task<IStorage>> open, TextWriter output)
     {
@@ -174,7 +177,7 @@ public static partial class Examples
         Directory.Delete(workspace, recursive: true);
     }
 
-    // 27: plan mode: the user switches a conversation into a read-only planning mode, the agent writes a plan into the extension's own
+    // 26: plan mode: the user switches a conversation into a read-only planning mode, the agent writes a plan into the extension's own
     // document, and switching back restores the full tool set.
 
     // The current plan of a conversation. A fork keeps the plan it had at the fork entry.
@@ -268,7 +271,7 @@ public static partial class Examples
         Directory.Delete(directory, recursive: true);
     }
 
-    // 28: a reviewer agent next to the main one: a cheaper model, a review role and loop, read-only tools, and its own checkout of the
+    // 27: a reviewer agent next to the main one: a cheaper model, a review role and loop, read-only tools, and its own checkout of the
     // project.
     private static async Task ReviewerAsync(Func<Task<IStorage>> open, TextWriter output)
     {

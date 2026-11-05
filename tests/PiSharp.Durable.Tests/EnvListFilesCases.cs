@@ -4,7 +4,7 @@ using PiSharp.Durable.Env;
 using PiSharp.Durable.Env.Local;
 using PiSharp.Durable.Tools.Env;
 
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/env/daemon/src/list.rs (its unit tests, as env.list-files.daemon.<case>),
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/env/daemon/src/list.rs (its unit tests, as env.list-files.daemon.<case>),
 // packages/env/test/remote.test.ts ("cancels a listing in the daemon", as env.list-files.remote.<case>) and packages/env/test/ssh.test.ts ("lists
 // files over SSH as the local environment lists them", as env.list-files.ssh.<case>), on LocalFileSystem's listFiles (LocalFileListing.cs), which
 // ports the daemon's walk; the env conformance kit's listFiles cases run in EnvNodeConformanceCases.cs. Adapted:

@@ -10,7 +10,7 @@
 // Under Node the first partial varies from run to run with the random token size. The bash tool runs `ls` in a directory that stands in for
 // upstream's working directory, packages/durable, with the same top-level entries (the listing feeds the next request's usage estimate).
 // Pi v1.5.0 sync (area vocabulary, 5f312dac4): both listeners take the tagged call and skip one that is not a value, as upstream's
-// do. The example keeps its v1.2.0 name, 19-json, as the other renumbered examples do (b9fb2b854).
+// do. Since the closeout the example carries v1.5.0's name, 18-json (b9fb2b854), where it was 19-json.
 using PiSharp.Durable.Chord;
 using PiSharp.Durable.Env;
 using PiSharp.Durable.Storage;
@@ -21,7 +21,7 @@ namespace PiSharp.Durable.Examples;
 
 public static partial class Examples
 {
-    // 19: JSON mode (v1.5.0's 18-json).
+    // 18: JSON mode.
     private static async Task JsonModeAsync(Func<Task<IStorage>> open, TextWriter output)
     {
         // A stand-in for upstream's working directory, packages/durable.

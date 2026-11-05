@@ -1,9 +1,9 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/src/harness/generation.ts. v1.2.0: the prepare checkpoint's
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/src/harness/generation.ts. v1.2.0: the prepare checkpoint's
 // threshold flag and a failed blocking threshold compaction failing the run with model_error (area j), and tool task v2 (area a): a round's
 // tool tasks take {kind: "model", assistant, callId}, a round reads controls only from model-issued results (a version 1 result has no
 // kind), and handing a round over removes pi.live.nestedTools with its slots. Pi v1.5.0 sync (area harness-options): the threshold check
-// and overflow recovery use the per-model compaction policy (upstream 6085986e4, #10942); the citation stays on v1.2.0 until the file's
-// other areas land. Pi v1.5.0 sync (area model-requests): classify records the requested thinking level on every provider message it
+// and overflow recovery use the per-model compaction policy (upstream 6085986e4, #10942; Compaction.PolicyFor). Pi v1.5.0 sync (area
+// model-requests): classify records the requested thinking level on every provider message it
 // handles, and a poll checkpoint pins it (upstream d5b3de22d); a request passes the beforeProviderRequest chain as its onPayload
 // (upstream d280e1ffa), only when the phase's agent has such a hook. Pi v1.5.0 sync (area sleep): retry backoffs and deferred polls
 // sleep instead of waiting in a running phase, and a retry or poll run before its time (an early wake, or a record an earlier version

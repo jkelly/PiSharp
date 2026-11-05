@@ -3,7 +3,7 @@ using PiSharp.Durable.Chord;
 using PiSharp.Durable.Env;
 using PiSharp.Durable.Env.Local;
 
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/test/jsonl-storage.test.ts (InstrumentedEnv). A fault-injecting
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/test/jsonl-storage.test.ts (InstrumentedEnv). A fault-injecting
 // IFileSystem over the local file system: it records every append, flush, write, rename and remove as "<operation>:<file name>" and
 // fails the configured call of one operation before it runs, after it ran ("after": the effect happened but the call reports failure),
 // or after writing only the first half of the bytes ("short": a torn append or write). Upstream subclasses NodeExecutionEnv; this

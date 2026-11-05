@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/test/harness-view.test.ts. Verbatim apart from the adaptations in
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/test/harness-view.test.ts. Verbatim apart from the adaptations in
 // ChatSupport.cs and SessionSupport.cs, and these:
 // - Backends. Upstream runs this file on MemoryStorage; nothing in it depends on the backend, so HarnessViewCases() runs it on MemoryStorage
 //   (harness.view.*), HarnessViewJsonlCases() on a fresh JSONL directory (harness.view.jsonl.*) and HarnessViewSqliteCases() on a fresh
@@ -21,8 +21,8 @@
 // mounted entries for a raw head write ..." and "cuts a fork's view into its inherited entries" are v1.5.0's "keeps head markers in place
 // ..." and "shows a fork's inherited entries in ID order ..."); "conversation view window" is harness.view.window.*. Adapted: window
 // bounds are ints and an EntryId, so 1.5 and NaN cannot be passed; the rejection case passes a From beyond JavaScript's safe integers for
-// NaN, and RangeError is ArgumentOutOfRangeException. The 6,000-commit overflow case runs in the MemoryStorage pass only, as upstream; the
-// long-lived watch case opens its own SQLite file in that pass (upstream openNodeSqliteStorage) and a StoreStorage in the store pass, and
+// NaN, and RangeError is ArgumentOutOfRangeException. The 6,000-commit overflow case and the long-lived watch case run in the MemoryStorage
+// pass only, as upstream runs each once; the long-lived watch case opens its own SQLite file there (upstream openNodeSqliteStorage), and
 // GC.Collect is upstream's gc(); WeakReference is WeakRef.
 // Pi v1.5.0 sync (area vocabulary, 5f312dac4): touches() counts with an ObserveCommits observer (upstream observeCommits({ advance, end }))
 // the document changes of kind change (DocumentValueChange); the watch listeners already take value calls (Change(call), onValue) and
@@ -563,7 +563,8 @@ internal static partial class ViewTests
             Check(next.Id.Value < from.Value, $"{next.Id} is below {from}");
             await Drained(harness);
             var last = frames.Snapshot()[^1].Value;
-            Seq(Ids([next]), Ids(last.Entries), "the next entry");
+            SameJson(JsonValue.Array((JsonValue)next.ToJson()).ToJson(), JsonValue.Array(last.Entries.Select(entry => (JsonValue)entry.ToJson())),
+                "the next entry");
             Equal<EntryId?>(written[2].Id, last.Before, "before");
             await stop();
             await harness.CloseAsync(Context);

@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/chord/src/json.ts (JsonValue, which v1.2.0 moved here from types.ts).
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/chord/src/json.ts (JsonValue, which v1.2.0 moved here from types.ts).
 // Chord's values are plain JavaScript JSON; here they are immutable trees whose reference identity is the unit of structural sharing, so
 // copyJson and isJsonValue are unnecessary, and JsonRepresentation is a compile-time mapping of TypeScript types with no C# counterpart.
 // Pi v1.5.0 sync (area partial-commits): a long JsonStringValue that grows by appends defers the concatenation, as V8's ropes do.

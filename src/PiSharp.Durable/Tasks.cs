@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/src/tasks.ts, plus the TaskDefinition, Task, RunningTask,
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/src/tasks.ts, plus the TaskDefinition, Task, RunningTask,
 // NextTaskState and PhaseHandler types of packages/durable/src/types.ts (the TaskRuntime and HookRunner interfaces are in TypesTasks.cs).
 //
 // Upstream types a definition by its input, checkpoint, result and hook map (TaskDefinition<I, S, R, H>); here a definition is erased:

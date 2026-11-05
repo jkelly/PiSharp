@@ -10,7 +10,7 @@ namespace PiSharp.Durable.Examples;
 
 public static partial class Examples
 {
-    // 31: reload an extension while a call runs, then restart the process. Running work finishes on the code it started with; stored choices
+    // 30: reload an extension while a call runs, then restart the process. Running work finishes on the code it started with; stored choices
     // are names, so they survive a restart and bind to whatever code the new process installs.
     private static async Task ReloadAndRestartAsync(Func<Task<IStorage>> open, TextWriter output)
     {

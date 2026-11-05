@@ -4,14 +4,18 @@ using System.Text.Json;
 using PiSharp.Durable;
 
 // The experimental pi-durable port (decision 0005). Cases are ported from Pi packages/durable/test and the Chord tests it relies on, by
-// reading, at the pinned commit (DurableUpstream.Commit, v1.5.0; the port began at v1.1.0, and the groups the v1.5.0 sync has not reached yet
-// still port v1.2.0); compatibility/durable-port-map.json records which upstream test each case group covers. Every static
-// method of Program whose name ends in "Cases" and returns IEnumerable<(string, Func<Task>)> is a case group.
+// reading, at the pinned commit (DurableUpstream.Commit, v1.5.0; the port began at v1.1.0 and was synced to v1.2.0 and v1.5.0). Each case
+// file's citation names the commit it matches: the groups of the Chord v1 delta and state tests that phase 6 of the v1.5.0 sync re-syncs,
+// and the differential and compat groups that compare with the v1.2.0 captures, keep v1.2.0's (decision 0013). Every static method of
+// Program whose name ends in "Cases" and returns IEnumerable<(string, Func<Task>)> is a case group; compatibility/durable-port-map.json
+// records which upstream test each covers.
 internal static partial class Program
 {
-    // The report's source label stays on Pi v1.2.0 while the v1.5.0 sync (compatibility/durable-sync-1.5.0-worklist.json) is under way: the
-    // cases check v1.2.0 behaviour and the compat.* captures are v1.2.0's (Fixtures/v1.2.0). The port map follows DurableUpstream.Commit.
-    internal const string Upstream = "06a466935536f8c9bcacb2d5efc0fc021be1bdff";
+    // The report's source label: the cases check Pi v1.5.0 behaviour (compatibility/durable-sync-1.5.0-worklist.json, closed out). The
+    // compat.* captures stay Pi v1.2.0's (Fixtures/v1.2.0), which v1.5.0 code opens as migration input; fixtures are not recaptured
+    // (decision 0013). Where v1.5.0 changed what they hold, a compat case compares with an authored v1.5.0 form of the capture (the *150
+    // transforms, CompatTests.AuthoredOverCapture) and is counted as authored; the rest compare with the capture itself.
+    internal const string Upstream = DurableUpstream.Commit;
 
     private static async Task<int> Main(string[] args)
     {
@@ -40,9 +44,9 @@ internal static partial class Program
         {
             var started = System.Diagnostics.Stopwatch.StartNew();
             Console.Error.WriteLine("start " + test.Id);
-            // compat.* cases check PiSharp against sessions and operations the pinned upstream itself produced (Compat/CompatCases.cs):
-            // captured upstream evidence, counted apart from the authored cases. Those that compare with an authored Pi v1.5.0 form of the
-            // capture (CompatTests.AuthoredOverCapture) count as authored.
+            // compat.* cases check PiSharp against sessions and operations upstream itself produced (Compat/CompatCases.cs; Pi v1.2.0's
+            // captures): captured upstream evidence, counted apart from the authored cases. Those that compare with an authored Pi v1.5.0
+            // form of the capture (CompatTests.AuthoredOverCapture) count as authored.
             var upstreamCapture = test.Id.StartsWith("compat.", StringComparison.Ordinal) && !CompatTests.AuthoredOverCapture.Contains(test.Id);
             try
             {

@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/ai/src/providers/faux.ts, reduced to what tool-output-bench.ts uses: the model
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/ai/src/providers/faux.ts, reduced to what tool-output-bench.ts uses: the model
 // faux/faux-1 answering each request with the next scripted reply, tool calls (stop reason toolUse) or a text. It is the scripted model of
 // samples/Durable.Examples (ScriptedModels.cs), kept internal here.
 using System.Collections.Concurrent;

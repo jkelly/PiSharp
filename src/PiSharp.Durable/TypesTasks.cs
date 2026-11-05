@@ -1,10 +1,10 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/src/types.ts (TaskRuntime and HookRunner; split from Types.cs).
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/src/types.ts (TaskRuntime and HookRunner; split from Types.cs).
 // Upstream's AbortSignal becomes a CancellationToken plus the handler context, which the same signal cancels; its memo and entry overloads
 // become C# overloads; its synchronous-or-promise commit callback becomes four overloads, as ISession.CommitAsync has. Pi v1.5.0 sync
 // (area reports): TaskRuntime.report takes whose code failed (ReportFrom, a30c2a81d). Area deferred-commits (6c2fd73b0): TaskRuntime.commit
 // takes CommitOptions. Area run-end (65fba65b2): TaskRuntime.entries(), the raw history read hooks share; ITaskRuntime inherits it and the
-// entry reads from IHookApi, which declares them for hooks (upstream declares them on both). The file's other areas keep the citation on
-// v1.2.0.
+// entry reads from IHookApi, which declares them for hooks (upstream declares them on both). Area sleep (f75b3240a): TaskRuntime.sleepUntil
+// and setTimer. Area harness-options (7ec1f648e): TaskRuntime.models is read at each use.
 using PiSharp.Durable.Chord;
 using PiSharp.Durable.Env;
 

@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/test/examples/20-inbox.ts. Upstream stands in for a model with pi-ai's
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/test/examples/19-inbox.ts. Upstream stands in for a model with pi-ai's
 // faux provider; here ScriptedModels does, with a held first reply, so the example runs offline. It prints what upstream's console.log
 // prints, as JSON. On a file backend the storage is then reopened in a plain Session and the transcript and inbox are read back.
 using PiSharp.Durable.Chord;
@@ -7,7 +7,7 @@ namespace PiSharp.Durable.Examples;
 
 public static partial class Examples
 {
-    // 20: what happens to submissions while a conversation is busy.
+    // 19: what happens to submissions while a conversation is busy.
     private static async Task InboxAsync(Func<Task<IStorage>> open, TextWriter output)
     {
         // The first answer waits until we let it go, so the conversation stays busy while we submit more.

@@ -1,6 +1,5 @@
 // Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/test/examples/32-tests-after-edits.ts (added in 7e15f9601, #11141),
-// ported in the Pi v1.5.0 sync (area run-end). Here it is 33-tests-after-edits: PiSharp's examples keep their Pi v1.2.0 numbers, so
-// v1.5.0's examples from 04 on are one higher (31-transcript is 32-transcript, 33-turn-limit-and-continue is 34-turn-limit-and-continue).
+// ported in the Pi v1.5.0 sync (area run-end; 33-tests-after-edits until the closeout gave the examples v1.5.0's names).
 // ScriptedModels stands in for the faux provider, and the edit tool declares pi-schema's obj({ path: str(), content: str() }) as JSON
 // Schema. It prints what upstream's console.log prints (its arguments joined with spaces). The tests' first attempt waits until the host
 // has queued its question (PiSharp-only): the run works on other threads here, so without it the question could be queued after the fix
@@ -16,7 +15,7 @@ public static partial class Examples
     private static readonly JsonObjectValue EditParameters = (JsonObjectValue)JsonValue.Parse(
         """{"type":"object","properties":{"path":{"type":"string"},"content":{"type":"string"}},"required":["path","content"],"additionalProperties":false}""");
 
-    // 33: run the project's tests at the end of every run that edited files, with an afterRun hook: the run waits for the tests, a failure
+    // 32: run the project's tests at the end of every run that edited files, with an afterRun hook: the run waits for the tests, a failure
     // starts a fix run, and input sent meanwhile waits for them too.
     private static async Task TestsAfterEditsAsync(Func<Task<IStorage>> open, TextWriter output)
     {

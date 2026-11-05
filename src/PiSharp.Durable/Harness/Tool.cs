@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/src/harness/tool.ts.
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/src/harness/tool.ts.
 //
 // Mappings:
 // - Input, checkpoints and results are upstream's JSON in its key order. Input (version 3) {kind: "model", assistant, callId, unoffered?:
@@ -24,6 +24,10 @@
 // - Pi v1.5.0 sync (area telemetry, 2ec55d808): reading the call sets the phase span's tool.name and tool.call_id, and a nested call
 //   answered from its stored result adds pi.durable.replay with the tool name; neither records arguments or output.
 // - performance.now() is a Stopwatch; Math.round is round half up.
+// - Pi v1.5.0 (7ec1f648e, area harness-options): api.models and api.env are getters, models read from the runtime at each access and env
+//   built for each call, so a rerun after recovery gets the conversation's environment at that time. ToolExecutionApi.Models reads
+//   runtime.Models at each access, and the call builds its environment before the API, which then holds it. 4a5d37291 moved OutputBuffer,
+//   Progress and boundOutput to @earendil-works/chord/output; they are Output.cs here, unchanged.
 // - A ToolExecutionResult field left null is upstream's undefined: Output null takes the retained output, Details null the last running
 //   details; JsonValue.Null is an explicit null. A C# JsonValue cannot hold undefined, so upstream's copyJson(..., {omitUndefinedProperties})
 //   of arguments, diagnostics and details has nothing to drop.

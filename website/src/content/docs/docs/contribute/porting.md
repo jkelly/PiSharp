@@ -135,7 +135,7 @@ Where PiSharp behaves differently from Pi on purpose, the difference is recorded
 
 ## The durable port map
 
-[`compatibility/durable-port-map.json`](https://github.com/jkelly/PiSharp/blob/main/compatibility/durable-port-map.json) maps every upstream pi-durable file to its PiSharp counterpart. It pins Pi v1.2.0 and records changes against Pi v1.1.0. Each of its 214 rows has the upstream path, blob id and line count, the PiSharp files, the phase, a `status` and an `upstreamChange`.
+[`compatibility/durable-port-map.json`](https://github.com/jkelly/PiSharp/blob/main/compatibility/durable-port-map.json) maps every upstream pi-durable file to its PiSharp counterpart. It pins Pi v1.5.0 and records changes against Pi v1.2.0. Each of its 289 rows has the upstream path, blob id and line count, the PiSharp files, the phase, a `status` and an `upstreamChange`.
 
 | Status | Meaning |
 | --- | --- |

@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/test/harness-registry.test.ts. Verbatim apart from the adaptations in
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/test/harness-registry.test.ts. Verbatim apart from the adaptations in
 // HarnessSupport.cs and these: a host tool type with an extra field is a derived ToolRegistration record (AppTool), and `{ ...tool, x }` is
 // `tool with { X = ... }`; stored agent states are pi.agent JSON; hook handler maps are the built-in hook classes; toBe is
 // ReferenceEquals.

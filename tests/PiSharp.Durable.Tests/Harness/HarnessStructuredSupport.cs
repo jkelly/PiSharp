@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): the support half of packages/durable/test/harness-structured.test.ts: the scriptable
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): the support half of packages/durable/test/harness-structured.test.ts: the scriptable
 // test.node task, its gates and log, and the helpers its task-runtime describes share. The cases are in HarnessStructuredCases.cs.
 //
 // Adaptations (beyond those of HarnessSupport.cs):

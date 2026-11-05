@@ -113,7 +113,7 @@ The owner chose (2026-10-27):
 
    | Limit | Workaround |
    |---|---|
-   | Submissions cannot be admitted inside a transaction | Two commits with deterministic request IDs |
+   | Submissions cannot be admitted inside a transaction (until Pi v1.5.0's `SubmitAsync(tx, draft)`, which this library does not use yet) | Two commits with deterministic request IDs |
    | A child cannot reach a parent blocked in a foreground call | The supervising anchor task, interruptible waits, and routing through the mailbox to the waiting call |
    | No response-format option on `IDurableModels` | A terminating `submit_result` tool whose arguments the Harness validates against the result type's schema |
    | Every installed extension is selected by default | Team settings with no extensions, plus explicit selections |
@@ -146,6 +146,7 @@ The owner chose (2026-10-27):
   - the end-to-end cases `agents.e2e.team-scenario` and `agents.e2e.crash-kill-child`.
 - The directory sweeper at `OpenAsync`. The anchor task covers its purpose; the sweeper was planned only as a backstop.
 - `AgentToolContext.Messages`. Tools reach messaging through `AgentMessaging.ForTool`.
+- Pi v1.5.0's `AgentChange.MaxTurns` (a run that reaches it ends unanswered, `turn_limit`) and `GenerationHooks.AfterRun` (tasks that run before a run's answer is committed). An `AgentDefinition` sets no turn bound, and workflows and teams keep their own steps after a run (the coordinator's default in the Pi v1.5.0 sync, [0013](0013-pi-1.5.0-sync.md)).
 
 ## Known limits
 

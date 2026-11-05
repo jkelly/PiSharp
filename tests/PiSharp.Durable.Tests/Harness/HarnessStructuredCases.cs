@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/test/harness-structured.test.ts, the task-runtime describes: task
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/test/harness-structured.test.ts, the task-runtime describes: task
 // ownership, waiting, completing, abort order, boundaries, recovery, definitions and waits, conversation abort and boundaries, and recovery
 // through ownership edges. Verbatim apart from the adaptations in HarnessSupport.cs and HarnessStructuredSupport.cs, and these:
 // - Backends. Upstream runs these on MemoryStorage and reopens a SQLite file for the reopen cases. HarnessStructuredCases() does the same
@@ -15,7 +15,8 @@
 //   check here.
 //
 // Tool rounds. HarnessStructuredToolRoundsCases.cs (harness.structured.tool-rounds.*) ports "keeps run control with a faulted generation
-// until its owned work drains, and retries a rejected final commit" (generation, P8) and the three tests the tool task unblocks (P9): "owns
+// until its owned work drains, and fails the Harness on a failed final commit" (generation, P8; v1.2.0's title, was "... and retries a
+// rejected final commit") and the three tests the tool task unblocks (P9): "owns
 // its tool tasks, waits for them, and hands the run to a conversation-owned generation"; "aborts a parallel round with its generation: tools
 // first, then the generation, with every result written"; "answers the unstarted calls of an aborted sequential round with aborted results,
 // in call order".
@@ -27,6 +28,7 @@
 // where upstream reads them at once. The v1.2.0 event forms run against PiSharp's event projection (AgentEventsCases.cs, agent-events.*).
 // "reopens a checkout waiting on live payments and finishes it", the last test of upstream's recovery describe (just before "tool rounds"),
 // needs no model and is ported.
+// Pi v1.5.0 sync (closeout): the tools upstream declares with pi-schema's obj({}) declare ToolsSchema150.EmptyObject (area tools-schema).
 using PiSharp.Durable;
 using PiSharp.Durable.Chord;
 using PiSharp.Durable.Sqlite;
@@ -1440,6 +1442,7 @@ internal static partial class StructuredTests
     {
         Name = "noop",
         Description = "Does nothing",
+        Parameters = ToolsSchema150.EmptyObject,
         Execute = (_, _, _) => Task.FromResult(new ToolExecutionResult { Output = JsonArrayValue.Empty }),
     });
 
@@ -1585,6 +1588,7 @@ internal static partial class StructuredTests
             {
                 Name = "delegate",
                 Description = "Starts work in a conversation it owns",
+                Parameters = ToolsSchema150.EmptyObject,
                 Execute = async (_, api, callContext) =>
                 {
                     await api.CommitAsync(async tx =>
@@ -1634,6 +1638,7 @@ internal static partial class StructuredTests
             {
                 Name = "broken",
                 Description = "Starts owned work, then returns a result that is not strict JSON",
+                Parameters = ToolsSchema150.EmptyObject,
                 Execute = async (_, api, callContext) =>
                 {
                     await api.CommitAsync(tx => tx.CreateTaskAsync(nodes.Node, NodeInput("held"), Owned(api.TaskId)), callContext);

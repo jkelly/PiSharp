@@ -25,9 +25,9 @@
 // - A runtime commit the case makes for a probe (raceMark) uses the probe's ITaskRuntime, exposed by its phase.
 // - "reads no task record from Storage for more live and awaited tasks than the record cache's count" (area publication-caches) counts the
 //   task reads of a ControlledStorage subclass (CountingTasks), as upstream's Counting does.
-// - "ends a task wait when the Harness closes while the terminal commit is stored, and still stores it" is PiSharp's counterpart of
-//   harness-tasks.test.ts's case of that name (durable@1.5.0 Changed#6), on a held storage call instead of LateResolvingStorage; that
-//   block of harness-tasks ("publication at adoption", area publication-caches) runs it on LateResolvingStorage (HarnessTasksCases.cs).
+// - Pi v1.5.0 sync (closeout): harness-tasks.test.ts's "ends a task wait when the Harness closes while the terminal commit is stored, and
+//   still stores it" (durable@1.5.0 Changed#6) is harness.tasks.publication-at-adoption.* on LateResolvingStorage, as upstream
+//   (HarnessTasksCases.cs); the held-storage-call twin this file kept until that block landed is dropped.
 using System.Collections.Concurrent;
 using System.Runtime.CompilerServices;
 using PiSharp.Durable;
@@ -670,32 +670,6 @@ internal static class HarnessGroupCommitTests
             await reopened.CloseAsync(Context);
         });
 
-        yield return Case(prefix + "ends-a-task-wait-when-the-harness-closes-while-the-terminal-commit-is-stored-and-still-stores-it", async () =>
-        {
-            var fixture = new GroupCommitFixture();
-            var storage = NewStorage();
-            var harness = (await OpenTasks(storage, [fixture.Hold])).Harness;
-            var root = await harness.RootAsync(Context);
-            var id = await root.CommitAsync(tx => tx.CreateTaskAsync(fixture.Hold, Named("end"), OwnConversation()), Context);
-            harness.Resume();
-            await Eventually(async () => await StatusAsync(harness, id) == DurableTaskStatus.Running);
-            var waited = Catch<TaskRecord>(() => harness.WaitForTaskAsync(id, Context));
-            // The terminal commit is the call in flight when close starts.
-            var held = storage.HoldCommits();
-            fixture.Gates.Open("end");
-            await held.Entered;
-            var closing = harness.CloseAsync(Context);
-            // Close ends the waits before it drains the commit in flight, which is published and stored all the same.
-            Check((await waited)?.ToString()?.Contains("closed") == true, $"the wait ends with the closed error: {await waited}");
-            Check(!await Settled(closing), "close waits for the call in flight");
-            held.Release();
-            await closing;
-            Equal(SessionEndKind.Closed, (await harness.Closed).Kind, "closed");
-            var reopened = (await OpenTasks(storage.Reopen(), [fixture.Hold])).Harness;
-            Equal(DurableTaskStatus.Terminal, await StatusAsync(reopened, id), "status after reopen");
-            await reopened.CloseAsync(Context);
-        });
-
         // ─── reads on the line ──────────────────────────────────────────────
 
         yield return Case(prefix + "reads-no-task-record-from-storage-for-more-live-and-awaited-tasks-than-the-record-caches-count", async () =>
@@ -773,13 +747,6 @@ internal static class HarnessGroupCommitTests
     /// <summary>The checkpoint's <c>n</c> of a running record (upstream <c>toMatchObject({ checkpoint: { n } })</c>).</summary>
     private static double CheckpointN(TaskRecord? record) =>
         record?.State is LiveTaskState live && ((JsonObjectValue)live.Checkpoint).TryGetValue("n", out var n) ? N(n) : double.NaN;
-
-    /// <summary>The value or the error of <paramref name="run"/> (upstream's <c>.then(value => value, error => error)</c>).</summary>
-    private static async Task<object?> Catch<T>(Func<Task<T>> run)
-    {
-        try { return await run(); }
-        catch (Exception error) { return error; }
-    }
 }
 
 /// <summary>One case's gates, run counts, refusals, probe runtimes and task definitions (upstream's module state of
