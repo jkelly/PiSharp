@@ -56,11 +56,11 @@
     "changelogBullets": 477,
     "repeatedBullets": 23,
     "byStatus": {
-      "ported": 202,
-      "ported-with-deferral": 25,
+      "ported": 206,
+      "ported-with-deferral": 23,
       "already-ported": 12,
       "no-op": 25,
-      "port": 62
+      "port": 60
     },
     "byArea": {
       "ai": 58,
@@ -8356,7 +8356,7 @@
       "id": "durable.restart-limit",
       "area": "durable",
       "phase": 4,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "durable@1.5.0/Breaking Changes#17",
         "durable@1.5.0/Added#6",
@@ -8396,13 +8396,43 @@
         "tests/PiSharp.Durable.Tests/Crash/CrashCases.cs"
       ],
       "release": "1.5.0",
-      "notes": "PiSharp counts no restarts: a task cut off by every crash reruns forever. Port 1.5.0's end state only; 1.4.0's parking and retryTask() were removed before 1.5.0 and get no C# surface. TaskRecord (Types.cs:745) gains restarts, a record JSON field the compat cases compare with upstream's. Depends on durable.run-failure (the restart_limit reason), durable.reports (task_interrupted, task_faulted) and durable.telemetry (report attributes). The crash suite (decision 0005 'Crash tests') needs cases at the limit. PiSharp-only extension tasks (recurring jobs in Hosting Apps/Jobs.cs; workflow and team tasks in CustomAgents) end faulted after five cut-offs in a row instead of rerunning."
+      "notes": "PiSharp counts no restarts: a task cut off by every crash reruns forever. Port 1.5.0's end state only; 1.4.0's parking and retryTask() were removed before 1.5.0 and get no C# surface. TaskRecord (Types.cs:745) gains restarts, a record JSON field the compat cases compare with upstream's. Depends on durable.run-failure (the restart_limit reason), durable.reports (task_interrupted, task_faulted) and durable.telemetry (report attributes). The crash suite (decision 0005 'Crash tests') needs cases at the limit. PiSharp-only extension tasks (recurring jobs in Hosting Apps/Jobs.cs; workflow and team tasks in CustomAgents) end faulted after five cut-offs in a row instead of rerunning.",
+      "evidence": {
+        "commits": [
+          "cd62648c",
+          "66ad6a3b",
+          "3671af15",
+          "2d2c5c2f",
+          "306d06d8"
+        ],
+        "tests": [
+          "tests/PiSharp.Durable.Tests/Harness/HarnessTasksCases.cs: task-close.stops-without-outcomes-and-starts-no-fresh-phase-or-abort-invocation-while-closing",
+          "tests/PiSharp.Durable.Tests/Harness/HarnessTasksCases.cs: task-close.joins-a-reservation-that-settles-while-closing-without-starting-its-handler",
+          "tests/PiSharp.Durable.Tests/HarnessRestartFailureCases.cs: ends-a-run-whose-generation-is-cut-off-restartlimit-times-outside-a-request",
+          "tests/PiSharp.Durable.Tests/HarnessRestartFailureCases.cs: ends-a-tool-call-with-an-error-result-instead-of-running-it-again",
+          "tests/PiSharp.Durable.Tests/HarnessRestartFailureCases.cs: fails-a-compaction-into-compactionfailure",
+          "tests/PiSharp.Durable.Tests/HarnessRestartFailureCases.cs: ends-a-run-someone-aborted-as-aborted-when-its-abort-handler-is-cut-off-restartlimit-times",
+          "tests/PiSharp.Durable.Tests/HarnessRestartFailureCases.cs: drops-the-partial-past-the-limit-where-converting-it-may-be-what-keeps-failing",
+          "tests/PiSharp.Durable.Tests/HarnessRestartFailureCases.cs: reports-task_interrupted-for-a-run-that-ends-interrupted-and-for-a-task-that-ends-at-the-limit",
+          "tests/PiSharp.Durable.Tests/HarnessRestartFailureCases.cs: resolves-the-settings-no-more-often-than-before-only-a-task-that-was-cut-off-reads-the-limit",
+          "tests/PiSharp.Durable.Tests/HarnessBlockedCases.cs: faults-an-extension-s-task-cut-off-restartlimit-times-in-a-row-instead-of-running-it-again",
+          "tests/PiSharp.Durable.Tests/HarnessBlockedCases.cs: counts-no-restart-for-a-task-a-close-stopped",
+          "tests/PiSharp.Durable.Tests/HarnessBlockedCases.cs: keeps-an-abort-mark-admitted-before-close-in-the-record-close-writes-back",
+          "tests/PiSharp.Durable.Tests/HarnessBlockedCases.cs: faults-a-task-whose-abort-handler-is-cut-off-restartlimit-times",
+          "tests/PiSharp.Durable.Tests/HarnessBlockedCases.cs: reads-restartlimit-when-it-reserves-the-task-a-raised-one-runs-it-again",
+          "tests/PiSharp.Durable.Tests/HarnessBlockedCases.cs: runs-the-abort-handler-of-a-task-at-the-limit",
+          "tests/PiSharp.Durable.Tests/HarnessBlockedCases.cs: does-not-count-the-same-checkpoint-committed-again-as-progress",
+          "tests/PiSharp.Durable.Tests/HarnessBlockedCases.cs: starts-the-count-over-when-the-task-makes-progress",
+          "tests/PiSharp.Durable.Tests/HarnessDeferredProgressCases.cs: never-counts-progress-commits-as-progress-of-a-task-cut-off-again-and-again",
+          "tests/PiSharp.Durable.Tests/Crash/CrashCases.cs: request-limit"
+        ]
+      }
     },
     {
       "id": "durable.interrupted-request",
       "area": "durable",
       "phase": 4,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "durable@1.5.0/Breaking Changes#18",
         "durable@1.5.0/Added#6",
@@ -8430,7 +8460,32 @@
         "tests/PiSharp.Durable.Tests/Crash/CrashCases.cs"
       ],
       "release": "1.5.0",
-      "notes": "PiSharp resends the request after a crash, and its crash cases at the request and streaming checkpoints rely on that (decision 0005 'Crash tests': exactly one answer per turn); they change to expect a charged attempt, the backoff and a runFailure once retries run out. Depends on durable.durable-sleep (the backoff sleeps), durable.restart-limit and durable.run-failure. NativeDurableModels implements no deferred responses (decision 0005 'Model adapter'), so the deferred-poll half is covered with faux models only."
+      "notes": "PiSharp resends the request after a crash, and its crash cases at the request and streaming checkpoints rely on that (decision 0005 'Crash tests': exactly one answer per turn); they change to expect a charged attempt, the backoff and a runFailure once retries run out. Depends on durable.durable-sleep (the backoff sleeps), durable.restart-limit and durable.run-failure. NativeDurableModels implements no deferred responses (decision 0005 'Model adapter'), so the deferred-poll half is covered with faux models only.",
+      "evidence": {
+        "commits": [
+          "cd62648c",
+          "66ad6a3b",
+          "3671af15",
+          "2d2c5c2f",
+          "b0695b7c"
+        ],
+        "tests": [
+          "tests/PiSharp.Durable.Tests/HarnessRestartFailureCases.cs: charges-the-attempt-keeps-the-partial-waits-for-the-retry-backoff-and-answers-on-the-next-attempt",
+          "tests/PiSharp.Durable.Tests/HarnessRestartFailureCases.cs: sleeps-the-backoff-of-settings-retry-before-the-next-attempt",
+          "tests/PiSharp.Durable.Tests/HarnessRestartFailureCases.cs: ends-the-run-interrupted-once-no-retry-is-left-keeping-every-partial",
+          "tests/PiSharp.Durable.Tests/HarnessRestartFailureCases.cs: ends-the-run-at-once-when-retries-are-disabled",
+          "tests/PiSharp.Durable.Tests/HarnessRestartFailureCases.cs: resends-after-a-clean-close-a-close-is-not-a-crash",
+          "tests/PiSharp.Durable.Tests/HarnessRestartFailureCases.cs: does-not-charge-a-generation-that-sleeps-in-a-retry-or-waits-for-its-tools",
+          "tests/PiSharp.Durable.Tests/HarnessRestartFailureCases.cs: charges-a-crash-during-a-poll-s-fetch-then-polls-the-same-deferred-response-again",
+          "tests/PiSharp.Durable.Tests/HarnessRestartFailureCases.cs: cancels-the-deferred-response-when-a-crash-during-its-poll-ends-the-run",
+          "tests/PiSharp.Durable.Tests/HarnessRestartFailureCases.cs: charges-an-interrupted-poll-even-when-the-clock-moved-backwards",
+          "tests/PiSharp.Durable.Tests/HarnessRestartFailureCases.cs: charges-a-request-once-when-a-crash-is-followed-by-a-clean-close-before-the-charge",
+          "tests/PiSharp.Durable.Tests/HarnessRestartFailureCases.cs: ends-a-run-restart_limit-when-charging-the-interrupted-request-keeps-being-cut-off",
+          "tests/PiSharp.Durable.Tests/HarnessRestartFailureCases.cs: keeps-the-interrupted-request-s-stream-metadata-for-the-next-attempt",
+          "tests/PiSharp.Durable.Tests/HarnessDeferredProgressCases.cs: converts-what-was-stored-into-the-aborted-entry-after-a-crash-and-retries-the-charged-attempt",
+          "tests/PiSharp.Durable.Tests/Crash/CrashCases.cs: request-interrupted"
+        ]
+      }
     },
     {
       "id": "durable.scheduler-idle-index",
@@ -8892,7 +8947,7 @@
       "id": "durable.deferred-commits",
       "area": "durable",
       "phase": 4,
-      "status": "ported-with-deferral",
+      "status": "ported",
       "changelog": [
         "durable@1.5.0/Breaking Changes#10",
         "durable@1.5.0/Added#2",
@@ -8935,7 +8990,8 @@
           "add777be",
           "6ce472a4",
           "8508d178",
-          "4f2b7225"
+          "4f2b7225",
+          "66ad6a3b"
         ],
         "tests": [
           "tests/PiSharp.Durable.Tests/SessionDeferredCommitsCases.cs: adopts-a-commit-that-only-changes-an-existing-latest-initial-fork-conversation-document-in-memory-unstored",
@@ -8964,7 +9020,7 @@
           "tests/PiSharp.Durable.Tests/SessionDeferredCommitsCases.cs: retains-a-held-revision-only-until-it-is-stored",
           "tests/PiSharp.Durable.Tests/SessionDeferredCommitsCases.cs: leaves-storage-at-the-last-stored-state-which-memory-had-and-nothing-held-after-reopen",
           "tests/PiSharp.Durable.Tests/HarnessDeferredProgressCases.cs: hold-partials-in-memory-and-store-them-together-at-most-every-persistwithinms",
-          "tests/PiSharp.Durable.Tests/HarnessDeferredProgressCases.cs: converts-what-was-stored-into-the-aborted-entry-after-a-crash-and-resends",
+          "tests/PiSharp.Durable.Tests/HarnessDeferredProgressCases.cs: converts-what-was-stored-into-the-aborted-entry-after-a-crash-and-retries-the-charged-attempt",
           "tests/PiSharp.Durable.Tests/HarnessDeferredProgressCases.cs: leaves-no-aborted-entry-for-a-stream-that-crashed-before-its-first-store",
           "tests/PiSharp.Durable.Tests/HarnessDeferredProgressCases.cs: converts-a-stored-partial-once-through-two-crashes-before-and-after-the-conversion",
           "tests/PiSharp.Durable.Tests/HarnessDeferredProgressCases.cs: stores-everything-held-at-a-clean-close",
@@ -8979,10 +9035,10 @@
           "tests/PiSharp.Durable.Tests/Harness/HarnessGenerationCases.cs: stores-partials-as-deltas-and-a-complete-base-once-nothing-is-in-flight",
           "tests/PiSharp.Durable.Hosting.Tests/StreamCases.cs: streams.an-agent-feed-shows-deferred-partials-before-they-are-stored",
           "tests/PiSharp.WebAgent.Tests/RecoveryCases.cs: recovery.kill-mid-stream-gives-exactly-one-answer",
-          "tests/PiSharp.WebAgent.Tests/SpendRecoveryCases.cs: spend.recovery.kill-mid-stream-leaves-the-reservation-uncertain-and-answers-once"
+          "tests/PiSharp.WebAgent.Tests/SpendRecoveryCases.cs: spend.recovery.kill-mid-stream-leaves-the-reservation-uncertain-and-answers-once",
+          "tests/PiSharp.Durable.Tests/HarnessDeferredProgressCases.cs: never-counts-progress-commits-as-progress-of-a-task-cut-off-again-and-again"
         ]
-      },
-      "deferred": "harness-deferred-progress.test.ts's \"never counts partial commits as progress of a task cut off again and again\" (6c2fd73b0; v1.5.0's \"never counts progress commits ...\") and v1.5.0's \"converts what was stored into the aborted entry after a crash, and retries the charged attempt\" (here 6c2fd73b0's \"... and resends\") count task restarts and charged attempts, which PiSharp's task records hold only once area restarts (b3a29f111) lands; that area ports both."
+      }
     },
     {
       "id": "durable.group-commit",
@@ -9521,7 +9577,8 @@
           "deaaf7dc",
           "0251bbac",
           "27a292eb",
-          "395850fa"
+          "395850fa",
+          "cd62648c"
         ],
         "tests": [
           "tests/PiSharp.Durable.Tests/HarnessTelemetryCases.cs: harness.telemetry.records-content-free-submit-and-phase-spans-nested-parents-checkpoints-entry-events-and-metrics",
@@ -9553,7 +9610,7 @@
           "tests/PiSharp.Durable.Tests/ModelsCases.cs: models.telemetry.a-throwing-adapter-never-changes-the-request-and-its-span-settles"
         ]
       },
-      "deferred": "DurableTelemetry.Schema's closed sets hold only what this port raises today: area restarts adds the task_interrupted report kind and the restart_limit and interrupted reasons, area admission the continue submission type and submit(tx, draft)'s provisional pi.durable.submit span, area vocabulary its renames (harness/telemetry.ts stays in-progress until then). harness-telemetry.test.ts keeps SubscribeCommits for harness.observeCommits until area observers lands. Upstream README.md text is not mirrored (PiSharp keeps no copy)."
+      "deferred": "DurableTelemetry.Schema's closed sets hold only what this port raises today: area restarts added the task_interrupted report kind and the restart_limit and interrupted reasons (cd62648c); area admission adds the continue submission type and submit(tx, draft)'s provisional pi.durable.submit span, area vocabulary its renames (harness/telemetry.ts stays in-progress until then). harness-telemetry.test.ts keeps SubscribeCommits for harness.observeCommits until area observers lands. Upstream README.md text is not mirrored (PiSharp keeps no copy)."
     },
     {
       "id": "durable.telemetry-host-error",
@@ -9754,7 +9811,7 @@
       "id": "durable.read-only-harness",
       "area": "durable",
       "phase": 4,
-      "status": "ported-with-deferral",
+      "status": "ported",
       "changelog": [
         "durable@1.5.0/Added#8"
       ],
@@ -9781,7 +9838,8 @@
       "notes": "No counterpart. Name collision: the device host's 'read-only switch' (HostedSession.cs:356, DurableDeviceOptions.cs:58) removes tools from an agent and is unrelated; keep the two apart in names and docs. PiSharp-only places that could use a viewer Harness: a second process watching a pisharp durable session, and the device host's doctor and backup tools (Hosting Storage/DeviceDoctor.cs, DeviceBackup.cs).",
       "evidence": {
         "commits": [
-          "27cd98c6"
+          "27cd98c6",
+          "66ad6a3b"
         ],
         "tests": [
           "tests/PiSharp.Durable.Tests/HarnessReadOnlyCases.cs: harness.read-only.opens-a-session-with-work-running-elsewhere-without-writing",
@@ -9789,8 +9847,7 @@
           "tests/PiSharp.Durable.Tests/HarnessReadOnlyCases.cs: harness.read-only.refuses-to-create-the-root-of-an-empty-storage",
           "tests/PiSharp.Durable.Tests/HarnessReadOnlyCases.cs: harness.read-only.leaves-recovery-to-the-next-writable-open"
         ]
-      },
-      "deferred": "Harness.wake() returning {active: false} and onWake staying silent for a read-only Harness wait on area sleep, which adds wake()/onWake; the scheduler's #scheduleWake guard goes in with them. The `restarts` assertion of leaves-recovery-to-the-next-writable-open waits on area restarts (TaskRecord has no Restarts yet); the case checks the pending status. Session's read-only CachedStorage/ConversationTails skips belong to the areas that add those."
+      }
     },
     {
       "id": "durable.continue-submissions",

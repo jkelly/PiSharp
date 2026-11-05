@@ -3370,7 +3370,13 @@
         "sleep"
       ],
       "commits": [
-        "b3a29f111"
+        "b3a29f111",
+        "cd62648c",
+        "66ad6a3b",
+        "3671af15",
+        "2d2c5c2f",
+        "306d06d8",
+        "b0695b7c"
       ],
       "notes": "Port 1.5.0's end state only; 1.4.0's parking and retryTask() were removed before 1.5.0. TaskRecord (Types.cs) gains restarts, a record JSON field the compat cases compare with upstream's: the v1.2.0 captures have none, so those written comparisons become authored expectations (labelled authored); byte equality with upstream-written v1.5.0 records cannot be shown without a recapture. PiSharp's crash cases at the request and streaming checkpoints rely on the resend (decision 0005 'Crash tests': exactly one answer per turn); they change to expect a charged attempt, the backoff in pi.live.generation.retry and a runFailure once retries run out. NativeDurableModels implements no deferred resume, so the interrupted path is the plain one."
     },
