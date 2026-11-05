@@ -35,7 +35,8 @@
 //   and the idle context expiry timer are armed and disarmed under a second lock of their own (timerGate), which may take the main lock
 //   briefly but is never taken under it. A timer's holder is installed before it is armed, so one that fires synchronously finds itself.
 //   Upstream's #scheduleWake microtask becomes one thread-pool job at a time (wakeRunning, wakeDirty): a change while it runs runs it
-//   again, so OnWake calls never overlap and none is lost.
+//   again, so OnWake calls never overlap and none is lost. One scheduled before the Session fails is taken at the failure (Seal, outside
+//   the lock) and still delivered by the job, as upstream's microtask runs before a storage failure.
 // - Walks up and down the ownership tree are loops, never recursion, as upstream's are: chains can be deeper than the stack.
 //
 // Pi v1.5.0 sync (area deferred-commits, 6c2fd73b0): the scheduler observes the Session's commits as memory adopts them
@@ -51,7 +52,9 @@
 // and at every reservation pass, and a pass skips a sleep not yet due (an abort mark ends a sleep). Without OnWake the earliest sleep keeps
 // a foreground timer while scheduling runs; with it, OnWake hears each change of Wake(). A read-only scheduler never schedules a wake and
 // answers inactive (be14d9732). runtime.SleepUntilAsync commits the sleep; runtime.SetTimer's timers are disarmed at the invocation's end;
-// the idle context expiry is a background timer. Each pass, inspection and wake reads the Harness clock once, outside the lock. Wake()
+// the idle context expiry is a background timer. Each pass, inspection and wake reads the Harness clock once, outside the lock. A pass and
+// the wake job read it on different threads, so a sleep can come due between the two: the wake job then asks for one more pass
+// (lastPassAt), as neither would run it (a hang under load: the sleep stayed asleep with no timer). Wake()
 // scanned the live tasks as f75b3240a's does until area scheduler-idle (below).
 //
 // Pi v1.5.0 sync (area reports): every report carries its ReportInfo (a30c2a81d, 91b33cab3, 5f312dac4). An invocation keeps the extension
@@ -329,6 +332,8 @@ internal sealed class DurableTaskScheduler
     /// <summary>The wake job is queued or running; <see cref="wakeDirty"/> asks it for another round.</summary>
     private bool wakeRunning;
     private bool wakeDirty;
+    /// <summary>The wake a job scheduled before the Session failed still owes OnWake (<see cref="Seal"/>).</summary>
+    private Wake? failedWake;
     private readonly Dictionary<TaskId, Invocation> invocations = [];
     private readonly Waiters<TaskId, TaskRecord> taskWaiters = new();
     /// <summary>Idle waiters by conversation; null waits for the whole Harness.</summary>
@@ -370,6 +375,9 @@ internal sealed class DurableTaskScheduler
     private readonly OrderedSet<TaskId> abandoned;
     /// <summary>Sleeping live tasks, due or not: the candidates of <see cref="WakeDueLocked"/>.</summary>
     private readonly OrderedSet<TaskId> sleeping;
+    /// <summary>The latest clock a reservation pass made due sleeps candidates at (<see cref="WakeDueLocked"/>): a sleep due after it
+    /// needs another pass.</summary>
+    private double lastPassAt = double.NegativeInfinity;
     /// <summary>Members iterated over the scheduler's sets, for tests that bound a pass's work (upstream's tests count
     /// <c>Set.prototype[Symbol.iterator]</c> entries).</summary>
     private readonly IterationCounter iterations = new();
@@ -642,12 +650,17 @@ internal sealed class DurableTaskScheduler
     /// read-only scheduler runs nothing, so it never needs a process. The earliest sleep comes from <see cref="sleeping"/>, and the live tasks
     /// are scanned only while nothing runs, so no call visits every live task while work is active (Pi 35dfa7573).
     /// </summary>
-    public Wake Wake()
+    public Wake Wake() => readOnly ? new Wake(false) : WakeAt(now(), out _);
+
+    /// <summary>
+    /// <see cref="Wake"/> at <paramref name="at"/>, and whether a sleep came due after the latest reservation pass read the clock
+    /// (<paramref name="dueSincePass"/>): its time is not in At, which holds sleeps not yet due, and no pass has made it a candidate.
+    /// </summary>
+    private Wake WakeAt(double at, out bool dueSincePass)
     {
-        if (readOnly) return new Wake(false);
-        var at = now();
         double? earliest = null;
         bool active;
+        dueSincePass = false;
         var check = new List<TaskRecord>();
         lock (gate)
         {
@@ -655,8 +668,9 @@ internal sealed class DurableTaskScheduler
             // The earliest sleep not yet due: only `sleeping` holds sleeping tasks.
             foreach (var id in sleeping)
             {
-                if (live.GetValueOrDefault(id) is { AbortRequested: false, State: SleepingTaskState asleep } && asleep.Until > at)
-                    earliest = earliest is { } other ? Math.Min(other, asleep.Until) : asleep.Until;
+                if (live.GetValueOrDefault(id) is not { AbortRequested: false, State: SleepingTaskState asleep }) continue;
+                if (asleep.Until > at) earliest = earliest is { } other ? Math.Min(other, asleep.Until) : asleep.Until;
+                else if (asleep.Until > lastPassAt) dueSincePass = true;
             }
         }
         if (!active && check.Count > 0) active = RunsNow(check);
@@ -2258,10 +2272,22 @@ internal sealed class DurableTaskScheduler
     /// <summary>Close listener: runs synchronously once admission is sealed, before <see cref="JoinAsync"/>, or when the Session fails.</summary>
     private void Seal()
     {
+        // A wake scheduled before the Session failed is still the host's: upstream's microtask runs before the failure, which comes from
+        // storage, so the host hears the work underway then (open's recovery pass keeps its alarm). The job runs on the thread pool and can
+        // find the Session closed first, so the wake is taken here, before closing and outside the lock (the clock and the registry
+        // snapshot are host code), and the job delivers it.
+        Wake? owed = null;
+        if (onWake is not null && session.Failure is not null)
+        {
+            bool pending;
+            lock (gate) pending = wakeDirty && !closing;
+            if (pending) owed = WakeAt(now(), out _);
+        }
         lock (gate)
         {
             if (!closing && countsActive) foreach (var record in live.Values) activeDeltas.Add((-1, record.Kind));
             resumed.Clear();
+            if (!closing) failedWake = owed;
             closing = true;
             sealedInvocations.AddRange(invocations.Values);
             contexts.Clear();
@@ -2310,40 +2336,64 @@ internal sealed class DurableTaskScheduler
         while (true)
         {
             bool timer;
+            Wake? owed = null;
             lock (gate)
             {
                 if (!wakeDirty || closing)
                 {
-                    wakeRunning = false;
-                    return;
+                    // Closed: only the wake owed at a failure (Seal) is delivered.
+                    if (closing && wakeDirty) owed = failedWake;
+                    failedWake = null;
+                    wakeDirty = false;
+                    if (owed is null)
+                    {
+                        wakeRunning = false;
+                        return;
+                    }
                 }
                 wakeDirty = false;
                 timer = enabled;
             }
+            if (owed is { } final)
+            {
+                Deliver(final);
+                lock (gate) wakeRunning = false;
+                return;
+            }
             try
             {
-                var wake = Wake();
+                var wake = WakeAt(now(), out var dueSincePass);
+                // A sleep's commit starts a pass and schedules this job, and each reads the clock on its own thread (upstream's pass and
+                // wake run in one turn): a pass that read it before the deadline left the sleep asleep, and this wake keeps no timer for a
+                // due sleep, so nothing would run it. One more pass does.
+                if (dueSincePass && timer) RequestPass(onLine: false);
                 if (onWake is null)
                 {
                     ArmTimer(timer ? wake.At : null);
                     continue;
                 }
-                if (lastWake == wake) continue;
-                try
-                {
-                    onWake(wake);
-                    // Only a delivered wake counts: after a throw, the next change or kick offers it again.
-                    lastWake = wake;
-                }
-                catch (Exception error)
-                {
-                    report(error, OnWakeError);
-                }
+                Deliver(wake);
             }
             catch (Exception error)
             {
                 report(error, ReportInfo.ListenerError);
             }
+        }
+    }
+
+    /// <summary>Tells OnWake of <paramref name="wake"/> unless it was the last delivered, on the wake job.</summary>
+    private void Deliver(Wake wake)
+    {
+        if (lastWake == wake) return;
+        try
+        {
+            onWake!(wake);
+            // Only a delivered wake counts: after a throw, the next change or kick offers it again.
+            lastWake = wake;
+        }
+        catch (Exception error)
+        {
+            report(error, OnWakeError);
         }
     }
 
@@ -2404,6 +2454,12 @@ internal sealed class DurableTaskScheduler
     private void Kick(bool onLine)
     {
         ScheduleWake();
+        RequestPass(onLine);
+    }
+
+    /// <summary>The reservation pass of <see cref="Kick(bool)"/>, without the wake it schedules (for the wake job itself).</summary>
+    private void RequestPass(bool onLine)
+    {
         lock (gate)
         {
             if (!enabled || closing)
@@ -2565,7 +2621,11 @@ internal sealed class DurableTaskScheduler
                 // Every pass picks up sleeps whose time has come: a pass started by any change may be the first to run after a deadline,
                 // and the wake it schedules no longer keeps a timer for a due sleep.
                 var at = now();
-                lock (gate) WakeDueLocked(at);
+                lock (gate)
+                {
+                    WakeDueLocked(at);
+                    lastPassAt = Math.Max(lastPassAt, at);
+                }
                 var plan = await RegionAsync(() => PlanReservationLocked(at), ReloadScopes, plan =>
                 {
                     foreach (var id in plan.Dropped) runnable.Remove(id);

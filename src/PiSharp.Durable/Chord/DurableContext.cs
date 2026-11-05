@@ -187,20 +187,26 @@ public sealed class DurableContext
         if (observed is null) return task;
         if (observed.Token.IsCancellationRequested) return Failed<T>(observed);
         if (task.IsCompleted) return task;
-        var waiter = new TaskCompletionSource<T>(TaskCreationOptions.RunContinuationsAsynchronously);
+        // A flow with an OrderedLineDelivery (the scheduler's abort invocations, Session.cs) is resumed through that delivery, as its line
+        // results are: the outcome is queued there, so the flow resumes in turn with the flows started with it, each running until it next
+        // suspends, as upstream's awaitWithContext resumes them in microtask order. On the thread pool, a flow whose wait settled first would
+        // run in parallel with the others and could commit before a flow ahead of it (a caller's nested calls abandoned at a restart settling
+        // out of call order). Any other waiter's continuation runs on the thread pool.
+        var ordered = OrderedLineDelivery.Current;
+        var waiter = new TaskCompletionSource<T>(ordered is null ? TaskCreationOptions.RunContinuationsAsynchronously : TaskCreationOptions.None);
         var registration = observed.Token.UnsafeRegister(static state =>
         {
-            var (waiter, observed) = ((TaskCompletionSource<T>, CancellationSignal))state!;
-            Fail(waiter, observed);
-        }, (waiter, observed));
+            var (waiter, observed, ordered) = ((TaskCompletionSource<T>, CancellationSignal, OrderedLineDelivery?))state!;
+            if (ordered is null) Fail(waiter, observed);
+            else ordered.Post(() => Fail(waiter, observed));
+        }, (waiter, observed, ordered));
         task.ContinueWith(static (completed, state) =>
         {
-            var (waiter, registration) = ((TaskCompletionSource<T>, CancellationTokenRegistration))state!;
+            var (waiter, registration, ordered) = ((TaskCompletionSource<T>, CancellationTokenRegistration, OrderedLineDelivery?))state!;
             registration.Unregister();
-            if (completed.IsCompletedSuccessfully) waiter.TrySetResult(completed.Result);
-            else if (completed.IsFaulted) waiter.TrySetException(completed.Exception!.InnerExceptions);
-            else waiter.TrySetCanceled(CanceledToken(completed));
-        }, (waiter, registration), CancellationToken.None, TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
+            if (ordered is null) Settle(waiter, completed);
+            else ordered.Post(() => Settle(waiter, completed));
+        }, (waiter, registration, ordered), CancellationToken.None, TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
         return waiter.Task;
     }
 
@@ -224,6 +230,13 @@ public sealed class DurableContext
         var waiter = new TaskCompletionSource<T>();
         Fail(waiter, observed);
         return waiter.Task;
+    }
+
+    private static void Settle<T>(TaskCompletionSource<T> waiter, Task<T> completed)
+    {
+        if (completed.IsCompletedSuccessfully) waiter.TrySetResult(completed.Result);
+        else if (completed.IsFaulted) waiter.TrySetException(completed.Exception!.InnerExceptions);
+        else waiter.TrySetCanceled(CanceledToken(completed));
     }
 
     private static void Fail<T>(TaskCompletionSource<T> waiter, CancellationSignal observed)

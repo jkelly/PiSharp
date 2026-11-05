@@ -556,10 +556,16 @@ internal static partial class Program
                 "settled at the reported cost: " + settled.ToJsonString());
             Check(!app.App.Log.Contains("Exception", StringComparison.Ordinal), "the first app logged no error: " + app.App.Log);
 
-            // The lock goes with the process, even a killed one: nothing stale is left for the next start.
+            // The lock goes with the process, even a killed one: nothing stale is left for the next start. Windows closes a killed process's
+            // handles as it tears the process down, which can trail the exit the kill waited for (a Windows runner found the file still
+            // locked at once), so the lock is taken within a few seconds rather than at the first try.
             Check(WebAgentDataLock.TryAcquire(data) is null, "the running app holds its folder");
             await app.App.StopAsync();
-            using (var free = WebAgentDataLock.TryAcquire(data)) Check(free is not null, "a killed app leaves no stale lock");
+            await WaitUntilAsync(() =>
+            {
+                using var free = WebAgentDataLock.TryAcquire(data);
+                return Task.FromResult(free is not null);
+            }, "a killed app leaves no stale lock", TimeSpan.FromSeconds(10));
         }),
 
         Case("spend.ledger.queries-and-totals-match-the-reference-rules", async () =>

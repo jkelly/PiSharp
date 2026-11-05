@@ -22,6 +22,14 @@
 //   task" (harness.tools.answers-calls-to-tools-the-request-did-not-offer-through-a-flagged-tool-task, "... without a task" before) and "never
 //   runs a tool the request did not offer, even when the agent has it" are v1.5.0's; "rejects details still waiting when the call is aborted
 //   during afterTool" skips the abort handler's result, which runs the hooks too. With them the file matches v1.5.0.
+// - Holds (upstream relies on timing a slow runner breaks): "answers an aborted tool with only its durable output, discarding buffered
+//   output" freezes the progress clock, its timers (a ManualTimeProvider) and its time (HarnessOptions.Now on the same provider), so the
+//   second output stays buffered until the abort discards it. "answers calls to tools the request did not offer through a flagged tool
+//   task" holds echo until the ghost call's result entry is committed: the two tool tasks run side by side, and upstream's ghost, which runs
+//   nothing, answers first, where a busy runner's echo did. "runs a round in parallel by default ..." holds b's handler (bounded) until a's
+//   has started: a parallel round's handlers start in call order only when the reservation pass finds the line idle and runs them inline
+//   (DurableTaskScheduler.Kick); on a busy line they start on the thread pool, where a busy runner started b first. a still waits for b's
+//   start, so the parallel check still fails if b does not start while a runs.
 using System.Collections.Immutable;
 using System.Text;
 using PiSharp.Durable;
@@ -170,8 +178,24 @@ internal static class ToolsTests
         yield return Case(prefix + "answers-calls-to-tools-the-request-did-not-offer-through-a-flagged-tool-task", async () =>
         {
             var setup = Setup();
-            AddTool(setup.Registry, Tool("echo", (_, _, _) => Result(NoContent)));
-            var (harness, root, entries, status) = await Run(fresh, setup, [Calls(("ghost", Obj(), "c1"), ("echo", Obj(), "c2")), Done]);
+            // Hold: echo answers once the ghost call's result is in.
+            var ghostAnswered = new HarnessTests.Deferred();
+            AddTool(setup.Registry, Tool("echo", async (_, _, _) =>
+            {
+                await ghostAnswered.Task.WaitAsync(TimeSpan.FromSeconds(30));
+                return NoContent;
+            }));
+            var (harness, root, entries, status) = await Run(fresh, setup, [Calls(("ghost", Obj(), "c1"), ("echo", Obj(), "c2")), Done],
+                (harness, _) =>
+                {
+                    FollowCommits(harness, (publication, _) =>
+                    {
+                        if (publication.Changes.Any(change => change is EntryWrite { Value: { Kind: "pi.tool-result", Model: [JsonObjectValue result, ..] } } &&
+                                result.TryGetValue("toolCallId", out var id) && S(id) == "c1"))
+                            ghostAnswered.Resolve();
+                    });
+                    return Task.CompletedTask;
+                });
             Equal(SubmissionStatus.Done, status, "status");
             var results = Results(entries);
             MatchJson("""{"toolCallId":"c1","isError":true}""", results[0], "ghost");
@@ -307,10 +331,14 @@ internal static class ToolsTests
             async Task<List<string>> Trace(ChatSetup setup, bool overlap = false)
             {
                 var events = new SyncList<string>();
+                var aStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
                 var bStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
                 ToolExecute Slow(string name) => async (_, _, _) =>
                 {
+                    // A parallel round's handlers can start in either order on the thread pool (see the file header): b starts after a.
+                    if (overlap && name == "b") await Task.WhenAny(aStarted.Task, Task.Delay(TimeSpan.FromSeconds(10)));
                     events.Add($"start {name}");
+                    if (name == "a") aStarted.TrySetResult();
                     if (name == "b") bStarted.TrySetResult();
                     if (overlap && name == "a") await Task.WhenAny(bStarted.Task, Task.Delay(TimeSpan.FromSeconds(10)));
                     else await Sleep(20);
@@ -1284,8 +1312,13 @@ internal static class ToolsTests
             }));
             setup.Faux.SetResponses(Calls(("slow", Obj(), "c1")), Done);
             // Upstream relies on the abort landing within the output throttle window. A loaded macOS runner let that window pass first and
-            // committed "buffered"; a manual clock that never advances keeps the second output buffered until the abort discards it.
-            var (harness, root) = await OpenChat(fresh(), setup, timeProvider: new ManualTimeProvider());
+            // committed "buffered"; a manual clock that never advances keeps the second output buffered until the abort discards it. Both
+            // halves of the progress clock are held: its timers (the TimeProvider) and, since area sleep paces tool output on the Harness
+            // clock (upstream progressClock), its time (HarnessOptions.Now), which otherwise reads the system clock, so a first commit or a
+            // Sleep(20) slower than the 100 ms window let "buffered" commit at once.
+            var time = new ManualTimeProvider();
+            setup.Now = time.NowMs;
+            var (harness, root) = await OpenChat(fresh(), setup, timeProvider: time);
             var submission = await root.SubmitAsync(SubmissionDraft.Input("go"), Context);
             await buffered.Task;
             var live = await harness.SnapshotAsync(Live.LiveDoc, root.Id, Context);

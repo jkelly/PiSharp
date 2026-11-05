@@ -294,6 +294,32 @@ internal static class QuestionsTests
             await harness.CloseAsync(Ctx);
         });
 
+        // The tool commits its document, publishes its pending state and then watches the document: a retirement that lands in between
+        // (here right behind the document's creation, from a commit follower) is that retirement too, not a missing document.
+        yield return Case(prefix + "retired-before-the-wait-starts", async () =>
+        {
+            var setup = NewSetup();
+            AskOnce(setup, Color);
+            var (harness, root) = await Open(location(), setup, new Dirs("retired-before-the-wait-starts"));
+            var retiring = 0;
+            using var follower = FollowCommits(harness, (commit, context) =>
+            {
+                foreach (var change in commit.Changes.OfType<DocumentValueChange>())
+                {
+                    if (change.Record.Kind != "pisharp.interaction" || !change.Ops.IsEmpty || Interlocked.Exchange(ref retiring, 1) == 1) continue;
+                    var task = new TaskId(change.Record.Scope.OwnerId);
+                    _ = harness.CommitAsync(tx => tx.RetireDocAsync(UserInteraction.InteractionDoc, task), Ctx);
+                }
+            });
+            var submission = await Submit(root, "go");
+            Equal(SubmissionStatus.Done, (await Settled(submission)).Status, "submission");
+            Equal(1, Volatile.Read(ref retiring), "retired");
+            var result = (await Results(root)).Single();
+            Check(IsError(result) && Text(result).Contains("was retired", StringComparison.Ordinal), "retired result: " + Text(result));
+            await NoLiveTasks(harness);
+            await harness.CloseAsync(Ctx);
+        });
+
         yield return Case(prefix + "answer-after-abort", async () =>
         {
             var setup = NewSetup();

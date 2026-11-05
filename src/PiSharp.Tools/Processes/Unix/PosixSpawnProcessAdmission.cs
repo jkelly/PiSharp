@@ -33,6 +33,13 @@ public sealed class PosixSpawnProcessAdmission : IUnixProcessAdmission
         // else. Node's spawn refuses such strings (ERR_INVALID_ARG_VALUE), and so does every launch here.
         if (NodeArgumentErrors.SpawnNullBytes(request.Executable, request.Arguments, request.WorkingDirectory, request.Environment) is { } nulError)
             throw new ArgumentException(nulError, nameof(request));
+        // Node's spawn reports a command that cannot start as an error (ENOENT for a missing executable or working directory), with nothing
+        // run. The /bin/sh launch below would run instead, print its own error and exit 126 or 127, so a missing absolute executable or
+        // working directory is refused first, before anything is spawned, as NativeProcessRunner refuses one on Windows.
+        if (Path.IsPathRooted(request.Executable) && !File.Exists(request.Executable))
+            throw new ProcessLaunchException(ProcessDiagnostic.ExecutableUnavailable, cleanupConfirmed: true);
+        if (Path.IsPathRooted(request.WorkingDirectory) && !Directory.Exists(request.WorkingDirectory))
+            throw new ProcessLaunchException(ProcessDiagnostic.WorkingDirectoryUnavailable, cleanupConfirmed: true);
         var environment = request.Environment.Select(pair => pair.Key + "=" + pair.Value).ToArray();
         var anchor = Spawn(Shell, [Shell, "-c", AnchorScript], environment, processGroup: 0, stdout: -1, stderr: -1);
         int[] stdout = [-1, -1], stderr = [-1, -1], stdin = [-1, -1];

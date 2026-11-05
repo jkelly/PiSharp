@@ -421,6 +421,38 @@ internal static partial class Program
             await made.Host.CloseAsync();
             await store.DisposeAsync();
         }),
+        // PiSharp's own: a callback that awaits its tx read is pending when it returns, as a promise is however long the synchronous code
+        // before its return runs. The read settles on the thread pool, which once finished the callback before the rule 3 check saw it
+        // return and refused it (CI: "the callback settled before its pending tx operations" seeding keyed documents); the read now
+        // resumes only once the check saw the callback return (Transaction.TrackedYield).
+        Case("documents.transaction.pisharp-tables-in-a-transaction-accept-a-callback-that-awaits-its-read-however-late-it-returns", async () =>
+        {
+            var (made, store, handles) = await TxStored();
+            var (self, edits) = (made.Attempts[0], handles[0].Edits);
+            await self.TxAsync(tx =>
+            {
+                tx.Put(edits, TxRow("e1", 1));
+                return Task.CompletedTask;
+            }, DocumentsBg);
+            var early = true;
+            await self.TxAsync(tx =>
+            {
+                var read = ReadThenWrite();
+                // Time for the thread pool to finish the callback before it returns, were the read not held.
+                early = SpinWait.SpinUntil(() => read.IsCompleted, TimeSpan.FromMilliseconds(500));
+                return read;
+
+                async Task ReadThenWrite()
+                {
+                    Json("""{"id":"e1","at":1}""", TxRowJson(await tx.GetAsync(edits, TxKey("e1"))), "the committed row");
+                    tx.Put(edits, TxRow("e2", 2));
+                }
+            }, DocumentsBg);
+            Check(!early, "the callback finished only after it returned");
+            Equal(2L, await edits.CountAsync(Tables.Query(TxEdits), DocumentsBg), "both committed");
+            await made.Host.CloseAsync();
+            await store.DisposeAsync();
+        }),
         Case("documents.transaction.tables-in-a-transaction-refuse-another-objects-table", async () =>
         {
             var (made, store, _) = await TxStored();

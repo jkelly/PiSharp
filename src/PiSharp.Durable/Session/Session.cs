@@ -923,7 +923,12 @@ public class Session : ISession
         ArgumentNullException.ThrowIfNull(context);
         var definition = token.Definition;
         var resolved = Documents.ResolveAddress(definition, owner, key);
-        var cached = Cached(resolved.Id);
+        // An ordered flow (the scheduler's abort invocations) reads through the line even when the document is cached. A line job runs
+        // inline in its caller here, where upstream's runs a microtask later: an earlier flow's cold load can then cache the document before
+        // a later flow, resumed in the same round, reads it, and the later flow would take this fast path past the earlier one, which waits
+        // for its delivery, and commit first (a caller's nested calls abandoned at a restart would settle out of call order). Through the
+        // line, its read is delivered behind the earlier flow's, as upstream's continuations run.
+        var cached = OrderedLineDelivery.Current is null ? Cached(resolved.Id) : null;
         if (cached?.ValueVersion == definition.Version) TouchDocument(resolved.Id);
         var loaded = cached?.ValueVersion == definition.Version
             ? cached

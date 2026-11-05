@@ -134,8 +134,9 @@ internal static class InteractionWait
     /// </summary>
     public static async Task<JsonObjectValue> WaitForResponseAsync(IToolExecutionApi api, DurableContext context)
     {
-        var watch = await api.WatchDocAsync(UserInteraction.InteractionDoc, api.TaskId, context).ConfigureAwait(false)
-            ?? throw new InvalidOperationException($"Tool call {api.CallId} has no interaction document");
+        // The caller committed the document before it published its pending state, which a host can act on at once: a document gone by
+        // the time the watch starts was retired in between, as one retired once the watch runs.
+        var watch = await api.WatchDocAsync(UserInteraction.InteractionDoc, api.TaskId, context).ConfigureAwait(false) ?? throw Retired(api);
         try
         {
             if (UserInteraction.ResponseOf(watch.Value) is not null) return watch.Value;
@@ -144,8 +145,7 @@ internal static class InteractionWait
             {
                 if (call is not WatchValueCall<JsonObjectValue> change) return Task.CompletedTask;
                 if (UserInteraction.ResponseOf(change.Value) is not null) answered.TrySetResult(change.Value);
-                else if (change.Retired)
-                    answered.TrySetException(new InvalidOperationException($"The interaction document of tool call {api.CallId} was retired"));
+                else if (change.Retired) answered.TrySetException(Retired(api));
                 return Task.CompletedTask;
             });
             _ = watch.Closed.ContinueWith(closed => answered.TrySetException(
@@ -158,4 +158,7 @@ internal static class InteractionWait
             await watch.StopAsync().ConfigureAwait(false);
         }
     }
+
+    private static InvalidOperationException Retired(IToolExecutionApi api) =>
+        new($"The interaction document of tool call {api.CallId} was retired");
 }

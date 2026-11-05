@@ -14,6 +14,10 @@
 //   report with Eventually where upstream's synchronous report is there at once.
 // - The `eventually(() => !harness.wake().active)` waits are 440a5fcdb's, which counts open's recovery pass and reconcile work as
 //   activity (ported by area reports).
+// - PiSharp's own case, no upstream counterpart: "runs a sleep that comes due between a pass and the wake it schedules". A reservation
+//   pass and the wake job read the Harness clock on different threads, where upstream's run in one turn; a SplitClock gives the pass the
+//   time before the deadline and the wake job the time after it, the interleaving a loaded runner gave (the sleep stayed asleep with no
+//   timer, and the case timed out).
 using PiSharp.Durable;
 using PiSharp.Durable.Chord;
 using PiSharp.Durable.Sqlite;
@@ -99,6 +103,41 @@ internal static class SleepTests
         public SetTimer SetTimer { get; }
         public List<FakeTimer> Armed => armed.Snapshot();
         public List<FakeTimer> Live() => [.. armed.Snapshot().Where(timer => !timer.Disarmed)];
+    }
+
+    /// <summary>
+    /// A Harness clock that reads <c>start</c> until the wake job (DurableTaskScheduler.RunWake) reads it after a reservation pass did, and
+    /// <c>due</c> from then on: after <see cref="Split"/>, the next pass finds the sleep not yet due and the wake after it finds it due. A
+    /// wake job that reads it before any pass waits for one. The callers are told apart by their stack.
+    /// </summary>
+    private sealed class SplitClock(double start, double due)
+    {
+        private readonly double before = start;
+        private double now = start;
+        private volatile bool split;
+        private volatile bool passRead;
+        private volatile bool switched;
+
+        /// <summary>Whether the wake job read <c>due</c> after a pass read <c>start</c>.</summary>
+        public bool Switched => switched;
+
+        public void Split() => split = true;
+
+        public double Now()
+        {
+            if (!split || switched) return Volatile.Read(ref now);
+            var stack = Environment.StackTrace;
+            if (stack.Contains("ReserveAsync", StringComparison.Ordinal))
+            {
+                passRead = true;
+                return before;
+            }
+            if (!stack.Contains("RunWake", StringComparison.Ordinal)) return Volatile.Read(ref now);
+            SpinWait.SpinUntil(() => passRead, TimeSpan.FromSeconds(10));
+            Volatile.Write(ref now, due);
+            switched = true;
+            return due;
+        }
     }
 
     /// <summary>Lets pending work and a few timer turns run (upstream <c>settle</c>).</summary>
@@ -231,6 +270,28 @@ internal static class SleepTests
             registry.Install(Define.Extension(new Extension { Name = "unrelated" }));
             // Polled: WaitForTaskAsync() would call Resume(), which wakes due sleeps itself.
             await Eventually(async () => await StatusOf(harness, id) == DurableTaskStatus.Terminal);
+            ChatTests.MatchJson("""{"outcome":{"status":"completed","result":1500}}""", (await StateOf(harness, id))?.ToJson(), "state");
+            await harness.CloseAsync(Context);
+        });
+
+        // PiSharp's own (see the file header).
+        yield return Case(prefix + "runs-a-sleep-that-comes-due-between-a-pass-and-the-wake-it-schedules", async () =>
+        {
+            var clock = new SplitClock(1_000, 1_500);
+            var timers = new FakeTimers();
+            var nap = NapTask(500);
+            var (harness, registry, _) = await OpenTasks(fresh(), [nap], now: clock.Now, setTimer: timers.SetTimer);
+            var id = await StartNap(harness, nap);
+            harness.Resume();
+            await Eventually(() => timers.Live().Any(timer => timer.DelayMs == 500));
+            await Settle();
+            Equal(DurableTaskStatus.Sleeping, await StatusOf(harness, id), "sleeping");
+            // An unrelated change starts a pass and schedules a wake; the deadline passes between their clock reads, before the timer fires.
+            clock.Split();
+            registry.Install(Define.Extension(new Extension { Name = "unrelated" }));
+            // Polled: WaitForTaskAsync() would call Resume(), which wakes due sleeps itself.
+            await Eventually(async () => await StatusOf(harness, id) == DurableTaskStatus.Terminal);
+            Check(clock.Switched, "the wake read the clock after the pass");
             ChatTests.MatchJson("""{"outcome":{"status":"completed","result":1500}}""", (await StateOf(harness, id))?.ToJson(), "state");
             await harness.CloseAsync(Context);
         });
