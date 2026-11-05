@@ -21,7 +21,9 @@
 // - Streamed partials (#9265): the cases moved here from HarnessEventsCases.cs (area partial-commits ported them in harness-events.test.ts's
 //   form, on the event stream); here they read the view's operations, as upstream's v1.5.0 form does. Two of them pace the faux stream on
 //   commits instead of real time (CommitPaced: .NET's timers on Windows tick every 15.6 ms), and they count allocations with
-//   GC.GetTotalAllocatedBytes and the heap with GC.GetTotalMemory in place of V8's GCProfiler and heap statistics.
+//   GC.GetTotalAllocatedBytes and the heap with GC.GetTotalMemory in place of V8's GCProfiler and heap statistics. In "streams a tool call
+//   partial ...", a partial of the "done" answer after the tool result has a text block, which the members check expects as text and type:
+//   that answer streams for less than the partial interval, so it commits a partial only on a slow runner (a macOS runner did).
 using System.Collections.Immutable;
 using PiSharp.Contracts;
 using PiSharp.Durable;
@@ -600,11 +602,13 @@ internal static class ViewRunTests
             // With the raw argument text on the block, every commit resent the whole call.
             var blockSets = onMessage.Count(op => op.Verb != "a" && op.Path.Length == 2);
             Check(blockSets <= 2, $"block sets: {blockSets}");
-            // The committed partials carry only the parsed arguments, never the raw argument text.
+            // The committed partials carry only the parsed arguments, never the raw argument text. A partial of the answer after the tool
+            // result holds its text block.
             foreach (var partial in partials.Snapshot())
             {
                 foreach (var block in ((JsonArrayValue)partial["content"]).Cast<JsonObjectValue>())
-                    Equal("arguments,id,name,type", string.Join(",", block.Keys.Order(StringComparer.Ordinal)), "block members");
+                    Equal(S(block["type"]) == "text" ? "text,type" : "arguments,id,name,type", string.Join(",", block.Keys.Order(StringComparer.Ordinal)),
+                        "block members");
             }
             await harness.CloseAsync(Context);
         });
@@ -667,6 +671,7 @@ internal static class ViewRunTests
                 return S(block["type"]) == "toolCall" && ((JsonObjectValue)block["arguments"]).TryGetValue("content", out var shown) ? S(shown).Length : 0;
             }
             var retained = new List<long>();
+            var framesAt = new List<int>();
             // Measure while the text, then the tool call, is almost complete: the watcher's view holds the most then. Upstream polls for it
             // while the stream goes on; the stream is held for it here (its pace is the commits', see CommitPaced).
             var raw = new[] { text.Length, Obj(("path", "a.ts"), ("content", content)).ToJson().Length };
@@ -680,6 +685,7 @@ internal static class ViewRunTests
                 streamed[index] += length;
                 if (streamed[index] < raw[index] * 0.9 || await Shown(index) <= (index == 0 ? text.Length : content.Length) * 0.95) return;
                 retained.Add(await HeapInUse(harness) - before);
+                framesAt.Add(listening.Frames.Count);
                 measured++;
             };
             await submission.WaitAsync(Context);
@@ -688,7 +694,9 @@ internal static class ViewRunTests
             Check(commits > 500, $"frames: {commits}");
             // The two 140 KB strings, the watcher's recorded frames and the rest of the stream: about 3 MB upstream. Sliced append ops made
             // the watcher's view hold a copy of the text per commit: well over 100 MB.
-            foreach (var bytes in retained) Check(bytes < 20_000_000, $"retained bytes: {string.Join(", ", retained)}");
+            // The message carries what the bytes depend on (the heap before, the frames at each measure), for a runner where they differ.
+            foreach (var bytes in retained)
+                Check(bytes < 20_000_000, $"retained bytes: {string.Join(", ", retained)} (before {before}, frames {string.Join(", ", framesAt)})");
             await listening.Watch.StopAsync();
             await harness.CloseAsync(Context);
         });

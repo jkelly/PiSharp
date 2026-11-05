@@ -32,6 +32,8 @@
 //   another thread. "stores a host listener's own commit before the reconcile commit ..." reads the stored commits after close, as no commit
 //   lands then. `publication.kind === "stored"` is !IsMemory, harness.closed is Closed, and infos are OpenedRoot.Infos. With this block
 //   every v1.5.0 test of the file is here (49 cases on each backend), so the citation moves to v1.5.0.
+// - "commits results with entries ...": the child task runs beside the writer's answer phase and ends first by upstream's microtask order;
+//   here it is on the thread pool, so the case waits for it before it counts the task documents its end drops (a busy runner read 1).
 using System.Collections.Concurrent;
 using PiSharp.Durable;
 using PiSharp.Durable.Chord;
@@ -299,12 +301,13 @@ internal static partial class HarnessTests
             Equal(conversation.Id, entry?.ConversationId, "entry conversation");
             SameJson("""["wrote"]""", progressSeen, "progress seen");
             Check(await harness.SnapshotAsync(progress, id, Context) is null, "task document retired");
+            var childReceipt = await harness.WaitForTaskAsync(childId!.Value, Context);
             // The Session indexed the documents of the tasks it created, so no terminal commit scanned for them, and it dropped each task's
             // entry at its end.
             Equal(0, counting.Scans, "document scans");
             Equal(0, ((DurableHarness)harness).IndexSizes.TaskDocuments, "task documents");
             Equal(receipt, await harness.GetTaskAsync(id, Context), "getTask");
-            Equal(conversation.Id, (await harness.WaitForTaskAsync(childId!.Value, Context)).ConversationId, "child conversation");
+            Equal(conversation.Id, childReceipt.ConversationId, "child conversation");
             Check(root.Id != conversation.Id, "distinct conversations");
             await harness.CloseAsync(Context);
         });

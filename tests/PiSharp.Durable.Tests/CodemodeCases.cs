@@ -16,11 +16,16 @@
 //   count of all journal commits (fewer than 10). The other commits only record acknowledged counts, and their number is timing: a commit
 //   here runs off the call's scheduler, so the VM acknowledges results while it is in flight, and those make one more commit after it (5 to
 //   54 journal commits in all, by VM and storage speed; 10 on a macOS runner).
+// - checks-a-rerun-s-calls-against-an-earlier-attempt-s-before-admitting-any-later-call restarts once its echo call ran: the call it does
+//   not await runs as a nested task beside the hold's, which can reach its block first on the thread pool, where upstream's echo runs
+//   first (a busy runner restarted with no echo run).
 // - Pi v1.5.0 sync (area sleep): drops-a-global-s-result-that-arrives-after-the-script-finished is ec1be23eb's case; upstream's
 //   process.on("unhandledRejection") is TaskScheduler.UnobservedTaskException after a full collection.
-// - Pi v1.5.0 sync (area codemode): replays-results-in-the-order-they-arrived-not-the-order-the-calls-were-made releases call 1 once call 2
-//   finished (slows.finishedCall, e17e2e105) instead of from an Eventually poll. Two authored cases check that code mode reads the Harness
-//   clock (f75b3240a), which upstream's suite does not:
+// - Pi v1.5.0 sync (area codemode): upstream's replays-results-in-the-order-they-arrived-not-the-order-the-calls-were-made releases call 1
+//   once call 2 finished (slows.finishedCall, e17e2e105); here once call 2's result is in the journal (a commit observer). A nested result
+//   reaches the script after its task's terminal commit and a snapshot of its call document, so a call 1 released as call 2 finished can
+//   still arrive first on the thread pool (a busy runner journaled [1,2], mostly without document retention). Two authored cases check that
+//   code mode reads the Harness clock (f75b3240a), which upstream's suite does not:
 //   codemode.reads-the-script-s-start-its-results-times-and-its-wall-time-from-the-harness-clock and
 //   codemode.measures-the-script-s-deadline-on-the-harness-clock-across-a-restart, both with HarnessOptions.Now as a test clock.
 // - Pi v1.5.0 sync (area vocabulary, 5f312dac4): journals-results-that-finish-together-in-one-commit counts the journal commits with an
@@ -201,14 +206,16 @@ internal static partial class CodemodeTests
 
     /// <summary>
     /// Run <paramref name="code"/> until <c>holds.Reached</c>, close the Harness (a restart), let <paramref name="between"/> change the stored
-    /// state, then reopen with <c>hold</c> no longer blocking and wait for the answer (upstream <c>restart</c>).
+    /// state, then reopen with <c>hold</c> no longer blocking and wait for the answer (upstream <c>restart</c>). <paramref name="onOpen"/> sees
+    /// the first Harness before the script starts.
     /// </summary>
     internal static async Task<Restarted> Restart(Chat chat, string code, Func<IHarness, TaskId, Task>? between = null,
-        Func<IHarness, TaskId, Task>? beforeClose = null)
+        Func<IHarness, TaskId, Task>? beforeClose = null, Action<IHarness>? onOpen = null)
     {
         var path = SqlitePath();
         chat.Setup.Faux.SetResponses(Script(code), Done);
         var opened = await OpenChat(await SqliteStorage.OpenAsync(path), chat.Setup);
+        onOpen?.Invoke(opened.Harness);
         var id = (await opened.Root.SubmitAsync(SubmissionDraft.Input("go"), Context)).Id;
         await chat.Holds.Reached.Task;
         if (beforeClose is not null) await beforeClose(opened.Harness, await ScriptTask(opened.Harness));
@@ -285,10 +292,14 @@ internal static partial class CodemodeTests
                 				await tools.hold({});
                 				return order;
                 """;
-            // 2 finishes first, then 1.
+            // 2 finishes first, then 1: 1 is released once 2's result is in the journal.
             chat.Slows.Release(2);
-            _ = chat.Slows.FinishedCall(2).ContinueWith(_ => chat.Slows.Release(1), TaskScheduler.Default);
-            var restarted = await Restart(chat, code);
+            var restarted = await Restart(chat, code, onOpen: harness => harness.ObserveCommits(new CommitObserver((publication, _) =>
+            {
+                foreach (var change in publication.Changes)
+                    if (change is DocumentValueChange { Record.Kind: "pi.codemode.journal", Value: var journal } && ((JsonArrayValue)journal["entries"]).Count > 0)
+                        chat.Slows.Release(1);
+            }, _ => { })));
             SameText(new("[2,1]", false), restarted.Result, "result");
             SameCounts(new() { ["2,1"] = 1 }, chat.EchoCounts(), "echo");
             await restarted.Harness.CloseAsync(Context);
@@ -565,7 +576,9 @@ internal static partial class CodemodeTests
                     // As if the restart came before the first journal commit.
                     journal.GetArray("entries").SetLength(0);
                     return Task.CompletedTask;
-                }));
+                }),
+                // The echo call runs beside the hold, and before it reaches its block by upstream's order.
+                beforeClose: (_, _) => Eventually(() => chat.Echo.ContainsKey("a")));
             Equal(true, restarted.Result.IsError, "isError");
             // The first run already made more calls than before.
             Contains(restarted.Result.Text, "its first run made 3 calls, where it had made 2", "result");
