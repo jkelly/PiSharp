@@ -14,6 +14,9 @@
 // conversation document (session changes); each Harness run is one faux text reply. Prints commits or runs per second, the storage calls
 // and the mean commits per call (the group size), the median run, and the Storage reads per commit or run (Pi v1.5.0 sync, area
 // publication-caches: the read caches let a normal run read nothing; on SQLite the count is LatencyStorage's too, with no round trip).
+// Both pin the document retention to its ten-minute default (ThroughputRetentionMs), as PartialCommitsBench.cs does: the Durable suite's
+// second CI run sets PI_DURABLE_DOCUMENT_RETENTION_MS=0, which evicts every unobserved document right after its use, so each commit and
+// run would load its conversation documents again and the reads would measure that override instead of the read caches.
 using System.Diagnostics;
 using System.Globalization;
 using PiSharp.Chord;
@@ -294,12 +297,16 @@ public static class StorageBench
     private static readonly ConversationDocToken Counter = Documents.DefineConversationDoc("bench.throughput.counter", 1, DocumentFork.Initial,
         () => (JsonObjectValue)JsonValue.Parse("""{"n":0}"""), checkpointWhen: (_, _, _) => false);
 
+    /// <summary>The document retention of every throughput Session and Harness: the default ten minutes, whatever the process default
+    /// (see the file header).</summary>
+    private const double ThroughputRetentionMs = 600_000;
+
     private static void Count(DraftObject counter) => counter.Set("n", ((JsonNumberValue)counter.Get("n")!).Value + 1);
 
     private static async Task<ThroughputRow> SessionCommitsAsync(Fixtures fixtures, BenchBackend backend, double latency, int count, bool changes)
     {
         var storage = new LatencyStorage(await fixtures.CreateAsync(backend), latency);
-        var session = Session.Create(storage);
+        var session = Session.Create(storage, documentRetentionMs: ThroughputRetentionMs);
         try
         {
             var ids = await session.CommitAsync(async tx =>
@@ -338,7 +345,12 @@ public static class StorageBench
         var each = Math.Max(1, HarnessRuns / count);
         var storage = new LatencyStorage(await fixtures.CreateAsync(backend), latency);
         var models = new FauxModels([.. Enumerable.Range(0, each * count).Select(_ => FauxModels.Text("done"))]);
-        var harness = await Harness.OpenAsync(storage, new HarnessOptions { Models = models, Registry = Registry.Create() }, Context);
+        var harness = await Harness.OpenAsync(storage, new HarnessOptions
+        {
+            Models = models,
+            Registry = Registry.Create(),
+            Settings = new HarnessSettings { DocumentRetentionMs = ThroughputRetentionMs },
+        }, Context);
         try
         {
             var created = new List<IConversation>();
