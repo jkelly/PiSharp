@@ -729,7 +729,10 @@ internal static class Sync150CliCases
                     RenderCall: (args, _, context) => new Text($"lookup {(string?)args?["q"]} ({KeybindingHints.KeyText("app.tools.expand")} to expand) in {context.Cwd}", 0, 0),
                     RenderResult: (result, options, _, context) => new Text(
                         $"{(options.Expanded ? "all" : "some")} of {(string?)result["content"]?[0]?["text"]} {(string?)result["details"]?["k"]} {(string?)context.Args?["q"]}", 0, 0));
-                var cwd = Path.Combine(Path.GetTempPath(), "pisharp-export-tools");
+                // The renderer only prints the cwd. Tools render at upstream's width of 100 columns (tool-renderer.ts), so the call line wraps
+                // once it is longer: a fixed short cwd keeps it on one line on every machine, where macOS's temporary folder
+                // (/private/var/folders/<id>/T/) made it 111 columns and split the path across two lines.
+                var cwd = OperatingSystem.IsWindows() ? @"C:\work\pisharp-export-tools" : "/work/pisharp-export-tools";
                 var renderer = ExportToolHtmlRenderer.Create(name => name == "lookup" ? lookup : BuiltInToolRenderers.Resolve(name), Themes.Current, cwd);
                 var root = Directory.CreateTempSubdirectory("pisharp-export-tools-").FullName;
                 try
