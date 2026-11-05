@@ -5,12 +5,16 @@ using PiSharp.Contracts;
 
 // Authored offline expectations for PiSharp 1.1.0.3: codemode on Jint (decision 0003), ported from Pi v1.1.0
 // packages/codemode/test/{sandbox,source,declarations}.test.ts, packages/coding-agent/test/suite/agent-session-codemode.test.ts
-// and codemode-renderer.test.ts by reading, updated to Pi v1.2.0 (06a46693); never captured from an upstream run. The declaration
-// differential (Declarations/declaration-goldens.json) is recorded from the real upstream 1.2.0 packages. Fake MCP servers, a fake model registry and a
+// and codemode-renderer.test.ts by reading, updated to Pi v1.2.0 (06a46693) and synced to Pi v1.5.0 under decision 0013 (the report's
+// sourceSha); never captured from an upstream run. The two differentials are captures of the real upstream 1.2.0 packages and stay
+// labelled 1.2.0 (the report's goldens field): Declarations/declaration-goldens.json from @earendil-works/pi-codemode and
+// pi-coding-agent 1.2.0, Deterministic/deterministic-goldens.json from pi-codemode 1.2.0. Fake MCP servers, a fake model registry and a
 // fake Anthropic endpoint answer in process; no network or live credentials are used.
 internal static partial class Program
 {
-    private const string Upstream = "06a466935536f8c9bcacb2d5efc0fc021be1bdff";
+    private const string Upstream = "f9a26365568127461c47a07a37dcb42c140a3ac5";
+    /// <summary>The differential goldens' provenance: captured from the real upstream 1.2.0 packages, never recaptured (decision 0013).</summary>
+    private const string GoldensProvenance = "Declarations/declaration-goldens.json (@earendil-works/pi-codemode and pi-coding-agent 1.2.0) and Deterministic/deterministic-goldens.json (pi-codemode 1.2.0): captured from the real upstream Pi v1.2.0 (06a46693) packages, not recaptured for v1.5.0";
 
     private static async Task<int> Main(string[] args)
     {
@@ -42,8 +46,8 @@ internal static partial class Program
             try { await test.Run().WaitAsync(TimeSpan.FromSeconds(180)); results.Add(new { test.Id, status = "PASS_AUTHORED_NATIVE_ONLY", ms = started.ElapsedMilliseconds }); }
             catch (Exception error) { failures++; results.Add(new { test.Id, status = "FAIL", failure = error.ToString() }); }
         }
-        var report = new { sourceSha = Upstream, status = "AUTHORED NATIVE; NO UPSTREAM CAPTURE", engine = "Jint 4.16.3", cases = cases.Count, failures,
-            genuineSourceCasesCaptured = 0, results };
+        var report = new { sourceSha = Upstream, status = "AUTHORED NATIVE; NO UPSTREAM CAPTURE", goldens = GoldensProvenance, engine = "Jint 4.16.3",
+            cases = cases.Count, failures, genuineSourceCasesCaptured = 0, results };
         var json = JsonSerializer.Serialize(report, new JsonSerializerOptions { WriteIndented = true });
         if (args.Length == 2 && args[0] == "--report")
         {

@@ -13,10 +13,10 @@ using PiSharp.Contracts.ModelOperations;
 // coding-agent model registry). They are derived from the pinned upstream source and its tests (test/openai-decisions,
 // typesafe-system-one, cloudflare-workers-ai-system-one, llama-cpp-classify, openrouter-images, classifier-models and
 // images-models) by reading, never captured from an upstream run. Fake HTTP handlers answer in process; no network or
-// live credentials are used.
+// live credentials are used. Synced to Pi v1.5.0 under decision 0013: the report's sourceSha names v1.5.0, and the expectations stay authored from reading the pinned sources, never captured.
 internal static partial class Program
 {
-    private const string Upstream = "06a466935536f8c9bcacb2d5efc0fc021be1bdff";
+    private const string Upstream = "f9a26365568127461c47a07a37dcb42c140a3ac5";
     private static int bodyComparisons;
 
     private static async Task<int> Main(string[] args)
