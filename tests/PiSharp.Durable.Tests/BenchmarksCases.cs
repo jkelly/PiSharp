@@ -145,6 +145,8 @@ internal static partial class Program
             Equal("session commits,session commits,session changes,session changes,harness runs,harness runs",
                 string.Join(",", throughputRows.Select(row => row.Scenario)), "storage-throughput rows: memory and SQLite each");
             Check(throughputRows.All(row => row.Work > 0 && row.StorageCalls > 0 && row.Commits >= row.StorageCalls), "storage-throughput counts");
+            // Pi v1.5.0 sync (area publication-caches): with the read caches a run reads Storage only for its conversation's first context.
+            Check(throughputRows.All(row => row.Reads <= row.Conversations), "storage-throughput reads: " + throughputOutput);
             Check(throughputOutput.ToString().StartsWith("scenario        | backend", StringComparison.Ordinal), "storage-throughput table: " + throughputOutput);
             Directory.Delete(root, recursive: true);
         });
