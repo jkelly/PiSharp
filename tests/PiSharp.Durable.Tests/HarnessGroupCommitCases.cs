@@ -5,7 +5,10 @@
 // HarnessSchedulerSupport.cs, and these, each for a step upstream's single thread orders and the thread pool does not:
 // - Gates and run counts are per case (GroupCommitFixture), not module state cleared after each test. gc.hold is SchedulerGates.Hold.
 // - flush() (a macrotask) where a racing job must have reached its gate is a wait for the Session's count of gate hits (Session.GateHits)
-//   to grow: the job is at its gate, which stays shut while the call in flight is held. Where a commit must have been admitted behind the
+//   to grow: the job is at its gate, which stays shut while the call in flight is held. Before holding storage those cases wait until the
+//   scheduler is quiet (DurableTaskScheduler.QuiesceAsync: no reservation, reconcile or sweep job scheduled or running, every commit
+//   published), so no job an earlier publication queued from the thread pool reaches the gate first and holds the racing job behind it,
+//   which upstream's single thread runs before the case goes on. Where a commit must have been admitted behind the
 //   call in flight before the case goes on, the case waits for the count of keys with an unpublished writer (Session.LineSizes.Unpublished)
 //   to grow. Commits the case itself makes are enqueued in call order, so a line read it starts after one runs after that one's line part.
 //   Where upstream flushes for a negative check or only to let work progress, Flush() (a short real delay) stands in.
@@ -77,6 +80,10 @@ internal static class HarnessGroupCommitTests
         return published;
     }
 
+    /// <summary>Waits until the scheduler has no pass or sweep scheduled or running and every commit is published, so the next storage call
+    /// is the case's own and no job a publication queued runs into its gate first (see the file header).</summary>
+    private static Task Quiet(IHarness harness) => Durable(harness).Scheduler.QuiesceAsync();
+
     /// <summary>Waits until a commit admitted after this call registered a key with an unpublished writer.</summary>
     private static async Task AdmittedAfter(IHarness harness, int unpublished) =>
         await Eventually(() => Durable(harness).LineSizes.Unpublished > unpublished);
@@ -107,6 +114,7 @@ internal static class HarnessGroupCommitTests
             fixture.Gates.Open("b");
             await harness.WaitForTaskAsync(tree.B, Context);
             // The creation of D in C is admitted and in flight when P commits its end.
+            await Quiet(harness);
             var held = storage.HoldCommits();
             var c = (await harness.ConversationAsync(tree.C, Context))!;
             var creating = c.CommitAsync(tx => tx.CreateTaskAsync(fixture.Hold, Named("d"), OwnConversation()), Context);
@@ -141,6 +149,7 @@ internal static class HarnessGroupCommitTests
             var c = (await harness.ConversationAsync(tree.C, Context))!;
             await Eventually(async () => await StatusAsync(harness, tree.B) == DurableTaskStatus.Running);
             // A call in flight, so what follows is admitted and stays unpublished, in this order.
+            await Quiet(harness);
             var held = storage.HoldCommits();
             var blocker = root.CommitAsync(tx => tx.AppendEntryAsync(root.Id, new EntryDraft { Kind = "note" }), Context);
             await held.Entered;
@@ -183,6 +192,7 @@ internal static class HarnessGroupCommitTests
                 var record = await harness.GetTaskAsync(child, Context);
                 return record?.State is RunningTaskState running && S(((JsonObjectValue)running.Checkpoint)["phase"]) == "two";
             });
+            await Quiet(harness);
             var held = storage.HoldCommits();
             var marking = harness.AbortTaskAsync(owner, Context);
             await held.Entered;
@@ -222,6 +232,7 @@ internal static class HarnessGroupCommitTests
             harness.Resume();
             await Eventually(async () => await StatusAsync(harness, x) == DurableTaskStatus.Running &&
                 await StatusAsync(harness, y) == DurableTaskStatus.Running);
+            await Quiet(harness);
             var held = storage.HoldCommits();
             fixture.Gates.Open("x");
             await held.Entered;
@@ -285,6 +296,7 @@ internal static class HarnessGroupCommitTests
             var root = await harness.RootAsync(Context);
             var id = await root.CommitAsync(tx => tx.CreateTaskAsync(v2, Named("m"), OwnConversation()), Context);
             // Stored at version 1, and written again by a commit that is in flight when the reservation reads it.
+            await Quiet(harness);
             var held = storage.HoldCommits();
             var writing = SetTasks(harness, async tx =>
             {
@@ -554,6 +566,7 @@ internal static class HarnessGroupCommitTests
             var harness = (await OpenTasks(storage, [])).Harness;
             var root = await harness.RootAsync(Context);
             var draft = SubmissionDraft.Write(new EntryDraft { Kind = "note", Data = JsonObjectValue.Empty }, "r1");
+            await Quiet(harness);
             var held = storage.HoldCommits();
             var first = root.SubmitAsync(draft, Context);
             await held.Entered;
@@ -586,6 +599,7 @@ internal static class HarnessGroupCommitTests
                     if (change.Value.State.Status == DurableTaskStatus.Terminal) ended[change.Value.Id] = true;
             });
             // Both end in one call, behind a commit in flight.
+            await Quiet(harness);
             var held = storage.HoldCommits();
             var blocker = root.CommitAsync(tx => tx.AppendEntryAsync(root.Id, new EntryDraft { Kind = "note" }), Context);
             await held.Entered;
