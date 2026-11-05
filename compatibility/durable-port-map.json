@@ -2538,7 +2538,7 @@
       "phase": "sync-1.5.0",
       "status": "ported",
       "upstreamChange": "added",
-      "note": "v1.5.0 (work list area telemetry): harness.telemetry.* (26 cases for upstream's 24 tests, the failed-outcome it.each as faulted, failed and orphaned) on MemoryStorage, recording into InMemoryTelemetryContext or throwing in-process adapters; carriers and trace shapes are authored from the upstream text, not captured. Adapted: vi.spyOn of propagation is SpyTelemetry, of storage.submission a counting storage; harness.observeCommits is ObserveCommits(CommitObserver), detached with Detach() (area vocabulary, 5f312dac4), and the report kinds and reasons are area reports'"
+      "note": "v1.5.0 (work list area telemetry): harness.telemetry.* (26 cases for upstream's 24 tests, the failed-outcome it.each as faulted, failed and orphaned) on MemoryStorage, recording into InMemoryTelemetryContext or throwing in-process adapters; carriers and trace shapes are authored from the upstream text, not captured. Adapted: vi.spyOn of propagation is SpyTelemetry, of storage.submission a counting storage; harness.observeCommits is ObserveCommits(CommitObserver), detached with Detach() (area vocabulary, 5f312dac4), and the report kinds and reasons are area reports'. Area publication-caches: \"inherits omitted or undefined task traces ...\" finds each task's phase span by its task.id, since tasks whose steps share one storage call start their phases in no fixed order"
     },
     {
       "upstream": "packages/durable/test/harness-tool-hooks.test.ts",
