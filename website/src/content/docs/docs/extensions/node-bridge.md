@@ -24,7 +24,7 @@ PiSharp starts Node only when an extension needs it. Without extensions, or with
 
 ## Pi's own packages
 
-The first time a TypeScript extension loads, PiSharp installs Pi 1.2.0's npm packages (`@earendil-works/pi-coding-agent`, `pi-ai`, `pi-tui` and `pi-agent-core`, with `typebox` and `jiti`) into `~/.pi/agent/pisharp/pi-runtime/1.2.0`, using your npm. Every package's integrity is checked against the npm registry before it's used. Extensions then load through Pi's own `jiti` setup, so imports such as `@earendil-works/pi-coding-agent` resolve to the real code.
+The first time a TypeScript extension loads, PiSharp installs Pi 1.2.0's npm packages (`@earendil-works/pi-coding-agent`, `pi-ai`, `pi-tui` and `pi-agent-core`, with `typebox` and `jiti`) into `~/.pi/agent/pisharp/pi-runtime/1.2.0`, using your npm. Every `@earendil-works` package is pinned to exactly 1.2.0. `undici`, which `pi-coding-agent` uses for HTTP, is overridden to exactly 8.12.3, the version Pi 1.5.0 moved to for security advisories (Pi 1.2.0 pins 8.10.2). The runtime stays on Pi 1.2.0's packages because Pi 1.5.0's `pi-agent-core` attributes agent requests to Pi by default, which PiSharp doesn't do. A runtime installed by an earlier PiSharp, whose `package.json` lacks the override, is installed again on next use. Every package's integrity is checked against the npm registry before it's used. Extensions then load through Pi's own `jiti` setup, so imports such as `@earendil-works/pi-coding-agent` resolve to the real code.
 
 `PISHARP_PI_RUNTIME_DIR` moves this folder.
 
