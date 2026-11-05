@@ -871,7 +871,7 @@ internal static class ToolPhases
     /// <summary>An error result from the slot's durable partial output, details and diagnostics, ending with <paramref name="code"/>; and the
     /// truncation diagnostic of that output, when its bounds dropped some, which the caller adds after <c>afterTool</c> (upstream
     /// <c>fromSlot</c>).</summary>
-    private static (ToolExecutionResult Result, ToolDiagnostic? Truncation) FromSlot(JsonObjectValue? slot, string code, string message)
+    private static (ToolExecutionResult Built, ToolDiagnostic? Truncation) FromSlot(JsonObjectValue? slot, string code, string message)
     {
         var diagnostics = new List<ToolDiagnostic>();
         if (slot is not null && slot.TryGetValue("diagnostics", out var listed) && listed is JsonArrayValue stored)
