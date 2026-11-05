@@ -21,8 +21,8 @@
 // - The randomized cases draw the storage latency from a second generator (seed + 1): storage calls run on the thread pool, so drawing it
 //   from the plans' generator would make the plans depend on thread timing. Each seed's plans differ from upstream's, which interleave
 //   the two draws on one thread.
-// - "fails the Session for a throw in the read caches' write-through, and leaves the later parts unpublished" is area publication-caches':
-//   PiSharp has no CachedStorage yet.
+// - vi.spyOn on CachedStorage.prototype.published is the Session's record cache's PublishedFault (Session.RecordCache, area
+//   publication-caches).
 // - toEqual of a failed Session end compares its kind and its error's message (or reference).
 using System.Diagnostics;
 using PiSharp.Durable;
@@ -793,6 +793,28 @@ internal static class GroupCommitTests
             await session.CloseAsync(Context);
             FailedWith(await session.Closed, failure, "closed");
             Empty(session.LineSizes, "line sizes");
+        });
+
+        yield return Case(prefix + "fails-the-session-for-a-throw-in-the-read-caches-write-through-and-leaves-the-later-parts-unpublished", async () =>
+        {
+            var (storage, session, ids, published) = await OpenAsync(3);
+            var (a, b, c) = (ids[0], ids[1], ids[2]);
+            var held = storage.Hold();
+            var first = Bump(session, a);
+            await held.Entered;
+            var failing = Bump(session, b);
+            var after = Bump(session, c);
+            await session.LineTickAsync();
+            var failure = new InvalidOperationException("cache write failed");
+            var writes = 0;
+            session.RecordCache!.PublishedFault = _ => Interlocked.Increment(ref writes) == 2 ? failure : null;
+            held.Release();
+            await first;
+            Same(failure, await Outcome(failing), "failing");
+            SessionFailed(await Outcome(after), "after");
+            Equal(1, published.Count, "published");
+            FailedWith(await session.Closed, failure, "closed");
+            await session.CloseAsync(Context);
         });
 
         // ─── deferred commits ───────────────────────────────────────────────

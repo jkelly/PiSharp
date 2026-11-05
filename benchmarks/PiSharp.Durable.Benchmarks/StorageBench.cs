@@ -11,9 +11,9 @@
 // one Session's commit throughput and one Harness's run throughput with N conversations working at once, over MemoryStorage behind a fixed
 // round trip on every call (LatencyStorage; PreciseDelay keeps sub-millisecond waits, as Task.Delay rounds up to the 15.6 ms Windows timer
 // tick) and over local SQLite. Each Session conversation appends one entry per commit (session commits), or changes its own cached
-// conversation document (session changes: a commit that reads nothing from Storage, until area publication-caches gives the entry path
-// its record cache); each Harness run is one faux text reply. Prints commits or runs per second, the storage calls and the mean commits
-// per call (the group size), and the median run.
+// conversation document (session changes); each Harness run is one faux text reply. Prints commits or runs per second, the storage calls
+// and the mean commits per call (the group size), the median run, and the Storage reads per commit or run (Pi v1.5.0 sync, area
+// publication-caches: the read caches let a normal run read nothing; on SQLite the count is LatencyStorage's too, with no round trip).
 using System.Diagnostics;
 using System.Globalization;
 using PiSharp.Chord;
@@ -237,9 +237,10 @@ public static class StorageBench
     /// <summary>The round trips, in milliseconds, of <see cref="ThroughputAsync"/> by default.</summary>
     public static IReadOnlyList<double> DefaultThroughputLatencies { get; } = [0, 1, 4];
 
-    /// <summary>One throughput row: <c>Work</c> is the commits or runs timed, <c>Commits</c> the commits the storage calls carried.</summary>
+    /// <summary>One throughput row: <c>Work</c> is the commits or runs timed, <c>Commits</c> the commits the storage calls carried,
+    /// <c>Reads</c> the Storage reads made while they ran.</summary>
     public sealed record ThroughputRow(string Scenario, string Backend, double LatencyMs, int Conversations, int Work, double Seconds,
-        int StorageCalls, int Commits, double MedianMs);
+        int StorageCalls, int Commits, double MedianMs, int Reads = 0);
 
     /// <summary>Comma-separated numbers, or the defaults.</summary>
     public static IReadOnlyList<T> ParseList<T>(string? argument, IReadOnlyList<T> defaults) where T : IParsable<T> =>
@@ -255,7 +256,7 @@ public static class StorageBench
     {
         var rows = new List<ThroughputRow>();
         await using var fixtures = new Fixtures(tempRoot ?? Path.GetTempPath());
-        output.WriteLine("scenario        | backend | round trip ms | conversations | commits | s     | commits/s | storage calls | commits per call");
+        output.WriteLine("scenario        | backend | round trip ms | conversations | commits | s     | commits/s | storage calls | commits per call | reads per commit");
         foreach (var changes in new[] { false, true })
             foreach (var (backend, latency) in Throughputs(latencies))
                 foreach (var count in conversations)
@@ -263,16 +264,16 @@ public static class StorageBench
                     var row = await SessionCommitsAsync(fixtures, backend, latency, count, changes);
                     rows.Add(row);
                     output.WriteLine(string.Create(CultureInfo.InvariantCulture,
-                        $"{row.Scenario,-15} | {row.Backend,-7} | {row.LatencyMs,-13} | {row.Conversations,-13} | {row.Work,-7} | {row.Seconds,-5:F2} | {row.Work / row.Seconds,-9:F0} | {row.StorageCalls,-13} | {(double)row.Commits / Math.Max(1, row.StorageCalls):F2}"));
+                        $"{row.Scenario,-15} | {row.Backend,-7} | {row.LatencyMs,-13} | {row.Conversations,-13} | {row.Work,-7} | {row.Seconds,-5:F2} | {row.Work / row.Seconds,-9:F0} | {row.StorageCalls,-13} | {(double)row.Commits / Math.Max(1, row.StorageCalls),-16:F2} | {(double)row.Reads / row.Work:F2}"));
                 }
-        output.WriteLine("scenario     | backend | round trip ms | conversations | runs | s     | runs/s | median run ms | commits per run | storage calls | commits per call");
+        output.WriteLine("scenario     | backend | round trip ms | conversations | runs | s     | runs/s | median run ms | commits per run | storage calls | commits per call | reads per run");
         foreach (var (backend, latency) in Throughputs([.. latencies.Where(latency => latency == 0 || latency >= 4)]))
             foreach (var count in conversations)
             {
                 var row = await HarnessRunsAsync(fixtures, backend, latency, count);
                 rows.Add(row);
                 output.WriteLine(string.Create(CultureInfo.InvariantCulture,
-                    $"harness runs | {row.Backend,-7} | {row.LatencyMs,-13} | {row.Conversations,-13} | {row.Work,-4} | {row.Seconds,-5:F2} | {row.Work / row.Seconds,-6:F1} | {row.MedianMs,-13:F1} | {(double)row.Commits / row.Work,-15:F1} | {row.StorageCalls,-13} | {(double)row.Commits / Math.Max(1, row.StorageCalls):F2}"));
+                    $"harness runs | {row.Backend,-7} | {row.LatencyMs,-13} | {row.Conversations,-13} | {row.Work,-4} | {row.Seconds,-5:F2} | {row.Work / row.Seconds,-6:F1} | {row.MedianMs,-13:F1} | {(double)row.Commits / row.Work,-15:F1} | {row.StorageCalls,-13} | {(double)row.Commits / Math.Max(1, row.StorageCalls),-16:F2} | {(double)row.Reads / row.Work:F2}"));
             }
         return rows;
     }
@@ -322,9 +323,9 @@ public static class StorageBench
                 }
             }));
             watch.Stop();
-            var (calls, commits) = storage.Reset();
+            var (calls, commits, reads) = storage.Reset();
             return new ThroughputRow(changes ? "session changes" : "session commits", Name(backend), latency, count, each * count,
-                watch.Elapsed.TotalSeconds, calls, commits, 0);
+                watch.Elapsed.TotalSeconds, calls, commits, 0, reads);
         }
         finally
         {
@@ -360,10 +361,10 @@ public static class StorageBench
                 }
             }));
             watch.Stop();
-            var (calls, commits) = storage.Reset();
+            var (calls, commits, reads) = storage.Reset();
             runs.Sort();
             return new ThroughputRow("harness runs", Name(backend), latency, count, each * count, watch.Elapsed.TotalSeconds, calls, commits,
-                runs[runs.Count / 2]);
+                runs[runs.Count / 2], reads);
         }
         finally
         {
@@ -423,12 +424,15 @@ internal sealed class LatencyStorage(IStorage inner, double latencyMs) : IStorag
 {
     private int calls;
     private int commits;
+    private int reads;
 
-    /// <summary>The commit calls and the commits they carried since the last reset; resets both.</summary>
-    public (int Calls, int Commits) Reset() => (Interlocked.Exchange(ref calls, 0), Interlocked.Exchange(ref commits, 0));
+    /// <summary>The commit calls, the commits they carried and the reads since the last reset; resets them.</summary>
+    public (int Calls, int Commits, int Reads) Reset() =>
+        (Interlocked.Exchange(ref calls, 0), Interlocked.Exchange(ref commits, 0), Interlocked.Exchange(ref reads, 0));
 
     private async Task<T> Trip<T>(Func<Task<T>> call)
     {
+        Interlocked.Increment(ref reads);
         await PreciseDelay.Wait(latencyMs);
         return await call();
     }

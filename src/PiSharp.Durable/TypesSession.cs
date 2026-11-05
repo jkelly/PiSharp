@@ -13,8 +13,11 @@
 // SubscribeCommits(listener) is ObserveCommits(CommitObserver), returning a CommitObservation (CommitObserver is a sealed class over two
 // callbacks, as Observer<T> is); SessionEnd is tagged by Kind (SessionEndKind, was Reason); and DocumentCommitChange is tagged: an abstract
 // record whose Kind says which of its two records it is, DocumentValueChange (a creation or an update, with its version, value and ops) or
-// DocumentRetireChange (a retirement), where a retirement used to be a null value. The citation stays on v1.2.0 until the file's other
-// areas land.
+// DocumentRetireChange (a retirement), where a retirement used to be a null value. Area publication-caches (8b0caefc2, 5f312dac4 and
+// e5c6182ba): ObserveCommits gives the C# publication order (after the Session's own observers, only for a commit published while an
+// observer was attached, to the observers attached when its dispatch runs), and Tx results are shared with the read caches and context
+// ranges, which upstream may freeze and PiSharp's immutable records need not. The citation stays on v1.2.0 until the file's other areas
+// land.
 using System.Collections.Immutable;
 using PiSharp.Durable.Chord;
 using PiSharp.Durable.Chord.Delta;
@@ -538,8 +541,11 @@ public interface ISession : IDocumentObserver, IDocumentReader
     /// <summary>
     /// Attaches a synchronous <see cref="CommitObserver"/> of stored commits (upstream <c>observeCommits</c>), each with exactly what it
     /// stored, except that a document the commit retires is published as its retirement only; a commit held in memory is published when it
-    /// is stored (<see cref="CommitPublication"/>). Advance runs at the commit's publication, on the Session line, before every wait the
-    /// commit resolves and every abort it queues, in no order with watch listeners; it must not block or call Session APIs. A throw, or a
+    /// is stored (<see cref="CommitPublication"/>). Commits are published in line order once Storage stored them, one at a time; a
+    /// publication made while an observer was attached dispatches the commit once the Session's own observers (the scheduler, views,
+    /// watches) saw it, to the observers attached by then, and before every wait the commit resolves and every abort it queues; a commit
+    /// published while none was attached has no dispatch. There is no order relative to watch listeners. Advance runs synchronously on the
+    /// publishing thread and must not block or call Session APIs. A throw, or a
     /// faulted task it returns, is reported (<c>HarnessOptions.OnReport</c>), detaches the observer and ends it
     /// <see cref="WatchEndKind.ListenerError"/>; the other observers still run. End comes once, at the Session's close after its last
     /// publication or at its failure (<see cref="CommitObserver"/>), never after <see cref="CommitObservation.Detach"/>. Attaches
@@ -558,7 +564,8 @@ public interface ISession : IDocumentObserver, IDocumentReader
 /// <summary>
 /// Transaction surface of one Session commit callback (upstream <c>Tx</c>). Table reads are allowed only before the first table write
 /// (<see cref="ReadAfterWriteException"/>); document access stays available. Every operation rejects once the callback settles, and every
-/// draft it returned is revoked. Table reads and creation results are trusted immutable values shared with commit listeners.
+/// draft it returned is revoked. Table reads and creation results are trusted immutable values shared with commit listeners and with the
+/// Session's read caches and context ranges, which keep them (upstream freezes them; PiSharp's records cannot be mutated).
 /// </summary>
 public interface ITx
 {

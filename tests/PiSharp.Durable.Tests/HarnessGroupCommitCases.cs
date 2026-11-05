@@ -23,11 +23,11 @@
 //   waits instead until the sweep its admission scheduled ran its line part (DurableTaskScheduler.SweepScheduled, then Session.LineTickAsync)
 //   and reads DurableHarness.SchedulerIndexSizes directly, as upstream.
 // - A runtime commit the case makes for a probe (raceMark) uses the probe's ITaskRuntime, exposed by its phase.
-// - "reads no task record from Storage for more live and awaited tasks than the record cache's count" is area publication-caches': PiSharp
-//   has no record cache (CachedStorage) yet, so the scheduler's reads of awaited outcomes still reach Storage.
+// - "reads no task record from Storage for more live and awaited tasks than the record cache's count" (area publication-caches) counts the
+//   task reads of a ControlledStorage subclass (CountingTasks), as upstream's Counting does.
 // - "ends a task wait when the Harness closes while the terminal commit is stored, and still stores it" is PiSharp's counterpart of
-//   harness-tasks.test.ts's case of that name (durable@1.5.0 Changed#6), on a held storage call instead of LateResolvingStorage: that block
-//   of harness-tasks ("publication at adoption") is area publication-caches'.
+//   harness-tasks.test.ts's case of that name (durable@1.5.0 Changed#6), on a held storage call instead of LateResolvingStorage; that
+//   block of harness-tasks ("publication at adoption", area publication-caches) runs it on LateResolvingStorage (HarnessTasksCases.cs).
 using System.Collections.Concurrent;
 using System.Runtime.CompilerServices;
 using PiSharp.Durable;
@@ -695,6 +695,79 @@ internal static class HarnessGroupCommitTests
             Equal(DurableTaskStatus.Terminal, await StatusAsync(reopened, id), "status after reopen");
             await reopened.CloseAsync(Context);
         });
+
+        // ─── reads on the line ──────────────────────────────────────────────
+
+        yield return Case(prefix + "reads-no-task-record-from-storage-for-more-live-and-awaited-tasks-than-the-record-caches-count", async () =>
+        {
+            var child = Tasks.DefineTask(new TaskDefinition
+            {
+                Name = "gc.child",
+                Version = 1,
+                Initial = _ => O("""{"phase":"end"}"""),
+                Phases = new Dictionary<string, TaskPhaseHandler>
+                {
+                    ["end"] = (task, runtime, ctx) => runtime.CommitAsync((_, _) => NextTaskState.Completed(task.Id.ToJson()), ctx),
+                },
+                Abort = (_, _, _) => Task.CompletedTask,
+            });
+            var parent = Tasks.DefineTask(new TaskDefinition
+            {
+                Name = "gc.parent",
+                Version = 1,
+                Initial = _ => O("""{"phase":"spawn"}"""),
+                Phases = new Dictionary<string, TaskPhaseHandler>
+                {
+                    ["spawn"] = (task, runtime, ctx) => runtime.CommitAsync(async (tx, _) =>
+                    {
+                        var on = new List<TaskId>();
+                        for (var n = 0; n < 300; n++)
+                            on.Add(await tx.CreateTaskAsync(child, JsonValue.Null, new TaskOptions(TaskOwnership.Task(task.Id))));
+                        var checkpoint = JsonValue.Object(KeyValuePair.Create("phase", (JsonValue)"read"),
+                            KeyValuePair.Create("on", (JsonValue)JsonValue.Array(on.Select(id => (JsonValue)id.ToJson()))));
+                        return (TaskState?)NextTaskState.Waiting(checkpoint, on, JoinPolicy.AllSettled);
+                    }, ctx),
+                    ["read"] = async (task, runtime, ctx) =>
+                    {
+                        var checkpoint = (JsonObjectValue)task.State.Checkpoint;
+                        var on = ((JsonArrayValue)checkpoint["on"]).Select(id => new TaskId((long)N(id))).ToList();
+                        var outcomes = await runtime.OutcomesAsync(on, ctx);
+                        var sum = outcomes.Count(outcome => outcome is CompletedTaskOutcome);
+                        await runtime.CommitAsync((_, _) => NextTaskState.Completed(sum), ctx);
+                    },
+                },
+                Abort = (_, _, _) => Task.CompletedTask,
+            });
+            var storage = new CountingTasks();
+            var harness = (await OpenTasks(storage, [parent, child])).Harness;
+            var root = await harness.RootAsync(Context);
+            var id = await root.CommitAsync(tx => tx.CreateTaskAsync(parent, JsonValue.Null, new TaskOptions(TaskOwnership.Conversation)), Context);
+            storage.TaskReads = 0;
+            harness.Resume();
+            var outcome = ((TerminalTaskState)(await harness.WaitForTaskAsync(id, Context)).State).Outcome;
+            Equal(300.0, outcome is CompletedTaskOutcome { Result: var result } ? N(result) : double.NaN, "outcome");
+            // Each change of a live task, and the parent's read of the outcomes it waited on, finds the record in memory.
+            Equal(0, storage.TaskReads, "task reads");
+            await harness.CloseAsync(Context);
+        });
+    }
+
+    /// <summary>Controlled storage over memory counting its task reads (upstream's <c>Counting</c>).</summary>
+    private sealed class CountingTasks() : ControlledStorage(new MemoryStorage())
+    {
+        private int taskReads;
+
+        public int TaskReads
+        {
+            get => Volatile.Read(ref taskReads);
+            set => Volatile.Write(ref taskReads, value);
+        }
+
+        public override Task<TaskRecord?> GetTaskAsync(TaskId id, DurableContext context)
+        {
+            Interlocked.Increment(ref taskReads);
+            return base.GetTaskAsync(id, context);
+        }
     }
 
     /// <summary>The checkpoint's <c>n</c> of a running record (upstream <c>toMatchObject({ checkpoint: { n } })</c>).</summary>

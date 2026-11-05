@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/src/session/transaction.ts (Transaction, LoadedDocument,
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/src/session/transaction.ts (Transaction, LoadedDocument,
 // TransactionHost, TransactionScope, applySubmissionChange, planDocument, publishes).
 //
 // A transaction belongs to one commit callback, which holds the Session line, so it never races another transaction. Its own operations
@@ -22,9 +22,9 @@
 // its key has an unpublished writer; a retirement touches its address first, and retiring a terminal task's documents touches the task's
 // scope (Touch); WriteKeys names what the commit writes for the writer's unpublished write set (its table records, and the address and
 // incarnation of every document it creates, changes or retires, with the scope of every incarnation it creates or retires); the newest
-// entry and head marker come from the host (LatestEntryIdAsync is v1.5.0's tx.latestEntryId). The host's index of live tasks' documents
-// (TaskDocuments) is area publication-caches': until then it knows none, and every terminal task's documents are scanned. The citation
-// stays on v1.2.0: area publication-caches completes this file's v1.5.0 port.
+// entry and head marker come from the host (LatestEntryIdAsync is v1.5.0's tx.latestEntryId). Pi v1.5.0 sync (area publication-caches,
+// e5c6182ba): retiring a terminal task's documents takes them from the host's index of the documents of the tasks its Session created
+// (TaskDocuments, upstream host.taskDocuments) and scans only for a task it does not know; CreatedTaskIds feeds that index.
 using System.Collections.Immutable;
 using PiSharp.Durable.Chord;
 using PiSharp.Durable.Chord.Delta;

@@ -13,6 +13,9 @@
 // - runtime.report's { kind: "host", callback: "models" } is ReportFrom.Host(HostCallback.Models).
 // - The codemode case runs DurableCodemode's tool on PiSharp.Codemode's sandbox, as the codemode.* groups do.
 // - The throwing adapters are small ITelemetryContext and ITelemetrySpan classes over the no-op ones (upstream's object spreads).
+// - Pi v1.5.0 sync (area publication-caches): "inherits omitted or undefined task traces ..." finds each task's phase span by its task.id
+//   instead of by start order: with the read caches the three tasks' first steps can be stored in one call, and .NET gives no order between
+//   the continuations their outcomes resume (Writer.cs), so the phases start in any order.
 using System.Collections.Immutable;
 using PiSharp.Durable;
 using PiSharp.Durable.Chord;
@@ -354,9 +357,12 @@ internal static class TelemetryTests
             SameCarrier(null, records[2].Trace, "root trace");
             var phases = Named(telemetry, "pi.durable.phase").ToList();
             Equal(3, phases.Count, "phases");
-            SameCarrier(creator.Context, phases[0].ParentContext, "first parent");
-            SameCarrier(creator.Context, phases[1].ParentContext, "second parent");
-            SameCarrier(null, phases[2].ParentContext, "root parent");
+            // Each task's phase, by task.id: the three tasks' steps may be stored in one call, and the continuations their outcomes resume
+            // start their phases in no fixed order (Writer.cs: the hop between two parts orders nothing on the thread pool).
+            RecordedTelemetrySpan PhaseOf(TaskId id) => phases.Single(span => Num(span, "task.id") == id.Value);
+            SameCarrier(creator.Context, PhaseOf(ids[0]).ParentContext, "first parent");
+            SameCarrier(creator.Context, PhaseOf(ids[1]).ParentContext, "second parent");
+            SameCarrier(null, PhaseOf(ids[2]).ParentContext, "root parent");
             await harness.CloseAsync(Context);
         });
 

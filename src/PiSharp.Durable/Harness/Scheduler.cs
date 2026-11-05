@@ -114,9 +114,22 @@
 //   region's changes to the candidate sets (a reservation's dropped candidates, the finalize and failFast checks it took) are applied
 //   under the same lock as its decide (RegionAsync's apply), never by clearing a set another publication may have added to since.
 // - A reservation pass a publication kicks (Kick(bool) on the line) is enqueued in line order there but starts on the thread pool, as a
-//   publication now runs on the writer's thread rather than inside a line job, and a job must not run inside it.
-// Upstream's kept context ranges, advanced at publication (#advanceContexts, rangeEntry, knownLatestEntryId), are area
-// publication-caches'. The citation stays on v1.2.0: area scheduler-idle changes this file last and re-pins it.
+//   publication now runs on the writer's thread rather than inside a line job, and a job must not run inside it. It starts after the
+//   publication's host observers (below).
+// Pi v1.5.0 sync (area publication-caches: 8b0caefc2's publication order, e5c6182ba's kept ranges):
+// - Kept context ranges advance at publication (AdvanceContextsLocked, upstream #advanceContexts): under the lock, a stored commit's
+//   entries extend each kept range of their conversation that is current (ContextRange.Current), so a later read scans nothing
+//   (ConversationContext.RangeEntry serves a single entry from it, as upstream's rangeEntry). A read installs its range under the same lock
+//   only if its tail is still the conversation's newest known entry (ConversationContext.IsKnownTail, the Session's ConversationTails,
+//   upstream knownLatestEntryId); otherwise it keeps it not current, and the next read extends it from Storage. A range's retention starts
+//   when its conversation goes idle (KeptContext.ExpiresAt) and a read that reinstalls it keeps that expiry. Lock order: this lock, then the
+//   tails' lock (IsKnownTail), never the reverse; ConversationTails calls nothing under its lock.
+// - Nothing a publication sets off runs before the host observers saw the commit: Observe and SettleIdle take the task and idle waits
+//   they resolve (Waiters.Take) and the runs they signal, and hand them to Session.AfterPublication, which runs them on the publishing
+//   thread after its ObserveCommits observers (upstream: promise continuations and the abort microtask queued behind the host dispatch).
+//   Reservation passes (Kick) and the reconcile pass (ScheduleReconcileLocked) start there too, so a commit a host observer makes is
+//   admitted before theirs, and still before the committer's continuation. Outside a publication AfterPublication runs its work at once.
+// The citation stays on v1.2.0: area scheduler-idle changes this file last and re-pins it.
 using System.Collections;
 using System.Collections.Immutable;
 using PiSharp.Durable.Chord;
@@ -855,8 +868,13 @@ internal sealed class DurableTaskScheduler
         // Whether the commit created a task, and whether a running task that keeps running committed it; see Kick(bool).
         var createsTask = false;
         var keepsRunning = false;
+        // The clock is host code, read before the lock: only a commit that appends entries can advance a kept range.
+        var at = publication.Changes.Any(change => change is EntryWrite) ? now() : 0;
+        // The waits a terminal commit resolves, resumed after host observers saw it, as the abort signals are.
+        var resumes = new List<Action>();
         lock (gate)
         {
+            AdvanceContextsLocked(publication, at);
             var updated = new List<TaskRecord>();
             var failed = new List<TaskId>();
             // Edges first, so the tasks a commit creates in a new conversation hang from it.
@@ -874,7 +892,7 @@ internal sealed class DurableTaskScheduler
                 {
                     failedMigrations.Remove(record.Id);
                     failFastChecks.Remove(record.Id);
-                    taskWaiters.Resolve(record.Id, record);
+                    if (taskWaiters.Take(record.Id, record) is { } resume) resumes.Add(resume);
                     // Its owner may finalize now.
                     ScheduleReconcileLocked();
                     continue;
@@ -936,10 +954,50 @@ internal sealed class DurableTaskScheduler
             SweepLocked();
         }
         CountActive();
-        foreach (var invocation in signal) Signal(invocation, null);
+        // Task code, and what the waits resume, never runs before host observers saw the commit (upstream: the aborts follow in a
+        // microtask and the waits in promise continuations, after the dispatch to host observers).
+        if (resumes.Count > 0 || signal.Count > 0)
+            session.AfterPublication(() =>
+            {
+                foreach (var resume in resumes) resume();
+                foreach (var invocation in signal) Signal(invocation, null);
+            });
         if (!changed) return;
         SettleIdle();
         Kick(onLine: createsTask && keepsRunning);
+    }
+
+    /// <summary>
+    /// Extends each kept context range with the entries a stored commit appended to its conversation, so a later read needs no Storage scan
+    /// (upstream <c>#advanceContexts</c>). Entries are published in ID order. Runs under the lock at the publication, which the context
+    /// read installs its range under, so a range is either installed before a publication advances it or checked against the entries that
+    /// publication's commit wrote (<see cref="ConversationContext.IsKnownTail"/>: the Session applied them to its tails before publishing).
+    /// </summary>
+    private void AdvanceContextsLocked(ObservedCommit publication, double at)
+    {
+        if (contexts.Count == 0) return;
+        Dictionary<ConversationId, List<EntryRecord>>? appended = null;
+        foreach (var change in publication.Changes)
+        {
+            if (change is not EntryWrite { Value: var entry } || !contexts.ContainsKey(entry.ConversationId)) continue;
+            appended ??= [];
+            if (appended.TryGetValue(entry.ConversationId, out var entries)) entries.Add(entry);
+            else appended[entry.ConversationId] = [entry];
+        }
+        if (appended is null) return;
+        foreach (var (conversationId, entries) in appended)
+        {
+            var kept = contexts[conversationId];
+            // An idle range past its retention is dropped here too: entry-only commits do not settle idleness, and a host may decline the
+            // expiry timer. ExpiresAt was fixed when it went idle, so no settings are read here.
+            if (kept.IdleSince is not null && kept.ExpiresAt is { } expiresAt && expiresAt <= at)
+            {
+                contexts.Remove(conversationId);
+                continue;
+            }
+            if (ConversationContext.AdvanceRange(kept.Range, entries) is { } range) kept.Range = range;
+            else contexts.Remove(conversationId);
+        }
     }
 
     /// <summary><c>settings.ContextRetentionMs</c>, or 0 when the host's settings throw. Kept contexts are only a cache, so dropping them is
@@ -976,19 +1034,33 @@ internal sealed class DurableTaskScheduler
     {
         var at = now();
         var retention = ContextRetentionMs();
+        var resumes = new List<Action>();
         lock (gate)
         {
             foreach (var conversationId in idleWaiters.Keys())
-                if (IdleLocked(conversationId)) idleWaiters.Resolve(conversationId, true);
+                if (IdleLocked(conversationId) && idleWaiters.Take(conversationId, true) is { } resume) resumes.Add(resume);
             foreach (var (conversationId, kept) in contexts.ToList())
             {
                 if (kept.IdleSince is { } since && at - since >= retention) contexts.Remove(conversationId);
                 else if (!IdleLocked(conversationId)) kept.IdleSince = null;
-                else if (retention > 0) kept.IdleSince ??= at;
+                else if (retention > 0)
+                {
+                    if (kept.IdleSince is null)
+                    {
+                        kept.IdleSince = at;
+                        kept.ExpiresAt = at + retention;
+                    }
+                }
                 else contexts.Remove(conversationId);
             }
             ComputeExpiryLocked(retention);
         }
+        // At a publication, after its host observers (upstream: promise continuations behind their dispatch); else at once.
+        if (resumes.Count > 0)
+            session.AfterPublication(() =>
+            {
+                foreach (var resume in resumes) resume();
+            });
         ApplyExpiry();
     }
 
@@ -1064,7 +1136,10 @@ internal sealed class DurableTaskScheduler
     {
         if (reconcileScheduled || closing || readOnly) return;
         reconcileScheduled = true;
-        ThreadPool.UnsafeQueueUserWorkItem(static scheduler => _ = scheduler.ReconcileAsync(), this, preferLocal: false);
+        // Queued after the host observers of a publication that asks for it (upstream: its microtask runs behind their dispatch), so a
+        // commit a host observer makes there lands before the pass's commit.
+        session.AfterPublication(() =>
+            ThreadPool.UnsafeQueueUserWorkItem(static scheduler => _ = scheduler.ReconcileAsync(), this, preferLocal: false));
     }
 
     /// <summary>
@@ -2094,9 +2169,12 @@ internal sealed class DurableTaskScheduler
                 draining = true;
             }
         }
-        // Never commit synchronously from a commit or registry listener: on the line, the pass only enqueues its commit.
-        if (onLine) _ = ReservePassAsync();
-        else ThreadPool.UnsafeQueueUserWorkItem(static scheduler => _ = scheduler.DrainAsync(), this, preferLocal: false);
+        // Never commit synchronously from a commit or registry listener: on the line, the pass only enqueues its commit. At a publication
+        // either starts after its host observers (upstream: the pass's microtask runs behind their dispatch), so a commit a host observer
+        // makes there lands before the pass's, and still before the committer's continuation.
+        if (onLine) session.AfterPublication(() => _ = ReservePassAsync());
+        else session.AfterPublication(() =>
+            ThreadPool.UnsafeQueueUserWorkItem(static scheduler => _ = scheduler.DrainAsync(), this, preferLocal: false));
     }
 
     /// <summary>One reservation pass outside the drain loop, for <see cref="Kick(bool)"/> on the line.</summary>
@@ -3274,8 +3352,12 @@ internal sealed class DurableTaskScheduler
 
     private sealed class KeptContext(ContextRange range, double? idleSince)
     {
-        public ContextRange Range { get; } = range;
+        /// <summary>Replaced when a publication advances it (AdvanceContextsLocked). Guarded by the scheduler's lock.</summary>
+        public ContextRange Range { get; set; } = range;
         public double? IdleSince { get; set; } = idleSince;
+        /// <summary>When an idle range expires, fixed when it went idle (upstream <c>expiresAt</c>), so a publication that advances it reads
+        /// no settings.</summary>
+        public double? ExpiresAt { get; set; }
     }
 
     /// <summary>A scheduler timer: when it is due, and its disarm once armed.</summary>
@@ -3581,9 +3663,12 @@ internal sealed class DurableTaskScheduler
 
         private Task<EntryRecord?> ReadEntry(Entry? token, EntryId id, DurableContext context) => Read(async () =>
         {
-            var found = await scheduler.session.ReadOnLineAsync(line => line.GetEntryAsync(invocation.ConversationId, id, context))
-                .ConfigureAwait(false);
-            var entry = found?.Entry;
+            // An entry of the conversation's kept context range is committed and visible: no Storage read.
+            EntryRecord? entry;
+            lock (scheduler.gate)
+                entry = scheduler.contexts.GetValueOrDefault(invocation.ConversationId) is { } kept ? ConversationContext.RangeEntry(kept.Range, id) : null;
+            entry ??= (await scheduler.session.ReadOnLineAsync(line => line.GetEntryAsync(invocation.ConversationId, id, context))
+                .ConfigureAwait(false))?.Entry;
             return token is null || entry?.Kind == token.Kind ? entry : null;
         });
 
@@ -3598,6 +3683,10 @@ internal sealed class DurableTaskScheduler
             var expires = false;
             lock (scheduler.gate)
             {
+                // Checked again here, under the lock up to the install below, which publications advance ranges under: a commit published
+                // since the read returned was not seen by AdvanceContextsLocked, so a range that missed it must not be advanced.
+                if (range is { Current: true } && !ConversationContext.IsKnownTail(scheduler.session, conversationId, range.Bounds.Tail))
+                    range = range with { Current = false };
                 // Keep it unless the invocation ended or a concurrent read already kept a newer range. A task no longer running ends its
                 // invocation at the next step (rule 1), which upstream's microtask order commits before any commit that follows the task's;
                 // here that step can queue behind them, so such an invocation counts as ended.
@@ -3609,7 +3698,10 @@ internal sealed class DurableTaskScheduler
                     if (!scheduler.IdleLocked(conversationId)) scheduler.contexts[conversationId] = new KeptContext(range, null);
                     else if (retention > 0)
                     {
-                        scheduler.contexts[conversationId] = new KeptContext(range, kept?.IdleSince ?? stamp);
+                        // An idle period that already started keeps its expiry; a new one starts now.
+                        var idleSince = kept?.IdleSince ?? stamp;
+                        var expiresAt = kept?.IdleSince is not null && kept.ExpiresAt is { } fixedAt ? fixedAt : idleSince + retention;
+                        scheduler.contexts[conversationId] = new KeptContext(range, idleSince) { ExpiresAt = expiresAt };
                         scheduler.ComputeExpiryLocked(retention);
                         expires = true;
                     }

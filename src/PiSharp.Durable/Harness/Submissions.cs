@@ -22,7 +22,8 @@
 // run did. Pi v1.5.0 sync (area group-commit-scheduler, e5c6182ba): reads on the line go through the line's Storage (ReadOnLineAsync's
 // argument), which waits for an unpublished commit of the submission, so the guarded Storage field is gone; a wait's check and its
 // registration still fall in one line job, which no settling publication of the submission can enter once its read found no unpublished
-// writer.
+// writer. Pi v1.5.0 sync (area publication-caches, 8b0caefc2 and e5c6182ba's publication order): the waits a commit settles resume after
+// its host observers (Session.AfterPublication), where upstream's promise continuations run behind the microtask that dispatches to them.
 using PiSharp.Durable.Chord;
 using PiSharp.Durable.Internal;
 using PiSharp.Telemetry;
@@ -164,8 +165,16 @@ internal sealed class Submissions
     {
         // A commit held in memory changes documents only.
         if (publication.IsMemory) return;
+        // Resumed after host observers saw the commit that settled them (upstream: promise continuations behind their dispatch).
+        List<Action>? resumes = null;
         foreach (var change in publication.Changes)
-            if (change is SubmissionWrite { Value: var record } && IsSettled(record)) waiters.Resolve(record.Id, record);
+            if (change is SubmissionWrite { Value: var record } && IsSettled(record) && waiters.Take(record.Id, record) is { } resume)
+                (resumes ??= []).Add(resume);
+        if (resumes is not null)
+            session.AfterPublication(() =>
+            {
+                foreach (var resume in resumes) resume();
+            });
     }
 
     private static bool IsSettled(SubmissionRecord record) => record.Status is SubmissionStatus.Done or SubmissionStatus.Unanswered;
