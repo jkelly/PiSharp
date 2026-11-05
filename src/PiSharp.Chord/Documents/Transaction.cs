@@ -115,6 +115,8 @@ internal sealed class Transaction : ITx, ILineHolder
     private int pending;
     // tx reads started so far: a callback that completed without yielding after starting one awaited none (Documents.TxAsync, rule 3).
     private int started;
+    // Set once Documents.TxAsync saw how the callback returned (Returned): the reads it started resume no sooner (TrackedYield).
+    private readonly TaskCompletionSource returned = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private TxState state = TxState.Open;
     // Failed by Cut while the commit waits in the store's queue: its caller is told at once (rule 3).
     private TaskCompletionSource? queued;
@@ -423,7 +425,7 @@ internal sealed class Transaction : ITx, ILineHolder
         {
             // As in Track: a load that settled already still counts until a later turn.
             var load = persisted.LoadAsync(key, context, Token);
-            if (load.IsCompleted) await Task.Yield();
+            await TrackedYield(load).ConfigureAwait(false);
             await load.ConfigureAwait(false);
             AssertOpen();
             return Begin(entry);
@@ -627,14 +629,28 @@ internal sealed class Transaction : ITx, ILineHolder
 
     /// <summary>
     /// Refuses a callback that completed without yielding after it started a tx read (rule 3). Each tracked read yields at least once (Track,
-    /// ColdDraftAsync), so the callback awaited none of them: they are pending as it settles, as a promise's are, however soon the thread pool
-    /// settles them. Without this, a read that settled at once could finish its yield on another thread before Commit counts it.
+    /// ColdDraftAsync), and not before this check (TrackedYield), so the callback awaited none of them: they are pending as it settles, as a
+    /// promise's are, however soon the thread pool settles them. Without this, a read that settled at once could finish its yield on another
+    /// thread before Commit counts it; without the wait, a callback that awaited its read could finish on another thread before this check.
     /// </summary>
     internal void AssertNoReadsStartedSince(int before)
     {
         lock (gate)
             if (started != before) throw new InvalidOperationException($"{documents.Label}: the callback settled before its pending tx operations");
     }
+
+    /// <summary>Documents.TxAsync saw how the callback returned: the reads it started may resume.</summary>
+    internal void Returned() => returned.TrySetResult();
+
+    /// <summary>
+    /// The yield of a tracked read (rule 3). One the callback started before it first returned resumes only once Documents.TxAsync saw how
+    /// it returned (<see cref="Returned"/>): a callback that awaits it is pending then, however soon the thread pool settles the read, as a
+    /// promise's continuation waits for the synchronous code that awaits it. A later read that settled already still yields once, as
+    /// awaiting a settled promise takes a turn.
+    /// </summary>
+    private Task TrackedYield(Task read) => !returned.Task.IsCompleted ? returned.Task : read.IsCompleted ? YieldOnce() : Task.CompletedTask;
+
+    private static async Task YieldOnce() => await Task.Yield();
 
     /// <summary>Counts <paramref name="read"/> as pending until it settles (rule 3); a read that settled already still counts until a later
     /// turn, as awaiting a settled promise takes one.</summary>
@@ -643,7 +659,7 @@ internal sealed class Transaction : ITx, ILineHolder
         lock (gate) { pending++; started++; }
         try
         {
-            if (read.IsCompleted) await Task.Yield();
+            await TrackedYield(read).ConfigureAwait(false);
             return await read.ConfigureAwait(false);
         }
         finally
