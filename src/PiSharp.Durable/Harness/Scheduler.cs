@@ -132,6 +132,11 @@
 //   thread after its ObserveCommits observers (upstream: promise continuations and the abort microtask queued behind the host dispatch).
 //   Reservation passes (Kick) and the reconcile pass (ScheduleReconcileLocked) start there too, so a commit a host observer makes is
 //   admitted before theirs, and still before the committer's continuation. Outside a publication AfterPublication runs its work at once.
+//   The reconcile pass a publication asks for enqueues its commit right there, as a line pass of Kick does (CommitInternalAsync without
+//   inline), so it is on the line before the publication returns, as upstream's microtask enqueues it before anything a later turn does.
+//   Queued on the thread pool, a busy pool brought it to the line while a later commit was stored, and it stored the parent's terminal
+//   record ahead of the commit that later commit's host observer made. One asked for outside a publication (under the lock) still starts
+//   on the thread pool. The scheduler's thread-pool work goes through Post, which tests can hand to Dispatch to stand in for a busy pool.
 //
 // Pi v1.5.0 sync (area scheduler-idle, 35dfa7573; durable 1.5.0 Changed#8): the per-commit work no longer grows with the conversations.
 // - A publication collects the conversations above each task that became live or ended (AddScopesAboveLocked, before the sweep; null when
@@ -453,9 +458,9 @@ internal sealed class DurableTaskScheduler
     internal long SetEntries => Interlocked.Read(ref iterations.Entries);
 
     /// <summary>Internal, for tests: starts the work the scheduler hands to the thread pool (<see cref="Post"/>: reservation drains, reconcile
-    /// passes, the wake job, the sweep job, blocked notifications) in place of the pool; null, the default, is the pool. A test holds what it
-    /// gets to stand in for a busy pool, whose workers start such work at any later time. Some sites call it under the lock, so it only takes
-    /// the work.</summary>
+    /// passes asked for outside a publication, the wake job, the sweep job, blocked notifications) in place of the pool; null, the default,
+    /// is the pool. A test holds what it gets to stand in for a busy pool, whose workers start such work at any later time. Some sites call
+    /// it under the lock, so it only takes the work.</summary>
     internal Action<Action>? Dispatch
     {
         get => Volatile.Read(ref dispatch);
@@ -1372,19 +1377,25 @@ internal sealed class DurableTaskScheduler
     {
         if (reconcileScheduled || closing || readOnly) return;
         reconcileScheduled = true;
-        // Queued after the host observers of a publication that asks for it (upstream: its microtask runs behind their dispatch), so a
-        // commit a host observer makes there lands before the pass's commit.
-        session.AfterPublication(() =>
-            Post(static scheduler => _ = scheduler.ReconcileAsync()));
+        // A publication that asks for it starts it right after its host observers, on the publishing thread, where it only enqueues its
+        // commit (upstream: its microtask runs behind their dispatch and enqueues the commit at once): a commit a host observer makes there
+        // lands first, and the pass is on the line before the publication returns, so before the committer's continuation, the waits it
+        // resolves and any later commit. Started on the thread pool instead, a busy pool could bring it to the line while a later commit was
+        // being stored: it then took that commit's request with it, waited at its gate ahead of the commits that commit's host observers
+        // make, and stored its own first (the busy-pool case of harness.tasks' publication-at-adoption block). Outside a publication this
+        // runs under the lock, so the pass starts on the thread pool.
+        if (session.InPublication) session.AfterPublication(() => _ = ReconcileAsync(inPublication: true));
+        else Post(static scheduler => _ = scheduler.ReconcileAsync(inPublication: false));
     }
 
     /// <summary>
     /// One commit that applies what committed records imply: abort marks below live owners with cancellation intent (spec §5.4),
     /// <c>failFast</c> marks (spec §5.5), withdrawn queued inputs below cancelled owners, and the final terminal record of every
     /// <c>completing</c> task whose ordinary owned work is gone. The durable records are the intent, so this also repairs whatever a crash
-    /// left unapplied. Resolves idle waiters that the loaded edges decide.
+    /// left unapplied. Resolves idle waiters that the loaded edges decide. Started in a publication (<paramref name="inPublication"/>), its
+    /// commit's job never starts inline there, and a commit refused at once fails the Session only after a yield.
     /// </summary>
-    private async Task ReconcileAsync()
+    private async Task ReconcileAsync(bool inPublication)
     {
         bool work;
         lock (gate)
@@ -1418,12 +1429,13 @@ internal sealed class DurableTaskScheduler
                 foreach (var id in withdrawn) await withdrawInputs(tx, id).ConfigureAwait(false);
                 await FinalizeAsync(tx).ConfigureAwait(false);
                 return true;
-            }, context).ConfigureAwait(false);
+            }, context, inline: !inPublication).ConfigureAwait(false);
         }
         catch (Exception error)
         {
             // No extension code runs in this commit: a throw is a storage failure, a host callback, or a bug. None is fixed by running the
-            // pass again, so it fails the Session, which reports it.
+            // pass again, so it fails the Session, which reports it; never from inside the publishing job (as ReservePassAsync).
+            if (inPublication) await Task.Yield();
             FailSession(error);
         }
         finally
