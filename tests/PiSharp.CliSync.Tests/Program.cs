@@ -15,10 +15,11 @@ using PiSharp.Tui.Input;
 using PiSharp.Tui.Rendering;
 
 // Authored expectations for the Pi v1.1.0 sync rows cli.*, prompt.hidden-tools and tui.* (work packages 2c, 2d, 2h).
-// Expected text is written from the upstream v1.1.0 sources; no upstream execution or genuine source capture credit.
+// Expected text is written from the upstream v1.1.0 sources and kept current by reading through Pi v1.5.0 (decision 0013, the report's
+// sourceSha); no upstream execution or genuine source capture credit.
 internal static partial class Program
 {
-    private const string Upstream = "06a466935536f8c9bcacb2d5efc0fc021be1bdff";
+    private const string Upstream = "f9a26365568127461c47a07a37dcb42c140a3ac5";
 
     private static async Task<int> Main(string[] args)
     {

@@ -7,14 +7,14 @@ using System.Text.Json.Nodes;
 using PiSharp.AI;
 using PiSharp.Contracts;
 
-// IMPL-A1 provider APIs and authentication. Authored expectations written from the Pi v1.2.0
-// (06a466935536f8c9bcacb2d5efc0fc021be1bdff) sources packages/ai/src/api/bedrock-converse-stream.ts, api/openai-codex-responses.ts,
+// IMPL-A1 provider APIs and authentication. Authored expectations written from the Pi v1.2.0 sources and synced to Pi v1.5.0
+// (decision 0013, the report's sourceSha): packages/ai/src/api/bedrock-converse-stream.ts, api/openai-codex-responses.ts,
 // api/github-copilot-headers.ts, api/cloudflare.ts, providers/*.ts and auth/**, plus AWS's published Signature Version 4 test
 // suite vectors (awslabs/aws-c-auth tests/aws-signing-test-suite/v4) and the documented signing-key derivation example. Nothing
 // here executes upstream code or is an upstream capture; every HTTP peer is an in-process fake and no browser is opened.
 internal static partial class Program
 {
-    private const string SourceSha = "06a466935536f8c9bcacb2d5efc0fc021be1bdff";
+    private const string SourceSha = "f9a26365568127461c47a07a37dcb42c140a3ac5";
     private static int bodyComparisons;
 
     private static async Task<int> Main(string[] args)

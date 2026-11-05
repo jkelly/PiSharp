@@ -4620,7 +4620,7 @@
         "2755927d",
         "db3c749b"
       ],
-      "notes": "Scheduler.cs ports v1.2.0's scheduler as a whole (decision 0005 'Scheduler'), per-commit walk included; this area is the last to change scheduler.ts (area group-commit-scheduler owns it), so once it lands Scheduler.cs matches the v1.5.0 blob and it re-pins the citation. Helps the device host, which serves many sessions (decision 0008); record the benchmark in docs/durable-benchmarks.md (SchedulerScaleBench.cs)."
+      "notes": "Scheduler.cs ports v1.2.0's scheduler as a whole (decision 0005 'Scheduler'), per-commit walk included; this area is the last to change scheduler.ts (area group-commit-scheduler owns it), so once it lands Scheduler.cs matches the v1.5.0 blob and it re-pins the citation. Helps the device host, which serves many sessions (decision 0008); record the benchmark in docs/durable-benchmarks.md (SchedulerScaleBench.cs). Re-pinned: 39c8829d moved the citations of Harness/Scheduler.cs and Harness/Harness.cs to f9a26365 under the citation rule, and closeout confirmed both, so compatibility/sync-1.5.0-worklist.json (regenerated in phase 8) no longer lists either as pending."
     },
     {
       "id": "cv2-contracts",

@@ -2,8 +2,8 @@
   <!-- Decision 0013 (Pi 1.5.0 sync, phase 4): a port of Chord v2, Pi's experimental @earendil-works/chord/next (packages/chord/src/next).
        Phase 4 ports the layers pi-durable needs (contracts, data, state, the store, documents and registries); phase 6 the rest. It
        references PiSharp.Contracts (pi-schema is PiSharp.Contracts.Schema) and no PiSharp.Durable project: the code joining Chord v2 with
-       Durable goes in PiSharp.Durable.Store. Experimental: the assembly is [Experimental("PISHARP_CHORD001")]. Not packable in phase 4;
-       whether it ships as a package is settled at release. -->
+       Durable goes in PiSharp.Durable.Store. Experimental: the assembly is [Experimental("PISHARP_CHORD001")]. Not packed in 1.5.0:
+       it reads PiSharp.Contracts' pi-schema internals, which need a public experimental API first, and the rest of Chord is phase 6. -->
   <PropertyGroup>
     <IsPackable>false</IsPackable>
     <!-- Chord's context carries a pi-telemetry span (PiSharp.Telemetry, [Experimental("PISHARP_TELEMETRY001")]), as upstream's does. -->

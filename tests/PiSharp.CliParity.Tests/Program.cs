@@ -9,10 +9,10 @@ using PiSharp.Cli.Pi;
 // core/trust-manager.ts, core/project-trust.ts, cli/file-processor.ts, cli/initial-message.ts, cli/auth-command.ts and migrations.ts.
 // Parsing cases are ported from test/args.test.ts, test/initial-message.test.ts and test/trust-manager.test.ts; other expectations are
 // written from the pinned sources by reading, never captured from an upstream run. Providers are fake HTTP endpoints in process;
-// no network, no real credentials, no real home or agent directory.
+// no network, no real credentials, no real home or agent directory. Synced to Pi v1.5.0 under decision 0013: the report's sourceSha names v1.5.0, and the expectations stay authored from reading the pinned sources, never captured.
 internal static partial class Program
 {
-    private const string Upstream = "06a466935536f8c9bcacb2d5efc0fc021be1bdff";
+    private const string Upstream = "f9a26365568127461c47a07a37dcb42c140a3ac5";
 
     private static async Task<int> Main(string[] args)
     {

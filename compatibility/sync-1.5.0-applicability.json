@@ -56,8 +56,8 @@
     "changelogBullets": 477,
     "repeatedBullets": 23,
     "byStatus": {
-      "ported": 232,
-      "ported-with-deferral": 20,
+      "ported": 233,
+      "ported-with-deferral": 19,
       "already-ported": 12,
       "no-op": 25,
       "port": 37
@@ -7553,7 +7553,7 @@
       "id": "telemetry.ai-request-tracing",
       "area": "telemetry",
       "phase": 3,
-      "status": "ported-with-deferral",
+      "status": "ported",
       "changelog": [
         "ai@1.4.0/Added#4",
         "ai@1.4.0/Added#5"
@@ -7572,11 +7572,13 @@
         "src/PiSharp.AI/Streaming/ChatRun.cs"
       ],
       "release": "1.5.0",
-      "notes": "Needs telemetry.adapter-contract, telemetry.metrics and telemetry.request-option-span. PiSharp's chat requests have no Models wrapper: pick the layer that sees every request and its normalized events (the transport registry or the stream run). Upstream's coding agent passes no telemetry span, so tracing stays opt-in for SDK hosts. Pending and deferred polls are excluded from token and cost metrics. Secrets never reach span attributes (standing rule); upstream records no content.",
+      "notes": "Needs telemetry.adapter-contract, telemetry.metrics and telemetry.request-option-span. PiSharp's chat requests have no Models wrapper: pick the layer that sees every request and its normalized events (the transport registry or the stream run). Upstream's coding agent passes no telemetry span, so tracing stays opt-in for SDK hosts. Pending and deferred polls are excluded from token and cost metrics. Secrets never reach span attributes (standing rule); upstream records no content. The close-out closed the deferral: phase 4 (durable.telemetry, deaaf7dc) records pi.ai.poll around NativeDurableModels' deferred polls (StreamDeferred, FetchDeferredAsync) when the request carries a span.",
       "evidence": {
         "commits": [
           "62d68506",
-          "ae16d659"
+          "ae16d659",
+          "deaaf7dc",
+          "27a292eb"
         ],
         "tests": [
           "tests/PiSharp.Telemetry.Tests/AiCases.cs: telemetry.ai.request-observes-a-chat-run-without-changing-events-or-results",
@@ -7593,10 +7595,10 @@
           "tests/PiSharp.Telemetry.Tests/AiCases.cs: telemetry.ai.records-poll-usage-only-when-final",
           "tests/PiSharp.Telemetry.Tests/AiCases.cs: telemetry.ai.creates-instruments-once-per-metrics-object",
           "tests/PiSharp.Telemetry.Tests/AiCases.cs: telemetry.ai.a-failing-adapter-never-changes-the-chat",
-          "tests/PiSharp.Telemetry.Tests/AiCases.cs: telemetry.ai.defaults-to-no-telemetry"
+          "tests/PiSharp.Telemetry.Tests/AiCases.cs: telemetry.ai.defaults-to-no-telemetry",
+          "tests/PiSharp.Durable.Tests/ModelsCases.cs: models.telemetry.records-one-pi-ai-request-span-per-request-and-one-pi-ai-poll-span-per-deferred-poll"
         ]
-      },
-      "deferred": "pi.ai.poll is implemented (AiTelemetry.ObserveModelRequest with poll: true, tested directly) but nothing calls it yet: PiSharp.AI has no streamDeferred/fetchDeferred, and PiSharp's deferred-response polls live in PiSharp.Durable (NativeDurableModels.StreamDeferred/FetchDeferredAsync), whose API takes no span. Wire the poll span there when the durable deferred path gains a telemetry option."
+      }
     },
     {
       "id": "telemetry.adapter-contract",

@@ -425,7 +425,7 @@ if (SessionCompactionTokenEstimator.ShouldCompact(estimate.Tokens, contextWindow
 {
     var request = SessionSummaryRequestBuilder.History(plan, model, sessionId);
     Console.WriteLine($"summarize {plan.MessagesToSummarize.Length} messages, keep from {plan.FirstKeptEntryId}");
-    Console.WriteLine($"{request.SystemPrompt.Length + request.Prompt.Length} characters, up to {request.MaximumOutputTokens} tokens");
+    Console.WriteLine($"{request.SystemPrompt.Length + request.Prompt.Length} characters, output cap: {request.MaximumOutputTokens?.ToString() ?? "the model's limit"}");
 }
 ```
 

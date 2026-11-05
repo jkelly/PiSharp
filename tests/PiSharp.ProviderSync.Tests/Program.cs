@@ -18,7 +18,8 @@ using PiSharp.CodingAgent;
 using PiSharp.CodingAgent.Configuration;
 using PiSharp.Contracts;
 
-// Authored expectations derived by reading Pi v1.2.0 (06a466935536f8c9bcacb2d5efc0fc021be1bdff) source text:
+// Authored expectations derived by reading Pi v1.2.0 source text, synced to Pi v1.5.0 under decision 0013 (the report's sourceSha;
+// v1.5.0 replaced utils/pi-user-agent.ts with utils/identity.ts and the shards are pi-ai@1.5.0's):
 // api/anthropic-messages.ts, api/constrained-sampling.ts, api/simple-options.ts, api/openai-completions.ts,
 // api/openai-responses.ts, api/azure-openai-responses.ts, providers/azure.ts, env-api-keys.ts, utils/retry.ts,
 // utils/provider-retry.ts, utils/overflow.ts, api/mistral-conversations.ts, utils/estimate.ts, utils/pi-user-agent.ts,
@@ -26,7 +27,7 @@ using PiSharp.Contracts;
 // no network, provider or credential is used.
 internal static partial class Program
 {
-    private const string SourceSha = "06a466935536f8c9bcacb2d5efc0fc021be1bdff";
+    private const string SourceSha = "f9a26365568127461c47a07a37dcb42c140a3ac5";
     private const string Key = "inert-provider-sync-key";
     private static readonly TimeSpan Deadline = TimeSpan.FromSeconds(10);
     private static int bodyComparisons;

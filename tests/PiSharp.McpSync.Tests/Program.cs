@@ -11,7 +11,8 @@ using PiSharp.Extensions.Mcp.Transport;
 using PiSharp.Extensions.Runtime.Mcp.Authentication;
 
 // Authored offline expectations for the Pi v1.1.0 MCP sync (names, exposure/prompt, OAuth), updated to Pi v1.2.0 (the iss check
-// without metadata, namespace aliases, no dispatch after a request settles). They are derived from the
+// without metadata, namespace aliases, no dispatch after a request settles) and synced to Pi v1.5.0 under decision 0013 (`mcp login
+// -l`, oauth.clientRegistration auto under the owner's safe default; the report's sourceSha). They are derived from the
 // pinned upstream source and its tests by reading, never captured from an upstream run. Fake authorization and token
 // servers answer in process; credential stores are in memory; no network or live credentials are used.
 internal static partial class Program
@@ -53,7 +54,7 @@ internal static partial class Program
             try { await test.Run().WaitAsync(TimeSpan.FromSeconds(60)); results.Add(new { test.Id, status = "PASS_AUTHORED_NATIVE_ONLY" }); }
             catch (Exception error) { failures++; results.Add(new { test.Id, status = "FAIL", failure = error.ToString() }); }
         }
-        var report = new { sourceSha = "06a466935536f8c9bcacb2d5efc0fc021be1bdff", status = "AUTHORED NATIVE; SOURCE QUALIFICATION OPEN",
+        var report = new { sourceSha = "f9a26365568127461c47a07a37dcb42c140a3ac5", status = "AUTHORED NATIVE; SOURCE QUALIFICATION OPEN",
             cases = cases.Count, failures, fakeHttpRequests = requests, genuineSourceCasesCaptured = 0, results };
         var json = JsonSerializer.Serialize(report, new JsonSerializerOptions { WriteIndented = args.Length == 2 });
         if (args.Length == 2)

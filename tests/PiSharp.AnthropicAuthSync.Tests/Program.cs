@@ -12,8 +12,9 @@ using PiSharp.AI.Providers;
 using PiSharp.Contracts;
 using R = PiSharp.AI.Authentication.InjectedAuthenticationResolver;
 
-// Authored offline expectations for the Pi v1.1.0 Anthropic auth sync (work package 2i), re-verified against Pi v1.2.0. These are not
-// upstream captures: fake token endpoints, synthetic identity tokens and loopback-only callback requests.
+// Authored offline expectations for the Pi v1.1.0 Anthropic auth sync (work package 2i), re-verified against Pi v1.2.0 and synced to
+// Pi v1.5.0 under decision 0013 (the report's sourceSha). These are not upstream captures: fake token endpoints, synthetic identity
+// tokens and loopback-only callback requests.
 internal static class Program
 {
     private const string ClientId = "9d1c250a-e61b-44d9-88ed-5944d1962f5e";
@@ -65,7 +66,7 @@ internal static class Program
             try { await test.Run().WaitAsync(TimeSpan.FromSeconds(30)); results.Add(new { test.Id, status = "PASS_AUTHORED_NATIVE_ONLY" }); }
             catch (Exception error) { failures++; results.Add(new { test.Id, status = "FAIL", failure = error.ToString() }); }
         }
-        var report = new { sourceSha = "06a466935536f8c9bcacb2d5efc0fc021be1bdff", status = "AUTHORED NATIVE; SOURCE QUALIFICATION OPEN",
+        var report = new { sourceSha = "f9a26365568127461c47a07a37dcb42c140a3ac5", status = "AUTHORED NATIVE; SOURCE QUALIFICATION OPEN",
             tests = cases.Length, failures, bodyComparisons, genuineSourceCasesCaptured = 0, results };
         if (args.Length == 2)
         {

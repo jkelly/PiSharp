@@ -47,11 +47,12 @@ dotnet tool install -g PiSharp.Cli
 
 ## Packages
 
-These are the 23 packages of the 1.2.0.2 release. The [SDK page](/sdk/) lists the same set.
+These are the 23 packages of the 1.2.0.2 release, and `PiSharp.Telemetry`, which is new in the Pi 1.5.0 sync and not released yet. The [SDK page](/sdk/) lists the same set.
 
 | Package | Group | Purpose | Docs |
 | --- | --- | --- | --- |
 | `PiSharp.Contracts` | Core | Messages, stream events, transcript entries and the JSON types every other package shares. | [Chat and providers](/docs/embed/chat/#messages-and-stream-events) |
+| `PiSharp.Telemetry` | Core, experimental | A port of Pi's telemetry contract: spans, links, metrics, propagation and typed schemas, with no-op and in-memory adapters and no exporter. | [Telemetry](/docs/embed/telemetry/) |
 | `PiSharp.AI` | Core | Streaming transports for every Pi chat API, the model catalog reader, provider auth and logins, and the classifier and image APIs. Also the media library and service tiers (experimental). | [Chat and providers](/docs/embed/chat/), [Classifiers and images](/docs/embed/model-operations/) |
 | `PiSharp.Agent` | Core | The agent loop: turns, tool invocation and batching, hooks, steering and follow-up queues. | [Agent loop](/docs/embed/agent/) |
 | `PiSharp.Tools` | Core | Pi's built-in file and process tools, with output truncation and a shared write queue. | [Built-in tools](/docs/embed/coding-agent/#built-in-tools) |
@@ -77,12 +78,13 @@ These are the 23 packages of the 1.2.0.2 release. The [SDK page](/sdk/) lists th
 
 ## How the layers fit
 
-Each package references only the layers below it. `PiSharp.Contracts` is at the bottom and references nothing. `PiSharp.Tui` stands alone and references no other PiSharp package.
+Each package references only the layers below it. `PiSharp.Contracts` and `PiSharp.Telemetry` are at the bottom and reference nothing. `PiSharp.Tui` stands alone and references no other PiSharp package.
 
 | Package | Builds on | Third-party dependencies |
 | --- | --- | --- |
 | `PiSharp.Contracts` | nothing | none |
-| `PiSharp.AI` | Contracts | none |
+| `PiSharp.Telemetry` | nothing | none |
+| `PiSharp.AI` | Contracts, Telemetry | none |
 | `PiSharp.Agent` | Contracts, AI | none |
 | `PiSharp.Tools` | Contracts, Agent | none |
 | `PiSharp.Tools.Skia` | Tools | SkiaSharp 4.152.1 and its native assets |
@@ -133,6 +135,14 @@ Some APIs carry `[Experimental("<ID>")]`. The compiler reports an error when you
 | `PISHARP_CATALOG001` | `MaintainedCatalogOverlay` and `MaintainedCatalogResult` in `PiSharp.AI`, which apply PiSharp's maintained model catalog layer. | Released as experimental in 1.2.0.2. |
 | `PISHARP_EXTUI001` | Extension UI additions from the Pi 1.5.0 sync: `IExtensionKeybindingHints` and `ExtensionToolRenderContext.Keybindings`, `ExtensionCustomComponentBlocked`, `ExtensionCustomComponentOverlay` and `ExtensionCustomComponentCallbacks.Blocked`, `.Overlay` and `.CapturesViewportInput` in `PiSharp.Extensions.Abstractions`, and `KeyText` and `KeyHint` on the HTML export's `ToolRenderContext` and `ToolHtmlRendererDependencies` in `PiSharp.CodingAgent`. | Added in the Pi 1.5.0 sync, experimental. Not released yet. |
 | `PISHARP_IDENTITY001` | Client identity from the Pi 1.5.0 sync: `ClientIdentity`, `ClientUserAgent`, `ClientAttribution` and `ClientIdentities` in `PiSharp.AI`, the `Identity` of `ChatRequest`, the protocol options and `AgentConfiguration`, and `AgentConfiguration.DefaultIdentity`, which turns attribution off. Coding agent sessions send the detailed user agent and no attribution. PiSharp defines no attribution of its own. | Added in the Pi 1.5.0 sync, experimental. Not released yet. |
+| `PISHARP_AI001` | Streaming tool-call arguments from the Pi 1.5.0 sync, in `PiSharp.AI`: `StreamingJsonParser` with `JsonChange`, `JsonSetChange`, `JsonAppendChange` and `JsonPathSegment`, `ToolCallArgumentsStream`, `ToolCallArgumentsResult`, `StreamingJson.ParseToolCallArguments`, and `GetToolArgumentsPreview` and `FinishToolArguments` on `AssistantStreamReducer`. | Added in the Pi 1.5.0 sync, experimental. Not released yet. |
+| `PISHARP_AUTH001` | `AuthEvent.OpenBrowserOnConfirm` and `AuthEvent.CopyCodeOnConfirm`, a device-code sign-in's hints, in `PiSharp.AI`. | Added in the Pi 1.5.0 sync, experimental. Not released yet. |
+| `PISHARP_CODEMODE001` | Worker admission in `PiSharp.Codemode`: `CodemodeSandboxOptions.AcquireWorker` and `.OnWorkerStarted`. | Added in the Pi 1.5.0 sync, experimental. Not released yet. |
+| `PISHARP_EXEC001` | Output limits of `pi.exec()` and process runs: `MaxBuffer` and `Truncated` in `PiSharp.Extensions.Abstractions`, and `CaptureLimitBytes` and the combined capture limit in `PiSharp.Tools`. | Added in the Pi 1.5.0 sync, experimental. Not released yet. |
+| `PISHARP_SCHEMA001` | The port of pi-schema in `PiSharp.Contracts` (namespace `PiSharp.Contracts.Schema`): `JsonSchemaValidator`, `CoercingJsonSchemaValidator`, `JsonSchemaCompileOptions`, `JsonSchemaFormats` and their results and errors. | Added in the Pi 1.5.0 sync, experimental. Not released yet. |
+| `PISHARP_TELEMETRY001` | Every public type in `PiSharp.Telemetry`, and the telemetry members of `PiSharp.AI`. See [Telemetry](/docs/embed/telemetry/). | Added in the Pi 1.5.0 sync, experimental. Not released yet. |
+| `PISHARP_TOOLSEARCH001` | `ToolSearchDocument.NamespaceText` in `PiSharp.Extensions.Abstractions`, which ranks a tool's namespace text. | Added in the Pi 1.5.0 sync, experimental. Not released yet. |
+| `PISHARP_TUI001` | TUI additions in `PiSharp.Tui`: `KeybindingsManager.GetSelectPageIndex`, `Terminal.RestoreOnExit`, `TextUtils.ReplaceControlCharacters` and `IComponent.CapturesViewportInput`. | Added in the Pi 1.5.0 sync, experimental. Not released yet. |
 
 Suppress the IDs you use in your project file:
 

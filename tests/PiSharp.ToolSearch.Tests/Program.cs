@@ -5,10 +5,11 @@ using System.Text.Json;
 // (packages/coding-agent/src/extensions/tool-search, extensions/mcp/index.ts and core/agent-session.ts). They are derived
 // from the pinned upstream source and its tests (test/tool-search.test.ts) by reading, never captured from an upstream run.
 // Fake MCP servers and a fake Anthropic endpoint answer in process; no network or live credentials are used. Updated to Pi v1.2.0
-// (06a46693): tool_search declares reachesTools ("all") instead of being recognized by its schema object.
+// (06a46693): tool_search declares reachesTools ("all") instead of being recognized by its schema object. Synced to Pi v1.5.0 under
+// decision 0013 (name-weighted ranking and non-ASCII words; the report's sourceSha), still by reading.
 internal static partial class Program
 {
-    private const string Upstream = "06a466935536f8c9bcacb2d5efc0fc021be1bdff";
+    private const string Upstream = "f9a26365568127461c47a07a37dcb42c140a3ac5";
 
     private static async Task<int> Main(string[] args)
     {

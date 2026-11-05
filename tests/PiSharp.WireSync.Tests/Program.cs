@@ -1,7 +1,7 @@
 using System.Text.Json;
 
-// Authored native expectations for the Pi v1.1.0 sync rows wire.*, ext.* and tools.*.
-// No upstream execution or genuine source capture credit.
+// Authored native expectations for the Pi v1.1.0 sync rows wire.*, ext.* and tools.*, synced to Pi v1.5.0 under decision 0013 (the
+// report's sourceSha). No upstream execution or genuine source capture credit.
 internal static class Program
 {
     private static async Task<int> Main(string[] args)
@@ -15,7 +15,7 @@ internal static class Program
             try { await run().WaitAsync(TimeSpan.FromSeconds(60)); results.Add(new { id, status = "PASS_AUTHORED_NATIVE_ONLY" }); }
             catch (Exception error) { failures++; results.Add(new { id, status = "FAIL", failure = error.ToString() }); }
         }
-        var report = new { sourceSha = "06a466935536f8c9bcacb2d5efc0fc021be1bdff", status = "AUTHORED NATIVE; SOURCE QUALIFICATION OPEN",
+        var report = new { sourceSha = "f9a26365568127461c47a07a37dcb42c140a3ac5", status = "AUTHORED NATIVE; SOURCE QUALIFICATION OPEN",
             failures, genuineSourceCasesCaptured = 0, results };
         if (args.Length == 2)
         {
