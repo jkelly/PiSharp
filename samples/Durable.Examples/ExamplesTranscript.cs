@@ -1,5 +1,5 @@
-// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/test/examples/31-transcript.ts (added in f3255de76). Here it is
-// 32-transcript: PiSharp's examples keep their Pi v1.2.0 numbers, and 31 is 31-reload-and-restart. Upstream waits one setTimeout(0) for
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/test/examples/31-transcript.ts (added in f3255de76;
+// 32-transcript until the closeout gave the examples v1.5.0's names). Upstream waits one setTimeout(0) for
 // the watch to deliver the 15 live appends; here the example waits until the transcript holds the newest entry it committed, which is the
 // same point without a timer. It prints what upstream's console.log prints. On a file backend the storage is reopened in a plain Session
 // and the stored entries are counted (PiSharp-only, as every example's read-back).
@@ -10,7 +10,7 @@ namespace PiSharp.Durable.Examples;
 
 public static partial class Examples
 {
-    // 32: a client's transcript over the windowed conversation view. ConversationTranscript merges every value of a watch into the client's
+    // 31: a client's transcript over the windowed conversation view. ConversationTranscript merges every value of a watch into the client's
     // whole transcript, marks entries a stall skipped as a gap, and loads them, and earlier pages, on demand. A client that drops resumes
     // after the newest entry it has.
     private static async Task TranscriptExampleAsync(Func<Task<IStorage>> open, TextWriter output)

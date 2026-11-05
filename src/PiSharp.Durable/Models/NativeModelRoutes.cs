@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/ai/src/models.ts (createProvider: one API implementation streams every
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/ai/src/models.ts (createProvider: one API implementation streams every
 // catalog model of that API at the model's own baseUrl), packages/ai/src/api/simple-options.ts (buildBaseOptions: maxTokens defaults to
 // model.maxTokens; adjustMaxTokensForThinking) and packages/ai/src/api/anthropic-messages.ts (streamSimple budget thinking, buildParams
 // compat.supportsMidConvoEffort and thinkingLevelMap.off, metadata.user_id). The per-API bindings mirror PiSharp.Cli's catalog routes

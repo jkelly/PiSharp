@@ -11,7 +11,8 @@
 // it saw, as v1.5.0's 22-subagent-background.ts does, where v1.2.0 printed the message_end events of watchEvents (removed). Area
 // tools-schema: the subagent tool's parameters are pi-schema's obj({ action: oneOf([...]), ... }) as JSON Schema; area checkpoint-when:
 // app.subagents states checkpointWhen. Area vocabulary (5f312dac4): follow()'s listener takes the tagged call and skips one that is not
-// a value. The example keeps its v1.2.0 name, 23-subagent-background, as the other renumbered examples do (b9fb2b854).
+// a value. Since the closeout it carries v1.5.0's name
+// (b9fb2b854).
 using System.Collections.Immutable;
 using System.Text.RegularExpressions;
 using PiSharp.Durable.Chord;
@@ -218,7 +219,7 @@ public static partial class Examples
         return string.Join("\n", Enumerable.Range(1, 135).Select(index => $"Chapter {index}: more whaling."));
     }
 
-    // 23: persistent background subagents. One subagent tool lets the main agent start named subagents, message them (steer or follow up),
+    // 22: persistent background subagents. One subagent tool lets the main agent start named subagents, message them (steer or follow up),
     // stop them mid-answer, and list them. Subagents keep working while the main agent answers the user, and each answer is delivered back
     // to the main agent as a new message once it arrives. Everything survives a restart: the example closes the Harness while a subagent
     // works and reopens it.

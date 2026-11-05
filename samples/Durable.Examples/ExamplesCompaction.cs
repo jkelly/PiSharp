@@ -20,7 +20,7 @@ namespace PiSharp.Durable.Examples;
 
 public static partial class Examples
 {
-    // 25: a long trip-planning chat whose older messages are summarized so the model context stays small.
+    // 24: a long trip-planning chat whose older messages are summarized so the model context stays small.
     private static async Task CompactionAsync(Func<Task<IStorage>> open, TextWriter output)
     {
         // A fake model with a tiny 3000-token window. It answers chat messages, writes summaries when asked to summarize, and once rejects a

@@ -1,6 +1,5 @@
 // Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/test/examples/34-submit-in-commit.ts (added in cc9c52310), ported in
-// the Pi v1.5.0 sync (area admission). Here it is 35-submit-in-commit: PiSharp's examples keep their Pi v1.2.0 numbers, so v1.5.0's
-// examples from 04 on are one higher (31-transcript is 32-transcript). ScriptedModels stands in for the faux provider, and the build tool's
+// the Pi v1.5.0 sync (area admission; 35-submit-in-commit until the closeout gave the examples v1.5.0's names). ScriptedModels stands in for the faux provider, and the build tool's
 // obj({}) is ToolRegistration's default empty parameters. It prints what upstream's console.log prints, with JSON in place of
 // util.inspect; the submission ID is the one this port mints. The second message waits until the build tool runs (PiSharp-only): the run
 // works on other threads here, so without it the ID would depend on how far the run got. On a file backend the storage is reopened in a
@@ -15,7 +14,7 @@ public static partial class Examples
     private static readonly ConversationDocToken Visitors = Documents.DefineConversationDoc("app.visitors", 1, DocumentFork.Initial,
         () => (JsonObjectValue)JsonValue.Parse("""{"muted":[],"sent":[]}"""), checkpointWhen: (_, _, _) => false);
 
-    // 35: a host lets people message an agent while it works. A message must join the current run as a steer and never start a run of its
+    // 34: a host lets people message an agent while it works. A message must join the current run as a steer and never start a run of its
     // own. SubmitAsync(tx, draft) admits it inside the host's own commit, together with the host's check and its own state; WhenIdle.Reject
     // refuses it when no run is working.
     private static async Task SubmitInCommitAsync(Func<Task<IStorage>> open, TextWriter output)

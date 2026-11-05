@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/ai/src/models.ts (the Models interface) and packages/ai/src/types.ts (Model,
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/ai/src/models.ts (the Models interface) and packages/ai/src/types.ts (Model,
 // SimpleStreamOptions, DeferredHandle), reduced to what packages/durable uses: getModel, streamSimple, completeSimple, streamDeferred,
 // fetchDeferred and cancelDeferred. Catalog refresh, auth and login, images and classifiers stay with the host.
 //
@@ -6,10 +6,10 @@
 // the transcript (pi-ai wire messages; system prompt and tools ride as positional system messages, so no other context field is
 // needed); stream events and the final message are PiSharp.Contracts types (PiWireJson converts both ways). P8 adds the production
 // adapter over PiSharp.AI transports; until then hosts and tests supply their own implementation.
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/ai/src/providers/model-schema.ts (ModelInputLimits, ModelImageInputLimits,
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/ai/src/providers/model-schema.ts (ModelInputLimits, ModelImageInputLimits,
 // ModelImageResizeOptions) and types.ts (Model.inputLimits), which pi-durable 1.2.0's read tool consults for its image limits (work list
 // area e).
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/ai/src/models.ts (getModelsOfType, getAvailableOfType, getModelOfType, classify,
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/ai/src/models.ts (getModelsOfType, getAvailableOfType, getModelOfType, classify,
 // generateImages) and packages/ai/src/utils/model-operations.ts (classifierErrorResult, imageErrorResult), which pi-durable 1.2.0's code mode
 // calls for scripts' models.* (work list area d). Models of every type are pi-ai model JSON (AnyModel); classifier and image contexts and
 // results are pi-ai wire JSON (ClassifierContext, ClassifierResult, ImagesContext, AssistantImages). The members have defaults, so a host

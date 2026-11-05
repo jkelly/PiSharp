@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/test/harness-structured.test.ts, describe "tool rounds": the three
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/test/harness-structured.test.ts, describe "tool rounds": the three
 // tests the tool task (P9) unblocks, "owns its tool tasks, waits for them, and hands the run to a conversation-owned generation", "aborts a
 // parallel round with its generation: tools first, then the generation, with every result written" and "answers the unstarted calls of an
 // aborted sequential round with aborted results, in call order", and the one generation alone (P8) unblocked, "keeps run control with a
@@ -15,6 +15,7 @@
 // Pi v1.5.0 sync (area run-failure, f3255de76): the aborted and the faulted run leave f3255de76's pi.live.runFailure where v1.2.0 expected
 // an empty pi.live. The faulted run's detail is Chord's "Value contains a non-finite number and is not strict JSON", where upstream's is
 // "Value contains a non-JSON function; expected strict JSON" (the invalid final message above).
+// Pi v1.5.0 sync (closeout): the tools upstream declares with pi-schema's obj({}) declare ToolsSchema150.EmptyObject (area tools-schema).
 using PiSharp.Durable;
 using PiSharp.Durable.Chord;
 using static ChatTests;
@@ -36,6 +37,7 @@ internal static partial class StructuredTests
         {
             Name = name,
             Description = $"The {name} tool",
+            Parameters = ToolsSchema150.EmptyObject,
             ExecutionMode = ToolExecutionMode.Sequential,
             Execute = async (_, api, callContext) =>
             {
@@ -69,6 +71,7 @@ internal static partial class StructuredTests
             {
                 Name = "noop",
                 Description = "Does nothing",
+                Parameters = ToolsSchema150.EmptyObject,
                 Execute = (_, _, _) => Task.FromResult(new ToolExecutionResult { Output = JsonArrayValue.Empty }),
             }));
             setup.Faux.SetResponses(ToolCalls(("noop", "c1"), ("noop", "c2")), FauxAssistantMessage("done"));

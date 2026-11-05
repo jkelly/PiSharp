@@ -9,8 +9,8 @@
 // the text and tool calls of the pi.assistant entries appended since the newest it saw, and attaches to the child a running subagent call
 // names in its pi.live slot's details, where v1.2.0 printed watchEvents' message_end and tool_execution_start events (removed). Area
 // tools-schema: the subagent tool's parameters are pi-schema's obj({ task: str({ description }) }) as JSON Schema. Area vocabulary
-// (5f312dac4): each view listener takes the tagged call and skips one that is not a value. The example keeps its v1.2.0 name,
-// 22-subagent-foreground, as the other renumbered examples do (b9fb2b854).
+// (5f312dac4): each view listener takes the tagged call and skips one that is not a value. Since the closeout the example carries
+// v1.5.0's name (b9fb2b854).
 using PiSharp.Durable.Chord;
 
 namespace PiSharp.Durable.Examples;
@@ -84,7 +84,7 @@ public static partial class Examples
         return subagent;
     }
 
-    // 22: a foreground subagent tool, with the UI attaching to the child through the call's running details (v1.5.0's 21).
+    // 21: a foreground subagent tool, with the UI attaching to the child through the call's running details.
     private static async Task SubagentForegroundAsync(Func<Task<IStorage>> open, TextWriter output)
     {
         // ─── Host setup ─────────────────────────────────────────────────────────────

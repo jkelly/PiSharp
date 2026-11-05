@@ -7,7 +7,7 @@
 // Pi v1.5.0 sync (area sleep): a payment waits for the bank's confirmation in a durable sleep, charge then confirm, as f75b3240a's
 // 24-child-tasks.ts (v1.5.0's 23-child-tasks.ts) has it, so the tree prints the charged payments as sleeping; the example prints the tree
 // once every charged payment is asleep (upstream waits 20 ms). Area watches (92ab53602): the tree is read from a task graph watch, which
-// is then stopped. The example keeps its v1.2.0 name, 24-child-tasks, as the other renumbered examples do (b9fb2b854).
+// is then stopped. Since the closeout it carries v1.5.0's name (b9fb2b854).
 using PiSharp.Durable.Chord;
 using PiSharp.Durable.Sqlite;
 using PiSharp.Durable.Storage;
@@ -16,7 +16,7 @@ namespace PiSharp.Durable.Examples;
 
 public static partial class Examples
 {
-    // 24: a task that owns child tasks: a checkout charges four payments at once and waits for them. The task graph view prints the
+    // 23: a task that owns child tasks: a checkout charges four payments at once and waits for them. The task graph view prints the
     // checkout's tree while its payments run.
     private static async Task ChildTasksAsync(Func<Task<IStorage>> open, TextWriter output)
     {

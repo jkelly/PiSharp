@@ -1,6 +1,6 @@
 // Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/ai/src/providers/faux.ts, its paced streaming (fauxProvider({ tokensPerSecond,
-// tokenSize })) and usage estimate (withUsageEstimate, with the prompt cache per session), reduced to what 19-json, 21-late-join and
-// 23-subagent-background use: each text or tool-call argument string is split into chunks of 4 x token size characters, and each chunk waits
+// tokenSize })) and usage estimate (withUsageEstimate, with the prompt cache per session), reduced to what 18-json, 20-late-join and
+// 22-subagent-background use: each text or tool-call argument string is split into chunks of 4 x token size characters, and each chunk waits
 // ceil(length / 4) / tokensPerSecond seconds before it streams. The waits are on an ExampleClock instead of setTimeout, and the token size is
 // fixed (upstream draws it at random between min and max). A reply is the next scripted one, or one a route picks from the request's
 // messages (upstream's FauxResponseStep function). As upstream, every partial carries the final usage estimate.

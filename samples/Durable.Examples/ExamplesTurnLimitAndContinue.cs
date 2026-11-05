@@ -1,6 +1,6 @@
 // Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/test/examples/33-turn-limit-and-continue.ts (added in f6a9db1d8,
-// #11043), ported in the Pi v1.5.0 sync (area live-turns). Here it is 34-turn-limit-and-continue: PiSharp's examples keep their Pi v1.2.0
-// numbers, so v1.5.0's examples from 04 on are one higher (31-transcript is 32-transcript, 34-submit-in-commit is 35-submit-in-commit).
+// #11043), ported in the Pi v1.5.0 sync (area live-turns; 34-turn-limit-and-continue until the closeout gave the examples v1.5.0's
+// names).
 // ScriptedModels stands in for the faux provider, and the step tool declares pi-schema's obj({ n: num() }) as JSON Schema. It prints what
 // upstream's console.log prints (its arguments joined with spaces); ConversationBusyException prints as upstream's ConversationBusy. On a
 // file backend the storage is reopened in a plain Session and the transcript's kinds read back (PiSharp-only, as every example's
@@ -18,7 +18,7 @@ public static partial class Examples
     // console.log(...args): its arguments joined with spaces.
     private static Task LogAsync(TextWriter output, params string?[] parts) => output.WriteLineAsync(string.Join(" ", parts.Select(part => part ?? "undefined")));
 
-    // 34: a per-conversation turn limit stops a long run after a number of tool rounds; a continue resumes it without a user message, with a
+    // 33: a per-conversation turn limit stops a long run after a number of tool rounds; a continue resumes it without a user message, with a
     // fresh budget. A host learns that a run stopped from pi.live.runFailure.
     private static async Task TurnLimitAndContinueAsync(Func<Task<IStorage>> open, TextWriter output)
     {

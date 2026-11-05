@@ -15,6 +15,12 @@ public static class DurableWire
     public const int ApiVersion = 1;
 
     /// <summary>The pi-durable version a PiSharp device reports.</summary>
+    /// <remarks>It names the version of the device protocol's durable-pi shapes, not the port's pin. It stays "1.2.0" after the Pi v1.5.0
+    /// sync: the device wire stays version 1 (<see cref="ApiVersion"/>; decision 0008). PiSharp.Durable.Hosting's AgentEvents.cs keeps
+    /// projecting v1.2.0's agent events (upstream v1.5.0 removed watchEvents), maps pi.live v3 back to v1.2.0's shapes (a compaction's
+    /// trigger as reason, no run.turns, no runFailure.first) and shows a run waiting for its after-run tasks as no run; the additions
+    /// since (the task node's Blocked, an agent's maxTurns) are optional fields a v1 client ignores. A move to "1.5.0" belongs with a
+    /// device wire version 2.</remarks>
     public const string DurableVersion = "1.2.0";
 
     /// <summary>The device's default port.</summary>

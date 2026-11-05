@@ -1,7 +1,7 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/src/types.ts (scans, cursors, document addressing, storage writes
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/src/types.ts (scans, cursors, document addressing, storage writes
 // and the Storage interface; split from Types.cs). Spec §10 is the normative contract.
-// Pi v1.5.0 (f9a26365568127461c47a07a37dcb42c140a3ac5, area storage-batches): Storage.commit(batches, receive, context) and CommitResult,
-// the optional publishing scope, and mintId's narrowed contract. The rest of the file follows v1.2.0 until the areas that change it land.
+// Pi v1.5.0 sync (area storage-batches): Storage.commit(batches, receive, context) and CommitResult, the optional publishing scope, and
+// mintId's narrowed contract.
 using System.Collections.Immutable;
 using PiSharp.Durable.Chord;
 using PiSharp.Durable.Internal;

@@ -1,5 +1,5 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/test/harness-nested-tools.test.ts ("nested tool calls", "tool task
-// version 1 records"), as harness.nested-tools.<case>. Verbatim apart from the adaptations in HarnessSupport.cs and ChatSupport.cs, and these:
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/test/harness-nested-tools.test.ts ("nested tool calls", "tool task
+// version 1 and 2 records"), as harness.nested-tools.<case>. Verbatim apart from the adaptations in HarnessSupport.cs and ChatSupport.cs, and these:
 // - Parameters is the JSON pi-schema builds for `obj({ text: opt(str()) })` (Pi v1.5.0, area tools-schema); `text()` reads a result's text as
 //   upstream's does. A result's toEqual/toMatchObject compare its JSON (NestedToolExecutionResult.ToJson), with "<number>" for
 //   expect.any(Number); `not.toHaveProperty("structuredOutput")` is a null StructuredOutput (absent).

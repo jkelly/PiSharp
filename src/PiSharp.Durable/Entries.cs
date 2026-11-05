@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/src/entries.ts, plus the Entry interface of types.ts. Upstream's
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/src/entries.ts, plus the Entry interface of types.ts. Upstream's
 // Entry<D> types an entry's data at compile time with D extends JsonValue; here Entry is a data-less kind (upstream Entry<never>) and
 // Entry<TData> a kind whose data is the JsonValue subtype TData. The tool-result data stays the JSON object {diagnostics} the tool task (P9)
 // writes in {severity, code?, message} order; a typed view of the compaction reason joins with the compaction task (P11).

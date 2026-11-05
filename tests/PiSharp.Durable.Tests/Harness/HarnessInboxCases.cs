@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/test/harness-inbox.test.ts. Verbatim apart from the adaptations in
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/test/harness-inbox.test.ts. Verbatim apart from the adaptations in
 // HarnessSupport.cs and ChatSupport.cs, and these:
 // - Backends. Upstream opens these on MemoryStorage and reopens a SQLite file for the reopen cases. harness.inbox.* does the same;
 //   harness.inbox.jsonl.* and harness.inbox.sqlite.* rerun every case on a fresh JSONL directory and a fresh SQLite file, and
@@ -9,8 +9,6 @@
 //   answer's boundary commit has queued behind the held commit before the test changes the mode. Here the onYield hook records the Session
 //   line's backlog, and the test waits (a deterministic barrier) until a further job, the boundary commit, waits on the line.
 // - `class RecordingStorage extends MemoryStorage { override commit() }` is RecordingStorage, a decorator over the case's storage.
-// - The stubborn and handoff tools return their empty results as ToolExecutionResult.Content: upstream's v1.2.0 `output` is area a's
-//   rename of that field, which renames it in every test at once.
 // - The usage cases call UsageLedger.RecordUsageAsync for upstream's `recordUsage`, and HarnessOptions.Settings' Retry for
 //   `setup.settings.retry`.
 // - Pi v1.5.0 sync (area vocabulary, 5f312dac4): the commit listeners are ObserveCommits observers (a CommitObserver; upstream
@@ -20,7 +18,7 @@
 //   "ends the run after the handoff when the round also terminates"; "writes the last handoff in call order and then runs queued follow-ups
 //   in the new context" is "writes only the last handoff in call order and runs queued follow-ups after the continuing run", which answers
 //   in the new context before the follow-up. recordRequest is RecordRequest, which the queued-reset case uses too; Type.Object({}) is
-//   NoParameters. The citation stays on v1.2.0 until the file's other areas land.
+//   NoParameters.
 // - Pi v1.5.0 sync (area group-commit, e5c6182ba): a held storage call no longer holds the line, so "reads queue modes when the final
 //   boundary's commit runs on the Session line" occupies it with a commit whose callback waits, as v1.5.0's does.
 using PiSharp.Durable;

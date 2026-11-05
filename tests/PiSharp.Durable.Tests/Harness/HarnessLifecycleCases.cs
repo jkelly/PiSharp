@@ -1,7 +1,5 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/test/harness-lifecycle.test.ts. Verbatim apart from the adaptations in
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/test/harness-lifecycle.test.ts. Verbatim apart from the adaptations in
 // HarnessSupport.cs, ChatSupport.cs and Session/SessionSupport.cs, and these:
-// - The stubborn tool of "joins ... before closing storage" returns its empty result as ToolExecutionResult.Content: upstream's v1.2.0
-//   `output` is area a's rename of that field (compatibility/durable-sync-1.2.0-worklist.json), which renames it in every test at once.
 // - Backends. Upstream opens these on MemoryStorage (some through ControlledStorage) and reopens a SQLite file for "lets a new Harness open
 //   the same Storage once close resolved". harness.lifecycle.* does the same; harness.lifecycle.jsonl.* reruns every case on JSONL (the
 //   reopen case reopening a JSONL directory) and harness.lifecycle.sqlite.* reruns the cases that need no reopen on a fresh SQLite file.

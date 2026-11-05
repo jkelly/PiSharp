@@ -8,15 +8,15 @@
 // Pi v1.5.0 sync (area events, f3255de76): the client is the conversation view alone, as in v1.5.0's 20-late-join.ts: the event client of
 // watchEvents (removed) is gone, and the view's listener also prints the streamed answer's partial when its text changes and the view's
 // entries once the run ended. Area tools-schema: the count tool's obj({}) is ToolRegistration's default empty parameters. Area vocabulary
-// (5f312dac4): the view's listener takes the tagged call and skips one that is not a value. The example keeps its v1.2.0 name,
-// 21-late-join, as the other renumbered examples do (b9fb2b854).
+// (5f312dac4): the view's listener takes the tagged call and skips one that is not a value. Since the closeout the example carries
+// v1.5.0's name (b9fb2b854).
 using PiSharp.Durable.Chord;
 
 namespace PiSharp.Durable.Examples;
 
 public static partial class Examples
 {
-    // 21: a client attaches while a run is already underway. It gets the current state first, the conversation view, and then only what
+    // 20: a client attaches while a run is already underway. It gets the current state first, the conversation view, and then only what
     // changes after that.
     private static async Task LateJoinAsync(Func<Task<IStorage>> open, TextWriter output)
     {

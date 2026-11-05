@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/chord/src/state.ts (ReplicatedStateDelivery, ReplicatedState,
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/chord/src/state.ts (ReplicatedStateDelivery, ReplicatedState,
 // ReplicatedStateSourceFrame, ReplicatedStateSourceAttachment, ReplicatedStateSource, ReplicatedStateSourceOptions), which v1.2.0 moved
 // out of types.ts (types.ts now holds only the excluded host runtime's types). Upstream's structural interfaces become C# interfaces with
 // the I prefix (IReplicatedState, IReplicatedStateSource, IReplicatedStateSourceAttachment); unsubscribe and dispose functions become

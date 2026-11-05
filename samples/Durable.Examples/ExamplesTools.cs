@@ -1,7 +1,7 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/test/examples/17-coding-tools.ts, 29-sandbox-per-conversation.ts and
-// 30-tool-override.ts. Upstream stands in for a model with pi-ai's faux provider; here ScriptedModels does, so the examples run offline.
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/test/examples/16-coding-tools.ts, 28-sandbox-per-conversation.ts and
+// 29-tool-override.ts. Upstream stands in for a model with pi-ai's faux provider; here ScriptedModels does, so the examples run offline.
 // Tools reach files and processes through LocalExecutionEnv (upstream NodeExecutionEnv) over fresh temporary directories; on Windows its
-// shell is Git Bash. Each prints what upstream's console.log prints, with JSON in place of util.inspect. 17 runs on the storage the runner
+// shell is Git Bash. Each prints what upstream's console.log prints, with JSON in place of util.inspect. 16 runs on the storage the runner
 // picks (upstream: JSONL in the example's directory), and on a file backend the storage is then reopened and the transcript read back.
 using System.Diagnostics;
 using PiSharp.Durable.Chord;
@@ -37,7 +37,7 @@ public static partial class Examples
         }
     }
 
-    // 17: a coding-agent tool turn: the model reads, edits, and runs commands, then answers.
+    // 16: a coding-agent tool turn: the model reads, edits, and runs commands, then answers.
     private static async Task CodingToolsAsync(Func<Task<IStorage>> open, TextWriter output)
     {
         var directory = ExampleDirectory("pi-durable-example-");
@@ -111,7 +111,7 @@ public static partial class Examples
         Directory.Delete(directory, recursive: true);
     }
 
-    // 29: one sandbox per conversation. The app records each conversation's sandbox in its own document, and the Harness environment
+    // 28: one sandbox per conversation. The app records each conversation's sandbox in its own document, and the Harness environment
     // function looks it up for every tool call. Here a sandbox is a directory; a hosted product would return an environment that runs inside
     // the conversation's container.
     private static readonly ConversationDocToken Sandbox =
@@ -171,7 +171,7 @@ public static partial class Examples
         Directory.Delete(bob.Path, recursive: true);
     }
 
-    // 30: replace a tool for some conversations, and decorate whichever tool wins: a bash that runs inside a Python virtualenv, and a wrapper
+    // 29: replace a tool for some conversations, and decorate whichever tool wins: a bash that runs inside a Python virtualenv, and a wrapper
     // that times every bash call.
     private static async Task ToolOverrideAsync(Func<Task<IStorage>> open, TextWriter output)
     {

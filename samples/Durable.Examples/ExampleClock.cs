@@ -1,5 +1,5 @@
 // Authored for the examples (no upstream counterpart): a manual clock in place of Node's timers, for the examples whose upstream output
-// depends on setTimeout (21-late-join, 23-subagent-background, 24-child-tasks). Passed as HarnessOptions.TimeProvider it drives the Harness
+// depends on setTimeout (20-late-join, 22-subagent-background, 23-child-tasks). Passed as HarnessOptions.TimeProvider it drives the Harness
 // clock, sleeps and throttles; the examples' own pauses and scripted streaming wait on it too. Nothing moves until the example advances it,
 // so a slow machine cannot reorder what upstream's event loop orders by time.
 using PiSharp.Durable.Chord;
