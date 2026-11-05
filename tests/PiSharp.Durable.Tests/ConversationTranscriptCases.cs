@@ -6,6 +6,8 @@
 //   underlying array) and on views and loads ReferenceEquals; a cursor is any JSON object ({"more": true} for upstream's "more").
 // - A loader that throws synchronously is a delegate that throws before it returns a task; drained() (setTimeout(0)) is a Session line
 //   barrier (ViewTests.Drained).
+// - Pi v1.5.0 sync (area vocabulary, 5f312dac4): the over-a-harness watch listener takes the tagged call; upstream's onValue(...) is
+//   SessionSupport.cs' Change(call), which a Durable watch only ever hands a value call.
 using System.Collections.Immutable;
 using PiSharp.Durable;
 using PiSharp.Durable.Chord;

@@ -1,10 +1,10 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/test/codemode-bench.ts. Durable code mode overhead: one model-issued
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/test/codemode-bench.ts. Durable code mode overhead: one model-issued
 // call makes N calls of a trivial `echo` tool, either sequentially or all at once, in two ways: a code mode script (`tools.echo()`, journaled
 // and replayable) and a plain tool calling ExecuteToolAsync the same way (nested calls, no journal). Reports wall time and commits per call on
 // SQLite.
 // Mappings: performance.now() is a Stopwatch; the sandbox is PiSharp.Codemode's CodemodeSandbox (256 MiB, engines on threads unless the host
 // sets a worker launcher, as upstream's run on worker threads); the faux model is FauxModels.cs's; commits are counted with
-// SubscribeCommits, as upstream's harness.subscribeCommits.
+// ObserveCommits, as upstream's harness.observeCommits (Pi v1.5.0 sync, area vocabulary, 5f312dac4; it was SubscribeCommits).
 using System.Diagnostics;
 using System.Globalization;
 using PiSharp.Codemode;
@@ -112,7 +112,7 @@ public static class CodemodeBench
             var harness = await Harness.OpenAsync(storage, new HarnessOptions { Models = new FauxModels(call, FauxModels.Text("ok")), Registry = registry }, Context);
             var root = await harness.RootAsync(Context, new AgentChange { Model = FauxModels.Ref });
             var commits = 0;
-            using var subscription = harness.SubscribeCommits((_, _) => Interlocked.Increment(ref commits));
+            harness.ObserveCommits(new CommitObserver((_, _) => Interlocked.Increment(ref commits), _ => { }));
             var started = Stopwatch.GetTimestamp();
             var settled = await (await root.SubmitAsync(SubmissionDraft.Input("go"), Context)).WaitAsync(Context);
             var ms = Stopwatch.GetElapsedTime(started).TotalMilliseconds;

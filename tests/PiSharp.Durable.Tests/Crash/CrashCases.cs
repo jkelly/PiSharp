@@ -348,9 +348,9 @@ internal static class CrashTests
     private static SyncList<string> RetryErrors(Recovery recovery)
     {
         var errors = new SyncList<string>();
-        ObserveCommits(recovery.Harness, (publication, _) =>
+        FollowCommits(recovery.Harness, (publication, _) =>
         {
-            foreach (var change in DocumentChanges(publication))
+            foreach (var change in DocumentValues(publication))
                 if (change.Record.Kind == "pi.live" && Field(change.Value, "generation", "retry", "error") is JsonStringValue error) errors.Add(error.Value);
         });
         return errors;

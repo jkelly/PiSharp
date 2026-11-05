@@ -3,8 +3,9 @@
 // kind). Verbatim apart from the adaptations in HarnessSupport.cs and ChatSupport.cs, and these:
 // - toEqual of a ReportInfo is record equality; toMatchObject compares the fields upstream names (a task's kind and conversation, not its
 //   id).
-// - registry.uninstall(old) disposes the installation; harness.observeCommits with a throwing advance is a throwing SubscribeCommits
-//   listener, the v1.2.0 form this port keeps until area observers lands; root.agent() is AgentAsync.
+// - registry.uninstall(old) disposes the installation; harness.observeCommits with a throwing advance is ObserveCommits with a
+//   CommitObserver whose advance throws (area vocabulary, 5f312dac4): reported once as listener_error, then detached; root.agent() is
+//   AgentAsync.
 // - The host's setTimer throws synchronously, as upstream's does; the Session's document sweep and the scheduler both report it as
 //   host_error setTimer, and the case reads the first report with the message.
 // - ControlledStorage.failNextCommit refuses the next commit, which fails the Session (Storage's v1.5.0 refusal).
@@ -205,7 +206,7 @@ internal static class ReportsTests
             });
             registry.Install(Define.Extension(new Extension { Name = "tools", Tools = [echo] }));
             registry.Install(Define.Extension(new Extension { Name = "wraps", Wraps = [Define.WrapTool(echo, tool => tool with { Name = "renamed" })] }));
-            harness.SubscribeCommits((_, _) => throw new InvalidOperationException("listener"));
+            harness.ObserveCommits(new CommitObserver((_, _) => throw new InvalidOperationException("listener"), _ => { }));
             var root = await harness.RootAsync(Context);
             await root.AgentAsync(Context);
             await root.CommitAsync(tx => tx.CreateTaskAsync(sleeper, JsonValue.Null, ConversationOwned), Context);

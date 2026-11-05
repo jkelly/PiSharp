@@ -350,8 +350,8 @@ internal static class CrashScenarios
             if (Fails(checkpoint))
             {
                 var end = await harness.Closed.WaitAsync(TimeSpan.FromSeconds(30));
-                if (end.Reason != SessionEndReason.Failed || end.Error?.Message != CrashStorage.Failure(checkpoint).Message)
-                    throw new InvalidOperationException($"The Harness ended with {end.Reason} ({end.Error?.Message}), not with the injected failure");
+                if (end.Kind != SessionEndKind.Failed || end.Error?.Message != CrashStorage.Failure(checkpoint).Message)
+                    throw new InvalidOperationException($"The Harness ended with {end.Kind} ({end.Error?.Message}), not with the injected failure");
                 CrashGate.Emit("CHECKPOINT " + checkpoint);
                 await CrashGate.Never();
             }

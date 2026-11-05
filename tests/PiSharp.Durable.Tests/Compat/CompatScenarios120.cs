@@ -594,8 +594,8 @@ internal static class CompatScenarios120
             var closed = await harness.Closed;
             await Close(harness);
             var closedJson = closed.Error is null
-                ? Obj(("reason", closed.Reason == SessionEndReason.Failed ? "failed" : "closed"))
-                : Obj(("reason", closed.Reason == SessionEndReason.Failed ? "failed" : "closed"), ("error", Described(closed.Error)));
+                ? Obj(("reason", closed.Kind == SessionEndKind.Failed ? "failed" : "closed"))
+                : Obj(("reason", closed.Kind == SessionEndKind.Failed ? "failed" : "closed"), ("error", Described(closed.Error)));
             // See the file header: the capture's close wrapper lets its waitForIdle() resolve; the library's own semantics reject it.
             Program.Equal("SessionFailed", S(At(idle, "error", "name")), "idle after the failure");
             return Obj(("failed", failed), ("later", later), ("idle", idle), ("closed", closedJson), ("reports", JsonValue.Array(reports.Snapshot())));

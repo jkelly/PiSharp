@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/test/examples/21-late-join.ts. Upstream's timing comes from Node's
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/test/examples/20-late-join.ts. Upstream's timing comes from Node's
 // timers: the tool pauses 100 ms between lines, pi-ai's faux provider streams the answer at 40 tokens per second, and the client joins after
 // 500 ms. Here all of it runs on an ExampleClock: the Harness clock and its throttles (HarnessOptions.TimeProvider), the tool's pauses, and
 // PacedModels' streaming (faux pacing, token size 1). The example drives the clock like Node's event loop, firing one timer at a time and
@@ -7,7 +7,9 @@
 // back.
 // Pi v1.5.0 sync (area events, f3255de76): the client is the conversation view alone, as in v1.5.0's 20-late-join.ts: the event client of
 // watchEvents (removed) is gone, and the view's listener also prints the streamed answer's partial when its text changes and the view's
-// entries once the run ended. The citation stays on v1.2.0 until areas tools-schema and vocabulary land.
+// entries once the run ended. Area tools-schema: the count tool's obj({}) is ToolRegistration's default empty parameters. Area vocabulary
+// (5f312dac4): the view's listener takes the tagged call and skips one that is not a value. The example keeps its v1.2.0 name,
+// 21-late-join, as the other renumbered examples do (b9fb2b854).
 using PiSharp.Durable.Chord;
 
 namespace PiSharp.Durable.Examples;

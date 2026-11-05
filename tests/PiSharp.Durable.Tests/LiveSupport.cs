@@ -1,13 +1,13 @@
-// Pi f3255de76581447d17db78c9d6a2c5dbb9eee762 (MIT): packages/durable/test/live-support.ts (added in f3255de76), ported in the Pi v1.5.0
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/test/live-support.ts (added in f3255de76), ported in the Pi v1.5.0
 // sync (area run-failure): what tests of renderers' state read, every pi.live value of a conversation, and the results of nested calls.
-// Its v1.5.0 changes (5f312dac4: observers get value calls, followCommits, a retirement is change.kind "retire") are area vocabulary's;
-// the observers here already take only WatchValueCall values (area observers), and a retirement is a document change without a value.
+// Its v1.5.0 changes (5f312dac4, area vocabulary): the observers take only value calls (WatchValueCall, as since area observers),
+// nestedResults follows commits with followCommits (SessionTests.FollowCommits) and skips a retirement by its kind (DocumentRetireChange).
 // Adaptations:
 // - pi.live states and their slots are JSON objects (JsonObjectValue); a slot that is absent is null, and the pi.live of a view without one
 //   is {}.
 // - The observers run on the Session line, not the test's thread, so History and NestedResults lock what they collect.
-// - nestedResults' observeCommits is SessionTests.ObserveCommits (commits as memory adopts them, upstream 6c2fd73b0) with DocumentChanges;
-//   a NestedToolExecutionResult is the result's JSON.
+// - nestedResults' followCommits is SessionTests.FollowCommits (commits as memory adopts them) with DocumentChanges; a
+//   NestedToolExecutionResult is the result's JSON.
 using System.Collections.Concurrent;
 using PiSharp.Durable;
 using PiSharp.Durable.Chord;
@@ -96,11 +96,12 @@ internal static class LiveTests
     internal static ConcurrentDictionary<long, JsonValue> NestedResults(IHarness harness)
     {
         var results = new ConcurrentDictionary<long, JsonValue>();
-        ObserveCommits(harness, (publication, _) =>
+        FollowCommits(harness, (publication, _) =>
         {
             foreach (var change in DocumentChanges(publication))
             {
-                if (change.Record.Kind != HarnessTasks.NestedCallDoc.Definition.Kind || change.Value is not { } state) continue;
+                if (change.Record.Kind != HarnessTasks.NestedCallDoc.Definition.Kind || change is not DocumentValueChange { Value: var state })
+                    continue;
                 if (state.TryGetValue("taskId", out var taskId) && taskId is JsonNumberValue id && state.TryGetValue("result", out var result))
                     results[(long)id.Value] = result;
             }

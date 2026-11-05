@@ -3,6 +3,7 @@
 // the watch to deliver the 15 live appends; here the example waits until the transcript holds the newest entry it committed, which is the
 // same point without a timer. It prints what upstream's console.log prints. On a file backend the storage is reopened in a plain Session
 // and the stored entries are counted (PiSharp-only, as every example's read-back).
+// Pi v1.5.0 sync (area vocabulary, 5f312dac4): both watches' listener (Follow) takes the tagged call and skips one that is not a value.
 using PiSharp.Durable.Chord;
 
 namespace PiSharp.Durable.Examples;

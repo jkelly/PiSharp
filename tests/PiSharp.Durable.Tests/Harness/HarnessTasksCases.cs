@@ -699,7 +699,7 @@ internal static partial class HarnessTests
             harness.Resume();
             var waiting = harness.WaitForTaskAsync(id, Context);
             var end = await harness.Closed;
-            Equal(new SessionEnd(SessionEndReason.Failed, failure), end, "closed");
+            Equal(SessionEnd.Failed(failure), end, "closed");
             Seq([failure], reports.Snapshot(), "reports");
             // The pending wait and every later call get SessionFailed with the storage error.
             Same(failure, (await ThrowsAsync<SessionFailedException>(() => waiting, "pending wait")).InnerException, "wait cause");
@@ -732,7 +732,7 @@ internal static partial class HarnessTests
             var (harness, _, reports, root) = await OpenRoot(controlled, [throws]);
             var id = await Start(root, throws);
             harness.Resume();
-            Equal(new SessionEnd(SessionEndReason.Failed, failure), await harness.Closed, "closed");
+            Equal(SessionEnd.Failed(failure), await harness.Closed, "closed");
             Equal(1, Volatile.Read(ref runs), "runs");
             Seq([failure], reports.Snapshot(), "reports");
             await harness.CloseAsync(Context);

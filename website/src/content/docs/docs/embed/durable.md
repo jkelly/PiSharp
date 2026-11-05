@@ -262,7 +262,7 @@ To write your own model access, implement `IDurableModels`. `GetModel`, `StreamS
 | `TaskGraphAsync`, `WatchTaskGraphAsync` | The live task graph (see [Inbox and task graph](#inbox-and-task-graph)). |
 | `InspectAsync(context)` | A diagnostic snapshot of tasks and scheduling. |
 
-From `ISession` it has `CommitAsync` (four overloads over an `ITx`), `SnapshotAsync` and `WatchDocAsync` for documents, `DocumentStateAsync`, `SubscribeCommits`, `SubscribeClose`, `Closed` and `CloseAsync`. `Session.Create(storage)` gives you a bare session without agents; examples 00 to 05 use one.
+From `ISession` it has `CommitAsync` (four overloads over an `ITx`), `SnapshotAsync` and `WatchDocAsync` for documents, `ObserveDocAsync`, `ObserveCommits` (a `CommitObserver` of stored commits), `SubscribeClose`, `Closed` (a `SessionEnd` of kind `Closed` or `Failed`) and `CloseAsync`. `Session.Create(storage)` gives you a bare session without agents; examples 00 to 05 use one.
 
 ## Conversations
 

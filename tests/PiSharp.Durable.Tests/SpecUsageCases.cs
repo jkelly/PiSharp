@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/test/spec-usage.test.ts. The usage examples of docs/spec.md,
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/test/spec-usage.test.ts. The usage examples of docs/spec.md,
 // compile-checked: each block is written in C# against the ported API, with the names the spec leaves to the application declared in
 // SpecNames below; SpecUsage.Examples() is never called, because those names have no values. Adaptations:
 // - TypeScript's type-level check (expectTypeOf(examples).returns.toHaveProperty("sequences")) is a reflection check of Examples()' return
@@ -11,7 +11,8 @@
 // - `delete live.generation` and `escaped!.generation = undefined` are DraftObject.Delete("generation").
 // - Upstream's `UserSettings implements HarnessSettings` stores the manager in a field; here it is a primary-constructor parameter.
 // Pi v1.5.0 sync (area view, f3255de76): the "transcript" example of Section 9.3 (a client's transcript over the windowed view) is
-// v1.5.0's; the citation stays on v1.2.0 until the file's other areas land.
+// v1.5.0's. Pi v1.5.0 sync (area vocabulary, 5f312dac4): its watch listener takes the tagged call, as upstream's onValue(...) wraps it:
+// a WatchValueCall renders, any other call is skipped.
 using System.Collections.Immutable;
 using PiSharp.Durable;
 using PiSharp.Durable.Chord;

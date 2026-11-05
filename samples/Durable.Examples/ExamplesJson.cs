@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/test/examples/19-json.ts. JSON mode: stream one prompt's run as JSON
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/test/examples/18-json.ts. JSON mode: stream one prompt's run as JSON
 // lines, like `pi --mode json`. Pi v1.5.0 sync (area events, f3255de76): both modes print the ConversationView, as v1.5.0's 18-json.ts does
 // (watchEvents and its --events mode are removed): --ops (upstream's default) the raw frames, starting with the view itself, each later line
 // the ops of the commits since; --state, per call, the entries appended since the previous one and the current pi.live, the state a renderer
@@ -9,7 +9,8 @@
 // and the faux usage estimate, on an ExampleClock that also drives the Harness throttles, so the run streams the same partial every time.
 // Under Node the first partial varies from run to run with the random token size. The bash tool runs `ls` in a directory that stands in for
 // upstream's working directory, packages/durable, with the same top-level entries (the listing feeds the next request's usage estimate).
-// The citation stays on v1.2.0 until area vocabulary (5f312dac4) lands.
+// Pi v1.5.0 sync (area vocabulary, 5f312dac4): both listeners take the tagged call and skip one that is not a value, as upstream's
+// do. The example keeps its v1.2.0 name, 19-json, as the other renumbered examples do (b9fb2b854).
 using PiSharp.Durable.Chord;
 using PiSharp.Durable.Env;
 using PiSharp.Durable.Storage;

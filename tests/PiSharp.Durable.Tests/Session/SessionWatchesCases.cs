@@ -56,10 +56,10 @@ internal static partial class SessionTests
             var initial = watch.Value;
             await SetValue(session, 1);
             await Flush(session);
-            var firstPublished = DocumentChanges(Last(publications))[0];
+            var firstPublished = DocumentValues(Last(publications))[0];
             await SetValue(session, 2);
             await Flush(session);
-            var secondPublished = DocumentChanges(Last(publications))[0];
+            var secondPublished = DocumentValues(Last(publications))[0];
             Same(initial, watch.Value, "acquisition revision until start");
 
             var startingThread = Environment.CurrentManagedThreadId;
@@ -90,7 +90,7 @@ internal static partial class SessionTests
             // A listener that keeps up gets each commit's ops as published.
             await SetValue(session, 3);
             await Flush(session);
-            var thirdPublished = DocumentChanges(Last(publications))[0];
+            var thirdPublished = DocumentValues(Last(publications))[0];
             lock (deliveries)
             {
                 Equal(2, deliveries.Count, "deliveries");

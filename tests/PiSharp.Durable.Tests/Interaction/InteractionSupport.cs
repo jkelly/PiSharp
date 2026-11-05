@@ -171,7 +171,7 @@ internal static class InteractionTests
     internal static async Task ClosedByFailure(IHarness harness)
     {
         var end = await harness.Closed.WaitAsync(Timeout);
-        Equal(SessionEndReason.Failed, end.Reason, "Harness end");
+        Equal(SessionEndKind.Failed, end.Kind, "Harness end");
     }
 
     /// <summary>The live tasks after the conversation went idle.</summary>

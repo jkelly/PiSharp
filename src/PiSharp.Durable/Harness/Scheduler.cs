@@ -38,11 +38,12 @@
 // - Walks up and down the ownership tree are loops, never recursion, as upstream's are: chains can be deeper than the stack.
 //
 // Pi v1.5.0 sync (area deferred-commits, 6c2fd73b0): the scheduler observes the Session's commits as memory adopts them
-// (Session.ObserveCommits) and skips a held one, which changes conversation documents only; ITaskRuntime.CommitAsync takes CommitOptions,
+// (Session.FollowCommits) and skips a held one, which changes conversation documents only; ITaskRuntime.CommitAsync takes CommitOptions,
 // so a phase may defer a commit (Live.ProgressCommit).
 // Pi v1.5.0 sync (area harness-options): the models are a function read at each access (7ec1f648e), and the readOnly option (be14d9732):
 // open loads live tasks as committed, running ones included, and schedules no reconcile; Resume throws ReadOnlySessionException; no
-// reconcile is ever scheduled. The citation stays on v1.2.0 until the file's other areas land.
+// reconcile is ever scheduled. Pi v1.5.0 sync (area vocabulary, 5f312dac4): the internal observeCommits is followCommits
+// (Session.FollowCommits). The citation stays on v1.2.0 until the file's other areas land.
 //
 // Pi v1.5.0 sync (area sleep): durable sleeps, host timers and wake() (f75b3240a, ec1be23eb). A sleeping task holds no invocation:
 // `sleeping` holds the sleeping live tasks, WakeDueLocked makes the due ones reservation candidates at resume, when the sleep timer fires
@@ -344,7 +345,7 @@ internal sealed class DurableTaskScheduler
     /// <c>running</c> task stays as committed, running in another process.</summary>
     public async Task OpenAsync(DurableContext openContext)
     {
-        session.ObserveCommits((publication, _) => Observe(publication));
+        session.FollowCommits((publication, _) => Observe(publication));
         session.SubscribeClose(Seal);
         registrySubscription = registry.Subscribe(() =>
         {

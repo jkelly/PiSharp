@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/test/harness-tasks-recovery.test.ts. Verbatim apart from the
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/test/harness-tasks-recovery.test.ts. Verbatim apart from the
 // adaptations in HarnessSupport.cs and HarnessRecoverySupport.cs, and these:
 // - Crashes are simulated as upstream does: the crashed Harness is abandoned without close, its held commit never lands
 //   (ControlledStorage.Crash) and its blocked handlers never return; a new Harness opens the same storage instance.
@@ -7,7 +7,8 @@
 // - "preserves an abort mark that races the handover commit ...": the commit log is read after close instead of before it; the task has
 //   ended by then, so close writes nothing of it (Pi v1.5.0 sync, area restarts: a close writes back only the tasks it stopped), and
 //   storage.commits is not safe to read while commits may still land.
-// None of the 24 tests needs generation, tools or compaction; all are ported.
+// None of the 25 tests needs generation, tools or compaction; all are ported. Pi v1.5.0 sync (area vocabulary, 5f312dac4): the report kinds
+// and the task_too_old case are area reports'; the tools' obj({}) is ToolRegistration.EmptyParameters (area tools-schema).
 using PiSharp.Durable;
 using PiSharp.Durable.Chord;
 using static HarnessTests;

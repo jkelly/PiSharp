@@ -15,6 +15,9 @@
 //   (Pi v1.5.0 sync, area watches).
 // - ControlledStorage.Adopting is v1.5.0's adopting (Pi v1.5.0 sync, area observers): set while Storage runs a commit's receive. PiSharp
 //   publishes a stored commit after its Storage call returned, so observers see it unset, as v1.5.0's do.
+// - Pi v1.5.0 sync (area vocabulary, 5f312dac4): openTestSession attaches with ObserveCommits (a CommitObserver; was SubscribeCommits),
+//   the internal follower helper is FollowCommits (upstream followCommits, was observeCommits), DocumentValues is upstream's
+//   documentValues (the document changes of kind change), and onValue is Change(call) above.
 using System.Collections.Immutable;
 using PiSharp.Durable;
 using PiSharp.Durable.Chord;
@@ -58,10 +61,10 @@ internal static partial class SessionTests
         // These tests pin the cache's identities and loads, so documents stay as long as the default keeps them.
         var session = new Session(storage, null, () => 600_000);
         var publications = new List<CommitPublication>();
-        session.SubscribeCommits((publication, _) =>
+        session.ObserveCommits(new CommitObserver((publication, _) =>
         {
             lock (publications) publications.Add(publication);
-        });
+        }, _ => { }));
         return new TestSession(storage, session, publications);
     }
 
@@ -81,12 +84,21 @@ internal static partial class SessionTests
         [.. publication.Changes.OfType<DocumentCommitChange>()];
 
     /// <summary>
-    /// Observe every commit as memory adopts it, deferred ones before they are stored, as views and document watches do;
-    /// <see cref="ISession.SubscribeCommits"/> sees only what was stored (upstream <c>observeCommits</c>, 6c2fd73b0). The internal
-    /// observer is on <see cref="Session"/>, which every Session and Harness is.
+    /// Follow every commit as memory adopts it, deferred ones before they are stored, as views and document watches do;
+    /// <see cref="ISession.ObserveCommits"/> sees only what was stored (upstream <c>followCommits</c>, 5f312dac4; 6c2fd73b0's
+    /// <c>observeCommits</c>). The internal follower is on <see cref="Session"/>, which every Session and Harness is.
     /// </summary>
-    internal static IDisposable ObserveCommits(ISession session, Action<ObservedCommit, DurableContext> listener) =>
-        ((Session)session).ObserveCommits(listener);
+    internal static IDisposable FollowCommits(ISession session, Action<ObservedCommit, DurableContext> listener) =>
+        ((Session)session).FollowCommits(listener);
+
+    /// <summary>The document changes of <paramref name="publication"/> that carry a value: creations and updates, no retirements
+    /// (upstream <c>documentValues</c>, 5f312dac4).</summary>
+    internal static List<DocumentValueChange> DocumentValues(CommitPublication publication) =>
+        [.. publication.Changes.OfType<DocumentValueChange>()];
+
+    /// <summary>The document changes that carry a value of what an internal follower saw.</summary>
+    internal static List<DocumentValueChange> DocumentValues(ObservedCommit publication) =>
+        [.. publication.Changes.OfType<DocumentValueChange>()];
 
     internal static List<DocumentCopyCommitChange> DocumentCopyChanges(CommitPublication publication) =>
         [.. publication.Changes.OfType<DocumentCopyCommitChange>()];

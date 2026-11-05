@@ -24,6 +24,9 @@
 // NaN, and RangeError is ArgumentOutOfRangeException. The 6,000-commit overflow case runs in the MemoryStorage pass only, as upstream; the
 // long-lived watch case opens its own SQLite file in that pass (upstream openNodeSqliteStorage) and a StoreStorage in the store pass, and
 // GC.Collect is upstream's gc(); WeakReference is WeakRef.
+// Pi v1.5.0 sync (area vocabulary, 5f312dac4): touches() counts with an ObserveCommits observer (upstream observeCommits({ advance, end }))
+// the document changes of kind change (DocumentValueChange); the watch listeners already take value calls (Change(call), onValue) and
+// WatchEnd kinds (area chord-watch).
 using System.Collections.Immutable;
 using PiSharp.Durable;
 using PiSharp.Durable.Chord;
@@ -131,14 +134,14 @@ internal static partial class ViewTests
     internal static Func<int> Touches(IHarness harness, IConversation conversation)
     {
         var count = 0;
-        harness.SubscribeCommits((publication, _) =>
+        harness.ObserveCommits(new CommitObserver((publication, _) =>
         {
             var touched = publication.Changes.Any(change =>
                 (change is EntryWrite entry && entry.Value.ConversationId == conversation.Id) ||
-                (change is DocumentCommitChange document && document.ConversationId == conversation.Id && document.Value is not null &&
+                (change is DocumentValueChange document && document.ConversationId == conversation.Id &&
                     MountedKinds.Contains(document.Record.Kind) && document.Ops.Length > 0));
             if (touched) Interlocked.Increment(ref count);
-        });
+        }, _ => { }));
         return () => Volatile.Read(ref count);
     }
 

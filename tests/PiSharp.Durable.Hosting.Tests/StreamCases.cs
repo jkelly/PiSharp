@@ -1,5 +1,5 @@
 // Pi v1.5.0 sync (area deferred-commits): streams.an-agent-feed-shows-deferred-partials-before-they-are-stored. Partial commits are deferred
-// (durable@1.5.0 Breaking Changes#10): Storage, and so the session's change notifications (SubscribeCommits), get them later, while an agent
+// (durable@1.5.0 Breaking Changes#10): Storage, and so the session's change notifications (ObserveCommits, was SubscribeCommits), get them later, while an agent
 // feed (views, which follow memory) shows each at once. With a window that never ends, nothing is stored while the answer streams.
 using PiSharp.Durable;
 using PiSharp.Durable.Hosting;

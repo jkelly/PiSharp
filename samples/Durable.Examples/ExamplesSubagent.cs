@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/test/examples/22-subagent-foreground.ts. Its product code is the same
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/test/examples/21-subagent-foreground.ts. Its product code is the same
 // foreground subagent as Pi v1.1.0's packages/coding-agent/src/experimental/durable/subagent.ts, which v1.2.0 deleted
 // (src/PiSharp.Cli/Durable/DurableSubagent.cs, PiSharp-only since; decision 0005). Upstream
 // uses OpenAI when OPENAI_API_KEY is set and pi-ai's faux provider otherwise; here ScriptedModels always stands in, so the example runs
@@ -7,8 +7,10 @@
 // child's answer was printed. On a file backend the storage is then reopened and the child conversation and transcripts read back.
 // Pi v1.5.0 sync (area events, f3255de76): the UI watches each conversation's view, as v1.5.0's 21-subagent-foreground.ts does: it prints
 // the text and tool calls of the pi.assistant entries appended since the newest it saw, and attaches to the child a running subagent call
-// names in its pi.live slot's details, where v1.2.0 printed watchEvents' message_end and tool_execution_start events (removed). The
-// citation stays on v1.2.0 until areas tools-schema and vocabulary land.
+// names in its pi.live slot's details, where v1.2.0 printed watchEvents' message_end and tool_execution_start events (removed). Area
+// tools-schema: the subagent tool's parameters are pi-schema's obj({ task: str({ description }) }) as JSON Schema. Area vocabulary
+// (5f312dac4): each view listener takes the tagged call and skips one that is not a value. The example keeps its v1.2.0 name,
+// 22-subagent-foreground, as the other renumbered examples do (b9fb2b854).
 using PiSharp.Durable.Chord;
 
 namespace PiSharp.Durable.Examples;

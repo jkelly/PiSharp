@@ -1,7 +1,7 @@
 // Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/src/types.ts (entry drafts and typed entries, commit publications,
 // the Tx and Session surfaces, document states and watches; split from Types.cs). Upstream's overloads keyed by token type become one C#
 // overload per token type; its `(...) => void` disposers become IDisposable; its promises become tasks. A document value is a
-// JsonObjectValue, and null stands for upstream's retired `null` value.
+// JsonObjectValue.
 // Pi v1.5.0 sync (area watches, 92ab53602 and 42cb822f1): the watch types are Chord's (Chord/Watch.cs: IWatchHandle<T>, WatchEnd,
 // WatchCall<T> and NativeWatchCall<T>, which upstream's index re-exports; in C# they stay in PiSharp.Durable.Chord), and the document
 // state getters and their type are removed (Session.documentState(), DocumentState). Area watch-folding (8b0caefc2 and d8d99950a): a
@@ -9,8 +9,12 @@
 // IWatchHandle<JsonObjectValue>. Area deferred-commits (6c2fd73b0): a commit takes CommitOptions, whose CommitPersistence may defer storing
 // it (spec §4.1), and a CommitPublication is what one storage transaction stored. Area observers (8b0caefc2, with v1.5.0's shapes):
 // Observer<T> and Observation<T>, and ISession.ObserveDocAsync; Observer<T> is a sealed class over two callbacks (a synchronous advance,
-// or one returning a task, whose fault counts as upstream's rejected promise) instead of a structural type. The citation stays on v1.2.0
-// until the file's other areas land.
+// or one returning a task, whose fault counts as upstream's rejected promise) instead of a structural type. Area vocabulary (5f312dac4):
+// SubscribeCommits(listener) is ObserveCommits(CommitObserver), returning a CommitObservation (CommitObserver is a sealed class over two
+// callbacks, as Observer<T> is); SessionEnd is tagged by Kind (SessionEndKind, was Reason); and DocumentCommitChange is tagged: an abstract
+// record whose Kind says which of its two records it is, DocumentValueChange (a creation or an update, with its version, value and ops) or
+// DocumentRetireChange (a retirement), where a retirement used to be a null value. The citation stays on v1.2.0 until the file's other
+// areas land.
 using System.Collections.Immutable;
 using PiSharp.Durable.Chord;
 using PiSharp.Durable.Chord.Delta;
@@ -136,18 +140,54 @@ public interface ICommitChange
     string Type { get; }
 }
 
-/// <summary>Committed change of one document incarnation (upstream <c>DocumentCommitChange</c> of type <c>"document"</c>).</summary>
+/// <summary>Which committed change of a document incarnation a <see cref="DocumentCommitChange"/> is (upstream
+/// <c>DocumentCommitChange["kind"]</c>).</summary>
+public enum DocumentCommitChangeKind
+{
+    /// <summary><c>change</c>: a creation or an update (<see cref="DocumentValueChange"/>).</summary>
+    Change,
+    /// <summary><c>retire</c>: this commit retired the incarnation (<see cref="DocumentRetireChange"/>).</summary>
+    Retire,
+}
+
+/// <summary>
+/// Committed change of one document incarnation (upstream <c>DocumentCommitChange</c> of type <c>"document"</c>), tagged by
+/// <see cref="Kind"/>: a <see cref="DocumentValueChange"/> (<c>kind: "change"</c>, a creation or an update) or a
+/// <see cref="DocumentRetireChange"/> (<c>kind: "retire"</c>, this commit retired the incarnation). Only a change carries a value.
+/// </summary>
 /// <param name="Record">The incarnation, as committed by this commit.</param>
 /// <param name="ConversationId">Conversation owning the document; task documents derive it from their task record. Null only for Session
 /// documents.</param>
-/// <param name="Version">Definition version of <paramref name="Value"/>; null when this commit retired the incarnation.</param>
-/// <param name="Value">Exact adopted immutable revision, or null when this commit retired the incarnation.</param>
-/// <param name="Ops">Exact adopted operations for an ordinary update; empty for creation and retirement.</param>
-public sealed record DocumentCommitChange(DocumentRecord Record, ConversationId? ConversationId, int? Version, JsonObjectValue? Value,
-    ImmutableArray<Op> Ops) : ICommitChange
+public abstract record DocumentCommitChange(DocumentRecord Record, ConversationId? ConversationId) : ICommitChange
 {
     /// <inheritdoc/>
     public string Type => "document";
+
+    /// <summary>A change or a retirement.</summary>
+    public abstract DocumentCommitChangeKind Kind { get; }
+}
+
+/// <summary>A document creation or update (upstream <c>DocumentCommitChange</c> of kind <c>"change"</c>).</summary>
+/// <param name="Record">The incarnation, as committed by this commit.</param>
+/// <param name="ConversationId">Conversation owning the document; null only for Session documents.</param>
+/// <param name="Version">Definition version of <paramref name="Value"/>.</param>
+/// <param name="Value">Exact adopted immutable revision.</param>
+/// <param name="Ops">Exact adopted operations for an ordinary update; empty for creation.</param>
+public sealed record DocumentValueChange(DocumentRecord Record, ConversationId? ConversationId, int Version, JsonObjectValue Value,
+    ImmutableArray<Op> Ops) : DocumentCommitChange(Record, ConversationId)
+{
+    /// <inheritdoc/>
+    public override DocumentCommitChangeKind Kind => DocumentCommitChangeKind.Change;
+}
+
+/// <summary>A document retirement (upstream <c>DocumentCommitChange</c> of kind <c>"retire"</c>): this commit retired the
+/// incarnation.</summary>
+/// <param name="Record">The incarnation, as committed by this commit.</param>
+/// <param name="ConversationId">Conversation owning the document; null only for Session documents.</param>
+public sealed record DocumentRetireChange(DocumentRecord Record, ConversationId? ConversationId) : DocumentCommitChange(Record, ConversationId)
+{
+    /// <inheritdoc/>
+    public override DocumentCommitChangeKind Kind => DocumentCommitChangeKind.Retire;
 }
 
 /// <summary>Definition-free child initialization by a fork (upstream <c>DocumentCommitChange</c> of type <c>"document.copy"</c>); consumers
@@ -207,19 +247,31 @@ public enum CommitPersistenceKind
 /// <param name="Persistence">When it reaches Storage; null: immediately.</param>
 public sealed record CommitOptions(CommitPersistence? Persistence = null);
 
-/// <summary>Why a Session ended: <c>close()</c>, or a failed Storage call, whose error it carries (upstream <c>SessionEnd</c>).</summary>
-/// <param name="Reason"><see cref="SessionEndReason.Closed"/> or <see cref="SessionEndReason.Failed"/>.</param>
-/// <param name="Error">What failed the Session; null when it closed.</param>
-public sealed record SessionEnd(SessionEndReason Reason, Exception? Error = null)
+/// <summary>Why a Session ended, by <see cref="Kind"/>: <c>close()</c>, or a failed Storage call, whose error it carries (upstream
+/// <c>SessionEnd</c>).</summary>
+public sealed record SessionEnd
 {
-    /// <summary><c>{reason: "closed"}</c>.</summary>
-    public static SessionEnd Closed { get; } = new(SessionEndReason.Closed);
-    /// <summary><c>{reason: "failed", error}</c>.</summary>
-    public static SessionEnd Failed(Exception error) => new(SessionEndReason.Failed, error);
+    private SessionEnd(SessionEndKind kind, Exception? error)
+    {
+        Kind = kind;
+        Error = error;
+    }
+
+    /// <summary><c>{kind: "closed"}</c>.</summary>
+    public static SessionEnd Closed { get; } = new(SessionEndKind.Closed, null);
+
+    /// <summary><c>{kind: "failed", error}</c>.</summary>
+    public static SessionEnd Failed(Exception error) => new(SessionEndKind.Failed, error ?? throw new ArgumentNullException(nameof(error)));
+
+    /// <summary><see cref="SessionEndKind.Closed"/> or <see cref="SessionEndKind.Failed"/>.</summary>
+    public SessionEndKind Kind { get; }
+
+    /// <summary>What failed the Session; null when it closed.</summary>
+    public Exception? Error { get; }
 }
 
-/// <summary>Why a Session ended (upstream <c>SessionEnd["reason"]</c>).</summary>
-public enum SessionEndReason
+/// <summary>Why a Session ended (upstream <c>SessionEnd["kind"]</c>).</summary>
+public enum SessionEndKind
 {
     /// <summary><c>close()</c> closed it.</summary>
     Closed,
@@ -370,6 +422,71 @@ internal interface IDetachable
 }
 
 /// <summary>
+/// A synchronous observer of stored commits (upstream <c>CommitObserver</c>, <see cref="ISession.ObserveCommits"/>): the advance callback
+/// gets each <see cref="CommitPublication"/>, the end callback the Session's close as a <see cref="WatchEnd"/>.
+/// </summary>
+/// <remarks>
+/// Advance runs synchronously at the commit's publication, on the Session line, and must not block or call Session APIs. A throw (or, for
+/// the <see cref="CommitObserver(Func{CommitPublication, DurableContext, Task}, Action{WatchEnd})"/> form, a task that faults or is
+/// cancelled: upstream's rejected promise) is reported as <see cref="ReportKind.ListenerError"/>, detaches the observer, and ends it
+/// <see cref="WatchEndKind.ListenerError"/> with the error, where a throwing listener used to stay subscribed. End is called once:
+/// <see cref="WatchEndKind.Failed"/> with the error "session closed" when the Session closes, after its last publication (a commit observer
+/// is a synchronous observer, so an adapter follows the next Session), or with the error that failed the Session; never after
+/// <see cref="CommitObservation.Detach"/>. A throwing end is reported.
+/// </remarks>
+public sealed class CommitObserver
+{
+    private readonly Action<CommitPublication, DurableContext>? advance;
+    private readonly Func<CommitPublication, DurableContext, Task>? advanceAsync;
+    private readonly Action<WatchEnd> end;
+
+    /// <summary>An observer of synchronous callbacks.</summary>
+    public CommitObserver(Action<CommitPublication, DurableContext> advance, Action<WatchEnd> end)
+    {
+        ArgumentNullException.ThrowIfNull(advance);
+        ArgumentNullException.ThrowIfNull(end);
+        this.advance = advance;
+        this.end = end;
+    }
+
+    /// <summary>An observer whose advance returns a task, as upstream's may return a promise: it still runs synchronously, the task is never
+    /// awaited, and one that faults or is cancelled counts as a throw, after the fact.</summary>
+    public CommitObserver(Func<CommitPublication, DurableContext, Task> advance, Action<WatchEnd> end)
+    {
+        ArgumentNullException.ThrowIfNull(advance);
+        ArgumentNullException.ThrowIfNull(end);
+        advanceAsync = advance;
+        this.end = end;
+    }
+
+    /// <summary>Runs the advance callback; the task of the task-returning form, null for the synchronous one.</summary>
+    internal Task? Advance(CommitPublication publication, DurableContext context)
+    {
+        if (advance is not null)
+        {
+            advance(publication, context);
+            return null;
+        }
+        return advanceAsync!(publication, context);
+    }
+
+    /// <summary>Runs the end callback.</summary>
+    internal void End(WatchEnd watchEnd) => end(watchEnd);
+}
+
+/// <summary>An attached <see cref="CommitObserver"/> (upstream <c>CommitObservation</c>): how to detach it. It has no value: commits are
+/// events, not a state, and the Session does not know Storage's newest <c>seq</c> before its own first commit.</summary>
+public sealed class CommitObservation
+{
+    private readonly IDetachable guarded;
+
+    internal CommitObservation(IDetachable guarded) => this.guarded = guarded;
+
+    /// <summary>Detaches the observer. Idempotent: no advance or end follows it.</summary>
+    public void Detach() => guarded.Detach();
+}
+
+/// <summary>
 /// Owner of one mutation line, its records and its tracked documents (upstream <c>Session</c>). Every commit runs on one FIFO line;
 /// only committed state is observable.
 /// </summary>
@@ -418,14 +535,17 @@ public interface ISession : IDocumentObserver, IDocumentReader
     /// </summary>
     Task<SessionEnd> Closed { get; }
 
-    /// <summary>Observes stored commits synchronously after adoption, each with exactly what it stored; a commit held in memory is published
-    /// when it is stored (<see cref="CommitPublication"/>). The listener must not block or call Session APIs; a throw, or a faulted task it
-    /// returns, is reported (<c>HarnessOptions.OnReport</c>) and the other listeners still run.</summary>
-    IDisposable SubscribeCommits(Action<CommitPublication, DurableContext> listener);
-
-    /// <summary>An asynchronous commit listener: it still runs synchronously after adoption, and a faulted task it returns (upstream's
-    /// rejected promise) is reported without being awaited.</summary>
-    IDisposable SubscribeCommits(Func<CommitPublication, DurableContext, Task> listener);
+    /// <summary>
+    /// Attaches a synchronous <see cref="CommitObserver"/> of stored commits (upstream <c>observeCommits</c>), each with exactly what it
+    /// stored, except that a document the commit retires is published as its retirement only; a commit held in memory is published when it
+    /// is stored (<see cref="CommitPublication"/>). Advance runs at the commit's publication, on the Session line, before every wait the
+    /// commit resolves and every abort it queues, in no order with watch listeners; it must not block or call Session APIs. A throw, or a
+    /// faulted task it returns, is reported (<c>HarnessOptions.OnReport</c>), detaches the observer and ends it
+    /// <see cref="WatchEndKind.ListenerError"/>; the other observers still run. End comes once, at the Session's close after its last
+    /// publication or at its failure (<see cref="CommitObserver"/>), never after <see cref="CommitObservation.Detach"/>. Attaches
+    /// synchronously; throws on a closed Session.
+    /// </summary>
+    CommitObservation ObserveCommits(CommitObserver observer);
 
     /// <summary>Observes close synchronously when it begins, also when a failed Storage call closes the Session. The listener must not
     /// block or call Session APIs; a throw is reported and the other listeners still run.</summary>

@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/test/harness-structured-output.test.ts ("structured output"), as
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/test/harness-structured-output.test.ts ("structured output"), as
 // harness.structured-output.<case>. Verbatim apart from the adaptations in HarnessSupport.cs and ChatSupport.cs, and these:
 // - Schemas are the JSON pi-schema builds (Pi v1.5.0, area tools-schema): `obj({ count: num() })` is Count, `nul()` is {"type":"null"},
 //   and `obj({})` is ToolsSchema150.EmptyObject.
@@ -9,6 +9,8 @@
 // - Upstream runs these on MemoryStorage; so do they here.
 // Pi v1.5.0 sync (area events, f3255de76): "stores exactly what callers and events get ..." no longer compares watchEvents' nested tool
 // ends (removed): a client reads a live caller's nested results from the same documents the stored results come from.
+// Pi v1.5.0 sync (area vocabulary, 5f312dac4): the committed results are read with an ObserveCommits observer (upstream
+// observeCommits({ advance, end })) from the nested-call documents' changes of kind change (DocumentValueChange).
 using System.Collections.Immutable;
 using PiSharp.Durable;
 using PiSharp.Durable.Chord;
@@ -140,14 +142,14 @@ internal static class StructuredOutputTests
             var (harness, root) = await OpenChat(new MemoryStorage(), setup);
             // The result each nested call's document got, as committed.
             var stored = new SyncList<JsonValue>();
-            harness.SubscribeCommits((publication, _) =>
+            harness.ObserveCommits(new CommitObserver((publication, _) =>
             {
                 foreach (var change in publication.Changes)
                 {
-                    if (change is not DocumentCommitChange { Record.Kind: "pi.tool.nested-call" } document) continue;
-                    if (document.Value is { } value && value.TryGetValue("result", out var result) && document.Ops.Length > 0) stored.Add(result);
+                    if (change is not DocumentValueChange { Record.Kind: "pi.tool.nested-call" } document) continue;
+                    if (document.Value.TryGetValue("result", out var result) && document.Ops.Length > 0) stored.Add(result);
                 }
-            });
+            }, _ => { }));
             await (await root.SubmitAsync(SubmissionDraft.Input("go"), Context)).WaitAsync(Context);
             await harness.WaitForIdleAsync(Context);
             await harness.CloseAsync(Context);

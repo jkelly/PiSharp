@@ -1331,7 +1331,7 @@ internal static partial class StructuredTests
             await Eventually(async () => await StatusOf(harness, parent) == DurableTaskStatus.Completing);
             storage.Fail = parent;
             nodes.Open("child");
-            Equal(new SessionEnd(SessionEndReason.Failed, storage.Failure), await harness.Closed, "closed");
+            Equal(SessionEnd.Failed(storage.Failure), await harness.Closed, "closed");
             Seq([storage.Failure], reports.Snapshot(), "reports");
             await harness.CloseAsync(Context);
             controlled.Reopen();

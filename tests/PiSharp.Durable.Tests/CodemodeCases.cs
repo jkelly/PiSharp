@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/test/codemode.test.ts ("durable code mode" as codemode.<case>,
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/test/codemode.test.ts ("durable code mode" as codemode.<case>,
 // "durable code mode output and tool search" as codemode.output.<case>). Verbatim apart from the adaptations in HarnessSupport.cs and
 // ChatSupport.cs, and these:
 // - `openNodeSqliteStorage(path)` is SqliteStorage.OpenAsync over a file in a fresh temporary directory; NodeExecutionEnv is
@@ -23,6 +23,8 @@
 //   clock (f75b3240a), which upstream's suite does not:
 //   codemode.reads-the-script-s-start-its-results-times-and-its-wall-time-from-the-harness-clock and
 //   codemode.measures-the-script-s-deadline-on-the-harness-clock-across-a-restart, both with HarnessOptions.Now as a test clock.
+// - Pi v1.5.0 sync (area vocabulary, 5f312dac4): journals-results-that-finish-together-in-one-commit counts the journal commits with an
+//   ObserveCommits observer (a CommitObserver; upstream observeCommits({ advance, end })) over the document changes of kind change.
 using System.Collections.Concurrent;
 using System.Text.RegularExpressions;
 using PiSharp.Codemode;
@@ -934,15 +936,15 @@ internal static partial class CodemodeTests
             var (harness, root) = await OpenChat(await SqliteStorage.OpenAsync(SqlitePath()), chat.Setup);
             // After each journal commit: its entries, and the acknowledged counts it holds (firstIssued and each issuedAfter).
             var journals = new ConcurrentQueue<(int Entries, int Counts)>();
-            harness.SubscribeCommits((publication, _) =>
+            harness.ObserveCommits(new CommitObserver((publication, _) =>
             {
                 foreach (var change in publication.Changes)
-                    if (change is DocumentCommitChange { Record.Kind: "pi.codemode.journal", Value: { } journal })
+                    if (change is DocumentValueChange { Record.Kind: "pi.codemode.journal", Value: var journal })
                     {
                         var entries = ((JsonArrayValue)journal["entries"]).Cast<JsonObjectValue>().ToList();
                         journals.Enqueue((entries.Count, (journal.ContainsKey("firstIssued") ? 1 : 0) + entries.Count(entry => entry.ContainsKey("issuedAfter"))));
                     }
-            });
+            }, _ => { }));
             await (await root.SubmitAsync(SubmissionDraft.Input("go"), Context)).WaitAsync(Context);
             SameText(new("50", false), await ResultOf(root), "result");
             var commits = journals.ToList();
