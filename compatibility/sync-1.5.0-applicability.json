@@ -2084,7 +2084,8 @@
         "tests": [
           "tests/PiSharp.ProviderSync.Tests/Sync150StreamCases.cs: sync150.parse-tool-call-arguments-and-repair",
           "tests/PiSharp.Agent.Tests/Sync150Cases.cs: sync150.tool-invoker-reports-malformed-final-arguments",
-          "tests/PiSharp.Agent.Tests/Sync150Cases.cs: sync150.tool-invoker-runs-well-formed-and-empty-final-arguments"
+          "tests/PiSharp.Agent.Tests/Sync150Cases.cs: sync150.tool-invoker-runs-well-formed-and-empty-final-arguments",
+          "tests/PiSharp.CodingAgent.Tests/SessionCommandTests.cs: Session CLI Completions rejects cross-family preflight and keeps failed wire/request/tool authority bounded"
         ]
       }
     },
@@ -2890,7 +2891,8 @@
         ],
         "tests": [
           "tests/PiSharp.ProviderSync.Tests/Sync150StreamCases.cs: sync150.usage-total-from-provider-and-combine",
-          "tests/PiSharp.Durable.Tests/ModelsCases.cs: models.stream.responses-sse-becomes-the-durable-assistant-message"
+          "tests/PiSharp.Durable.Tests/ModelsCases.cs: models.stream.responses-sse-becomes-the-durable-assistant-message",
+          "tests/PiSharp.CodingAgent.Tests/SessionCompactionIntegrationTests.cs: actual-summary-requests-split-usage"
         ]
       }
     },
@@ -2978,7 +2980,8 @@
         ],
         "tests": [
           "tests/PiSharp.Models.Tests/Sync150CatalogCases.cs: sync150.catalog-drops-realtime-and-image-only-chat-models",
-          "tests/PiSharp.ProviderSync.Tests/Program.cs: catalog.pi-ai-1.1.0-shards-hashes-and-additions"
+          "tests/PiSharp.ProviderSync.Tests/Program.cs: catalog.pi-ai-1.1.0-shards-hashes-and-additions",
+          "tests/PiSharp.CodingAgent.Tests/MistralLiveSelectionTests.cs: mistral CLI normal Simple and summary direct routes use actual factory HTTP"
         ]
       }
     },
@@ -3829,7 +3832,9 @@
         ],
         "tests": [
           "tests/PiSharp.CliSync.Tests/Sync150Cases.cs: sync150.resume-keeps-branch-tools-with-default-selection",
-          "tests/PiSharp.CliSync.Tests/Sync150Cases.cs: sync150.resume-cli-keeps-tools-enabled-in-the-session"
+          "tests/PiSharp.CliSync.Tests/Sync150Cases.cs: sync150.resume-cli-keeps-tools-enabled-in-the-session",
+          "tests/PiSharp.CodingAgent.Tests/StartupToolSelectionTests.cs: resumed RPC keeps recorded tools over settings and absent leaves them",
+          "tests/PiSharp.CodingAgent.Tests/StartupToolSelectionTests.cs: unavailable recorded Bash is pending without override and explicit selection resumes safely"
         ]
       }
     },
@@ -3967,7 +3972,9 @@
           "be30acea"
         ],
         "tests": [
-          "tests/PiSharp.SessionParity.Tests/Sync150Cases.cs: sync150.summaries-send-no-output-cap-and-focus-the-split-turn-prefix"
+          "tests/PiSharp.SessionParity.Tests/Sync150Cases.cs: sync150.summaries-send-no-output-cap-and-focus-the-split-turn-prefix",
+          "tests/PiSharp.CodingAgent.Tests/SessionCompactionIntegrationTests.cs: actual-summary-requests-split-usage",
+          "tests/PiSharp.CodingAgent.Tests/SessionCompactionIntegrationTests.cs: summary-failures-abort-boundary"
         ]
       }
     },
@@ -3994,7 +4001,8 @@
           "be30acea"
         ],
         "tests": [
-          "tests/PiSharp.SessionParity.Tests/Sync150Cases.cs: sync150.summaries-send-no-output-cap-and-focus-the-split-turn-prefix"
+          "tests/PiSharp.SessionParity.Tests/Sync150Cases.cs: sync150.summaries-send-no-output-cap-and-focus-the-split-turn-prefix",
+          "tests/PiSharp.CodingAgent.Tests/SessionCompactionIntegrationTests.cs: actual-summary-requests-split-usage"
         ]
       }
     },
@@ -4021,7 +4029,8 @@
           "a99a2be5"
         ],
         "tests": [
-          "tests/PiSharp.CliSync.Tests/Sync150Cases.cs: sync150.resume-activates-unmentioned-extension-tools-over-the-whole-branch"
+          "tests/PiSharp.CliSync.Tests/Sync150Cases.cs: sync150.resume-activates-unmentioned-extension-tools-over-the-whole-branch",
+          "tests/PiSharp.CodingAgent.Tests/CoreResumeToolSelectionTests.cs: core legacy explicit exposure activation and reopen preserve every tool origin"
         ]
       }
     },
@@ -4451,7 +4460,10 @@
           "a99a2be5"
         ],
         "tests": [
-          "tests/PiSharp.CliSync.Tests/Sync150Cases.cs: sync150.active-tools-keep-their-order"
+          "tests/PiSharp.CliSync.Tests/Sync150Cases.cs: sync150.active-tools-keep-their-order",
+          "tests/PiSharp.CodingAgent.Tests/NativeLsInstallationTests.cs: actual profile preserves defaults schema read write and policy-mediated listing",
+          "tests/PiSharp.CodingAgent.Tests/NativeLoadoutDiagnosticTests.cs: actual loader binding bootstrap and session startup deliver sanitized captured occurrences once",
+          "tests/PiSharp.CodingAgent.Tests/BuiltinToolInstallationTests.cs: actual profile explicit edit activation persists and requires exact read and write grants"
         ]
       }
     },
@@ -4844,7 +4856,8 @@
         ],
         "tests": [
           "tests/PiSharp.SessionParity.Tests/Sync150Cases.cs: sync150.branch-entries-apply-context-edits",
-          "tests/PiSharp.SessionParity.Tests/Sync150Cases.cs: sync150.tree-summary-carries-thinking-level-and-context-edits"
+          "tests/PiSharp.SessionParity.Tests/Sync150Cases.cs: sync150.tree-summary-carries-thinking-level-and-context-edits",
+          "tests/PiSharp.CodingAgent.Tests/SessionCompactionIntegrationTests.cs: nonroot-raw-branch-common-ancestor"
         ]
       }
     },
