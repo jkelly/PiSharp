@@ -3968,7 +3968,8 @@
         "018fdcf43",
         "3ac64a074",
         "5f312dac4",
-        "f6a9db1d8"
+        "f6a9db1d8",
+        "e45e2a9e"
       ],
       "notes": "Design point, formats: pi.live is version 1 in PiSharp (Live.cs:25); land the migrate chain v1 -> v2 (reason renamed trigger) -> v3 (run.turns 0) at once. Upstream migrates on read and the next commit stores v3, which v1 code cannot read: PiSharp 1.2.0.x cannot read a conversation PiSharp 1.5.0 wrote to (no rollback; decision 0005 and the release notes must say so, phase 8). The v1.2.0 corpus's pi.live values are migration input (compat.read and compat.harness keep reading them); the written comparisons that store pi.live become authored expectations from upstream v1.5.0's harness-compaction.test.ts and harness-turn-limit.test.ts. PiSharp-only readers of compactionFailure.reason move to trigger: pisharp durable's 'Compaction failed (<reason>)' line, the client model, the hub (StreamMux.cs, app.js) and the web agent's chat views. Custom agent subagents and workflows (decision 0012) could set maxTurns; the device host's agent settings could expose it."
     },

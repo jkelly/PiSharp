@@ -56,11 +56,11 @@
     "changelogBullets": 477,
     "repeatedBullets": 23,
     "byStatus": {
-      "ported": 215,
-      "ported-with-deferral": 22,
+      "ported": 216,
+      "ported-with-deferral": 23,
       "already-ported": 12,
       "no-op": 25,
-      "port": 52
+      "port": 50
     },
     "byArea": {
       "ai": 58,
@@ -9433,7 +9433,7 @@
       "id": "durable.live-compaction-trigger",
       "area": "durable",
       "phase": 4,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "durable@1.5.0/Breaking Changes#24"
       ],
@@ -9456,7 +9456,31 @@
         "tests/PiSharp.Durable.Tests/Harness/HarnessCompactionCases.cs"
       ],
       "release": "1.5.0",
-      "notes": "pi.live is version 1 in PiSharp (Live.cs:25); the migrate chain to version 2 (this row) and version 3 (turns, durable.turn-limit) should land as one. PiSharp 1.2.0.x cannot read a conversation PiSharp 1.5.0 wrote to; record it in decision 0005 and the release notes. PiSharp-only readers of compactionFailure.reason: pisharp durable's 'Compaction failed (<reason>)' line (decision 0005 area l), the client model, the hub and the web agent's chat views."
+      "notes": "pi.live is version 1 in PiSharp (Live.cs:25); the migrate chain to version 2 (this row) and version 3 (turns, durable.turn-limit) should land as one. PiSharp 1.2.0.x cannot read a conversation PiSharp 1.5.0 wrote to; record it in decision 0005 and the release notes. PiSharp-only readers of compactionFailure.reason: pisharp durable's 'Compaction failed (<reason>)' line (decision 0005 area l), the client model, the hub and the web agent's chat views.",
+      "evidence": {
+        "commits": [
+          "e45e2a9e"
+        ],
+        "tests": [
+          "tests/PiSharp.Durable.Tests/Harness/HarnessCompactionCases.cs: reads-a-version-1-value-with-each-compaction-s-reason-as-trigger-and-stores-it-migrated-on-its-next-write",
+          "tests/PiSharp.Durable.Tests/Harness/HarnessCompactionCases.cs: gives-a-version-2-run-without-turns-a-count-of-0",
+          "tests/PiSharp.Durable.Tests/Harness/HarnessCompactionCases.cs: starts-above-the-background-threshold-without-blocking-the-run-idle-waits-and-esc-ignore-it",
+          "tests/PiSharp.Durable.Tests/Harness/HarnessCompactionCases.cs: records-a-failure-in-pi-live-in-the-commit-that-ends-the-compaction-until-a-summary-is-produced",
+          "tests/PiSharp.Durable.Tests/Harness/HarnessCompactionCases.cs: waits-for-its-compaction-which-appends-the-summary-before-the-request",
+          "tests/PiSharp.Durable.Tests/Harness/HarnessCompactionCases.cs: fails-the-run-with-the-compactions-error-without-a-request-when-its-compaction-fails",
+          "tests/PiSharp.Durable.Tests/Harness/HarnessCompactionCases.cs: lists-a-compaction-from-start-to-end-with-its-retry-backoff-in-a-late-joiners-view",
+          "tests/PiSharp.Durable.Tests/Harness/HarnessCompactionCases.cs: fails-the-run-when-its-blocking-compaction-faults-and-records-the-fault",
+          "tests/PiSharp.Durable.Tests/Harness/HarnessCompactionCases.cs: shows-a-late-joiner-a-compaction-that-is-summarizing",
+          "tests/PiSharp.Durable.Tests/Harness/HarnessCompactionCases.cs: survives-reopen-blocked-and-is-orphaned-on-abort-with-its-status-removed",
+          "tests/PiSharp.Durable.Tests/HarnessRestartFailureCases.cs: fails-a-compaction-into-compactionfailure",
+          "tests/PiSharp.Durable.Tests/Harness/HarnessCompactionDifferentialCases.cs: background-failure",
+          "tests/PiSharp.Durable.Tests/Harness/HarnessCompactionDifferentialCases.cs: blocking-failure",
+          "tests/PiSharp.Durable.Tests/Compat/CompatScenarios120.cs: compaction-failure",
+          "tests/PiSharp.DurableCli.Tests/TuiLibraryCases.cs: tui.alert.compaction-failure",
+          "tests/PiSharp.DurableCli.Tests/TuiStreamingCases.cs: tui.status.retry-deferred-compaction",
+          "tests/PiSharp.DurableCli.Tests/RuntimeLibraryCases.cs: runtime.compact.failure-is-the-live-compaction-failure"
+        ]
+      }
     },
     {
       "id": "durable.task-inspection-states",
@@ -9763,7 +9787,8 @@
           "tests/PiSharp.Durable.Tests/HarnessFailedRunInboxCases.cs: inputs-queued-behind-a-failed-run.start-the-next-run-with-continue",
           "tests/PiSharp.Durable.Tests/HarnessFailedRunInboxCases.cs: inputs-queued-behind-a-failed-run.place-queued-writes-and-keep-them-with-withdraw",
           "tests/PiSharp.Durable.Tests/HarnessFailedRunInboxCases.cs: inputs-queued-behind-a-failed-run.settle-unanswered-with-run_failed-with-withdraw",
-          "tests/PiSharp.Durable.Tests/Harness/HarnessGenerationCases.cs: resolves-settings-over-the-built-in-defaults"
+          "tests/PiSharp.Durable.Tests/Harness/HarnessGenerationCases.cs: resolves-settings-over-the-built-in-defaults",
+          "tests/PiSharp.Durable.Tests/HarnessTurnLimitCases.cs: leaves-items-queued-during-the-last-round-to-afterfailedrun"
         ]
       }
     },
@@ -9955,7 +9980,7 @@
       "id": "durable.turn-limit",
       "area": "durable",
       "phase": 4,
-      "status": "port",
+      "status": "ported-with-deferral",
       "changelog": [
         "durable@1.5.0/Breaking Changes#32",
         "durable@1.5.0/Breaking Changes#33",
@@ -9981,7 +10006,33 @@
         "samples/Durable.Examples/ (new)"
       ],
       "release": "1.5.0",
-      "notes": "No turn limit in PiSharp. Depends on durable.run-failure, durable.after-failed-run and durable.live-compaction-trigger (pi.live version 2; the migrate chain to version 3 lands once). PiSharp-only: custom agent subagents and workflows (decision 0012) bound their own loops and could set maxTurns; the device host's agent settings could expose it."
+      "notes": "No turn limit in PiSharp. Depends on durable.run-failure, durable.after-failed-run and durable.live-compaction-trigger (pi.live version 2; the migrate chain to version 3 lands once). PiSharp-only: custom agent subagents and workflows (decision 0012) bound their own loops and could set maxTurns; the device host's agent settings could expose it.",
+      "evidence": {
+        "commits": [
+          "e45e2a9e"
+        ],
+        "tests": [
+          "tests/PiSharp.Durable.Tests/HarnessTurnLimitCases.cs: ends-a-run-after-the-tool-round-that-reaches-the-limit-like-a-failure",
+          "tests/PiSharp.Durable.Tests/HarnessTurnLimitCases.cs: counts-tool-rounds-only-a-run-answers-below-its-limit-and-an-answer-at-the-limit-settles-done",
+          "tests/PiSharp.Durable.Tests/HarnessTurnLimitCases.cs: runs-onyield-at-the-limit-and-a-continuation-starts-the-count-over",
+          "tests/PiSharp.Durable.Tests/HarnessTurnLimitCases.cs: settles-a-steer-that-joined-the-run-at-an-earlier-round-with-turn_limit-too",
+          "tests/PiSharp.Durable.Tests/HarnessTurnLimitCases.cs: leaves-items-queued-during-the-last-round-to-afterfailedrun",
+          "tests/PiSharp.Durable.Tests/HarnessTurnLimitCases.cs: applies-a-changed-limit-at-the-end-of-the-round-null-removes-it",
+          "tests/PiSharp.Durable.Tests/HarnessTurnLimitCases.cs: rejects-a-limit-that-is-not-an-integer-1-or-more",
+          "tests/PiSharp.Durable.Tests/HarnessTurnLimitCases.cs: lets-terminate-settle-done-at-the-limit-and-writes-a-handoff-s-reset-before-ending",
+          "tests/PiSharp.Durable.Tests/HarnessTurnLimitCases.cs: is-resumed-by-a-continue-with-a-fresh-budget-on-the-round-s-results",
+          "tests/PiSharp.Durable.Tests/HarnessTurnLimitCases.cs: is-inherited-by-forks-and-children-which-may-set-their-own",
+          "tests/PiSharp.Durable.Tests/HarnessTurnLimitCases.cs: keeps-the-stored-count-across-a-restart",
+          "tests/PiSharp.Durable.Tests/StoreStorageNode.cs: harness.turn-limit.store.",
+          "tests/PiSharp.Durable.Tests/Harness/HarnessLiveDeltasCases.cs: hands-a-generation-over-to-its-tool-round-and-starts-a-tool-with-one-field-write-each",
+          "tests/PiSharp.Durable.Tests/Harness/HarnessCompactionCases.cs: gives-a-version-2-run-without-turns-a-count-of-0",
+          "tests/PiSharp.Durable.Tests/ExamplesCases.cs: 34-turn-limit-and-continue",
+          "tests/PiSharp.Durable.Tests/ExamplesCases.cs: examples.memory.upstream-output",
+          "tests/PiSharp.Durable.Tests/Harness/HarnessViewsDifferentialCases.cs: tool-turn",
+          "tests/PiSharp.Durable.Tests/Compat/CompatScenarios.cs: tool-interrupted"
+        ]
+      },
+      "deferred": "Upstream's \"lets terminate settle done at the limit, and writes a handoff's reset before ending\" expects the handoff's run to end turn_limit, because v1.5.0 continues a run after a handoff (area run-end, 38ff99177). PiSharp still ends a run done at a handoff (Pi v1.2.0), ahead of the limit, so harness.turn-limit.lets-terminate-settle-done-at-the-limit-and-writes-a-handoff-s-reset-before-ending asserts done for the handoff half; area run-end flips it to turn_limit and moves harness-turn-limit.test.ts to ported. LiveRun's first and afterRun are run-end's too."
     },
     {
       "id": "durable.when-idle-reject",
