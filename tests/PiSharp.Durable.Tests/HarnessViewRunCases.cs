@@ -24,6 +24,12 @@
 //   GC.GetTotalAllocatedBytes and the heap with GC.GetTotalMemory in place of V8's GCProfiler and heap statistics. In "streams a tool call
 //   partial ...", a partial of the "done" answer after the tool result has a text block, which the members check expects as text and type:
 //   that answer streams for less than the partial interval, so it commits a partial only on a slow runner (a macOS runner did).
+// - "keeps a watcher's memory ...": the watcher records each frame's operations but not its value, where upstream's listen() keeps both.
+//   A frame's value is the view at that revision. In .NET its JSON spine (the objects on the path to the changed text) costs about 2 KB a
+//   frame against V8's few hundred bytes. With the 4,049 frames the case commits by its second measure, the recorded values alone took
+//   the heap from 9.4 MB to 17 MB on Windows and past upstream's 20 MB on a macOS runner (20.1 MB). The bound stays upstream's 20 MB and
+//   still covers the watcher, its view and every recorded operation. A view or operation that held a copy of the text per commit would
+//   still exceed it many times over (140 KB a commit). The per-commit text cost is also checked by the allocation case before it.
 using System.Collections.Immutable;
 using PiSharp.Contracts;
 using PiSharp.Durable;
@@ -657,7 +663,15 @@ internal static class ViewRunTests
                 FauxAssistantMessage([FauxText("done")]));
             var (harness, root) = await OpenChat(new MemoryStorage(), setup);
             using var subscription = FollowCommits(harness, (_, _) => paced.Committed());
-            var listening = await Listen(root, check: false);
+            // The watcher records each frame's operations, not its value (see the header): a frame's value is the view at that revision,
+            // whose JSON spine costs about 2 KB in .NET.
+            var watch = await root.WatchAsync(Context);
+            var frames = new SyncList<ImmutableArray<Op>>();
+            watch.Start((call, _) =>
+            {
+                frames.Add(Change(call).Ops);
+                return Task.CompletedTask;
+            });
             var before = await HeapInUse(harness);
             var submission = await root.SubmitAsync(SubmissionDraft.Input("go"), Context);
             async Task<int> Shown(int index)
@@ -685,19 +699,19 @@ internal static class ViewRunTests
                 streamed[index] += length;
                 if (streamed[index] < raw[index] * 0.9 || await Shown(index) <= (index == 0 ? text.Length : content.Length) * 0.95) return;
                 retained.Add(await HeapInUse(harness) - before);
-                framesAt.Add(listening.Frames.Count);
+                framesAt.Add(frames.Count);
                 measured++;
             };
             await submission.WaitAsync(Context);
             Equal(2, retained.Count, "measures");
-            var commits = listening.Frames.Count;
+            var commits = frames.Count;
             Check(commits > 500, $"frames: {commits}");
             // The two 140 KB strings, the watcher's recorded frames and the rest of the stream: about 3 MB upstream. Sliced append ops made
             // the watcher's view hold a copy of the text per commit: well over 100 MB.
             // The message carries what the bytes depend on (the heap before, the frames at each measure), for a runner where they differ.
             foreach (var bytes in retained)
                 Check(bytes < 20_000_000, $"retained bytes: {string.Join(", ", retained)} (before {before}, frames {string.Join(", ", framesAt)})");
-            await listening.Watch.StopAsync();
+            await watch.StopAsync();
             await harness.CloseAsync(Context);
         });
     }
