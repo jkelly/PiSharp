@@ -3,8 +3,8 @@
 // harness-options): a read-only Session refuses commits with writes (upstream be14d9732); the citation stays on v1.2.0 until the file's
 // other areas land. Pi v1.5.0 sync (area storage-batches): a commit sends its writes as one batch of the batched Storage.commit and judges
 // the result, as session/writer.ts does for a call of one part: a refusal fails the Session and is the commit's error, as a rejection is.
-// Group commit (several parts per call) and the publication scope (Storage.publishing) follow with their own areas; GuardedStorage
-// already forwards both. Pi v1.5.0 sync (area sleep): createSession's setTimer arms the document sweep as a background timer (upstream
+// Group commit (several parts per call) and the publication scope (Storage.publishing) came with area group-commit (below); GuardedStorage
+// forwards both. Pi v1.5.0 sync (area sleep): createSession's setTimer arms the document sweep as a background timer (upstream
 // f75b3240a, Timers.cs); a host that declines one leaves eviction to the end of each commit. Pi v1.5.0 sync (area reports): a report
 // carries its ReportInfo (a30c2a81d): the Session's failure and a failing close are storage_failed, a host timer host_error setTimer, and a
 // listener's throw listener_error, the default. Pi v1.5.0 sync (area telemetry, 2ec55d808 and v1.5.0's fix): a stored commit's publication

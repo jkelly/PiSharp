@@ -10,12 +10,15 @@
 // section 9, and quotes "about 5 -> 440 agent runs per second" for one Harness with 128 conversations over storage with a 4 ms round trip):
 // one Session's commit throughput and one Harness's run throughput with N conversations working at once, over MemoryStorage behind a fixed
 // round trip on every call (LatencyStorage; PreciseDelay keeps sub-millisecond waits, as Task.Delay rounds up to the 15.6 ms Windows timer
-// tick) and over local SQLite. Each Session conversation appends one entry per commit; each Harness run is one faux text reply. Prints
-// commits or runs per second, the storage calls and the mean commits per call (the group size), and the median run.
+// tick) and over local SQLite. Each Session conversation appends one entry per commit (session commits), or changes its own cached
+// conversation document (session changes: a commit that reads nothing from Storage, until area publication-caches gives the entry path
+// its record cache); each Harness run is one faux text reply. Prints commits or runs per second, the storage calls and the mean commits
+// per call (the group size), and the median run.
 using System.Diagnostics;
 using System.Globalization;
 using PiSharp.Chord;
 using PiSharp.Durable.Chord;
+using PiSharp.Durable.Chord.Delta;
 using PiSharp.Durable.Sqlite;
 using PiSharp.Durable.Storage;
 using PiSharp.Durable.Storage.Jsonl;
@@ -253,14 +256,15 @@ public static class StorageBench
         var rows = new List<ThroughputRow>();
         await using var fixtures = new Fixtures(tempRoot ?? Path.GetTempPath());
         output.WriteLine("scenario        | backend | round trip ms | conversations | commits | s     | commits/s | storage calls | commits per call");
-        foreach (var (backend, latency) in Throughputs(latencies))
-            foreach (var count in conversations)
-            {
-                var row = await SessionCommitsAsync(fixtures, backend, latency, count);
-                rows.Add(row);
-                output.WriteLine(string.Create(CultureInfo.InvariantCulture,
-                    $"session commits | {row.Backend,-7} | {row.LatencyMs,-13} | {row.Conversations,-13} | {row.Work,-7} | {row.Seconds,-5:F2} | {row.Work / row.Seconds,-9:F0} | {row.StorageCalls,-13} | {(double)row.Commits / Math.Max(1, row.StorageCalls):F2}"));
-            }
+        foreach (var changes in new[] { false, true })
+            foreach (var (backend, latency) in Throughputs(latencies))
+                foreach (var count in conversations)
+                {
+                    var row = await SessionCommitsAsync(fixtures, backend, latency, count, changes);
+                    rows.Add(row);
+                    output.WriteLine(string.Create(CultureInfo.InvariantCulture,
+                        $"{row.Scenario,-15} | {row.Backend,-7} | {row.LatencyMs,-13} | {row.Conversations,-13} | {row.Work,-7} | {row.Seconds,-5:F2} | {row.Work / row.Seconds,-9:F0} | {row.StorageCalls,-13} | {(double)row.Commits / Math.Max(1, row.StorageCalls):F2}"));
+                }
         output.WriteLine("scenario     | backend | round trip ms | conversations | runs | s     | runs/s | median run ms | commits per run | storage calls | commits per call");
         foreach (var (backend, latency) in Throughputs([.. latencies.Where(latency => latency == 0 || latency >= 4)]))
             foreach (var count in conversations)
@@ -285,7 +289,13 @@ public static class StorageBench
     /// <summary>The runs of one Harness row: 128 in all, split evenly across the conversations, each conversation's in sequence.</summary>
     private const int HarnessRuns = 128;
 
-    private static async Task<ThroughputRow> SessionCommitsAsync(Fixtures fixtures, BenchBackend backend, double latency, int count)
+    /// <summary>The conversation document a session changes row changes (see the file header).</summary>
+    private static readonly ConversationDocToken Counter = Documents.DefineConversationDoc("bench.throughput.counter", 1, DocumentFork.Initial,
+        () => (JsonObjectValue)JsonValue.Parse("""{"n":0}"""), checkpointWhen: (_, _, _) => false);
+
+    private static void Count(DraftObject counter) => counter.Set("n", ((JsonNumberValue)counter.Get("n")!).Value + 1);
+
+    private static async Task<ThroughputRow> SessionCommitsAsync(Fixtures fixtures, BenchBackend backend, double latency, int count, bool changes)
     {
         var storage = new LatencyStorage(await fixtures.CreateAsync(backend), latency);
         var session = Session.Create(storage);
@@ -298,16 +308,23 @@ public static class StorageBench
                 return created;
             }, Context);
             var each = Math.Max(1, SessionCommits / count);
+            // Each conversation's document is created and cached before the clock starts.
+            if (changes)
+                foreach (var id in ids) await session.CommitAsync(async tx => Count(await tx.DocAsync(Counter, id)), Context);
             storage.Reset();
             var watch = Stopwatch.StartNew();
             await Task.WhenAll(ids.Select(async id =>
             {
                 for (var index = 0; index < each; index++)
-                    await session.CommitAsync(tx => tx.AppendEntryAsync(id, new EntryDraft { Kind = "note" }), Context);
+                {
+                    if (changes) await session.CommitAsync(async tx => Count(await tx.DocAsync(Counter, id)), Context);
+                    else await session.CommitAsync(tx => tx.AppendEntryAsync(id, new EntryDraft { Kind = "note" }), Context);
+                }
             }));
             watch.Stop();
             var (calls, commits) = storage.Reset();
-            return new ThroughputRow("session commits", Name(backend), latency, count, each * count, watch.Elapsed.TotalSeconds, calls, commits, 0);
+            return new ThroughputRow(changes ? "session changes" : "session commits", Name(backend), latency, count, each * count,
+                watch.Elapsed.TotalSeconds, calls, commits, 0);
         }
         finally
         {
