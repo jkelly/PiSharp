@@ -13,8 +13,8 @@ using PiSharp.Durable.Testing;
 // document retention, three subagent cycles under a live parent, a fan-out of four child tasks and a chain of five, four nested calls, two
 // tiny nested-tools scenarios, the four nested-images variants of two images, the four code mode rows of three echo calls, and a 2,000
 // character partial-commits answer (PartialCommitsBench.cs, Pi v1.5.0 sync area partial-commits), and every conversation-view scenario
-// over 120 entries on SQLite and the store (ConversationViewBench.cs, area view: test/conversation-view-bench.ts). It asserts
-// completion,
+// over 120 entries on SQLite and the store (ConversationViewBench.cs, area view: test/conversation-view-bench.ts), and storage-throughput
+// with two conversations and no round trip on memory and SQLite (StorageBench.cs, area group-commit). It asserts completion,
 // the number of results and the scheduler's bounded indexes, never a timing.
 internal static partial class Program
 {
@@ -137,6 +137,13 @@ internal static partial class Program
                 Check(windows is [50, 20, >= 50 and <= 100, >= 50 and <= 100, >= 50 and <= 100], $"{storage} windows: {string.Join(", ", windows)}");
             }
             Equal(7, ConversationViewBench.Scenarios().Count, "conversation-view scenario count");
+            // Pi v1.5.0 sync (area group-commit): storage-throughput with two conversations and no round trip, in this process.
+            var throughputOutput = new StringWriter();
+            var throughputRows = await StorageBench.ThroughputAsync([0], [2], throughputOutput, root);
+            Equal("session commits,session commits,session changes,session changes,harness runs,harness runs",
+                string.Join(",", throughputRows.Select(row => row.Scenario)), "storage-throughput rows: memory and SQLite each");
+            Check(throughputRows.All(row => row.Work > 0 && row.StorageCalls > 0 && row.Commits >= row.StorageCalls), "storage-throughput counts");
+            Check(throughputOutput.ToString().StartsWith("scenario        | backend", StringComparison.Ordinal), "storage-throughput table: " + throughputOutput);
             Directory.Delete(root, recursive: true);
         });
     }
