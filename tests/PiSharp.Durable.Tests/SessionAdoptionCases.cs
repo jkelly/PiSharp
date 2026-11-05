@@ -9,7 +9,9 @@
 // - "discards the staged changes when Storage rejects before adoption" mocks MemoryStorage's commit to reject once; here FaultyStorage's
 //   fault RejectBeforeAdopt throws before it reaches its backend.
 // - Upstream's host dispatch is a microtask queued at the publication; PiSharp runs it right after the Session's own observers, in the
-//   same publication (Session.Publish), which keeps every order these cases assert: no wait and no other code can run in between.
+//   same publication (Session.Publish), which keeps every order these cases assert: what the publication sets off (the waits it resolves,
+//   abort signals, scheduler passes) runs only after it. A wait called on another thread in between is the one window Session.cs's header
+//   documents; no case here makes one.
 // - The JSONL case's NodeExecutionEnv subclass is a LocalFileSystem subclass recording each rename.
 // - toEqual of a failed Session end compares its kind and its error (by reference, or by message for a storage error built inside it).
 using PiSharp.Durable;

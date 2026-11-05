@@ -31,7 +31,7 @@
 //   the abort handler waits until the order is asserted, as the abort invocation's terminal commit would otherwise race the assertion on
 //   another thread. "stores a host listener's own commit before the reconcile commit ..." reads the stored commits after close, as no commit
 //   lands then. `publication.kind === "stored"` is !IsMemory, harness.closed is Closed, and infos are OpenedRoot.Infos. With this block
-//   every v1.5.0 test of the file is here (49 per storage), so the citation moves to v1.5.0.
+//   every v1.5.0 test of the file is here (49 cases on each backend), so the citation moves to v1.5.0.
 using System.Collections.Concurrent;
 using PiSharp.Durable;
 using PiSharp.Durable.Chord;
