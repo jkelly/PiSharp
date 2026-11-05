@@ -10,10 +10,11 @@
 // - "leaves no aborted entry for a stream that crashed before its first store" expects no stored generation at all: e5c6182ba defers the
 //   attempt too (durable@1.5.0 Changed#5), where 6c2fd73b0 stored `{ generation: { attempt: 1 } }`.
 // The v1.5.0 blob (07116cc08) differs by later areas only: observers (followCommits, observeCommits({ advance, end })), vocabulary
-// (change.kind), pi-schema (obj({}) for Type.Object({})), and restarts (b3a29f111): slowSetup's retry settings, "converts what was stored
-// ... and retries the charged attempt" (here 6c2fd73b0's "... and resends"), and "never counts progress commits as progress of a task cut
-// off again and again", which replaces 6c2fd73b0's "never counts partial commits ...". Both count restarts, which PiSharp's task records do
-// not hold until area restarts lands, so neither runs here yet.
+// (change.kind) and pi-schema (obj({}) for Type.Object({})). Pi v1.5.0 sync (area restarts, b3a29f111): slowSetup retries at once, as a
+// request a crash interrupted is a failed attempt; "converts what was stored ... and retries the charged attempt" is 6c2fd73b0's "... and
+// resends" renamed; "never counts progress commits as progress of a task cut off again and again", which replaces 6c2fd73b0's "never
+// counts partial commits ...", is ported. A crash here is Session.Fail, whose close writes nothing back, so the tasks it cut off count a
+// restart as upstream's do.
 using PiSharp.Durable;
 using PiSharp.Durable.Chord;
 using PiSharp.Durable.Chord.Delta;
@@ -39,6 +40,8 @@ internal static class DeferredProgressTests
     {
         var setup = Setup(new FauxOptions { TokensPerSecond = 80, MinTokenSize = 4, MaxTokenSize = 4 });
         setup.Progress = new ProgressSettings { PersistWithinMs = persistWithinMs };
+        // A request a crash interrupted is a failed attempt (#11139): retry at once.
+        setup.Retry = new RetrySettings { Enabled = true, MaxRetries = 5, BaseDelayMs = 1 };
         return setup;
     }
 
@@ -217,7 +220,7 @@ internal static class DeferredProgressTests
             await opened.Harness.CloseAsync(Context);
         });
 
-        yield return Case(prefix + "converts-what-was-stored-into-the-aborted-entry-after-a-crash-and-resends", async () =>
+        yield return Case(prefix + "converts-what-was-stored-into-the-aborted-entry-after-a-crash-and-retries-the-charged-attempt", async () =>
         {
             var storage = NewStorage();
             var setup = SlowSetup(150);
@@ -347,6 +350,48 @@ internal static class DeferredProgressTests
         });
 
         // ─── tool output ──────────────────────────────────────────────────────────
+
+        // #11139: a generation's request is charged at once after a crash, so its partials never stream with a count; a replay-safe tool
+        // reruns and streams its output with one.
+        yield return Case(prefix + "never-counts-progress-commits-as-progress-of-a-task-cut-off-again-and-again", async () =>
+        {
+            var storage = NewStorage();
+            var setup = SlowSetup(50);
+            var runs = 0;
+            AddTool(setup.Registry, Define.Tool(new ToolRegistration
+            {
+                Name = "work",
+                Description = "work",
+                Replay = ToolReplay.Safe,
+                Execute = async (_, api, callContext) =>
+                {
+                    Interlocked.Increment(ref runs);
+                    var signal = callContext.CancellationToken;
+                    for (var line = 0; !signal.IsCancellationRequested; line++)
+                    {
+                        api.Output($"run {Volatile.Read(ref runs)} line {line}\n");
+                        await Task.Delay(20, CancellationToken.None);
+                    }
+                    await Aborted(signal);
+                    return new ToolExecutionResult();
+                },
+            }));
+            setup.Faux.SetResponses(Call("work", "c1"));
+            var opened = await Open(storage, setup);
+            await Submit(opened.Root, "go");
+            for (var crashes = 1; crashes <= 2; crashes++)
+            {
+                // This run stored output of its own, a progress commit, before it was cut off.
+                var prefixOfRun = $"run {crashes} ";
+                var current = opened;
+                await Eventually(async () => (await StoredOutput(storage, current.Root.Id))?.StartsWith(prefixOfRun, StringComparison.Ordinal) == true);
+                await Crash(opened.Harness);
+                opened = await Open(storage, setup);
+                var tool = (await opened.Harness.CommitAsync(tx => tx.ScanTasksAsync(new TaskQuery { Kind = "pi.tool" }, 1), Context)).Items[0];
+                Equal(crashes, tool.Restarts, "restarts");
+            }
+            await opened.Harness.CloseAsync(Context);
+        });
 
         yield return Case(prefix + "answers-a-tool-without-replay-that-crashed-with-the-output-stored-by-then", async () =>
         {

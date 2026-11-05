@@ -106,6 +106,9 @@ public sealed class RunningTask
     public bool AbandonOnRestart => Record.AbandonOnRestart;
     /// <summary>First-writer-wins values retained while the task can run.</summary>
     public JsonObjectValue? Memos => Record.Memos;
+    /// <summary>How many times in a row a crash, eviction or reset cut the task off without the task changing its state since (upstream
+    /// <c>restarts</c>; <see cref="TaskRecord.Restarts"/>).</summary>
+    public int? Restarts => Record.Restarts;
     /// <summary>The complete durable state execution resumes from.</summary>
     public JsonValue Checkpoint => State.Checkpoint;
     /// <summary>The checkpoint's <c>phase</c>; null when the checkpoint names none.</summary>

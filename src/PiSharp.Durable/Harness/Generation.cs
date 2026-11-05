@@ -20,10 +20,22 @@
 // Pi v1.5.0 sync (area run-failure, f3255de76): a run that ends without an answer records pi.live.runFailure (Live.EndRun with a RunEnd):
 // model_error with the error text, no_model naming the missing model (its inputs' settlement keeps no detail), aborted and reset;
 // StartRunAsync removes it, except for the run afterFailedRun: continue or a reset's queued input starts in the same commit (keepFailure).
+// Pi v1.5.0 sync (area restarts, b3a29f111): a request or poll the host died during (TaskRecord.Restarts) is a failed attempt under
+// settings.retry, not a resend (Interrupted): the committed partial becomes an aborted entry, the next attempt follows the backoff (a
+// poll's polls its deferred response again: the retry checkpoint keeps {model, thinkingLevel?, cutoff, handle} as poll, and its retry
+// phase moves to poll), and with no retry left the run ends runFailure interrupted, cancelling a polled deferred response. Every phase
+// first ends a generation cut off settings.restartLimit times (EndCutOff): runFailure restart_limit, keeping the partial and cancelling the
+// deferred response only at the limit, not past it. The abort handler cancels the deferred response a retry would poll again (DeferredOf).
+// The finish and drain phases with their cut-off ends are area run-end's (7e15f9601). PiSharp-only (decision 0011): the next attempt after
+// an interrupted request is that request recovered, so it keeps the stream metadata the request was prepared with (a host's op and
+// account, SessionStreamMetadata): the retry checkpoint and the next prepare checkpoint carry it as metadata, pinned only when the
+// interrupted request had any, so upstream records keep their shape; the other stream options are read again at the next prepare, as
+// upstream's are.
 //
 // Mappings:
 // - Checkpoints, live state and results are upstream's JSON, built in upstream's key order: prepare {phase, attempt, compacted?, overflow?},
-//   request {phase, attempt, compacted?, model, thinkingLevel, streamOptions, cutoff}, retry {phase, attempt, compacted?, until}, poll
+//   request {phase, attempt, compacted?, model, thinkingLevel, streamOptions, cutoff}, retry {phase, attempt, compacted?, until, poll?:
+//   {model, thinkingLevel?, cutoff, handle}}, poll
 //   {phase, attempt, compacted?, model, thinkingLevel?, cutoff, handle, pollAt}, tools {phase, assistant, tools, pending}; the result is
 //   {entryId}.
 // - Provider messages cross IDurableModels as PiSharp.Contracts values and are stored as pi-ai wire JSON (PiWireJson). Stream events are
@@ -157,6 +169,11 @@ internal static class GenerationPhases
     /// </summary>
     public static async Task PrepareAsync(RunningTask task, ITaskRuntime runtime, DurableContext context)
     {
+        if (Live.CutOffTooOften(task, runtime))
+        {
+            await EndCutOffAsync(runtime, task, context).ConfigureAwait(false);
+            return;
+        }
         var conversationId = runtime.ConversationId;
         var agent = await runtime.AgentAsync(context).ConfigureAwait(false);
         var settings = runtime.Settings;
@@ -171,6 +188,7 @@ internal static class GenerationPhases
         var attempt = Attempt(checkpoint);
         var compacted = OptionalTask(checkpoint, "compacted");
         var overflow = checkpoint.TryGetValue("overflow", out var text) && text is JsonStringValue overflowText ? overflowText.Value : null;
+        var recovered = RecoveredMetadata(checkpoint);
         if (compacted is { } compaction && overflow is not null)
         {
             var outcome = (await runtime.OutcomesAsync([compaction], context).ConfigureAwait(false))[0];
@@ -214,7 +232,7 @@ internal static class GenerationPhases
             await runtime.CommitAsync(async (tx, _) =>
             {
                 var child = await Compaction.CreateCompactionAsync(tx, conversationId, "threshold", owner: runtime.TaskId).ConfigureAwait(false);
-                return (TaskState?)NextTaskState.Waiting(Prepare(attempt, child, null, threshold: true), [child], JoinPolicy.AllSettled);
+                return (TaskState?)NextTaskState.Waiting(Prepare(attempt, child, null, threshold: true, recovered), [child], JoinPolicy.AllSettled);
             }, context).ConfigureAwait(false);
             return;
         }
@@ -232,7 +250,7 @@ internal static class GenerationPhases
                 .Add("compacted", compacted?.ToJson())
                 .Add("model", model.ToJson())
                 .Add("thinkingLevel", agent.ThinkingLevel)
-                .Add("streamOptions", StreamOptionsJson(settings.Stream))
+                .Add("streamOptions", StreamOptionsJson(recovered is null ? settings.Stream : settings.Stream with { Metadata = recovered }))
                 // PiSharp-only (decision 0007): pinned only when set, so upstream records keep their shape.
                 .Add("serviceTier", agent.ServiceTier)
                 .Add("cutoff", tail.ToJson())
@@ -243,7 +261,19 @@ internal static class GenerationPhases
 
     public static async Task RequestAsync(RunningTask task, ITaskRuntime runtime, DurableContext context)
     {
+        // Charging the attempt may itself be what keeps failing, such as converting a huge partial: the limit ends it.
+        if (Live.CutOffTooOften(task, runtime))
+        {
+            await EndCutOffAsync(runtime, task, context).ConfigureAwait(false);
+            return;
+        }
         var checkpoint = (JsonObjectValue)task.Checkpoint;
+        // The host stopped while this request was in flight: a failed attempt, not a resend (spec §8.3).
+        if (task.Restarts is not null)
+        {
+            await InterruptedAsync(runtime, checkpoint, context).ConfigureAwait(false);
+            return;
+        }
         var attempt = Attempt(checkpoint);
         var compacted = OptionalTask(checkpoint, "compacted");
         var reference = ModelRef.FromJson(checkpoint["model"])!;
@@ -293,6 +323,13 @@ internal static class GenerationPhases
         var attempt = Attempt(checkpoint);
         var compacted = OptionalTask(checkpoint, "compacted");
         var until = ((JsonNumberValue)checkpoint["until"]).Value;
+        var poll = checkpoint.TryGetValue("poll", out var polled) && polled is JsonObjectValue deferred ? deferred : null;
+        var recovered = RecoveredMetadata(checkpoint);
+        if (Live.CutOffTooOften(task, runtime))
+        {
+            await EndCutOffAsync(runtime, task, context).ConfigureAwait(false);
+            return;
+        }
         if (until > runtime.Now())
         {
             await runtime.SleepUntilAsync(until, checkpoint, context).ConfigureAwait(false);
@@ -300,8 +337,19 @@ internal static class GenerationPhases
         }
         await runtime.CommitAsync(async (tx, _) =>
         {
-            (await tx.DocAsync(Live.LiveDoc, runtime.ConversationId).ConfigureAwait(false)).Set("generation", GenerationState(attempt + 1));
-            return (TaskState?)NextTaskState.Running(Prepare(attempt + 1, compacted, null));
+            var live = await tx.DocAsync(Live.LiveDoc, runtime.ConversationId).ConfigureAwait(false);
+            // A poll the host died during polls its response again, as the next attempt.
+            if (poll is not null)
+            {
+                var pollAt = runtime.Now();
+                live.Set("generation", new RecordJson.Writer().Number("attempt", attempt + 1)
+                    .Add("deferred", JsonValue.Object([KeyValuePair.Create("pollAt", (JsonValue)pollAt)])).Build());
+                var next = new RecordJson.Writer().Add("phase", "poll").Number("attempt", attempt + 1).Add("compacted", compacted?.ToJson());
+                foreach (var (key, value) in poll) next.Add(key, value);
+                return (TaskState?)NextTaskState.Running(next.Number("pollAt", pollAt).Build());
+            }
+            live.Set("generation", GenerationState(attempt + 1));
+            return (TaskState?)NextTaskState.Running(Prepare(attempt + 1, compacted, null, metadata: recovered));
         }, context).ConfigureAwait(false);
     }
 
@@ -310,6 +358,18 @@ internal static class GenerationPhases
     {
         var checkpoint = (JsonObjectValue)task.Checkpoint;
         var pollAt = ((JsonNumberValue)checkpoint["pollAt"]).Value;
+        if (Live.CutOffTooOften(task, runtime))
+        {
+            await EndCutOffAsync(runtime, task, context).ConfigureAwait(false);
+            return;
+        }
+        // The host stopped while the poll's fetch was in flight: a failed attempt, as for a request. Checked before the time, which may have
+        // moved backwards on a replacement host; a sleeping poll is never cut off.
+        if (task.Restarts is not null)
+        {
+            await InterruptedAsync(runtime, checkpoint, context).ConfigureAwait(false);
+            return;
+        }
         if (pollAt > runtime.Now())
         {
             await runtime.SleepUntilAsync(pollAt, checkpoint, context).ConfigureAwait(false);
@@ -337,6 +397,11 @@ internal static class GenerationPhases
 
     public static async Task ToolsAsync(RunningTask task, ITaskRuntime runtime, DurableContext context)
     {
+        if (Live.CutOffTooOften(task, runtime))
+        {
+            await EndCutOffAsync(runtime, task, context).ConfigureAwait(false);
+            return;
+        }
         var checkpoint = (JsonObjectValue)task.Checkpoint;
         var assistant = new EntryId(Id(checkpoint["assistant"]));
         var tools = ((JsonArrayValue)checkpoint["tools"]).Select(id => new TaskId(Id(id))).ToList();
@@ -373,19 +438,7 @@ internal static class GenerationPhases
     {
         var checkpoint = (JsonObjectValue)task.Checkpoint;
         var phase = task.Phase;
-        if (phase == "poll" && ModelRef.FromJson(checkpoint["model"]) is { } reference &&
-            runtime.Models.GetModel(reference.Provider, reference.ModelId) is { } model)
-        {
-            try
-            {
-                await runtime.Models.CancelDeferredAsync(model, new DurableDeferredHandle((JsonObjectValue)checkpoint["handle"]),
-                    new DurableRequestOptions { Telemetry = context.Telemetry }, runtime.Signal).ConfigureAwait(false);
-            }
-            catch (Exception error)
-            {
-                runtime.Report(error, ReportFrom.Host(HostCallback.Models));
-            }
-        }
+        if (DeferredOf(checkpoint) is { } polled) await CancelDeferredAsync(runtime, polled, context).ConfigureAwait(false);
         var conversationId = runtime.ConversationId;
         // Runs after the round's tool tasks are terminal; calls never started get `aborted` results (spec §8.5).
         var unstarted = phase == "tools"
@@ -439,6 +492,99 @@ internal static class GenerationPhases
         var over = tokens > blocking ? "blocking" : policy.BackgroundTokens > 0 && tokens > background ? "background" : null;
         if (over is null || Compaction.SelectCut(view, policy.KeepRecentTokens) is null) return null;
         return over;
+    }
+
+    /// <summary>
+    /// The host stopped while this attempt's request or poll was in flight (<see cref="TaskRecord.Restarts"/>): a failed attempt under
+    /// <c>settings.Retry</c> (upstream <c>interrupted</c>, spec §8.3). The committed partial becomes an aborted entry; the next attempt follows
+    /// the backoff, a poll's by polling its deferred response again, or, with no retry left, the run ends <c>interrupted</c>.
+    /// </summary>
+    private static async Task InterruptedAsync(ITaskRuntime runtime, JsonObjectValue checkpoint, DurableContext context)
+    {
+        var attempt = Attempt(checkpoint);
+        var compacted = OptionalTask(checkpoint, "compacted");
+        var policy = runtime.Settings.Retry;
+        var retry = policy.Enabled && attempt <= policy.MaxRetries;
+        var until = retry ? runtime.Now() + PiAiRetry.RetryDelayMs(policy.BaseDelayMs, policy.MaxAgentDelayMs, attempt) : 0;
+        var polled = Str(checkpoint, "phase") == "poll" ? checkpoint : null;
+        var text = polled is null
+            ? $"The host stopped while the model was answering, on attempt {attempt}"
+            : $"The host stopped while the deferred answer was fetched, on attempt {attempt}";
+        // A run that ends does not leave the provider's job running.
+        if (!retry && polled is not null) await CancelDeferredAsync(runtime, polled, context).ConfigureAwait(false);
+        await runtime.CommitAsync(async (tx, _) =>
+        {
+            // Read before the first table write; only a failure uses it.
+            var failure = retry ? null : await PrepareFailureAsync(tx, runtime).ConfigureAwait(false);
+            var live = await tx.DocAsync(Live.LiveDoc, runtime.ConversationId).ConfigureAwait(false);
+            await HarnessTasks.ConvertPartialAsync(tx, live, runtime.ConversationId).ConfigureAwait(false);
+            if (failure is null)
+            {
+                var retryState = JsonValue.Object([
+                    KeyValuePair.Create("at", (JsonValue)until),
+                    KeyValuePair.Create("error", (JsonValue)text),
+                ]);
+                live.Set("generation", new RecordJson.Writer().Number("attempt", attempt).Add("retry", retryState).Build());
+                var poll = polled is null ? null : new RecordJson.Writer().Add("model", polled["model"])
+                    .Add("thinkingLevel", polled.TryGetValue("thinkingLevel", out var level) ? level : null)
+                    .Add("cutoff", polled["cutoff"]).Add("handle", polled["handle"]).Build();
+                // PiSharp-only (decision 0011): the request's stream metadata, for the next attempt (see the file header).
+                var metadata = polled is null && checkpoint.TryGetValue("streamOptions", out var pinned) && pinned is JsonObjectValue options &&
+                    options.TryGetValue("metadata", out var data) && data is JsonObjectValue kept ? kept : null;
+                var next = new RecordJson.Writer().Add("phase", "retry").Number("attempt", attempt).Add("compacted", compacted?.ToJson())
+                    .Number("until", until).Add("poll", poll).Add("metadata", metadata).Build();
+                return (TaskState?)NextTaskState.Sleeping(next, until);
+            }
+            await EndFailedRunAsync(tx, runtime, live, failure, RunEnd.Unanswered(RunFailureReason.Interrupted, text)).ConfigureAwait(false);
+            return (TaskState?)NextTaskState.Failed(text, Reason("interrupted"));
+        }, context).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Ends a run whose generation was cut off <c>settings.RestartLimit</c> times in a row (upstream <c>endCutOff</c>, spec §5.4). At the
+    /// limit it still keeps a committed partial as an aborted entry and cancels a deferred response it polled; past the limit that cleanup
+    /// may be what cut it off, so it ends without it.
+    /// </summary>
+    private static async Task EndCutOffAsync(ITaskRuntime runtime, RunningTask task, DurableContext context)
+    {
+        var checkpoint = (JsonObjectValue)task.Checkpoint;
+        var text = $"The generation was interrupted {Live.CutOffCount(task)} in its {task.Phase} phase";
+        var salvage = Live.Salvageable(task, runtime);
+        if (salvage && DeferredOf(checkpoint) is { } polled) await CancelDeferredAsync(runtime, polled, context).ConfigureAwait(false);
+        await runtime.CommitAsync(async (tx, _) =>
+        {
+            var failure = await PrepareFailureAsync(tx, runtime).ConfigureAwait(false);
+            var live = await tx.DocAsync(Live.LiveDoc, runtime.ConversationId).ConfigureAwait(false);
+            if (salvage) await HarnessTasks.ConvertPartialAsync(tx, live, runtime.ConversationId).ConfigureAwait(false);
+            await EndFailedRunAsync(tx, runtime, live, failure, RunEnd.Unanswered(RunFailureReason.RestartLimit, text)).ConfigureAwait(false);
+            return (TaskState?)NextTaskState.Failed(text, Reason("restart_limit"));
+        }, context).ConfigureAwait(false);
+    }
+
+    /// <summary>The deferred response a checkpoint polls, or will poll again after a retry's backoff (upstream <c>deferredOf</c>): an object
+    /// with its <c>model</c> and <c>handle</c>.</summary>
+    private static JsonObjectValue? DeferredOf(JsonObjectValue checkpoint) => Str(checkpoint, "phase") switch
+    {
+        "poll" => checkpoint,
+        "retry" => checkpoint.TryGetValue("poll", out var poll) && poll is JsonObjectValue deferred ? deferred : null,
+        _ => null,
+    };
+
+    /// <summary>Cancels a deferred response no attempt will poll again; a failure is reported, never thrown (upstream
+    /// <c>cancelDeferred</c>).</summary>
+    private static async Task CancelDeferredAsync(ITaskRuntime runtime, JsonObjectValue polled, DurableContext context)
+    {
+        if (ModelRef.FromJson(polled["model"]) is not { } reference || runtime.Models.GetModel(reference.Provider, reference.ModelId) is not { } model)
+            return;
+        try
+        {
+            await runtime.Models.CancelDeferredAsync(model, new DurableDeferredHandle((JsonObjectValue)polled["handle"]),
+                new DurableRequestOptions { Telemetry = context.Telemetry }, runtime.Signal).ConfigureAwait(false);
+        }
+        catch (Exception error)
+        {
+            runtime.Report(error, ReportFrom.Host(HostCallback.Models));
+        }
     }
 
     /// <summary>Settles the run's inputs <c>unanswered</c> with <c>model_error</c> and fails with <paramref name="text"/> (upstream
@@ -1022,9 +1168,17 @@ internal static class GenerationPhases
         };
     }
 
-    private static JsonObjectValue Prepare(int attempt, TaskId? compacted, string? overflow, bool threshold = false) => new RecordJson.Writer()
-        .Add("phase", "prepare").Number("attempt", attempt).Add("compacted", compacted?.ToJson()).Add("overflow", overflow)
-        .Add("threshold", threshold ? (JsonValue)true : null).Build();
+    private static JsonObjectValue Prepare(int attempt, TaskId? compacted, string? overflow, bool threshold = false, JsonObjectValue? metadata = null) =>
+        new RecordJson.Writer()
+            .Add("phase", "prepare").Number("attempt", attempt).Add("compacted", compacted?.ToJson()).Add("overflow", overflow)
+            .Add("threshold", threshold ? (JsonValue)true : null)
+            // PiSharp-only (decision 0011): an interrupted request's stream metadata, for the attempt that recovers it.
+            .Add("metadata", metadata).Build();
+
+    /// <summary>The stream metadata a retry or prepare checkpoint carries from an interrupted request (PiSharp-only, decision 0011; see the
+    /// file header); null when it carries none.</summary>
+    private static JsonObjectValue? RecoveredMetadata(JsonObjectValue checkpoint) =>
+        checkpoint.TryGetValue("metadata", out var metadata) && metadata is JsonObjectValue data ? data : null;
 
     /// <summary>Error text for a generation whose blocking compaction ended without completing (upstream <c>compactionFailure</c>).</summary>
     private static string CompactionFailure(TaskOutcome outcome) => outcome switch

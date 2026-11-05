@@ -794,8 +794,8 @@ public sealed class TerminalTaskState(TaskOutcome outcome) : SettlingTaskState(o
 /// JsonValue&gt;</c>; typed task views join with the runtime in P7). JSON key order is upstream's: <c>id, conversationId, kind, version, input,
 /// trace, links, owner, background, abortRequested, abandonOnRestart, state</c> as the Session creates a record, then <c>startedAt</c> (stamped on the first
 /// change to running), <c>memos</c> (added by a running invocation, dropped with the outcome) and <c>endedAt</c>, each appended by a spread of
-/// the current record; <c>abortReason</c> is appended by the mark that sets it. <see cref="KeyOrder"/> keeps a decoded or marked record's own
-/// order through <c>with</c>.</summary>
+/// the current record; <c>abortReason</c> is appended by the mark that sets it, and <c>restarts</c> by the open that counts a cut-off.
+/// <see cref="KeyOrder"/> keeps a decoded or marked record's own order through <c>with</c>.</summary>
 public sealed record TaskRecord
 {
     /// <summary>The task ID.</summary>
@@ -835,6 +835,13 @@ public sealed record TaskRecord
     public double? StartedAt { get; init; }
     /// <summary>Wall-clock milliseconds of the change to terminal, stamped by the Session.</summary>
     public double? EndedAt { get; init; }
+    /// <summary>
+    /// How many times in a row a crash, eviction or reset cut the task off while it ran, without the task changing its state since; open
+    /// counts them, and a close does not. At <see cref="HarnessSettings.RestartLimit"/> the task ends (the built-in tasks end themselves,
+    /// visibly; the scheduler faults any other kind), and a generation reads it to charge an interrupted model request as a failed attempt.
+    /// Absent while the task was not cut off.
+    /// </summary>
+    public int? Restarts { get; init; }
     /// <summary>The JSON key order of a decoded record (see <see cref="RecordJson.Ordered"/>); default: the creation order above.</summary>
     internal ImmutableArray<string> KeyOrder { get; init; }
 
@@ -851,7 +858,7 @@ public sealed record TaskRecord
         .Add("trace", RecordJson.Carrier(Trace)).Add("links", RecordJson.Carriers(Links)).Add("owner", Owner?.ToJson()).Add("background", Background).Add("abortRequested", AbortRequested)
         .Add("abandonOnRestart", AbandonOnRestart ? JsonValue.Boolean(true) : null).Add("state", State.ToJson())
         .Number("startedAt", StartedAt).Add("memos", Memos).Number("endedAt", EndedAt)
-        .Add("abortReason", AbortReason is { } reason ? WireName.Of(reason) : null).Build(), KeyOrder);
+        .Add("abortReason", AbortReason is { } reason ? WireName.Of(reason) : null).Number("restarts", Restarts).Build(), KeyOrder);
 
     /// <summary>Decodes and validates <see cref="ToJson"/>.</summary>
     public static TaskRecord FromJson(JsonValue json)
@@ -859,7 +866,7 @@ public sealed record TaskRecord
         const string what = "task record";
         var value = RecordJson.Object(json, what);
         RecordJson.OnlyKeys(value, what, "id", "conversationId", "kind", "version", "input", "trace", "links", "owner", "background", "abortRequested",
-            "abortReason", "abandonOnRestart", "state", "memos", "startedAt", "endedAt");
+            "abortReason", "abandonOnRestart", "state", "memos", "startedAt", "endedAt", "restarts");
         return new TaskRecord
         {
             Id = RecordJson.Id<TaskId>(value, "id", what),
@@ -883,6 +890,12 @@ public sealed record TaskRecord
             Memos = RecordJson.Optional(value, "memos") is { } memos ? RecordJson.Object(memos, "task memos") : null,
             StartedAt = RecordJson.OptionalNumber(value, "startedAt", what),
             EndedAt = RecordJson.OptionalNumber(value, "endedAt", what),
+            Restarts = RecordJson.OptionalInteger(value, "restarts", what) switch
+            {
+                null => null,
+                >= 0 and <= int.MaxValue and var restarts => (int)restarts,
+                _ => throw RecordJson.Invalid(what, "field \"restarts\" must be a non-negative integer"),
+            },
             KeyOrder = RecordJson.KeysOf(value),
         }.Validate();
     }

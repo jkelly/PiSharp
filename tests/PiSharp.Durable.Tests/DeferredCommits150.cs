@@ -17,6 +17,10 @@
 // Every other commit and write is kept, in order, with new seqs and ordinals. A document's records start at its last base, as the captures
 // keep them (both backends drop what a base covers), so a held change before that base is not in any record. A capture that this plan does
 // not cover (a held base, an overflowed queue, a resume that creates documents) throws rather than guess.
+// Pi v1.5.0 sync (area restarts, b3a29f111): a clean close writes the tasks it stopped back as pending (Restarts150.cs), in one commit after
+// the captured ones and before the held documents are stored: one task write per task the capture left running, in task id order, its
+// record line the task's last one with the pending state. A resume of the written session finds them pending, so it writes no reconcile
+// commit of its own; v1.2.0's reconcile commit and the close's take the same place.
 using System.Collections.Immutable;
 using System.Globalization;
 using PiSharp.Durable.Chord;
@@ -43,13 +47,15 @@ internal static class DeferredCommits150
         public List<long> Held { get; } = [];
         /// <summary>The new ordinal.</summary>
         public long NewOrdinal { get; set; }
+        /// <summary>The task whose record a clean close writes back as pending (area restarts).</summary>
+        public long? Task { get; init; }
     }
 
     /// <summary>One v1.5.0 commit.</summary>
     internal sealed class Commit
     {
         public required long Seq { get; init; }
-        /// <summary>The captured commit it keeps; <see cref="long.MaxValue"/> for the close.</summary>
+        /// <summary>The captured commit it keeps; <see cref="long.MaxValue"/> for the close, one less for the tasks the close writes back.</summary>
         public required long Position { get; init; }
         public required JsonObjectValue Line { get; init; }
         public List<Write> Writes { get; } = [];
@@ -61,12 +67,14 @@ internal static class DeferredCommits150
         private readonly List<Commit> commits;
         private readonly Dictionary<long, long> seqs;
         private readonly long captured;
+        private readonly HashSet<long> closed;
 
-        internal Plan(List<Commit> commits, Dictionary<long, long> seqs, long captured)
+        internal Plan(List<Commit> commits, Dictionary<long, long> seqs, long captured, HashSet<long> closed)
         {
             this.commits = commits;
             this.seqs = seqs;
             this.captured = captured;
+            this.closed = closed;
         }
 
         /// <summary>Whether the plan changes anything.</summary>
@@ -76,11 +84,12 @@ internal static class DeferredCommits150
         public long Seq(long seq) => seqs.TryGetValue(seq, out var mapped) ? mapped
             : throw new InvalidOperationException($"captured commit {seq} is not kept (deferred commits)");
 
-        /// <summary>The records a Dump reads: documents' createdAt and retiredAt seqs move with their commits.</summary>
+        /// <summary>The records a Dump reads: documents' createdAt and retiredAt seqs move with their commits, and the tasks a clean close
+        /// stopped are pending (area restarts).</summary>
         public JsonValue Records(JsonValue records)
         {
             if (!Changes) return records;
-            var properties = (JsonObjectValue)records;
+            var properties = (JsonObjectValue)Restarts150.Closed(records);
             var documents = JsonValue.Array(((JsonArrayValue)properties["documents"]).Select(item =>
             {
                 var document = (JsonObjectValue)item;
@@ -130,7 +139,14 @@ internal static class DeferredCommits150
                     var first = lines.Count == 0 ? long.MaxValue : lines.Keys.Min(key => key.Seq);
                     if (commit.Position < first) continue;
                     JsonObjectValue line;
-                    if (write.Seq is { } seq)
+                    if (write.Task is not null)
+                    {
+                        // The task's last record, as the close writes it back.
+                        var last = lines.MaxBy(entry => entry.Key.Seq).Value;
+                        var payload = (JsonObjectValue)last["payload"];
+                        line = last.SetItem("payload", payload.SetItem("value", Restarts150.Pending((JsonObjectValue)payload["value"])));
+                    }
+                    else if (write.Seq is { } seq)
                     {
                         if (!lines.TryGetValue((seq, write.Ordinal!.Value), out var captured))
                             throw new InvalidOperationException($"{name} holds no record of captured commit {seq}");
@@ -181,6 +197,10 @@ internal static class DeferredCommits150
                 return [.. rows.Select(row => row.Select((cell, index) => index is 6 or 7 && cell != "null" ? Text(Seq(long.Parse(cell, CultureInfo.InvariantCulture)))
                     : index == 8 ? RecordSeqs((JsonObjectValue)JsonValue.Parse(cell)).ToJson() : cell).ToArray())];
             if (sql.Contains("FROM document_revisions", StringComparison.Ordinal)) return Revisions(rows);
+            // id, conversation_id, kind, status, abort_requested, background, record: the tasks a clean close stopped are pending.
+            if (sql.Contains("FROM tasks", StringComparison.Ordinal))
+                return [.. rows.Select(row => closed.Contains(long.Parse(row[0], CultureInfo.InvariantCulture))
+                    ? row.Select((cell, index) => index == 3 ? "pending" : index == 6 ? Restarts150.PendingText(cell) : cell).ToArray() : row)];
             return rows;
         }
 
@@ -333,6 +353,21 @@ internal static class DeferredCommits150
             seqs[seq] = commit.Seq;
             commits.Add(commit);
         }
+        // Area restarts: the tasks the close stopped, written back as pending before the held documents are stored.
+        var stopped = Restarts150.Running(records);
+        if (stopped.Count > 0)
+        {
+            var writeBack = new Commit { Seq = commits.Count + 1, Position = long.MaxValue - 1, Line = lines[^1] };
+            foreach (var id in stopped)
+                writeBack.Writes.Add(new Write
+                {
+                    Value = JsonValue.Object(KeyValuePair.Create("type", (JsonValue)"task.sidecar"), KeyValuePair.Create("id", (JsonValue)id)),
+                    HasRecord = true,
+                    Task = id,
+                });
+            Number(writeBack);
+            commits.Add(writeBack);
+        }
         if (holds.Count > 0)
         {
             var close = new Commit { Seq = commits.Count + 1, Position = long.MaxValue, Line = lines[^1] };
@@ -345,7 +380,7 @@ internal static class DeferredCommits150
             Number(close);
             commits.Add(close);
         }
-        return new Plan(commits, seqs, lines.Count);
+        return new Plan(commits, seqs, lines.Count, [.. stopped]);
     }
 
     private static JsonObjectValue Change(long document) => JsonValue.Object(

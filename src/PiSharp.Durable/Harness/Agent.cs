@@ -6,8 +6,9 @@
 // sectionExtension and toolExtension name the extension whose code a section or tool runs, a wrapper's failure is reported with its
 // extension's name, and settings.afterFailedRun (a30c2a81d, 5f312dac4, 91b33cab3). Pi v1.5.0 sync (area deferred-commits, 6c2fd73b0):
 // settings.progress.persistWithinMs, the window a deferred progress commit waits at most before it is stored (ProgressPolicy.PersistWithinMs,
-// default 1,000 ms; a value that is not a number of milliseconds, 0 or more, is the default). The file's other areas (restart limit,
-// maxTurns) keep the citation on v1.2.0.
+// default 1,000 ms; a value that is not a number of milliseconds, 0 or more, is the default). Pi v1.5.0 sync (area restarts, b3a29f111):
+// settings.restartLimit (default 5; a number of restarts, 1 or more, rounded down, else the default). The file's other area (maxTurns)
+// keeps the citation on v1.2.0.
 using System.Collections.Immutable;
 using PiSharp.Durable.Chord;
 using PiSharp.Durable.Chord.Delta;
@@ -62,8 +63,16 @@ public static class Agents
             ContextRetentionMs = settings?.ContextRetentionMs ?? DefaultContextRetentionMs,
             DocumentRetentionMs = Session.DocumentRetention(settings?.DocumentRetentionMs),
             AfterFailedRun = settings?.AfterFailedRun ?? AfterFailedRun.Keep,
+            RestartLimit = RestartLimit(settings?.RestartLimit),
         };
     }
+
+    /// <summary>Default <see cref="HarnessSettings.RestartLimit"/> (upstream <c>DEFAULT_RESTART_LIMIT</c>).</summary>
+    public const int DefaultRestartLimit = 5;
+
+    /// <summary>A restart limit as given when it is a number of restarts, 1 or more, rounded down (<see cref="double.PositiveInfinity"/>: no
+    /// task ends for restarts); else the default (upstream <c>restartLimit</c>).</summary>
+    private static double RestartLimit(double? limit) => limit is >= 1 and var given ? Math.Floor(given) : DefaultRestartLimit;
 
     /// <summary>Applies one change to <c>pi.agent</c>: a given field replaces the stored one, a clear removes it, an absent field changes
     /// nothing (upstream <c>configure</c>).</summary>

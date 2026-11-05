@@ -12,8 +12,9 @@
 //   it delays.
 // - chatSetup's settings object, whose fields tests assign between decisions, is ChatSetup's mutable properties (Stream, Retry, ...) behind a
 //   HarnessSettings whose getters read them at every resolution.
-// - `new Proxy(models, { get })` overriding streamSimple or cancelDeferred is ModelsOverride, a decorator.
+// - `new Proxy(models, { get })` overriding streamSimple, fetchDeferred or cancelDeferred is ModelsOverride, a decorator.
 // - waitFor (a 5 ms poll for at most 5 s) is Eventually (a bounded poll of about 20 s): only how long a slow machine may take differs.
+// Pi v1.5.0 sync (area restarts): ChatSetup.RestartLimit, the settings field tests set (upstream's `setup.settings.restartLimit`).
 // Pi v1.5.0 sync (area model-requests): ChatSetup.Identity, the setup's HarnessOptions.Identity (upstream adc5fa9f8).
 // Pi v1.5.0 sync (area telemetry): as the faux provider is registered in pi-ai's Models, whose streamSimple and deferred polls observe
 // each request (models.ts' observeModelRequest, 2ec55d808), a request whose options carry telemetry is one pi.ai.request span and a
@@ -250,6 +251,7 @@ internal sealed class ChatSetup
     public double? ContextRetentionMs { get => values.ContextRetentionMs; set => values.ContextRetentionMs = value; }
     public double? DocumentRetentionMs { get => values.DocumentRetentionMs; set => values.DocumentRetentionMs = value; }
     public AfterFailedRun? AfterFailedRun { get => values.AfterFailedRun; set => values.AfterFailedRun = value; }
+    public double? RestartLimit { get => values.RestartLimit; set => values.RestartLimit = value; }
 
     /// <summary><c>OnReport</c>: the error in <see cref="Reports"/>, what it is about in <see cref="Infos"/>, at the same index.</summary>
     public void Record(Report report)
@@ -281,6 +283,7 @@ internal sealed class ChatSetup
         public double? ContextRetentionMs;
         public double? DocumentRetentionMs;
         public AfterFailedRun? AfterFailedRun;
+        public double? RestartLimit;
     }
 
     private sealed class LiveSettings(Values values) : HarnessSettings
@@ -296,6 +299,7 @@ internal sealed class ChatSetup
         public override double? ContextRetentionMs { get => values.ContextRetentionMs; init { } }
         public override double? DocumentRetentionMs { get => values.DocumentRetentionMs; init { } }
         public override AfterFailedRun? AfterFailedRun { get => values.AfterFailedRun; init { } }
+        public override double? RestartLimit { get => values.RestartLimit; init { } }
     }
 }
 
@@ -806,6 +810,8 @@ internal sealed class ModelsOverride(IDurableModels inner) : IDurableModels
 {
     public Func<DurableModel, ImmutableArray<JsonValue>, DurableStreamOptions?, CancellationToken, IAsyncEnumerable<StreamEvent>>? StreamSimpleOverride { get; init; }
     public Func<DurableModel, DurableDeferredHandle, CancellationToken, Task>? CancelDeferredOverride { get; init; }
+    /// <summary>Replaces <c>fetchDeferred</c> (Pi v1.5.0 sync, area restarts: harness-restart-failure's deferredSetup).</summary>
+    public Func<DurableModel, DurableDeferredHandle, CancellationToken, Task<AssistantMessage>>? FetchDeferredOverride { get; init; }
 
     public DurableModel? GetModel(string provider, string modelId) => inner.GetModel(provider, modelId);
 
@@ -820,7 +826,7 @@ internal sealed class ModelsOverride(IDurableModels inner) : IDurableModels
         inner.StreamDeferred(model, handle, cancellationToken);
 
     public Task<AssistantMessage> FetchDeferredAsync(DurableModel model, DurableDeferredHandle handle, CancellationToken cancellationToken) =>
-        inner.FetchDeferredAsync(model, handle, cancellationToken);
+        FetchDeferredOverride is { } fetch ? fetch(model, handle, cancellationToken) : inner.FetchDeferredAsync(model, handle, cancellationToken);
 
     public Task CancelDeferredAsync(DurableModel model, DurableDeferredHandle handle, CancellationToken cancellationToken) =>
         CancelDeferredOverride is { } cancel ? cancel(model, handle, cancellationToken) : inner.CancelDeferredAsync(model, handle, cancellationToken);

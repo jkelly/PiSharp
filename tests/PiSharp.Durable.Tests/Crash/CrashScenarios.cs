@@ -204,7 +204,8 @@ internal static class CrashScenarios
     // ─── Setup ──────────────────────────────────────────────────────────────
 
     /// <summary>The models, registry and settings of a scenario. Identical in both processes except for the child's gates, holds and its
-    /// slow <c>chat.stream</c> and <c>chat.stream-stored</c> model and their progress windows.</summary>
+    /// slow <c>chat.stream</c> and <c>chat.stream-stored</c> model and their progress windows, and the retry backoff: 60 s in the chat
+    /// child, 1 ms in the parent, which retries a charged attempt.</summary>
     internal static ChatSetup BuildSetup(string scenario, string checkpoint, CrashGate gate, string workDir)
     {
         // The ask-user and plan-approval scenarios (InteractionCrashScenarios.cs).
@@ -221,9 +222,12 @@ internal static class CrashScenarios
         // Pi v1.5.0 sync (area deferred-commits): chat.stream's partials stay in memory until the kill; chat.stream-stored's are stored
         // within 20 ms, so the kill after the first such store lands.
         if (slow) setup.Progress = new ProgressSettings { PartialIntervalMs = 5, PersistWithinMs = checkpoint == "stream" ? double.PositiveInfinity : 20 };
+        // Pi v1.5.0 sync (area restarts): a request in flight at the kill is a charged attempt (durable.interrupted-request); the reopened
+        // host retries it after 1 ms. The child's chat backoff stays 60 s, so chat.retry kills while it sleeps.
+        if (!gate.Child) setup.Retry = new RetrySettings { Enabled = true, MaxRetries = 2, BaseDelayMs = 1 };
         if (scenario == "chat")
         {
-            setup.Retry = new RetrySettings { Enabled = true, MaxRetries = 2, BaseDelayMs = 60_000 };
+            if (gate.Child) setup.Retry = new RetrySettings { Enabled = true, MaxRetries = 2, BaseDelayMs = 60_000 };
             HarnessTests.AddSection(setup.Registry, "preamble", async (_, _) =>
             {
                 await gate.At("prepare");

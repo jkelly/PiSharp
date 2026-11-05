@@ -28,6 +28,11 @@
 // Pi v1.5.0 sync (area events, f3255de76): v1.5.0 removed watchEvents with its events; the events comparisons check PiSharp's projection
 // (PiSharp.Durable.Hosting's AgentEvents.cs) against the v1.2.0 events.json captures, which stays honest only while the projection
 // reproduces v1.2.0's events. They are evidence for the projection, not for v1.5.0.
+// Pi v1.5.0 sync (area restarts, b3a29f111): the cases of a capture that left tasks running compare with Restarts150.cs's authored forms:
+// v1.5.0's open counts a restart of each task it finds running (harness, upgrade opened: "restarts": 1), and a clean close writes the
+// tasks it stopped back as pending (written, through DeferredCommits150's plan: one more commit, before the held documents are stored).
+// A resume of a capture that left a generation's request in flight charges the attempt: the records it ends with stay the captured ones,
+// and its events show the backoff (resume events). Its scenario retries at once, as a backoff never ends on the scenarios' frozen clock.
 // - upgrade-from-v1.1.0: a v1.2.0 Harness opens copies of the v1.1.0 sessions (Fixtures/upstream-sessions) without resuming them, and
 //   resumes the resumable ones with their scenario's model, ending with the records upstream's v1.2.0 left (its v1 pi.tool tasks migrate to
 //   version 2 when they run).
@@ -261,7 +266,7 @@ internal static partial class CompatTests
                     var checkedTexts = backend == "sqlite" ? RawSqlite(Path.Combine(directory, "session.sqlite")) : RawJsonl(directory);
                     Check(checkedTexts > 0, "persisted texts were checked");
                 });
-                yield return Case(prefix + "harness", () => HarnessReads(scenario.Name, backend));
+                yield return Case(Counted(prefix + "harness", scenario.Name, backend), () => HarnessReads(scenario.Name, backend));
                 if (scenario.Resume is { } resume)
                     yield return Case(AuthoredCase(prefix + "resume"), async () =>
                     {
@@ -300,11 +305,13 @@ internal static partial class CompatTests
             foreach (var backend in Backends)
             {
                 var prefix = $"compat.upgrade-from-v1.1.0.{scenario.Name}.{backend}.";
-                yield return Case(prefix + "opened", async () =>
+                yield return Case(Counted(prefix + "opened", scenario.Name, backend, Fixtures110), async () =>
                 {
                     var directory = CopyFixture(scenario.Name, backend, Fixtures110);
                     await OpenOnly(() => OpenBackend(backend, directory));
-                    SameJson(Expected(upgrade, "opened.json", backend), await Dump(await OpenBackend(backend, directory)), "opened records");
+                    // Pi v1.5.0 (area restarts): the open counts a restart of each task it finds running (Restarts150.cs).
+                    SameJson(Restarts150.Opened(Expected(upgrade, "opened.json", backend), Expected(scenario.Name, "records.json", backend, Fixtures110)),
+                        await Dump(await OpenBackend(backend, directory)), "opened records");
                 });
                 if (scenario.Resume is { } resume)
                     yield return Case(AuthoredCase(prefix + "resumed"), async () =>
@@ -318,6 +325,11 @@ internal static partial class CompatTests
             }
         }
     }
+
+    /// <summary><paramref name="id"/>, listed as authored when the capture of <paramref name="scenario"/> left tasks running, whose restarts
+    /// v1.5.0's open counts (area restarts, Restarts150.cs).</summary>
+    private static string Counted(string id, string scenario, string backend, string? root = null) =>
+        Restarts150.Running(Expected(scenario, "records.json", backend, root)).Count > 0 ? AuthoredCase(id) : id;
 
     /// <summary>scenarios.mjs <c>openOnly</c>: a Harness opens the session and closes it without resuming.</summary>
     private static async Task OpenOnly(Func<Task<IStorage>> openStorage)
@@ -348,7 +360,7 @@ internal static partial class CompatTests
                     var checkedTexts = backend == "sqlite" ? RawSqlite(Path.Combine(directory, "session.sqlite")) : RawJsonl(directory);
                     Check(checkedTexts > 0, "persisted texts were checked");
                 });
-                yield return Case(prefix + "harness", () => HarnessReads(scenario.Name, backend, root));
+                yield return Case(Counted(prefix + "harness", scenario.Name, backend, root), () => HarnessReads(scenario.Name, backend, root));
                 var eventsFile = Path.Combine(root, scenario.Name, "events.json");
                 JsonObjectValue? expectedEvents = File.Exists(eventsFile) ? (JsonObjectValue)Expected(scenario.Name, "events.json", backend, root) : null;
                 if (scenario.Resume is { } resume)
@@ -362,7 +374,9 @@ internal static partial class CompatTests
                         }
                         // Pi v1.5.0 (area model-requests): the messages the resume classifies record the thinking level (ModelRequests150.cs).
                         var held = Expected(scenario.Name, "records.json", backend, root);
-                        var events = CompatEvents.Expect(expectedEvents is null ? null : (JsonObjectValue)ModelRequests150.Authored(expectedEvents, held), "resume");
+                        // (area restarts) and the backoff of the request the capture left in flight, which the resume charges (Restarts150.cs).
+                        var events = CompatEvents.Expect(expectedEvents is null ? null
+                            : (JsonObjectValue)Restarts150.Charged(ModelRequests150.Authored(expectedEvents, held), held, CompatScenarios.Now), "resume");
                         await CompatEvents.Record(events, () => resume(() => OpenBackend(backend, directory)));
                         SameJson(ModelRequests150.Authored(Expected(scenario.Name, "resumed.json", backend, root), held), await Dump(await OpenBackend(backend, directory)),
                             "resumed records");
@@ -430,10 +444,11 @@ internal static partial class CompatTests
         ("pi.provider", ProviderIdentity.ProviderDoc),
     ];
 
-    /// <summary>A Harness that is never resumed reads upstream's transcripts, tasks and pi.* documents, and closes with upstream's records.</summary>
+    /// <summary>A Harness that is never resumed reads upstream's transcripts, tasks and pi.* documents, and closes with upstream's records;
+    /// Pi v1.5.0 (area restarts): with a restart counted for each task it found running (Restarts150.cs).</summary>
     private static async Task HarnessReads(string scenario, string backend, string? root = null)
     {
-        var expected = (JsonObjectValue)Expected(scenario, "opened.json", backend, root);
+        var expected = (JsonObjectValue)Restarts150.Opened(Expected(scenario, "opened.json", backend, root), Expected(scenario, "records.json", backend, root));
         var directory = CopyFixture(scenario, backend, root);
         var setup = new ChatSetup(new FauxModels(new FauxOptions { Api = "faux" }));
         var harness = await Harness.OpenAsync(await OpenBackend(backend, directory),

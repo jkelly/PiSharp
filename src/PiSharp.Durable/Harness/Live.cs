@@ -13,6 +13,10 @@
 // f3255de76: runFailure is an optional field. RunFailureReason declares every v1.5.0 value: this area produces model_error, no_model,
 // aborted, reset, faulted and orphaned, and areas restarts (interrupted, restart_limit), admission (nothing_to_answer) and live-turns
 // (turn_limit) the others. RunFailure.first (7e15f9601) is area run-end's. The citation stays on v1.2.0 until the file's other areas land.
+// Pi v1.5.0 sync (area restarts, b3a29f111): LimitsRestarts (upstream LIMITS_RESTARTS), the built-in kinds that end themselves once cut off
+// settings.restartLimit times, and the helpers their phases read (cutOffTooOften, salvageable, cutOffCount). The scheduler faults only an
+// abort handler of theirs for the limit, with detail {reason: "restart_limit"}: SettleSchedulerOutcomeAsync then ends its run aborted with
+// the limit as detail and without converting the partial, and removes a compaction's status without recording a failure.
 using System.Collections.Immutable;
 using PiSharp.Durable.Chord;
 using PiSharp.Durable.Chord.Delta;
@@ -27,6 +31,24 @@ public static class Live
     private static readonly HashSet<string> RunTaskKinds = new(StringComparer.Ordinal) { "pi.generation" };
     private const string ToolTaskKind = "pi.tool";
     private const string CompactionTaskKind = "pi.compaction";
+
+    /// <summary>Built-in task kinds that end themselves once cut off <see cref="Settings.RestartLimit"/> times (<see cref="TaskRecord.Restarts"/>);
+    /// the scheduler faults a task of any other kind instead (upstream <c>LIMITS_RESTARTS</c>, spec §5.4).</summary>
+    internal static IReadOnlySet<string> LimitsRestarts { get; } =
+        new HashSet<string>([.. RunTaskKinds, ToolTaskKind, CompactionTaskKind], StringComparer.Ordinal);
+
+    /// <summary>Whether <paramref name="task"/> was cut off <see cref="Settings.RestartLimit"/> times in a row, so its phase ends it instead of
+    /// running (upstream <c>cutOffTooOften</c>). The settings are read only for a task that was cut off at all, so the normal path resolves
+    /// nothing more.</summary>
+    internal static bool CutOffTooOften(RunningTask task, ITaskRuntime runtime) =>
+        task.Restarts is { } restarts && restarts >= runtime.Settings.RestartLimit;
+
+    /// <summary>Whether a task at the limit may still do the cleanup it does when it ends, such as converting a partial: only at the limit.
+    /// Past it, that cleanup may be what cut the task off, so the task ends without it (upstream <c>salvageable</c>).</summary>
+    internal static bool Salvageable(RunningTask task, ITaskRuntime runtime) => (task.Restarts ?? 0) <= runtime.Settings.RestartLimit;
+
+    /// <summary>How often a task was cut off, for a message: "once", or "3 times in a row" (upstream <c>cutOffCount</c>).</summary>
+    internal static string CutOffCount(RunningTask task) => task.Restarts is 1 ? "once" : $"{task.Restarts ?? 0} times in a row";
 
     /// <summary>
     /// Built-in live conversation state: run control and presentation of the current generation and tool round (upstream <c>LiveDoc</c>).
@@ -195,7 +217,9 @@ public static class Live
     /// recorded. Other kinds are ignored, so it never
     /// creates <c>pi.live</c>
     /// elsewhere. A committed generation partial becomes an aborted assistant entry, as in the generation abort handler; the scheduler's
-    /// commit has no task scope, so that entry has no <c>byTaskId</c>.
+    /// commit has no task scope, so that entry has no <c>byTaskId</c>. Only an abort handler is faulted for the restart limit here (the
+    /// built-in phases end themselves): the task was aborted, and keeps that meaning. Its run ends <c>aborted</c>, with the limit as detail
+    /// and without the partial (converting it may be what died), and an aborted compaction is no failure.
     /// </summary>
     internal static async Task SettleSchedulerOutcomeAsync(ITx tx, TaskRecord record, TaskOutcome outcome)
     {
@@ -206,6 +230,8 @@ public static class Live
             RemoveNestedSlots(slots, record.Id);
             return;
         }
+        var cutOff = outcome is FaultedTaskOutcome { Error.Detail: JsonObjectValue detail } && detail.TryGetValue("reason", out var reason) &&
+            reason is JsonStringValue { Value: "restart_limit" };
         if (record.Kind == CompactionTaskKind)
         {
             var error = outcome switch
@@ -214,16 +240,19 @@ public static class Live
                 OrphanedTaskOutcome orphaned => orphaned.Reason,
                 _ => throw new ArgumentException($"The scheduler settles faulted and orphaned outcomes, not {outcome.Status}"),
             };
-            FailCompactionStatus(await tx.DocAsync(LiveDoc, record.ConversationId).ConfigureAwait(false), record.Id, error);
+            var compactions = await tx.DocAsync(LiveDoc, record.ConversationId).ConfigureAwait(false);
+            if (cutOff) RemoveCompactionStatus(compactions, record.Id);
+            else FailCompactionStatus(compactions, record.Id, error);
             return;
         }
         if (!RunTaskKinds.Contains(record.Kind)) return;
         var live = await tx.DocAsync(LiveDoc, record.ConversationId).ConfigureAwait(false);
         if (RunTaskId(live) != record.Id.Value) return;
-        await HarnessTasks.ConvertPartialAsync(tx, live, record.ConversationId).ConfigureAwait(false);
+        // Cut off, the abort handler may have died converting the partial: the run ends without it.
+        if (!cutOff) await HarnessTasks.ConvertPartialAsync(tx, live, record.ConversationId).ConfigureAwait(false);
         EndRun(tx, live, record.Id, outcome switch
         {
-            FaultedTaskOutcome faulted => RunEnd.Unanswered(RunFailureReason.Faulted, faulted.Error.Message),
+            FaultedTaskOutcome faulted => RunEnd.Unanswered(cutOff ? RunFailureReason.Aborted : RunFailureReason.Faulted, faulted.Error.Message),
             // The run fails as orphaned, with why as its detail; its inputs keep the orphan reason as their settlement.
             OrphanedTaskOutcome orphaned => RunEnd.Unanswered(RunFailureReason.Orphaned, orphaned.Reason, SubmissionSettlement.Unanswered(orphaned.Reason)),
             _ => throw new ArgumentException($"The scheduler settles faulted and orphaned outcomes, not {outcome.Status}"),

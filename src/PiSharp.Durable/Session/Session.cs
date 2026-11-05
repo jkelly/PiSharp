@@ -30,6 +30,9 @@
 // earliest deadline (one foreground timer), at close after the writes at close, by UnloadDocumentsAsync, and before a token of another
 // definition version reloads the document. SubscribeCommits sees each storage transaction with exactly what it stored, so its seq has
 // gaps; a failed Session stores nothing more.
+// Pi v1.5.0 sync (area restarts, b3a29f111): WriteAtCloseAsync (upstream writeAtClose), for the scheduler's join, writes on the line,
+// after the commits admitted before the seal, straight to Storage; a failed Session writes nothing. Upstream admits it to its group-commit
+// writer; here it is one storage call of one batch.
 //
 // Concurrency model. Upstream relies on one JavaScript thread: `#enqueue` chains every mutation and cold load onto one promise, and
 // listeners run in later microtasks. Here .NET callers may be on any thread, so:
@@ -695,6 +698,29 @@ public class Session : ISession
 
     /// <summary>Runs after the close listeners (and, for a failure, its report) and before the line closes Storage; must not fail.</summary>
     internal virtual Task BeforeCloseAsync() => Task.CompletedTask;
+
+    /// <summary>
+    /// Internal, for <see cref="BeforeCloseAsync"/>: on the line, after every commit admitted before the seal has settled, writes what
+    /// <paramref name="writes"/> returns then straight to Storage, in one batch (upstream <c>writeAtClose</c>). Nothing is published, since
+    /// the Session is closing; a failed Session writes nothing. A Storage that throws or refuses the batch fails the Session, and the returned
+    /// task faults with that error.
+    /// </summary>
+    internal Task WriteAtCloseAsync(Func<IReadOnlyList<StorageWrite>> writes) => line.Enqueue(async () =>
+    {
+        if (failure is not null) return true;
+        var batch = writes();
+        if (batch.Count == 0) return true;
+        Seq? received = null;
+        // The guard fails the Session when Storage throws.
+        var committed = await storage.CommitAsync([batch], (_, stored) => received = stored, DurableContext.Background).ConfigureAwait(false);
+        if (received is null)
+        {
+            var refusal = committed.Refused ?? new InvalidOperationException("Storage committed without adopting the batch");
+            Fail(refusal);
+            ExceptionDispatchInfo.Throw(refusal);
+        }
+        return true;
+    });
 
     /// <inheritdoc/>
     public IDisposable SubscribeCommits(Action<CommitPublication, DurableContext> listener)
