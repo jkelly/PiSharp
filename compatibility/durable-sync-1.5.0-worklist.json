@@ -6753,7 +6753,14 @@
         "publication-caches",
         "scheduler-idle"
       ],
-      "commits": [],
+      "commits": [
+        "9eb0b832",
+        "d6b73425",
+        "f993173c",
+        "2867c0f3",
+        "facf9906",
+        "a450533d"
+      ],
       "notes": "Runs last, after every area (and after the Chord v2 areas if the owner pulls them in). It moves the Durable suite's report label (tests/PiSharp.Durable.Tests/Program.cs Upstream, on v1.2.0 during the sync) to v1.5.0 and DurableUpstream.cs's line 1 citation once index.ts is ported; DurableWire.DurableVersion (Client Wire.cs, \"1.2.0\") is the pi-durable version the device wire announces: move it to 1.5.0 only if the device protocol keeps durable-pi compatibility at 1.5.0 (area events), otherwise leave it and say why. The upgrade case group upgrade-from-v1.2.0 (a v1.2.0-written corpus opened by v1.5.0 code, like upgrade-from-v1.1.0) lands here if the format areas have not added it. Moves every port map row to ported whose area landed with its tests passing, and checks that no needs-sync or planned row is left outside phase 6. The renamed examples (05-harness to 30-reload-and-restart) changed only their numbers unless a listed area owns them: their C# files keep their names, so only their citations move. Session/SessionStatesCases.cs was deleted by area watches (2cce573d), so this area no longer edits it."
     }
   ],

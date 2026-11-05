@@ -56,11 +56,11 @@
     "changelogBullets": 477,
     "repeatedBullets": 23,
     "byStatus": {
-      "ported": 229,
-      "ported-with-deferral": 22,
+      "ported": 232,
+      "ported-with-deferral": 20,
       "already-ported": 12,
       "no-op": 25,
-      "port": 38
+      "port": 37
     },
     "byArea": {
       "ai": 58,
@@ -8219,7 +8219,8 @@
           "b095f17b",
           "5137dff7",
           "0cd3126c",
-          "21d74fb7"
+          "21d74fb7",
+          "68277da7"
         ],
         "tests": [
           "tests/PiSharp.Durable.Tests/StoreStorageCases.cs: storage.store.claims.refuse-a-second-storestorage-on-one-owner-until-the-first-closed-two-owners-share-a-store",
@@ -8230,10 +8231,11 @@
           "tests/PiSharp.Durable.Tests/StoreStorageCases.cs: storage.store.commits.publishes-inside-the-attached-hosts-batch-and-plainly-without-a-host",
           "tests/PiSharp.Durable.Tests/StoreStorageCases.cs: storage.store.gc.a-closed-storestorage-is-collected-while-its-store-stays-open",
           "tests/PiSharp.Durable.Tests/StoreStorageCommitCases.cs: storage.store.commit.stores-the-batches-in-one-backend-transaction-one-seq-and-one-outbox-commit-each-receipts-in-order",
-          "tests/PiSharp.Durable.Tests/StoreStorageCommitCases.cs: storage.store.commit.writes-the-metadata-once-per-call-three-statements-per-entry-append-plus-one-cost-guard"
+          "tests/PiSharp.Durable.Tests/StoreStorageCommitCases.cs: storage.store.commit.writes-the-metadata-once-per-call-three-statements-per-entry-append-plus-one-cost-guard",
+          "tests/PiSharp.Durable.Tests/StoreStorageCommitCases.cs: storage.store.commit.publishes-each-commit-of-a-call-in-a-host-batch-of-its-own-after-the-calls-one-transaction"
         ]
       },
-      "deferred": "Examples 35 and 36 and store-storage.test.ts's 2 view cases need phase 6 (createHost, defineFacet, self.table/open/follow/derive), and the examples would also need an upstream run for expected output. store-storage-commit.test.ts's publication case waits on group-commit, publication-caches and phase 6; its 1.5-id case cannot be ported (PiSharp ids are longs). conversation-view-bench.ts is area view's. StoreStorage passes the conformance suite (storage.store.conformance.* and storage.store.reopen.conformance.*, generated case ids) and the store pass runs 322 harness.<group>.store.* cases."
+      "deferred": "Phase 6 (createHost, defineFacet, self.table/open/follow/derive) takes examples 35-durable-on-the-store and 36-durable-views, which would also need an upstream run for their expected output, and store-storage.test.ts's 2 view cases. store-storage-commit.test.ts's 1.5-id case cannot be ported (PiSharp ids are longs). Everything else is ported. StoreStorage passes the conformance suite (storage.store.conformance.* and storage.store.reopen.conformance.*, generated case ids), and the store pass runs 455 harness.<group>.store.* cases (19 groups). The publication case ('publishes each commit of a call in a host batch of its own') runs since area publication-caches on a hand-built Chord batch; createHost's own batch is phase 6's."
     },
     {
       "id": "durable.durable-sleep",
@@ -9262,7 +9264,7 @@
           "tests/PiSharp.Durable.Tests/HarnessGroupCommitCases.cs: finds-the-submission-an-unpublished-commit-admitted-with-the-same-request-id",
           "tests/PiSharp.Durable.Tests/HarnessGroupCommitCases.cs: runs-a-wait-continuation-of-one-commit-before-the-next-commit-of-the-same-call-is-published",
           "tests/PiSharp.Durable.Tests/HarnessGroupCommitCases.cs: signals-an-invocation-when-it-closes-during-a-call-in-flight-and-stores-that-call-before-storage-closes",
-          "tests/PiSharp.Durable.Tests/HarnessGroupCommitCases.cs: ends-a-task-wait-when-the-harness-closes-while-the-terminal-commit-is-stored-and-still-stores-it",
+          "tests/PiSharp.Durable.Tests/Harness/HarnessTasksCases.cs: publication-at-adoption.ends-a-task-wait-when-the-harness-closes-while-the-terminal-commit-is-stored-and-still-stores-it",
           "tests/PiSharp.Durable.Tests/Harness/HarnessOwnershipCases.cs: runs-a-handle-operation-queued-behind-the-abort-mark-before-the-marks-publication-and-the-cascade-aborts-it",
           "tests/PiSharp.Durable.Tests/HarnessSchedulerRetentionCases.cs: loads-the-chain-of-new-work-below-a-forgotten-conversation-before-admitting-it-and-keeps-the-scope-busy",
           "tests/PiSharp.Durable.Tests/HarnessRestartFailureCases.cs: the-restart-limit-on-the-normal-path.resolves-the-settings-no-more-often-than-before-only-a-task-that-was-cut-off-reads-the-limit",
@@ -9760,7 +9762,7 @@
       "id": "durable.reports",
       "area": "durable",
       "phase": 4,
-      "status": "ported-with-deferral",
+      "status": "ported",
       "changelog": [
         "durable@1.5.0/Breaking Changes#22",
         "durable@1.5.0/Breaking Changes#28",
@@ -9803,7 +9805,10 @@
       "notes": "PiSharp's OnReport is Action<Exception> (Harness/Types.cs:754) and ITaskRuntime.Report(Exception) (TypesTasks.cs:95), the v1.2.0 shape. Port 1.5.0's one-argument Report directly; 1.4.0's (error, info) form never reached PiSharp. PiSharp-only consumers pass the exception through and must move to Report or unwrap it: the device host's OnReport(sessionId, Exception) (HostedSession.cs:729, DurableDeviceOptions.cs:66), pisharp durable (DurableRuntime.cs:154), pisharp durable serve (DurableServe.cs:164), custom agent teams (AgentTeam.cs:94) and the web agent (DeviceHostService.cs:77). The pi.durable.report telemetry event is durable.telemetry; task_interrupted is durable.restart-limit.",
       "evidence": {
         "commits": [
-          "1d0b14ee"
+          "1d0b14ee",
+          "cd62648c",
+          "deaaf7dc",
+          "2867c0f3"
         ],
         "tests": [
           "tests/PiSharp.Durable.Tests/HarnessReportsCases.cs: reports.say-which-task-reported-a-failure-or-faulted",
@@ -9814,10 +9819,12 @@
           "tests/PiSharp.Durable.Tests/Harness/HarnessTasksRecoveryCases.cs: definition-handover.keeps-running-under-the-old-definition-when-the-replacement-is-missing-or-cannot-take-the-task",
           "tests/PiSharp.Durable.Tests/Harness/HarnessTasksRecoveryCases.cs: definition-handover.reports-a-replacement-older-than-the-running-task-as-task_too_old-and-keeps-the-old-definition",
           "tests/PiSharp.Durable.Tests/Harness/HarnessToolsCases.cs: reports-a-throwing-beforeproviderrequest-hook-and-continues-the-chain",
-          "tests/PiSharp.Durable.Tests/Harness/HarnessRegistryCases.cs: agent-resolution.collects-hooks-of-the-selected-extensions-in-extension-order-and-applies-field-defaults"
+          "tests/PiSharp.Durable.Tests/Harness/HarnessRegistryCases.cs: agent-resolution.collects-hooks-of-the-selected-extensions-in-extension-order-and-applies-field-defaults",
+          "tests/PiSharp.Durable.Tests/HarnessRestartFailureCases.cs: ends-a-run-whose-generation-is-cut-off-restartlimit-times-outside-a-request",
+          "tests/PiSharp.Durable.Tests/HarnessRestartFailureCases.cs: ends-a-tool-call-with-an-error-result-instead-of-running-it-again",
+          "tests/PiSharp.Durable.Tests/HarnessTelemetryCases.cs: harness.telemetry.mirrors-runtime-reports-as-fixed-field-phase-events-and-type-only-counters"
         ]
-      },
-      "deferred": "The task_interrupted kind (its restart_limit and interrupted reasons and restart count) is area restarts' (durable.restart-limit); the telemetry HostCallback, the report's telemetry context and the pi.durable.report event are area telemetry's (durable.telemetry). Upstream README.md and docs/spec.md text is not mirrored (PiSharp keeps no copy; the website's embed/durable.md OnReport row still reads as before)."
+      }
     },
     {
       "id": "durable.telemetry",
@@ -10061,7 +10068,7 @@
           "tests/PiSharp.Durable.Tests/ModelsCases.cs: models.identity.a-request-identity-sets-the-user-agent"
         ]
       },
-      "deferred": "Upstream's DEFAULT_HARNESS_IDENTITY is { attribution: PI_ATTRIBUTION }; PiSharp's Harness.DefaultIdentity is empty and adds no attribution, pending the owner-blocked row core.client-identity-attribution (core.agent-identity likewise not landed through durable). The user-agent part is ported: a Harness without an identity sends PiSharp.AI's default pi/1.5.0 (<platform>; dotnet/<runtime>; <arch>) user agent, and a HarnessOptions.Identity is merged over the default into every chat request. No caller passes an identity yet (CLI, web agent, device host): there is no PiSharp app identity until the owner decides. IDurableModels' classify, generateImages and deferred fetch/cancel take no request options, so the Harness identity reaches chat requests only (upstream's withClientIdentity wraps every Models call); those calls send PiSharp.AI's default, which equals the Harness default today."
+      "deferred": "Upstream's DEFAULT_HARNESS_IDENTITY is { attribution: PI_ATTRIBUTION }; PiSharp's Harness.DefaultIdentity is empty and adds no attribution, by the owner's decision of 2026-11-05 (decision 0013, core.client-identity-attribution: no attribution). The user-agent part is ported: a Harness without an identity sends PiSharp.AI's default pi/1.5.0 (<platform>; dotnet/<runtime>; <arch>) user agent, and a HarnessOptions.Identity is merged over the default into every chat request. Left for a later sync: (1) IDurableModels' classify, generateImages and deferred fetch/cancel take no request options, so the Harness identity reaches chat requests only (upstream's withClientIdentity wraps every Models call; those calls send PiSharp.AI's default, which equals the Harness default today); (2) NativeDurableModels has no createModels identity option (upstream adc5fa9f8), so its citation stays on v1.2.0. The device host forwards DurableDeviceOptions.Identity, which no caller (CLI, web agent) sets, as PiSharp has no attribution to send."
     },
     {
       "id": "durable.host-option-providers",
@@ -11164,7 +11171,7 @@
       "id": "durable.upstream-tests",
       "area": "durable",
       "phase": 4,
-      "status": "port",
+      "status": "ported",
       "changelog": [],
       "upstream": [
         "packages/durable/test"
@@ -11176,7 +11183,30 @@
         "tests/PiSharp.Durable.Hosting.Tests"
       ],
       "release": "1.5.0",
-      "notes": "PiSharp's durable tests port upstream's cases and cite them (see the durable area of sync-1.5.0-worklist.json). Each durable row ports its upstream cases with it; this row tracks the cited test files no other row names, so the re-sync re-pins every durable test citation."
+      "notes": "PiSharp's durable tests port upstream's cases and cite them (see the durable area of sync-1.5.0-worklist.json). Each durable row ports its upstream cases with it; this row tracks the cited test files no other row names, so the re-sync re-pins every durable test citation.",
+      "evidence": {
+        "commits": [
+          "9eb0b832",
+          "d6b73425",
+          "f993173c"
+        ],
+        "tests": [
+          "tests/PiSharp.Durable.Tests/Compat/CompatUpgrade120Cases.cs: sqlite.migrates-the-schema-to-version-2",
+          "tests/PiSharp.Durable.Tests/Compat/CompatUpgrade120Cases.cs: mssql.resumed",
+          "tests/PiSharp.Durable.Tests/Compat/CompatUpgrade120Cases.cs: sleeps-the-charged-retry-across-a-reopen-and-answers-both-inputs",
+          "tests/PiSharp.Durable.Tests/Compat/CompatUpgrade120Cases.cs: re-adds-the-built-in-tool-declarations-once",
+          "tests/PiSharp.Durable.Tests/Harness/HarnessGenerationCases.cs: resolves-settings-over-the-built-in-defaults",
+          "tests/PiSharp.Durable.Tests/Harness/HarnessViewCases.cs: uses-from-only-for-the-first-value-a-from-past-the-newest-entry-starts-empty-and-takes-every-append",
+          "tests/PiSharp.Durable.Tests/Harness/HarnessInboxCases.cs: places-every-follow-up-in-one-successor-run-with-followupmode-all",
+          "tests/PiSharp.Durable.Tests/Harness/HarnessLifecycleCases.cs: closes-without-a-cancelled-caller-context-and-rethrows-the-original-error-when-open-fails",
+          "tests/PiSharp.Durable.Tests/Harness/HarnessTaskGraphCases.cs: follows-every-live-task-through-its-statuses-owner-edges-and-owned-conversations",
+          "tests/PiSharp.Durable.Tests/Harness/HarnessRegistryCases.cs: registry.installs-replaces-in-place-and-uninstalls-extensions-by-name",
+          "tests/PiSharp.Durable.Tests/HarnessNestedToolsCases.cs: stores-one-document-per-nested-call-keyed-by-its-key-written-only-by-that-call",
+          "tests/PiSharp.Durable.Tests/EnvLineScanCases.cs: env.line-scan.keeps-a-u-feff-that-does-not-start-the-stream",
+          "tests/PiSharp.Durable.Tests/Storage/StorageRuntimeBoundaryCases.cs: storage.runtime-boundary.keeps-the-package-root-limited-to-portable-core-storage",
+          "tests/PiSharp.Durable.Tests/ExamplesCases.cs: examples.memory.upstream-output"
+        ]
+      }
     },
     {
       "id": "env.remote-watcher-stop",
@@ -11379,7 +11409,7 @@
       "id": "chord.watch-handle",
       "area": "chord",
       "phase": 4,
-      "status": "ported-with-deferral",
+      "status": "ported",
       "changelog": [
         "chord@1.5.0/Breaking Changes#3",
         "chord@1.5.0/Breaking Changes#5",
@@ -11409,7 +11439,9 @@
       "evidence": {
         "commits": [
           "35f289a9",
-          "cefeb937"
+          "cefeb937",
+          "2cce573d",
+          "3de6990f"
         ],
         "tests": [
           "tests/PiSharp.Durable.Tests/Chord/WatchCases.cs: chord.watch.delivery.keeps-the-acquisition-value-until-start-then-delivers-the-frames-since-in-one-call",
@@ -11424,10 +11456,11 @@
           "tests/PiSharp.Durable.Tests/Chord/WatchCases.cs: chord.watch.ends.ends-aborted-when-its-acquisition-signal-aborts-also-when-already-aborted",
           "tests/PiSharp.Durable.Tests/Chord/WatchCases.cs: chord.watch.ends.ends-listener-error-on-a-throw-reports-it-and-delivers-nothing-more",
           "tests/PiSharp.Durable.Tests/Chord/WatchCases.cs: chord.watch.references.retain-neither-source-listener-nor-signal-once-ended-while-still-referenced",
-          "tests/PiSharp.Durable.Tests/Chord/WatchCases.cs: chord.watch.threads.a-producer-thread-and-a-slow-listener-converge-on-the-newest-value"
+          "tests/PiSharp.Durable.Tests/Chord/WatchCases.cs: chord.watch.threads.a-producer-thread-and-a-slow-listener-converge-on-the-newest-value",
+          "tests/PiSharp.Durable.Tests/Session/SessionWatchesCases.cs: keeps-the-acquisition-revision-until-start-then-delivers-the-commits-since-in-one-call",
+          "tests/PiSharp.Durable.Tests/Session/SessionWatchesCases.cs: folds-a-retirement-into-the-pending-commits-call-which-reports-it-with-the-last-value-and-goes-on"
         ]
-      },
-      "deferred": "Chord's watch API (IWatchHandle, IWatchable, WatchEnd by kind, tagged calls, Watch<T>) is ported in src/PiSharp.Durable/Chord/Watch.cs, but Durable's own watches (TypesSession.cs WatchEnd/WatchEndReason/IWatchHandle, Session/Observation.cs CommittedWatch) still follow v1.2.0: the coordinator assigned moving them onto Chord's to work list area watches (row durable.watch-handles). packages/chord/README.md has no PiSharp counterpart; chord/src/index.ts is the barrel, with no C# counterpart."
+      }
     },
     {
       "id": "chord.native-watch",
@@ -12385,7 +12418,7 @@
           "tests/PiSharp.Chord.Tests/Contracts/SchemaCases.cs: contracts.schema.bytes-checks-the-type-and-the-length-bounds"
         ]
       },
-      "deferred": "The entry point (src/PiSharp.Chord, PiSharp.Chord.ChordNext, experimental PISHARP_CHORD001, not packable) and its contracts layer are ported with their tests. The other layers @earendil-works/chord/next exports come with later areas: data, state, documents, registries and the store with the cv2-*, store-storage and registry-reader areas; hosts, jobs, links and relays in phase 6. Contract evolution and checkAccepts come with cv2-evolve. Of support.ts, the GC check and the slice declarations are ported; its counters, watch frames, store helpers, NotesDoc, rejection helpers and createHost/link helpers come with the first area whose tests use them (ChordSupport.cs's header lists them)."
+      "deferred": "The entry point (src/PiSharp.Chord, PiSharp.Chord.ChordNext, experimental PISHARP_CHORD001, not packable) is ported, and so is every layer @earendil-works/chord/next exports up to the store, with their tests: contracts (with contract evolution and checkAccepts), data, documents, state, registries, and the store with its SQLite backend (areas cv2-*, store-storage and registry-reader). Left for phase 6: the host, jobs and link layers (hosts, jobs, links and relays) that next/index.ts also re-exports, and the support.ts helpers no ported test uses yet (NotesDoc, and the host, link, relay and raw-peer helpers built on createHost; ChordSupport.cs's header lists them)."
     },
     {
       "id": "chord.next-contracts-data",
@@ -12438,7 +12471,7 @@
           "tests/PiSharp.Chord.Tests/Schema/SchemaSwitchCases.cs: schema.schema-switch.keeps-every-fingerprint-and-normal-form-of-contracts"
         ]
       },
-      "deferred": "Contracts (cv2-contracts, cv2-evolve) and data (cv2-data) are ported: every file of packages/chord/src/next/contracts and next/data, and every upstream case of test/next/contracts and test/next/data except the type-level ones. bindProvider now runs checkAccepts on cv2-evolve's AcceptsTable, args.test.ts evolves with Contract.Evolve, and its \"missing mapping\" assertion is ported. Left, all in test/next/schema and waiting on other areas: (1) schema-switch.test.ts compares the contracts' fingerprints and normal forms, and the profile's normal form, with recorded.json now. Documents' fingerprints wait for defineState (documents areas, e.g. cv2-state), tables' for defineTable/evolveTable/json (cv2-store-tables), and the job's for defineJob (jobs, phase 6). \"stored data\" (storedReads: a host reading stored/store.db and an import of stored/archive.jsonl) needs createHost and defineFacet (phase 6) plus the store engine and archive. (2) owner.ts waits for phase 6 (createHost, defineFacet). write-stored.ts is not ported: it rewrites the fixtures, which decision 0013 rules out."
+      "deferred": "Contracts (cv2-contracts, cv2-evolve) and data (cv2-data) are ported: every file of packages/chord/src/next/contracts and next/data, and every upstream case of test/next/contracts and test/next/data except the type-level ones. Left, in test/next/schema: (1) schema-switch.test.ts's fingerprint case compares the contracts and the documents with recorded.json. The tables' fingerprints and records are not compared yet, although defineTable landed with cv2-store-tables (a follow-up for phase 6's Chord work). The job's fingerprint waits for defineJob (phase 6). Its 'stored data' case (storedReads: a host reading stored/store.db and importing stored/archive.jsonl) needs createHost and defineFacet (phase 6); two PiSharp cases read stored/ through the store alone. (2) owner.ts waits for phase 6 (createHost, defineFacet). write-stored.ts is not ported: it rewrites the fixtures, which decision 0013 rules out."
     },
     {
       "id": "chord.next-documents-state",
@@ -12674,7 +12707,7 @@
           "tests/PiSharp.Chord.Tests/Store/StoreCases.cs: store.store.a-commit-series-stops-the-store-when-a-receipt-throws"
         ]
       },
-      "deferred": "Export and import (store.export, importStore, the archive format and parts, JSONL) are area cv2-store-archive's, later in this phase; Archive.cs already holds the write schema and checkWrite batch apply needs. refusal.test.ts's \"Chord's owners\" case serves an object on a host (createHost, phase 6). The Durable Objects backend (chord/sqlite/cloudflare) is Cloudflare, excluded. The production ISqliteDatabase over PiSharp.Durable.Sqlite comes with store-storage (PiSharp.Durable.Store), per the coordinator's decision."
+      "deferred": "refusal.test.ts's \"Chord's owners\" case serves an object on a host (createHost, phase 6). The Durable Objects backend (chord/sqlite/cloudflare) is Cloudflare's, which is excluded. Everything else of the store is ported: the engine, tables and SQL; export and import (store.export, importStore, the archive format and its parts, JSONL; area cv2-store-archive); and the production ISqliteDatabase over PiSharp.Durable.Sqlite (PiSharp.Durable.Store's Database.cs, area store-storage)."
     },
     {
       "id": "chord.next-registries",
