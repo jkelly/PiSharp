@@ -15,6 +15,8 @@
 // pi.live.runFailure before it removes run, its final view holds it, and its run_end event carries it (PiSharp's event projection).
 // Pi v1.5.0 sync (area events, f3255de76): v1.5.0 removed watchEvents; the event half compares PiSharp's projection (PiSharp.Durable.Hosting's
 // AgentEvents.cs, PiSharp-only) with the v1.2.0 capture, which stays honest only while the projection reproduces v1.2.0's events.
+// Pi v1.5.0 sync (area live-turns, f6a9db1d8): and with LiveV3150.cs's: the frame that sets pi.live.run gives it turns 0, and the frame of
+// the commit that starts a tool round sets run.turns after its pi.live ops. The events keep v1.2.0's wire (no turns).
 using PiSharp.Durable;
 using PiSharp.Durable.Chord;
 using PiSharp.Durable.Hosting;
@@ -44,8 +46,8 @@ internal static class ViewsDifferentialTests
     private const double T = 1000;
 
     // Pi v1.5.0 (area model-requests): the capture's authored v1.5.0 form (see the file header).
-    private static readonly Lazy<JsonObjectValue> Upstream = new(() => RunFailure150.Views(Splices150((JsonObjectValue)ModelRequests150.Authored(JsonValue.Parse(
-        File.ReadAllText(Path.Combine(RepositoryRoot(), "tests", "PiSharp.Durable.Tests", "Fixtures", "v1.2.0", "views.upstream.json")))))));
+    private static readonly Lazy<JsonObjectValue> Upstream = new(() => LiveV3150.Views(RunFailure150.Views(Splices150((JsonObjectValue)ModelRequests150.Authored(JsonValue.Parse(
+        File.ReadAllText(Path.Combine(RepositoryRoot(), "tests", "PiSharp.Durable.Tests", "Fixtures", "v1.2.0", "views.upstream.json"))))))));
 
     /// <summary>Pi v1.5.0 (area view): every scenario's frames with each run of consecutive entry splices joined into one (see the file
     /// header).</summary>

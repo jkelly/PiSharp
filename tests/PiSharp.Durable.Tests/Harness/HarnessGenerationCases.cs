@@ -28,6 +28,7 @@
 // was observeCommits) and reads the document changes of kind change (DocumentValueChange).
 // Pi v1.5.0 sync (area tool-tasks, 1c6928b30): "orphans a blocked run task with full run cleanup" stores the run under the generation
 // definition's version plus one (pi.generation is version 2), as v1.5.0's does.
+// Pi v1.5.0 sync (area live-turns, f6a9db1d8): that case's run is { taskId, inputs, turns: 0 }, as pi.live.run carries turns.
 #pragma warning disable PISHARP_IDENTITY001 // PiSharp.AI's ClientIdentity (Pi v1.5.0) is experimental.
 using System.Collections.Immutable;
 using System.Text.RegularExpressions;
@@ -636,7 +637,7 @@ internal static class GenerationTests
                     ConversationId = root.Id, Type = SubmissionType.Input, Status = SubmissionStatus.Placed, Entry = entry.Id,
                 });
                 var id = await tx.CreateTaskAsync(newer, JsonObjectValue.Empty, new TaskOptions(TaskOwnership.Conversation) { ConversationId = root.Id });
-                (await tx.DocAsync(Live.LiveDoc, root.Id)).Set("run", Obj(("taskId", id.ToJson()), ("inputs", JsonValue.Array(submission.Id.ToJson()))));
+                (await tx.DocAsync(Live.LiveDoc, root.Id)).Set("run", Obj(("taskId", id.ToJson()), ("inputs", JsonValue.Array(submission.Id.ToJson())), ("turns", 0)));
                 return (id, submission.Id);
             }, Context);
             harness.Resume();

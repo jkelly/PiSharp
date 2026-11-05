@@ -1,13 +1,13 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/src/harness/compaction.ts. Pi v1.5.0 sync (area sleep): a retry
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/src/harness/compaction.ts. Pi v1.5.0 sync (area sleep): a retry
 // backoff sleeps instead of waiting in a running phase, and a retry run before its time (an early wake, or a record an earlier version
-// stored as running) sleeps again (f75b3240a); the citation stays on v1.2.0 until the file's other areas land.
+// stored as running) sleeps again (f75b3240a).
 //
 // Mappings:
 // - Input, checkpoints and results are upstream's JSON in its key order: input {reason, instructions?}; checkpoints {phase: "select"},
 //   {phase: "summarize", attempt, model, thinkingLevel, streamOptions, maxTokens, tail, firstKept} and the same request followed by
 //   `until` for {phase: "retry"}; the result is {entryId} (blocking), {submissionId} (conversation-owned) or {} (nothing compacted).
-// - The live status is upstream's {taskId, reason, blocking, attempt, retry?: {at, error}} in pi.live.compactions (Live.cs); a failure stays
-//   in pi.live.compactionFailure {taskId, reason, error} until a compaction produces a summary.
+// - The live status is upstream's {taskId, trigger, blocking, attempt, retry?: {at, error}} in pi.live.compactions (Live.cs); a failure stays
+//   in pi.live.compactionFailure {taskId, trigger, error} until a compaction produces a summary. The task input keeps its reason.
 // - The summarization request crosses IDurableModels.CompleteSimpleAsync with pi-ai wire messages; its answer comes back as a
 //   PiSharp.Contracts message and is classified as wire JSON (GenerationPhases.ToWire). `runtime.signal` is ITaskRuntime.Signal, and
 //   `signal.throwIfAborted()` throws OperationCanceledException.
@@ -15,13 +15,14 @@
 //   (upstream's `{decline: true} | {summary}`).
 // - JSON.stringify of a tool call argument is JsonValue.ToJson (JavaScript formatting); String.prototype.trim is Js.Trim.
 //
-// Pi v1.5.0 sync (area harness-options): compactionPolicy() and select's per-model policy (upstream 6085986e4, #10942). Areas restarts,
-// sleep, telemetry and live-turns change this file again, so the citation stays on v1.2.0.
+// Pi v1.5.0 sync (area harness-options): compactionPolicy() and select's per-model policy (upstream 6085986e4, #10942).
 // Pi v1.5.0 sync (area restarts, b3a29f111): select, summarize and retry first fail a compaction cut off settings.restartLimit times in a
 // row (TaskRecord.Restarts) into pi.live.compactionFailure, "Compaction was interrupted once" or "N times in a row", with detail
 // {reason: "restart_limit"} (FailCutOffAsync), instead of running it again.
 // Pi v1.5.0 sync (area telemetry, 2ec55d808): the summarization request passes the phase's span as its telemetry parent; a
 // conversation-owned compaction's admission records no submit span, only the phase's events.
+// Pi v1.5.0 sync (area live-turns, 5f312dac4): a compaction's live status names what started it trigger (pi.live version 2), where v1.2.0
+// named it reason; the task input keeps reason. The file is v1.5.0's now.
 using System.Collections.Immutable;
 using System.Text;
 using PiSharp.Durable.Chord;
@@ -333,7 +334,7 @@ internal static class Compaction
         var input = new RecordJson.Writer().Add("reason", reason).Add("instructions", instructions).Build();
         var options = new TaskOptions(ownership) { ConversationId = conversationId, Background = background };
         var id = await tx.CreateTaskAsync(HarnessTasks.CompactionTask, input, options).ConfigureAwait(false);
-        var status = new RecordJson.Writer().Add("taskId", id.ToJson()).Add("reason", reason).Add("blocking", owner is not null)
+        var status = new RecordJson.Writer().Add("taskId", id.ToJson()).Add("trigger", reason).Add("blocking", owner is not null)
             .Number("attempt", 1).Build();
         Live.AddCompactionStatus(await tx.DocAsync(Live.LiveDoc, conversationId).ConfigureAwait(false), status);
         return id;

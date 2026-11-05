@@ -2,6 +2,7 @@
 // durable agent in v1.2.0, so these cases have no upstream twin): nested tool calls as rows under their caller's card, a tool result's
 // diagnostics as plain lines (a failed command's exit code as pi shows it), images as interactive mode shows them, and the alerts for a failed
 // session and for pi.live.compactionFailure. Pi v1.5.0 sync (area run-failure): the alert for pi-durable 1.5.0's pi.live.runFailure.
+// Area live-turns: pi.live version 2 names the compaction's trigger, as compactionFailure.trigger.
 using System.Collections.Immutable;
 using System.Text.Json.Nodes;
 using PiSharp.Cli.Durable;
@@ -186,7 +187,7 @@ internal static partial class Program
         Case("tui.alert.compaction-failure", async () =>
         {
             await using var run = await TuiRun.Start(View([UserEntry(1, "q")]));
-            run.Source.Publish(View([UserEntry(1, "q")], live: """{"compactionFailure":{"taskId":3,"reason":"threshold","error":"summarizer down"}}"""));
+            run.Source.Publish(View([UserEntry(1, "q")], live: """{"compactionFailure":{"taskId":3,"trigger":"threshold","error":"summarizer down"}}"""));
             await run.WaitFor("Compaction failed (threshold): summarizer down");
             Check(run.Terminal.RawOutput.Contains(Themes.Current.Fg("error", "Compaction failed (threshold): summarizer down"), StringComparison.Ordinal),
                 "error color");

@@ -8,6 +8,7 @@
 // Pi v1.5.0 sync (area view): runtime.transcript.<case> check DurableView.Transcript, the active transcript the TUI renders and counts
 // context tokens from, now that the conversation view's entries are a window over the whole transcript: it stays the shown conversation's
 // ContextView.Entries past the window's 100 entries, and starts at the summary after a compaction while the window keeps the history.
+// Area live-turns: the recorded pi.live.compactionFailure names its trigger (pi.live version 2).
 using PiSharp.Cli.Durable;
 using PiSharp.Cli.Pi;
 using PiSharp.Durable;
@@ -202,7 +203,7 @@ internal static partial class Program
             var failed = await UntilView(durable.View, view => view.Conversation.Doc("pi.live") is { } live &&
                 live.TryGetValue("compactionFailure", out var failure) && failure is JsonObjectValue, "pi.live.compactionFailure");
             var recorded = (JsonObjectValue)failed.Conversation.Doc("pi.live")!["compactionFailure"];
-            Equal("\"manual\"", recorded["reason"].ToJson(), "reason");
+            Equal("\"manual\"", recorded["trigger"].ToJson(), "trigger");
             Check(((JsonStringValue)recorded["error"]).Value.Contains("summarizer down", StringComparison.Ordinal), "error: " + recorded.ToJson());
             await Task.Delay(300);
             Check(!durable.View.Current.Notices.Any(notice => notice.Message.StartsWith("Compaction", StringComparison.Ordinal)),

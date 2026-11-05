@@ -48,6 +48,10 @@ using PiSharp.Durable.Examples;
 // Area admission (cc9c52310): 35-submit-in-commit is v1.5.0's 34-submit-in-commit.ts; its lines are authored from that example, not
 // captured: the submission ID is the one this port mints, and the recorded visitors print as JSON in place of util.inspect. Its file
 // backends read the host's record back.
+// Area live-turns (f6a9db1d8): 34-turn-limit-and-continue is v1.5.0's 33-turn-limit-and-continue.ts; its lines are authored from that
+// example (console.log's arguments joined with spaces), not captured. Its file backends read the transcript's kinds back. 19-json's ops
+// lines take LiveV3150.cs's authored form too (pi.live version 3): the run's set has turns 0, and the frame that starts the tool round
+// sets run.turns 1 after its pi.live ops; its state lines, replayed from them, show the run's turns.
 // Area events (f3255de76): v1.5.0 removed watchEvents, and the examples that printed agent events print the view, as upstream's do. 19-json
 // runs v1.5.0's two modes (18-json.ts), ops on the runner's storage and state on MemoryStorage: the ops lines stay the v1.2.0 capture's
 // authored forms (JsonModeOpsLines), and the state lines are authored from them, not captured: JsonModeStateLines replays each frame's ops
@@ -76,8 +80,9 @@ internal static partial class Program
     // Declared before ExamplesUpstreamOutput, which spreads them. Pi v1.5.0 (area tools-schema): authored forms of the capture, with the
     // built-in tools declared in pi-schema's key order (ToolsSchema150.cs); (area model-requests) and with the thinking level each classified
     // message records (ModelRequests150.cs). (Area events) the state mode's lines are authored from the ops lines (JsonModeStateLines).
-    private static readonly string[] JsonModeOps =
-        [.. JsonModeOpsLines(JsonModeFixture("ops", "v1.2.0"), JsonModeFixture("ops")).Select(line => ModelRequests150.AuthoredText(ToolsSchema150.AuthoredText(line)))];
+    // (Area live-turns) and with pi.live's run turns (LiveV3150.cs).
+    private static readonly string[] JsonModeOps = LiveV3150.OpsLines(
+        [.. JsonModeOpsLines(JsonModeFixture("ops", "v1.2.0"), JsonModeFixture("ops")).Select(line => ModelRequests150.AuthoredText(ToolsSchema150.AuthoredText(line)))]);
     private static readonly string[] JsonModeState = JsonModeStateLines(JsonModeOps);
     private static readonly string[] ReviewerTranscript =
     [
@@ -345,6 +350,19 @@ internal static partial class Program
         "fill gap                     [load earlier] 171..255",
         "resume after 3 missed        window: 3 entries",
         TranscriptLastLine,
+        // Pi v1.5.0 sync (area live-turns): v1.5.0's 33-turn-limit-and-continue.ts, authored (see the file header).
+        "== 34-turn-limit-and-continue",
+        "first run: unanswered turn_limit (2 turns)",
+        "second continue while busy: ConversationBusy",
+        "first continue: unanswered turn_limit",
+        "second continue: done (runFailure cleared)",
+        "> Do the four steps.",
+        "  tool: step 1 done",
+        "  tool: step 2 done",
+        "  tool: step 3 done",
+        "  tool: step 4 done",
+        "agent: All four steps are done.",
+        TurnLimitLastLine,
         // Pi v1.5.0 sync (area admission): v1.5.0's 34-submit-in-commit.ts, authored (see the file header).
         "== 35-submit-in-commit",
         "ana: the agent isn't working now",
@@ -356,7 +374,12 @@ internal static partial class Program
         SubmitInCommitRecorded,
     ];
 
+    private const string TurnLimitTranscript =
+        """transcript: ["pi.user","pi.system","pi.assistant","pi.tool-result","pi.assistant","pi.tool-result","pi.assistant","pi.tool-result","pi.assistant","pi.tool-result","pi.assistant"]""";
+
     private const string SubmitInCommitRecorded = """recorded: [{"from":"ana","text":"Add a test for the build."}]""";
+
+    private const string TurnLimitLastLine = "continue after the answer: unanswered nothing_to_answer";
 
     private const string TranscriptLastLine = "                             [load earlier] 171..258";
 
@@ -502,6 +525,7 @@ internal static partial class Program
         [ReviewerTranscript[^1]] = ReviewerTranscript,
         [TranscriptLastLine] = ["stored: 258 chat entries, the newest \"line 258\""],
         [SubmitInCommitRecorded] = [SubmitInCommitRecorded],
+        [TurnLimitLastLine] = [TurnLimitTranscript],
     };
 
     private static IEnumerable<(string, Func<Task>)> ExamplesCases()

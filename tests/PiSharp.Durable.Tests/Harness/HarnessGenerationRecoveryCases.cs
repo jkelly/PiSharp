@@ -13,6 +13,8 @@
 //   the record as the thinking-level case does, where upstream's SQL turns the stored status back to running; no_model's poll runs once
 //   the clock reaches its time. The `eventually(() => !harness.wake().active)` waits are 440a5fcdb's (area reports) and hold at once
 //   until it lands. The citation stays on v1.2.0 until the file's other areas land.
+// - Pi v1.5.0 sync (area live-turns, f6a9db1d8): "resumes a retry backoff after reopen" expects pi.live.run's turns: 0; its first
+//   (7e15f9601) is area run-end's.
 using PiSharp.Durable;
 using PiSharp.Durable.Chord;
 using PiSharp.Durable.Sqlite;
@@ -215,7 +217,7 @@ internal static class GenerationRecoveryTests
             opened.Harness.Resume();
             await Task.Delay(20);
             Equal(1, setup.Faux.State.CallCount, "calls before its time");
-            SameJson("""{"run":{"taskId":""" + taskId + ""","inputs":[""" + id + """]},"generation":{"attempt":1,"retry":{"at":61000,"error":"503 Service Unavailable"}}}""",
+            SameJson("""{"run":{"taskId":""" + taskId + ""","inputs":[""" + id + """],"turns":0},"generation":{"attempt":1,"retry":{"at":61000,"error":"503 Service Unavailable"}}}""",
                 await LiveOf(opened), "live");
             Volatile.Write(ref now, 61_000);
             opened.Harness.Resume();

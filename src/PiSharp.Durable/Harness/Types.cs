@@ -34,6 +34,8 @@
 // Pi v1.5.0 sync (area admission): SubmissionDraft.Continue, a run on the context as it is (fb524dd2e, #11043), and IConversationHandle's
 // SubmitAsync takes any draft, as IConversation's does; WhenIdle.Reject on input (6a2825113, #11149); and SubmitAsync(tx, draft) on both,
 // admission inside the caller's commit (cc9c52310, #11149). settings.afterFailedRun's doc names nothing_to_answer.
+// Pi v1.5.0 sync (area live-turns, f6a9db1d8, #11043): AgentChange.MaxTurns and Agent.MaxTurns, the per-conversation turn limit (AgentState
+// maxTurns), and settings.afterFailedRun's doc names turn_limit. The citation stays on v1.2.0 until area run-end lands.
 using System.Collections.Immutable;
 using PiSharp.AI;
 using PiSharp.Durable.Chord;
@@ -166,6 +168,10 @@ public sealed record AgentChange
     public Patch<string>? Instructions { get; init; }
     /// <summary>Directory within the environment's file system, passed to <c>HarnessOptions.Env</c>.</summary>
     public Patch<string>? Cwd { get; init; }
+    /// <summary>Tool rounds one run takes at most (<see cref="Agent.MaxTurns"/>). Configuring throws
+    /// <see cref="ArgumentOutOfRangeException"/> (upstream <c>RangeError</c>) unless it is an integer 1 or more, within JavaScript's safe
+    /// integers, or <see cref="Patch{T}.Clear"/>.</summary>
+    public Patch<long>? MaxTurns { get; init; }
     /// <summary>PiSharp-only (decision 0007): the service tier of the conversation's requests (auto, normal, economy, priority, fast,
     /// ultrafast). A child conversation starts with its owner's.</summary>
     public Patch<string>? ServiceTier { get; init; }
@@ -193,6 +199,11 @@ public sealed record Agent
     public string? Instructions { get; init; }
     /// <summary>The environment directory.</summary>
     public string? Cwd { get; init; }
+    /// <summary>
+    /// Tool rounds one run takes at most (<c>pi.live.run.turns</c>): the round that reaches it runs its tools, then the run ends
+    /// <c>unanswered</c> with <c>turn_limit</c>. An integer, 1 or more; null, no limit. Task-owned children and forks inherit it.
+    /// </summary>
+    public long? MaxTurns { get; init; }
     /// <summary>PiSharp-only (decision 0007): the service tier; null when unset.</summary>
     public string? ServiceTier { get; init; }
 }
@@ -768,8 +779,8 @@ public class HarnessSettings
     /// </summary>
     public virtual double? DocumentRetentionMs { get; init; }
     /// <summary>
-    /// What a run that fails (<c>model_error</c>, <c>no_model</c>, <c>interrupted</c>, <c>restart_limit</c>, <c>nothing_to_answer</c>) does
-    /// with the inputs queued behind it: <see cref="Durable.AfterFailedRun.Keep"/> leaves them queued until the next input or queued write,
+    /// What a run that fails (<c>model_error</c>, <c>no_model</c>, <c>interrupted</c>, <c>restart_limit</c>, <c>nothing_to_answer</c>,
+    /// <c>turn_limit</c>) does with the inputs queued behind it: <see cref="Durable.AfterFailedRun.Keep"/> leaves them queued until the next input or queued write,
     /// <see cref="Durable.AfterFailedRun.Continue"/> starts the next run with them, as an answer would, and <see cref="Durable.AfterFailedRun.Withdraw"/> settles them <c>unanswered</c> with
     /// reason <c>run_failed</c>. Default <see cref="Durable.AfterFailedRun.Keep"/>.
     /// </summary>
@@ -786,7 +797,8 @@ public class HarnessSettings
 }
 
 /// <summary>What a failed run does with the inputs queued behind it (<see cref="HarnessSettings.AfterFailedRun"/>; upstream
-/// <c>AfterFailedRun</c>).</summary>
+/// <c>AfterFailedRun</c>): a run that ends with <c>model_error</c>, <c>no_model</c>, <c>interrupted</c>, <c>restart_limit</c>,
+/// <c>nothing_to_answer</c>, or <c>turn_limit</c>.</summary>
 public enum AfterFailedRun
 {
     /// <summary><c>keep</c>: they stay queued until the next input or queued write.</summary>

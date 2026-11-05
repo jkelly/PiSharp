@@ -23,6 +23,9 @@
 // of kind change (DocumentValues, upstream documentValues), and "stores a complete base exactly ..." skips a retirement by its kind.
 // Pi v1.5.0 sync (area tool-tasks, 1c6928b30, #11043): "starts calls the request did not offer as flagged tasks ..." (...-as-done-... before)
 // takes v1.5.0's slot: the unoffered call is pending with its own task, flagged unoffered.
+// Pi v1.5.0 sync (area live-turns, f6a9db1d8): pi.live.run carries turns, 0 when the run starts, and the commit that starts a tool round
+// counts the round as one turn (["s",["run","turns"],1], #11043); the base check's run has turns. A run's first (7e15f9601) is area
+// run-end's.
 using System.Collections.Immutable;
 using System.Threading.Channels;
 using PiSharp.Durable;
@@ -183,7 +186,7 @@ internal static partial class LiveDeltaTests
             const string slotPending = """{"callId":"c","name":"n","status":"pending"}""";
             const string slotRunning = """{"callId":"c","name":"n","status":"running"}""";
             const string slotDone = """{"callId":"c","name":"n","status":"done"}""";
-            const string run = """{"taskId":1,"inputs":[]}""";
+            const string run = """{"taskId":1,"inputs":[],"turns":0}""";
             Equal(true, Base("{}"), "empty");
             Equal(false, Base("{\"run\":" + run + ",\"generation\":{\"attempt\":1}}"), "generation");
             Equal(true, Base("{\"run\":" + run + ",\"tools\":[" + slotPending + "," + slotDone + "]}"), "pending and done");
@@ -210,10 +213,10 @@ internal static partial class LiveDeltaTests
             var all = commits.Snapshot();
             Equal(5, all.Count, "commits: " + string.Join(" | ", all.Select(ops => Json(ops))));
             // submission
-            MatchExactly($$"""[["s",["run"],{"taskId":{{firstGeneration}},"inputs":["<number>"]}]]""", J(Json(all[0])), "submission");
-            // the generation starts its tool round and keeps the run; the request's attempt is deferred, so it is stored here, its held
-            // operation first
-            Equal($$"""[["s",["generation"],{"attempt":1}],["s",["tools"],[{"callId":"c1","name":"noop","taskId":{{tool}},"status":"pending"}]],["d",["generation"]]]""",
+            MatchExactly($$"""[["s",["run"],{"taskId":{{firstGeneration}},"inputs":["<number>"],"turns":0}]]""", J(Json(all[0])), "submission");
+            // the generation starts its tool round and keeps the run, counting the round as one turn (#11043); the request's attempt is
+            // deferred, so it is stored here, its held operation first
+            Equal($$"""[["s",["generation"],{"attempt":1}],["s",["tools"],[{"callId":"c1","name":"noop","taskId":{{tool}},"status":"pending"}]],["d",["generation"]],["s",["run","turns"],1]]""",
                 Json(all[1]), "handover");
             // result: the running status is deferred like progress, so it is stored with the result, folded into its write
             Equal($$"""[["s",["tools",0,"status"],"done"],["s",["tools",0,"entry"],{{result}}]]""", Json(all[2]), "result");
