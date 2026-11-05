@@ -1,7 +1,9 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/test/scheduler-fanout-bench.ts. One model-issued tool makes `calls`
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/test/scheduler-fanout-bench.ts. One model-issued tool makes `calls`
 // parallel nested calls (IToolExecutionApi.ExecuteToolAsync, progress off) of a tool that returns at once, on in-memory storage, so the time
 // is the Harness's and the scheduler's own. Quadratic work shows as four times the time per doubling of `calls`. The faux model is
 // FauxModels.cs's; time is a Stopwatch around the run and waitForIdle, as upstream's performance.now() is.
+// Pi v1.5.0 sync: the tools declare pi-schema's obj() JSON (6536f8012, area tools-schema), and commits count the batches of each Storage
+// call (CountingStorage; e5c6182ba's `commits += batches.length`, area group-commit-scheduler).
 using System.Diagnostics;
 using System.Globalization;
 using PiSharp.Durable.Chord;

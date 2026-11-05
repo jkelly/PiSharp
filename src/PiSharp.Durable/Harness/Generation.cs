@@ -17,6 +17,8 @@
 // of their own parse of the streamed argument text (PartialChanges), so a committed partial now carries a streaming tool call's parsed
 // arguments, as upstream's does. Pi v1.5.0 sync (area deferred-commits, 6c2fd73b0): partial commits are deferred (Live.ProgressCommit),
 // and so is the request phase's attempt commit unless it converts an interrupted attempt's partial (e5c6182ba, durable@1.5.0 Changed#5).
+// Pi v1.5.0 sync (area group-commit-scheduler, e5c6182ba): the prepare phase's commit reads the newest entry with tx.LatestEntryIdAsync
+// (upstream tx.latestEntryId), not a one-entry scan.
 // Pi v1.5.0 sync (area run-failure, f3255de76): a run that ends without an answer records pi.live.runFailure (Live.EndRun with a RunEnd):
 // model_error with the error text, no_model naming the missing model (its inputs' settlement keeps no detail), aborted and reset;
 // StartRunAsync removes it, except for the run afterFailedRun: continue or a reset's queued input starts in the same commit (keepFailure).
@@ -297,7 +299,7 @@ internal static class GenerationPhases
         await runtime.CommitAsync(async (tx, _) =>
         {
             // The context ends in a message the model answers, so the conversation has an entry.
-            var tail = (await tx.ScanEntriesAsync(new EntryQuery(conversationId), 1).ConfigureAwait(false)).Items[0].Id;
+            var tail = (await tx.LatestEntryIdAsync(conversationId).ConfigureAwait(false))!.Value;
             foreach (var entry in entries) tail = (await tx.AppendEntryAsync(Entries.SystemEntry, conversationId, entry).ConfigureAwait(false)).Id;
             // Checked in this commit, so a compaction admitted during preparation counts.
             if (threshold == "background" && !(await tx.DocAsync(Live.LiveDoc, conversationId).ConfigureAwait(false)).ContainsKey("compactions"))

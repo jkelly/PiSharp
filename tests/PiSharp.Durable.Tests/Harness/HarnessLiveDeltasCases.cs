@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/test/harness-live-deltas.test.ts. Verbatim apart from the adaptations
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/test/harness-live-deltas.test.ts. Verbatim apart from the adaptations
 // in ChatSupport.cs and HarnessSupport.cs, and these:
 // - Backends. Upstream runs this file on MemoryStorage; HarnessLiveDeltasCases() does the same (harness.live-deltas.*), and the JSONL and
 //   SQLite groups (harness.live-deltas.jsonl.*, harness.live-deltas.sqlite.*) rerun every case but "keeps a complete base exactly while
@@ -7,17 +7,19 @@
 //   MatchExactly.
 // - drive()'s action queue is a Channel the tool reads under its invocation's cancellation, as upstream's tool awaits a wake promise that
 //   rejects on abort. waitFor is Eventually: output progress crosses the Harness's real-time throttle, as upstream's does.
-// - RecordingStorage (a MemoryStorage subclass that remembers base or delta per commit) is ControlledStorage: Session commits run one at a
-//   time on the line and publish right after Storage admits them, so a commit listener reads its own commit's batch as LastCommit.
+// - RecordingStorage (a MemoryStorage subclass that remembers base or delta per commit) is LiveRecordingStorage, a DelegatingStorage over
+//   the case's storage that records each batch's kind by the seq it receives, as upstream's does since e5c6182ba (Pi v1.5.0 sync, area
+//   group-commit-scheduler); v1.2.0's port read its own commit's batch as ControlledStorage.LastCommit, which group commit no longer allows.
 // - "starts calls the request did not offer ...": upstream's "bad" tool returns a function in `details`, which is not strict JSON, so its
 //   result commit throws. A C# result holds only JSON values; as in HarnessToolsRecoveryCases.cs, the result carries a null tool name in
 //   `control.addTools`, which is not strict JSON either and makes the same commit throw.
 // Pi v1.5.0 sync (area deferred-commits, 6c2fd73b0 and e5c6182ba's deferred attempt and running status): drive() and "streams partial
 // text as appends" observe commits as memory adopts them (LiveCommits, upstream observeCommits); "hands a generation over ..." and
 // "starts calls the request did not offer ..." record what was stored (StoredLiveCommits, upstream subscribeCommits), and the first takes
-// e5c6182ba's expectations without #11043's turn count (area turn-limit): the request's attempt and the tool's running status are stored
-// with the next commit. "stores a complete base exactly ..." stores deferred progress within each tool's run (persistWithinMs 50), as
-// e5c6182ba's does.
+// e5c6182ba's expectations: the request's attempt and the tool's running status are stored with the next commit. "stores a complete base
+// exactly ..." stores deferred progress within each tool's run (persistWithinMs 50), as e5c6182ba's does.
+// Pi v1.5.0 sync (area group-commit-scheduler, the file's last area): the tools declare pi-schema's obj({}) (ToolsSchema150.EmptyObject;
+// 6536f8012, area tools-schema's part).
 // Pi v1.5.0 sync (area vocabulary, 5f312dac4): LiveCommits follows commits with SessionTests.FollowCommits (upstream followCommits) and the
 // stored ones are observed with ObserveCommits (a CommitObserver; upstream observeCommits({ advance, end })); both read the document changes
 // of kind change (DocumentValues, upstream documentValues), and "stores a complete base exactly ..." skips a retirement by its kind.
@@ -26,6 +28,7 @@
 // Pi v1.5.0 sync (area live-turns, f6a9db1d8): pi.live.run carries turns, 0 when the run starts, and the commit that starts a tool round
 // counts the round as one turn (["s",["run","turns"],1], #11043); the base check's run has turns. Area run-end (7e15f9601): the
 // submission's run carries its first entry, "<number>" for expect.any(Number).
+using System.Collections.Concurrent;
 using System.Collections.Immutable;
 using System.Threading.Channels;
 using PiSharp.Durable;
@@ -60,6 +63,7 @@ internal static partial class LiveDeltaTests
     {
         Name = name,
         Description = name,
+        Parameters = ToolsSchema150.EmptyObject,
         OutputLimits = limits,
         Execute = execute,
     });
@@ -319,7 +323,9 @@ internal static partial class LiveDeltaTests
 
         yield return Case(prefix + "stores-a-complete-base-exactly-in-the-commits-where-nothing-runs", async () =>
         {
-            var storage = new ControlledStorage(await fresh());
+            // Storage that remembers whether each commit wrote pi.live as a base or a delta.
+            var written = new ConcurrentDictionary<Seq, string>();
+            var storage = new LiveRecordingStorage(await fresh(), written);
             var setup = Setup();
             foreach (var name in new[] { "first", "second" })
             {
@@ -337,25 +343,28 @@ internal static partial class LiveDeltaTests
             // Store deferred progress within each tool's run, so running slots reach Storage as deltas.
             setup.Progress = new ProgressSettings { PersistWithinMs = 50 };
             var (harness, root) = await OpenChat(storage, setup);
-            var written = new SyncList<(string Kind, JsonObjectValue Value)>();
+            var values = new ConcurrentDictionary<Seq, JsonObjectValue>();
             harness.ObserveCommits(new CommitObserver((publication, _) =>
             {
                 foreach (var change in DocumentChanges(publication))
                 {
-                    if (change.Record.Kind != "pi.live" || change is not DocumentValueChange { Value: var value }) continue;
-                    // Session commits run one at a time, so this commit's batch is the last one Storage admitted.
-                    var write = storage.LastCommit.OfType<DocumentChangeWrite>().FirstOrDefault(item => item.Id == change.Record.Id);
-                    if (write is not null) written.Add((write.Content is DocumentDelta ? "delta" : "base", value));
+                    if (change.Record.Kind != "pi.live") continue;
+                    storage.LiveId = change.Record.Id;
+                    if (change is DocumentValueChange { Value: var value }) values[publication.Seq] = value;
                 }
             }, _ => { }));
             await (await root.SubmitAsync(SubmissionDraft.Input("go"), Context)).WaitAsync(Context);
             static bool NothingRuns(JsonObjectValue value) => !value.ContainsKey("generation") &&
                 !(value.TryGetValue("tools", out var tools) && ((JsonArrayValue)tools).Any(slot => ((JsonObjectValue)slot)["status"] is JsonStringValue { Value: "running" }));
-            var kinds = written.Snapshot();
-            foreach (var (kind, value) in kinds) Equal(NothingRuns(value), kind == "base", $"{kind} for {value.ToJson()}");
+            var kinds = written.OrderBy(item => item.Key).Select(item =>
+            {
+                Check(values.TryGetValue(item.Key, out var value), $"the value published at {item.Key}");
+                Equal(NothingRuns(value!), item.Value == "base", $"{item.Value} for {value!.ToJson()}");
+                return item.Value;
+            }).ToList();
             // Bases at the handover, after each sequential tool, after the round, and when the run ends.
-            Check(kinds.Count(item => item.Kind == "base") >= 5, $"at least five bases: {string.Join(", ", kinds.Select(item => item.Kind))}");
-            Check(kinds.Any(item => item.Kind == "delta"), "a delta");
+            Check(kinds.Count(kind => kind == "base") >= 5, $"at least five bases: {string.Join(", ", kinds)}");
+            Check(kinds.Contains("delta"), "a delta");
             await harness.CloseAsync(Context);
         });
 
@@ -424,5 +433,37 @@ internal static partial class LiveDeltaTests
             Equal(4, abortCommit.Length, "abort commit length");
             await run.Harness.CloseAsync(Context);
         });
+    }
+}
+
+/// <summary>Remembers, by the seq each batch receives, whether it wrote <see cref="LiveId"/> as a base or a delta (upstream's
+/// <c>RecordingStorage</c> of "stores a complete base exactly ...", Pi v1.5.0).</summary>
+internal sealed class LiveRecordingStorage(IStorage inner, ConcurrentDictionary<Seq, string> written) : DelegatingStorage(inner)
+{
+    private DocumentId? liveId;
+
+    /// <summary>The pi.live document, once a publication named it.</summary>
+    public DocumentId? LiveId
+    {
+        get { lock (written) return liveId; }
+        set { lock (written) liveId = value; }
+    }
+
+    public override Task<CommitResult> CommitAsync(IReadOnlyList<IReadOnlyList<StorageWrite>> batches, Action<int, Seq> receive,
+        DurableContext context)
+    {
+        var live = LiveId;
+        var kinds = batches.Select(writes =>
+        {
+            string? kind = null;
+            foreach (var write in writes)
+                if (write is DocumentChangeWrite change && change.Id == live) kind = change.Content is DocumentDelta ? "delta" : "base";
+            return kind;
+        }).ToList();
+        return base.CommitAsync(batches, (index, seq) =>
+        {
+            if (kinds[index] is { } kind) written[seq] = kind;
+            receive(index, seq);
+        }, context);
     }
 }

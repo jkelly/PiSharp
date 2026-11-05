@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): the shared parts of packages/durable/test/harness-scheduler-indexes.test.ts,
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): the shared parts of packages/durable/test/harness-scheduler-indexes.test.ts,
 // harness-scheduler-retention.test.ts and harness-cancellation-barrier.test.ts: gated test tasks, a SQLite path per case, storages whose reads
 // and commits a case observes, and the scheduler's index sizes.
 //
@@ -6,7 +6,9 @@
 // - Upstream keeps gates, run counts and probe results at module scope and clears them after each test; here each case builds a fresh
 //   SchedulerGates, whose task definitions close over it.
 // - Upstream patches storage methods on the instance (storage.commit = ..., storage.conversation = ...); here HookedStorage, a
-//   DelegatingStorage, calls the hooks a case sets.
+//   DelegatingStorage, calls the hooks a case sets. Pi v1.5.0 sync (area group-commit-scheduler, e5c6182ba): OnCommit runs for each batch
+//   of a Storage call before the call (upstream's loops over batches), and OnTaskRead is awaited before a task read (upstream's patched
+//   async storage.task in "loads the chain of new work below a forgotten conversation ...").
 // - Upstream reads the index sizes through the Harness's SCHEDULER_INDEX_SIZES getter right after an await; their passes run in microtasks
 //   it has already drained. Here reconciliation, reservation and the sweep job run on the thread pool, so Sizes first waits until none is
 //   scheduled or running and the line is flushed (DurableTaskScheduler.QuiesceAsync), then reads DurableHarness.SchedulerIndexSizes.
@@ -141,6 +143,8 @@ internal sealed class HookedStorage(IStorage inner) : DelegatingStorage(inner)
     public Func<IReadOnlyList<StorageWrite>, Task>? OnCommit { get; set; }
     public Func<ConversationId, Task>? OnConversation { get; set; }
     public Action<TaskId>? OnTask { get; set; }
+    /// <summary>Awaited before each task read (upstream's patched async <c>storage.task</c>).</summary>
+    public Func<TaskId, Task>? OnTaskRead { get; set; }
     public Action<SubmissionQuery>? OnScanSubmissions { get; set; }
 
     public override async Task<CommitResult> CommitAsync(IReadOnlyList<IReadOnlyList<StorageWrite>> batches, Action<int, Seq> receive, DurableContext context)
@@ -156,10 +160,11 @@ internal sealed class HookedStorage(IStorage inner) : DelegatingStorage(inner)
         return await base.GetConversationAsync(id, context);
     }
 
-    public override Task<TaskRecord?> GetTaskAsync(TaskId id, DurableContext context)
+    public override async Task<TaskRecord?> GetTaskAsync(TaskId id, DurableContext context)
     {
         OnTask?.Invoke(id);
-        return base.GetTaskAsync(id, context);
+        if (OnTaskRead is { } hook) await hook(id);
+        return await base.GetTaskAsync(id, context);
     }
 
     public override Task<Page<SubmissionRecord>> ScanSubmissionsAsync(SubmissionQuery query, int limit, JsonObjectValue? cursor, DurableContext context)

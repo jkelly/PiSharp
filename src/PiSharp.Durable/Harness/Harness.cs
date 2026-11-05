@@ -35,6 +35,11 @@
 // caller's commit carries its own context. Upstream's runtime test of the first argument is overload resolution here.
 // Pi v1.5.0 sync (area run-end, 65fba65b2): Conversation.entries() builds its scan with HarnessUtil.ConversationEntries, shared with
 // TaskRuntime.entries().
+// Pi v1.5.0 sync (area group-commit-scheduler, e5c6182ba): the Harness's line jobs overlap storage like a plain Session's (the serialized
+// line a Harness kept, LineWaitsForPublication, is gone): every read on the line goes through the line's Storage (ReadOnLineAsync's
+// IStorage argument, upstream readOnLine((storage) => ...)), which waits for what an unpublished commit wrote, and a commit's task and
+// conversation changes write their ownership memberships from the scheduler's indexes (MembershipKeysAsync, upstream membershipKeys).
+// Submissions, the conversation views and the task graph read through it too, so they no longer take the guarded Storage.
 using System.Collections.Immutable;
 using PiSharp.AI;
 using PiSharp.Durable.Chord;
@@ -160,16 +165,16 @@ internal sealed class DurableHarness : Session, IHarness
             WithdrawInputs = (tx, id) => Inbox.WithdrawQueuedInputsAsync(tx, id),
             Conversation = async (id, binding, callContext) =>
             {
-                var record = await ReadOnLineAsync(() => storage.GetConversationAsync(id, callContext)).ConfigureAwait(false);
+                var record = await ReadOnLineAsync(line => line.GetConversationAsync(id, callContext)).ConfigureAwait(false);
                 return record is null ? null : new BoundConversation(id, binding, scheduler!, submissions!);
             },
             Context = context.WithoutCancellation(),
             ReadOnly = options.ReadOnly,
             LimitsRestarts = Live.LimitsRestarts.Contains,
         });
-        submissions = new Submissions(this, storage, Now, () => Agents.ResolveSettings(hostSettings()), () => scheduler.Resume(), options.Telemetry);
-        views = new ConversationViews(this, storage);
-        taskGraph = new TaskGraphView(this, storage, scheduler.BlockedReasonOf, scheduler.SubscribeBlocked);
+        submissions = new Submissions(this, Now, () => Agents.ResolveSettings(hostSettings()), () => scheduler.Resume(), options.Telemetry);
+        views = new ConversationViews(this);
+        taskGraph = new TaskGraphView(this, scheduler.BlockedReasonOf, scheduler.SubscribeBlocked);
     }
 
     /// <summary>The Harness clock.</summary>
@@ -300,13 +305,13 @@ internal sealed class DurableHarness : Session, IHarness
         return scheduler.Wake();
     }
 
-    public Task<TaskRecord?> GetTaskAsync(TaskId id, DurableContext context) => ReadOnLineAsync(() => storage.GetTaskAsync(id, context));
+    public Task<TaskRecord?> GetTaskAsync(TaskId id, DurableContext context) => ReadOnLineAsync(line => line.GetTaskAsync(id, context));
 
-    public Task<HarnessInspection> InspectAsync(DurableContext context) => ReadOnLineAsync(async () =>
+    public Task<HarnessInspection> InspectAsync(DurableContext context) => ReadOnLineAsync(async line =>
     {
         var (scheduling, tasks) = await scheduler.InspectAsync(options.Registry.Snapshot()).ConfigureAwait(false);
         Task<List<SubmissionRecord>> Scan(SubmissionStatus status) => HarnessUtil.ScanAll(cursor =>
-            storage.ScanSubmissionsAsync(new SubmissionQuery { Status = status }, ScanPageSize, cursor, context));
+            line.ScanSubmissionsAsync(new SubmissionQuery { Status = status }, ScanPageSize, cursor, context));
         var submissions = (await Scan(SubmissionStatus.Queued).ConfigureAwait(false))
             .Concat(await Scan(SubmissionStatus.Placed).ConfigureAwait(false))
             .OrderBy(submission => submission.Id.Value).ToImmutableArray();
@@ -335,8 +340,8 @@ internal sealed class DurableHarness : Session, IHarness
     /// <summary>Sums every conversation's committed <c>pi.usage</c>. Each document is read at its own point; totals only grow.</summary>
     public async Task<JsonObjectValue> UsageAsync(DurableContext context)
     {
-        var conversations = await ReadOnLineAsync(() => HarnessUtil.ScanAll(cursor =>
-            storage.ScanConversationsAsync(new ConversationQuery(), ScanPageSize, cursor, context))).ConfigureAwait(false);
+        var conversations = await ReadOnLineAsync(line => HarnessUtil.ScanAll(cursor =>
+            line.ScanConversationsAsync(new ConversationQuery(), ScanPageSize, cursor, context))).ConfigureAwait(false);
         var total = UsageLedger.UsageDoc.Definition.Initial();
         foreach (var conversation in conversations)
         {
@@ -371,7 +376,7 @@ internal sealed class DurableHarness : Session, IHarness
     public async Task<IConversation?> ConversationAsync(ConversationId id, DurableContext context)
     {
         AssertUsable();
-        var record = await ReadOnLineAsync(() => storage.GetConversationAsync(id, context)).ConfigureAwait(false);
+        var record = await ReadOnLineAsync(line => line.GetConversationAsync(id, context)).ConfigureAwait(false);
         return record is null ? null : new ConversationImpl(record.Id, this);
     }
 
@@ -384,13 +389,8 @@ internal sealed class DurableHarness : Session, IHarness
     /// <summary>Signals and joins task invocations after the close listeners and before Storage closes; writes no task outcome.</summary>
     internal override Task BeforeCloseAsync() => scheduler.JoinAsync();
 
-    /// <summary>
-    /// Pi v1.5.0 sync (area group-commit): the scheduler's decisions read its memory, which only a commit's publication brings up to date, and
-    /// they do not yet record the keys they read (upstream's decision regions and membership keys, area group-commit-scheduler). Until they do,
-    /// every line job of a Harness starts once what was admitted before it is published: the serialized line, with the writer's per-part
-    /// outcomes and publication scope.
-    /// </summary>
-    internal override bool LineWaitsForPublication => true;
+    /// <summary>The ownership memberships a commit's task changes write, from the scheduler's indexes (upstream <c>membershipKeys</c>).</summary>
+    internal override ValueTask<IReadOnlyList<string>> MembershipKeysAsync(Transaction tx) => scheduler.MembershipKeysAsync(tx);
 
     internal async Task<IConversation> CreateAsync(CreateTarget target, AgentChange? agent, ConversationInit? init, DurableContext context)
     {
@@ -505,7 +505,7 @@ internal sealed class ConversationImpl(ConversationId id, DurableHarness harness
     {
         ArgumentNullException.ThrowIfNull(query);
         var scan = HarnessUtil.ConversationEntries(Id, query);
-        return harness.ReadOnLineAsync(() => harness.Storage.ScanEntriesAsync(scan, limit, cursor, context));
+        return harness.ReadOnLineAsync(line => line.ScanEntriesAsync(scan, limit, cursor, context));
     }
 
     public Task<IConversation> ForkAsync(EntryId at, ConversationCreateOptions options, DurableContext context)

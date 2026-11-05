@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/test/tool-output-bench.ts
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/test/tool-output-bench.ts
 // Tool output benchmark: drives the real tool task, adaptive progress throttle and pi.live commits. Each scenario runs in its own child
 // process so its peak working set is its own. Rate scenarios write output for a fixed time, then close the Harness mid-round (persistent
 // backends) to measure replay of the round's delta chain on reopen, and finish the run to measure the stored size after the round's base and
@@ -7,7 +7,9 @@
 // needs on Windows (upstream joins the path with backslashes there, so its cat fails at once on Windows; see docs/durable-benchmarks.md),
 // and the scenario deletes the env's full-output spill of the cat afterwards.
 // Pi v1.5.0 sync (area vocabulary, 5f312dac4): live commits are counted with ObserveCommits (was SubscribeCommits) over the document
-// changes of kind change (DocumentValueChange). The citation stays on v1.2.0 until area group-commit-scheduler (e5c6182ba) lands.
+// changes of kind change (DocumentValueChange). Pi v1.5.0 sync (area group-commit-scheduler, the file's last area): the emit tool declares
+// pi-schema's obj({}) (6536f8012, area tools-schema's part), and TimedStorage measures every Storage commit call, which group commit may
+// fill with several commits (e5c6182ba).
 using System.Diagnostics;
 using System.Globalization;
 using System.Text;
@@ -231,6 +233,8 @@ public static class ToolOutputBench
                         {
                             Name = "emit",
                             Description = "",
+                            // pi-schema's obj({}).
+                            Parameters = (JsonObjectValue)JsonValue.Parse("""{"type":"object","properties":{},"additionalProperties":false}"""),
                             OutputLimits = new ToolOutputLimits { Retain = scenario.Retain == "tail" ? ToolOutputRetention.Tail : ToolOutputRetention.Head },
                             Execute = async (_, api, callContext) =>
                             {
@@ -379,7 +383,7 @@ public static class ToolOutputBench
 
     private static double Round(double value) => Math.Round(value * 100) / 100;
 
-    /// <summary>Measures every storage commit (upstream <c>timed()</c>, a Proxy over <c>commit</c>).</summary>
+    /// <summary>Measures every Storage commit call (upstream <c>timed()</c>, a Proxy over <c>commit</c>).</summary>
     private sealed class TimedStorage(IStorage inner, List<double> latencies) : IStorage
     {
         public async Task<CommitResult> CommitAsync(IReadOnlyList<IReadOnlyList<StorageWrite>> batches, Action<int, Seq> receive, DurableContext context)

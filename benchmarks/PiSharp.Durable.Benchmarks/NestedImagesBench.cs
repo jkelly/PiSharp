@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/test/nested-images-bench.ts. One model-issued `script` call, as a code
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/test/nested-images-bench.ts. One model-issued `script` call, as a code
 // mode call would, loops `count` times: a nested `read_image` call returns a unique base64 image of `bytes` characters, then a nested
 // `classify` call reads it. The `inline` variant passes the image data in `classify`'s arguments; the `reference` variant passes the `taskId`
 // of the `read_image` result, whose value is the image, and `classify` resolves it from its caller's NestedCallDoc. Reports commits, wall time,
@@ -6,6 +6,10 @@
 // close and after reopening, the heap (peak during the run, sampled every 5 ms and at each commit; after a collection once the run settles,
 // after waitForIdle, and after reopening; all over the heap after a collection before opening), the number of nested task records, and the
 // size of the largest one. Mappings as in NestedToolsBench.cs; random bytes come from RandomNumberGenerator.
+// Pi v1.5.0 sync: the tools declare pi-schema's obj() JSON (6536f8012, area tools-schema), and commits count the batches of each Storage
+// call (CountingStorage; e5c6182ba's `commits += batches.length`, area group-commit-scheduler). CountingStorage samples the heap at each
+// batch where upstream samples once per call; a call holds one batch unless group commit joined several, and more samples can only raise the
+// peak seen.
 using System.Diagnostics;
 using System.Globalization;
 using System.Security.Cryptography;

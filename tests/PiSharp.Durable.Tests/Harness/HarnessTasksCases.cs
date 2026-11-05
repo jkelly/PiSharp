@@ -23,6 +23,9 @@
 //   pending, so five task-close cases expect that last commit: "stops without outcomes ...", "writes no fault when close seals ...",
 //   "starts no abort handler whose reservation settles ...", "rejects a runtime commit that was queued ..." and "joins a reservation
 //   that settles ...". storage.commits.at(-2) is ControlledStorage.Commits[^2].
+// - Pi v1.5.0 sync (area group-commit-scheduler, e5c6182ba): "writes no fault when close seals ..." and "rejects a runtime commit that was
+//   queued ..." hold the Session line with a commit whose callback waits (HoldLine, upstream holdLine), as a held storage call no longer
+//   holds the line. e5c6182ba's document-scan count and its "publication at adoption" cases are area publication-caches'.
 using System.Collections.Concurrent;
 using PiSharp.Durable;
 using PiSharp.Durable.Chord;
@@ -33,6 +36,24 @@ using static SessionTests;
 internal static partial class HarnessTests
 {
     private static readonly JsonValue RunStep = O("""{"phase":"run"}""");
+
+    /// <summary>A held Session line (upstream <c>holdLine</c>'s result): <see cref="Entered"/> completes once the holding commit's callback
+    /// runs; the jobs queued after it start once <see cref="Release"/> is called.</summary>
+    internal sealed record LineHold(Task Entered, Action Release);
+
+    /// <summary>Holds the Session line with a commit whose callback waits: the jobs queued after it start once it is released (upstream
+    /// <c>holdLine</c>, Pi v1.5.0 e5c6182ba).</summary>
+    internal static LineHold HoldLine(IHarness harness)
+    {
+        var entered = new Deferred();
+        var release = new Deferred();
+        _ = harness.CommitAsync(async _ =>
+        {
+            entered.Resolve();
+            await release.Task;
+        }, Context);
+        return new LineHold(entered.Task, release.Resolve);
+    }
 
     /// <summary>A one-phase task; the default abort handler settles aborted with reason "test" (upstream <c>oneStep</c>).</summary>
     private static DurableTask OneStep(string name, Func<RunningTask, ITaskRuntime, DurableContext, Task> run,
@@ -1207,12 +1228,12 @@ internal static partial class HarnessTests
         yield return Case(prefix + "task-close.writes-no-fault-when-close-seals-while-the-step-after-a-failed-phase-is-queued", async () =>
         {
             var controlled = Controlled();
-            Gate? held = null;
+            LineHold? held = null;
             IHarness? harnessRef = null;
-            var throws = OneStep("test.close-fault", (_, runtime, _) =>
+            var throws = OneStep("test.close-fault", (_, _, _) =>
             {
-                held = controlled.HoldCommits();
-                _ = harnessRef!.CommitAsync(async tx => { await tx.AppendEntryAsync(runtime.ConversationId, new EntryDraft { Kind = "blocker" }); }, Context);
+                // The step after this phase queues behind a job that holds the line.
+                held = HoldLine(harnessRef!);
                 throw new InvalidOperationException("would fault");
             });
             var (harness, _, _, root) = await OpenRoot(controlled, [throws]);
@@ -1261,13 +1282,12 @@ internal static partial class HarnessTests
         {
             var controlled = Controlled();
             Task<object?>? queued = null;
-            Gate? held = null;
+            LineHold? held = null;
             IHarness? harnessRef = null;
             var proceed = new Deferred();
             var queuedTask = OneStep("test.close-queued-commit", async (_, runtime, _) =>
             {
-                held = controlled.HoldCommits();
-                _ = harnessRef!.CommitAsync(async tx => { await tx.AppendEntryAsync(runtime.ConversationId, new EntryDraft { Kind = "blocker" }); }, Context);
+                held = HoldLine(harnessRef!);
                 queued = Catch<object?>(async () => { await runtime.CommitAsync((_, _) => Completed(null), Context); return null; });
                 // Ignores the close signal, so the invocation is still alive when the queued commit reaches the line.
                 await proceed.Task;

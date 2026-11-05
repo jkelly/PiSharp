@@ -51,9 +51,12 @@
 // held-store path (StoreHoldsAsync), the writes at close and close itself go through the writer; a stored commit is published inside the
 // Storage's publication scope (IStorage.Publishing). Upkeep (sweeps, hold timers, close, the writes at close) runs as maintain jobs, with
 // no outcome fence. The read caches, conversation tails and the task-document index (upstream CachedStorage, ConversationTails,
-// #taskDocuments) are area publication-caches'; the scheduler half (decision regions, membership keys) is area group-commit-scheduler's,
-// so until it lands a Harness keeps every line job behind the publication of what was admitted before it (LineWaitsForPublication),
-// which is the old serialized line. The citation stays on v1.2.0: areas publication-caches and registry-reader change this file too.
+// #taskDocuments) are area publication-caches'. Pi v1.5.0 sync (area group-commit-scheduler, e5c6182ba's scheduler half): a Harness's
+// line jobs overlap storage too, as its scheduler's decisions record the keys they read and its commits write their membership keys
+// (MembershipKeysAsync); the serialized line a Harness kept until then (LineWaitsForPublication) is gone. A stored commit's keys leave
+// after the Session's own observers (the scheduler's indexes among them) adopted it and before host observers run (Publish), so a
+// decision region that finds a key without an unpublished writer reads memory that already holds its every write. The citation stays on
+// v1.2.0: areas publication-caches and registry-reader change this file too.
 //
 // Concurrency model. Upstream relies on one JavaScript thread: `#enqueue` chains every mutation and cold load onto one promise, the writer
 // publishes between line jobs, and listeners run in later microtasks. Here .NET callers may be on any thread, so:
@@ -399,15 +402,17 @@ public class Session : ISession
     /// Internal: <see cref="CommitWithAsync{T}"/> for a commit of the scheduler's own whose outcome goes only to scheduler code (upstream
     /// <c>commitInternal</c>). When it writes nothing and waited at no gate, it is equivalent to having run before every unpublished commit, so
     /// its outcome is delivered at once, ahead of theirs. One that writes is never exempt: its outcome waits for its own publication and every
-    /// earlier outcome, so no invocation starts on a reservation that is not durable.
+    /// earlier outcome, so no invocation starts on a reservation that is not durable. Without <paramref name="inline"/>, a job enqueued on an
+    /// idle line starts on the thread pool instead of in the caller: the scheduler enqueues one from inside a publication, which a job must
+    /// not run in.
     /// </summary>
-    internal Task<T> CommitInternalAsync<T>(Func<Transaction, Task<T>> change, DurableContext context)
+    internal Task<T> CommitInternalAsync<T>(Func<Transaction, Task<T>> change, DurableContext context, bool inline = true)
     {
         ArgumentNullException.ThrowIfNull(change);
         ArgumentNullException.ThrowIfNull(context);
         try { AssertUsable(); }
         catch (Exception error) { return Task.FromException<T>(error); }
-        return Enqueue(index => RunCommitAsync(change, context, null, null, index), exempt: true);
+        return Enqueue(index => RunCommitAsync(change, context, null, null, index), exempt: true, inline: inline);
     }
 
     /// <summary>
@@ -489,13 +494,6 @@ public class Session : ISession
     /// adds none.
     /// </summary>
     internal virtual ValueTask<IReadOnlyList<string>> MembershipKeysAsync(Transaction tx) => new([]);
-
-    /// <summary>
-    /// Whether every line job waits, before it starts, for the publication of every commit admitted before it: the serialized line of a
-    /// Session without group commit. A Harness sets it until its scheduler records the keys its decisions read (area
-    /// group-commit-scheduler): its decisions read scheduler memory that only a commit's publication brings up to date.
-    /// </summary>
-    internal virtual bool LineWaitsForPublication => false;
 
     /// <summary>Internal, for tests: the writer's wait between two parts of one call (see Writer.cs).</summary>
     internal Func<Writer.Part, Task>? PublicationHop
@@ -584,8 +582,7 @@ public class Session : ISession
     });
 
     /// <summary>Internal test barrier: completes once every job enqueued before it has run its line part (its callback, up to admission),
-    /// without waiting for their commits to be stored (upstream's <c>flush()</c>, a macrotask). A Harness's line waits for publication
-    /// anyway (<see cref="LineWaitsForPublication"/>).</summary>
+    /// without waiting for their commits to be stored (upstream's <c>flush()</c>, a macrotask).</summary>
     internal Task LineTickAsync() => Maintain(_ => Task.FromResult(true));
 
     /// <summary>Internal test barrier: how many jobs wait on the line behind the running one.</summary>
@@ -673,7 +670,6 @@ public class Session : ISession
             Exception? error = null;
             try
             {
-                if (LineWaitsForPublication) await DrainedAsync().ConfigureAwait(false);
                 current = job;
                 ran = await work(job.Index).ConfigureAwait(false);
             }
@@ -789,7 +785,6 @@ public class Session : ISession
             T value;
             try
             {
-                if (LineWaitsForPublication) await DrainedAsync().ConfigureAwait(false);
                 current = job;
                 value = await work(job.Index).ConfigureAwait(false);
             }
@@ -1505,8 +1500,7 @@ public class Session : ISession
         }
         // Before the keys leave: a job that then touches a document whose held changes this commit stored must not find them held.
         if (taken.Count > 0) Release(taken);
-        unregister();
-        var failure = Publish(seq, writes, documentChanges, context);
+        var failure = Publish(seq, writes, documentChanges, context, unregister);
         foreach (var adopted in documentChanges.Stored)
         {
             var record = adopted switch
@@ -1523,9 +1517,12 @@ public class Session : ISession
     /// <summary>
     /// At publication: publishes a stored commit (upstream <c>#publish</c>). Its telemetry events first, listeners or not, then the Session's
     /// own observers, then host observers, then the watch deliveries they scheduled. Never throws: returns the first error of an own observer,
-    /// which fails the Session once its storage call settled.
+    /// which fails the Session once its storage call settled. <paramref name="unregister"/> drops the commit's keys once the Session's own
+    /// observers adopted it, before host observers run: upstream drops them before the publication, as nothing else runs until it returns,
+    /// but here a job on another thread that touched one in between would read scheduler memory that has not adopted the commit yet.
     /// </summary>
-    private Exception? Publish(Seq seq, IReadOnlyList<StorageWrite> writes, AdoptedDocuments documentChanges, DurableContext context)
+    private Exception? Publish(Seq seq, IReadOnlyList<StorageWrite> writes, AdoptedDocuments documentChanges, DurableContext context,
+        Action unregister)
     {
         // Its telemetry events first, listeners or not.
         foreach (var write in writes)
@@ -1547,7 +1544,11 @@ public class Session : ISession
             internals = [.. internalListeners];
             observers = [.. commitListeners];
         }
-        if (internals.Length == 0 && observers.Length == 0) return null;
+        if (internals.Length == 0 && observers.Length == 0)
+        {
+            unregister();
+            return null;
+        }
         var changes = new List<ICommitChange>();
         foreach (var write in writes)
             if (write is ICommitChange change) changes.Add(change);
@@ -1564,6 +1565,7 @@ public class Session : ISession
             // The commit is durable: a failing listener neither fails the commit nor skips the others. A host observer's guard reports its
             // throw, detaches it and ends it listener_error.
             foreach (var listener in internals) Contained(() => listener(observed, context), error => failure ??= error);
+            unregister();
             foreach (var observer in observers) observer.Advance(stored, context);
         });
         return failure;

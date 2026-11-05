@@ -6,7 +6,10 @@
 // change this file again (areas publication-caches, group-commit and view), so the citation stays on v1.2.0. Area view (f3255de76): the
 // windowed view no longer reads the active transcript. Area events (f3255de76): activeEntries is gone with watchEvents, as upstream removed
 // it; AppendActive stays for PiSharp's readers of the active transcript (Hosting's event projection, which reads its first one from the
-// context, and the durable TUI).
+// context, and the durable TUI). Area group-commit-scheduler (e5c6182ba): the bounds are captured on the line through the line's Storage
+// (ReadOnLineAsync's argument), which waits for an unpublished commit of the conversation's entries; upstream reads the newest entry and
+// head marker through the Session (session.latestEntryId, latestHeadMarker), whose conversation tails and the kept range's `current` and
+// `visible` are area publication-caches'.
 using System.Collections.Immutable;
 using PiSharp.Durable.Chord;
 
@@ -48,8 +51,9 @@ internal static class ConversationContext
 
     /// <summary>
     /// Captures the bounds of the current context, or of the context cut off at the visible entry <paramref name="at"/>, with two O(1)
-    /// reads (upstream <c>captureContextBounds</c>). Run this on the Session line; entries at or below the tail are immutable, so
-    /// <see cref="DeriveContextAsync"/> can then scan them off the line.
+    /// reads (upstream <c>captureContextBounds</c>). Run this on the Session line, through the line's Storage, which waits for what an
+    /// unpublished commit appended; entries at or below the tail are immutable, so <see cref="DeriveContextAsync"/> can then scan them off
+    /// the line.
     /// </summary>
     public static async Task<ContextBounds?> CaptureContextBoundsAsync(IStorage storage, ConversationId conversationId, DurableContext context,
         EntryId? at = null)
@@ -78,7 +82,7 @@ internal static class ConversationContext
     public static async Task<(ContextView View, ContextRange? Range)> ReadContextFromAsync(Session session, IStorage storage,
         ConversationId conversationId, DurableContext context, EntryId? at, ContextRange? previous)
     {
-        var bounds = await session.ReadOnLineAsync(() => CaptureContextBoundsAsync(storage, conversationId, context, at)).ConfigureAwait(false);
+        var bounds = await session.ReadOnLineAsync(line => CaptureContextBoundsAsync(line, conversationId, context, at)).ConfigureAwait(false);
         if (bounds is null) return (ContextView.Empty, null);
         ContextRange range;
         if (previous is null || previous.Bounds.Head?.Id != bounds.Head?.Id)
@@ -103,8 +107,8 @@ internal static class ConversationContext
     {
         // The lease admits the off-line derive's first Storage call when close follows the bounds job on the line, as upstream's single
         // thread starts it before the closing job runs (Session.HoldStorageOpen); a later page is refused once close has begun.
-        var (bounds, lease) = await session.ReadOnLineAsync(async () =>
-            (await CaptureContextBoundsAsync(storage, conversationId, context, at).ConfigureAwait(false), session.HoldStorageOpen())).ConfigureAwait(false);
+        var (bounds, lease) = await session.ReadOnLineAsync(async line =>
+            (await CaptureContextBoundsAsync(line, conversationId, context, at).ConfigureAwait(false), session.HoldStorageOpen())).ConfigureAwait(false);
         using (lease) return await DeriveContextAsync(lease.Storage, conversationId, bounds, context).ConfigureAwait(false);
     }
 
