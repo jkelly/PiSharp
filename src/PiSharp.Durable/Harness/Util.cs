@@ -1,6 +1,7 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/src/harness/util.ts. Waiters are guarded by a short lock, since .NET
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/src/harness/util.ts. Waiters are guarded by a short lock, since .NET
 // callers may add and resolve from any thread; a waiter's task completes asynchronously (a promise's continuation is a later microtask),
-// so resolving one never runs its caller's code under the lock or inline in a Session listener.
+// so resolving one never runs its caller's code under the lock or inline in a Session listener. Upstream's optionalExtension is a spread
+// helper for an optional property; C# reports set ReportInfo.Extension (null when unknown) instead, so it has no counterpart here.
 using PiSharp.Durable.Chord;
 
 namespace PiSharp.Durable;
@@ -91,6 +92,14 @@ internal static class HarnessUtil
             cursor = page.Next;
         } while (cursor is not null);
         return items;
+    }
+
+    /// <summary>The scan of conversation <paramref name="conversationId"/>'s history that <paramref name="query"/> asks for (upstream
+    /// <c>conversationEntries</c>); its bounds and order are copied, so the scan names no other conversation.</summary>
+    public static EntryQuery ConversationEntries(ConversationId conversationId, EntryQueryBounds query)
+    {
+        ArgumentNullException.ThrowIfNull(query);
+        return new EntryQuery(conversationId) { MinEntryId = query.MinEntryId, MaxEntryId = query.MaxEntryId, Order = query.Order };
     }
 
     /// <summary>What a closed Harness rejects with: <see cref="SessionFailedException"/> with the cause when it closed because the Session

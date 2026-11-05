@@ -17,6 +17,8 @@
 // AgentEvents.cs, PiSharp-only) with the v1.2.0 capture, which stays honest only while the projection reproduces v1.2.0's events.
 // Pi v1.5.0 sync (area live-turns, f6a9db1d8): and with LiveV3150.cs's: the frame that sets pi.live.run gives it turns 0, and the frame of
 // the commit that starts a tool round sets run.turns after its pi.live ops. The events keep v1.2.0's wire (no turns).
+// Pi v1.5.0 sync (area run-end, 7e15f9601): and the run's set carries first, the input entry its frame appends, as abortedRound's
+// runFailure does (LiveV3150.cs). The events keep the wire without it (AgentEvents.cs).
 using PiSharp.Durable;
 using PiSharp.Durable.Chord;
 using PiSharp.Durable.Hosting;

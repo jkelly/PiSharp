@@ -24,8 +24,8 @@
 // Pi v1.5.0 sync (area tool-tasks, 1c6928b30, #11043): "starts calls the request did not offer as flagged tasks ..." (...-as-done-... before)
 // takes v1.5.0's slot: the unoffered call is pending with its own task, flagged unoffered.
 // Pi v1.5.0 sync (area live-turns, f6a9db1d8): pi.live.run carries turns, 0 when the run starts, and the commit that starts a tool round
-// counts the round as one turn (["s",["run","turns"],1], #11043); the base check's run has turns. A run's first (7e15f9601) is area
-// run-end's.
+// counts the round as one turn (["s",["run","turns"],1], #11043); the base check's run has turns. Area run-end (7e15f9601): the
+// submission's run carries its first entry, "<number>" for expect.any(Number).
 using System.Collections.Immutable;
 using System.Threading.Channels;
 using PiSharp.Durable;
@@ -213,7 +213,7 @@ internal static partial class LiveDeltaTests
             var all = commits.Snapshot();
             Equal(5, all.Count, "commits: " + string.Join(" | ", all.Select(ops => Json(ops))));
             // submission
-            MatchExactly($$"""[["s",["run"],{"taskId":{{firstGeneration}},"inputs":["<number>"],"turns":0}]]""", J(Json(all[0])), "submission");
+            MatchExactly($$"""[["s",["run"],{"taskId":{{firstGeneration}},"inputs":["<number>"],"turns":0,"first":"<number>"}]]""", J(Json(all[0])), "submission");
             // the generation starts its tool round and keeps the run, counting the round as one turn (#11043); the request's attempt is
             // deferred, so it is stored here, its held operation first
             Equal($$"""[["s",["generation"],{"attempt":1}],["s",["tools"],[{"callId":"c1","name":"noop","taskId":{{tool}},"status":"pending"}]],["d",["generation"]],["s",["run","turns"],1]]""",

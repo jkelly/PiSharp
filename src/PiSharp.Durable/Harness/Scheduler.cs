@@ -84,8 +84,13 @@
 // settings.restartLimit a reservation pass faults an abort handler's task, or a task of a kind that does not end itself at the limit
 // (LimitsRestarts: the built-in generation, tool and compaction tasks end themselves), with detail {reason: "restart_limit"}, and
 // reports task_faulted with reason restart_limit; the settings are read only for a task that was cut off at all. A runtime commit that
-// ends its task failed with detail reason restart_limit or interrupted reports task_interrupted with the task's count. Run-end's
-// endedByCrashes (7e15f9601) is that area's.
+// ends its task failed with detail reason restart_limit or interrupted reports task_interrupted with the task's count.
+//
+// Pi v1.5.0 sync (area run-end): TaskRuntime.entries() reads the task's conversation's raw history on the line (65fba65b2), and
+// endedByCrashes (7e15f9601) marks a terminal state a built-in task commits because it was cut off settings.restartLimit times when its
+// outcome does not say so (a generation whose run answered ends completed without its after-run tasks): the runtime commit reports it
+// task_interrupted with reason restart_limit. Upstream keys a WeakMap by the state object; EndedByCrashesStates is a
+// ConditionalWeakTable keyed by the TaskState instance, so nothing is added to the stored state.
 using System.Collections;
 using System.Collections.Immutable;
 using PiSharp.Durable.Chord;
@@ -2646,6 +2651,21 @@ internal sealed class DurableTaskScheduler
     /// <summary><c>{reason: "restart_limit"}</c>, the detail of an outcome that ends a task cut off <c>settings.RestartLimit</c> times.</summary>
     internal static JsonObjectValue RestartLimitDetail { get; } = new RecordJson.Writer().Add("reason", "restart_limit").Build();
 
+    /// <summary>
+    /// Terminal states a built-in task commits because it was cut off <c>settings.RestartLimit</c> times, when their outcome does not say so
+    /// (a failure with detail <c>{reason: "restart_limit"}</c> does), with the message the scheduler reports them <c>task_interrupted</c> with
+    /// (upstream <c>endedByCrashesStates</c>). Keyed by the state instance the task returns, so nothing is added to the stored state.
+    /// </summary>
+    private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<TaskState, string> EndedByCrashesStates = [];
+
+    /// <summary><paramref name="state"/>, marked as ending its task for crashes (<c>task_interrupted</c> with <paramref name="message"/>),
+    /// whatever its outcome (upstream <c>endedByCrashes</c>).</summary>
+    internal static T EndedByCrashes<T>(T state, string message) where T : TaskState
+    {
+        EndedByCrashesStates.AddOrUpdate(state, message);
+        return state;
+    }
+
     /// <summary>Why a failed outcome's error says crashes ended the task (its detail's <c>reason</c>), if it does (upstream
     /// <c>interruptionOf</c>).</summary>
     private static ReportReason? InterruptionOf(TaskOutcomeError error) =>
@@ -3013,9 +3033,17 @@ internal sealed class DurableTaskScheduler
                 if (next is not null) await scheduler.CommitStateAsync(tx, invocation, current, next).ConfigureAwait(false);
                 if (next is RunningTaskState running && PhaseOf(running.Checkpoint) is { } phase && phase != current.Phase) checkpoint = phase;
                 // A task that ends for crashes says so (task_interrupted), so a host keeps a crash-loop signal.
-                interrupted = next is TerminalTaskState { Outcome: FailedTaskOutcome failed } && InterruptionOf(failed.Error) is { } reason
-                    ? (failed.Error.Message, reason, current.Record.Restarts ?? 0)
-                    : null;
+                interrupted = null;
+                if (next is TerminalTaskState terminal)
+                {
+                    var restarts = current.Record.Restarts ?? 0;
+                    if (terminal.Outcome is FailedTaskOutcome failed && InterruptionOf(failed.Error) is { } reason)
+                        interrupted = (failed.Error.Message, reason, restarts);
+                    // A task that ended for crashes with another outcome says so itself, as a generation whose run answered ends
+                    // completed without its after-run tasks.
+                    else if (EndedByCrashesStates.TryGetValue(terminal, out var message))
+                        interrupted = (message, ReportReason.RestartLimit, restarts);
+                }
                 return true;
             }, context, options).ConfigureAwait(false);
             if (interrupted is { } ended)
@@ -3153,6 +3181,13 @@ internal sealed class DurableTaskScheduler
         {
             ArgumentNullException.ThrowIfNull(token);
             return token.As(await ReadEntry(token, id, context).ConfigureAwait(false));
+        }
+
+        public Task<Page<EntryRecord>> EntriesAsync(EntryQueryBounds query, int limit, JsonObjectValue? cursor, DurableContext context)
+        {
+            ArgumentNullException.ThrowIfNull(query);
+            return Read(() => scheduler.session.ReadOnLineAsync(() =>
+                scheduler.storage.ScanEntriesAsync(HarnessUtil.ConversationEntries(invocation.ConversationId, query), limit, cursor, context)));
         }
 
         private Task<EntryRecord?> ReadEntry(Entry? token, EntryId id, DurableContext context) => Read(async () =>

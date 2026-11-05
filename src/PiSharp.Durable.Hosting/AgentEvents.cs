@@ -31,6 +31,12 @@
 //   compactionFailure and compaction_start/end map trigger back to reason (V1Compaction), and the snapshot's run carries only its inputs, so
 //   turns stays off the wire. A turn_limit run end is a run_end whose failure has reason turn_limit; pi.agent's maxTurns, which the device
 //   host does not set, would reach agent fields as it is (additive).
+// - Area run-end (7e15f9601, 38ff99177): pi.live.run and runFailure carry first, the entry the run's history starts at; the wire keeps area
+//   run-failure's runFailure {taskId, inputs, reason, detail?} (V1RunFailure), as the run's turns stay off it. A run that answered and
+//   waits for its afterRun tasks keeps pi.live.run with no inputs and run.afterRun: its inputs are done, so the projection reads it as no
+//   run, and the answer's commit is the run's run_end, as in v1.2.0; the commit that ends it after the tasks shows no run change, only
+//   the run_start of a run it starts. A handoff continues the run in the new context (38ff99177), which the events show as the reset's
+//   entries within the run.
 //
 // Mappings: each AgentEvent variant is a sealed record whose ToJson() is upstream's object with upstream's key order, so a JSON-mode host
 // prints what upstream prints. pi-ai messages, usage, tool slots, compaction statuses and the pi.agent / pi.usage states are wire JSON, as
@@ -571,7 +577,8 @@ public static class AgentEvents
 
     private sealed record Parts(JsonObjectValue Live, JsonObjectValue? Inbox, JsonObjectValue? Agent, JsonObjectValue? Usage)
     {
-        public JsonObjectValue? Run => Live.TryGetValue("run", out var run) ? run as JsonObjectValue : null;
+        // A run held for its afterRun tasks answered: no run on the wire (area run-end).
+        public JsonObjectValue? Run => Live.TryGetValue("run", out var run) && run is JsonObjectValue fields && !fields.ContainsKey("afterRun") ? fields : null;
         public JsonObjectValue? Generation => Live.TryGetValue("generation", out var generation) ? generation as JsonObjectValue : null;
         public JsonArrayValue? Tools => Live.TryGetValue("tools", out var tools) ? tools as JsonArrayValue : null;
         public JsonArrayValue? NestedTools => Live.TryGetValue("nestedTools", out var nested) ? nested as JsonArrayValue : null;
@@ -596,7 +603,7 @@ public static class AgentEvents
             Compactions = parts.Compactions is { } compactions
                 ? JsonValue.Array(compactions.Select(status => status is JsonObjectValue item ? V1Compaction(item) : status)) : JsonArrayValue.Empty,
             CompactionFailure = parts.CompactionFailure is { } failure ? V1Compaction(failure) : null,
-            RunFailure = parts.RunFailure,
+            RunFailure = parts.RunFailure is { } runFailure ? V1RunFailure(runFailure) : null,
             Inbox = Queued(parts.Inbox),
             Agent = parts.Agent ?? Agents.AgentDoc.Definition.Initial(),
             Usage = parts.Usage ?? UsageLedger.UsageDoc.Definition.Initial(),
@@ -607,6 +614,10 @@ public static class AgentEvents
     /// its position.</summary>
     private static JsonObjectValue V1Compaction(JsonObjectValue value) => !value.ContainsKey("trigger") ? value
         : JsonObjectValue.From(value.Select(field => KeyValuePair.Create(field.Key == "trigger" ? "reason" : field.Key, field.Value)));
+
+    /// <summary>A pi.live.runFailure as the wire has it since area run-failure: without first (area run-end), which v1.5.0 adds as its last
+    /// key.</summary>
+    private static JsonObjectValue V1RunFailure(JsonObjectValue failure) => failure.ContainsKey("first") ? failure.Remove("first") : failure;
 
     private static ImmutableArray<QueuedItem> Queued(JsonObjectValue? inbox) =>
         inbox is not null && inbox.TryGetValue("items", out var items) && items is JsonArrayValue list
@@ -829,7 +840,7 @@ public static class AgentEvents
         {
             // A failure this commit recorded is the ending run's: a run that started in the same commit keeps it.
             var recorded = now.RunFailure is { } runFailure && !ReferenceEquals(runFailure, was.RunFailure) ? runFailure : null;
-            events.Add(new RunEndEvent(Inputs(runBefore)) { Failure = recorded });
+            events.Add(new RunEndEvent(Inputs(runBefore)) { Failure = recorded is null ? null : V1RunFailure(recorded) });
         }
 
         // Submissions, document state, then what began.

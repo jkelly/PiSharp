@@ -12,6 +12,7 @@
 // Pi v1.5.0 sync (area run-failure, f3255de76): and with RunFailure150.cs's: noModel's pi.live holds the run's runFailure.
 // Pi v1.5.0 sync (area tool-tasks, 1c6928b30): and with ToolTasks150.cs's: tasks at pi.tool version 3 and pi.generation version 2, and
 // unavailable's call, to a tool its request did not offer, answered by its own flagged pi.tool task.
+// Pi v1.5.0 sync (area run-end, 7e15f9601): and with LiveV3150.cs's: noModel's runFailure carries its run's first entry, its input's.
 using PiSharp.Durable;
 using PiSharp.Durable.Chord;
 using PiSharp.Durable.Sqlite;
@@ -41,9 +42,9 @@ internal static class ChatDifferentialTests
     private static readonly string[] Times = ["timestamp", "at", "until", "pollAt", "startedAt", "endedAt", "durationMs"];
 
     // Pi v1.5.0 (area model-requests): the capture's authored v1.5.0 form (see the file header).
-    private static readonly Lazy<JsonObjectValue> Upstream = new(() => ToolTasks150.Differential(RunFailure150.ChatTurns((JsonObjectValue)ModelRequests150.Authored(
+    private static readonly Lazy<JsonObjectValue> Upstream = new(() => LiveV3150.Differential(ToolTasks150.Differential(RunFailure150.ChatTurns((JsonObjectValue)ModelRequests150.Authored(
         JsonValue.Parse(File.ReadAllText(Path.Combine(RepositoryRoot(), "tests", "PiSharp.Durable.Tests", "Fixtures", "v1.2.0", "chat-turns.upstream.json"))))),
-        ("unavailable", "call-1")));
+        ("unavailable", "call-1"))));
 
     internal static JsonValue Normalize(JsonValue value, string? key = null) => value switch
     {

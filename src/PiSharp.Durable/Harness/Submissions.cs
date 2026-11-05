@@ -13,11 +13,13 @@
 // (area vocabulary, 5f312dac4): the internal observeCommits is followCommits (Session.FollowCommits).
 //
 // Pi v1.5.0 sync (area admission): a continue (fb524dd2e, #11043) is rejected busy, never queued; idle, it places the inbox's queued items
-// and starts a run with them and itself, without an entry of its own (the run's first entry, upstream startRun's first, is area run-end's).
+// and starts a run with them and itself, without an entry of its own.
 // whenIdle: "reject" input throws ConversationIdleException before any write (6a2825113, #11149). AdmitAsync is submit(tx, draft)
 // (cc9c52310, #11149): the same admission inside the caller's commit, refused for a transaction of another Session and after the commit's
-// first table write; the span both forms share is Traced (upstream #traced). The citation stays on v1.2.0 until the file's other areas land
-// (run-end; group-commit-scheduler, which drops the storage field).
+// first table write; the span both forms share is Traced (upstream #traced).
+// Pi v1.5.0 sync (area run-end, 7e15f9601): every run admission starts records pi.live.run.first: an idle input's entry, the first entry a
+// boundary placed, and for a continue the failed run's runFailure.first ahead of that, so the continue's afterRun hooks see what the failed
+// run did. The citation stays on v1.2.0 until the file's other areas land (group-commit-scheduler, which drops the storage field).
 using PiSharp.Durable.Chord;
 using PiSharp.Durable.Internal;
 using PiSharp.Telemetry;
@@ -236,9 +238,11 @@ internal sealed class Submissions
                 ConversationId = conversationId, RequestId = draft.RequestId, Trace = trace, Type = SubmissionType.Continue,
                 Status = SubmissionStatus.Placed,
             }).ConfigureAwait(false);
-            // Items an earlier failed run left queued (afterFailedRun: keep) are placed first and join the run.
-            var (placed, _) = await Inbox.ApplyBoundaryAsync(tx, continueBoundary, true, now).ConfigureAwait(false);
-            await HarnessTasks.StartRunAsync(tx, conversationId, live, [.. placed, continued.Id]).ConfigureAwait(false);
+            // Items an earlier failed run left queued (afterFailedRun: keep) are placed first and join the run. Its history starts with the
+            // failed run's, so afterRun hooks see what that run did.
+            var (placed, first, _) = await Inbox.ApplyBoundaryAsync(tx, continueBoundary, true, now).ConfigureAwait(false);
+            await HarnessTasks.StartRunAsync(tx, conversationId, live, [.. placed, continued.Id], (live.ContainsKey("runFailure") ? RunFailure.FromJson(live.Get("runFailure")!).First : null) ?? first)
+                .ConfigureAwait(false);
             return new Admission(continued.Id, "placed");
         }
         // A boundary reads the table, so it is prepared before the first table write; a busy one needs none.
@@ -264,8 +268,8 @@ internal sealed class Submissions
                         Array.Empty<KeyValuePair<string, JsonValue>>(),
                 ]));
             if (boundary is null) return new Admission(queued.Id, "queued");
-            var (users, _) = await Inbox.ApplyBoundaryAsync(tx, boundary, true, now).ConfigureAwait(false);
-            if (!users.IsEmpty) await HarnessTasks.StartRunAsync(tx, conversationId, live, users).ConfigureAwait(false);
+            var (users, first, _) = await Inbox.ApplyBoundaryAsync(tx, boundary, true, now).ConfigureAwait(false);
+            if (!users.IsEmpty) await HarnessTasks.StartRunAsync(tx, conversationId, live, users, first).ConfigureAwait(false);
             return new Admission(queued.Id,
                 draft.Type == SubmissionType.Write ? "done" : !users.IsEmpty && users[^1] == queued.Id ? "placed" : "queued");
         }
@@ -293,7 +297,7 @@ internal sealed class Submissions
             ConversationId = conversationId, RequestId = draft.RequestId, Trace = trace, Type = SubmissionType.Input,
             Status = SubmissionStatus.Placed, Entry = entry.Id,
         }).ConfigureAwait(false);
-        await HarnessTasks.StartRunAsync(tx, conversationId, live, [input.Id]).ConfigureAwait(false);
+        await HarnessTasks.StartRunAsync(tx, conversationId, live, [input.Id], entry.Id).ConfigureAwait(false);
         return new Admission(input.Id, "placed");
     }
 

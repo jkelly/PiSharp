@@ -33,6 +33,8 @@
 // Pi v1.5.0 sync (area admission, cc9c52310): Conversation.submit(tx, draft) and ConversationHandle.submit(tx, draft) admit inside the
 // caller's commit (Submissions.AdmitAsync), as C# overloads of SubmitAsync; the handle's form checks the invocation's abort itself, as the
 // caller's commit carries its own context. Upstream's runtime test of the first argument is overload resolution here.
+// Pi v1.5.0 sync (area run-end, 65fba65b2): Conversation.entries() builds its scan with HarnessUtil.ConversationEntries, shared with
+// TaskRuntime.entries().
 using System.Collections.Immutable;
 using PiSharp.AI;
 using PiSharp.Durable.Chord;
@@ -494,8 +496,8 @@ internal sealed class ConversationImpl(ConversationId id, DurableHarness harness
     public Task<Page<EntryRecord>> EntriesAsync(EntryQueryBounds query, int limit, JsonObjectValue? cursor, DurableContext context)
     {
         ArgumentNullException.ThrowIfNull(query);
-        var bounded = new EntryQuery(Id) { MinEntryId = query.MinEntryId, MaxEntryId = query.MaxEntryId, Order = query.Order };
-        return harness.ReadOnLineAsync(() => harness.Storage.ScanEntriesAsync(bounded, limit, cursor, context));
+        var scan = HarnessUtil.ConversationEntries(Id, query);
+        return harness.ReadOnLineAsync(() => harness.Storage.ScanEntriesAsync(scan, limit, cursor, context));
     }
 
     public Task<IConversation> ForkAsync(EntryId at, ConversationCreateOptions options, DurableContext context)

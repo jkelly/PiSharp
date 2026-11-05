@@ -23,6 +23,14 @@
 //   trigger, and none holds a run. The chat-turns, inbox and tool-rounds captures hold neither a run nor a compaction status in pi.live.
 // The agent event projection (PiSharp.Durable.Hosting's AgentEvents.cs) keeps v1.2.0's wire: compactions and compaction failures name their
 // reason, and a run carries no turns. So events and observed values compare as captured.
+// Pi v1.5.0 sync (area run-end, 7e15f9601): pi.live.run and pi.live.runFailure carry first, the entry the run's history starts at (still
+// version 3: the field is optional, and a value without it migrates as it is). startRun writes {taskId, inputs, turns: 0, first} for the
+// first entry the boundary that started the run placed, an idle input its own entry; endRun copies it into runFailure as its last key. Every
+// captured run starts with an idle input, so a run's first is the entry its first input's placement appended: Plan reads it off main.jsonl
+// (the commit that placed the input, the least entry that commit both appended and placed), the Differential form off the dump's
+// submissions, and the Frames form off the frame that sets the run, which must append exactly that one entry. This form applies last, after
+// RunFailure150.cs's, so the runFailure values that file authors get their run's first too. A run another way started is not covered and
+// throws. The events keep the wire without it (AgentEvents.cs).
 using System.Globalization;
 using PiSharp.Durable.Chord;
 using PiSharp.Durable.Chord.Delta;
@@ -34,15 +42,27 @@ internal static class LiveV3150
     internal const int Version = 3;
 
     /// <summary>A pi.live value as v1.5.0 holds it: compaction statuses and compactionFailure name their trigger, and a run carries
-    /// <paramref name="turns"/>, which a value with a run must be given.</summary>
-    public static JsonObjectValue Value(JsonObjectValue value, long? turns)
+    /// <paramref name="turns"/>, which a value with a run must be given. With <paramref name="entryOf"/> (a submission's placement's entry,
+    /// area run-end), the run and runFailure carry their first entry, their first input's.</summary>
+    public static JsonObjectValue Value(JsonObjectValue value, long? turns, Func<long, long>? entryOf = null)
     {
         var live = value;
         if (value.TryGetValue("run", out var run) && run is JsonObjectValue fields)
-            live = live.SetItem("run", WithTurns(fields, turns ?? throw new InvalidOperationException("a pi.live run this plan cannot count the turns of (live v3)")));
+            live = live.SetItem("run", WithFirst(WithTurns(fields, turns ?? throw new InvalidOperationException("a pi.live run this plan cannot count the turns of (live v3)")), entryOf));
         if (value.TryGetValue("compactions", out var compactions)) live = live.SetItem("compactions", Renamed(compactions));
         if (value.TryGetValue("compactionFailure", out var failure) && failure is JsonObjectValue recorded) live = live.SetItem("compactionFailure", Renamed(recorded));
+        if (value.TryGetValue("runFailure", out var runFailure) && runFailure is JsonObjectValue ended) live = live.SetItem("runFailure", WithFirst(ended, entryOf));
         return live;
+    }
+
+    /// <summary>A run or runFailure with its first entry, its first input's placement's (area run-end); as it is without
+    /// <paramref name="entryOf"/> or when it has one.</summary>
+    private static JsonObjectValue WithFirst(JsonObjectValue run, Func<long, long>? entryOf)
+    {
+        if (entryOf is null || run.ContainsKey("first")) return run;
+        if (run["inputs"] is not JsonArrayValue { Count: > 0 } inputs)
+            throw new InvalidOperationException("a pi.live run without an input, whose first entry this plan cannot tell (run-end)");
+        return run.SetItem("first", entryOf(Long(inputs[0])));
     }
 
     /// <summary>What a Harness reads from a stored version 1 value (live.ts migrate): the trigger, and a run's turns from 0.</summary>
@@ -64,17 +84,30 @@ internal static class LiveV3150
     /// <summary>The resumed records dump of a session v1.5.0 wrote: every pi.live document at version 3, no run in flight.</summary>
     public static JsonValue WrittenResumed(JsonValue resumed) => MapDocuments(resumed, document => Stored(document, Value((JsonObjectValue)document["value"], null)));
 
-    /// <summary>A Harness differential capture's authored form: every pi.live value in a <c>docs</c> object, none with a run.</summary>
-    public static JsonObjectValue Differential(JsonObjectValue capture) => (JsonObjectValue)Docs(capture);
+    /// <summary>A Harness differential capture's authored form: every pi.live value in a <c>docs</c> object, none with a run; a runFailure
+    /// gets its run's first entry from the dump's submissions (area run-end).</summary>
+    public static JsonObjectValue Differential(JsonObjectValue capture) => (JsonObjectValue)Docs(capture, null);
 
-    private static JsonValue Docs(JsonValue value) => value switch
+    private static JsonValue Docs(JsonValue value, Func<long, long>? entryOf) => value switch
     {
-        JsonArrayValue items => JsonValue.Array(items.Select(Docs)),
-        JsonObjectValue properties => JsonValue.Object(properties.Select(property => KeyValuePair.Create(property.Key,
-            property.Key == "docs" && property.Value is JsonObjectValue docs && docs.TryGetValue("pi.live", out var live) && live is JsonObjectValue fields
-                ? docs.SetItem("pi.live", Value(fields, null)) : Docs(property.Value)))),
+        JsonArrayValue items => JsonValue.Array(items.Select(item => Docs(item, entryOf))),
+        JsonObjectValue properties => DocsIn(properties, properties.TryGetValue("submissions", out var submissions) && submissions is JsonArrayValue records
+            ? EntryOf(records) : entryOf),
         _ => value,
     };
+
+    private static JsonObjectValue DocsIn(JsonObjectValue properties, Func<long, long>? entryOf) => JsonValue.Object(properties.Select(property =>
+        KeyValuePair.Create(property.Key, property.Key == "docs" && property.Value is JsonObjectValue docs && docs.TryGetValue("pi.live", out var live) &&
+            live is JsonObjectValue fields ? docs.SetItem("pi.live", Value(fields, null, entryOf)) : Docs(property.Value, entryOf))));
+
+    /// <summary>A dump's submissions as a lookup of the entry each one's placement appended.</summary>
+    private static Func<long, long> EntryOf(JsonArrayValue submissions)
+    {
+        var entries = submissions.OfType<JsonObjectValue>().Where(record => record.ContainsKey("entry"))
+            .ToDictionary(record => Long(record["id"]), record => Long(record["entry"]));
+        return submission => entries.TryGetValue(submission, out var entry) ? entry
+            : throw new InvalidOperationException($"submission {submission} placed no entry this dump holds (run-end)");
+    }
 
     /// <summary>views.upstream.json's authored form: each scenario's frames (<see cref="Frames"/>), and its initial and final views'
     /// pi.live with the count where each stands.</summary>
@@ -104,14 +137,21 @@ internal static class LiveV3150
     private static JsonValue View(JsonValue view, Counter counter) =>
         view is JsonObjectValue fields && fields.TryGetValue("docs", out var docs) && docs is JsonObjectValue documents &&
         documents.TryGetValue("pi.live", out var live) && live is JsonObjectValue value
-            ? fields.SetItem("docs", documents.SetItem("pi.live", Value(value, counter.Turns))) : view;
+            ? fields.SetItem("docs", documents.SetItem("pi.live", Value(value, counter.Turns, counter.EntryOf))) : view;
 
-    /// <summary>The count of one watch's frames: set to 0 by a run's set, one more at each tool round's start.</summary>
+    /// <summary>The count of one watch's frames: set to 0 by a run's set, one more at each tool round's start; and the run's first entry
+    /// (area run-end), the one entry the frame that sets the run appends.</summary>
     private sealed class Counter
     {
         private static readonly string[] Prefix = ["docs", "pi.live"];
 
         public long? Turns { get; private set; }
+
+        /// <summary>The newest run's first entry; it stays after the run's removal for the runFailure that frame or the final view holds.</summary>
+        public long? First { get; private set; }
+
+        /// <summary><see cref="First"/> as <see cref="Value"/>'s lookup.</summary>
+        public long EntryOf(long submission) => First ?? throw new InvalidOperationException("a runFailure before any run set (run-end)");
 
         public JsonArrayValue Frame(JsonArrayValue frame)
         {
@@ -128,10 +168,14 @@ internal static class LiveV3150
                 }
                 last = ops.Count;
                 var kind = ((JsonStringValue)op[0]).Value;
-                if (kind == "s" && path is ["run"]) Turns = 0;
+                if (kind == "s" && path is ["run"])
+                {
+                    Turns = 0;
+                    First = Appended(frame);
+                }
                 else if (kind == "d" && path is ["run"]) Turns = null;
                 else if (kind == "s" && path is ["tools"]) round = true;
-                ops.Add(LiveOp(op, Prefix.Length, path, Turns));
+                ops.Add(LiveOp(op, Prefix.Length, path, Turns, EntryOf));
             }
             if (round)
             {
@@ -153,13 +197,17 @@ internal static class LiveV3150
         private readonly HashSet<(long Document, long Seq)> rounds;
         // Each pi.live document's last revision.
         private readonly Dictionary<long, long> last;
+        // The entry each submission's placement appended, the first of a run it starts (area run-end).
+        private readonly Func<long, long> entryOf;
 
-        internal Plan(Dictionary<long, long> conversations, Dictionary<(long, long), long?> turns, HashSet<(long, long)> rounds, Dictionary<long, long> last)
+        internal Plan(Dictionary<long, long> conversations, Dictionary<(long, long), long?> turns, HashSet<(long, long)> rounds, Dictionary<long, long> last,
+            Func<long, long> entryOf)
         {
             this.conversations = conversations;
             this.turns = turns;
             this.rounds = rounds;
             this.last = last;
+            this.entryOf = entryOf;
         }
 
         /// <summary>The records dump a written run reads: every pi.live document at version 3, its value with the turns after its last
@@ -167,7 +215,7 @@ internal static class LiveV3150
         public JsonValue Records(JsonValue records) => MapDocuments(records, document =>
         {
             var id = Long(((JsonObjectValue)document["record"])["id"]);
-            return Stored(document, Value((JsonObjectValue)document["value"], last.TryGetValue(id, out var seq) ? turns[(id, seq)] : null));
+            return Stored(document, Value((JsonObjectValue)document["value"], last.TryGetValue(id, out var seq) ? turns[(id, seq)] : null, entryOf));
         });
 
         /// <summary>A JSONL line's authored form: a pi.live revision record at version 3 (see <see cref="Content"/>). A line that changes
@@ -210,11 +258,11 @@ internal static class LiveV3150
                 throw new InvalidOperationException($"pi.live document {document} has no captured revision {seq} (live v3)");
             var kind = ((JsonStringValue)content["kind"]).Value;
             var authored = content.SetItem("version", Version);
-            if (kind == "base") return authored.SetItem("value", Value((JsonObjectValue)content["value"], count));
+            if (kind == "base") return authored.SetItem("value", Value((JsonObjectValue)content["value"], count, entryOf));
             var ops = ((JsonArrayValue)content["ops"]).Select(item =>
             {
                 var op = (JsonArrayValue)item;
-                return LiveOp(op, 0, Relative(op, []) ?? [], count);
+                return LiveOp(op, 0, Relative(op, []) ?? [], count, entryOf);
             }).ToList();
             if (rounds.Contains((document, seq))) ops.Add(JsonValue.Array("s", JsonValue.Array("run", "turns"), count ?? throw new InvalidOperationException("a tool round without a run (live v3)")));
             return authored.SetItem("ops", JsonValue.Array(ops));
@@ -228,12 +276,21 @@ internal static class LiveV3150
         var conversations = new Dictionary<long, long>();
         // Each submission's first placement, and each conversation's commits that start a tool round.
         var placed = new Dictionary<long, long>();
+        // Each commit's least entry that it both appended and placed (a submission write of the commit names it): the first entry of a run
+        // the commit starts (area run-end).
+        var placedFirst = new Dictionary<long, long>();
         var roundCommits = new Dictionary<long, List<long>>();
         foreach (var line in File.ReadAllText(Path.Combine(directory, "main.jsonl")).Split('\n').Where(line => line.Length > 0))
         {
             var commit = (JsonObjectValue)JsonValue.Parse(line);
             var seq = Long(commit["seq"]);
-            foreach (var write in ((JsonArrayValue)commit["writes"]).Cast<JsonObjectValue>())
+            var writes = ((JsonArrayValue)commit["writes"]).Cast<JsonObjectValue>().ToList();
+            var appended = writes.Where(write => write["type"] is JsonStringValue { Value: "entry" }).Select(write => Long(((JsonObjectValue)write["value"])["id"])).ToHashSet();
+            var placedHere = writes.Where(write => write["type"] is JsonStringValue { Value: "submission" } && write["value"] is JsonObjectValue submission &&
+                submission.TryGetValue("entry", out var entry) && appended.Contains(Long(entry)))
+                .Select(write => Long(((JsonObjectValue)write["value"])["entry"])).ToList();
+            if (placedHere.Count > 0) placedFirst[seq] = placedHere.Min();
+            foreach (var write in writes)
             {
                 switch (((JsonStringValue)write["type"]).Value)
                 {
@@ -279,7 +336,9 @@ internal static class LiveV3150
                 last[document] = seq;
             }
         }
-        return new Plan(conversations, turns, rounds, last);
+        long EntryOf(long submission) => placed.TryGetValue(submission, out var at) && placedFirst.TryGetValue(at, out var first) ? first
+            : throw new InvalidOperationException($"submission {submission}'s placement appended no entry, so its run's first is not covered (run-end)");
+        return new Plan(conversations, turns, rounds, last, EntryOf);
     }
 
     /// <summary>Whether a captured entry is the assistant message a tool round starts with: it stops for tool use with a tool call
@@ -302,7 +361,7 @@ internal static class LiveV3150
 
     /// <summary>One pi.live op (its path <paramref name="path"/> after <paramref name="prefix"/> segments) as v1.5.0 writes it: a run's
     /// set with <paramref name="turns"/>, compaction statuses and compactionFailure with their trigger, and a whole value authored.</summary>
-    private static JsonValue LiveOp(JsonArrayValue op, int prefix, object[] path, long? turns)
+    private static JsonValue LiveOp(JsonArrayValue op, int prefix, object[] path, long? turns, Func<long, long> entryOf)
     {
         var kind = ((JsonStringValue)op[0]).Value;
         JsonArrayValue With(int index, JsonValue value) => JsonValue.Array(op.Select((item, at) => at == index ? value : item));
@@ -310,11 +369,13 @@ internal static class LiveV3150
         switch (kind, path)
         {
             case ("r", _):
-                return With(1, Value((JsonObjectValue)op[1], turns));
+                return With(1, Value((JsonObjectValue)op[1], turns, entryOf));
             case ("s", []):
-                return With(2, Value((JsonObjectValue)op[2], turns));
+                return With(2, Value((JsonObjectValue)op[2], turns, entryOf));
             case ("s", ["run"]):
-                return With(2, WithTurns((JsonObjectValue)op[2], turns ?? 0));
+                return With(2, WithFirst(WithTurns((JsonObjectValue)op[2], turns ?? 0), entryOf));
+            case ("s", ["runFailure"]):
+                return op[2] is JsonObjectValue ended ? With(2, WithFirst(ended, entryOf)) : op;
             case ("s", ["compactions"]):
                 return With(2, Renamed(op[2]));
             case ("s", ["compactions", long]):
@@ -333,6 +394,18 @@ internal static class LiveV3150
     }
 
     private static JsonObjectValue WithTurns(JsonObjectValue run, long turns) => run.SetItem("turns", turns);
+
+    /// <summary>The ID of the one entry <paramref name="frame"/> appends (its splices of the view's entries), the first of the run it sets
+    /// (area run-end); a frame that appends another number is not covered and throws.</summary>
+    private static long Appended(JsonArrayValue frame)
+    {
+        var appended = frame.Cast<JsonArrayValue>()
+            .Where(op => op[0] is JsonStringValue { Value: "p" } && op[1] is JsonArrayValue { Count: 1 } path && path[0] is JsonStringValue { Value: "entries" })
+            .SelectMany(op => ((JsonArrayValue)op[4]).Cast<JsonObjectValue>()).ToList();
+        if (appended.Count != 1)
+            throw new InvalidOperationException($"a frame that sets a run appends {appended.Count} entries, so the run's first is not covered (run-end)");
+        return Long(appended[0]["id"]);
+    }
 
     /// <summary>A compaction status or failure with reason renamed trigger in its place (live.ts renameReason); an array of them.</summary>
     private static JsonValue Renamed(JsonValue value) => value switch

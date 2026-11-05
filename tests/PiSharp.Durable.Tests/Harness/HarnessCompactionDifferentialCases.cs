@@ -12,6 +12,7 @@
 // Pi v1.5.0 sync (area run-failure, f3255de76): and with RunFailure150.cs's: blockingFailure's pi.live holds the failed run's runFailure.
 // Pi v1.5.0 sync (area tool-tasks, 1c6928b30): and with ToolTasks150.cs's: generation tasks at pi.generation version 2.
 // Pi v1.5.0 sync (area live-turns, 5f312dac4): and with LiveV3150.cs's: pi.live's compactionFailure names its trigger (no dump holds a run).
+// Pi v1.5.0 sync (area run-end, 7e15f9601): and blockingFailure's runFailure carries its run's first entry, its input's (LiveV3150.cs).
 using PiSharp.Durable;
 using PiSharp.Durable.Chord;
 using PiSharp.Durable.Internal;

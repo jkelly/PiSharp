@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/test/harness-generation-recovery.test.ts. Verbatim apart from the
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/test/harness-generation-recovery.test.ts. Verbatim apart from the
 // adaptations in HarnessSupport.cs and ChatSupport.cs, and these:
 // - Backends. Upstream reopens a SQLite file; harness.generation-recovery.* does the same, and harness.generation-recovery.jsonl.* reruns
 //   every case reopening a JSONL directory.
@@ -12,9 +12,9 @@
 //   are sleeping and Harness.Wake() names their time; "sleeps again for a retry stored as a running phase by an earlier version" rewrites
 //   the record as the thinking-level case does, where upstream's SQL turns the stored status back to running; no_model's poll runs once
 //   the clock reaches its time. The `eventually(() => !harness.wake().active)` waits are 440a5fcdb's (area reports) and hold at once
-//   until it lands. The citation stays on v1.2.0 until the file's other areas land.
-// - Pi v1.5.0 sync (area live-turns, f6a9db1d8): "resumes a retry backoff after reopen" expects pi.live.run's turns: 0; its first
-//   (7e15f9601) is area run-end's.
+//   until it lands.
+// - Pi v1.5.0 sync (area live-turns, f6a9db1d8): "resumes a retry backoff after reopen" expects pi.live.run's turns: 0, and (area run-end,
+//   7e15f9601) its first, "<number>" for expect.any(Number) (MatchExactly). Area run-end is the last of the file's areas.
 using PiSharp.Durable;
 using PiSharp.Durable.Chord;
 using PiSharp.Durable.Sqlite;
@@ -217,7 +217,7 @@ internal static class GenerationRecoveryTests
             opened.Harness.Resume();
             await Task.Delay(20);
             Equal(1, setup.Faux.State.CallCount, "calls before its time");
-            SameJson("""{"run":{"taskId":""" + taskId + ""","inputs":[""" + id + """],"turns":0},"generation":{"attempt":1,"retry":{"at":61000,"error":"503 Service Unavailable"}}}""",
+            MatchExactly("""{"run":{"taskId":""" + taskId + ""","inputs":[""" + id + """],"turns":0,"first":"<number>"},"generation":{"attempt":1,"retry":{"at":61000,"error":"503 Service Unavailable"}}}""",
                 await LiveOf(opened), "live");
             Volatile.Write(ref now, 61_000);
             opened.Harness.Resume();
