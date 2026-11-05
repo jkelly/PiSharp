@@ -30,6 +30,9 @@
 // Pi v1.5.0 sync (area restarts, b3a29f111): the scheduler learns which built-in kinds end themselves at settings.restartLimit
 // (Live.LimitsRestarts), and its join writes at close through Session.WriteAtCloseAsync; safeReport records task_interrupted's reason,
 // extension and task ID, as task_faulted's.
+// Pi v1.5.0 sync (area admission, cc9c52310): Conversation.submit(tx, draft) and ConversationHandle.submit(tx, draft) admit inside the
+// caller's commit (Submissions.AdmitAsync), as C# overloads of SubmitAsync; the handle's form checks the invocation's abort itself, as the
+// caller's commit carries its own context. Upstream's runtime test of the first argument is overload resolution here.
 using System.Collections.Immutable;
 using PiSharp.AI;
 using PiSharp.Durable.Chord;
@@ -439,6 +442,8 @@ internal sealed class ConversationImpl(ConversationId id, DurableHarness harness
 
     public Task<ISubmission> SubmitAsync(SubmissionDraft submission, DurableContext context) => harness.Submissions.SubmitAsync(Id, submission, context);
 
+    public Task<SubmissionId> SubmitAsync(ITx tx, SubmissionDraft submission) => harness.Submissions.AdmitAsync(tx, Id, submission);
+
     /// <summary>Admits a write of a <c>pi.reset</c> entry with <c>head: "self"</c>, carrying <paramref name="handoff"/> as a user message when
     /// given; a busy conversation places it at its next boundary.</summary>
     public async Task ResetAsync(string? handoff, DurableContext context)
@@ -526,12 +531,25 @@ internal sealed class BoundConversation(ConversationId id, InvocationBinding bin
 {
     public ConversationId Id { get; } = id;
 
-    /// <summary>Admits user input; the returned submission's operations are bound to the invocation too.</summary>
+    /// <summary>Admits a submission; the returned submission's operations are bound to the invocation too.</summary>
     public async Task<ISubmission> SubmitAsync(SubmissionDraft submission, DurableContext context)
     {
         binding.Check();
         var admitted = await submissions.SubmitAsync(Id, submission, context.WithSignal(binding.Signal)).ConfigureAwait(false);
         return new BoundSubmission(admitted, binding);
+    }
+
+    /// <summary>Admits a submission inside the caller's commit; rejects once the invocation is aborted or ended.</summary>
+    public Task<SubmissionId> SubmitAsync(ITx tx, SubmissionDraft submission)
+    {
+        try
+        {
+            binding.Check();
+            // The caller's commit carries its own context, so the invocation's abort is checked here.
+            if (binding.Signal.Token.IsCancellationRequested) throw binding.Signal.Error();
+        }
+        catch (Exception error) { return Task.FromException<SubmissionId>(error); }
+        return submissions.AdmitAsync(tx, Id, submission);
     }
 
     public async Task AbortAsync(DurableContext context, ConversationAbortOptions? options = null)

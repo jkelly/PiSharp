@@ -15,8 +15,10 @@
 // per incarnation by the Session (HeldDocument). The next commit that reads or writes such a document stores them first (TakeHeld, right
 // before Storage admission), and adoption then publishes its own changes to the Session's observers and what it stored to ObserveCommits
 // (AdoptedDocuments). Pi v1.5.0 sync (area vocabulary, 5f312dac4): a document publication is tagged: a DocumentValueChange, or a
-// DocumentRetireChange for a retirement (was a null value), which carries no held operations. The citation stays on v1.2.0 until the
-// file's other areas land.
+// DocumentRetireChange for a retirement (was a null value), which carries no held operations. Pi v1.5.0 sync (area admission, fb524dd2e,
+// cc9c52310): a continue is never queued, so never placed, and a placed continue can be answered as a placed input can; Context,
+// HasTableWrite and OwnedBy serve submit(tx, draft), and a read after a table write names its call (ReadAfterWriteException's operation,
+// Tx.<method>()). The citation stays on v1.2.0 until the file's other areas land.
 using System.Collections.Immutable;
 using PiSharp.Durable.Chord;
 using PiSharp.Durable.Chord.Delta;
@@ -134,6 +136,18 @@ internal sealed class Transaction : ITx
         this.context = context;
         this.scope = scope ?? TransactionScope.None;
     }
+
+    /// <summary>Internal: the context of the commit this transaction belongs to (upstream <c>context</c>).</summary>
+    public DurableContext Context => context;
+
+    /// <summary>Internal: whether a table write was staged, after which table reads throw <see cref="ReadAfterWriteException"/> (upstream
+    /// <c>hasTableWrite</c>).</summary>
+    public bool HasTableWrite => hasTableWrite;
+
+    /// <summary>Internal: whether <paramref name="tx"/> is a transaction of a commit of the Session behind <paramref name="owner"/> (upstream
+    /// <c>Transaction.ownedBy</c>). A type and owner check, so another <see cref="ITx"/> implementation, a wrapper of a transaction
+    /// included, is not one.</summary>
+    internal static bool OwnedBy(ITx tx, ITransactionHost owner) => tx is Transaction transaction && ReferenceEquals(transaction.host, owner);
 
     // ─── Table reads ────────────────────────────────────────────────────────
 
@@ -974,7 +988,7 @@ internal sealed class Transaction : ITx
         try
         {
             AssertOpen();
-            if (hasTableWrite) throw new ReadAfterWriteException(method);
+            if (hasTableWrite) throw new ReadAfterWriteException($"Tx.{method}()");
             return Track(read());
         }
         catch (Exception error)
@@ -1046,8 +1060,8 @@ internal sealed class Transaction : ITx
         }
     }
 
-    /// <summary>Complete record after applying one change. Placement turns a queued input placed and a queued write done; only a placed
-    /// input can be answered. A settled record stays.</summary>
+    /// <summary>Complete record after applying one change. Placement turns a queued input placed and a queued write done; a continue is
+    /// never queued, so never placed. Only a placed input or continue can be answered. A settled record stays.</summary>
     private static SubmissionRecord ApplySubmissionChange(SubmissionRecord current, SubmissionChange change)
     {
         if (current.Status is SubmissionStatus.Done or SubmissionStatus.Unanswered) return current;
@@ -1058,7 +1072,7 @@ internal sealed class Transaction : ITx
         }
         var settlement = change.Settlement!;
         if (settlement.Status == SubmissionStatus.Done && current.Status != SubmissionStatus.Placed)
-            throw new InvalidOperationException($"Submission {current.Id} is not a placed input");
+            throw new InvalidOperationException($"Submission {current.Id} is not a placed input or continue");
         // Queued and placed records carry no answer, reason or detail; an unanswered input keeps its entry.
         return (current with { Status = settlement.Status, Answer = settlement.Answer, Reason = settlement.Reason, Detail = settlement.Detail }).Validate();
     }

@@ -10,8 +10,14 @@
 // linked to the caller's span, a write's a child of it. The commit runs under the span, so its entry and submission events land there, and
 // admission stores the span's carrier on the record and links a steer to the running generation's trace. An error records only the error
 // status, as its text may carry caller content. Admission returns its result with the ID (upstream Admission). Pi v1.5.0 sync
-// (area vocabulary, 5f312dac4): the internal observeCommits is followCommits (Session.FollowCommits). The citation stays on v1.2.0 until
-// the file's other areas land.
+// (area vocabulary, 5f312dac4): the internal observeCommits is followCommits (Session.FollowCommits).
+//
+// Pi v1.5.0 sync (area admission): a continue (fb524dd2e, #11043) is rejected busy, never queued; idle, it places the inbox's queued items
+// and starts a run with them and itself, without an entry of its own (the run's first entry, upstream startRun's first, is area run-end's).
+// whenIdle: "reject" input throws ConversationIdleException before any write (6a2825113, #11149). AdmitAsync is submit(tx, draft)
+// (cc9c52310, #11149): the same admission inside the caller's commit, refused for a transaction of another Session and after the commit's
+// first table write; the span both forms share is Traced (upstream #traced). The citation stays on v1.2.0 until the file's other areas land
+// (run-end; group-commit-scheduler, which drops the storage field).
 using PiSharp.Durable.Chord;
 using PiSharp.Durable.Internal;
 using PiSharp.Telemetry;
@@ -57,22 +63,48 @@ internal sealed class Submissions
     public async Task<ISubmission> SubmitAsync(ConversationId conversationId, SubmissionDraft draft, DurableContext context)
     {
         ArgumentNullException.ThrowIfNull(draft);
+        var admission = await Traced(conversationId, draft, context, span => session.CommitWithAsync(
+            tx => AdmitSubmissionAsync(tx, conversationId, draft, now(), queueModes(), span),
+            context.WithTelemetry(span))).ConfigureAwait(false);
+        return new SubmissionHandle(admission.Id, this);
+    }
+
+    /// <summary>Admits a submission inside the caller's commit <paramref name="tx"/>, with the rules of <see cref="SubmitAsync"/> (upstream
+    /// <c>admit</c>). The admission is stored or lost with that commit. It must come before the commit's first table write, another
+    /// admission's included.</summary>
+    public async Task<SubmissionId> AdmitAsync(ITx tx, ConversationId conversationId, SubmissionDraft draft)
+    {
+        ArgumentNullException.ThrowIfNull(tx);
+        ArgumentNullException.ThrowIfNull(draft);
+        if (!session.OwnsTransaction(tx)) throw new InvalidOperationException("The transaction belongs to another Session");
+        var transaction = (Transaction)tx;
+        // Enforced on every path: admission reads tables only on some (request IDs, an idle boundary, a steer's trace).
+        if (transaction.HasTableWrite) throw new ReadAfterWriteException("submit(tx, draft)");
+        var admission = await Traced(conversationId, draft, transaction.Context,
+            span => AdmitSubmissionAsync(tx, conversationId, draft, now(), queueModes(), span)).ConfigureAwait(false);
+        return admission.Id;
+    }
+
+    /// <summary>Runs one admission in its <c>pi.durable.submit</c> span, asking for progress first, as the run it starts needs it (upstream
+    /// <c>#traced</c>).</summary>
+    private Task<Admission> Traced(ConversationId conversationId, SubmissionDraft draft, DurableContext context,
+        Func<ITelemetrySpan, Task<Admission>> admit)
+    {
         resume();
-        var input = draft.Type == SubmissionType.Input;
-        var parent = input ? telemetry : context.Telemetry;
-        return await TelemetrySchema.CreateTypedSpanStarter(parent, DurableTelemetry.Schema).StartSpanAsync<ISubmission>(
+        // Inputs and continues start runs: root traces linked to their callers.
+        var startsRun = draft.Type != SubmissionType.Write;
+        var parent = startsRun ? telemetry : context.Telemetry;
+        return TelemetrySchema.CreateTypedSpanStarter(parent, DurableTelemetry.Schema).StartSpanAsync<Admission>(
             DurableTelemetry.SubmitSpanName,
-            new SpanAttributes { ["submission.type"] = input ? "input" : "write", ["conversation.id"] = conversationId.Value },
+            new SpanAttributes { ["submission.type"] = WireName.Of(draft.Type), ["conversation.id"] = conversationId.Value },
             async (span, _) =>
             {
-                if (input) span.AddLink(new SpanLink(context.Telemetry));
+                if (startsRun) span.AddLink(new SpanLink(context.Telemetry));
                 try
                 {
-                    var admission = await session.CommitWithAsync(
-                        tx => AdmitSubmissionAsync(tx, conversationId, draft, now(), queueModes(), span.Span),
-                        context.WithTelemetry(span.Span)).ConfigureAwait(false);
+                    var admission = await admit(span.Span).ConfigureAwait(false);
                     span.SetAttributes(new SpanAttributes { ["submission.id"] = admission.Id.Value, ["result"] = admission.Status });
-                    return new SubmissionHandle(admission.Id, this);
+                    return admission;
                 }
                 catch
                 {
@@ -80,7 +112,7 @@ internal sealed class Submissions
                     span.SetStatus(SpanStatus.Failed());
                     throw;
                 }
-            }).ConfigureAwait(false);
+            });
     }
 
     /// <summary>A handle for an existing submission, or null.</summary>
@@ -110,7 +142,8 @@ internal sealed class Submissions
         return await found.ConfigureAwait(false);
     }
 
-    /// <summary>Withdraws a queued submission and removes its inbox item; placed inputs and settled submissions are reported.</summary>
+    /// <summary>Withdraws a queued submission and removes its inbox item; placed inputs and continues and settled submissions are
+    /// reported.</summary>
     public Task<SubmissionAbortResult> AbortAsync(SubmissionId id, DurableContext context, ConversationId? conversationId = null) =>
         session.CommitWithAsync(async tx =>
         {
@@ -144,14 +177,16 @@ internal sealed class Submissions
     }
 
     /// <summary>
-    /// Admits a submission inside a commit (upstream <c>admitSubmission</c>, spec §6); <c>Conversation.SubmitAsync()</c> and
+    /// Admits a submission inside a commit (upstream <c>admitSubmission</c>, spec §6); both <c>Conversation.SubmitAsync()</c> forms and
     /// conversation-owned compactions share it. A known request ID returns its existing submission without writing. A display-only write
     /// (only kind and data) is appended and settled <c>done</c> at once, busy or not, as it changes nothing the model sees; only behind a
     /// queued reset it queues, so it lands after the reset instead of before it in the context the reset ends. A busy conversation queues
-    /// anything else in <c>pi.inbox</c>, or rejects <c>whenBusy: "reject"</c> input with <see cref="ConversationBusyException"/>. An idle
-    /// conversation with queued items queues it behind them and runs a final boundary. Otherwise idle input places its entry
-    /// (<c>pi.user</c>, or the input's own) and starts a run, and an idle write appends its entry and settles <c>done</c>, or <c>stale</c>
-    /// when its head reaches before the active range.
+    /// anything else in <c>pi.inbox</c>, or rejects <c>whenBusy: "reject"</c> input and any continue with
+    /// <see cref="ConversationBusyException"/>; an idle one rejects <c>whenIdle: "reject"</c> input with
+    /// <see cref="ConversationIdleException"/>. An idle continue places queued items and starts a run with them and itself, placing no entry
+    /// of its own. An idle conversation with queued items queues it behind them and runs a final boundary. Otherwise idle input places its
+    /// entry (<c>pi.user</c>, or the input's own) and starts a run, and an idle write appends its entry and settles <c>done</c>, or
+    /// <c>stale</c> when its head reaches before the active range.
     /// </summary>
     internal static async Task<Admission> AdmitSubmissionAsync(ITx tx, ConversationId conversationId, SubmissionDraft draft, double now,
         Settings queueModes, ITelemetrySpan? span = null)
@@ -163,7 +198,7 @@ internal sealed class Submissions
             if (existing is not null)
             {
                 if (existing.Type != draft.Type)
-                    throw new InvalidOperationException($"Request {requestId} already identifies a submission of type {Wire(existing.Type)}");
+                    throw new InvalidOperationException($"Request {requestId} already identifies a submission of type {WireName.Of(existing.Type)}");
                 return new Admission(existing.Id, existing.Status == SubmissionStatus.Unanswered ? "done" : WireName.Of(existing.Status));
             }
         }
@@ -190,6 +225,22 @@ internal sealed class Submissions
             if (run?.Trace is { } runTrace) span.AddLink(new SpanLink(propagation.Extract(runTrace)));
         }
         if (busy && draft.Type == SubmissionType.Input && draft.WhenBusy == WhenBusy.Reject) throw new ConversationBusyException(conversationId);
+        if (!busy && draft.Type == SubmissionType.Input && draft.WhenIdle == WhenIdle.Reject) throw new ConversationIdleException(conversationId);
+        if (draft.Type == SubmissionType.Continue)
+        {
+            // Never queued: whether a run can continue depends on how the current one ends. Rejected before any write.
+            if (busy) throw new ConversationBusyException(conversationId);
+            var continueBoundary = await Inbox.PrepareBoundaryAsync(tx, conversationId, queueModes).ConfigureAwait(false);
+            var continued = await tx.CreateSubmissionAsync(new SubmissionCreate
+            {
+                ConversationId = conversationId, RequestId = draft.RequestId, Trace = trace, Type = SubmissionType.Continue,
+                Status = SubmissionStatus.Placed,
+            }).ConfigureAwait(false);
+            // Items an earlier failed run left queued (afterFailedRun: keep) are placed first and join the run.
+            var (placed, _) = await Inbox.ApplyBoundaryAsync(tx, continueBoundary, true, now).ConfigureAwait(false);
+            await HarnessTasks.StartRunAsync(tx, conversationId, live, [.. placed, continued.Id]).ConfigureAwait(false);
+            return new Admission(continued.Id, "placed");
+        }
         // A boundary reads the table, so it is prepared before the first table write; a busy one needs none.
         var boundary = busy ? null : await Inbox.PrepareBoundaryAsync(tx, conversationId, queueModes).ConfigureAwait(false);
         if (boundary is null || boundary.Inbox.GetArray("items").Count > 0)
@@ -245,8 +296,6 @@ internal sealed class Submissions
         await HarnessTasks.StartRunAsync(tx, conversationId, live, [input.Id]).ConfigureAwait(false);
         return new Admission(input.Id, "placed");
     }
-
-    private static string Wire(SubmissionType type) => type == SubmissionType.Input ? "input" : "write";
 
     /// <summary>The handle of one admitted submission (upstream <c>SubmissionHandle</c>).</summary>
     private sealed class SubmissionHandle(SubmissionId id, Submissions submissions) : ISubmission

@@ -37,6 +37,9 @@
 // round's first commit without a task. A sequential round keeps such a call pending, flagged, until its turn (which a version 1 Harness would
 // start unflagged, so it leaves version 2 blocked: task_too_old). The abort handler answers an unstarted flagged call tool_unavailable, not
 // aborted, and finishToolRound reads the controls in call order (the slots' order), every slot's counting toward terminate.
+// Pi v1.5.0 sync (area admission, fb524dd2e, #11043): a run whose context does not end in a user message or tool results (system messages
+// aside) ends before any request, unanswered with nothing_to_answer (FailNothingToAnswerAsync), as a continue after an answer or in an empty
+// conversation does; the request commit's cutoff then always finds an entry. StartRunAsync's inputs may include a continue.
 //
 // Mappings:
 // - Checkpoints, live state and results are upstream's JSON, built in upstream's key order: prepare {phase, attempt, compacted?, overflow?},
@@ -115,7 +118,7 @@ public static partial class HarnessTasks
             .ConfigureAwait(false);
     }
 
-    /// <summary>Starts a run for <paramref name="inputs"/>, placed input submissions: a new generation takes <c>pi.live.run</c>
+    /// <summary>Starts a run for <paramref name="inputs"/>, placed input and continue submissions: a new generation takes <c>pi.live.run</c>
     /// (upstream <c>startRun</c>). Removes <c>runFailure</c>, unless <paramref name="keepFailure"/>: a run started in the commit that ended
     /// the failed one keeps its failure.</summary>
     internal static async Task StartRunAsync(ITx tx, ConversationId conversationId, DraftObject live, IEnumerable<SubmissionId> inputs,
@@ -220,6 +223,14 @@ internal static class GenerationPhases
             }
         }
         var view = await runtime.ContextAsync(conversationId, context).ConfigureAwait(false);
+        // The model owes an answer only to a context ending in a user message or tool results; system messages say nothing it answers.
+        // Otherwise, as for a continue after an answer or in an empty conversation, end the run before any request.
+        var last = view.Messages.LastOrDefault(message => RoleOf(message) != "system");
+        if (RoleOf(last) is not ("user" or "toolResult"))
+        {
+            await FailNothingToAnswerAsync(runtime, context).ConfigureAwait(false);
+            return;
+        }
         var shown = HarnessPrompt.ReplaySections(view.Messages);
         Env.IExecutionEnv? env = null;
         try
@@ -248,9 +259,9 @@ internal static class GenerationPhases
         }
         await runtime.CommitAsync(async (tx, _) =>
         {
-            var cutoff = (await tx.ScanEntriesAsync(new EntryQuery(conversationId), 1).ConfigureAwait(false)).Items.FirstOrDefault()?.Id;
-            foreach (var entry in entries) cutoff = (await tx.AppendEntryAsync(Entries.SystemEntry, conversationId, entry).ConfigureAwait(false)).Id;
-            if (cutoff is not { } tail) throw new InvalidOperationException($"Conversation {conversationId} has no entries to send");
+            // The context ends in a message the model answers, so the conversation has an entry.
+            var tail = (await tx.ScanEntriesAsync(new EntryQuery(conversationId), 1).ConfigureAwait(false)).Items[0].Id;
+            foreach (var entry in entries) tail = (await tx.AppendEntryAsync(Entries.SystemEntry, conversationId, entry).ConfigureAwait(false)).Id;
             // Checked in this commit, so a compaction admitted during preparation counts.
             if (threshold == "background" && !(await tx.DocAsync(Live.LiveDoc, conversationId).ConfigureAwait(false)).ContainsKey("compactions"))
                 await Compaction.CreateCompactionAsync(tx, conversationId, "threshold").ConfigureAwait(false);
@@ -632,6 +643,23 @@ internal static class GenerationPhases
             return (TaskState?)NextTaskState.Failed(message, Reason("no_model"));
         }, context);
     }
+
+    /// <summary>Ends the run without a request: its context has nothing the model would answer (upstream <c>failNothingToAnswer</c>).</summary>
+    private static Task FailNothingToAnswerAsync(ITaskRuntime runtime, DurableContext context)
+    {
+        const string message = "The conversation has nothing to answer";
+        return runtime.CommitAsync(async (tx, _) =>
+        {
+            var failure = await PrepareFailureAsync(tx, runtime).ConfigureAwait(false);
+            var live = await tx.DocAsync(Live.LiveDoc, runtime.ConversationId).ConfigureAwait(false);
+            await EndFailedRunAsync(tx, runtime, live, failure, RunEnd.Unanswered(RunFailureReason.NothingToAnswer)).ConfigureAwait(false);
+            return (TaskState?)NextTaskState.Failed(message, Reason("nothing_to_answer"));
+        }, context);
+    }
+
+    /// <summary>A model message's <c>role</c>, or null.</summary>
+    private static string? RoleOf(JsonValue? message) =>
+        message is JsonObjectValue value && value.TryGetValue("role", out var role) && role is JsonStringValue text ? text.Value : null;
 
     /// <summary>What a failed run's end needs from the table, read before the commit's first table write (upstream <c>Failure</c>).</summary>
     private sealed record Failure(AfterFailedRun Policy, Inbox.Boundary? Boundary);
