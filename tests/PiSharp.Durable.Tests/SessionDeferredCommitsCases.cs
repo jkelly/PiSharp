@@ -1,4 +1,4 @@
-// Pi 6c2fd73b0c545a4034672cb60e34d53e035dd751 (MIT): packages/durable/test/session-deferred-commits.test.ts, new in Pi v1.5.0 (sync area
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/test/session-deferred-commits.test.ts, new in Pi v1.5.0 (sync area
 // deferred-commits). Deferred commits (CommitPersistence): what a deferred commit holds in memory, what stores it, and what Storage and each
 // kind of listener then sees. Verbatim apart from the adaptations in SessionSupport.cs, and these:
 // - Upstream's ControlledStorage extends MemoryStorage; here it decorates one (session.deferred-commits.* runs on MemoryStorage, as
@@ -10,10 +10,11 @@
 // - flush() is Flush(session) (see SessionSupport.cs); readOnLine(async () => {}) is ReadOnLineAsync.
 // - "retains a held revision only until it is stored" uses WeakReference and GC.Collect in place of WeakRef and --expose-gc, taking the
 //   reference in a method of its own so no local keeps the revision.
-// The v1.5.0 blob (7de47e659) differs only by later areas: 8b0caefc2 (area observers) has the watch listener read value.text, a watch's
-// value being never null, which the publications case does here; vocabulary (5f312dac4) renames subscribeCommits to observeCommits and the
-// internal observeCommits to followCommits (here SubscribeCommits and SessionTests.ObserveCommits, upstream 6c2fd73b0's names), and spells a
-// Session end's reason and a document change as kinds (here SessionEnd.Reason and DocumentCommitChange).
+// The v1.5.0 blob (7de47e659) differs from 6c2fd73b0's by later areas: 8b0caefc2 (area observers) has the watch listener read value.text, a
+// watch's value being never null, which the publications case does here; vocabulary (5f312dac4) renames subscribeCommits to observeCommits
+// (ISession.ObserveCommits with a CommitObserver) and the internal observeCommits to followCommits (SessionTests.FollowCommits), so the
+// publications case is give-observecommits-exactly-what-was-stored-and-nothing-for-a-held-commit, and spells a Session end's reason and a
+// document change as kinds (SessionEnd.Kind, and DocumentValueChange for a change of kind change).
 using System.Runtime.CompilerServices;
 using PiSharp.Durable;
 using PiSharp.Durable.Chord;
@@ -123,7 +124,7 @@ internal static class DeferredCommitsTests
 
     /// <summary>
     /// A Session over controlled storage with a manual clock and manual foreground timers (background ones are declined, so commits evict),
-    /// recording what <c>SubscribeCommits()</c> and the Session's own observers get.
+    /// recording what <c>ObserveCommits()</c> and the Session's own observers get.
     /// </summary>
     private static async Task<Opened> OpenAsync(double? retentionMs = null, double? persistWithinMs = null)
     {
@@ -142,12 +143,12 @@ internal static class DeferredCommitsTests
         var storage = new ControlledStorage(new MemoryStorage()) { KeepOpenForReopen = true };
         var session = new Session(storage, () => clock.Now, () => retentionMs ?? 600_000, setTimer: setTimer, persistWithinMs: () => persistWithinMs);
         var stored = new List<CommitPublication>();
-        session.SubscribeCommits((publication, _) =>
+        session.ObserveCommits(new CommitObserver((publication, _) =>
         {
             lock (stored) stored.Add(publication);
-        });
+        }, _ => { }));
         var observed = new List<ObservedCommit>();
-        ObserveCommits(session, (publication, _) =>
+        FollowCommits(session, (publication, _) =>
         {
             lock (observed) observed.Add(publication);
         });
@@ -397,7 +398,7 @@ internal static class DeferredCommitsTests
                 Same(failure, error, "close rejects with the store's failure");
             }
             var end = await failing.Session.Closed;
-            Equal(SessionEndReason.Failed, end.Reason, "closed reason");
+            Equal(SessionEndKind.Failed, end.Kind, "closed kind");
             Same(failure, end.Error, "closed error");
             // Closed: the Session closed the backend all the same.
             Equal(1, failing.Storage.CloseCount, "backend closes");
@@ -483,7 +484,7 @@ internal static class DeferredCommitsTests
             Check(contents is [{ Content: DocumentBase { Version: 1 } stored }] && JsonValue.DeepEquals(value, stored.Value), "one base of the value");
             // A durable listener replaces its copy with the stored value.
             var last = Snapshot(opened.Stored)[^1];
-            Check(last.Changes is [DocumentCommitChange { Ops: [ReplaceOp replace] }] && JsonValue.DeepEquals(value, replace.Value),
+            Check(last.Changes is [DocumentValueChange { Ops: [ReplaceOp replace] }] && JsonValue.DeepEquals(value, replace.Value),
                 "the last publication replaces the value: " + string.Join(" ", last.Changes.Select(change => change.Type)));
         });
 
@@ -501,7 +502,7 @@ internal static class DeferredCommitsTests
 
         // ─── publications ───────────────────────────────────────────────────
 
-        yield return Case(prefix + "give-subscribecommits-exactly-what-was-stored-and-nothing-for-a-held-commit", async () =>
+        yield return Case(prefix + "give-observecommits-exactly-what-was-stored-and-nothing-for-a-held-commit", async () =>
         {
             var opened = await OpenAsync();
             var (session, storage, conversationId, recordId) = (opened.Session, opened.Storage, opened.ConversationId, opened.RecordId);
@@ -529,7 +530,7 @@ internal static class DeferredCommitsTests
             for (var index = 0; index < batches.Count; index++)
             {
                 var write = ChangesOf([batches[index]]).First(candidate => candidate.Id == recordId);
-                var change = published[index].Changes.OfType<DocumentCommitChange>().First(candidate => candidate.Record.Id == recordId);
+                var change = published[index].Changes.OfType<DocumentValueChange>().First(candidate => candidate.Record.Id == recordId);
                 fromStorage = write.Content is DocumentBase stored ? stored.Value : DeltaApply.Apply(fromStorage, ((DocumentDelta)write.Content).Ops);
                 fromPublications = DeltaApply.Apply(fromPublications, change.Ops);
                 Check(JsonValue.DeepEquals(fromStorage, fromPublications), $"replica {index}: {fromPublications.ToJson()} vs {fromStorage.ToJson()}");
@@ -567,7 +568,7 @@ internal static class DeferredCommitsTests
             // The storing commit shows its own operations; the held ones were shown already. The timer showed nothing.
             Equal("""[[[["a",["text"],"a"]]],[[["a",["text"],"b"]]],[[["a",["text"],"c"]]],[[["a",["text"],"d"]]]]""",
                 JsonValue.Array(seen.Select(publication => (JsonValue)JsonValue.Array(publication.Changes.Select(change =>
-                    change is DocumentCommitChange document ? J(OpsJson(document.Ops)) : (JsonValue)false)))).ToJson(), "ops");
+                    change is DocumentValueChange document ? J(OpsJson(document.Ops)) : (JsonValue)false)))).ToJson(), "ops");
             await watch.StopAsync();
         });
 
@@ -613,10 +614,10 @@ internal static class DeferredCommitsTests
             var opened = await OpenAsync();
             var session = opened.Session;
             var states = new List<string>();
-            ObserveCommits(session, (publication, _) =>
+            FollowCommits(session, (publication, _) =>
             {
                 foreach (var change in publication.Changes)
-                    if (change is DocumentCommitChange document && document.Record.Id == opened.RecordId) lock (states) states.Add(S(document.Value!["text"]));
+                    if (change is DocumentValueChange document && document.Record.Id == opened.RecordId) lock (states) states.Add(S(document.Value["text"]));
             });
             await Append(session, opened.ConversationId, "a");
             await opened.Fire();

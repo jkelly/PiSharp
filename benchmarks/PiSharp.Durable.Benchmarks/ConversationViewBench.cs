@@ -12,6 +12,8 @@
 // process.cpuUsage() the process's total processor time, its WeakRef a WeakReference, and its setTimeout(1) polls Task.Delay(1) (which ticks
 // at the timer resolution, 15.6 ms on Windows, so a poll ends later than under Node). The faux models answer nothing: no scenario asks a
 // model. Report only: nothing here passes or fails on a timing.
+// Pi v1.5.0 sync (area vocabulary, 5f312dac4): the long-lived listener skips a call that is not a value, and the stream scenario writes
+// pi.live compactionFailure with its trigger, as upstream does (the bench writes that JSON value; the rename is area live-turns's).
 using System.Diagnostics;
 using System.Globalization;
 using System.Text.Json;

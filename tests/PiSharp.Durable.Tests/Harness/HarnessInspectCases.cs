@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/test/harness-inspect.test.ts. Verbatim apart from the adaptations in
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/test/harness-inspect.test.ts. Verbatim apart from the adaptations in
 // HarnessSupport.cs and ChatSupport.cs, and these:
 // - Backends. Upstream runs this file on MemoryStorage; nothing in it depends on the backend, so HarnessInspectCases() runs it on
 //   MemoryStorage (harness.inspect.*), HarnessInspectJsonlCases() on a fresh JSONL directory (harness.inspect.jsonl.*) and
@@ -6,6 +6,8 @@
 // - toEqual on an inspection state compares Kind, Migrates, On and Reason; vitest compares an Error by its message, so error: new Error(m)
 //   is a check of State.Error.Message. waitFor and eventually are Eventually.
 // - The test.missing record is created by a definition the registry never holds, as upstream does.
+// - Pi v1.5.0 sync (area vocabulary, 5f312dac4): a task the next pass reserves is TaskInspectionKind.Pending (upstream kind "pending", v1.2.0's
+//   "ready"), in place since area reports.
 using System.Collections.Immutable;
 using PiSharp.Durable;
 using PiSharp.Durable.Chord;

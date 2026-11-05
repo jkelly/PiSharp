@@ -182,7 +182,7 @@ internal static partial class StructuredTests
             storage.Fail = generation;
             nodes.Open("abort.hooked");
             // The final commit, with the run's cleanup, fails: nothing of the cleanup lands, and the Harness fails.
-            Equal(new SessionEnd(SessionEndReason.Failed, storage.Failure), await harness.Closed, "closed");
+            Equal(SessionEnd.Failed(storage.Failure), await harness.Closed, "closed");
             Same(storage.Failure, (await ThrowsAsync<SessionFailedException>(() => submission.WaitAsync(Context), "wait")).InnerException, "cause");
             await harness.CloseAsync(Context);
             // Reopening finalizes the run; the partial becomes one aborted entry.

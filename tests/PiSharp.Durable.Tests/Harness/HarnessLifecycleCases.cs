@@ -9,11 +9,10 @@
 //   Pi v1.5.0 sync (area telemetry): upstream's withSignal derives through withAbortSignal(signal, context) since 2ec55d808, which keeps
 //   the context's values and telemetry span; WithCancel() already derives the same way, so the cases are unchanged.
 // - `class FailingClose extends ControlledStorage` is FailingCloseStorage, a decorator over ControlledStorage.
-// - "leaves no subscription behind ...": upstream replaces `harness.subscribeCommits` to count the subscriptions made after the patch. A
-//   C# method cannot be replaced, so the case counts the Session's commit listeners (by reflection) against the count before the cancelled
-//   acquisitions; it reads the same thing: no observer subscription outlives a cancelled acquisition. Since v1.2.0 document observers
-//   subscribe through the internal observeCommits, which upstream's patched subscribeCommits no longer sees; the count includes those
-//   listeners, so the check still covers them.
+// - "leaves no subscription behind ...": upstream replaces the Session's internal `followCommits` (v1.5.0, 5f312dac4; v1.2.0 replaced
+//   `harness.subscribeCommits`) to count the subscriptions made after the patch. A C# method cannot be replaced, so the case counts the
+//   Session's commit listeners (by reflection: the ObserveCommits observers and the internal FollowCommits followers) against the count
+//   before the cancelled acquisitions; it reads the same thing: no observer subscription outlives a cancelled acquisition.
 // - `/closed/.test(String(error))` tests the exception's message.
 // Pi v1.5.0 sync (area watches, 92ab53602): the state getters are gone, so "publishes no frame to watches ..." (renamed with them), the
 // cancelled-acquisition case, the close-gate tables and the read-only viewer case use the watches alone, and a close ends a watch Ended.

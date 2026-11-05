@@ -18,6 +18,9 @@
 // e5c6182ba's expectations without #11043's turn count (area turn-limit): the request's attempt and the tool's running status are stored
 // with the next commit. "stores a complete base exactly ..." stores deferred progress within each tool's run (persistWithinMs 50), as
 // e5c6182ba's does.
+// Pi v1.5.0 sync (area vocabulary, 5f312dac4): LiveCommits follows commits with SessionTests.FollowCommits (upstream followCommits) and the
+// stored ones are observed with ObserveCommits (a CommitObserver; upstream observeCommits({ advance, end })); both read the document changes
+// of kind change (DocumentValues, upstream documentValues), and "stores a complete base exactly ..." skips a retirement by its kind.
 using System.Collections.Immutable;
 using System.Threading.Channels;
 using PiSharp.Durable;
@@ -60,9 +63,9 @@ internal static partial class LiveDeltaTests
     private static SyncList<ImmutableArray<Op>> LiveCommits(IHarness harness)
     {
         var commits = new SyncList<ImmutableArray<Op>>();
-        ObserveCommits(harness, (publication, _) =>
+        FollowCommits(harness, (publication, _) =>
         {
-            foreach (var change in DocumentChanges(publication))
+            foreach (var change in DocumentValues(publication))
                 if (change.Record.Kind == "pi.live" && change.Ops.Length > 0) commits.Add(change.Ops);
         });
         return commits;
@@ -72,11 +75,11 @@ internal static partial class LiveDeltaTests
     private static SyncList<ImmutableArray<Op>> StoredLiveCommits(IHarness harness)
     {
         var commits = new SyncList<ImmutableArray<Op>>();
-        harness.SubscribeCommits((publication, _) =>
+        harness.ObserveCommits(new CommitObserver((publication, _) =>
         {
-            foreach (var change in DocumentChanges(publication))
+            foreach (var change in DocumentValues(publication))
                 if (change.Record.Kind == "pi.live" && change.Ops.Length > 0) commits.Add(change.Ops);
-        });
+        }, _ => { }));
         return commits;
     }
 
@@ -330,16 +333,16 @@ internal static partial class LiveDeltaTests
             setup.Progress = new ProgressSettings { PersistWithinMs = 50 };
             var (harness, root) = await OpenChat(storage, setup);
             var written = new SyncList<(string Kind, JsonObjectValue Value)>();
-            harness.SubscribeCommits((publication, _) =>
+            harness.ObserveCommits(new CommitObserver((publication, _) =>
             {
                 foreach (var change in DocumentChanges(publication))
                 {
-                    if (change.Record.Kind != "pi.live" || change.Value is not { } value) continue;
+                    if (change.Record.Kind != "pi.live" || change is not DocumentValueChange { Value: var value }) continue;
                     // Session commits run one at a time, so this commit's batch is the last one Storage admitted.
                     var write = storage.LastCommit.OfType<DocumentChangeWrite>().FirstOrDefault(item => item.Id == change.Record.Id);
                     if (write is not null) written.Add((write.Content is DocumentDelta ? "delta" : "base", value));
                 }
-            });
+            }, _ => { }));
             await (await root.SubmitAsync(SubmissionDraft.Input("go"), Context)).WaitAsync(Context);
             static bool NothingRuns(JsonObjectValue value) => !value.ContainsKey("generation") &&
                 !(value.TryGetValue("tools", out var tools) && ((JsonArrayValue)tools).Any(slot => ((JsonObjectValue)slot)["status"] is JsonStringValue { Value: "running" }));
@@ -380,14 +383,14 @@ internal static partial class LiveDeltaTests
                 stopReason: "toolUse"), FauxAssistantMessage([FauxText("done")]));
             var (harness, root) = await OpenChat(await fresh(), setup);
             CommitPublication? handover = null;
-            harness.SubscribeCommits((publication, _) =>
+            harness.ObserveCommits(new CommitObserver((publication, _) =>
             {
-                foreach (var change in DocumentChanges(publication))
+                foreach (var change in DocumentValues(publication))
                 {
-                    if (change.Record.Kind == "pi.live" && change.Value is { } value && value.TryGetValue("tools", out var tools) && tools is JsonArrayValue { Count: 2 })
+                    if (change.Record.Kind == "pi.live" && change.Value.TryGetValue("tools", out var tools) && tools is JsonArrayValue { Count: 2 })
                         Interlocked.CompareExchange(ref handover, publication, null);
                 }
-            });
+            }, _ => { }));
             await (await root.SubmitAsync(SubmissionDraft.Input("go"), Context)).WaitAsync(Context);
             var kinds = handover!.Changes.SelectMany(change => change switch
             {

@@ -1,16 +1,17 @@
-// Pi 6c2fd73b0c545a4034672cb60e34d53e035dd751 (MIT): packages/durable/test/harness-deferred-progress.test.ts, new in Pi v1.5.0 (sync area
-// deferred-commits), with e5c6182ba's change to it. Deferred progress commits (Live.ProgressCommit): the partial answer and tool output reach
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/test/harness-deferred-progress.test.ts, new in Pi v1.5.0 (sync area
+// deferred-commits). Deferred progress commits (Live.ProgressCommit): the partial answer and tool output reach
 // watches at once and Storage at the next commit that reads or writes pi.live or within settings.progress.persistWithinMs. Crashes are
 // simulated by failing the Harness: from that moment nothing more reaches Storage, as when the process dies; the reopened Harness resumes from
 // what was stored. Verbatim apart from the adaptations in HarnessSupport.cs, ChatSupport.cs and SessionSupport.cs, and these:
 // - Upstream's ControlledStorage extends MemoryStorage; here it decorates one, kept open for reopen (SessionSupport.cs).
 // - `aborted(signal)` is Aborted(token); waitFor is Eventually; `harness.fail()` is the internal Session.Fail.
-// - The memory partials come from SessionTests.ObserveCommits, upstream 6c2fd73b0's internal observeCommits; the replica reads
-//   SubscribeCommits, 6c2fd73b0's name.
+// - The memory partials come from SessionTests.FollowCommits (upstream followCommits, 5f312dac4), the replica from ObserveCommits with a
+//   CommitObserver; both read the document changes of kind change (DocumentValues).
 // - "leaves no aborted entry for a stream that crashed before its first store" expects no stored generation at all: e5c6182ba defers the
 //   attempt too (durable@1.5.0 Changed#5), where 6c2fd73b0 stored `{ generation: { attempt: 1 } }`.
-// The v1.5.0 blob (07116cc08) differs by later areas only: observers (followCommits, observeCommits({ advance, end })), vocabulary
-// (change.kind) and pi-schema (obj({}) for Type.Object({})). Pi v1.5.0 sync (area restarts, b3a29f111): slowSetup retries at once, as a
+// The v1.5.0 blob (07116cc08) is 6c2fd73b0's with e5c6182ba's change above, vocabulary's (5f312dac4: followCommits,
+// observeCommits({ advance, end }) and change.kind) and pi-schema's (obj({}) for Type.Object({}), the tools' default
+// ToolRegistration.EmptyParameters here). Pi v1.5.0 sync (area restarts, b3a29f111): slowSetup retries at once, as a
 // request a crash interrupted is a failed attempt; "converts what was stored ... and retries the charged attempt" is 6c2fd73b0's "... and
 // resends" renamed; "never counts progress commits as progress of a task cut off again and again", which replaces 6c2fd73b0's "never
 // counts partial commits ...", is ported. A crash here is Session.Fail, whose close writes nothing back, so the tasks it cut off count a
@@ -75,9 +76,9 @@ internal static class DeferredProgressTests
     private static List<string> MemoryPartials(IHarness harness)
     {
         var texts = new List<string>();
-        ObserveCommits(harness, (publication, _) =>
+        FollowCommits(harness, (publication, _) =>
         {
-            foreach (var change in DocumentChanges(publication))
+            foreach (var change in DocumentValues(publication))
             {
                 if (change.Record.Kind != "pi.live") continue;
                 if (Message(change.Value) is { } message)
@@ -226,15 +227,15 @@ internal static class DeferredProgressTests
             var setup = SlowSetup(150);
             setup.Faux.SetResponses(FauxAssistantMessage(Long));
             var opened = await Open(storage, setup);
-            // A replica fed by SubscribeCommits() alone, as a replication feed would be.
+            // A replica fed by ObserveCommits() alone, as a replication feed would be.
             JsonValue? replica = await StoredLive(storage, opened.Root.Id);
             var replicaGate = new Lock();
-            opened.Harness.SubscribeCommits((publication, _) =>
+            opened.Harness.ObserveCommits(new CommitObserver((publication, _) =>
             {
-                foreach (var change in DocumentChanges(publication))
+                foreach (var change in DocumentValues(publication))
                     if (change.Record.Kind == "pi.live")
                         lock (replicaGate) replica = DeltaApply.Apply(replica, change.Ops);
-            });
+            }, _ => { }));
             var submission = await Submit(opened.Root, "hi");
             await Eventually(async () => await StoredLength(storage, opened.Root.Id) > 40);
             var inMemory = opened.LastMemory!;

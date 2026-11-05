@@ -1,8 +1,9 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/test/session-checkpoints-migrations.test.ts. Verbatim apart from the
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/test/session-checkpoints-migrations.test.ts. Verbatim apart from the
 // adaptations in SessionSupport.cs and these: a checkpoint predicate is a delegate, so "its definition as the receiver" (`this.initial()`)
 // is the token's definition reached through the closure; a migration result is an immutable value, so "copies the callback result"
 // checks that replacing the callback's retained variable changes nothing, and "strict-checks migration results" returns null (the only
-// non-object a C# migration can return; "must return a JSON object").
+// non-object a C# migration can return; "must return a JSON object"). Pi v1.5.0 sync (area vocabulary, 5f312dac4): the published values are
+// DocumentValues (upstream documentValues), and a watch listener reads its value call through Change(call) (upstream onValue).
 using PiSharp.Durable;
 using PiSharp.Durable.Chord;
 using PiSharp.Durable.Chord.Delta;
@@ -71,7 +72,7 @@ internal static partial class SessionTests
             Equal(1, falseCalls.Count, "false-predicate calls");
             var snapshot = (await session.SnapshotAsync(baseDoc, Context))!;
             var deltaSnapshot = (await session.SnapshotAsync(deltaDoc, Context))!;
-            var published = DocumentChanges(Last(publications));
+            var published = DocumentValues(Last(publications));
             Same(snapshot, calls[0].Value, "predicate value");
             SameOps(published[0].Ops, calls[0].Ops, "predicate ops");
             Same(deltaSnapshot, falseCalls[0].Value, "false predicate value");
@@ -306,7 +307,8 @@ internal static partial class SessionTests
             Equal(0, checkpoints, "no predicate call");
             // The migration-only base is published, so the older-shape watch receives the new value as a root replacement.
             var published = DocumentChanges(Last(publications));
-            Check(published is [{ Version: 3, Ops.IsEmpty: true } change] && JsonValue.DeepEquals(change.Value, O("{\"count\":4}")), "published base");
+            Check(published is [DocumentValueChange { Version: 3, Ops.IsEmpty: true } change] && JsonValue.DeepEquals(change.Value, O("{\"count\":4}")),
+                "published base");
             lock (frames) Seq(["{\"count\":4} [[\"r\",{\"count\":4}]]"], frames, "older-shape frames");
             lock (currentFrames) Equal(0, currentFrames.Count, "new-shape frames");
             await watch.StopAsync();
@@ -354,7 +356,7 @@ internal static partial class SessionTests
             Check(writes is [DocumentChangeWrite { Content: DocumentBase { Version: 2 } coalesced }] &&
                 JsonValue.DeepEquals(coalesced.Value, O("{\"count\":9,\"migrated\":false}")), "one coalesced base");
             await Flush(session);
-            var published = DocumentChanges(Last(publications))[0];
+            var published = DocumentValues(Last(publications))[0];
             var admitted = storage.LastAdmitted[0] as DocumentChangeWrite;
             var admittedBase = admitted?.Content as DocumentBase ?? throw new InvalidOperationException("Expected migration base");
             Same(await session.SnapshotAsync(current, Context), published.Value, "published value");

@@ -1,5 +1,7 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/test/session-forks.test.ts. Verbatim apart from the adaptations in
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/test/session-forks.test.ts. Verbatim apart from the adaptations in
 // SessionSupport.cs; the 260 concurrent family acquisitions start together and are awaited together, as upstream's Promise.all does.
+// Pi v1.5.0 sync (area vocabulary, 5f312dac4): a failed Session ends SessionEnd.Failed (kind failed), and the published creation is a
+// document change of kind change (DocumentValueChange).
 using PiSharp.Durable;
 using PiSharp.Durable.Chord;
 using static Program;
@@ -202,7 +204,7 @@ internal static partial class SessionTests
             Equal(2, creates[0].Content.Version, "version");
             SameJson("{\"count\":9,\"migrated\":true}", creates[0].Content.Value, "base");
             Equal(0, checkpoints, "no predicate call");
-            Check(DocumentChanges(Last(publications)) is [{ Version: 2 }], "published creation");
+            Check(DocumentChanges(Last(publications)) is [DocumentValueChange { Version: 2 }], "published creation");
             SameJson("{\"count\":9,\"migrated\":true}", await session.SnapshotAsync(v2, child.Id, Context), "child");
             var parentRecord = await storage.FindDocumentAsync(Address(v1, parentId), DocumentPoint.Current, Context);
             Equal(1, (await storage.GetDocumentAsync(parentRecord!.Id, DocumentPoint.Current, Context))!.Version, "parent version");
@@ -381,7 +383,7 @@ internal static partial class SessionTests
                 "later commit");
             Same(rejection, failed.InnerException, "cause");
             // The failed Session closed its Storage; reopened, it holds nothing of the batch.
-            Equal(new SessionEnd(SessionEndReason.Failed, rejection), await session.Closed, "closed");
+            Equal(SessionEnd.Failed(rejection), await session.Closed, "closed");
             Check(await storage.Reopen().GetConversationAsync(rejectedChildId, Context) is null, "nothing committed");
             await storage.Inner.CloseAsync(Context);
         });

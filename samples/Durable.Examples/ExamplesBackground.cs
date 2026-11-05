@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/test/examples/23-subagent-background.ts. Upstream uses OpenAI when
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/test/examples/22-subagent-background.ts. Upstream uses OpenAI when
 // OPENAI_API_KEY is set and otherwise pi-ai's faux provider, routing each request by its last message and streaming at 50 tokens per second.
 // Here PacedModels always stands in with the same route and pacing (token size fixed at 4, upstream's is drawn between 3 and 5), and the
 // Harness clock, the streaming and the example's waits all run on an ExampleClock that the example drives like Node's event loop: one timer
@@ -8,8 +8,10 @@
 // when stdout is not a terminal. Intentional difference (decision 0005): upstream's tool still returns its replies as v1.1.0's `content`,
 // which v1.2.0 renamed to `output`, so under v1.2.0 its replies are empty; Reply returns them as Output, as the example means.
 // Pi v1.5.0 sync (area events, f3255de76): follow() watches the main conversation's view and prints the entries appended since the newest
-// it saw, as v1.5.0's 22-subagent-background.ts does, where v1.2.0 printed the message_end events of watchEvents (removed). The rest of
-// the file still ports v1.2.0.
+// it saw, as v1.5.0's 22-subagent-background.ts does, where v1.2.0 printed the message_end events of watchEvents (removed). Area
+// tools-schema: the subagent tool's parameters are pi-schema's obj({ action: oneOf([...]), ... }) as JSON Schema; area checkpoint-when:
+// app.subagents states checkpointWhen. Area vocabulary (5f312dac4): follow()'s listener takes the tagged call and skips one that is not
+// a value. The example keeps its v1.2.0 name, 23-subagent-background, as the other renumbered examples do (b9fb2b854).
 using System.Collections.Immutable;
 using System.Text.RegularExpressions;
 using PiSharp.Durable.Chord;

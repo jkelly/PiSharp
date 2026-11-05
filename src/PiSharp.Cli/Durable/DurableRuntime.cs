@@ -11,7 +11,8 @@
 // each through the PiSharp.Durable.Tools host API in one commit of the shown conversation.
 // Since pi-durable 1.5.0 (Pi v1.5.0 sync, area watches): Durable has no state getters (viewState(), taskGraph()), so the view follows a
 // watch of the shown conversation's view (Conversation.watch()) and the open task panel a task graph watch (Harness.watchTaskGraph()),
-// each started at its acquisition value, which the view shows at once.
+// each started at its acquisition value, which the view shows at once. Area vocabulary (5f312dac4): subagents are found by a commit
+// observer (Harness.observeCommits() with a CommitObserver; was subscribeCommits()), and a failed Session's SessionEnd is of kind Failed.
 // Pi v1.5.0 sync (area view): the view watch's entries are a window over the whole transcript (newest 50, dropping the oldest past 100), so
 // the view also carries the shown conversation's active transcript, which the TUI renders: read with Conversation.context() when a watch
 // starts, advanced by the entries each later value appends (the 1.2.0 view's head-marker cut), and read again when entries left the
@@ -286,7 +287,7 @@ internal sealed class DurableSession : IOpenDurable, IDurableViewSource, IDurabl
     private long nextNotice = 1;
     private volatile IConversation current;
     private IWatchHandle<ConversationView> conversation;
-    private IDisposable? unsubscribeCommits;
+    private CommitObservation? commitObservation;
     private IDisposable? unsubscribeClose;
     /// <summary>Set when the Harness begins to close: ours, or a failed Session's.</summary>
     private volatile bool ended;
@@ -370,8 +371,8 @@ internal sealed class DurableSession : IOpenDurable, IDurableViewSource, IDurabl
         {
             if (!session.ended) session.Notice(DurableNoticeLevel.Warning, error.Message);
         });
-        // Subagents appear as their conversations are created. A commit listener only records; it calls no Session API.
-        session.unsubscribeCommits = harness.SubscribeCommits((publication, _) => session.OnCommit(publication));
+        // Subagents appear as their conversations are created. A commit observer only records; it calls no Session API.
+        session.commitObservation = harness.ObserveCommits(new CommitObserver((publication, _) => session.OnCommit(publication), _ => { }));
         var saved = DurableRuntime.ModelOf(DurableRuntime.AgentOf(session.Current.Conversation));
         if (saved is null) session.Notice(DurableNoticeLevel.Warning, "No model configured; select one with /model.");
         else if (models.GetModel(saved.Provider, saved.ModelId) is null)
@@ -476,11 +477,11 @@ internal sealed class DurableSession : IOpenDurable, IDurableViewSource, IDurabl
     private void MarkFailed(Exception cause) => Update(view => view.Failure is null ? view with { Failure = cause.Message } : view);
 
     /// <summary>Marks the view failed when the Harness closes because its Session failed (<c>ISession.Closed</c> settles with
-    /// <see cref="SessionEndReason.Failed"/>). Our own close settles it with <see cref="SessionEndReason.Closed"/>.</summary>
+    /// <see cref="SessionEndKind.Failed"/>). Our own close settles it with <see cref="SessionEndKind.Closed"/>.</summary>
     private async Task WatchClosedAsync()
     {
         var end = await harness.Closed.ConfigureAwait(false);
-        if (end.Reason == SessionEndReason.Failed) MarkFailed(end.Error ?? new InvalidOperationException("unknown error"));
+        if (end.Kind == SessionEndKind.Failed) MarkFailed(end.Error ?? new InvalidOperationException("unknown error"));
     }
 
     private void OnCommit(CommitPublication publication)
@@ -768,7 +769,7 @@ internal sealed class DurableSession : IOpenDurable, IDurableViewSource, IDurabl
 
     private async Task CloseAsync()
     {
-        unsubscribeCommits?.Dispose();
+        commitObservation?.Detach();
         unsubscribeClose?.Dispose();
         _ = conversation.StopAsync();
         CloseTasks();
@@ -777,7 +778,7 @@ internal sealed class DurableSession : IOpenDurable, IDurableViewSource, IDurabl
             // Close writes no outcome: a running turn resumes with --continue. A failed session closed itself already; what its close
             // rethrows is the failure the view shows.
             try { await harness.CloseAsync(Context).ConfigureAwait(false); }
-            catch (Exception) when (Current.Failure is not null || harness.Closed is { IsCompleted: true, Result.Reason: SessionEndReason.Failed })
+            catch (Exception) when (Current.Failure is not null || harness.Closed is { IsCompleted: true, Result.Kind: SessionEndKind.Failed })
             {
             }
             await envs.CleanupAsync(Context).ConfigureAwait(false);

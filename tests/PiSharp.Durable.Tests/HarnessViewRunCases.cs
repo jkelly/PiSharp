@@ -4,8 +4,9 @@
 // describe("streamed partials") harness.view-run.streamed-partials.*, on MemoryStorage as upstream. Verbatim apart from the adaptations in
 // ChatSupport.cs, HarnessSupport.cs and SessionSupport.cs, and these:
 // - live-support.ts's viewHistory and slotsOf are LiveTests.ViewHistory and SlotsOf (LiveSupport.cs, area run-failure); pi.live states
-//   and their slots are JSON objects, a missing slot is null. followCommits and documentValues are SessionTests.ObserveCommits and
-//   DocumentChanges with a value (commits as memory adopts them, upstream 6c2fd73b0's observeCommits).
+//   and their slots are JSON objects, a missing slot is null. followCommits and documentValues (5f312dac4, area vocabulary) are
+//   SessionTests.FollowCommits and DocumentValues (commits as memory adopts them, the document changes of kind change), and onValue is
+//   Change(call); an observer's advance takes value calls only (WatchValueCall).
 // - listen() checks each frame's operations as JSON values (JsonValue.DeepEquals) where upstream compares JSON.stringify texts; replays use
 //   DeltaApply.Apply. drained() (setTimeout(0)) is ViewTests.Drained, a Session line barrier; waitFor is Eventually. A distinct partial is
 //   one whose JSON differs from the previous one, where upstream compares references.
@@ -81,11 +82,11 @@ internal static class ViewRunTests
     private static SyncList<JsonObjectValue> PartialsOf(IHarness harness)
     {
         var partials = new SyncList<JsonObjectValue>();
-        ObserveCommits(harness, (publication, _) =>
+        FollowCommits(harness, (publication, _) =>
         {
-            foreach (var change in DocumentChanges(publication))
+            foreach (var change in DocumentValues(publication))
             {
-                if (change.Record.Kind == "pi.live" && change.Value is { } live && Field(Generation(live), "message") is JsonObjectValue message)
+                if (change.Record.Kind == "pi.live" && Field(Generation(change.Value), "message") is JsonObjectValue message)
                     partials.Add(message);
             }
         });
@@ -290,9 +291,9 @@ internal static class ViewRunTests
                 Field(live, "tools") is JsonArrayValue { Count: > 0 } tools && Field(tools[0] as JsonObjectValue, "output") is JsonStringValue { Value: var output }
                     ? output : null;
             var outputs = new SyncList<string>();
-            ObserveCommits(harness, (publication, _) =>
+            FollowCommits(harness, (publication, _) =>
             {
-                foreach (var change in DocumentChanges(publication))
+                foreach (var change in DocumentValues(publication))
                 {
                     if (change.Record.Kind == "pi.live" && FirstOutput(change.Value) is { } output && (outputs.Count == 0 || outputs[outputs.Count - 1] != output))
                         outputs.Add(output);
@@ -620,7 +621,7 @@ internal static class ViewRunTests
                         stopReason: "toolUse"),
                     FauxAssistantMessage([FauxText("done")]));
                 var (harness, root) = await OpenChat(new MemoryStorage(), setup);
-                using var subscription = ObserveCommits(harness, (_, _) => paced.Committed());
+                using var subscription = FollowCommits(harness, (_, _) => paced.Committed());
                 // Upstream's allocatedBytes: the bytes allocated meanwhile, on every thread.
                 GC.Collect();
                 var before = GC.GetTotalAllocatedBytes(precise: true);
@@ -648,7 +649,7 @@ internal static class ViewRunTests
                 FauxAssistantMessage([FauxText(text), FauxToolCall("missing", Obj(("path", "a.ts"), ("content", content)), "c1")], stopReason: "toolUse"),
                 FauxAssistantMessage([FauxText("done")]));
             var (harness, root) = await OpenChat(new MemoryStorage(), setup);
-            using var subscription = ObserveCommits(harness, (_, _) => paced.Committed());
+            using var subscription = FollowCommits(harness, (_, _) => paced.Committed());
             var listening = await Listen(root, check: false);
             var before = await HeapInUse(harness);
             var submission = await root.SubmitAsync(SubmissionDraft.Input("go"), Context);

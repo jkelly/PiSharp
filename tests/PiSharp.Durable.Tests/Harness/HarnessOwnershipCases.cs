@@ -327,7 +327,7 @@ internal static partial class OwnershipTests
             var tree = await holds.OwnedChild(root, "owner");
             storage.Fail = tree.Inner;
             holds.Open("owner", Ending.Failed);
-            Equal(new SessionEnd(SessionEndReason.Failed, storage.Failure), await harness.Closed, "closed");
+            Equal(SessionEnd.Failed(storage.Failure), await harness.Closed, "closed");
             Seq([storage.Failure], reports.Snapshot(), "reports");
             await harness.CloseAsync(Context);
             controlled.Reopen();
@@ -782,7 +782,7 @@ internal static partial class OwnershipTests
             // The failed cascade commit fails the Harness. Closed settles once its invocations have ended, and the owner's abort handler
             // ignores its signal: let it return.
             holds.Open("abort.owner");
-            Equal(SessionEndReason.Failed, (await opened.Harness.Closed).Reason, "closed");
+            Equal(SessionEndKind.Failed, (await opened.Harness.Closed).Kind, "closed");
             await opened.Harness.CloseAsync(Context);
             // Reopening derives the mark again.
             opened = await holds.OpenHarness(await location());

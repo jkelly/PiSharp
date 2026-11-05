@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/test/harness-nested-tools-restart.test.ts ("nested tool calls across
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/test/harness-nested-tools-restart.test.ts ("nested tool calls across
 // a restart"), as harness.nested-tools-restart.<case>. Verbatim apart from the adaptations in HarnessSupport.cs and ChatSupport.cs, and these:
 // - `openNodeSqliteStorage(path)` is SqliteStorage.OpenAsync over a file in a fresh temporary directory.
 // - The tools' Parameters are the JSON pi-schema builds for `obj({ text: opt(str()) })` (NestedToolsTests; Pi v1.5.0, area tools-schema).
@@ -8,6 +8,8 @@
 // Pi v1.5.0 sync (area events, f3255de76): the nested calls' results come from the view's pi.live history and the nested results
 // (LiveSupport.cs: viewHistory, nestedResults, nestedResultOf) where v1.2.0 collected watchEvents' tool ends (removed); a Session line
 // barrier (ViewTests.Drained) lets the synchronous observers record what the commits the waits returned after published.
+// Pi v1.5.0 sync (area vocabulary, 5f312dac4): "clears the slots of nested calls ..." watches the caller's terminal commit with an
+// ObserveCommits observer (upstream observeCommits({ advance, end })) and reads pi.live only from a change of kind change.
 // Authored, first: the hook that gives api.createTask() children and nested calls of a caller that does not resume abandonOnRestart
 // (ToolExecutionApi.ChildTaskOptions), as upstream's `{ abandonOnRestart: true, ...options }` does.
 using PiSharp.Durable;
@@ -358,15 +360,16 @@ internal static partial class SchedulerTests
 
             opened = await OpenRestart(path, setup);
             int? slotsAfterCaller = null;
-            opened.Harness.SubscribeCommits((publication, _) =>
+            opened.Harness.ObserveCommits(new CommitObserver((publication, _) =>
             {
                 foreach (var change in publication.Changes)
                 {
                     if (change is not TaskWrite { Value: { Kind: "pi.tool" } task } || IsNested(task) || task.State.Status != DurableTaskStatus.Terminal) continue;
                     var live = publication.Changes.OfType<DocumentCommitChange>().FirstOrDefault(each => each.Record.Kind == "pi.live");
-                    slotsAfterCaller = live?.Value is { } value && value.TryGetValue("nestedTools", out var slots) ? ((JsonArrayValue)slots).Count : 0;
+                    slotsAfterCaller = live is DocumentValueChange { Value: var value } && value.TryGetValue("nestedTools", out var slots)
+                        ? ((JsonArrayValue)slots).Count : 0;
                 }
-            });
+            }, _ => { }));
             opened.Harness.Resume();
             Equal(SubmissionStatus.Done, (await (await opened.Harness.SubmissionAsync(id, Context))!.WaitAsync(Context)).Status, "status");
             Equal(2, attempts, "attempts");

@@ -1,9 +1,9 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/test/harness-storage-failure.test.ts. Verbatim apart from the
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/test/harness-storage-failure.test.ts. Verbatim apart from the
 // adaptations in HarnessSupport.cs and SessionSupport.cs, and these:
 // - Upstream's storages extend ControlledStorage or MemoryStorage; here they are decorators over a ControlledStorage (DelegatingStorage).
 // - SessionFailed's `cause` is SessionFailedException.InnerException; toMatchObject({ name: "SessionFailed" }) is the exception type.
-// - "reports a listener or onReport whose promise rejects ...": a listener's promise is the task an asynchronous SubscribeCommits or
-//   SubscribeClose overload returns. OnReport is an Action, so a handler that "rejects" is one that throws (an async void handler's
+// - "reports a listener or onReport whose promise rejects ...": a listener's promise is the task a CommitObserver's task-returning advance or
+//   the asynchronous SubscribeClose overload returns. OnReport is an Action, so a handler that "rejects" is one that throws (an async void handler's
 //   exception escapes to the thread pool, which no caller can contain); unhandled means TaskScheduler.UnobservedTaskException or
 //   ReplicatedState.UnhandledError.
 // - "contains a fulfilled thenable ..." and "contains a rejected promise from another realm": .NET has neither thenables nor realms. The
@@ -17,6 +17,11 @@
 //   test makes, so Running also awaits Waiting's phase start.
 // Pi v1.5.0 sync (area events, f3255de76): "ends everything with the first error ..." ends a conversation view watch where v1.2.0 ended an
 // agent event stream (watchEvents, removed).
+// Pi v1.5.0 sync (area vocabulary, 5f312dac4): a Session end is SessionEnd.Failed or SessionEnd.Closed (by kind), the commit listeners are
+// ObserveCommits observers (a CommitObserver; upstream observeCommits({ advance, end })), and the internal listener that fails the Session is
+// FollowCommits (upstream followCommits). The v1.5.0 blob's other changes are in place: Chord's WatchEnd kinds and value calls (areas
+// chord-watch, watches and observers), and the entry the context-read case commits before it fails scanRange (e5c6182ba, area
+// group-commit-scheduler), which this port's case already made.
 using PiSharp.Durable;
 using PiSharp.Durable.Chord;
 using PiSharp.Durable.Storage;
@@ -334,7 +339,7 @@ internal static class StorageFailureTests
             var storage = new ControlledStorage(new MemoryStorage());
             var (harness, root, reports, _, _) = await Start(storage);
             var bug = new InvalidOperationException("listener bug");
-            ((Session)harness).ObserveCommits((_, _) => throw bug);
+            ((Session)harness).FollowCommits((_, _) => throw bug);
             // The commit itself is durable and resolves; the Session fails behind it.
             await Note(root);
             Equal(SessionEnd.Failed(bug), await harness.Closed, "closed");
@@ -437,7 +442,7 @@ internal static class StorageFailureTests
                     await Task.Yield();
                     throw new InvalidOperationException("async listener");
                 }
-                harness.SubscribeCommits((_, _) => AsyncThrow());
+                harness.ObserveCommits(new CommitObserver((_, _) => AsyncThrow(), _ => { }));
                 harness.SubscribeClose(AsyncThrow);
                 await Note(root);
                 await harness.CloseAsync(Context);
@@ -450,7 +455,7 @@ internal static class StorageFailureTests
                     Registry = Registry.Create(),
                     OnReport = _ => throw new InvalidOperationException("report broke"),
                 }, Context);
-                rejecting.SubscribeCommits((_, _) => throw new InvalidOperationException("sync listener"));
+                rejecting.ObserveCommits(new CommitObserver((_, _) => throw new InvalidOperationException("sync listener"), _ => { }));
                 var again = await rejecting.RootAsync(Context);
                 await Note(again);
                 await rejecting.CloseAsync(Context);
@@ -470,8 +475,8 @@ internal static class StorageFailureTests
         {
             var (harness, root, reports, _, _) = await Start(new MemoryStorage());
             var seen = new SyncList<string>();
-            harness.SubscribeCommits((_, _) => throw new InvalidOperationException("commit listener"));
-            harness.SubscribeCommits((_, _) => seen.Add("commit"));
+            harness.ObserveCommits(new CommitObserver((_, _) => throw new InvalidOperationException("commit listener"), _ => { }));
+            harness.ObserveCommits(new CommitObserver((_, _) => seen.Add("commit"), _ => { }));
             harness.SubscribeClose(() => throw new InvalidOperationException("close listener"));
             harness.SubscribeClose(() => seen.Add("close"));
             await Note(root);

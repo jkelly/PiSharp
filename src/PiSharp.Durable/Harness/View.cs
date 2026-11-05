@@ -13,7 +13,7 @@
 //
 // Pi v1.5.0 sync (area watches, 92ab53602 and 42cb822f1): a view watch is Chord's Watch (Chord/Watch.cs) on the Session line's scheduler,
 // ViewObserver.closeSession is end(failure), and the view state getter (Conversation.viewState()) is removed.
-// Pi v1.5.0 sync (area deferred-commits, 6c2fd73b0): views observe the Session's commits as memory adopts them (Session.ObserveCommits),
+// Pi v1.5.0 sync (area deferred-commits, 6c2fd73b0): views observe the Session's commits as memory adopts them (Session.FollowCommits),
 // deferred ones included, so a view shows a held partial or tool output at once.
 // Pi v1.5.0 sync (area observers, 8b0caefc2 with v1.5.0's shapes): Harness.observeConversation() attaches a host's Observer<T> to a mount
 // behind GuardedObserver<T> (ObserveAsync, upstream observe); a mount's observers are SyncObserver<ConversationView>s, watches
@@ -29,7 +29,9 @@
 // (upstream RangeError). Area events (f3255de76): upstream removed watchEvents and with it the publication hook of its ViewObserver; PiSharp
 // keeps the hook, internal, for PiSharp.Durable.Hosting's PiSharp-only event projection (AgentEvents.cs, decision 0013), which keeps its own
 // active transcript.
-// The citation stays on v1.2.0 until the file's other areas land (vocabulary, group-commit-scheduler, registry-reader).
+// Pi v1.5.0 sync (area vocabulary, 5f312dac4): the Session's own observers are FollowCommits (upstream followCommits), and a mounted
+// document's retirement is a DocumentRetireChange (change.kind === "retire", was a null value).
+// The citation stays on v1.2.0 until the file's other areas land (group-commit-scheduler, registry-reader).
 using System.Collections.Immutable;
 using PiSharp.Durable.Chord;
 using PiSharp.Durable.Chord.Delta;
@@ -177,7 +179,7 @@ internal sealed class ConversationViews
     {
         this.session = session;
         this.storage = storage;
-        session.ObserveCommits((publication, context) =>
+        session.FollowCommits((publication, context) =>
         {
             KeyValuePair<ConversationId, Mount>[] current;
             lock (gate) current = [.. mounts];
@@ -405,20 +407,20 @@ internal sealed class ConversationViews
             if (!MountedKinds.Contains(kind) || document.Record.Key is not null) continue;
             ImmutableArray<PathSegment> path = [PathSegment.Of("docs"), PathSegment.Of(kind)];
             var isMounted = mount.Incarnations.TryGetValue(kind, out var mounted);
-            if (document.Value is null)
+            if (document is not DocumentValueChange valued)
             {
                 if (!isMounted || mounted.Id != document.Record.Id) continue;
                 mount.Incarnations.Remove(kind);
                 docOps.Add(new DeleteOp(path));
             }
-            else if (isMounted && mounted.Id == document.Record.Id && mounted.Version == document.Version)
+            else if (isMounted && mounted.Id == valued.Record.Id && mounted.Version == valued.Version)
             {
-                foreach (var op in document.Ops) docOps.Add(Prefixed(op, path));
+                foreach (var op in valued.Ops) docOps.Add(Prefixed(op, path));
             }
             else
             {
-                mount.Incarnations[kind] = (document.Record.Id, document.Version!.Value);
-                docOps.Add(new SetOp(path, document.Value));
+                mount.Incarnations[kind] = (valued.Record.Id, valued.Version);
+                docOps.Add(new SetOp(path, valued.Value));
             }
         }
         var observers = mount.Snapshot(gate);

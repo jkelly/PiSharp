@@ -28,11 +28,16 @@
 // queued per incarnation (Hold, Chord's PendingOps) and the document pinned in the cache. The first commit that reads or writes the document
 // stores them in front of its own (Transaction.TakeHeld); otherwise they are stored, every held document in one storage transaction, at the
 // earliest deadline (one foreground timer), at close after the writes at close, by UnloadDocumentsAsync, and before a token of another
-// definition version reloads the document. SubscribeCommits sees each storage transaction with exactly what it stored, so its seq has
+// definition version reloads the document. ObserveCommits sees each storage transaction with exactly what it stored, so its seq has
 // gaps; a failed Session stores nothing more.
 // Pi v1.5.0 sync (area restarts, b3a29f111): WriteAtCloseAsync (upstream writeAtClose), for the scheduler's join, writes on the line,
 // after the commits admitted before the seal, straight to Storage; a failed Session writes nothing. Upstream admits it to its group-commit
-// writer; here it is one storage call of one batch.
+// writer; here it is one storage call of one batch. Pi v1.5.0 sync (area vocabulary, 5f312dac4): SubscribeCommits(listener) is
+// ObserveCommits(CommitObserver), each observer behind the generic guard (ObserverGuard<CommitPublication>, Observers.cs): a throw is
+// reported, detaches it and ends it listener_error, and close ends the rest after its last publication, failed with "session closed"
+// (CloseEnds, as v1.5.0 ends every synchronous observer) or with the error that failed the Session. The internal observeCommits is
+// FollowCommits (upstream followCommits); Closed settles a SessionEnd tagged by Kind, and a document change is a DocumentValueChange or a
+// DocumentRetireChange.
 //
 // Concurrency model. Upstream relies on one JavaScript thread: `#enqueue` chains every mutation and cold load onto one promise, and
 // listeners run in later microtasks. Here .NET callers may be on any thread, so:
@@ -121,7 +126,8 @@ public class Session : ISession
     /// documentsGate.</summary>
     private bool documentTimersUnavailable;
     private readonly Lock listenersGate = new();
-    private readonly List<Action<CommitPublication, DurableContext>> commitListeners = [];
+    // Host commit observers (ObserveCommits), each behind its guard.
+    private readonly List<ObserverGuard<CommitPublication>> commitListeners = [];
     // The Session's own listeners, such as its scheduler's: they keep memory in step with storage, so a throw fails it.
     private readonly List<Action<ObservedCommit, DurableContext>> internalListeners = [];
     private readonly List<Action> closeListeners = [];
@@ -637,11 +643,17 @@ public class Session : ISession
                     try { await StoreHoldsAsync(held, cleanup).ConfigureAwait(false); }
                     catch (Exception error) { unstored = ExceptionDispatchInfo.Capture(error); }
                 }
+                ObserverGuard<CommitPublication>[] observers;
                 lock (listenersGate)
                 {
+                    observers = [.. commitListeners];
                     commitListeners.Clear();
                     internalListeners.Clear();
                 }
+                // After the last publication: the commits admitted before the seal have settled, held changes are stored. Commit observers
+                // are synchronous observers, all of them (CloseEnds).
+                var end = CloseEnds.Of(failure?.Error).Observer;
+                foreach (var observer in observers) observer.End(end);
                 lock (documentsGate)
                 {
                     documents.Clear();
@@ -723,40 +735,34 @@ public class Session : ISession
     });
 
     /// <inheritdoc/>
-    public IDisposable SubscribeCommits(Action<CommitPublication, DurableContext> listener)
+    public CommitObservation ObserveCommits(CommitObserver observer)
     {
-        ArgumentNullException.ThrowIfNull(listener);
-        return Subscribe(commitListeners, listener);
-    }
-
-    /// <inheritdoc/>
-    public IDisposable SubscribeCommits(Func<CommitPublication, DurableContext, Task> listener)
-    {
-        ArgumentNullException.ThrowIfNull(listener);
-        return Subscribe(commitListeners, (publication, context) =>
-            Observe(listener(publication, context), error => Report(error, ReportInfo.ListenerError, context)));
+        ArgumentNullException.ThrowIfNull(observer);
+        AssertUsable();
+        ObserverGuard<CommitPublication>? guarded = null;
+        guarded = new ObserverGuard<CommitPublication>(observer.Advance, observer.End, () =>
+        {
+            lock (listenersGate) commitListeners.Remove(guarded!);
+        }, (error, context) => Report(error, ReportInfo.ListenerError, context));
+        lock (listenersGate) commitListeners.Add(guarded);
+        return new CommitObservation(guarded);
     }
 
     /// <summary>
-    /// Internal: observes every commit as memory adopts it (<see cref="ObservedCommit"/>), for the Session's own components, whose state
-    /// follows memory (upstream <c>observeCommits</c>). A throw leaves that state behind, so it fails the Session instead of being reported.
-    /// They run before host listeners.
+    /// Internal: follows every commit as memory adopts it (<see cref="ObservedCommit"/>), for the Session's own components, whose state
+    /// follows memory (upstream <c>followCommits</c>). A throw leaves that state behind, so it fails the Session instead of being reported.
+    /// They run before host observers.
     /// </summary>
-    internal IDisposable ObserveCommits(Action<ObservedCommit, DurableContext> listener)
+    internal IDisposable FollowCommits(Action<ObservedCommit, DurableContext> listener)
     {
         ArgumentNullException.ThrowIfNull(listener);
-        return Subscribe(internalListeners, listener);
-    }
-
-    private Unsubscriber Subscribe<TPublication>(List<Action<TPublication, DurableContext>> listeners, Action<TPublication, DurableContext> listener)
-    {
         AssertUsable();
         // A distinct wrapper per subscription, so two subscriptions of one delegate are independent and removal is exact.
-        Action<TPublication, DurableContext> entry = (publication, context) => listener(publication, context);
-        lock (listenersGate) listeners.Add(entry);
+        Action<ObservedCommit, DurableContext> entry = (publication, context) => listener(publication, context);
+        lock (listenersGate) internalListeners.Add(entry);
         return new Unsubscriber(() =>
         {
-            lock (listenersGate) listeners.Remove(entry);
+            lock (listenersGate) internalListeners.Remove(entry);
         });
     }
 
@@ -1075,13 +1081,13 @@ public class Session : ISession
                 }, context);
         }
         Action<ObservedCommit, DurableContext>[] internals;
-        Action<CommitPublication, DurableContext>[] listeners;
+        ObserverGuard<CommitPublication>[] observers;
         lock (listenersGate)
         {
             internals = [.. internalListeners];
-            listeners = [.. commitListeners];
+            observers = [.. commitListeners];
         }
-        if (internals.Length == 0 && listeners.Length == 0) return;
+        if (internals.Length == 0 && observers.Length == 0) return;
         var changes = new List<ICommitChange>();
         foreach (var write in writes)
             if (write is ICommitChange change) changes.Add(change);
@@ -1095,9 +1101,10 @@ public class Session : ISession
         lock (deferGate) deferred = [];
         try
         {
-            // The commit is durable: a failing listener neither fails the commit nor skips the others.
+            // The commit is durable: a failing listener neither fails the commit nor skips the others. A host observer's guard reports its
+            // throw, detaches it and ends it listener_error.
             foreach (var listener in internals) Contained(() => listener(observed, context), error => Fail(error, context));
-            foreach (var listener in listeners) Contained(() => listener(stored, context), error => Report(error, ReportInfo.ListenerError, context));
+            foreach (var observer in observers) observer.Advance(stored, context);
         }
         finally
         {
@@ -1156,7 +1163,7 @@ public class Session : ISession
 
     /// <summary>
     /// Stores the held changes of <paramref name="held"/> in one storage transaction, on the line (upstream <c>#storeHolds</c>). Memory
-    /// already has them, so only <c>SubscribeCommits</c> listeners see it. A failure fails the Session, as every Storage failure does.
+    /// already has them, so only <c>ObserveCommits</c> observers see it. A failure fails the Session, as every Storage failure does.
     /// </summary>
     private async Task StoreHoldsAsync(IReadOnlyList<Hold> held, DurableContext context)
     {
@@ -1171,7 +1178,7 @@ public class Session : ISession
             var (content, ops) = Transaction.StoreHeld(hold, NoOperations, value, version);
             writes.Add(new DocumentChangeWrite(loaded.Record.Id, content));
             // Held documents are conversation documents.
-            changes.Add(new DocumentCommitChange(loaded.Record, loaded.Record.Scope.ConversationId, version, value, ops));
+            changes.Add(new DocumentValueChange(loaded.Record, loaded.Record.Scope.ConversationId, version, value, ops));
         }
         var adopted = false;
         void Adopt()
@@ -1199,10 +1206,11 @@ public class Session : ISession
             return;
         }
         Release(held);
-        Action<CommitPublication, DurableContext>[] listeners;
-        lock (listenersGate) listeners = [.. commitListeners];
+        ObserverGuard<CommitPublication>[] observers;
+        lock (listenersGate) observers = [.. commitListeners];
         var publication = new CommitPublication(seq, changes);
-        foreach (var listener in listeners) Contained(() => listener(publication, context), error => Report(error, ReportInfo.ListenerError, context));
+        // Their guards report a throw.
+        foreach (var observer in observers) observer.Advance(publication, context);
     }
 
     /// <summary>After their store: forgets <paramref name="held"/>, unpins their documents, and moves the timer to the next deadline (upstream
@@ -1483,7 +1491,7 @@ public class Session : ISession
             observer = followed;
             try
             {
-                commitSubscription = session.ObserveCommits(Follow);
+                commitSubscription = session.FollowCommits(Follow);
                 closeSubscription = session.SubscribeClose(Close);
             }
             catch
@@ -1551,7 +1559,7 @@ public class Session : ISession
                     // The incarnation followed is at the address by definition; only another record needs the address compared.
                     var record = document.Record;
                     if (record.Id != incarnation && !AtAddress(record)) continue;
-                    if (document.Value is not { } next)
+                    if (document is not DocumentValueChange valued)
                     {
                         if (record.Id != incarnation) continue;
                         // Set with every incarnation.
@@ -1561,7 +1569,7 @@ public class Session : ISession
                         Release(ref released);
                         call = new WatchValueCall<JsonObjectValue>(last, NoOperations, Retired: true);
                     }
-                    else if (record.Id != incarnation || document.Version != version)
+                    else if (record.Id != incarnation || valued.Version != version)
                     {
                         // A new incarnation at the address, or a value of another definition version, whose shape the observer's value
                         // does not have: shown whole.
@@ -1571,16 +1579,16 @@ public class Session : ISession
                             Release(ref released);
                             unpin = session.PinDocument(addressId, record.Id);
                         }
-                        version = document.Version!.Value;
-                        value = next;
-                        call = new WatchValueCall<JsonObjectValue>(next, [new ReplaceOp(next)]);
+                        version = valued.Version;
+                        value = valued.Value;
+                        call = new WatchValueCall<JsonObjectValue>(valued.Value, [new ReplaceOp(valued.Value)]);
                     }
                     else
                     {
                         // A migration-only base changes nothing for an observer of the new version.
-                        if (document.Ops.IsEmpty) continue;
-                        value = next;
-                        call = new WatchValueCall<JsonObjectValue>(next, document.Ops);
+                        if (valued.Ops.IsEmpty) continue;
+                        value = valued.Value;
+                        call = new WatchValueCall<JsonObjectValue>(valued.Value, valued.Ops);
                     }
                 }
                 released?.Invoke();

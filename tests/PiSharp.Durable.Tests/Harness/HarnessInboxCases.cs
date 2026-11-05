@@ -13,6 +13,8 @@
 //   rename of that field, which renames it in every test at once.
 // - The usage cases call UsageLedger.RecordUsageAsync for upstream's `recordUsage`, and HarnessOptions.Settings' Retry for
 //   `setup.settings.retry`.
+// - Pi v1.5.0 sync (area vocabulary, 5f312dac4): the commit listeners are ObserveCommits observers (a CommitObserver; upstream
+//   observeCommits({ advance, end })), and the ones that read operations read the document changes of kind change (DocumentValues).
 using PiSharp.Durable;
 using PiSharp.Durable.Chord;
 using PiSharp.Durable.Sqlite;
@@ -509,11 +511,11 @@ internal static class InboxTests
             setup.Faux.SetResponses(first.Step, Answer("second"));
             var (harness, root) = await OpenChat(fresh(), setup);
             var ops = new SyncList<JsonValue>();
-            harness.SubscribeCommits((publication, _) =>
+            harness.ObserveCommits(new CommitObserver((publication, _) =>
             {
-                foreach (var change in DocumentChanges(publication))
+                foreach (var change in DocumentValues(publication))
                     if (change.Record.Kind == "pi.inbox" && change.Ops.Length > 0) ops.Add(J(OpsJson(change.Ops)));
-            });
+            }, _ => { }));
             var input = await Submit(root, "a");
             await first.Reached;
             var w1 = await Write(root, QueuedNote("w"));
@@ -748,11 +750,11 @@ internal static class InboxTests
             var items = new List<ISubmission>();
             foreach (var text in new[] { "x", "y", "z" }) items.Add(await Submit(root, text));
             var ops = new SyncList<string>();
-            harness.SubscribeCommits((publication, _) =>
+            harness.ObserveCommits(new CommitObserver((publication, _) =>
             {
-                foreach (var change in DocumentChanges(publication))
+                foreach (var change in DocumentValues(publication))
                     if (change.Record.Kind == "pi.inbox" && change.Ops.Length > 0) ops.Add(OpsJson(change.Ops));
-            });
+            }, _ => { }));
             await items[1].AbortAsync(Context);
             Equal(1, ops.Count, "inbox changes");
             SameJson("""[["p",["items"],1,1,[]]]""", J(ops[0]), "removal");
@@ -767,11 +769,11 @@ internal static class InboxTests
             var first = Gated(Answer("first"));
             setup.Faux.SetResponses(first.Step, Answer("second"));
             var (harness, root) = await OpenChat(storage, setup);
-            harness.SubscribeCommits((publication, _) =>
+            harness.ObserveCommits(new CommitObserver((publication, _) =>
             {
                 foreach (var change in DocumentChanges(publication))
                     if (change.Record.Kind == "pi.inbox") storage.InboxId = change.Record.Id;
-            });
+            }, _ => { }));
             var input = await Submit(root, "a");
             await first.Reached;
             await Submit(root, "f1");
@@ -902,15 +904,15 @@ internal static class InboxTests
             setup.Faux.SetResponses(Answer("one"), Answer("two"));
             var (harness, root) = await OpenChat(fresh(), setup);
             var commits = new SyncList<(int Entries, JsonArrayValue Ops)>();
-            harness.SubscribeCommits((publication, _) =>
+            harness.ObserveCommits(new CommitObserver((publication, _) =>
             {
-                foreach (var change in DocumentChanges(publication))
+                foreach (var change in DocumentValues(publication))
                 {
                     if (change.Record.Kind != "pi.usage") continue;
                     var entries = publication.Changes.Count(other => other.Type == "entry");
                     commits.Add((entries, (JsonArrayValue)J(OpsJson(change.Ops))));
                 }
-            });
+            }, _ => { }));
             await (await Submit(root, "a")).WaitAsync(Context);
             await (await Submit(root, "b")).WaitAsync(Context);
             await Delivered(harness);

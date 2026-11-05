@@ -1,7 +1,8 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/test/session-tables.test.ts. Verbatim apart from the adaptations in
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/test/session-tables.test.ts. Verbatim apart from the adaptations in
 // SessionSupport.cs and these: task definitions carry only what the Session needs until the task runtime (P7); "takes ownership of table
 // JSON and rejects non-strict values" checks that a caller cannot change committed JSON (immutable values) and that NaN cannot be
-// constructed as JSON, which rejects inside the callback before any write.
+// constructed as JSON, which rejects inside the callback before any write. Pi v1.5.0 sync (area vocabulary, 5f312dac4): the retirements
+// a task's end publishes are document changes of kind retire (DocumentRetireChange), which carry no ops.
 using PiSharp.Durable;
 using PiSharp.Durable.Chord;
 using static Program;
@@ -323,8 +324,8 @@ internal static partial class SessionTests
             var publication = Last(publications);
             var documents = DocumentChanges(publication);
             Equal(1, publication.Changes.OfType<TaskWrite>().Count(), "published task");
-            Check(documents.Count == 3 && documents.All(document => document.Value is null), "three retirements");
-            foreach (var document in documents) Check(document.Ops.IsEmpty, "retirement ops are empty");
+            Seq([DocumentCommitChangeKind.Retire, DocumentCommitChangeKind.Retire, DocumentCommitChangeKind.Retire],
+                documents.Select(document => document.Kind), "three retirements");
             foreach (var document in documents) Equal<ConversationId?>(conversationId, document.ConversationId, "retirement conversation");
             Check(await session.SnapshotAsync(progressDoc, taskId, Context) is null, "progress retired");
             Check(await session.SnapshotAsync(stepDoc, taskId, "committed", Context) is null, "step retired");

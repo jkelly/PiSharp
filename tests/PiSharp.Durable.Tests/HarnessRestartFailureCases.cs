@@ -8,12 +8,14 @@
 // - open's kill() is KillableStorage: once killed, every call of the storage hangs, so the Harness writes nothing more, not even the pending
 //   records a close writes for the tasks it stops. The killed Harness is never closed; its storage is closed after the case, as upstream's
 //   afterEach does.
-// - liveValues follows commits as memory adopts them (SessionTests.ObserveCommits); waitFor is Eventually; `aborted(signal)` is
-//   Aborted(token); commitWrites is PiSharp.Durable.Testing.CommitWrites.CommitWritesAsync.
+// - liveValues follows commits as memory adopts them (SessionTests.FollowCommits, upstream followCommits, over the document changes of kind
+//   change); waitFor is Eventually; `aborted(signal)` is Aborted(token); commitWrites is
+//   PiSharp.Durable.Testing.CommitWrites.CommitWritesAsync.
 // - The Proxy over the models is ModelsOverride (FetchDeferredOverride, CancelDeferredOverride); the Proxy over the settings that counts
 //   resolutions is a HarnessSettings whose Extensions getter counts, as every resolution reads it once.
 // - Later areas' parts of the v1.5.0 blob are left out: pi.live.runFailure's `first` (area run-end, 7e15f9601) is not asserted, as PiSharp's
-//   RunFailure has no such field yet, and compactionFailure keeps v1.2.0's `reason` where vocabulary (5f312dac4) renames it `trigger`.
+//   RunFailure has no such field yet, and compactionFailure keeps v1.2.0's `reason` where 5f312dac4's pi.live version 2 (area live-turns)
+//   renames it `trigger`.
 //   The settings bound (49 resolutions a round, #11327) is upstream's with group commit (e5c6182ba, area group-commit-scheduler), which
 //   coalesces some reconcile passes; this port, without group commit yet, measured 36 a round, so upstream's bound holds as it is.
 // - PiSharp-only (decision 0011), not upstream's: "keeps the interrupted request's stream metadata for the next attempt" checks that the
@@ -149,10 +151,10 @@ internal static class RestartFailureTests
     private static SyncList<JsonObjectValue> LiveValues(IHarness harness)
     {
         var values = new SyncList<JsonObjectValue>();
-        ObserveCommits(harness, (publication, _) =>
+        FollowCommits(harness, (publication, _) =>
         {
-            foreach (var change in DocumentChanges(publication))
-                if (change.Record.Kind == "pi.live" && change.Value is { } value) values.Add(value);
+            foreach (var change in DocumentValues(publication))
+                if (change.Record.Kind == "pi.live") values.Add(change.Value);
         });
         return values;
     }

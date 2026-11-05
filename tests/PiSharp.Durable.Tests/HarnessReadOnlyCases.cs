@@ -6,6 +6,8 @@
 // - Area sleep: the first case checks Harness.Wake() and HarnessOptions.OnWake as upstream does.
 // - Area restarts: the last case checks the restart count the writable open records (TaskRecord.Restarts), as upstream does.
 // - ReadOnlySession is ReadOnlySessionException; root.commit(() => "nothing") is a CommitAsync whose callback writes nothing.
+// - Area vocabulary (5f312dac4): onReport takes one Report ({ error, ...info }); upstream's ({ error }) => reports.push(error) is
+//   ChatSetup.Record, which also keeps the info that no case here reads.
 using Microsoft.Data.Sqlite;
 using PiSharp.Durable;
 using PiSharp.Durable.Chord;

@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/test/harness-support.ts and packages/durable/test/task-support.ts
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/test/harness-support.ts and packages/durable/test/task-support.ts
 // (session-support.ts's ControlledStorage, context and helpers are in Session/SessionSupport.cs). The harness.* case groups run on any
 // storage: HarnessCases() runs them on MemoryStorage, HarnessBackendCases.cs reruns the task groups on JSONL and SQLite.
 //
@@ -15,6 +15,8 @@
 //   vi.getTimerCount() does.
 // - Pi v1.5.0 sync (area sleep): openTasks takes onWake and setTimer, as f75b3240a's task-support.ts does.
 // - Pi v1.5.0 sync (area telemetry): openTasks takes HarnessOptions.Telemetry, as 8b0caefc2's task-support.ts does.
+// - Pi v1.5.0 sync (area vocabulary, 5f312dac4): onReport takes one Report, so openHarness hands its callback report.Error and openTasks
+//   keeps each report's ReportInfo (in place since area reports); tool()'s obj({}) is ToolRegistration.EmptyParameters (area tools-schema).
 using PiSharp.Durable;
 using PiSharp.Durable.Chord;
 using static Program;

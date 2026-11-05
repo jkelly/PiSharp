@@ -39,7 +39,7 @@ internal static partial class Program
                 var view = await UntilView(durable.View, current => current.Failure is not null, "the session failed");
                 Equal("disk is full", view.Failure, "the storage error");
                 var end = await durable.Harness.Closed.WaitAsync(TimeSpan.FromSeconds(20));
-                Equal(SessionEndReason.Failed, end.Reason, "the Harness closed failed");
+                Equal(SessionEndKind.Failed, end.Kind, "the Harness closed failed");
                 // The failed call's error, the Harness's report of it and later refused requests are no notices: the failure says it once.
                 await durable.Controller.SubmitAsync("more", WhenBusy.Steer);
                 await durable.Controller.CompactAsync(null);
@@ -114,7 +114,7 @@ internal static partial class Program
                 Equal($"the session lock was lost (removed, or taken over by another process): {lockPath}", view.Failure, "the failure");
                 Check(durable.Location.LockLost is not null && durable.Location.Lock.Compromised, "the lock is lost");
                 var end = await durable.Harness.Closed.WaitAsync(TimeSpan.FromSeconds(30));
-                Equal(SessionEndReason.Failed, end.Reason, "the Harness closed failed");
+                Equal(SessionEndKind.Failed, end.Kind, "the Harness closed failed");
                 // Nothing more reaches the storage: the request is refused and becomes no notice besides the failure.
                 await durable.Controller.SubmitAsync("after the loss", WhenBusy.Steer);
                 await durable.Controller.CompactAsync(null);

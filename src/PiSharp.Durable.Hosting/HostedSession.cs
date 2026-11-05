@@ -2,7 +2,8 @@
 // agents by number or name with derived names, busy state from the task graph, idempotent sends that can wait for the answer, forks, the
 // read-only switch, per-session compaction, and model re-routing on reopen. Decision 0011 adds the host's per-session stream metadata
 // (DurableDeviceOptions.SessionStream) to every request a session prepares. Pi v1.5.0 sync (area model-requests): the Harness takes the
-// device's DurableDeviceOptions.Identity.
+// device's DurableDeviceOptions.Identity. Pi v1.5.0 sync (area vocabulary, 5f312dac4): change notifications observe commits through
+// ObserveCommits (a CommitObserver; was SubscribeCommits), and a failed session is a SessionEnd of kind Failed.
 using PiSharp.Durable.Chord;
 using PiSharp.Durable.Sqlite;
 using PiSharp.Durable.Tools;
@@ -27,7 +28,7 @@ public sealed partial class HostedSession
     private volatile bool closing;
     private IHarness? harness;
     private FileLock? fileLock;
-    private IDisposable? commits;
+    private CommitObservation? commits;
     private IRegistry? registry;
     private IReadOnlyDictionary<string, DurableTask> jobTasks = new Dictionary<string, DurableTask>();
     private readonly SemaphoreSlim creations = new(1, 1);
@@ -751,7 +752,8 @@ public sealed partial class HostedSession
                 host.Catalog.CompleteInitialization(Id);
             }
             await RerouteAllAsync(opened, context).ConfigureAwait(false);
-            commits = opened.SubscribeCommits((_, _) => host.Notify(new DeviceChange(DeviceChangeKind.Session, Id)));
+            commits = opened.ObserveCommits(new CommitObserver(
+                (_, _) => host.Notify(new DeviceChange(DeviceChangeKind.Session, Id)), _ => { }));
             fileLock = acquired;
             acquired = null;
             error = null;
@@ -813,7 +815,7 @@ public sealed partial class HostedSession
     internal async Task CloseAsync()
     {
         closing = true;
-        Interlocked.Exchange(ref commits, null)?.Dispose();
+        Interlocked.Exchange(ref commits, null)?.Detach();
         if (Interlocked.Exchange(ref harness, null) is { } opened)
         {
             try { await opened.CloseAsync(DurableContext.Background).ConfigureAwait(false); }
@@ -872,7 +874,7 @@ public sealed partial class HostedSession
     private async Task WatchClosedAsync(IHarness opened)
     {
         var end = await opened.Closed.ConfigureAwait(false);
-        if (closing || end.Reason != SessionEndReason.Failed) return;
+        if (closing || end.Kind != SessionEndKind.Failed) return;
         error = new SessionUnavailableException($"Session {Name} failed: {end.Error?.Message}", end.Error);
         host.Options.OnReport?.Invoke(Id, error);
         host.Notify(new DeviceChange(DeviceChangeKind.Session, Id));

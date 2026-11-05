@@ -6,6 +6,8 @@
 // set and the heap after gc the GC heap after a forced collection. The `cat` command names the file with forward slashes, which Git Bash
 // needs on Windows (upstream joins the path with backslashes there, so its cat fails at once on Windows; see docs/durable-benchmarks.md),
 // and the scenario deletes the env's full-output spill of the cat afterwards.
+// Pi v1.5.0 sync (area vocabulary, 5f312dac4): live commits are counted with ObserveCommits (was SubscribeCommits) over the document
+// changes of kind change (DocumentValueChange). The citation stays on v1.2.0 until area group-commit-scheduler (e5c6182ba) lands.
 using System.Diagnostics;
 using System.Globalization;
 using System.Text;
@@ -270,17 +272,17 @@ public static class ToolOutputBench
             var root = await harness.RootAsync(Context, new AgentChange { Model = FauxModels.Ref });
             int liveCommits = 0, outputSets = 0;
             long liveOpBytes = 0;
-            void Observe(IHarness target) => target.SubscribeCommits((publication, _) =>
+            void Observe(IHarness target) => target.ObserveCommits(new CommitObserver((publication, _) =>
             {
                 foreach (var change in publication.Changes)
                 {
-                    if (change is not DocumentCommitChange { Record.Kind: "pi.live" } document) continue;
+                    if (change is not DocumentValueChange { Record.Kind: "pi.live" } document) continue;
                     Interlocked.Increment(ref liveCommits);
                     Interlocked.Add(ref liveOpBytes, JsonValue.Array(document.Ops.Select(op => (JsonValue)op.ToJson())).ToJson().Length);
                     foreach (var op in document.Ops)
                         if (op is SetOp set && set.Path.Length > 0 && set.Path[^1] == PathSegment.Of("output")) Interlocked.Increment(ref outputSets);
                 }
-            });
+            }, _ => { }));
             Observe(harness);
             var started = Stopwatch.GetTimestamp();
             var submission = await root.SubmitAsync(SubmissionDraft.Input("go"), Context);

@@ -171,7 +171,7 @@ internal static class BlockedTests
             failing.FailNextCommit(new InvalidOperationException("reset"));
             var wakes = new SyncList<Wake>();
             var (harness, _, _) = await OpenTasks(failing, [], registry, onWake: wakes.Add);
-            Equal(SessionEndReason.Failed, (await harness.Closed).Reason, "closed");
+            Equal(SessionEndKind.Failed, (await harness.Closed).Kind, "closed");
             // The host was told work is underway, and never that it ended: its recovery alarm stays.
             await Flush();
             Seq([new Wake(true)], wakes.Snapshot(), "wakes");

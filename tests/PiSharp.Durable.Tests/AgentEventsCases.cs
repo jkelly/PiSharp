@@ -25,8 +25,8 @@
 //   1e42501bb) moved, with upstream, to harness-view-run.test.ts (HarnessViewRunCases.cs, harness.view-run.streamed-partials.*), where
 //   they read the conversation view.
 // - Pi v1.5.0 sync (area deferred-commits): the cases that follow commits as views do (pacing the stream, or reading what a commit
-//   published) observe them as memory adopts them (SessionTests.ObserveCommits, upstream 6c2fd73b0's internal observeCommits), since
-//   SubscribeCommits now sees deferred commits only once they are stored.
+//   published) observe them as memory adopts them (SessionTests.FollowCommits, upstream 6c2fd73b0's internal observeCommits, which
+//   5f312dac4 renamed followCommits), since ObserveCommits (was SubscribeCommits) sees deferred commits only once they are stored.
 // - Pi v1.5.0 sync (area watch-folding, d8d99950a): the stream is Chord's NativeWatch, so pending batches are not folded as state watches are
 //   (delivers-each-of-100-pending-batches-in-its-own-call-in-order-unlike-state-watches).
 // - The structured tests: "ends a turn at the generation's hold ...": upstream's last `waitFor(() => turns().length === 4)` after the held
@@ -156,11 +156,11 @@ internal static partial class EventTests
     private static SyncList<JsonObjectValue> PartialsOf(IHarness harness)
     {
         var partials = new SyncList<JsonObjectValue>();
-        ObserveCommits(harness, (publication, _) =>
+        FollowCommits(harness, (publication, _) =>
         {
-            foreach (var change in DocumentChanges(publication))
+            foreach (var change in DocumentValues(publication))
             {
-                if (change.Record.Kind == "pi.live" && change.Value is { } live && live.TryGetValue("generation", out var generation) &&
+                if (change.Record.Kind == "pi.live" && change.Value.TryGetValue("generation", out var generation) &&
                     generation is JsonObjectValue state && state.TryGetValue("message", out var message))
                     partials.Add((JsonObjectValue)message);
             }
@@ -201,11 +201,11 @@ internal static partial class EventTests
             var listening = await Listen(harness, root);
             MatchJson("""{"type":"snapshot","entries":[],"tools":[],"inbox":[]}""", listening.Stream.Snapshot.ToJson(), "snapshot");
             var partials = new SyncList<string>();
-            ObserveCommits(harness, (publication, _) =>
+            FollowCommits(harness, (publication, _) =>
             {
-                foreach (var change in DocumentChanges(publication))
+                foreach (var change in DocumentValues(publication))
                 {
-                    if (change.Record.Kind == "pi.live" && change.Value is { } live && live.TryGetValue("generation", out var generation) &&
+                    if (change.Record.Kind == "pi.live" && change.Value.TryGetValue("generation", out var generation) &&
                         generation is JsonObjectValue state && state.TryGetValue("message", out var message))
                         partials.Add(TextOf(message) ?? "");
                 }
@@ -404,11 +404,11 @@ internal static partial class EventTests
                 FauxAssistantMessage([FauxText("done")]));
             var (harness, root) = await OpenChat(await fresh(), setup);
             var outputs = new SyncList<string>();
-            ObserveCommits(harness, (publication, _) =>
+            FollowCommits(harness, (publication, _) =>
             {
-                foreach (var change in DocumentChanges(publication))
+                foreach (var change in DocumentValues(publication))
                 {
-                    if (change.Record.Kind != "pi.live" || change.Value is not { } live || !live.TryGetValue("tools", out var tools) ||
+                    if (change.Record.Kind != "pi.live" || !change.Value.TryGetValue("tools", out var tools) ||
                         tools is not JsonArrayValue { Count: > 0 } slots || ((JsonObjectValue)slots[0]).TryGetValue("output", out var output) is false) continue;
                     var text = S(output);
                     var seen = outputs.Snapshot();

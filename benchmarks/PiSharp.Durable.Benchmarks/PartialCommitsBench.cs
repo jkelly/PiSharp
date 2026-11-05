@@ -9,7 +9,7 @@
 // nothing and committed nothing: once 200 ms pass without a commit, the phase streams its other pieces without waiting. Each phase reports its
 // commits, the bytes allocated on every thread meanwhile (GC.GetTotalAllocatedBytes) and the time. A per-commit cost that grows with the
 // size is an O(length) copy per commit; a flat one is the cost of the new text.
-// Pi v1.5.0 sync (area deferred-commits): partial commits are deferred, and SubscribeCommits sees only what was stored; the run sets
+// Pi v1.5.0 sync (area deferred-commits): partial commits are deferred, and ObserveCommits sees only what was stored; the run sets
 // progress.persistWithinMs to 0, so each partial is still stored on its own right after its commit and every phase measures a commit and
 // its store, as before.
 using System.Collections.Immutable;
@@ -80,7 +80,7 @@ public static class PartialCommitsBench
             Context);
         try
         {
-            using var subscription = harness.SubscribeCommits((_, _) => gate.Committed());
+            harness.ObserveCommits(new CommitObserver((_, _) => gate.Committed(), _ => { }));
             var root = await harness.RootAsync(Context, new AgentChange { Model = StreamingModels.Ref });
             var settled = await (await root.SubmitAsync(SubmissionDraft.Input("go"), Context)).WaitAsync(Context);
             if (settled.Status != SubmissionStatus.Done) throw new InvalidOperationException($"size {size}: {settled}");

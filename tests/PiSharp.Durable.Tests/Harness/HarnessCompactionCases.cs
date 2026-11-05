@@ -2229,7 +2229,7 @@ internal static class CompactionTests
                 return Task.FromResult(Summary());
             }));
             var id = await Compact(chat.Root);
-            Equal(new SessionEnd(SessionEndReason.Failed, failure), await chat.Harness.Closed, "closed");
+            Equal(SessionEnd.Failed(failure), await chat.Harness.Closed, "closed");
             await chat.Harness.CloseAsync(Context);
             // Nothing of the failed commit landed: the task is still live, without usage, entry, or submission.
             storage.Reopen();

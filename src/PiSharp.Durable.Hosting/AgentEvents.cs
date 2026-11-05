@@ -626,7 +626,7 @@ public static class AgentEvents
         {
             switch (change)
             {
-                case DocumentCommitChange document when document.Record.Kind == NestedCallKind && document.Value is { } state &&
+                case DocumentValueChange { Value: var state } document when document.Record.Kind == NestedCallKind &&
                     document.ConversationId == conversationId:
                     if (state.TryGetValue("taskId", out var nestedTask) && state.TryGetValue("result", out var nestedResult))
                         nestedResults[Integer(nestedTask)] = NestedToolExecutionResult.FromJson(nestedResult);

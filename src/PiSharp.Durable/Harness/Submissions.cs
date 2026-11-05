@@ -4,13 +4,14 @@
 // an InputEntry is typed, so only its kind is checked.
 //
 // Pi v1.5.0 sync (area deferred-commits, 6c2fd73b0): the inbox observes the Session's commits as memory adopts them
-// (Session.ObserveCommits) and skips a held one, which holds no submission.
+// (Session.FollowCommits) and skips a held one, which holds no submission.
 //
 // Pi v1.5.0 sync (area telemetry, 2ec55d808): a public admission is a pi.durable.submit span: an input's is a root of the Harness telemetry
 // linked to the caller's span, a write's a child of it. The commit runs under the span, so its entry and submission events land there, and
 // admission stores the span's carrier on the record and links a steer to the running generation's trace. An error records only the error
-// status, as its text may carry caller content. Admission returns its result with the ID (upstream Admission). The citation stays on
-// v1.2.0 until the file's other areas land.
+// status, as its text may carry caller content. Admission returns its result with the ID (upstream Admission). Pi v1.5.0 sync
+// (area vocabulary, 5f312dac4): the internal observeCommits is followCommits (Session.FollowCommits). The citation stays on v1.2.0 until
+// the file's other areas land.
 using PiSharp.Durable.Chord;
 using PiSharp.Durable.Internal;
 using PiSharp.Telemetry;
@@ -44,7 +45,7 @@ internal sealed class Submissions
         this.now = now;
         this.queueModes = queueModes;
         this.resume = resume;
-        session.ObserveCommits((publication, _) => Observe(publication));
+        session.FollowCommits((publication, _) => Observe(publication));
         session.SubscribeClose(() =>
         {
             closed = true;

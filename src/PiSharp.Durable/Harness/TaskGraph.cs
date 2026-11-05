@@ -17,11 +17,12 @@
 // Pi v1.5.0 sync (area watches, 92ab53602 and 42cb822f1): a task graph watch is Chord's Watch (Chord/Watch.cs) on the Session line's
 // scheduler, and the task graph state getter (Harness.taskGraph()) is removed.
 // Pi v1.5.0 sync (area deferred-commits, 6c2fd73b0): the graph observes the Session's commits as memory adopts them
-// (Session.ObserveCommits) and skips a held one, which changes conversation documents only.
+// (Session.FollowCommits) and skips a held one, which changes conversation documents only.
 // Pi v1.5.0 sync (area observers, 8b0caefc2 with v1.5.0's shapes): Harness.observeTaskGraph() attaches a host's Observer<T> to the mount
 // behind GuardedObserver<T> (ObserveAsync, upstream observe); the mount's observers are SyncObserver<TaskGraph>s, watches (WatchObserver<T>)
 // and guarded host observers, which a publication hands one value call. The Session's close ends a watch ended and a host observer failed
-// with "session closed" (CloseEnds). The citation stays on v1.2.0 until the file's other areas land.
+// with "session closed" (CloseEnds). Pi v1.5.0 sync (area vocabulary, 5f312dac4): the internal observeCommits is followCommits
+// (Session.FollowCommits). The citation stays on v1.2.0 until the file's other areas land.
 // Pi v1.5.0 sync (area events, f3255de76): the task graph view is spec §9.4, renumbered from §9.5 with the agent events' section removed.
 using System.Collections.Immutable;
 using PiSharp.Durable.Chord;
@@ -249,7 +250,7 @@ internal sealed class TaskGraphView
         this.session = session;
         this.storage = storage;
         this.blocked = blocked;
-        session.ObserveCommits((publication, context) =>
+        session.FollowCommits((publication, context) =>
         {
             // A commit held in memory changes documents only, which the graph does not show.
             if (publication.IsMemory) return;

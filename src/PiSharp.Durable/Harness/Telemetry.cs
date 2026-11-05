@@ -1,10 +1,11 @@
 // Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/src/harness/telemetry.ts (DURABLE_TELEMETRY_SCHEMA), ported in the
 // Pi v1.5.0 sync (area telemetry, 2ec55d808). Its closed sets list what this port can raise so far: the report kinds and reasons of
 // ReportKind and ReportReason, and the input and write submission types. Area restarts added the task_interrupted kind and the
-// restart_limit and interrupted reasons (in upstream's order, as the enums list them). Two later areas of the sync extend them with what
-// they bring: admission the continue type and submit(tx, draft)'s provisional admission span (whose part of the pi.durable.submit
-// description is left out until then), vocabulary its renames. Every
-// attribute addresses a durable record by ID or names a fixed category; none carries content.
+// restart_limit and interrupted reasons (in upstream's order, as the enums list them). 5f312dac4's renames (storage_failed for
+// session_failed, the task_too_old and migration_failed reasons, the descriptions naming Report.kind) came with area reports' ReportKind and
+// ReportReason (area vocabulary checked them). Area admission extends the sets with what it brings: the continue type and submit(tx,
+// draft)'s provisional admission span (whose part of the pi.durable.submit description is left out until then). Every attribute addresses
+// a durable record by ID or names a fixed category; none carries content.
 using PiSharp.Telemetry;
 
 namespace PiSharp.Durable;

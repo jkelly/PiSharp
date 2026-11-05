@@ -1,8 +1,9 @@
-// Pi 2ec55d808 (MIT): packages/durable/test/harness-telemetry.test.ts, ported in the Pi v1.5.0 sync (area telemetry) from the text of
-// that commit's cases as f9a26365 has them. The file is also changed by areas tools-schema (pi-schema parameters, here JSON Schema),
-// observers (observeCommits, here SubscribeCommits, the v1.2.0 form this port keeps until that area lands) and vocabulary, so its citation
-// names the telemetry commit. Every case records into a fresh InMemoryTelemetryContext, or a throwing in-process adapter: nothing leaves
-// the process. Adaptations, beyond those of ChatSupport.cs and HarnessSupport.cs:
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/test/harness-telemetry.test.ts, ported in the Pi v1.5.0 sync (area
+// telemetry, 2ec55d808) from the text of its cases as f9a26365 has them. The file's other areas: tools-schema (pi-schema parameters, here the
+// JSON Schema obj() builds), observers (8b0caefc2's case of telemetry adapters that throw while a commit is published) and vocabulary
+// (5f312dac4: observeCommits({ advance, end }) is ObserveCommits with a CommitObserver, whose throwing advance is reported once, detached
+// and ended listener_error; onReport({ error, ...info }), ReportFrom by kind and SessionEnd by kind). Every case records into a fresh
+// InMemoryTelemetryContext, or a throwing in-process adapter: nothing leaves the process. Adaptations, beyond those of ChatSupport.cs and HarnessSupport.cs:
 // - toMatchObject/toEqual of recorded spans compare the fields upstream names; carriers compare by their entries; JSON.stringify of a span
 //   is Dump, its name, attributes, events, links and status. A thrown Error's `name` is the exception's type name here, so the faulted
 //   case throws a PrivateExceptionName exception.
@@ -880,13 +881,13 @@ internal static class TelemetryTests
             var telemetry = new InMemoryTelemetryContext();
             var (harness, root) = await OpenTracked(new MemoryStorage(), setup, telemetry);
             var error = new InvalidOperationException("private-noop-report");
-            var observation = harness.SubscribeCommits((_, _) => throw error);
+            var observation = harness.ObserveCommits(new CommitObserver((_, _) => throw error, _ => { }));
             await root.CommitAsync(tx => tx.AppendEntryAsync(root.Id, new EntryDraft { Kind = "app.note" }), Context);
             await Eventually(() => setup.Reports.Count > 0);
             Check(setup.Reports.Snapshot().SequenceEqual<Exception>([error]), "reports");
             Equal(0, telemetry.GetSpans().Count, "spans");
             SameAttributes([new SpanAttributes { ["type"] = "listener_error" }], MetricAttributes(telemetry, "pi.durable.reports"), "report counters");
-            observation.Dispose();
+            observation.Detach();
             await harness.CloseAsync(Context);
         });
 
@@ -897,10 +898,10 @@ internal static class TelemetryTests
             setup.Faux.SetResponses(FauxAssistantMessage("answer"));
             var (harness, root) = await OpenTracked(new MemoryStorage(), setup, telemetry);
             var error = new InvalidOperationException("private-listener-error");
-            var observation = harness.SubscribeCommits((publication, _) =>
+            var observation = harness.ObserveCommits(new CommitObserver((publication, _) =>
             {
                 if (publication.Changes.Any(change => change is EntryWrite { Value.Kind: "pi.user" })) throw error;
-            });
+            }, _ => { }));
             await (await root.SubmitAsync(SubmissionDraft.Input("input"), Context)).WaitAsync(Context);
             await harness.WaitForIdleAsync(Context);
             await AllSettled(telemetry);
@@ -908,7 +909,7 @@ internal static class TelemetryTests
             var span = telemetry.GetSpans().First(span => span.Name == "pi.durable.submit");
             Check(Contains(span.Events, Event("pi.durable.report", new SpanAttributes { ["type"] = "listener_error" })), $"submit events: {Dump(span)}");
             Check(!Dump(telemetry.GetSpans()).Contains("private-listener-error", StringComparison.Ordinal), "no error text");
-            observation.Dispose();
+            observation.Detach();
             await harness.CloseAsync(Context);
         });
 
@@ -919,8 +920,8 @@ internal static class TelemetryTests
             setup.Faux.SetResponses(FauxAssistantMessage("answer"));
             var (harness, root) = await OpenTracked(new MemoryStorage(), setup, telemetry);
             var failed = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-            var observation = harness.SubscribeCommits((publication, _) =>
-                publication.Changes.Any(change => change is EntryWrite { Value.Kind: "pi.user" }) ? failed.Task : Task.CompletedTask);
+            var observation = harness.ObserveCommits(new CommitObserver((publication, _) =>
+                publication.Changes.Any(change => change is EntryWrite { Value.Kind: "pi.user" }) ? failed.Task : Task.CompletedTask, _ => { }));
             await (await root.SubmitAsync(SubmissionDraft.Input("input"), Context)).WaitAsync(Context);
             await harness.WaitForIdleAsync(Context);
             await AllSettled(telemetry);
@@ -930,7 +931,7 @@ internal static class TelemetryTests
             Check(setup.Reports.Snapshot().SequenceEqual<Exception>([error]), "reports");
             SameAttributes([new SpanAttributes { ["type"] = "listener_error" }], MetricAttributes(telemetry, "pi.durable.reports"), "report counters");
             Check(!Dump(telemetry.GetSpans()).Contains("private-async-listener-error", StringComparison.Ordinal), "no error text");
-            observation.Dispose();
+            observation.Detach();
             await harness.CloseAsync(Context);
         });
 
@@ -1000,7 +1001,7 @@ internal static class TelemetryTests
                 return Task.CompletedTask;
             });
             var hosts = new SyncList<Seq>();
-            harness.SubscribeCommits((publication, _) => hosts.Add(publication.Seq));
+            harness.ObserveCommits(new CommitObserver((publication, _) => hosts.Add(publication.Seq), _ => { }));
             var failing = Context.WithTelemetry(new ThrowingEvents());
             var (entry, created) = await root.CommitAsync(async tx =>
             {
@@ -1027,7 +1028,7 @@ internal static class TelemetryTests
             var (harness, _, reports) = opened;
             var root = await harness.RootAsync(Context);
             var bug = new InvalidOperationException("listener bug");
-            harness.SubscribeCommits((_, _) => throw bug);
+            harness.ObserveCommits(new CommitObserver((_, _) => throw bug, _ => { }));
             await root.CommitAsync(tx => tx.AppendEntryAsync(root.Id, new EntryDraft { Kind = "note", Data = JsonObjectValue.Empty }), Context);
             // The listener runs in the commit's publication; a throw escaping its report would fail the commit there.
             await Flush();

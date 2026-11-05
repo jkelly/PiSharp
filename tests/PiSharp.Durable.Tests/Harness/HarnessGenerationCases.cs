@@ -19,11 +19,13 @@
 // core.client-identity-attribution). Both also run as harness.generation.jsonl.* and harness.generation.sqlite.*.
 // Pi v1.5.0 sync (area reports): "resolves settings over the built-in defaults" expects afterFailedRun: "keep" (a30c2a81d); its
 // restartLimit (area restarts) arrives with its area.
-// Pi v1.5.0 sync (area deferred-commits, 6c2fd73b0): livePublications observes commits as memory adopts them (SessionTests.ObserveCommits,
-// upstream observeCommits), and "resolves settings over the built-in defaults" expects progress.persistWithinMs 1000, the default for -1,
-// and 0 kept. "stores partials as deltas ..." stores deferred partials within 100 ms, as e5c6182ba's does.
+// Pi v1.5.0 sync (area deferred-commits, 6c2fd73b0): livePublications observes commits as memory adopts them, and "resolves settings over
+// the built-in defaults" expects progress.persistWithinMs 1000, the default for -1, and 0 kept. "stores partials as deltas ..." stores
+// deferred partials within 100 ms, as e5c6182ba's does.
 // Pi v1.5.0 sync (area run-failure, f3255de76): the cases whose run ends without an answer expect f3255de76's pi.live.runFailure where
 // v1.2.0 expected an empty pi.live; the faulted run's detail contains "non-finite number" (see above).
+// Pi v1.5.0 sync (area vocabulary, 5f312dac4): livePublications follows commits with SessionTests.FollowCommits (upstream followCommits,
+// was observeCommits) and reads the document changes of kind change (DocumentValueChange).
 #pragma warning disable PISHARP_IDENTITY001 // PiSharp.AI's ClientIdentity (Pi v1.5.0) is experimental.
 using System.Collections.Immutable;
 using System.Text.RegularExpressions;
@@ -76,10 +78,10 @@ internal static class GenerationTests
     private static SyncList<JsonObjectValue> LivePublications(IHarness harness)
     {
         var values = new SyncList<JsonObjectValue>();
-        ObserveCommits(harness, (publication, _) =>
+        FollowCommits(harness, (publication, _) =>
         {
             foreach (var change in publication.Changes)
-                if (change is DocumentCommitChange { Record.Kind: "pi.live", Value: { } value }) values.Add(value);
+                if (change is DocumentValueChange { Record.Kind: "pi.live", Value: var value }) values.Add(value);
         });
         return values;
     }

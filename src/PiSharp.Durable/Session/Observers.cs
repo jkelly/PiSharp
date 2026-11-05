@@ -2,7 +2,8 @@
 // guardObserver, ENDED, closeEnds, closeEndOf and observation, which Session.cs, Harness/View.cs and Harness/TaskGraph.cs attach with.
 // Pi v1.5.0 sync, area observers (8b0caefc2, with v1.5.0's shapes): Session.observeDoc(), Harness.observeConversation() and
 // Harness.observeTaskGraph() attach a host's Observer<T> behind GuardedObserver<T>, and the document, view and task graph watches are
-// observers of the same sources (WatchObserver<T>).
+// observers of the same sources (WatchObserver<T>). Pi v1.5.0 sync, area vocabulary (5f312dac4): the guard (ObserverGuard<TCall>) is
+// generic over the call, as upstream's guardObserver<A> is, so Session.observeCommits() attaches a CommitObserver behind the same rule.
 //
 // Adaptations:
 // - Upstream's structural observer types are classes: SyncObserver<T> is what a source holds, a watch (WatchObserver<T>) or a guarded host
@@ -55,27 +56,54 @@ internal sealed class WatchObserver<T>(Watch<T> watch) : SyncObserver<T>
 }
 
 /// <summary>
-/// A host's <see cref="Observer{T}"/> behind the rule for observers that run at a commit's publication (upstream <c>guardObserver</c>):
-/// one that throws, or whose advance returns a task that faults, is reported, detached, and ended <see cref="WatchEndKind.ListenerError"/>
-/// with the error, so the throw never reaches the publication; nothing reaches it after its detach or end, and from then on the guard
-/// references neither it nor its source. The constructor's detach is the source's; <see cref="Detach"/> is the observation's.
+/// A host's <see cref="Observer{T}"/> behind the rule for observers that run at a commit's publication (upstream <c>guardObserver</c>;
+/// <see cref="ObserverGuard{TCall}"/>). The constructor's detach is the source's; <see cref="Detach"/> is the observation's.
 /// </summary>
 internal sealed class GuardedObserver<T> : SyncObserver<T>, IDetachable
 {
-    private Attached? attached;
+    private readonly ObserverGuard<WatchCall<T>> guard;
 
     /// <param name="observer">The host's observer.</param>
     /// <param name="detach">The source's detach, run once.</param>
     /// <param name="report">Reports an error of the observer, with the context of the call that threw, if any.</param>
     public GuardedObserver(Observer<T> observer, Action detach, Action<Exception, DurableContext?> report) =>
-        attached = new Attached(observer, detach, report);
+        guard = new ObserverGuard<WatchCall<T>>(observer.Advance, observer.End, detach, report);
 
-    public override void Advance(WatchCall<T> call, DurableContext context)
+    public override void Advance(WatchCall<T> call, DurableContext context) => guard.Advance(call, context);
+
+    public override void End(WatchEnd end) => guard.End(end);
+
+    /// <summary>The observation's detach: idempotent.</summary>
+    public void Detach() => guard.Detach();
+}
+
+/// <summary>
+/// The rule for a host's synchronous observer that runs at a commit's publication (upstream <c>guardObserver</c>, generic over the call as
+/// upstream's <c>SyncObserver&lt;A&gt;</c> is: an <see cref="Observer{T}"/>'s <see cref="WatchCall{T}"/>, or a
+/// <see cref="CommitObserver"/>'s <see cref="CommitPublication"/>): one that throws, or whose advance returns a task that faults, is
+/// reported, detached, and ended <see cref="WatchEndKind.ListenerError"/> with the error, so the throw never reaches the publication;
+/// nothing reaches it after its detach or end, and from then on the guard references neither it nor its source. The constructor's detach
+/// is the source's; <see cref="Detach"/> is the observation's.
+/// </summary>
+internal sealed class ObserverGuard<TCall> : IDetachable
+{
+    private Attached? attached;
+
+    /// <param name="advance">The host's advance; the task of a task-returning one, otherwise null.</param>
+    /// <param name="end">The host's end.</param>
+    /// <param name="detach">The source's detach, run once.</param>
+    /// <param name="report">Reports an error of the observer, with the context of the call that threw, if any.</param>
+    public ObserverGuard(Func<TCall, DurableContext, Task?> advance, Action<WatchEnd> end, Action detach,
+        Action<Exception, DurableContext?> report) =>
+        attached = new Attached(advance, end, detach, report);
+
+    /// <summary>One call, unless the observer was detached or ended.</summary>
+    public void Advance(TCall call, DurableContext context)
     {
         if (Volatile.Read(ref attached) is not { } current) return;
         try
         {
-            var result = current.Observer.Advance(call, context);
+            var result = current.Advance(call, context);
             // A task that faults is the observer's throw, after the fact.
             if (result is not null) Session.Observe(result, error => Fault(current, error, context));
         }
@@ -85,9 +113,10 @@ internal sealed class GuardedObserver<T> : SyncObserver<T>, IDetachable
         }
     }
 
-    public override void End(WatchEnd end)
+    /// <summary>The end, once, unless the observer was detached or ended.</summary>
+    public void End(WatchEnd end)
     {
-        if (Release() is { } ending) Session.Contained(() => ending.Observer.End(end), error => ending.Report(error, null));
+        if (Release() is { } ending) Session.Contained(() => ending.End(end), error => ending.Report(error, null));
     }
 
     /// <summary>The observation's detach: idempotent.</summary>
@@ -107,10 +136,11 @@ internal sealed class GuardedObserver<T> : SyncObserver<T>, IDetachable
         current.Report(error, context);
         if (Release() is null) return;
         var end = WatchEnd.ListenerError(error);
-        Session.Contained(() => current.Observer.End(end), endError => current.Report(endError, null));
+        Session.Contained(() => current.End(end), endError => current.Report(endError, null));
     }
 
-    private sealed record Attached(Observer<T> Observer, Action Detach, Action<Exception, DurableContext?> Report);
+    private sealed record Attached(Func<TCall, DurableContext, Task?> Advance, Action<WatchEnd> End, Action Detach,
+        Action<Exception, DurableContext?> Report);
 }
 
 /// <summary>
