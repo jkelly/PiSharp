@@ -6411,8 +6411,8 @@
       ],
       "pisharp": [
         "samples/Durable.Examples/ExamplesHarnessRegistry.cs (new)",
+        "src/PiSharp.Durable.Store/RegistryReader.cs (new)",
         "src/PiSharp.Durable/Harness/Registry.cs",
-        "src/PiSharp.Durable/Harness/RegistryReader.cs (new)",
         "src/PiSharp.Durable/Harness/TaskGraph.cs",
         "src/PiSharp.Durable/Harness/View.cs",
         "src/PiSharp.Durable/Session/Session.cs",

@@ -15,6 +15,8 @@
 // keep their names, and TranscriptItem and TranscriptView are ConversationTranscriptItem and ConversationTranscriptView (Transcript.cs).
 // Area events (f3255de76): watchEvents and its types (AgentEvent, AgentEventStream, SnapshotEvent, MessageChange, ToolEventCall) are no
 // longer exported, as upstream removed them; PiSharp.Durable.Hosting keeps the projection, PiSharp-only, for the device wire (AgentEvents.cs).
+// Area registry-reader (6eb99ad65): the registryReader export is RegistryReader.Create in PiSharp.Durable.Store (RegistryReader.cs), which
+// needs Chord v2's registry value, so PiSharp.Durable keeps no reference to PiSharp.Chord (decision 0005 §4).
 namespace PiSharp.Durable;
 
 /// <summary>The upstream source this port follows (decision 0005): Pi's <c>packages/durable</c> and the Chord subset it uses, at the

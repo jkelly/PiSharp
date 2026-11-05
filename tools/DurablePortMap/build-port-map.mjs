@@ -60,7 +60,10 @@ function sourcePlan(path) {
   if (sub === 'storage/indexeddb.ts') return [null, null, 'excluded', 'Browser storage over IndexedDB (decision 0013, targets .NET cannot run; applicability row durable.indexeddb-storage is no-op)'];
   if (sub.endsWith('.d.ts')) return [null, null, 'excluded', 'Ambient type declarations for a WebAssembly module; no C# counterpart'];
   let [phase, project, dir] = ['P2', 'PiSharp.Durable', ''];
-  if (parts[0] === 'harness') [phase, project, dir] = [harnessPhase[base] ?? 'P6', 'PiSharp.Durable', 'Harness'];
+  // Area registry-reader: registryReader needs Chord v2's registry value, so it is the adapter project PiSharp.Durable.Store's (decision
+  // 0013, phase 4).
+  if (sub === 'harness/registry-reader.ts') [phase, project, dir] = ['P6', 'PiSharp.Durable.Store', ''];
+  else if (parts[0] === 'harness') [phase, project, dir] = [harnessPhase[base] ?? 'P6', 'PiSharp.Durable', 'Harness'];
   else if (parts[0] === 'session') [phase, project, dir] = ['P3', 'PiSharp.Durable', 'Session'];
   else if (parts[0] === 'storage' && parts.length > 2 && parts[1] === 'sqlite') [phase, project, dir] = ['P5', 'PiSharp.Durable.Sqlite', ''];
   else if (parts[0] === 'storage' && parts.length > 2 && parts[1] === 'jsonl') [phase, project, dir] = ['P4', 'PiSharp.Durable', 'Storage/Jsonl'];

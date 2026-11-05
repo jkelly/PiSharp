@@ -1,5 +1,5 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/src/types.ts (entry drafts and typed entries, commit publications,
-// the Tx and Session surfaces, document states and watches; split from Types.cs). Upstream's overloads keyed by token type become one C#
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/src/types.ts (entry drafts and typed entries, commit publications,
+// the Tx and Session surfaces, document watches and observers; split from Types.cs). Upstream's overloads keyed by token type become one C#
 // overload per token type; its `(...) => void` disposers become IDisposable; its promises become tasks. A document value is a
 // JsonObjectValue.
 // Pi v1.5.0 sync (area watches, 92ab53602 and 42cb822f1): the watch types are Chord's (Chord/Watch.cs: IWatchHandle<T>, WatchEnd,
@@ -16,8 +16,10 @@
 // DocumentRetireChange (a retirement), where a retirement used to be a null value. Area publication-caches (8b0caefc2, 5f312dac4 and
 // e5c6182ba): ObserveCommits gives the C# publication order (after the Session's own observers, only for a commit published while an
 // observer was attached, to the observers attached when its dispatch runs), and Tx results are shared with the read caches and context
-// ranges, which upstream may freeze and PiSharp's immutable records need not. The citation stays on v1.2.0 until the file's other areas
-// land.
+// ranges, which upstream may freeze and PiSharp's immutable records need not. Area admission (fb524dd2e): a settled submission's answer
+// is a placed input's or continue's. Area group-commit (e5c6182ba): ITx.LatestEntryIdAsync (tx.latestEntryId), and ISession.CommitAsync's
+// doc says a callback may run while earlier commits are stored, waiting at its first read or write of what one wrote (area
+// registry-reader: upstream's wording).
 using System.Collections.Immutable;
 using PiSharp.Durable.Chord;
 using PiSharp.Durable.Chord.Delta;
@@ -520,7 +522,10 @@ public interface ISession : IDocumentObserver, IDocumentReader
 
     /// <summary>Runs one atomic transaction on the Session mutation line and returns the callback's result. Inside the callback read only
     /// through the transaction: <c>SnapshotAsync</c>, <c>WatchDocAsync</c> and the other Session and runtime reads may queue on the line the
-    /// callback holds, and then never complete. <paramref name="options"/> may defer storing it (<see cref="CommitPersistence"/>).</summary>
+    /// callback holds, and then never complete. <paramref name="options"/> may defer storing it (<see cref="CommitPersistence"/>). The
+    /// callback may run while an earlier commit is being stored: at its first read or write of what an unpublished commit wrote, it waits
+    /// until that commit is stored and published; code before that runs early, so act on what it computes only once the commit completes.
+    /// Completes once the commit is stored and published, after every earlier commit's outcome.</summary>
     Task<T> CommitAsync<T>(Func<ITx, Task<T>> change, DurableContext context, CommitOptions? options = null);
     /// <summary>Runs one atomic asynchronous transaction on the Session mutation line.</summary>
     Task CommitAsync(Func<ITx, Task> change, DurableContext context, CommitOptions? options = null);

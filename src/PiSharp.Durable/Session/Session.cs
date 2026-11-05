@@ -1,7 +1,10 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/src/session/session.ts (createSession, setDefaultDocumentRetention,
-// documentRetention, SessionImpl, contained, GuardedStorage, observedOperations, cancellationError). Pi v1.5.0 sync (area
-// harness-options): a read-only Session refuses commits with writes (upstream be14d9732); the citation stays on v1.2.0 until the file's
-// other areas land. Pi v1.5.0 sync (area storage-batches): a commit sends its writes as one batch of the batched Storage.commit and judges
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/src/session/session.ts (createSession, setDefaultDocumentRetention,
+// documentRetention, persistWithin, ObservedCommit, SessionImpl, contained, GuardedStorage, cancellationError, and the document follower's
+// atAddress, abortWatch and detachObservation, the last two inline at the attachment they undo); its observer helpers (SyncObserver,
+// GuardedObserver, guardObserver, ENDED, closeEnds, closeEndOf, observation, and createWatch, endWatch and endGuarded as WatchObserver<T>
+// and SyncObserver<T>.OwnerEnded) are Session/Observers.cs. Pi v1.5.0 sync (area
+// harness-options): a read-only Session refuses commits with writes (upstream be14d9732). Pi v1.5.0 sync (area storage-batches): a commit
+// sends its writes as one batch of the batched Storage.commit and judges
 // the result, as session/writer.ts does for a call of one part: a refusal fails the Session and is the commit's error, as a rejection is.
 // Group commit (several parts per call) and the publication scope (Storage.publishing) came with area group-commit (below); GuardedStorage
 // forwards both. Pi v1.5.0 sync (area sleep): createSession's setTimer arms the document sweep as a background timer (upstream
@@ -10,11 +13,11 @@
 // listener's throw listener_error, the default. Pi v1.5.0 sync (area telemetry, 2ec55d808 and v1.5.0's fix): a stored commit's publication
 // records its committed entries (pi.durable.entry) and settled submissions (pi.durable.submission) on the commit context's span first,
 // listeners or not; a throwing telemetry adapter is reported host_error telemetry with that context and the commit stands. A listener's
-// report, and the Session's failure from a commit, carry the commit context, so the Harness records them on its span. Pi v1.5.0 sync
-// (area watches, 92ab53602 and 42cb822f1): a document watch is Chord's Watch (Chord/Watch.cs) on the Session line's scheduler; the Session
-// ends it ended at close, failed with its failure, and delivers a retirement as its last call (a null value, [["r", null]] and retired),
-// after which it ends ended (Chord's endAfterDelivery). documentState() is removed, and Durable no longer uses Chord's replicatedState().
-// Pi v1.5.0 sync (area watch-folding, 8b0caefc2 and 5f312dac4): instead, a document watch follows its address (DocumentFollower, upstream
+// report carries the commit context, so the Harness records it on its span; the Session's failure from a commit is reported without one,
+// as upstream's writer host passes none (fail(error, undefined, at, own), area registry-reader). Pi v1.5.0 sync (area watches, 92ab53602
+// and 42cb822f1): a document watch is Chord's Watch (Chord/Watch.cs) on the Session line's scheduler; the Session ends it ended at close,
+// or failed with its failure. documentState() is removed, and Durable no longer uses Chord's replicatedState().
+// Pi v1.5.0 sync (area watch-folding, 8b0caefc2 and 5f312dac4): a document watch follows its address (DocumentFollower, upstream
 // #observeDocument with createWatch and endWatch): a retirement is a retired call with the last value and no ops, a later incarnation
 // arrives as [["r", value]], the current incarnation is pinned (nothing while the address is absent), and a task document's watch ends
 // ended after the retirement call of the commit that makes its task terminal. Its value is never null. Publication at adoption came with
@@ -61,10 +64,12 @@
 // adopted, a task's entry dropped when it ends), so a terminal commit of such a task scans no documents. A read-only Session keeps none of them.
 // Both caches take a stored batch right before it is published (WriterHost.Stored, inside the Storage's publication scope); a throw there
 // leaves memory behind what is stored, so it fails the Session as an adoption error does and the call's later parts stay unpublished.
-// Publication order of a stored commit (AdoptCommit, Publish), upstream's: (1) the read caches, the transaction's adoption into memory and
-// the task-document index; (2) its telemetry events, then the Session's own observers (FollowCommits: the scheduler, submissions, views,
-// watches), contained, the first throw failing the Session once the storage call settled, after the host observers got the commit;
-// (3) its keys leave; (4) the ObserveCommits host observers, only when one was attached as the publication began, and then the observers
+// Publication order of a stored commit (AdoptCommit, Publish), upstream's apart from (3): (1) the read caches, the transaction's adoption
+// into memory, the task-document index and the release of the held changes it stored; (2) its telemetry events, then the Session's own
+// observers (FollowCommits: the scheduler, submissions, views, watches), contained, the first throw failing the Session once the storage
+// call settled, after the host observers got the commit; (3) its keys leave (upstream drops them before the publication runs, as nothing
+// else runs until it returns; here a job on another thread could then read memory not yet adopted, Session/Writer.cs); (4) the
+// ObserveCommits host observers, only when one was attached as the publication began, and then the observers
 // attached by the time the dispatch runs (upstream: one microtask later, queued before the own observers ran); (5) what the own observers
 // deferred (AfterPublication, Defer), in order: resumed task, idle and submission waits, abort signals, the scheduler's reservation passes
 // and reconcile, watch deliveries (upstream's microtasks and promise continuations behind the dispatch). All of it runs on the publishing
@@ -73,7 +78,14 @@
 // saw it; a wait registered before the publication always resumes after (4). Locks: CachedStorage and ConversationTails each guard their
 // maps with one short lock of their own, held for no Storage call or callback, and taskDocumentsGate guards the index; none of them is
 // taken while another Session lock is held, except the tails' lock under the scheduler's gate (ConversationContext.IsKnownTail), never the
-// reverse. The citation stays on v1.2.0: area registry-reader changes this file too.
+// reverse.
+// Pi v1.5.0 sync (area registry-reader, the re-pin): the writer host's fail takes no context, as upstream's. The file matches session.ts at
+// v1.5.0 apart from the adaptations in this header and these PiSharp hardenings: a host timer's disarm (the document sweep's and the hold
+// timer's, at close and on re-arming) is contained and reported host_error setTimer, where upstream's throw would propagate from the call
+// that disarms; the held changes a commit stored are released before its publication (step 1), where upstream releases them right after
+// the publication's synchronous part, since here a job on another thread could otherwise find them still held; and FollowCommits and
+// SubscribeClose wrap each subscription, so one delegate subscribed twice runs twice and each disposer removes its own (upstream's Sets
+// hold a function once).
 //
 // Concurrency model. Upstream relies on one JavaScript thread: `#enqueue` chains every mutation and cold load onto one promise, the writer
 // publishes between line jobs, and listeners run in later microtasks. Here .NET callers may be on any thread, so:
@@ -2313,8 +2325,8 @@ public class Session : ISession
 
         public Exception? Failure => session.failure?.Error;
 
-        public void Fail(Exception error, long? at, IReadOnlyCollection<long> own, DurableContext? context) =>
-            session.Fail(error, context, at, own);
+        // Upstream's (error, at, own) => this.fail(error, undefined, at, own): reported without a commit's context.
+        public void Fail(Exception error, long? at, IReadOnlyCollection<long> own) => session.Fail(error, null, at, own);
 
         public void Report(Exception error, DurableContext context) => session.Report(error, ReportInfo.ListenerError, context);
     }
@@ -2327,7 +2339,7 @@ public class Session : ISession
 }
 
 /// <summary>
-/// What the Session's own components observe of one commit (<c>Session.ObserveCommits</c>; upstream <c>ObservedCommit</c>): a stored commit
+/// What the Session's own components observe of one commit (<c>Session.FollowCommits</c>; upstream <c>ObservedCommit</c>): a stored commit
 /// with its own changes, or a deferred one adopted in memory only (<see cref="CommitPersistence"/>), which changes documents only. Memory is
 /// never behind: a later store of held changes is not observed again.
 /// </summary>

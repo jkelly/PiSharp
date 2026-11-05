@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/src/harness/view.ts (ConversationView, ConversationViews,
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/src/harness/view.ts (ConversationView, ConversationViews,
 // conversationViews, advance, prefixed).
 //
 // Upstream's ConversationView is a plain JSON object {conversation, entries, docs}; here it is a typed immutable class whose ToJson() is
@@ -33,8 +33,10 @@
 // document's retirement is a DocumentRetireChange (change.kind === "retire", was a null value).
 // Pi v1.5.0 sync (area group-commit-scheduler, e5c6182ba): a mount hydrates, and an observer's window and its create callback read, on
 // the line through the line's Storage (ReadOnLineAsync's argument), which waits for what an unpublished commit wrote, so nothing a
-// publication then applies is in the mount already; the guarded Storage field is gone. The citation stays on v1.2.0 until the file's
-// other area lands (registry-reader).
+// publication then applies is in the mount already; the guarded Storage field is gone.
+// Matches view.ts at v1.5.0 apart from the adaptations above and one PiSharp addition: the internal ViewObserver (Hosting's projection) is
+// a watch for the Session's close (SyncObserver<T>.IsWatch), so close ends it ended where upstream, which has no such observer, would end
+// a non-watch observer failed with "session closed" (area registry-reader, the re-pin).
 using System.Collections.Immutable;
 using PiSharp.Durable.Chord;
 using PiSharp.Durable.Chord.Delta;

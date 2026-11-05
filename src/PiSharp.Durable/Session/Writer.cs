@@ -60,8 +60,9 @@ internal interface IWriterHost
     /// <summary>The Session's failure, if it failed.</summary>
     Exception? Failure { get; }
     /// <summary>Fails the Session; <paramref name="at"/> is the line index of the first job whose outcome the failure is (null: the job on the
-    /// line), and <paramref name="own"/> the jobs after it whose outcome is still their own error (the other parts of a call that rejected).</summary>
-    void Fail(Exception error, long? at, IReadOnlyCollection<long> own, DurableContext? context);
+    /// line), and <paramref name="own"/> the jobs after it whose outcome is still their own error (the other parts of a call that rejected).
+    /// It takes no context, as upstream's <c>fail(error, at, own)</c>: the Session reports the failure without one.</summary>
+    void Fail(Exception error, long? at, IReadOnlyCollection<long> own);
     /// <summary>Reports an own observer's throw that cannot fail the Session, as it fails with a storage error.</summary>
     void Report(Exception error, DurableContext context);
 }
@@ -189,7 +190,7 @@ internal sealed class Writer(IWriterHost host)
 
     /// <summary>Why the publication of a call stopped: the error, the line index whose outcome it is, and whether it failed the Session from
     /// outside the call.</summary>
-    private sealed record Stop(Exception Error, long At, bool External, DurableContext Context);
+    private sealed record Stop(Exception Error, long At, bool External);
 
     /// <summary>
     /// Publishes the received parts and held ones in order, a hop apart, and settles every part (group commit 3.4). A refusal, a rejection, or
@@ -223,7 +224,7 @@ internal sealed class Writer(IWriterHost host)
                         ? refused
                         : new InvalidOperationException("Storage committed without adopting the batch"));
                 failing.Add((part, error, false));
-                stop = new Stop(error, part.Spec.Index, false, part.Spec.Context);
+                stop = new Stop(error, part.Spec.Index, false);
                 continue;
             }
             // A hop between two parts: what the first resolves is scheduled before the second is published.
@@ -252,14 +253,14 @@ internal sealed class Writer(IWriterHost host)
             if (publication is not null) await publication.ConfigureAwait(false);
             if (external is not null)
             {
-                stop = new Stop(external, part.Spec.Index, true, part.Spec.Context);
+                stop = new Stop(external, part.Spec.Index, true);
                 failing.Add((part, null, false));
                 continue;
             }
             if (failure is { Adoption: true })
             {
                 failing.Add((part, failure.Error, true));
-                stop = new Stop(failure.Error, part.Spec.Index, false, part.Spec.Context);
+                stop = new Stop(failure.Error, part.Spec.Index, false);
                 continue;
             }
             // A part published while its call rejected is durable but faults (spec 10.1); an own observer's throw is then reported, as the
@@ -271,7 +272,7 @@ internal sealed class Writer(IWriterHost host)
                 continue;
             }
             // An own observer's throw: the commit stands; the Session fails after it.
-            if (failure is not null) stop = new Stop(failure.Error, part.Spec.Index, false, part.Spec.Context);
+            if (failure is not null) stop = new Stop(failure.Error, part.Spec.Index, false);
             if (host.Failure is { } failedMeanwhile && failure is null) part.Reject(new SessionFailedException(failedMeanwhile));
             else part.Resolve();
             Open(part);
@@ -281,8 +282,8 @@ internal sealed class Writer(IWriterHost host)
             // Every part of the call that rejected keeps the storage error; the first of them is the failure's boundary.
             var own = failing.Where(entry => entry.Own is not null).Select(entry => entry.Part.Spec.Index).ToList();
             if (rejected is not null)
-                host.Fail(rejected, own.Count > 0 ? own[0] : null, own, failing.Count > 0 ? failing[0].Part.Spec.Context : null);
-            else host.Fail(stop!.Error, stop.At, own, stop.Context);
+                host.Fail(rejected, own.Count > 0 ? own[0] : null, own);
+            else host.Fail(stop!.Error, stop.At, own);
         }
         foreach (var (part, own, wasPublished) in failing)
         {
@@ -317,7 +318,7 @@ internal sealed class Writer(IWriterHost host)
     /// </summary>
     private void Abandon(List<Part> parts, Exception error)
     {
-        host.Fail(error, parts[0].Spec.Index, [], parts[0].Spec.Context);
+        host.Fail(error, parts[0].Spec.Index, []);
         foreach (var part in parts)
         {
             if (!part.Done) Unpublish(part, Failed(error));
