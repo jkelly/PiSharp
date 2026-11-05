@@ -26,7 +26,7 @@
 // phase moves to poll), and with no retry left the run ends runFailure interrupted, cancelling a polled deferred response. Every phase
 // first ends a generation cut off settings.restartLimit times (EndCutOff): runFailure restart_limit, keeping the partial and cancelling the
 // deferred response only at the limit, not past it. The abort handler cancels the deferred response a retry would poll again (DeferredOf).
-// The finish and drain phases with their cut-off ends are area run-end's (7e15f9601). PiSharp-only (decision 0011): the next attempt after
+// The finish and drain phases end themselves too (EndAnsweredCutOffAsync, area run-end). PiSharp-only (decision 0011): the next attempt after
 // an interrupted request is that request recovered, so it keeps the stream metadata the request was prepared with (a host's op and
 // account, SessionStreamMetadata): the retry checkpoint and the next prepare checkpoint carry it as metadata, pinned only when the
 // interrupted request had any, so upstream records keep their shape; the other stream options are read again at the next prepare, as
@@ -44,7 +44,22 @@
 // the round that reaches the phase agent's maxTurns runs its tools and then ends the run like a failure, unanswered with turn_limit and
 // detail "1 turn" or "N turns": settings.afterFailedRun decides the queued inputs, and a continue resumes on the round's results. answer
 // decides an onYield continuation from the inbox before the final boundary places anything (TakesContinuation), and the continuation starts
-// the count over. Until area run-end (38ff99177) lands, a handoff still ends its run done, as in v1.2.0, so it is never turn_limit.
+// the count over.
+// Pi v1.5.0 sync (area run-end, 38ff99177, 7e15f9601, #11141): a tool round's handoff appends its reset first and then continues the run in
+// the new context at the postTools boundary (a terminate round still ends it at the final boundary, and the turn limit and a queued reset
+// still end it), with queued writes and selected steers placed after the reset. With an afterRun hook selected (AsksAfterRunAsync), a run
+// that answers (a final answer without a taken continuation, or a terminate round) holds pi.live.run in commit A (HoldRun): its inputs
+// settle done with the answer, run.inputs becomes [], run.afterRun {}, the presentation goes, and the generation moves to finish
+// {phase, run: RunSummary}. finish asks the hooks (a crash there asks again) and checks what they asked for off the line
+// (PrepareRunEndTasks: not built-in, installed, initial() run once on the installed definition and starting at one of its phases; a
+// rejected request is skipped, and one hook's rejections throw together, reported against its extension); with none it ends the run, else
+// it creates them as its children, lists them in run.afterRun.tasks and waits in drain {phase, answer, tasks}, allSettled. drain then
+// ends the run in commit B (EndAnsweredRunAsync): the final boundary places what it selects, the run ends done, and selected user items
+// start the next run. Cut off restartLimit times in finish or drain, the generation ends completed without its tasks, the run without a
+// failure and queued items left queued, marked so the scheduler reports task_interrupted restart_limit (EndedByCrashes). An abort in
+// either ends the run without a failure (Live.EndRun). pi.live.run.first is the first entry the boundary that started a run placed
+// (BoundaryResult.First), a continue's the failed run's (Submissions.cs), otherwise its first tool-calling answer (StartToolRoundAsync);
+// RunSummary.first falls back to the answer. pi.generation stays version 2, as upstream adds the phases without a bump.
 //
 // Mappings:
 // - Checkpoints, live state and results are upstream's JSON, built in upstream's key order: prepare {phase, attempt, compacted?, overflow?},
@@ -96,6 +111,8 @@ public static partial class HarnessTasks
             ["retry"] = GenerationPhases.RetryAsync,
             ["poll"] = GenerationPhases.PollAsync,
             ["tools"] = GenerationPhases.ToolsAsync,
+            ["finish"] = GenerationPhases.FinishAsync,
+            ["drain"] = GenerationPhases.DrainAsync,
         },
         Abort = GenerationPhases.AbortAsync,
     });
@@ -123,11 +140,12 @@ public static partial class HarnessTasks
             .ConfigureAwait(false);
     }
 
-    /// <summary>Starts a run for <paramref name="inputs"/>, placed input and continue submissions: a new generation takes <c>pi.live.run</c>,
-    /// <c>{taskId, inputs, turns: 0}</c> (upstream <c>startRun</c>). Removes <c>runFailure</c>, unless <paramref name="keepFailure"/>: a run
-    /// started in the commit that ended the failed one keeps its failure.</summary>
+    /// <summary>Starts a run for <paramref name="inputs"/>, placed input and continue submissions, whose first entry is <paramref name="first"/>
+    /// (<c>LiveRun.first</c>): a new generation takes <c>pi.live.run</c>, <c>{taskId, inputs, turns: 0, first?}</c> (upstream <c>startRun</c>).
+    /// Removes <c>runFailure</c>, unless <paramref name="keepFailure"/>: a run started in the commit that ended the failed one keeps its
+    /// failure.</summary>
     internal static async Task StartRunAsync(ITx tx, ConversationId conversationId, DraftObject live, IEnumerable<SubmissionId> inputs,
-        bool keepFailure = false)
+        EntryId? first, bool keepFailure = false)
     {
         var ids = inputs as IReadOnlyList<SubmissionId> ?? [.. inputs];
         inputs = ids;
@@ -136,6 +154,7 @@ public static partial class HarnessTasks
             KeyValuePair.Create("taskId", (JsonValue)taskId.ToJson()),
             KeyValuePair.Create("inputs", (JsonValue)JsonValue.Array(inputs.Select(id => (JsonValue)id.ToJson()))),
             KeyValuePair.Create("turns", (JsonValue)0),
+            .. first is { } start ? [KeyValuePair.Create("first", (JsonValue)start.ToJson())] : Array.Empty<KeyValuePair<string, JsonValue>>(),
         ]));
         if (!keepFailure) live.Delete("runFailure");
     }
@@ -473,6 +492,59 @@ internal static class GenerationPhases
         }, context).ConfigureAwait(false);
     }
 
+    /// <summary>
+    /// The run answered (upstream <c>finish</c>, spec §8.3): asks the <c>afterRun</c> hooks for tasks and creates them, as the generation's
+    /// children, in the commit that moves to <c>drain</c>; without any, ends the run now. A crash here asks them again: nothing was created
+    /// yet.
+    /// </summary>
+    public static async Task FinishAsync(RunningTask task, ITaskRuntime runtime, DurableContext context)
+    {
+        var run = RunSummary.FromJson(((JsonObjectValue)task.Checkpoint)["run"]);
+        if (Live.CutOffTooOften(task, runtime))
+        {
+            await EndAnsweredCutOffAsync(runtime, task, run.Answer, context).ConfigureAwait(false);
+            return;
+        }
+        var prepared = new List<PreparedTask>();
+        await runtime.Hooks.EachAsync<GenerationHooks, Func<RunSummary, IHookApi, DurableContext, Task<IReadOnlyList<RunEndTask>?>>>(
+            hooks => hooks.AfterRun, async hook =>
+            {
+                if (await hook(run, runtime, context).ConfigureAwait(false) is { } asked) PrepareRunEndTasks(runtime, asked, prepared);
+            }).ConfigureAwait(false);
+        if (prepared.Count == 0)
+        {
+            await EndAnsweredRunAsync(runtime, run.Answer, context).ConfigureAwait(false);
+            return;
+        }
+        await runtime.CommitAsync(async (tx, _) =>
+        {
+            var tasks = new List<TaskId>();
+            foreach (var (definition, input) in prepared)
+                tasks.Add(await tx.CreateTaskAsync(definition, input, new TaskOptions(TaskOwnership.Task(runtime.TaskId))).ConfigureAwait(false));
+            var live = await tx.DocAsync(Live.LiveDoc, runtime.ConversationId).ConfigureAwait(false);
+            if (HarnessTasks.RunTaskId(live) == runtime.TaskId.Value && live.GetObject("run").ContainsKey("afterRun"))
+                live.GetObject("run").GetObject("afterRun").Set("tasks", JsonValue.Array(tasks.Select(id => (JsonValue)id.ToJson())));
+            var checkpoint = JsonValue.Object([
+                KeyValuePair.Create("phase", (JsonValue)"drain"),
+                KeyValuePair.Create("answer", (JsonValue)run.Answer.ToJson()),
+                KeyValuePair.Create("tasks", (JsonValue)JsonValue.Array(tasks.Select(id => (JsonValue)id.ToJson()))),
+            ]);
+            return (TaskState?)NextTaskState.Waiting(checkpoint, tasks, JoinPolicy.AllSettled);
+        }, context).ConfigureAwait(false);
+    }
+
+    /// <summary>The after-run tasks are terminal, whatever their outcomes: ends the run (upstream <c>drain</c>).</summary>
+    public static async Task DrainAsync(RunningTask task, ITaskRuntime runtime, DurableContext context)
+    {
+        var answer = new EntryId(Id(((JsonObjectValue)task.Checkpoint)["answer"]));
+        if (Live.CutOffTooOften(task, runtime))
+        {
+            await EndAnsweredCutOffAsync(runtime, task, answer, context).ConfigureAwait(false);
+            return;
+        }
+        await EndAnsweredRunAsync(runtime, answer, context).ConfigureAwait(false);
+    }
+
     public static async Task AbortAsync(RunningTask task, ITaskRuntime runtime, DurableContext context)
     {
         var checkpoint = (JsonObjectValue)task.Checkpoint;
@@ -501,6 +573,7 @@ internal static class GenerationPhases
                     : ToolResults.HarnessError("aborted", $"Tool {name} was aborted");
                 await ToolResults.AppendToolResultAsync(tx, conversationId, call, result, runtime.Now()).ConfigureAwait(false);
             }
+            // In finish and drain the run answered already: it ends without a failure, its inputs stay done.
             Live.EndRun(tx, live, runtime.TaskId, RunEnd.Unanswered(RunFailureReason.Aborted));
             return (TaskState?)NextTaskState.Aborted();
         }, context).ConfigureAwait(false);
@@ -703,8 +776,8 @@ internal static class GenerationPhases
         Live.EndRun(tx, live, runtime.TaskId, end);
         if (failure.Policy == AfterFailedRun.Withdraw) await Inbox.WithdrawQueuedInputsAsync(tx, conversationId, "run_failed").ConfigureAwait(false);
         if (failure.Boundary is not { } boundary) return;
-        var (users, _) = await Inbox.ApplyBoundaryAsync(tx, boundary, true, runtime.Now()).ConfigureAwait(false);
-        if (!users.IsEmpty) await HarnessTasks.StartRunAsync(tx, conversationId, live, users, keepFailure: true).ConfigureAwait(false);
+        var (users, first, _) = await Inbox.ApplyBoundaryAsync(tx, boundary, true, runtime.Now()).ConfigureAwait(false);
+        if (!users.IsEmpty) await HarnessTasks.StartRunAsync(tx, conversationId, live, users, first, keepFailure: true).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -994,8 +1067,9 @@ internal static class GenerationPhases
     /// <summary>
     /// A final answer; the final boundary places queued items (upstream <c>answer</c>, spec §6). The first <c>onYield</c> continuation appends
     /// a user message and hands the run to a successor generation, starting its turn count over, but only when the inbox holds no user item
-    /// and no reset (<see cref="TakesContinuation"/>). Otherwise the run's inputs settle <c>done</c>, and selected user items start the next
-    /// run.
+    /// and no reset (<see cref="TakesContinuation"/>). Otherwise the run's inputs settle <c>done</c>; with <c>afterRun</c> hooks selected the
+    /// run waits for the tasks they ask for, in <c>finish</c> and <c>drain</c>, before the final boundary; without, selected user items start
+    /// the next run now.
     /// </summary>
     private static async Task AnswerAsync(ITaskRuntime runtime, JsonObjectValue message, DurableContext context)
     {
@@ -1006,6 +1080,7 @@ internal static class GenerationPhases
                 if (continuation is not null) return;
                 continuation = await hook(message, runtime, context).ConfigureAwait(false);
             }).ConfigureAwait(false);
+        var afterRun = await AsksAfterRunAsync(runtime, context).ConfigureAwait(false);
         var conversationId = runtime.ConversationId;
         await runtime.CommitAsync(async (tx, _) =>
         {
@@ -1015,7 +1090,9 @@ internal static class GenerationPhases
             var entry = await HarnessTasks.AppendAssistantAsync(tx, conversationId, message).ConfigureAwait(false);
             var result = NextTaskState.Completed(EntryResult(entry.Id));
             var continues = TakesContinuation(continuation, boundary) ? continuation : null;
-            var (users, _) = await Inbox.ApplyBoundaryAsync(tx, boundary, true, runtime.Now()).ConfigureAwait(false);
+            if (continues is null && afterRun && HoldRun(tx, live, runtime, RunSummaryReason.Answer, entry.Id, entry.Id) is { } held)
+                return (TaskState?)held;
+            var (users, first, _) = await Inbox.ApplyBoundaryAsync(tx, boundary, true, runtime.Now()).ConfigureAwait(false);
             if (continues is not null)
             {
                 var user = JsonValue.Object([
@@ -1031,9 +1108,125 @@ internal static class GenerationPhases
                 return (TaskState?)result;
             }
             Live.EndRun(tx, live, runtime.TaskId, RunEnd.Done(entry.Id));
-            if (!users.IsEmpty) await HarnessTasks.StartRunAsync(tx, conversationId, live, users).ConfigureAwait(false);
+            if (!users.IsEmpty) await HarnessTasks.StartRunAsync(tx, conversationId, live, users, first).ConfigureAwait(false);
             return (TaskState?)result;
         }, context).ConfigureAwait(false);
+    }
+
+    /// <summary>Whether the phase's agent selects an <c>afterRun</c> hook, so a run that answers waits for its tasks (upstream
+    /// <c>asksAfterRun</c>, spec §8.3).</summary>
+    private static async Task<bool> AsksAfterRunAsync(ITaskRuntime runtime, DurableContext context) =>
+        Agents.AgentHooks(await runtime.AgentAsync(context).ConfigureAwait(false), HarnessTasks.GenerationTask.Definition.Name)
+            .Any(hook => hook.Handlers is GenerationHooks { AfterRun: not null });
+
+    /// <summary>
+    /// Commit A of a run that answered with <c>afterRun</c> hooks selected (upstream <c>holdRun</c>, spec §8.3): settles the run's inputs
+    /// <c>done</c> with the answer and keeps <c>pi.live.run</c> for the after-run tasks, then asks the hooks in <c>finish</c>. The final
+    /// boundary waits for the run's end, so queued items stay queued. Null when the generation does not own the run.
+    /// </summary>
+    private static RunningTaskState? HoldRun(ITx tx, DraftObject live, ITaskRuntime runtime, RunSummaryReason reason, EntryId answer, EntryId last)
+    {
+        if (HarnessTasks.RunTaskId(live) != runtime.TaskId.Value) return null;
+        var run = live.GetObject("run");
+        foreach (var id in ((JsonArrayValue)run.GetArray("inputs").ToValue()).Select(id => new SubmissionId(Id(id))))
+            tx.SettleSubmission(id, SubmissionSettlement.Done(answer));
+        run.Set("inputs", JsonArrayValue.Empty);
+        run.Set("afterRun", JsonObjectValue.Empty);
+        live.Delete("generation");
+        live.Delete("tools");
+        live.Delete("nestedTools");
+        // A run started before first was recorded has its answer as its first entry.
+        var first = ((JsonObjectValue)live.Get("run")!).TryGetValue("first", out var start) && start is JsonNumberValue ? new EntryId(Id(start)) : answer;
+        var summary = new RunSummary(reason, first, answer, last);
+        return NextTaskState.Running(JsonValue.Object([
+            KeyValuePair.Create("phase", (JsonValue)"finish"),
+            KeyValuePair.Create("run", (JsonValue)summary.ToJson()),
+        ]));
+    }
+
+    /// <summary>A task an <c>afterRun</c> hook asked for, checked and ready to create (upstream <c>PreparedTask</c>).</summary>
+    private sealed record PreparedTask(DurableTask Task, JsonValue Input);
+
+    /// <summary>
+    /// Checks the tasks one <c>afterRun</c> hook asked for, off the line, and adds those that pass to <paramref name="prepared"/>, so a broken
+    /// request is skipped instead of failing the creating commit (upstream <c>prepareRunEndTasks</c>): its kind must be an installed task
+    /// that is not built-in, and its definition's <c>Initial</c> must return a JSON checkpoint of one of its phases. The task is created from
+    /// the installed definition, as every task runs under it, with that checkpoint, so <c>Initial</c> runs once. Then throws the rejections,
+    /// which the hook runner reports against the hook's extension. A C# <see cref="JsonValue"/> input is strict JSON by construction (a
+    /// non-finite number cannot be built), so upstream's copyJson check of the input rejects only a missing request, task or input here.
+    /// </summary>
+    private static void PrepareRunEndTasks(ITaskRuntime runtime, IReadOnlyList<RunEndTask> requests, List<PreparedTask> prepared)
+    {
+        var rejected = new List<Exception>();
+        foreach (var request in requests)
+        {
+            try
+            {
+                if (request?.Task is not { } requested) throw new ArgumentException("An afterRun task request names no task");
+                var name = requested.Definition.Name;
+                if (name.StartsWith("pi.", StringComparison.Ordinal)) throw new InvalidOperationException($"An afterRun hook cannot start the built-in task {name}");
+                var installed = runtime.Registry.GetTask(name) ?? throw new InvalidOperationException($"Task {name} is not installed");
+                var input = request.Input ?? throw new ArgumentException($"The afterRun request for task {name} has no input; expected strict JSON");
+                var definition = installed.Definition;
+                var checkpoint = definition.Initial(input);
+                var phase = checkpoint is JsonObjectValue fields && fields.TryGetValue("phase", out var named) ? named : null;
+                if (phase is not JsonStringValue { Value: var start } || !definition.Phases.ContainsKey(start))
+                    throw new InvalidOperationException($"Task {name} starts at the unknown phase {PhaseText(phase)}");
+                prepared.Add(new PreparedTask(Tasks.DefineTask(new TaskDefinition
+                {
+                    Name = definition.Name, Version = definition.Version, Initial = _ => checkpoint, Phases = definition.Phases,
+                    Abort = definition.Abort, Migrate = definition.Migrate, Hooks = definition.Hooks,
+                }), input));
+            }
+            catch (Exception error)
+            {
+                rejected.Add(error);
+            }
+        }
+        if (rejected.Count == 1) System.Runtime.ExceptionServices.ExceptionDispatchInfo.Throw(rejected[0]);
+        if (rejected.Count > 1) throw new AggregateException($"{rejected.Count} afterRun task requests were rejected", rejected);
+    }
+
+    /// <summary>A checkpoint's phase as upstream's <c>String(checkpoint.phase)</c> renders it.</summary>
+    private static string PhaseText(JsonValue? phase) => phase switch
+    {
+        null => "undefined",
+        JsonStringValue text => text.Value,
+        _ => phase.ToJson(),
+    };
+
+    /// <summary>
+    /// Commit B of a run that answered (upstream <c>endAnsweredRun</c>, spec §8.3): its after-run tasks are terminal, or there were none.
+    /// Places what the final boundary selects, ends the run, and starts the next one for selected user items.
+    /// </summary>
+    private static Task EndAnsweredRunAsync(ITaskRuntime runtime, EntryId answer, DurableContext context)
+    {
+        var conversationId = runtime.ConversationId;
+        return runtime.CommitAsync(async (tx, _) =>
+        {
+            var boundary = await Inbox.PrepareBoundaryAsync(tx, conversationId, runtime.Settings).ConfigureAwait(false);
+            var live = await tx.DocAsync(Live.LiveDoc, conversationId).ConfigureAwait(false);
+            var (users, first, _) = await Inbox.ApplyBoundaryAsync(tx, boundary, true, runtime.Now()).ConfigureAwait(false);
+            Live.EndRun(tx, live, runtime.TaskId, RunEnd.Done(answer));
+            if (!users.IsEmpty) await HarnessTasks.StartRunAsync(tx, conversationId, live, users, first).ConfigureAwait(false);
+            return (TaskState?)NextTaskState.Completed(EntryResult(answer));
+        }, context);
+    }
+
+    /// <summary>
+    /// Ends a run that answered once its <c>finish</c> or <c>drain</c> phase was cut off <c>settings.RestartLimit</c> times (upstream
+    /// <c>endAnsweredCutOff</c>, spec §5.4): the run answered, so it ends <c>completed</c>, without a failure and without the tasks it would
+    /// still have waited for, marked so the scheduler reports it <c>task_interrupted</c>. Queued items stay queued, as after a failed run.
+    /// </summary>
+    private static Task EndAnsweredCutOffAsync(ITaskRuntime runtime, RunningTask task, EntryId answer, DurableContext context)
+    {
+        var text = $"The generation was interrupted {Live.CutOffCount(task)} in its {task.Phase} phase";
+        return runtime.CommitAsync(async (tx, _) =>
+        {
+            var live = await tx.DocAsync(Live.LiveDoc, runtime.ConversationId).ConfigureAwait(false);
+            Live.EndRun(tx, live, runtime.TaskId, RunEnd.Done(answer));
+            return (TaskState?)DurableTaskScheduler.EndedByCrashes(NextTaskState.Completed(EntryResult(answer)), text);
+        }, context);
     }
 
     /// <summary>
@@ -1095,17 +1288,23 @@ internal static class GenerationPhases
             }
             live.Delete("generation");
             live.Set("tools", JsonValue.Array(slots));
-            // A tool round is one turn of the run (AgentState.maxTurns).
-            HarnessTasks.SetRunTurns(live, runtime.TaskId, HarnessTasks.RunTurns(live, runtime.TaskId) + 1);
+            if (HarnessTasks.RunTaskId(live) == runtime.TaskId.Value)
+            {
+                // A tool round is one turn of the run (AgentState.maxTurns).
+                HarnessTasks.SetRunTurns(live, runtime.TaskId, HarnessTasks.RunTurns(live, runtime.TaskId) + 1);
+                // A run its boundary started without placing anything, as a continue after an answer, begins here.
+                var run = live.GetObject("run");
+                if (!run.ContainsKey("first")) run.Set("first", entry.Id.ToJson());
+            }
             return (TaskState?)NextTaskState.Waiting(ToolsCheckpoint(entry.Id, tools, pending), tools, JoinPolicy.AllSettled);
         }, context).ConfigureAwait(false);
     }
 
     /// <summary>
-    /// The round's tools are terminal: applies their controls and either ends the run at the final boundary (<c>terminate</c>,
-    /// <c>handoff</c>), ends it like a failure at the conversation's turn limit (<c>turn_limit</c>), ends it at a queued reset, or hands it
-    /// to the next generation at the <c>postTools</c> boundary (upstream <c>finishToolRound</c>, spec §8.5). Pi v1.5.0 continues the run after
-    /// a handoff (area run-end, 38ff99177); here a handoff still ends it <c>done</c>, ahead of the limit.
+    /// The round's tools are terminal: applies their controls, appends a <c>handoff</c>'s reset, and then ends the run at the final boundary
+    /// (<c>terminate</c>), ends it like a failure at the conversation's turn limit (<c>turn_limit</c>), ends it at a queued reset, or hands it
+    /// to the next generation at the <c>postTools</c> boundary, in the handoff's new context when there is one (upstream
+    /// <c>finishToolRound</c>, spec §8.5). A terminate round with <c>afterRun</c> hooks selected holds the run instead (<see cref="HoldRun"/>).
     /// </summary>
     private static async Task FinishToolRoundAsync(ITaskRuntime runtime, EntryId assistant, IReadOnlyList<TaskId> tools, DurableContext context)
     {
@@ -1135,30 +1334,35 @@ internal static class GenerationPhases
             is { } last ? ((JsonStringValue)last["handoff"]).Value : null;
         // Read from the phase's agent, as every agent field; a configure() during the round applies at its end.
         var maxTurns = (await runtime.AgentAsync(context).ConfigureAwait(false)).MaxTurns;
+        var afterRun = terminate && await AsksAfterRunAsync(runtime, context).ConfigureAwait(false);
         await runtime.CommitAsync(async (tx, _) =>
         {
             var boundary = await Inbox.PrepareBoundaryAsync(tx, conversationId, runtime.Settings).ConfigureAwait(false);
             if (added.Count > 0) await Agents.AddToolsAsync(tx, conversationId, added).ConfigureAwait(false);
             var state = await tx.DocAsync(Live.LiveDoc, conversationId).ConfigureAwait(false);
             var now = runtime.Now();
-            var turns = HarnessTasks.RunTurns(state, runtime.TaskId);
-            // Until area run-end (38ff99177) a handoff ends the run done, as in Pi v1.2.0.
-            if (terminate || handoff is not null)
+            // The run's last entry so far: the newest result, or the assistant when no result has an entry.
+            var last = results.Aggregate(assistant, (newest, id) => id.Value > newest.Value ? id : newest);
+            if (handoff is not null)
             {
-                if (handoff is not null)
-                {
-                    var message = JsonValue.Object([
-                        KeyValuePair.Create("role", (JsonValue)"user"),
-                        KeyValuePair.Create("content", (JsonValue)handoff),
-                        KeyValuePair.Create("timestamp", (JsonValue)now),
-                    ]);
-                    var entry = await tx.AppendEntryAsync(Entries.ResetEntry, conversationId,
-                        new TypedEntryDraft { Head = EntryHead.Self, Model = JsonValue.Array(message) }).ConfigureAwait(false);
-                    boundary.Head = entry.Id;
-                }
-                var (users, _) = await Inbox.ApplyBoundaryAsync(tx, boundary, true, now).ConfigureAwait(false);
+                // The handoff's reset precedes every queued item, so queued writes and selected steers land in its context.
+                var message = JsonValue.Object([
+                    KeyValuePair.Create("role", (JsonValue)"user"),
+                    KeyValuePair.Create("content", (JsonValue)handoff),
+                    KeyValuePair.Create("timestamp", (JsonValue)now),
+                ]);
+                var entry = await tx.AppendEntryAsync(Entries.ResetEntry, conversationId,
+                    new TypedEntryDraft { Head = EntryHead.Self, Model = JsonValue.Array(message) }).ConfigureAwait(false);
+                boundary.Head = entry.Id;
+                last = entry.Id;
+            }
+            var turns = HarnessTasks.RunTurns(state, runtime.TaskId);
+            if (afterRun && HoldRun(tx, state, runtime, RunSummaryReason.Terminate, assistant, last) is { } held) return (TaskState?)held;
+            if (terminate)
+            {
+                var (users, first, _) = await Inbox.ApplyBoundaryAsync(tx, boundary, true, now).ConfigureAwait(false);
                 Live.EndRun(tx, state, runtime.TaskId, RunEnd.Done(assistant));
-                if (!users.IsEmpty) await HarnessTasks.StartRunAsync(tx, conversationId, state, users).ConfigureAwait(false);
+                if (!users.IsEmpty) await HarnessTasks.StartRunAsync(tx, conversationId, state, users, first).ConfigureAwait(false);
             }
             else if (maxTurns is { } limit && turns >= limit)
             {
@@ -1171,12 +1375,12 @@ internal static class GenerationPhases
             }
             else
             {
-                var (users, reset) = await Inbox.ApplyBoundaryAsync(tx, boundary, false, now).ConfigureAwait(false);
+                var (users, first, reset) = await Inbox.ApplyBoundaryAsync(tx, boundary, false, now).ConfigureAwait(false);
                 if (reset)
                 {
                     // The queued reset cut the run's context before an answer.
                     Live.EndRun(tx, state, runtime.TaskId, RunEnd.Unanswered(RunFailureReason.Reset));
-                    if (!users.IsEmpty) await HarnessTasks.StartRunAsync(tx, conversationId, state, users, keepFailure: true).ConfigureAwait(false);
+                    if (!users.IsEmpty) await HarnessTasks.StartRunAsync(tx, conversationId, state, users, first, keepFailure: true).ConfigureAwait(false);
                 }
                 else
                 {

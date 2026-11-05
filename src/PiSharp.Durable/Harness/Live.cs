@@ -1,8 +1,8 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/src/harness/live.ts (LiveDoc, endRun, compaction statuses and
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/src/harness/live.ts (LiveDoc, endRun, compaction statuses and
 // failures, tool slot lookup, finishing and nested slot removal, and settleSchedulerOutcome, the cleanup the scheduler runs for faulted and
-// orphaned outcomes). The state is upstream's JSON: {run?: {taskId, inputs, turns}, generation?: {attempt, message?, retry?, deferred?},
+// orphaned outcomes). The state is upstream's JSON: {run?: {taskId, inputs, turns, first?, afterRun?: {tasks?}}, generation?: {attempt, message?, retry?, deferred?},
 // tools?: ToolSlot[], nestedTools?: NestedToolSlot[], compactions?: [...], compactionFailure?: {taskId, trigger, error}, runFailure?:
-// {taskId, inputs, reason, detail?}}. A ToolSlot is
+// {taskId, inputs, reason, detail?, first?}}. A ToolSlot is
 // {callId, name, taskId?, unoffered?, status, output?, droppedBytes?, droppedLines?, details?, diagnostics?, entry?}; a NestedToolSlot is {callId,
 // parentCallId, parentTaskId, name, taskId, arguments, status, output?, ..., summary?: {isError, durationMs?, usage?, error?}}.
 // Upstream's run writers startRun and handOver live in generation.ts, as HarnessTasks.StartRunAsync and HandOver do in Generation.cs.
@@ -12,7 +12,7 @@
 // run as orphaned with the orphan reason as detail, its inputs still settled with that reason. pi.live stays at version 1, as at
 // f3255de76: runFailure is an optional field. RunFailureReason declares every v1.5.0 value: this area produces model_error, no_model,
 // aborted, reset, faulted and orphaned, and areas restarts (interrupted, restart_limit), admission (nothing_to_answer) and live-turns
-// (turn_limit) the others. RunFailure.first (7e15f9601) is area run-end's. The citation stays on v1.2.0 until the file's other areas land.
+// (turn_limit) the others.
 // Pi v1.5.0 sync (area restarts, b3a29f111): LimitsRestarts (upstream LIMITS_RESTARTS), the built-in kinds that end themselves once cut off
 // settings.restartLimit times, and the helpers their phases read (cutOffTooOften, salvageable, cutOffCount). The scheduler faults only an
 // abort handler of theirs for the limit, with detail {reason: "restart_limit"}: SettleSchedulerOutcomeAsync then ends its run aborted with
@@ -28,6 +28,11 @@
 // migrate (MigrateLive) renames a version 1 value's reason to trigger and gives a run without turns a count of 0, in memory; the next
 // commit stores version 3, which PiSharp before the Pi v1.5.0 sync cannot read. The Harness produces turn_limit (Generation.cs). LiveRun's
 // first and afterRun (7e15f9601) are area run-end's.
+// Pi v1.5.0 sync (area run-end, 7e15f9601): pi.live.run.first, where the run's history starts (upstream LiveRun.first), and run.afterRun,
+// present once the run answered and its generation waits for the tasks afterRun hooks asked for ({tasks?}, listed once created); EndRun
+// records no failure and settles nothing for such a run however it ends (its inputs settled done when it answered), and copies run.first
+// into runFailure.first. Both are optional fields of version 3, as upstream adds them without a version bump. Upstream's LiveRun and
+// LiveState types are this JSON shape; C# reads pi.live as JSON, so neither is a C# type.
 using System.Collections.Immutable;
 using PiSharp.Durable.Chord;
 using PiSharp.Durable.Chord.Delta;
@@ -108,26 +113,28 @@ public static class Live
 
     /// <summary>
     /// Ends the run owned by <paramref name="taskId"/>: settles each of its inputs, removes <c>run</c> and, without an answer, records
-    /// <c>runFailure</c> (upstream <c>endRun</c>). Always removes <c>generation</c>, <c>tools</c> and <c>nestedTools</c>, whose presentation
-    /// belongs to the ending run.
+    /// <c>runFailure</c> (upstream <c>endRun</c>). A run that answered already, and runs only its <c>afterRun</c> tasks, records no failure,
+    /// however it ends. Always removes <c>generation</c>, <c>tools</c> and <c>nestedTools</c>, whose presentation belongs to the ending run.
     /// </summary>
     public static void EndRun(ITx tx, DraftObject live, TaskId taskId, RunEnd end)
     {
         ArgumentNullException.ThrowIfNull(end);
         if (RunTaskId(live) == taskId.Value)
         {
-            var inputs = ((JsonArrayValue)live.GetObject("run").GetArray("inputs").ToValue()).Select(id => new SubmissionId(Id(id))).ToImmutableArray();
+            var run = (JsonObjectValue)live.Get("run")!;
+            var inputs = ((JsonArrayValue)run["inputs"]).Select(id => new SubmissionId(Id(id))).ToImmutableArray();
+            EntryId? first = run.TryGetValue("first", out var start) && start is JsonNumberValue ? new EntryId(Id(start)) : null;
             if (end.Answer is { } answer)
             {
                 foreach (var id in inputs) tx.SettleSubmission(id, SubmissionSettlement.Done(answer));
             }
-            else
+            else if (!run.ContainsKey("afterRun"))
             {
                 var reason = end.Reason!.Value;
                 var settlement = end.Settlement ?? SubmissionSettlement.Unanswered(RunFailure.ReasonName(reason),
                     end.Detail is { } detail ? JsonValue.String(detail) : null);
                 foreach (var id in inputs) tx.SettleSubmission(id, settlement);
-                live.Set("runFailure", new RunFailure(taskId, inputs, reason, end.Detail).ToJson());
+                live.Set("runFailure", new RunFailure(taskId, inputs, reason, end.Detail, first).ToJson());
             }
             live.Delete("run");
         }
@@ -365,7 +372,7 @@ public enum RunFailureReason
 
 /// <summary>
 /// The newest run that ended without an answer (upstream <c>RunFailure</c>, spec §8.2): <c>pi.live.runFailure</c>, <c>{taskId, inputs,
-/// reason, detail?}</c>. Set in the commit that ends the run; removed when a later commit starts a run. A run started in the same commit,
+/// reason, detail?, first?}</c>. Set in the commit that ends the run; removed when a later commit starts a run. A run started in the same commit,
 /// by <c>afterFailedRun: continue</c> or after a reset, keeps it.
 /// </summary>
 /// <param name="TaskId">The task that ended the run: the run's task at its end.</param>
@@ -375,7 +382,10 @@ public enum RunFailureReason
 /// <c>orphaned</c>: why the task could not run (<c>missing_task</c>, <c>task_too_old</c>, <c>migration_failed</c>); <c>interrupted</c> and
 /// <c>restart_limit</c>: what was cut off, and how often; <c>turn_limit</c>: the tool rounds the run took, <c>"1 turn"</c> or
 /// <c>"N turns"</c>.</param>
-public sealed record RunFailure(TaskId TaskId, ImmutableArray<SubmissionId> Inputs, RunFailureReason Reason, string? Detail = null)
+/// <param name="First">The failed run's <c>run.first</c>, so a continue's <c>afterRun</c> hooks see its history too; null for a run that
+/// recorded none.</param>
+public sealed record RunFailure(TaskId TaskId, ImmutableArray<SubmissionId> Inputs, RunFailureReason Reason, string? Detail = null,
+    EntryId? First = null)
 {
     /// <summary>The persisted spelling of <paramref name="reason"/> (<c>model_error</c>, <c>no_model</c>, ...).</summary>
     public static string ReasonName(RunFailureReason reason) => reason switch
@@ -402,12 +412,13 @@ public sealed record RunFailure(TaskId TaskId, ImmutableArray<SubmissionId> Inpu
         return false;
     }
 
-    /// <summary>Upstream's JSON, in its key order: <c>{taskId, inputs, reason, detail?}</c>.</summary>
+    /// <summary>Upstream's JSON, in its key order: <c>{taskId, inputs, reason, detail?, first?}</c>.</summary>
     public JsonObjectValue ToJson() => new RecordJson.Writer()
         .Add("taskId", TaskId.ToJson())
         .Add("inputs", JsonValue.Array(Inputs.Select(id => (JsonValue)id.ToJson())))
         .Add("reason", ReasonName(Reason))
         .Add("detail", Detail)
+        .Add("first", First?.ToJson())
         .Build();
 
     /// <summary>Reads <see cref="ToJson"/>; fields it does not know (a later version's) are ignored.</summary>
@@ -420,14 +431,14 @@ public sealed record RunFailure(TaskId TaskId, ImmutableArray<SubmissionId> Inpu
         var inputs = RecordJson.Array(RecordJson.Required(value, "inputs", what), "inputs", what);
         return new RunFailure(RecordJson.Id<TaskId>(value, "taskId", what),
             [.. inputs.Select(id => SubmissionId.FromNumber(RecordJson.Integer(id, "inputs", what)))], reason,
-            RecordJson.OptionalString(value, "detail", what));
+            RecordJson.OptionalString(value, "detail", what), RecordJson.OptionalId<EntryId>(value, "first", what));
     }
 
     /// <inheritdoc/>
     public bool Equals(RunFailure? other) => other is not null && JsonValue.DeepEquals(ToJson(), other.ToJson());
 
     /// <inheritdoc/>
-    public override int GetHashCode() => HashCode.Combine(TaskId, Reason, Detail);
+    public override int GetHashCode() => HashCode.Combine(TaskId, Reason, Detail, First);
 }
 
 /// <summary>

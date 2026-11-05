@@ -12,10 +12,8 @@
 // - "keeps the stored count across a restart" opens the file behind a KillableStorage (HarnessRestartFailureCases.cs), upstream's Proxy
 //   whose calls hang once dead; the killed storage is closed after the case (KilledStorages). openNodeSqliteStorage is the openFile the
 //   group takes.
-// - "lets terminate settle done at the limit, and writes a handoff's reset before ending": Pi v1.5.0 continues a run after a handoff
-//   (38ff99177, area run-end), so at the limit the handoff's round ends it unanswered with turn_limit, after its reset. PiSharp still ends
-//   the run done at a handoff, as Pi v1.2.0 did, ahead of the limit: the case checks the reset and terminate's done as upstream does, and
-//   the handoff's run as done, until area run-end makes it turn_limit.
+// - "lets terminate settle done at the limit, and writes a handoff's reset before ending": a handoff continues the run (38ff99177, area
+//   run-end), so at the limit the handoff's round ends it unanswered with turn_limit, after its reset, as upstream expects.
 using PiSharp.Durable;
 using PiSharp.Durable.Chord;
 using PiSharp.Durable.Sqlite;
@@ -245,8 +243,7 @@ internal static class TurnLimitTests
             setup.Faux.SetResponses(Round("t"), Round("h"), Done());
             Equal(SubmissionStatus.Done, (await (await root.SubmitAsync(SubmissionDraft.Input("one"), Context)).WaitAsync(Context)).Status, "terminate");
             var handedOff = await (await root.SubmitAsync(SubmissionDraft.Input("two"), Context)).WaitAsync(Context);
-            // Upstream: unanswered turn_limit, as a handoff continues the run (38ff99177, area run-end). Until then the handoff ends it done.
-            Settled(handedOff, SubmissionStatus.Done, null, null, "handoff");
+            Settled(handedOff, SubmissionStatus.Unanswered, "turn_limit", null, "handoff");
             var resets = (await AllEntries(root)).Where(entry => Entries.ResetEntry.Is(entry)).ToList();
             Seq(["fresh"], resets.Select(entry => S(((JsonObjectValue)entry.Model![0])["content"])), "resets");
             await harness.CloseAsync(Context);

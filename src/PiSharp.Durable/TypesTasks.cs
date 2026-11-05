@@ -2,7 +2,9 @@
 // Upstream's AbortSignal becomes a CancellationToken plus the handler context, which the same signal cancels; its memo and entry overloads
 // become C# overloads; its synchronous-or-promise commit callback becomes four overloads, as ISession.CommitAsync has. Pi v1.5.0 sync
 // (area reports): TaskRuntime.report takes whose code failed (ReportFrom, a30c2a81d). Area deferred-commits (6c2fd73b0): TaskRuntime.commit
-// takes CommitOptions. The file's other areas keep the citation on v1.2.0.
+// takes CommitOptions. Area run-end (65fba65b2): TaskRuntime.entries(), the raw history read hooks share; ITaskRuntime inherits it and the
+// entry reads from IHookApi, which declares them for hooks (upstream declares them on both). The file's other areas keep the citation on
+// v1.2.0.
 using PiSharp.Durable.Chord;
 using PiSharp.Durable.Env;
 
@@ -24,7 +26,9 @@ public interface IHookRunner
 /// <summary>
 /// Operations of one task invocation (upstream <c>TaskRuntime</c>). Every operation rejects after the invocation ends; watches acquired
 /// through it stop at invocation end. A runtime is the <see cref="IHookApi"/> its task passes to hooks, as upstream's structurally is; the task
-/// and conversation IDs, <c>Models</c> and the memo reads and writes are the inherited <see cref="IHookApi"/> members.
+/// and conversation IDs, <c>Models</c>, the memo reads and writes, and the entry reads (<c>EntryAsync</c>, and <c>EntriesAsync</c>, the
+/// conversation's committed raw history: every entry, also those a compaction summary or reset left behind, so a range bounded by entry IDs
+/// reads the same before and after a compaction and in a rerun after a crash) are the inherited <see cref="IHookApi"/> members.
 /// </summary>
 public interface ITaskRuntime : IDocumentObserver, IDocumentReader, IHookApi
 {
@@ -84,12 +88,6 @@ public interface ITaskRuntime : IDocumentObserver, IDocumentReader, IHookApi
     /// submissions it returns reject after the invocation ends; admitted work stays durable.
     /// </summary>
     Task<IConversationHandle?> ConversationAsync(ConversationId id, DurableContext context);
-    /// <summary>A committed entry visible from the task's conversation.</summary>
-    Task<EntryRecord?> EntryAsync(EntryId id, DurableContext context);
-    /// <summary>A committed entry visible from the task's conversation; null when absent, not visible, or of another kind.</summary>
-    Task<EntryRecord?> EntryAsync(Entry token, EntryId id, DurableContext context);
-    /// <summary>A committed typed entry visible from the task's conversation; null when absent, not visible, or of another kind.</summary>
-    Task<TypedEntry<TData>?> EntryAsync<TData>(Entry<TData> token, EntryId id, DurableContext context) where TData : JsonValue;
     /// <summary>Committed raw active transcript and model context, optionally cut off at the visible entry <paramref name="at"/>.</summary>
     Task<ContextView> ContextAsync(ConversationId conversationId, DurableContext context, EntryId? at = null);
     /// <summary>The Harness clock, in milliseconds.</summary>

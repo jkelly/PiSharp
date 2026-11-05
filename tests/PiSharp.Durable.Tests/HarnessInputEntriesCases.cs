@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/test/harness-input-entries.test.ts. Inputs placed as application
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/test/harness-input-entries.test.ts. Inputs placed as application
 // entries, and data-only writes appended at once (#10407). Verbatim apart from the adaptations in HarnessSupport.cs and ChatSupport.cs, and
 // these:
 // - An InputEntry is typed: its kind is a string and it has no model, head or edits. "rejects an input entry whose kind is not a non-empty
@@ -7,7 +7,7 @@
 //   thing a caller can pass.
 // - The reopen case reopens a SQLite file, as upstream does.
 // Pi v1.5.0 sync (area run-failure, f3255de76): "appends a data-only write while idle after a failed run ..." expects the run's
-// pi.live.runFailure where v1.2.0 expected an empty pi.live.
+// pi.live.runFailure where v1.2.0 expected an empty pi.live, with (area run-end, 7e15f9601) its first, "<number>".
 // Pi v1.5.0 sync (area events, f3255de76): "appends a data-only write mid-run ..." reads the view's history (LiveSupport.cs's viewHistory)
 // where v1.2.0 listened to watchEvents (removed): the first view that shows the write ends with it while pi.live's run still holds the input.
 using PiSharp.Durable;
@@ -338,7 +338,7 @@ internal static class InputEntriesTests
             Equal(SubmissionStatus.Queued, (await f.StatusAsync(Context)).Status, "f");
             Seq([(double)f.Id.Value], (await InboxItems(harness, root)).Select(item => N(((JsonObjectValue)item)["id"])), "inbox");
             // Pi v1.5.0 (area run-failure): pi.live records why the run ended without an answer.
-            MatchExactly($$$"""{"runFailure":{"taskId":"<number>","inputs":[{{{input.Id.Value}}}],"reason":"model_error","detail":"invalid request"}}""",
+            MatchExactly($$$"""{"runFailure":{"taskId":"<number>","inputs":[{{{input.Id.Value}}}],"reason":"model_error","detail":"invalid request","first":"<number>"}}""",
                 await harness.SnapshotAsync(Live.LiveDoc, root.Id, Context), "live");
             Equal(1, setup.Faux.State.CallCount, "calls");
             // The next input places the waiting mention first.

@@ -23,7 +23,8 @@
 // the built-in defaults" expects progress.persistWithinMs 1000, the default for -1, and 0 kept. "stores partials as deltas ..." stores
 // deferred partials within 100 ms, as e5c6182ba's does.
 // Pi v1.5.0 sync (area run-failure, f3255de76): the cases whose run ends without an answer expect f3255de76's pi.live.runFailure where
-// v1.2.0 expected an empty pi.live; the faulted run's detail contains "non-finite number" (see above).
+// v1.2.0 expected an empty pi.live; the faulted run's detail contains "non-finite number" (see above). Area run-end (7e15f9601): each one's
+// toEqual carries first, "<number>" for expect.any(Number) (MatchExactly).
 // Pi v1.5.0 sync (area vocabulary, 5f312dac4): livePublications follows commits with SessionTests.FollowCommits (upstream followCommits,
 // was observeCommits) and reads the document changes of kind change (DocumentValueChange).
 // Pi v1.5.0 sync (area tool-tasks, 1c6928b30): "orphans a blocked run task with full run cleanup" stores the run under the generation
@@ -169,7 +170,7 @@ internal static class GenerationTests
             // The earlier settlement stays; the run's own settlement leaves it unchanged.
             MatchJson("""{"status":"unanswered","reason":"withdrawn"}""", (await submission.StatusAsync(Context)).ToJson(), "submission");
             // Pi v1.5.0 (area run-failure): a run ends without an answer even when its inputs were settled already.
-            SameJson($$$"""{"runFailure":{"taskId":{{{taskId.Value}}},"inputs":[{{{submission.Id.Value}}}],"reason":"aborted"}}""", await LiveOf(harness, root), "live");
+            MatchExactly($$$"""{"runFailure":{"taskId":{{{taskId.Value}}},"inputs":[{{{submission.Id.Value}}}],"reason":"aborted","first":"<number>"}}""", await LiveOf(harness, root), "live");
             await harness.CloseAsync(Context);
         });
 
@@ -190,7 +191,7 @@ internal static class GenerationTests
             SameJson("""{"status":"terminal","outcome":{"status":"failed","error":{"message":"Model faux/missing is not available","detail":{"reason":"no_model"}}}}""",
                 tasks[0].State.ToJson(), "task state");
             // Pi v1.5.0 (area run-failure): each conversation's pi.live records why its run ended without an answer.
-            MatchExactly($$$"""{"runFailure":{"taskId":{{{tasks[0].Id.Value}}},"inputs":["<number>"],"reason":"no_model","detail":"Model faux/missing is not available"}}""",
+            MatchExactly($$$"""{"runFailure":{"taskId":{{{tasks[0].Id.Value}}},"inputs":["<number>"],"reason":"no_model","detail":"Model faux/missing is not available","first":"<number>"}}""",
                 await LiveOf(harness, root), "root live");
             MatchJson("""{"reason":"no_model","detail":"No model is configured"}""", (await LiveOf(harness, plain))?["runFailure"], "plain live");
             await harness.CloseAsync(Context);
@@ -313,7 +314,7 @@ internal static class GenerationTests
             var converted = (JsonObjectValue)entries[1].Model![0];
             Equal("aborted", S(converted["stopReason"]), "stop reason");
             Check(TextOf(converted)!.StartsWith(TextOf(partial)!, StringComparison.Ordinal), "the converted entry extends the partial");
-            SameJson($$$"""{"runFailure":{"taskId":{{{taskId.Value}}},"inputs":[{{{submission.Id.Value}}}],"reason":"aborted"}}""", await LiveOf(harness, root), "live");
+            MatchExactly($$$"""{"runFailure":{"taskId":{{{taskId.Value}}},"inputs":[{{{submission.Id.Value}}}],"reason":"aborted","first":"<number>"}}""", await LiveOf(harness, root), "live");
             SameJson("""{"status":"aborted"}""", OutcomeJson(await harness.WaitForTaskAsync(taskId, Context)), "outcome");
             await harness.CloseAsync(Context);
         });
@@ -331,7 +332,7 @@ internal static class GenerationTests
             await harness.AbortTaskAsync(taskId, Context);
             MatchJson("""{"status":"unanswered","reason":"aborted"}""", (await submission.WaitAsync(Context)).ToJson(), "settled");
             Equal(1, setup.Faux.State.CancelledDeferred.Count, "cancelled");
-            SameJson($$$"""{"runFailure":{"taskId":{{{taskId.Value}}},"inputs":[{{{submission.Id.Value}}}],"reason":"aborted"}}""", await LiveOf(harness, root), "live");
+            MatchExactly($$$"""{"runFailure":{"taskId":{{{taskId.Value}}},"inputs":[{{{submission.Id.Value}}}],"reason":"aborted","first":"<number>"}}""", await LiveOf(harness, root), "live");
             await harness.CloseAsync(Context);
         });
 
@@ -353,7 +354,7 @@ internal static class GenerationTests
             await harness.AbortTaskAsync(taskId, Context);
             MatchJson("""{"status":"unanswered","reason":"aborted"}""", (await submission.WaitAsync(Context)).ToJson(), "settled");
             Check(setup.Reports.Snapshot().Any(error => error.Message == "cancel failed"), "the cancel failure is reported");
-            SameJson($$$"""{"runFailure":{"taskId":{{{taskId.Value}}},"inputs":[{{{submission.Id.Value}}}],"reason":"aborted"}}""", await LiveOf(harness, root), "live");
+            MatchExactly($$$"""{"runFailure":{"taskId":{{{taskId.Value}}},"inputs":[{{{submission.Id.Value}}}],"reason":"aborted","first":"<number>"}}""", await LiveOf(harness, root), "live");
             await harness.CloseAsync(Context);
         });
 
@@ -611,7 +612,7 @@ internal static class GenerationTests
             Equal("partial", TextOf(entries[1].Model![0]), "converted text");
             // Pi v1.5.0 (area run-failure): the fault's detail names the value that is not strict JSON (see the header).
             var live = await LiveOf(harness, root);
-            MatchExactly($$$"""{"runFailure":{"taskId":"<number>","inputs":[{{{submission.Id.Value}}}],"reason":"faulted","detail":"<string>"}}""", live, "live");
+            MatchExactly($$$"""{"runFailure":{"taskId":"<number>","inputs":[{{{submission.Id.Value}}}],"reason":"faulted","detail":"<string>","first":"<number>"}}""", live, "live");
             Rejects(new InvalidOperationException(S(((JsonObjectValue)live!["runFailure"])["detail"])), "non-finite number", "failure detail");
             var tasks = await TasksOf(harness, root);
             MatchJson("""{"status":"terminal","outcome":{"status":"faulted"}}""", tasks[0].State.ToJson(), "state");

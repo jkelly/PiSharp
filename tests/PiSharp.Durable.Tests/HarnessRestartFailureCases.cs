@@ -13,8 +13,8 @@
 //   PiSharp.Durable.Testing.CommitWrites.CommitWritesAsync.
 // - The Proxy over the models is ModelsOverride (FetchDeferredOverride, CancelDeferredOverride); the Proxy over the settings that counts
 //   resolutions is a HarnessSettings whose Extensions getter counts, as every resolution reads it once.
-// - Later areas' parts of the v1.5.0 blob are left out: pi.live.runFailure's `first` (area run-end, 7e15f9601) is not asserted, as PiSharp's
-//   RunFailure has no such field yet. compactionFailure names its `trigger` (pi.live version 2, 5f312dac4; area live-turns).
+// - pi.live.runFailure's `first` (7e15f9601, area run-end) is "<number>" for expect.any(Number), the toEqual checks MatchExactly.
+//   compactionFailure names its `trigger` (pi.live version 2, 5f312dac4; area live-turns).
 //   The settings bound (49 resolutions a round, #11327) is upstream's with group commit (e5c6182ba, area group-commit-scheduler), which
 //   coalesces some reconcile passes; this port, without group commit yet, measured 36 a round, so upstream's bound holds as it is.
 // - PiSharp-only (decision 0011), not upstream's: "keeps the interrupted request's stream metadata for the next attempt" checks that the
@@ -220,8 +220,8 @@ internal static class RestartFailureTests
     private static readonly RetrySettings NoRetry = new() { Enabled = false };
 
     private static string RunFailure(TaskId taskId, SubmissionId id, string reason, string detail) =>
-        Obj(("runFailure", Obj(("taskId", taskId.Value), ("inputs", JsonValue.Array((JsonValue)id.Value)), ("reason", reason), ("detail", detail))))
-            .ToJson();
+        Obj(("runFailure", Obj(("taskId", taskId.Value), ("inputs", JsonValue.Array((JsonValue)id.Value)), ("reason", reason), ("detail", detail),
+            ("first", "<number>")))).ToJson();
 
     /// <summary>
     /// A setup whose model answers deferred, and whose first fetch of each deferred response is in flight until the Harness stops; later
@@ -411,7 +411,7 @@ internal static class RestartFailureTests
             opened.Harness.Resume();
             const string text = "The host stopped while the model was answering, on attempt 2";
             MatchJson($$$$"""{"status":"unanswered","reason":"interrupted","detail":"{{{{text}}}}"}""", (await Settled(opened.Harness, id)).ToJson(), "settled");
-            SameJson(RunFailure(taskId, id, "interrupted", text), await Live(opened.Harness), "live");
+            MatchExactly(RunFailure(taskId, id, "interrupted", text), await Live(opened.Harness), "live");
             SameJson($$$$"""{"status":"failed","error":{"message":"{{{{text}}}}","detail":{"reason":"interrupted"}}}""",
                 OutcomeJson(await opened.Harness.WaitForTaskAsync(taskId, Context)), "outcome");
             var entries = await AllEntries(opened.Root);
@@ -535,7 +535,7 @@ internal static class RestartFailureTests
             opened.Harness.Resume();
             const string text = "The generation was interrupted once in its prepare phase";
             MatchJson($$$$"""{"status":"unanswered","reason":"restart_limit","detail":"{{{{text}}}}"}""", (await Settled(opened.Harness, id)).ToJson(), "settled");
-            SameJson(RunFailure(taskId, id, "restart_limit", text), await Live(opened.Harness), "live");
+            MatchExactly(RunFailure(taskId, id, "restart_limit", text), await Live(opened.Harness), "live");
             await Eventually(() => setup.Infos.Count > 0);
             Check(setup.Infos.Snapshot().Any(info => info is { Kind: ReportKind.TaskInterrupted, Reason: ReportReason.RestartLimit, Restarts: 1 }),
                 $"task_interrupted reported: {string.Join(", ", setup.Infos.Snapshot())}");
@@ -672,7 +672,7 @@ internal static class RestartFailureTests
             opened.Harness.Resume();
             const string text = "The host stopped while the deferred answer was fetched, on attempt 1";
             MatchJson($$$$"""{"status":"unanswered","reason":"interrupted","detail":"{{{{text}}}}"}""", (await Settled(opened.Harness, id)).ToJson(), "settled");
-            SameJson(RunFailure(taskId, id, "interrupted", text), await Live(opened.Harness), "live");
+            MatchExactly(RunFailure(taskId, id, "interrupted", text), await Live(opened.Harness), "live");
             Equal(1, setup.Faux.State.CancelledDeferred.Count, "cancelled");
             await opened.Harness.CloseAsync(Context);
         });
@@ -736,7 +736,7 @@ internal static class RestartFailureTests
             opened.Harness.Resume();
             const string text = "The generation was interrupted once in its request phase";
             MatchJson($$$$"""{"status":"unanswered","reason":"restart_limit","detail":"{{{{text}}}}"}""", (await Settled(opened.Harness, id)).ToJson(), "settled");
-            SameJson(RunFailure(taskId, id, "restart_limit", text), await Live(opened.Harness), "live");
+            MatchExactly(RunFailure(taskId, id, "restart_limit", text), await Live(opened.Harness), "live");
             var entries = await AllEntries(opened.Root);
             Seq(["pi.user", "pi.assistant"], entries.Select(entry => entry.Kind), "kinds");
             Equal(partial, TextOf(entries[1].Model![0]), "partial");
@@ -799,7 +799,7 @@ internal static class RestartFailureTests
             }
             var detail = $"Abort handler of task {taskId.Value} (pi.generation) was cut off 2 times";
             MatchJson($$$$"""{"status":"unanswered","reason":"aborted","detail":"{{{{detail}}}}"}""", (await Settled(opened.Harness, id)).ToJson(), "settled");
-            SameJson(RunFailure(taskId, id, "aborted", detail), await Live(opened.Harness), "live");
+            MatchExactly(RunFailure(taskId, id, "aborted", detail), await Live(opened.Harness), "live");
             MatchJson("""{"status":"faulted","error":{"detail":{"reason":"restart_limit"}}}""",
                 OutcomeJson(await opened.Harness.WaitForTaskAsync(taskId, Context)), "outcome");
             await Eventually(() => setup.Infos.Snapshot().Any(info => info.Kind == ReportKind.TaskFaulted));

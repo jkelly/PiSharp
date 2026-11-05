@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/src/harness/types.ts. The openable Harness (P6) and the task runtime (P7)
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/src/harness/types.ts. The openable Harness (P6) and the task runtime (P7)
 // are complete; submissions and the generation hooks are final (P8); tools are final (P9); views are final (P10); compaction and the task
 // graph are final (P11). v1.2.0: input entries (area i), documentRetentionMs and onReport's contract (area b), and tool task v2 (area a):
 // ToolExecutionResult.Output and StructuredOutput, NestedToolExecutionResult, IToolExecutionApi.RetainedOutput and ExecuteToolAsync,
@@ -14,8 +14,7 @@
 //
 // Pi v1.5.0 sync (area harness-options): CompactionSettings.ModelOverrides and Settings.Compaction's overrides (upstream 6085986e4,
 // #10942), HarnessOptions.CurrentModels and CurrentSettings (upstream's function forms of models and settings, 7ec1f648e) and
-// HarnessOptions.ReadOnly (be14d9732), and ToolControl.Terminate as a bool? that may be false (6085986e4, #10858). The citation stays on
-// v1.2.0 until the file's other areas land.
+// HarnessOptions.ReadOnly (be14d9732), and ToolControl.Terminate as a bool? that may be false (6085986e4, #10858).
 // Pi v1.5.0 sync (area model-requests): HarnessOptions.Identity (adc5fa9f8, 04a93bad8) and GenerationHooks.BeforeProviderRequest
 // (d280e1ffa).
 // Pi v1.5.0 sync (area reports): HarnessOptions.OnReport takes one Report (TypesReports.cs; a30c2a81d, 91b33cab3, 5f312dac4),
@@ -35,7 +34,13 @@
 // SubmitAsync takes any draft, as IConversation's does; WhenIdle.Reject on input (6a2825113, #11149); and SubmitAsync(tx, draft) on both,
 // admission inside the caller's commit (cc9c52310, #11149). settings.afterFailedRun's doc names nothing_to_answer.
 // Pi v1.5.0 sync (area live-turns, f6a9db1d8, #11043): AgentChange.MaxTurns and Agent.MaxTurns, the per-conversation turn limit (AgentState
-// maxTurns), and settings.afterFailedRun's doc names turn_limit. The citation stays on v1.2.0 until area run-end lands.
+// maxTurns), and settings.afterFailedRun's doc names turn_limit.
+// Pi v1.5.0 sync (area run-end): IHookApi's entry reads, EntryAsync and EntriesAsync (65fba65b2), which ITaskRuntime inherits;
+// GenerationHooks.AfterRun with RunSummary and RunEndTask (Define.RunEndTask, 7e15f9601); WhenIdle's doc says a run waiting for its
+// afterRun tasks is busy; ToolControl.Handoff continues the run (38ff99177). Upstream's afterRun returns {tasks}; AfterRun returns the
+// list itself (null for none), as BeforeRequest returns its messages. Upstream's tools-schema typing (ToolArgs, object schemas) has no
+// C# counterpart beyond the JsonObjectValue schemas area tools-schema documented. With this area every area that changes the file has
+// landed, so it cites v1.5.0.
 using System.Collections.Immutable;
 using PiSharp.AI;
 using PiSharp.Durable.Chord;
@@ -260,7 +265,8 @@ public sealed record ToolControl
     /// <summary>End the run without another model request when every result of the round sets it to true; false is a no-op and is stored as
     /// given (upstream's <c>terminate?: boolean</c>, #10858).</summary>
     public bool? Terminate { get; init; }
-    /// <summary>Hand off to a new context with this text.</summary>
+    /// <summary>Start a new context with this text as its user message, as <c>reset(handoff)</c> writes, and continue the run there. The last
+    /// handoff in call order wins.</summary>
     public string? Handoff { get; init; }
 }
 
@@ -1053,8 +1059,9 @@ public sealed record ConversationAbortOptions
 /// run.</summary>
 public enum WhenIdle
 {
-    /// <summary><c>reject</c>: rejected with <see cref="ConversationIdleException"/> and nothing is written, so the input never starts a run.
-    /// With <see cref="WhenBusy.Steer"/> it steers the current run or is refused, in one admission.</summary>
+    /// <summary><c>reject</c>: rejected with <see cref="ConversationIdleException"/> and nothing is written, so the input never starts a run of
+    /// its own. With <see cref="WhenBusy.Steer"/> it steers the current run or is refused, in one admission; a run that answered and waits for
+    /// its <c>afterRun</c> tasks is still busy, and such an input queues and starts the next run.</summary>
     Reject,
 }
 
@@ -1359,7 +1366,10 @@ public enum TaskAbortResult
 
 // ─── Hooks ──────────────────────────────────────────────────────────────
 
-/// <summary>What a hook may use: committed reads and the asking task's memos, which hooks and the task share (upstream <c>HookApi</c>).</summary>
+/// <summary>What a hook may use: committed reads and the asking task's memos, which hooks and the task share (upstream <c>HookApi</c>). Hooks
+/// run off the Session line, so reads see what is committed when they run; a hook rerun after a crash may see more. Entries never change and
+/// compaction never removes them: a range bounded by entry IDs reads the same before and after a compaction and in a rerun. There is no
+/// context read: the active transcript changes in the middle of a run, so a hook asking what a run did reads its history instead.</summary>
 public interface IHookApi : IDocumentReader
 {
     /// <summary>The asking task.</summary>
@@ -1372,6 +1382,18 @@ public interface IHookApi : IDocumentReader
     Task<JsonValue?> MemoAsync(string name, DurableContext context);
     /// <summary>Stores a memo unless one exists; returns the winner.</summary>
     Task<JsonValue> MemoAsync(string name, JsonValue candidate, DurableContext context);
+    /// <summary>A committed entry visible from the task's conversation.</summary>
+    Task<EntryRecord?> EntryAsync(EntryId id, DurableContext context);
+    /// <summary>A committed entry visible from the task's conversation; null when absent, not visible, or of another kind.</summary>
+    Task<EntryRecord?> EntryAsync(Entry token, EntryId id, DurableContext context);
+    /// <summary>A committed typed entry visible from the task's conversation; null when absent, not visible, or of another kind.</summary>
+    Task<TypedEntry<TData>?> EntryAsync<TData>(Entry<TData> token, EntryId id, DurableContext context) where TData : JsonValue;
+    /// <summary>
+    /// Committed raw history of the task's conversation, fork-aware, as <see cref="IConversation.EntriesAsync"/> (upstream <c>entries()</c>):
+    /// every entry, also those a compaction summary or reset left behind, newest first unless the query orders ascending. A range also holds
+    /// entries of others, such as display-only writes, compaction summaries and entries of other tasks; filter by kind.
+    /// </summary>
+    Task<Page<EntryRecord>> EntriesAsync(EntryQueryBounds query, int limit, JsonObjectValue? cursor, DurableContext context);
 }
 
 /// <summary>Hooks of the built-in generation task (upstream <c>GenerationHooks</c>); every handler is optional. Messages are pi-ai wire
@@ -1394,7 +1416,58 @@ public sealed class GenerationHooks
     public Func<JsonObjectValue, IHookApi, DurableContext, Task<JsonValue?>>? OnYield { get; init; }
     /// <summary>After every tool of the round is terminal; the round's result entries in call order.</summary>
     public Func<EntryId, ImmutableArray<EntryId>, IHookApi, DurableContext, Task>? AfterTools { get; init; }
+    /// <summary>
+    /// After a run answered, its answer committed and its inputs settled <c>done</c>: a final answer, or a <c>terminate</c> round; not when an
+    /// <see cref="OnYield"/> continuation is taken, and never after a failure or an abort (upstream <c>afterRun</c>, spec §8.3). Returns the
+    /// tasks to run (<see cref="Define.RunEndTask"/>), or null for none. The requested tasks of every hook are created together as children of
+    /// the generation, which keeps the run, and the conversation busy, until they are terminal; then queued items are placed and the run
+    /// ends. A crash before they are created asks again; once created, never again for this run. A request that cannot start (a built-in or
+    /// uninstalled task, a throwing <c>Initial</c>, an unknown first phase) is skipped and reported against the hook's extension.
+    /// </summary>
+    public Func<RunSummary, IHookApi, DurableContext, Task<IReadOnlyList<RunEndTask>?>>? AfterRun { get; init; }
 }
+
+/// <summary>How a run ended, for <see cref="GenerationHooks.AfterRun"/> (upstream <c>RunSummary</c>). Read the run's history with
+/// <c>api.EntriesAsync(new EntryQueryBounds { MinEntryId = First, MaxEntryId = Last }, ...)</c>.</summary>
+/// <param name="Reason">A final answer, or a tool round whose every call asked to terminate.</param>
+/// <param name="First">The run's first entry (<c>pi.live.run.first</c>): the first one the boundary that started it placed, for a continue the
+/// failed run's it continues, otherwise its first tool-calling answer; the answer itself for a run that has none of these.</param>
+/// <param name="Answer">The answer, or the terminating round's tool-calling answer, whose results follow it.</param>
+/// <param name="Last">The run's last entry: the answer; for a terminate round its newest result, or the reset of its handoff.</param>
+public sealed record RunSummary(RunSummaryReason Reason, EntryId First, EntryId Answer, EntryId Last)
+{
+    /// <summary>Upstream's JSON, as the <c>finish</c> checkpoint stores it: <c>{reason, answer, last, first}</c>.</summary>
+    internal JsonObjectValue ToJson() => JsonValue.Object([
+        KeyValuePair.Create("reason", (JsonValue)(Reason == RunSummaryReason.Terminate ? "terminate" : "answer")),
+        KeyValuePair.Create("answer", (JsonValue)Answer.ToJson()),
+        KeyValuePair.Create("last", (JsonValue)Last.ToJson()),
+        KeyValuePair.Create("first", (JsonValue)First.ToJson()),
+    ]);
+
+    /// <summary>Reads <see cref="ToJson"/>.</summary>
+    internal static RunSummary FromJson(JsonValue json)
+    {
+        var value = (JsonObjectValue)json;
+        static EntryId Id(JsonObjectValue value, string key) => new((long)((JsonNumberValue)value[key]).Value);
+        var reason = ((JsonStringValue)value["reason"]).Value == "terminate" ? RunSummaryReason.Terminate : RunSummaryReason.Answer;
+        return new RunSummary(reason, Id(value, "first"), Id(value, "answer"), Id(value, "last"));
+    }
+}
+
+/// <summary>Why a run answered (upstream <c>RunSummary["reason"]</c>).</summary>
+public enum RunSummaryReason
+{
+    /// <summary><c>answer</c>: a final answer.</summary>
+    Answer,
+    /// <summary><c>terminate</c>: a tool round whose every call asked to terminate.</summary>
+    Terminate,
+}
+
+/// <summary>A task a <see cref="GenerationHooks.AfterRun"/> hook asks for (upstream <c>RunEndTask</c>), built by <see cref="Define.RunEndTask"/>:
+/// the task and its input.</summary>
+/// <param name="Task">The task, which must be installed and not built-in; it is created from the installed definition.</param>
+/// <param name="Input">Its input.</param>
+public sealed record RunEndTask(DurableTask Task, JsonValue Input);
 
 /// <summary>What <see cref="ToolHooks.BeforeTool"/> decides: replacement arguments or a block.</summary>
 public sealed record BeforeToolDecision(JsonObjectValue? Arguments = null, string? Block = null);

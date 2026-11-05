@@ -1,5 +1,9 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/src/harness/define.ts. Upstream's identity functions exist for
-// TypeScript inference; here they are plain constructors.
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/src/harness/define.ts. Upstream's identity functions exist for
+// TypeScript inference; here they are plain constructors. Pi v1.5.0 sync (area run-end, 7e15f9601): runEndTask, the request an afterRun hook
+// returns; upstream types its input by the task, which a C# DurableTask erases. Area tools-schema's TSchema to object change of defineTool
+// is TypeScript typing only.
+using PiSharp.Durable.Chord;
+
 namespace PiSharp.Durable;
 
 /// <summary>Definitions of extensions, tools, prompt sections, hooks and wraps (upstream <c>define.ts</c>).</summary>
@@ -26,6 +30,14 @@ public static class Define
         ArgumentNullException.ThrowIfNull(task);
         ArgumentNullException.ThrowIfNull(handlers);
         return new(task.Definition.Name, handlers);
+    }
+
+    /// <summary>A task a <see cref="GenerationHooks.AfterRun"/> hook asks for, with its input (upstream <c>runEndTask</c>, spec §8.3).</summary>
+    public static RunEndTask RunEndTask(DurableTask task, JsonValue input)
+    {
+        ArgumentNullException.ThrowIfNull(task);
+        ArgumentNullException.ThrowIfNull(input);
+        return new(task, input);
     }
 
     /// <summary>Wraps the tool named like <paramref name="tool"/> wherever the wrapping extension is selected (upstream

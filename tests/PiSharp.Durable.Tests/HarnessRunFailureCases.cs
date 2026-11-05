@@ -4,13 +4,13 @@
 // ChatSupport.cs and HarnessSupport.cs, and these:
 // - live() reads harness.snapshot(LiveDoc) as a JSON object, {} when absent. toEqual is ChatTests.MatchExactly and toMatchObject MatchJson,
 //   with "<number>" for expect.any(Number); `not.toHaveProperty("detail")` checks the record's Detail is null.
-// - v1.5.0's runFailure.first (7e15f9601, the failed run's pi.live.run.first) is area run-end's: until it lands, the two toEqual checks
-//   expect f3255de76's {taskId, inputs, reason, detail?} without it.
+// - runFailure.first (7e15f9601, area run-end: the failed run's pi.live.run.first) is "<number>" in the two toEqual checks.
 // - The tool's parameters are pi-schema's obj({}) (6536f8012), the JSON Schema of an object without properties.
 // PiSharp-only cases, authored: harness.run-failure.pisharp.reads-and-writes-every-reason-in-upstream-spelling (RunFailureReason declares every
 // v1.5.0 value once, the work list's rule), and harness.run-failure.pisharp.the-event-stream-carries-the-run-failure: the PiSharp-only event
 // projection (PiSharp.Durable.Hosting's AgentEvents.cs since area events) carries pi.live.runFailure in its snapshot and on the run_end
-// of a run that ended without an answer, a continue's run_start in the same batch.
+// of a run that ended without an answer, a continue's run_start in the same batch. Its wire keeps area run-failure's {taskId, inputs, reason,
+// detail?}: AgentEvents.cs leaves runFailure's first (area run-end) off, as it does run.turns.
 using PiSharp.Durable;
 using PiSharp.Durable.Chord;
 using PiSharp.Durable.Hosting;
@@ -71,7 +71,7 @@ internal static class RunFailureTests
             Settled(settled, SubmissionStatus.Unanswered, "model_error", "settled");
             SameJson("\"Invalid request\"", settled.Detail, "settled detail");
             var failure = Field(await LiveOf(harness, root), "runFailure");
-            MatchExactly($$"""{"taskId":"<number>","inputs":[{{submission.Id.Value}}],"reason":"model_error","detail":"Invalid request"}""", failure,
+            MatchExactly($$"""{"taskId":"<number>","inputs":[{{submission.Id.Value}}],"reason":"model_error","detail":"Invalid request","first":"<number>"}""", failure,
                 "runFailure");
             // The typed reading of the same value.
             var typed = Live.RunFailureOf(await LiveOf(harness, root))!;
@@ -111,7 +111,7 @@ internal static class RunFailureTests
             var taskId = (long)N(((JsonObjectValue)(await LiveOf(harness, root))["run"])["taskId"]);
             await root.AbortAsync(Context);
             Settled(await submission.WaitAsync(Context), SubmissionStatus.Unanswered, "aborted", "settled");
-            MatchExactly($$"""{"taskId":{{taskId}},"inputs":[{{submission.Id.Value}}],"reason":"aborted"}""", Field(await LiveOf(harness, root), "runFailure"),
+            MatchExactly($$"""{"taskId":{{taskId}},"inputs":[{{submission.Id.Value}}],"reason":"aborted","first":"<number>"}""", Field(await LiveOf(harness, root), "runFailure"),
                 "runFailure");
             await harness.CloseAsync(Context);
         });
@@ -228,9 +228,10 @@ internal static class RunFailureTests
             var failure = new RunFailure(new TaskId(7), [new SubmissionId(3), new SubmissionId(4)], RunFailureReason.TurnLimit, "2 turns");
             SameJson("""{"taskId":7,"inputs":[3,4],"reason":"turn_limit","detail":"2 turns"}""", failure.ToJson(), "json");
             Equal(failure, RunFailure.FromJson(failure.ToJson()), "round trip");
-            // A field a later version adds (run-end's first) is ignored by this reading.
-            Equal(new RunFailure(new TaskId(7), [new SubmissionId(3)], RunFailureReason.Aborted),
-                RunFailure.FromJson(O("""{"taskId":7,"inputs":[3],"reason":"aborted","first":2}""")), "later field");
+            // The failed run's first entry (area run-end), its last key.
+            var started = new RunFailure(new TaskId(7), [new SubmissionId(3)], RunFailureReason.Aborted, null, new EntryId(2));
+            SameJson("""{"taskId":7,"inputs":[3],"reason":"aborted","first":2}""", started.ToJson(), "first json");
+            Equal(started, RunFailure.FromJson(started.ToJson()), "first round trip");
             Throws<FormatException>(() => RunFailure.FromJson(O("""{"taskId":7,"inputs":[3],"reason":"bored"}""")), "unknown reason");
         });
     }

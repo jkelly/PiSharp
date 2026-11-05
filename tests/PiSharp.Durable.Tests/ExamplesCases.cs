@@ -52,6 +52,9 @@ using PiSharp.Durable.Examples;
 // example (console.log's arguments joined with spaces), not captured. Its file backends read the transcript's kinds back. 19-json's ops
 // lines take LiveV3150.cs's authored form too (pi.live version 3): the run's set has turns 0, and the frame that starts the tool round
 // sets run.turns 1 after its pi.live ops; its state lines, replayed from them, show the run's turns.
+// Area run-end (7e15f9601): 33-tests-after-edits is v1.5.0's 32-tests-after-edits.ts; its lines are authored from that example
+// (console.log's arguments joined with spaces), not captured. Its file backends read the transcript's kinds back. 19-json's ops lines
+// take LiveV3150.cs's run-end form too: the run's set carries first, the entry its input appended.
 // Area events (f3255de76): v1.5.0 removed watchEvents, and the examples that printed agent events print the view, as upstream's do. 19-json
 // runs v1.5.0's two modes (18-json.ts), ops on the runner's storage and state on MemoryStorage: the ops lines stay the v1.2.0 capture's
 // authored forms (JsonModeOpsLines), and the state lines are authored from them, not captured: JsonModeStateLines replays each frame's ops
@@ -350,6 +353,20 @@ internal static partial class Program
         "fill gap                     [load earlier] 171..255",
         "resume after 3 missed        window: 3 entries",
         TranscriptLastLine,
+        // Pi v1.5.0 sync (area run-end): v1.5.0's 32-tests-after-edits.ts, authored (see the file header).
+        "== 33-tests-after-edits",
+        "answered: done",
+        "busy with after-run tasks: true",
+        "  [tests, attempt 1] add(1, 2): expected 3, got -1",
+        "  [tests, attempt 2] 1 passed",
+        "> Clean up math.ts.",
+        "agent: I cleaned up add.",
+        "tests: add(1, 2): expected 3, got -1",
+        "> Are the tests green now?",
+        "agent: Not yet: add subtracts. The fix is queued next.",
+        "> The tests failed: add(1, 2): expected 3, got -1. Fix it.",
+        "agent: Fixed: add adds now.",
+        TestsAfterEditsLastLine,
         // Pi v1.5.0 sync (area live-turns): v1.5.0's 33-turn-limit-and-continue.ts, authored (see the file header).
         "== 34-turn-limit-and-continue",
         "first run: unanswered turn_limit (2 turns)",
@@ -378,6 +395,11 @@ internal static partial class Program
         """transcript: ["pi.user","pi.system","pi.assistant","pi.tool-result","pi.assistant","pi.tool-result","pi.assistant","pi.tool-result","pi.assistant","pi.tool-result","pi.assistant"]""";
 
     private const string SubmitInCommitRecorded = """recorded: [{"from":"ana","text":"Add a test for the build."}]""";
+
+    private const string TestsAfterEditsLastLine = "tests: 1 passed";
+
+    private const string TestsAfterEditsTranscript =
+        """transcript: ["pi.user","pi.system","pi.assistant","pi.tool-result","pi.assistant","app.tests","pi.user","pi.assistant","pi.user","pi.assistant","pi.tool-result","pi.assistant","app.tests"]""";
 
     private const string TurnLimitLastLine = "continue after the answer: unanswered nothing_to_answer";
 
@@ -526,6 +548,7 @@ internal static partial class Program
         [TranscriptLastLine] = ["stored: 258 chat entries, the newest \"line 258\""],
         [SubmitInCommitRecorded] = [SubmitInCommitRecorded],
         [TurnLimitLastLine] = [TurnLimitTranscript],
+        [TestsAfterEditsLastLine] = [TestsAfterEditsTranscript],
     };
 
     private static IEnumerable<(string, Func<Task>)> ExamplesCases()

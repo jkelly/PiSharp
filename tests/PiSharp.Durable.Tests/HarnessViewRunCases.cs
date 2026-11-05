@@ -12,8 +12,8 @@
 //   one whose JSON differs from the previous one, where upstream compares references.
 // - Tools sleep with Task.Delay where upstream uses setTimeout: their output must cross the progress throttle in real time, as upstream's
 //   does. An aborted controller is a DurableCancellation cancelled with Exception("cancelled").
-// - Not yet v1.5.0, each left to the area that ports it: a run's pi.live.run has turns (f6a9db1d8, area live-turns) but not first
-//   (7e15f9601, area run-end). Area run-failure added the two pi.live.runFailure checks.
+// - A run's pi.live.run has turns (f6a9db1d8, area live-turns) and first (7e15f9601, area run-end), "<number>" for expect.any(Number). Area
+//   run-failure added the two pi.live.runFailure checks.
 // - Pi v1.5.0 sync (area tool-tasks, 1c6928b30, #11043): "ends a call that never runs through its own task, and a tool aborted with its
 //   generation" (...-with-its-result-at-once-... before, f3255de76's form) is v1.5.0's: the call not offered is listed pending with its task,
 //   which ends it done with its result entry. The tools declare their parameters with pi-schema's obj() (ToolsSchema150.EmptyObject,
@@ -148,7 +148,7 @@ internal static class ViewRunTests
             // The run shows from the input's commit until the commit that appends the answer and clears the partial.
             var started = states.FindIndex(state => state.ContainsKey("run"));
             // f3255de76's run; v1.5.0's adds turns and first (area live-turns).
-            MatchExactly($$"""{"taskId":"<number>","inputs":[{{submission.Id.Value}}],"turns":0}""", states[started]["run"], "the run");
+            MatchExactly($$"""{"taskId":"<number>","inputs":[{{submission.Id.Value}}],"turns":0,"first":"<number>"}""", states[started]["run"], "the run");
             Equal("pi.user", views[started].Entries[^1].Kind, "the input's commit");
             var ended = states.FindIndex(started + 1, state => !state.ContainsKey("run"));
             Check(!states[ended].ContainsKey("generation"), "no partial once the run ends");
