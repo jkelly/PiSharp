@@ -578,6 +578,8 @@ public interface ITx
     Task<Page<EntryRecord>> ScanEntriesAsync(EntryQuery query, int limit, JsonObjectValue? cursor = null);
     /// <summary>The newest visible entry of the conversation that carries a head.</summary>
     Task<EntryRecord?> LatestHeadMarkerAsync(ConversationId conversationId);
+    /// <summary>ID of the newest entry visible from the conversation; null when it has none (Pi v1.5.0's <c>tx.latestEntryId</c>).</summary>
+    Task<EntryId?> LatestEntryIdAsync(ConversationId conversationId);
     /// <summary>Scans tasks with the caller's limit and cursor.</summary>
     Task<Page<TaskRecord>> ScanTasksAsync(TaskQuery query, int limit, JsonObjectValue? cursor = null);
     /// <summary>The committed submission with a conversation-scoped request ID.</summary>

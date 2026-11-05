@@ -18,7 +18,13 @@
 // DocumentRetireChange for a retirement (was a null value), which carries no held operations. Pi v1.5.0 sync (area admission, fb524dd2e,
 // cc9c52310): a continue is never queued, so never placed, and a placed continue can be answered as a placed input can; Context,
 // HasTableWrite and OwnedBy serve submit(tx, draft), and a read after a table write names its call (ReadAfterWriteException's operation,
-// Tx.<method>()). The citation stays on v1.2.0 until the file's other areas land.
+// Tx.<method>()). Pi v1.5.0 sync (area group-commit, e5c6182ba): the host's Storage is the line's GatedStorage, so a read waits while
+// its key has an unpublished writer; a retirement touches its address first, and retiring a terminal task's documents touches the task's
+// scope (Touch); WriteKeys names what the commit writes for the writer's unpublished write set (its table records, and the address and
+// incarnation of every document it creates, changes or retires, with the scope of every incarnation it creates or retires); the newest
+// entry and head marker come from the host (LatestEntryIdAsync is v1.5.0's tx.latestEntryId). The host's index of live tasks' documents
+// (TaskDocuments) is area publication-caches': until then it knows none, and every terminal task's documents are scanned. The citation
+// stays on v1.2.0: area publication-caches completes this file's v1.5.0 port.
 using System.Collections.Immutable;
 using PiSharp.Durable.Chord;
 using PiSharp.Durable.Chord.Delta;
@@ -69,7 +75,16 @@ internal sealed record AdoptedDocuments(List<ICommitChange> Observed, List<IComm
 /// <summary>Session services used by a transaction while it holds the mutation line (upstream <c>TransactionHost</c>).</summary>
 internal interface ITransactionHost
 {
+    /// <summary>Reads wait while their key has an unpublished writer (<see cref="GatedStorage"/>).</summary>
     IStorage Storage { get; }
+    /// <summary>Waits while <paramref name="key"/> has an unpublished writer; null when it has none.</summary>
+    Task? Touch(string key);
+    /// <summary>The newest entry ID visible from a conversation.</summary>
+    Task<EntryId?> LatestEntryIdAsync(ConversationId conversationId, DurableContext context);
+    /// <summary>The newest visible head marker of a conversation.</summary>
+    Task<EntryRecord?> LatestHeadMarkerAsync(ConversationId conversationId, DurableContext context);
+    /// <summary>The current documents of a live task when the Session knows all of them (it created the task), else null.</summary>
+    IEnumerable<DocumentRecord>? TaskDocuments(TaskId taskId);
     /// <summary>Wall clock for task lifecycle times, in milliseconds.</summary>
     double Now();
     /// <summary>The cached current incarnation, without loading.</summary>
@@ -183,7 +198,10 @@ internal sealed class Transaction : ITx
         Read("scanEntries", () => host.Storage.ScanEntriesAsync(query, limit, cursor, context));
 
     public Task<EntryRecord?> LatestHeadMarkerAsync(ConversationId conversationId) =>
-        Read("latestHeadMarker", () => host.Storage.FindLatestHeadMarkerAsync(conversationId, null, context));
+        Read("latestHeadMarker", () => host.LatestHeadMarkerAsync(conversationId, context));
+
+    public Task<EntryId?> LatestEntryIdAsync(ConversationId conversationId) =>
+        Read("latestEntryId", () => host.LatestEntryIdAsync(conversationId, context));
 
     public Task<Page<TaskRecord>> ScanTasksAsync(TaskQuery query, int limit, JsonObjectValue? cursor = null) =>
         Read("scanTasks", () => host.Storage.ScanTasksAsync(query, limit, cursor, context));
@@ -575,6 +593,7 @@ internal sealed class Transaction : ITx
 
     private async Task FindRetirementAsync(DocumentEntry entry)
     {
+        if (host.Touch(LineKeys.Document(entry.AddressId)) is { } touched) await touched.ConfigureAwait(false);
         var record = host.Cached(entry.AddressId)?.Record ??
             await host.Storage.FindDocumentAsync(entry.Address, DocumentPoint.Current, context).ConfigureAwait(false);
         AssertOpen();
@@ -709,6 +728,34 @@ internal sealed class Transaction : ITx
         return taken;
     }
 
+    /// <summary>
+    /// Internal: the keys this commit writes, once settled (and after <see cref="TakeHeld{THold}"/>), for the Session's unpublished write set
+    /// (upstream <c>writeKeys</c>): its table records, and the address and incarnation of every document it creates, changes, or retires,
+    /// with the scope of every incarnation it creates or retires.
+    /// </summary>
+    public List<string> WriteKeys()
+    {
+        var keys = new List<string>();
+        lock (gate)
+        {
+            LineKeys.TableKeys(writes, keys);
+            foreach (var plan in plans)
+            {
+                if (plan.Content is null && !plan.Retire) continue;
+                keys.Add(LineKeys.Document(plan.AddressId));
+                keys.Add(LineKeys.Incarnation(plan.Record.Id));
+                if (plan.Retire || plan.Record is not DocumentRecord) keys.Add(LineKeys.Scope(plan.Record.Scope));
+            }
+        }
+        return keys;
+    }
+
+    /// <summary>Internal: IDs of the tasks this transaction creates (upstream <c>createdTaskIds</c>), for the scheduler's membership keys.</summary>
+    public List<TaskId> CreatedTaskIds()
+    {
+        lock (gate) return [.. tasksById.Where(task => task.Value.Write?.Kind == TaskWriteKind.Create).Select(task => task.Key)];
+    }
+
     /// <summary>Stages a content write for an incarnation, before its retirement when it retires.</summary>
     private void InsertBeforeRetirement(DocumentChangeWrite write)
     {
@@ -820,19 +867,27 @@ internal sealed class Transaction : ITx
                 plan.Retire = true;
                 retiring.Add(plan.Record.Id);
             }
+            void Retire(DocumentRecord record)
+            {
+                if (!retiring.Add(record.Id)) return;
+                plans.Add(new DocumentPlan(Documents.AddressId(DocumentAddress.Of(record)), record) { Retire = true });
+            }
             foreach (var taskId in terminalTaskIds)
             {
                 if (tasksById[taskId].Write?.Kind == TaskWriteKind.Create) continue;
+                // The Session knows the documents of the tasks it created; any other task's are scanned.
+                if (host.Touch(LineKeys.Scope(DocumentScope.Task(taskId))) is { } touched) await touched.ConfigureAwait(false);
+                if (host.TaskDocuments(taskId) is { } known)
+                {
+                    foreach (var record in known) Retire(record);
+                    continue;
+                }
                 JsonObjectValue? cursor = null;
                 do
                 {
                     var page = await storage.ScanDocumentsAsync(new DocumentQuery(DocumentScope.Task(taskId), DocumentPoint.Current),
                         InternalScanPageSize, cursor, context).ConfigureAwait(false);
-                    foreach (var record in page.Items)
-                    {
-                        if (!retiring.Add(record.Id)) continue;
-                        plans.Add(new DocumentPlan(Documents.AddressId(DocumentAddress.Of(record)), record) { Retire = true });
-                    }
+                    foreach (var record in page.Items) Retire(record);
                     cursor = page.Next;
                 } while (cursor is not null);
             }

@@ -384,6 +384,14 @@ internal sealed class DurableHarness : Session, IHarness
     /// <summary>Signals and joins task invocations after the close listeners and before Storage closes; writes no task outcome.</summary>
     internal override Task BeforeCloseAsync() => scheduler.JoinAsync();
 
+    /// <summary>
+    /// Pi v1.5.0 sync (area group-commit): the scheduler's decisions read its memory, which only a commit's publication brings up to date, and
+    /// they do not yet record the keys they read (upstream's decision regions and membership keys, area group-commit-scheduler). Until they do,
+    /// every line job of a Harness starts once what was admitted before it is published: the serialized line, with the writer's per-part
+    /// outcomes and publication scope.
+    /// </summary>
+    internal override bool LineWaitsForPublication => true;
+
     internal async Task<IConversation> CreateAsync(CreateTarget target, AgentChange? agent, ConversationInit? init, DurableContext context)
     {
         AssertUsable();
