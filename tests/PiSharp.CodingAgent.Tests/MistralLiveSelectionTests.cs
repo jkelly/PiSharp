@@ -35,7 +35,19 @@ internal static class MistralLiveSelectionTests
         using var handler = new Handler(); var reads = new List<string>();
         using var connection = selected.Connect(new(name => { reads.Add(name); return name == "MISTRAL_API_KEY" ? "fixture-only" : null; }, () => handler));
         var normal = connection.CreateTransport(); var summary = connection.CreateTransport(summary: true);
-        var request = new ChatRequest(selected.Model, [new("user", JsonData.Parse("{\"content\":\"hello\"}"))], 1);
+        // pi-ai 1.5.0 dropped open-mistral-7b, whose 8000-token context made the normal Simple route clamp max_tokens to the room left
+        // (simple-options.ts clampMaxTokensToContext: contextWindow - estimateContextTokens - CONTEXT_SAFETY_TOKENS 4096, at most 3904).
+        // open-mistral-nemo has a 128000-token context: an earlier answer that reports 120000 used tokens (estimateContextTokens starts
+        // from the last usage) leaves the same 3904 tokens of room.
+        var earlier = JsonData.Parse(JsonSerializer.Serialize(new
+        {
+            role = "assistant", provider = selected.Model.Provider, api = selected.Model.Api, model = selected.Model.Id,
+            content = new[] { new { type = "text", text = "earlier" } }, stopReason = "stop", timestamp = 2,
+            usage = new { input = 119_990, output = 10, cacheRead = 0, cacheWrite = 0, totalTokens = 120_000,
+                cost = new { input = 0, output = 0, cacheRead = 0, cacheWrite = 0, total = 0 } }
+        }));
+        var request = new ChatRequest(selected.Model, [new("user", JsonData.Parse("{\"role\":\"user\",\"content\":\"hello\",\"timestamp\":1}")),
+            new("assistant", earlier), new("user", JsonData.Parse("{\"role\":\"user\",\"content\":\"hello\",\"timestamp\":3}"))], 4);
         var normalEvents = await Collect(normal.StreamAsync(request)); var summaryEvents = await Collect(summary.StreamAsync(request));
         Check(normalEvents[^1] is StreamDone && summaryEvents[^1] is StreamDone);
         // Pi 1.1.0 resolution (7b4590d7): the session's environment is read once per provider variable at start, and
