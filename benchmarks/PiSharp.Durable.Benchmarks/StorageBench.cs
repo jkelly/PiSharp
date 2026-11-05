@@ -6,6 +6,14 @@
 // after 5 warmups; reopen 20 after 3. The store backend opens a store over the file and Durable's storage in it under one owner, whose
 // close closes the store too (StoreOwningStorage, as upstream's openStoreStorage of test/store-storage-support.ts); its reopen copies the
 // file, as SQLite's does.
+// Throughput (PiSharp-authored, Pi v1.5.0 area group-commit; upstream measured its group commit with an uncommitted probe, docs/group-commit.md
+// section 9, and quotes "about 5 -> 440 agent runs per second" for one Harness with 128 conversations over storage with a 4 ms round trip):
+// one Session's commit throughput and one Harness's run throughput with N conversations working at once, over MemoryStorage behind a fixed
+// round trip on every call (LatencyStorage; PreciseDelay keeps sub-millisecond waits, as Task.Delay rounds up to the 15.6 ms Windows timer
+// tick) and over local SQLite. Each Session conversation appends one entry per commit; each Harness run is one faux text reply. Prints
+// commits or runs per second, the storage calls and the mean commits per call (the group size), and the median run.
+using System.Diagnostics;
+using System.Globalization;
 using PiSharp.Chord;
 using PiSharp.Durable.Chord;
 using PiSharp.Durable.Sqlite;
@@ -219,6 +227,132 @@ public static class StorageBench
     {
         if (actual != expected) throw new InvalidOperationException($"Invalid benchmark result: {scenario}: expected {expected}, actual {actual}");
     }
+
+    /// <summary>The conversation counts of <see cref="ThroughputAsync"/> by default.</summary>
+    public static IReadOnlyList<int> DefaultThroughputConversations { get; } = [1, 8, 32, 128];
+
+    /// <summary>The round trips, in milliseconds, of <see cref="ThroughputAsync"/> by default.</summary>
+    public static IReadOnlyList<double> DefaultThroughputLatencies { get; } = [0, 1, 4];
+
+    /// <summary>One throughput row: <c>Work</c> is the commits or runs timed, <c>Commits</c> the commits the storage calls carried.</summary>
+    public sealed record ThroughputRow(string Scenario, string Backend, double LatencyMs, int Conversations, int Work, double Seconds,
+        int StorageCalls, int Commits, double MedianMs);
+
+    /// <summary>Comma-separated numbers, or the defaults.</summary>
+    public static IReadOnlyList<T> ParseList<T>(string? argument, IReadOnlyList<T> defaults) where T : IParsable<T> =>
+        argument is null ? defaults : [.. argument.Split(',').Select(item => T.Parse(item, CultureInfo.InvariantCulture))];
+
+    /// <summary>
+    /// Session commit and Harness run throughput with each count of <paramref name="conversations"/> working at once, over memory storage
+    /// behind each round trip of <paramref name="latencies"/> and over local SQLite (see the file header). Writes one table per scenario.
+    /// Harness rows take only the round trips of 0 and at least 4 ms.
+    /// </summary>
+    public static async Task<IReadOnlyList<ThroughputRow>> ThroughputAsync(IReadOnlyList<double> latencies, IReadOnlyList<int> conversations,
+        TextWriter output, string? tempRoot = null)
+    {
+        var rows = new List<ThroughputRow>();
+        await using var fixtures = new Fixtures(tempRoot ?? Path.GetTempPath());
+        output.WriteLine("scenario        | backend | round trip ms | conversations | commits | s     | commits/s | storage calls | commits per call");
+        foreach (var (backend, latency) in Throughputs(latencies))
+            foreach (var count in conversations)
+            {
+                var row = await SessionCommitsAsync(fixtures, backend, latency, count);
+                rows.Add(row);
+                output.WriteLine(string.Create(CultureInfo.InvariantCulture,
+                    $"session commits | {row.Backend,-7} | {row.LatencyMs,-13} | {row.Conversations,-13} | {row.Work,-7} | {row.Seconds,-5:F2} | {row.Work / row.Seconds,-9:F0} | {row.StorageCalls,-13} | {(double)row.Commits / Math.Max(1, row.StorageCalls):F2}"));
+            }
+        output.WriteLine("scenario     | backend | round trip ms | conversations | runs | s     | runs/s | median run ms | commits per run | storage calls | commits per call");
+        foreach (var (backend, latency) in Throughputs([.. latencies.Where(latency => latency == 0 || latency >= 4)]))
+            foreach (var count in conversations)
+            {
+                var row = await HarnessRunsAsync(fixtures, backend, latency, count);
+                rows.Add(row);
+                output.WriteLine(string.Create(CultureInfo.InvariantCulture,
+                    $"harness runs | {row.Backend,-7} | {row.LatencyMs,-13} | {row.Conversations,-13} | {row.Work,-4} | {row.Seconds,-5:F2} | {row.Work / row.Seconds,-6:F1} | {row.MedianMs,-13:F1} | {(double)row.Commits / row.Work,-15:F1} | {row.StorageCalls,-13} | {(double)row.Commits / Math.Max(1, row.StorageCalls):F2}"));
+            }
+        return rows;
+    }
+
+    private static IEnumerable<(BenchBackend Backend, double Latency)> Throughputs(IReadOnlyList<double> latencies)
+    {
+        foreach (var latency in latencies) yield return (BenchBackend.Memory, latency);
+        yield return (BenchBackend.Sqlite, 0);
+    }
+
+    /// <summary>The commits of one Session row: 512 in all, split evenly across the conversations, each conversation's in sequence.</summary>
+    private const int SessionCommits = 512;
+
+    /// <summary>The runs of one Harness row: 128 in all, split evenly across the conversations, each conversation's in sequence.</summary>
+    private const int HarnessRuns = 128;
+
+    private static async Task<ThroughputRow> SessionCommitsAsync(Fixtures fixtures, BenchBackend backend, double latency, int count)
+    {
+        var storage = new LatencyStorage(await fixtures.CreateAsync(backend), latency);
+        var session = Session.Create(storage);
+        try
+        {
+            var ids = await session.CommitAsync(async tx =>
+            {
+                var created = new List<ConversationId>();
+                for (var index = 0; index < count; index++) created.Add((await tx.CreateConversationAsync(ConversationOwnership.Ownerless)).Id);
+                return created;
+            }, Context);
+            var each = Math.Max(1, SessionCommits / count);
+            storage.Reset();
+            var watch = Stopwatch.StartNew();
+            await Task.WhenAll(ids.Select(async id =>
+            {
+                for (var index = 0; index < each; index++)
+                    await session.CommitAsync(tx => tx.AppendEntryAsync(id, new EntryDraft { Kind = "note" }), Context);
+            }));
+            watch.Stop();
+            var (calls, commits) = storage.Reset();
+            return new ThroughputRow("session commits", Name(backend), latency, count, each * count, watch.Elapsed.TotalSeconds, calls, commits, 0);
+        }
+        finally
+        {
+            await session.CloseAsync(Context);
+        }
+    }
+
+    private static async Task<ThroughputRow> HarnessRunsAsync(Fixtures fixtures, BenchBackend backend, double latency, int count)
+    {
+        var each = Math.Max(1, HarnessRuns / count);
+        var storage = new LatencyStorage(await fixtures.CreateAsync(backend), latency);
+        var models = new FauxModels([.. Enumerable.Range(0, each * count).Select(_ => FauxModels.Text("done"))]);
+        var harness = await Harness.OpenAsync(storage, new HarnessOptions { Models = models, Registry = Registry.Create() }, Context);
+        try
+        {
+            var created = new List<IConversation>();
+            for (var index = 0; index < count; index++)
+                created.Add(await harness.CreateConversationAsync(new ConversationCreateOptions(ConversationOwnership.Ownerless)
+                {
+                    Agent = new AgentChange { Model = FauxModels.Ref },
+                }, Context));
+            storage.Reset();
+            var runs = new List<double>();
+            var watch = Stopwatch.StartNew();
+            await Task.WhenAll(created.Select(async conversation =>
+            {
+                for (var index = 0; index < each; index++)
+                {
+                    var started = Stopwatch.GetTimestamp();
+                    var settled = await (await conversation.SubmitAsync(SubmissionDraft.Input("go"), Context)).WaitAsync(Context);
+                    if (settled.Status != SubmissionStatus.Done) throw new InvalidOperationException($"run {index}: {settled}");
+                    lock (runs) runs.Add(Stopwatch.GetElapsedTime(started).TotalMilliseconds);
+                }
+            }));
+            watch.Stop();
+            var (calls, commits) = storage.Reset();
+            runs.Sort();
+            return new ThroughputRow("harness runs", Name(backend), latency, count, each * count, watch.Elapsed.TotalSeconds, calls, commits,
+                runs[runs.Count / 2]);
+        }
+        finally
+        {
+            await harness.CloseAsync(Context);
+        }
+    }
 }
 
 /// <summary>A StoreStorage whose close also closes its store, once (the store backend's storage).</summary>
@@ -264,5 +398,102 @@ internal sealed class StoreOwningStorage(StoreStorage storage, IStore store) : I
     {
         await storage.CloseAsync(context);
         await store.CloseAsync(ChordContext.Background);
+    }
+}
+
+/// <summary>A storage whose every call first waits a fixed round trip (the throughput benchmark's; see the file header).</summary>
+internal sealed class LatencyStorage(IStorage inner, double latencyMs) : IStorage
+{
+    private int calls;
+    private int commits;
+
+    /// <summary>The commit calls and the commits they carried since the last reset; resets both.</summary>
+    public (int Calls, int Commits) Reset() => (Interlocked.Exchange(ref calls, 0), Interlocked.Exchange(ref commits, 0));
+
+    private async Task<T> Trip<T>(Func<Task<T>> call)
+    {
+        await PreciseDelay.Wait(latencyMs);
+        return await call();
+    }
+
+    public async Task<CommitResult> CommitAsync(IReadOnlyList<IReadOnlyList<StorageWrite>> batches, Action<int, Seq> receive, DurableContext context)
+    {
+        Interlocked.Increment(ref calls);
+        Interlocked.Add(ref commits, batches.Count);
+        await PreciseDelay.Wait(latencyMs);
+        return await inner.CommitAsync(batches, receive, context);
+    }
+
+    public void Publishing(Action publish, DurableContext context) => inner.Publishing(publish, context);
+    public Task<TId> MintIdAsync<TId>() where TId : struct, IDurableId<TId> => inner.MintIdAsync<TId>();
+    public Task<ConversationRecord?> GetConversationAsync(ConversationId id, DurableContext context) => Trip(() => inner.GetConversationAsync(id, context));
+    public Task<Page<ConversationRecord>> ScanConversationsAsync(ConversationQuery query, int limit, JsonObjectValue? cursor, DurableContext context) =>
+        Trip(() => inner.ScanConversationsAsync(query, limit, cursor, context));
+    public Task<CommittedEntry?> GetEntryAsync(EntryId id, DurableContext context) => Trip(() => inner.GetEntryAsync(id, context));
+    public Task<CommittedEntry?> GetEntryAsync(ConversationId conversationId, EntryId id, DurableContext context) =>
+        Trip(() => inner.GetEntryAsync(conversationId, id, context));
+    public Task<EntryRecord?> FindLatestHeadMarkerAsync(ConversationId conversationId, EntryId? atOrBeforeEntryId, DurableContext context) =>
+        Trip(() => inner.FindLatestHeadMarkerAsync(conversationId, atOrBeforeEntryId, context));
+    public Task<Page<EntryRecord>> ScanEntriesAsync(EntryQuery query, int limit, JsonObjectValue? cursor, DurableContext context) =>
+        Trip(() => inner.ScanEntriesAsync(query, limit, cursor, context));
+    public Task<TaskRecord?> GetTaskAsync(TaskId id, DurableContext context) => Trip(() => inner.GetTaskAsync(id, context));
+    public Task<Page<TaskRecord>> ScanTasksAsync(TaskQuery query, int limit, JsonObjectValue? cursor, DurableContext context) =>
+        Trip(() => inner.ScanTasksAsync(query, limit, cursor, context));
+    public Task<SubmissionRecord?> GetSubmissionAsync(SubmissionId id, DurableContext context) => Trip(() => inner.GetSubmissionAsync(id, context));
+    public Task<Page<SubmissionRecord>> ScanSubmissionsAsync(SubmissionQuery query, int limit, JsonObjectValue? cursor, DurableContext context) =>
+        Trip(() => inner.ScanSubmissionsAsync(query, limit, cursor, context));
+    public Task<SubmissionRecord?> GetSubmissionByRequestAsync(ConversationId conversationId, string requestId, DurableContext context) =>
+        Trip(() => inner.GetSubmissionByRequestAsync(conversationId, requestId, context));
+    public Task<DocumentRecord?> FindDocumentAsync(DocumentAddress address, DocumentPoint at, DurableContext context) =>
+        Trip(() => inner.FindDocumentAsync(address, at, context));
+    public Task<StoredDocument?> GetDocumentAsync(DocumentId id, DocumentPoint at, DurableContext context) =>
+        Trip(() => inner.GetDocumentAsync(id, at, context));
+    public Task<Page<DocumentRecord>> ScanDocumentsAsync(DocumentQuery query, int limit, JsonObjectValue? cursor, DurableContext context) =>
+        Trip(() => inner.ScanDocumentsAsync(query, limit, cursor, context));
+    public Task CloseAsync(DurableContext context) => inner.CloseAsync(context);
+}
+
+/// <summary>
+/// Waits a given number of milliseconds to within a few microseconds: one background thread spins over a deadline queue while waits are
+/// pending (it costs one core while the throughput benchmark runs) and sleeps on the queue's monitor otherwise.
+/// </summary>
+internal static class PreciseDelay
+{
+    private static readonly object Gate = new();
+    private static readonly PriorityQueue<TaskCompletionSource, long> Waits = new();
+    private static Thread? worker;
+
+    /// <summary>Completes after about <paramref name="ms"/> milliseconds; at once for 0 or less.</summary>
+    public static Task Wait(double ms)
+    {
+        if (ms <= 0) return Task.CompletedTask;
+        var done = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var due = Stopwatch.GetTimestamp() + (long)(ms * Stopwatch.Frequency / 1000);
+        lock (Gate)
+        {
+            Waits.Enqueue(done, due);
+            if (worker is null)
+            {
+                worker = new Thread(Run) { IsBackground = true, Name = "bench-latency" };
+                worker.Start();
+            }
+            Monitor.Pulse(Gate);
+        }
+        return done.Task;
+    }
+
+    private static void Run()
+    {
+        while (true)
+        {
+            TaskCompletionSource? due = null;
+            lock (Gate)
+            {
+                while (Waits.Count == 0) Monitor.Wait(Gate);
+                if (Waits.TryPeek(out var next, out var at) && Stopwatch.GetTimestamp() >= at) due = Waits.Dequeue();
+            }
+            if (due is not null) due.SetResult();
+            else Thread.SpinWait(20);
+        }
     }
 }

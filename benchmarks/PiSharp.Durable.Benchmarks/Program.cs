@@ -3,11 +3,11 @@ using PiSharp.Durable.Benchmarks;
 // Usage: PiSharp.Durable.Benchmarks [storage] [storage-memory] [tool-output [<scenario label filter>]] [document-append [N,...]]
 //   [document-cache [N,...]] [scheduler-memory [N,...]] [scheduler-scale [fanout N,...] [chain N,...]] [scheduler-fanout [N,...]]
 //   [nested-tools [streaming|nesting]] [nested-images [count]] [codemode [N,...]] [partial-commits [N,...]]
-//   [conversation-view [sqlite|store|both]]
+//   [conversation-view [sqlite|store|both]] [storage-throughput [latency ms,...] [conversations N,...]]
 // With no argument, runs all thirteen (upstream: npm run bench:storage, bench:storage:memory, bench:tool-output, bench:document-append,
 // bench:document-cache, bench:scheduler-memory, bench:scheduler-fanout and bench:codemode, and test/nested-tools-bench.ts,
 // test/nested-images-bench.ts and, Pi v1.5.0 area view, test/conversation-view-bench.ts;
-// scheduler-scale and partial-commits are PiSharp-authored, see SchedulerScaleBench.cs and PartialCommitsBench.cs). Report only: the
+// scheduler-scale, partial-commits and storage-throughput (not part of the default run) are PiSharp-authored, see SchedulerScaleBench.cs and PartialCommitsBench.cs). Report only: the
 // benchmarks print tables and never pass or fail on a timing. Run in Release. The --worker forms are the child processes of storage-memory
 // and tool-output.
 if (args is ["storage-memory", "--worker", var backend, var scale]) return await StorageMemory.WorkerMainAsync(backend, scale, Console.Out);
@@ -25,6 +25,17 @@ for (var index = 0; index < selected.Length; index++)
         case "storage":
             Console.WriteLine("## storage.bench");
             await StorageBench.RunAsync(new StorageBenchOptions(), Console.Out);
+            break;
+        case "storage-throughput":
+            string? latencies = null, counts = null;
+            while (index + 2 < selected.Length && selected[index + 1] is "latency" or "conversations")
+            {
+                if (selected[++index] == "latency") latencies = selected[++index];
+                else counts = selected[++index];
+            }
+            Console.WriteLine("## storage-throughput (PiSharp-authored)");
+            await StorageBench.ThroughputAsync(StorageBench.ParseList(latencies, StorageBench.DefaultThroughputLatencies),
+                StorageBench.ParseList(counts, StorageBench.DefaultThroughputConversations), Console.Out);
             break;
         case "storage-memory":
             Console.WriteLine("## storage-memory");
@@ -102,7 +113,7 @@ for (var index = 0; index < selected.Length; index++)
             await ConversationViewBench.RunDriverAsync(ConversationViewBench.Storages(viewStorage), Console.Out);
             break;
         default:
-            Console.Error.WriteLine("Usage: PiSharp.Durable.Benchmarks [storage] [storage-memory] [tool-output [<scenario label filter>]] [document-append [N,...]] [document-cache [N,...]] [scheduler-memory [N,...]] [scheduler-scale [fanout N,...] [chain N,...]] [scheduler-fanout [N,...]] [nested-tools [streaming|nesting]] [nested-images [count]] [codemode [N,...]] [partial-commits [N,...]] [conversation-view [sqlite|store|both]]");
+            Console.Error.WriteLine("Usage: PiSharp.Durable.Benchmarks [storage] [storage-memory] [tool-output [<scenario label filter>]] [document-append [N,...]] [document-cache [N,...]] [scheduler-memory [N,...]] [scheduler-scale [fanout N,...] [chain N,...]] [scheduler-fanout [N,...]] [nested-tools [streaming|nesting]] [nested-images [count]] [codemode [N,...]] [partial-commits [N,...]] [conversation-view [sqlite|store|both]] [storage-throughput [latency ms,...] [conversations N,...]]");
             return 2;
     }
 }
