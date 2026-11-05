@@ -56,11 +56,11 @@
     "changelogBullets": 477,
     "repeatedBullets": 23,
     "byStatus": {
-      "ported": 228,
+      "ported": 229,
       "ported-with-deferral": 22,
       "already-ported": 12,
       "no-op": 25,
-      "port": 39
+      "port": 38
     },
     "byArea": {
       "ai": 58,
@@ -8539,7 +8539,7 @@
       "id": "durable.scheduler-idle-index",
       "area": "durable",
       "phase": 4,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "durable@1.5.0/Changed#8"
       ],
@@ -8556,7 +8556,31 @@
         "benchmarks/PiSharp.Durable.Benchmarks/SchedulerScaleBench.cs"
       ],
       "release": "1.5.0",
-      "notes": "Scheduler.cs ports v1.2.0's scheduler as a whole (decision 0005 'Scheduler'), per-commit walk included. Depends on durable.wake for wake() and on durable.group-commit (the scheduler's commit path changes there). Helps the device host, which serves many sessions (decision 0008); record the benchmark in docs/durable-benchmarks.md."
+      "notes": "Scheduler.cs ports v1.2.0's scheduler as a whole (decision 0005 'Scheduler'), per-commit walk included. Depends on durable.wake for wake() and on durable.group-commit (the scheduler's commit path changes there). Helps the device host, which serves many sessions (decision 0008); record the benchmark in docs/durable-benchmarks.md.",
+      "evidence": {
+        "commits": [
+          "39c8829d",
+          "2755927d",
+          "db3c749b"
+        ],
+        "tests": [
+          "tests/PiSharp.Durable.Tests/HarnessIdleScopesCases.cs: resolve-through-owner-chains-owned-conversations-and-ended-tasks-between-ignoring-background-work",
+          "tests/PiSharp.Durable.Tests/HarnessIdleScopesCases.cs: count-work-whose-chain-is-not-loaded-yet-as-inside-until-the-open-reconcile-loads-it",
+          "tests/PiSharp.Durable.Tests/HarnessIdleScopesCases.cs: resolve-a-waiter-on-an-unrelated-conversation-without-settling-the-busy-one",
+          "tests/PiSharp.Durable.Tests/HarnessIdleScopesCases.cs: settles-a-run-end-whose-sweep-drops-the-chain-without-a-check-of-every-scope",
+          "tests/PiSharp.Durable.Tests/HarnessIdleScopesCases.cs: drops-a-range-past-its-retention-when-a-task-change-makes-it-busy-again-with-background-timers-declined",
+          "tests/PiSharp.Durable.Tests/HarnessIdleScopesCases.cs: drops-a-range-past-its-retention-at-a-reconcile-pass-with-nothing-to-do-with-background-timers-declined-review",
+          "tests/PiSharp.Durable.Tests/HarnessIdleScopesCases.cs: expires-in-idle-order-when-the-clock-goes-back",
+          "tests/PiSharp.Durable.Tests/HarnessIdleScopesCases.cs: drops-every-idle-range-when-retention-becomes-zero-also-one-that-went-idle-after-the-clock-s-now-review",
+          "tests/PiSharp.Durable.Tests/HarnessIdleScopesCases.cs: keeps-an-idle-range-s-expiry-when-another-task-reads-it-again",
+          "tests/PiSharp.Durable.Tests/HarnessIdleScopesCases.cs: drops-a-range-from-the-expiry-order-when-an-entry-commit-finds-it-expired",
+          "tests/PiSharp.Durable.Tests/HarnessIdleScopesCases.cs: drops-a-range-from-the-expiry-order-when-an-entry-commit-cannot-extend-it",
+          "tests/PiSharp.Durable.Tests/HarnessIdleScopesCases.cs: drops-a-range-that-goes-idle-with-zero-retention",
+          "tests/PiSharp.Durable.Tests/HarnessIdleScopesCases.cs: incremental-idle-state.equals-a-full-recompute-after-every-step-of-random-nested-work",
+          "tests/PiSharp.Durable.Tests/HarnessIdleScopesCases.cs: with-an-invocation-running-active-and-the-earliest-sleep-still-found",
+          "tests/PiSharp.Durable.Tests/BenchmarksCases.cs: benchmarks.smoke"
+        ]
+      }
     },
     {
       "id": "durable.checkpoint-when-required",
