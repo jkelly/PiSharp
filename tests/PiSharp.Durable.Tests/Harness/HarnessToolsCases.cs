@@ -26,7 +26,10 @@
 //   output" freezes the progress clock, its timers (a ManualTimeProvider) and its time (HarnessOptions.Now on the same provider), so the
 //   second output stays buffered until the abort discards it. "answers calls to tools the request did not offer through a flagged tool
 //   task" holds echo until the ghost call's result entry is committed: the two tool tasks run side by side, and upstream's ghost, which runs
-//   nothing, answers first, where a busy runner's echo did.
+//   nothing, answers first, where a busy runner's echo did. "runs a round in parallel by default ..." holds b's handler (bounded) until a's
+//   has started: a parallel round's handlers start in call order only when the reservation pass finds the line idle and runs them inline
+//   (DurableTaskScheduler.Kick); on a busy line they start on the thread pool, where a busy runner started b first. a still waits for b's
+//   start, so the parallel check still fails if b does not start while a runs.
 using System.Collections.Immutable;
 using System.Text;
 using PiSharp.Durable;
@@ -328,10 +331,14 @@ internal static class ToolsTests
             async Task<List<string>> Trace(ChatSetup setup, bool overlap = false)
             {
                 var events = new SyncList<string>();
+                var aStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
                 var bStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
                 ToolExecute Slow(string name) => async (_, _, _) =>
                 {
+                    // A parallel round's handlers can start in either order on the thread pool (see the file header): b starts after a.
+                    if (overlap && name == "b") await Task.WhenAny(aStarted.Task, Task.Delay(TimeSpan.FromSeconds(10)));
                     events.Add($"start {name}");
+                    if (name == "a") aStarted.TrySetResult();
                     if (name == "b") bStarted.TrySetResult();
                     if (overlap && name == "a") await Task.WhenAny(bStarted.Task, Task.Delay(TimeSpan.FromSeconds(10)));
                     else await Sleep(20);
