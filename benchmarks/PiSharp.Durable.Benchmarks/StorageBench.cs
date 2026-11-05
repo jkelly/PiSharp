@@ -17,6 +17,10 @@
 // Both pin the document retention to its ten-minute default (ThroughputRetentionMs), as PartialCommitsBench.cs does: the Durable suite's
 // second CI run sets PI_DURABLE_DOCUMENT_RETENTION_MS=0, which evicts every unobserved document right after its use, so each commit and
 // run would load its conversation documents again and the reads would measure that override instead of the read caches.
+// Hold (Harness rows): the counters reset and the clock starts once the scheduler is quiet (SchedulerMemoryBench.SchedulerInternals,
+// DurableTaskScheduler.QuiesceAsync). The open's recovery pass scans the queued inputs (one Storage read), and the scheduler's passes run
+// on the thread pool here, not in drained microtasks (as SchedulerMemoryBench.cs notes), so on a loaded two-core runner it could land after
+// the reset and count as a run's read.
 using System.Diagnostics;
 using System.Globalization;
 using PiSharp.Chord;
@@ -359,6 +363,8 @@ public static class StorageBench
                 {
                     Agent = new AgentChange { Model = FauxModels.Ref },
                 }, Context));
+            // The open's recovery pass has run before the clock starts (see the file header).
+            await new SchedulerMemoryBench.SchedulerInternals(harness).QuiesceAsync();
             storage.Reset();
             var runs = new List<double>();
             var watch = Stopwatch.StartNew();
