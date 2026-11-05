@@ -3872,7 +3872,8 @@
         "3ac64a074",
         "6a2825113",
         "cc9c52310",
-        "fb524dd2e"
+        "fb524dd2e",
+        "74c5a98f"
       ],
       "notes": "SubmissionRecord (Types.cs) is input-only today: PiSharp-only code that narrows a record by status alone must also check its type (custom agent teams, orchestration and model calls, the device API's SubmissionAnswers.cs, pisharp durable). The device API passes whenBusy through to SubmissionDraft (Server DurableDeviceApi.cs, Hosting HostedSession.cs); exposing whenIdle or a Continue action there is a protocol choice under decision 0010, not required here. Hosts that write their own documents and then submit in a second commit could merge the two with submit(tx, draft) (recurring job start receipts, app tool entry receipts, workflow starts); record whether they adopt it. Example 33 is shared with area live-turns (which owns it); 34 is here."
     },

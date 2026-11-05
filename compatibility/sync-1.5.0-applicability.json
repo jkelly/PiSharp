@@ -56,11 +56,11 @@
     "changelogBullets": 477,
     "repeatedBullets": 23,
     "byStatus": {
-      "ported": 211,
-      "ported-with-deferral": 23,
+      "ported": 215,
+      "ported-with-deferral": 22,
       "already-ported": 12,
       "no-op": 25,
-      "port": 55
+      "port": 52
     },
     "byArea": {
       "ai": 58,
@@ -9569,7 +9569,7 @@
       "id": "durable.telemetry",
       "area": "durable",
       "phase": 4,
-      "status": "ported-with-deferral",
+      "status": "ported",
       "changelog": [
         "durable@1.4.0/Added#2"
       ],
@@ -9615,7 +9615,8 @@
           "0251bbac",
           "27a292eb",
           "395850fa",
-          "cd62648c"
+          "cd62648c",
+          "74c5a98f"
         ],
         "tests": [
           "tests/PiSharp.Durable.Tests/HarnessTelemetryCases.cs: harness.telemetry.records-content-free-submit-and-phase-spans-nested-parents-checkpoints-entry-events-and-metrics",
@@ -9644,10 +9645,14 @@
           "tests/PiSharp.Durable.Tests/HarnessTelemetryCases.cs: harness.telemetry.emits-replay-for-a-codemode-journal-result-without-rerunning-its-nested-tool",
           "tests/PiSharp.Durable.Tests/HarnessTelemetryOptionsCases.cs: harness.telemetry-options.accepts-one-adapter-with-optional-propagation-and-metrics-capabilities",
           "tests/PiSharp.Durable.Tests/ModelsCases.cs: models.telemetry.records-one-pi-ai-request-span-per-request-and-one-pi-ai-poll-span-per-deferred-poll",
-          "tests/PiSharp.Durable.Tests/ModelsCases.cs: models.telemetry.a-throwing-adapter-never-changes-the-request-and-its-span-settles"
+          "tests/PiSharp.Durable.Tests/ModelsCases.cs: models.telemetry.a-throwing-adapter-never-changes-the-request-and-its-span-settles",
+          "tests/PiSharp.Durable.Tests/HarnessContinueCases.cs: starts-a-root-trace-linked-to-its-caller-as-an-input-does",
+          "tests/PiSharp.Durable.Tests/HarnessSubmitInCommitCases.cs: records-the-trace-carrier-and-links-a-steer-to-its-caller-and-the-running-trace",
+          "tests/PiSharp.Durable.Tests/HarnessSubmitInCommitCases.cs: starts-an-idle-input-s-run-in-the-admission-s-trace",
+          "tests/PiSharp.Durable.Tests/HarnessSubmitInCommitCases.cs: makes-a-write-a-child-of-its-caller-and-leaves-the-commit-s-events-to-the-caller-s-commit",
+          "tests/PiSharp.Durable.Tests/HarnessSubmitInCommitCases.cs: ends-its-span-before-the-commit-and-a-later-throw-leaves-no-submission"
         ]
-      },
-      "deferred": "DurableTelemetry.Schema's closed sets hold only what this port raises today: area restarts added the task_interrupted report kind and the restart_limit and interrupted reasons (cd62648c); area admission adds the continue submission type and submit(tx, draft)'s provisional pi.durable.submit span, area vocabulary its renames (harness/telemetry.ts stays in-progress until then). harness-telemetry.test.ts keeps SubscribeCommits for harness.observeCommits until area observers lands. Upstream README.md text is not mirrored (PiSharp keeps no copy)."
+      }
     },
     {
       "id": "durable.telemetry-host-error",
@@ -9890,7 +9895,7 @@
       "id": "durable.continue-submissions",
       "area": "durable",
       "phase": 4,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "durable@1.5.0/Breaking Changes#31",
         "durable@1.5.0/Breaking Changes#32",
@@ -9922,7 +9927,29 @@
         "samples/Durable.Examples/ (new)"
       ],
       "release": "1.5.0",
-      "notes": "SubmissionRecord (Types.cs) is input-only today; code that narrows a record by status alone must also check its type. Depends on durable.run-failure (runFailure, run.first) and durable.telemetry (the pi.durable.submit root span). PiSharp-only hosts that build submissions (the device API and Hosting SubmissionAnswers.cs, decision 0010; the web agent, decision 0011) could offer a Continue action after a failed run; record whether they do."
+      "notes": "SubmissionRecord (Types.cs) is input-only today; code that narrows a record by status alone must also check its type. Depends on durable.run-failure (runFailure, run.first) and durable.telemetry (the pi.durable.submit root span). PiSharp-only hosts that build submissions (the device API and Hosting SubmissionAnswers.cs, decision 0010; the web agent, decision 0011) could offer a Continue action after a failed run; record whether they do.",
+      "evidence": {
+        "commits": [
+          "74c5a98f"
+        ],
+        "tests": [
+          "tests/PiSharp.Durable.Tests/HarnessContinueCases.cs: answers-a-run-that-failed-without-a-new-user-message",
+          "tests/PiSharp.Durable.Tests/HarnessContinueCases.cs: answers-the-tool-results-of-a-round-aborted-midway",
+          "tests/PiSharp.Durable.Tests/HarnessContinueCases.cs: skips-system-messages-when-deciding-there-is-something-to-answer",
+          "tests/PiSharp.Durable.Tests/HarnessContinueCases.cs: is-rejected-while-busy-after-request-id-deduplication",
+          "tests/PiSharp.Durable.Tests/HarnessContinueCases.cs: ends-without-a-request-when-there-is-nothing-to-answer",
+          "tests/PiSharp.Durable.Tests/HarnessContinueCases.cs: continues-an-answer-with-tool-calls-cut-off-at-its-output-limit-which-ends-in-their-missing-results",
+          "tests/PiSharp.Durable.Tests/HarnessContinueCases.cs: does-not-continue-a-text-answer-cut-off-at-its-output-limit",
+          "tests/PiSharp.Durable.Tests/HarnessContinueCases.cs: answers-a-run-interrupted-by-a-host-that-died-while-the-model-answered",
+          "tests/PiSharp.Durable.Tests/HarnessContinueCases.cs: places-a-reset-a-failed-run-kept-and-finds-nothing-to-answer-in-the-context-it-starts",
+          "tests/PiSharp.Durable.Tests/HarnessContinueCases.cs: starts-the-inputs-queued-behind-a-continue-with-nothing-to-answer-under-afterfailedrun-continue",
+          "tests/PiSharp.Durable.Tests/HarnessContinueCases.cs: is-submitted-by-a-tool-through-the-handle-of-a-conversation-it-owns-and-rejected-there-while-busy",
+          "tests/PiSharp.Durable.Tests/HarnessContinueCases.cs: starts-a-root-trace-linked-to-its-caller-as-an-input-does",
+          "tests/PiSharp.Durable.Tests/HarnessContinueCases.cs: places-inputs-a-failed-run-left-queued-first-and-they-join-its-run",
+          "tests/PiSharp.Durable.Tests/HarnessSubmitInCommitCases.cs: continues-a-failed-run-and-must-precede-the-commit-s-table-writes",
+          "tests/PiSharp.Durable.Tests/HarnessSubmitInCommitCases.cs: rejects-a-busy-continue-and-steers-with-whenidle-inside-the-commit"
+        ]
+      }
     },
     {
       "id": "durable.turn-limit",
@@ -9960,7 +9987,7 @@
       "id": "durable.when-idle-reject",
       "area": "durable",
       "phase": 4,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "durable@1.5.0/Added#11"
       ],
@@ -9981,13 +10008,27 @@
         "tests/PiSharp.Durable.Tests/Harness/HarnessSubmissionsCases.cs"
       ],
       "release": "1.5.0",
-      "notes": "PiSharp-only: the device API passes whenBusy through to SubmissionDraft (Server DurableDeviceApi.cs:203-212, Hosting HostedSession.cs:269); exposing whenIdle there is a protocol choice under decision 0010."
+      "notes": "PiSharp-only: the device API passes whenBusy through to SubmissionDraft (Server DurableDeviceApi.cs:203-212, Hosting HostedSession.cs:269); exposing whenIdle there is a protocol choice under decision 0010.",
+      "evidence": {
+        "commits": [
+          "74c5a98f"
+        ],
+        "tests": [
+          "tests/PiSharp.Durable.Tests/HarnessSubmitInCommitCases.cs: rejects-input-to-an-idle-conversation-without-writing",
+          "tests/PiSharp.Durable.Tests/HarnessSubmitInCommitCases.cs: rejects-input-to-an-idle-conversation-that-keeps-queued-items-after-a-failed-run",
+          "tests/PiSharp.Durable.Tests/HarnessSubmitInCommitCases.cs: steers-a-working-run",
+          "tests/PiSharp.Durable.Tests/HarnessSubmitInCommitCases.cs: returns-the-submission-of-a-known-request-id-also-once-idle",
+          "tests/PiSharp.Durable.Tests/HarnessSubmitInCommitCases.cs: rejects-through-a-tool-s-conversation-handle",
+          "tests/PiSharp.Durable.Tests/HarnessSubmitInCommitCases.cs: rejects-a-busy-continue-and-steers-with-whenidle-inside-the-commit",
+          "tests/PiSharp.Durable.Tests/HarnessSubmitInCommitCases.cs: deduplicates-request-ids"
+        ]
+      }
     },
     {
       "id": "durable.submit-in-commit",
       "area": "durable",
       "phase": 4,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "durable@1.5.0/Added#12"
       ],
@@ -10016,7 +10057,33 @@
         "samples/Durable.Examples/ (new)"
       ],
       "release": "1.5.0",
-      "notes": "No counterpart. PiSharp-only hosts that write their own documents and then submit in a second commit could merge the two: recurring jobs' start receipts (Hosting Apps/Jobs.cs, pisharp.job-start), app tools' entry receipts (Apps/AppTools.cs) and workflow starts (CustomAgents Workflows/Hosting/WorkflowTools.cs); record whether they adopt it. durable.after-run-tasks uses it (a run-end task admits its follow-up in its own commit)."
+      "notes": "No counterpart. PiSharp-only hosts that write their own documents and then submit in a second commit could merge the two: recurring jobs' start receipts (Hosting Apps/Jobs.cs, pisharp.job-start), app tools' entry receipts (Apps/AppTools.cs) and workflow starts (CustomAgents Workflows/Hosting/WorkflowTools.cs); record whether they adopt it. durable.after-run-tasks uses it (a run-end task admits its follow-up in its own commit).",
+      "evidence": {
+        "commits": [
+          "74c5a98f"
+        ],
+        "tests": [
+          "tests/PiSharp.Durable.Tests/HarnessSubmitInCommitCases.cs: admits-with-the-host-s-own-check-and-writes-in-one-commit",
+          "tests/PiSharp.Durable.Tests/HarnessSubmitInCommitCases.cs: is-rolled-back-with-the-commit-when-the-callback-throws-later",
+          "tests/PiSharp.Durable.Tests/HarnessSubmitInCommitCases.cs: leaves-no-submission-and-no-run-when-storage-fails-the-commit-also-after-reopening",
+          "tests/PiSharp.Durable.Tests/HarnessSubmitInCommitCases.cs: starts-the-run-of-an-idle-input-once-the-commit-is-stored",
+          "tests/PiSharp.Durable.Tests/HarnessSubmitInCommitCases.cs: queues-a-model-visible-write-while-busy-and-places-it-at-the-next-boundary",
+          "tests/PiSharp.Durable.Tests/HarnessSubmitInCommitCases.cs: deduplicates-request-ids",
+          "tests/PiSharp.Durable.Tests/HarnessSubmitInCommitCases.cs: rejects-before-any-write-so-the-callback-may-catch-the-rejection",
+          "tests/PiSharp.Durable.Tests/HarnessSubmitInCommitCases.cs: throws-readafterwrite-after-a-table-write-of-the-commit-on-every-path",
+          "tests/PiSharp.Durable.Tests/HarnessSubmitInCommitCases.cs: continues-a-failed-run-and-must-precede-the-commit-s-table-writes",
+          "tests/PiSharp.Durable.Tests/HarnessSubmitInCommitCases.cs: rejects-a-busy-continue-and-steers-with-whenidle-inside-the-commit",
+          "tests/PiSharp.Durable.Tests/HarnessSubmitInCommitCases.cs: throws-for-a-transaction-of-another-session-or-a-wrapped-one",
+          "tests/PiSharp.Durable.Tests/HarnessSubmitInCommitCases.cs: records-the-trace-carrier-and-links-a-steer-to-its-caller-and-the-running-trace",
+          "tests/PiSharp.Durable.Tests/HarnessSubmitInCommitCases.cs: starts-an-idle-input-s-run-in-the-admission-s-trace",
+          "tests/PiSharp.Durable.Tests/HarnessSubmitInCommitCases.cs: makes-a-write-a-child-of-its-caller-and-leaves-the-commit-s-events-to-the-caller-s-commit",
+          "tests/PiSharp.Durable.Tests/HarnessSubmitInCommitCases.cs: ends-its-span-before-the-commit-and-a-later-throw-leaves-no-submission",
+          "tests/PiSharp.Durable.Tests/HarnessSubmitInCommitCases.cs: admits-atomically-from-a-tool-s-commit-through-its-conversation-handle",
+          "tests/PiSharp.Durable.Tests/HarnessSubmitInCommitCases.cs: admits-inside-a-task-s-terminal-commit",
+          "tests/PiSharp.Durable.Tests/HarnessSubmitInCommitCases.cs: rejects-through-a-handle-once-its-invocation-is-aborted-and-once-it-ended",
+          "tests/PiSharp.Durable.Tests/ExamplesCases.cs: examples.memory.upstream-output"
+        ]
+      }
     },
     {
       "id": "durable.entry-reads",
