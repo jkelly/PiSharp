@@ -258,7 +258,8 @@ internal static class CoreResumeToolSelectionTests
             var before = await Bytes(path);
             // Pi 1.5.0 agent-session.ts _restoreToolsFromTranscript (bd3c9b823; core.extension-tools-active-on-resume): the recorded
             // code, deferred loadout is restored, and extension tools the branch never added or removed that registration activates
-            // (direct and model-only, defaultActive) are appended as newly registered ones. Non-extension tools are not.
+            // (direct and model-only, defaultActive) are appended as newly registered ones. Non-extension registrations are the
+            // session's base tools here, which upstream leaves to the selection (`!this._baseToolDefinitions.has(name)`), so they are not.
             string[] restored = origin ? ["code", "deferred", "direct", "model"] : ["code", "deferred"];
             await using (var reopened = await PersistentAgentSession.OpenWithRegistryAsync(path, registry, () => 1, () => "reopen-" + ++ids, fallbackModel: profile.SelectedModel))
             {
