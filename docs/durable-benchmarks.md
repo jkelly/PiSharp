@@ -2,12 +2,12 @@
 
 Report only. These numbers are a snapshot of one machine; nothing in CI passes or fails on them. The `benchmarks.smoke` case in `tests/PiSharp.Durable.Tests` runs every benchmark at a tiny size so the ports keep working, and asserts completion only.
 
-PiSharp ports ten upstream benchmarks of Pi v1.2.0 (`06a466935536f8c9bcacb2d5efc0fc021be1bdff`) in `benchmarks/PiSharp.Durable.Benchmarks`, over the storage benchmark kit `src/PiSharp.Durable/Testing/StorageBenchmark.cs` (upstream `src/testing/storage-benchmark.ts`):
+PiSharp ports eleven upstream benchmarks of `pi-durable` in `benchmarks/PiSharp.Durable.Benchmarks`: ten that Pi v1.2.0 (`06a466935536f8c9bcacb2d5efc0fc021be1bdff`) has, ported then, and `conversation-view-bench.ts`, new in v1.5.0. The Pi v1.5.0 sync checked them against v1.5.0 (`f9a26365568127461c47a07a37dcb42c140a3ac5`), which their citations name, and added three PiSharp-authored ones. They run over the storage benchmark kit `src/PiSharp.Durable/Testing/StorageBenchmark.cs` (upstream `src/testing/storage-benchmark.ts`):
 
 | upstream | PiSharp | what it measures |
 |---|---|---|
-| `test/storage.bench.ts` (`npm run bench:storage`) | `StorageBench.cs` (`storage`) | read, write and reopen latency of memory, SQLite and JSONL storage |
-| `test/storage-memory.ts` (`npm run bench:storage:memory`) | `StorageMemory.cs` (`storage-memory`) | heap, RSS and disk footprint after the seed, one child process per backend and scale |
+| `test/storage.bench.ts` (`npm run bench:storage`) | `StorageBench.cs` (`storage`) | read, write and reopen latency of memory, SQLite, the store and JSONL storage |
+| `test/storage-memory.ts` (`npm run bench:storage:memory`) | `StorageMemory.cs` (`storage-memory`) | heap, RSS and disk footprint after the seed, one child process per backend (memory, SQLite, the store and JSONL) and scale |
 | `test/tool-output-bench.ts` (`npm run bench:tool-output`) | `ToolOutputBench.cs` (`tool-output`) | the tool task, progress throttle and `pi.live` commits at low, normal and high output rates, the 1 GiB firehose and `cat` |
 | `test/document-append-bench.ts` (`npm run bench:document-append`, new in v1.2.0) | `DocumentAppendBench.cs` (`document-append [N,...]`) | one commit per appended item: one array in one document against one family member per item |
 | `test/session-document-cache-bench.ts` (`npm run bench:document-cache`, new in v1.2.0) | `SessionDocumentCacheBench.cs` (`document-cache [N,...]`), with `HeapRetained.cs` (`test/heap-retained.ts`) | the Session document cache at four retentions: cached documents, retained bytes per conversation and the cost of reading an old conversation's document again |
@@ -16,11 +16,14 @@ PiSharp ports ten upstream benchmarks of Pi v1.2.0 (`06a466935536f8c9bcacb2d5efc
 | `test/nested-tools-bench.ts` (new in v1.2.0) | `NestedToolsBench.cs` (`nested-tools [streaming\|nesting]`) | commits, bytes written by write type, stored size and heap of 200 to 2,000 streaming or fast nested calls, at depth 1 and 2 |
 | `test/nested-images-bench.ts` (new in v1.2.0) | `NestedImagesBench.cs` (`nested-images [count]`) | 1 MiB images passed between nested calls inline or by a `NestedCallDoc` reference |
 | `test/codemode-bench.ts` (`npm run bench:codemode`, new in v1.2.0) | `CodemodeBench.cs` (`codemode [N,...]`) | durable code mode's overhead: N calls of a trivial tool, sequential or parallel, from a code mode script (journaled) and from a plain tool's nested calls, on SQLite |
+| `test/conversation-view-bench.ts` (new in v1.5.0) | `ConversationViewBench.cs` (`conversation-view [sqlite\|store\|both]`) | starting, resuming and keeping watches of a conversation of thousands of entries: time, window entries and heap, on SQLite and the store |
 | none: PiSharp-authored, Node twin `benchmarks/PiSharp.Durable.Benchmarks/node/scheduler-scale-bench.ts` (fan-out and chain only) | `SchedulerScaleBench.cs` (`scheduler-scale [fanout N,...] [chain N,...] [conversations N,...]`) | the scheduler's fan-out (one tool creating N child tasks at once), owned chains of N tasks settling bottom-up, and one-tool runs while the scheduler keeps N idle conversations' context ranges |
 | none: PiSharp-authored, for Pi v1.5.0's partial commits (upstream bounds the same path in a test) | `PartialCommitsBench.cs` (`partial-commits [N,...]`) | the partial commits of one long streamed answer, a text and then a tool call of about N characters each: commits, bytes allocated and time per phase |
 | none: PiSharp-authored, for Pi v1.5.0's group commit (upstream measured it with an uncommitted probe, `docs/group-commit.md` section 9) | `StorageBench.cs` (`storage-throughput [latency ms,...] [conversations N,...]`) | commits per second of one Session and runs per second of one Harness with N conversations working at once, over memory storage behind a fixed round trip and over SQLite, with the storage calls, the commits each call carried and the Storage reads per commit or run |
 
 Run them with `dotnet run -c Release --project benchmarks/PiSharp.Durable.Benchmarks -- [storage] [storage-memory] [tool-output] [document-append [N,...]] [document-cache [N,...]] [scheduler-memory [N,...]] [scheduler-scale [fanout N,...] [chain N,...] [conversations N,...]] [scheduler-fanout [N,...]] [nested-tools [streaming|nesting]] [nested-images [count]] [codemode [N,...]] [partial-commits [N,...]] [conversation-view [sqlite|store|both]] [storage-throughput [latency ms,...] [conversations N,...]]`. There is no benchmark library and no new dependency. The timing loops mirror upstream's.
+
+The store backend (`store`) is Durable's storage on Chord's store over one SQLite file (StoreStorage, `PiSharp.Durable.Store`, which the v1.5.0 sync added). `storage` and `storage-memory` gained it in that sync, after the storage latency and footprint tables below were measured on 2026-10-13, so those tables have no store rows yet. `conversation-view` measures it in its own table; with no backend argument it reads upstream's `PI_DURABLE_BENCH_STORAGE` (`store`, else SQLite).
 
 ## Machine
 

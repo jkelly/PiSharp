@@ -4,7 +4,8 @@
 // so on, in folders named after src/next's). Each layer's internal.ts, which upstream's own layers import, is the internal static partial
 // class <Layer>Internal of that namespace (ContractsInternal). The store's surface for adapters, which next/index.ts exports marked
 // @internal (StoreOwnerTables, OwnerTable, the documents engine's reads and writes, the commit step, applyBatch), is for
-// PiSharp.Durable.Store, the Durable adapter (decision 0013). Ported so far: the contracts layer. The host, jobs and link layers, which
+// PiSharp.Durable.Store, the Durable adapter (decision 0013). Ported so far: the contracts, data, documents, state, store (with its SQLite
+// backend, PiSharp.Chord.Sqlite) and registries layers, and the watch handle (Watch.cs). The host, jobs and link layers, which
 // next/index.ts also re-exports, are phase 6.
 namespace PiSharp.Chord;
 

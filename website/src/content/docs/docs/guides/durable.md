@@ -8,7 +8,7 @@ sidebar:
 ---
 
 :::caution[Experimental]
-Pi Durable ships as experimental from PiSharp 1.2.0.1: the `pisharp durable` command and the `PiSharp.Durable`, `PiSharp.Durable.Tools` and `PiSharp.Durable.Sqlite` packages. PiSharp 1.2.0.2 adds questions, plan mode, service tiers, the media tools and the [device server](#device-server). Its command, session format and library API may change or be removed in any release, without notice or a deprecation period.
+Pi Durable ships as experimental from PiSharp 1.2.0.1: the `pisharp durable` command and the `PiSharp.Durable`, `PiSharp.Durable.Tools` and `PiSharp.Durable.Sqlite` packages. PiSharp 1.2.0.2 adds questions, plan mode, service tiers, the media tools and the [device server](#device-server). PiSharp 1.5.0 moves the libraries to `pi-durable` v1.5.0, whose session format older PiSharp versions can't open (see [Upgrading to 1.5.0](#upgrading-to-150)). Its command, session format and library API may change or be removed in any release, without notice or a deprecation period.
 :::
 
 Pi includes `pi-durable`, an experimental agent harness that saves every step of a conversation before it shows it. PiSharp ports it as a set of .NET libraries and as an interactive mode, `pisharp durable`.
@@ -16,7 +16,8 @@ Pi includes `pi-durable`, an experimental agent harness that saves every step of
 ## What durable means
 
 - Every model turn, streamed partial answer, tool call and queued message is committed to storage before it appears.
-- If the process dies mid-turn, reopening the session finishes that turn. The turn still ends with exactly one answer, and queued messages are not duplicated.
+- If the process dies mid-turn, reopening the session finishes that turn. The turn still ends with exactly one answer, and queued messages are not duplicated. From 1.5.0, a model request the crash cut off counts as a failed attempt and is retried after the usual backoff, and up to about a second of the answer streamed before the crash may be lost, since partial answers are stored about once a second.
+- Work that keeps crashing its process stops: from 1.5.0, a task cut off five times in a row ends instead of running again.
 - A tool that was interrupted after it started is not run again unless it is declared replay-safe. The model gets an "interrupted" result instead. A replay-safe tool runs again exactly once.
 - Subagents run as child conversations owned by the task that called them. A child outlives the call, so you can switch to it and keep talking.
 
@@ -129,6 +130,10 @@ A session is locked while it is open, so two processes cannot write to it at onc
 
 The layout and the lock are those of Pi v1.1.0's experimental durable agent, so each finds the other's newest session with `--continue` and respects the other's lock. Pi v1.1.0 cannot resume the records PiSharp's v1.2.0 library writes, though, so don't continue a PiSharp session with it.
 
+### Upgrading to 1.5.0
+
+PiSharp 1.5.0 opens and continues sessions that 1.2.0.x wrote. Opening one migrates its database to schema version 2, and the tasks and documents 1.5.0 writes are newer than 1.2.0.x knows, so once 1.5.0 has opened a session, PiSharp 1.2.0.x can't open it again. Copy a session's folder first if you may go back. A conversation from 1.2.0.x records its tool declarations once more on its next turn, because 1.5.0 writes them in another key order; the model sees the same tools.
+
 ## Device server
 
 From 1.2.0.2, `pisharp durable serve` runs this machine as a durable device: many durable sessions in one process, behind an authenticated HTTP and server-sent-events API. Pi has no device server, and neither does `pi-durable`; this is a PiSharp addition ([decision 0008](https://github.com/jkelly/PiSharp/blob/main/docs/decisions/0008-durable-network-host-and-web.md)) that follows the wire format of the MIT-licensed durable-pi project. These commands are not in `pisharp --help`; `pisharp durable help` lists them all, and `pisharp durable help <command>` shows one.
@@ -164,11 +169,12 @@ The device server needs the ASP.NET Core runtime. The .NET SDK includes it; with
 ## How it differs from Pi
 
 - **The command is PiSharp's.** Pi v1.1.0 ran its durable agent from source, not from the `pi` command, and Pi v1.2.0 removed that agent. PiSharp keeps it as a PiSharp-only mode, ported from Pi v1.1.0's agent.
-- **The libraries follow `pi-durable` v1.2.0.** The storage format (SQLite schema, JSONL layout and record JSON) is upstream's. Tests open, resume and rewrite sessions that upstream wrote, and upstream reads PiSharp's.
+- **The libraries follow `pi-durable` v1.5.0.** The storage format (SQLite schema, JSONL layout and record JSON) follows upstream's. Tests open, resume and rewrite sessions that upstream v1.2.0 wrote, comparing with v1.5.0's forms of those records; sessions written by upstream v1.5.0 have not been compared yet.
 - **Code mode scripts don't move between Pi and PiSharp.** Durable code mode records its engine's fingerprint, and PiSharp runs scripts on Jint where Pi uses QuickJS, so neither resumes a script the other interrupted. The resume is refused rather than diverging.
 - **A lost lock fails the session.** Pi's agent ends its process when its session lock is lost; PiSharp fails the session instead, so the TUI can say why before it exits with 1. Either way nothing more is saved.
 - **Images use SkiaSharp.** Upstream resizes images with Photon compiled to WebAssembly. PiSharp applies the same rules through the image codec its main `read` tool uses.
-- **No Cloudflare adapters.** The Cloudflare Durable Object storage and image processor are not ported.
+- **No Cloudflare adapters.** The Cloudflare Durable Object storage and image processor are not ported, nor is the browser's IndexedDB storage.
+- **No Chord host yet.** Upstream v1.5.0 can run Durable on Chord v2's host and store; PiSharp ports Chord v2's store and registries but not its host yet, so those examples wait.
 - **Questions and plan mode are PiSharp's.** `pi-durable` has no `ask_user_question` tool and no plan mode. PiSharp adds both, in `PiSharp.Durable.Tools` and in `pisharp durable`, so a session that used them stores two document kinds that Pi doesn't know (`pisharp.interaction` and `pisharp.plan-mode`).
 
 ## Libraries
@@ -188,9 +194,9 @@ Every public type is marked `[Experimental("PISHARP_DURABLE001")]`, so the compi
   <NoWarn>$(NoWarn);PISHARP_DURABLE001</NoWarn>
 </PropertyGroup>
 <ItemGroup>
-  <PackageReference Include="PiSharp.Durable" Version="1.2.0.2" />
-  <PackageReference Include="PiSharp.Durable.Sqlite" Version="1.2.0.2" />
-  <PackageReference Include="PiSharp.Durable.Tools" Version="1.2.0.2" />
+  <PackageReference Include="PiSharp.Durable" Version="1.5.0" />
+  <PackageReference Include="PiSharp.Durable.Sqlite" Version="1.5.0" />
+  <PackageReference Include="PiSharp.Durable.Tools" Version="1.5.0" />
 </ItemGroup>
 ```
 
@@ -206,6 +212,6 @@ Every public type is marked `[Experimental("PISHARP_DURABLE001")]`, so the compi
 
 ## Status
 
-[Decision 0005](https://github.com/jkelly/PiSharp/blob/main/docs/decisions/0005-pi-durable-experimental.md) records the scope, the differences from Pi, the port status and the decision to release it as experimental. [`durable-port-map.json`](https://github.com/jkelly/PiSharp/blob/main/compatibility/durable-port-map.json) maps every upstream file to its C# counterpart. The [1.2.0.1](https://github.com/jkelly/PiSharp/blob/main/docs/release-notes/1.2.0.1.md) and [1.2.0.2](https://github.com/jkelly/PiSharp/blob/main/docs/release-notes/1.2.0.2.md) release notes cover what shipped. Upstream's [`pi-durable` README](https://github.com/earendil-works/pi/blob/v1.2.0/packages/durable/README.md) and [specification](https://github.com/earendil-works/pi/blob/v1.2.0/packages/durable/docs/spec.md) describe the design.
+[Decision 0005](https://github.com/jkelly/PiSharp/blob/main/docs/decisions/0005-pi-durable-experimental.md) records the scope, the differences from Pi, the port status and the decision to release it as experimental. [`durable-port-map.json`](https://github.com/jkelly/PiSharp/blob/main/compatibility/durable-port-map.json) maps every upstream file to its C# counterpart. The [1.2.0.1](https://github.com/jkelly/PiSharp/blob/main/docs/release-notes/1.2.0.1.md) and [1.2.0.2](https://github.com/jkelly/PiSharp/blob/main/docs/release-notes/1.2.0.2.md) release notes cover what shipped. Upstream's [`pi-durable` README](https://github.com/earendil-works/pi/blob/v1.5.0/packages/durable/README.md) and [specification](https://github.com/earendil-works/pi/blob/v1.5.0/packages/durable/docs/spec.md) describe the design.
 
 Feedback is welcome in [GitHub issues](https://github.com/jkelly/PiSharp/issues).
