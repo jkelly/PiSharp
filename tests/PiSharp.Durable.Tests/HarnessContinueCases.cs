@@ -10,6 +10,8 @@
 // - The tools' parameters are pi-schema's obj({}), the JSON Schema of an object without properties; `aborted(signal)` is Aborted(token).
 // - `telemetry.startSpan({ name: "caller" }, ...)` is InMemoryTelemetryContext.StartSpanAsync("caller", ...), and `withTelemetry(caller,
 //   context)` is Context.WithTelemetry(caller); carriers compare by their keys and values (upstream's toEqual on the carrier objects).
+// - "starts the inputs queued behind a continue with nothing to answer" holds the continue's run at its model lookup (ModelsOverride's
+//   BeforeGetModel) until the followUp is queued, which upstream's single-threaded loop guarantees (Pi v1.5.0 sync, area live-turns).
 using System.Collections.Immutable;
 using PiSharp.Durable;
 using PiSharp.Durable.Chord;
@@ -303,11 +305,18 @@ internal static class ContinueTests
             var setup = Setup();
             setup.AfterFailedRun = AfterFailedRun.Continue;
             setup.Faux.SetResponses(FauxAssistantMessage("answered"), FauxAssistantMessage("second answered"));
+            // The continue's run task waits at its model lookup until the followUp is queued: upstream's single-threaded loop cannot end
+            // that run between the two submits, PiSharp's thread-pool scheduler can (the followUp is then placed, not queued).
+            using var followUpQueued = new ManualResetEventSlim(true);
+            setup.Models = new ModelsOverride(setup.Models) { BeforeGetModel = () => followUpQueued.Wait(TimeSpan.FromSeconds(30)) };
             var (harness, root) = await OpenChat(memory(), setup);
             await (await root.SubmitAsync(SubmissionDraft.Input("one"), Context)).WaitAsync(Context);
+            followUpQueued.Reset();
             var resumed = await Continue(root);
             var queued = await root.SubmitAsync(SubmissionDraft.Input("two", WhenBusy.FollowUp), Context);
-            Equal(SubmissionStatus.Queued, (await queued.StatusAsync(Context)).Status, "queued");
+            var status = (await queued.StatusAsync(Context)).Status;
+            followUpQueued.Set();
+            Equal(SubmissionStatus.Queued, status, "queued");
             MatchJson("""{"status":"unanswered","reason":"nothing_to_answer"}""", (await resumed.WaitAsync(Context)).ToJson(), "resumed");
             var settled = await queued.WaitAsync(Context);
             Equal("second answered", await AnswerText(root, settled), "answer");

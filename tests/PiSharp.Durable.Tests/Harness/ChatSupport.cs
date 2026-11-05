@@ -817,7 +817,15 @@ internal sealed class ModelsOverride(IDurableModels inner) : IDurableModels
     /// <summary>Replaces <c>fetchDeferred</c> (Pi v1.5.0 sync, area restarts: harness-restart-failure's deferredSetup).</summary>
     public Func<DurableModel, DurableDeferredHandle, CancellationToken, Task<AssistantMessage>>? FetchDeferredOverride { get; init; }
 
-    public DurableModel? GetModel(string provider, string modelId) => inner.GetModel(provider, modelId);
+    /// <summary>Runs before each model lookup (PiSharp-only, harness.continue: holds a run's task, which looks its model up first, off the
+    /// commit line).</summary>
+    public Action? BeforeGetModel { get; init; }
+
+    public DurableModel? GetModel(string provider, string modelId)
+    {
+        BeforeGetModel?.Invoke();
+        return inner.GetModel(provider, modelId);
+    }
 
     public IAsyncEnumerable<StreamEvent> StreamSimple(DurableModel model, ImmutableArray<JsonValue> messages, DurableStreamOptions? options,
         CancellationToken cancellationToken) =>
