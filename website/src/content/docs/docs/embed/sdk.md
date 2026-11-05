@@ -132,6 +132,7 @@ Some APIs carry `[Experimental("<ID>")]`. The compiler reports an error when you
 | `PISHARP_AGENTS001` | Every public type in the custom agents packages. These also use durable types, so suppress `PISHARP_DURABLE001` too. | Released as experimental in 1.2.0.2. |
 | `PISHARP_CATALOG001` | `MaintainedCatalogOverlay` and `MaintainedCatalogResult` in `PiSharp.AI`, which apply PiSharp's maintained model catalog layer. | Released as experimental in 1.2.0.2. |
 | `PISHARP_EXTUI001` | Extension UI additions from the Pi 1.5.0 sync: `IExtensionKeybindingHints` and `ExtensionToolRenderContext.Keybindings`, `ExtensionCustomComponentBlocked`, `ExtensionCustomComponentOverlay` and `ExtensionCustomComponentCallbacks.Blocked`, `.Overlay` and `.CapturesViewportInput` in `PiSharp.Extensions.Abstractions`, and `KeyText` and `KeyHint` on the HTML export's `ToolRenderContext` and `ToolHtmlRendererDependencies` in `PiSharp.CodingAgent`. | Added in the Pi 1.5.0 sync, experimental. Not released yet. |
+| `PISHARP_IDENTITY001` | Client identity from the Pi 1.5.0 sync: `ClientIdentity`, `ClientUserAgent`, `ClientAttribution` and `ClientIdentities` in `PiSharp.AI`, the `Identity` of `ChatRequest`, the protocol options and `AgentConfiguration`, and `AgentConfiguration.DefaultIdentity`, which turns attribution off. Coding agent sessions send the detailed user agent and no attribution. PiSharp defines no attribution of its own. | Added in the Pi 1.5.0 sync, experimental. Not released yet. |
 
 Suppress the IDs you use in your project file:
 

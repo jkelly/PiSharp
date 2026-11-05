@@ -58,6 +58,7 @@ internal static partial class Program
         cases.AddRange(Sync150PackageCases());
         cases.AddRange(Sync150UserAgentCases());
         cases.AddRange(Sync150CliCases());
+        cases.AddRange(Sync150AttributionCases());
         var filter = Environment.GetEnvironmentVariable("CLIPARITY_FILTER");
         if (!string.IsNullOrEmpty(filter)) cases = [.. cases.Where(test => test.Id.Contains(filter, StringComparison.Ordinal))];
         var results = new List<object>(); var failures = 0;

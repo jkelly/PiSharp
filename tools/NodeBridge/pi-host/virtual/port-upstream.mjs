@@ -202,7 +202,7 @@ const patchConfig = {
 	"agent/src/agent-loop.ts": [
 		[
 			"export const DEFAULT_AGENT_IDENTITY: ClientIdentity = { attribution: PI_ATTRIBUTION };",
-			"// PiSharp: no default attribution. Upstream attributes agent requests to pi ({ attribution: PI_ATTRIBUTION }); PiSharp\n// must not report as Pi, and the owner has not chosen an attribution (core.client-identity-attribution).\nexport const DEFAULT_AGENT_IDENTITY: ClientIdentity = {};",
+			"// PiSharp: no default attribution. Upstream attributes agent requests to pi ({ attribution: PI_ATTRIBUTION }); PiSharp\n// must not report as Pi, and the owner chose none (2026-11-05, core.agent-identity).\nexport const DEFAULT_AGENT_IDENTITY: ClientIdentity = { attribution: null };",
 		],
 	],
 	"coding-agent/src/config.ts": [
@@ -238,8 +238,8 @@ const patchConfig = {
 };
 
 const appendConfig = {
-	"agent/src/agent-loop.ts": `// PiSharp adaptation: DEFAULT_AGENT_IDENTITY sends no attribution (upstream: { attribution: PI_ATTRIBUTION }). PiSharp must
-// not report as Pi, and the owner has not chosen an attribution (core.client-identity-attribution).`,
+	"agent/src/agent-loop.ts": `// PiSharp adaptation: DEFAULT_AGENT_IDENTITY is { attribution: null }, so agent requests carry no attribution (upstream:
+// { attribution: PI_ATTRIBUTION }). PiSharp must not report as Pi; owner decision 2026-11-05 (core.agent-identity).`,
 	"ai/src/compat.ts": `// ---------------------------------------------------------------------------------------------
 // PiSharp adaptations: builtin API providers are host-backed. Calling stream/complete for them without
 // the host bridge hook throws "<name> is not available in the PiSharp Node bridge".

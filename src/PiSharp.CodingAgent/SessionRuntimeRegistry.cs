@@ -589,8 +589,11 @@ public sealed partial class SessionRuntimeRegistry
             } };
         }
         cancellationToken.ThrowIfCancellationRequested();
+        // Source sdk.ts: every request carries getClientIdentity's identity, over the agent's default (CodingAgentClientIdentity).
+#pragma warning disable PISHARP_IDENTITY001
         return new(new AgentConfiguration(binding.Model, binding.Transport, definitions, binding.ToolHooks, binding.ExecutionMode, hooks)
-            { ThinkingLevel = thinkingLevel, ServiceTier = _options.ServiceTier },
+            { ThinkingLevel = thinkingLevel, ServiceTier = _options.ServiceTier, Identity = CodingAgentClientIdentity.Get() },
+#pragma warning restore PISHARP_IDENTITY001
             rawDeclarations.ToImmutable()) { LoadoutDiagnostics = loadoutDiagnostics, ModelCatalogRevision = catalog.Revision, Invoker = invoker };
 
         void Count()

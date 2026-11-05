@@ -149,8 +149,8 @@ internal static partial class Program
     }
 
     // agent.ts / agent-loop.ts: AgentOptions.identity and Agent.identity reach every request, merged field by field over
-    // DEFAULT_AGENT_IDENTITY. Upstream's default attributes to Pi; PiSharp's port-upstream patch makes it empty, so no attribution is
-    // sent unless the caller gives one (core.client-identity-attribution is the owner's decision).
+    // DEFAULT_AGENT_IDENTITY. Upstream's default attributes to Pi; PiSharp's port-upstream patch makes it { attribution: null } (owner
+    // decision 2026-11-05, core.agent-identity), so every request carries no attribution unless the caller gives one.
     private static async Task BridgeAgentIdentity()
     {
         var output = await BridgeModuleScript("sync150-agent-identity", """
@@ -173,7 +173,8 @@ internal static partial class Program
             await agent.prompt("again");
             console.log(JSON.stringify({ defaultIdentity: core.DEFAULT_AGENT_IDENTITY, identities }));
             """);
-        Equal("""{"defaultIdentity":{},"identities":[{},{"userAgent":"ext/1.0"},{"attribution":{"name":"ext"},"version":"2"}]}""", output, "agent identity");
+        Equal("""{"defaultIdentity":{"attribution":null},"identities":[{"attribution":null},{"attribution":null,"userAgent":"ext/1.0"},{"attribution":{"name":"ext"},"version":"2"}]}""",
+            output, "agent identity");
     }
 
     // markdown.ts at v1.5.0 (the bridge half of the tui Markdown rows): marked-cjk-friendly's emStrong (CJK punctuation next to a
