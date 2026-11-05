@@ -1,15 +1,15 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/src/harness/harness.ts. The Harness extends the Session kernel, as
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/src/harness/harness.ts. The Harness extends the Session kernel, as
 // upstream's HarnessImpl extends SessionImpl. Every component reads and writes through the Session's Storage guard; safeReport, safeNow,
-// documentRetentionMs, report, assertUsable and the open failure's close are v1.2.0's. Upstream's SCHEDULER_INDEX_SIZES symbol getter, for
-// tests, is the internal SchedulerIndexSizes property (the test project sees internals).
+// documentRetentionMs, report, assertUsable and the open failure's close are v1.2.0's, as the later areas below changed them. Upstream's
+// SCHEDULER_INDEX_SIZES and SCHEDULER_IDLE_STATE symbol getters, for tests, are the internal SchedulerIndexSizes and SchedulerIdleState
+// properties (the test project sees internals).
 //
 // Pi v1.5.0 sync (area harness-options): HarnessOptions.CurrentModels and CurrentSettings, upstream's function forms of models and
 // settings, read at each use (7ec1f648e; currentModels and currentSettings), and HarnessOptions.ReadOnly (be14d9732). The calls that
-// resume the scheduler are async, so a read-only Harness's ReadOnlySessionException faults their task, as upstream made them async. The
-// citation stays on v1.2.0 until the file's other areas land.
+// resume the scheduler are async, so a read-only Harness's ReadOnlySessionException faults their task, as upstream made them async.
 // Pi v1.5.0 sync (area model-requests): HarnessOptions.Identity over DEFAULT_HARNESS_IDENTITY, applied by currentModels through
 // withClientIdentity (adc5fa9f8, 04a93bad8). Upstream's default attributes requests to pi (PI_ATTRIBUTION); PiSharp's is empty and adds no
-// attribution, as PiSharp.Agent's DefaultIdentity, until the owner decides core.client-identity-attribution.
+// attribution, as PiSharp.Agent's DefaultIdentity: the owner chose no attribution (decision 0013, core.client-identity-attribution).
 // Pi v1.5.0 sync (area sleep): HarnessOptions.SetTimer reaches the Session (document sweeps) and the scheduler as hostTimers, each over
 // the default timers of HarnessOptions.TimeProvider; wake() and HarnessOptions.OnWake (f75b3240a, ec1be23eb).
 // Pi v1.5.0 sync (area reports): OnReport takes one Report, an error with its ReportInfo (a30c2a81d). safeReport passes the info on (its
@@ -40,6 +40,9 @@
 // IStorage argument, upstream readOnLine((storage) => ...)), which waits for what an unpublished commit wrote, and a commit's task and
 // conversation changes write their ownership memberships from the scheduler's indexes (MembershipKeysAsync, upstream membershipKeys).
 // Submissions, the conversation views and the task graph read through it too, so they no longer take the guarded Storage.
+// Pi v1.5.0 sync (area scheduler-idle, 35dfa7573): SchedulerIdleState, upstream's SCHEDULER_IDLE_STATE getter. With it the file matches
+// harness.ts at v1.5.0 as a whole, apart from the decided empty DefaultIdentity (area model-requests, above). harness.ts has no
+// registryReader part; registry-reader.ts is its own file.
 using System.Collections.Immutable;
 using PiSharp.AI;
 using PiSharp.Durable.Chord;
@@ -186,6 +189,10 @@ internal sealed class DurableHarness : Session, IHarness
 
     /// <summary>Internal, for tests: sizes of the scheduler's ownership indexes (upstream <c>[SCHEDULER_INDEX_SIZES]</c>).</summary>
     internal SchedulerIndexSizes SchedulerIndexSizes => scheduler.IndexSizes;
+
+    /// <summary>Internal, for tests: the kept contexts' idle state and its disagreements with a full recompute (upstream
+    /// <c>[SCHEDULER_IDLE_STATE]</c>).</summary>
+    internal SchedulerIdleState SchedulerIdleState => scheduler.IdleState;
 
     internal Submissions Submissions => submissions;
 

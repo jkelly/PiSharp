@@ -1,8 +1,8 @@
 using PiSharp.Durable.Benchmarks;
 
 // Usage: PiSharp.Durable.Benchmarks [storage] [storage-memory] [tool-output [<scenario label filter>]] [document-append [N,...]]
-//   [document-cache [N,...]] [scheduler-memory [N,...]] [scheduler-scale [fanout N,...] [chain N,...]] [scheduler-fanout [N,...]]
-//   [nested-tools [streaming|nesting]] [nested-images [count]] [codemode [N,...]] [partial-commits [N,...]]
+//   [document-cache [N,...]] [scheduler-memory [N,...]] [scheduler-scale [fanout N,...] [chain N,...] [conversations N,...]]
+//   [scheduler-fanout [N,...]] [nested-tools [streaming|nesting]] [nested-images [count]] [codemode [N,...]] [partial-commits [N,...]]
 //   [conversation-view [sqlite|store|both]] [storage-throughput [latency ms,...] [conversations N,...]]
 // With no argument, runs all thirteen (upstream: npm run bench:storage, bench:storage:memory, bench:tool-output, bench:document-append,
 // bench:document-cache, bench:scheduler-memory, bench:scheduler-fanout and bench:codemode, and test/nested-tools-bench.ts,
@@ -66,15 +66,18 @@ for (var index = 0; index < selected.Length; index++)
             await SchedulerMemoryBench.RunAsync(SchedulerMemoryBench.ParseSizes(cycles), Console.Out);
             break;
         case "scheduler-scale":
-            string? fanout = null, chain = null;
-            while (index + 2 < selected.Length && selected[index + 1] is "fanout" or "chain")
+            string? fanout = null, chain = null, kept = null;
+            while (index + 2 < selected.Length && selected[index + 1] is "fanout" or "chain" or "conversations")
             {
-                if (selected[++index] == "fanout") fanout = selected[++index];
-                else chain = selected[++index];
+                var which = selected[++index];
+                if (which == "fanout") fanout = selected[++index];
+                else if (which == "chain") chain = selected[++index];
+                else kept = selected[++index];
             }
             Console.WriteLine("## scheduler-scale (PiSharp-authored)");
             await SchedulerScaleBench.RunAsync(SchedulerScaleBench.ParseSizes(fanout, SchedulerScaleBench.DefaultFanout),
-                SchedulerScaleBench.ParseSizes(chain, SchedulerScaleBench.DefaultChain), Console.Out);
+                SchedulerScaleBench.ParseSizes(chain, SchedulerScaleBench.DefaultChain),
+                SchedulerScaleBench.ParseSizes(kept, SchedulerScaleBench.DefaultConversations), Console.Out);
             break;
         case "scheduler-fanout":
             string? calls = null;

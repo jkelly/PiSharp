@@ -1,5 +1,6 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/src/harness/scheduler.ts. Named DurableTaskScheduler because
-// System.Threading.Tasks.TaskScheduler is used throughout the assembly. Ported as a whole against the v1.2.0 text: the ownership indexes
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/src/harness/scheduler.ts. Named DurableTaskScheduler because
+// System.Threading.Tasks.TaskScheduler is used throughout the assembly. Ported as a whole against the v1.2.0 text, and brought to v1.5.0 by
+// the Pi v1.5.0 sync's areas below (area scheduler-idle last, with the v1.5.0 text as a whole): the ownership indexes
 // (below, roots, edges, settled, unloaded, dropQueue) and the candidate sets of each pass (intent, runnable, finalizeChecks, failFastChecks,
 // waiters, abandoned), abandonOnRestart with abortReason "restart", abortOwned and ownedTasks, and wait-cycle rejection.
 //
@@ -43,15 +44,15 @@
 // Pi v1.5.0 sync (area harness-options): the models are a function read at each access (7ec1f648e), and the readOnly option (be14d9732):
 // open loads live tasks as committed, running ones included, and schedules no reconcile; Resume throws ReadOnlySessionException; no
 // reconcile is ever scheduled. Pi v1.5.0 sync (area vocabulary, 5f312dac4): the internal observeCommits is followCommits
-// (Session.FollowCommits). The citation stays on v1.2.0 until the file's other areas land.
+// (Session.FollowCommits).
 //
 // Pi v1.5.0 sync (area sleep): durable sleeps, host timers and wake() (f75b3240a, ec1be23eb). A sleeping task holds no invocation:
 // `sleeping` holds the sleeping live tasks, WakeDueLocked makes the due ones reservation candidates at resume, when the sleep timer fires
 // and at every reservation pass, and a pass skips a sleep not yet due (an abort mark ends a sleep). Without OnWake the earliest sleep keeps
 // a foreground timer while scheduling runs; with it, OnWake hears each change of Wake(). A read-only scheduler never schedules a wake and
 // answers inactive (be14d9732). runtime.SleepUntilAsync commits the sleep; runtime.SetTimer's timers are disarmed at the invocation's end;
-// the idle context expiry is a background timer. Each pass, inspection and wake reads the Harness clock once, outside the lock. Upstream's
-// idle index is another area's: Wake() scans the live tasks as f75b3240a's does.
+// the idle context expiry is a background timer. Each pass, inspection and wake reads the Harness clock once, outside the lock. Wake()
+// scanned the live tasks as f75b3240a's does until area scheduler-idle (below).
 //
 // Pi v1.5.0 sync (area reports): every report carries its ReportInfo (a30c2a81d, 91b33cab3, 5f312dac4). An invocation keeps the extension
 // that installed its definition at reservation (installerOf), which a task's own failure names: task_error, task_faulted with reason threw
@@ -73,8 +74,7 @@
 // the scheduler decides is kept (Invocation.Fault), as its terminal record is published after the invocation ended. A running commit that
 // changes the checkpoint's phase adds pi.durable.checkpoint. pi.durable.tasks.active counts live tasks: +1 when one becomes live (open's
 // load included), -1 when it ends, every live one at close; the deltas are taken under the lock and counted outside it, a throwing adapter
-// reported host_error telemetry. Reports and the Session's failure from a step carry the invocation's context. The citation stays on v1.2.0
-// until the file's other areas land.
+// reported host_error telemetry. Reports and the Session's failure from a step carry the invocation's context.
 //
 // Pi v1.5.0 sync (area restarts, b3a29f111 over a30c2a81d's crash-loop guard, without 1.4.0's parking): open counts a restart of each task
 // it finds running (TaskRecord.Restarts); a state the task commits that differs from its current one is progress and drops the count, the
@@ -129,7 +129,35 @@
 //   thread after its ObserveCommits observers (upstream: promise continuations and the abort microtask queued behind the host dispatch).
 //   Reservation passes (Kick) and the reconcile pass (ScheduleReconcileLocked) start there too, so a commit a host observer makes is
 //   admitted before theirs, and still before the committer's continuation. Outside a publication AfterPublication runs its work at once.
-// The citation stays on v1.2.0: area scheduler-idle changes this file last and re-pins it.
+//
+// Pi v1.5.0 sync (area scheduler-idle, 35dfa7573; durable 1.5.0 Changed#8): the per-commit work no longer grows with the conversations.
+// - A publication collects the conversations above each task that became live or ended (AddScopesAboveLocked, before the sweep; null when
+//   a node on the way up is not known) and settles only those (SettleIdleLocked): their idle waiters, the Harness-wide ones, and the idle
+//   periods of their kept contexts. It settles under the same lock as its task changes, as upstream's observe does in the same synchronous
+//   call, so the kept contexts' idle state never disagrees with the published tasks; the clock and the retention are read before the lock.
+// - A chain load that resolved what IdleLocked counts as unknown for a live task whose chain is not loaded (a live task passed, or a node
+//   installed while one is unloaded) sets unknownsChanged and schedules a reconcile pass: the next settle covers every scope.
+// - Idle contexts expire oldest first from idleOrder (upstream #idleOrder, an insertion-ordered map with O(1) removal), sorted again when
+//   the clock goes back (MarkIdleLocked); zero retention drops every idle one. The expiry timer only expires, and a reconcile pass resolves
+//   idle waiters and expires (a full settle when unknownsChanged), for hosts that decline the timer. A pass counts itself done
+//   (QuiesceAsync's reconciling) only after that check.
+// - Wake() takes the earliest sleep from `sleeping` and scans the live tasks only while nothing runs (RunsNowLocked, then the registry check
+//   outside the lock). IdleState (upstream idleState, SCHEDULER_IDLE_STATE) checks the incremental state against a full recompute.
+// - One v1.5.0 detail outside 35dfa7573 found by the whole-file comparison: SubscribeBlocked holds a listener once, as upstream's Set.
+//
+// Deliberate differences from the v1.5.0 text, beyond the concurrency model above (each also commented where it is):
+// - A reservation pass starts its abort invocations before its run invocations, each with the record the reservation committed
+//   (StartPass), as a run invocation here can run its step inline; JoinAsync also joins the invocations Seal saw; FailSession also ignores
+//   a throw once the Session is closing, and a refused sweep job clears its flag; WaitForTaskAsync checks for close again before it adds a
+//   waiter; Signal reports a throwing abort listener as listener_error.
+// - The context read takes the retention and the clock before the lock on every read, where upstream reads them on the idle branch only, so
+//   a throwing settings getter is reported on every read. A missing phase or abort handler faults with PiSharp's own text, not V8's
+//   TypeError. Seal counts the closing -1 active deltas once; the active counter is used only with host telemetry; ownedTasks returns the
+//   immutable records without copies; LimitsRestarts may be null (none).
+// - AddScopesAboveLocked also stops at a task an earlier walk of the same publication passed, not only at a conversation already
+//   collected, with the same scopes: upstream's walks are quadratic in the depth of a chain that one publication creates or ends. With
+//   upstream's walk, harness.ownership.tracks-ownership-chains-deeper-than-the-call-stack (20,000 tasks) took 17 s here instead of 2 s,
+//   and scheduler-scale's 20,000-deep chain 7.9 to 8.4 s instead of 2.1 s (docs/durable-benchmarks.md).
 using System.Collections;
 using System.Collections.Immutable;
 using PiSharp.Durable.Chord;
@@ -151,6 +179,11 @@ internal sealed record InvocationBinding(CancellationSignal Signal, Action Check
 /// loads keep for commits not published yet.</summary>
 internal readonly record struct SchedulerIndexSizes(int Live, int Settled, int Edges, int Below, int Roots, int Unloaded, int DropQueue,
     int Pins);
+
+/// <summary>The kept contexts' idle state, for tests (upstream <c>TaskScheduler.idleState</c>, read through the Harness's
+/// <c>SCHEDULER_IDLE_STATE</c>): how many are kept and how many idle, how many disagree with a full recompute, and how many idle checks
+/// covered every scope.</summary>
+internal readonly record struct SchedulerIdleState(int Contexts, int IdleContexts, int IdleMismatches, int FullIdleChecks);
 
 /// <summary>Options of the task scheduler (upstream <c>TaskSchedulerOptions</c>).</summary>
 /// <summary>What <see cref="DurableTaskScheduler.BlockedReasonOf"/> reads of a task: the task graph keeps only this of each record
@@ -268,6 +301,20 @@ internal sealed class DurableTaskScheduler
     /// <c>settings.ContextRetentionMs</c> of idleness, and at close.
     /// </summary>
     private readonly Dictionary<ConversationId, KeptContext> contexts = [];
+    /// <summary>
+    /// The idle kept contexts by <c>IdleSince</c>, oldest first: the expiry order, so neither an expiry nor finding the next one scans
+    /// <see cref="contexts"/> (upstream <c>#idleOrder</c>). Kept sorted also when the Harness clock goes back (see
+    /// <see cref="MarkIdleLocked"/>).
+    /// </summary>
+    private readonly OrderedMap<ConversationId, double> idleOrder = new();
+    /// <summary>At least the newest <c>IdleSince</c> in <see cref="idleOrder"/> (drops do not lower it): an older one added means the clock
+    /// went back.</summary>
+    private double idleNewest = double.NegativeInfinity;
+    /// <summary>A chain load resolved what <see cref="IdleLocked"/> treats as unknown for a live task whose chain is not loaded, which can make
+    /// a scope idle without a task change below it; the next idle check then covers every scope.</summary>
+    private bool unknownsChanged;
+    /// <summary>Idle checks that covered every scope (<see cref="IdleState"/>, a test diagnostic).</summary>
+    private int fullIdleChecks;
     /// <summary>Guards the two timers below while they are armed or disarmed; taken before <see cref="gate"/>, never under it.</summary>
     private readonly Lock timerGate = new();
     /// <summary>Background timer for the earliest expiry of an idle context, unless the host declined it. Guarded by
@@ -489,6 +536,36 @@ internal sealed class DurableTaskScheduler
         }
     }
 
+    /// <summary>
+    /// The kept contexts' idle state, for tests (a diagnostic, computed on demand; upstream <c>idleState</c>): how many are kept and how many
+    /// are idle, how many disagree with a full recompute (an idle period without <see cref="IdleLocked"/>, or <see cref="IdleLocked"/> without
+    /// one; an expiry order that differs from the idle periods, or is not sorted), and how many idle checks covered every scope.
+    /// </summary>
+    internal SchedulerIdleState IdleState
+    {
+        get
+        {
+            lock (gate)
+            {
+                var mismatches = 0;
+                var idle = 0;
+                foreach (var (conversationId, kept) in contexts)
+                {
+                    if (kept.IdleSince is not null) idle++;
+                    if ((kept.IdleSince is not null) != IdleLocked(conversationId)) mismatches++;
+                    if ((idleOrder.TryGetValue(conversationId, out var since) ? since : (double?)null) != kept.IdleSince) mismatches++;
+                }
+                var previous = double.NegativeInfinity;
+                foreach (var (conversationId, idleSince) in idleOrder)
+                {
+                    if (idleSince < previous || contexts.GetValueOrDefault(conversationId)?.IdleSince != idleSince) mismatches++;
+                    previous = idleSince;
+                }
+                return new SchedulerIdleState(contexts.Count, idle, mismatches, fullIdleChecks);
+            }
+        }
+    }
+
     /// <summary>Enables scheduling, and makes sleeping tasks that are due runnable: a host wakeup, such as an alarm, calls this. Idempotent;
     /// the kick does nothing once closing. A read-only scheduler throws <see cref="ReadOnlySessionException"/>.</summary>
     public void Resume()
@@ -529,11 +606,12 @@ internal sealed class DurableTaskScheduler
     }
 
     /// <summary>Calls <paramref name="listener"/> when blocked reasons may have changed without a commit: a registry change or a failed
-    /// migration (upstream <c>subscribeBlocked</c>). Returns its unsubscribe.</summary>
+    /// migration (upstream <c>subscribeBlocked</c>). Returns its unsubscribe. A set, as upstream's: a listener subscribed twice is held and
+    /// called once, and one unsubscribe removes it.</summary>
     public Action SubscribeBlocked(Action listener)
     {
         ArgumentNullException.ThrowIfNull(listener);
-        lock (gate) blockedListeners = blockedListeners.Add(listener);
+        lock (gate) if (!blockedListeners.Contains(listener)) blockedListeners = blockedListeners.Add(listener);
         return () =>
         {
             lock (gate) blockedListeners = blockedListeners.Remove(listener);
@@ -561,7 +639,8 @@ internal sealed class DurableTaskScheduler
     /// When the Session next needs a process (upstream <c>wake()</c>): <c>Active</c> while some task can run now or is running, or a reconcile
     /// pass has work (it finalizes held outcomes and marks cascades, at open as recovery: a process that dies before it lands must be woken
     /// again), <c>At</c> for the earliest sleep not yet due. From memory; a task whose chain is not loaded yet counts as it would alone. A
-    /// read-only scheduler runs nothing, so it never needs a process.
+    /// read-only scheduler runs nothing, so it never needs a process. The earliest sleep comes from <see cref="sleeping"/>, and the live tasks
+    /// are scanned only while nothing runs, so no call visits every live task while work is active (Pi 35dfa7573).
     /// </summary>
     public Wake Wake()
     {
@@ -572,27 +651,38 @@ internal sealed class DurableTaskScheduler
         var check = new List<TaskRecord>();
         lock (gate)
         {
-            active = invocations.Count > 0 || reconcilingWork > 0 || ReconcileWorkLocked();
-            foreach (var record in live.Values)
+            active = invocations.Count > 0 || reconcilingWork > 0 || ReconcileWorkLocked() || RunsNowLocked(at, check);
+            // The earliest sleep not yet due: only `sleeping` holds sleeping tasks.
+            foreach (var id in sleeping)
             {
-                var state = record.State;
-                if (state.Status == DurableTaskStatus.Completing) continue;
-                if (state is WaitingTaskState waiting && !record.AbortRequested && waiting.On.Any(live.ContainsKey)) continue;
-                if (state is SleepingTaskState asleep && !record.AbortRequested && asleep.Until > at)
-                {
+                if (live.GetValueOrDefault(id) is { AbortRequested: false, State: SleepingTaskState asleep } && asleep.Until > at)
                     earliest = earliest is { } other ? Math.Min(other, asleep.Until) : asleep.Until;
-                    continue;
-                }
-                if (active) continue;
-                // An abort invocation waits for the live work below it, which counts itself.
-                if (record.AbortRequested && WaitingOnLocked(record, first: true).Count > 0) continue;
-                // An abort-marked task runs its handler or is orphaned; any other waits for a definition that can take it.
-                if (record.AbortRequested && record.AbortReason is null) active = true;
-                else check.Add(record);
             }
         }
         if (!active && check.Count > 0) active = RunsNow(check);
         return new Wake(active, earliest);
+    }
+
+    /// <summary>
+    /// Whether a live task can run now without a registry check (upstream <c>#runsNow</c>, the scan <see cref="Wake"/> needs only while no
+    /// invocation runs): an abort-marked task, which runs its handler or is orphaned. Any other task that could run waits for a definition
+    /// that can take it; those are added to <paramref name="check"/> for <see cref="RunsNow(List{TaskRecord})"/>, as the registry snapshot is
+    /// host code and runs outside the lock.
+    /// </summary>
+    private bool RunsNowLocked(double at, List<TaskRecord> check)
+    {
+        foreach (var record in live.Values)
+        {
+            var state = record.State;
+            if (state.Status == DurableTaskStatus.Completing) continue;
+            if (state is WaitingTaskState waiting && !record.AbortRequested && waiting.On.Any(live.ContainsKey)) continue;
+            if (state is SleepingTaskState asleep && !record.AbortRequested && asleep.Until > at) continue;
+            // An abort invocation waits for the live work below it, which counts itself.
+            if (record.AbortRequested && WaitingOnLocked(record, first: true).Count > 0) continue;
+            if (record.AbortRequested && record.AbortReason is null) return true;
+            check.Add(record);
+        }
+        return false;
     }
 
     /// <summary>Whether a definition can take one of <paramref name="records"/>: the registry check <see cref="Wake"/> needs only while
@@ -868,15 +958,23 @@ internal sealed class DurableTaskScheduler
         // Whether the commit created a task, and whether a running task that keeps running committed it; see Kick(bool).
         var createsTask = false;
         var keepsRunning = false;
-        // The clock is host code, read before the lock: only a commit that appends entries can advance a kept range.
-        var at = publication.Changes.Any(change => change is EntryWrite) ? now() : 0;
-        // The waits a terminal commit resolves, resumed after host observers saw it, as the abort signals are.
+        // The clock and the settings are host code, read before the lock: only a commit that appends entries can advance a kept range, and
+        // only one that changes a task settles idleness.
+        var tasks = publication.Changes.Any(change => change is TaskWrite);
+        var at = tasks || publication.Changes.Any(change => change is EntryWrite) ? now() : 0;
+        var retention = tasks ? ContextRetentionMs() : 0;
+        // The waits a terminal commit resolves, resumed after host observers saw it, as the abort signals and the idle waits are.
         var resumes = new List<Action>();
+        var idle = new List<Action>();
         lock (gate)
         {
             AdvanceContextsLocked(publication, at);
             var updated = new List<TaskRecord>();
             var failed = new List<TaskId>();
+            // The conversations whose idleness the commit's task changes can change; null when a chain is not known.
+            HashSet<ConversationId>? scopes = [];
+            // The tasks those walks passed, so one publication walks each node once (see AddScopesAboveLocked).
+            HashSet<TaskId> walked = [];
             // Edges first, so the tasks a commit creates in a new conversation hang from it.
             foreach (var change in publication.Changes)
                 if (change is ConversationWrite created && !edges.ContainsKey(created.Value.Id)) SetEdgeLocked(created.Value.Id, created.Value.Owner?.TaskId);
@@ -888,6 +986,10 @@ internal sealed class DurableTaskScheduler
                 var previous = live.GetValueOrDefault(record.Id);
                 if (FailedOutcome(record) && (previous is null || !FailedOutcome(previous))) failed.Add(record.Id);
                 TrackLocked(previous, record);
+                // Idleness counts live tasks, so only a task that became live or ended can change it. Collected before SweepLocked, which
+                // may forget the chain of a task that ended.
+                var liveness = previous is null || record.State.Status == DurableTaskStatus.Terminal;
+                if (liveness && scopes is not null && !AddScopesAboveLocked(record, scopes, walked)) scopes = null;
                 if (record.State.Status == DurableTaskStatus.Terminal)
                 {
                     failedMigrations.Remove(record.Id);
@@ -952,19 +1054,46 @@ internal sealed class DurableTaskScheduler
             // A cascade that a reservation or step found pending runs with the next commit of any kind.
             if (cascadePending) ScheduleReconcileLocked();
             SweepLocked();
+            // Under the same lock as the task changes, as upstream's observe settles in the same synchronous call: the kept contexts' idle
+            // state never disagrees with the published tasks.
+            if (changed) SettleIdleLocked(scopes, at, retention, idle);
         }
         CountActive();
         // Task code, and what the waits resume, never runs before host observers saw the commit (upstream: the aborts follow in a
         // microtask and the waits in promise continuations, after the dispatch to host observers).
-        if (resumes.Count > 0 || signal.Count > 0)
+        if (resumes.Count > 0 || signal.Count > 0 || idle.Count > 0)
             session.AfterPublication(() =>
             {
                 foreach (var resume in resumes) resume();
                 foreach (var invocation in signal) Signal(invocation, null);
+                foreach (var resume in idle) resume();
             });
         if (!changed) return;
-        SettleIdle();
+        ApplyExpiry();
         Kick(onLine: createsTask && keepsRunning);
+    }
+
+    /// <summary>
+    /// Adds the conversations above <paramref name="record"/> to <paramref name="scopes"/>: those whose idleness a change of it can change
+    /// (upstream <c>#addScopesAbove</c>). False when a node on the way up is not known. A conversation already in <paramref name="scopes"/>
+    /// has everything above it there too, and so does a task in <paramref name="walked"/>, which an earlier walk of the same publication
+    /// passed (a deliberate difference: upstream stops at a conversation only, so the walks of one publication that creates or ends a
+    /// chain of N tasks in one conversation take N²/2 steps; here N). Owners and conversation edges never change, and a walk that met
+    /// an unknown node ended the collection, so the scopes are upstream's.
+    /// </summary>
+    private bool AddScopesAboveLocked(TaskRecord record, HashSet<ConversationId> scopes, HashSet<TaskId> walked)
+    {
+        foreach (var step in AboveLocked(ParentOf(record), null))
+        {
+            if (step.Kind == StepKind.Unknown) return false;
+            if (step.Kind == StepKind.Task)
+            {
+                if (!walked.Add(step.Task)) return true;
+                continue;
+            }
+            if (!scopes.Add(step.Conversation)) return true;
+        }
+        return true;
     }
 
     /// <summary>
@@ -992,11 +1121,11 @@ internal sealed class DurableTaskScheduler
             // expiry timer. ExpiresAt was fixed when it went idle, so no settings are read here.
             if (kept.IdleSince is not null && kept.ExpiresAt is { } expiresAt && expiresAt <= at)
             {
-                contexts.Remove(conversationId);
+                DropContextLocked(conversationId);
                 continue;
             }
             if (ConversationContext.AdvanceRange(kept.Range, entries) is { } range) kept.Range = range;
-            else contexts.Remove(conversationId);
+            else DropContextLocked(conversationId);
         }
     }
 
@@ -1029,54 +1158,127 @@ internal sealed class DurableTaskScheduler
         }
     }
 
-    /// <summary>Resolves idle waiters, and drops each kept context whose conversation has been idle for the retention period.</summary>
-    private void SettleIdle()
+    /// <summary>
+    /// After task changes below the conversations in <paramref name="scopes"/> (every conversation when null): resolves their idle waiters
+    /// and the Harness-wide ones, drops the kept contexts whose idle period passed the retention, then starts or ends the idle periods of the
+    /// kept contexts in <paramref name="scopes"/> (upstream <c>#settleIdle</c>). A task change can change the idleness only of the
+    /// conversations above it, so no check visits every conversation. The clock (<paramref name="at"/>) and the retention are host code,
+    /// read by the caller before the lock; the waits it takes are added to <paramref name="resumes"/>, and the caller runs
+    /// <see cref="ApplyExpiry"/> out of the lock.
+    /// </summary>
+    private void SettleIdleLocked(IReadOnlySet<ConversationId>? scopes, double at, double retention, List<Action> resumes)
     {
-        var at = now();
-        var retention = ContextRetentionMs();
-        var resumes = new List<Action>();
-        lock (gate)
+        var all = scopes is null || unknownsChanged;
+        unknownsChanged = false;
+        if (all) fullIdleChecks++;
+        ResolveIdleWaitersLocked(all ? null : scopes, resumes);
+        // Expired first: a context past its retention is dropped even when the same commit makes it busy again.
+        ExpireContextsLocked(at, retention);
+        IEnumerable<ConversationId> checks = all ? [.. contexts.Keys] : scopes!;
+        foreach (var conversationId in checks)
         {
-            foreach (var conversationId in idleWaiters.Keys())
-                if (IdleLocked(conversationId) && idleWaiters.Take(conversationId, true) is { } resume) resumes.Add(resume);
-            foreach (var (conversationId, kept) in contexts.ToList())
+            if (!contexts.TryGetValue(conversationId, out var kept)) continue;
+            if (!IdleLocked(conversationId))
             {
-                if (kept.IdleSince is { } since && at - since >= retention) contexts.Remove(conversationId);
-                else if (!IdleLocked(conversationId)) kept.IdleSince = null;
-                else if (retention > 0)
-                {
-                    if (kept.IdleSince is null)
-                    {
-                        kept.IdleSince = at;
-                        kept.ExpiresAt = at + retention;
-                    }
-                }
-                else contexts.Remove(conversationId);
+                if (kept.IdleSince is null) continue;
+                kept.IdleSince = null;
+                idleOrder.Remove(conversationId);
             }
-            ComputeExpiryLocked(retention);
+            else if (retention <= 0) DropContextLocked(conversationId);
+            else if (kept.IdleSince is null)
+            {
+                kept.IdleSince = at;
+                kept.ExpiresAt = at + retention;
+                MarkIdleLocked(conversationId, at);
+            }
         }
-        // At a publication, after its host observers (upstream: promise continuations behind their dispatch); else at once.
+        ComputeExpiryLocked(retention);
+    }
+
+    /// <summary>Takes the waits of the idle waiters of the conversations in <paramref name="scopes"/> (all when null) and of the Harness-wide
+    /// ones, those that are idle now (upstream <c>#resolveIdleWaiters</c>).</summary>
+    private void ResolveIdleWaitersLocked(IReadOnlySet<ConversationId>? scopes, List<Action> resumes)
+    {
+        foreach (var conversationId in idleWaiters.Keys())
+        {
+            if (conversationId is { } id && scopes is not null && !scopes.Contains(id)) continue;
+            if (IdleLocked(conversationId) && idleWaiters.Take(conversationId, true) is { } resume) resumes.Add(resume);
+        }
+    }
+
+    /// <summary>Resumes idle waits at a publication, after its host observers (upstream: promise continuations behind their dispatch); else at
+    /// once.</summary>
+    private void ResumeAfterPublication(List<Action> resumes)
+    {
         if (resumes.Count > 0)
             session.AfterPublication(() =>
             {
                 foreach (var resume in resumes) resume();
             });
-        ApplyExpiry();
-    }
-
-    /// <summary>Records when the earliest idle context expires, for <see cref="ApplyExpiry"/>, which the caller runs once out of the
-    /// lock.</summary>
-    private void ComputeExpiryLocked(double retention)
-    {
-        double? due = null;
-        foreach (var kept in contexts.Values)
-            if (kept.IdleSince is { } since && (due is null || since + retention < due)) due = since + retention;
-        expiryDue = due;
     }
 
     /// <summary>
-    /// Runs <see cref="SettleIdle"/> when the earliest idle context expires, on a background timer, which never keeps the process alive.
-    /// Where the host declines it, none is kept: task changes alone check expiry. Never called under the lock.
+    /// Drops the kept contexts idle for at least <paramref name="retention"/>, oldest first (upstream <c>#expireContexts</c>); with no
+    /// retention, every idle one, also those whose idle period a clock that went back makes start after now.
+    /// </summary>
+    private void ExpireContextsLocked(double at, double retention)
+    {
+        while (idleOrder.First is { } oldest)
+        {
+            if (retention > 0 && at - oldest.Value < retention) return;
+            DropContextLocked(oldest.Key);
+        }
+    }
+
+    /// <summary>
+    /// Starts the idle period of a kept context in the expiry order (upstream <c>#markIdle</c>). An idle period older than the newest one
+    /// kept, which a clock that went back starts, sorts the order again (stably, as upstream's sort), and the newest is taken from what is
+    /// kept then.
+    /// </summary>
+    private void MarkIdleLocked(ConversationId conversationId, double idleSince)
+    {
+        idleOrder.Remove(conversationId);
+        idleOrder.Set(conversationId, idleSince);
+        if (idleOrder.Count == 1 || idleSince >= idleNewest)
+        {
+            idleNewest = idleSince;
+            return;
+        }
+        var sorted = idleOrder.OrderBy(entry => entry.Value).ToList();
+        idleOrder.Clear();
+        foreach (var (id, since) in sorted) idleOrder.Set(id, since);
+        idleNewest = sorted[^1].Value;
+    }
+
+    /// <summary>Forgets a kept context, idle or not, and its place in the expiry order (upstream <c>#dropContext</c>).</summary>
+    private void DropContextLocked(ConversationId conversationId)
+    {
+        contexts.Remove(conversationId);
+        idleOrder.Remove(conversationId);
+    }
+
+    /// <summary>Records when the earliest idle context expires, the oldest in <see cref="idleOrder"/>, for <see cref="ApplyExpiry"/>, which
+    /// the caller runs once out of the lock.</summary>
+    private void ComputeExpiryLocked(double retention) => expiryDue = idleOrder.First is { } oldest ? oldest.Value + retention : null;
+
+    /// <summary>The expiry timer's work (upstream's timer callback): drops the expired contexts, then arms the timer for the next
+    /// expiry.</summary>
+    private void ExpireDue()
+    {
+        var at = now();
+        var retention = ContextRetentionMs();
+        lock (gate)
+        {
+            ExpireContextsLocked(at, retention);
+            ComputeExpiryLocked(retention);
+        }
+        ApplyExpiry();
+    }
+
+    /// <summary>
+    /// Drops the expired contexts when the earliest idle context expires (<see cref="ExpireDue"/>), on a background timer, which never keeps
+    /// the process alive. Where the host declines it, none is kept: task changes and reconcile passes alone check expiry. Never called under
+    /// the lock.
     /// </summary>
     private void ApplyExpiry()
     {
@@ -1099,7 +1301,7 @@ internal sealed class DurableTaskScheduler
             var disarm = timers.Background(() => Contained(() =>
             {
                 lock (timerGate) if (ReferenceEquals(expiry, armed)) expiry = null;
-                SettleIdle();
+                ExpireDue();
             }, ReportInfo.ListenerError), when - now());
             if (disarm is null)
             {
@@ -1192,14 +1394,35 @@ internal sealed class DurableTaskScheduler
         }
         finally
         {
+            lock (gate) if (work) reconcilingWork--;
+        }
+        try
+        {
+            ScheduleWake();
+            // Its commit's task changes were settled at their publication; a waiter that asked for this pass checks again, and what its
+            // chain loads resolved can make any scope idle.
+            var at = now();
+            var retention = ContextRetentionMs();
+            var resumes = new List<Action>();
             lock (gate)
             {
-                reconciling--;
-                if (work) reconcilingWork--;
+                if (unknownsChanged) SettleIdleLocked(null, at, retention, resumes);
+                else
+                {
+                    ResolveIdleWaitersLocked(null, resumes);
+                    // A pass checks expiry too, for hosts that decline the expiry timer.
+                    ExpireContextsLocked(at, retention);
+                    ComputeExpiryLocked(retention);
+                }
             }
+            ResumeAfterPublication(resumes);
+            ApplyExpiry();
         }
-        ScheduleWake();
-        SettleIdle();
+        finally
+        {
+            // Counted down once the pass's idle check ran, so QuiesceAsync waits for it too.
+            lock (gate) reconciling--;
+        }
     }
 
     /// <summary>Whether a reconcile pass would have work: a cascade to derive, held outcomes to check, or <c>failFast</c> waits (upstream
@@ -1384,63 +1607,94 @@ internal sealed class DurableTaskScheduler
     private async Task LoadChainAsync(Up start, Overlay? overlay)
     {
         var passed = new List<TaskId>();
+        var installed = false;
         Up? at = start;
-        while (at is { } current)
+        try
         {
-            if (current.IsTask)
+            while (at is { } current)
             {
-                var id = current.Task;
-                TaskNode? node;
-                bool loaded;
-                lock (gate)
+                if (current.IsTask)
                 {
-                    node = live.TryGetValue(id, out var record) ? NodeOf(record) : settled.TryGetValue(id, out var known) ? known : null;
-                    // Created in this commit: the load from its own record covers what is above it.
-                    if (node is null && overlay?.Tasks.ContainsKey(id) == true) break;
-                    loaded = node is not null && !unloaded.Contains(id);
-                }
-                if (loaded) break;
-                if (node is null)
-                {
-                    // Through the line's Storage: a task whose creation or end is not published yet waits for it.
-                    var record = await session.LineStorage.GetTaskAsync(id, context).ConfigureAwait(false);
-                    if (record is null) return;
-                    node = NodeOf(record);
-                    var terminal = record.State.Status == DurableTaskStatus.Terminal;
+                    var id = current.Task;
+                    TaskNode? node;
+                    bool loaded;
                     lock (gate)
                     {
-                        if (terminal) SettleLocked(id, node.Value);
-                        // A loaded node can reveal a cancelling owner: the next reconcile derives marks again.
-                        ScheduleReconcileLocked();
+                        node = live.TryGetValue(id, out var record) ? NodeOf(record) : settled.TryGetValue(id, out var known) ? known : null;
+                        // Created in this commit: the load from its own record covers what is above it.
+                        if (node is null && overlay?.Tasks.ContainsKey(id) == true) break;
+                        loaded = node is not null && !unloaded.Contains(id);
                     }
-                    if (terminal) Pin(Node.Of(id));
+                    if (loaded) break;
+                    if (node is null)
+                    {
+                        // Through the line's Storage: a task whose creation or end is not published yet waits for it.
+                        var record = await session.LineStorage.GetTaskAsync(id, context).ConfigureAwait(false);
+                        if (record is null) return;
+                        node = NodeOf(record);
+                        var terminal = record.State.Status == DurableTaskStatus.Terminal;
+                        lock (gate)
+                        {
+                            if (terminal) SettleLocked(id, node.Value);
+                            // A loaded node can reveal a cancelling owner: the next reconcile derives marks again.
+                            ScheduleReconcileLocked();
+                        }
+                        if (terminal)
+                        {
+                            Pin(Node.Of(id));
+                            installed = true;
+                        }
+                    }
+                    passed.Add(id);
+                    at = ParentOf(node.Value);
                 }
-                passed.Add(id);
-                at = ParentOf(node.Value);
+                else
+                {
+                    bool known;
+                    TaskId? owner;
+                    lock (gate) known = EdgeLocked(current.Conversation, overlay, out owner);
+                    if (!known)
+                    {
+                        // Through the line's Storage: a conversation whose creation is not published yet waits for it, so a missing record is
+                        // never mistaken for an ownerless one.
+                        var record = await session.LineStorage.GetConversationAsync(current.Conversation, context).ConfigureAwait(false);
+                        owner = record?.Owner?.TaskId;
+                        lock (gate)
+                        {
+                            SetEdgeLocked(current.Conversation, owner);
+                            // A loaded node can reveal a cancelling owner: the next reconcile derives marks again.
+                            ScheduleReconcileLocked();
+                        }
+                        Pin(Node.Of(current.Conversation));
+                        installed = true;
+                    }
+                    at = owner is { } task ? Up.Of(task) : null;
+                }
             }
-            else
+        }
+        finally
+        {
+            // IdleLocked counts a live task whose chain is not loaded as inside every scope it may be in: what this load resolved, also when
+            // it stopped early, can make such a scope idle without a task change below it.
+            lock (gate)
             {
-                bool known;
-                TaskId? owner;
-                lock (gate) known = EdgeLocked(current.Conversation, overlay, out owner);
-                if (!known)
+                if (passed.Exists(live.ContainsKey) || (installed && LiveUnloadedLocked()))
                 {
-                    // Through the line's Storage: a conversation whose creation is not published yet waits for it, so a missing record is never
-                    // mistaken for an ownerless one.
-                    var record = await session.LineStorage.GetConversationAsync(current.Conversation, context).ConfigureAwait(false);
-                    owner = record?.Owner?.TaskId;
-                    lock (gate)
-                    {
-                        SetEdgeLocked(current.Conversation, owner);
-                        // A loaded node can reveal a cancelling owner: the next reconcile derives marks again.
-                        ScheduleReconcileLocked();
-                    }
-                    Pin(Node.Of(current.Conversation));
+                    unknownsChanged = true;
+                    // A waiter such a task held is checked again at the pass's end, also when this load was not a reconcile's.
+                    ScheduleReconcileLocked();
                 }
-                at = owner is { } task ? Up.Of(task) : null;
             }
         }
         lock (gate) foreach (var id in passed) unloaded.Remove(id);
+    }
+
+    /// <summary>Whether a live task's chain is not loaded yet: one <see cref="IdleLocked"/> counts as inside every scope it may be in
+    /// (upstream <c>#liveUnloaded</c>).</summary>
+    private bool LiveUnloadedLocked()
+    {
+        foreach (var id in unloaded) if (live.ContainsKey(id)) return true;
+        return false;
     }
 
     private void SetEdgeLocked(ConversationId conversationId, TaskId? owner)
@@ -2011,6 +2265,7 @@ internal sealed class DurableTaskScheduler
             closing = true;
             sealedInvocations.AddRange(invocations.Values);
             contexts.Clear();
+            idleOrder.Clear();
             expiryDue = null;
             var error = HarnessUtil.ClosedError(session);
             taskWaiters.RejectAll(error);
@@ -3375,6 +3630,55 @@ internal sealed class DurableTaskScheduler
         public bool Done { get; set; }
     }
 
+    /// <summary>An insertion-ordered map, as a JavaScript Map iterates: setting a key that is present keeps its place; removal is O(1)
+    /// (upstream's <c>#idleOrder</c> Map). Its iterations are not counted, as upstream's tests count only Set iterations.</summary>
+    private sealed class OrderedMap<TKey, TValue> : IEnumerable<KeyValuePair<TKey, TValue>> where TKey : notnull
+    {
+        private readonly Dictionary<TKey, LinkedListNode<KeyValuePair<TKey, TValue>>> index = [];
+        private readonly LinkedList<KeyValuePair<TKey, TValue>> order = new();
+
+        public int Count => index.Count;
+
+        /// <summary>The first entry in order, or null when empty.</summary>
+        public KeyValuePair<TKey, TValue>? First => order.First?.Value;
+
+        public bool TryGetValue(TKey key, out TValue value)
+        {
+            if (index.TryGetValue(key, out var node))
+            {
+                value = node.Value.Value;
+                return true;
+            }
+            value = default!;
+            return false;
+        }
+
+        public void Set(TKey key, TValue value)
+        {
+            if (index.TryGetValue(key, out var node)) node.Value = KeyValuePair.Create(key, value);
+            else index[key] = order.AddLast(KeyValuePair.Create(key, value));
+        }
+
+        public bool Remove(TKey key)
+        {
+            if (!index.Remove(key, out var node)) return false;
+            order.Remove(node);
+            return true;
+        }
+
+        public void Clear()
+        {
+            index.Clear();
+            order.Clear();
+        }
+
+        public LinkedList<KeyValuePair<TKey, TValue>>.Enumerator GetEnumerator() => order.GetEnumerator();
+
+        IEnumerator<KeyValuePair<TKey, TValue>> IEnumerable<KeyValuePair<TKey, TValue>>.GetEnumerator() => GetEnumerator();
+
+        IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
+    }
+
     /// <summary>Counts the members the scheduler's sets yield; they are iterated under the scheduler lock.</summary>
     private sealed class IterationCounter
     {
@@ -3695,13 +3999,18 @@ internal sealed class DurableTaskScheduler
                 if (range is not null && !scheduler.closing && !ended && (kept is null || kept.Range.Bounds.Tail.Value <= range.Bounds.Tail.Value))
                 {
                     // A read of another, idle conversation starts or continues its retention period.
-                    if (!scheduler.IdleLocked(conversationId)) scheduler.contexts[conversationId] = new KeptContext(range, null);
+                    if (!scheduler.IdleLocked(conversationId))
+                    {
+                        scheduler.contexts[conversationId] = new KeptContext(range, null);
+                        scheduler.idleOrder.Remove(conversationId);
+                    }
                     else if (retention > 0)
                     {
-                        // An idle period that already started keeps its expiry; a new one starts now.
+                        // An idle period that already started keeps its expiry and its place; a new one starts now.
                         var idleSince = kept?.IdleSince ?? stamp;
                         var expiresAt = kept?.IdleSince is not null && kept.ExpiresAt is { } fixedAt ? fixedAt : idleSince + retention;
                         scheduler.contexts[conversationId] = new KeptContext(range, idleSince) { ExpiresAt = expiresAt };
+                        if (kept?.IdleSince is null) scheduler.MarkIdleLocked(conversationId, idleSince);
                         scheduler.ComputeExpiryLocked(retention);
                         expires = true;
                     }

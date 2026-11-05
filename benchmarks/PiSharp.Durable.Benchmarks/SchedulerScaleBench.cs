@@ -8,6 +8,13 @@
 // - chain: one commit creates N tasks, each owning the next; every one completes in its first phase, holding as completing while the task
 //   below it lives, so the chain settles bottom-up once the last ends (upstream's changelog: 500 tasks took 12 s before the rewrite, 50 ms
 //   after; 20,000 take 1.5 s). The time runs from the creating commit to the top task's terminal record.
+// - conversations (Pi v1.5.0 sync, area scheduler-idle; Pi 35dfa7573, durable 1.5.0 Changed#8): the scheduler's per-commit work against the
+//   number of conversations whose context it keeps. N ownerless conversations with one entry each; one task reads all their contexts, so
+//   the scheduler keeps N idle context ranges (ten minutes' retention, the default); then 128 one-tool runs (a tool call, then a text) run
+//   one after another, round robin over the conversations, and are timed. Before 35dfa7573 every commit that changed a task walked every
+//   kept context; after it, only the conversations above the tasks that became live or ended. Upstream's commit message quotes one Session
+//   with one-tool runs and no storage latency: 2,048 conversations 100 -> 805 runs/s, 4,096 46 -> 772. That workload is not in the
+//   repository, so this one is PiSharp's own, and the Node twin does not run it.
 using System.Diagnostics;
 using System.Globalization;
 using PiSharp.Durable.Chord;
@@ -23,6 +30,12 @@ public static class SchedulerScaleBench
 
     /// <summary>The default chain depths.</summary>
     public static IReadOnlyList<int> DefaultChain { get; } = [500, 2000, 20_000];
+
+    /// <summary>The default conversation counts of the conversations scenario.</summary>
+    public static IReadOnlyList<int> DefaultConversations { get; } = [1, 256, 1024, 2048, 4096];
+
+    /// <summary>The timed one-tool runs of each conversations row.</summary>
+    public const int ConversationRuns = 128;
 
     /// <summary>One row: the scenario, its size, the time and the commits.</summary>
     public sealed record Row(string Scenario, int Size, double Ms, int Commits);
@@ -43,7 +56,14 @@ public static class SchedulerScaleBench
     });
 
     /// <summary>Runs the fan-out sizes, then the chain depths; writes a table each and returns the rows.</summary>
-    public static async Task<IReadOnlyList<Row>> RunAsync(IReadOnlyList<int> fanout, IReadOnlyList<int> chain, TextWriter output)
+    public static Task<IReadOnlyList<Row>> RunAsync(IReadOnlyList<int> fanout, IReadOnlyList<int> chain, TextWriter output) =>
+        RunAsync(fanout, chain, [], output);
+
+    /// <summary>Runs the fan-out sizes, the chain depths, then the conversation counts; writes a table each (none for no conversation
+    /// counts) and returns the rows. A conversations row's <see cref="Row.Ms"/> times its <see cref="ConversationRuns"/> runs, and its
+    /// <see cref="Row.Commits"/> counts their commits.</summary>
+    public static async Task<IReadOnlyList<Row>> RunAsync(IReadOnlyList<int> fanout, IReadOnlyList<int> chain, IReadOnlyList<int> conversations,
+        TextWriter output)
     {
         var rows = new List<Row>();
         output.WriteLine("fanout | ms     | commits | ms per task");
@@ -60,7 +80,88 @@ public static class SchedulerScaleBench
             rows.Add(row);
             output.WriteLine(string.Create(CultureInfo.InvariantCulture, $"{n,-6} | {Math.Round(row.Ms),-6} | {row.Commits,-7} | {row.Ms / n:F3}"));
         }
+        if (conversations.Count == 0) return rows;
+        output.WriteLine("conversations | runs | ms     | runs/s | ms per run | commits per run");
+        foreach (var n in conversations)
+        {
+            var row = await ConversationsAsync(n);
+            rows.Add(row);
+            output.WriteLine(string.Create(CultureInfo.InvariantCulture,
+                $"{n,-13} | {ConversationRuns,-4} | {Math.Round(row.Ms),-6} | {ConversationRuns / (row.Ms / 1000),-6:F0} | {row.Ms / ConversationRuns,-10:F2} | {(double)row.Commits / ConversationRuns:F1}"));
+        }
         return rows;
+    }
+
+    /// <summary>Reads the context of every conversation its input lists, then completes.</summary>
+    private static readonly DurableTask Reader = Tasks.DefineTask(new TaskDefinition
+    {
+        Name = "bench.reader",
+        Version = 1,
+        Initial = _ => JsonValue.Object(KeyValuePair.Create("phase", (JsonValue)"run")),
+        Phases = new Dictionary<string, TaskPhaseHandler>
+        {
+            ["run"] = async (task, runtime, ctx) =>
+            {
+                foreach (var id in (JsonArrayValue)task.Input)
+                    await runtime.ContextAsync(new ConversationId((long)((JsonNumberValue)id).Value), ctx);
+                await runtime.CommitAsync((_, _) => NextTaskState.Completed(JsonValue.Null), ctx);
+            },
+        },
+        Abort = (_, runtime, ctx) => runtime.CommitAsync((_, _) => NextTaskState.Aborted(), ctx),
+    });
+
+    /// <summary><see cref="ConversationRuns"/> one-tool runs, one after another, while the scheduler keeps the contexts of
+    /// <paramref name="count"/> idle conversations.</summary>
+    public static async Task<Row> ConversationsAsync(int count)
+    {
+        var registry = Registry.Create();
+        var noop = Define.Tool(new ToolRegistration
+        {
+            Name = "noop",
+            Description = "Do nothing",
+            Parameters = ToolRegistration.EmptyParameters,
+            Execute = (_, _, _) => Task.FromResult(new ToolExecutionResult
+            {
+                Output = JsonValue.Array(JsonValue.Object(KeyValuePair.Create("type", (JsonValue)"text"), KeyValuePair.Create("text", (JsonValue)"ok"))),
+            }),
+        });
+        registry.Install(Define.Extension(new Extension { Name = "bench", Tools = [noop], Tasks = [Reader] }));
+        var storage = new CommitCounter(new MemoryStorage());
+        var models = new FauxModels([.. Enumerable.Range(0, ConversationRuns).SelectMany(run =>
+            new[] { FauxModels.Calls("noop", JsonObjectValue.Empty, $"call{run}"), FauxModels.Text("done") })]);
+        var harness = await Harness.OpenAsync(storage, new HarnessOptions { Models = models, Registry = registry }, Context);
+        try
+        {
+            harness.Resume();
+            var created = new List<IConversation>(count);
+            for (var index = 0; index < count; index++)
+            {
+                var conversation = await harness.CreateConversationAsync(new ConversationCreateOptions(ConversationOwnership.Ownerless)
+                {
+                    Agent = new AgentChange { Model = FauxModels.Ref },
+                }, Context);
+                // A context range keeps entries: an empty conversation has none to keep.
+                await conversation.CommitAsync(tx => tx.AppendEntryAsync(conversation.Id, new EntryDraft { Kind = "note" }), Context);
+                created.Add(conversation);
+            }
+            var root = await harness.RootAsync(Context);
+            var ids = JsonValue.Array([.. created.Select(conversation => (JsonValue)conversation.Id.Value)]);
+            var reader = await root.CommitAsync(tx => tx.CreateTaskAsync(Reader, ids, new TaskOptions(TaskOwnership.Conversation)), Context);
+            await harness.WaitForTaskAsync(reader, Context);
+            var before = storage.Commits;
+            var started = Stopwatch.GetTimestamp();
+            for (var run = 0; run < ConversationRuns; run++)
+            {
+                var settled = await (await created[run % count].SubmitAsync(SubmissionDraft.Input("go"), Context)).WaitAsync(Context);
+                if (settled.Status != SubmissionStatus.Done) throw new InvalidOperationException($"run {run}: {WireStatus(settled.Status)}");
+            }
+            var ms = Stopwatch.GetElapsedTime(started).TotalMilliseconds;
+            return new Row("conversations", count, ms, storage.Commits - before);
+        }
+        finally
+        {
+            await harness.CloseAsync(Context);
+        }
     }
 
     /// <summary>One model-issued tool creating <paramref name="count"/> child tasks at once and waiting for all of them.</summary>
