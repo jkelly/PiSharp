@@ -141,6 +141,8 @@ internal sealed class HookedStorage(IStorage inner) : DelegatingStorage(inner)
     public Func<IReadOnlyList<StorageWrite>, Task>? OnCommit { get; set; }
     public Func<ConversationId, Task>? OnConversation { get; set; }
     public Action<TaskId>? OnTask { get; set; }
+    /// <summary>Awaited before each task read (upstream's patched async <c>storage.task</c>).</summary>
+    public Func<TaskId, Task>? OnTaskRead { get; set; }
     public Action<SubmissionQuery>? OnScanSubmissions { get; set; }
 
     public override async Task<CommitResult> CommitAsync(IReadOnlyList<IReadOnlyList<StorageWrite>> batches, Action<int, Seq> receive, DurableContext context)
@@ -156,10 +158,11 @@ internal sealed class HookedStorage(IStorage inner) : DelegatingStorage(inner)
         return await base.GetConversationAsync(id, context);
     }
 
-    public override Task<TaskRecord?> GetTaskAsync(TaskId id, DurableContext context)
+    public override async Task<TaskRecord?> GetTaskAsync(TaskId id, DurableContext context)
     {
         OnTask?.Invoke(id);
-        return base.GetTaskAsync(id, context);
+        if (OnTaskRead is { } hook) await hook(id);
+        return await base.GetTaskAsync(id, context);
     }
 
     public override Task<Page<SubmissionRecord>> ScanSubmissionsAsync(SubmissionQuery query, int limit, JsonObjectValue? cursor, DurableContext context)

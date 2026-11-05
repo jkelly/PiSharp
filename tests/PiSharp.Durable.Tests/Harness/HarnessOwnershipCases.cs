@@ -5,9 +5,12 @@
 //   HarnessOwnershipSqliteCases() reruns the cases that need no reopen on a fresh SQLite file (its reopen cases would repeat the
 //   MemoryStorage group's).
 // - The parameterized "derives marks a crash left unapplied below ... at open" is one case per parameter.
-// - "rejects a handle operation queued on the line ...": upstream calls abortTask, whose mark commit queues behind the held commit at once,
-//   and then lets the tool queue its submit. Handlers here run on other threads, so the case waits until the mark is queued on the Session
-//   line (Session.LineBacklog, a deterministic barrier) before it lets the tool go.
+// - "runs a handle operation queued behind the abort mark ...": upstream calls abortTask, whose mark commit queues behind the held commit at
+//   once, and then lets the tool queue its submit. Handlers here run on other threads, so the case waits until the mark, then the submit,
+//   are queued on the Session line (Session.LineBacklog, a deterministic barrier) before it goes on. Upstream's setTimeout(0), in which the
+//   submit's job starts while the mark's storage call is held, waits until that call reached the storage (MarkHoldingStorage.Entered) and
+//   the submit's job, past its start, waits at the gate of the task the mark writes, which its admission's memberships walk through
+//   (Session.GateHits grows).
 // - Tools and supervisors append the IDs they see from other threads, so those lists are SyncLists.
 // - Pi v1.2.0's queuedNote: writes queued while busy carry a model message, as a data-only write is appended at once (area i).
 // - Pi v1.2.0's two cases that count Set iterations (upstream patches Set.prototype[Symbol.iterator]) count the members the scheduler's own
@@ -15,6 +18,9 @@
 //   "finalizes many held siblings ..." starts counting before the leaves' commit, so its count also covers the tracking that upstream's
 //   leaves out, and first waits until every sibling holds.
 // - "tracks ownership chains deeper than the call stack" (20,000 tasks in one commit) runs on MemoryStorage only, as upstream's does.
+// Pi v1.5.0 sync (area group-commit-scheduler, e5c6182ba): v1.2.0's "rejects a handle operation queued on the line when the invocation ends
+// before it runs" is v1.5.0's "runs a handle operation queued behind the abort mark before the mark's publication, and the cascade aborts
+// it": with the publication barrier gone, the submit's job starts while the mark's storage call is held, lands, and the cascade aborts it.
 // Pi v1.5.0 sync (area run-failure, f3255de76): "aborts a subagent run with its parent's conversation ..." expects the child's
 // pi.live.runFailure (reason aborted) where v1.2.0 expected an empty pi.live.
 using PiSharp.Durable;
@@ -891,12 +897,12 @@ internal static partial class OwnershipTests
             await harness.CloseAsync(Context);
         });
 
-        yield return Case(prefix + "rejects-a-handle-operation-queued-on-the-line-when-the-invocation-ends-before-it-runs", async () =>
+        yield return Case(prefix + "runs-a-handle-operation-queued-behind-the-abort-mark-before-the-marks-publication-and-the-cascade-aborts-it", async () =>
         {
             var setup = Setup();
             var ready = new Deferred<(ConversationId Child, TaskId TaskId)>();
             var go = new HarnessTests.Deferred();
-            var queued = new Deferred<Task>();
+            var queued = new Deferred<Task<ISubmission>>();
             AddTool(setup.Registry, Delegating("delegate", "Delegates late", async (arguments, api, callContext) =>
             {
                 var child = await api.CommitAsync(async tx => (await tx.CreateConversationAsync(ConversationOwnership.Task(api.TaskId))).Id, callContext);
@@ -912,9 +918,12 @@ internal static partial class OwnershipTests
                 throw new InvalidOperationException("unreachable");
             }));
             setup.Faux.SetResponses(CallOf("delegate", JsonObjectValue.Empty, "c1"));
-            var (harness, root) = await OpenChat(await fresh(), setup);
+            // Holds the storage call that writes the abort mark, so the mark is published only once the test lets it.
+            var storage = new MarkHoldingStorage(await fresh());
+            var (harness, root) = await OpenChat(storage, setup);
             await root.SubmitAsync(SubmissionDraft.Input("go"), Context);
             var (child, taskId) = await ready.Task;
+            storage.Hold = taskId;
             // Hold the Session line, queue the abort mark behind it, then let the tool queue its submit.
             var release = new HarnessTests.Deferred();
             var entered = new HarnessTests.Deferred();
@@ -925,16 +934,28 @@ internal static partial class OwnershipTests
             }, Context);
             await entered.Task;
             var aborting = harness.AbortTaskAsync(taskId, Context);
-            // Deterministic barrier: the mark commit waits on the line behind the held commit.
+            // Deterministic barriers: the mark commit, then the submit, wait on the line behind the held commit.
             await Eventually(() => ((DurableHarness)harness).LineBacklog >= 1);
             go.Resolve();
             var submitting = await queued.Task;
+            await Eventually(() => ((DurableHarness)harness).LineBacklog >= 2);
+            var hits = ((DurableHarness)harness).GateHits;
             release.Resolve();
             await holding;
+            // The submit starts while the mark's storage call is in flight: it passes the job's cancellation check, and its admission's
+            // memberships, which walk the owner chain, wait at the gate of the task the mark writes.
+            await storage.Entered.Task;
+            await Eventually(() => ((DurableHarness)harness).GateHits > hits);
+            storage.Stored.Resolve();
             await aborting;
-            await ThrowsAsync<Exception>(() => submitting, "late submit");
+            // Cancellation is checked when a job starts: the submit touches nothing the mark writes, so it starts before the mark is
+            // published and lands. The mark's cascade then aborts the run it started in the owned conversation.
+            var submission = await submitting;
             var childConversation = (await harness.ConversationAsync(child, Context))!;
-            Equal(0, (await childConversation.EntriesAsync(new EntryQueryBounds(), 10, null, Context)).Items.Length, "child entries");
+            await childConversation.WaitForIdleAsync(Context);
+            UnansweredAborted(await RecordOf(harness, submission.Id), "late submission");
+            Equal("pi.user", string.Join(",", (await childConversation.EntriesAsync(new EntryQueryBounds(), 10, null, Context)).Items.Select(entry => entry.Kind)),
+                "child entry kinds");
             Equal(0, (await harness.InspectAsync(Context)).Submissions.Count(record => record.ConversationId == child), "child submissions");
             await harness.CloseAsync(Context);
         });

@@ -11,6 +11,9 @@
 // - The internal `tx.setTask` of a Harness commit is DurableHarness.CommitWithAsync's Transaction.SetTask in the conversation's scope.
 // - Pi v1.5.0 sync (area live-turns, f6a9db1d8): busy() writes pi.live.run with turns: 0, as v1.5.0's does (harness.scheduler-retention
 //   uses it for its busy conversations too).
+// - Pi v1.5.0 sync (area group-commit-scheduler, e5c6182ba): MarkHoldingStorage is v1.5.0's HoldMark storage of "runs a handle operation
+//   queued behind the abort mark ...", a decorator over any IStorage like MarkFailingStorage, which refuses the marking batch through
+//   SessionTests.RefusingAt (upstream refusingAt) where v1.2.0's storages threw.
 using System.Collections.Concurrent;
 using PiSharp.Durable;
 using PiSharp.Durable.Chord;
@@ -221,8 +224,9 @@ internal static partial class OwnershipTests
 }
 
 /// <summary>
-/// Fails, once, the first commit that writes the abort mark of the task <see cref="Fail"/> names with <see cref="Failure"/>, then clears it
-/// (upstream v1.2.0's <c>class Failing extends ControlledStorage</c> and patched <c>storage.commit</c> of harness-ownership, as a decorator).
+/// Refuses, once, the first batch that writes the abort mark of the task <see cref="Fail"/> names with <see cref="Failure"/>, storing the
+/// batches before it, then clears it (upstream's <c>class Failing extends ControlledStorage</c> and patched <c>storage.commit</c> of
+/// harness-ownership, as a decorator; Pi v1.5.0 e5c6182ba refuses through <c>refusingAt</c> where v1.2.0 threw).
 /// </summary>
 internal sealed class MarkFailingStorage(IStorage inner) : IStorage
 {
@@ -238,15 +242,14 @@ internal sealed class MarkFailingStorage(IStorage inner) : IStorage
         set => Interlocked.Exchange(ref fail, value?.Value ?? -1);
     }
 
-    public Task<CommitResult> CommitAsync(IReadOnlyList<IReadOnlyList<StorageWrite>> batches, Action<int, Seq> receive, DurableContext context)
-    {
-        var target = Fail;
-        var marks = target is { } id &&
-            batches.SelectMany(writes => writes).Any(write => write is TaskWrite task && task.Value.Id == id && task.Value.AbortRequested);
-        if (marks && Interlocked.CompareExchange(ref fail, -1, target!.Value.Value) == target.Value.Value)
-            return Task.FromException<CommitResult>(Failure);
-        return inner.CommitAsync(batches, receive, context);
-    }
+    public Task<CommitResult> CommitAsync(IReadOnlyList<IReadOnlyList<StorageWrite>> batches, Action<int, Seq> receive, DurableContext context) =>
+        SessionTests.RefusingAt(inner.CommitAsync, batches, receive, context, writes =>
+        {
+            var target = Fail;
+            var marks = target is { } id &&
+                writes.Any(write => write is TaskWrite task && task.Value.Id == id && task.Value.AbortRequested);
+            return marks && Interlocked.CompareExchange(ref fail, -1, target!.Value.Value) == target.Value.Value;
+        }, Failure);
 
     public Task<TId> MintIdAsync<TId>() where TId : struct, IDurableId<TId> => inner.MintIdAsync<TId>();
     public Task<StoredDocument?> GetDocumentAsync(DocumentId id, DocumentPoint at, DurableContext context) => inner.GetDocumentAsync(id, at, context);
@@ -273,4 +276,41 @@ internal sealed class MarkFailingStorage(IStorage inner) : IStorage
     public Task<Page<DocumentRecord>> ScanDocumentsAsync(DocumentQuery query, int limit, JsonObjectValue? cursor, DurableContext context) =>
         inner.ScanDocumentsAsync(query, limit, cursor, context);
     public Task CloseAsync(DurableContext context) => inner.CloseAsync(context);
+}
+
+/// <summary>
+/// Holds the storage call that writes the abort mark of the task <see cref="Hold"/> names until <see cref="Stored"/> completes, so the mark
+/// is published only once the test lets it, then clears <see cref="Hold"/>; <see cref="Entered"/> completes once that call reached it (Pi
+/// v1.5.0's <c>class HoldMark extends MemoryStorage</c> of harness-ownership, as a decorator).
+/// </summary>
+internal sealed class MarkHoldingStorage(IStorage inner) : DelegatingStorage(inner)
+{
+    private long hold = -1;
+
+    /// <summary>The task whose next marking commit is held; null once held.</summary>
+    public TaskId? Hold
+    {
+        get => Interlocked.Read(ref hold) is var value and >= 0 ? new TaskId(value) : null;
+        set => Interlocked.Exchange(ref hold, value?.Value ?? -1);
+    }
+
+    /// <summary>Completes once the held storage call reached this storage.</summary>
+    public HarnessTests.Deferred Entered { get; } = new();
+
+    /// <summary>Lets the held storage call through.</summary>
+    public HarnessTests.Deferred Stored { get; } = new();
+
+    public override async Task<CommitResult> CommitAsync(IReadOnlyList<IReadOnlyList<StorageWrite>> batches, Action<int, Seq> receive,
+        DurableContext context)
+    {
+        var target = Hold;
+        var marks = target is { } id &&
+            batches.SelectMany(writes => writes).Any(write => write is TaskWrite task && task.Value.Id == id && task.Value.AbortRequested);
+        if (marks && Interlocked.CompareExchange(ref hold, -1, target!.Value.Value) == target.Value.Value)
+        {
+            Entered.Resolve();
+            await Stored.Task.ConfigureAwait(false);
+        }
+        return await base.CommitAsync(batches, receive, context).ConfigureAwait(false);
+    }
 }

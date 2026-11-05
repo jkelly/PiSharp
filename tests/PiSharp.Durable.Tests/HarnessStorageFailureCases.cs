@@ -20,8 +20,9 @@
 // Pi v1.5.0 sync (area vocabulary, 5f312dac4): a Session end is SessionEnd.Failed or SessionEnd.Closed (by kind), the commit listeners are
 // ObserveCommits observers (a CommitObserver; upstream observeCommits({ advance, end })), and the internal listener that fails the Session is
 // FollowCommits (upstream followCommits). The v1.5.0 blob's other changes are in place: Chord's WatchEnd kinds and value calls (areas
-// chord-watch, watches and observers), and the entry the context-read case commits before it fails scanRange (e5c6182ba, area
-// group-commit-scheduler), which this port's case already made.
+// chord-watch, watches and observers).
+// Pi v1.5.0 sync (area group-commit-scheduler, e5c6182ba): the context-read case commits an entry before it fails scanRange, as v1.5.0's
+// does (the vocabulary note that the port already made it was wrong: its only entry came after the read).
 using PiSharp.Durable;
 using PiSharp.Durable.Chord;
 using PiSharp.Durable.Storage;
@@ -420,6 +421,8 @@ internal static class StorageFailureTests
             var cancelled = new InvalidOperationException("caller gave up");
             var storage = new CancelledRead(new MemoryStorage(), controller, cancelled);
             var (harness, root, _, _, _) = await Start(storage);
+            // An entry to scan: the Session's cache answers the bounds of the context, not its entries (e5c6182ba).
+            await Note(root);
             await RejectsWith(cancelled, () => root.ContextAsync(controller.Context), "context read");
             await Note(root);
             await harness.CloseAsync(Context);

@@ -24,6 +24,9 @@
 // with "session closed" (CloseEnds). Pi v1.5.0 sync (area vocabulary, 5f312dac4): the internal observeCommits is followCommits
 // (Session.FollowCommits). The citation stays on v1.2.0 until the file's other areas land.
 // Pi v1.5.0 sync (area events, f3255de76): the task graph view is spec §9.4, renumbered from §9.5 with the agent events' section removed.
+// Pi v1.5.0 sync (area group-commit-scheduler, e5c6182ba): the mount is built on the line through the line's Storage (ReadOnLineAsync's
+// argument), whose scans wait for every unpublished commit, so nothing a publication then applies is in the mount already; the guarded
+// Storage field is gone.
 using System.Collections.Immutable;
 using PiSharp.Durable.Chord;
 using PiSharp.Durable.Chord.Delta;
@@ -232,7 +235,6 @@ internal sealed class TaskGraphView
     private const int ScanPageSize = 256;
 
     private readonly DurableHarness session;
-    private readonly IStorage storage;
     /// <summary>The scheduler's blocked reason of a task (upstream <c>TaskGraphBlocking.blocked</c>).</summary>
     private readonly Func<BlockedSubject, BlockedReason?> blocked;
     private readonly Lock gate = new();
@@ -241,14 +243,12 @@ internal sealed class TaskGraphView
     private bool closed;
 
     /// <param name="session">The Harness.</param>
-    /// <param name="storage">Its guarded Storage.</param>
     /// <param name="blocked">A task's blocked reason (upstream <c>TaskGraphBlocking.blocked</c>).</param>
     /// <param name="subscribeBlocked">Subscribes to changes of blocked reasons without a commit (upstream
     /// <c>TaskGraphBlocking.subscribeBlocked</c>).</param>
-    public TaskGraphView(DurableHarness session, IStorage storage, Func<BlockedSubject, BlockedReason?> blocked, Func<Action, Action> subscribeBlocked)
+    public TaskGraphView(DurableHarness session, Func<BlockedSubject, BlockedReason?> blocked, Func<Action, Action> subscribeBlocked)
     {
         this.session = session;
-        this.storage = storage;
         this.blocked = blocked;
         session.FollowCommits((publication, context) =>
         {
@@ -315,11 +315,11 @@ internal sealed class TaskGraphView
     /// <summary>Registers an observer created from the current revision, atomically on the Session line (upstream <c>attach</c>).</summary>
     private Task<(TObserver Observer, Action Detach)> AttachAsync<TObserver>(Func<TaskGraph, Action, TObserver> create, DurableContext context)
         where TObserver : SyncObserver<TaskGraph> =>
-        session.ReadOnLineAsync(async () =>
+        session.ReadOnLineAsync(async line =>
         {
             Mount? existing;
             lock (gate) existing = mount;
-            var target = existing ?? await BuildAsync(context).ConfigureAwait(false);
+            var target = existing ?? await BuildAsync(line, context).ConfigureAwait(false);
             SyncObserver<TaskGraph>? registered = null;
             void Detach()
             {
@@ -368,7 +368,8 @@ internal sealed class TaskGraphView
         }), _ => { });
     }
 
-    private async Task<Mount> BuildAsync(DurableContext context)
+    /// <summary>Reads the graph on the line, through the line's <paramref name="storage"/>.</summary>
+    private async Task<Mount> BuildAsync(IStorage storage, DurableContext context)
     {
         var records = new List<TaskRecord>();
         foreach (var status in LiveStatuses)

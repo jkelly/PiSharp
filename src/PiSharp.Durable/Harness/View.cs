@@ -31,7 +31,10 @@
 // active transcript.
 // Pi v1.5.0 sync (area vocabulary, 5f312dac4): the Session's own observers are FollowCommits (upstream followCommits), and a mounted
 // document's retirement is a DocumentRetireChange (change.kind === "retire", was a null value).
-// The citation stays on v1.2.0 until the file's other areas land (group-commit-scheduler, registry-reader).
+// Pi v1.5.0 sync (area group-commit-scheduler, e5c6182ba): a mount hydrates, and an observer's window and its create callback read, on
+// the line through the line's Storage (ReadOnLineAsync's argument), which waits for what an unpublished commit wrote, so nothing a
+// publication then applies is in the mount already; the guarded Storage field is gone. The citation stays on v1.2.0 until the file's
+// other area lands (registry-reader).
 using System.Collections.Immutable;
 using PiSharp.Durable.Chord;
 using PiSharp.Durable.Chord.Delta;
@@ -169,16 +172,14 @@ internal sealed class ConversationViews
     private static readonly ImmutableArray<PathSegment> BeforePath = [PathSegment.Of("before")];
 
     private readonly DurableHarness session;
-    private readonly IStorage storage;
     private readonly Lock gate = new();
     private readonly Dictionary<ConversationId, Mount> mounts = [];
     // Guarded by gate.
     private bool closed;
 
-    public ConversationViews(DurableHarness session, IStorage storage)
+    public ConversationViews(DurableHarness session)
     {
         this.session = session;
-        this.storage = storage;
         session.FollowCommits((publication, context) =>
         {
             KeyValuePair<ConversationId, Mount>[] current;
@@ -275,12 +276,12 @@ internal sealed class ConversationViews
         where TObserver : SyncObserver<ConversationView>
     {
         var bounds = ResolveWindow(window);
-        return await session.ReadOnLineAsync(async () =>
+        return await session.ReadOnLineAsync(async line =>
         {
             Mount? existing;
             lock (gate) mounts.TryGetValue(id, out existing);
-            var mount = existing ?? await BuildAsync(id, context).ConfigureAwait(false);
-            var (entries, before) = await LoadWindowAsync(id, bounds, context).ConfigureAwait(false);
+            var mount = existing ?? await BuildAsync(line, id, context).ConfigureAwait(false);
+            var (entries, before) = await LoadWindowAsync(line, id, bounds, context).ConfigureAwait(false);
             var value = new ConversationView(mount.Conversation, entries, before, mount.Docs);
             Windowed? windowed = null;
             void Detach()
@@ -291,7 +292,7 @@ internal sealed class ConversationViews
                     if (mount.Observers.Count == 0 && mounts.TryGetValue(id, out var current) && current == mount) mounts.Remove(id);
                 }
             }
-            var (result, created) = await create(value, Detach, storage).ConfigureAwait(false);
+            var (result, created) = await create(value, Detach, line).ConfigureAwait(false);
             lock (gate)
             {
                 // Close or cancellation may begin while the mount hydrates; register nothing then.
@@ -324,7 +325,8 @@ internal sealed class ConversationViews
         return new WindowBounds(from, min, max);
     }
 
-    private async Task<Mount> BuildAsync(ConversationId id, DurableContext context)
+    /// <summary>Hydrates a mount on the line, through the line's <paramref name="storage"/>.</summary>
+    private async Task<Mount> BuildAsync(IStorage storage, ConversationId id, DurableContext context)
     {
         var conversation = await storage.GetConversationAsync(id, context).ConfigureAwait(false) ??
             throw new InvalidOperationException($"Conversation {id} does not exist");
@@ -343,13 +345,13 @@ internal sealed class ConversationViews
     /// A new observer's window, read on the Session line with bounded scans (upstream <c>loadWindow</c>): the entries from <c>From</c> when
     /// at most <c>Max</c> are at or after it, otherwise the newest <c>Min</c>, and the entry before them.
     /// </summary>
-    private async Task<(ImmutableArray<EntryRecord> Entries, EntryId? Before)> LoadWindowAsync(ConversationId id, WindowBounds bounds,
-        DurableContext context)
+    private static async Task<(ImmutableArray<EntryRecord> Entries, EntryId? Before)> LoadWindowAsync(IStorage storage, ConversationId id,
+        WindowBounds bounds, DurableContext context)
     {
         if (bounds.From is { } from)
         {
-            var since = await ScanUpToAsync(new EntryQuery(id) { MinEntryId = from, Order = ScanOrder.Ascending }, bounds.Max + 1L, context)
-                .ConfigureAwait(false);
+            var since = await ScanUpToAsync(storage, new EntryQuery(id) { MinEntryId = from, Order = ScanOrder.Ascending }, bounds.Max + 1L,
+                context).ConfigureAwait(false);
             if (since.Count <= bounds.Max)
             {
                 var query = new EntryQuery(id) { MaxEntryId = new EntryId(from.Value - 1) };
@@ -357,7 +359,7 @@ internal sealed class ConversationViews
                 return ([.. since], previous.IsEmpty ? null : previous[0].Id);
             }
         }
-        var newest = await ScanUpToAsync(new EntryQuery(id), bounds.Min + 1L, context).ConfigureAwait(false);
+        var newest = await ScanUpToAsync(storage, new EntryQuery(id), bounds.Min + 1L, context).ConfigureAwait(false);
         EntryId? before = null;
         if (newest.Count > bounds.Min)
         {
@@ -370,7 +372,7 @@ internal sealed class ConversationViews
 
     /// <summary>Up to <paramref name="limit"/> entries of <paramref name="query"/>, following cursors past short pages (upstream
     /// <c>scanUpTo</c>).</summary>
-    private async Task<List<EntryRecord>> ScanUpToAsync(EntryQuery query, long limit, DurableContext context)
+    private static async Task<List<EntryRecord>> ScanUpToAsync(IStorage storage, EntryQuery query, long limit, DurableContext context)
     {
         var entries = new List<EntryRecord>();
         JsonObjectValue? cursor = null;

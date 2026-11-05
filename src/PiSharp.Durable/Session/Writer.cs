@@ -10,7 +10,9 @@
 //   synchronously publishes the part before Admit returns. The flush loop then takes what was admitted meanwhile, as #pump does.
 // - Upstream drops a part's keys before its publication runs, as nothing else runs until the publication returns. Here a job touching one of
 //   them could then read memory the publication has not adopted yet, so the part's publish callback drops them itself (its unregister
-//   argument) once memory has adopted the part, before its observers run; the writer drops them again, idempotently, after the publication.
+//   argument) once memory and the Session's own observers (the scheduler's indexes) have adopted the part, before host observers run; the
+//   writer drops them again, idempotently, after the publication. A decision region that touches its keys under the scheduler's lock, which
+//   that observer takes, so never finds a key without a writer while memory lacks the writer's changes (Harness/Scheduler.cs).
 //   The part's gate opens only after its whole publication, as upstream's.
 // - The macrotask between two parts (hop) is a Task.Yield: what the first part's outcome resumes is scheduled before the next part is
 //   published, but .NET gives no order between thread-pool work items, so nothing waits for it to run. Tests that rely on upstream's order

@@ -19,7 +19,10 @@
 // first table write; the span both forms share is Traced (upstream #traced).
 // Pi v1.5.0 sync (area run-end, 7e15f9601): every run admission starts records pi.live.run.first: an idle input's entry, the first entry a
 // boundary placed, and for a continue the failed run's runFailure.first ahead of that, so the continue's afterRun hooks see what the failed
-// run did. The citation stays on v1.2.0 until the file's other areas land (group-commit-scheduler, which drops the storage field).
+// run did. Pi v1.5.0 sync (area group-commit-scheduler, e5c6182ba): reads on the line go through the line's Storage (ReadOnLineAsync's
+// argument), which waits for an unpublished commit of the submission, so the guarded Storage field is gone; a wait's check and its
+// registration still fall in one line job, which no settling publication of the submission can enter once its read found no unpublished
+// writer.
 using PiSharp.Durable.Chord;
 using PiSharp.Durable.Internal;
 using PiSharp.Telemetry;
@@ -35,7 +38,6 @@ internal sealed class Submissions
 {
     private readonly ITelemetryContext telemetry;
     private readonly Session session;
-    private readonly IStorage storage;
     private readonly Func<double> now;
     /// <summary>Read at each admission, on the Session line.</summary>
     private readonly Func<Settings> queueModes;
@@ -44,12 +46,10 @@ internal sealed class Submissions
     private readonly Waiters<SubmissionId, SubmissionRecord> waiters = new();
     private volatile bool closed;
 
-    public Submissions(Session session, IStorage storage, Func<double> now, Func<Settings> queueModes, Action resume,
-        ITelemetryContext? telemetry = null)
+    public Submissions(Session session, Func<double> now, Func<Settings> queueModes, Action resume, ITelemetryContext? telemetry = null)
     {
         this.telemetry = telemetry ?? NoopTelemetry.Context;
         this.session = session;
-        this.storage = storage;
         this.now = now;
         this.queueModes = queueModes;
         this.resume = resume;
@@ -120,21 +120,21 @@ internal sealed class Submissions
     /// <summary>A handle for an existing submission, or null.</summary>
     public async Task<ISubmission?> GetAsync(SubmissionId id, DurableContext context)
     {
-        var record = await session.ReadOnLineAsync(() => storage.GetSubmissionAsync(id, context)).ConfigureAwait(false);
+        var record = await session.ReadOnLineAsync(line => line.GetSubmissionAsync(id, context)).ConfigureAwait(false);
         return record is null ? null : new SubmissionHandle(record.Id, this);
     }
 
     public async Task<SubmissionRecord> StatusAsync(SubmissionId id, DurableContext context) =>
-        await session.ReadOnLineAsync(() => storage.GetSubmissionAsync(id, context)).ConfigureAwait(false) ??
+        await session.ReadOnLineAsync(line => line.GetSubmissionAsync(id, context)).ConfigureAwait(false) ??
         throw new InvalidOperationException($"Submission {id} does not exist");
 
     public async Task<SubmissionRecord> WaitAsync(SubmissionId id, DurableContext context)
     {
         resume();
         // Check and register on the line so no settling publication falls between them.
-        var found = await session.ReadOnLineAsync(async () =>
+        var found = await session.ReadOnLineAsync(async line =>
         {
-            var record = await storage.GetSubmissionAsync(id, context).ConfigureAwait(false) ??
+            var record = await line.GetSubmissionAsync(id, context).ConfigureAwait(false) ??
                 throw new InvalidOperationException($"Submission {id} does not exist");
             if (IsSettled(record)) return Task.FromResult(record);
             // Close rejects registered waiters synchronously and may begin during the read.

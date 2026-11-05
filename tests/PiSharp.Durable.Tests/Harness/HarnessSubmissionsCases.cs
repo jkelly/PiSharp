@@ -9,6 +9,9 @@
 // - `defineEntry<{ n: number }>` is a JsonObjectValue-typed entry kind; `const n: number = counter.data.n` reads the number.
 // Pi v1.5.0 sync (area admission, fb524dd2e): the idle-input case narrows the record by type too, as continue submissions are placed
 // without an entry. The citation stays on v1.2.0 until the file's other areas land (publication-caches, group-commit-scheduler).
+// Pi v1.5.0 sync (area group-commit-scheduler, e5c6182ba): "rejects a wait whose submission read spans the start of close" reads the
+// submission through a reopened Harness, as only a reopened one reads it from Storage once the Session caches the submissions it writes
+// (area publication-caches); the ControlledStorage stays open for the reopen (KeepOpenForReopen).
 using System.Collections.Immutable;
 using PiSharp.Durable;
 using PiSharp.Durable.Chord;
@@ -171,11 +174,18 @@ internal static class SubmissionsTests
 
         yield return Case(prefix + "rejects-a-wait-whose-submission-read-spans-the-start-of-close", async () =>
         {
-            var storage = new HeldReads(Controlled());
+            var controlled = Controlled();
+            controlled.KeepOpenForReopen = true;
+            var storage = new HeldReads(controlled);
             var setup = Setup();
-            setup.Faux.SetResponses(Unanswered().Step);
-            var (harness, root) = await OpenChat(storage, setup);
-            var submission = await Submit(root, "hi");
+            setup.Faux.SetResponses(Unanswered().Step, Unanswered().Step);
+            var first = await OpenChat(storage, setup);
+            var id = (await Submit(first.Root, "hi")).Id;
+            await first.Harness.CloseAsync(Context);
+            // Reopen: the Session caches the submissions it writes, so only a reopened one reads it from Storage.
+            controlled.Reopen();
+            var (harness, _) = await OpenChat(storage, setup);
+            var submission = (await harness.SubmissionAsync(id, Context))!;
             storage.Hold = true;
             var waiting = submission.WaitAsync(Context);
             await storage.Entered.Task;
