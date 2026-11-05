@@ -19,6 +19,10 @@
 //   the context's values and telemetry span; DurableContext.WithCancel() already derives the same way, so the cases are unchanged.
 // - Pi v1.5.0 sync (area observers, 8b0caefc2): the ended-invocation watch listener records value.text, a watch's value being never null.
 //   8b0caefc2's "publication at adoption" block waits on area publication-caches, which ports the final publication order.
+// - Pi v1.5.0 sync (area restarts, 440a5fcdb's task close cases, b3a29f111's end state): a close writes the tasks it stopped back as
+//   pending, so five task-close cases expect that last commit: "stops without outcomes ...", "writes no fault when close seals ...",
+//   "starts no abort handler whose reservation settles ...", "rejects a runtime commit that was queued ..." and "joins a reservation
+//   that settles ...". storage.commits.at(-2) is ControlledStorage.Commits[^2].
 using System.Collections.Concurrent;
 using PiSharp.Durable;
 using PiSharp.Durable.Chord;
@@ -1161,7 +1165,12 @@ internal static partial class HarnessTests
             proceed.Resolve();
             await closing;
             Equal(TaskAbortResult.Marked, await aborting, "abort");
-            Equal(commits, controlled.CommitCount, "no commit while closing");
+            // No outcome: close writes only the stopped task back as pending, so a reopen counts no restart.
+            Equal(commits + 1, controlled.CommitCount, "only the write-back while closing");
+            var written = controlled.LastCommit;
+            Check(written.Length == 1 && written[0] is TaskWrite { Value: { AbortRequested: true, State: PendingTaskState pending } back } &&
+                back.Id == id && JsonValue.DeepEquals(pending.Checkpoint, O("""{"phase":"two"}""")),
+                $"close writes the marked task back as pending at phase two: {string.Join(", ", written)}");
             Seq(["one"], phases.Snapshot(), "phases");
             Check(!Volatile.Read(ref abortRan), "no abort handler");
             Check(record is { AbortRequested: true, State: RunningTaskState running } && JsonValue.DeepEquals(running.Checkpoint, O("""{"phase":"two"}""")),
@@ -1216,7 +1225,8 @@ internal static partial class HarnessTests
             var closing = harness.CloseAsync(Context);
             held.Release();
             await closing;
-            Seq(["pending", "running"], TaskWrites(controlled, id).Select(record => WireName(record.State.Status)), "task writes");
+            // Created, reserved, and written back as pending by close: no fault.
+            Seq(["pending", "running", "pending"], TaskWrites(controlled, id).Select(record => WireName(record.State.Status)), "task writes");
         });
 
         yield return Case(prefix + "task-close.starts-no-abort-handler-whose-reservation-settles-while-closing", async () =>
@@ -1238,9 +1248,13 @@ internal static partial class HarnessTests
             held.Release();
             await closing;
             Check(!Volatile.Read(ref ran), "no abort handler");
-            var writes = controlled.LastCommit.OfType<TaskWrite>().Select(write => write.Value).ToList();
+            // The reservation landed; close wrote the task back as pending.
+            var writes = controlled.Commits[^2].OfType<TaskWrite>().Select(write => write.Value).ToList();
             Check(writes.Count == 1 && writes[0].Id == id && writes[0].AbortRequested && writes[0].State.Status == DurableTaskStatus.Running,
-                $"last commit reserves the marked task: {string.Join(", ", writes)}");
+                $"the commit before the last reserves the marked task: {string.Join(", ", writes)}");
+            var written = controlled.LastCommit;
+            Check(written.Length == 1 && written[0] is TaskWrite { Value: { AbortRequested: true, State.Status: DurableTaskStatus.Pending } back } && back.Id == id,
+                $"close writes the marked task back as pending: {string.Join(", ", written)}");
         });
 
         yield return Case(prefix + "task-close.rejects-a-runtime-commit-that-was-queued-on-the-line-when-close-sealed-it", async () =>
@@ -1270,7 +1284,8 @@ internal static partial class HarnessTests
             Check((await queued!)?.ToString()?.Contains("Harness is closed") == true, "queued commit rejects");
             proceed.Resolve();
             await closing;
-            Equal(2, TaskWrites(controlled, id).Count, "task writes");
+            // Created, reserved, and written back as pending by close; the queued outcome never landed.
+            Seq(["pending", "running", "pending"], TaskWrites(controlled, id).Select(record => WireName(record.State.Status)), "task writes");
         });
 
         yield return Case(prefix + "task-close.starts-no-next-phase-when-close-seals-during-a-step-that-decided-to-continue", async () =>
@@ -1340,9 +1355,13 @@ internal static partial class HarnessTests
             held.Release();
             await closing;
             Check(!Volatile.Read(ref ran), "no handler");
-            var writes = controlled.LastCommit.OfType<TaskWrite>().Select(write => write.Value).ToList();
+            // The reservation landed; close wrote the task back as pending.
+            var writes = controlled.Commits[^2].OfType<TaskWrite>().Select(write => write.Value).ToList();
             Check(writes.Count == 1 && writes[0].Id == id && writes[0].State.Status == DurableTaskStatus.Running,
-                $"last commit reserves the task: {string.Join(", ", writes)}");
+                $"the commit before the last reserves the task: {string.Join(", ", writes)}");
+            var written = controlled.LastCommit;
+            Check(written.Length == 1 && written[0] is TaskWrite { Value: { State.Status: DurableTaskStatus.Pending } back } && back.Id == id,
+                $"close writes the task back as pending: {string.Join(", ", written)}");
         });
     }
 
