@@ -1,8 +1,8 @@
-// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/test/session-observers.test.ts, in part (Pi v1.5.0 sync, area
-// observers, 8b0caefc2): Session.observeDoc(), the synchronous observer of one document address that watches are built on
-// (session.observers.observe-doc.*, observe-doc-throwing-asynchronously.* and observe-doc-detached-during-a-commit.*). Its observeCommits
-// block (Session.observeCommits() with a CommitObserver) waits on area vocabulary (5f312dac4), which adds that API. Verbatim apart from the
-// adaptations in SessionSupport.cs, and these:
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/test/session-observers.test.ts (Pi v1.5.0 sync, areas observers,
+// 8b0caefc2, and vocabulary, 5f312dac4): Session.observeDoc(), the synchronous observer of one document address that watches are built on
+// (session.observers.observe-doc.*, observe-doc-throwing-asynchronously.* and observe-doc-detached-during-a-commit.*), and
+// Session.ObserveCommits() with a CommitObserver (session.observers.observe-commits.*). Verbatim apart from the adaptations in
+// SessionSupport.cs, and these:
 // - ReportingSession overrides the internal Session.Report, as upstream's overrides report().
 // - An observer is Observer<T> over two callbacks; "an observer whose call returns a rejected promise" is its task-returning form with an
 //   async callback that throws.
@@ -11,6 +11,7 @@
 // - The garbage-collection cases use WeakReference and GC.Collect for WeakRef and --expose-gc, with what they hold built in a method the JIT
 //   does not inline (SessionWatchesCases.cs).
 // - toEqual of recorded calls compares their descriptions (Describe); toBe is ReferenceEquals.
+// - commits()'s `{ seq: expect.any(Number) }` is a recorded "seq <n>"; flush() (a macrotask) is the Session line barrier, Flush.
 using System.Runtime.CompilerServices;
 using PiSharp.Durable;
 using PiSharp.Durable.Chord;
@@ -95,6 +96,7 @@ internal static class SessionObserverTests
     {
         foreach (var observeDoc in ObserveDoc(prefix + "observe-doc.")) yield return observeDoc;
         foreach (var throwing in ThrowingAsynchronously(prefix + "observe-doc-throwing-asynchronously.")) yield return throwing;
+        foreach (var commits in ObserveCommits(prefix + "observe-commits.")) yield return commits;
         foreach (var detached in DetachedDuringACommit(prefix + "observe-doc-detached-during-a-commit.")) yield return detached;
     }
 
@@ -328,6 +330,88 @@ internal static class SessionObserverTests
             Equal(1, Volatile.Read(ref calls), "calls");
             Seq([(bug, ReportInfo.ListenerError)], session.Reports.Snapshot(), "reports");
             Seq([WatchEnd.ListenerError(bug)], ends.Snapshot(), "ends");
+            await session.CloseAsync(Context);
+            Equal(1, ends.Count, "one end");
+        });
+    }
+
+    /// <summary>A commit observer recording each seq and its end (upstream <c>commits</c>).</summary>
+    private sealed class Commits
+    {
+        public Commits() => Observer = new CommitObserver((publication, _) => Calls.Add($"seq {publication.Seq.Value}"), end =>
+        {
+            Ends.Add(end);
+            Calls.Add(Describe(end));
+        });
+
+        public SyncList<string> Calls { get; } = new();
+        public SyncList<WatchEnd> Ends { get; } = new();
+        public CommitObserver Observer { get; }
+    }
+
+    private static IEnumerable<(string, Func<Task>)> ObserveCommits(string prefix)
+    {
+        yield return Case(prefix + "gets-every-stored-commit-then-failed-once-the-session-closed-s1-after-its-last-publication", async () =>
+        {
+            var (_, session) = Open();
+            var commits = new Commits();
+            session.ObserveCommits(commits.Observer);
+            await Add(session);
+            await Add(session);
+            await session.CloseAsync(Context);
+            var calls = commits.Calls.Snapshot();
+            Equal(3, calls.Count, "calls");
+            Check(calls[0].StartsWith("seq ", StringComparison.Ordinal) && calls[1].StartsWith("seq ", StringComparison.Ordinal), "two seqs");
+            Equal("end Failed session closed", calls[2], "the end");
+        });
+
+        yield return Case(prefix + "ends-failed-with-the-error-that-failed-the-session", async () =>
+        {
+            var (storage, session) = Open();
+            var commits = new Commits();
+            session.ObserveCommits(commits.Observer);
+            var failure = new InvalidOperationException("disk gone");
+            storage.FailNextCommit(failure);
+            await RejectsAsync(() => Add(session), "disk gone", "the failing commit");
+            await session.Closed;
+            Seq(["end Failed disk gone"], commits.Calls.Snapshot(), "calls");
+            Seq([WatchEnd.Failed(failure)], commits.Ends.Snapshot(), "ends");
+        });
+
+        yield return Case(prefix + "gets-nothing-after-detach-which-is-idempotent-not-even-its-end", async () =>
+        {
+            var (_, session) = Open();
+            var commits = new Commits();
+            var observation = session.ObserveCommits(commits.Observer);
+            await Add(session);
+            await Flush(session);
+            observation.Detach();
+            observation.Detach();
+            await Add(session);
+            await session.CloseAsync(Context);
+            Equal(1, commits.Calls.Count, "calls");
+        });
+
+        yield return Case(prefix + "reports-a-throwing-observer-detaches-it-and-ends-it-listener-error-the-others-go-on", async () =>
+        {
+            var (_, session) = Open();
+            var bug = new InvalidOperationException("commit observer bug");
+            var ends = new SyncList<WatchEnd>();
+            var thrown = 0;
+            session.ObserveCommits(new CommitObserver((_, _) =>
+            {
+                Interlocked.Increment(ref thrown);
+                throw bug;
+            }, ends.Add));
+            var healthy = new Commits();
+            session.ObserveCommits(healthy.Observer);
+            await Add(session);
+            await Add(session);
+            await Flush(session);
+            Equal(1, Volatile.Read(ref thrown), "thrown");
+            Seq([(bug, ReportInfo.ListenerError)], session.Reports.Snapshot(), "reports");
+            Seq([WatchEnd.ListenerError(bug)], ends.Snapshot(), "ends");
+            Equal(2, healthy.Calls.Count, "the healthy observer");
             await session.CloseAsync(Context);
             Equal(1, ends.Count, "one end");
         });
