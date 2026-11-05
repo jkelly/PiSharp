@@ -16,11 +16,11 @@ PiSharp ports ten upstream benchmarks of Pi v1.2.0 (`06a466935536f8c9bcacb2d5efc
 | `test/nested-tools-bench.ts` (new in v1.2.0) | `NestedToolsBench.cs` (`nested-tools [streaming\|nesting]`) | commits, bytes written by write type, stored size and heap of 200 to 2,000 streaming or fast nested calls, at depth 1 and 2 |
 | `test/nested-images-bench.ts` (new in v1.2.0) | `NestedImagesBench.cs` (`nested-images [count]`) | 1 MiB images passed between nested calls inline or by a `NestedCallDoc` reference |
 | `test/codemode-bench.ts` (`npm run bench:codemode`, new in v1.2.0) | `CodemodeBench.cs` (`codemode [N,...]`) | durable code mode's overhead: N calls of a trivial tool, sequential or parallel, from a code mode script (journaled) and from a plain tool's nested calls, on SQLite |
-| none: PiSharp-authored, Node twin `benchmarks/PiSharp.Durable.Benchmarks/node/scheduler-scale-bench.ts` | `SchedulerScaleBench.cs` (`scheduler-scale [fanout N,...] [chain N,...]`) | the scheduler's fan-out (one tool creating N child tasks at once) and owned chains of N tasks settling bottom-up |
+| none: PiSharp-authored, Node twin `benchmarks/PiSharp.Durable.Benchmarks/node/scheduler-scale-bench.ts` (fan-out and chain only) | `SchedulerScaleBench.cs` (`scheduler-scale [fanout N,...] [chain N,...] [conversations N,...]`) | the scheduler's fan-out (one tool creating N child tasks at once), owned chains of N tasks settling bottom-up, and one-tool runs while the scheduler keeps N idle conversations' context ranges |
 | none: PiSharp-authored, for Pi v1.5.0's partial commits (upstream bounds the same path in a test) | `PartialCommitsBench.cs` (`partial-commits [N,...]`) | the partial commits of one long streamed answer, a text and then a tool call of about N characters each: commits, bytes allocated and time per phase |
 | none: PiSharp-authored, for Pi v1.5.0's group commit (upstream measured it with an uncommitted probe, `docs/group-commit.md` section 9) | `StorageBench.cs` (`storage-throughput [latency ms,...] [conversations N,...]`) | commits per second of one Session and runs per second of one Harness with N conversations working at once, over memory storage behind a fixed round trip and over SQLite, with the storage calls, the commits each call carried and the Storage reads per commit or run |
 
-Run them with `dotnet run -c Release --project benchmarks/PiSharp.Durable.Benchmarks -- [storage] [storage-memory] [tool-output] [document-append [N,...]] [document-cache [N,...]] [scheduler-memory [N,...]] [scheduler-scale [fanout N,...] [chain N,...]] [scheduler-fanout [N,...]] [nested-tools [streaming|nesting]] [nested-images [count]] [codemode [N,...]] [partial-commits [N,...]] [conversation-view [sqlite|store|both]] [storage-throughput [latency ms,...] [conversations N,...]]`. There is no benchmark library and no new dependency. The timing loops mirror upstream's.
+Run them with `dotnet run -c Release --project benchmarks/PiSharp.Durable.Benchmarks -- [storage] [storage-memory] [tool-output] [document-append [N,...]] [document-cache [N,...]] [scheduler-memory [N,...]] [scheduler-scale [fanout N,...] [chain N,...] [conversations N,...]] [scheduler-fanout [N,...]] [nested-tools [streaming|nesting]] [nested-images [count]] [codemode [N,...]] [partial-commits [N,...]] [conversation-view [sqlite|store|both]] [storage-throughput [latency ms,...] [conversations N,...]]`. There is no benchmark library and no new dependency. The timing loops mirror upstream's.
 
 ## Machine
 
@@ -268,6 +268,33 @@ Pi v1.2.0 rewrote the scheduler (work list area c): no pass visits every live ta
 - **Owned chains settle in linear time.** Before, a 500-task chain took 2.4 s and a 2,000-task chain almost 18 minutes; now 31 ms and 76 ms, and 20,000 tasks 0.8 s, close to Node (upstream's changelog: 500 tasks took 12 s before, 50 ms after, 20,000 take 1.5 s).
 - **Fan-out is linear in both runtimes, and PiSharp matches Node from 500 children up.** The first PiSharp row includes JIT warm-up. Before the rewrite it was about four to seven times slower, as each pass scanned every live child.
 - Upstream's own fan-out benchmark (nested calls, area a) reports 8,000 nested calls in 2.7 s instead of 18.8 s; see the next section.
+
+**Pi v1.5.0 sync, area scheduler-idle** (2026-11-05; Pi 35dfa7573, durable 1.5.0 Changed#8). This area measures PiSharp only. The Node twin does not run the new `conversations` scenario, and upstream v1.5.0 was not run. The runs use memory storage and alternate between two builds, three times each; the table shows the medians. "Before" is the branch's base `0f4a25c2` built with the same `SchedulerScaleBench.cs`, and "after" is the area's head. Other work was running on the machine.
+
+`conversations` keeps N idle conversations' context ranges in the scheduler: N ownerless conversations with one entry each, all read by one task. It then times 128 one-tool runs (a tool call, then a text), round robin over the conversations. Every run makes 12 commits in both builds.
+
+| scenario | N | before | after | commits |
+|---|---:|---:|---:|---:|
+| conversations | 1 | 2.15 ms per run (465 runs/s) | 2.71 ms per run (370 runs/s) | 1,536 |
+| conversations | 256 | 2.34 ms (427 runs/s) | 2.04 ms (491 runs/s) | 1,536 |
+| conversations | 1,024 | 3.36 ms (298 runs/s) | 1.85 ms (541 runs/s) | 1,536 |
+| conversations | 2,048 | 4.64 ms (216 runs/s) | 1.81 ms (552 runs/s) | 1,536 |
+| conversations | 4,096 | 7.60 ms (132 runs/s) | 1.88 ms (531 runs/s) | 1,536 |
+| fan-out | 250 | 241 ms | 223 ms | 514 |
+| fan-out | 500 | 77 ms | 41 ms | 1,014 |
+| fan-out | 1,000 | 237 ms | 70 ms | 2,014 |
+| fan-out | 2,000 | 434 ms | 166 ms | 4,014 |
+| fan-out | 4,000 | 923 ms | 404 ms | 8,014 |
+| chain | 500 | 38 ms | 66 ms | 504 |
+| chain | 2,000 | 237 ms | 265 ms | 2,004 |
+| chain | 20,000 | 3,408 ms | 2,050 ms | 20,004 |
+
+- **The time per run no longer grows with the kept conversations.** Before the change, every commit that changed a task walked every kept context. A run took 2.2 ms with 1 kept conversation and 7.6 ms with 4,096. After it, a commit settles only the conversations above its changed tasks, and a run takes 1.8 to 2.0 ms from 256 conversations up.
+- **The 1-conversation row is noise.** Both builds take 2 to 3 ms per run there. In a separate run of seven rows with 1 to 64 conversations, both builds took 2.6 to 3.4 ms per run.
+- **No comparison with upstream is made.** Upstream's commit message reports one Session doing one-tool runs: 2,048 conversations went from 100 to 805 runs/s, and 4,096 from 46 to 772. That workload is not in the upstream repository. This scenario is PiSharp's own, so the two sets of numbers cannot be compared.
+- **Fan-out is about twice as fast.** While invocations run, `Wake()` no longer scans the live tasks.
+- **Chains: PiSharp's walk differs from upstream's.** Upstream's `#addScopesAbove` stops only at a conversation, so a commit that creates or finalizes a chain walks every task's owners, which is quadratic in the depth. This comes from reading the code, not from running upstream. Ported as written, the 20,000-deep chain took 7.9 to 8.4 s here, and `harness.ownership.tracks-ownership-chains-deeper-than-the-call-stack` took 17 s instead of 2 s. PiSharp also stops a walk at a task that an earlier walk of the same publication passed. The scopes are the same (see the `Scheduler.cs` header), and the chain takes 2.1 s.
+- **The 500-deep chain row is noisy.** It runs right after the 4,000-task fan-out. In a run with only a 250-task fan-out before it, four 500-deep chains took 31 to 53 ms after the change and 58 to 100 ms before it, and two 2,000-deep chains took about 200 ms after and 318 to 445 ms before.
 
 ## Nested tool calls (`scheduler-fanout-bench.ts`, `nested-tools-bench.ts`, `nested-images-bench.ts`)
 

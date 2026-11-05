@@ -154,6 +154,10 @@
 //   a throwing settings getter is reported on every read. A missing phase or abort handler faults with PiSharp's own text, not V8's
 //   TypeError. Seal counts the closing -1 active deltas once; the active counter is used only with host telemetry; ownedTasks returns the
 //   immutable records without copies; LimitsRestarts may be null (none).
+// - AddScopesAboveLocked also stops at a task an earlier walk of the same publication passed, not only at a conversation already
+//   collected, with the same scopes: upstream's walks are quadratic in the depth of a chain that one publication creates or ends. With
+//   upstream's walk, harness.ownership.tracks-ownership-chains-deeper-than-the-call-stack (20,000 tasks) took 17 s here instead of 2 s,
+//   and scheduler-scale's 20,000-deep chain 7.9 to 8.4 s instead of 2.1 s (docs/durable-benchmarks.md).
 using System.Collections;
 using System.Collections.Immutable;
 using PiSharp.Durable.Chord;
@@ -969,6 +973,8 @@ internal sealed class DurableTaskScheduler
             var failed = new List<TaskId>();
             // The conversations whose idleness the commit's task changes can change; null when a chain is not known.
             HashSet<ConversationId>? scopes = [];
+            // The tasks those walks passed, so one publication walks each node once (see AddScopesAboveLocked).
+            HashSet<TaskId> walked = [];
             // Edges first, so the tasks a commit creates in a new conversation hang from it.
             foreach (var change in publication.Changes)
                 if (change is ConversationWrite created && !edges.ContainsKey(created.Value.Id)) SetEdgeLocked(created.Value.Id, created.Value.Owner?.TaskId);
@@ -983,7 +989,7 @@ internal sealed class DurableTaskScheduler
                 // Idleness counts live tasks, so only a task that became live or ended can change it. Collected before SweepLocked, which
                 // may forget the chain of a task that ended.
                 var liveness = previous is null || record.State.Status == DurableTaskStatus.Terminal;
-                if (liveness && scopes is not null && !AddScopesAboveLocked(record, scopes)) scopes = null;
+                if (liveness && scopes is not null && !AddScopesAboveLocked(record, scopes, walked)) scopes = null;
                 if (record.State.Status == DurableTaskStatus.Terminal)
                 {
                     failedMigrations.Remove(record.Id);
@@ -1070,14 +1076,21 @@ internal sealed class DurableTaskScheduler
     /// <summary>
     /// Adds the conversations above <paramref name="record"/> to <paramref name="scopes"/>: those whose idleness a change of it can change
     /// (upstream <c>#addScopesAbove</c>). False when a node on the way up is not known. A conversation already in <paramref name="scopes"/>
-    /// has everything above it there too.
+    /// has everything above it there too, and so does a task in <paramref name="walked"/>, which an earlier walk of the same publication
+    /// passed (a deliberate difference: upstream stops at a conversation only, so the walks of one publication that creates or ends a
+    /// chain of N tasks in one conversation take N²/2 steps; here N). Owners and conversation edges never change, and a walk that met
+    /// an unknown node ended the collection, so the scopes are upstream's.
     /// </summary>
-    private bool AddScopesAboveLocked(TaskRecord record, HashSet<ConversationId> scopes)
+    private bool AddScopesAboveLocked(TaskRecord record, HashSet<ConversationId> scopes, HashSet<TaskId> walked)
     {
         foreach (var step in AboveLocked(ParentOf(record), null))
         {
             if (step.Kind == StepKind.Unknown) return false;
-            if (step.Kind != StepKind.Conversation) continue;
+            if (step.Kind == StepKind.Task)
+            {
+                if (!walked.Add(step.Task)) return true;
+                continue;
+            }
             if (!scopes.Add(step.Conversation)) return true;
         }
         return true;
