@@ -11,7 +11,12 @@
 //   partials are deferred (durable@1.5.0 Breaking Changes#10, "visible progress" is now durable within settings.progress.persistWithinMs),
 //   so chat.stream kills while a partial is only in memory (the child's window never ends) and leaves no aborted entry, as upstream's
 //   harness-deferred-progress.test.ts "leaves no aborted entry for a stream that crashed before its first store" does; chat.stream-stored
-//   kills right after a stored partial (a short window) and converts it into exactly one aborted entry.
+//   kills right after a stored partial (a short window) and converts it into exactly one aborted entry. Pi v1.5.0 sync (area restarts,
+//   b3a29f111, durable.interrupted-request): a request in flight at the kill is no longer resent but charged as a failed attempt under
+//   settings.retry, so request, stream, stream-stored, answer-before and answer-failed (and the followup request points) see the backoff's
+//   "The host stopped while the model was answering, on attempt 1" in pi.live.generation.retry and answer on the next attempt; the reopened
+//   host retries after 1 ms. chat.request-interrupted reopens with retries disabled: the run ends with runFailure reason interrupted, its
+//   input unanswered, reported task_interrupted. chat.request-limit reopens with settings.restartLimit 1: the run ends restart_limit.
 // - tool-unsafe / tool-safe: §5.2 effect sandwich; §8.4 tool recovery: before intent the call phase reruns, after intent a non-replay-safe
 //   call is never rerun and settles with the interrupted result, a replay-safe call reruns exactly once; §8.5 the tools phase reruns
 //   before its commit and resumes after a result commit. The run continues to a final answer.
@@ -49,8 +54,13 @@ internal static class CrashTests
     private static readonly TimeSpan ExitTimeout = TimeSpan.FromSeconds(30);
     private static readonly TimeSpan RecoveryTimeout = TimeSpan.FromSeconds(60);
 
-    /// <summary>One crash point: where the child is killed and what holds after reopen.</summary>
-    internal sealed record Point(string Scenario, string Checkpoint, Func<Recovery, Task> Verify);
+    /// <summary>One crash point: where the child is killed and what holds after reopen. <paramref name="Child"/>, when given, is the child's
+    /// checkpoint, where it is not <paramref name="Checkpoint"/>; <paramref name="Reopen"/> changes the reopened host's settings.</summary>
+    internal sealed record Point(string Scenario, string Checkpoint, Func<Recovery, Task> Verify, string? Child = null, Action<ChatSetup>? Reopen = null)
+    {
+        /// <summary>Where the child stops.</summary>
+        public string ChildCheckpoint => Child ?? Checkpoint;
+    }
 
     /// <summary>The reopened Harness of a case and what the case reads from it.</summary>
     internal sealed class Recovery(string backend, string path, ChatSetup setup, ChatTests.OpenedChat opened)
@@ -73,15 +83,21 @@ internal static class CrashTests
     internal static readonly Point[] Points =
     [
         // Generation phases of a chat turn: prepare, request, a streaming partial, retry, and either side of the answer commit.
+        // A request in flight at the kill is a charged attempt (Pi v1.5.0): the reopened host retries it.
         new("chat", "prepare", r => ChatTurn(r, fauxCalls: 1)),
-        new("chat", "request", r => ChatTurn(r, fauxCalls: 1)),
-        new("chat", "stream", r => ChatTurn(r, fauxCalls: 1, aborted: 0)),
-        new("chat", "stream-stored", r => ChatTurn(r, fauxCalls: 1, aborted: 1)),
+        new("chat", "request", r => ChatTurn(r, fauxCalls: 1, charged: true)),
+        new("chat", "stream", r => ChatTurn(r, fauxCalls: 1, aborted: 0, charged: true)),
+        new("chat", "stream-stored", r => ChatTurn(r, fauxCalls: 1, aborted: 1, charged: true)),
         new("chat", "retry", r => ChatTurn(r, fauxCalls: 1, errors: 1)),
-        new("chat", "answer-before", r => ChatTurn(r, fauxCalls: 1)),
+        new("chat", "answer-before", r => ChatTurn(r, fauxCalls: 1, charged: true)),
         new("chat", "answer-after", r => ChatTurn(r, fauxCalls: 0)),
         // The answer commit fails in Storage: the Session fails, and reopening answers as after a kill before it.
-        new("chat", "answer-failed", r => ChatTurn(r, fauxCalls: 1)),
+        new("chat", "answer-failed", r => ChatTurn(r, fauxCalls: 1, charged: true)),
+        // The charged request with no retry left ends the run interrupted; cut off restartLimit times, it ends it restart_limit.
+        new("chat", "request-interrupted", r => EndedRun(r, "interrupted", "The host stopped while the model was answering, on attempt 1", ReportReason.Interrupted),
+            Child: "request", Reopen: setup => setup.Retry = new RetrySettings { Enabled = false }),
+        new("chat", "request-limit", r => EndedRun(r, "restart_limit", "The generation was interrupted once in its request phase", ReportReason.RestartLimit),
+            Child: "request", Reopen: setup => setup.RestartLimit = 1),
         // A non-replay-safe tool: before intent, after the intent commit, mid-execute, after the result commit, in the tools phase.
         new("tool-unsafe", "before-tool", r => ToolTurn(r, runs: 1, interrupted: false, fauxCalls: 1)),
         new("tool-unsafe", "intent-after", r => ToolTurn(r, runs: 0, interrupted: true, fauxCalls: 1)),
@@ -95,10 +111,10 @@ internal static class CrashTests
         new("tool-safe", "intent-after", r => ToolTurn(r, runs: 1, interrupted: false, fauxCalls: 1)),
         new("tool-safe", "execute", r => ToolTurn(r, runs: 2, interrupted: false, fauxCalls: 1)),
         // A follow-up queued while the first input runs.
-        new("followup", "first-request", r => TwoTurns(r, fauxCalls: 2)),
+        new("followup", "first-request", r => TwoTurns(r, fauxCalls: 2, charged: true)),
         new("followup", "first-answer-after", r => TwoTurns(r, fauxCalls: 1)),
-        new("followup", "second-request", r => TwoTurns(r, fauxCalls: 1)),
-        new("followup", "first-answer-failed", r => TwoTurns(r, fauxCalls: 2)),
+        new("followup", "second-request", r => TwoTurns(r, fauxCalls: 1, charged: true)),
+        new("followup", "first-answer-failed", r => TwoTurns(r, fauxCalls: 2, charged: true)),
         // Submission retries with the same request id.
         new("submit", "admit-before", r => Resubmit(r, admitted: false)),
         new("submit", "admit-after", r => Resubmit(r, admitted: true)),
@@ -124,9 +140,10 @@ internal static class CrashTests
         await RunChildAsync(backend, path, point);
         Observe(backend, path, point, "after kill");
 
-        var setup = BuildSetup(point.Scenario, point.Checkpoint, CrashGate.Parent, directory);
+        var setup = BuildSetup(point.Scenario, point.ChildCheckpoint, CrashGate.Parent, directory);
         // The retry backoff of the killed child is 60 s; the reopened host's clock is past it.
         if (point.Checkpoint == "retry") setup.Now = () => DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() + 120_000;
+        point.Reopen?.Invoke(setup);
         var opened = await OpenChat(await OpenStorage(backend, path), setup, EnvFor(point.Scenario, directory));
         try
         {
@@ -158,9 +175,9 @@ internal static class CrashTests
     /// <summary>Launches the child, waits for its sentinel, kills its process tree and waits until it exited.</summary>
     private static async Task RunChildAsync(string backend, string path, Point point)
     {
-        var start = ChildStart(["--crash-child", point.Scenario, backend, path, point.Checkpoint]);
+        var start = ChildStart(["--crash-child", point.Scenario, backend, path, point.ChildCheckpoint]);
         using var process = new Process { StartInfo = start, EnableRaisingEvents = true };
-        var sentinel = "CHECKPOINT " + point.Checkpoint;
+        var sentinel = "CHECKPOINT " + point.ChildCheckpoint;
         var outcome = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
         var output = new StringBuilder();
         var errors = new StringBuilder();
@@ -324,8 +341,33 @@ internal static class CrashTests
         }
     }
 
-    private static async Task ChatTurn(Recovery recovery, int fauxCalls, int errors = 0, int aborted = 0)
+    /// <summary>The backoff error of a request a crash interrupted, on its first attempt (Pi v1.5.0, durable.interrupted-request).</summary>
+    private const string ChargedAttempt = "The host stopped while the model was answering, on attempt 1";
+
+    /// <summary>Every <c>pi.live.generation.retry.error</c> memory adopts from now on.</summary>
+    private static SyncList<string> RetryErrors(Recovery recovery)
     {
+        var errors = new SyncList<string>();
+        ObserveCommits(recovery.Harness, (publication, _) =>
+        {
+            foreach (var change in DocumentChanges(publication))
+                if (change.Record.Kind == "pi.live" && Field(change.Value, "generation", "retry", "error") is JsonStringValue error) errors.Add(error.Value);
+        });
+        return errors;
+    }
+
+    /// <summary>A request in flight at the kill was charged, its retry backoff shown with why, or (<paramref name="charged"/> false) no
+    /// attempt was charged.</summary>
+    private static void Charged(SyncList<string> errors, bool charged)
+    {
+        var seen = errors.Snapshot();
+        if (charged) Check(seen.Contains(ChargedAttempt), $"charged attempt: retry errors [{string.Join(" | ", seen)}]");
+        else Check(!seen.Contains(ChargedAttempt), $"no charged attempt: retry errors [{string.Join(" | ", seen)}]");
+    }
+
+    private static async Task ChatTurn(Recovery recovery, int fauxCalls, int errors = 0, int aborted = 0, bool charged = false)
+    {
+        var retryErrors = RetryErrors(recovery);
         await recovery.Idle();
         await Answered(recovery, "go");
         var (_, answers, all) = await Transcript(recovery);
@@ -334,6 +376,36 @@ internal static class CrashTests
         // A partial stored before the kill is converted into one aborted entry; one only in memory leaves none.
         Equal(aborted, all.Count(entry => entry.Kind == "pi.assistant" && StopReason(entry) == "aborted"), "converted partials");
         Equal(fauxCalls, recovery.FauxCalls, "requests after reopen");
+        Charged(retryErrors, charged);
+    }
+
+    /// <summary>A charged request ended the run (Pi v1.5.0): the input is unanswered with <paramref name="reason"/> and
+    /// <paramref name="detail"/>, pi.live keeps the runFailure, nothing was sent again, and the end was reported task_interrupted.</summary>
+    private static async Task EndedRun(Recovery recovery, string reason, string detail, ReportReason reported)
+    {
+        recovery.Harness.Resume();
+        await recovery.Idle();
+        var (users, answers, all) = await Transcript(recovery);
+        Equal(1, users.Count, "user entries");
+        Equal(0, answers.Count, "answers");
+        Equal(0, all.Count(entry => entry.Kind == "pi.assistant"), "assistant entries");
+        var submission = (await Submissions(recovery)).Single();
+        MatchJson($$$$"""{"status":"unanswered","reason":"{{{{reason}}}}","detail":"{{{{detail}}}}"}""", submission.ToJson(), "submission");
+        MatchJson($$$$"""{"runFailure":{"inputs":[{{{{submission.Id}}}}],"reason":"{{{{reason}}}}","detail":"{{{{detail}}}}"}}""",
+            await LiveOf(recovery.Harness, recovery.Root), "live");
+        Equal(0, recovery.FauxCalls, "requests after reopen");
+        var generation = (await Tasks(recovery)).Single(task => task.Kind == "pi.generation");
+        MatchJson($$$$"""{"status":"failed","error":{"message":"{{{{detail}}}}","detail":{"reason":"{{{{reason}}}}"}}}""", OutcomeJson(generation), "generation outcome");
+        await HarnessTests.Eventually(() => recovery.Setup.Infos.Count > 0);
+        Seq([new ReportInfo(ReportKind.TaskInterrupted)
+        {
+            Task = new ReportTask(generation.Id, "pi.generation", recovery.Root.Id),
+            Reason = reported,
+            Restarts = 1,
+        }], recovery.Setup.Infos.Snapshot(), "reports");
+        // The expected report checked, the case's check that nothing else was reported stays.
+        recovery.Setup.Reports.Clear();
+        recovery.Setup.Infos.Clear();
     }
 
     private static async Task ToolTurn(Recovery recovery, int runs, bool interrupted, int fauxCalls)
@@ -354,13 +426,15 @@ internal static class CrashTests
         MatchJson(interrupted ? """{"status":"failed"}""" : """{"status":"completed"}""", OutcomeJson(tool), "tool outcome");
     }
 
-    private static async Task TwoTurns(Recovery recovery, int fauxCalls)
+    private static async Task TwoTurns(Recovery recovery, int fauxCalls, bool charged = false)
     {
+        var retryErrors = RetryErrors(recovery);
         await recovery.Idle();
         await Answered(recovery, "one", "two");
         var (_, answers, _) = await Transcript(recovery);
         Seq(["answer: one", "answer: two"], answers.Select(Text), "answers");
         Equal(fauxCalls, recovery.FauxCalls, "requests after reopen");
+        Charged(retryErrors, charged);
     }
 
     private static async Task Resubmit(Recovery recovery, bool admitted)

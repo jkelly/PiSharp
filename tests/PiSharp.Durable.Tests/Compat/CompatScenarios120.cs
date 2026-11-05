@@ -494,7 +494,10 @@ internal static class CompatScenarios120
             return Obj(("rejected", rejected));
         }, async open =>
         {
+            // Pi v1.5.0 (area restarts): the request the capture left in flight is a charged attempt, and the next one waits for the backoff.
+            // On the scenarios' frozen clock a backoff never ends (the retry phase sleeps again until its time, f75b3240a), so it is none.
             var setup = Chat();
+            setup.Retry = new RetrySettings { BaseDelayMs = 0 };
             setup.Faux.SetResponses(Answer("first again"), Answer("for s"), Answer("for f"), Answer("spare"));
             var (harness, _) = await Open(setup, await open());
             harness.Resume();
