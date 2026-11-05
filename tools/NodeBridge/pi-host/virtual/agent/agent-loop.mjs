@@ -2,7 +2,9 @@
 // Ported to plain ESM for the PiSharp Node extension bridge (TypeScript types stripped mechanically; behaviour unchanged except for the marked PiSharp adaptations).
 import { EventStream, getCurrentTools, getToolStateChanges, mergeClientIdentity, normalizeContext, PI_ATTRIBUTION, toToolDeclaration, validateToolArguments } from "../pi-ai.mjs";
 import { getDefaultStreamFn } from "./stream-fn.mjs";
-export const DEFAULT_AGENT_IDENTITY = {};
+export const DEFAULT_AGENT_IDENTITY = {
+    attribution: null
+};
 export function agentLoop(prompts, context, config, signal, streamFn) {
     const stream = createAgentStream();
     void runAgentLoop(prompts, context, config, async (event)=>{
@@ -697,5 +699,5 @@ async function emitToolResultMessage(toolResultMessage, emit) {
     });
 }
 
-// PiSharp adaptation: DEFAULT_AGENT_IDENTITY sends no attribution (upstream: { attribution: PI_ATTRIBUTION }). PiSharp must
-// not report as Pi, and the owner has not chosen an attribution (core.client-identity-attribution).
+// PiSharp adaptation: DEFAULT_AGENT_IDENTITY is { attribution: null }, so agent requests carry no attribution (upstream:
+// { attribution: PI_ATTRIBUTION }). PiSharp must not report as Pi; owner decision 2026-11-05 (core.agent-identity).

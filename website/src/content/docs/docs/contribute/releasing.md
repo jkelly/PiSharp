@@ -129,7 +129,7 @@ After the publish job succeeds, the release job creates the GitHub release for t
 
 It writes provenance files to `artifacts/release-inputs/`, recording the commit, version, Pi baseline and SDK. Then it packs:
 
-- The 22 libraries, with `tools/release/PiSharp.NativeSdk.targets`. The targets file sets the package id, version, description, license, readme and notices, embeds the provenance, and fails without a version, a commit, the provenance file or `net10.0`. Each package is checked by `Assert-PiSharpNativeSdkPackage`: its members, its dependencies (PiSharp siblings at the release version, third-party packages at their pinned versions) and its assembly.
+- The 22 libraries, with `tools/release/PiSharp.NativeSdk.targets`. The targets file sets the package id, version, description, license, readme and notices, embeds the provenance, and fails without a version, a commit, the provenance file or `net10.0`. Each package is checked by `Assert-PiSharpNativeSdkPackage`: its members, its dependencies (PiSharp siblings at exactly the release version, `[<version>]`, so a consumer can't mix packages from different releases, as Pi pins its own packages from 1.3.0; third-party packages at their pinned versions) and its assembly. The targets file is what makes `dotnet pack` write `[<version>]` for project references; NuGet would otherwise write the release version as a minimum.
 - The CLI, as the `PiSharp.Cli` tool with the command `pisharp`, with `tools/packaging/PiSharp.Distribution.targets`, checked by `tools/packaging/validate-distribution.ps1`.
 
 The reports go to `artifacts/validation/`. The script fails unless it ends with exactly 23 packages.

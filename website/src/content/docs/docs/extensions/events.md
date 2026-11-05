@@ -85,7 +85,7 @@ TypeScript extensions also get their `ctx` object; C# handlers get a [callback c
 | Event | Fires | Payload | C# registration | Handler can |
 | --- | --- | --- | --- | --- |
 | `before_provider_request` | Before each provider HTTP request with a JSON body. | `payload`: the request body | Event handler | Return a replacement body. Each handler gets the previous handler's body. |
-| `before_provider_headers` | Before each provider HTTP request. | `headers` | Event handler | Return the edited headers object. A header set to `null`, or left out, is removed. |
+| `before_provider_headers` | Before each provider HTTP request. | `headers` | Event handler | Return the edited headers object. A header set to `null`, or left out, is removed. As in Pi 1.5.0, `headers` leaves out the user agent and attribution headers (`User-Agent`, `HTTP-Referer`, `X-OpenRouter-*`, `X-BILLING-INVOKE-ORIGIN`, `x-opencode-client`); returning one sets it, and `null` removes it. |
 | `after_provider_response` | When the response headers arrive. | `status`, `headers` (names in lower case) | Observer | Nothing |
 | `provider_stream_event` | For each server-sent event frame, or Bedrock event-stream message, of a streaming response. | `data`, `provider`, `api`, `model` | Observer | Nothing |
 | `cache_warming_decision` | Before each prompt-cache warming refresh, with Pi's decision filled in. | `warmCost`, `missCost`, `continuationProbability`, `action` | Event handler | Return `{ "action": "warm" \| "stop" }`. The last answer wins. |

@@ -13,19 +13,24 @@ namespace PiSharp.Cli.Extensions.Pi;
 /// installed package's lockfile integrity is checked against the npm registry's <c>dist.integrity</c>, and the result is recorded in
 /// <c>provenance.json</c>. The Node host then loads extensions with Pi's own jiti and aliases, as upstream's loader does. Offline
 /// (<c>PI_OFFLINE</c>) or without npm, PiSharp's built-in compatibility modules are the fallback, and the run says so.
+/// Pi 1.5.0 sync (bridge.undici-gondolin-advisories, owner decision 2026-11-05): the runtime stays on Pi 1.2.0's packages, since
+/// Pi 1.5.0's pi-agent-core attributes agent requests to Pi by default, and undici is overridden to <see cref="UndiciVersion"/>, the
+/// version Pi 1.5.0 moved to for its security advisories (Pi 1.2.0's pi-coding-agent pins 8.10.2).
 /// </summary>
 internal static class PiNodeRuntime
 {
     internal const string PiVersion = "1.2.0";
     internal const string ProvenanceFile = "provenance.json";
+    /// <summary>Pi 1.5.0's packages/coding-agent/package.json undici, applied to the 1.2.0 runtime as an npm override.</summary>
+    internal const string UndiciVersion = "8.12.3";
 
     /// <summary>The pinned set: the packages upstream's getAliases resolves for extensions, their loader (jiti) and, through overrides,
-    /// every @earendil-works package of the 1.2.0 release at exactly 1.2.0 (Pi 1.2.0 no longer depends on
-    /// @earendil-works/chord).</summary>
+    /// every @earendil-works package of the 1.2.0 release at exactly 1.2.0 (Pi 1.2.0 no longer depends on @earendil-works/chord) and
+    /// undici at exactly <see cref="UndiciVersion"/>.</summary>
     internal static JsonObject PackageJson() => new()
     {
         ["name"] = "pisharp-pi-runtime", ["private"] = true,
-        ["description"] = "Pi " + PiVersion + " packages for PiSharp extensions (installed by PiSharp; do not edit)",
+        ["description"] = "Pi " + PiVersion + " packages for PiSharp extensions, with undici " + UndiciVersion + " (installed by PiSharp; do not edit)",
         ["dependencies"] = new JsonObject
         {
             ["@earendil-works/pi-coding-agent"] = PiVersion, ["@earendil-works/pi-ai"] = PiVersion, ["@earendil-works/pi-tui"] = PiVersion,
@@ -34,7 +39,8 @@ internal static class PiNodeRuntime
         ["overrides"] = new JsonObject
         {
             ["@earendil-works/pi-ai"] = PiVersion, ["@earendil-works/pi-tui"] = PiVersion, ["@earendil-works/pi-agent-core"] = PiVersion,
-            ["@earendil-works/pi-mcp"] = PiVersion, ["@earendil-works/pi-codemode"] = PiVersion, ["@earendil-works/pi-telemetry"] = PiVersion
+            ["@earendil-works/pi-mcp"] = PiVersion, ["@earendil-works/pi-codemode"] = PiVersion, ["@earendil-works/pi-telemetry"] = PiVersion,
+            ["undici"] = UndiciVersion
         }
     };
 
@@ -66,6 +72,10 @@ internal static class PiNodeRuntime
             await output.WriteLineAsync($"Installing Pi {PiVersion} packages for extensions into {directory} (npm)...").ConfigureAwait(false);
             await processes.RunAsync(npm, ["install", "--no-audit", "--no-fund", "--loglevel=error"], staging, token).ConfigureAwait(false);
             var provenance = await VerifyAsync(staging, createHttp ?? (() => new HttpClient()), token).ConfigureAwait(false);
+            // The override must have applied: every undici the lockfile resolves is the pinned version.
+            var undici = provenance["packages"]!.AsArray().Where(item => item!["name"]!.GetValue<string>() == "undici").Select(item => item!["version"]!.GetValue<string>()).ToList();
+            if (undici.Count == 0 || undici.Any(version => version != UndiciVersion))
+                throw new InvalidDataException($"undici resolved to {(undici.Count == 0 ? "nothing" : string.Join(", ", undici))}, not the pinned {UndiciVersion}");
             provenance["directory"] = directory;
             provenance["node"] = Capture(processes, OperatingSystem.IsWindows() ? "node.exe" : "node");
             provenance["npm"] = Capture(processes, npm);
@@ -97,14 +107,17 @@ internal static class PiNodeRuntime
         catch (Exception error) when (error is PiSharp.Cli.Packages.PiPackageException or System.ComponentModel.Win32Exception or InvalidOperationException) { return null; }
     }
 
-    /// <summary>Installed: a provenance record of this version whose packages verified, and the coding agent present.</summary>
+    /// <summary>Installed: a provenance record of this version whose packages verified, installed from this <see cref="PackageJson"/>,
+    /// and the coding agent present. A runtime installed from another manifest, such as an earlier PiSharp's without the undici
+    /// override, is not, so the next extension use installs it again.</summary>
     internal static bool IsInstalled(string directory)
     {
         try
         {
-            var provenance = Path.Combine(directory, ProvenanceFile);
+            var provenance = Path.Combine(directory, ProvenanceFile); var manifest = Path.Combine(directory, "package.json");
             if (!File.Exists(provenance) || JsonNode.Parse(File.ReadAllText(provenance)) is not JsonObject record) return false;
             return record["pi"]?.GetValue<string>() == PiVersion && record["verified"]?.GetValue<bool>() == true &&
+                File.Exists(manifest) && JsonNode.DeepEquals(JsonNode.Parse(File.ReadAllText(manifest)), PackageJson()) &&
                 File.Exists(Path.Combine(directory, "node_modules", "@earendil-works", "pi-coding-agent", "package.json"));
         }
         catch (Exception error) when (error is IOException or JsonException or InvalidOperationException or UnauthorizedAccessException) { return false; }

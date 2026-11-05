@@ -41,7 +41,7 @@ PiSharp opens Pi's current (v3) session files directly. For v1 and v2 files, or 
 - **Tool policy.** A PiSharp option, `--tool-policy explicit`, limits the built-in tools to paths and commands you grant. The default, `pi`, behaves as Pi does. See [Tool policy](/docs/reference/configuration/#tool-policy).
 - **No telemetry.** PiSharp doesn't report installs to Pi's servers. `PI_TELEMETRY` is ignored.
 - **`/bug` opens a GitHub issue.** Reports never go to Pi's developers. PiSharp writes the report zip and opens a prefilled issue on [PiSharp's GitHub](https://github.com/jkelly/PiSharp/issues) for you to attach it to. See [/bug](/docs/guides/interactive/).
-- **It names itself.** Requests carry a PiSharp user agent, not Pi's.
+- **No attribution to Pi.** Requests carry the user agent of the Pi version PiSharp tracks, `pi/1.5.0 (<platform>; dotnet/<version>; <arch>)`, but never attribute themselves to Pi. Pi sends OpenRouter, NVIDIA NIM and OpenCode attribution headers naming pi and `https://pi.dev` while install telemetry is on. PiSharp sends none, whatever `enableInstallTelemetry` says. OpenCode requests with a session name PiSharp in `x-opencode-client: pisharp`.
 - **Versions match Pi's.** See [How versions work](/docs/versioning/).
 
 The [Parity](/parity/) page lists the smaller differences that remain.

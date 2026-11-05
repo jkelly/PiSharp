@@ -143,7 +143,8 @@ The WebSocket connection gets 15 seconds to open. PiSharp doesn't read Pi's `web
 
 ## Differences from Pi
 
-- Requests to Anthropic, Azure, Bedrock, Mistral and OpenAI-compatible endpoints carry a `PiSharp` user agent instead of the SDK's.
+- Chat requests carry Pi's detailed user agent, `pi/1.5.0 (<platform>; dotnet/<version>; <arch>)`, with the runtime naming .NET where Pi names Node. Bedrock sends `pi/1.5.0` as the whole user agent, since PiSharp has no AWS SDK user agent to append it to.
+- PiSharp sends no attribution headers. Pi attributes OpenRouter, NVIDIA NIM and OpenCode requests to pi (`https://pi.dev`) while install telemetry is on; PiSharp never does. OpenCode requests with a session carry `x-opencode-client: pisharp`, where Pi sends `x-opencode-client: pi` only while attribution is on.
 - PiSharp's zstd frames are valid zstd but not byte for byte what Node's zstd writes.
 - Classifier calls use the built-in catalog entries. A `baseUrl` or provider `compat` for them in `models.json` doesn't reach them yet.
 

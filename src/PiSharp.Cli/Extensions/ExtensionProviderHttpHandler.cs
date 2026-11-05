@@ -87,10 +87,18 @@ internal sealed class ExtensionProviderHttpHandler : DelegatingHandler
         return response;
     }
 
+    /// <summary>Pi 1.5.0 identity.ts getIdentityHeaders: the `User-Agent` and attribution headers (OpenRouter, NVIDIA NIM, OpenCode) the AI
+    /// layer adds below the request headers. PiSharp's `x-opencode-client: pisharp` goes with them.</summary>
+    private static readonly HashSet<string> IdentityHeaders = new(StringComparer.OrdinalIgnoreCase)
+    { "User-Agent", "HTTP-Referer", "X-OpenRouter-Title", "X-OpenRouter-Categories", "X-BILLING-INVOKE-ORIGIN", "x-opencode-client" };
+
     private async Task ApplyHeadersAsync(HttpRequestMessage request, CancellationToken token)
     {
+        // Pi 1.5.0 sdk.ts (core.client-identity-attribution): transformHeaders runs before pi-ai adds the identity headers, so handlers
+        // see neither the User-Agent nor attribution headers. A handler that returns one sets it; returning null removes it, as a null
+        // request header removes an identity header upstream.
         var original = new JsonObject();
-        foreach (var header in request.Headers) original[header.Key] = string.Join(", ", header.Value);
+        foreach (var header in request.Headers) if (!IdentityHeaders.Contains(header.Key)) original[header.Key] = string.Join(", ", header.Value);
         var initial = Event("before_provider_headers", writer => { writer.WritePropertyName("headers"); writer.WriteRawValue(original.ToJsonString(), skipInputValidation: true); });
         var reduced = await _registry.ReduceEventAsync(_captured, "before_provider_headers", initial,
             (current, result) => result.Value.ValueKind == JsonValueKind.Object ? Event("before_provider_headers", writer => Raw(writer, "headers", result)) : null, _report, token).ConfigureAwait(false);
@@ -98,6 +106,8 @@ internal sealed class ExtensionProviderHttpHandler : DelegatingHandler
         // Handlers edit the headers object: a removed or null header is deleted, a string value is set.
         foreach (var name in original.Select(pair => pair.Key).ToArray())
             if (!headers.TryGetProperty(name, out var kept) || kept.ValueKind == JsonValueKind.Null) request.Headers.Remove(name);
+        foreach (var header in headers.EnumerateObject())
+            if (header.Value.ValueKind == JsonValueKind.Null && IdentityHeaders.Contains(header.Name)) request.Headers.Remove(header.Name);
         foreach (var header in headers.EnumerateObject())
             if (header.Value.ValueKind == JsonValueKind.String && (!original.TryGetPropertyValue(header.Name, out var before) || before!.GetValue<string>() != header.Value.GetString()))
             { request.Headers.Remove(header.Name); request.Headers.TryAddWithoutValidation(header.Name, header.Value.GetString()); }
