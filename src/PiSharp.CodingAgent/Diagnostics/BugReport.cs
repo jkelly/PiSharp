@@ -65,8 +65,10 @@ public static class BugReport
 {
     public const string CustomEntryType = "pi.bug-report";
     public const int SchemaVersion = 1;
-    /// <summary>config.ts <c>VERSION</c> of the Pi release PiSharp tracks.</summary>
-    public const string PiVersion = "1.2.0";
+    /// <summary>config.ts <c>VERSION</c> of the Pi release PiSharp tracks (decision 0013, Identity).</summary>
+#pragma warning disable PISHARP_IDENTITY001
+    public const string PiVersion = PiSharp.AI.ClientIdentities.PiVersion;
+#pragma warning restore PISHARP_IDENTITY001
 
     public const string SummarySystemPrompt =
         "You are helping a user file a bug report about pi, the coding agent they are talking to. You will be shown the conversation transcript. Write a report for the pi developers describing what the user was doing and what went wrong.\n\n" +
