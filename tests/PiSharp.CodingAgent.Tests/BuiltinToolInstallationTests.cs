@@ -105,7 +105,9 @@ internal static class BuiltinToolInstallationTests
         await using var session = await NewSession(files, profile); profile.AttachOwner(session);
         Names(["read", "write"], session.GetActiveTools());
         await session.SetActiveToolsAsync(["edit", "read"]);
-        Names(["edit", "read"], session.GetActiveTools());
+        // Pi 1.5.0 agent-session.ts _applyToolLoadout (b9e3eef6c, #11514; core.active-tools-keep-order): read stays active in its
+        // current place and the newly active edit is appended.
+        Names(["read", "edit"], session.GetActiveTools());
         // Pi 1.1.0 setActiveToolsByName applies the selection in memory: the transcript declares read, write until the next prompt.
         Names(["read", "write"], Declared(session));
         var count = session.Snapshot.Log.Entries.Length;
@@ -113,13 +115,13 @@ internal static class BuiltinToolInstallationTests
         Check(session.Snapshot.Fault is null && profile.UsedTurns == 2 && await File.ReadAllTextAsync(files.Target) == "changed",
             "Real profile did not execute the explicitly activated edit.");
         // agent-loop declareToolChanges: the run's first entry records the delta (write removed, edit added) before the prompt, so the
-        // transcript and its requests (normalizeContext) declare read, edit in declaration order; the loadout keeps its selected order.
+        // transcript and its requests (normalizeContext) declare read, edit in declaration order, which is now also the loadout's order.
         var record = session.Snapshot.Log.Entries[count].WireBody.Value.GetProperty("message");
         Check(record.GetProperty("role").GetString() == "system" &&
             record.GetProperty("toolsRemoved").EnumerateArray().Select(tool => tool.GetProperty("name").GetString()).SequenceEqual(["write"]) &&
             record.GetProperty("toolsAdded").EnumerateArray().Select(tool => tool.GetProperty("name").GetString()).SequenceEqual(["edit"]) &&
             session.Snapshot.Log.Entries[count + 1].WireBody.Value.GetProperty("message").GetProperty("role").GetString() == "user", "The prompt did not record the edit selection first.");
-        Names(["read", "edit"], Declared(session)); Names(["edit", "read"], session.GetActiveTools());
+        Names(["read", "edit"], Declared(session)); Names(["read", "edit"], session.GetActiveTools());
         foreach (var request in JsonSerializer.SerializeToElement(profile.Requests).EnumerateArray())
             Names(["read", "edit"], request.GetProperty("toolNames").EnumerateArray().Select(name => name.GetString()!));
         var actions = JsonSerializer.SerializeToElement(profile.Actions).EnumerateArray().ToArray();

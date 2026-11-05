@@ -59,7 +59,9 @@ internal static class NativeLsInstallationTests
         // Semantic comparison: replayed declarations are re-serialized (for example "doesn't" becomes "doesn\u0027t").
         Check(defaults.Zip(original.Declarations).All(pair => JsonElement.DeepEquals(pair.First.Value, pair.Second.Value)), "Existing read/write declarations changed.");
         await session.SetActiveToolsAsync(["read", "ls", "write"]);
-        Names(["read", "ls", "write"], session.GetActiveTools());
+        // Pi 1.5.0 agent-session.ts _applyToolLoadout (b9e3eef6c, #11514; core.active-tools-keep-order): read and write stay active
+        // in their current order and the newly active ls is appended.
+        Names(["read", "write", "ls"], session.GetActiveTools());
         // Pi 1.1.0 setActiveToolsByName applies the selection in memory: the transcript declares read, write until the next prompt.
         Names(["read", "write"], new SessionSystemReplay().Replay(session.Snapshot.Context.LlmMessages).Tools.Select(tool => tool.Value.GetProperty("name").GetString()!));
         var count = session.Snapshot.Log.Entries.Length;

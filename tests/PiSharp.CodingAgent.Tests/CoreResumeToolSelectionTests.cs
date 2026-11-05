@@ -256,10 +256,14 @@ internal static class CoreResumeToolSelectionTests
                 Recorded(await PromptRecord(session), [], ["code", "deferred"]);
             }
             var before = await Bytes(path);
+            // Pi 1.5.0 agent-session.ts _restoreToolsFromTranscript (bd3c9b823; core.extension-tools-active-on-resume): the recorded
+            // code, deferred loadout is restored, and extension tools the branch never added or removed that registration activates
+            // (direct and model-only, defaultActive) are appended as newly registered ones. Non-extension tools are not.
+            string[] restored = origin ? ["code", "deferred", "direct", "model"] : ["code", "deferred"];
             await using (var reopened = await PersistentAgentSession.OpenWithRegistryAsync(path, registry, () => 1, () => "reopen-" + ++ids, fallbackModel: profile.SelectedModel))
             {
-                Names(reopened, "code", "deferred");
-                Check(reopened.Snapshot.Agent.Tools.Select(tool => tool.Name).SequenceEqual(new[] { "code", "deferred" }),
+                Names(reopened, restored);
+                Check(reopened.Snapshot.Agent.Tools.Select(tool => tool.Name).SequenceEqual(restored),
                     "Ordinary recorded replay rejected legacy script exposure declarations.");
                 var after = await Bytes(path); Check(before.SequenceEqual(after), "Ordinary exposure replay mutated durable source.");
             }
