@@ -45,7 +45,7 @@ using DurableRegistry = PiSharp.Durable.Registry;
 
 internal static partial class Program
 {
-    private static IEnumerable<(string, Func<Task>)> HarnessRegistryReaderCases() => HarnessRegistryReaderTests.Cases("harness.registry-reader.");
+    private static IEnumerable<(string, Func<Task>)> HarnessRegistryReaderCases() => HarnessRegistryReaderTests.Cases();
 }
 
 internal static class HarnessRegistryReaderTests
@@ -93,13 +93,11 @@ internal static class HarnessRegistryReaderTests
     /// <summary>The plugin object's install (upstream <c>Plugin.install</c>): its extension now has the task app.done.</summary>
     private static void Install(IWritable<Extension> plugin) => plugin.Set(Define.Extension(new Extension { Name = "app.plugin", Tasks = [Done] }));
 
-    internal static IEnumerable<(string, Func<Task>)> Cases(string prefix) =>
-        [.. RegistryReaderCases(prefix + "registry-reader."), .. ViewsCases(prefix + "durable-s-views-from-other-objects-slice-8-5-s1."),
-            .. ContractCases(prefix + "contract.")];
+    internal static IEnumerable<(string, Func<Task>)> Cases() => [.. RegistryReaderCases(), .. ViewsCases(), .. ContractCases()];
 
-    private static IEnumerable<(string, Func<Task>)> RegistryReaderCases(string prefix)
+    private static IEnumerable<(string, Func<Task>)> RegistryReaderCases()
     {
-        yield return Case(prefix + "reads-the-composed-snapshot-a-listener-is-called-synchronously-inside-the-batch-that-composed", () =>
+        yield return Case("harness.registry-reader.registry-reader.reads-the-composed-snapshot-a-listener-is-called-synchronously-inside-the-batch-that-composed", () =>
         {
             var host = Extensions();
             var value = host.Value;
@@ -126,7 +124,7 @@ internal static class HarnessRegistryReaderTests
             host.Close();
         });
 
-        yield return Case(prefix + "wakes-a-harness-s-scheduler-a-task-blocked-on-its-missing-definition-runs-once-a-contribution-brings-it", async () =>
+        yield return Case("harness.registry-reader.registry-reader.wakes-a-harness-s-scheduler-a-task-blocked-on-its-missing-definition-runs-once-a-contribution-brings-it", async () =>
         {
             var host = Extensions();
             var harness = await Harness.OpenAsync(new MemoryStorage(),
@@ -145,9 +143,9 @@ internal static class HarnessRegistryReaderTests
         });
     }
 
-    private static IEnumerable<(string, Func<Task>)> ViewsCases(string prefix)
+    private static IEnumerable<(string, Func<Task>)> ViewsCases()
     {
-        yield return Case(prefix + "a-follower-of-a-contributed-harness-fails-when-that-harness-s-session-closes-and-follows-the-next-one", async () =>
+        yield return Case("harness.registry-reader.durable-s-views-from-other-objects-slice-8-5-s1.a-follower-of-a-contributed-harness-fails-when-that-harness-s-session-closes-and-follows-the-next-one", async () =>
         {
             // The Durable object opens a Harness and contributes it; the Harnesses registry composes the last contribution.
             var first = await OpenPlain();
@@ -179,9 +177,9 @@ internal static class HarnessRegistryReaderTests
         });
     }
 
-    private static IEnumerable<(string, Func<Task>)> ContractCases(string prefix)
+    private static IEnumerable<(string, Func<Task>)> ContractCases()
     {
-        yield return Case(prefix + "keeps-the-last-good-snapshot-while-compose-fails-and-calls-no-listener-for-the-failure", () =>
+        yield return Case("harness.registry-reader.contract.keeps-the-last-good-snapshot-while-compose-fails-and-calls-no-listener-for-the-failure", () =>
         {
             var failing = false;
             var host = Extensions((table, compose) => failing ? throw new InvalidOperationException("compose broke") : Compose(table, compose));
@@ -201,7 +199,7 @@ internal static class HarnessRegistryReaderTests
             host.Close();
         });
 
-        yield return Case(prefix + "aborting-its-context-detaches-every-listener", () =>
+        yield return Case("harness.registry-reader.contract.aborting-its-context-detaches-every-listener", () =>
         {
             var host = Extensions();
             var (context, cancel) = ChordContext.WithCancel(ChordBackground);
@@ -217,7 +215,7 @@ internal static class HarnessRegistryReaderTests
             host.Close();
         });
 
-        yield return Case(prefix + "its-disposer-detaches-the-listener-once-and-close-calls-none", () =>
+        yield return Case("harness.registry-reader.contract.its-disposer-detaches-the-listener-once-and-close-calls-none", () =>
         {
             var host = Extensions();
             var reader = RegistryReader.Create(host.Value, ChordBackground);

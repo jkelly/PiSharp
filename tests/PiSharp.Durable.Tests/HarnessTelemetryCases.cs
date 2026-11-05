@@ -881,6 +881,31 @@ internal static class TelemetryTests
             SameAttributes([new SpanAttributes { ["type"] = "storage_failed" }], MetricAttributes(telemetry, "pi.durable.reports"), "report counters");
         });
 
+        // Authored (area registry-reader): upstream's writer host fails the Session without a context (fail(error, undefined, at, own)),
+        // so a commit made inside a span that fails the Session leaves no report event on that span; the counter still counts it.
+        yield return Case("harness.telemetry.reports-a-session-failure-from-a-commit-inside-a-span-without-the-commit-s-context", async () =>
+        {
+            var setup = Setup();
+            var telemetry = new InMemoryTelemetryContext();
+            var storage = new ControlledStorage(new MemoryStorage());
+            var (harness, root) = await OpenTracked(storage, setup, telemetry);
+            var error = new InvalidOperationException("private-storage-error");
+            storage.FailNextCommit(error);
+            await telemetry.StartSpanAsync("caller", async span =>
+            {
+                var thrown = await ThrowsAsync<InvalidOperationException>(() => root.CommitAsync(tx => tx.AppendEntryAsync(root.Id,
+                    new EntryDraft { Kind = "app.failed" }), Context.WithTelemetry(span)), "refused commit");
+                Check(ReferenceEquals(error, thrown), "the commit rejects with the storage error");
+            });
+            await harness.Closed;
+            await AllSettled(telemetry);
+            Check(setup.Reports.Snapshot().SequenceEqual<Exception>([error]), "reports");
+            var caller = Named(telemetry, "caller").Single();
+            Check(!caller.Events.Any(item => item.Name == "pi.durable.report"), $"no report event on the caller's span: {Dump(caller)}");
+            Check(!telemetry.GetSpans().Any(item => item.Name == "pi.durable.report"), "no report span");
+            SameAttributes([new SpanAttributes { ["type"] = "storage_failed" }], MetricAttributes(telemetry, "pi.durable.reports"), "report counters");
+        });
+
         yield return Case("harness.telemetry.counts-reports-raised-with-a-noop-span-without-creating-a-root", async () =>
         {
             var setup = Setup();
