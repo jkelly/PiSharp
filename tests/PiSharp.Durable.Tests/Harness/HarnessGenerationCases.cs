@@ -26,6 +26,8 @@
 // v1.2.0 expected an empty pi.live; the faulted run's detail contains "non-finite number" (see above).
 // Pi v1.5.0 sync (area vocabulary, 5f312dac4): livePublications follows commits with SessionTests.FollowCommits (upstream followCommits,
 // was observeCommits) and reads the document changes of kind change (DocumentValueChange).
+// Pi v1.5.0 sync (area tool-tasks, 1c6928b30): "orphans a blocked run task with full run cleanup" stores the run under the generation
+// definition's version plus one (pi.generation is version 2), as v1.5.0's does.
 #pragma warning disable PISHARP_IDENTITY001 // PiSharp.AI's ClientIdentity (Pi v1.5.0) is experimental.
 using System.Collections.Immutable;
 using System.Text.RegularExpressions;
@@ -623,7 +625,7 @@ internal static class GenerationTests
             var definition = HarnessTasks.GenerationTask.Definition;
             var newer = Tasks.DefineTask(new TaskDefinition
             {
-                Name = definition.Name, Version = 2, Initial = definition.Initial, Phases = definition.Phases, Abort = definition.Abort,
+                Name = definition.Name, Version = definition.Version + 1, Initial = definition.Initial, Phases = definition.Phases, Abort = definition.Abort,
             });
             var (taskId, submissionId) = await ((DurableHarness)harness).CommitWithAsync(async tx =>
             {

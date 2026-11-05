@@ -21,6 +21,8 @@
 // Pi v1.5.0 sync (area vocabulary, 5f312dac4): LiveCommits follows commits with SessionTests.FollowCommits (upstream followCommits) and the
 // stored ones are observed with ObserveCommits (a CommitObserver; upstream observeCommits({ advance, end })); both read the document changes
 // of kind change (DocumentValues, upstream documentValues), and "stores a complete base exactly ..." skips a retirement by its kind.
+// Pi v1.5.0 sync (area tool-tasks, 1c6928b30, #11043): "starts calls the request did not offer as flagged tasks ..." (...-as-done-... before)
+// takes v1.5.0's slot: the unoffered call is pending with its own task, flagged unoffered.
 using System.Collections.Immutable;
 using System.Threading.Channels;
 using PiSharp.Durable;
@@ -354,7 +356,7 @@ internal static partial class LiveDeltaTests
             await harness.CloseAsync(Context);
         });
 
-        yield return Case(prefix + "starts-calls-the-request-did-not-offer-as-done-and-marks-a-faulted-tools-slot-done-without-an-entry", async () =>
+        yield return Case(prefix + "starts-calls-the-request-did-not-offer-as-flagged-tasks-and-marks-a-faulted-tools-slot-done-without-an-entry", async () =>
         {
             var setup = Setup();
             // Not strict JSON: the result commit throws and the scheduler faults the task.
@@ -365,10 +367,10 @@ internal static partial class LiveDeltaTests
             var (harness, root) = await OpenChat(await fresh(), setup);
             var commits = StoredLiveCommits(harness);
             await (await root.SubmitAsync(SubmissionDraft.Input("go"), Context)).WaitAsync(Context);
-            var ghostResult = (await root.EntriesAsync(new EntryQueryBounds(), 10, null, Context)).Items.First(entry => entry.Kind == "pi.tool-result").Id.Value;
             var all = commits.Snapshot();
             var handover = all.First(ops => ops.Any(op => op is SetOp set && set.Path.Length > 0 && set.Path[0].Key == "tools"));
-            ContainsAll(handover, $$"""[["s",["tools"],[{"callId":"g","name":"ghost","status":"done","entry":{{ghostResult}}},{"callId":"b","name":"bad","taskId":"<number>","status":"pending"}]]]""",
+            // #11043: an unoffered call gets a task too, flagged on its slot.
+            ContainsAll(handover, """[["s",["tools"],[{"callId":"g","name":"ghost","taskId":"<number>","status":"pending","unoffered":true},{"callId":"b","name":"bad","taskId":"<number>","status":"pending"}]]]""",
                 "handover");
             // The fault cleanup writes only the status.
             Check(all.Any(ops => Json(ops) == """[["s",["tools",1,"status"],"done"]]"""), "fault cleanup: " + string.Join(" | ", all.Select(ops => Json(ops))));

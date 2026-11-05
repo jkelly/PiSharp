@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/test/harness-tools.test.ts. Verbatim apart from the adaptations in
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/test/harness-tools.test.ts. Verbatim apart from the adaptations in
 // HarnessSupport.cs and ChatSupport.cs, and these:
 // - Backends. Upstream opens every case on MemoryStorage. harness.tools.* does the same; harness.tools.jsonl.* and harness.tools.sqlite.*
 //   rerun every case on a fresh JSONL directory and a fresh SQLite file.
@@ -16,8 +16,12 @@
 //   takes v1.5.0's form (adc5fa9f8): one view of the host's models that adds the Harness identity; `getProviders()` is compared through
 //   GetModel, as IDurableModels has no provider list. The two beforeProviderRequest cases are d280e1ffa's:
 //   harness.tools.chains-beforeproviderrequest-over-every-provider-request-body and
-//   harness.tools.reports-a-throwing-beforeproviderrequest-hook-and-continues-the-chain. Upstream's report info names the throwing hook's
-//   extension, which waits on ReportInfo (area reports), so the C# case checks the report's message.
+//   harness.tools.reports-a-throwing-beforeproviderrequest-hook-and-continues-the-chain. Area reports added upstream's check that the report info
+//   names the throwing hook's extension.
+// - Pi v1.5.0 sync (area tool-tasks, 87eff524f, 1c6928b30, #11043): "answers calls to tools the request did not offer through a flagged tool
+//   task" (harness.tools.answers-calls-to-tools-the-request-did-not-offer-through-a-flagged-tool-task, "... without a task" before) and "never
+//   runs a tool the request did not offer, even when the agent has it" are v1.5.0's; "rejects details still waiting when the call is aborted
+//   during afterTool" skips the abort handler's result, which runs the hooks too. With them the file matches v1.5.0.
 using System.Collections.Immutable;
 using System.Text;
 using PiSharp.Durable;
@@ -163,7 +167,7 @@ internal static class ToolsTests
             await ran.Harness.CloseAsync(Context);
         });
 
-        yield return Case(prefix + "answers-calls-to-tools-the-request-did-not-offer-without-a-task", async () =>
+        yield return Case(prefix + "answers-calls-to-tools-the-request-did-not-offer-through-a-flagged-tool-task", async () =>
         {
             var setup = Setup();
             AddTool(setup.Registry, Tool("echo", (_, _, _) => Result(NoContent)));
@@ -175,7 +179,29 @@ internal static class ToolsTests
             MatchJson("""{"toolCallId":"c2","isError":false}""", results[1], "echo");
             var ghostEntry = entries.First(entry => entry.Kind == "pi.tool-result");
             SameJson("""{"diagnostics":[{"severity":"error","code":"tool_unavailable","message":"Tool ghost is not available"}]}""", ghostEntry.Data, "data");
-            Equal(1, (await Tasks(harness, root.Id)).Count(task => task.Kind == "pi.tool"), "tool tasks");
+            // #11043: the unoffered call has its own task, so `afterTool` and `control` apply to it as to any call.
+            var inputs = (await Tasks(harness, root.Id)).Where(task => task.Kind == "pi.tool").Select(task => (JsonObjectValue)task.Input).ToList();
+            Equal(2, inputs.Count, "tool tasks");
+            Check(inputs.Any(input => input.TryGetValue("callId", out var callId) && S(callId) == "c1" &&
+                input.TryGetValue("unoffered", out var flag) && flag is JsonBooleanValue { Value: true }), "a flagged c1 task");
+            Check(inputs.Any(input => !(input.TryGetValue("unoffered", out var flag) && flag is JsonBooleanValue { Value: true })), "an unflagged task");
+            await harness.CloseAsync(Context);
+        });
+
+        // #11043
+        yield return Case(prefix + "never-runs-a-tool-the-request-did-not-offer-even-when-the-agent-has-it", async () =>
+        {
+            var setup = Setup();
+            var ran = 0;
+            AddTool(setup.Registry, Tool("hidden", (_, _, _) =>
+            {
+                Interlocked.Increment(ref ran);
+                return Result(NoContent);
+            }, tool => tool with { Deferred = true }));
+            var (harness, _, entries, status) = await Run(fresh, setup, [Calls(("hidden", Obj(), "c1")), Done]);
+            Equal(SubmissionStatus.Done, status, "status");
+            Equal(0, Volatile.Read(ref ran), "ran");
+            Equal("<harness>\n[error] Tool hidden is not available\n</harness>", ResultText(Results(entries)[0]), "text");
             await harness.CloseAsync(Context);
         });
 
@@ -1216,8 +1242,10 @@ internal static class ToolsTests
             }));
             AddHooks(setup.Registry, HarnessTasks.ToolTask, new ToolHooks
             {
-                AfterTool = async (_, _, _, callContext) =>
+                AfterTool = async (_, result, _, callContext) =>
                 {
+                    // The abort handler's result runs the hooks too (#11043); only the executed call's waits.
+                    if (result.Diagnostics?.Any(diagnostic => diagnostic.Code == "aborted") == true) return null;
                     inAfterTool.Resolve();
                     await Aborted(callContext.CancellationToken);
                     return null;
