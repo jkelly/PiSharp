@@ -1942,10 +1942,6 @@ public class Session : ISession
         else work();
     }
 
-    /// <summary>Whether this thread runs a publication of one of this Session's commits, so <see cref="AfterPublication"/> defers its
-    /// work.</summary>
-    internal bool InPublication => publishing is { } scope && ReferenceEquals(scope.Owner, this);
-
     private void RunDeferred()
     {
         if (publishing is not { } scope || !ReferenceEquals(scope.Owner, this)) return;
