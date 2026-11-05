@@ -31,6 +31,12 @@
 // account, SessionStreamMetadata): the retry checkpoint and the next prepare checkpoint carry it as metadata, pinned only when the
 // interrupted request had any, so upstream records keep their shape; the other stream options are read again at the next prepare, as
 // upstream's are.
+// Pi v1.5.0 sync (area tool-tasks, 1c6928b30, #11043): pi.generation is version 2, and its migrate keeps a version 1 record. Every call of a
+// round gets a pi.tool task owned by the generation, in call order: a call to a tool its request did not offer is flagged unoffered: true in
+// its task input and its pi.live.tools slot, and its task settles tool_unavailable through afterTool, where v1.2.0 appended its result in the
+// round's first commit without a task. A sequential round keeps such a call pending, flagged, until its turn (which a version 1 Harness would
+// start unflagged, so it leaves version 2 blocked: task_too_old). The abort handler answers an unstarted flagged call tool_unavailable, not
+// aborted, and finishToolRound reads the controls in call order (the slots' order), every slot's counting toward terminate.
 //
 // Mappings:
 // - Checkpoints, live state and results are upstream's JSON, built in upstream's key order: prepare {phase, attempt, compacted?, overflow?},
@@ -58,7 +64,7 @@ using PiSharp.Durable.Internal.PiAi;
 
 namespace PiSharp.Durable;
 
-/// <summary>Built-in tasks: the generation task (upstream <c>GenerationTask</c>, kind <c>pi.generation</c>, version 1).</summary>
+/// <summary>Built-in tasks: the generation task (upstream <c>GenerationTask</c>, kind <c>pi.generation</c>, version 2).</summary>
 public static partial class HarnessTasks
 {
     /// <summary>
@@ -69,8 +75,12 @@ public static partial class HarnessTasks
     public static DurableTask GenerationTask { get; } = Tasks.DefineTask(new TaskDefinition
     {
         Name = "pi.generation",
-        Version = 1,
+        Version = 2,
         Initial = _ => JsonValue.Parse("""{"phase":"prepare","attempt":1}"""),
+        // Version 2 leaves calls to tools not offered in a sequential round's `pending`, flagged `unoffered` in their slots. A version 1
+        // Harness would start their tool tasks unflagged, resolving the name, so it leaves version 2 blocked instead. A version 1 checkpoint
+        // has no such calls and is kept as it is.
+        Migrate = (input, checkpoint, _) => new TaskMigrationResult(input, checkpoint),
         Phases = new Dictionary<string, TaskPhaseHandler>(StringComparer.Ordinal)
         {
             ["prepare"] = GenerationPhases.PrepareAsync,
@@ -416,20 +426,20 @@ internal static class GenerationPhases
         await runtime.CommitAsync(async (tx, _) =>
         {
             var live = await tx.DocAsync(Live.LiveDoc, runtime.ConversationId).ConfigureAwait(false);
-            var taskId = await CreateToolTaskAsync(tx, runtime, assistant, next).ConfigureAwait(false);
-            if (live.ContainsKey("tools") && live.Get("tools") is JsonArrayValue)
+            var slots = live.ContainsKey("tools") && live.Get("tools") is JsonArrayValue ? live.GetArray("tools") : null;
+            var index = -1;
+            for (var at = 0; slots is not null && at < slots.Count; at++)
             {
-                var slots = live.GetArray("tools");
-                for (var index = 0; index < slots.Count; index++)
+                var candidate = (JsonObjectValue)slots.Get(at);
+                if (candidate.TryGetValue("callId", out var callId) && callId is JsonStringValue { Value: var id } && id == next && !candidate.ContainsKey("taskId"))
                 {
-                    var slot = (JsonObjectValue)slots.Get(index);
-                    if (slot.TryGetValue("callId", out var callId) && callId is JsonStringValue { Value: var id } && id == next && !slot.ContainsKey("taskId"))
-                    {
-                        slots.GetObject(index).Set("taskId", taskId.ToJson());
-                        break;
-                    }
+                    index = at;
+                    break;
                 }
             }
+            var unoffered = index >= 0 && ((JsonObjectValue)slots!.Get(index)).TryGetValue("unoffered", out var flag) && flag is JsonBooleanValue { Value: true };
+            var taskId = await CreateToolTaskAsync(tx, runtime, assistant, next, unoffered).ConfigureAwait(false);
+            if (index >= 0) slots!.GetObject(index).Set("taskId", taskId.ToJson());
             return (TaskState?)NextTaskState.Waiting(ToolsCheckpoint(assistant, [.. tools, taskId], pending.Skip(1)), [taskId], JoinPolicy.AllSettled);
         }, context).ConfigureAwait(false);
     }
@@ -440,7 +450,8 @@ internal static class GenerationPhases
         var phase = task.Phase;
         if (DeferredOf(checkpoint) is { } polled) await CancelDeferredAsync(runtime, polled, context).ConfigureAwait(false);
         var conversationId = runtime.ConversationId;
-        // Runs after the round's tool tasks are terminal; calls never started get `aborted` results (spec §8.5).
+        // Runs after the round's tool tasks are terminal; calls never started get `aborted` results (spec §8.5), unoffered ones
+        // `tool_unavailable`.
         var unstarted = phase == "tools"
             ? await ReadCallsAsync(runtime, new EntryId(Id(checkpoint["assistant"])),
                 [.. ((JsonArrayValue)checkpoint["pending"]).Select(id => ((JsonStringValue)id).Value)], context).ConfigureAwait(false)
@@ -451,7 +462,14 @@ internal static class GenerationPhases
             await HarnessTasks.ConvertPartialAsync(tx, live, conversationId).ConfigureAwait(false);
             foreach (var call in unstarted)
             {
-                var result = ToolResults.HarnessError("aborted", $"Tool {((JsonStringValue)call["name"]).Value} was aborted");
+                // A call its request did not offer could not have run either way.
+                var unoffered = live.ContainsKey("tools") && live.Get("tools") is JsonArrayValue slots && slots.OfType<JsonObjectValue>().Any(slot =>
+                    slot.TryGetValue("callId", out var callId) && JsonValue.DeepEquals(callId, call["id"]) &&
+                    slot.TryGetValue("unoffered", out var flag) && flag is JsonBooleanValue { Value: true });
+                var name = ((JsonStringValue)call["name"]).Value;
+                var result = unoffered
+                    ? ToolResults.HarnessError("tool_unavailable", $"Tool {name} is not available")
+                    : ToolResults.HarnessError("aborted", $"Tool {name} was aborted");
                 await ToolResults.AppendToolResultAsync(tx, conversationId, call, result, runtime.Now()).ConfigureAwait(false);
             }
             Live.EndRun(tx, live, runtime.TaskId, RunEnd.Unanswered(RunFailureReason.Aborted));
@@ -471,12 +489,14 @@ internal static class GenerationPhases
         return [.. callIds.SelectMany(id => calls.Where(call => Str(call, "id") == id).Take(1))];
     }
 
-    /// <summary>A tool task for call <paramref name="callId"/>, owned by the generation (upstream <c>createToolTask</c>).</summary>
-    private static Task<TaskId> CreateToolTaskAsync(ITx tx, ITaskRuntime runtime, EntryId assistant, string callId) =>
-        tx.CreateTaskAsync(HarnessTasks.ToolTask,
-            JsonValue.Object([KeyValuePair.Create("kind", (JsonValue)"model"), KeyValuePair.Create("assistant", (JsonValue)assistant.ToJson()),
-                KeyValuePair.Create("callId", (JsonValue)callId)]),
-            new TaskOptions(TaskOwnership.Task(runtime.TaskId)));
+    /// <summary>A tool task for call <paramref name="callId"/>, owned by the generation; <paramref name="unoffered"/> for a call to a tool its
+    /// request did not offer (upstream <c>createToolTask</c>).</summary>
+    private static Task<TaskId> CreateToolTaskAsync(ITx tx, ITaskRuntime runtime, EntryId assistant, string callId, bool unoffered)
+    {
+        var input = new RecordJson.Writer().Add("kind", "model").Add("assistant", assistant.ToJson()).Add("callId", callId);
+        if (unoffered) input.Add("unoffered", true);
+        return tx.CreateTaskAsync(HarnessTasks.ToolTask, input.Build(), new TaskOptions(TaskOwnership.Task(runtime.TaskId)));
+    }
 
     /// <summary>
     /// Which threshold compaction preparation starts before its request (upstream <c>thresholdCompaction</c>, spec §8.3): <c>blocking</c>
@@ -967,9 +987,10 @@ internal static class GenerationPhases
     }
 
     /// <summary>
-    /// Appends the tool-calling answer and starts its tool round in one commit (upstream <c>startToolRound</c>, spec §8.3). A call to a tool
-    /// the request did not offer gets its <c>tool_unavailable</c> result here; every other call gets a tool task owned by the generation,
-    /// only the first one now when the round is sequential. The generation then waits for them in its <c>tools</c> phase, keeping the run.
+    /// Appends the tool-calling answer and starts its tool round in one commit (upstream <c>startToolRound</c>, spec §8.3). Every call gets a
+    /// tool task owned by the generation, in call order, only the first one now when the round is sequential; a call to a tool the request did
+    /// not offer is flagged, and its task settles <c>tool_unavailable</c>. The generation then waits for them in its <c>tools</c> phase,
+    /// keeping the run.
     /// </summary>
     private static async Task StartToolRoundAsync(ITaskRuntime runtime, Request request, JsonObjectValue message, List<JsonObjectValue> calls,
         DurableContext context)
@@ -993,22 +1014,20 @@ internal static class GenerationPhases
             {
                 var callId = call["id"];
                 var name = call["name"];
-                if (!offered.Contains(Str(call, "name") ?? ""))
-                {
-                    var unavailable = ToolResults.HarnessError("tool_unavailable", $"Tool {Str(call, "name")} is not available");
-                    var result = await ToolResults.AppendToolResultAsync(tx, conversationId, call, unavailable, runtime.Now()).ConfigureAwait(false);
-                    slots.Add(new RecordJson.Writer().Add("callId", callId).Add("name", name).Add("status", "done").Add("entry", result.Id.ToJson()).Build());
-                    continue;
-                }
+                var unoffered = !offered.Contains(Str(call, "name") ?? "");
                 if (sequential && tools.Count > 0)
                 {
                     pending.Add(Str(call, "id")!);
-                    slots.Add(new RecordJson.Writer().Add("callId", callId).Add("name", name).Add("status", "pending").Build());
+                    var waiting = new RecordJson.Writer().Add("callId", callId).Add("name", name).Add("status", "pending");
+                    if (unoffered) waiting.Add("unoffered", true);
+                    slots.Add(waiting.Build());
                     continue;
                 }
-                var taskId = await CreateToolTaskAsync(tx, runtime, entry.Id, Str(call, "id")!).ConfigureAwait(false);
+                var taskId = await CreateToolTaskAsync(tx, runtime, entry.Id, Str(call, "id")!, unoffered).ConfigureAwait(false);
                 tools.Add(taskId);
-                slots.Add(new RecordJson.Writer().Add("callId", callId).Add("name", name).Add("taskId", taskId.ToJson()).Add("status", "pending").Build());
+                var started = new RecordJson.Writer().Add("callId", callId).Add("name", name).Add("taskId", taskId.ToJson()).Add("status", "pending");
+                if (unoffered) started.Add("unoffered", true);
+                slots.Add(started.Build());
             }
             live.Delete("generation");
             live.Set("tools", JsonValue.Array(slots));
@@ -1037,14 +1056,15 @@ internal static class GenerationPhases
         var results = slots.Where(slot => slot.ContainsKey("entry")).Select(slot => new EntryId(Id(slot["entry"]))).ToImmutableArray();
         await runtime.Hooks.EachAsync<GenerationHooks, Func<EntryId, ImmutableArray<EntryId>, IHookApi, DurableContext, Task>>(hooks => hooks.AfterTools,
             hook => hook(assistant, results, runtime, context)).ConfigureAwait(false);
-        // Every call of the round, including those answered without a task, must ask to terminate.
-        var terminate = slots.Count > 0 && slots.All(slot => slot.TryGetValue("taskId", out var taskId) &&
-            controls.GetValueOrDefault(new TaskId(Id(taskId))) is { } control && control.TryGetValue("terminate", out var flag) &&
+        // In call order, the slots' order; a slot without a task (faulted or orphaned before it got one) has no control.
+        var ordered = slots.Select(slot => slot.TryGetValue("taskId", out var taskId) ? controls.GetValueOrDefault(new TaskId(Id(taskId))) : null).ToList();
+        // Every call of the round must ask to terminate.
+        var terminate = slots.Count > 0 && ordered.All(control => control is not null && control.TryGetValue("terminate", out var flag) &&
             flag is JsonBooleanValue { Value: true });
-        var added = controls.Values.SelectMany(control => control is not null && control.TryGetValue("addTools", out var names) && names is JsonArrayValue list
+        var added = ordered.SelectMany(control => control is not null && control.TryGetValue("addTools", out var names) && names is JsonArrayValue list
             ? list.OfType<JsonStringValue>().Select(name => name.Value) : []).ToList();
         // The last handoff in call order wins.
-        var handoff = controls.Values.LastOrDefault(control => control is not null && control.TryGetValue("handoff", out var text) && text is JsonStringValue)
+        var handoff = ordered.LastOrDefault(control => control is not null && control.TryGetValue("handoff", out var text) && text is JsonStringValue)
             is { } last ? ((JsonStringValue)last["handoff"]).Value : null;
         await runtime.CommitAsync(async (tx, _) =>
         {

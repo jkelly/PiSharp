@@ -1,10 +1,11 @@
 // Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/src/harness/tool.ts.
 //
 // Mappings:
-// - Input, checkpoints and results are upstream's JSON in its key order. Input (version 2) {kind: "model", assistant, callId} or {kind:
-//   "nested", parent, parentCallId, key, call, progress?}; checkpoints {phase: "call"} and {phase: "execute", arguments, replay}; result
-//   {kind: "model", entryId, control?} (control {addTools?, terminate?, handoff?}) or {kind: "nested"}. Migrate turns version 1 input
-//   {assistant, callId} into {kind: "model", assistant, callId}; a version 1 result has no kind and is a model-issued call's.
+// - Input, checkpoints and results are upstream's JSON in its key order. Input (version 3) {kind: "model", assistant, callId, unoffered?:
+//   true} or {kind: "nested", parent, parentCallId, key, call, progress?}; checkpoints {phase: "call"} and {phase: "execute", arguments,
+//   replay}; result {kind: "model", entryId, control?} (control {addTools?, terminate?, handoff?}) or {kind: "nested"}. Migrate turns
+//   version 1 input {assistant, callId} into {kind: "model", assistant, callId} and keeps version 2 input, which has no unoffered; a version
+//   1 result has no kind and is a model-issued call's.
 // - NestedCallDoc (pi.tool.nested-call, a task-scoped family of the caller) holds {taskId?, result?}, the result being
 //   NestedToolExecutionResult.ToJson.
 // - Calls are pi-ai ToolCall wire JSON; a nested call's hook call adds `parent: {taskId, callId}`. Arguments are validated by
@@ -39,7 +40,19 @@
 // - Pi v1.5.0 sync (area restarts, b3a29f111): a call cut off settings.restartLimit times in a row (TaskRecord.Restarts) ends with an
 //   error result built from its slot, diagnostic code restart_limit, instead of running again (EndCutOffAsync): checked in the call phase
 //   once the call is read, and before a safe rerun. The task fails with detail {reason: "restart_limit"}, which the scheduler reports as
-//   task_interrupted. 87eff524f's afterTool hooks on Harness-written results, and their skip past the limit, are another area's.
+//   task_interrupted.
+// - Pi v1.5.0 sync (area tool-tasks, 87eff524f, #11043): afterTool runs on every result the task writes, also the error results the Harness
+//   writes itself without executing the tool: tool_unavailable, invalid_arguments and blocked from the call phase (RejectAsync, the hooks
+//   seeing the call as the model made it), and interrupted, restart_limit, aborted and abandoned rebuilt from the slot (SettleFromSlotAsync,
+//   which reads the slot from a snapshot before the result commit, since hooks run outside commits). Such a result is then bounded with the
+//   tool's output limits (the defaults when it did not resolve), loses any structuredOutput (a nested call a hook turns into a success gets
+//   its bounded output as value unless the tool declares a schema), and its control applies only when the task completes
+//   (AfterHarnessResultAsync). The hooks are skipped past the restart limit (Live.Salvageable) and in the abort handler's last attempt
+//   (restarts at the limit minus one); the cut-off check now comes before an interruption result too, so a non-replay-safe tool interrupted
+//   restartLimit times ends with restart_limit.
+// - Pi v1.5.0 sync (area tool-tasks, 1c6928b30): a call to a tool its request did not offer is a task whose input is flagged unoffered
+//   (pi.tool version 3): it resolves nothing, so it settles tool_unavailable through afterTool even when the agent has the tool, and its
+//   abort handler settles tool_unavailable too.
 using System.Collections.Immutable;
 using System.Diagnostics;
 using System.Globalization;
@@ -52,7 +65,7 @@ using PiSharp.Durable.Internal.PiAi.Validation;
 
 namespace PiSharp.Durable;
 
-/// <summary>Built-in tasks: the tool task (upstream <c>ToolTask</c>, kind <c>pi.tool</c>, version 2) and its nested call document.</summary>
+/// <summary>Built-in tasks: the tool task (upstream <c>ToolTask</c>, kind <c>pi.tool</c>, version 3) and its nested call document.</summary>
 public static partial class HarnessTasks
 {
     /// <summary>
@@ -61,16 +74,18 @@ public static partial class HarnessTasks
     /// separates resolution from settlement. <c>execute</c> is reached only by recovery and applies the replay rule: a call reruns only when
     /// both its recorded and its current registration say <see cref="ToolReplay.Safe"/>; otherwise it settles <c>failed</c> with an
     /// <c>interrupted</c> result. A model-issued call settles by appending its result entry; a nested call by writing its result to its
-    /// caller's <see cref="NestedCallDoc"/>. Version 1 tasks, which had only model-issued calls, migrate.
+    /// caller's <see cref="NestedCallDoc"/>. Every result the task writes passes <c>afterTool</c>, also the error results the Harness writes
+    /// itself, except past the restart limit. A call flagged <c>unoffered</c> resolves nothing and settles <c>tool_unavailable</c>. Version 1
+    /// tasks, which had only model-issued calls, and version 2 tasks, which had no <c>unoffered</c>, migrate.
     /// </summary>
     public static DurableTask ToolTask { get; } = Tasks.DefineTask(new TaskDefinition
     {
         Name = "pi.tool",
-        Version = 2,
+        Version = 3,
         Initial = _ => JsonValue.Parse("""{"phase":"call"}"""),
-        // Version 1 had only model-issued calls.
-        Migrate = (input, checkpoint, _) => new TaskMigrationResult(
-            JsonValue.Object([KeyValuePair.Create("kind", (JsonValue)"model"), .. (JsonObjectValue)input]), checkpoint),
+        // Version 1 had only model-issued calls, without kind; version 3 added unoffered, absent in version 2 inputs.
+        Migrate = (input, checkpoint, fromVersion) => new TaskMigrationResult(
+            fromVersion == 1 ? JsonValue.Object([KeyValuePair.Create("kind", (JsonValue)"model"), .. (JsonObjectValue)input]) : input, checkpoint),
         Phases = new Dictionary<string, TaskPhaseHandler>(StringComparer.Ordinal)
         {
             ["call"] = ToolPhases.CallAsync,
@@ -115,9 +130,10 @@ internal static class ToolPhases
     private readonly record struct Checked(JsonValue? Args, string? Error);
 
     /// <summary>The task input (upstream <c>ToolTaskInput</c>): a model-issued call, read from its assistant entry, or a nested call, whose
-    /// call the input carries because no entry holds it.</summary>
+    /// call the input carries because no entry holds it. <c>Unoffered</c>: a model-issued call to a tool its request did not offer (upstream
+    /// <c>isUnoffered</c>, spec §8.3), which settles <c>tool_unavailable</c> without resolving the name.</summary>
     internal sealed record ToolInput(bool Nested, EntryId Assistant, string CallId, TaskId Parent, string ParentCallId, string Key,
-        JsonObjectValue? Call, bool Progress)
+        JsonObjectValue? Call, bool Progress, bool Unoffered = false)
     {
         public static ToolInput Parse(JsonValue input)
         {
@@ -126,9 +142,15 @@ internal static class ToolPhases
                 return new ToolInput(true, default, "", new TaskId(Id(fields["parent"])), ((JsonStringValue)fields["parentCallId"]).Value,
                     ((JsonStringValue)fields["key"]).Value, (JsonObjectValue)fields["call"],
                     !(fields.TryGetValue("progress", out var progress) && progress is JsonBooleanValue { Value: false }));
-            return new ToolInput(false, new EntryId(Id(fields["assistant"])), ((JsonStringValue)fields["callId"]).Value, default, "", "", null, true);
+            return new ToolInput(false, new EntryId(Id(fields["assistant"])), ((JsonStringValue)fields["callId"]).Value, default, "", "", null, true,
+                fields.TryGetValue("unoffered", out var unoffered) && unoffered is JsonBooleanValue { Value: true });
         }
     }
+
+    /// <summary>The hooks a result rebuilt from the slot passes: the tool whose output limits bound it, null for the defaults (upstream's
+    /// <c>hooks</c> argument of <c>settleFromSlot</c>). No value: the result settles as built, since the hooks may be what cuts the task
+    /// off.</summary>
+    private readonly record struct SlotHooks(ToolRegistration? Tool);
 
     // ─── Phases ─────────────────────────────────────────────────────────────
 
@@ -142,18 +164,18 @@ internal static class ToolPhases
             return;
         }
         var name = Name(call);
-        var tool = await ResolveToolAsync(runtime, input, name, context).ConfigureAwait(false);
+        var tool = input.Unoffered ? null : await ResolveToolAsync(runtime, input, name, context).ConfigureAwait(false);
         if (tool is null)
         {
             var unavailable = ToolResults.HarnessError("tool_unavailable", $"Tool {name} is not available");
-            await SettleAsync(runtime, input, call, Ending.Completed, _ => unavailable, context).ConfigureAwait(false);
+            await RejectAsync(runtime, input, call, null, unavailable, context).ConfigureAwait(false);
             return;
         }
         var prepared = Prepare(tool, call["arguments"]);
         var checkedArgs = prepared.Error is null ? Validate(tool, call, prepared.Args!) : prepared;
         if (checkedArgs.Error is { } invalid)
         {
-            await SettleAsync(runtime, input, call, Ending.Completed, _ => Invalid(invalid), context).ConfigureAwait(false);
+            await RejectAsync(runtime, input, call, tool, Invalid(invalid), context).ConfigureAwait(false);
             return;
         }
         var args = checkedArgs.Args!;
@@ -177,13 +199,13 @@ internal static class ToolPhases
         if (block is not null)
         {
             var blocked = ToolResults.HarnessError("blocked", $"Tool call blocked: {block}");
-            await SettleAsync(runtime, input, call, Ending.Completed, _ => blocked, context).ConfigureAwait(false);
+            await RejectAsync(runtime, input, call, tool, blocked, context).ConfigureAwait(false);
             return;
         }
         var validated = Validate(tool, call, args);
         if (validated.Error is { } rejected)
         {
-            await SettleAsync(runtime, input, call, Ending.Completed, _ => Invalid(rejected), context).ConfigureAwait(false);
+            await RejectAsync(runtime, input, call, tool, Invalid(rejected), context).ConfigureAwait(false);
             return;
         }
         var final = validated.Args!;
@@ -218,15 +240,16 @@ internal static class ToolPhases
         var args = checkpoint["arguments"];
         var replay = checkpoint["replay"] is JsonStringValue { Value: var stored } ? stored : null;
         var call = await ReadCallAsync(runtime, input, context).ConfigureAwait(false);
+        // Also before an interruption result: its afterTool hooks may be what cut the task off.
+        if (Live.CutOffTooOften(task, runtime))
+        {
+            await EndCutOffAsync(runtime, task, input, call, context).ConfigureAwait(false);
+            return;
+        }
         var name = Name(call);
         var tool = await ResolveToolAsync(runtime, input, name, context).ConfigureAwait(false);
         if (replay == "safe" && tool?.Replay == ToolReplay.Safe)
         {
-            if (Live.CutOffTooOften(task, runtime))
-            {
-                await EndCutOffAsync(runtime, task, input, call, context).ConfigureAwait(false);
-                return;
-            }
             // The rerun reports from scratch: clear what the interrupted attempt published, and show the slot running with the arguments it
             // runs with again, as the deferred commit that showed them may have been lost with the crash.
             await runtime.CommitAsync(async (tx, _) =>
@@ -242,19 +265,21 @@ internal static class ToolPhases
             return;
         }
         var message = $"Tool {name} was interrupted and may have partially run";
-        // `failed` records cancellation intent, so the call's owned conversations, left unsupervised, are aborted.
-        await SettleAsync(runtime, input, call, Ending.Failed(message), slot => FromSlot(slot, "interrupted", message), context).ConfigureAwait(false);
+        // `failed` records cancellation intent, so the call's owned conversations, left unsupervised, are aborted. Not cut off too often
+        // (checked above), so the hooks run.
+        await SettleFromSlotAsync(runtime, input, call, new SlotHooks(tool), Ending.Failed(message), "interrupted", message, context).ConfigureAwait(false);
     }
 
     /// <summary>
     /// Ends a call cut off <c>settings.RestartLimit</c> times in a row (spec §5.4) with an error result, built from the slot like an
     /// interrupted call's, instead of running it again (upstream <c>endCutOff</c>). <c>failed</c>, like an interruption, so its owned work
-    /// is aborted.
+    /// is aborted. Past the limit the hooks may be what keeps cutting the task off (<see cref="Live.Salvageable"/>), so they run only at it.
     /// </summary>
-    private static Task EndCutOffAsync(ITaskRuntime runtime, RunningTask task, ToolInput input, JsonObjectValue call, DurableContext context)
+    private static async Task EndCutOffAsync(ITaskRuntime runtime, RunningTask task, ToolInput input, JsonObjectValue call, DurableContext context)
     {
         var message = $"Tool {Name(call)} was interrupted {Live.CutOffCount(task)}; it is not run again";
-        return SettleAsync(runtime, input, call, Ending.Failed(message, "restart_limit"), slot => FromSlot(slot, "restart_limit", message), context);
+        SlotHooks? hooks = Live.Salvageable(task, runtime) ? new SlotHooks(await ToolForLimitsAsync(runtime, input, Name(call), context).ConfigureAwait(false)) : null;
+        await SettleFromSlotAsync(runtime, input, call, hooks, Ending.Failed(message, "restart_limit"), "restart_limit", message, context).ConfigureAwait(false);
     }
 
     public static async Task AbortAsync(RunningTask task, ITaskRuntime runtime, DurableContext context)
@@ -262,13 +287,63 @@ internal static class ToolPhases
         var input = ToolInput.Parse(task.Input);
         var call = await ReadCallAsync(runtime, input, context).ConfigureAwait(false);
         var name = Name(call);
-        // Abandoned after a restart (TaskOptions.AbandonOnRestart): say whether the call may have run.
-        var (code, message) = task.AbortReason != TaskAbortReason.Restart
-            ? ("aborted", $"Tool {name} was aborted")
-            : task.Phase == "execute"
-                ? ("interrupted", $"Tool {name} was interrupted by a restart and may have partially run")
-                : ("abandoned", $"Tool {name} was not started: its caller ended with a restart");
-        await SettleAsync(runtime, input, call, Ending.Aborted, slot => FromSlot(slot, code, message), context).ConfigureAwait(false);
+        // Abandoned after a restart (TaskOptions.AbandonOnRestart): say whether the call may have run. An unoffered call could not run in any
+        // case, and its result says so.
+        var (code, message) = input.Unoffered
+            ? ("tool_unavailable", $"Tool {name} is not available")
+            : task.AbortReason != TaskAbortReason.Restart
+                ? ("aborted", $"Tool {name} was aborted")
+                : task.Phase == "execute"
+                    ? ("interrupted", $"Tool {name} was interrupted by a restart and may have partially run")
+                    : ("abandoned", $"Tool {name} was not started: its caller ended with a restart");
+        // The scheduler runs an abort handler only while its restarts are below the limit, and faults the task without a result when the last
+        // attempt is cut off. That attempt skips the hooks, which may be what cuts it off.
+        SlotHooks? hooks = (task.Restarts ?? 0) < runtime.Settings.RestartLimit - 1
+            ? new SlotHooks(await ToolForLimitsAsync(runtime, input, name, context).ConfigureAwait(false))
+            : null;
+        await SettleFromSlotAsync(runtime, input, call, hooks, Ending.Aborted, code, message, context).ConfigureAwait(false);
+    }
+
+    /// <summary>Settles a result the Harness decided in the <c>call</c> phase, without running the tool: the tool did not resolve, the
+    /// arguments are invalid, or <c>beforeTool</c> blocked the call. <c>afterTool</c> applies as to an executed call's result (upstream
+    /// <c>reject</c>).</summary>
+    private static async Task RejectAsync(ITaskRuntime runtime, ToolInput input, JsonObjectValue call, ToolRegistration? tool,
+        ToolExecutionResult result, DurableContext context)
+    {
+        var settled = await AfterHarnessResultAsync(runtime, input, call, tool, result, null, context).ConfigureAwait(false);
+        await SettleAsync(runtime, input, call, Ending.Completed, settled, context).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Settles an error result built from the call's slot (<see cref="FromSlot"/>): an interruption, the restart limit, or an abort (upstream
+    /// <c>settleFromSlot</c>). The tool is not running, so the slot read before the commit is still current when it commits. With
+    /// <paramref name="hooks"/>, the result passes <c>afterTool</c> and is bounded with the limits of its tool (the defaults when it is null);
+    /// without, it is settled as built, when the hooks may be what cuts the task off.
+    /// </summary>
+    private static async Task SettleFromSlotAsync(ITaskRuntime runtime, ToolInput input, JsonObjectValue call, SlotHooks? hooks, Ending ending,
+        string code, string message, DurableContext context)
+    {
+        var live = await runtime.SnapshotAsync(Live.LiveDoc, runtime.ConversationId, context).ConfigureAwait(false);
+        var (result, truncation) = FromSlot(live is null ? null : Live.ToolSlotOf(live, runtime.TaskId), code, message);
+        var settled = hooks is { } with
+            ? await AfterHarnessResultAsync(runtime, input, call, with.Tool, result, truncation, context).ConfigureAwait(false)
+            : truncation is null ? result : result with { Diagnostics = [.. result.Diagnostics ?? [], truncation] };
+        await SettleAsync(runtime, input, call, ending, settled, context).ConfigureAwait(false);
+    }
+
+    /// <summary>The tool whose output limits bound a hooks' result: the called tool, or none when it, or the agent, fails to resolve, and for
+    /// an unoffered call, which never resolves its name (upstream <c>toolForLimits</c>).</summary>
+    private static async Task<ToolRegistration?> ToolForLimitsAsync(ITaskRuntime runtime, ToolInput input, string name, DurableContext context)
+    {
+        if (input.Unoffered) return null;
+        try
+        {
+            return await ResolveToolAsync(runtime, input, name, context).ConfigureAwait(false);
+        }
+        catch (Exception)
+        {
+            return null;
+        }
     }
 
     // ─── Resolution and validation ──────────────────────────────────────────
@@ -280,6 +355,13 @@ internal static class ToolPhases
         var agent = await runtime.AgentAsync(context).ConfigureAwait(false);
         return (input.Nested ? agent.Callable : agent.Tools).FirstOrDefault(tool => tool.Name == name);
     }
+
+    /// <summary>The tool's output limits, the defaults filled in; all defaults when the tool did not resolve (upstream
+    /// <c>outputLimits</c>).</summary>
+    private static OutputLimits OutputLimitsOf(ToolRegistration? tool) => new(
+        tool?.OutputLimits?.MaxBytes ?? Truncation.DefaultMaxBytes,
+        tool?.OutputLimits?.MaxLines ?? Truncation.DefaultMaxLines,
+        tool?.OutputLimits?.Retain ?? ToolOutputRetention.Head);
 
     /// <summary>The call: from the input for a nested call, which hooks see with its parent, else the tool call <c>callId</c> of the
     /// assistant entry (upstream <c>readCall</c>).</summary>
@@ -355,10 +437,7 @@ internal static class ToolPhases
     private static async Task RunAsync(ITaskRuntime runtime, ToolInput input, JsonObjectValue call, ToolRegistration tool, JsonValue args,
         DurableContext context)
     {
-        var limits = new OutputLimits(
-            tool.OutputLimits?.MaxBytes ?? Truncation.DefaultMaxBytes,
-            tool.OutputLimits?.MaxLines ?? Truncation.DefaultMaxLines,
-            tool.OutputLimits?.Retain ?? ToolOutputRetention.Head);
+        var limits = OutputLimitsOf(tool);
         var reported = new ToolReport(new OutputBuffer(limits), limits);
         var streams = !input.Nested || input.Progress;
         var progress = PublishProgress(runtime, reported, streams, context);
@@ -416,7 +495,7 @@ internal static class ToolPhases
         try
         {
             var settled = await FinalResultAsync(runtime, input, call, tool, result, reported, context).ConfigureAwait(false);
-            await SettleAsync(runtime, input, call, ending, _ => settled, context, durationMs).ConfigureAwait(false);
+            await SettleAsync(runtime, input, call, ending, settled, context, durationMs).ConfigureAwait(false);
         }
         catch (Exception error)
         {
@@ -569,6 +648,31 @@ internal static class ToolPhases
         return final with { Output = bounded.Content, Diagnostics = [.. final.Diagnostics ?? [], .. harness] };
     }
 
+    /// <summary>
+    /// A result the Harness wrote itself, without executing the tool, after the <c>afterTool</c> chain, normalized like an executed call's
+    /// (upstream <c>afterHarnessResult</c>): the output bounded with the tool's limits (the defaults when it did not resolve), a truncation
+    /// diagnostic when that dropped something, and the hooks' <c>StructuredOutput</c> dropped, since the tool never produced one. A nested call
+    /// that the hooks turned into a success gets the bounded output as its value, as a schema-less tool's success does, unless the tool
+    /// declares a schema. <c>Usage</c> is kept and recorded; <c>Control</c> applies only when the task completes (SettleAsync).
+    /// <paramref name="truncation"/> describes what the result's own output lost before (a slot's retained output); it is kept only while the
+    /// hooks keep that output.
+    /// </summary>
+    private static async Task<ToolExecutionResult> AfterHarnessResultAsync(ITaskRuntime runtime, ToolInput input, JsonObjectValue call,
+        ToolRegistration? tool, ToolExecutionResult result, ToolDiagnostic? truncation, DurableContext context)
+    {
+        var final = result;
+        await runtime.Hooks.EachAsync<ToolHooks, Func<JsonObjectValue, ToolExecutionResult, IHookApi, DurableContext, Task<ToolExecutionResult?>>>(
+            hooks => hooks.AfterTool,
+            async hook => final = await hook(call, final, runtime, context).ConfigureAwait(false) ?? final).ConfigureAwait(false);
+        var harness = new List<ToolDiagnostic>();
+        if (truncation is not null && ReferenceEquals(final.Output, result.Output)) harness.Add(truncation);
+        var limits = OutputLimitsOf(tool);
+        var bounded = BoundContent(final.Output ?? JsonValue.Array(), limits);
+        if (bounded.DroppedBytes > 0) harness.Add(Truncated(bounded.DroppedLines, bounded.DroppedBytes, limits.Retain));
+        var value = input.Nested && final.IsError != true && tool?.StructuredOutputSchema is null ? OutputValue(bounded.Content) : null;
+        return final with { StructuredOutput = value, Output = bounded.Content, Diagnostics = [.. final.Diagnostics ?? [], .. harness] };
+    }
+
     private static readonly ConditionalWeakTable<JsonObjectValue, StructuredOutputValidator> StructuredValidators = new();
 
     /// <summary>Why a result's structured output breaks the tool's contract, or null when it keeps it (upstream
@@ -589,10 +693,10 @@ internal static class ToolPhases
     /// Commits the tool's terminal state and marks its slot done (upstream <c>settle</c>). A model-issued call appends its result entry and
     /// ends with the entry ID; a nested call writes its result to the caller's <c>NestedCallDoc</c>, records its usage, and ends with a small
     /// receipt. Nested calls this call left running are aborted first, so they report into their slots before the slots below the call leave
-    /// <c>pi.live</c>. <paramref name="build"/> receives the slot so interruption and abort can report the durable partial output.
+    /// <c>pi.live</c>. <c>Control</c> applies only when the task completes.
     /// </summary>
     private static async Task SettleAsync(ITaskRuntime runtime, ToolInput input, JsonObjectValue call, Ending ending,
-        Func<DraftObject?, ToolExecutionResult> build, DurableContext context, double? durationMs = null)
+        ToolExecutionResult result, DurableContext context, double? durationMs = null)
     {
         // A crash in between leaves the call in `execute`: a safe rerun reattaches to the calls, an interruption ends here. Every live nested
         // call the task owns, also those an earlier attempt made and this one never called again.
@@ -609,7 +713,6 @@ internal static class ToolPhases
             var conversationId = runtime.ConversationId;
             var live = await tx.DocAsync(Live.LiveDoc, conversationId).ConfigureAwait(false);
             var slot = Live.ToolSlot(live, runtime.TaskId);
-            var result = build(slot);
             JsonObjectValue settled;
             if (input.Nested)
             {
@@ -765,27 +868,29 @@ internal static class ToolPhases
         return new NestedToolExecutionResult { TaskId = taskId, IsError = true, Diagnostics = error.Diagnostics ?? [] };
     }
 
-    /// <summary>An error result from the slot's durable partial output, details and diagnostics (upstream <c>fromSlot</c>).</summary>
-    private static ToolExecutionResult FromSlot(DraftObject? slot, string code, string message)
+    /// <summary>An error result from the slot's durable partial output, details and diagnostics, ending with <paramref name="code"/>; and the
+    /// truncation diagnostic of that output, when its bounds dropped some, which the caller adds after <c>afterTool</c> (upstream
+    /// <c>fromSlot</c>).</summary>
+    private static (ToolExecutionResult Result, ToolDiagnostic? Truncation) FromSlot(JsonObjectValue? slot, string code, string message)
     {
         var diagnostics = new List<ToolDiagnostic>();
-        if (slot is not null && slot.ContainsKey("diagnostics") && slot.Get("diagnostics") is JsonArrayValue stored)
+        if (slot is not null && slot.TryGetValue("diagnostics", out var listed) && listed is JsonArrayValue stored)
             diagnostics.AddRange(stored.Select(ToolResults.ParseDiagnostic));
-        var droppedBytes = Number(slot, "droppedBytes") ?? 0;
-        if (droppedBytes > 0) diagnostics.Add(Truncated(Number(slot, "droppedLines") ?? 0, droppedBytes, null));
         diagnostics.Add(ToolResults.Diagnostic(code, message));
-        var output = slot is not null && slot.ContainsKey("output") && slot.Get("output") is JsonStringValue { Value: var text } ? text : null;
-        return new ToolExecutionResult
+        var output = slot is not null && slot.TryGetValue("output", out var retained) && retained is JsonStringValue { Value: var text } ? text : null;
+        var result = new ToolExecutionResult
         {
             Output = string.IsNullOrEmpty(output) ? JsonValue.Array() : JsonValue.Array(Text(output)),
             IsError = true,
-            Details = slot is not null && slot.ContainsKey("details") ? slot.Get("details") : null,
+            Details = slot is not null && slot.TryGetValue("details", out var details) ? details : null,
             Diagnostics = [.. diagnostics],
         };
+        var droppedBytes = Number(slot, "droppedBytes") ?? 0;
+        return (result, droppedBytes > 0 ? Truncated(Number(slot, "droppedLines") ?? 0, droppedBytes, null) : null);
     }
 
-    private static long? Number(DraftObject? slot, string key) =>
-        slot is not null && slot.ContainsKey(key) && slot.Get(key) is JsonNumberValue number ? (long)number.Value : null;
+    private static long? Number(JsonObjectValue? slot, string key) =>
+        slot is not null && slot.TryGetValue(key, out var value) && value is JsonNumberValue number ? (long)number.Value : null;
 
     /// <summary>The Harness's truncation diagnostic; <paramref name="retain"/> is unknown when rebuilt from a slot after recovery (upstream
     /// <c>truncated</c>).</summary>

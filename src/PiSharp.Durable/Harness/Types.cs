@@ -29,6 +29,8 @@
 // the view and task graph mounts the watches share.
 // Pi v1.5.0 sync (area view, f3255de76): IConversation.WatchAsync and IHarness.ObserveConversationAsync take a ConversationWindow; the
 // view's entries are a window over the transcript.
+// Pi v1.5.0 sync (area tool-tasks, 87eff524f, 1c6928b30): ToolHooks.AfterTool runs on every result a tool task writes, the Harness's own error
+// results included, and its doc says which (#11043).
 using System.Collections.Immutable;
 using PiSharp.AI;
 using PiSharp.Durable.Chord;
@@ -1346,7 +1348,19 @@ public sealed class ToolHooks
 {
     /// <summary>Before intent; the first block wins, otherwise arguments replace the call's arguments. A throw blocks.</summary>
     public Func<JsonObjectValue, IHookApi, DurableContext, Task<BeforeToolDecision?>>? BeforeTool { get; init; }
-    /// <summary>After execution, before the result is committed; replaces the result.</summary>
+    /// <summary>
+    /// Before the result is committed; replaces the result. Runs on every result the tool task writes: an executed call's, and the error
+    /// results the Harness writes itself, told apart by their diagnostic code: a tool that does not resolve (<c>tool_unavailable</c>, also
+    /// every call to a tool its request did not offer), invalid arguments (<c>invalid_arguments</c>, with the call's <c>arguments</c> as the
+    /// model sent them), a block (<c>blocked</c>), and, rebuilt from the call's partial output, an interruption (<c>interrupted</c>), the
+    /// restart limit (<c>restart_limit</c>), and an abort (<c>aborted</c>, <c>abandoned</c>). Once the task was cut off more than
+    /// <see cref="HarnessSettings.RestartLimit"/> times the hooks no longer run, since they may be what cuts it off, nor in the last attempt
+    /// the scheduler gives an abort handler (restarts at the limit minus one). A result's <c>StructuredOutput</c> is dropped when the Harness
+    /// wrote it (a nested call a hook turns into a success gets the bounded output as a schema-less tool's does), and its <c>Control</c>
+    /// applies only to a call that completes (not to an interrupted, cut-off, or aborted one). An abort's hooks run inside the abort handler,
+    /// which cannot be aborted: a slow hook delays <see cref="IConversation.AbortAsync"/>. Hooks that assume the tool ran (that cast the
+    /// call's arguments or read <c>StructuredOutput</c>) check the result's diagnostics first.
+    /// </summary>
     public Func<JsonObjectValue, ToolExecutionResult, IHookApi, DurableContext, Task<ToolExecutionResult?>>? AfterTool { get; init; }
 }
 
