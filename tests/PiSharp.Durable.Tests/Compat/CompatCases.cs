@@ -36,6 +36,10 @@
 // Pi v1.5.0 sync (area tool-tasks, 1c6928b30): the written, resume and upgrade resumed cases also compare with ToolTasks150.cs's authored
 // forms: v1.5.0 writes pi.tool tasks at version 3 and pi.generation tasks at version 2, a written run every one of them, a resume those it
 // reserves (live when it starts) or creates; the tasks a resumed session held terminal keep the captured version.
+// Pi v1.5.0 sync (area live-turns, 5f312dac4, f6a9db1d8, 018fdcf43): the harness, resume, written and upgrade resumed cases also compare
+// with LiveV3150.cs's authored forms: v1.5.0 stores pi.live at version 3, where a compaction status and compactionFailure name their
+// trigger and a run carries its turns. A Harness reads the captures' version 1 values migrated (harness: a run counts 0 turns), a resume
+// stores the documents it changes at version 3, and a written run every revision, a run's turns counted from the captured commits.
 // - upgrade-from-v1.1.0: a v1.2.0 Harness opens copies of the v1.1.0 sessions (Fixtures/upstream-sessions) without resuming them, and
 //   resumes the resumable ones with their scenario's model, ending with the records upstream's v1.2.0 left (its v1 pi.tool tasks migrate to
 //   version 2 when they run; to version 3 since Pi v1.5.0, area tool-tasks).
@@ -277,8 +281,9 @@ internal static partial class CompatTests
                         await resume(() => OpenBackend(backend, directory));
                         // Pi v1.5.0 (area model-requests): the messages the resume classifies record the thinking level (ModelRequests150.cs).
                         // (area tool-tasks) the tool and generation tasks it reserves or creates at their v1.5.0 versions (ToolTasks150.cs).
+                        // (area live-turns) the pi.live documents it changes at version 3 (LiveV3150.cs).
                         var before = Expected(scenario.Name, "records.json", backend);
-                        SameJson(ToolTasks150.Resumed(ModelRequests150.Authored(Expected(scenario.Name, "resumed.json", backend), before), before),
+                        SameJson(LiveV3150.Resumed(ToolTasks150.Resumed(ModelRequests150.Authored(Expected(scenario.Name, "resumed.json", backend), before), before), before),
                             await Dump(await OpenBackend(backend, directory)), "resumed records");
                     });
                 yield return Case(AuthoredCase(prefix + "written"), async () =>
@@ -286,22 +291,24 @@ internal static partial class CompatTests
                     // Pi v1.5.0 (area model-requests): the messages PiSharp classifies record the thinking level (ModelRequests150.cs).
                     // (area deferred-commits) and DeferredCommits150's, the commits v1.5.0 holds and stores later.
                     // (area tool-tasks) and ToolTasks150's, every tool and generation task at its v1.5.0 version.
+                    // (area live-turns) and LiveV3150's, every pi.live revision at version 3.
                     static JsonValue Authored(JsonValue capture) => ToolTasks150.Written(ModelRequests150.Authored(capture));
-                    static string AuthoredText(string text) => ToolTasks150.WrittenText(ModelRequests150.AuthoredText(text));
+                    var live = LiveV3150.For(Path.Combine(Fixtures, scenario.Name));
+                    string AuthoredText(string text) => live.Text(ToolTasks150.WrittenText(ModelRequests150.AuthoredText(text)));
                     var deferred = DeferredCommits150.For(Path.Combine(Fixtures, scenario.Name));
                     var directory = Temp($"compat-written-{scenario.Name}-{backend}");
                     await scenario.Run(() => OpenBackend(backend, directory));
-                    SameJson(deferred.Records(Authored(Expected(scenario.Name, "records.json", backend))), await Dump(await OpenBackend(backend, directory)),
+                    SameJson(deferred.Records(live.Records(Authored(Expected(scenario.Name, "records.json", backend)))), await Dump(await OpenBackend(backend, directory)),
                         "records");
                     var upstream = Path.Combine(Fixtures, scenario.Name, backend);
                     if (backend == "jsonl") SameFiles(upstream, directory, AuthoredText, deferred);
                     // A copy: even a read-only connection to a WAL database leaves -wal and -shm files beside it.
                     else SameColumns(Path.Combine(CopyFixture(scenario.Name, backend), "session.sqlite"), Path.Combine(directory, "session.sqlite"),
-                        AuthoredText, deferred);
+                        AuthoredText, deferred, live);
                     if (scenario.Resume is { } resume)
                     {
                         await resume(() => OpenBackend(backend, directory));
-                        SameJson(deferred.Records(Authored(Expected(scenario.Name, "resumed.json", backend))),
+                        SameJson(deferred.Records(LiveV3150.WrittenResumed(Authored(Expected(scenario.Name, "resumed.json", backend)))),
                             await Dump(await OpenBackend(backend, directory)), "resumed records");
                     }
                 });
@@ -328,8 +335,9 @@ internal static partial class CompatTests
                         await resume(() => OpenBackend(backend, directory));
                         // Pi v1.5.0 (area model-requests): the messages the resume classifies record the thinking level (ModelRequests150.cs).
                         // (area tool-tasks) the tool and generation tasks it reserves or creates at their v1.5.0 versions (ToolTasks150.cs).
+                        // (area live-turns) the pi.live documents it changes at version 3 (LiveV3150.cs).
                         var before = Expected(upgrade, "opened.json", backend);
-                        SameJson(ToolTasks150.Resumed(ModelRequests150.Authored(Expected(upgrade, "resumed.json", backend), before), before),
+                        SameJson(LiveV3150.Resumed(ToolTasks150.Resumed(ModelRequests150.Authored(Expected(upgrade, "resumed.json", backend), before), before), before),
                             await Dump(await OpenBackend(backend, directory)), "resumed records");
                     });
             }
@@ -337,9 +345,11 @@ internal static partial class CompatTests
     }
 
     /// <summary><paramref name="id"/>, listed as authored when the capture of <paramref name="scenario"/> left tasks running, whose restarts
-    /// v1.5.0's open counts (area restarts, Restarts150.cs).</summary>
+    /// v1.5.0's open counts (area restarts, Restarts150.cs), or holds a pi.live value that v1.5.0 reads migrated (area live-turns,
+    /// LiveV3150.cs).</summary>
     private static string Counted(string id, string scenario, string backend, string? root = null) =>
-        Restarts150.Running(Expected(scenario, "records.json", backend, root)).Count > 0 ? AuthoredCase(id) : id;
+        Restarts150.Running(Expected(scenario, "records.json", backend, root)).Count > 0 || LiveV3150.Migrates(Expected(scenario, "records.json", backend, root))
+            ? AuthoredCase(id) : id;
 
     /// <summary>scenarios.mjs <c>openOnly</c>: a Harness opens the session and closes it without resuming.</summary>
     private static async Task OpenOnly(Func<Task<IStorage>> openStorage)
@@ -389,7 +399,8 @@ internal static partial class CompatTests
                             : (JsonObjectValue)Restarts150.Charged(ModelRequests150.Authored(expectedEvents, held), held, CompatScenarios.Now), "resume");
                         await CompatEvents.Record(events, () => resume(() => OpenBackend(backend, directory)));
                         // (area tool-tasks) the tool and generation tasks it reserves or creates at their v1.5.0 versions (ToolTasks150.cs).
-                        SameJson(ToolTasks150.Resumed(ModelRequests150.Authored(Expected(scenario.Name, "resumed.json", backend, root), held), held),
+                        // (area live-turns) the pi.live documents it changes at version 3 (LiveV3150.cs).
+                        SameJson(LiveV3150.Resumed(ToolTasks150.Resumed(ModelRequests150.Authored(Expected(scenario.Name, "resumed.json", backend, root), held), held), held),
                             await Dump(await OpenBackend(backend, directory)), "resumed records");
                         events?.Check("resume events");
                     });
@@ -404,23 +415,26 @@ internal static partial class CompatTests
                     // frame or observed value holds a seq).
                     // (area run-failure) and RunFailure150's, the runFailure a scenario's failed newest run leaves in pi.live.
                     // (area tool-tasks) and ToolTasks150's, every tool and generation task at its v1.5.0 version.
+                    // (area live-turns) and LiveV3150's, every pi.live revision at version 3 (records and persisted texts: the events keep
+                    // v1.2.0's wire, and no observed value holds pi.live).
                     var runFailure = RunFailure150.For(scenario.Name);
+                    var live = LiveV3150.For(Path.Combine(root, scenario.Name));
                     JsonValue Authored(JsonValue capture) =>
                         ToolTasks150.Written(runFailure.Authored(ModelRequests150.Authored(ToolsSchema150.Authored(capture))));
                     string AuthoredText(string text) =>
-                        ToolTasks150.WrittenText(runFailure.AuthoredText(ModelRequests150.AuthoredText(ToolsSchema150.AuthoredText(text))));
+                        live.Text(ToolTasks150.WrittenText(runFailure.AuthoredText(ModelRequests150.AuthoredText(ToolsSchema150.AuthoredText(text)))));
                     var deferred = DeferredCommits150.For(Path.Combine(root, scenario.Name));
                     var writtenEvents = expectedEvents is null ? null : (JsonObjectValue)Authored(expectedEvents);
                     var directory = Temp($"compat-written-{scenario.Name}-{backend}");
                     var runEvents = CompatEvents.Expect(writtenEvents, "run");
                     var observed = await CompatEvents.Record(runEvents, () => runScenario(() => OpenBackend(backend, directory)));
                     runEvents?.Check("run events");
-                    SameJson(deferred.Records(Authored(Expected(scenario.Name, "records.json", backend, root))), await Dump(await OpenBackend(backend, directory)),
-                        "records");
+                    SameJson(deferred.Records(live.Records(Authored(Expected(scenario.Name, "records.json", backend, root)))),
+                        await Dump(await OpenBackend(backend, directory)), "records");
                     var upstream = Path.Combine(root, scenario.Name, backend);
                     if (backend == "jsonl") SameFiles(upstream, directory, AuthoredText, deferred);
                     else SameColumns(Path.Combine(CopyFixture(scenario.Name, backend, root), "session.sqlite"), Path.Combine(directory, "session.sqlite"),
-                        AuthoredText, deferred);
+                        AuthoredText, deferred, live);
                     var observedFile = Path.Combine(root, scenario.Name, "observed.json");
                     JsonObjectValue? expectedObserved = File.Exists(observedFile)
                         ? (JsonObjectValue)Authored(Expected(scenario.Name, "observed.json", backend, root)) : null;
@@ -431,8 +445,8 @@ internal static partial class CompatTests
                         var resumeEvents = CompatEvents.Expect(writtenEvents, "resume");
                         var resumed = await CompatEvents.Record(resumeEvents, () => resume(() => OpenBackend(backend, directory)));
                         resumeEvents?.Check("resume events");
-                        SameJson(deferred.Records(Authored(Expected(scenario.Name, "resumed.json", backend, root))), await Dump(await OpenBackend(backend, directory)),
-                            "resumed records");
+                        SameJson(deferred.Records(LiveV3150.WrittenResumed(Authored(Expected(scenario.Name, "resumed.json", backend, root)))),
+                            await Dump(await OpenBackend(backend, directory)), "resumed records");
                         if (expectedObserved?.TryGetValue("resume", out var onResume) == true)
                             SameObserved(onResume, resumed ?? throw new InvalidOperationException("the resume observed nothing"), scenario.UnobservedFields,
                                 "observed resume");
@@ -459,7 +473,8 @@ internal static partial class CompatTests
     ];
 
     /// <summary>A Harness that is never resumed reads upstream's transcripts, tasks and pi.* documents, and closes with upstream's records;
-    /// Pi v1.5.0 (area restarts): with a restart counted for each task it found running (Restarts150.cs).</summary>
+    /// Pi v1.5.0 (area restarts): with a restart counted for each task it found running (Restarts150.cs); (area live-turns) reading pi.live
+    /// migrated from version 1 (LiveV3150.cs).</summary>
     private static async Task HarnessReads(string scenario, string backend, string? root = null)
     {
         var expected = (JsonObjectValue)Restarts150.Opened(Expected(scenario, "opened.json", backend, root), Expected(scenario, "records.json", backend, root));
@@ -487,7 +502,7 @@ internal static partial class CompatTests
                     });
                     var snapshot = await harness.SnapshotAsync(doc, id, Context);
                     if (stored is null) Check(snapshot is null, $"conversation {id} has no {name}");
-                    else SameJson(stored["value"], snapshot!, $"conversation {id} {name}");
+                    else SameJson(name == "pi.live" ? LiveV3150.Migrated((JsonObjectValue)stored["value"]) : stored["value"], snapshot!, $"conversation {id} {name}");
                 }
             }
             foreach (var taskJson in ((JsonArrayValue)expected["tasks"]).Cast<JsonObjectValue>())
@@ -642,14 +657,17 @@ internal static partial class CompatTests
     ];
 
     /// <summary>The SQLite session PiSharp wrote holds upstream's rows and JSON text, apart from the varying fields; <paramref name="authored"/>,
-    /// when given, turns each captured column into its authored form, and <paramref name="deferred"/> then moves the commits v1.5.0 holds.</summary>
-    private static void SameColumns(string upstream, string pisharp, Func<string, string>? authored = null, DeferredCommits150.Plan? deferred = null)
+    /// when given, turns each captured column into its authored form, <paramref name="live"/> each pi.live revision row (area live-turns),
+    /// and <paramref name="deferred"/> then moves the commits v1.5.0 holds.</summary>
+    private static void SameColumns(string upstream, string pisharp, Func<string, string>? authored = null, DeferredCommits150.Plan? deferred = null,
+        LiveV3150.Plan? live = null)
     {
         using var left = ReadOnly(upstream);
         using var right = ReadOnly(pisharp);
         foreach (var sql in Columns)
         {
             var expected = Rows(left, sql).Select(row => row.Select(authored ?? (cell => cell)).ToArray()).ToList();
+            if (live is not null) expected = live.Rows(sql, expected);
             if (deferred is not null) expected = deferred.Rows(sql, expected);
             var actual = Rows(right, sql);
             for (var index = 0; index < Math.Max(expected.Count, actual.Count); index++)

@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/test/harness-compaction.test.ts. Verbatim apart from the adaptations in
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/test/harness-compaction.test.ts. Verbatim apart from the adaptations in
 // HarnessSupport.cs and ChatSupport.cs, and these:
 // - Tools return their results as ToolExecutionResult.Content: upstream's v1.2.0 `output` is area a's rename of that field, which renames
 //   it in every test at once.
@@ -23,7 +23,7 @@
 // cases (6085986e4: harness.compaction.per-model-compaction-overrides.applies-the-current-model-s-override-to-the-blocking-threshold,
 // harness.compaction.per-model-compaction-overrides.applies-the-request-model-s-override-on-a-context-overflow and
 // harness.compaction.per-model-compaction-overrides.applies-the-model-s-override-when-a-compaction-selects-and-sizes-its-summary) are
-// v1.5.0's; the citation stays on v1.2.0 until the file's other areas land. Area sleep: "resumes a retry backoff after reopen" is
+// v1.5.0's. Area sleep: "resumes a retry backoff after reopen" is
 // ec1be23eb's: the backoff is a durable sleep, and a retry an earlier version stored as a running phase sleeps again when reopened before
 // its time; upstream's SQL that turns the stored status back to running is a write of the record read from the closed storage.
 // Area view (f3255de76): "compacts a fork whose cut falls on a parent entry" checks the windowed view of v1.5.0, and "keeps the kept
@@ -35,6 +35,10 @@
 // background compaction in the preparation commit, with the entries it appends", and the blocking abort, late joiner and blocked cases.
 // A Session line barrier (ViewTests.Drained) lets the synchronous observer record the publications of the commits a wait returned after,
 // where upstream reads them at once.
+// Area live-turns (5f312dac4, f6a9db1d8, 018fdcf43): compaction statuses and pi.live.compactionFailure name their trigger, and describe
+// "pi.live migrations" is harness.compaction.pi-live-migrations.* (MigrationCases, on MemoryStorage as upstream): a version 1 and a
+// version 2 value written with an older pi.live token read migrated through Live.LiveDoc (version 3), and Storage keeps the older value
+// until the next write. The file is v1.5.0's now.
 using System.Collections.Immutable;
 using System.Text.RegularExpressions;
 using PiSharp.Contracts;
@@ -66,6 +70,7 @@ internal static partial class Program
         return
         [
             .. CompactionTests.PureCases("harness.compaction."),
+            .. CompactionTests.MigrationCases("harness.compaction.pi-live-migrations."),
             .. CompactionTests.Cases("harness.compaction.", () => new MemoryStorage(), SqliteFile),
             .. CompactionTests.Cases("harness.compaction.jsonl.",
                 () => JsonlStorage.OpenAsync(Temp("compaction-jsonl"), DurableContext.Background).GetAwaiter().GetResult(), JsonlDirectory),
@@ -1062,7 +1067,7 @@ internal static class CompactionTests
             var task = Single(await CompactionTasks(chat), "background");
             MatchJson("""{"background":true,"input":{"reason":"threshold"}}""", task.ToJson(), "task");
             Equal(null, task.Owner, "owner");
-            SameJson($$"""[{"taskId":{{task.Id.Value}},"reason":"threshold","blocking":false,"attempt":1}]""", await Compactions(chat), "statuses");
+            SameJson($$"""[{"taskId":{{task.Id.Value}},"trigger":"threshold","blocking":false,"attempt":1}]""", await Compactions(chat), "statuses");
             // Background work: neither conversation idle nor Esc waits for or stops it.
             await chat.Root.WaitForIdleAsync(Context);
             await chat.Root.AbortAsync(Context);
@@ -1118,7 +1123,7 @@ internal static class CompactionTests
             await Turn(chat, Text("u4", 100), Text("a4", 100));
             await Eventually(async () => (await LiveOf(chat)).ContainsKey("compactionFailure"));
             var recorded = (JsonObjectValue)(await LiveOf(chat))["compactionFailure"];
-            MatchJson("""{"reason":"threshold","error":"Summarization failed: bad request"}""", recorded, "recorded");
+            MatchJson("""{"trigger":"threshold","error":"Summarization failed: bad request"}""", recorded, "recorded");
             // The value that drops the compaction's status records its failure.
             JsonObjectValue Ended(long taskId)
             {
@@ -1188,7 +1193,7 @@ internal static class CompactionTests
             MatchJson($$$"""{"owner":{{{generation}}},"background":false,"input":{"reason":"threshold"}}""", child.ToJson(), "child");
             MatchJson($$$"""{"status":"waiting","on":[{{{child.Id.Value}}}],"checkpoint":{"phase":"prepare","attempt":1,"compacted":{{{child.Id.Value}}}}}""",
                 (await chat.Harness.GetTaskAsync(new TaskId((long)generation), Context))!.State.ToJson(), "generation");
-            SameJson($$"""[{"taskId":{{child.Id.Value}},"reason":"threshold","blocking":true,"attempt":1}]""", await Compactions(chat), "statuses");
+            SameJson($$"""[{"taskId":{{child.Id.Value}},"trigger":"threshold","blocking":true,"attempt":1}]""", await Compactions(chat), "statuses");
             // Nothing was appended before the wait.
             Equal("pi.user", (await KindsOf(chat.Root))[^1], "last kind");
             gate.Resolve();
@@ -1244,7 +1249,7 @@ internal static class CompactionTests
             Equal("pi.user", (await KindsOf(chat.Root))[^1], "last kind");
             var state = await LiveOf(chat);
             Check(!state.ContainsKey("compactions"), "no status");
-            MatchJson("""{"reason":"threshold","error":"Summarization failed: bad request"}""", state["compactionFailure"], "failure");
+            MatchJson("""{"trigger":"threshold","error":"Summarization failed: bad request"}""", state["compactionFailure"], "failure");
             await chat.Harness.CloseAsync(Context);
         });
 
@@ -1646,7 +1651,7 @@ internal static class CompactionTests
             await Eventually(async () => await Compactions(chat) is JsonArrayValue { Count: > 0 } statuses &&
                 ((JsonObjectValue)statuses[0]).ContainsKey("retry"));
             var late = await chat.Root.WatchAsync(Context);
-            MatchExactly($$$"""[{"taskId":{{{id.Value}}},"reason":"manual","blocking":false,"attempt":1,"retry":{"at":"<number>","error":"overloaded"}}]""",
+            MatchExactly($$$"""[{"taskId":{{{id.Value}}},"trigger":"manual","blocking":false,"attempt":1,"retry":{"at":"<number>","error":"overloaded"}}]""",
                 (late.Value.Doc("pi.live") ?? JsonObjectValue.Empty)["compactions"], "late view");
             await late.StopAsync();
             await chat.Harness.AbortTaskAsync(id, Context);
@@ -1654,7 +1659,7 @@ internal static class CompactionTests
             await ViewTests.Drained(chat.Harness);
             views.Detach();
             var listed = views.Live().SelectMany(state => state.TryGetValue("compactions", out var compactions) ? ((JsonArrayValue)compactions).ToList() : []).ToList();
-            SameJson($$"""{"taskId":{{id.Value}},"reason":"manual","blocking":false,"attempt":1}""", listed[0], "listed");
+            SameJson($$"""{"taskId":{{id.Value}},"trigger":"manual","blocking":false,"attempt":1}""", listed[0], "listed");
             // An abort is not a failure.
             Check(!views.Live()[^1].ContainsKey("compactionFailure"), "no failure");
             await chat.Harness.CloseAsync(Context);
@@ -2075,7 +2080,7 @@ internal static class CompactionTests
             Check(!(await KindsOf(chat.Root)).Contains("pi.compaction"), "no summary");
             var state = await LiveOf(chat);
             Check(!state.ContainsKey("compactions"), "no status");
-            MatchJson("""{"reason":"threshold","error":"no credentials"}""", state["compactionFailure"], "failure");
+            MatchJson("""{"trigger":"threshold","error":"no credentials"}""", state["compactionFailure"], "failure");
             await chat.Harness.CloseAsync(Context);
         });
 
@@ -2385,7 +2390,7 @@ internal static class CompactionTests
             var id = await Compact(chat.Root);
             await reached.Task;
             var watch = await chat.Root.WatchAsync(Context);
-            SameJson($$"""[{"taskId":{{id.Value}},"reason":"manual","blocking":false,"attempt":1}]""", (watch.Value.Doc("pi.live") ?? JsonObjectValue.Empty)["compactions"],
+            SameJson($$"""[{"taskId":{{id.Value}},"trigger":"manual","blocking":false,"attempt":1}]""", (watch.Value.Doc("pi.live") ?? JsonObjectValue.Empty)["compactions"],
                 "late view");
             await watch.StopAsync();
             await chat.Harness.AbortTaskAsync(id, Context);
@@ -2458,7 +2463,7 @@ internal static class CompactionTests
             {
                 var taskId = await tx.CreateTaskAsync(newer, O("""{"reason":"manual"}"""), new TaskOptions(TaskOwnership.Conversation));
                 var live = await tx.DocAsync(Live.LiveDoc, root.Id);
-                live.Set("compactions", J($$"""[{"taskId":{{taskId.Value}},"reason":"manual","blocking":false,"attempt":1}]"""));
+                live.Set("compactions", J($$"""[{"taskId":{{taskId.Value}},"trigger":"manual","blocking":false,"attempt":1}]"""));
                 return taskId;
             }, Context);
             await harness.CloseAsync(Context);
@@ -2472,7 +2477,7 @@ internal static class CompactionTests
             await chat.Harness.AbortTaskAsync(id, Context);
             SameJson("""{"status":"orphaned","reason":"task_too_old"}""", OutcomeJson(await chat.Harness.WaitForTaskAsync(id, Context)), "outcome");
             Check(await Compactions(chat) is null, "no status");
-            SameJson($$"""{"taskId":{{id.Value}},"reason":"manual","error":"task_too_old"}""", (await LiveOf(chat))["compactionFailure"], "failure");
+            SameJson($$"""{"taskId":{{id.Value}},"trigger":"manual","error":"task_too_old"}""", (await LiveOf(chat))["compactionFailure"], "failure");
             await chat.Harness.CloseAsync(Context);
         });
     }
@@ -2566,6 +2571,76 @@ internal static class CompactionTests
             var messages = (await chat.Root.ContextAsync(Context)).Messages;
             Seq([Text("u3", 100), Text("a3", 100)], messages.Skip(1).Select(UserText), "kept messages");
             await chat.Harness.CloseAsync(Context);
+        });
+    }
+
+    // ─── pi.live migrations ───────────────────────────────────────────────────
+
+    // Pi v1.5.0 sync (area live-turns): upstream's describe "pi.live migrations" (5f312dac4, f6a9db1d8, 018fdcf43), on MemoryStorage as
+    // upstream runs it. A Session opens the stored value with the older token, and Live.LiveDoc (version 3) reads it migrated.
+    internal static IEnumerable<(string, Func<Task>)> MigrationCases(string prefix)
+    {
+        static async Task<StoredDocument> Stored(MemoryStorage storage, ConversationId conversationId)
+        {
+            var record = await storage.FindDocumentAsync(new DocumentAddress("pi.live", DocumentScope.Conversation(conversationId)), DocumentPoint.Current, Context);
+            return (await storage.GetDocumentAsync(record!.Id, DocumentPoint.Current, Context))!;
+        }
+
+        yield return Case(prefix + "reads-a-version-1-value-with-each-compaction-s-reason-as-trigger-and-stores-it-migrated-on-its-next-write", async () =>
+        {
+            var storage = new MemoryStorage();
+            var session = Session.Create(storage);
+            // pi.live as version 1 wrote it.
+            var liveV1 = Documents.DefineConversationDoc("pi.live", 1, DocumentFork.Initial, () => JsonObjectValue.Empty, checkpointWhen: (_, _, _) => false);
+            var conversationId = await session.CommitAsync(async tx => (await tx.CreateConversationAsync(ConversationOwnership.Ownerless)).Id, Context);
+            await session.CommitAsync(async tx =>
+            {
+                var live = await tx.DocAsync(liveV1, conversationId);
+                live.Set("run", J("""{"taskId":9,"inputs":[4]}"""));
+                live.Set("compactions", J("""[{"taskId":7,"reason":"threshold","blocking":true,"attempt":2}]"""));
+                live.Set("compactionFailure", J("""{"taskId":5,"reason":"manual","error":"no model"}"""));
+            }, Context);
+            // The version 3 token reloads the stored value and migrates it; a run in flight across the upgrade counts its turns from 0
+            // (#11043).
+            var read = await session.SnapshotAsync(Live.LiveDoc, conversationId, Context);
+            MatchExactly("""{"run":{"taskId":9,"inputs":[4],"turns":0},"compactions":[{"taskId":7,"trigger":"threshold","blocking":true,"attempt":2}],"compactionFailure":{"taskId":5,"trigger":"manual","error":"no model"}}""",
+                read, "read");
+            Seq(["taskId", "trigger", "blocking", "attempt"], ((JsonObjectValue)((JsonArrayValue)read!["compactions"])[0]).Keys, "keys");
+            // A read migrates in memory only: Storage keeps the version 1 value.
+            var before = await Stored(storage, conversationId);
+            Equal(1, before.Version, "stored version");
+            MatchJson("""{"compactions":[{"reason":"threshold"}],"compactionFailure":{"reason":"manual"}}""", before.Value, "stored value");
+            await session.CommitAsync(async tx =>
+            {
+                var live = await tx.DocAsync(Live.LiveDoc, conversationId);
+                live.GetArray("compactions").GetObject(0).Set("attempt", 3);
+            }, Context);
+            var after = await Stored(storage, conversationId);
+            Equal(3, after.Version, "migrated version");
+            MatchJson("""{"compactions":[{"trigger":"threshold","attempt":3}],"compactionFailure":{"trigger":"manual"}}""", after.Value, "migrated value");
+            await session.CloseAsync(Context);
+        });
+
+        // #11043: an unreleased build stored version 2 without run.turns; a run in flight then counted NaN turns.
+        yield return Case(prefix + "gives-a-version-2-run-without-turns-a-count-of-0", async () =>
+        {
+            var storage = new MemoryStorage();
+            var session = Session.Create(storage);
+            var liveV2 = Documents.DefineConversationDoc("pi.live", 2, DocumentFork.Initial, () => JsonObjectValue.Empty, checkpointWhen: (_, _, _) => false);
+            var conversationId = await session.CommitAsync(async tx => (await tx.CreateConversationAsync(ConversationOwnership.Ownerless)).Id, Context);
+            await session.CommitAsync(async tx =>
+            {
+                var live = await tx.DocAsync(liveV2, conversationId);
+                live.Set("run", J("""{"taskId":9,"inputs":[4]}"""));
+                live.Set("compactions", J("""[{"taskId":7,"trigger":"threshold","blocking":true,"attempt":2}]"""));
+            }, Context);
+            MatchExactly("""{"run":{"taskId":9,"inputs":[4],"turns":0},"compactions":[{"taskId":7,"trigger":"threshold","blocking":true,"attempt":2}]}""",
+                await session.SnapshotAsync(Live.LiveDoc, conversationId, Context), "read");
+            // A version 2 run that has a count keeps it.
+            await session.CommitAsync(async tx => (await tx.DocAsync(liveV2, conversationId)).Set("run", J("""{"taskId":9,"inputs":[4],"turns":3}""")), Context);
+            var run = (JsonObjectValue)(await session.SnapshotAsync(Live.LiveDoc, conversationId, Context))!["run"];
+            Equal(3.0, ((JsonNumberValue)run["turns"]).Value, "turns");
+            await session.CloseAsync(Context);
         });
     }
 }

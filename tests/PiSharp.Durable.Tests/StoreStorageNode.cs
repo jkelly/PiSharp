@@ -8,7 +8,7 @@
 // lifecycle, ownership, structured, submissions, task-graph, tasks-recovery, tools-recovery, view); every one runs on the store fresh and,
 // where the group has reopen cases, across reopen. Not rerun: the groups of upstream's list that open their own SQLite file
 // (input-entries, nested-tools, nested-tools-restart, read-only, scheduler-indexes, scheduler-retention; ports that take no storage) and
-// the files later areas port (after-run, turn-limit). Area sleep adds harness.sleep.store.*:
+// the files later areas port (after-run). Area sleep adds harness.sleep.store.*:
 // its reopen case opens the file as a StoreStorage, and its MemoryStorage cases run on a fresh StoreStorage. Area reports adds
 // harness.blocked.store.*, opening every file as a StoreStorage. Area events (f3255de76) keeps the store run of the structured group's
 // v1.2.0 event tests, which moved to the PiSharp-only projection's cases (AgentEventsCases.cs): agent-events.store.tool-rounds.* and
@@ -16,7 +16,8 @@
 // harness.restart-failure.store.*, opening every file as a StoreStorage, and its blocked cases join harness.blocked.store.*. Area tool-tasks
 // adds harness.tool-hooks.store.*: its SQLite cases open every file as a StoreStorage, and its MemoryStorage cases run on a fresh
 // StoreStorage, as area sleep's do. Area admission adds harness.continue.store.*, the same way (upstream's list holds harness-continue.test.ts,
-// not harness-submit-in-commit.test.ts, so harness.submit-in-commit.* has no store pass).
+// not harness-submit-in-commit.test.ts, so harness.submit-in-commit.* has no store pass). Area live-turns adds harness.turn-limit.store.*,
+// the same way.
 using PiSharp.Durable;
 using PiSharp.Durable.Sqlite;
 
@@ -74,5 +75,6 @@ internal static partial class Program
         .. RestartFailureTests.Cases("harness.restart-failure.store.", path => OpenNodeSqliteStorageAsync(path)),
         .. ToolHooksTests.Cases("harness.tool-hooks.store.", () => FreshStore("tool-hooks-store"), path => OpenNodeSqliteStorageAsync(path)),
         .. ContinueTests.Cases("harness.continue.store.", () => FreshStore("continue-store"), path => OpenNodeSqliteStorageAsync(path)),
+        .. TurnLimitTests.Cases("harness.turn-limit.store.", () => FreshStore("turn-limit-store"), path => OpenNodeSqliteStorageAsync(path)),
     ];
 }

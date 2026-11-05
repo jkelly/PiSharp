@@ -12,7 +12,8 @@
 // watch-folding (d8d99950a, 8b0caefc2 and 5f312dac4): 05-watches runs v1.5.0's 04-watches (a busy first call, three commits folded into
 // the second, the ops printed with each update); it keeps its v1.2.0 name, as the other renumbered examples do. Area view (f3255de76):
 // 32-transcript is v1.5.0's 31-transcript.ts (ExamplesTranscript.cs), numbered after the v1.2.0 examples. Area admission (cc9c52310):
-// 35-submit-in-commit is v1.5.0's 34-submit-in-commit.ts (ExamplesSubmitInCommit.cs).
+// 35-submit-in-commit is v1.5.0's 34-submit-in-commit.ts (ExamplesSubmitInCommit.cs). Area live-turns (f6a9db1d8): 34-turn-limit-and-continue
+// is v1.5.0's 33-turn-limit-and-continue.ts (ExamplesTurnLimitAndContinue.cs).
 using PiSharp.Durable.Chord;
 using PiSharp.Durable.Sqlite;
 using PiSharp.Durable.Storage;
@@ -31,8 +32,8 @@ public enum ExampleStorage
     Sqlite,
 }
 
-/// <summary>Upstream durable examples 00-31, v1.5.0's 31-transcript as 32-transcript, and v1.5.0's 34-submit-in-commit as
-/// 35-submit-in-commit.</summary>
+/// <summary>Upstream durable examples 00-31, v1.5.0's 31-transcript as 32-transcript, v1.5.0's 33-turn-limit-and-continue as
+/// 34-turn-limit-and-continue, and v1.5.0's 34-submit-in-commit as 35-submit-in-commit.</summary>
 public static partial class Examples
 {
     // Every Session call takes a context, which is used for cancellation. Background means "never cancel".
@@ -81,6 +82,7 @@ public static partial class Examples
         ("30-tool-override", ToolOverrideAsync),
         ("31-reload-and-restart", ReloadAndRestartAsync),
         ("32-transcript", TranscriptExampleAsync),
+        ("34-turn-limit-and-continue", TurnLimitAndContinueAsync),
         ("35-submit-in-commit", SubmitInCommitAsync),
     ];
 

@@ -40,6 +40,11 @@
 // Pi v1.5.0 sync (area admission, fb524dd2e, #11043): a run whose context does not end in a user message or tool results (system messages
 // aside) ends before any request, unanswered with nothing_to_answer (FailNothingToAnswerAsync), as a continue after an answer or in an empty
 // conversation does; the request commit's cutoff then always finds an entry. StartRunAsync's inputs may include a continue.
+// Pi v1.5.0 sync (area live-turns, f6a9db1d8, #11043): a tool round is one turn of its run (pi.live.run.turns, 0 at every run start), and
+// the round that reaches the phase agent's maxTurns runs its tools and then ends the run like a failure, unanswered with turn_limit and
+// detail "1 turn" or "N turns": settings.afterFailedRun decides the queued inputs, and a continue resumes on the round's results. answer
+// decides an onYield continuation from the inbox before the final boundary places anything (TakesContinuation), and the continuation starts
+// the count over. Until area run-end (38ff99177) lands, a handoff still ends its run done, as in v1.2.0, so it is never turn_limit.
 //
 // Mappings:
 // - Checkpoints, live state and results are upstream's JSON, built in upstream's key order: prepare {phase, attempt, compacted?, overflow?},
@@ -118,9 +123,9 @@ public static partial class HarnessTasks
             .ConfigureAwait(false);
     }
 
-    /// <summary>Starts a run for <paramref name="inputs"/>, placed input and continue submissions: a new generation takes <c>pi.live.run</c>
-    /// (upstream <c>startRun</c>). Removes <c>runFailure</c>, unless <paramref name="keepFailure"/>: a run started in the commit that ended
-    /// the failed one keeps its failure.</summary>
+    /// <summary>Starts a run for <paramref name="inputs"/>, placed input and continue submissions: a new generation takes <c>pi.live.run</c>,
+    /// <c>{taskId, inputs, turns: 0}</c> (upstream <c>startRun</c>). Removes <c>runFailure</c>, unless <paramref name="keepFailure"/>: a run
+    /// started in the commit that ended the failed one keeps its failure.</summary>
     internal static async Task StartRunAsync(ITx tx, ConversationId conversationId, DraftObject live, IEnumerable<SubmissionId> inputs,
         bool keepFailure = false)
     {
@@ -130,8 +135,21 @@ public static partial class HarnessTasks
         live.Set("run", JsonValue.Object([
             KeyValuePair.Create("taskId", (JsonValue)taskId.ToJson()),
             KeyValuePair.Create("inputs", (JsonValue)JsonValue.Array(inputs.Select(id => (JsonValue)id.ToJson()))),
+            KeyValuePair.Create("turns", (JsonValue)0),
         ]));
         if (!keepFailure) live.Delete("runFailure");
+    }
+
+    /// <summary>The tool rounds the run owned by <paramref name="taskId"/> took so far (<c>pi.live.run.turns</c>); 0 when another task owns
+    /// the run, or none runs.</summary>
+    internal static long RunTurns(DraftObject live, TaskId taskId) =>
+        RunTaskId(live) == taskId.Value && ((JsonObjectValue)live.Get("run")!).TryGetValue("turns", out var turns) && turns is JsonNumberValue count
+            ? (long)count.Value : 0;
+
+    /// <summary>Sets the turn count of the run owned by <paramref name="taskId"/>, if it owns the run.</summary>
+    internal static void SetRunTurns(DraftObject live, TaskId taskId, long turns)
+    {
+        if (RunTaskId(live) == taskId.Value) live.GetObject("run").Set("turns", JsonValue.Number(turns));
     }
 
     /// <summary>A generation owned by its conversation (upstream <c>createGeneration</c>); a run's generation is traced from its inputs'
@@ -975,8 +993,9 @@ internal static class GenerationPhases
 
     /// <summary>
     /// A final answer; the final boundary places queued items (upstream <c>answer</c>, spec §6). The first <c>onYield</c> continuation appends
-    /// a user message and hands the run to a successor generation, but only when the boundary selected no user item and no reset.
-    /// Otherwise the run's inputs settle <c>done</c>, and selected user items start the next run.
+    /// a user message and hands the run to a successor generation, starting its turn count over, but only when the inbox holds no user item
+    /// and no reset (<see cref="TakesContinuation"/>). Otherwise the run's inputs settle <c>done</c>, and selected user items start the next
+    /// run.
     /// </summary>
     private static async Task AnswerAsync(ITaskRuntime runtime, JsonObjectValue message, DurableContext context)
     {
@@ -995,15 +1014,18 @@ internal static class GenerationPhases
             var live = await tx.DocAsync(Live.LiveDoc, conversationId).ConfigureAwait(false);
             var entry = await HarnessTasks.AppendAssistantAsync(tx, conversationId, message).ConfigureAwait(false);
             var result = NextTaskState.Completed(EntryResult(entry.Id));
-            var (users, reset) = await Inbox.ApplyBoundaryAsync(tx, boundary, true, runtime.Now()).ConfigureAwait(false);
-            if (continuation is not null && users.IsEmpty && !reset)
+            var continues = TakesContinuation(continuation, boundary) ? continuation : null;
+            var (users, _) = await Inbox.ApplyBoundaryAsync(tx, boundary, true, runtime.Now()).ConfigureAwait(false);
+            if (continues is not null)
             {
                 var user = JsonValue.Object([
                     KeyValuePair.Create("role", (JsonValue)"user"),
-                    KeyValuePair.Create("content", continuation),
+                    KeyValuePair.Create("content", continues),
                     KeyValuePair.Create("timestamp", (JsonValue)runtime.Now()),
                 ]);
                 await tx.AppendEntryAsync(Entries.UserEntry, conversationId, new TypedEntryDraft { Model = JsonValue.Array(user) }).ConfigureAwait(false);
+                // The continuation starts the run's turn count over: bounding onYield loops is the extension's job.
+                HarnessTasks.SetRunTurns(live, runtime.TaskId, 0);
                 HarnessTasks.HandOver(live, runtime.TaskId, await HarnessTasks.CreateGenerationAsync(tx, conversationId).ConfigureAwait(false));
                 live.Delete("generation");
                 return (TaskState?)result;
@@ -1012,6 +1034,20 @@ internal static class GenerationPhases
             if (!users.IsEmpty) await HarnessTasks.StartRunAsync(tx, conversationId, live, users).ConfigureAwait(false);
             return (TaskState?)result;
         }, context).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Whether an answer's <c>onYield</c> continuation is taken (upstream <c>takesContinuation</c>, spec §8.3), decided from the inbox before
+    /// the final boundary places anything: only when it holds no user item, of which the boundary would select one, and no reset, which would
+    /// otherwise run first. A continuation starts the turn count over.
+    /// </summary>
+    private static bool TakesContinuation(JsonValue? continuation, Inbox.Boundary boundary)
+    {
+        if (continuation is null) return false;
+        var items = boundary.Inbox.GetArray("items");
+        var snapshot = Enumerable.Range(0, items.Count).Select(index => (JsonObjectValue)items.Get(index)).ToList();
+        return !snapshot.Any(item => item.TryGetValue("mode", out var mode) && mode is JsonStringValue { Value: "steer" or "followUp" }) &&
+            !Inbox.HasQueuedReset(snapshot);
     }
 
     /// <summary>
@@ -1059,14 +1095,17 @@ internal static class GenerationPhases
             }
             live.Delete("generation");
             live.Set("tools", JsonValue.Array(slots));
+            // A tool round is one turn of the run (AgentState.maxTurns).
+            HarnessTasks.SetRunTurns(live, runtime.TaskId, HarnessTasks.RunTurns(live, runtime.TaskId) + 1);
             return (TaskState?)NextTaskState.Waiting(ToolsCheckpoint(entry.Id, tools, pending), tools, JoinPolicy.AllSettled);
         }, context).ConfigureAwait(false);
     }
 
     /// <summary>
     /// The round's tools are terminal: applies their controls and either ends the run at the final boundary (<c>terminate</c>,
-    /// <c>handoff</c>, or a queued reset) or hands it to the next generation at the <c>postTools</c> boundary (upstream
-    /// <c>finishToolRound</c>, spec §8.5).
+    /// <c>handoff</c>), ends it like a failure at the conversation's turn limit (<c>turn_limit</c>), ends it at a queued reset, or hands it
+    /// to the next generation at the <c>postTools</c> boundary (upstream <c>finishToolRound</c>, spec §8.5). Pi v1.5.0 continues the run after
+    /// a handoff (area run-end, 38ff99177); here a handoff still ends it <c>done</c>, ahead of the limit.
     /// </summary>
     private static async Task FinishToolRoundAsync(ITaskRuntime runtime, EntryId assistant, IReadOnlyList<TaskId> tools, DurableContext context)
     {
@@ -1094,12 +1133,16 @@ internal static class GenerationPhases
         // The last handoff in call order wins.
         var handoff = ordered.LastOrDefault(control => control is not null && control.TryGetValue("handoff", out var text) && text is JsonStringValue)
             is { } last ? ((JsonStringValue)last["handoff"]).Value : null;
+        // Read from the phase's agent, as every agent field; a configure() during the round applies at its end.
+        var maxTurns = (await runtime.AgentAsync(context).ConfigureAwait(false)).MaxTurns;
         await runtime.CommitAsync(async (tx, _) =>
         {
             var boundary = await Inbox.PrepareBoundaryAsync(tx, conversationId, runtime.Settings).ConfigureAwait(false);
             if (added.Count > 0) await Agents.AddToolsAsync(tx, conversationId, added).ConfigureAwait(false);
             var state = await tx.DocAsync(Live.LiveDoc, conversationId).ConfigureAwait(false);
             var now = runtime.Now();
+            var turns = HarnessTasks.RunTurns(state, runtime.TaskId);
+            // Until area run-end (38ff99177) a handoff ends the run done, as in Pi v1.2.0.
             if (terminate || handoff is not null)
             {
                 if (handoff is not null)
@@ -1116,6 +1159,15 @@ internal static class GenerationPhases
                 var (users, _) = await Inbox.ApplyBoundaryAsync(tx, boundary, true, now).ConfigureAwait(false);
                 Live.EndRun(tx, state, runtime.TaskId, RunEnd.Done(assistant));
                 if (!users.IsEmpty) await HarnessTasks.StartRunAsync(tx, conversationId, state, users).ConfigureAwait(false);
+            }
+            else if (maxTurns is { } limit && turns >= limit)
+            {
+                // The turn limit ends the run like a failure: afterFailedRun decides the queued items, and a continue resumes it on the
+                // round's results. The table was read for the boundary already, before any write.
+                var policy = runtime.Settings.AfterFailedRun;
+                await EndFailedRunAsync(tx, runtime, state, new Failure(policy, policy == AfterFailedRun.Continue ? boundary : null),
+                    RunEnd.Unanswered(RunFailureReason.TurnLimit,
+                        turns == 1 ? "1 turn" : $"{turns.ToString(System.Globalization.CultureInfo.InvariantCulture)} turns")).ConfigureAwait(false);
             }
             else
             {

@@ -9,6 +9,8 @@
 //   IStorage, so the cases run on every backend.
 // - test.hold's slow abort handler also ends when its signal aborts, which only close does (see there).
 // - The internal `tx.setTask` of a Harness commit is DurableHarness.CommitWithAsync's Transaction.SetTask in the conversation's scope.
+// - Pi v1.5.0 sync (area live-turns, f6a9db1d8): busy() writes pi.live.run with turns: 0, as v1.5.0's does (harness.scheduler-retention
+//   uses it for its busy conversations too).
 using System.Collections.Concurrent;
 using PiSharp.Durable;
 using PiSharp.Durable.Chord;
@@ -188,7 +190,7 @@ internal static partial class OwnershipTests
     /// <summary>Upstream <c>busy(conversation, task)</c>: marks a conversation busy with <paramref name="task"/> standing in for its run, so
     /// submissions queue.</summary>
     internal static Task Busy(IConversation conversation, TaskId task) => conversation.CommitAsync(async tx =>
-        (await tx.DocAsync(Live.LiveDoc, conversation.Id)).Set("run", Obj(("taskId", task.ToJson()), ("inputs", JsonArrayValue.Empty))), Context);
+        (await tx.DocAsync(Live.LiveDoc, conversation.Id)).Set("run", Obj(("taskId", task.ToJson()), ("inputs", JsonArrayValue.Empty), ("turns", 0))), Context);
 
     /// <summary>Upstream <c>status(harness, id)</c>: the task's state.</summary>
     internal static async Task<TaskState> StateOf(IHarness harness, TaskId id) => (await harness.GetTaskAsync(id, Context))!.State;

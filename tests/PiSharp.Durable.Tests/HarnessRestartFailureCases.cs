@@ -14,8 +14,7 @@
 // - The Proxy over the models is ModelsOverride (FetchDeferredOverride, CancelDeferredOverride); the Proxy over the settings that counts
 //   resolutions is a HarnessSettings whose Extensions getter counts, as every resolution reads it once.
 // - Later areas' parts of the v1.5.0 blob are left out: pi.live.runFailure's `first` (area run-end, 7e15f9601) is not asserted, as PiSharp's
-//   RunFailure has no such field yet, and compactionFailure keeps v1.2.0's `reason` where 5f312dac4's pi.live version 2 (area live-turns)
-//   renames it `trigger`.
+//   RunFailure has no such field yet. compactionFailure names its `trigger` (pi.live version 2, 5f312dac4; area live-turns).
 //   The settings bound (49 resolutions a round, #11327) is upstream's with group commit (e5c6182ba, area group-commit-scheduler), which
 //   coalesces some reconcile passes; this port, without group commit yet, measured 36 a round, so upstream's bound holds as it is.
 // - PiSharp-only (decision 0011), not upstream's: "keeps the interrupted request's stream metadata for the next attempt" checks that the
@@ -625,7 +624,7 @@ internal static class RestartFailureTests
             SameJson($$$$"""{"status":"failed","error":{"message":"{{{{error}}}}","detail":{"reason":"restart_limit"}}}""",
                 OutcomeJson(await opened.Harness.WaitForTaskAsync(compaction, Context)), "outcome");
             // v1.5.0 names the field `trigger` (area vocabulary); this port keeps v1.2.0's `reason`.
-            SameJson($$$$"""{"taskId":{{{{compaction.Value}}}},"reason":"manual","error":"{{{{error}}}}"}""", Field(await Live(opened.Harness), "compactionFailure"),
+            SameJson($$$$"""{"taskId":{{{{compaction.Value}}}},"trigger":"manual","error":"{{{{error}}}}"}""", Field(await Live(opened.Harness), "compactionFailure"),
                 "compaction failure");
             Check(!(await Live(opened.Harness)).ContainsKey("compactions"), "no compaction status");
             await Eventually(() => setup.Infos.Count > 0);

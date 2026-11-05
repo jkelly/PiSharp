@@ -1,7 +1,7 @@
 // Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/src/harness/live.ts (LiveDoc, endRun, compaction statuses and
 // failures, tool slot lookup, finishing and nested slot removal, and settleSchedulerOutcome, the cleanup the scheduler runs for faulted and
-// orphaned outcomes). The state is upstream's JSON: {run?: {taskId, inputs}, generation?: {attempt, message?, retry?, deferred?},
-// tools?: ToolSlot[], nestedTools?: NestedToolSlot[], compactions?: [...], compactionFailure?: {taskId, reason, error}, runFailure?:
+// orphaned outcomes). The state is upstream's JSON: {run?: {taskId, inputs, turns}, generation?: {attempt, message?, retry?, deferred?},
+// tools?: ToolSlot[], nestedTools?: NestedToolSlot[], compactions?: [...], compactionFailure?: {taskId, trigger, error}, runFailure?:
 // {taskId, inputs, reason, detail?}}. A ToolSlot is
 // {callId, name, taskId?, unoffered?, status, output?, droppedBytes?, droppedLines?, details?, diagnostics?, entry?}; a NestedToolSlot is {callId,
 // parentCallId, parentTaskId, name, taskId, arguments, status, output?, ..., summary?: {isError, durationMs?, usage?, error?}}.
@@ -18,10 +18,16 @@
 // abort handler of theirs for the limit, with detail {reason: "restart_limit"}: SettleSchedulerOutcomeAsync then ends its run aborted with
 // the limit as detail and without converting the partial, and removes a compaction's status without recording a failure.
 // Pi v1.5.0 sync (area admission, fb524dd2e): the Harness produces nothing_to_answer, a continue's run on a context with nothing to answer
-// (Generation.cs), and RunFailureReason's doc says only turn_limit waits.
+// (Generation.cs).
 // Pi v1.5.0 sync (area tool-tasks, 1c6928b30): a ToolSlot's taskId is absent only for a call not started yet (a sequential round's
 // pending); a call its request did not offer starts pending with its task, flagged unoffered: true, instead of done with the entry
 // generation wrote. ToolSlotOf finds a slot in a snapshot, which a tool task's results rebuilt from the slot read before their commit.
+// Pi v1.5.0 sync (area live-turns, 5f312dac4, f6a9db1d8, 018fdcf43): pi.live is version 3. A compaction status and pi.live.compactionFailure
+// name what started the compaction trigger (version 2; a run failure's reason is why it failed), and pi.live.run carries turns, the run's
+// tool rounds so far, which AgentState.maxTurns bounds (version 3; HarnessTasks.StartRunAsync writes 0, the tool round adds one). The
+// migrate (MigrateLive) renames a version 1 value's reason to trigger and gives a run without turns a count of 0, in memory; the next
+// commit stores version 3, which PiSharp before the Pi v1.5.0 sync cannot read. The Harness produces turn_limit (Generation.cs). LiveRun's
+// first and afterRun (7e15f9601) are area run-end's.
 using System.Collections.Immutable;
 using PiSharp.Durable.Chord;
 using PiSharp.Durable.Chord.Delta;
@@ -56,12 +62,37 @@ public static class Live
     internal static string CutOffCount(RunningTask task) => task.Restarts is 1 ? "once" : $"{task.Restarts ?? 0} times in a row";
 
     /// <summary>
-    /// Built-in live conversation state: run control and presentation of the current generation and tool round (upstream <c>LiveDoc</c>).
-    /// A complete base is stored whenever nothing runs (spec §8.2): no generation and no running tool slot.
+    /// Built-in live conversation state: run control and presentation of the current generation and tool round (upstream <c>LiveDoc</c>),
+    /// version 3. A complete base is stored whenever nothing runs (spec §8.2): no generation and no running tool slot. An older value
+    /// migrates when it is read (<see cref="MigrateLive"/>), and the next commit stores it at version 3.
     /// </summary>
-    public static ConversationDocToken LiveDoc { get; } = Documents.DefineConversationDoc("pi.live", 1, DocumentFork.Initial,
+    public static ConversationDocToken LiveDoc { get; } = Documents.DefineConversationDoc("pi.live", 3, DocumentFork.Initial,
         () => JsonObjectValue.Empty,
-        checkpointWhen: (value, _, _) => !value.ContainsKey("generation") && !AnyRunning(value, "tools") && !AnyRunning(value, "nestedTools"));
+        checkpointWhen: (value, _, _) => !value.ContainsKey("generation") && !AnyRunning(value, "tools") && !AnyRunning(value, "nestedTools"),
+        migrate: MigrateLive);
+
+    /// <summary>
+    /// The migrate of <see cref="LiveDoc"/> (upstream <c>LiveDoc.migrate</c>). Version 1 named a compaction's trigger <c>reason</c>, in
+    /// <c>compactions</c> and <c>compactionFailure</c>. Versions 1 and 2 (as builds before <c>run.turns</c> stored it) may lack
+    /// <c>run.turns</c>: a run in flight across the upgrade counts its turns from 0. Version 2 already names the trigger <c>trigger</c>, so
+    /// renaming leaves it alone. Keys keep their positions, as upstream's object spread keeps them.
+    /// </summary>
+    private static JsonObjectValue MigrateLive(JsonObjectValue value, int fromVersion)
+    {
+        var live = value;
+        if (value.TryGetValue("run", out var run) && run is JsonObjectValue fields)
+            live = live.SetItem("run", fields.SetItem("turns", fields.TryGetValue("turns", out var turns) && turns is JsonNumberValue ? turns : 0));
+        if (value.TryGetValue("compactions", out var compactions) && compactions is JsonArrayValue statuses)
+            live = live.SetItem("compactions", JsonValue.Array(statuses.Select(status => status is JsonObjectValue item ? RenameReason(item) : status)));
+        if (value.TryGetValue("compactionFailure", out var failure) && failure is JsonObjectValue recorded)
+            live = live.SetItem("compactionFailure", RenameReason(recorded));
+        return live;
+    }
+
+    /// <summary>A copy of a version 1 compaction status or failure with <c>reason</c> renamed <c>trigger</c>, its keys in their order
+    /// (upstream <c>renameReason</c>).</summary>
+    private static JsonObjectValue RenameReason(JsonObjectValue value) => !value.ContainsKey("reason") ? value
+        : JsonObjectValue.From(value.Select(field => KeyValuePair.Create(field.Key == "reason" ? "trigger" : field.Key, field.Value)));
 
     /// <summary>
     /// How the progress throttles commit a partial answer and running tool output into <c>pi.live</c> (upstream <c>PROGRESS_COMMIT</c>):
@@ -110,7 +141,7 @@ public static class Live
     public static RunFailure? RunFailureOf(JsonObjectValue? live) =>
         live is not null && live.TryGetValue("runFailure", out var failure) ? RunFailure.FromJson(failure) : null;
 
-    /// <summary>Adds the status <c>{taskId, reason, blocking, attempt, retry?}</c> of a compaction task created in this commit; statuses stay
+    /// <summary>Adds the status <c>{taskId, trigger, blocking, attempt, retry?}</c> of a compaction task created in this commit; statuses stay
     /// in task ID order (upstream <c>addCompactionStatus</c>).</summary>
     public static void AddCompactionStatus(DraftObject live, JsonObjectValue status)
     {
@@ -140,7 +171,7 @@ public static class Live
 
     /// <summary>
     /// Removes the status of compaction task <paramref name="taskId"/> and records that it failed with <paramref name="error"/> as
-    /// <c>pi.live.compactionFailure</c> <c>{taskId, reason, error}</c>, the newest failure since a compaction last produced a summary (upstream
+    /// <c>pi.live.compactionFailure</c> <c>{taskId, trigger, error}</c>, the newest failure since a compaction last produced a summary (upstream
     /// <c>failCompactionStatus</c>).
     /// </summary>
     public static void FailCompactionStatus(DraftObject live, TaskId taskId, string error)
@@ -148,7 +179,7 @@ public static class Live
         if (CompactionStatus(live, taskId) is { } status)
             live.Set("compactionFailure", JsonValue.Object([
                 KeyValuePair.Create("taskId", status.Get("taskId")!),
-                KeyValuePair.Create("reason", status.Get("reason")!),
+                KeyValuePair.Create("trigger", status.Get("trigger")!),
                 KeyValuePair.Create("error", (JsonValue)error),
             ]));
         RemoveCompactionStatus(live, taskId);
@@ -303,7 +334,7 @@ public static class Live
 
 /// <summary>
 /// Why a run ended without an answer (upstream <c>RunFailureReason</c>; <see cref="RunFailure.ReasonName"/> is the persisted spelling).
-/// Every Pi v1.5.0 value is declared; the Harness produces <see cref="TurnLimit"/> once the Pi v1.5.0 sync area that ports it lands.
+/// Every Pi v1.5.0 value is declared, and the Harness produces each.
 /// </summary>
 public enum RunFailureReason
 {
@@ -327,7 +358,8 @@ public enum RunFailureReason
     /// <summary><c>nothing_to_answer</c>: the context did not end in a user message or tool results (empty, or ending in an answer), so no
     /// request was sent.</summary>
     NothingToAnswer,
-    /// <summary><c>turn_limit</c>: a tool round reached the conversation's <c>maxTurns</c>; a continue resumes on its results.</summary>
+    /// <summary><c>turn_limit</c>: a tool round reached the conversation's <c>maxTurns</c> (<see cref="Agent.MaxTurns"/>); a continue resumes on
+    /// its results.</summary>
     TurnLimit,
 }
 
@@ -340,7 +372,9 @@ public enum RunFailureReason
 /// <param name="Inputs">The run's inputs, settled <c>unanswered</c>.</param>
 /// <param name="Reason">Why the run ended without an answer.</param>
 /// <param name="Detail"><c>model_error</c>: the error text; <c>no_model</c>: which model is missing; <c>faulted</c>: the error message;
-/// <c>orphaned</c>: why the task could not run (<c>missing_task</c>, <c>task_too_old</c>, <c>migration_failed</c>).</param>
+/// <c>orphaned</c>: why the task could not run (<c>missing_task</c>, <c>task_too_old</c>, <c>migration_failed</c>); <c>interrupted</c> and
+/// <c>restart_limit</c>: what was cut off, and how often; <c>turn_limit</c>: the tool rounds the run took, <c>"1 turn"</c> or
+/// <c>"N turns"</c>.</param>
 public sealed record RunFailure(TaskId TaskId, ImmutableArray<SubmissionId> Inputs, RunFailureReason Reason, string? Detail = null)
 {
     /// <summary>The persisted spelling of <paramref name="reason"/> (<c>model_error</c>, <c>no_model</c>, ...).</summary>

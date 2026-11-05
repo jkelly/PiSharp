@@ -26,6 +26,11 @@
 //   publication's entries (AppendActive, v1.2.0's head-marker cut). Its view observer has a one-entry window.
 // - Area run-failure (f3255de76; PiSharp-only fields): the snapshot carries pi.live.runFailure, and a run_end whose commit recorded the
 //   run's failure carries it as failure, so a device client shows why a run ended without an answer (both fields are additive).
+// - Area live-turns (5f312dac4, f6a9db1d8): pi.live version 2 names a compaction's trigger `trigger` (compactions, compactionFailure),
+//   and version 3 counts the run's tool rounds in run.turns. The wire keeps v1.2.0's `reason`: the snapshot's compactions and
+//   compactionFailure and compaction_start/end map trigger back to reason (V1Compaction), and the snapshot's run carries only its inputs, so
+//   turns stays off the wire. A turn_limit run end is a run_end whose failure has reason turn_limit; pi.agent's maxTurns, which the device
+//   host does not set, would reach agent fields as it is (additive).
 //
 // Mappings: each AgentEvent variant is a sealed record whose ToJson() is upstream's object with upstream's key order, so a JSON-mode host
 // prints what upstream prints. pi-ai messages, usage, tool slots, compaction statuses and the pi.agent / pi.usage states are wire JSON, as
@@ -84,10 +89,11 @@ public sealed record SnapshotEvent : AgentEvent
     public required JsonArrayValue Tools { get; init; }
     /// <summary><c>pi.live.nestedTools</c>: nested calls of running tool calls.</summary>
     public required JsonArrayValue NestedTools { get; init; }
-    /// <summary><c>pi.live.compactions</c>: live compactions with their attempt and retry backoff.</summary>
+    /// <summary><c>pi.live.compactions</c>: live compactions with their attempt and retry backoff, each <c>{taskId, reason, blocking, attempt,
+    /// retry?}</c> (pi.live's <c>trigger</c> as v1.2.0's <c>reason</c>).</summary>
     public required JsonArrayValue Compactions { get; init; }
-    /// <summary><c>pi.live.compactionFailure</c> <c>{taskId, reason, error}</c>: the newest compaction failure since a compaction last produced
-    /// a summary; null when there is none.</summary>
+    /// <summary><c>pi.live.compactionFailure</c> <c>{taskId, reason, error}</c> (pi.live's <c>trigger</c> as v1.2.0's <c>reason</c>): the newest
+    /// compaction failure since a compaction last produced a summary; null when there is none.</summary>
     public JsonObjectValue? CompactionFailure { get; init; }
     /// <summary><c>pi.live.runFailure</c> <c>{taskId, inputs, reason, detail?}</c>: why the newest run ended without an answer, until a later
     /// run starts (PiSharp-only, Pi v1.5.0); null when there is none.</summary>
@@ -587,14 +593,20 @@ public static class AgentEvents
             Generation = parts.Generation,
             Tools = parts.Tools ?? JsonArrayValue.Empty,
             NestedTools = parts.NestedTools ?? JsonArrayValue.Empty,
-            Compactions = parts.Compactions ?? JsonArrayValue.Empty,
-            CompactionFailure = parts.CompactionFailure,
+            Compactions = parts.Compactions is { } compactions
+                ? JsonValue.Array(compactions.Select(status => status is JsonObjectValue item ? V1Compaction(item) : status)) : JsonArrayValue.Empty,
+            CompactionFailure = parts.CompactionFailure is { } failure ? V1Compaction(failure) : null,
             RunFailure = parts.RunFailure,
             Inbox = Queued(parts.Inbox),
             Agent = parts.Agent ?? Agents.AgentDoc.Definition.Initial(),
             Usage = parts.Usage ?? UsageLedger.UsageDoc.Definition.Initial(),
         };
     }
+
+    /// <summary>A pi.live compaction status or failure as v1.2.0's wire has it: <c>trigger</c> (pi.live version 2) renamed <c>reason</c>, in
+    /// its position.</summary>
+    private static JsonObjectValue V1Compaction(JsonObjectValue value) => !value.ContainsKey("trigger") ? value
+        : JsonObjectValue.From(value.Select(field => KeyValuePair.Create(field.Key == "trigger" ? "reason" : field.Key, field.Value)));
 
     private static ImmutableArray<QueuedItem> Queued(JsonObjectValue? inbox) =>
         inbox is not null && inbox.TryGetValue("items", out var items) && items is JsonArrayValue list
@@ -787,7 +799,7 @@ public static class AgentEvents
             if (!compactions.Any(candidate => Same(candidate["taskId"], status["taskId"])))
             {
                 var error = failure is not null && Same(failure["taskId"], status["taskId"]) ? Text(failure["error"]) : null;
-                events.Add(new CompactionEndEvent(new TaskId(Integer(status["taskId"])), Text(status["reason"]), error));
+                events.Add(new CompactionEndEvent(new TaskId(Integer(status["taskId"])), Text(status["trigger"]), error));
             }
         }
         // A generation's turn ends when its outcome is committed: at a `completing` hold or at terminal, whichever comes first, so a
@@ -830,7 +842,7 @@ public static class AgentEvents
         {
             if (!compactionsBefore.Any(candidate => Same(candidate["taskId"], status["taskId"])))
             {
-                events.Add(new CompactionStartEvent(new TaskId(Integer(status["taskId"])), Text(status["reason"]),
+                events.Add(new CompactionStartEvent(new TaskId(Integer(status["taskId"])), Text(status["trigger"]),
                     status["blocking"] is JsonBooleanValue { Value: true }));
             }
         }
