@@ -9123,7 +9123,12 @@
           "ec8bd270",
           "f17c1f10",
           "6f33476e",
-          "56d30153"
+          "56d30153",
+          "60d846d9",
+          "10fc0b80",
+          "8f1d34dd",
+          "368bc80d",
+          "a8c2fdd8"
         ],
         "tests": [
           "tests/PiSharp.Durable.Tests/SessionGroupCommitCases.cs: stores-the-commits-admitted-while-a-call-is-in-flight-in-one-call-each-with-its-seq-published-in-order",
@@ -9163,10 +9168,31 @@
           "tests/PiSharp.Durable.Tests/SessionDeferredCommitsCases.cs: stores-them-at-close-after-the-commits-admitted-before-it-and-closes-storage-when-that-store-fails",
           "tests/PiSharp.Durable.Tests/SessionDeferredCommitsCases.cs: stores-every-held-document-in-one-transaction-when-the-earliest-deadline-comes",
           "tests/PiSharp.Durable.Tests/SessionDeferredCommitsCases.cs: stores-nothing-once-the-session-failed",
-          "tests/PiSharp.Durable.Tests/BenchmarksCases.cs: benchmarks.smoke"
+          "tests/PiSharp.Durable.Tests/BenchmarksCases.cs: benchmarks.smoke",
+          "tests/PiSharp.Durable.Tests/HarnessGroupCommitCases.cs: holds-a-live-owner-whose-end-races-a-creation-below-its-ended-tasks-live-p-ended-b-and-a-empty-c",
+          "tests/PiSharp.Durable.Tests/HarnessGroupCommitCases.cs: holds-an-owner-whose-end-follows-a-creation-below-its-childs-pending-end-live-p-ending-b-conversation-c",
+          "tests/PiSharp.Durable.Tests/HarnessGroupCommitCases.cs: ends-a-child-before-its-next-phase-when-its-owners-abort-mark-is-unpublished-at-its-step",
+          "tests/PiSharp.Durable.Tests/HarnessGroupCommitCases.cs: refuses-the-second-of-two-opposite-waits-admitted-behind-each-other",
+          "tests/PiSharp.Durable.Tests/HarnessGroupCommitCases.cs: starts-no-invocation-on-a-reservation-before-the-reservation-is-published",
+          "tests/PiSharp.Durable.Tests/HarnessGroupCommitCases.cs: runs-a-migration-once-although-its-reservation-waits-for-an-unpublished-write-of-the-task",
+          "tests/PiSharp.Durable.Tests/HarnessGroupCommitCases.cs: reports-a-failed-migration-once-although-its-reservation-waits-for-an-unpublished-write-of-the-task",
+          "tests/PiSharp.Durable.Tests/HarnessGroupCommitCases.cs: makes-a-reader-of-the-roots-wait-for-a-creation-under-a-root-a-pending-end-would-unlist",
+          "tests/PiSharp.Durable.Tests/HarnessGroupCommitCases.cs: walks-a-creations-memberships-past-an-ancestor-whose-pending-end-is-unpublished",
+          "tests/PiSharp.Durable.Tests/HarnessGroupCommitCases.cs: reserves-the-live-work-of-the-owner-above-an-ancestor-whose-end-is-pending-for-a-creation-below-it",
+          "tests/PiSharp.Durable.Tests/HarnessGroupCommitCases.cs: keeps-the-nodes-a-chain-load-installed-for-an-unpublished-creation-through-the-sweep",
+          "tests/PiSharp.Durable.Tests/HarnessGroupCommitCases.cs: marks-a-child-in-a-cascade-from-its-current-record-not-one-its-pending-commit-replaces",
+          "tests/PiSharp.Durable.Tests/HarnessGroupCommitCases.cs: marks-the-other-tasks-of-a-failfast-wait-from-their-current-records",
+          "tests/PiSharp.Durable.Tests/HarnessGroupCommitCases.cs: finds-the-submission-an-unpublished-commit-admitted-with-the-same-request-id",
+          "tests/PiSharp.Durable.Tests/HarnessGroupCommitCases.cs: runs-a-wait-continuation-of-one-commit-before-the-next-commit-of-the-same-call-is-published",
+          "tests/PiSharp.Durable.Tests/HarnessGroupCommitCases.cs: signals-an-invocation-when-it-closes-during-a-call-in-flight-and-stores-that-call-before-storage-closes",
+          "tests/PiSharp.Durable.Tests/HarnessGroupCommitCases.cs: ends-a-task-wait-when-the-harness-closes-while-the-terminal-commit-is-stored-and-still-stores-it",
+          "tests/PiSharp.Durable.Tests/Harness/HarnessOwnershipCases.cs: runs-a-handle-operation-queued-behind-the-abort-mark-before-the-marks-publication-and-the-cascade-aborts-it",
+          "tests/PiSharp.Durable.Tests/HarnessSchedulerRetentionCases.cs: loads-the-chain-of-new-work-below-a-forgotten-conversation-before-admitting-it-and-keeps-the-scope-busy",
+          "tests/PiSharp.Durable.Tests/HarnessRestartFailureCases.cs: the-restart-limit-on-the-normal-path.resolves-the-settings-no-more-often-than-before-only-a-task-that-was-cut-off-reads-the-limit",
+          "tests/PiSharp.Durable.Tests/AgentEventsCases.cs: emits-one-exact-batch-when-a-run-ends-and-a-queued-follow-up-starts-the-next"
         ]
       },
-      "deferred": "Session half landed; left for two later areas. group-commit-scheduler: the Harness runs the serialized line (DurableHarness.LineWaitsForPublication => true in Harness.cs, the only Harness change here) until the scheduler records decision regions and membership keys (upstream MembershipKeys, the scheduler's region reads and the CommitInternal exemption for its own commits in scheduler.ts, harness.ts and context.ts); then remove the override and port durable@1.5.0/Changed#6 (a wait whose commit is still being stored when the Harness closes ends with the closed error, the commit still stored and published before close completes), Changed#7 (cancellation checked when a job starts) and harness-group-commit.test.ts, and re-measure storage-throughput's harness rows (upstream: about 5 -> 440 runs/s at 128 conversations over 4 ms). publication-caches: CachedStorage and session-group-commit's 'fails the Session for a throw in the read caches' write-through, and leaves the later parts unpublished', the conversation record cache (until then every AppendEntryAsync reads its conversation on the line, so entry commits do not batch), conversation tails, the TaskDocuments index (until then every terminal task's documents are scanned) and LineSizes' read counts."
+      "deferred": "Session and Harness halves landed (areas group-commit and group-commit-scheduler): Harness line jobs overlap storage calls, the scheduler's decisions record and touch the keys they read (regions, membership keys, its own commits through CommitInternalAsync), and Changed#6 and #7 hold for the Harness. Left for area publication-caches: CachedStorage, the bounded record cache, with session-group-commit's 'fails the Session for a throw in the read caches' write-through, and leaves the later parts unpublished' and harness-group-commit's 'reads no task record from Storage for more live and awaited tasks than the record cache's count'; the conversation record cache (until then every AppendEntryAsync reads its conversation on the line, so entry commits do not batch); conversation tails; the TaskDocuments index (until then every terminal task's documents are scanned); and LineSizes' read counts."
     },
     {
       "id": "durable.commit-publication",
