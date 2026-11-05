@@ -274,7 +274,13 @@ internal static partial class Program
                 && Regex.IsMatch(config, $"<option value=\"{personal}\" data-label=\"Personal\">Personal</option>"), "the active account and Personal are offered");
             Check(config.Contains("The account you chose", StringComparison.Ordinal), "the source says so");
             NoSecret(config, "Model & auth", personalKey, workKey);
-            NoSecret(config, "Model & auth's hints", personalKey[^4..], workKey[^4..]);
+            // A hint is SecretText.Mask's ellipsis and last 4 characters, which the page may HTML-encode. The 4 characters alone are not
+            // looked for: the model picker lists the catalog's model ids, which hold many 4-character hex runs (CI: a key ending "baba"
+            // found in "alibaba", one ending "501b" in "beam-1.0-501b-a23b").
+            NoSecret(config, "Model & auth's hints", [.. new[] { personalKey, workKey }.SelectMany(key => new[]
+            {
+                "…" + key[^4..], "&#x2026;" + key[^4..], "&hellip;" + key[^4..],
+            })]);
 
             // Compare: the preset's columns keep their accounts, the column offers the choice with Work selected, and Run all (the draft the
             // page posts) runs the first column on Work and the second on the active account.

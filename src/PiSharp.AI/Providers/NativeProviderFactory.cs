@@ -82,9 +82,10 @@ public static partial class NativeProviderFactory
         if (modelMetadata is not null && (maximum != Math.Truncate(maximum) || maximum is <= 0 or > int.MaxValue))
             throw new ArgumentException("Unsupported native thinking token cap.");
         var profile = modelMetadata is null ? null : new NativeThinkingProfile(model, modelMetadata, projectionOptions.ModelReasoning, (int)maximum);
-        // Pi abe508 buildParams: compat.supportsMidConvoEffort alone selects managed effort, whatever the requested level.
-        if (profile is not null && profile.MidConversationEffort != projectionOptions.SupportsMidConversationEffort)
-            factory = new(endpoint, model, projectionOptions = projectionOptions with { SupportsMidConversationEffort = profile.MidConversationEffort }, requestOptions);
+        // Pi abe508 buildParams: compat.supportsMidConvoEffort selects managed effort, except while thinking is disabled, which needs
+        // thinkingLevelMap.off !== null (Pi 1.5.0 dc939913f).
+        if (profile is not null && (profile.MidConversationEffort != projectionOptions.SupportsMidConversationEffort || profile.SupportsOff != projectionOptions.SupportsThinkingOff))
+            factory = new(endpoint, model, projectionOptions = projectionOptions with { SupportsMidConversationEffort = profile.MidConversationEffort, SupportsThinkingOff = profile.SupportsOff }, requestOptions);
         var messagesOptions = AnthropicMessagesOptionsForModel(modelMetadata);
         return Bind(model, handler, client =>
         {

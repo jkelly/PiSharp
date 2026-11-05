@@ -7,6 +7,12 @@
 // settings, and alerts above the notices for a failed session and for pi.live.compactionFailure. PiSharp-only (decision 0005,
 // "PiSharp-only additions"): a pending ask_user_question or plan review replaces the editor with its form (the editor keeps its draft),
 // the status says what the run waits for, the footer shows plan mode, and both tools have their own cards.
+// Pi v1.5.0 sync (area view): the transcript and the footer's context tokens come from DurableView.Transcript, the shown conversation's
+// active transcript; pi-durable 1.5.0's view entries are a window over the whole transcript.
+// Pi v1.5.0 sync (area run-failure): an alert says why the newest run ended without an answer (pi-durable 1.5.0 pi.live.runFailure) until
+// a later run starts; a stop (aborted) has none, as it has no notice. pi.live is no longer {} after such a run, and the status reads run.
+// Pi v1.5.0 sync (area live-turns, 5f312dac4): pi.live version 2 names what started a compaction trigger, so the compaction alert and
+// the compacting status read a status's and pi.live.compactionFailure's trigger (the view's pi.live is migrated when it is read).
 using System.Collections.Immutable;
 using System.Globalization;
 using System.Text.Json.Nodes;
@@ -194,10 +200,10 @@ internal sealed class DurableTuiView
     public void Apply(DurableView view)
     {
         var live = Doc(view.Conversation, "pi.live", static () => []);
-        SyncTranscript(view.Conversation.Entries);
+        SyncTranscript(view.Transcript);
         var message = Obj(Obj(live, "generation"), "message");
         // A partial without its entry was dropped, for example by a retry: render the transcript again.
-        if (message is null && streaming is not null) Rebuild(view.Conversation.Entries);
+        if (message is null && streaming is not null) Rebuild(view.Transcript);
         if (message is not null) SyncStreaming(message);
         foreach (var slot in Arr(live, "tools"))
         {
@@ -272,15 +278,18 @@ internal sealed class DurableTuiView
         }
     }
 
-    /// <summary>What must stay on screen until it changes: the session failed, or the newest compaction failed (pi.live.compactionFailure,
-    /// kept until a compaction produces a summary).</summary>
+    /// <summary>What must stay on screen until it changes: the session failed, the newest compaction failed (pi.live.compactionFailure,
+    /// kept until a compaction produces a summary), or the newest run ended without an answer other than a stop (pi.live.runFailure, kept
+    /// until a later run starts).</summary>
     private void SyncAlerts(DurableView view, JsonObject live)
     {
         alerts.Clear();
         if (view.Failure is { } failure) alerts.AddChild(new Text(theme.Fg("error", DurableFailure.Message(failure)), 1, 0));
         if (Obj(live, "compactionFailure") is { } compaction)
             alerts.AddChild(new TruncatedText(theme.Fg("error",
-                $"Compaction failed ({Str(compaction, "reason") ?? "undefined"}): {Str(compaction, "error") ?? "undefined"}"), 1, 0));
+                $"Compaction failed ({Str(compaction, "trigger") ?? "undefined"}): {Str(compaction, "error") ?? "undefined"}"), 1, 0));
+        if (Obj(live, "runFailure") is { } run && Str(run, "reason") is { } reason && reason != "aborted")
+            alerts.AddChild(new TruncatedText(theme.Fg("error", $"No answer ({reason}){(Str(run, "detail") is { } detail ? ": " + detail : "")}"), 1, 0));
     }
 
     private void SyncTasks(TaskGraph? graph)
@@ -407,7 +416,7 @@ internal sealed class DurableTuiView
         else if (Obj(generation, "deferred") is not null) text = "Waiting for deferred response...";
         else if (compaction is not null)
         {
-            var reason = Str(compaction, "reason") ?? "undefined";
+            var reason = Str(compaction, "trigger") ?? "undefined";
             text = Obj(compaction, "retry") is not null
                 ? $"Retrying {reason} compaction (attempt {JsNumber((Num(compaction, "attempt") ?? double.NaN) + 1)})..."
                 : $"Compacting ({reason})...";
@@ -438,7 +447,7 @@ internal sealed class DurableTuiView
             model.ModelId == current.ModelId)?.ContextWindow ?? 0;
         if (contextWindow > 0)
         {
-            var tokens = ContextTokens(view.Conversation.Entries);
+            var tokens = ContextTokens(view.Transcript);
             double? percent = tokens is null ? null : tokens.Value / contextWindow * 100;
             var text = $"{(percent is null ? "?" : percent.Value.ToString("F1", CultureInfo.InvariantCulture))}%/{FooterComponent.FormatTokens(contextWindow)}";
             stats.Add(percent is > 90 ? theme.Fg("error", text) : text);

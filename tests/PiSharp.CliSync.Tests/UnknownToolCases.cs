@@ -117,9 +117,9 @@ internal static partial class Program
             var before = session.Snapshot.Log.Sequence;
             await session.SetActiveToolsAsync(["grep", "read", "missing_tool"]);
             Equal(before, session.Snapshot.Log.Sequence, "an unchanged selection after ignoring names appended a record");
-            // The extension setActiveTools facade schedules the same selection.
+            // The extension setActiveTools facade schedules the same selection (Pi 1.5.0 _applyToolLoadout: read keeps its place).
             var scheduled = session.ScheduleToolActivation(["write", "missing_tool", "grep", "read"]);
-            Names(["write", "read"], scheduled.Names, "scheduled activation ignores unknown and capped-out names");
+            Names(["read", "write"], scheduled.Names, "scheduled activation ignores unknown and capped-out names");
             Check(session.PendingToolNames.IsEmpty, "an ignored name became pending");
         }
         finally { await session.DisposeAsync(); Directory.Delete(directory, recursive: true); }

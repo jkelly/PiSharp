@@ -5,6 +5,7 @@ using System.Runtime.ExceptionServices;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using PiSharp.AI;
 using PiSharp.AI.Protocols.PiMessages;
 using PiSharp.Agent;
@@ -345,14 +346,29 @@ internal static class OriginalPiMessagesToolContinuationTests
         Dictionary<string, string[]> after, byte[] body)
     {
         Check(actual.RequestUri!.AbsoluteUri == expected.GetProperty("uri").GetString() && actual.Method.Method == expected.GetProperty("method").GetString(), "Complete URI/method differs.");
-        SameJson(expected.GetProperty("headers"), JsonSerializer.SerializeToElement(before));
-        var wanted = expected.GetProperty("headers").EnumerateObject().ToDictionary(field => field.Name,
+        var sourceHeaders = Pi150IdentityHeaders(expected.GetProperty("headers"));
+        SameJson(sourceHeaders, JsonSerializer.SerializeToElement(before));
+        var wanted = sourceHeaders.EnumerateObject().ToDictionary(field => field.Name,
             field => field.Value.EnumerateArray().Select(value => value.GetString()!).ToArray(), StringComparer.Ordinal);
         wanted.TryAdd("content-length", [Convert.FromBase64String(expected.GetProperty("bodyUtf8Base64").GetString()!).Length.ToString(CultureInfo.InvariantCulture)]);
         SameJson(JsonSerializer.SerializeToElement(wanted), JsonSerializer.SerializeToElement(after));
         Check(Convert.ToBase64String(body) == expected.GetProperty("bodyUtf8Base64").GetString(), "Complete physical UTF8 request bytes differ.");
         using var parsed = JsonDocument.Parse(body); SameJson(expected.GetProperty("body"), parsed.RootElement);
     }
+    // Pi 1.5.0 pi-messages.ts sends getIdentityHeaders(model, identity) below every other header. The frozen fixture predates it, so
+    // this authored v1.5.0 delta (not a Source capture) adds the detailed pi/<version> User-Agent when no case header sets one,
+    // tokenized as HttpHeaders records it, as PiSharp.PiMessages.Tests does. The fixture itself stays unchanged and SHA-pinned.
+#pragma warning disable PISHARP_IDENTITY001
+    private static JsonElement Pi150IdentityHeaders(JsonElement headers)
+    {
+        if (headers.EnumerateObject().Any(field => field.Name.Equals("user-agent", StringComparison.OrdinalIgnoreCase))) return headers;
+        using var probe = new HttpRequestMessage();
+        probe.Headers.TryAddWithoutValidation("user-agent", ClientIdentities.FormatUserAgent(null));
+        var node = new JsonObject { ["user-agent"] = new JsonArray([.. probe.Headers.GetValues("user-agent").Select(value => (JsonNode?)JsonValue.Create(value))]) };
+        foreach (var field in headers.EnumerateObject()) node[field.Name] = JsonNode.Parse(field.Value.GetRawText());
+        return JsonSerializer.SerializeToElement(node);
+    }
+#pragma warning restore PISHARP_IDENTITY001
     private static void SameJson(JsonElement expected, JsonElement actual)
     {
         Check(expected.ValueKind == actual.ValueKind, "JSON kind differs.");

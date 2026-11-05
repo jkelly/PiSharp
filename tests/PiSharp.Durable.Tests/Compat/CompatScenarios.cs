@@ -31,7 +31,8 @@ internal static class CompatScenarios
     {
         var harness = await Harness.OpenAsync(storage, new HarnessOptions
         {
-            Models = setup.Models, Registry = setup.Registry, Settings = setup.Settings, Now = () => setup.Now(),
+            Models = setup.Models, Registry = setup.Registry, Settings = setup.Settings, Now = CompatTimers.Clock(() => setup.Now()),
+            SetTimer = CompatTimers.SetTimer,
         }, Context);
         var root = await harness.RootAsync(Context, new AgentChange { Model = new ModelRef("faux", "faux-1") });
         return new OpenedChat(harness, root);
@@ -183,7 +184,10 @@ internal static class CompatScenarios
             await harness.CloseAsync(Context);
         }, async open =>
         {
+            // Pi v1.5.0 (area restarts): the request the capture left in flight is a charged attempt, and the next one waits for the backoff.
+            // On the scenarios' frozen clock a backoff never ends (the retry phase sleeps again until its time, f75b3240a), so it is none.
             var setup = Chat();
+            setup.Retry = new RetrySettings { BaseDelayMs = 0 };
             setup.Faux.SetResponses(Answer("first"), Answer("second"));
             var (harness, _) = await Open(setup, await open());
             harness.Resume();
@@ -300,4 +304,41 @@ internal static class CompatScenarios
     ];
 
     internal static CompatScenario Named(string name) => All.Single(scenario => scenario.Name == name);
+}
+
+/// <summary>
+/// Pi v1.5.0 (area sleep): the scenarios' host timers. A tool's progress commits pace on the Harness clock and check it again when their
+/// timer fires (ec1be23eb), so on the scenarios' frozen clock a paced commit never lands and <c>api.details</c> never settles; scenarios.mjs
+/// at v1.5.0 would stall the same way. Each foreground timer here fires on time: the first clock read of its callback is its deadline, and
+/// every other read is the frozen clock the captures stamp. Background timers fire as the default ones do, on the frozen clock.
+/// </summary>
+internal static class CompatTimers
+{
+    /// <summary>The time a firing foreground timer waited, for the first clock read of its callback.</summary>
+    [ThreadStatic] private static double? waited;
+
+    /// <summary><paramref name="frozen"/>, read at a firing foreground timer's deadline by the first read of its callback.</summary>
+    public static Func<double> Clock(Func<double> frozen) => () =>
+    {
+        if (waited is not { } delay) return frozen();
+        waited = null;
+        return frozen() + delay;
+    };
+
+    /// <summary>One-shot <see cref="TimeProvider.System"/> timers (<see cref="HarnessOptions.SetTimer"/>).</summary>
+    public static Action? SetTimer(Action callback, double delayMs, TimerOptions options)
+    {
+        var timer = TimeProvider.System.CreateTimer(_ =>
+        {
+            if (options.Background)
+            {
+                callback();
+                return;
+            }
+            waited = delayMs;
+            try { callback(); }
+            finally { waited = null; }
+        }, null, TimeSpan.FromMilliseconds(Math.Max(0, delayMs)), Timeout.InfiniteTimeSpan);
+        return timer.Dispose;
+    }
 }

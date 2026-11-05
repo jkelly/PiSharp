@@ -1,4 +1,5 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/src/extensions/mcp/oauth.ts callbackId/clientMetadataDocument.
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/coding-agent/src/extensions/mcp/oauth.ts callbackId, clientMetadataDocument and
+// createProvider's cimd failure.
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -7,8 +8,9 @@ using PiSharp.Extensions.Mcp.Authentication;
 
 namespace PiSharp.Extensions.Runtime.Mcp.Authentication;
 
-/// <summary>Client ID Metadata Documents for `oauth.clientRegistration: "cimd"`, chosen like Codex chooses its own.
-/// The caller supplies the https base where the application serves them; nothing is fetched or published here.</summary>
+/// <summary>Client ID Metadata Documents, chosen like Codex chooses its own, for a sign-in that offers one. PiSharp's sign-in offers
+/// them only for an explicit `oauth.clientRegistration: "cimd"` (its `auto` always registers; see McpSignIn). The caller supplies
+/// the https base where the application serves them; nothing is fetched or published here.</summary>
 public static class McpOAuthClientMetadataDocuments
 {
     /// <summary>The loopback callback path the configuration requires for `cimd`.</summary>
@@ -25,7 +27,8 @@ public static class McpOAuthClientMetadataDocuments
 
     /// <summary>The document to identify as. Without the `iss` parameter in authorization responses (RFC 9207), the
     /// redirect URI and the document are specific to the MCP server, so a response cannot be mixed up with one from
-    /// another authorization server (RFC 9700 section 4.4.2.2).</summary>
+    /// another authorization server (RFC 9700 section 4.4.2.2). Upstream's clientMetadataDocument returns undefined without server
+    /// support and createProvider fails only for `cimd`; only `cimd` reaches this in PiSharp, so the failure is raised here.</summary>
     public static McpOAuthClientMetadataDocument Create(Uri documentBase, Uri serverUrl, string redirectUrl, JsonData? metadata)
     {
         ArgumentNullException.ThrowIfNull(documentBase); ArgumentNullException.ThrowIfNull(redirectUrl);

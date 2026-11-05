@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/src/core/trust-manager.ts (ProjectTrustStore,
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/coding-agent/src/core/trust-manager.ts (ProjectTrustStore,
 // hasTrustRequiringProjectResources, getProjectTrustOptions) and packages/coding-agent/src/core/project-trust.ts (resolveProjectTrusted).
 using System.Collections.Immutable;
 using System.Text.Json;
@@ -36,7 +36,9 @@ internal sealed class ProjectTrustStore
         var current = NormalizeCwd(cwd);
         while (true)
         {
-            if (data.TryGetValue(current, out var value) && value is { } decision) return new ProjectTrustStoreEntry(current, decision);
+            // A key saved with other casing names the same folder on Windows.
+            foreach (var key in FindTrustFileKeys(data, current))
+                if (data[key] is { } decision) return new ProjectTrustStoreEntry(key, decision);
             var parent = Path.GetDirectoryName(current);
             if (parent is null || parent == current) return null;
             current = parent;
@@ -51,11 +53,16 @@ internal sealed class ProjectTrustStore
         foreach (var update in decisions)
         {
             var key = NormalizeCwd(update.Path);
-            if (update.Decision is null) data.Remove(key); else data[key] = update.Decision;
+            foreach (var existing in FindTrustFileKeys(data, key)) data.Remove(existing);
+            if (update.Decision is not null) data[key] = update.Decision;
         }
         WriteTrustFile(data);
         return 0;
     });
+
+    /// <summary>Source findTrustFileKeys: the keys naming <paramref name="path"/>; several on Windows when saved with other casing.</summary>
+    private static List<string> FindTrustFileKeys(Dictionary<string, bool?> data, string path) =>
+        [.. data.Keys.Where(key => PiPaths.PathsEqual(key, path))];
 
     /// <summary>Source readTrustFile, with its error texts.</summary>
     private Dictionary<string, bool?> ReadTrustFile()
@@ -106,7 +113,7 @@ internal sealed class ProjectTrustStore
         while (true)
         {
             var agentsSkills = Path.Join(current, ".agents", "skills");
-            if (agentsSkills != userAgentsSkills && Path.Exists(agentsSkills)) return true;
+            if (!PiPaths.PathsEqual(agentsSkills, userAgentsSkills) && Path.Exists(agentsSkills)) return true;
             var parent = Path.GetDirectoryName(current);
             if (parent is null || parent == current) return false;
             current = parent;
@@ -146,7 +153,8 @@ internal delegate Task<ProjectTrustOption?> PiProjectTrustPrompt(string title, I
 /// <summary>Source resolveProjectTrusted for a cwd, and the trust seam other packages consume.</summary>
 internal static class PiProjectTrust
 {
-    /// <summary>Source resolveProjectTrusted: the CLI override, then "no trust-requiring resources", then the project_trust extension
+    /// <summary>Source resolveProjectTrusted: the CLI override, then "no trust-requiring resources" (the stored decision, else trusted:
+    /// a saved "Do not trust" wins over auto-trust), then the project_trust extension
     /// handlers (<paramref name="extensionDecision"/>; a remembered decision is saved), then the stored decision, then
     /// <c>defaultProjectTrust</c>, then the prompt when a UI exists.</summary>
     internal static async Task<bool> ResolveAsync(string cwd, string home, ProjectTrustStore store, bool? trustOverride, string defaultProjectTrust,
@@ -154,7 +162,7 @@ internal static class PiProjectTrust
         Func<string, CancellationToken, Task<PiProjectTrustDecision?>>? extensionDecision = null)
     {
         if (trustOverride is { } forced) return forced;
-        if (!ProjectTrustStore.HasTrustRequiringProjectResources(cwd, home)) return true;
+        if (!ProjectTrustStore.HasTrustRequiringProjectResources(cwd, home)) return store.Get(cwd) ?? true;
         if (extensionDecision is not null && await extensionDecision(cwd, cancellationToken).ConfigureAwait(false) is { } decided)
         {
             if (decided.Remember) store.Set(cwd, decided.Trusted);

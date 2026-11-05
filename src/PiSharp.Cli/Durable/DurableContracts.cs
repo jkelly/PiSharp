@@ -4,6 +4,8 @@
 // Harness object crosses it. Upstream's unsubscribe function is an IDisposable and its close() is DisposeAsync.
 // PiSharp-only since pi-durable 1.2.0 (durable work list area l): the view also carries the session's failure and the nested tool calls.
 // PiSharp-only (decision 0005, "PiSharp-only additions"): the controller answers ask_user_question, reviews plans and switches plan mode.
+// Pi v1.5.0 sync (area view): pi-durable 1.5.0's ConversationView holds a window over the whole transcript, so the view carries the shown
+// conversation's active transcript (Transcript), which the TUI renders and counts context tokens from, as it rendered the 1.2.0 view's.
 using System.Collections.Immutable;
 using PiSharp.Cli.Pi;
 using PiSharp.Durable;
@@ -56,7 +58,13 @@ internal sealed record DurableView(
     ImmutableArray<DurableNotice> Notices,
     TaskGraph? Tasks = null,
     string? Failure = null,
-    ImmutableSortedDictionary<long, DurableNestedCall>? NestedCalls = null);
+    ImmutableSortedDictionary<long, DurableNestedCall>? NestedCalls = null)
+{
+    /// <summary>The shown conversation's raw active transcript, as <see cref="ContextView.Entries"/>: its newest head marker, then the
+    /// non-head entries from its head, or every entry without one. <see cref="Conversation"/>'s entries are only a window over the whole
+    /// transcript (pi-durable 1.5.0).</summary>
+    public ImmutableArray<EntryRecord> Transcript { get; init; } = [];
+}
 
 /// <summary>A nested tool call as the runtime last saw it in <c>pi.live.nestedTools</c>.</summary>
 /// <param name="Slot">Its slot: <c>{callId, parentCallId, parentTaskId, name, taskId, arguments, status, output?, ..., summary?: {isError,

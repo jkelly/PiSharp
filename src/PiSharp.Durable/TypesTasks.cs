@@ -1,6 +1,10 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/src/types.ts (TaskRuntime and HookRunner; split from Types.cs).
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/src/types.ts (TaskRuntime and HookRunner; split from Types.cs).
 // Upstream's AbortSignal becomes a CancellationToken plus the handler context, which the same signal cancels; its memo and entry overloads
-// become C# overloads; its synchronous-or-promise commit callback becomes four overloads, as ISession.CommitAsync has.
+// become C# overloads; its synchronous-or-promise commit callback becomes four overloads, as ISession.CommitAsync has. Pi v1.5.0 sync
+// (area reports): TaskRuntime.report takes whose code failed (ReportFrom, a30c2a81d). Area deferred-commits (6c2fd73b0): TaskRuntime.commit
+// takes CommitOptions. Area run-end (65fba65b2): TaskRuntime.entries(), the raw history read hooks share; ITaskRuntime inherits it and the
+// entry reads from IHookApi, which declares them for hooks (upstream declares them on both). Area sleep (f75b3240a): TaskRuntime.sleepUntil
+// and setTimer. Area harness-options (7ec1f648e): TaskRuntime.models is read at each use.
 using PiSharp.Durable.Chord;
 using PiSharp.Durable.Env;
 
@@ -22,7 +26,9 @@ public interface IHookRunner
 /// <summary>
 /// Operations of one task invocation (upstream <c>TaskRuntime</c>). Every operation rejects after the invocation ends; watches acquired
 /// through it stop at invocation end. A runtime is the <see cref="IHookApi"/> its task passes to hooks, as upstream's structurally is; the task
-/// and conversation IDs, <c>Models</c> and the memo reads and writes are the inherited <see cref="IHookApi"/> members.
+/// and conversation IDs, <c>Models</c>, the memo reads and writes, and the entry reads (<c>EntryAsync</c>, and <c>EntriesAsync</c>, the
+/// conversation's committed raw history: every entry, also those a compaction summary or reset left behind, so a range bounded by entry IDs
+/// reads the same before and after a compaction and in a rerun after a crash) are the inherited <see cref="IHookApi"/> members.
 /// </summary>
 public interface ITaskRuntime : IDocumentObserver, IDocumentReader, IHookApi
 {
@@ -45,20 +51,21 @@ public interface ITaskRuntime : IDocumentObserver, IDocumentReader, IHookApi
 
     /// <summary>
     /// Commits on the Session line after rereading the task. Rejects when the task is terminal, the invocation ended, the Harness is
-    /// closing, or, in a run invocation, the task carries an abort mark. A returned state (running, waiting or terminal; see
+    /// closing, or, in a run invocation, the task carries an abort mark. A returned state (running, waiting, sleeping or terminal; see
     /// <see cref="NextTaskState"/>) replaces the task's state in the same commit; returning null leaves it unchanged.
     /// <c>tx.CreateTaskAsync()</c> defaults to the task's conversation, and appended entries carry the task as <c>byTaskId</c>. Inside the
-    /// callback read only through the transaction: <c>SnapshotAsync</c>, <c>DocumentStateAsync</c>, <c>WatchDocAsync</c>,
-    /// <c>GetTaskAsync</c> and the other Session and runtime reads may queue on the line the callback holds, and then never complete.
+    /// callback read only through the transaction: <c>SnapshotAsync</c>, <c>WatchDocAsync</c>, <c>GetTaskAsync</c> and the other Session
+    /// and runtime reads may queue on the line the callback holds, and then never complete. <paramref name="options"/> may defer storing a
+    /// commit that changes only documents (<see cref="CommitPersistence"/>); one that returns a state is immediate.
     /// </summary>
-    Task CommitAsync(Func<ITx, RunningTask, Task<TaskState?>> change, DurableContext context);
-    /// <summary><see cref="CommitAsync(Func{ITx, RunningTask, Task{TaskState?}}, DurableContext)"/> leaving the state unchanged.</summary>
-    Task CommitAsync(Func<ITx, RunningTask, Task> change, DurableContext context);
-    /// <summary><see cref="CommitAsync(Func{ITx, RunningTask, Task{TaskState?}}, DurableContext)"/> with a synchronous callback.</summary>
-    Task CommitAsync(Func<ITx, RunningTask, TaskState?> change, DurableContext context);
-    /// <summary><see cref="CommitAsync(Func{ITx, RunningTask, Task{TaskState?}}, DurableContext)"/> with a synchronous callback leaving the
+    Task CommitAsync(Func<ITx, RunningTask, Task<TaskState?>> change, DurableContext context, CommitOptions? options = null);
+    /// <summary><see cref="CommitAsync(Func{ITx, RunningTask, Task{TaskState?}}, DurableContext, CommitOptions?)"/> leaving the state unchanged.</summary>
+    Task CommitAsync(Func<ITx, RunningTask, Task> change, DurableContext context, CommitOptions? options = null);
+    /// <summary><see cref="CommitAsync(Func{ITx, RunningTask, Task{TaskState?}}, DurableContext, CommitOptions?)"/> with a synchronous callback.</summary>
+    Task CommitAsync(Func<ITx, RunningTask, TaskState?> change, DurableContext context, CommitOptions? options = null);
+    /// <summary><see cref="CommitAsync(Func{ITx, RunningTask, Task{TaskState?}}, DurableContext, CommitOptions?)"/> with a synchronous callback leaving the
     /// state unchanged.</summary>
-    Task CommitAsync(Action<ITx, RunningTask> change, DurableContext context);
+    Task CommitAsync(Action<ITx, RunningTask> change, DurableContext context, CommitOptions? options = null);
 
     /// <summary>The committed task record.</summary>
     Task<TaskRecord?> GetTaskAsync(TaskId id, DurableContext context);
@@ -81,19 +88,27 @@ public interface ITaskRuntime : IDocumentObserver, IDocumentReader, IHookApi
     /// submissions it returns reject after the invocation ends; admitted work stays durable.
     /// </summary>
     Task<IConversationHandle?> ConversationAsync(ConversationId id, DurableContext context);
-    /// <summary>A committed entry visible from the task's conversation.</summary>
-    Task<EntryRecord?> EntryAsync(EntryId id, DurableContext context);
-    /// <summary>A committed entry visible from the task's conversation; null when absent, not visible, or of another kind.</summary>
-    Task<EntryRecord?> EntryAsync(Entry token, EntryId id, DurableContext context);
-    /// <summary>A committed typed entry visible from the task's conversation; null when absent, not visible, or of another kind.</summary>
-    Task<TypedEntry<TData>?> EntryAsync<TData>(Entry<TData> token, EntryId id, DurableContext context) where TData : JsonValue;
     /// <summary>Committed raw active transcript and model context, optionally cut off at the visible entry <paramref name="at"/>.</summary>
     Task<ContextView> ContextAsync(ConversationId conversationId, DurableContext context, EntryId? at = null);
     /// <summary>The Harness clock, in milliseconds.</summary>
     double Now();
-    /// <summary>Forwards a non-fatal failure to <c>HarnessOptions.OnReport</c>.</summary>
-    void Report(Exception error);
-    /// <summary>Resolves once the Harness clock reaches <paramref name="until"/>; rejects when the invocation or
-    /// <paramref name="context"/> is cancelled.</summary>
-    Task SleepAsync(double until, DurableContext context);
+    /// <summary>
+    /// Calls <paramref name="callback"/> once after about <paramref name="delayMs"/> on the Harness's timer (<see cref="HarnessOptions.SetTimer"/>),
+    /// for pacing work inside a phase, such as throttled progress commits. Not durable: the invocation's end disarms it, and after its end
+    /// nothing is armed. Returns an action that disarms it. The callback runs on a timer thread; a throw from it is reported as the task's
+    /// (<see cref="ReportKind.TaskError"/>). Wait for time between phases with <see cref="SleepUntilAsync"/>.
+    /// </summary>
+    Action SetTimer(Action callback, double delayMs);
+    /// <summary>
+    /// Forwards a non-fatal failure to <c>HarnessOptions.OnReport</c>, about this task. Without <paramref name="from"/> it is the task's own
+    /// (<see cref="ReportKind.TaskError"/>, naming the extension that installed its definition); with it, the code it names failed: an
+    /// extension's, such as a section (<see cref="ReportKind.ExtensionError"/>), or a host callback (<see cref="ReportKind.HostError"/>).
+    /// </summary>
+    void Report(Exception error, ReportFrom? from = null);
+    /// <summary>
+    /// Commits a sleep: the task holds no invocation until the Harness clock reaches <paramref name="until"/>, then resumes at
+    /// <paramref name="checkpoint"/>. Completes once the sleep is stored, not when the time comes; the phase returns right after. Returning
+    /// <see cref="NextTaskState.Sleeping"/> from <c>CommitAsync</c> is the same sleep, for one that must commit together with other writes.
+    /// </summary>
+    Task SleepUntilAsync(double until, JsonValue checkpoint, DurableContext context);
 }

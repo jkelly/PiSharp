@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/src/core/bash-executor.ts and utils/shell.ts (the shell runs
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/coding-agent/src/core/bash-executor.ts and utils/shell.ts (the shell runs
 // detached in its own process group; abort and timeout kill the whole tree).
 using System.Collections.Immutable;
 using System.ComponentModel;
@@ -15,7 +15,7 @@ namespace PiSharp.Tools.Processes.Unix;
 /// The command's stdout and stderr are pipes; its stdin is a pipe carrying <see cref="ProcessRequest.StandardInput"/> then EOF (or
 /// <c>/dev/null</c> without it, source commandTransport "stdin"); its environment is exactly the request's, and it
 /// starts in the request's working directory (a <c>/bin/sh</c> <c>cd</c> before <c>exec</c>). Both processes are reaped by this class
-/// (<c>waitpid</c>). Stopping kills the whole group with SIGKILL, so descendants that stayed in the group die with it, as upstream
+/// (<c>waitpid</c>). Stopping kills the whole group with SIGKILL (on macOS after SIGSTOP), so descendants that stayed in the group die with it, as upstream
 /// kills the detached process tree.
 /// </summary>
 public sealed class PosixSpawnProcessAdmission : IUnixProcessAdmission
@@ -33,6 +33,13 @@ public sealed class PosixSpawnProcessAdmission : IUnixProcessAdmission
         // else. Node's spawn refuses such strings (ERR_INVALID_ARG_VALUE), and so does every launch here.
         if (NodeArgumentErrors.SpawnNullBytes(request.Executable, request.Arguments, request.WorkingDirectory, request.Environment) is { } nulError)
             throw new ArgumentException(nulError, nameof(request));
+        // Node's spawn reports a command that cannot start as an error (ENOENT for a missing executable or working directory), with nothing
+        // run. The /bin/sh launch below would run instead, print its own error and exit 126 or 127, so a missing absolute executable or
+        // working directory is refused first, before anything is spawned, as NativeProcessRunner refuses one on Windows.
+        if (Path.IsPathRooted(request.Executable) && !File.Exists(request.Executable))
+            throw new ProcessLaunchException(ProcessDiagnostic.ExecutableUnavailable, cleanupConfirmed: true);
+        if (Path.IsPathRooted(request.WorkingDirectory) && !Directory.Exists(request.WorkingDirectory))
+            throw new ProcessLaunchException(ProcessDiagnostic.WorkingDirectoryUnavailable, cleanupConfirmed: true);
         var environment = request.Environment.Select(pair => pair.Key + "=" + pair.Value).ToArray();
         var anchor = Spawn(Shell, [Shell, "-c", AnchorScript], environment, processGroup: 0, stdout: -1, stderr: -1);
         int[] stdout = [-1, -1], stderr = [-1, -1], stdin = [-1, -1];
@@ -55,10 +62,56 @@ public sealed class PosixSpawnProcessAdmission : IUnixProcessAdmission
         catch
         {
             Close(ref stdout[0]); Close(ref stdout[1]); Close(ref stderr[0]); Close(ref stderr[1]); Close(ref stdin[0]); Close(ref stdin[1]);
-            _ = Native.kill(-anchor, Native.SIGKILL);
+            _ = KillGroup(anchor);
             Reap(anchor);
             throw;
         }
+    }
+
+    /// <summary>Pi 1.5.0 clipboard-command.ts (<c>spawn(command, args, { detached: true, cwd: "/" })</c>): starts a helper that leaves this
+    /// process's group, so a daemon it leaves behind (a clipboard owner) is not stopped by the terminal's Ctrl+Z (SIGTSTP to the
+    /// foreground group). The command leads a new process group, starts in <paramref name="workingDirectory"/> (a <c>/bin/sh</c>
+    /// <c>cd</c> before <c>exec</c>, so a command that cannot start exits 127) with this process's environment; its stdin is a pipe,
+    /// its stdout a pipe when <paramref name="captureOutput"/> is set (else <c>/dev/null</c>), its stderr <c>/dev/null</c>. Nothing kills
+    /// the group: <see cref="DetachedHelper.Kill"/> signals only the command.</summary>
+    internal static DetachedHelper SpawnDetachedHelper(string executable, IReadOnlyList<string> arguments, string workingDirectory, bool captureOutput)
+    {
+        if (!OperatingSystem.IsLinux() && !OperatingSystem.IsMacOS()) throw new PlatformNotSupportedException();
+        if (NodeArgumentErrors.SpawnNullBytes(executable, arguments, workingDirectory, null) is { } nulError)
+            throw new ArgumentException(nulError, nameof(arguments));
+        var environment = System.Environment.GetEnvironmentVariables().Cast<System.Collections.DictionaryEntry>()
+            .Select(entry => entry.Key + "=" + entry.Value).ToArray();
+        int[] stdout = [-1, -1], stdin = [-1, -1];
+        try
+        {
+            Pipe(stdin);
+            if (captureOutput) Pipe(stdout);
+            int pid;
+            try
+            {
+                pid = Spawn(Shell, [Shell, "-c", LaunchScript, workingDirectory, executable, .. arguments], environment,
+                    processGroup: 0, stdout: stdout[1], stderr: -1, stdin: stdin[0]);
+            }
+            finally { Close(ref stdout[1]); Close(ref stdin[0]); }
+            var exit = Task.Factory.StartNew(() => Reap(pid), CancellationToken.None, TaskCreationOptions.LongRunning, TaskScheduler.Default);
+            return new DetachedHelper(pid, Writer(ref stdin[1]), captureOutput ? Stream(ref stdout[0]) : null, exit);
+        }
+        catch
+        {
+            Close(ref stdout[0]); Close(ref stdout[1]); Close(ref stdin[0]); Close(ref stdin[1]);
+            throw;
+        }
+    }
+
+    /// <summary>A helper started by <see cref="SpawnDetachedHelper"/>: its pipes and its exit status (or 128 + the terminating signal).</summary>
+    internal sealed class DetachedHelper(int processId, Stream standardInput, Stream? standardOutput, Task<int> exit)
+    {
+        public int ProcessId { get; } = processId;
+        public Stream StandardInput { get; } = standardInput;
+        public Stream? StandardOutput { get; } = standardOutput;
+        public Task<int> Exit { get; } = exit;
+        /// <summary>SIGKILL to the command only (its group, which may hold a daemon, is left alone); nothing once it was reaped.</summary>
+        public void Kill() { if (!Exit.IsCompleted) _ = Native.kill(ProcessId, Native.SIGKILL); }
     }
 
     private static FileStream Stream(ref int fd)
@@ -185,12 +238,12 @@ public sealed class PosixSpawnProcessAdmission : IUnixProcessAdmission
 
         public ValueTask<bool> StopGroupAsync() { lock (gate) return new(stop ??= StopCoreAsync()); }
 
-        /// <summary>SIGKILL to the whole group (the anchor keeps the group id reserved until now), then both reaps are joined and the
+        /// <summary>SIGKILL (after SIGSTOP on macOS) to the whole group (the anchor keeps the group id reserved until now), then both reaps are joined and the
         /// group must be gone.</summary>
         private async Task<bool> StopCoreAsync()
         {
             if (anchorExit.IsCompleted) return false; // The identity anchor is gone: never signal a group id that may be reused.
-            if (Native.kill(-anchor, Native.SIGKILL) != 0 && Marshal.GetLastPInvokeError() != Native.ESRCH) return false;
+            if (KillGroup(anchor) != 0 && Marshal.GetLastPInvokeError() != Native.ESRCH) return false;
             await Task.WhenAll(Exit, anchorExit).WaitAsync(TimeSpan.FromSeconds(5)).ConfigureAwait(false);
             // Members not yet reaped by their new parent (launchd adopts orphans on macOS) keep the group: macOS answers EPERM for a
             // group of zombies, Linux 0, until it is gone (ESRCH). Any other answer, or a group still present after 5 s, is uncertain.
@@ -219,8 +272,20 @@ public sealed class PosixSpawnProcessAdmission : IUnixProcessAdmission
         }
     }
 
+    /// <summary>Source killProcessTree: on macOS the group is stopped first, since macOS signals members one at a time and a killed child
+    /// could otherwise wake its waiting shell, which then starts the next command of <c>a; b</c>. Best effort, not an atomic freeze;
+    /// a failed stop is ignored and SIGKILL also kills stopped processes. Linux signals the group under one lock, so it needs no stop.
+    /// Returns the SIGKILL result.</summary>
+    private static int KillGroup(int group)
+    {
+        if (OperatingSystem.IsMacOS()) _ = Native.kill(-group, Native.SIGSTOP);
+        return Native.kill(-group, Native.SIGKILL);
+    }
+
     private static class Native
     {
+        /// <summary>SIGSTOP is 17 on macOS (19 on Linux, where it is not sent).</summary>
+        internal const int SIGSTOP = 17;
         internal const int SIGKILL = 9, EPERM = 1, ESRCH = 3, EINTR = 4, O_RDONLY = 0, O_WRONLY = 1, F_GETFD = 1, F_SETFD = 2, FD_CLOEXEC = 1;
         /// <summary>macOS <c>_IO('f', 1)</c>.</summary>
         internal const nuint FIOCLEX = 0x20006601;

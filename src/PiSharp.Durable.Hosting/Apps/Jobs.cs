@@ -2,6 +2,9 @@
 // a repeatable workflow of named phases; each phase is a task checkpoint, so a restart resumes the current phase. A repeat phase runs again
 // after a durable sleep; an approval phase waits for a person in a child task that watches a task document (the pattern of decision 0005's
 // UserInteraction) instead of polling it as durable-pi does. Runs are recorded in a conversation document the UI renders as job cards.
+// Pi v1.5.0 sync (area sleep): ITaskRuntime.SleepAsync is gone. A repeat phase's pause commits a durable sleep (the task holds no
+// invocation and resumes at the phase), and a review deadline that races a decision inside a phase waits on runtime.SetTimer timers that
+// recheck the Harness clock (DelayUntilAsync).
 using System.Diagnostics;
 using System.Text;
 using PiSharp.Durable.Chord;
@@ -341,17 +344,19 @@ public static class Jobs
 
     /// <summary>The agent's job runs, newest first: <c>{items: [run], counters: {job: n}}</c>.</summary>
     public static ConversationDocToken RunsDoc { get; } = Documents.DefineConversationDoc("pisharp.job-runs", 1, DocumentFork.Initial,
-        () => JsonValue.Object([new("items", JsonArrayValue.Empty), new("counters", JsonObjectValue.Empty)]));
+        () => JsonValue.Object([new("items", JsonArrayValue.Empty), new("counters", JsonObjectValue.Empty)]), checkpointWhen: (_, _, _) => false);
 
     /// <summary>The decision an approval waits for: <c>{decision?: {approved, at}}</c>, on the approval task.</summary>
-    internal static TaskDocToken ApprovalDoc { get; } = Documents.DefineTaskDoc("pisharp.job-approval", 1, () => JsonObjectValue.Empty);
+    internal static TaskDocToken ApprovalDoc { get; } = Documents.DefineTaskDoc("pisharp.job-approval", 1, () => JsonObjectValue.Empty,
+        checkpointWhen: (_, _, _) => false);
 
     /// <summary>Which job a <c>run_durable_job</c> call started, so a rerun finds it.</summary>
-    private static readonly TaskDocToken StartReceipt = Documents.DefineTaskDoc("pisharp.job-start", 1, () => JsonObjectValue.Empty);
+    private static readonly TaskDocToken StartReceipt = Documents.DefineTaskDoc("pisharp.job-start", 1, () => JsonObjectValue.Empty,
+        checkpointWhen: (_, _, _) => false);
 
     /// <summary>The full run record, independent of the bounded conversation card window.</summary>
     internal static ConversationDocFamilyToken RecordDoc { get; } = Documents.DefineConversationDocFamily("pisharp.job-record", 1,
-        DocumentFork.Initial, _ => JsonObjectValue.Empty);
+        DocumentFork.Initial, _ => JsonObjectValue.Empty, checkpointWhen: (_, _, _) => false);
 
     /// <summary>The approval task every approval phase creates.</summary>
     internal static DurableTask ApprovalTask { get; } = Tasks.DefineTask(new TaskDefinition
@@ -587,7 +592,12 @@ public static class Jobs
             await BypassAsync(phase, next, data, runtime, context).ConfigureAwait(false);
             return;
         }
-        if (checkpoint.TryGetValue("wakeAt", out var wake) && wake is JsonNumberValue at) await runtime.SleepAsync(at.Value, context).ConfigureAwait(false);
+        // A run before its time (an early wake) sleeps again.
+        if (checkpoint.TryGetValue("wakeAt", out var wake) && wake is JsonNumberValue at && at.Value > runtime.Now())
+        {
+            await runtime.SleepUntilAsync(at.Value, checkpoint, context).ConfigureAwait(false);
+            return;
+        }
         await runtime.CommitAsync((tx, running) => UpdateRunAsync(tx, running.ConversationId, running.Id,
             run => Begin(run, phase, iteration, runtime.Now())), context).ConfigureAwait(false);
         var agent = await runtime.AgentAsync(context).ConfigureAwait(false);
@@ -616,7 +626,9 @@ public static class Jobs
             {
                 await UpdateRunAsync(tx, running.ConversationId, running.Id, run => UpdatePhase(run, phase.Id,
                     item => item.SetItem("summary", result.Summary).SetItem("progress", iteration + 1))).ConfigureAwait(false);
-                return (TaskState?)NextTaskState.Running(Checkpoint(phase.Id, iteration + 1, result.Data, now + result.AgainAfterMs));
+                var wakeAt = now + result.AgainAfterMs;
+                var again = Checkpoint(phase.Id, iteration + 1, result.Data, wakeAt);
+                return wakeAt > now ? NextTaskState.Sleeping(again, wakeAt) : NextTaskState.Running(again);
             }
             JsonObjectValue? finished = null;
             await UpdateRunAsync(tx, running.ConversationId, running.Id, run =>
@@ -774,7 +786,9 @@ public static class Jobs
         return status == "completed" && !passedAudit ? finished.SetItem("status", "failed").SetItem("error", "Completion audit failed: " + string.Join(", ", missing)) : finished;
     }
 
-    /// <summary>Waits until the approval document holds a decision, watching it rather than polling.</summary>
+    /// <summary>Waits until the approval document holds a decision, watching it rather than polling. A document watch follows its address
+    /// since pi-durable 1.5.0 (a retirement is a call, not its end), so a retirement without a decision fails the wait, as the watch's end
+    /// does, and the watch is stopped either way.</summary>
     private static async Task<JsonObjectValue> WaitForDecisionAsync(ITaskRuntime runtime, TaskId approvalTask, DurableContext context, double? deadline = null)
     {
         var watch = await runtime.WatchDocAsync(ApprovalDoc, approvalTask, context).ConfigureAwait(false)
@@ -783,19 +797,22 @@ public static class Jobs
         {
             if (Decision(watch.Value) is { } ready) return ready;
             var decided = new TaskCompletionSource<JsonObjectValue>(TaskCreationOptions.RunContinuationsAsynchronously);
-            watch.Start((value, _, _) =>
+            watch.Start((call, _) =>
             {
-                if (Decision(value) is { } decision) decided.TrySetResult(decision);
+                if (call is not WatchValueCall<JsonObjectValue> change) return Task.CompletedTask;
+                if (Decision(change.Value) is { } decision) decided.TrySetResult(decision);
+                else if (change.Retired)
+                    decided.TrySetException(new InvalidOperationException($"The approval document of task {approvalTask.Value} was retired."));
                 return Task.CompletedTask;
             });
             _ = watch.Closed.ContinueWith(closed => decided.TrySetException(new InvalidOperationException(
-                $"The approval watch of task {approvalTask.Value} ended: {closed.Result.Reason}", closed.Result.Error)),
+                $"The approval watch of task {approvalTask.Value} ended: {closed.Result.Kind}", closed.Result.Error as Exception)),
                 CancellationToken.None, TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
             if (deadline is not { } at) return await context.WaitAsync(decided.Task).ConfigureAwait(false);
             // A review deadline (decision 0010) resolves the approval as expired, never approved. The decision document is written
             // only when nobody decided first, so a late person and the deadline cannot both win.
             using var stop = new CancellationTokenSource();
-            var sleeping = runtime.SleepAsync(at, context.WithCancellation(stop.Token));
+            var sleeping = DelayUntilAsync(runtime, at, context.WithCancellation(stop.Token));
             var waiting = context.WaitAsync(decided.Task);
             if (await Task.WhenAny(waiting, sleeping).ConfigureAwait(false) == sleeping && !decided.Task.IsCompleted)
             {
@@ -821,6 +838,31 @@ public static class Jobs
 
     private static JsonObjectValue? Decision(JsonObjectValue? doc) =>
         doc is not null && doc.TryGetValue("decision", out var decision) && decision is JsonObjectValue value ? value : null;
+
+    /// <summary>
+    /// Waits inside a phase until the Harness clock reaches <paramref name="until"/>, on <see cref="ITaskRuntime.SetTimer"/> timers that
+    /// recheck the clock when they fire; rejects when <paramref name="context"/> or the invocation is cancelled. Not durable: for a deadline
+    /// that races another event inside one phase, which a restart rearms from its stored time.
+    /// </summary>
+    internal static async Task DelayUntilAsync(ITaskRuntime runtime, double until, DurableContext context)
+    {
+        while (true)
+        {
+            context.ThrowIfCancellationRequested();
+            var remaining = until - runtime.Now();
+            if (remaining <= 0) return;
+            var fired = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var disarm = runtime.SetTimer(() => fired.TrySetResult(), remaining);
+            try
+            {
+                await context.WaitAsync(fired.Task).ConfigureAwait(false);
+            }
+            finally
+            {
+                disarm();
+            }
+        }
+    }
 
     // ─── Tools ──────────────────────────────────────────────────────────────
 

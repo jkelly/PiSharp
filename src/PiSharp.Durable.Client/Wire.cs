@@ -1,7 +1,7 @@
 // PiSharp-only (decision 0008). The durable network's v1 JSON bodies, after durable-pi's wire contract (apps/dpi-sdk/src/api.ts, MIT). Keys and
 // value spellings are durable-pi's, so its clients and hub can talk to a PiSharp device and ours to theirs. PiSharp additions are optional
-// fields a durable-pi client ignores: a model's provider next to its id, a tool's effect and whether it is deferred, and a session's
-// provider. Agent events are not typed here: they pass through as pi-durable's own JSON (PiSharp.Durable's AgentEvent.ToJson()).
+// fields a durable-pi client ignores: a model's provider next to its id, a tool's effect and whether it is deferred, a session's
+// provider, and why a live task cannot run (TaskNode.Blocked, pi-durable's TaskGraphNode.blocked; Pi v1.5.0 sync, area reports). Agent events are not typed here: they pass through as Pi v1.2.0 pi-durable's own JSON (PiSharp.Durable.Hosting's AgentEvent.ToJson(), PiSharp-only since Pi v1.5.0 removed watchEvents).
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
@@ -15,6 +15,12 @@ public static class DurableWire
     public const int ApiVersion = 1;
 
     /// <summary>The pi-durable version a PiSharp device reports.</summary>
+    /// <remarks>It names the version of the device protocol's durable-pi shapes, not the port's pin. It stays "1.2.0" after the Pi v1.5.0
+    /// sync: the device wire stays version 1 (<see cref="ApiVersion"/>; decision 0008). PiSharp.Durable.Hosting's AgentEvents.cs keeps
+    /// projecting v1.2.0's agent events (upstream v1.5.0 removed watchEvents), maps pi.live v3 back to v1.2.0's shapes (a compaction's
+    /// trigger as reason, no run.turns, no runFailure.first) and shows a run waiting for its after-run tasks as no run; the additions
+    /// since (the task node's Blocked, an agent's maxTurns) are optional fields a v1 client ignores. A move to "1.5.0" belongs with a
+    /// device wire version 2.</remarks>
     public const string DurableVersion = "1.2.0";
 
     /// <summary>The device's default port.</summary>
@@ -300,6 +306,9 @@ public sealed record TaskNode
     public string? Label { get; init; }
     /// <summary>A <c>pi.tool</c> task's call id.</summary>
     public string? CallId { get; init; }
+    /// <summary>Why the task cannot run: <c>missing_task</c>, <c>task_too_old</c> or <c>migration_failed</c> (pi-durable
+    /// <c>TaskGraphNode.blocked</c>); absent while it can. A PiSharp addition.</summary>
+    public string? Blocked { get; init; }
 }
 
 /// <summary>Token counts and costs (pi-ai <c>Usage</c>).</summary>

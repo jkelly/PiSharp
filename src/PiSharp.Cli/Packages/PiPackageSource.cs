@@ -52,8 +52,13 @@ internal sealed class PiPathMetadata
     internal required string Scope { get; init; }
     internal required string Origin { get; init; }
     internal string? BaseDir { get; set; }
+    /// <summary>Pi 1.5.0: the package's changelog file (pi.changelogPath, else CHANGELOG.md), resolved inside the package root.</summary>
+    internal string? ChangelogPath { get; set; }
     internal string? PackageRoot { get; set; }
-    internal PiPathMetadata With(string? baseDir) => new() { Source = Source, Scope = Scope, Origin = Origin, BaseDir = baseDir, PackageRoot = PackageRoot };
+    internal PiPathMetadata With(string? baseDir) => new()
+    {
+        Source = Source, Scope = Scope, Origin = Origin, BaseDir = baseDir, ChangelogPath = ChangelogPath, PackageRoot = PackageRoot
+    };
 }
 
 /// <summary>Source ResolvedResource.</summary>
@@ -64,12 +69,17 @@ internal sealed record PiResolvedPaths(ImmutableArray<PiResolvedResource> Extens
     ImmutableArray<PiResolvedResource> Prompts, ImmutableArray<PiResolvedResource> Themes)
 {
     internal static PiResolvedPaths Empty { get; } = new([], [], [], []);
+    /// <summary>Source installFailures: configured packages that were skipped because installing them failed.</summary>
+    internal ImmutableArray<PiPackageInstallFailure> InstallFailures { get; init; } = [];
     internal ImmutableArray<PiResolvedResource> Get(string resourceType) => resourceType switch
     {
         "extensions" => Extensions, "skills" => Skills, "prompts" => Prompts, "themes" => Themes,
         _ => throw new ArgumentOutOfRangeException(nameof(resourceType))
     };
 }
+
+/// <summary>Source PackageInstallFailure: a configured package that could not be installed while resolving resources.</summary>
+internal sealed record PiPackageInstallFailure(string Source, string Scope, string Message);
 
 /// <summary>Source MissingSourceAction.</summary>
 internal enum PiMissingSourceAction { Install, Skip, Error }
@@ -105,13 +115,19 @@ internal sealed record PiPackageEntry(string Source, JsonNode Node)
 }
 
 /// <summary>Source PiManifest / readPiManifest: the <c>pi</c> object of a package.json; a resource field counts only when it is an
-/// array of strings, and an unreadable or malformed file has no manifest.</summary>
+/// array of strings, <c>changelogPath</c> only when it is a string (Pi 1.5.0), and an unreadable or malformed file has no manifest.</summary>
 internal sealed record PiManifest(ImmutableArray<string>? Extensions, ImmutableArray<string>? Skills, ImmutableArray<string>? Prompts, ImmutableArray<string>? Themes)
 {
+    internal string? ChangelogPath { get; init; }
+
     internal ImmutableArray<string>? Get(string resourceType) => resourceType switch
     {
         "extensions" => Extensions, "skills" => Skills, "prompts" => Prompts, "themes" => Themes, _ => null
     };
+
+    /// <summary>Pi 1.5.0 hasManifestResourceFields: a <c>pi</c> object is a resource manifest only when it lists resources; one that holds
+    /// only metadata (changelogPath, gallery image or video) leaves the package to directory auto-discovery.</summary>
+    internal bool HasResourceFields => Extensions is not null || Skills is not null || Prompts is not null || Themes is not null;
 
     internal static PiManifest? Read(string packageJsonPath)
     {
@@ -120,7 +136,10 @@ internal sealed record PiManifest(ImmutableArray<string>? Extensions, ImmutableA
             if (JsonNode.Parse(PiPaths.ReadText(packageJsonPath)) is not JsonObject package || package["pi"] is not JsonObject pi) return null;
             ImmutableArray<string>? Field(string name) => pi[name] is JsonArray array && array.All(item => item is JsonValue value && value.TryGetValue<string>(out _))
                 ? [.. array.Select(item => item!.GetValue<string>())] : null;
-            return new(Field("extensions"), Field("skills"), Field("prompts"), Field("themes"));
+            return new(Field("extensions"), Field("skills"), Field("prompts"), Field("themes"))
+            {
+                ChangelogPath = pi["changelogPath"] is JsonValue changelog && changelog.TryGetValue<string>(out var changelogPath) ? changelogPath : null
+            };
         }
         catch (Exception error) when (error is System.Text.Json.JsonException or IOException or UnauthorizedAccessException or InvalidOperationException or ArgumentException)
         { return null; }

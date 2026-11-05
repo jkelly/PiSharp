@@ -1,10 +1,18 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/test/harness-output.test.ts. Verbatim apart from these adaptations:
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/chord/test/output.test.ts.
+//
+// Upstream moved it from Durable's harness-output.test.ts; the case ids keep the harness.output prefix. New at v1.5.0:
+// harness.output.removes-whole-ansi-escape-sequences-not-only-their-esc-bytes (#11607) and harness.output.paces-on-the-clock-it-is-given
+// (the ProgressClock, f75b3240a and ec1be23eb). Verbatim apart from these adaptations:
 // - Node's Buffer (from, byteLength, subarray().toString) is Encoding.UTF8, which encodes a lone surrogate as U+FFFD and decodes invalid
 //   data with one U+FFFD per maximal subpart, as Buffer does.
 // - vi.useFakeTimers({now: 0}) is a ManualTimeProvider starting at 0 passed to Progress; advanceTimersByTimeAsync(ms) is Advance(ms). A
-//   write that completes synchronously settles inline (see Output.cs), so no microtask flush is needed between steps.
+//   write that completes synchronously settles inline (see Output.cs), so no microtask flush is needed between steps; nor is the
+//   `await new Promise((resolve) => setTimeout(resolve, 0))` that lets a commit finish settling.
+// - The clock object of "paces on the clock it is given" is a ProgressClock of the same two functions; a timer's `disarmed` flag is a
+//   StrongBox.
 // - The deterministic fuzz PRNG `(seed * 1664525 + 1013904223) >>> 0` is the same recurrence on uint.
 // - BoundedOutput is a record struct, so `toEqual({text, droppedBytes, droppedLines})` is struct equality.
+using System.Runtime.CompilerServices;
 using System.Text;
 using PiSharp.Durable;
 using static Program;
@@ -15,7 +23,7 @@ internal static partial class Program
     private static IEnumerable<(string, Func<Task>)> HarnessOutputCases() => OutputTests.Cases("harness.output.");
 }
 
-/// <summary>The harness.output.* cases (upstream harness-output.test.ts).</summary>
+/// <summary>The harness.output.* cases (upstream Chord output.test.ts).</summary>
 internal static class OutputTests
 {
     private static OutputLimits Head(long maxLines, long maxBytes = 1000) => new(maxBytes, maxLines, ToolOutputRetention.Head);
@@ -75,6 +83,19 @@ internal static class OutputTests
 
         yield return Case(prefix + "removes-control-characters-but-keeps-tabs-newlines-and-other-text", () =>
             Equal("ab\tc\ndefgh😀", ToolOutput.SanitizeOutput("a\0b\tc\nd\re\u0007f￹g￻h😀"), "sanitized"));
+
+        // #11604
+        yield return Case(prefix + "removes-whole-ansi-escape-sequences-not-only-their-esc-bytes", () =>
+        {
+            Equal("ERROR\n", ToolOutput.SanitizeOutput("\u001b[31mERROR\u001b[0m\n"), "color");
+            Equal("xyz", ToolOutput.SanitizeOutput("\u001b[1;38;5;208mx\u001b[?25l\u001b[2K\u001b(By\u001b7z"), "cursor, erase, charset and short forms");
+            Equal("link ok", ToolOutput.SanitizeOutput("\u001b]8;;https://pi.dev\u0007link\u001b]8;;\u001b\\ \u001b]0;title\u0007ok"), "strings");
+            var output = new OutputBuffer(new OutputLimits(1024, 100, ToolOutputRetention.Tail));
+            output.Push("\u001b[3");
+            output.Push("1mERROR\u001b[0");
+            output.Push("m\n");
+            Equal("ERROR\n", output.Snapshot().Text, "split across chunks");
+        });
 
         yield return Case(prefix + "keeps-output-within-the-limits-unchanged", () =>
         {
@@ -281,6 +302,41 @@ internal static class OutputTests
             Seq([0d], commits, "waiting");
             time.Advance(TimeSpan.FromMilliseconds(1));
             Seq([0d, 500], commits, "second");
+        });
+
+        yield return Case(prefix + "paces-on-the-clock-it-is-given", async () =>
+        {
+            double now = 1_000;
+            var timers = new List<(double DelayMs, Action Callback, StrongBox<bool> Disarmed)>();
+            var commits = new List<double>();
+            var progress = new Progress(() =>
+            {
+                commits.Add(now);
+                return Task.FromResult(10L);
+            }, _ => { }, 100, new ProgressClock(() => now, (callback, delayMs) =>
+            {
+                var disarmed = new StrongBox<bool>(false);
+                timers.Add((delayMs, callback, disarmed));
+                return () => disarmed.Value = true;
+            }));
+            await progress.MarkAndWait();
+            Seq([1_000d], commits, "first");
+            now = 1_040;
+            var second = progress.MarkAndWait();
+            Seq([60d], timers.Select(timer => timer.DelayMs), "armed");
+            // A timer that fires early commits nothing and waits for the rest.
+            now = 1_080;
+            timers[0].Callback();
+            Seq([1_000d], commits, "early");
+            Seq([60d, 20], timers.Select(timer => timer.DelayMs), "rearmed");
+            now = 1_100;
+            timers[1].Callback();
+            await second;
+            Seq([1_000d, 1_100], commits, "second");
+            progress.Mark();
+            Seq([60d, 20, 100], timers.Select(timer => timer.DelayMs), "third armed");
+            await progress.StopAsync();
+            Check(timers[2].Disarmed.Value, "stop disarms the timer");
         });
 
         yield return Case(prefix + "rejects-the-waiters-of-a-failed-commit-and-reports-its-error", async () =>

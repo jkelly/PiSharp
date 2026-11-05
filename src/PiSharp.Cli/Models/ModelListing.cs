@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/src/cli/list-models.ts,
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/coding-agent/src/cli/list-models.ts,
 // packages/coding-agent/src/core/auth-guidance.ts (getProviderLoginHelp and its messages) and packages/tui/src/fuzzy.ts.
 using System.Globalization;
 using System.Text.RegularExpressions;
@@ -13,24 +13,41 @@ internal static partial class FuzzyFilter
     internal static Match FuzzyMatch(string query, string text)
     {
         var queryLower = query.ToLowerInvariant(); var textLower = text.ToLowerInvariant();
-        Match Run(string normalized)
+        double Score(int[] positions)
         {
-            if (normalized.Length == 0) return new(true, 0);
-            if (normalized.Length > textLower.Length) return new(false, 0);
-            int queryIndex = 0, last = -1, consecutive = 0; double score = 0;
-            while (queryIndex < normalized.Length)
+            int last = -1, consecutive = 0; double score = 0;
+            foreach (var index in positions)
             {
-                var index = textLower.IndexOf(normalized[queryIndex], last + 1);
-                if (index == -1) break;
                 var boundary = index == 0 || textLower[index - 1] is ' ' or '\t' or '\n' or '\r' or '\f' or '\v' or '-' or '_' or '.' or '/' or ':' ||
                     char.IsWhiteSpace(textLower[index - 1]);
                 if (last == index - 1) { consecutive++; score -= consecutive * 5; }
                 else { consecutive = 0; if (last >= 0) score += (index - last - 1) * 2; }
                 if (boundary) score -= 10;
                 score += index * 0.1;
-                last = index; queryIndex++;
+                last = index;
             }
-            if (queryIndex < normalized.Length) return new(false, 0);
+            return score;
+        }
+        Match Run(string normalized)
+        {
+            if (normalized.Length == 0) return new(true, 0);
+            if (normalized.Length > textLower.Length) return new(false, 0);
+            // The greedy alignment (each query character at its first occurrence after the previous one), then every contiguous
+            // occurrence: the greedy one can scatter the query over an earlier, unrelated part of the text. The best score wins.
+            var positions = new int[normalized.Length]; var last = -1;
+            for (var queryIndex = 0; queryIndex < normalized.Length; queryIndex++)
+            {
+                var index = textLower.IndexOf(normalized[queryIndex], last + 1);
+                if (index == -1) return new(false, 0);
+                positions[queryIndex] = last = index;
+            }
+            var score = Score(positions);
+            for (var start = textLower.IndexOf(normalized, StringComparison.Ordinal); start != -1;
+                 start = textLower.IndexOf(normalized, start + 1, StringComparison.Ordinal))
+            {
+                for (var k = 0; k < positions.Length; k++) positions[k] = start + k;
+                score = Math.Min(score, Score(positions));
+            }
             if (normalized == textLower) score -= 100;
             return new(true, score);
         }

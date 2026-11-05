@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/ai/src/providers/azure.ts and packages/ai/src/api/azure-openai-config.ts.
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/ai/src/providers/azure.ts and packages/ai/src/api/azure-openai-config.ts.
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using PiSharp.AI.Authentication;

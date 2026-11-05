@@ -63,6 +63,8 @@ internal sealed class NodeEditorComponent : IEditorComponent
             PiSharp.Compatibility.Node.Pi.PiNodeHostException) { return []; }
     }
     public void Invalidate() { }
+    /// <summary>Pi 1.5.0: the Node editor's capturesViewportInput (an open autocomplete menu), as the bridge last reported it.</summary>
+    public bool CapturesViewportInput => host.ComponentCapturesViewportInput(id);
     public void HandleInput(string data) =>
         _ = host.InputComponentAsync(id, data, CancellationToken.None).ContinueWith(static task => _ = task.Exception, TaskScheduler.Default);
 

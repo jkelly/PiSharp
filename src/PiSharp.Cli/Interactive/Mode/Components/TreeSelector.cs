@@ -906,8 +906,7 @@ internal sealed class TreeList : IComponent, IInputHandler
         static string ShortenPath(string p)
         {
             var home = Environment.GetEnvironmentVariable("HOME") is { Length: > 0 } h ? h : Environment.GetEnvironmentVariable("USERPROFILE") ?? "";
-            if (home.Length > 0 && p.StartsWith(home, StringComparison.Ordinal)) return "~" + p[home.Length..];
-            return p;
+            return PiSharp.Cli.Pi.PiPaths.ShortenHomePath(p, home);
         }
 
         switch (name)
@@ -915,16 +914,7 @@ internal sealed class TreeList : IComponent, IInputHandler
             case "read":
             {
                 var path = ShortenPath(Or(args, "", "path", "file_path"));
-                var offset = SessionEntryJson.Number(args["offset"]);
-                var limit = SessionEntryJson.Number(args["limit"]);
-                var display = path;
-                if (offset is not null || limit is not null)
-                {
-                    var start = offset ?? 1;
-                    var end = limit is not null ? SessionEntryJson.JsNumber(start + limit.Value - 1) : "";
-                    display += $":{SessionEntryJson.JsNumber(start)}{(end.Length > 0 && end != "0" && end != "NaN" ? $"-{end}" : "")}";
-                }
-                return $"[read: {display}]";
+                return $"[read: {path}{RenderUtils.FormatReadLineRange(args["offset"], args["limit"])}]";
             }
             case "write":
                 return $"[write: {ShortenPath(Or(args, "", "path", "file_path"))}]";
@@ -1110,7 +1100,7 @@ internal sealed class TreeList : IComponent, IInputHandler
 }
 
 /// <summary>Component that renders a session tree selector for navigation.</summary>
-internal sealed class TreeSelectorComponent : Container, IFocusable, IInputHandler
+internal sealed class TreeSelectorComponent : Container, IComponent, IFocusable, IInputHandler
 {
     /// <summary>Source DynamicBorder (dynamic-border.ts), kept local to this file.</summary>
     private sealed class DynamicBorder(Func<string, string>? color = null) : IComponent
@@ -1353,6 +1343,9 @@ internal sealed class TreeSelectorComponent : Container, IFocusable, IInputHandl
         treeContainer.Clear();
         treeContainer.AddChild(treeList);
     }
+
+    /// <summary>The tree receives fullscreen viewport keys (PageUp/PageDown); the label input does not.</summary>
+    public bool CapturesViewportInput => labelInput is null;
 
     public void HandleInput(string keyData)
     {

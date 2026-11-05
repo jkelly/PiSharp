@@ -24,6 +24,8 @@ pisharp install ./local-package
 
 PiSharp uses your `npm` (or the `npmCommand` setting) and `git`.
 
+If a configured package fails to install at startup, for example because npm cannot reach the registry, PiSharp warns about it, skips that package's resources, and keeps running. It tries to install the package again on the next start or `/reload`. `pisharp install` and `pisharp update --extensions` still report the failure and exit non-zero.
+
 ## Manage
 
 | Command | What it does |
@@ -37,3 +39,25 @@ PiSharp uses your `npm` (or the `npmCommand` setting) and `git`.
 To try a package without installing it, load it for one run with `-e npm:@example/pi-tools`. Its extensions, skills, prompt templates and themes all load, as in Pi.
 
 A package can hold TypeScript extensions, C# extensions (a folder with a `pisharp-extension.json`), skills, prompt templates and themes.
+
+## Show a changelog
+
+After a package update, PiSharp shows what changed, as Pi 1.5.0 does. On the next fresh launch, it reads the package's changelog and shows the entries newer than the last version you saw under "Extension Updates", after PiSharp's own "What's New". The first time PiSharp sees a package, it records the version and shows nothing. Resumed and continued sessions show nothing.
+
+This applies to packages that load at least one extension. Packages that only hold skills, prompt templates or themes show no changelog.
+
+PiSharp reads `CHANGELOG.md` in the package root by default. Point `pi.changelogPath` at another file inside the package, or set it to `""` to turn the changelog off:
+
+```json
+{
+  "name": "my-pi-package",
+  "version": "1.2.0",
+  "pi": {
+    "changelogPath": "./docs/CHANGELOG.md"
+  }
+}
+```
+
+A path that leaves the package, or isn't a file, is ignored. Use version headings such as `## [1.2.0]` or `## 1.2.0 - 2026-01-01`. Entries are matched against the `version` in `package.json`, so a git package shows a changelog only when that field goes up. `collapseChangelog` shortens the section to one line per package, such as `Updated my-pi-package to v1.2.0.` `/changelog` doesn't show package changelogs.
+
+A `pi` object that holds only metadata, such as `changelogPath`, doesn't count as a resource list: PiSharp still finds the package's `extensions`, `skills`, `prompts` and `themes` folders.

@@ -3,7 +3,7 @@ using System.Text;
 using System.Text.Json;
 using PiSharp.Durable.Env;
 
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/test/env-line-scan.test.ts, as env.line-scan.<case>. The seeded
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/test/env-line-scan.test.ts, as env.line-scan.<case>. The seeded
 // generator and chunking are ported exactly. Upstream compares against Node's `new TextDecoder().decode(file)`; here
 // Fixtures/v1.2.0/env-line-scan.upstream.json (printed by Fixtures/capture-env-line-scan.mjs, which runs the pinned decode.ts and line-scan.ts under
 // Node) holds, per seed, a digest of the file with its whole-file TextDecoder text and of upstream's LineScanner result, so each case checks

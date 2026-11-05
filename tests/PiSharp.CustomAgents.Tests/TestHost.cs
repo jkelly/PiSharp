@@ -42,7 +42,7 @@ internal sealed class TestHost : IAsyncDisposable
         {
             Models = models,
             Registry = registry,
-            OnReport = error => { lock (reports) reports.Add(error); },
+            OnReport = report => { lock (reports) reports.Add(report.Error); },
         }, Context);
         harness.Resume();
         return new TestHost(harness, registry, catalog, models, reports);

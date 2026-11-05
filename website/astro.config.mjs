@@ -72,6 +72,7 @@ export default defineConfig({
 						'docs/embed/model-operations',
 						'docs/embed/codemode',
 						'docs/embed/durable',
+						'docs/embed/telemetry',
 						'docs/embed/media',
 					],
 				},

@@ -52,10 +52,11 @@ public sealed partial class MistralTextHttpSseTransport
                     {
                         var text = block["thinking"]?.GetValue<string>() ?? "";
                         var redacted = block["redacted"]?.GetValue<bool>() == true;
-                        if (redacted) { if (same) parts.Add(block.DeepClone()); continue; }
-                        if (same && !string.IsNullOrEmpty(block["thinkingSignature"]?.GetValue<string>())) { parts.Add(block.DeepClone()); continue; }
+                        // transformMessages drops thinking from another model instead of replaying it as text.
+                        if (!same) continue;
+                        if (redacted || !string.IsNullOrEmpty(block["thinkingSignature"]?.GetValue<string>())) { parts.Add(block.DeepClone()); continue; }
                         if (text.Trim(EcmaWhitespace).Length == 0) continue;
-                        parts.Add(same ? block.DeepClone() : new JsonObject { ["type"] = "text", ["text"] = text }); continue;
+                        parts.Add(block.DeepClone()); continue;
                     }
                     if (type == "text" && !same) { parts.Add(new JsonObject { ["type"] = "text", ["text"] = block["text"]!.GetValue<string>() }); continue; }
                     if (type == "toolCall" && !same)

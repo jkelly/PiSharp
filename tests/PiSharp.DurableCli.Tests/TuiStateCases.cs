@@ -54,6 +54,9 @@ internal static partial class Program
                 State(DurableTaskStatus.Completing, null, outcome: TaskOutcomeStatus.Aborted), abortRequested: true, conversations: [2, 3])), "completing");
             Equal("bg #9: running poll [background]", DurableTuiState.DescribeTask(Node(9, "bg", RootId, State(DurableTaskStatus.Running, "poll"),
                 background: true)), "running");
+            // Pi v1.5.0 sync (area sleep), authored: upstream v1.5.0 has no durable TUI, so a sleeping task takes the default line.
+            Equal("pi.run #6: sleeping retry", DurableTuiState.DescribeTask(Node(6, "pi.run", RootId,
+                State(DurableTaskStatus.Sleeping, "retry", until: 61_000))), "sleeping");
             // Upstream interpolates an absent phase as JavaScript does.
             Equal("pi.compaction #5: pending undefined", DurableTuiState.DescribeTask(Node(5, "pi.compaction", RootId, State(DurableTaskStatus.Pending, null))),
                 "absent phase");

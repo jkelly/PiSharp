@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/tui/src/tui.ts.
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/tui/src/tui.ts.
 // Ported to plain ESM for the PiSharp Node extension bridge (TypeScript types stripped mechanically; behaviour unchanged).
 import { performance } from "node:perf_hooks";
 import { isKeyRelease, matchesKey } from "./keys.mjs";
@@ -189,6 +189,18 @@ export class TuiBase extends Container {
     afterTerminalStart() {}
     beforeTerminalStop(_options) {}
     afterTerminalStop(_options) {}
+    getExitRestorePrefix() {
+        return `${this.terminalColorSchemeNotificationsEnabled ? "\x1b[?2031l" : ""}\x1b[?25h`;
+    }
+    getExitRestoreSuffix() {
+        return "";
+    }
+    exitRestoreHandler = ()=>{
+        if (this.stopped) return;
+        try {
+            this.terminal.restoreOnExit?.(this.getExitRestorePrefix(), this.getExitRestoreSuffix());
+        } catch  {}
+    };
     get fullRedraws() {
         return this.fullRedrawCount;
     }
@@ -496,6 +508,8 @@ export class TuiBase extends Container {
     }
     start() {
         this.stopped = false;
+        process.off("exit", this.exitRestoreHandler);
+        process.on("exit", this.exitRestoreHandler);
         this.beforeTerminalStart();
         this.terminal.start((data)=>this.handleTerminalInput(data), ()=>this.requestRender());
         this.afterTerminalStart();
@@ -538,6 +552,7 @@ export class TuiBase extends Container {
     }
     stop(options = {}) {
         this.stopped = true;
+        process.off("exit", this.exitRestoreHandler);
         this.cancelRenderTimer();
         if (this.terminalColorSchemeNotificationsEnabled) {
             this.terminal.write("\x1b[?2031l");

@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/test/harness-context.test.ts. Verbatim apart from the adaptations in
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/test/harness-context.test.ts. Verbatim apart from the adaptations in
 // HarnessSupport.cs and HarnessConversationsSupport.cs, and these:
 // - Every case runs on the storage the group is given; countingSetup's Proxy is CountingStorage, which decorates that storage.
 // - toEqual on views is SameView (deep JSON equality of head, entries, contributions and messages).
@@ -13,6 +13,12 @@
 // - "drops an idle conversation's context read on a timer ...": vi.useFakeTimers is ManualTimeProvider (TimeProvider and Now). Idle
 //   waiters resolve on the thread pool, so the expiry timer the same idle check schedules is awaited with Eventually before the count
 //   is asserted.
+// - Pi v1.5.0 sync (area harness-options): upstream 5713c9507's baseline cases (#10904), among them
+//   harness.context.leads-with-the-baseline-after-a-compaction-that-keeps-assistant-messages and
+//   harness.context.finds-the-baseline-among-the-entries-an-extended-read-adds, and its changes to the pseudo-random transcript.
+// - Pi v1.5.0 sync (area publication-caches, e5c6182ba): the scanned-row counts are v1.5.0's. The Session knows each conversation's
+//   bounds (ConversationTails) and a kept range takes each entry as it is committed (Scheduler.Observe), so an extended read and a
+//   bounds probe scan nothing.
 using System.Collections.Concurrent;
 using PiSharp.Durable;
 using PiSharp.Durable.Chord;
@@ -156,6 +162,135 @@ internal static partial class HarnessConversationTests
             await setup.Harness.CloseAsync(Context);
         });
 
+        // #10904
+        yield return Case(prefix + "leads-with-the-baseline-after-a-compaction-that-keeps-assistant-messages", async () =>
+        {
+            var setup = await Setup(storage());
+            await setup.Msg(User("old"));
+            var kept = await setup.Msg(User("kept"));
+            await setup.Msg(Assistant("calling", ["a"]));
+            await setup.Msg(ToolResult("a"));
+            await setup.Msg(Assistant("answer"));
+            await setup.Append(new EntryDraft { Kind = "summary", Head = kept.Id, Model = Messages(User("summary")) });
+            await setup.Msg(User("next"));
+            await setup.Msg(SystemMessage(("preamble", "Baseline.")), "pi.system");
+            var view = await setup.Root.ContextAsync(Context);
+            Seq(["system:preamble", "user:summary", "user:kept", "assistant:calling", "result:a:result a", "assistant:answer", "user:next"],
+                Described(view.Messages), "messages");
+
+            // Later system messages stay in place.
+            await setup.Msg(Assistant("done"));
+            await setup.Msg(SystemMessage(("cwd", "/repo")), "pi.system");
+            view = await setup.Root.ContextAsync(Context);
+            Seq(["system:preamble", "user:summary"], Described(view.Messages).Take(2), "leading messages");
+            Seq(["assistant:done", "system:cwd"], Described(view.Messages).TakeLast(2), "trailing messages");
+            await setup.Harness.CloseAsync(Context);
+        });
+
+        // #10904
+        yield return Case(prefix + "leads-with-a-baseline-written-after-the-first-answers-when-the-agent-had-no-section-or-tool-before", async () =>
+        {
+            var setup = await Setup(storage());
+            await setup.Msg(User("first"), "pi.user");
+            await setup.Msg(Assistant("answer"), "pi.assistant");
+            await setup.Msg(User("next"), "pi.user");
+            await setup.Msg(SystemMessage(("plan", "Plan.")), "pi.system");
+            var view = await setup.Root.ContextAsync(Context);
+            Seq(["system:plan", "user:first", "assistant:answer", "user:next"], Described(view.Messages), "messages");
+            await setup.Harness.CloseAsync(Context);
+        });
+
+        // #10904
+        yield return Case(prefix + "keeps-system-messages-other-than-the-baseline-in-place-once-an-assistant-message-precedes-them", async () =>
+        {
+            var setup = await Setup(storage());
+            await setup.Msg(User("first"));
+            await setup.Msg(Assistant("answer"));
+            // Another kind's system message is positional; the baseline after it is not the first system message.
+            await setup.Msg(SystemMessage(("note", "From here on.")), "host.note");
+            await setup.Msg(SystemMessage(("preamble", "Baseline.")), "pi.system");
+            var view = await setup.Root.ContextAsync(Context);
+            Seq(["user:first", "assistant:answer", "system:note", "system:preamble"], Described(view.Messages), "messages");
+
+            // After a compaction that keeps the other kind's system message, the new baseline does not move ahead of it.
+            var kept = await setup.Msg(User("kept"));
+            await setup.Msg(Assistant("kept answer"));
+            await setup.Msg(SystemMessage(("mode", "plan")), "host.note");
+            await setup.Append(new EntryDraft { Kind = "summary", Head = kept.Id, Model = Messages(User("summary")) });
+            await setup.Msg(User("next"));
+            await setup.Msg(SystemMessage(("preamble", "Baseline.")), "pi.system");
+            view = await setup.Root.ContextAsync(Context);
+            Seq(["user:summary", "user:kept", "assistant:kept answer", "system:mode", "user:next", "system:preamble"], Described(view.Messages),
+                "messages after the compaction");
+            await setup.Harness.CloseAsync(Context);
+        });
+
+        // #10904
+        yield return Case(prefix + "does-not-lead-with-a-first-system-entry-written-after-another-system-message-even-once-that-is-omitted", async () =>
+        {
+            var setup = await Setup(storage());
+            var host = await setup.Msg(SystemMessage(("legacy", "Use the legacy format.")), "host.system");
+            await setup.Msg(User("first"));
+            await setup.Msg(Assistant("answer"));
+            // Generation wrote this entry against the host's message: it only removes a section, so it is no baseline.
+            await setup.Msg(SystemMessage(("legacy", null)), "pi.system");
+            await setup.Append(Edit(ContextEdit.Omit(host.Id)));
+            var view = await setup.Root.ContextAsync(Context);
+            Seq(["user:first", "assistant:answer", "system:legacy"], Described(view.Messages), "messages");
+
+            // The same holds for a system message an edit put before it.
+            var other = await Setup(storage());
+            var first = await other.Msg(User("first"));
+            await other.Append(Edit(ContextEdit.Replace(first.Id, Messages(User("first"), SystemMessage(("note", "Note."))))));
+            await other.Msg(Assistant("answer"));
+            await other.Msg(SystemMessage(("note", null)), "pi.system");
+            await other.Append(Edit(ContextEdit.Replace(first.Id, Messages(User("first")))));
+            view = await other.Root.ContextAsync(Context);
+            Seq(["user:first", "assistant:answer", "system:note"], Described(view.Messages), "messages after an edit");
+            await other.Harness.CloseAsync(Context);
+            await setup.Harness.CloseAsync(Context);
+        });
+
+        // #10904
+        yield return Case(prefix + "does-not-lead-with-a-retained-edited-or-later-system-entry-in-place-of-the-baseline", async () =>
+        {
+            var setup = await Setup(storage());
+            var kept = await setup.Msg(User("kept"));
+            await setup.Msg(Assistant("answer"));
+            var retained = await setup.Msg(SystemMessage(("cwd", "/repo")), "pi.system");
+            // Before generation writes the baseline after the head marker, a retained system entry stays in place.
+            await setup.Append(new EntryDraft { Kind = "summary", Head = kept.Id, Model = Messages(User("summary")) });
+            await setup.Msg(User("next"));
+            var view = await setup.Root.ContextAsync(Context);
+            Seq(["user:summary", "user:kept", "assistant:answer", "system:cwd", "user:next"], Described(view.Messages), "messages");
+
+            // The baseline omits the retained entry, as generation writes it, and leads.
+            var baseline = await setup.Append(new EntryDraft
+            {
+                Kind = "pi.system",
+                Model = Messages(SystemMessage(("preamble", "Baseline."))),
+                Edits = [ContextEdit.Omit(retained.Id)],
+            });
+            await setup.Msg(Assistant("done"));
+            await setup.Msg(SystemMessage(("preamble", null)), "pi.system");
+            view = await setup.Root.ContextAsync(Context);
+            Seq(["system:preamble", "user:summary", "user:kept", "assistant:answer", "user:next", "assistant:done", "system:preamble"],
+                Described(view.Messages), "messages with the baseline");
+
+            // An omitted baseline leaves no message to lead; the delta after it is not a baseline and stays in place.
+            await setup.Append(Edit(ContextEdit.Omit(baseline.Id)));
+            view = await setup.Root.ContextAsync(Context);
+            Seq(["user:summary", "user:kept", "assistant:answer", "user:next", "assistant:done", "system:preamble"], Described(view.Messages),
+                "messages with the baseline omitted");
+
+            // A replacement of the baseline is not one either.
+            await setup.Append(Edit(ContextEdit.Replace(baseline.Id, Messages(SystemMessage(("other", "Other."))))));
+            view = await setup.Root.ContextAsync(Context);
+            Seq(["user:summary", "user:kept", "assistant:answer", "user:next", "system:other", "assistant:done", "system:preamble"],
+                Described(view.Messages), "messages with the baseline replaced");
+            await setup.Harness.CloseAsync(Context);
+        });
+
         yield return Case(prefix + "synthesizes-missing-tool-results-after-a-fork-and-drops-results-cut-from-their-call", async () =>
         {
             var setup = await Setup(storage());
@@ -225,18 +360,18 @@ internal static partial class HarnessConversationTests
                 var initial = await Read();
                 SameView(await root.ContextAsync(ctx), initial.View, "initial");
 
-                // Three new entries: the bounds probe reads one row, the extension the three new ones.
+                // Three new entries: the kept range took them as they were committed, so the read scans nothing.
                 await Write(Message(User("new")));
                 await Write(new EntryDraft { Kind = "note", Data = O("""{"text":"display only"}""") });
                 await Write(Message(Assistant("answer")));
                 var extended = await Read();
-                Equal(4, extended.Rows, "extended rows");
+                Equal(0, extended.Rows, "extended rows");
                 SameView(await root.ContextAsync(ctx), extended.View, "extended");
 
                 // A newer edit of an older entry applies to the extended range.
                 await Write(Edit(ContextEdit.Omit(first.Id)));
                 var edited = await Read();
-                Equal(2, edited.Rows, "edited rows");
+                Equal(0, edited.Rows, "edited rows");
                 SameView(await root.ContextAsync(ctx), edited.View, "edited");
                 Check(!Described(edited.View.Messages).Contains("user:first"), "the omitted entry is gone");
 
@@ -325,9 +460,9 @@ internal static partial class HarnessConversationTests
             await Probe("idle");
             Volatile.Write(ref clock, clock + 600_000);
             await Probe("expired");
-            // Bounds probes read one row each. The child scans its own new entry; the waiting parent's later invocation and the probe
-            // within the retention period scan nothing new. After it, the probe reads the whole transcript again.
-            SameRows([("parent", 22), ("child", 2), ("after", 1), ("idle", 1), ("expired", 23)], rows, "rows");
+            // The Session knows the bounds, and the kept range takes each committed entry, so only a first read scans: the parent's,
+            // and the probe's after the retention period, which reads the whole transcript again.
+            SameRows([("parent", 21), ("child", 0), ("after", 0), ("idle", 0), ("expired", 22)], rows, "rows");
             await harness.CloseAsync(Context);
         });
 
@@ -385,8 +520,10 @@ internal static partial class HarnessConversationTests
                     }
                     if (pick < 9)
                     {
-                        Count("system");
-                        return Message(SystemMessage(("s", $"v{next++}")));
+                        // `pi.system` entries can be the baseline that leads the context (#10904).
+                        var kind = Random(2) == 0 ? "pi.system" : "message";
+                        Count(kind == "pi.system" ? "baseline system" : "system");
+                        return Message(SystemMessage(("s", $"v{next++}")), kind);
                     }
                     if (pick < 10)
                     {
@@ -417,7 +554,13 @@ internal static partial class HarnessConversationTests
                 for (var step = 0; step < 150; step++)
                 {
                     await Append(root.Id);
-                    SameView(await root.ContextAsync(ctx), await runtime.ContextAsync(root.Id, ctx), $"step {step}");
+                    var view = await root.ContextAsync(ctx);
+                    SameView(view, await runtime.ContextAsync(root.Id, ctx), $"step {step}");
+                    var contributed = view.Contributions.SelectMany(messages => messages).ToList();
+                    var firstSystem = contributed.FindIndex(message => S(((JsonObjectValue)message)["role"]) == "system");
+                    if (firstSystem > 0 && view.Messages.Length > 0 && ReferenceEquals(view.Messages[0], contributed[firstSystem]) &&
+                        contributed.Take(firstSystem).Any(message => S(((JsonObjectValue)message)["role"]) == "assistant"))
+                        Count("baseline past assistant");
                     if (step % 10 == 9)
                     {
                         // Overlapping reads, one with an earlier cutoff, share the kept range.
@@ -444,9 +587,82 @@ internal static partial class HarnessConversationTests
             var record = await harness.WaitForTaskAsync(id, Context);
             failures.ThrowIfAny();
             SameJson(DoneOutcome, OutcomeOf(record), "outcome");
-            string[] categories = ["user", "assistant", "aborted", "error", "deferred", "result", "stray result", "system", "note"];
+            string[] categories =
+                ["user", "assistant", "aborted", "error", "deferred", "result", "stray result", "system", "baseline system", "baseline past assistant", "note"];
             foreach (var category in categories.Concat(["omit", "replace", "head"]))
                 Check(seen.GetValueOrDefault(category) > 0, $"category {category} was drawn");
+            await harness.CloseAsync(Context);
+        });
+
+        // #10904
+        yield return Case(prefix + "finds-the-baseline-among-the-entries-an-extended-read-adds", async () =>
+        {
+            var (harness, registry, root, first, scanned) = await CountingSetup(storage());
+            var failures = new HandlerFailures();
+            var ownerless = new ConversationCreateOptions(ConversationOwnership.Ownerless);
+            var steps = ContextTask("test.context-baseline", (_, runtime, ctx) => failures.Guard(async () =>
+            {
+                Task Append(ConversationId conversationId, EntryDraft draft) =>
+                    runtime.CommitAsync(async (tx, _) => { await tx.AppendEntryAsync(conversationId, draft); }, ctx);
+                async Task<(List<string> Messages, int Rows)> Read(IConversation conversation)
+                {
+                    var before = scanned.Rows;
+                    var view = await runtime.ContextAsync(conversation.Id, ctx);
+                    var rows = scanned.Rows - before;
+                    SameView(await conversation.ContextAsync(ctx), view, $"read of {conversation.Id}");
+                    return (Described(view.Messages), rows);
+                }
+
+                // The cached range has answers and no system message; the baseline arrives in a later read.
+                Equal("user:first", (await Read(root)).Messages[0], "cached range");
+                await Append(root.Id, new EntryDraft { Kind = "pi.system", Model = Messages(SystemMessage(("plan", "Plan."))) });
+                var read = await Read(root);
+                // Nothing: the kept range took the added entry as it was committed.
+                Equal(0, read.Rows, "extended rows");
+                Seq(["system:plan", "user:first", "assistant:old 0"], read.Messages.Take(3), "baseline leads");
+
+                // A system message the cached range already has keeps a later first `pi.system` entry in place.
+                var fork = await root.ForkAsync(first.Id, ownerless, ctx);
+                await Append(fork.Id, Message(Assistant("answer")));
+                await Append(fork.Id, new EntryDraft { Kind = "host.system", Model = Messages(SystemMessage(("note", "Note."))) });
+                Seq(["user:first", "assistant:answer", "system:note"], (await Read(fork)).Messages, "fork");
+                await Append(fork.Id, new EntryDraft { Kind = "pi.system", Model = Messages(SystemMessage(("note", null))) });
+                read = await Read(fork);
+                Equal(0, read.Rows, "fork extended rows");
+                Seq(["user:first", "assistant:answer", "system:note", "system:note"], read.Messages, "fork extended");
+
+                // An omitted system message still rules out a later baseline; the extended read keeps that.
+                var omitted = await root.ForkAsync(first.Id, ownerless, ctx);
+                await Append(omitted.Id, Message(Assistant("answer")));
+                EntryRecord? host = null;
+                await runtime.CommitAsync(async (tx, _) =>
+                {
+                    host = await tx.AppendEntryAsync(omitted.Id, new EntryDraft { Kind = "host.system", Model = Messages(SystemMessage(("legacy", "Legacy."))) });
+                }, ctx);
+                await Append(omitted.Id, Edit(ContextEdit.Omit(host!.Id)));
+                Seq(["user:first", "assistant:answer"], (await Read(omitted)).Messages, "omitted");
+                await Append(omitted.Id, new EntryDraft { Kind = "pi.system", Model = Messages(SystemMessage(("legacy", null))) });
+                read = await Read(omitted);
+                Equal(0, read.Rows, "omitted extended rows");
+                Seq(["user:first", "assistant:answer", "system:legacy"], read.Messages, "omitted extended");
+
+                // A first `pi.system` entry without a system message leaves no baseline for a later one to take.
+                var empty = await root.ForkAsync(first.Id, ownerless, ctx);
+                await Append(empty.Id, new EntryDraft { Kind = "pi.system" });
+                await Append(empty.Id, Message(Assistant("answer")));
+                Seq(["user:first", "assistant:answer"], (await Read(empty)).Messages, "empty");
+                await Append(empty.Id, new EntryDraft { Kind = "pi.system", Model = Messages(SystemMessage(("s", "Delta."))) });
+                read = await Read(empty);
+                Equal(0, read.Rows, "empty extended rows");
+                Seq(["user:first", "assistant:answer", "system:s"], read.Messages, "empty extended");
+                await runtime.CommitAsync((_, _) => Done(), ctx);
+            }));
+            AddTask(registry, steps);
+            harness.Resume();
+            var id = await harness.CommitAsync(tx => tx.CreateTaskAsync(steps, JsonObjectValue.Empty, OwnedBy(root.Id)), Context);
+            var record = await harness.WaitForTaskAsync(id, Context);
+            failures.ThrowIfAny();
+            SameJson(DoneOutcome, OutcomeOf(record), "outcome");
             await harness.CloseAsync(Context);
         });
 
@@ -535,7 +751,7 @@ internal static partial class HarnessConversationTests
             await late!;
             probeStart.Resolve();
             SameJson(DoneOutcome, OutcomeOf(await harness.WaitForTaskAsync(probeId, Context)), "probe outcome");
-            SameRows([("probe", 22)], rows, "rows");
+            SameRows([("probe", 21)], rows, "rows");
             await harness.CloseAsync(Context);
         });
 
@@ -567,7 +783,7 @@ internal static partial class HarnessConversationTests
             time.Advance(TimeSpan.FromMilliseconds(1_000));
             Equal(idle, time.TimerCount, "timers after expiry");
             await Probe("second");
-            SameRows([("first", 22), ("second", 22)], rows, "rows");
+            SameRows([("first", 21), ("second", 21)], rows, "rows");
             await harness.CloseAsync(Context);
         });
 
@@ -589,7 +805,7 @@ internal static partial class HarnessConversationTests
                 SameJson(DoneOutcome, OutcomeOf(await harness.WaitForTaskAsync(id, Context)), name + " outcome");
                 await root.WaitForIdleAsync(Context);
             }
-            SameRows([("first", 22), ("second", 22)], rows, "rows");
+            SameRows([("first", 21), ("second", 21)], rows, "rows");
             await harness.CloseAsync(Context);
         });
     }

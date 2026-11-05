@@ -5,8 +5,23 @@
 // normalized as HarnessChatDifferentialCases.cs's fixture is and compared as JSON values and by their exact text; every event's keys must
 // also come in upstream's order. The scenarios run here on memory, JSONL and SQLite and must deliver the same frames and batches, IDs included. Upstream's
 // `setTimeout(0)` before reading the last frame is ViewTests.Drained (a Session line barrier).
+// Pi v1.5.0 sync (area model-requests): the cases compare with the capture's authored v1.5.0 form (ModelRequests150.cs), not the
+// capture itself: v1.5.0 records the requested thinking level on each message it classifies. A byte comparison needs a recapture.
+// Pi v1.5.0 sync (area view, f3255de76): the watch frames compare with an authored v1.5.0 form too. v1.5.0's windowed view appends a
+// commit's entries in one splice (["p",["entries"],length,0,inserted]), where v1.2.0 spliced each entry in on its own; Splices150 joins
+// each run of consecutive entry splices of a captured frame into that one splice. The scenarios hold fewer entries than the default window
+// (50), so no frame drops entries or sets "before".
+// Pi v1.5.0 sync (area run-failure, f3255de76): and with RunFailure150.cs's: abortedRound's frame that ends the run sets
+// pi.live.runFailure before it removes run, its final view holds it, and its run_end event carries it (PiSharp's event projection).
+// Pi v1.5.0 sync (area events, f3255de76): v1.5.0 removed watchEvents; the event half compares PiSharp's projection (PiSharp.Durable.Hosting's
+// AgentEvents.cs, PiSharp-only) with the v1.2.0 capture, which stays honest only while the projection reproduces v1.2.0's events.
+// Pi v1.5.0 sync (area live-turns, f6a9db1d8): and with LiveV3150.cs's: the frame that sets pi.live.run gives it turns 0, and the frame of
+// the commit that starts a tool round sets run.turns after its pi.live ops. The events keep v1.2.0's wire (no turns).
+// Pi v1.5.0 sync (area run-end, 7e15f9601): and the run's set carries first, the input entry its frame appends, as abortedRound's
+// runFailure does (LiveV3150.cs). The events keep the wire without it (AgentEvents.cs).
 using PiSharp.Durable;
 using PiSharp.Durable.Chord;
+using PiSharp.Durable.Hosting;
 using PiSharp.Durable.Sqlite;
 using PiSharp.Durable.Storage;
 using PiSharp.Durable.Storage.Jsonl;
@@ -32,8 +47,40 @@ internal static class ViewsDifferentialTests
     private static readonly DurableContext Context = DurableContext.Background;
     private const double T = 1000;
 
-    private static readonly Lazy<JsonObjectValue> Upstream = new(() => (JsonObjectValue)JsonValue.Parse(
-        File.ReadAllText(Path.Combine(RepositoryRoot(), "tests", "PiSharp.Durable.Tests", "Fixtures", "v1.2.0", "views.upstream.json"))));
+    // Pi v1.5.0 (area model-requests): the capture's authored v1.5.0 form (see the file header).
+    private static readonly Lazy<JsonObjectValue> Upstream = new(() => LiveV3150.Views(RunFailure150.Views(Splices150((JsonObjectValue)ModelRequests150.Authored(JsonValue.Parse(
+        File.ReadAllText(Path.Combine(RepositoryRoot(), "tests", "PiSharp.Durable.Tests", "Fixtures", "v1.2.0", "views.upstream.json"))))))));
+
+    /// <summary>Pi v1.5.0 (area view): every scenario's frames with each run of consecutive entry splices joined into one (see the file
+    /// header).</summary>
+    private static JsonObjectValue Splices150(JsonObjectValue capture) => JsonObjectValue.From(capture.Select(scenario =>
+        KeyValuePair.Create(scenario.Key, scenario.Value is JsonObjectValue parts && parts.TryGetValue("frames", out var frames)
+            ? (JsonValue)JsonObjectValue.From(parts.Select(part => KeyValuePair.Create(part.Key, part.Key == "frames"
+                ? (JsonValue)JsonValue.Array(((JsonArrayValue)frames).Select(frame => (JsonValue)JoinedSplices((JsonArrayValue)frame)))
+                : part.Value)))
+            : scenario.Value)));
+
+    private static JsonArrayValue JoinedSplices(JsonArrayValue frame)
+    {
+        static bool IsAppend(JsonValue op) => op is JsonArrayValue { Count: 5 } splice && splice[0] is JsonStringValue { Value: "p" } &&
+            splice[1] is JsonArrayValue { Count: 1 } path && path[0] is JsonStringValue { Value: "entries" } && splice[3] is JsonNumberValue { Value: 0 };
+        var ops = new List<JsonValue>();
+        foreach (var op in frame)
+        {
+            if (IsAppend(op) && ops.Count > 0 && IsAppend(ops[^1]))
+            {
+                var last = (JsonArrayValue)ops[^1];
+                var inserted = (JsonArrayValue)last[4];
+                if (N(((JsonArrayValue)op)[2]) == N(last[2]) + inserted.Count)
+                {
+                    ops[^1] = JsonValue.Array([last[0], last[1], last[2], last[3], JsonValue.Array([.. inserted, .. (JsonArrayValue)((JsonArrayValue)op)[4]])]);
+                    continue;
+                }
+            }
+            ops.Add(op);
+        }
+        return JsonValue.Array(ops);
+    }
 
     /// <summary><c>Type.Object({ text: Type.String() })</c>, as TypeBox prints it.</summary>
     private static readonly JsonObjectValue TextParameters = O("""{"type":"object","required":["text"],"properties":{"text":{"type":"string"}}}""");
@@ -46,9 +93,9 @@ internal static class ViewsDifferentialTests
         var root = await harness.RootAsync(Context, new AgentChange { Model = new ModelRef("faux", "faux-1") });
         var watch = await root.WatchAsync(Context);
         var frames = new SyncList<JsonValue>();
-        watch.Start((_, ops, _) =>
+        watch.Start((call, _) =>
         {
-            frames.Add(JsonValue.Array(ops.Select(op => (JsonValue)op.ToJson())));
+            frames.Add(JsonValue.Array(Change(call).Ops.Select(op => (JsonValue)op.ToJson())));
             return Task.CompletedTask;
         });
         var stream = await harness.WatchEventsAsync(root.Id, Context);

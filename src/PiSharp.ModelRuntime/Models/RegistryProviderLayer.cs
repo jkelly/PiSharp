@@ -1,5 +1,5 @@
 // Web Agent W2 (WU2, plan "Architecture" item 2): the hook that keeps the built-in llama.cpp provider in PiSharp.Cli. Pi
-// 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/src/extensions/index.ts (builtInExtensions register their
+// f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/coding-agent/src/extensions/index.ts (builtInExtensions register their
 // provider after the pi-ai built-ins) and packages/coding-agent/src/extensions/llama/provider.ts (the provider's auth check/resolve and
 // refreshModels), which ModelRegistry called directly before the move.
 using PiSharp.AI.Catalogs;

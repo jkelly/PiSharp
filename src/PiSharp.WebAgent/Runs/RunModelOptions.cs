@@ -452,12 +452,12 @@ public static class RunModelOptions
             ? text == "anthropic"
             : model.Provider == "openrouter" && model.Id.StartsWith("anthropic/", StringComparison.Ordinal);
 
-    /// <summary>A Gemini model that thinks by level rather than by budget (Gemini 3, Gemma 4, the flash aliases), as PiSharp's Google route
+    /// <summary>A Gemini model that thinks by level rather than by budget (Gemini 3 and later, Gemma 4, the flash aliases), as PiSharp's Google route
     /// decides it.</summary>
     internal static bool GeminiLevelThinking(string id)
     {
         var normalized = id.ToLowerInvariant();
-        return System.Text.RegularExpressions.Regex.IsMatch(normalized, @"gemini-3(?:\.[0-9]+)?-(?:pro|flash)|gemma-?4") ||
+        return System.Text.RegularExpressions.Regex.IsMatch(normalized, @"gemini-3(?:\.[0-9]+)?-(?:pro|flash)|gemini-(?:[4-9]|[1-9][0-9])|gemma-?4") ||
             normalized is "gemini-flash-latest" or "gemini-flash-lite-latest";
     }
 

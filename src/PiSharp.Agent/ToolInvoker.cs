@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/agent/src/agent-loop.ts.
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/agent/src/agent-loop.ts.
 using System.Collections.Immutable;
 using System.Text.Json;
 using PiSharp.Contracts;
@@ -343,6 +343,11 @@ public sealed class ToolInvoker : IFinalizedToolExecutor
                     initialView = invocation with { AssistantMessage = assistant with { Content = assistant.Content.SetItem(invocation.SourceIndex, call) }, Call = call };
                 }
             }
+            // validation.ts validateToolArguments first: a call whose complete argument text was malformed carries argumentsError, and
+            // fails with it, so the model sees what it sent instead of the tool running on a recovered subset.
+            if (PiSharp.AI.ToolCallArgumentsResult.ErrorOf(initialView.Call) is { } argumentsError)
+                return CompleteResult(ToolResult.Error(ToolFailureKind.InvalidArguments,
+                    $"Invalid arguments for tool \"{invocation.Call.Name}\": {argumentsError}"));
             // Source prepareToolCall: validateToolArguments(tool, preparedToolCall). The committed assistant message and the
             // tool execution events keep the model's arguments; only preparation and execution see the coerced ones.
             if (schemaAdapter is { ArgumentSchema: { } schema })
@@ -351,14 +356,18 @@ public sealed class ToolInvoker : IFinalizedToolExecutor
                     initialView.Call.Arguments.ToString(), schema.Origin);
                 cancellationToken.ThrowIfCancellationRequested();
                 if (!validated.IsValid) return CompleteResult(ToolResult.Error(ToolFailureKind.InvalidArguments, validated.ErrorMessage!));
-                if (validated.ArgumentsJson is not { } coercedJson) return CompleteResult(Error(ToolFailureKind.InvalidArguments));
-                var coerced = JsonData.Parse(coercedJson);
-                if (!ValidArguments(coerced, cancellationToken)) return CompleteResult(Error(ToolFailureKind.InvalidArguments));
-                if (!JsonUtf16.DeepEquals(coerced.Value, initialView.Call.Arguments.Value))
+                // Arguments that coercion did not change stand as the model sent them (pi-schema returns the value it was given).
+                if (validated.Coerced)
                 {
-                    var call = initialView.Call with { Arguments = coerced };
-                    initialView = initialView with { AssistantMessage = initialView.AssistantMessage with
-                        { Content = initialView.AssistantMessage.Content.SetItem(invocation.SourceIndex, call) }, Call = call };
+                    if (validated.ArgumentsJson is not { } coercedJson) return CompleteResult(Error(ToolFailureKind.InvalidArguments));
+                    var coerced = JsonData.Parse(coercedJson);
+                    if (!ValidArguments(coerced, cancellationToken)) return CompleteResult(Error(ToolFailureKind.InvalidArguments));
+                    if (!JsonUtf16.DeepEquals(coerced.Value, initialView.Call.Arguments.Value))
+                    {
+                        var call = initialView.Call with { Arguments = coerced };
+                        initialView = initialView with { AssistantMessage = initialView.AssistantMessage with
+                            { Content = initialView.AssistantMessage.Content.SetItem(invocation.SourceIndex, call) }, Call = call };
+                    }
                 }
             }
             PreparedToolAction action;

@@ -69,7 +69,7 @@ internal static partial class SessionTests
 
         yield return Case(prefix + "starts-watch-delivery-in-its-own-line-job", async () =>
         {
-            var doc = Documents.DefineSessionDoc("line.watch", 1, () => O("{\"value\":0}"));
+            var doc = Documents.DefineSessionDoc("line.watch", 1, () => O("{\"value\":0}"), checkpointWhen: (_, _, _) => false);
             var (_, session, _) = Open(storageFactory);
             await session.CommitAsync(tx => tx.DocAsync(doc), Context);
             var watch = (await session.WatchDocAsync(doc, Context))!;
@@ -77,7 +77,7 @@ internal static partial class SessionTests
             var gate = new Deferred();
             var held = session.CommitAsync(async _ => await gate.Task, Context);
             var delivered = new Deferred(inline: false);
-            watch.Start((_, _, _) =>
+            watch.Start((_, _) =>
             {
                 delivered.Resolve();
                 return Task.CompletedTask;

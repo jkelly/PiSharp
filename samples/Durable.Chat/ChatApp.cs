@@ -166,9 +166,9 @@ public static class ChatApp
                 // the answer and shows each tool call as it starts. The watch sees only committed values.
                 var liveWatch = await harness.WatchDocAsync(Live.LiveDoc, root.Id, Context) ?? throw new InvalidOperationException("pi.live is absent");
                 var printer = new LivePrinter(output);
-                liveWatch.Start((value, _, _) =>
+                liveWatch.Start((call, _) =>
                 {
-                    printer.Show(value);
+                    if (call is WatchValueCall<JsonObjectValue> change) printer.Show(change.Value);
                     return Task.CompletedTask;
                 });
                 harness.Resume();

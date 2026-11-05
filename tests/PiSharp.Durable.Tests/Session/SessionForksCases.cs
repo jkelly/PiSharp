@@ -1,5 +1,7 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/test/session-forks.test.ts. Verbatim apart from the adaptations in
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/test/session-forks.test.ts. Verbatim apart from the adaptations in
 // SessionSupport.cs; the 260 concurrent family acquisitions start together and are awaited together, as upstream's Promise.all does.
+// Pi v1.5.0 sync (area vocabulary, 5f312dac4): a failed Session ends SessionEnd.Failed (kind failed), and the published creation is a
+// document change of kind change (DocumentValueChange).
 using PiSharp.Durable;
 using PiSharp.Durable.Chord;
 using static Program;
@@ -15,11 +17,16 @@ internal static partial class SessionTests
 
         yield return Case(prefix + "copies-as-of-and-current-singleton-and-family-bases-while-leaving-initial-documents-absent", async () =>
         {
-            var asOf = Documents.DefineRewindableConversationDoc("fork.policies.as-of", 1, DocumentFork.AsOf, () => O("{\"value\":\"as-initial\"}"));
-            var current = Documents.DefineConversationDoc("fork.policies.current", 1, DocumentFork.Current, () => O("{\"value\":\"current-initial\"}"));
-            var initial = Documents.DefineConversationDoc("fork.policies.initial", 1, DocumentFork.Initial, () => O("{\"value\":\"fresh\"}"));
-            var asOfFamily = Documents.DefineRewindableConversationDocFamily("fork.policies.as-of-family", 1, DocumentFork.AsOf, seed => Obj(("value", seed)));
-            var currentFamily = Documents.DefineConversationDocFamily("fork.policies.current-family", 1, DocumentFork.Current, seed => Obj(("value", seed)));
+            var asOf = Documents.DefineRewindableConversationDoc("fork.policies.as-of", 1, DocumentFork.AsOf, () => O("{\"value\":\"as-initial\"}"),
+                checkpointWhen: (_, _, _) => false);
+            var current = Documents.DefineConversationDoc("fork.policies.current", 1, DocumentFork.Current, () => O("{\"value\":\"current-initial\"}"),
+                checkpointWhen: (_, _, _) => false);
+            var initial = Documents.DefineConversationDoc("fork.policies.initial", 1, DocumentFork.Initial, () => O("{\"value\":\"fresh\"}"),
+                checkpointWhen: (_, _, _) => false);
+            var asOfFamily = Documents.DefineRewindableConversationDocFamily("fork.policies.as-of-family", 1, DocumentFork.AsOf, seed => Obj(("value", seed)),
+                checkpointWhen: (_, _, _) => false);
+            var currentFamily = Documents.DefineConversationDocFamily("fork.policies.current-family", 1, DocumentFork.Current, seed => Obj(("value", seed)),
+                checkpointWhen: (_, _, _) => false);
             var (storage, session, publications) = Open(storageFactory);
             var parentId = await CreateConversation(session);
             EntryId forkAt = default;
@@ -80,7 +87,8 @@ internal static partial class SessionTests
 
         yield return Case(prefix + "uses-final-document-state-from-the-fork-entry-commit-while-excluding-later-same-commit-entries", async () =>
         {
-            var doc = Documents.DefineRewindableConversationDoc("fork.same-commit", 1, DocumentFork.AsOf, () => O("{\"value\":\"initial\"}"));
+            var doc = Documents.DefineRewindableConversationDoc("fork.same-commit", 1, DocumentFork.AsOf, () => O("{\"value\":\"initial\"}"),
+                checkpointWhen: (_, _, _) => false);
             var (_, session, _) = Open(storageFactory);
             var parentId = await CreateConversation(session);
             EntryId forkAt = default, excluded = default;
@@ -99,8 +107,10 @@ internal static partial class SessionTests
 
         yield return Case(prefix + "selects-the-entry-owning-ancestor-for-as-of-copies-and-the-immediate-parent-for-current-copies", async () =>
         {
-            var asOf = Documents.DefineRewindableConversationDoc("fork.ancestry.as-of", 1, DocumentFork.AsOf, () => O("{\"value\":\"initial\"}"));
-            var current = Documents.DefineConversationDoc("fork.ancestry.current", 1, DocumentFork.Current, () => O("{\"value\":\"initial\"}"));
+            var asOf = Documents.DefineRewindableConversationDoc("fork.ancestry.as-of", 1, DocumentFork.AsOf, () => O("{\"value\":\"initial\"}"),
+                checkpointWhen: (_, _, _) => false);
+            var current = Documents.DefineConversationDoc("fork.ancestry.current", 1, DocumentFork.Current, () => O("{\"value\":\"initial\"}"),
+                checkpointWhen: (_, _, _) => false);
             var (_, session, _) = Open(storageFactory);
             var rootId = await CreateConversation(session);
             EntryId inherited = default;
@@ -130,9 +140,11 @@ internal static partial class SessionTests
 
         yield return Case(prefix + "copies-the-stored-value-and-version-without-consulting-migration-definitions-or-migrated-caches", async () =>
         {
-            var v1 = Documents.DefineRewindableConversationDoc("fork.stored-version", 1, DocumentFork.AsOf, () => O("{\"count\":1}"));
+            var v1 = Documents.DefineRewindableConversationDoc("fork.stored-version", 1, DocumentFork.AsOf, () => O("{\"count\":1}"),
+                checkpointWhen: (_, _, _) => false);
             var migrations = 0;
             var v3 = Documents.DefineRewindableConversationDoc("fork.stored-version", 3, DocumentFork.AsOf, () => O("{\"count\":0,\"migrated\":false}"),
+                checkpointWhen: (_, _, _) => false,
                 migrate: (value, fromVersion) =>
                 {
                     Equal(1, fromVersion, "fromVersion");
@@ -163,7 +175,8 @@ internal static partial class SessionTests
 
         yield return Case(prefix + "coalesces-a-typed-migration-and-override-into-the-copied-creation-base", async () =>
         {
-            var v1 = Documents.DefineRewindableConversationDoc("fork.override", 1, DocumentFork.AsOf, () => O("{\"count\":2}"));
+            var v1 = Documents.DefineRewindableConversationDoc("fork.override", 1, DocumentFork.AsOf, () => O("{\"count\":2}"),
+                checkpointWhen: (_, _, _) => false);
             var checkpoints = 0;
             var v2 = Documents.DefineRewindableConversationDoc("fork.override", 2, DocumentFork.AsOf, () => O("{\"count\":0,\"migrated\":false}"),
                 migrate: (value, _) => Obj(("count", value["count"]), ("migrated", true)),
@@ -191,7 +204,7 @@ internal static partial class SessionTests
             Equal(2, creates[0].Content.Version, "version");
             SameJson("{\"count\":9,\"migrated\":true}", creates[0].Content.Value, "base");
             Equal(0, checkpoints, "no predicate call");
-            Check(DocumentChanges(Last(publications)) is [{ Version: 2 }], "published creation");
+            Check(DocumentChanges(Last(publications)) is [DocumentValueChange { Version: 2 }], "published creation");
             SameJson("{\"count\":9,\"migrated\":true}", await session.SnapshotAsync(v2, child.Id, Context), "child");
             var parentRecord = await storage.FindDocumentAsync(Address(v1, parentId), DocumentPoint.Current, Context);
             Equal(1, (await storage.GetDocumentAsync(parentRecord!.Id, DocumentPoint.Current, Context))!.Version, "parent version");
@@ -199,7 +212,8 @@ internal static partial class SessionTests
 
         yield return Case(prefix + "copies-the-incarnation-alive-at-the-fork-point-across-retirement-and-recreation", async () =>
         {
-            var doc = Documents.DefineRewindableConversationDoc("fork.incarnations", 1, DocumentFork.AsOf, () => O("{\"value\":\"initial\"}"));
+            var doc = Documents.DefineRewindableConversationDoc("fork.incarnations", 1, DocumentFork.AsOf, () => O("{\"value\":\"initial\"}"),
+                checkpointWhen: (_, _, _) => false);
             var (_, session, _) = Open(storageFactory);
             var parentId = await CreateConversation(session);
             EntryId oldAt = default, retiredAt = default, newAt = default;
@@ -251,8 +265,10 @@ internal static partial class SessionTests
 
         yield return Case(prefix + "rejects-duplicate-as-of-and-current-selections-for-one-child-address-before-admission", async () =>
         {
-            var asOf = Documents.DefineRewindableConversationDoc("fork.duplicate-policy", 1, DocumentFork.AsOf, () => O("{\"value\":\"as-of\"}"));
-            var current = Documents.DefineConversationDoc("fork.duplicate-policy", 1, DocumentFork.Current, () => O("{\"value\":\"current\"}"));
+            var asOf = Documents.DefineRewindableConversationDoc("fork.duplicate-policy", 1, DocumentFork.AsOf, () => O("{\"value\":\"as-of\"}"),
+                checkpointWhen: (_, _, _) => false);
+            var current = Documents.DefineConversationDoc("fork.duplicate-policy", 1, DocumentFork.Current, () => O("{\"value\":\"current\"}"),
+                checkpointWhen: (_, _, _) => false);
             var (storage, session, _) = Open(storageFactory);
             var parentId = await CreateConversation(session);
             EntryId oldAt = default;
@@ -272,8 +288,10 @@ internal static partial class SessionTests
 
         yield return Case(prefix + "rejects-current-and-as-of-source-writes-in-the-fork-transaction", async () =>
         {
-            var current = Documents.DefineConversationDoc("fork.same-transaction-current", 1, DocumentFork.Current, () => O("{\"value\":\"committed\"}"));
-            var asOf = Documents.DefineRewindableConversationDoc("fork.same-transaction-as-of", 1, DocumentFork.AsOf, () => O("{\"value\":\"committed\"}"));
+            var current = Documents.DefineConversationDoc("fork.same-transaction-current", 1, DocumentFork.Current, () => O("{\"value\":\"committed\"}"),
+                checkpointWhen: (_, _, _) => false);
+            var asOf = Documents.DefineRewindableConversationDoc("fork.same-transaction-as-of", 1, DocumentFork.AsOf, () => O("{\"value\":\"committed\"}"),
+                checkpointWhen: (_, _, _) => false);
             var (storage, session, _) = Open(storageFactory);
             var parentId = await CreateConversation(session);
             EntryId forkAt = default;
@@ -307,7 +325,8 @@ internal static partial class SessionTests
 
         yield return Case(prefix + "rolls-every-copied-base-back-when-later-pre-admission-assembly-fails", async () =>
         {
-            var copied = Documents.DefineRewindableConversationDoc("fork.rollback.copied", 1, DocumentFork.AsOf, () => O("{\"value\":\"copied\"}"));
+            var copied = Documents.DefineRewindableConversationDoc("fork.rollback.copied", 1, DocumentFork.AsOf, () => O("{\"value\":\"copied\"}"),
+                checkpointWhen: (_, _, _) => false);
             var failCheckpoint = true;
             var failure = Documents.DefineSessionDoc("fork.rollback.failure", 1, () => O("{\"count\":0}"),
                 checkpointWhen: (_, _, _) => failCheckpoint ? throw new InvalidOperationException("checkpoint failed") : false);
@@ -341,7 +360,8 @@ internal static partial class SessionTests
 
         yield return Case(prefix + "fails-the-session-on-a-rejected-fork-commit-which-leaves-no-effect", async () =>
         {
-            var doc = Documents.DefineRewindableConversationDoc("fork.storage-rejected", 1, DocumentFork.AsOf, () => O("{\"value\":\"source\"}"));
+            var doc = Documents.DefineRewindableConversationDoc("fork.storage-rejected", 1, DocumentFork.AsOf, () => O("{\"value\":\"source\"}"),
+                checkpointWhen: (_, _, _) => false);
             var (storage, session, _) = Open(storageFactory);
             storage.KeepOpenForReopen = true;
             var parentId = await CreateConversation(session);
@@ -363,14 +383,15 @@ internal static partial class SessionTests
                 "later commit");
             Same(rejection, failed.InnerException, "cause");
             // The failed Session closed its Storage; reopened, it holds nothing of the batch.
-            Equal(new SessionEnd(SessionEndReason.Failed, rejection), await session.Closed, "closed");
+            Equal(SessionEnd.Failed(rejection), await session.Closed, "closed");
             Check(await storage.Reopen().GetConversationAsync(rejectedChildId, Context) is null, "nothing committed");
             await storage.Inner.CloseAsync(Context);
         });
 
         yield return Case(prefix + "retires-a-copied-document-and-can-recreate-the-address-in-the-fork-transaction", async () =>
         {
-            var doc = Documents.DefineRewindableConversationDoc("fork.retire-recreate", 1, DocumentFork.AsOf, () => O("{\"value\":\"fresh\"}"));
+            var doc = Documents.DefineRewindableConversationDoc("fork.retire-recreate", 1, DocumentFork.AsOf, () => O("{\"value\":\"fresh\"}"),
+                checkpointWhen: (_, _, _) => false);
             var (storage, session, _) = Open(storageFactory);
             var parentId = await CreateConversation(session);
             EntryId forkAt = default;
@@ -395,9 +416,11 @@ internal static partial class SessionTests
 
         yield return Case(prefix + "copies-only-conversation-documents-leaving-session-and-task-documents-in-their-original-scopes", async () =>
         {
-            var copied = Documents.DefineConversationDoc("fork.scope.conversation", 1, DocumentFork.Current, () => O("{\"value\":\"conversation\"}"));
-            var sessionOnly = Documents.DefineSessionDoc("fork.scope.session", 1, () => O("{\"value\":\"session\"}"));
-            var taskOnly = Documents.DefineTaskDoc("fork.scope.task", 1, () => O("{\"value\":\"task\"}"));
+            var copied = Documents.DefineConversationDoc("fork.scope.conversation", 1, DocumentFork.Current, () => O("{\"value\":\"conversation\"}"),
+                checkpointWhen: (_, _, _) => false);
+            var sessionOnly = Documents.DefineSessionDoc("fork.scope.session", 1, () => O("{\"value\":\"session\"}"),
+                checkpointWhen: (_, _, _) => false);
+            var taskOnly = Documents.DefineTaskDoc("fork.scope.task", 1, () => O("{\"value\":\"task\"}"), checkpointWhen: (_, _, _) => false);
             var work = Tasks.DefineTask(new TaskDefinition { Name = "fork.scope.work", Version = 1, Initial = _ => O("{\"phase\":\"start\"}") });
             var (storage, session, publications) = Open(storageFactory);
             var parentId = await CreateConversation(session);
@@ -422,7 +445,8 @@ internal static partial class SessionTests
 
         yield return Case(prefix + "copies-every-family-member-across-storage-scan-pages", async () =>
         {
-            var family = Documents.DefineConversationDocFamily("fork.pagination", 1, DocumentFork.Current, seed => Obj(("value", seed)));
+            var family = Documents.DefineConversationDocFamily("fork.pagination", 1, DocumentFork.Current, seed => Obj(("value", seed)),
+                checkpointWhen: (_, _, _) => false);
             var (storage, session, _) = Open(storageFactory);
             var parentId = await CreateConversation(session);
             var forkAt = await session.CommitAsync(async tx => (await tx.AppendEntryAsync(parentId, new EntryDraft { Kind = "point" })).Id, Context);

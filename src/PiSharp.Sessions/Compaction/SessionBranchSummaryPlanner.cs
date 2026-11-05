@@ -7,7 +7,8 @@ using PiSharp.Sessions.Serialization;
 
 namespace PiSharp.Sessions.Compaction;
 
-/// <summary>Raw abandoned-branch selection. Source branch summaries deliberately do not apply context edits.</summary>
+/// <summary>Abandoned-branch selection. Pi 1.5.0 prepareBranchEntries applies the latest context edit for each message and custom
+/// message entry (projectContextEntry), as live context and compaction do.</summary>
 public sealed class SessionBranchSummaryPlanner
 {
     private readonly SessionCompactionPlanningOptions options;
@@ -47,6 +48,11 @@ public sealed class SessionBranchSummaryPlanner
         if (!double.IsFinite(tokenBudget)) throw new SessionCompactionException(SessionCompactionFailure.InvalidSettings);
         var fileOps = new SessionFileOperationsBuilder();
         foreach (var entry in entries) { cancellationToken.ThrowIfCancellationRequested(); if (entry.Kind == SessionEntryKind.BranchSummary) fileOps.Details(entry); }
+        // Context edits hide or replace earlier entries in model context; the latest edit per target applies.
+        var edits = new Dictionary<string, JsonElement>(StringComparer.Ordinal);
+        foreach (var entry in entries)
+            if (entry.Kind == SessionEntryKind.ContextEdit)
+                edits[entry.WireBody.Value.GetProperty("targetId").GetString()!] = entry.WireBody.Value.GetProperty("replacement");
         var messages = new List<TranscriptEntry>(); double tokens = 0; long characters = 0;
         for (var i = entries.Length - 1; i >= 0; i--)
         {
@@ -58,7 +64,8 @@ public sealed class SessionBranchSummaryPlanner
                     { role = "branchSummary", summary = entry.WireBody.Value.GetProperty("summary").GetString(),
                         fromId = entry.WireBody.Value.GetProperty("fromId").GetString(),
                         timestamp = DateTimeOffset.Parse(entry.Timestamp, CultureInfo.InvariantCulture).ToUnixTimeMilliseconds() })))
-                : SessionContextInfluenceProjector.ProjectEntry(entry, null, cancellationToken)
+                : SessionContextInfluenceProjector.ProjectEntry(entry, entry.Kind is SessionEntryKind.Message or SessionEntryKind.CustomMessage &&
+                    edits.TryGetValue(entry.Id!, out var edit) ? edit : null, cancellationToken)
                     .FirstOrDefault(message => message.Role != "toolResult" &&
                         (entry.Kind != SessionEntryKind.Compaction || message.Role == "compactionSummary"));
             if (message is null) continue;

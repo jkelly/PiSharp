@@ -11,7 +11,8 @@ using PiSharp.Extensions.Mcp.Transport;
 using PiSharp.Extensions.Runtime.Mcp.Authentication;
 
 // Authored offline expectations for the Pi v1.1.0 MCP sync (names, exposure/prompt, OAuth), updated to Pi v1.2.0 (the iss check
-// without metadata, namespace aliases, no dispatch after a request settles). They are derived from the
+// without metadata, namespace aliases, no dispatch after a request settles) and synced to Pi v1.5.0 under decision 0013 (`mcp login
+// -l`, oauth.clientRegistration auto under the owner's safe default; the report's sourceSha). They are derived from the
 // pinned upstream source and its tests by reading, never captured from an upstream run. Fake authorization and token
 // servers answer in process; credential stores are in memory; no network or live credentials are used.
 internal static partial class Program
@@ -43,6 +44,8 @@ internal static partial class Program
             ("transport.no-dispatch-after-a-request-settles", NoDispatchAfterSettle)
         };
         cases.AddRange(CompletionCases());
+        cases.AddRange(Sync150CliCases());
+        cases.AddRange(Sync150OwnerDefaultsCases());
         // Linked existing contract cases (tests/PiSharp.Extensions.ContractTests/McpConfigurationTests.cs).
         cases.AddRange(McpConfigurationTests.Cases().Select(item => ("linked." + item.Name, item.Run)));
         var results = new List<object>(); var failures = 0;
@@ -51,7 +54,7 @@ internal static partial class Program
             try { await test.Run().WaitAsync(TimeSpan.FromSeconds(60)); results.Add(new { test.Id, status = "PASS_AUTHORED_NATIVE_ONLY" }); }
             catch (Exception error) { failures++; results.Add(new { test.Id, status = "FAIL", failure = error.ToString() }); }
         }
-        var report = new { sourceSha = "06a466935536f8c9bcacb2d5efc0fc021be1bdff", status = "AUTHORED NATIVE; SOURCE QUALIFICATION OPEN",
+        var report = new { sourceSha = "f9a26365568127461c47a07a37dcb42c140a3ac5", status = "AUTHORED NATIVE; SOURCE QUALIFICATION OPEN",
             cases = cases.Count, failures, fakeHttpRequests = requests, genuineSourceCasesCaptured = 0, results };
         var json = JsonSerializer.Serialize(report, new JsonSerializerOptions { WriteIndented = args.Length == 2 });
         if (args.Length == 2)
@@ -302,16 +305,17 @@ internal static partial class Program
             "plainMetadata":{"url":"https://a.example/mcp","oauth":{"authServerMetadataUrl":"http://idp.example/m"}},
             "cimd":{"url":"https://a.example/mcp","oauth":{"clientRegistration":"cimd","callbackUrl":"http://localhost/callback"}},
             "dcr":{"url":"https://a.example/mcp","oauth":{"clientRegistration":"dcr","clientId":"x"}},
-            "badRegistration":{"url":"https://a.example/mcp","oauth":{"clientRegistration":"auto"}},
+            "auto":{"url":"https://a.example/mcp","oauth":{"clientRegistration":"auto","clientName":"x"}},
+            "badRegistration":{"url":"https://a.example/mcp","oauth":{"clientRegistration":"oidc"}},
             "cimdClient":{"url":"https://a.example/mcp","oauth":{"clientRegistration":"cimd","clientId":"x"}},
             "cimdPath":{"url":"https://a.example/mcp","oauth":{"clientRegistration":"cimd","callbackUrl":"http://127.0.0.1/cb"}},
             "cimdIpv6":{"url":"https://a.example/mcp","oauth":{"clientRegistration":"cimd","callbackUrl":"http://[::1]/callback"}}}}
             """), null, false);
-        Equal("named,metadata,loopbackMetadata,cimd,dcr", string.Join(',', loaded.Servers.Select(server => server.Name)));
+        Equal("named,metadata,loopbackMetadata,cimd,dcr,auto", string.Join(',', loaded.Servers.Select(server => server.Name)));
         Equal(string.Join('|', [
             "global.json: server \"unnamed\": oauth.clientName must be a non-empty string",
             "global.json: server \"plainMetadata\": oauth.authServerMetadataUrl must be an https URL, or http on localhost, 127.0.0.1, or [::1]",
-            "global.json: server \"badRegistration\": oauth.clientRegistration must be \"dcr\" or \"cimd\"",
+            "global.json: server \"badRegistration\": oauth.clientRegistration must be \"auto\", \"dcr\", or \"cimd\"",
             "global.json: server \"cimdClient\": oauth.clientRegistration \"cimd\" cannot be combined with oauth.clientId or oauth.clientName",
             "global.json: server \"cimdPath\": oauth.clientRegistration \"cimd\" requires oauth.callbackUrl on localhost or 127.0.0.1 with path /callback",
             "global.json: server \"cimdIpv6\": oauth.clientRegistration \"cimd\" requires oauth.callbackUrl on localhost or 127.0.0.1 with path /callback"]),

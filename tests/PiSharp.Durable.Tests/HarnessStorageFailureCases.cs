@@ -1,9 +1,9 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/test/harness-storage-failure.test.ts. Verbatim apart from the
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/test/harness-storage-failure.test.ts. Verbatim apart from the
 // adaptations in HarnessSupport.cs and SessionSupport.cs, and these:
 // - Upstream's storages extend ControlledStorage or MemoryStorage; here they are decorators over a ControlledStorage (DelegatingStorage).
 // - SessionFailed's `cause` is SessionFailedException.InnerException; toMatchObject({ name: "SessionFailed" }) is the exception type.
-// - "reports a listener or onReport whose promise rejects ...": a listener's promise is the task an asynchronous SubscribeCommits or
-//   SubscribeClose overload returns. OnReport is an Action, so a handler that "rejects" is one that throws (an async void handler's
+// - "reports a listener or onReport whose promise rejects ...": a listener's promise is the task a CommitObserver's task-returning advance or
+//   the asynchronous SubscribeClose overload returns. OnReport is an Action, so a handler that "rejects" is one that throws (an async void handler's
 //   exception escapes to the thread pool, which no caller can contain); unhandled means TaskScheduler.UnobservedTaskException or
 //   ReplicatedState.UnhandledError.
 // - "contains a fulfilled thenable ..." and "contains a rejected promise from another realm": .NET has neither thenables nor realms. The
@@ -15,6 +15,14 @@
 // - running(): upstream polls on timers, so by the time it sees the record `running` the reservation's continuations (the invocation's first
 //   step commit and its phase's start) have run as microtasks. Here they continue on the thread pool and can queue behind the next commit the
 //   test makes, so Running also awaits Waiting's phase start.
+// Pi v1.5.0 sync (area events, f3255de76): "ends everything with the first error ..." ends a conversation view watch where v1.2.0 ended an
+// agent event stream (watchEvents, removed).
+// Pi v1.5.0 sync (area vocabulary, 5f312dac4): a Session end is SessionEnd.Failed or SessionEnd.Closed (by kind), the commit listeners are
+// ObserveCommits observers (a CommitObserver; upstream observeCommits({ advance, end })), and the internal listener that fails the Session is
+// FollowCommits (upstream followCommits). The v1.5.0 blob's other changes are in place: Chord's WatchEnd kinds and value calls (areas
+// chord-watch, watches and observers).
+// Pi v1.5.0 sync (area group-commit-scheduler, e5c6182ba): the context-read case commits an entry before it fails scanRange, as v1.5.0's
+// does (the vocabulary note that the port already made it was wrong: its only entry came after the read).
 using PiSharp.Durable;
 using PiSharp.Durable.Chord;
 using PiSharp.Durable.Storage;
@@ -115,8 +123,8 @@ internal static class StorageFailureTests
             var task = harness.WaitForTaskAsync(id, Context);
             var idle = harness.WaitForIdleAsync(Context);
             var watch = (await harness.WatchDocAsync(Live.LiveDoc, root.Id, Context))!;
-            var stream = await harness.WatchEventsAsync(root.Id, Context);
-            stream.Start((_, _) => Task.CompletedTask);
+            var view = await root.WatchAsync(Context);
+            view.Start((_, _) => Task.CompletedTask);
 
             var failure = new IOException("disk gone");
             storage.FailNextCommit(failure);
@@ -125,8 +133,8 @@ internal static class StorageFailureTests
 
             await FailedWith(failure, () => task, "task wait");
             await FailedWith(failure, () => idle, "idle wait");
-            Equal(WatchEnd.SessionFailed(failure), await watch.Closed, "watch");
-            Equal(WatchEnd.SessionFailed(failure), await stream.Closed, "stream");
+            Equal(WatchEnd.Failed(failure), await watch.Closed, "watch");
+            Equal(WatchEnd.Failed(failure), await view.Closed, "view");
             // Every later call, and a wait that starts now.
             await FailedWith(failure, () => harness.GetTaskAsync(id, Context), "getTask");
             await FailedWith(failure, () => harness.WaitForIdleAsync(Context), "waitForIdle");
@@ -222,7 +230,7 @@ internal static class StorageFailureTests
             await harness.CloseAsync(Context);
         });
 
-        yield return Case(prefix + "ends-what-a-task-holds-with-session-failed-not-as-cancelled-by-its-signal", async () =>
+        yield return Case(prefix + "ends-what-a-task-holds-as-failed-not-as-cancelled-by-its-signal", async () =>
         {
             var ends = new SyncList<object>();
             var watching = new Deferred();
@@ -258,7 +266,7 @@ internal static class StorageFailureTests
             await opened.Harness.Closed;
             var seen = ends.Snapshot();
             Equal(2, seen.Count, "ends");
-            Equal(WatchEnd.SessionFailed(failure), seen[0], "watch end");
+            Equal(WatchEnd.Failed(failure), seen[0], "watch end");
             Equal(nameof(SessionFailedException), seen[1], "idle wait");
             await opened.Harness.CloseAsync(Context);
         });
@@ -305,7 +313,8 @@ internal static class StorageFailureTests
             var (harness, root, reports, _, _) = await Start(new MemoryStorage());
             var entry = await Note(root);
             // pi.live keeps no history; a rewindable token of its kind asks for it anyway (upstream `LiveDoc as never`).
-            var liveAsRewindable = Documents.DefineRewindableConversationDoc(Live.LiveDoc.Definition.Kind, 1, DocumentFork.AsOf, () => JsonObjectValue.Empty);
+            var liveAsRewindable = Documents.DefineRewindableConversationDoc(Live.LiveDoc.Definition.Kind, 1, DocumentFork.AsOf, () => JsonObjectValue.Empty,
+                checkpointWhen: (_, _, _) => false);
             var requests = new List<Func<Task>>
             {
                 () => root.EntriesAsync(new EntryQueryBounds(), 10, O("""{"after":"x"}"""), Context),
@@ -331,7 +340,7 @@ internal static class StorageFailureTests
             var storage = new ControlledStorage(new MemoryStorage());
             var (harness, root, reports, _, _) = await Start(storage);
             var bug = new InvalidOperationException("listener bug");
-            ((Session)harness).ObserveCommits((_, _) => throw bug);
+            ((Session)harness).FollowCommits((_, _) => throw bug);
             // The commit itself is durable and resolves; the Session fails behind it.
             await Note(root);
             Equal(SessionEnd.Failed(bug), await harness.Closed, "closed");
@@ -412,6 +421,8 @@ internal static class StorageFailureTests
             var cancelled = new InvalidOperationException("caller gave up");
             var storage = new CancelledRead(new MemoryStorage(), controller, cancelled);
             var (harness, root, _, _, _) = await Start(storage);
+            // An entry to scan: the Session's cache answers the bounds of the context, not its entries (e5c6182ba).
+            await Note(root);
             await RejectsWith(cancelled, () => root.ContextAsync(controller.Context), "context read");
             await Note(root);
             await harness.CloseAsync(Context);
@@ -434,7 +445,7 @@ internal static class StorageFailureTests
                     await Task.Yield();
                     throw new InvalidOperationException("async listener");
                 }
-                harness.SubscribeCommits((_, _) => AsyncThrow());
+                harness.ObserveCommits(new CommitObserver((_, _) => AsyncThrow(), _ => { }));
                 harness.SubscribeClose(AsyncThrow);
                 await Note(root);
                 await harness.CloseAsync(Context);
@@ -447,7 +458,7 @@ internal static class StorageFailureTests
                     Registry = Registry.Create(),
                     OnReport = _ => throw new InvalidOperationException("report broke"),
                 }, Context);
-                rejecting.SubscribeCommits((_, _) => throw new InvalidOperationException("sync listener"));
+                rejecting.ObserveCommits(new CommitObserver((_, _) => throw new InvalidOperationException("sync listener"), _ => { }));
                 var again = await rejecting.RootAsync(Context);
                 await Note(again);
                 await rejecting.CloseAsync(Context);
@@ -467,8 +478,8 @@ internal static class StorageFailureTests
         {
             var (harness, root, reports, _, _) = await Start(new MemoryStorage());
             var seen = new SyncList<string>();
-            harness.SubscribeCommits((_, _) => throw new InvalidOperationException("commit listener"));
-            harness.SubscribeCommits((_, _) => seen.Add("commit"));
+            harness.ObserveCommits(new CommitObserver((_, _) => throw new InvalidOperationException("commit listener"), _ => { }));
+            harness.ObserveCommits(new CommitObserver((_, _) => seen.Add("commit"), _ => { }));
             harness.SubscribeClose(() => throw new InvalidOperationException("close listener"));
             harness.SubscribeClose(() => seen.Add("close"));
             await Note(root);
@@ -485,16 +496,16 @@ internal static class StorageFailureTests
             await views.AttachAsync(root.Id, (_, _, _) => Task.FromResult((true, (ViewObserver)new ThrowingObserver(failure))), Context);
             var watch = await root.WatchAsync(Context);
             var seen = new SyncList<ConversationView>();
-            watch.Start((value, _, _) =>
+            watch.Start((call, _) =>
             {
-                seen.Add(value);
+                seen.Add(Change(call).Value);
                 return Task.CompletedTask;
             });
             await Note(root);
             await Eventually(() => seen.Count > 0);
             Seq([failure], reports.Snapshot(), "reports");
             await harness.CloseAsync(Context);
-            Equal(WatchEnd.SessionClosed, await watch.Closed, "watch end");
+            Equal(WatchEnd.Ended, await watch.Closed, "watch end");
         });
 
         yield return Case(prefix + "contains-a-fulfilled-thenable-that-calls-only-its-fulfillment-handler", async () =>
@@ -548,9 +559,9 @@ internal static class StorageFailureTests
             var (harness, root, reports, _, _) = await Start(new MemoryStorage());
             var watch = (await harness.WatchDocAsync(Live.LiveDoc, root.Id, Context))!;
             var failure = new InvalidOperationException("listener broke");
-            watch.Start((_, _, _) => throw failure);
+            watch.Start((_, _) => throw failure);
             await root.CommitAsync(async tx => (await tx.DocAsync(Live.LiveDoc, root.Id))["compactions"] = JsonArrayValue.Empty, Context);
-            Equal(new WatchEnd(WatchEndReason.ListenerError, failure), await watch.Closed, "watch end");
+            Equal(WatchEnd.ListenerError(failure), await watch.Closed, "watch end");
             Seq([failure], reports.Snapshot(), "reports");
             await harness.CloseAsync(Context);
         });
@@ -569,13 +580,13 @@ internal static class StorageFailureTests
             var opened = await OpenTasks(new MemoryStorage(), [throws]);
             var root = await opened.Harness.RootAsync(Context);
             var watch = (await opened.Harness.WatchDocAsync(Live.LiveDoc, root.Id, Context))!;
-            watch.Start((_, _, _) => throw unformattable);
+            watch.Start((_, _) => throw unformattable);
             var id = await root.CommitAsync(tx => tx.CreateTaskAsync(throws, JsonValue.Null, OwnConversation()), Context);
             opened.Harness.Resume();
             var outcome = ((SettlingTaskState)(await opened.Harness.WaitForTaskAsync(id, Context)).State).Outcome;
             SameJson("""{"status":"faulted","error":{"message":"[object UnformattableException]"}}""", outcome.ToJson(), "outcome");
             await root.CommitAsync(async tx => (await tx.DocAsync(Live.LiveDoc, root.Id))["compactions"] = JsonArrayValue.Empty, Context);
-            Equal(WatchEndReason.ListenerError, (await watch.Closed).Reason, "watch end");
+            Equal(WatchEndKind.ListenerError, (await watch.Closed).Kind, "watch end");
             await Note(root);
             await opened.Harness.CloseAsync(Context);
         });
@@ -584,7 +595,7 @@ internal static class StorageFailureTests
         {
             var reports = new List<Exception>();
             Func<double>? clock = null;
-            clock = DurableHarness.SafeNow(() => throw new InvalidOperationException("clock broke"), true, error =>
+            clock = DurableHarness.SafeNow(() => throw new InvalidOperationException("clock broke"), true, (error, _) =>
             {
                 reports.Add(error);
                 // Reentry, as a handler that commits does: the clock is read again before this report returns.
@@ -629,9 +640,9 @@ internal static class StorageFailureTests
     private sealed class ThrowingObserver(Exception failure) : ViewObserver
     {
         public override void Publication(ConversationView before, ConversationView after, System.Collections.Immutable.ImmutableArray<PiSharp.Durable.Chord.Delta.Op> ops,
-            CommitPublication publication, DurableContext context) => throw failure;
+            ObservedCommit publication, DurableContext context) => throw failure;
 
-        public override void CloseSession(Exception? failure) { }
+        public override void End(WatchEnd end) { }
     }
 
     private sealed record HeldRange(Deferred Entered, Task Release);
@@ -740,7 +751,9 @@ internal class DelegatingStorage(IStorage inner) : IStorage
 {
     public IStorage Inner { get; } = inner;
 
-    public virtual Task<Seq> CommitAsync(IReadOnlyList<StorageWrite> writes, DurableContext context) => Inner.CommitAsync(writes, context);
+    public virtual Task<CommitResult> CommitAsync(IReadOnlyList<IReadOnlyList<StorageWrite>> batches, Action<int, Seq> receive, DurableContext context) =>
+        Inner.CommitAsync(batches, receive, context);
+    public virtual void Publishing(Action publish, DurableContext context) => Inner.Publishing(publish, context);
     public virtual Task<TId> MintIdAsync<TId>() where TId : struct, IDurableId<TId> => Inner.MintIdAsync<TId>();
     public virtual Task<ConversationRecord?> GetConversationAsync(ConversationId id, DurableContext context) => Inner.GetConversationAsync(id, context);
     public virtual Task<Page<ConversationRecord>> ScanConversationsAsync(ConversationQuery query, int limit, JsonObjectValue? cursor, DurableContext context) =>

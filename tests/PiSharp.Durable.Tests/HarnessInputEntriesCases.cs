@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/test/harness-input-entries.test.ts. Inputs placed as application
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/test/harness-input-entries.test.ts. Inputs placed as application
 // entries, and data-only writes appended at once (#10407). Verbatim apart from the adaptations in HarnessSupport.cs and ChatSupport.cs, and
 // these:
 // - An InputEntry is typed: its kind is a string and it has no model, head or edits. "rejects an input entry whose kind is not a non-empty
@@ -6,6 +6,10 @@
 //   an untyped caller's entry" checks that what the inbox and the transcript keep is the kind and data alone, which the type makes the only
 //   thing a caller can pass.
 // - The reopen case reopens a SQLite file, as upstream does.
+// Pi v1.5.0 sync (area run-failure, f3255de76): "appends a data-only write while idle after a failed run ..." expects the run's
+// pi.live.runFailure where v1.2.0 expected an empty pi.live, with (area run-end, 7e15f9601) its first, "<number>".
+// Pi v1.5.0 sync (area events, f3255de76): "appends a data-only write mid-run ..." reads the view's history (LiveSupport.cs's viewHistory)
+// where v1.2.0 listened to watchEvents (removed): the first view that shows the write ends with it while pi.live's run still holds the input.
 using PiSharp.Durable;
 using PiSharp.Durable.Chord;
 using PiSharp.Durable.Sqlite;
@@ -25,7 +29,8 @@ internal static partial class Program
 internal static class InputEntriesTests
 {
     private static readonly DurableContext Context = DurableContext.Background;
-    private static readonly JsonObjectValue NoParameters = O("""{"type":"object","properties":{}}""");
+    // pi-schema's `obj({})` (Pi v1.5.0, area tools-schema).
+    private static readonly JsonObjectValue NoParameters = ToolsSchema150.EmptyObject;
 
     private static JsonObjectValue Answer(string text) => FauxAssistantMessage([FauxText(text)]);
 
@@ -225,13 +230,7 @@ internal static class InputEntriesTests
             var requests = new SyncList<List<string>>();
             setup.Faux.SetResponses(RequestLog(requests, Hold), RequestLog(requests, Answer("done")));
             var (harness, root) = await OpenChat(new MemoryStorage(), setup);
-            var events = new SyncList<AgentEvent>();
-            var stream = await harness.WatchEventsAsync(root.Id, Context);
-            stream.Start((batch, _) =>
-            {
-                foreach (var item in batch) events.Add(item);
-                return Task.CompletedTask;
-            });
+            var history = await LiveTests.ViewHistory(harness, root.Id);
             var input = await Input(root, "a");
             await ToolRunning(harness, root);
             var chat = new EntryDraft { Kind = "chat.message", Data = Obj(("author", "bob"), ("text", "lunch?")) };
@@ -242,11 +241,13 @@ internal static class InputEntriesTests
             Equal(0, (await InboxItems(harness, root)).Count, "inbox");
             SameJson("""[["pi.user","a"],["pi.assistant"],["chat.message",{"author":"bob","text":"lunch?"}]]""", Transcript(await AllEntries(root)),
                 "transcript while busy");
-            await Eventually(() => events.Snapshot().Any(item => item is EntryAppendedEvent));
-            var appended = (EntryAppendedEvent)events.Snapshot().First(item => item is EntryAppendedEvent);
-            Equal("chat.message", appended.Entry.Kind, "appended kind");
-            Equal(settled.Entry, appended.Entry.Id, "appended entry");
-            Check(!events.Snapshot().Any(item => item.Type == "run_end"), "run still going");
+            // The view shows it while the run goes on.
+            await ViewTests.Drained(harness);
+            var shown = history.Views.FirstOrDefault(view => view.Entries.Any(entry => entry.Kind == "chat.message"));
+            Check(shown is not null, "a view shows the write");
+            Equal("chat.message", shown!.Entries[^1].Kind, "shown kind");
+            Equal(settled.Entry, shown.Entries[^1].Id, "shown entry");
+            MatchExactly($"[{input.Id.Value}]", ((JsonObjectValue)LiveTests.LiveOf(shown)["run"])["inputs"], "the run's inputs");
             // A repeated request ID returns the same write without a second entry.
             Equal(write.Id, (await Write(root, chat, "bob:1")).Id, "deduplicated");
 
@@ -259,7 +260,7 @@ internal static class InputEntriesTests
             Equal(2, seen.Count, "requests");
             Seq(["system:", "user:a"], seen[0], "first request");
             Seq(["system:", "user:a", "assistant:", "toolResult:held"], seen[1], "second request");
-            await stream.StopAsync();
+            history.Detach();
             await harness.CloseAsync(Context);
         });
 
@@ -336,7 +337,9 @@ internal static class InputEntriesTests
             await harness.WaitForIdleAsync(Context);
             Equal(SubmissionStatus.Queued, (await f.StatusAsync(Context)).Status, "f");
             Seq([(double)f.Id.Value], (await InboxItems(harness, root)).Select(item => N(((JsonObjectValue)item)["id"])), "inbox");
-            SameJson("{}", await harness.SnapshotAsync(Live.LiveDoc, root.Id, Context), "live");
+            // Pi v1.5.0 (area run-failure): pi.live records why the run ended without an answer.
+            MatchExactly($$$"""{"runFailure":{"taskId":"<number>","inputs":[{{{input.Id.Value}}}],"reason":"model_error","detail":"invalid request","first":"<number>"}}""",
+                await harness.SnapshotAsync(Live.LiveDoc, root.Id, Context), "live");
             Equal(1, setup.Faux.State.CallCount, "calls");
             // The next input places the waiting mention first.
             var g = await Input(root, "g");

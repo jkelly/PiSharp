@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/src/env/line-scan.ts.
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/src/env/line-scan.ts.
 // Upstream's line numbers are safe integers with `endLine` defaulting to Infinity; here they are longs with a null end.
 using System.Text;
 

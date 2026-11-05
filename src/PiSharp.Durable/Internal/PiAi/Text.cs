@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/ai/src/utils/text.ts (contentText, getSystemMessageText) over pi-ai wire
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/ai/src/utils/text.ts (contentText, getSystemMessageText) over pi-ai wire
 // JSON. PiSharp.AI's ProviderTranscript has the same helpers over System.Text.Json nodes, internal to PiSharp.AI.
 using PiSharp.Durable.Chord;
 

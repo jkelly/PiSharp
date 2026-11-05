@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/ai/src/utils/transcript.ts (getCurrentTools, toToolDeclaration,
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/ai/src/utils/transcript.ts (getCurrentTools, toToolDeclaration,
 // declarationsEqual) over pi-ai wire JSON. PiSharp.AI's ProviderTranscript.CurrentTools is the same replay over System.Text.Json nodes and
 // internal to PiSharp.AI; the test project compares the two on shared inputs.
 using PiSharp.Durable.Chord;

@@ -1,9 +1,9 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/test/harness-tools.test.ts. Verbatim apart from the adaptations in
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/test/harness-tools.test.ts. Verbatim apart from the adaptations in
 // HarnessSupport.cs and ChatSupport.cs, and these:
 // - Backends. Upstream opens every case on MemoryStorage. harness.tools.* does the same; harness.tools.jsonl.* and harness.tools.sqlite.*
 //   rerun every case on a fresh JSONL directory and a fresh SQLite file.
-// - EchoParameters is the JSON TypeBox prints for `Type.Object({ text: Type.Optional(Type.String()) })`; ToolRegistration.ParametersOrigin
-//   stays TypeBox, so validation converts as pi-ai does for it.
+// - EchoParameters is the JSON pi-schema builds for `obj({ text: opt(str()) })` (Pi v1.5.0, area tools-schema); validation coerces as
+//   pi-ai's does for every schema.
 // - `new NodeExecutionEnv({ cwd })`, read only for `env.cwd`, is ToolTestEnv (ToolEnvSupport.cs).
 // - A `.then(push)` on a details() promise is a continuation that runs when the promise settles; Progress settles waiters inline and in order,
 //   as promise reactions run, so the recorded order is upstream's.
@@ -12,6 +12,24 @@
 // - "uses explicit null details": `details: null` is JsonValue.Null (a C# null is upstream's undefined).
 // - The two "coding tools" cases run CodingTools over a LocalExecutionEnv (upstream NodeExecutionEnv) in a fresh directory, on each backend
 //   (upstream: MemoryStorage only); the shell is Git Bash on Windows.
+// - Pi v1.5.0 sync (area model-requests): "gives tools and hooks the Harness's models" (harness.tools.gives-tools-and-hooks-the-harness-s-models)
+//   takes v1.5.0's form (adc5fa9f8): one view of the host's models that adds the Harness identity; `getProviders()` is compared through
+//   GetModel, as IDurableModels has no provider list. The two beforeProviderRequest cases are d280e1ffa's:
+//   harness.tools.chains-beforeproviderrequest-over-every-provider-request-body and
+//   harness.tools.reports-a-throwing-beforeproviderrequest-hook-and-continues-the-chain. Area reports added upstream's check that the report info
+//   names the throwing hook's extension.
+// - Pi v1.5.0 sync (area tool-tasks, 87eff524f, 1c6928b30, #11043): "answers calls to tools the request did not offer through a flagged tool
+//   task" (harness.tools.answers-calls-to-tools-the-request-did-not-offer-through-a-flagged-tool-task, "... without a task" before) and "never
+//   runs a tool the request did not offer, even when the agent has it" are v1.5.0's; "rejects details still waiting when the call is aborted
+//   during afterTool" skips the abort handler's result, which runs the hooks too. With them the file matches v1.5.0.
+// - Holds (upstream relies on timing a slow runner breaks): "answers an aborted tool with only its durable output, discarding buffered
+//   output" freezes the progress clock, its timers (a ManualTimeProvider) and its time (HarnessOptions.Now on the same provider), so the
+//   second output stays buffered until the abort discards it. "answers calls to tools the request did not offer through a flagged tool
+//   task" holds echo until the ghost call's result entry is committed: the two tool tasks run side by side, and upstream's ghost, which runs
+//   nothing, answers first, where a busy runner's echo did. "runs a round in parallel by default ..." holds b's handler (bounded) until a's
+//   has started: a parallel round's handlers start in call order only when the reservation pass finds the line idle and runs them inline
+//   (DurableTaskScheduler.Kick); on a busy line they start on the thread pool, where a busy runner started b first. a still waits for b's
+//   start, so the parallel check still fails if b does not start while a runs.
 using System.Collections.Immutable;
 using System.Text;
 using PiSharp.Durable;
@@ -44,8 +62,8 @@ internal static class ToolsTests
 {
     private static readonly DurableContext Context = DurableContext.Background;
 
-    /// <summary><c>Type.Object({ text: Type.Optional(Type.String()) })</c>.</summary>
-    internal static readonly JsonObjectValue EchoParameters = O("""{"type":"object","properties":{"text":{"type":"string"}}}""");
+    /// <summary><c>obj({ text: opt(str()) })</c>.</summary>
+    internal static readonly JsonObjectValue EchoParameters = O("""{"type":"object","properties":{"text":{"type":"string"}},"additionalProperties":false}""");
 
     internal static ToolRegistration Tool(string name, ToolExecute execute, Func<ToolRegistration, ToolRegistration>? extra = null)
     {
@@ -150,16 +168,34 @@ internal static class ToolsTests
             var ran = await Run(fresh, setup, [Calls(("echo", Obj(), "c1")), Done]);
             Equal(SubmissionStatus.Done, ran.Status, "status");
             var models = seen.Snapshot();
+            // One view of the host's Models that adds the Harness identity, shared by tools and hooks.
             Equal(2, models.Count, "seen");
-            Check(models.All(each => ReferenceEquals(each, setup.Models)), "every models is the Harness's");
+            Check(ReferenceEquals(models[0], models[1]), "one view");
+            Equal(setup.Models.GetModel("faux", "faux-1")?.Descriptor, models[0].GetModel("faux", "faux-1")?.Descriptor, "the host's models");
             await ran.Harness.CloseAsync(Context);
         });
 
-        yield return Case(prefix + "answers-calls-to-tools-the-request-did-not-offer-without-a-task", async () =>
+        yield return Case(prefix + "answers-calls-to-tools-the-request-did-not-offer-through-a-flagged-tool-task", async () =>
         {
             var setup = Setup();
-            AddTool(setup.Registry, Tool("echo", (_, _, _) => Result(NoContent)));
-            var (harness, root, entries, status) = await Run(fresh, setup, [Calls(("ghost", Obj(), "c1"), ("echo", Obj(), "c2")), Done]);
+            // Hold: echo answers once the ghost call's result is in.
+            var ghostAnswered = new HarnessTests.Deferred();
+            AddTool(setup.Registry, Tool("echo", async (_, _, _) =>
+            {
+                await ghostAnswered.Task.WaitAsync(TimeSpan.FromSeconds(30));
+                return NoContent;
+            }));
+            var (harness, root, entries, status) = await Run(fresh, setup, [Calls(("ghost", Obj(), "c1"), ("echo", Obj(), "c2")), Done],
+                (harness, _) =>
+                {
+                    FollowCommits(harness, (publication, _) =>
+                    {
+                        if (publication.Changes.Any(change => change is EntryWrite { Value: { Kind: "pi.tool-result", Model: [JsonObjectValue result, ..] } } &&
+                                result.TryGetValue("toolCallId", out var id) && S(id) == "c1"))
+                            ghostAnswered.Resolve();
+                    });
+                    return Task.CompletedTask;
+                });
             Equal(SubmissionStatus.Done, status, "status");
             var results = Results(entries);
             MatchJson("""{"toolCallId":"c1","isError":true}""", results[0], "ghost");
@@ -167,7 +203,29 @@ internal static class ToolsTests
             MatchJson("""{"toolCallId":"c2","isError":false}""", results[1], "echo");
             var ghostEntry = entries.First(entry => entry.Kind == "pi.tool-result");
             SameJson("""{"diagnostics":[{"severity":"error","code":"tool_unavailable","message":"Tool ghost is not available"}]}""", ghostEntry.Data, "data");
-            Equal(1, (await Tasks(harness, root.Id)).Count(task => task.Kind == "pi.tool"), "tool tasks");
+            // #11043: the unoffered call has its own task, so `afterTool` and `control` apply to it as to any call.
+            var inputs = (await Tasks(harness, root.Id)).Where(task => task.Kind == "pi.tool").Select(task => (JsonObjectValue)task.Input).ToList();
+            Equal(2, inputs.Count, "tool tasks");
+            Check(inputs.Any(input => input.TryGetValue("callId", out var callId) && S(callId) == "c1" &&
+                input.TryGetValue("unoffered", out var flag) && flag is JsonBooleanValue { Value: true }), "a flagged c1 task");
+            Check(inputs.Any(input => !(input.TryGetValue("unoffered", out var flag) && flag is JsonBooleanValue { Value: true })), "an unflagged task");
+            await harness.CloseAsync(Context);
+        });
+
+        // #11043
+        yield return Case(prefix + "never-runs-a-tool-the-request-did-not-offer-even-when-the-agent-has-it", async () =>
+        {
+            var setup = Setup();
+            var ran = 0;
+            AddTool(setup.Registry, Tool("hidden", (_, _, _) =>
+            {
+                Interlocked.Increment(ref ran);
+                return Result(NoContent);
+            }, tool => tool with { Deferred = true }));
+            var (harness, _, entries, status) = await Run(fresh, setup, [Calls(("hidden", Obj(), "c1")), Done]);
+            Equal(SubmissionStatus.Done, status, "status");
+            Equal(0, Volatile.Read(ref ran), "ran");
+            Equal("<harness>\n[error] Tool hidden is not available\n</harness>", ResultText(Results(entries)[0]), "text");
             await harness.CloseAsync(Context);
         });
 
@@ -273,10 +331,14 @@ internal static class ToolsTests
             async Task<List<string>> Trace(ChatSetup setup, bool overlap = false)
             {
                 var events = new SyncList<string>();
+                var aStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
                 var bStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
                 ToolExecute Slow(string name) => async (_, _, _) =>
                 {
+                    // A parallel round's handlers can start in either order on the thread pool (see the file header): b starts after a.
+                    if (overlap && name == "b") await Task.WhenAny(aStarted.Task, Task.Delay(TimeSpan.FromSeconds(10)));
                     events.Add($"start {name}");
+                    if (name == "a") aStarted.TrySetResult();
                     if (name == "b") bStarted.TrySetResult();
                     if (overlap && name == "a") await Task.WhenAny(bStarted.Task, Task.Delay(TimeSpan.FromSeconds(10)));
                     else await Sleep(20);
@@ -643,6 +705,22 @@ internal static class ToolsTests
             await first.Harness.CloseAsync(Context);
         });
 
+        // Pi v1.5.0 sync (area harness-options): upstream's v1.5.0 case (#10858), harness.tools.does-not-terminate-on-terminate-false. The
+        // stored control check is PiSharp's: Terminate false is kept as given, as upstream's copyJson keeps `terminate: false`.
+        yield return Case(prefix + "does-not-terminate-on-terminate-false", async () =>
+        {
+            var setup = Setup();
+            var keep = Tool("keep", (_, _, _) => Result(NoContent with { Control = new ToolControl { Terminate = false } }));
+            AddTool(setup.Registry, keep);
+            var (harness, root, entries, status) = await Run(fresh, setup, [Calls(("keep", Obj(), "c1")), Done], (_, conversation) =>
+                conversation.ConfigureAsync(new AgentChange { Tools = ToolSelection.Only(keep) }, Context));
+            Equal(SubmissionStatus.Done, status, "status");
+            Equal("pi.assistant", entries[^1].Kind, "last kind");
+            MatchJson("""{"status":"completed","result":{"control":{"terminate":false}}}""",
+                OutcomeJson((await Tasks(harness, root.Id, "pi.tool")).Single()), "stored control");
+            await harness.CloseAsync(Context);
+        });
+
         // ─── generation hooks ───────────────────────────────────────────────
 
         yield return Case(prefix + "replaces-request-messages-observes-responses-and-continues-on-yield", async () =>
@@ -680,6 +758,78 @@ internal static class ToolsTests
             Seq(["pi.user", "pi.assistant", "pi.user", "pi.assistant"], ran.Entries.Select(entry => entry.Kind), "kinds");
             // The injected message was used for the request only.
             Check(!ran.Entries.Any(entry => TextOf(entry.Model?[0]) == "injected"), "no injected entry");
+            await ran.Harness.CloseAsync(Context);
+        });
+
+        yield return Case(prefix + "chains-beforeproviderrequest-over-every-provider-request-body", async () =>
+        {
+            var setup = Setup();
+            var seen = new SyncList<string>();
+            AddHooks(setup.Registry, HarnessTasks.GenerationTask, new GenerationHooks
+            {
+                BeforeProviderRequest = (model, payload, _, _) =>
+                {
+                    seen.Add($"first {model.Provider}/{model.Id} {payload.ToJson()}");
+                    return Task.FromResult<JsonValue?>(((JsonObjectValue)payload).SetItem("first", true));
+                },
+            });
+            AddHooks(setup.Registry, HarnessTasks.GenerationTask, new GenerationHooks
+            {
+                BeforeProviderRequest = (model, payload, _, _) =>
+                {
+                    seen.Add($"keep {model.Provider}/{model.Id} {payload.ToJson()}");
+                    return Task.FromResult<JsonValue?>(null);
+                },
+            });
+            AddHooks(setup.Registry, HarnessTasks.GenerationTask, new GenerationHooks
+            {
+                BeforeProviderRequest = (_, payload, _, _) => Task.FromResult<JsonValue?>(((JsonObjectValue)payload).SetItem("last", true)),
+            });
+            var sent = new SyncList<string?>();
+            // pi-ai builds a body per provider call, and again when it resends within one attempt.
+            FauxStep respond = new FauxResponseFactory(async request =>
+            {
+                sent.Add((await request.Options!.OnPayload!(Obj(("body", 1)), request.Model, request.Signal))?.ToJson());
+                sent.Add((await request.Options!.OnPayload!(Obj(("body", 2)), request.Model, request.Signal))?.ToJson());
+                return Done;
+            });
+            var ran = await Run(fresh, setup, [respond]);
+            Equal(SubmissionStatus.Done, ran.Status, "status");
+            Seq(["""{"body":1,"first":true,"last":true}""", """{"body":2,"first":true,"last":true}"""], sent.Snapshot(), "sent");
+            Seq(
+            [
+                """first faux/faux-1 {"body":1}""",
+                """keep faux/faux-1 {"body":1,"first":true}""",
+                """first faux/faux-1 {"body":2}""",
+                """keep faux/faux-1 {"body":2,"first":true}""",
+            ], seen.Snapshot(), "seen");
+            await ran.Harness.CloseAsync(Context);
+        });
+
+        yield return Case(prefix + "reports-a-throwing-beforeproviderrequest-hook-and-continues-the-chain", async () =>
+        {
+            var setup = Setup();
+            AddHooks(setup.Registry, HarnessTasks.GenerationTask, new GenerationHooks
+            {
+                BeforeProviderRequest = (_, _, _, _) => throw new InvalidOperationException("broken hook"),
+            }, "broken");
+            AddHooks(setup.Registry, HarnessTasks.GenerationTask, new GenerationHooks
+            {
+                BeforeProviderRequest = (_, payload, _, _) => Task.FromResult<JsonValue?>(((JsonObjectValue)payload).SetItem("after", true)),
+            });
+            string? sent = null;
+            FauxStep respond = new FauxResponseFactory(async request =>
+            {
+                sent = (await request.Options!.OnPayload!(Obj(("body", 1)), request.Model, request.Signal))?.ToJson();
+                return Done;
+            });
+            var ran = await Run(fresh, setup, [respond]);
+            Equal(SubmissionStatus.Done, ran.Status, "status");
+            Equal("""{"body":1,"after":true}""", sent, "sent");
+            Equal(1, setup.Reports.Snapshot().Count(error => error.Message == "broken hook"), "reports");
+            // Pi v1.5.0 sync (area reports): the report names the hook's extension.
+            var extensionErrors = setup.Infos.Snapshot().Where(info => info.Kind == ReportKind.ExtensionError).ToList();
+            Check(extensionErrors.Count == 1 && extensionErrors[0].Extension == "broken", $"extension errors: {string.Join(", ", extensionErrors)}");
             await ran.Harness.CloseAsync(Context);
         });
 
@@ -1120,8 +1270,10 @@ internal static class ToolsTests
             }));
             AddHooks(setup.Registry, HarnessTasks.ToolTask, new ToolHooks
             {
-                AfterTool = async (_, _, _, callContext) =>
+                AfterTool = async (_, result, _, callContext) =>
                 {
+                    // The abort handler's result runs the hooks too (#11043); only the executed call's waits.
+                    if (result.Diagnostics?.Any(diagnostic => diagnostic.Code == "aborted") == true) return null;
                     inAfterTool.Resolve();
                     await Aborted(callContext.CancellationToken);
                     return null;
@@ -1160,8 +1312,13 @@ internal static class ToolsTests
             }));
             setup.Faux.SetResponses(Calls(("slow", Obj(), "c1")), Done);
             // Upstream relies on the abort landing within the output throttle window. A loaded macOS runner let that window pass first and
-            // committed "buffered"; a manual clock that never advances keeps the second output buffered until the abort discards it.
-            var (harness, root) = await OpenChat(fresh(), setup, timeProvider: new ManualTimeProvider());
+            // committed "buffered"; a manual clock that never advances keeps the second output buffered until the abort discards it. Both
+            // halves of the progress clock are held: its timers (the TimeProvider) and, since area sleep paces tool output on the Harness
+            // clock (upstream progressClock), its time (HarnessOptions.Now), which otherwise reads the system clock, so a first commit or a
+            // Sleep(20) slower than the 100 ms window let "buffered" commit at once.
+            var time = new ManualTimeProvider();
+            setup.Now = time.NowMs;
+            var (harness, root) = await OpenChat(fresh(), setup, timeProvider: time);
             var submission = await root.SubmitAsync(SubmissionDraft.Input("go"), Context);
             await buffered.Task;
             var live = await harness.SnapshotAsync(Live.LiveDoc, root.Id, Context);

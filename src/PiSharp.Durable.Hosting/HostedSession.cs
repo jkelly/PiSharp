@@ -1,7 +1,9 @@
 // PiSharp-only (decision 0008): one session of a durable device, after durable-pi's per-session store logic (apps/dpi-backend/src/store.ts):
 // agents by number or name with derived names, busy state from the task graph, idempotent sends that can wait for the answer, forks, the
 // read-only switch, per-session compaction, and model re-routing on reopen. Decision 0011 adds the host's per-session stream metadata
-// (DurableDeviceOptions.SessionStream) to every request a session prepares.
+// (DurableDeviceOptions.SessionStream) to every request a session prepares. Pi v1.5.0 sync (area model-requests): the Harness takes the
+// device's DurableDeviceOptions.Identity. Pi v1.5.0 sync (area vocabulary, 5f312dac4): change notifications observe commits through
+// ObserveCommits (a CommitObserver; was SubscribeCommits), and a failed session is a SessionEnd of kind Failed.
 using PiSharp.Durable.Chord;
 using PiSharp.Durable.Sqlite;
 using PiSharp.Durable.Tools;
@@ -26,14 +28,15 @@ public sealed partial class HostedSession
     private volatile bool closing;
     private IHarness? harness;
     private FileLock? fileLock;
-    private IDisposable? commits;
+    private CommitObservation? commits;
     private IRegistry? registry;
     private IReadOnlyDictionary<string, DurableTask> jobTasks = new Dictionary<string, DurableTask>();
     private readonly SemaphoreSlim creations = new(1, 1);
 
     /// <summary>A creation key's record (<c>{conversation, request}</c>), written in the commit that creates the conversation, so a retried
     /// creation finds the first one's agent (the device server's <c>Idempotency-Key</c>).</summary>
-    private static readonly SessionDocFamilyToken CreationKeys = Documents.DefineSessionDocFamily("pisharp.creation-key", 1, _ => JsonObjectValue.Empty);
+    private static readonly SessionDocFamilyToken CreationKeys = Documents.DefineSessionDocFamily("pisharp.creation-key", 1, _ => JsonObjectValue.Empty,
+        checkpointWhen: (_, _, _) => false);
 
     internal HostedSession(DurableDeviceHost host, CatalogSession row)
     {
@@ -119,8 +122,7 @@ public sealed partial class HostedSession
         var opened = GetHarness();
         var context = Context(cancellationToken);
         var records = await ConversationsAsync(opened, context).ConfigureAwait(false);
-        using var graph = await opened.TaskGraphAsync(context).ConfigureAwait(false);
-        var nodes = graph.Value.Tasks.Values.ToList();
+        var nodes = (await GraphOfAsync(opened, context).ConfigureAwait(false)).Tasks.Values.ToList();
         var names = host.Catalog.AgentNames(Id);
         return [.. records.Select(record => Summarize(record, names, nodes))];
     }
@@ -454,10 +456,15 @@ public sealed partial class HostedSession
     }
 
     /// <summary>The live tasks of the session (for a task panel).</summary>
-    public async Task<TaskGraph> TaskGraphAsync(CancellationToken cancellationToken = default)
+    public Task<TaskGraph> TaskGraphAsync(CancellationToken cancellationToken = default) => GraphOfAsync(GetHarness(), Context(cancellationToken));
+
+    /// <summary>The task graph now: the acquisition value of a task graph watch, which stops at once (pi-durable 1.5.0 removed the
+    /// <c>taskGraph()</c> state getter).</summary>
+    private static async Task<TaskGraph> GraphOfAsync(IHarness harness, DurableContext context)
     {
-        using var graph = await GetHarness().TaskGraphAsync(Context(cancellationToken)).ConfigureAwait(false);
-        return graph.Value;
+        var watch = await harness.WatchTaskGraphAsync(context).ConfigureAwait(false);
+        try { return watch.Value; }
+        finally { await watch.StopAsync().ConfigureAwait(false); }
     }
 
     /// <summary>Aborts one task, such as a job run; its owned work stops first.</summary>
@@ -720,13 +727,14 @@ public sealed partial class HostedSession
             opened = await Harness.OpenAsync(storage, new HarnessOptions
             {
                 Models = host.Options.Models,
+                Identity = host.Options.Identity,
                 Registry = created,
                 Settings = new SessionHarnessSettings(host.Options.Settings, () => Compaction,
                     () => [.. created.Snapshot().Installed().Where(extension => DeviceApps.IsDefault(extension.Name))],
                     host.Options.SessionStream is null ? null : StreamMetadata),
                 Env = envs.EnvAsync,
                 TimeProvider = host.Options.TimeProvider,
-                OnReport = report => host.Options.OnReport?.Invoke(Id, report),
+                OnReport = report => host.Options.OnReport?.Invoke(Id, report.Error),
             }, context).ConfigureAwait(false);
             if (createModel is null)
             {
@@ -744,7 +752,8 @@ public sealed partial class HostedSession
                 host.Catalog.CompleteInitialization(Id);
             }
             await RerouteAllAsync(opened, context).ConfigureAwait(false);
-            commits = opened.SubscribeCommits((_, _) => host.Notify(new DeviceChange(DeviceChangeKind.Session, Id)));
+            commits = opened.ObserveCommits(new CommitObserver(
+                (_, _) => host.Notify(new DeviceChange(DeviceChangeKind.Session, Id)), _ => { }));
             fileLock = acquired;
             acquired = null;
             error = null;
@@ -806,7 +815,7 @@ public sealed partial class HostedSession
     internal async Task CloseAsync()
     {
         closing = true;
-        Interlocked.Exchange(ref commits, null)?.Dispose();
+        Interlocked.Exchange(ref commits, null)?.Detach();
         if (Interlocked.Exchange(ref harness, null) is { } opened)
         {
             try { await opened.CloseAsync(DurableContext.Background).ConfigureAwait(false); }
@@ -865,7 +874,7 @@ public sealed partial class HostedSession
     private async Task WatchClosedAsync(IHarness opened)
     {
         var end = await opened.Closed.ConfigureAwait(false);
-        if (closing || end.Reason != SessionEndReason.Failed) return;
+        if (closing || end.Kind != SessionEndKind.Failed) return;
         error = new SessionUnavailableException($"Session {Name} failed: {end.Error?.Message}", end.Error);
         host.Options.OnReport?.Invoke(Id, error);
         host.Notify(new DeviceChange(DeviceChangeKind.Session, Id));

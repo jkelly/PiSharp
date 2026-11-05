@@ -139,19 +139,19 @@ internal static class InteractiveModeCases
             }));
         // Issue #5: /new (handleClearCommand) on a model whose thinking cannot be turned off failed with "Failed to create session: RPC
         // command failed." and exited. sdk.ts createAgentSession clamps the new session's level (defaultThinkingLevel "off") to the
-        // model: anthropic/claude-haiku-5-5 maps off and minimal to null, so "low"; setModel (/model) clamps the same way.
+        // model: anthropic/claude-sonnet-5-5 maps off and minimal to null, so "low"; setModel (/model) clamps the same way.
         yield return ("e2e.slash.new-session-on-a-model-without-off-clamps-thinking", async () =>
         {
             await using var pi = new InteractiveHarness("new-clamped");
             File.WriteAllText(Path.Combine(pi.AgentDir, "settings.json"), """{"defaultThinkingLevel":"off"}""");
-            pi.Start("--provider", "anthropic", "--model", "claude-haiku-5-5", "--tui-mode", "regular");
+            pi.Start("--provider", "anthropic", "--model", "claude-sonnet-5-5", "--tui-mode", "regular");
             await pi.WaitFor("escape interrupt");
-            await pi.WaitUntil(text => text.Contains("claude-haiku-5-5 • low", StringComparison.Ordinal), "startup level clamped");
+            await pi.WaitUntil(text => text.Contains("claude-sonnet-5-5 • low", StringComparison.Ordinal), "startup level clamped");
             await pi.Submit("first message");
             await pi.WaitFor("Hello from the fake model.");
             await pi.Submit("/new");
             await pi.WaitFor("✓ New session started");
-            await pi.WaitUntil(text => text.Contains("claude-haiku-5-5 • low", StringComparison.Ordinal), "new session level clamped");
+            await pi.WaitUntil(text => text.Contains("claude-sonnet-5-5 • low", StringComparison.Ordinal), "new session level clamped");
             await pi.Submit("after clear");
             await pi.WaitUntil(text => text.IndexOf("after clear", StringComparison.Ordinal) is >= 0 and var asked &&
                 text.IndexOf("Hello from the fake model.", asked, StringComparison.Ordinal) > asked, "the answer in the new session");
@@ -170,13 +170,13 @@ internal static class InteractiveModeCases
             var cwd = System.Text.Json.JsonSerializer.Serialize(pi.Cwd);
             var session = pi.Write("resume-clamped.jsonl", string.Join("\n",
                 "{\"type\":\"session\",\"version\":3,\"id\":\"01a00000-0000-7000-8000-00000000c1a5\",\"timestamp\":\"2026-10-09T10:00:00.000Z\",\"cwd\":" + cwd + "}",
-                "{\"type\":\"model_change\",\"id\":\"a1\",\"parentId\":null,\"timestamp\":\"2026-10-09T10:00:00.001Z\",\"provider\":\"anthropic\",\"modelId\":\"claude-haiku-5-5\"}",
+                "{\"type\":\"model_change\",\"id\":\"a1\",\"parentId\":null,\"timestamp\":\"2026-10-09T10:00:00.001Z\",\"provider\":\"anthropic\",\"modelId\":\"claude-sonnet-5-5\"}",
                 "{\"type\":\"thinking_level_change\",\"id\":\"a2\",\"parentId\":\"a1\",\"timestamp\":\"2026-10-09T10:00:00.002Z\",\"thinkingLevel\":\"off\"}",
                 "{\"type\":\"message\",\"id\":\"a3\",\"parentId\":\"a2\",\"timestamp\":\"2026-10-09T10:00:00.003Z\",\"message\":{\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"first\"}],\"timestamp\":1}}",
-                "{\"type\":\"message\",\"id\":\"a4\",\"parentId\":\"a3\",\"timestamp\":\"2026-10-09T10:00:00.004Z\",\"message\":{\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"ok\"}],\"api\":\"anthropic-messages\",\"provider\":\"anthropic\",\"model\":\"claude-haiku-5-5\",\"usage\":{\"input\":3,\"output\":2,\"cacheRead\":0,\"cacheWrite\":0,\"totalTokens\":5,\"cost\":{\"input\":0,\"output\":0,\"cacheRead\":0,\"cacheWrite\":0,\"total\":0}},\"stopReason\":\"stop\",\"timestamp\":2}}") + "\n");
+                "{\"type\":\"message\",\"id\":\"a4\",\"parentId\":\"a3\",\"timestamp\":\"2026-10-09T10:00:00.004Z\",\"message\":{\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"ok\"}],\"api\":\"anthropic-messages\",\"provider\":\"anthropic\",\"model\":\"claude-sonnet-5-5\",\"usage\":{\"input\":3,\"output\":2,\"cacheRead\":0,\"cacheWrite\":0,\"totalTokens\":5,\"cost\":{\"input\":0,\"output\":0,\"cacheRead\":0,\"cacheWrite\":0,\"total\":0}},\"stopReason\":\"stop\",\"timestamp\":2}}") + "\n");
             pi.Start("--session", session, "--tui-mode", "regular");
             await pi.WaitFor("escape interrupt");
-            await pi.WaitUntil(text => text.Contains("claude-haiku-5-5 • low", StringComparison.Ordinal), "resumed at the clamped level");
+            await pi.WaitUntil(text => text.Contains("claude-sonnet-5-5 • low", StringComparison.Ordinal), "resumed at the clamped level");
             await pi.Submit("/reload");
             await pi.WaitFor("Reloaded keybindings, extensions, skills, prompts, themes, and context files");
             await pi.Submit("after reload");
@@ -195,8 +195,8 @@ internal static class InteractiveModeCases
                 await pi.WaitFor("/model " + reference);
                 await Task.Delay(300); pi.Type("\r"); await Task.Delay(300); pi.Type("\r");
             }
-            await Model("anthropic/claude-haiku-5-5");
-            await pi.WaitUntil(text => text.Contains("claude-haiku-5-5 • low", StringComparison.Ordinal), "switched model clamps off to low");
+            await Model("anthropic/claude-sonnet-5-5");
+            await pi.WaitUntil(text => text.Contains("claude-sonnet-5-5 • low", StringComparison.Ordinal), "switched model clamps off to low");
             await Model("anthropic/claude-sonnet-4-5");
             // _getThinkingLevelForModelSwitch: the settings default ("off") again, supported by sonnet.
             await pi.WaitUntil(text => text.Contains("claude-sonnet-4-5 • thinking off", StringComparison.Ordinal), "switched back");

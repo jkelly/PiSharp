@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): coding-agent/src/core/tools/renderers/write.ts.
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): coding-agent/src/core/tools/renderers/write.ts.
 using System.Text.Json.Nodes;
 using PiSharp.Tui.Pi;
 
@@ -18,7 +18,12 @@ internal static class WriteRenderers
 
     private sealed class WriteCallRenderComponent() : Text("", 0, 0)
     {
+        // Line by line highlighting of a call whose content is still streaming.
         public WriteHighlightCache? Cache;
+        // A streamed call highlights its first lines on every delta, which stop changing once the file is longer, and a complete call
+        // highlights the whole file on every update and expand toggle. Either way the row reuses the last highlighting; it also holds
+        // the only copy of a complete call's displayed source.
+        public readonly CodeHighlighter Highlighter = new();
     }
 
     private const int WritePartialFullHighlightLines = 50;
@@ -29,12 +34,12 @@ internal static class WriteRenderers
         return highlighted.Count > 0 ? highlighted[0] : "";
     }
 
-    private static void RefreshWriteHighlightPrefix(WriteHighlightCache cache)
+    private static void RefreshWriteHighlightPrefix(WriteHighlightCache cache, CodeHighlighter highlighter)
     {
         var prefixCount = Math.Min(WritePartialFullHighlightLines, cache.NormalizedLines.Count);
         if (prefixCount == 0) return;
         var prefixSource = string.Join("\n", cache.NormalizedLines.Take(prefixCount));
-        var prefixHighlighted = Themes.HighlightCode(prefixSource, cache.Lang);
+        var prefixHighlighted = highlighter.Highlight(prefixSource, cache.Lang);
         while (cache.HighlightedLines.Count < prefixCount) cache.HighlightedLines.Add("");
         for (var i = 0; i < prefixCount; i++)
             cache.HighlightedLines[i] = i < prefixHighlighted.Count ? prefixHighlighted[i] : HighlightSingleLine(cache.NormalizedLines[i], cache.Lang);
@@ -56,13 +61,14 @@ internal static class WriteRenderers
         };
     }
 
-    private static WriteHighlightCache? UpdateWriteHighlightCacheIncremental(WriteHighlightCache? cache, string? rawPath, string fileContent)
+    private static WriteHighlightCache? UpdateWriteHighlightCacheIncremental(WriteHighlightCache? cache, string? rawPath, string fileContent,
+        CodeHighlighter highlighter)
     {
         var lang = !string.IsNullOrEmpty(rawPath) ? Themes.GetLanguageFromPath(rawPath) : null;
         if (lang is null) return null;
         if (cache is null) return RebuildWriteHighlightCacheFull(rawPath, fileContent);
-        if (cache.Lang != lang || cache.RawPath != rawPath) return RebuildWriteHighlightCacheFull(rawPath, fileContent);
-        if (!fileContent.StartsWith(cache.RawContent, StringComparison.Ordinal)) return RebuildWriteHighlightCacheFull(rawPath, fileContent);
+        if (cache.Lang != lang || cache.RawPath != rawPath || !fileContent.StartsWith(cache.RawContent, StringComparison.Ordinal))
+            return RebuildWriteHighlightCacheFull(rawPath, fileContent);
         if (fileContent.Length == cache.RawContent.Length) return cache;
 
         var deltaRaw = fileContent[cache.RawContent.Length..];
@@ -86,7 +92,7 @@ internal static class WriteRenderers
             cache.NormalizedLines.Add(segments[i]);
             cache.HighlightedLines.Add(HighlightSingleLine(segments[i], cache.Lang));
         }
-        RefreshWriteHighlightPrefix(cache);
+        RefreshWriteHighlightPrefix(cache, highlighter);
         return cache;
     }
 
@@ -97,7 +103,8 @@ internal static class WriteRenderers
         return lines.Take(end).ToList();
     }
 
-    private static string FormatWriteCall(JsonNode? args, ToolRenderResultOptions options, Theme theme, WriteHighlightCache? cache, string cwd)
+    private static string FormatWriteCall(JsonNode? args, ToolRenderResultOptions options, Theme theme, WriteHighlightCache? cache,
+        CodeHighlighter highlighter, string cwd)
     {
         var rawPath = RenderUtils.Str(ToolJson.Get(args, "file_path") ?? ToolJson.Get(args, "path"));
         var fileContent = RenderUtils.Str(ToolJson.Get(args, "content"));
@@ -110,7 +117,7 @@ internal static class WriteRenderers
         {
             var lang = !string.IsNullOrEmpty(rawPath) ? Themes.GetLanguageFromPath(rawPath) : null;
             IReadOnlyList<string> renderedLines = lang is not null
-                ? (IReadOnlyList<string>?)cache?.HighlightedLines ?? Themes.HighlightCode(RenderUtils.ReplaceTabs(RenderUtils.NormalizeDisplayText(fileContent)), lang)
+                ? (IReadOnlyList<string>?)cache?.HighlightedLines ?? highlighter.Highlight(RenderUtils.ReplaceTabs(RenderUtils.NormalizeDisplayText(fileContent)), lang)
                 : RenderUtils.NormalizeDisplayText(fileContent).Split('\n');
             var lines = TrimTrailingEmptyLines(renderedLines);
             var totalLines = lines.Count;
@@ -139,14 +146,11 @@ internal static class WriteRenderers
             var rawPath = RenderUtils.Str(ToolJson.Get(args, "file_path") ?? ToolJson.Get(args, "path"));
             var fileContent = RenderUtils.Str(ToolJson.Get(args, "content"));
             var component = context.LastComponent as WriteCallRenderComponent ?? new WriteCallRenderComponent();
-            if (fileContent is not null)
-            {
-                component.Cache = context.ArgsComplete
-                    ? RebuildWriteHighlightCacheFull(rawPath, fileContent)
-                    : UpdateWriteHighlightCacheIncremental(component.Cache, rawPath, fileContent);
-            }
-            else component.Cache = null;
-            component.SetText(FormatWriteCall(args, new ToolRenderResultOptions(context.Expanded, context.IsPartial), theme, component.Cache, context.Cwd));
+            component.Cache = fileContent is not null && !context.ArgsComplete
+                ? UpdateWriteHighlightCacheIncremental(component.Cache, rawPath, fileContent, component.Highlighter)
+                : null;
+            component.SetText(FormatWriteCall(args, new ToolRenderResultOptions(context.Expanded, context.IsPartial), theme, component.Cache,
+                component.Highlighter, context.Cwd));
             return component;
         },
         RenderResult: (result, _, theme, context) =>

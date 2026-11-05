@@ -1,5 +1,6 @@
 // tui.ts's live rendering from the pi.live document: the streaming partial (#syncStreaming), tool slots (apply's tool loop), and the
-// working status in the editor's top border (#syncStatus).
+// working status in the editor's top border (#syncStatus). Pi v1.5.0 sync (area live-turns): a compaction status names its trigger
+// (pi.live version 2).
 using System.Text.Json.Nodes;
 using PiSharp.Cli.Interactive.Mode.Components;
 using static TuiTests;
@@ -97,9 +98,9 @@ internal static partial class Program
             await run.WaitFor("Retrying (attempt 2): overloaded");
             run.Source.Publish(View([UserEntry(1, "q")], live: """{"run":{"taskId":7,"inputs":[1]},"generation":{"attempt":0,"deferred":{"pollAt":0}}}"""));
             await run.WaitFor("Waiting for deferred response...");
-            run.Source.Publish(View([UserEntry(1, "q")], live: """{"compactions":[{"taskId":3,"reason":"threshold","blocking":false,"attempt":0}]}"""));
+            run.Source.Publish(View([UserEntry(1, "q")], live: """{"compactions":[{"taskId":3,"trigger":"threshold","blocking":false,"attempt":0}]}"""));
             await run.WaitFor("Compacting (threshold)...");
-            run.Source.Publish(View([UserEntry(1, "q")], live: """{"compactions":[{"taskId":3,"reason":"manual","blocking":false,"attempt":2,"retry":{"at":0,"error":"x"}}]}"""));
+            run.Source.Publish(View([UserEntry(1, "q")], live: """{"compactions":[{"taskId":3,"trigger":"manual","blocking":false,"attempt":2,"retry":{"at":0,"error":"x"}}]}"""));
             await run.WaitFor("Retrying manual compaction (attempt 3)...");
             run.Source.Publish(View([UserEntry(1, "q")], live: "{}"));
             await run.WaitUntil(text => !text.Contains("Retrying", StringComparison.Ordinal), "status cleared when idle");

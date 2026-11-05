@@ -362,7 +362,7 @@ internal sealed partial class InteractiveMode
             {
                 case AuthEventKind.AuthUrl: dialog.ShowAuth(authEvent.Url ?? "", authEvent.Instructions); break;
                 case AuthEventKind.DeviceCode:
-                    dialog.ShowDeviceCode(authEvent.UserCode ?? "", authEvent.VerificationUri ?? "");
+                    dialog.ShowDeviceCode(authEvent.UserCode ?? "", authEvent.VerificationUri ?? "", authEvent.OpenBrowserOnConfirm, authEvent.CopyCodeOnConfirm);
                     dialog.ShowWaiting("Waiting for authentication...");
                     break;
                 case AuthEventKind.Info: dialog.ShowInfo(authEvent.Message ?? "", authEvent.Links); break;

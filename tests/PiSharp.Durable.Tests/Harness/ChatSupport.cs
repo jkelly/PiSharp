@@ -12,14 +12,29 @@
 //   it delays.
 // - chatSetup's settings object, whose fields tests assign between decisions, is ChatSetup's mutable properties (Stream, Retry, ...) behind a
 //   HarnessSettings whose getters read them at every resolution.
-// - `new Proxy(models, { get })` overriding streamSimple or cancelDeferred is ModelsOverride, a decorator.
+// - `new Proxy(models, { get })` overriding streamSimple, fetchDeferred or cancelDeferred is ModelsOverride, a decorator.
 // - waitFor (a 5 ms poll for at most 5 s) is Eventually (a bounded poll of about 20 s): only how long a slow machine may take differs.
+// Pi v1.5.0 sync (area restarts): ChatSetup.RestartLimit, the settings field tests set (upstream's `setup.settings.restartLimit`).
+// Pi v1.5.0 sync (area model-requests): ChatSetup.Identity, the setup's HarnessOptions.Identity (upstream adc5fa9f8).
+// Pi v1.5.0 sync (area telemetry): as the faux provider is registered in pi-ai's Models, whose streamSimple and deferred polls observe
+// each request (models.ts' observeModelRequest, 2ec55d808), a request whose options carry telemetry is one pi.ai.request span and a
+// deferred poll one pi.ai.poll span, through PiSharp.AI's AiTelemetry (Observed). openChat takes HarnessOptions.Telemetry.
+// Pi v1.5.0 sync (area partial-commits): the faux stream keeps a block's text so far in a StringBuilder and writes it into the partial
+// only when an abort reports it. Upstream's `text += chunk` is a V8 rope; a .NET `+=` copied the whole text per chunk, which the streamed
+// partials' cost case (HarnessViewRunCases.cs) would count as the Harness's.
+// Pi v1.5.0 sync (area vocabulary): chatSetup's onReport({ error, ...info }) is ChatSetup's report recorder, which keeps the Report as is
+// (area reports). chat-support.ts matches v1.5.0, but the citation stays on v1.2.0 for the faux provider: faux.ts's f3fa8bd92 (a cached
+// prompt's cacheWrite is max(0, promptTokens - cacheRead) and input 0 while caching is simulated) is not ported here, and f715a15c1's
+// ToolCallArgumentsStream partials have no counterpart in this provider's compact frames (ToolCallDelta carries the chunk only).
+#pragma warning disable PISHARP_IDENTITY001 // PiSharp.AI's ClientIdentity (Pi v1.5.0) is experimental.
 using System.Collections.Concurrent;
 using System.Collections.Immutable;
 using System.Runtime.CompilerServices;
+using PiSharp.AI;
 using PiSharp.Contracts;
 using PiSharp.Durable;
 using PiSharp.Durable.Chord;
+using PiSharp.Telemetry;
 using static HarnessTests;
 using static SessionTests;
 
@@ -76,17 +91,20 @@ internal static class ChatTests
     /// <summary>Opens a Harness over <paramref name="storage"/> and returns its root, configured with the faux model on first creation
     /// (upstream <c>openChat</c>).</summary>
     internal static async Task<OpenedChat> OpenChat(IStorage storage, ChatSetup setup,
-        Func<EnvTarget, DurableContext, Task<PiSharp.Durable.Env.IExecutionEnv?>>? env = null, TimeProvider? timeProvider = null)
+        Func<EnvTarget, DurableContext, Task<PiSharp.Durable.Env.IExecutionEnv?>>? env = null, TimeProvider? timeProvider = null,
+        ITelemetryContext? telemetry = null)
     {
         var harness = await Harness.OpenAsync(storage, new HarnessOptions
         {
+            Telemetry = telemetry,
             TimeProvider = timeProvider,
             Models = setup.Models,
+            Identity = setup.Identity,
             Registry = setup.Registry,
             Settings = setup.Settings,
             Env = env,
             Now = () => setup.Now(),
-            OnReport = setup.Reports.Add,
+            OnReport = setup.Record,
         }, Context);
         var root = await harness.RootAsync(Context, new AgentChange { Model = new ModelRef("faux", "faux-1") });
         return new OpenedChat(harness, root);
@@ -199,14 +217,15 @@ internal sealed class ChatSetup
 {
     private readonly Values values;
 
-    public ChatSetup(FauxModels faux) : this(faux, PiSharp.Durable.Registry.Create(), new SyncList<Exception>(), new Values()) { }
+    public ChatSetup(FauxModels faux) : this(faux, PiSharp.Durable.Registry.Create(), new SyncList<Exception>(), new SyncList<ReportInfo>(), new Values()) { }
 
-    private ChatSetup(FauxModels faux, IRegistry registry, SyncList<Exception> reports, Values values)
+    private ChatSetup(FauxModels faux, IRegistry registry, SyncList<Exception> reports, SyncList<ReportInfo> infos, Values values)
     {
         Faux = faux;
         Models = faux;
         Registry = registry;
         Reports = reports;
+        Infos = infos;
         this.values = values;
         Settings = new LiveSettings(values);
     }
@@ -216,9 +235,13 @@ internal sealed class ChatSetup
     public IDurableModels Models { get; set; }
     public IRegistry Registry { get; }
     public SyncList<Exception> Reports { get; }
+    /// <summary>What each report was about, in the order of <see cref="Reports"/> (upstream <c>infos</c>).</summary>
+    public SyncList<ReportInfo> Infos { get; }
     public Func<double> Now { get; set; } = () => DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
     /// <summary>The HarnessSettings the Harness reads; its getters read the mutable fields below at every resolution.</summary>
     public HarnessSettings Settings { get; }
+    /// <summary><c>HarnessOptions.Identity</c>.</summary>
+    public PiSharp.AI.ClientIdentity? Identity { get; set; }
 
     // Upstream's `setup.settings.<field> = ...`.
     public IReadOnlyList<Extension>? Extensions { get => values.Extensions; set => values.Extensions = value; }
@@ -231,13 +254,25 @@ internal sealed class ChatSetup
     public QueueMode? FollowUpMode { get => values.FollowUpMode; set => values.FollowUpMode = value; }
     public double? ContextRetentionMs { get => values.ContextRetentionMs; set => values.ContextRetentionMs = value; }
     public double? DocumentRetentionMs { get => values.DocumentRetentionMs; set => values.DocumentRetentionMs = value; }
+    public AfterFailedRun? AfterFailedRun { get => values.AfterFailedRun; set => values.AfterFailedRun = value; }
+    public double? RestartLimit { get => values.RestartLimit; set => values.RestartLimit = value; }
+
+    /// <summary><c>OnReport</c>: the error in <see cref="Reports"/>, what it is about in <see cref="Infos"/>, at the same index.</summary>
+    public void Record(Report report)
+    {
+        lock (Reports)
+        {
+            Reports.Add(report.Error);
+            Infos.Add(report.Info);
+        }
+    }
 
     /// <summary>A copy sharing the faux provider, registry, reports and settings object, with other models (upstream
     /// <c>{ ...base, models }</c>).</summary>
-    public ChatSetup WithModels(IDurableModels models) => new(Faux, Registry, Reports, values) { Models = models, Now = Now };
+    public ChatSetup WithModels(IDurableModels models) => new(Faux, Registry, Reports, Infos, values) { Models = models, Now = Now, Identity = Identity };
 
     /// <summary>A copy with a fresh settings object (upstream <c>{ ...base, settings }</c>).</summary>
-    public ChatSetup WithFreshSettings() => new(Faux, Registry, Reports, new Values()) { Models = Models, Now = Now };
+    public ChatSetup WithFreshSettings() => new(Faux, Registry, Reports, Infos, new Values()) { Models = Models, Now = Now, Identity = Identity };
 
     private sealed class Values
     {
@@ -251,6 +286,8 @@ internal sealed class ChatSetup
         public QueueMode? FollowUpMode;
         public double? ContextRetentionMs;
         public double? DocumentRetentionMs;
+        public AfterFailedRun? AfterFailedRun;
+        public double? RestartLimit;
     }
 
     private sealed class LiveSettings(Values values) : HarnessSettings
@@ -265,6 +302,8 @@ internal sealed class ChatSetup
         public override QueueMode? FollowUpMode { get => values.FollowUpMode; init { } }
         public override double? ContextRetentionMs { get => values.ContextRetentionMs; init { } }
         public override double? DocumentRetentionMs { get => values.DocumentRetentionMs; init { } }
+        public override AfterFailedRun? AfterFailedRun { get => values.AfterFailedRun; init { } }
+        public override double? RestartLimit { get => values.RestartLimit; init { } }
     }
 }
 
@@ -394,8 +433,41 @@ internal sealed class FauxModels : IDurableModels
             if (step is not null) pending.RemoveAt(0);
         }
         State.Called();
-        return StreamAsync(model, messages, options, step, cancellationToken);
+        var stream = StreamAsync(model, messages, options, step, cancellationToken);
+        return options?.Telemetry is { } telemetry ? Observed(stream, model, telemetry, options.Reasoning, poll: false) : stream;
     }
+
+    /// <summary>pi-ai Models' <c>observeModelRequest</c> around a request: a <c>pi.ai.request</c> (<c>pi.ai.poll</c>) span under
+    /// <paramref name="telemetry"/>, fed every event and the final message.</summary>
+    internal static async IAsyncEnumerable<StreamEvent> Observed(IAsyncEnumerable<StreamEvent> events, DurableModel model, ITelemetrySpan telemetry,
+        string? reasoning, bool poll, [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    {
+        var observer = AiTelemetry.ObserveModelRequest(model.Descriptor, telemetry, reasoning, poll);
+        AssistantMessage? final = null;
+        try
+        {
+            await foreach (var value in events.WithCancellation(cancellationToken))
+            {
+                observer.OnEvent(value);
+                if (value is StreamTerminalEvent terminal) final = terminal.Message;
+                yield return value;
+            }
+        }
+        finally
+        {
+            observer.OnResult(final);
+        }
+    }
+
+    public IAsyncEnumerable<StreamEvent> StreamDeferred(DurableModel model, DurableDeferredHandle handle, DurableRequestOptions? options,
+        CancellationToken cancellationToken)
+    {
+        var stream = StreamDeferred(model, handle, cancellationToken);
+        return options?.Telemetry is { } telemetry ? Observed(stream, model, telemetry, null, poll: true) : stream;
+    }
+
+    public async Task<AssistantMessage> FetchDeferredAsync(DurableModel model, DurableDeferredHandle handle, DurableRequestOptions? options,
+        CancellationToken cancellationToken) => await TerminalOf(StreamDeferred(model, handle, options, cancellationToken));
 
     private async IAsyncEnumerable<StreamEvent> StreamAsync(DurableModel model, ImmutableArray<JsonValue> messages, DurableStreamOptions? options,
         FauxStep? step, [EnumeratorCancellation] CancellationToken cancellationToken)
@@ -534,17 +606,18 @@ internal sealed class FauxModels : IDurableModels
                 var text = S(block[key]);
                 content.Add(Obj(("type", type), (key, "")));
                 yield return type == "text" ? new TextStarted(index, new TextContent("")) : new ThinkingStarted(index, new ThinkingContent(""));
-                var sofar = "";
+                // The text so far, written into the partial only when an abort reports it (area partial-commits).
+                var sofar = new System.Text.StringBuilder();
                 foreach (var chunk in Split(text))
                 {
                     await ScheduleChunk(chunk);
                     if (signal.IsCancellationRequested)
                     {
+                        content[index] = Obj(("type", type), (key, sofar.ToString()));
                         yield return AbortedEvent();
                         yield break;
                     }
-                    sofar += chunk;
-                    content[index] = Obj(("type", type), (key, sofar));
+                    sofar.Append(chunk);
                     yield return type == "text" ? new TextDelta(index, chunk) : new ThinkingDelta(index, chunk);
                 }
                 content[index] = block;
@@ -741,8 +814,18 @@ internal sealed class ModelsOverride(IDurableModels inner) : IDurableModels
 {
     public Func<DurableModel, ImmutableArray<JsonValue>, DurableStreamOptions?, CancellationToken, IAsyncEnumerable<StreamEvent>>? StreamSimpleOverride { get; init; }
     public Func<DurableModel, DurableDeferredHandle, CancellationToken, Task>? CancelDeferredOverride { get; init; }
+    /// <summary>Replaces <c>fetchDeferred</c> (Pi v1.5.0 sync, area restarts: harness-restart-failure's deferredSetup).</summary>
+    public Func<DurableModel, DurableDeferredHandle, CancellationToken, Task<AssistantMessage>>? FetchDeferredOverride { get; init; }
 
-    public DurableModel? GetModel(string provider, string modelId) => inner.GetModel(provider, modelId);
+    /// <summary>Runs before each model lookup (PiSharp-only, harness.continue: holds a run's task, which looks its model up first, off the
+    /// commit line).</summary>
+    public Action? BeforeGetModel { get; init; }
+
+    public DurableModel? GetModel(string provider, string modelId)
+    {
+        BeforeGetModel?.Invoke();
+        return inner.GetModel(provider, modelId);
+    }
 
     public IAsyncEnumerable<StreamEvent> StreamSimple(DurableModel model, ImmutableArray<JsonValue> messages, DurableStreamOptions? options,
         CancellationToken cancellationToken) =>
@@ -755,7 +838,7 @@ internal sealed class ModelsOverride(IDurableModels inner) : IDurableModels
         inner.StreamDeferred(model, handle, cancellationToken);
 
     public Task<AssistantMessage> FetchDeferredAsync(DurableModel model, DurableDeferredHandle handle, CancellationToken cancellationToken) =>
-        inner.FetchDeferredAsync(model, handle, cancellationToken);
+        FetchDeferredOverride is { } fetch ? fetch(model, handle, cancellationToken) : inner.FetchDeferredAsync(model, handle, cancellationToken);
 
     public Task CancelDeferredAsync(DurableModel model, DurableDeferredHandle handle, CancellationToken cancellationToken) =>
         CancelDeferredOverride is { } cancel ? cancel(model, handle, cancellationToken) : inner.CancelDeferredAsync(model, handle, cancellationToken);

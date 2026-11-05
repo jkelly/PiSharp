@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/ai/src/utils/text.ts.
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/ai/src/utils/text.ts.
 // Ported to plain ESM for the PiSharp Node extension bridge (TypeScript types stripped mechanically; behaviour unchanged).
 export function contentText(content, separator = "\n") {
     if (typeof content === "string") return content;
@@ -21,4 +21,7 @@ export function renderSystemMessageUpdate(message) {
         parts.push(value === null ? `Removed system prompt section "${name}".` : `Updated system prompt section "${name}":\n\n${value}`);
     }
     return parts.join("\n\n");
+}
+export function ownedSlice(text, start, end = text.length) {
+    return `${text.slice(start, end)} `.slice(0, -1);
 }

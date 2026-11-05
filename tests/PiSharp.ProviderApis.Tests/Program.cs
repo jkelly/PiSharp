@@ -7,14 +7,14 @@ using System.Text.Json.Nodes;
 using PiSharp.AI;
 using PiSharp.Contracts;
 
-// IMPL-A1 provider APIs and authentication. Authored expectations written from the Pi v1.2.0
-// (06a466935536f8c9bcacb2d5efc0fc021be1bdff) sources packages/ai/src/api/bedrock-converse-stream.ts, api/openai-codex-responses.ts,
+// IMPL-A1 provider APIs and authentication. Authored expectations written from the Pi v1.2.0 sources and synced to Pi v1.5.0
+// (decision 0013, the report's sourceSha): packages/ai/src/api/bedrock-converse-stream.ts, api/openai-codex-responses.ts,
 // api/github-copilot-headers.ts, api/cloudflare.ts, providers/*.ts and auth/**, plus AWS's published Signature Version 4 test
 // suite vectors (awslabs/aws-c-auth tests/aws-signing-test-suite/v4) and the documented signing-key derivation example. Nothing
 // here executes upstream code or is an upstream capture; every HTTP peer is an in-process fake and no browser is opened.
 internal static partial class Program
 {
-    private const string SourceSha = "06a466935536f8c9bcacb2d5efc0fc021be1bdff";
+    private const string SourceSha = "f9a26365568127461c47a07a37dcb42c140a3ac5";
     private static int bodyComparisons;
 
     private static async Task<int> Main(string[] args)
@@ -55,7 +55,7 @@ internal static partial class Program
             ("live.long-transcript-2000-messages-with-loadout-records-every-family", LongTranscriptEveryFamily),
             ("login.every-provider-cli-flow-api-key-and-oauth", CliLogin),
         };
-        cases = [.. cases, .. GoogleAdcCases, .. CodexWebSocketCases, .. ZstdCases, .. JsonLeftoverCases];
+        cases = [.. cases, .. GoogleAdcCases, .. CodexWebSocketCases, .. ZstdCases, .. JsonLeftoverCases, .. Sync150Cases];
         if (Environment.GetEnvironmentVariable("PROVIDERAPIS_FILTER") is { Length: > 0 } filter) cases = [.. cases.Where(test => test.Id.Contains(filter, StringComparison.Ordinal))];
         var results = new List<object>(); var failures = 0;
         foreach (var test in cases)
@@ -136,7 +136,9 @@ internal static partial class Program
         {
             var bytes = request.Content is null ? [] : await request.Content.ReadAsByteArrayAsync(cancellationToken);
             var headers = request.Headers.Concat(request.Content?.Headers ?? Enumerable.Empty<KeyValuePair<string, IEnumerable<string>>>())
-                .GroupBy(pair => pair.Key.ToLowerInvariant()).ToImmutableDictionary(group => group.Key, group => string.Join(", ", group.SelectMany(pair => pair.Value)));
+                .GroupBy(pair => pair.Key.ToLowerInvariant()).ToImmutableDictionary(group => group.Key,
+                    // HttpHeaders parses a User-Agent into product and comment tokens; the wire separates them with spaces.
+                    group => string.Join(group.Key == "user-agent" ? " " : ", ", group.SelectMany(pair => pair.Value)));
             // A zstd body (the Codex SSE request) is recorded decoded; BodyBytes keeps the wire bytes.
             var text = headers.GetValueOrDefault("content-encoding") == "zstd" ? Encoding.UTF8.GetString(PiSharp.AI.Compression.ZstdDecoder.Decompress(bytes)) : Encoding.UTF8.GetString(bytes);
             var recorded = new Recorded(request.Method.Method, request.RequestUri!.AbsoluteUri, headers, text, bytes);

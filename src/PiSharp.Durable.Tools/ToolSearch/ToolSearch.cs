@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/src/tool-search/tool-search.ts and tool-search/index.ts, the
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/src/tool-search/tool-search.ts and tool-search/index.ts, the
 // `@earendil-works/pi-durable/tool-search` entry point. Upstream's TOOL_SEARCH_TOOL_NAME, DEFAULT_TOOL_SEARCH_LIMIT, createToolSearchTool and
 // createToolSearchExtension are ToolSearch.ToolName, DefaultLimit, CreateTool and CreateExtension; its `ToolSearchToolDetails` type,
 // `{ loaded: string[] }`, is the result's details JSON. The ranking is PiSharp.Durable's Search (upstream search.ts).
@@ -28,10 +28,10 @@ public static class ToolSearch
         "Some of the tools, such as tools of MCP servers, may not have been provided to you upfront, and you should use this tool (`" + ToolName +
         "`) to search for the required tools. For MCP tool discovery, always use `" + ToolName + "`.";
 
-    /// <summary><c>Type.Object({ query: Type.String(...), limit: Type.Optional(Type.Number(...)) })</c>, as TypeBox prints it.</summary>
+    /// <summary><c>obj({ query: str(...), limit: opt(num(...)) }, { open: true })</c>, as pi-schema builds it.</summary>
     internal static readonly JsonObjectValue Parameters = (JsonObjectValue)JsonValue.Parse(
-        """{"type":"object","required":["query"],"properties":{"query":{"type":"string","description":"Search query for deferred tools."},"limit":{"type":"number","description":"Maximum number of tools to return. Defaults to """ +
-        DefaultLimit + """."}}}""");
+        """{"type":"object","properties":{"query":{"type":"string","description":"Search query for deferred tools."},"limit":{"type":"number","description":"Maximum number of tools to return. Defaults to """ +
+        DefaultLimit + """."}},"required":["query"]}""");
 
     /// <summary>The <c>tool_search</c> tool (upstream <c>createToolSearchTool</c>). Only the model may call it: searching changes what the
     /// model is offered, and scripts have their own <c>searchTools()</c>. It is replay-safe. Each call creates a new registration.</summary>
@@ -101,10 +101,10 @@ public static class ToolSearch
                 foreach (var variant in list) SchemaText(variant, parts);
     }
 
-    /// <summary>Search text of a tool: its name, the name with <c>_</c> as spaces, its description, and its parameters' text.</summary>
+    /// <summary>Search text of a tool: its description and its parameters' names and descriptions; the ranker reads the name.</summary>
     internal static string SearchText(ToolRegistration tool)
     {
-        var parts = new List<string> { tool.Name, tool.Name.Replace('_', ' '), tool.Description };
+        var parts = new List<string> { tool.Description };
         SchemaText(tool.Parameters, parts);
         return string.Join(" ", parts.Where(part => Js.Trim(part).Length != 0));
     }

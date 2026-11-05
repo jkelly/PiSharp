@@ -5,10 +5,19 @@ using System.Text.Json;
 using PiSharp.Contracts;
 using PiSharp.Durable;
 using PiSharp.Durable.Chord;
+using PiSharp.Telemetry;
 
 // NativeDurableModels (decision 0005, P8): the production IDurableModels over PiSharp.AI. Authored native cases, fully offline: every
 // request goes to a recording HttpMessageHandler that serves recorded SSE, every environment is an injected dictionary (never the process
 // environment) and every key is a fake test value.
+// Pi v1.5.0 sync (area model-requests): models.payload.on-payload-replaces-the-json-request-body-and-null-keeps-it (pi-ai's onPayload,
+// which pi-durable 1.5.0's beforeProviderRequest uses, d280e1ffa) and models.identity.a-request-identity-sets-the-user-agent (pi-ai's
+// StreamOptions.identity, which the Harness identity sets, adc5fa9f8).
+// Pi v1.5.0 sync (area telemetry): models.telemetry.* pin NativeDurableModels' observation, as pi-ai's Models observes each request
+// (models.ts' observeModelRequest around lazyStream, 2ec55d808): a request with telemetry is one pi.ai.request span, a deferred poll one
+// pi.ai.poll span, a cancel none, all under the caller's span and content-free; a throwing adapter never changes the request. Every
+// span is recorded in process by InMemoryTelemetryContext.
+#pragma warning disable PISHARP_IDENTITY001 // PiSharp.AI's ClientIdentity (Pi v1.5.0) is experimental.
 internal static partial class Program
 {
     private static IEnumerable<(string, Func<Task>)> ModelsCases() =>
@@ -190,6 +199,54 @@ internal static partial class Program
             Check(body.GetProperty("stream").GetBoolean(), "streams");
             Equal("yes", request.Header("X-Durable-Test"), "caller header");
         }),
+        Case("models.payload.on-payload-replaces-the-json-request-body-and-null-keeps-it", async () =>
+        {
+            var handler = new RecordingHandler(_ => Sse(ResponsesText));
+            using var models = Models(new() { ["OPENAI_API_KEY"] = "test-openai-key" }, handler);
+            var model = models.GetModel("openai", "gpt-5")!;
+            var seen = new List<string>();
+            await models.CompleteSimpleAsync(model, UserTurn("hi"), new DurableStreamOptions
+            {
+                OnPayload = (payload, target, _) =>
+                {
+                    seen.Add($"{target.Provider}/{target.Id} {((JsonObjectValue)payload)["model"].ToJson()}");
+                    return Task.FromResult<JsonValue?>(((JsonObjectValue)payload).SetItem("x_hook", "yes"));
+                },
+            }, CancellationToken.None);
+            await models.CompleteSimpleAsync(model, UserTurn("hi"), new DurableStreamOptions { OnPayload = (_, _, _) => Task.FromResult<JsonValue?>(null) },
+                CancellationToken.None);
+            await models.CompleteSimpleAsync(model, UserTurn("hi"), null, CancellationToken.None);
+            Equal("openai/gpt-5 \"gpt-5\"", string.Join(" | ", seen), "the hook sees the provider body and the model");
+            var (replaced, kept, plain) = (handler.Requests[0], handler.Requests[1], handler.Requests[2]);
+            Equal("yes", replaced.Json.GetProperty("x_hook").GetString(), "the replacement is sent");
+            Equal("gpt-5", replaced.Json.GetProperty("model").GetString(), "the rest of the body");
+            Equal(plain.Header("Content-Type"), replaced.Header("Content-Type"), "content type");
+            Equal(plain.Body, kept.Body, "a null result sends the body as built");
+            Check(!kept.Json.TryGetProperty("x_hook", out _), "no replacement");
+        }),
+        Case("models.identity.a-request-identity-sets-the-user-agent", async () =>
+        {
+            var handler = new RecordingHandler(_ => Sse(ResponsesText));
+            using var models = Models(new() { ["OPENAI_API_KEY"] = "test-openai-key" }, handler);
+            var model = models.GetModel("openai", "gpt-5")!;
+            await models.CompleteSimpleAsync(model, UserTurn("hi"), null, CancellationToken.None);
+            await models.CompleteSimpleAsync(model, UserTurn("hi"), new DurableStreamOptions { Identity = new PiSharp.AI.ClientIdentity() }, CancellationToken.None);
+            await models.CompleteSimpleAsync(model, UserTurn("hi"),
+                new DurableStreamOptions { Identity = new PiSharp.AI.ClientIdentity { UserAgent = PiSharp.AI.ClientUserAgent.Custom("acme-agent/2") } },
+                CancellationToken.None);
+            var detailed = PiSharp.AI.ClientIdentities.FormatUserAgent(null);
+            Check(detailed.StartsWith("pi/1.5.0 (", StringComparison.Ordinal), "the default user agent: " + detailed);
+            // RecordingHandler joins a header's values with commas, and HttpHeaders splits User-Agent into its products and comment.
+            static string Recorded(string userAgent)
+            {
+                using var message = new HttpRequestMessage();
+                message.Headers.TryAddWithoutValidation("User-Agent", userAgent);
+                return string.Join(",", message.Headers.GetValues("User-Agent"));
+            }
+            Equal(Recorded(detailed), handler.Requests[0].Header("User-Agent"), "no identity");
+            Equal(Recorded(detailed), handler.Requests[1].Header("User-Agent"), "an empty identity, the Harness default");
+            Equal(Recorded("acme-agent/2"), handler.Requests[2].Header("User-Agent"), "the request's identity");
+        }),
         Case("models.mapping.defaults-use-the-model-cap-and-clamp-the-level", async () =>
         {
             var handler = new RecordingHandler(_ => Sse(ResponsesText));
@@ -266,9 +323,10 @@ internal static partial class Program
             Check(events.Take(events.Count - 1).All(value => value is not StreamTerminalEvent), "one terminal, last");
             Equal(StopReason.Stop, done.Reason, "stop");
             // The exact pi-ai wire message durable stores (generation appends it as the pi.assistant entry), and its round trip.
+            // Pi f9a26365 calculateCost records cost.totalFromProvider false.
             var wire = PiWireJson.WriteMessage(done.Message);
             var stored = (JsonObjectValue)JsonValue.FromData(wire);
-            Equal("""{"role":"assistant","content":[{"type":"text","text":"Hello world","textSignature":"{\"v\":1,\"id\":\"msg_1\"}"}],"api":"openai-responses","provider":"openai","model":"gpt-4.1","usage":{"input":12,"output":3,"cacheRead":0,"cacheWrite":0,"reasoning":0,"totalTokens":15,"cost":{"input":0.000024,"output":0.000024,"cacheRead":0,"cacheWrite":0,"total":0.000048}},"stopReason":"stop","timestamp":1800000000000,"responseId":"resp_1","rawStopReason":"completed","durationMs":0}""",
+            Equal("""{"role":"assistant","content":[{"type":"text","text":"Hello world","textSignature":"{\"v\":1,\"id\":\"msg_1\"}"}],"api":"openai-responses","provider":"openai","model":"gpt-4.1","usage":{"input":12,"output":3,"cacheRead":0,"cacheWrite":0,"reasoning":0,"totalTokens":15,"cost":{"input":0.000024,"output":0.000024,"cacheRead":0,"cacheWrite":0,"total":0.000048,"totalFromProvider":false}},"stopReason":"stop","timestamp":1800000000000,"responseId":"resp_1","rawStopReason":"completed","durationMs":0}""",
                 stored.ToJson(), "stored message");
             var reread = PiWireJson.ReadMessage(wire.Value);
             Equal(wire.ToString(), PiWireJson.WriteMessage(reread).ToString(), "round trip");
@@ -336,7 +394,97 @@ internal static partial class Program
             var thrown = await ThrowsAsync<NotSupportedException>(() => models.CancelDeferredAsync(model, handle, CancellationToken.None), "cancel gap");
             Check(thrown.Message.Contains("deferred", StringComparison.Ordinal), "names deferred");
         }),
+        Case("models.telemetry.records-one-pi-ai-request-span-per-request-and-one-pi-ai-poll-span-per-deferred-poll", async () =>
+        {
+            using var models = Models(new() { ["OPENAI_API_KEY"] = "test-openai-key" }, new RecordingHandler(_ => Sse(ResponsesText)));
+            var model = models.GetModel("openai", "gpt-4.1")!;
+            var handle = new DurableDeferredHandle(JsonValue.Object([new("provider", "openai"), new("modelId", "gpt-4.1"), new("api", "openai-responses"), new("id", "d1")]));
+            var telemetry = new InMemoryTelemetryContext();
+            await telemetry.StartSpanAsync("phase", async span =>
+            {
+                var answer = await models.CompleteSimpleAsync(model, UserTurn("private-prompt"), new DurableStreamOptions { Telemetry = span }, CancellationToken.None);
+                Equal(StopReason.Stop, answer.StopReason, "request answered");
+                var options = new DurableRequestOptions { Telemetry = span };
+                Equal(StopReason.Error, (await models.FetchDeferredAsync(model, handle, options, CancellationToken.None)).StopReason, "fetch gap");
+                Check((await Collect(models.StreamDeferred(model, handle, options, CancellationToken.None))).Single() is StreamError, "stream gap");
+                await ThrowsAsync<NotSupportedException>(() => models.CancelDeferredAsync(model, handle, options, CancellationToken.None), "cancel gap");
+                return 0;
+            });
+            var spans = telemetry.GetSpans();
+            var phase = spans.Single(span => span.Name == "phase");
+            var requests = spans.Where(span => span.Name == PiSharp.AI.AiTelemetry.RequestSpanName).ToList();
+            var polls = spans.Where(span => span.Name == PiSharp.AI.AiTelemetry.PollSpanName).ToList();
+            Equal(1, requests.Count, "one pi.ai.request span: the chat run records none of its own");
+            Equal(2, polls.Count, "one pi.ai.poll span per deferred poll");
+            Equal(4, spans.Count, "the cancel records no span");
+            foreach (var span in spans.Where(span => span.Id != phase.Id))
+            {
+                Equal(phase.Id, span.ParentId, span.Name + " parent");
+                Check(span.Settled, span.Name + " settled");
+                Check(span.Attributes["provider"] is { } provider && provider.Equals((AttributeValue)"openai"), span.Name + " provider");
+                Check(span.Attributes["model"] is { } id && id.Equals((AttributeValue)"gpt-4.1"), span.Name + " model");
+            }
+            Check(!requests[0].Status.IsError, "the answered request is ok");
+            foreach (var poll in polls) Equal("provider_error", poll.Status.Error?.Name, "a poll that ends in an error message");
+            var recorded = JsonSerializer.Serialize(spans);
+            Check(!recorded.Contains("private-prompt", StringComparison.Ordinal) && !recorded.Contains("Hello world", StringComparison.Ordinal),
+                "no prompt or output recorded: " + recorded);
+        }),
+        Case("models.telemetry.a-throwing-adapter-never-changes-the-request-and-its-span-settles", async () =>
+        {
+            using var models = Models(new() { ["OPENAI_API_KEY"] = "test-openai-key" }, new RecordingHandler(_ => Sse(ResponsesText)));
+            var model = models.GetModel("openai", "gpt-4.1")!;
+            var refused = await models.CompleteSimpleAsync(model, UserTurn("hi"), new DurableStreamOptions { Telemetry = new RefusingSpans() }, CancellationToken.None);
+            Equal(StopReason.Stop, refused.StopReason, "a span that cannot start");
+            var telemetry = new InMemoryTelemetryContext();
+            await telemetry.StartSpanAsync("phase", async span =>
+            {
+                var events = await Collect(models.StreamSimple(model, UserTurn("hi"), new DurableStreamOptions { Telemetry = new ThrowingChildEvents(span) },
+                    CancellationToken.None));
+                Equal("Hello world", string.Concat(events.OfType<TextDelta>().Select(delta => delta.Delta)), "every delta still arrives");
+                Equal(StopReason.Stop, ((StreamDone)events[^1]).Reason, "the stream still ends done");
+                return 0;
+            });
+            var request = telemetry.GetSpans().Single(span => span.Name == PiSharp.AI.AiTelemetry.RequestSpanName);
+            Check(request.Settled, "the observed span settles once observation stops");
+        }),
     ];
+
+    /// <summary>A telemetry parent whose spans cannot start.</summary>
+    private sealed class RefusingSpans : ITelemetrySpan
+    {
+        public ITelemetryMetrics? Metrics => NoopTelemetry.Metrics;
+        public ITelemetryPropagation? Propagation => NoopTelemetry.Propagation;
+        public Task<T> StartSpanAsync<T>(SpanOptions options, Func<ITelemetrySpan, Task<T>> callback) => throw new InvalidOperationException("telemetry down");
+        public void AddLink(SpanLink link) { }
+        public void AddEvent(string name, SpanAttributes? attributes = null) { }
+        public void SetAttributes(SpanAttributes attributes) { }
+        public void SetStatus(SpanStatus status) { }
+    }
+
+    /// <summary>A recorded telemetry parent whose child spans throw on every event.</summary>
+    private sealed class ThrowingChildEvents(ITelemetrySpan inner) : ITelemetrySpan
+    {
+        public ITelemetryMetrics? Metrics => inner.Metrics;
+        public ITelemetryPropagation? Propagation => inner.Propagation;
+        public Task<T> StartSpanAsync<T>(SpanOptions options, Func<ITelemetrySpan, Task<T>> callback) =>
+            inner.StartSpanAsync(options, child => callback(new ThrowingEvents(child)));
+        public void AddLink(SpanLink link) => inner.AddLink(link);
+        public void AddEvent(string name, SpanAttributes? attributes = null) => inner.AddEvent(name, attributes);
+        public void SetAttributes(SpanAttributes attributes) => inner.SetAttributes(attributes);
+        public void SetStatus(SpanStatus status) => inner.SetStatus(status);
+
+        private sealed class ThrowingEvents(ITelemetrySpan span) : ITelemetrySpan
+        {
+            public ITelemetryMetrics? Metrics => span.Metrics;
+            public ITelemetryPropagation? Propagation => span.Propagation;
+            public Task<T> StartSpanAsync<T>(SpanOptions options, Func<ITelemetrySpan, Task<T>> callback) => span.StartSpanAsync(options, callback);
+            public void AddLink(SpanLink link) => span.AddLink(link);
+            public void AddEvent(string name, SpanAttributes? attributes = null) => throw new InvalidOperationException("telemetry down");
+            public void SetAttributes(SpanAttributes attributes) => span.SetAttributes(attributes);
+            public void SetStatus(SpanStatus status) => span.SetStatus(status);
+        }
+    }
 
     // ── Helpers ─────────────────────────────────────────────────────────
 

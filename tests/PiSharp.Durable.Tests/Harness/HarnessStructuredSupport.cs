@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): the support half of packages/durable/test/harness-structured.test.ts: the scriptable
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): the support half of packages/durable/test/harness-structured.test.ts: the scriptable
 // test.node task, its gates and log, and the helpers its task-runtime describes share. The cases are in HarnessStructuredCases.cs.
 //
 // Adaptations (beyond those of HarnessSupport.cs):
@@ -7,7 +7,8 @@
 // - Phase and abort handlers run on thread-pool threads, so the log is a SyncList and the maps are concurrent.
 // - until() (chat-support's waitFor, a 5 ms poll) is Eventually.
 // - Upstream v1.2.0's `class Failing extends ControlledStorage` is FinalizeFailingStorage, a decorator over any IStorage (a ControlledStorage
-//   kept open for its reopen), so the case runs on every backend.
+//   kept open for its reopen), so the case runs on every backend. Pi v1.5.0 sync (area group-commit-scheduler, e5c6182ba): it refuses the
+//   finalizing batch through SessionTests.RefusingAt (upstream refusingAt), storing the batches before it, where v1.2.0's threw for the call.
 // - Recovery seeds write records through a bare Session over the reopenable storage and its internal Transaction.SetTask, as upstream
 //   writes them through createSession and the internal tx.setTask.
 using System.Collections.Concurrent;
@@ -61,7 +62,8 @@ internal static partial class StructuredTests
     });
 
     /// <summary>Upstream <c>TaskNotes</c>.</summary>
-    internal static readonly TaskDocToken TaskNotes = Documents.DefineTaskDoc("test.task-notes", 1, () => O("""{"text":""}"""));
+    internal static readonly TaskDocToken TaskNotes = Documents.DefineTaskDoc("test.task-notes", 1, () => O("""{"text":""}"""),
+        checkpointWhen: (_, _, _) => false);
 
     /// <summary>The input of a node named <paramref name="name"/>.</summary>
     internal static JsonObjectValue NodeInput(string name) => Obj(("name", name));
@@ -384,8 +386,8 @@ internal static partial class StructuredTests
 }
 
 /// <summary>
-/// Fails the first commit that finalizes the task <see cref="Fail"/> names with <see cref="Failure"/>, then clears it (upstream v1.2.0's
-/// <c>class Failing extends ControlledStorage</c>, as a decorator).
+/// Refuses the first batch that finalizes the task <see cref="Fail"/> names with <see cref="Failure"/>, then clears it (upstream
+/// <c>class Failing extends ControlledStorage</c>, as a decorator; v1.5.0 refuses through <c>refusingAt</c>).
 /// </summary>
 internal sealed class FinalizeFailingStorage(IStorage inner) : IStorage
 {
@@ -401,14 +403,14 @@ internal sealed class FinalizeFailingStorage(IStorage inner) : IStorage
         set => Interlocked.Exchange(ref fail, value?.Value ?? -1);
     }
 
-    public Task<Seq> CommitAsync(IReadOnlyList<StorageWrite> writes, DurableContext context)
-    {
-        var target = Fail;
-        var finalizes = target is { } id && writes.Any(write => write is TaskWrite task && task.Value.Id == id && task.Value.State.Status == DurableTaskStatus.Terminal);
-        if (finalizes && Interlocked.CompareExchange(ref fail, -1, target!.Value.Value) == target.Value.Value)
-            return Task.FromException<Seq>(Failure);
-        return inner.CommitAsync(writes, context);
-    }
+    public Task<CommitResult> CommitAsync(IReadOnlyList<IReadOnlyList<StorageWrite>> batches, Action<int, Seq> receive, DurableContext context) =>
+        RefusingAt(inner.CommitAsync, batches, receive, context, writes =>
+        {
+            var target = Fail;
+            var finalizes = target is { } id &&
+                writes.Any(write => write is TaskWrite task && task.Value.Id == id && task.Value.State.Status == DurableTaskStatus.Terminal);
+            return finalizes && Interlocked.CompareExchange(ref fail, -1, target!.Value.Value) == target.Value.Value;
+        }, Failure);
 
     public Task<TId> MintIdAsync<TId>() where TId : struct, IDurableId<TId> => inner.MintIdAsync<TId>();
     public Task<StoredDocument?> GetDocumentAsync(DocumentId id, DocumentPoint at, DurableContext context) => inner.GetDocumentAsync(id, at, context);

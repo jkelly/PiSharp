@@ -62,7 +62,7 @@ internal static partial class Program
                 var settings = DurableHarnessSetup.CreateHarnessSettings(PiSettings.FromObjects(new JsonObject()), registry);
                 Equal("coding-tools,pi-prompt,user-interaction,subagent", string.Join(",", settings.Extensions!.Select(extension => extension.Name)),
                     "the default selection");
-                var agent = Agents.ResolveAgent(null, registry.Snapshot(), Agents.ResolveSettings(settings), error => throw error);
+                var agent = Agents.ResolveAgent(null, registry.Snapshot(), Agents.ResolveSettings(settings), (error, _) => throw error);
                 Equal(DefaultTools, Names(agent.Tools), "the tools offered");
                 Check(!agent.Extensions.Any(extension => extension.Name == PlanMode.ExtensionName), "plan-mode not selected");
                 // A deferred tool turns tool_search on; plan-mode stays off.

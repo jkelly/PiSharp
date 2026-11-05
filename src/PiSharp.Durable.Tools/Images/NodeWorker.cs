@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/src/images/node-worker.ts, and the PhotonThread class of
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/src/images/node-worker.ts, and the PhotonThread class of
 // packages/durable/src/images/node.ts.
 // The worker of ImageProcessors.CreateThreaded(): images are prepared here, off the caller's thread. Requests are answered in order; a
 // failure becomes an InvalidOperationException with its message, as upstream's reply carries only the message. After idleMs without a

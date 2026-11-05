@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): coding-agent/src/core/tools/renderers/read.ts.
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): coding-agent/src/core/tools/renderers/read.ts.
 // getReadmePath (coding-agent/src/config.ts) is PiSharp's documentation location (PiSystemPrompt.Documentation).
 using System.Text.Json.Nodes;
 using PiSharp.Cli.Pi;
@@ -17,27 +17,16 @@ internal static class ReadRenderers
     /// <summary>getReadmePath(): the README.md of the package (tests may replace it).</summary>
     public static Func<string> ReadmePath { get; set; } = () => PiSystemPrompt.Documentation().Readme;
 
-    private static string FormatReadLineRange(JsonNode? args, Theme theme)
+    private static string StyledReadLineRange(JsonNode? args, Theme theme)
     {
-        // Strict tool schemas make models send null for omitted optional fields.
-        var offset = ToolJson.Get(args, "offset");
-        var limit = ToolJson.Get(args, "limit");
-        if (offset is null && limit is null) return "";
-        var startLine = offset ?? JsonValue.Create(1);
-        string endLine = "";
-        if (limit is not null)
-        {
-            // startLine + limit - 1; non-numeric arguments (invalid per the schema) are shown as NaN.
-            endLine = ToolJson.AsNumber(startLine) is { } start && ToolJson.AsNumber(limit) is { } count ? ToolJson.JsNumber(start + count - 1) : "NaN";
-            if (endLine == "0") endLine = "";
-        }
-        return theme.Fg("warning", $":{ToolJson.Template(startLine)}{(endLine.Length > 0 ? "-" + endLine : "")}");
+        var range = RenderUtils.FormatReadLineRange(ToolJson.Get(args, "offset"), ToolJson.Get(args, "limit"));
+        return range.Length > 0 ? theme.Fg("warning", range) : "";
     }
 
     private static string FormatReadCall(JsonNode? args, Theme theme, string cwd)
     {
         var pathDisplay = RenderUtils.RenderToolPath(RenderUtils.Str(ToolJson.Get(args, "file_path") ?? ToolJson.Get(args, "path")), theme, cwd);
-        return theme.Fg("toolTitle", theme.Bold("read")) + " " + pathDisplay + FormatReadLineRange(args, theme);
+        return theme.Fg("toolTitle", theme.Bold("read")) + " " + pathDisplay + StyledReadLineRange(args, theme);
     }
 
     private static List<string> TrimTrailingEmptyLines(IReadOnlyList<string> lines)
@@ -92,13 +81,13 @@ internal static class ReadRenderers
         {
             return theme.Fg("customMessageLabel", "\u001b[1m[skill]\u001b[22m ") +
                 theme.Fg("customMessageText", classification.Label) +
-                FormatReadLineRange(args, theme) +
+                StyledReadLineRange(args, theme) +
                 expandHint;
         }
 
         return theme.Fg("toolTitle", theme.Bold($"read {classification.Kind}")) + " " +
             theme.Fg("accent", classification.Label) +
-            FormatReadLineRange(args, theme) +
+            StyledReadLineRange(args, theme) +
             expandHint;
     }
 

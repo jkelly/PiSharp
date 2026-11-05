@@ -214,14 +214,16 @@ internal static class SessionCompactionIntegrationTests
             }
             case "prepareBranchEntries":
             {
-                var plan = new SessionBranchSummaryPlanner().Prepare(ReadReferenceEntries(args[0]), args[1].GetDouble());
+                var entries = ReadReferenceEntries(args[0]);
+                var plan = new SessionBranchSummaryPlanner().Prepare(entries, args[1].GetDouble());
                 using var frame = ReferenceWrite(writer =>
                 {
                     writer.WriteStartObject(); writer.WritePropertyName("messages"); ReferenceMessages(writer, plan.Messages);
                     writer.WritePropertyName("fileOps"); ReferenceFileOps(writer, plan.FileOps);
                     writer.WriteNumber("totalTokens", plan.TotalTokens); writer.WriteEndObject();
                 });
-                SameReference(call.GetProperty("value"), frame.RootElement, "complete raw branch preparation"); break;
+                using var expected = ReferenceBranchPreparation150(call.GetProperty("value"), entries, args[1].GetDouble());
+                SameReference(expected.RootElement, frame.RootElement, "complete raw branch preparation"); break;
             }
             case "compact":
             case "generateBranchSummary":
@@ -254,6 +256,71 @@ internal static class SessionCompactionIntegrationTests
         writer.WriteNumber("reserveTokens", plan.Settings.ReserveTokens); writer.WriteNumber("keepRecentTokens", plan.Settings.KeepRecentTokens);
         writer.WriteEndObject(); writer.WriteEndObject();
     });
+    /// <summary>
+    /// Pi 1.5.0 prepareBranchEntries (d0fe21308, #11680; core.branch-summary-context-edits) applies the latest context edit for each
+    /// message entry through projectContextEntry, as live context and compaction do. The pinned v0.99.1 capture predates it, so its raw
+    /// preparation is adjusted to v1.5.0 here (an authored delta, not a capture; it agrees with the bridge's v1.5.0
+    /// branch-summarization.mjs on both captured calls): the edited message's content is replaced, its tool calls no longer contribute
+    /// file operations (utils.ts extractFileOpsFromMessage), and its estimate (compaction.ts estimateTokens, ceil(chars / 4)) changes.
+    /// Only the edit shape the capture holds is covered; any other refuses rather than passing unadjusted.
+    /// </summary>
+    private static JsonDocument ReferenceBranchPreparation150(JsonElement captured, ImmutableArray<SessionEntry> entries, double budget)
+    {
+        var edits = new Dictionary<string, JsonElement>(StringComparer.Ordinal);
+        foreach (var entry in entries)
+            if (entry.Kind == SessionEntryKind.ContextEdit) edits[entry.WireBody.Value.GetProperty("targetId").GetString()!] = entry.WireBody.Value.GetProperty("replacement");
+        var value = JsonNode.Parse(captured.GetRawText())!.AsObject();
+        if (edits.Count != 0)
+        {
+            Check(entries.All(entry => entry.Kind != SessionEntryKind.BranchSummary), "A captured branch summary's file details are outside the authored v1.5.0 delta.");
+            var messages = value["messages"]!.AsArray(); var total = value["totalTokens"]!.GetValue<double>();
+            var calls = new List<(string Name, string Path)>(); var edited = new List<JsonNode>();
+            foreach (var (target, replacement) in edits)
+            {
+                var entry = entries.Single(candidate => candidate.Id == target);
+                var original = entry.WireBody.Value.GetProperty("message");
+                Check(entry.Kind == SessionEntryKind.Message && original.GetProperty("role").GetString() == "assistant" &&
+                    replacement.ValueKind == JsonValueKind.Object && replacement.GetProperty("content").ValueKind == JsonValueKind.Array,
+                    "A captured context edit is outside the authored v1.5.0 branch preparation delta.");
+                var message = JsonNode.Parse(original.GetRawText())!.AsObject();
+                message["content"] = JsonNode.Parse(replacement.GetProperty("content").GetRawText()); edited.Add(message);
+                calls.AddRange(FileCalls(original));
+                var index = Enumerable.Range(0, messages.Count).Where(i => ReferenceJsonEqual(JsonSerializer.SerializeToElement(messages[i]), original)).ToArray();
+                using var replaced = JsonDocument.Parse(message.ToJsonString());
+                if (index.Length == 1) { messages[index[0]] = message; total += AssistantTokens(replaced.RootElement) - AssistantTokens(original); }
+                // A message the budget left out stays out: the budget case's walk stops at it either way.
+                else Check(index.Length == 0 && messages.Count == 0 && budget > 0 && AssistantTokens(replaced.RootElement) > budget,
+                    "An edit changed which captured messages fit the branch budget.");
+            }
+            value["totalTokens"] = total;
+            var remaining = messages.Select(message => JsonSerializer.SerializeToElement(message)).Concat(edited.Select(message => JsonSerializer.SerializeToElement(message)))
+                .SelectMany(FileCalls).ToHashSet();
+            foreach (var (name, path) in calls.Where(call => !remaining.Contains(call)))
+            {
+                var list = value["fileOps"]![name switch { "read" => "read", "write" => "written", _ => "edited" }]!.AsArray();
+                var at = list.Select(item => item!.GetValue<string>()).ToList().IndexOf(path);
+                Check(at >= 0, "The capture did not track an edited call's file."); list.RemoveAt(at);
+            }
+        }
+        return JsonDocument.Parse(value.ToJsonString(), new JsonDocumentOptions { MaxDepth = 128 });
+
+        static IEnumerable<(string Name, string Path)> FileCalls(JsonElement message) =>
+            message.GetProperty("role").GetString() != "assistant" || message.GetProperty("content").ValueKind != JsonValueKind.Array ? [] :
+            message.GetProperty("content").EnumerateArray().Where(block => block.GetProperty("type").GetString() == "toolCall" &&
+                block.GetProperty("name").GetString() is "read" or "write" or "edit" && block.TryGetProperty("arguments", out var arguments) &&
+                arguments.ValueKind == JsonValueKind.Object && arguments.TryGetProperty("path", out var path) && path.ValueKind == JsonValueKind.String &&
+                path.GetString()!.Length > 0)
+            .Select(block => (block.GetProperty("name").GetString()!, block.GetProperty("arguments").GetProperty("path").GetString()!));
+        static double AssistantTokens(JsonElement message) => Math.Ceiling(message.GetProperty("content").EnumerateArray().Sum(block =>
+            block.GetProperty("type").GetString() switch
+            {
+                "text" => block.GetProperty("text").GetString()!.Length,
+                "thinking" => block.GetProperty("thinking").GetString()!.Length,
+                "toolCall" => block.GetProperty("name").GetString()!.Length + JsonSerializer.Serialize(block.GetProperty("arguments"),
+                    new JsonSerializerOptions { Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping }).Length,
+                _ => 0
+            }) / 4.0);
+    }
     private static void ReferenceFileOps(Utf8JsonWriter writer, SessionFileOperations operations)
     {
         writer.WriteStartObject(); Strings("read", operations.Read); Strings("written", operations.Written); Strings("edited", operations.Edited); writer.WriteEndObject();
@@ -268,13 +335,19 @@ internal static class SessionCompactionIntegrationTests
         await CreateReferenceFile(files.A, manager);
         var captured = raw.GetProperty("pureCalls").EnumerateArray().Single(row =>
             row.GetProperty("value").GetProperty("api").GetString() == "compact").GetProperty("value");
-        var expected = raw.GetProperty("operationReturns").EnumerateArray().Last().GetProperty("value").GetProperty("returnedEntry");
+        var capturedEntry = raw.GetProperty("operationReturns").EnumerateArray().Last().GetProperty("value").GetProperty("returnedEntry");
+        var compactionId = capturedEntry.GetProperty("id").GetString()!;
+        // This case splits a turn: its checkpoint sums the history and turn-prefix usage (ReferenceMergedUsage150).
+        Check(raw.GetProperty("streamCalls").GetArrayLength() == 2, "The split-turn capture changed.");
+        using var expectedEntry = ReferenceMergedUsage150(capturedEntry, compactionId); var expected = expectedEntry.RootElement;
+        using var expectedUsage = ReferenceMergedUsage150(captured.GetProperty("value").GetProperty("usage"), null);
         var author = new Author
         {
             PlannedId = expected.GetProperty("id").GetString(),
             PlannedTimestamp = DateTimeOffset.Parse(expected.GetProperty("timestamp").GetString()!, CultureInfo.InvariantCulture).ToUnixTimeMilliseconds()
         };
-        var script = new Script(); var streams = raw.GetProperty("streamCalls").EnumerateArray().Select(row => row.GetProperty("value")).ToArray();
+        var script = new Script();
+        var streams = ReferenceRequests150(raw.GetProperty("streamCalls").EnumerateArray().Select(row => row.GetProperty("value")), captured.GetProperty("args")[2].GetString());
         var generator = new ReferenceGenerator(streams, manager.GetProperty("sessionId").GetString()!);
         SessionSummaryCheckpointReceipt receipt;
         await using (var session = await OpenReferenceSession(files.A, author, script, NullableString(manager.GetProperty("leafId"))))
@@ -289,7 +362,7 @@ internal static class SessionCompactionIntegrationTests
             finally { generator.ThrowIfComparisonFailed(); }
             SummaryCheckpoint(receipt);
             SameReference(expected, receipt.Entry.WireBody.Value, "actual coordinator complete source-authored checkpoint");
-            SameReference(captured.GetProperty("value").GetProperty("usage"), receipt.Entry.WireBody.Value.GetProperty("usage"), "complete merged usage and optional splits");
+            SameReference(expectedUsage.RootElement, receipt.Entry.WireBody.Value.GetProperty("usage"), "complete merged usage and optional splits");
             SameReference(captured.GetProperty("value").GetProperty("details"), receipt.Entry.WireBody.Value.GetProperty("details"), "complete generated details");
             Equal(captured.GetProperty("value").GetProperty("summary").GetString(), receipt.Entry.WireBody.Value.GetProperty("summary").GetString());
             Equal(2, generator.Index); Equal(2, generator.Disposals); Equal(0, script.Requests.Count);
@@ -299,9 +372,9 @@ internal static class SessionCompactionIntegrationTests
         {
             Equal(receipt.Entry.Id, reopened.Snapshot.Context.LeafId);
             SameReference(expected, reopened.Snapshot.Log.ById[receipt.Entry.Id].WireBody.Value, "actual generated close/reopen checkpoint");
-            var sourceReopened = raw.GetProperty("checkpoints").EnumerateArray().Last().GetProperty("value").GetProperty("manager");
+            using var sourceReopened = ReferenceMergedUsage150(raw.GetProperty("checkpoints").EnumerateArray().Last().GetProperty("value").GetProperty("manager"), compactionId);
             using var frame = ReferenceManagerFrame(reopened.Snapshot.Log.Header, reopened.Snapshot.Log.Entries, reopened.Snapshot.Context);
-            foreach (var field in ReferenceManagerFields) SameReference(sourceReopened.GetProperty(field), frame.RootElement.GetProperty(field), "actual generated reopened " + field);
+            foreach (var field in ReferenceManagerFields) SameReference(sourceReopened.RootElement.GetProperty(field), frame.RootElement.GetProperty(field), "actual generated reopened " + field);
         }
     }
 
@@ -312,7 +385,8 @@ internal static class SessionCompactionIntegrationTests
         var author = new Author(); var script = new Script();
         await using var session = await OpenReferenceSession(files.A, author, script, NullableString(manager.GetProperty("leafId")));
         var pure = raw.GetProperty("pureCalls").EnumerateArray().Select(row => row.GetProperty("value")).ToArray();
-        var streams = raw.GetProperty("streamCalls").EnumerateArray().Select(row => row.GetProperty("value")).ToArray();
+        // No /compact instructions here: only the maxTokens delta applies (ReferenceRequests150).
+        var streams = ReferenceRequests150(raw.GetProperty("streamCalls").EnumerateArray().Select(row => row.GetProperty("value")), null);
         var sourceBranchRoutes = streams.Where(stream => stream.GetProperty("name").GetString()!.StartsWith("branch-", StringComparison.Ordinal))
             .Select(stream => stream.GetProperty("options").GetProperty("sessionId").GetString()!).ToArray();
         Equal(sourceBranchRoutes.Length, sourceBranchRoutes.Distinct(StringComparer.Ordinal).Count());
@@ -322,7 +396,8 @@ internal static class SessionCompactionIntegrationTests
         foreach (var field in new[] { "maxTokens", "prompt" })
         {
             var mutation = JsonNode.Parse(streams.First(stream => stream.GetProperty("name").GetString() == "compact-error").GetRawText())!;
-            if (field == "maxTokens") mutation["options"]!["maxTokens"] = mutation["options"]!["maxTokens"]!.GetValue<int>() + 1;
+            // Pi 1.5.0's expected cap is the request model's maxTokens (ReferenceRequests150), so that is what the control mutates.
+            if (field == "maxTokens") mutation["model"]!["maxTokens"] = mutation["model"]!["maxTokens"]!.GetValue<int>() + 1;
             else mutation["context"]!["messages"]![1]!["content"]![0]!["text"] = "authored request comparison mutation";
             using var changed = JsonDocument.Parse(mutation.ToJsonString());
             var control = new ReferenceGenerator([changed.RootElement], session.Snapshot.Log.Header.Id);
@@ -457,6 +532,59 @@ internal static class SessionCompactionIntegrationTests
             }
         }
     }
+    /// <summary>
+    /// The pinned v0.99.1 capture's summary requests as Pi 1.5.0 makes them (authored deltas, not a capture):
+    /// <list type="bullet">
+    /// <item>Compaction, turn-prefix and branch summaries set no maxTokens (6fcb48670, #11036; core.summaries-model-output-limit), where
+    /// v0.99.1 sent 0.8 and 0.5 times reserveTokens and 4096, each capped at model.maxTokens. pi-ai's buildBaseOptions then sizes the
+    /// output from the model (simple-options.ts <c>options?.maxTokens ?? model.maxTokens</c>, clamped to the context), so
+    /// options.maxTokens is removed and the request model's maxTokens is the cap the native request must name.</item>
+    /// <item>A split turn's prefix summary is focused by the /compact instructions too (adfc14461; core.compact-instructions-split-turn):
+    /// compaction.ts generateTurnPrefixSummary appends "\n\nAdditional focus: " and the instructions to its prompt.</item>
+    /// </list>
+    /// </summary>
+    private static JsonElement[] ReferenceRequests150(IEnumerable<JsonElement> streams, string? instructions) => streams.Select(stream =>
+    {
+        var node = JsonNode.Parse(stream.GetRawText(), null, new JsonDocumentOptions { MaxDepth = 128 })!;
+        Check(node["options"]!.AsObject().Remove("maxTokens"), "A captured v0.99.1 summary request lost its maxTokens.");
+        var prompt = node["context"]!["messages"]![1]!["content"]![0]!; var text = prompt["text"]!.GetValue<string>();
+        if (!string.IsNullOrEmpty(instructions) && text.StartsWith("# Conversation\n", StringComparison.Ordinal))
+            prompt["text"] = text + "\n\nAdditional focus: " + instructions;
+        using var document = JsonDocument.Parse(node.ToJsonString(new JsonSerializerOptions { MaxDepth = 128 }), new JsonDocumentOptions { MaxDepth = 128 });
+        return document.RootElement.Clone();
+    }).ToArray();
+
+    /// <summary>
+    /// Pi 1.5.0 usage-totals.ts combineUsage (7c22a93d0, #11178; ai.usage-total-from-provider) ends a summed cost with
+    /// totalFromProvider, true only when both parts were provider-reported. A split turn's compaction sums its history and turn-prefix
+    /// usage (compaction.ts compact), so the v1.5.0 checkpoint's usage.cost carries totalFromProvider: false where the v0.99.1 capture
+    /// has none (an authored delta, not a capture). With <paramref name="compactionId"/> the delta applies to that compaction entry
+    /// wherever it appears; without, <paramref name="captured"/> is the summed usage itself.
+    /// </summary>
+    private static JsonDocument ReferenceMergedUsage150(JsonElement captured, string? compactionId)
+    {
+        var node = JsonNode.Parse(captured.GetRawText(), null, new JsonDocumentOptions { MaxDepth = 128 })!; var patched = 0;
+        if (compactionId is null) Patch(node.AsObject()); else Visit(node);
+        Check(patched > 0, "The captured split-turn checkpoint usage was not found.");
+        return JsonDocument.Parse(node.ToJsonString(new JsonSerializerOptions { MaxDepth = 128 }), new JsonDocumentOptions { MaxDepth = 128 });
+
+        void Visit(JsonNode? value)
+        {
+            if (value is JsonArray array) foreach (var item in array) Visit(item);
+            else if (value is JsonObject obj)
+            {
+                if (obj["type"]?.GetValueKind() == JsonValueKind.String && obj["type"]!.GetValue<string>() == "compaction" &&
+                    obj["id"]?.GetValueKind() == JsonValueKind.String && obj["id"]!.GetValue<string>() == compactionId) Patch(obj["usage"]!.AsObject());
+                else foreach (var (_, child) in obj) Visit(child);
+            }
+        }
+        void Patch(JsonObject usage)
+        {
+            var cost = usage["cost"]!.AsObject();
+            Check(!cost.ContainsKey("totalFromProvider"), "The v0.99.1 capture already records totalFromProvider."); cost["totalFromProvider"] = false; patched++;
+        }
+    }
+
     private static (string Source, string Native) CompareReferenceRequest(JsonElement source, SessionSummaryRequest request, string activeSessionId)
     {
         var messages = source.GetProperty("context").GetProperty("messages");
@@ -464,7 +592,10 @@ internal static class SessionCompactionIntegrationTests
         Equal(messages[0].GetProperty("content").GetString(), request.SystemPrompt);
         Check(messages[1].GetProperty("content")[0].GetProperty("text").GetString() == request.Prompt, "Complete source/native request differs at prompt.");
         var options = source.GetProperty("options");
-        Check(options.GetProperty("maxTokens").GetDouble() == request.MaximumOutputTokens, "Complete source/native request differs at maxTokens.");
+        // Pi 1.5.0 summaries send no maxTokens (ReferenceRequests150 removes the capture's): the output is sized from the model's own
+        // maxTokens, which the native request names exactly, since every caller here passes the model's maximum.
+        Check(!options.TryGetProperty("maxTokens", out _) &&
+            request.MaximumOutputTokens == source.GetProperty("model").GetProperty("maxTokens").GetDouble(), "Complete source/native request differs at maxTokens.");
         Equal(options.GetProperty("cacheRetention").GetString(), request.CacheRetention);
         var sourceRoute = options.GetProperty("sessionId").GetString()!;
         if (request.Kind == SessionSummaryKind.Branch)
@@ -811,8 +942,10 @@ internal static class SessionCompactionIntegrationTests
             collected.Entries.All(entry => entry.Id != "old-user" && entry.Id != "sibling"), "Raw abandoned ancestry/common ancestor was wrong.");
         var prepared = planner.Prepare(collected.Entries, 0, collected.CommonAncestorId);
         Check(prepared.Messages.All(message => message.Role != "toolResult"), "Source branch preparation includes tool results.");
-        Check(prepared.Messages.Any(message => HasCall(message, "authored-call")), "Raw branch preparation silently applied active context edits.");
-        Check(prepared.FileOps.Read.Contains("read-only.txt"), "Raw abandoned call was not tracked.");
+        // Pi 1.5.0 prepareBranchEntries applies the latest context edit per target (projectContextEntry), as live context does.
+        Check(!prepared.Messages.Any(message => HasCall(message, "authored-call")) &&
+            prepared.Messages.Any(message => message.WireBody.ToString().Contains("edited branch call", StringComparison.Ordinal)), "Branch preparation ignored the active context edit.");
+        Check(!prepared.FileOps.Read.Contains("read-only.txt"), "Edited abandoned call was still tracked.");
         var active = new SessionCompactionPlanner().Prepare(session.Snapshot.Context, new(true, 128, 0))!;
         Check(!active.FileOps.Read.Contains("read-only.txt"), "Edited compaction input accidentally shared raw branch preparation.");
         Check(planner.Collect(entries, null, "sibling").Entries.IsEmpty, "Absent previous leaf manufactured abandoned entries.");
@@ -873,10 +1006,12 @@ internal static class SessionCompactionIntegrationTests
         Check(request.Prompt.StartsWith("<conversation>\n", StringComparison.Ordinal) && request.Prompt.EndsWith("\n\nAdditional focus: " + instructions, StringComparison.Ordinal), "History instructions escaped the declared prompt-data envelope.");
         Check(request.SystemPrompt.Contains("Do NOT continue the conversation", StringComparison.Ordinal), "Summary request lost its separate system instructions.");
         var prefix = SessionSummaryRequestBuilder.TurnPrefix(plan, Model, "source", options with { ModelMaximumTokens = 0 });
-        Equal(64d, prefix.MaximumOutputTokens); Check(prefix.Prompt.StartsWith("# Conversation\n", StringComparison.Ordinal), "Turn-prefix request lost source framing.");
+        Equal<double?>(null, prefix.MaximumOutputTokens); Check(prefix.Prompt.StartsWith("# Conversation\n", StringComparison.Ordinal), "Turn-prefix request lost source framing.");
+        // Pi 1.5.0 generateTurnPrefixSummary: the /compact instructions focus the split turn's prefix too.
+        Check(prefix.Prompt.EndsWith("\n\nAdditional focus: " + instructions, StringComparison.Ordinal), "Turn-prefix request dropped the compact instructions.");
         var branch = new SessionBranchSummaryPlanner().Prepare(session.Snapshot.Log.Entries.Where(entry => entry.Id is "old-user" or "old-answer").ToImmutableArray());
         var branchRequest = SessionSummaryRequestBuilder.Branch(branch, Model, "authored-routing-id", options with { ReplaceBranchInstructions = true });
-        Equal<string?>(null, branchRequest.ThinkingLevel); Equal(50d, branchRequest.MaximumOutputTokens);
+        Equal<string?>("high", branchRequest.ThinkingLevel); Equal(50d, branchRequest.MaximumOutputTokens);
         Check(branchRequest.Prompt.EndsWith("</conversation>\n\n" + instructions, StringComparison.Ordinal), "Replace-branch instructions silently retained the default branch prompt.");
         Check(SessionSummaryRequestBuilder.History(plan, Model, "source", new(CustomInstructions: new string('a', 65_536))).Prompt.Length > 65_536, "Exact custom-instruction bound was not exercised.");
         Equal(SessionCompactionFailure.ResourceLimit, ThrowsSync<SessionCompactionException>(() => SessionSummaryRequestBuilder.History(plan, Model, "source", new(CustomInstructions: new string('a', 65_537)))).Failure);

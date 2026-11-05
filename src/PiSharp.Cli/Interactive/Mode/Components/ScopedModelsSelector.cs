@@ -19,8 +19,10 @@ internal sealed record ModelsCallbacks(
 
 /// <summary>Component for enabling/disabling models for Ctrl+P cycling. Changes are session-only until explicitly persisted with
 /// Ctrl+S.</summary>
-internal sealed class ScopedModelsSelectorComponent : Container, IFocusable, IInputHandler
+internal sealed class ScopedModelsSelectorComponent : Container, IComponent, IFocusable, IInputHandler
 {
+    /// <summary>Fullscreen viewport keys (PageUp/PageDown) reach the selector, not the transcript.</summary>
+    public bool CapturesViewportInput => true;
     // EnabledIds: null = all enabled (no filter), list = explicit ordered list
 
     private static bool IsEnabled(List<string>? enabledIds, string id) => enabledIds is null || enabledIds.Contains(id);
@@ -229,9 +231,11 @@ internal sealed class ScopedModelsSelectorComponent : Container, IFocusable, IIn
             var id = item.Model is { } model ? ModelJson.Id(model) : item.FullId;
             var styledId = item.Model is not null ? id : theme.Strikethrough(id);
             var modelText = isSelected ? theme.Fg("accent", styledId) : styledId;
+            var name = item.Model is { } named ? ModelSearch.GetDistinctModelName(ModelJson.Id(named), ModelJson.Name(named)) : null;
+            var nameText = name is not null ? theme.Fg("muted", $" ({name})") : "";
             var providerBadge = theme.Fg("muted", item.Model is not null ? $" [{ModelJson.Provider(item.Model)}]" : " [unavailable]");
             var status = item.Model is not null && item.Enabled ? theme.Fg("accent", "✓ ") : "  ";
-            listContainer.AddChild(new Text($"{prefix}{status}{modelText}{providerBadge}", 0, 0));
+            listContainer.AddChild(new Text($"{prefix}{status}{modelText}{nameText}{providerBadge}", 0, 0));
         }
 
         // Add scroll indicator if needed
@@ -270,6 +274,13 @@ internal sealed class ScopedModelsSelectorComponent : Container, IFocusable, IIn
         {
             if (filteredItems.Count == 0) return;
             selectedIndex = selectedIndex == filteredItems.Count - 1 ? 0 : selectedIndex + 1;
+            UpdateList();
+            return;
+        }
+        if (KeybindingsManager.GetSelectPageIndex(kb, data, selectedIndex, filteredItems.Count, maxVisible) is { } pageIndex)
+        {
+            if (filteredItems.Count == 0) return;
+            selectedIndex = pageIndex;
             UpdateList();
             return;
         }

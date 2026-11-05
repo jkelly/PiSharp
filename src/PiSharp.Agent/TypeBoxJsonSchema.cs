@@ -2,6 +2,7 @@
 // TypeBox schemas with repeated parts moved to $defs) and the TypeBox 1.3.27 Compile(schema).Check/Errors that model-config.ts,
 // keybindings.ts and theme-schema.ts run.
 using System.Text.Json.Nodes;
+using PiSharp.Contracts.Schema;
 
 namespace PiSharp.Agent;
 

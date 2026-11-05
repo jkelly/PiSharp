@@ -17,7 +17,7 @@ internal static class MistralReplayTests
         ("mistral-replay orphan repair closes at user assistant and EOF without duplicate results", OrphanBoundaries),
         ("mistral-replay failed assistants are omitted before provider and never create new synthetic results", FailedAssistants),
         ("mistral-replay same model IDs retained foreign IDs normalized and results linked", Identity),
-        ("mistral-replay foreign thinking converted redaction dropped same model thinking retained", Thinking),
+        ("mistral-replay foreign thinking dropped redaction dropped same model thinking retained", Thinking),
         ("mistral-replay null content normalized and ECMAScript arguments serialized without mutation", NullAndArguments),
         ("mistral-replay Simple model compat selects collapse or original system update path", SimpleCompat),
         ("mistral-replay refused transcript bounds precede hooks and HTTP without mutation", Bounds)
@@ -108,9 +108,12 @@ internal static class MistralReplayTests
                 new JsonObject { ["type"] = "thinking", ["thinking"] = "redacted", ["redacted"] = true },
                 new JsonObject { ["type"] = "thinking", ["thinking"] = "", ["thinkingSignature"] = "opaque" });
             var wire = (await Capture([User(), Assistant(blocks, same, "stop")])).Value;
-            var content = wire.GetProperty("messages")[1].GetProperty("content").EnumerateArray().ToArray();
-            Check(same ? content.Length == 2 && content.All(part => part.GetProperty("type").GetString() == "thinking") :
-                content.Length == 1 && content[0].GetProperty("type").GetString() == "text" && content[0].GetProperty("text").GetString() == "ordinary");
+            // Pi 1.5.0 transformMessages drops every thinking block from another model (1.2.0 converted readable ones to text), so the
+            // foreign reply is left empty and the Mistral converter omits it.
+            var messages = wire.GetProperty("messages").EnumerateArray().ToArray();
+            if (!same) { Check(messages.Length == 1 && messages[0].GetProperty("role").GetString() == "user"); continue; }
+            var content = messages[1].GetProperty("content").EnumerateArray().ToArray();
+            Check(content.Length == 2 && content.All(part => part.GetProperty("type").GetString() == "thinking"));
         }
     }
     private static async Task NullAndArguments()

@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): coding-agent/src/core/footer-data-provider.ts.
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): coding-agent/src/core/footer-data-provider.ts.
 // Also ports closeWatcher, FS_WATCH_RETRY_DELAY_MS and watchWithErrorHandler (coding-agent/src/utils/fs-watch.ts). Filesystem,
 // git process, timer and environment access go through FooterDataProviderHost so tests can drive watchers and the debounce clock.
 using System.Diagnostics;

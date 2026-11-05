@@ -24,6 +24,9 @@ internal delegate Task<string?> PiSessionSelector(ImmutableArray<PiSessionInfo> 
 internal sealed record PiHost
 {
     internal required string Cwd { get; init; }
+    /// <summary>The process's working directory no longer exists (<see cref="PiCommand.ReadCwd"/> found none); <see cref="Cwd"/> is
+    /// empty and every command but <c>auth</c> ends with main.ts's error.</summary>
+    internal bool CwdMissing { get; init; }
     internal required string Home { get; init; }
     internal required Func<string, string?> GetEnvironment { get; init; }
     internal Action<string, string?> SetEnvironment { get; init; } = (_, _) => { };
@@ -68,6 +71,10 @@ internal sealed record PiHost
     internal Func<TextWriter, TextWriter, PiSharp.Cli.Packages.PiPackageProcesses>? PackageProcesses { get; init; }
     /// <summary>Adjusts the <c>mcp</c> command's collaborators (tests: fake channels and stores); null keeps the defaults.</summary>
     internal Func<McpCommandOptions, McpCommandOptions>? ConfigureMcp { get; init; }
+    /// <summary>The release check of <c>pisharp update</c> with a configured self-update command (tests: a fake NuGet); null uses the
+    /// shared client and <see cref="PiSharp.Cli.Interactive.Mode.Utilities.VersionCheck.DefaultNuGetBaseUrl"/>.</summary>
+    internal HttpMessageInvoker? VersionCheckHttp { get; init; }
+    internal string? NuGetBaseUrl { get; init; }
 }
 
 /// <summary>An exit decided by the entry after its messages were written.</summary>
@@ -88,6 +95,17 @@ internal static class PiCommand
         if (global["httpProxy"] is JsonValue proxyValue && proxyValue.TryGetValue<string>(out var proxy) && PiArgs.JsTrim(proxy) is { Length: > 0 } trimmedProxy)
             foreach (var name in new[] { "HTTP_PROXY", "HTTPS_PROXY" })
                 if (host.GetEnvironment(name) is null) host.SetEnvironment(name, trimmedProxy);
+    }
+
+    internal const string DeletedCwdMessage = "Error: The current working directory no longer exists. Change to an existing directory and try again.";
+
+    /// <summary>Source main.ts (Pi 1.5.0): the first <c>process.cwd()</c>, null when the directory no longer exists (ENOENT, which .NET
+    /// reports as a missing file or directory on Linux and macOS; Windows does not let a process's directory be deleted). Other errors
+    /// propagate.</summary>
+    internal static string? ReadCwd(Func<string> read)
+    {
+        try { return read(); }
+        catch (Exception error) when (error is FileNotFoundException or DirectoryNotFoundException) { return null; }
     }
 
     internal static async Task<int> RunAsync(string[] args, PiHost host, CancellationToken cancellationToken)
@@ -115,6 +133,7 @@ internal static class PiCommand
         var offline = args.Contains("--offline") || IsTruthyEnvFlag(host.GetEnvironment("PI_OFFLINE"));
         if (offline) { host.SetEnvironment("PI_OFFLINE", "1"); host.SetEnvironment("PI_SKIP_VERSION_CHECK", "1"); }
         if (args.Length > 0 && args[0] == "auth") return await PiAuthCommand.RunAsync(args, host, token).ConfigureAwait(false);
+        if (host.CwdMissing) { await Line(err, Paint(Red, DeletedCwdMessage)).ConfigureAwait(false); return 1; }
         // main.ts: the bootstrap settings (project untrusted) apply the global httpProxy before the package, config and mcp commands.
         ApplyHttpProxy(host, PiSettings.Load(host.Cwd, PiPaths.AgentDirectory(host.GetEnvironment, host.Home), projectTrusted: false).Global);
         if (args.Length > 0 && PackageCommands.Contains(args[0]))
@@ -170,29 +189,31 @@ internal static class PiCommand
 
         if (parsed.Help)
         {
-            await Report(startupDiagnostics).ConfigureAwait(false);
-            // main.ts: help prints after the runtime loaded the extensions (no trust prompt in this pass), listing their flags.
+            // main.ts: help prints after the runtime loaded the extensions (no trust prompt in this pass), listing their flags; the
+            // diagnostics reported first include the runtime's (a configured package that failed to install).
             IReadOnlyList<PiExtensionFlag>? helpFlags = null;
+            PiDiagnostic[] helpDiagnostics = [];
             if (host.LoadExtensions is null)
             {
-                var helpTrusted = parsed.ProjectTrustOverride ?? (!ProjectTrustStore.HasTrustRequiringProjectResources(cwd, home) || new ProjectTrustStore(agentDir, home).Get(cwd) == true);
+                // main.ts createRuntime: the saved decision comes before auto-trust.
+                var helpTrusted = parsed.ProjectTrustOverride ?? new ProjectTrustStore(agentDir, home).Get(cwd) ?? !ProjectTrustStore.HasTrustRequiringProjectResources(cwd, home);
                 await using var helpRun = await PiExtensionRun.LoadAsync(host, parsed, cwd, agentDir, home, helpTrusted, "print", false, null, token).ConfigureAwait(false);
-                helpFlags = helpRun.Host?.Flags;
+                helpFlags = helpRun.Host?.Flags; helpDiagnostics = [.. helpRun.Diagnostics];
             }
+            await Report(Deduplicate([.. startupDiagnostics, .. helpDiagnostics])).ConfigureAwait(false);
             await console.WriteAsync((PiHelp.Text(helpFlags, color: color) + "\n").AsMemory(), token).ConfigureAwait(false);
             await console.FlushAsync(token).ConfigureAwait(false);
             return 0;
         }
         if (parsed.ListModels is { } search)
         {
-            await Report(startupDiagnostics).ConfigureAwait(false);
             // main.ts: --list-models lists the runtime's models after createAgentSessionRuntime loaded the extensions (no trust prompt in
             // this pass): their providers join the registry, and a built-in llama.cpp extension that is not loaded registers none.
             var listRuntime = host.LiveRuntime;
             PiExtensionRun? listRun = null;
             if (host.LoadExtensions is null)
             {
-                var listTrusted = parsed.ProjectTrustOverride ?? (!ProjectTrustStore.HasTrustRequiringProjectResources(cwd, home) || new ProjectTrustStore(agentDir, home).Get(cwd) == true);
+                var listTrusted = parsed.ProjectTrustOverride ?? new ProjectTrustStore(agentDir, home).Get(cwd) ?? !ProjectTrustStore.HasTrustRequiringProjectResources(cwd, home);
                 listRun = await PiExtensionRun.LoadAsync(host, parsed, cwd, agentDir, home, listTrusted, "print", false, null, token).ConfigureAwait(false);
                 PiSharp.Cli.Packages.PiResolvedPaths listPackages;
                 try
@@ -213,6 +234,7 @@ internal static class PiCommand
                 }
             }
             await using var listed = listRun;
+            await Report(Deduplicate([.. startupDiagnostics, .. listRun?.Diagnostics ?? []])).ConfigureAwait(false);
             var registry = await listRuntime.CreateModelRegistryAsync(token).ConfigureAwait(false);
             await PiSharp.Cli.Models.ModelListing.ListAsync(registry, search.Length == 0 ? null : search, console, err, cancellationToken: token).ConfigureAwait(false);
             await console.FlushAsync(token).ConfigureAwait(false);
@@ -669,6 +691,7 @@ internal static class PiCommand
         var request = new SettingsModelSelection(parsed.Provider, parsed.Model, null)
         {
             ModelPatterns = parsed.Models is { } models ? [.. models] : null, CliThinking = parsed.Thinking, UseModelMaximumTokens = true,
+            InlineApiKey = parsed.ApiKey is not null,
             SessionBranch = sessionPath is null ? null : PiSessions.ReadBranch(sessionPath)
         };
         using var warnings = new StringWriter();

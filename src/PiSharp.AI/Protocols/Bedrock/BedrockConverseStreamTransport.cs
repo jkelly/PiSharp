@@ -152,24 +152,36 @@ public sealed partial class BedrockConverseStreamTransport : IChatTransport, ITh
     public async Task<HttpRequestMessage> CreateRequestAsync(ChatRequest request, CancellationToken cancellationToken = default)
     {
         var resolved = await ResolveAsync(cancellationToken).ConfigureAwait(false);
-        var body = Encoding.UTF8.GetBytes(BodyText(BuildBody(request, resolved)));
-        return CreateHttpRequest(resolved, body);
+        var body = Encoding.UTF8.GetBytes(BodyText(BuildBody(request, resolved, false, out _)));
+        return CreateHttpRequest(resolved, body, ClientIdentities.Merge(_options.Identity, request.Identity));
     }
 
     // The SDK's JSON.stringify: a tool call's arguments keep a lone surrogate (name or value) as its escape, at any depth Pi holds.
     private static string BodyText(JsonNode body) => JsonUtf16.ToJsonString(body, System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping);
 
-    private JsonObject BuildBody(ChatRequest request, Resolved resolved)
+    private JsonObject BuildBody(ChatRequest request, Resolved resolved, bool disablePreferredStrictTools, out bool hasPreferredStrictTools)
     {
         var level = request.ThinkingLevel ?? _defaultLevel;
         if (level is not null && !_levels.Contains(level)) throw new ArgumentException("Unsupported Bedrock thinking level.");
         var transcript = ProviderTranscript.Parse(request.Messages);
         var o = resolved.Options;
         var stream = BedrockConverseRequest.Simple(_model, transcript, o, level);
-        return BedrockConverseRequest.Build(_model, request, o, stream, name => Env(o, name), ConfiguredRegion(o) ?? resolved.Region);
+        return BedrockConverseRequest.Build(_model, request, o, stream, name => Env(o, name), ConfiguredRegion(o) ?? resolved.Region,
+            disablePreferredStrictTools, out hasPreferredStrictTools);
     }
 
-    private HttpRequestMessage CreateHttpRequest(Resolved resolved, byte[] body)
+    /// <summary>
+    /// Pi 1.5.0 bedrockUserAgent: the AWS SDK appends <c>[["pi", version]]</c> (short: <c>[["pi"]]</c>; custom: the value) to its own
+    /// User-Agent. PiSharp signs requests itself and has no SDK agent to append to, so the pair is the whole User-Agent
+    /// (<c>pi/1.5.0</c>); it stays outside the SigV4 signed headers.
+    /// </summary>
+    internal static string BedrockUserAgent(ClientIdentity? identity)
+    {
+        var mode = identity?.UserAgent ?? ClientUserAgent.Detailed;
+        return mode.Mode == "custom" ? mode.Value! : mode.Mode == "short" ? "pi" : "pi/" + ClientIdentities.GetClientVersion(identity);
+    }
+
+    private HttpRequestMessage CreateHttpRequest(Resolved resolved, byte[] body, ClientIdentity? identity)
     {
         var basePath = resolved.Endpoint.AbsolutePath.TrimEnd('/');
         // __extendedEncodeURIComponent(modelId): every reserved character, including ":" and "/", is escaped.
@@ -187,7 +199,9 @@ public sealed partial class BedrockConverseStreamTransport : IChatTransport, ITh
             headers.Add(new(name, value));
         }
         var message = new HttpRequestMessage(HttpMethod.Post, uri) { Content = new ByteArrayContent(body), Version = HttpVersion.Version11 };
-        message.Headers.TryAddWithoutValidation("User-Agent", "PiSharp");
+        // A caller User-Agent replaces the identity's.
+        if (!headers.Any(pair => pair.Key.Equals("User-Agent", StringComparison.OrdinalIgnoreCase)))
+            message.Headers.TryAddWithoutValidation("User-Agent", BedrockUserAgent(identity));
         foreach (var (name, value) in headers)
             if (name.Equals("content-type", StringComparison.OrdinalIgnoreCase)) message.Content.Headers.TryAddWithoutValidation("Content-Type", value);
             else if (!message.Headers.TryAddWithoutValidation(name, value)) message.Content.Headers.TryAddWithoutValidation(name, value);
@@ -233,12 +247,28 @@ public sealed partial class BedrockConverseStreamTransport : IChatTransport, ITh
             try
             {
                 var resolved = await ResolveAsync(token).ConfigureAwait(false);
-                var payload = BuildBody(request, resolved);
-                if (_options.OnPayload is { } hook && await hook(JsonData.Parse(BodyText(payload)), request.Model, token).ConfigureAwait(false) is { } replaced)
-                    payload = JsonUtf16.MutableNode(replaced.Value) as JsonObject ?? throw new InvalidOperationException("Bedrock payload must be an object.");
-                var bytes = Encoding.UTF8.GetBytes(BodyText(payload));
-                if (bytes.Length > _options.MaximumPayloadBytes) throw new BedrockServiceException("Error", "Bedrock request exceeds the configured payload limit.") { Modeled = false };
-                response = await SendWithRetriesAsync(resolved, bytes, token).ConfigureAwait(false);
+                for (var disablePreferredStrictTools = false; ; )
+                {
+                    var payload = BuildBody(request, resolved, disablePreferredStrictTools, out var hasPreferredStrictTools);
+                    if (_options.OnPayload is { } hook && await hook(JsonData.Parse(BodyText(payload)), request.Model, token).ConfigureAwait(false) is { } replaced)
+                        payload = JsonUtf16.MutableNode(replaced.Value) as JsonObject ?? throw new InvalidOperationException("Bedrock payload must be an object.");
+                    var bytes = Encoding.UTF8.GetBytes(BodyText(payload));
+                    if (bytes.Length > _options.MaximumPayloadBytes) throw new BedrockServiceException("Error", "Bedrock request exceeds the configured payload limit.") { Modeled = false };
+                    try { response = await SendWithRetriesAsync(resolved, bytes, ClientIdentities.Merge(_options.Identity, request.Identity), token).ConfigureAwait(false); break; }
+                    // Bedrock checks the tool schemas before it starts the stream, so the one retry with strict "prefer" tools sent
+                    // non-strict never repeats streamed output (bedrock_strict_tools_fallback, #11416).
+                    catch (BedrockServiceException rejected) when (!token.IsCancellationRequested && !disablePreferredStrictTools && hasPreferredStrictTools &&
+                        rejected is { Modeled: true, Name: "ValidationException" } && ProviderTranscript.IsStrictToolLimitErrorMessage(rejected.Message))
+                    {
+                        disablePreferredStrictTools = true;
+                        state.AddDiagnostic(new JsonObject
+                        {
+                            ["type"] = "bedrock_strict_tools_fallback", ["timestamp"] = _environment.Time.GetUtcNow().ToUnixTimeMilliseconds(),
+                            ["error"] = new JsonObject { ["message"] = rejected.Message },
+                            ["details"] = new JsonObject { ["reason"] = "strict_tool_limits_exceeded" },
+                        });
+                    }
+                }
                 requestId = Normalize(Header(response, "x-amzn-requestid"));
                 if (_options.OnResponse is { } responseHook) await responseHook(Observation(response), request.Model, token).ConfigureAwait(false);
                 body = await response.Content.ReadAsStreamAsync(token).ConfigureAwait(false);
@@ -274,7 +304,7 @@ public sealed partial class BedrockConverseStreamTransport : IChatTransport, ITh
         yield return state.Fail(failure!, aborted, FormatError(failure!, aborted), aborted ? null : Diagnostic(failure!, requestId));
     }
 
-    private async Task<HttpResponseMessage> SendWithRetriesAsync(Resolved resolved, byte[] body, CancellationToken token)
+    private async Task<HttpResponseMessage> SendWithRetriesAsync(Resolved resolved, byte[] body, ClientIdentity? identity, CancellationToken token)
     {
         var maxAttempts = _options.MaxAttempts ?? (int.TryParse(Env(resolved.Options, "AWS_MAX_ATTEMPTS"), NumberStyles.None, CultureInfo.InvariantCulture, out var configured) && configured > 0 ? configured : 3);
         var random = _options.Random ?? System.Random.Shared.NextDouble;
@@ -283,7 +313,7 @@ public sealed partial class BedrockConverseStreamTransport : IChatTransport, ITh
         {
             token.ThrowIfCancellationRequested();
             HttpResponseMessage? response = null; Exception? error;
-            using (var request = CreateHttpRequest(resolved, body))
+            using (var request = CreateHttpRequest(resolved, body, identity))
             {
                 try
                 {

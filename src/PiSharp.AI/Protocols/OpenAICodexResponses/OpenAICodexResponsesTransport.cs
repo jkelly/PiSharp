@@ -38,8 +38,13 @@ public sealed record OpenAICodexResponsesOptions
     public double? MaxRetryDelayMilliseconds { get; init; }
     /// <summary>Response-header timeout (timeoutMs); null waits indefinitely.</summary>
     public TimeSpan? Timeout { get; init; }
-    public string UserAgent { get; init; } = "pi/1.2.0";
+    /// <summary>An explicit user-agent over the identity's; null (the default) sends the identity's (Pi 1.5.0 getIdentityHeaders).</summary>
+    public string? UserAgent { get; init; }
     public string Originator { get; init; } = "pi";
+    /// <summary>Source StreamOptions.identity (Pi 1.5.0 identity.ts): the user-agent and attribution headers, below the model and
+    /// caller headers; a request's own identity merges over it. Null: a detailed user-agent and no attribution.</summary>
+    [System.Diagnostics.CodeAnalysis.Experimental("PISHARP_IDENTITY001")]
+    public ClientIdentity? Identity { get; init; }
     public Func<TimeSpan, CancellationToken, Task>? Delay { get; init; }
     public TimeProvider? Time { get; init; }
     public Func<JsonData, ModelDescriptor, CancellationToken, ValueTask<JsonData?>>? OnPayload { get; init; }
@@ -209,9 +214,9 @@ public sealed partial class OpenAICodexResponsesTransport : IChatTransport, IThi
 
     /// <summary>buildSSEHeaders: originator and user agent defaults, model then caller headers (null deletes), then the bearer token,
     /// the account id, OpenAI-Beta, accept, content-type and the session headers.</summary>
-    public List<KeyValuePair<string, string>> BuildHeaders(string token, string? sessionId = null)
+    public List<KeyValuePair<string, string>> BuildHeaders(string token, string? sessionId = null, ClientIdentity? identity = null)
     {
-        var headers = BaseHeaders(token);
+        var headers = BaseHeaders(token, identity);
         Set(headers, "openai-beta", "responses=experimental"); Set(headers, "accept", "text/event-stream"); Set(headers, "content-type", "application/json");
         var session = _options.CacheRetention == "none" ? null : ClampCacheKey(_options.SessionId ?? sessionId);
         if (session is not null) { Set(headers, "session-id", session); Set(headers, "x-client-request-id", session); }
@@ -221,22 +226,26 @@ public sealed partial class OpenAICodexResponsesTransport : IChatTransport, IThi
     /// <summary>buildWebSocketHeaders: the base headers without accept, content-type and the caller's OpenAI-Beta, then the WebSocket
     /// beta and the request id as x-client-request-id and session-id. connectWebSocket's delete of "OpenAI-Beta" misses the lowercased
     /// key headersToRecord produces, so the beta header is sent.</summary>
-    public List<KeyValuePair<string, string>> BuildWebSocketHeaders(string token, string requestId)
+    public List<KeyValuePair<string, string>> BuildWebSocketHeaders(string token, string requestId, ClientIdentity? identity = null)
     {
-        var headers = BaseHeaders(token);
+        var headers = BaseHeaders(token, identity);
         Set(headers, "accept", null); Set(headers, "content-type", null); Set(headers, "openai-beta", null);
         Set(headers, "openai-beta", OpenAIBetaResponsesWebSockets);
         Set(headers, "x-client-request-id", requestId); Set(headers, "session-id", requestId);
         return headers;
     }
 
-    /// <summary>buildBaseCodexHeaders: originator and user agent defaults, model then caller headers (null deletes), then the bearer
-    /// token and the account id.</summary>
-    private List<KeyValuePair<string, string>> BaseHeaders(string token)
+    /// <summary>buildBaseCodexHeaders: originator and identity defaults (Pi 1.5.0 <c>{ originator: "pi", ...getIdentityHeaders }</c>,
+    /// the request's identity merged over the configured one), model then caller headers (null deletes), then the bearer token and
+    /// the account id.</summary>
+    private List<KeyValuePair<string, string>> BaseHeaders(string token, ClientIdentity? identity)
     {
         var accountId = ExtractAccountId(token);
         var headers = new List<KeyValuePair<string, string>>();
-        Set(headers, "originator", _options.Originator); Set(headers, "user-agent", _options.UserAgent);
+        Set(headers, "originator", _options.Originator);
+        var baseUrl = _metadata.TryGetProperty("baseUrl", out var configured) && configured.ValueKind == JsonValueKind.String ? configured.GetString()! : DefaultBaseUrl;
+        foreach (var (name, value) in ClientIdentities.HeadersFor(_model.Provider, baseUrl, _options.Identity, identity))
+            Set(headers, name == "User-Agent" ? "user-agent" : name, name == "User-Agent" && _options.UserAgent is { } explicitAgent ? explicitAgent : value);
         foreach (var (name, value) in _options.ModelHeaders ?? ImmutableDictionary<string, string>.Empty) Set(headers, name, value);
         foreach (var (name, value) in _options.Headers ?? ImmutableDictionary<string, string?>.Empty) Set(headers, name, value);
         Set(headers, "authorization", "Bearer " + token); Set(headers, "chatgpt-account-id", accountId);
@@ -270,6 +279,7 @@ public sealed partial class OpenAICodexResponsesTransport : IChatTransport, IThi
         internal int RequestBytes;
         /// <summary>PiSharp-only: the tier this request asked for (ChatRequest.ServiceTier), which prices it.</summary>
         internal string? RequestedTier;
+        internal ClientIdentity? Identity;
     }
 
     private async IAsyncEnumerable<StreamEvent> StreamCore(ChatRequest request, [EnumeratorCancellation] CancellationToken token)
@@ -341,7 +351,7 @@ public sealed partial class OpenAICodexResponsesTransport : IChatTransport, IThi
         var token0 = await _accessToken(token).ConfigureAwait(false);
         if (string.IsNullOrEmpty(token0)) throw new InvalidOperationException($"No API key for provider: {_model.Provider}");
         var accountId = ExtractAccountId(token0);
-        var headers = BuildHeaders(token0, request.SessionId);
+        var headers = BuildHeaders(token0, request.SessionId, request.Identity);
         var body = BuildBody(request);
         if (_options.OnPayload is { } hook && await hook(JsonData.Parse(body.ToJsonString(BodyJson)), _model, token).ConfigureAwait(false) is { } replaced)
             body = JsonNode.Parse(replaced.ToString(), documentOptions: JsonData.DocumentOptions) as JsonObject ?? throw new InvalidOperationException("Codex payload must be an object.");
@@ -351,6 +361,7 @@ public sealed partial class OpenAICodexResponsesTransport : IChatTransport, IThi
         invocation.CacheSessionId = cacheSessionId; invocation.ConfiguredTransport = transport;
         invocation.RequestBytes = Encoding.UTF8.GetByteCount(bodyJson);
         invocation.RequestedTier = request.ServiceTier is { } requestedTier ? ServiceTiers.Codex(requestedTier) : null;
+        invocation.Identity = request.Identity;
         if (transport != "sse")
         {
             if (OpenAICodexWebSockets.IsFallbackActive(cacheSessionId)) OpenAICodexWebSockets.RecordSseFallback(cacheSessionId);

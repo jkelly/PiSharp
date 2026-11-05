@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/tui/src/autocomplete.ts.
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/tui/src/autocomplete.ts.
 // Ported to plain ESM for the PiSharp Node extension bridge (TypeScript types stripped mechanically; behaviour unchanged).
 import { spawn } from "child_process";
 import { readdirSync, statSync } from "fs";
@@ -30,7 +30,7 @@ function escapeRegex(value) {
 function buildFdPathQuery(query) {
     const normalized = toDisplayPath(query);
     if (!normalized.includes("/")) {
-        return normalized;
+        return escapeRegex(normalized);
     }
     const hasTrailingSeparator = normalized.endsWith("/");
     const trimmed = normalized.replace(/^\/+|\/+$/g, "");
@@ -39,9 +39,6 @@ function buildFdPathQuery(query) {
     }
     const separatorPattern = "[\\\\/]";
     const segments = trimmed.split("/").filter(Boolean).map((segment)=>escapeRegex(segment));
-    if (segments.length === 0) {
-        return normalized;
-    }
     let pattern = segments.join(separatorPattern);
     if (hasTrailingSeparator) {
         pattern += separatorPattern;

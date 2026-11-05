@@ -70,6 +70,30 @@ internal static partial class Program
             Equal(0, await lease.Exit.WaitAsync(TimeSpan.FromSeconds(30)), "cat exits once its input reaches EOF");
             Equal("line one\nline two without newline", await stdout.WaitAsync(TimeSpan.FromSeconds(30)), "stdout");
         }),
+        // Node's spawn reports a command that cannot start as an error and runs nothing; the admission launches through /bin/sh (a `cd`
+        // before `exec`), which would run, print its own error and exit 126 (macOS) or 127 (Linux). A missing executable or working
+        // directory is refused before anything is spawned, as NativeProcessRunner refuses it on Windows, so pi.exec resolves "spawn <command>
+        // ENOENT" with code 1 on every platform (ExtensionParity's sync150.native-exec-max-buffer-truncates-stops-and-spawn-errors).
+        ("unix.runner-refuses-a-missing-executable-or-working-directory-before-launching", async () =>
+        {
+            UnixOnly();
+            using var sandbox = new Sandbox("unix-missing");
+            var runner = new UnixProcessRunner(new PosixSpawnProcessAdmission());
+            foreach (var (executable, cwd, diagnostic) in new[]
+            {
+                (Path.Combine(sandbox.Root, "missing-program"), sandbox.Cwd, ProcessDiagnostic.ExecutableUnavailable),
+                ("/bin/sh", Path.Combine(sandbox.Root, "missing-directory"), ProcessDiagnostic.WorkingDirectoryUnavailable),
+            })
+            {
+                var result = await runner.RunSeparatedAsync(new ProcessRequest(executable, [], cwd, UnixEnvironment(),
+                    Path.Combine(sandbox.Root, Guid.NewGuid().ToString("N") + ".spill")));
+                var receipt = result.Process;
+                Equal((ProcessRunStatus.Failed, false, true, (int?)null), (receipt.Status, receipt.ProcessStarted, receipt.CleanupConfirmed, receipt.ExitCode),
+                    diagnostic + ": a refused launch");
+                Equal(diagnostic.ToString(), string.Join(",", receipt.Diagnostics), diagnostic + ": the diagnostic");
+                Equal("", result.StandardError.Content, diagnostic + ": no shell error");
+            }
+        }),
         ("unix.runner-timeout-and-cancel-kill-the-whole-process-group", async () =>
         {
             UnixOnly();

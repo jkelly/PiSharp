@@ -425,7 +425,7 @@ if (SessionCompactionTokenEstimator.ShouldCompact(estimate.Tokens, contextWindow
 {
     var request = SessionSummaryRequestBuilder.History(plan, model, sessionId);
     Console.WriteLine($"summarize {plan.MessagesToSummarize.Length} messages, keep from {plan.FirstKeptEntryId}");
-    Console.WriteLine($"{request.SystemPrompt.Length + request.Prompt.Length} characters, up to {request.MaximumOutputTokens} tokens");
+    Console.WriteLine($"{request.SystemPrompt.Length + request.Prompt.Length} characters, output cap: {request.MaximumOutputTokens?.ToString() ?? "the model's limit"}");
 }
 ```
 
@@ -450,7 +450,7 @@ These match Pi's `compaction` settings.
 | `SessionSummaryRequestBuilder.History`, `.TurnPrefix`, `.Branch` | Build a `SessionSummaryRequest` with Pi's prompts. |
 | `SessionSummaryRequestBuilder.SerializeConversation(messages)` | The conversation as the text Pi summarizes. |
 
-`SessionCompactionPlan` has `FirstKeptEntryId`, `MessagesToSummarize`, `TurnPrefixMessages` and `IsSplitTurn` (a cut in the middle of a turn, which needs a second `TurnPrefix` summary), `TokensBefore`, `PreviousSummary`, `FileOps` and the `Settings` it used. `FileOps.ComputeFileLists()` and `SessionFileOperations.FormatFileOperations` produce the read and modified file lists Pi appends to a summary. `SessionSummaryRequest` has `Kind`, `Model`, `SystemPrompt`, `Prompt`, `MaximumOutputTokens`, `ThinkingLevel`, `SessionId` and `CacheRetention`; `SessionSummaryRequestOptions` adds custom instructions and the model's limits. Failures throw `SessionCompactionException`.
+`SessionCompactionPlan` has `FirstKeptEntryId`, `MessagesToSummarize`, `TurnPrefixMessages` and `IsSplitTurn` (a cut in the middle of a turn, which needs a second `TurnPrefix` summary), `TokensBefore`, `PreviousSummary`, `FileOps` and the `Settings` it used. `FileOps.ComputeFileLists()` and `SessionFileOperations.FormatFileOperations` produce the read and modified file lists Pi appends to a summary. `SessionSummaryRequest` has `Kind`, `Model`, `SystemPrompt`, `Prompt`, `MaximumOutputTokens`, `ThinkingLevel`, `SessionId` and `CacheRetention`; `SessionSummaryRequestOptions` adds custom instructions and the model's limits. As in Pi 1.5.0, a summary has no output budget of its own: `MaximumOutputTokens` is the model's limit from the options, or null, and then the transport applies the model's limit. Failures throw `SessionCompactionException`.
 
 ## List sessions
 

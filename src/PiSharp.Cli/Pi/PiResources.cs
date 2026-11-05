@@ -95,8 +95,8 @@ internal sealed class PiResources
         var commonGitDir = PiPaths.Canonicalize(git.CommonGitDir);
         var worktreeRoot = PiPaths.Canonicalize(git.RepoDir);
         var mainRepoRoot = Path.GetDirectoryName(commonGitDir);
-        if (mainRepoRoot is null || !worktreeRoot.StartsWith(mainRepoRoot + Path.DirectorySeparatorChar, StringComparison.Ordinal)) return null;
-        if (PiPaths.Canonicalize(Path.Join(mainRepoRoot, ".git")) != commonGitDir) return null;
+        if (mainRepoRoot is null || !PiPaths.IsPathWithin(mainRepoRoot, worktreeRoot) || PiPaths.PathsEqual(worktreeRoot, mainRepoRoot)) return null;
+        if (!PiPaths.PathsEqual(PiPaths.Canonicalize(Path.Join(mainRepoRoot, ".git")), commonGitDir)) return null;
         var worktreeContext = LoadContextFileFromDir(worktreeRoot);
         return worktreeContext is null ? null : Path.Join(mainRepoRoot, Path.GetFileName(worktreeContext.Path));
     }
@@ -117,7 +117,7 @@ internal sealed class PiResources
             // Compare the directory's real path, not the file's: a worktree AGENTS.md that symlinks to the main repo's file
             // resolves to the shadowed path itself.
             var isShadowed = shadowed is not null && context is not null &&
-                Path.Join(PiPaths.Canonicalize(current), Path.GetFileName(context.Path)) == shadowed;
+                PiPaths.PathsEqual(Path.Join(PiPaths.Canonicalize(current), Path.GetFileName(context.Path)), shadowed);
             if (context is not null && !isShadowed && seen.Add(context.Path)) ancestors.Insert(0, context);
             var parent = Path.GetDirectoryName(current);
             if (parent is null || parent == current) break;
@@ -230,10 +230,10 @@ internal sealed class PiResources
                 else list.AddRange(CollectTopLevelFiles(Path.Join(agentDir, type), type == "prompts" ? ".md" : ".json").Select(path => new PiResourcePath(path, "user", "auto", false)));
                 list.AddRange(Resolved(request.Packages, type, true));
             }
-            // Source mergePaths(primary, additional): CLI paths last, duplicates (by canonical path) dropped.
+            // Source mergePaths(primary, additional): CLI paths last, duplicates (by getResourcePathKey) dropped.
             list.AddRange(cliPaths.Select(path => new PiResourcePath(PiPaths.IsLocalPath(path) ? PiPaths.ResolvePath(path, cwd, home, trim: true) : path, "temporary", "cli", true)));
             var seen = new HashSet<string>(StringComparer.Ordinal);
-            return [.. list.Where(item => seen.Add(PiPaths.Canonicalize(item.Path)))];
+            return [.. list.Where(item => seen.Add(PiSharp.Cli.Extensions.Pi.PiSourceInfo.ResourcePathKey(item.Path)))];
         }
 
         var skills = Collect("skills", request.CliSkills, request.NoSkills);
@@ -268,10 +268,10 @@ internal sealed class PiResources
         if (discovered.IsEmpty) return resources;
         ImmutableArray<PiResourcePath> Append(ImmutableArray<PiResourcePath> existing, ImmutableArray<PiDiscoveredPath> added)
         {
-            var seen = new HashSet<string>(existing.Select(item => PiPaths.Canonicalize(item.Path)), StringComparer.Ordinal);
+            var seen = new HashSet<string>(existing.Select(item => PiSharp.Cli.Extensions.Pi.PiSourceInfo.ResourcePathKey(item.Path)), StringComparer.Ordinal);
             // buildExtensionResourcePaths: source "extension:<name>", scope temporary, origin top-level.
             return [.. existing, .. added.Select(entry => new PiResourcePath(PiPaths.ResolvePath(entry.Path, cwd, home, trim: true), "temporary", entry.SourceLabel, true))
-                .Where(item => seen.Add(PiPaths.Canonicalize(item.Path)))];
+                .Where(item => seen.Add(PiSharp.Cli.Extensions.Pi.PiSourceInfo.ResourcePathKey(item.Path)))];
         }
         var themePaths = Append(resources.ThemePaths, discovered.ThemePaths);
         var (themes, themeDiagnostics) = LoadThemes(themePaths);

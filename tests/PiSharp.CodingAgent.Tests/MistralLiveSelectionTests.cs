@@ -26,16 +26,28 @@ internal static class MistralLiveSelectionTests
                 Check(selection.Definition.Raw.Value.GetProperty("cost").GetProperty(field).GetDouble() == value.GetProperty("cost").GetProperty(field).GetDouble());
             Check(selection.Definition.DeclaresImageInput == value.GetProperty("input").EnumerateArray().Any(item => item.GetString() == "image")); count++;
         }
-        // The @earendil-works/pi-ai@1.1.0 shard has 40 chat rows; the v0.99.1 source catalog had 32.
-        Check(count == 40); return Task.CompletedTask;
+        // The @earendil-works/pi-ai@1.5.0 shard has 34 chat rows (1.1.0 had 40; the v0.99.1 source catalog had 32).
+        Check(count == 34); return Task.CompletedTask;
     }
     private static async Task Routes()
     {
-        var selected = LiveSessionSelection.Parse("mistral", "open-mistral-7b", "8000");
+        var selected = LiveSessionSelection.Parse("mistral", "open-mistral-nemo", "8000");
         using var handler = new Handler(); var reads = new List<string>();
         using var connection = selected.Connect(new(name => { reads.Add(name); return name == "MISTRAL_API_KEY" ? "fixture-only" : null; }, () => handler));
         var normal = connection.CreateTransport(); var summary = connection.CreateTransport(summary: true);
-        var request = new ChatRequest(selected.Model, [new("user", JsonData.Parse("{\"content\":\"hello\"}"))], 1);
+        // pi-ai 1.5.0 dropped open-mistral-7b, whose 8000-token context made the normal Simple route clamp max_tokens to the room left
+        // (simple-options.ts clampMaxTokensToContext: contextWindow - estimateContextTokens - CONTEXT_SAFETY_TOKENS 4096, at most 3904).
+        // open-mistral-nemo has a 128000-token context: an earlier answer that reports 120000 used tokens (estimateContextTokens starts
+        // from the last usage) leaves the same 3904 tokens of room.
+        var earlier = JsonData.Parse(JsonSerializer.Serialize(new
+        {
+            role = "assistant", provider = selected.Model.Provider, api = selected.Model.Api, model = selected.Model.Id,
+            content = new[] { new { type = "text", text = "earlier" } }, stopReason = "stop", timestamp = 2,
+            usage = new { input = 119_990, output = 10, cacheRead = 0, cacheWrite = 0, totalTokens = 120_000,
+                cost = new { input = 0, output = 0, cacheRead = 0, cacheWrite = 0, total = 0 } }
+        }));
+        var request = new ChatRequest(selected.Model, [new("user", JsonData.Parse("{\"role\":\"user\",\"content\":\"hello\",\"timestamp\":1}")),
+            new("assistant", earlier), new("user", JsonData.Parse("{\"role\":\"user\",\"content\":\"hello\",\"timestamp\":3}"))], 4);
         var normalEvents = await Collect(normal.StreamAsync(request)); var summaryEvents = await Collect(summary.StreamAsync(request));
         Check(normalEvents[^1] is StreamDone && summaryEvents[^1] is StreamDone);
         // Pi 1.1.0 resolution (7b4590d7): the session's environment is read once per provider variable at start, and
@@ -62,7 +74,7 @@ internal static class MistralLiveSelectionTests
     }
     private static async Task ImageRoutes()
     {
-        foreach (var (id, supportsImages) in new[] { ("mistral-large-latest", true), ("open-mistral-7b", false) })
+        foreach (var (id, supportsImages) in new[] { ("mistral-large-latest", true), ("open-mistral-nemo", false) })
         {
             var selected = LiveSessionSelection.Parse("mistral", id, "100");
             Check(selected.Definition.DeclaresImageInput == supportsImages);
@@ -108,7 +120,7 @@ internal static class MistralLiveSelectionTests
     }
     private static Task Refusals()
     {
-        foreach (var (provider, model, max) in new[] { ("mistral", "missing", "100"), ("mistral", "codestral-latest", "8192"), ("mistral", "open-mistral-7b", "0") })
+        foreach (var (provider, model, max) in new[] { ("mistral", "missing", "100"), ("mistral", "codestral-latest", "8192"), ("mistral", "open-mistral-nemo", "0") })
         {
             var refused = false;
             try { LiveSessionSelection.Parse(provider, model, max); } catch (Exception error) when (error is LiveSessionException or SessionCommandException) { refused = true; }

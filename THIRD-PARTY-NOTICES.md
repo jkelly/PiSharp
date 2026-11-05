@@ -1,12 +1,12 @@
 # Third-party notices
 
-The CLI's embedded Models/*.json (all 42 provider catalog shards, amazon-bedrock through zai-coding-cn) are byte-for-byte copies of `package/dist/providers/data/*.json` from the Pi AI 1.2.0 package `@earendil-works/pi-ai@1.2.0` (SHA256 c3e69423bcab9712f31a7e5b6d3448ae356af84439ec6bc701f626f6ea164535, npm integrity sha512-U5/1zXqfV1on7/9sbez03tT4Ru49Lvfb4+zXSDK3DBKF5cRk6KxvAOTOY3HJ4jimlZth+rs7vbJqN6iBQAoNuQ==). Each matches its hash in the package's `providers/data/.manifest.json` (SHA256 a4c0a81f2cc4323b81d4c5d3886b343dc226939168f33e8eb731c928a81cfce9, generatedAt 2026-10-12T22:50:30.032Z); the hashes are recorded in `BuiltinModelCatalog.ShardHashes` and verified before parsing. They replace the earlier openai, openrouter and anthropic shards from the Pi AI 0.99.1 package (SHA256 f9f44692157d0bf5679c4a17304a310028231d7daaeaaea3b73252f4b7a264d3) and the earlier mistral.json copied from the v0.99.1 source catalog. The Pi MIT notice below applies. Catalog metadata is separate from live provider qualification.
+The CLI's embedded Models/*.json (all 42 provider catalog shards, amazon-bedrock through zai-coding-cn) are byte-for-byte copies of `package/dist/providers/data/*.json` from the Pi AI 1.5.0 package `@earendil-works/pi-ai@1.5.0` (SHA256 e320fe7bd2b927782ba9a37d356fe5837f1aa96a46432610e1b3b9ccb748ea5c, npm integrity sha512-VeWxNqTHSqRCf8AcY/6kvNwh+neRL6MPxZPePVztIQy6qqK9MR/YoCSN/ZgDnIyCD3pqEXgRyQbzk4KV4uvjbg==). Each matches its hash in the package's `providers/data/.manifest.json` (SHA256 50e0e74cb54dada0a6972c2619e56e99830ee01857810719b6b913cd29e04e87, generatedAt 2026-11-02T10:43:28.346Z); the hashes are recorded in `BuiltinModelCatalog.ShardHashes` and verified before parsing. They replace the earlier openai, openrouter and anthropic shards from the Pi AI 0.99.1 package (SHA256 f9f44692157d0bf5679c4a17304a310028231d7daaeaaea3b73252f4b7a264d3) and the earlier mistral.json copied from the v0.99.1 source catalog. The Pi MIT notice below applies. Catalog metadata is separate from live provider qualification.
 
 The native parsed Anthropic Messages mapper substantially adapts public Pi `packages/ai/src/api/anthropic-messages.ts`, under the Pi MIT notice below. Authored offline DTO tests establish native behavior separately from genuine provider/SDK reference observations. No Anthropic SDK, Node runtime or network dependency is included in the native mapper.
 
 Native edit matching and replacement substantially adapt public Pi `packages/coding-agent/src/core/tools/edit.ts`, `edit-diff.ts` and `utils/text.ts`, under the Pi MIT notice below. The source hashes are `31a368c14cf5437ecac157765660001b16063302d9bd746303d6d1b1dcb5625d`, `f85a9809eb44b9828236050cf38a8e45933e5cfd583a186e9a0e55a664dd3e8d` and `bb323f9607c499115b532021f4f0163c6df04d834aee9c32c3c77b273bd2d7c6`. Its bounded native Myers formatter is an independently authored algorithm; exact upstream jsdiff formatting remains to be qualified. No Node dependency is bundled with the native edit adapter.
 
-PiSharp's current porting baseline is public Pi version 1.2.0, commit `06a466935536f8c9bcacb2d5efc0fc021be1bdff` (see `compatibility/target.lock.json`). The adaptation records in this file name the upstream version and source hashes each adaptation was derived from; a record is updated when its source is re-ported against the current baseline. Records for version 0.99.1 remain accurate for code that has not been re-ported.
+PiSharp's current porting baseline is public Pi version 1.5.0, commit `f9a26365568127461c47a07a37dcb42c140a3ac5` (see `compatibility/target.lock.json`). The adaptation records in this file name the upstream version and source hashes each adaptation was derived from; a record is updated when its source is re-ported against the current baseline. Records for version 0.99.1 remain accurate for code that has not been re-ported.
 
 PiSharp contracts, assistant stream reduction, parsed Responses text/function mapping, transcript projection, bounded catalog/request construction, append-only loop continuation and tool-batch scheduling substantially adapt public Pi types and behavior from [earendil-works/pi](https://github.com/earendil-works/pi), version 0.99.1, commit `d86654abb8862e201933517d6f1fce9f88dd117f`. Relevant sources are `packages/ai/src/types.ts`, `packages/ai/src/utils/assistant-message-frame.ts`, `packages/ai/src/utils/event-stream.ts`, `packages/ai/src/api/{openai-responses,openai-responses-shared}.ts`, `packages/ai/src/api/transform-messages.ts`, `packages/ai/src/utils/{transcript,text,hash}.ts`, and `packages/agent/src/{agent-loop,types}.ts`. The Responses source SHA-256 is `85db12efcd109d505c98846e34c45cb4a3260edcee88ef28c8afd1db20eac26a`; additional projector source pins are retained in `tools/PiReferenceRunner/responses-replay-lock.json`. The development reference runner imports a separate unmodified public checkout. The following upstream notice is retained for copied or substantially adapted material.
 
@@ -107,11 +107,27 @@ Native shell output sanitizing (`src/PiSharp.Tools/Processes/ShellAnsiText.cs`) 
 
 Both MIT licenses grant the same permissions, under the same conditions, as the Pi MIT notice above.
 
-The CLI ships Pi v1.1.0 `packages/coding-agent/docs/llama-cpp.md` unchanged as `docs/llama-cpp.md` (source `src/PiSharp.Cli/docs/llama-cpp.md`), under the Pi MIT notice above.
+The CLI ships Pi v1.5.0 `packages/coding-agent/docs/llama-cpp.md` unchanged as `docs/llama-cpp.md` (source `src/PiSharp.Cli/docs/llama-cpp.md`), under the Pi MIT notice above.
 
-## Pi v1.2.0 configuration schemas
+## Pi v1.5.0 configuration schemas
 
-`src/PiSharp.CodingAgent/Schemas/{models,settings,keybindings,theme}.schema.json` are byte-for-byte copies of Pi v1.2.0 `packages/coding-agent/schemas/*.schema.json` (commit `06a466935536f8c9bcacb2d5efc0fc021be1bdff`; git blobs `40e27fa3ebee59118b0db6373435479d5fc1baeb`, `81cfc5fb198d0e1bb7dd3fd782dd9553c023f97d`, `aa3b3e9be501475ce465855ee676abe32b8b9c2e` and `95350a58db931d116d982d3212dbfd2c5c946760`), embedded to validate models.json, keybindings and themes, under the Pi MIT notice above. The built-in `dark.json` and `light.json` themes are the v1.2.0 files.
+`src/PiSharp.CodingAgent/Schemas/{models,settings,keybindings,theme}.schema.json` are byte-for-byte copies of Pi v1.5.0 `packages/coding-agent/schemas/*.schema.json` (commit `f9a26365568127461c47a07a37dcb42c140a3ac5`; git blobs `c51a82c358ef1d92d4b2a2481be1e9d37258057e`, `c331ae27a714e2fca19f9bb7b95f67f7f2f6e367`, `aa3b3e9be501475ce465855ee676abe32b8b9c2e` and `95350a58db931d116d982d3212dbfd2c5c946760`; the keybindings and theme schemas are unchanged since v1.2.0), embedded to validate models.json, keybindings and themes, under the Pi MIT notice above. The built-in `dark.json` and `light.json` themes are the v1.2.0 files, unchanged in v1.5.0.
+
+## Pi v1.5.0 JSON Schema validation (pi-schema)
+
+`src/PiSharp.Contracts/Schema/` ports Pi v1.5.0 `packages/schema` (pi-schema, commit `f9a26365568127461c47a07a37dcb42c140a3ac5`), which validates and coerces tool arguments, under the Pi MIT notice above. Its format checks (`SchemaFormats.cs`) are adapted, through pi-schema's `src/formats/typebox/`, from TypeBox 1.3.27, MIT License, Copyright (c) 2017-2026 Haydn Paterson (pi-schema ships the license as `LICENSES/typebox-LICENSE`); the TypeBox 1.3.27 Compile port that `src/PiSharp.Agent/TypeBoxJsonSchema.cs` uses for the configuration files is under the same license. Both MIT licenses grant the same permissions, under the same conditions, as the Pi MIT notice above.
+
+The Node extension bridge carries the same pi-schema package mechanically ported to ESM by `tools/NodeBridge/pi-host/virtual/port-upstream.mjs` (`tools/NodeBridge/pi-host/virtual/schema/`, TypeScript types stripped), with the TypeBox license headers kept in `schema/formats/typebox/`.
+
+The pi-schema suite (`tests/PiSharp.Schema.Tests`, a test project, never packed or shipped) vendors pi-schema's test fixtures unmodified: the JSON-Schema-Test-Suite at commit `3f05891cac5d51ffa068d7076d1372130e00c829` (MIT, Copyright (c) 2012 Julian Berman; `fixtures/json-schema-test-suite/LICENSE`) and the official JSON Schema meta-schemas (`fixtures/meta-schemas/`, published by the JSON Schema organization under AFL-3.0 or BSD-3-Clause).
+
+## Pi v1.5.0 telemetry (pi-telemetry)
+
+`src/PiSharp.Telemetry/` ports Pi v1.5.0 `packages/telemetry` (pi-telemetry, commit `f9a26365568127461c47a07a37dcb42c140a3ac5`): the span, link, carrier and metric contract, typed schemas, the no-op and in-memory adapters, the trace store, `renderTrace` and the adapter conformance kit. `src/PiSharp.AI/Telemetry/AiTelemetry.cs` ports the request tracing of `packages/ai/src/telemetry.ts` from the same commit. Both are under the Pi MIT notice above; pi-telemetry has no dependencies of its own, and nothing in either exports or sends telemetry.
+
+## Pi v1.5.0 Chord v2 (@earendil-works/chord/next)
+
+`src/PiSharp.Chord/` (decision 0013; not packed or shipped) ports Chord v2 from Pi v1.5.0 `packages/chord/src/next/`, the `@earendil-works/chord/next` entry point (commit `f9a26365568127461c47a07a37dcb42c140a3ac5`), under the Pi MIT notice above. It references only `PiSharp.Contracts` and `PiSharp.Telemetry` and bundles no Node package; its suite (`tests/PiSharp.Chord.Tests`, a test project, never packed or shipped) ports the matching tests from `packages/chord/test/next/` and holds upstream's schema-switch fixtures (`packages/chord/test/next/schema/recorded.json` and `stored/`) unchanged, as test input.
 
 ## Anthropic SDK reviewed development oracle
 
@@ -130,6 +146,12 @@ The `read` tool's image decoding, resizing and re-encoding (`src/PiSharp.Tools.S
 ## Syntax highlighting (highlight.js)
 
 Interactive mode highlights code with a C# port of highlight.js 10.7.3 (`src/PiSharp.Cli/Interactive/Mode/Theme/Highlight`; BSD-3-Clause, Copyright (c) 2006, Ivan Sagalaev), the library Pi v1.1.0 `packages/coding-agent/src/utils/syntax-highlight.ts` registers. The engine ports `lib/core.js`; the grammars of every `lib/languages/*.js` are extracted by `tools/HljsGrammars/extract-grammars.mjs` into `hljs-grammars.json.gz` (with V8's case-folding table for case-insensitive patterns), and the output is verified against the original library's (`tests/PiSharp.InteractiveParity.Tests/Highlight`). `HljsTimSort.cs` follows V8's `Array.prototype.sort`. The license text ships as `licenses/highlight.js.LICENSE.txt` (source in `third-party/`).
+
+## HTML export scripts (marked, marked-cjk-friendly, highlight.js)
+
+The HTML session export embeds Pi v1.5.0 `packages/coding-agent/src/core/export-html/vendor/*.min.js` byte-for-byte (`src/PiSharp.CodingAgent/Export/Assets/vendor`, commit `f9a26365568127461c47a07a37dcb42c140a3ac5`): marked v18.0.11 (MIT, Copyright (c) 2018-2026, MarkedJS; Copyright (c) 2011-2018, Christopher Jeffrey; git blob `9b8644b8c2f708da81365ff387d805dedeafd77d`), marked-cjk-friendly v0.1.2 (MIT, Copyright (c) 2024 Tatsunori Uchino, and authors and contributors of original packages; git blob `1931333ed83a86bde59356f4328afe7a450ab096`) and Highlight.js v11.9.0 (BSD-3-Clause, (c) 2006-2023 its contributors). Each file keeps its license header. Both MIT licenses grant the same permissions, under the same conditions, as the Pi MIT notice above.
+
+The Node extension bridge carries marked-cjk-friendly v0.1.2's emphasis tokenizer and CJK character class, de-minified from that file with its copyright and license notice, in `tools/NodeBridge/pi-host/virtual/vendor/marked-cjk-friendly.mjs`.
 
 ## Mermaid diagrams (grok-mermaid)
 

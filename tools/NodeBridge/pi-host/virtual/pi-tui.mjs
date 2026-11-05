@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/tui/src/index.ts.
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/tui/src/index.ts.
 // Ported to plain ESM for the PiSharp Node extension bridge (TypeScript types stripped mechanically; behaviour unchanged).
 export { Marked } from "./vendor/marked.mjs";
 export { CombinedAutocompleteProvider } from "./tui/autocomplete.mjs";
@@ -20,7 +20,7 @@ export { Text } from "./tui/components/text.mjs";
 export { TruncatedText } from "./tui/components/truncated-text.mjs";
 export { VStack } from "./tui/components/v-stack.mjs";
 export { fuzzyFilter, fuzzyMatch } from "./tui/fuzzy.mjs";
-export { getKeybindings, KeybindingsManager, setKeybindings, TUI_KEYBINDINGS } from "./tui/keybindings.mjs";
+export { getKeybindings, getSelectPageIndex, KeybindingsManager, setKeybindings, TUI_KEYBINDINGS } from "./tui/keybindings.mjs";
 export { decodeKittyPrintable, isKeyRelease, isKeyRepeat, isKittyProtocolActive, Key, matchesKey, parseKey, setKittyProtocolActive } from "./tui/keys.mjs";
 export { renderLatex } from "./tui/latex.mjs";
 export { getNativeClipboard } from "./tui/native-platform.mjs";
@@ -33,4 +33,4 @@ export { allocateImageId, calculateImageRows, deleteAllKittyImages, deleteKittyI
 export { Container, CURSOR_MARKER, compositeTuiLine, isFocusable, isViewportTUI, renderFakeCursor } from "./tui/tui.mjs";
 export { TuiAltScreen } from "./tui/tui-alt-screen.mjs";
 export { TuiMainScreen } from "./tui/tui-main-screen.mjs";
-export { getOsc8LinkAtColumn, sliceByColumn, stripTerminalSequences, truncateToWidth, visibleWidth, wrapTextWithAnsi } from "./tui/utils.mjs";
+export { getOsc8LinkAtColumn, replaceControlCharacters, sliceByColumn, stripTerminalSequences, truncateToWidth, visibleWidth, wrapTextWithAnsi } from "./tui/utils.mjs";

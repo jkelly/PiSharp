@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/src/core/bug-report.ts.
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/coding-agent/src/core/bug-report.ts.
 using System.Collections;
 using System.Collections.Immutable;
 using System.Runtime.InteropServices;
@@ -65,8 +65,10 @@ public static class BugReport
 {
     public const string CustomEntryType = "pi.bug-report";
     public const int SchemaVersion = 1;
-    /// <summary>config.ts <c>VERSION</c> of the Pi release PiSharp tracks.</summary>
-    public const string PiVersion = "1.2.0";
+    /// <summary>config.ts <c>VERSION</c> of the Pi release PiSharp tracks (decision 0013, Identity).</summary>
+#pragma warning disable PISHARP_IDENTITY001
+    public const string PiVersion = PiSharp.AI.ClientIdentities.PiVersion;
+#pragma warning restore PISHARP_IDENTITY001
 
     public const string SummarySystemPrompt =
         "You are helping a user file a bug report about pi, the coding agent they are talking to. You will be shown the conversation transcript. Write a report for the pi developers describing what the user was doing and what went wrong.\n\n" +
@@ -80,8 +82,12 @@ public static class BugReport
         "## Relevant details\nTool calls involved, files touched, model behavior, anything else that helps a developer reproduce or locate the problem.\n\n" +
         "Do not include file contents, secrets, or credentials from the transcript; refer to files by path only. Keep the report factual and concise.";
 
-    /// <summary>pi-user-agent.ts <c>getPiUserAgent</c> with the runtime field naming .NET: <c>pi/1.2.0 (win32; dotnet/10.0.0; x64)</c>.</summary>
-    public static string PiUserAgent(string version) => $"pi/{version} ({Platform}; {Runtime}; {Arch})";
+    /// <summary>pi-user-agent.ts <c>getPiUserAgent</c>: pi-ai's detailed <c>formatUserAgent</c> for <paramref name="version"/>
+    /// (<see cref="PiSharp.AI.ClientIdentities.FormatUserAgent"/>, the runtime field naming .NET): <c>pi/1.5.0 (win32; dotnet/10.0.0; x64)</c>.</summary>
+#pragma warning disable PISHARP_IDENTITY001
+    public static string PiUserAgent(string version) =>
+        PiSharp.AI.ClientIdentities.FormatUserAgent(new PiSharp.AI.ClientIdentity { Version = version });
+#pragma warning restore PISHARP_IDENTITY001
 
     /// <summary>Node <c>process.platform</c> for this OS.</summary>
     public static string Platform => OperatingSystem.IsWindows() ? "win32" : OperatingSystem.IsMacOS() ? "darwin" : OperatingSystem.IsLinux() ? "linux"

@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/src/extensions/mcp/index.ts (the tool_call handler:
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/coding-agent/src/extensions/mcp/index.ts (the tool_call handler:
 // reachesServer, waitForServers) and packages/coding-agent/src/core/package-manager.ts (the built-in extensions load after the others,
 // so the MCP extension's tool_call handler runs after theirs).
 using PiSharp.Agent;

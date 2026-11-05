@@ -162,12 +162,12 @@ internal static class ProviderTranscript
                     var type = Text(block, "type");
                     if (type == "thinking")
                     {
-                        if (block["redacted"] is JsonValue redacted && redacted.TryGetValue<bool>(out var isRedacted) && isRedacted)
-                        { if (same) next.Add(block.DeepClone()); continue; }
-                        var thinking = Text(block, "thinking") ?? "";
-                        if (same && !string.IsNullOrEmpty(Text(block, "thinkingSignature"))) { next.Add(block.DeepClone()); continue; }
-                        if (thinking.Trim().Length == 0) continue;
-                        next.Add(same ? block.DeepClone() : new JsonObject { ["type"] = "text", ["text"] = thinking });
+                        // Thinking from another model is dropped: its signatures only work for that model, and readable thinking sent as
+                        // text reads as part of the visible reply. Redacted and signed blocks are kept even when their text is empty.
+                        if (!same) continue;
+                        var redacted = block["redacted"] is JsonValue flag && flag.TryGetValue<bool>(out var isRedacted) && isRedacted;
+                        if (!redacted && string.IsNullOrEmpty(Text(block, "thinkingSignature")) && (Text(block, "thinking") ?? "").Trim().Length == 0) continue;
+                        next.Add(block.DeepClone());
                         continue;
                     }
                     if (type == "text") { next.Add(same ? block.DeepClone() : new JsonObject { ["type"] = "text", ["text"] = Text(block, "text") ?? "" }); continue; }
@@ -220,6 +220,26 @@ internal static class ProviderTranscript
         Close();
         return result;
     }
+
+    internal const string ErrorToolImagePlaceholder = "(image attached after the tool results)";
+
+    /// <summary>
+    /// transform-messages.ts splitErrorToolResultImages (Pi f9a26365568127461c47a07a37dcb42c140a3ac5, #10794): for APIs that reject images in
+    /// error tool results (Anthropic, and Claude on Bedrock), the text-only content to send as the result, with each run of images replaced
+    /// by a note, and the caption and images to send after all tool results of the turn. Null when the result needs no split.
+    /// </summary>
+    internal static (JsonArray Content, string Caption, List<JsonObject> Images)? SplitErrorToolResultImages(JsonObject message)
+    {
+        if (!(message["isError"] is JsonValue flag && flag.TryGetValue<bool>(out var isError) && isError) || message["content"] is not JsonArray content)
+            return null;
+        var images = content.OfType<JsonObject>().Where(block => Text(block, "type") == "image").ToList();
+        if (images.Count == 0) return null;
+        return (DowngradeImages(content, ErrorToolImagePlaceholder), ErrorToolImagesCaption(Text(message, "toolCallId"), Text(message, "toolName")), images);
+    }
+
+    /// <summary>The caption before an error tool result's images; a missing id or name reads as JavaScript's "undefined".</summary>
+    internal static string ErrorToolImagesCaption(string? toolCallId, string? toolName) =>
+        $"Images from the error result of tool call {toolCallId ?? "undefined"} ({toolName ?? "undefined"}):";
 
     private static JsonArray DowngradeImages(JsonArray content, string placeholder)
     {
@@ -352,6 +372,21 @@ internal static class ProviderTranscript
             throw new ProviderTranscriptException($"Tool \"{name}\" requires JSON-schema constrained sampling, but strict tools are unsupported.");
         return null;
     }
+
+    /// <summary>constrained-sampling.ts prefersJsonSchemaStrictSampling: a tool that asks for strict JSON-schema sampling only when
+    /// possible (<c>strict: "prefer"</c>).</summary>
+    internal static bool PrefersStrict(JsonObject tool) =>
+        tool["constrainedSampling"] is JsonObject config && Text(config, "type") == "json_schema" && Text(config, "strict") == "prefer";
+
+    // Claude rejects (on the Anthropic API and on Bedrock) a request whose strict tools exceed its limits with one of these messages.
+    // Observed limits: 20 strict tools, and 16 optional or union-typed parameters across all strict tools.
+    private static readonly string[] StrictToolLimitErrorMessages =
+        ["The compiled grammar is too large", "Too many strict tools (", "Schemas contains too many parameters with union types ("];
+
+    /// <summary>constrained-sampling.ts isStrictToolLimitErrorMessage (Pi f9a26365568127461c47a07a37dcb42c140a3ac5): the provider error
+    /// message says the request's strict tools exceed the provider's limits.</summary>
+    internal static bool IsStrictToolLimitErrorMessage(string message) =>
+        StrictToolLimitErrorMessages.Any(limit => message.Contains(limit, StringComparison.Ordinal));
 
     /// <summary>getJsonSchemaToolParameters: the strict form when strict, else the declared parameters.</summary>
     internal static JsonNode? ToolParameters(JsonObject tool, bool? strict) => strict == true ? MakeStrict(tool["parameters"]) : tool["parameters"]?.DeepClone();

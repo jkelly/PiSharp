@@ -15,6 +15,10 @@ public sealed record PiMessagesOptions(JsonData ModelMetadata, string? ApiKey = 
     public JsonData? ToolChoice { get; init; }
     public bool Debug { get; init; }
     public JsonData? Headers { get; init; }
+    /// <summary>Source StreamOptions.identity (Pi 1.5.0 identity.ts): the User-Agent and attribution headers, below the auth and
+    /// request headers; a request's own identity merges over it. Null: a detailed User-Agent and no attribution.</summary>
+    [System.Diagnostics.CodeAnalysis.Experimental("PISHARP_IDENTITY001")]
+    public ClientIdentity? Identity { get; init; }
     public JsonData? Environment { get; init; }
     public Func<string, string?>? EnvironmentLookup { get; init; }
     public PiMessagesLifecycleHooks Hooks { get; init; } = new();

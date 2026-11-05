@@ -2,6 +2,7 @@ using System.Collections.Immutable;
 using System.Runtime.CompilerServices;
 using System.Security.Cryptography;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using PiSharp.AI;
 using PiSharp.AI.Providers;
 using PiSharp.AI.Protocols.OpenAICompletions;
@@ -36,7 +37,8 @@ internal static class CompletionsSourceDifferentialTests
         var inputs = input.RootElement.GetProperty("cases");
         var observations = golden.RootElement.GetProperty("observations").GetProperty("cases");
         Equal(3, inputs.GetArrayLength(), "complete source inputs"); Equal(3, observations.GetArrayLength(), "complete source records");
-        var authored = inputs[index]; var observed = observations[index];
+        var authored = inputs[index]; var captured = observations[index];
+        var observed = FollowPi150(captured);
         Equal(authored.GetProperty("caseId").GetString(), observed.GetProperty("caseId").GetString(), "source case identity");
         var fields = observed.EnumerateObject().Select(property => property.Name).Order(StringComparer.Ordinal);
         Check(fields.SequenceEqual(new[] { "caseId", "payloadSnapshots", "fetchRequests", "responseHooks", "providerEvents", "emissionSnapshots", "drainedFrames", "finalResult", "trace", "responseWire" }.Order(StringComparer.Ordinal)),
@@ -102,7 +104,9 @@ internal static class CompletionsSourceDifferentialTests
             Equal("", provisional.ToolCall.Id, "real blank provisional identity"); Equal("beta", provisional.ToolCall.Name, "retained initial name");
             Check(frames.OfType<ToolCallHeaderUpdated>().Single().ContentIndex == provisional.ContentIndex, "Explicit header update lost correlation.");
             Equal("", provisional.ToolCall.Id, "earlier immutable frame changed after identity fill");
-            Check(pushes.Any(value => value.Value.GetProperty("ownUndefinedPaths").GetArrayLength() > 0), "Source own-undefined distinctions were erased.");
+            // The capture's own-undefined customInput fields are block stream state, which 1.5.0 no longer has (see FollowPi150).
+            Check(captured.GetProperty("emissionSnapshots").EnumerateArray().Any(value => value.GetProperty("ownUndefinedPaths").GetArrayLength() > 0) &&
+                pushes.All(value => value.Value.GetProperty("ownUndefinedPaths").GetArrayLength() == 0), "Source own-undefined stream state was not removed.");
         }
         // Request payload, fetch/header/body and response hooks remain complete in
         // the pinned case record, owned by the separate request/HTTP composition lane.
@@ -332,6 +336,30 @@ internal static class CompletionsSourceDifferentialTests
         Check(length >= 0 && length <= cap, "Reference file exceeds admission cap: " + path);
         var bytes = File.ReadAllBytes(full); Check(bytes.Length <= cap && Convert.ToHexStringLower(SHA256.HashData(bytes)) == digest, "Frozen complete reference changed: " + path); return bytes;
     }
+    // Authored, not captured: the d86654 capture predates Pi f9a26365 (1.5.0). There openai-completions.ts keeps each call's stream
+    // state (partialArgs, streamIndex, customInput) in its toolCallStates map instead of on the block, and calculateCost, which
+    // parseChunkUsage runs (it is the one that writes usage.reasoning), ends with cost.totalFromProvider = false. This applies exactly
+    // those two changes to a captured case before the comparison.
+    private static JsonElement FollowPi150(JsonElement observation)
+    {
+        var node = JsonNode.Parse(observation.GetRawText())!;
+        Walk(node);
+        return JsonDocument.Parse(node.ToJsonString()).RootElement.Clone();
+
+        static void Walk(JsonNode? value)
+        {
+            if (value is JsonArray array) { foreach (var item in array) Walk(item); return; }
+            if (value is not JsonObject obj) return;
+            if (obj["type"] is JsonValue type && type.GetValueKind() == JsonValueKind.String && type.GetValue<string>() == "toolCall")
+                foreach (var field in StreamState) obj.Remove(field);
+            if (obj["usage"] is JsonObject usage && usage.ContainsKey("reasoning") && usage["cost"] is JsonObject cost) cost["totalFromProvider"] = false;
+            if (obj["ownUndefinedPaths"] is JsonArray paths)
+                foreach (var path in paths.ToArray())
+                    if (StreamState.Any(field => path!.GetValue<string>().EndsWith("/" + field, StringComparison.Ordinal))) paths.Remove(path);
+            foreach (var (_, child) in obj.ToArray()) Walk(child);
+        }
+    }
+    private static readonly string[] StreamState = ["partialArgs", "streamIndex", "customInput"];
     private static void Same(JsonElement expected, JsonElement actual, string path)
     {
         if (expected.ValueKind != actual.ValueKind) throw new InvalidOperationException(path + ": JSON kind differs");

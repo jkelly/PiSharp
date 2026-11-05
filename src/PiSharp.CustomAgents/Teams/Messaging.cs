@@ -96,7 +96,7 @@ internal static class Mailboxes
 
     /// <summary><c>{messages: [{id, from, to, kind, text, correlationId?, requestId?, at, ack?}]}</c>, keyed by address.</summary>
     public static SessionDocFamilyToken Doc { get; } = Documents.DefineSessionDocFamily("pisharp.agents.mailbox", 1,
-        seed => seed as JsonObjectValue ?? JsonObjectValue.Empty);
+        seed => seed as JsonObjectValue ?? JsonObjectValue.Empty, checkpointWhen: (_, _, _) => false);
 
     public static Task<DraftObject> OpenAsync(ITx tx, string address) => tx.DocAsync(Doc, address, JsonObjectValue.Empty);
 
@@ -306,7 +306,13 @@ internal sealed class Messenger(AgentTeam team, MessagingPort port, string? self
             if (watch is not null)
             {
                 Offer(watch.Value);
-                watch.Start((value, _, _) => { Offer(value); return Task.CompletedTask; });
+                // The watch follows the mailbox's address (pi-durable 1.5.0): a mailbox created again after a retirement goes on arriving
+                // here; the watch is stopped when the reader stops.
+                watch.Start((call, _) =>
+                {
+                    if (call is WatchValueCall<JsonObjectValue> change) Offer(change.Value);
+                    return Task.CompletedTask;
+                });
             }
             else Offer(await port.Reader.SnapshotAsync(Mailboxes.Doc, sender.Address, context).ConfigureAwait(false));
             while (await channel.Reader.WaitToReadAsync(cancellationToken).ConfigureAwait(false))

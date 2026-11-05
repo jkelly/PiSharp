@@ -1,8 +1,17 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/src/harness/agent.ts. The stored agent (upstream AgentState) is the
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/src/harness/agent.ts. The stored agent (upstream AgentState) is the
 // pi.agent document's JSON object, written with upstream's key order: fields appear in the order they were first set, as a JavaScript
 // object's do. Composition uses OrderedDictionary, whose replacement keeps a key's position as a JavaScript Map's does. v1.2.0: the
 // modelTools filter (an array, or {remove?, add?}), ToolRegistration.Callers and Deferred, Agent.Callable and Deferred, addTools extending
-// modelTools, and settings.documentRetentionMs (area b).
+// modelTools, and settings.documentRetentionMs (area b). Pi v1.5.0 sync (area reports): agentHooks pairs each handler with its extension,
+// sectionExtension and toolExtension name the extension whose code a section or tool runs, a wrapper's failure is reported with its
+// extension's name, and settings.afterFailedRun (a30c2a81d, 5f312dac4, 91b33cab3). Pi v1.5.0 sync (area deferred-commits, 6c2fd73b0):
+// settings.progress.persistWithinMs, the window a deferred progress commit waits at most before it is stored (ProgressPolicy.PersistWithinMs,
+// default 1,000 ms; a value that is not a number of milliseconds, 0 or more, is the default). Pi v1.5.0 sync (area restarts, b3a29f111):
+// settings.restartLimit (default 5; a number of restarts, 1 or more, rounded down, else the default). Pi v1.5.0 sync (area live-turns,
+// f6a9db1d8): AgentState.maxTurns, the tool rounds one run takes at most: configure() stores it after cwd and throws
+// ArgumentOutOfRangeException (upstream RangeError) unless it is an integer 1 or more within JavaScript's safe integers, Clear removes it,
+// and resolveAgent passes it on (Agent.MaxTurns); task-owned children and forks inherit it with the rest of pi.agent. AgentChange.MaxTurns
+// is a long, so upstream's non-integer values (1.5, NaN, Infinity) cannot be given. The file is v1.5.0's now.
 using System.Collections.Immutable;
 using PiSharp.Durable.Chord;
 using PiSharp.Durable.Chord.Delta;
@@ -19,7 +28,7 @@ public static class Agents
     public static CompactionPolicy DefaultCompactionPolicy { get; } = new(true, 16384, 20000, 32768);
 
     /// <summary>Upstream <c>DEFAULT_PROGRESS_POLICY</c>.</summary>
-    public static ProgressPolicy DefaultProgressPolicy { get; } = new(100, 100);
+    public static ProgressPolicy DefaultProgressPolicy { get; } = new(100, 100, 1_000);
 
     /// <summary>The reserved section key of the agent's instructions (upstream <c>INSTRUCTIONS_KEY</c>).</summary>
     public const string InstructionsKey = "instructions";
@@ -47,17 +56,26 @@ public static class Agents
                 retry?.BaseDelayMs ?? DefaultRetryPolicy.BaseDelayMs, retry?.MaxAgentDelayMs ?? DefaultRetryPolicy.MaxAgentDelayMs),
             Compaction = new CompactionPolicy(compaction?.Enabled ?? DefaultCompactionPolicy.Enabled,
                 compaction?.ReserveTokens ?? DefaultCompactionPolicy.ReserveTokens, compaction?.KeepRecentTokens ?? DefaultCompactionPolicy.KeepRecentTokens,
-                compaction?.BackgroundTokens ?? DefaultCompactionPolicy.BackgroundTokens),
+                compaction?.BackgroundTokens ?? DefaultCompactionPolicy.BackgroundTokens) { ModelOverrides = compaction?.ModelOverrides },
             // Field by field, so an unset interval keeps its default.
             Progress = new ProgressPolicy(progress?.PartialIntervalMs ?? DefaultProgressPolicy.PartialIntervalMs,
-                progress?.OutputIntervalMs ?? DefaultProgressPolicy.OutputIntervalMs),
+                progress?.OutputIntervalMs ?? DefaultProgressPolicy.OutputIntervalMs, Session.PersistWithin(progress?.PersistWithinMs)),
             ToolExecution = settings?.ToolExecution ?? ToolExecutionMode.Parallel,
             SteeringMode = settings?.SteeringMode ?? QueueMode.OneAtATime,
             FollowUpMode = settings?.FollowUpMode ?? QueueMode.OneAtATime,
             ContextRetentionMs = settings?.ContextRetentionMs ?? DefaultContextRetentionMs,
             DocumentRetentionMs = Session.DocumentRetention(settings?.DocumentRetentionMs),
+            AfterFailedRun = settings?.AfterFailedRun ?? AfterFailedRun.Keep,
+            RestartLimit = RestartLimit(settings?.RestartLimit),
         };
     }
+
+    /// <summary>Default <see cref="HarnessSettings.RestartLimit"/> (upstream <c>DEFAULT_RESTART_LIMIT</c>).</summary>
+    public const int DefaultRestartLimit = 5;
+
+    /// <summary>A restart limit as given when it is a number of restarts, 1 or more, rounded down (<see cref="double.PositiveInfinity"/>: no
+    /// task ends for restarts); else the default (upstream <c>restartLimit</c>).</summary>
+    private static double RestartLimit(double? limit) => limit is >= 1 and var given ? Math.Floor(given) : DefaultRestartLimit;
 
     /// <summary>Applies one change to <c>pi.agent</c>: a given field replaces the stored one, a clear removes it, an absent field changes
     /// nothing (upstream <c>configure</c>).</summary>
@@ -134,8 +152,15 @@ public static class Agents
             : JsonValue.Object(Fields(("remove", selection.Remove?.Select(tool => tool.Name)), ("add", selection.Add?.Select(tool => tool.Name)))));
         Set("instructions", change.Instructions, text => text);
         Set("cwd", change.Cwd, text => text);
+        if (change.MaxTurns is { IsClear: false } limit && limit.Value is var maxTurns && !(maxTurns >= 1 && maxTurns <= MaxSafeInteger))
+            throw new ArgumentOutOfRangeException(nameof(change), maxTurns,
+                $"maxTurns must be an integer 1 or more, got {maxTurns.ToString(System.Globalization.CultureInfo.InvariantCulture)}");
+        Set("maxTurns", change.MaxTurns, turns => JsonValue.Number(turns));
         Set("serviceTier", change.ServiceTier, text => text);
     }
+
+    /// <summary>JavaScript's <c>Number.MAX_SAFE_INTEGER</c>: <c>Number.isSafeInteger</c> bounds a turn limit.</summary>
+    private const long MaxSafeInteger = 9_007_199_254_740_991;
 
     private static JsonArrayValue Names(IEnumerable<string> names) => JsonValue.Array(names.Select(name => (JsonValue)name));
 
@@ -156,22 +181,54 @@ public static class Agents
         foreach (var (key, value) in (JsonObjectValue)owner.ToValue()) agent.Set(key, value);
     }
 
-    /// <summary>Handlers of the selected extensions' hooks for a task name, in extension order (upstream <c>agentHooks</c>).</summary>
-    public static IReadOnlyList<object> AgentHooks(Agent agent, string taskName)
+    /// <summary>Handlers of the selected extensions' hooks for a task name, each with its extension's name, in extension order (upstream
+    /// <c>agentHooks</c>).</summary>
+    public static IReadOnlyList<(string Extension, object Handlers)> AgentHooks(Agent agent, string taskName)
     {
         ArgumentNullException.ThrowIfNull(agent);
-        var handlers = new List<object>();
+        var handlers = new List<(string Extension, object Handlers)>();
         foreach (var extension in agent.Extensions)
             foreach (var hook in extension.Hooks ?? [])
-                if (hook.Task == taskName) handlers.Add(hook.Handlers);
+                if (hook.Task == taskName) handlers.Add((extension.Name, hook.Handlers));
         return handlers;
+    }
+
+    /// <summary>The extension whose code a section of <paramref name="agent"/> runs: the last selected one that provides or wraps it
+    /// (upstream <c>sectionExtension</c>).</summary>
+    public static string? SectionExtension(Agent agent, string key)
+    {
+        ArgumentNullException.ThrowIfNull(agent);
+        string? found = null;
+        foreach (var extension in agent.Extensions)
+        {
+            var provides = extension.Sections?.Any(section => section.Key == key) == true;
+            var wraps = extension.Wraps?.Any(wrap => wrap is SectionWrap section && section.Section == key) == true;
+            if (provides || wraps) found = extension.Name;
+        }
+        return found;
+    }
+
+    /// <summary>The extension whose code a tool of <paramref name="agent"/> runs: the last selected one that provides or wraps it (upstream
+    /// <c>toolExtension</c>).</summary>
+    public static string? ToolExtension(Agent agent, string name)
+    {
+        ArgumentNullException.ThrowIfNull(agent);
+        string? found = null;
+        foreach (var extension in agent.Extensions)
+        {
+            var provides = extension.Tools?.Any(tool => tool.Name == name) == true;
+            var wraps = extension.Wraps?.Any(wrap => wrap is ToolWrap tool && tool.Tool == name) == true;
+            if (provides || wraps) found = extension.Name;
+        }
+        return found;
     }
 
     /// <summary>
     /// Resolves an agent from its stored state (null: every field unset), a registry snapshot and resolved settings (upstream
-    /// <c>resolveAgent</c>). A wrapper that throws or renames drops its target and is reported; a wrapper without a target does nothing.
+    /// <c>resolveAgent</c>). A wrapper that throws or renames drops its target and is reported to <paramref name="report"/> with the name of
+    /// the wrapper's extension; a wrapper without a target does nothing.
     /// </summary>
-    public static Agent ResolveAgent(JsonObjectValue? state, IRegistrySnapshot snapshot, Settings settings, Action<Exception> report)
+    public static Agent ResolveAgent(JsonObjectValue? state, IRegistrySnapshot snapshot, Settings settings, Action<Exception, string> report)
     {
         ArgumentNullException.ThrowIfNull(snapshot);
         ArgumentNullException.ThrowIfNull(settings);
@@ -186,8 +243,9 @@ public static class Agents
         {
             foreach (var wrap in extension.Wraps ?? [])
             {
-                if (wrap is ToolWrap tool) ApplyWrap(composed, tool.Tool, tool.Apply, item => item.Name, report);
-                else if (wrap is SectionWrap section) ApplyWrap(sections, section.Section, section.Apply, item => item.Key, report);
+                void WrapReport(Exception error) => report(error, extension.Name);
+                if (wrap is ToolWrap tool) ApplyWrap(composed, tool.Tool, tool.Apply, item => item.Name, WrapReport);
+                else if (wrap is SectionWrap section) ApplyWrap(sections, section.Section, section.Apply, item => item.Key, WrapReport);
             }
         }
 
@@ -215,6 +273,7 @@ public static class Agents
             Sections = [.. agentSections],
             Instructions = instructions,
             Cwd = (Field(state, "cwd") as JsonStringValue)?.Value,
+            MaxTurns = Field(state, "maxTurns") is JsonNumberValue maxTurns ? (long)maxTurns.Value : null,
             ServiceTier = (Field(state, "serviceTier") as JsonStringValue)?.Value,
         };
     }

@@ -1,6 +1,6 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/test/harness-callers.test.ts ("who may call a tool"), as
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/test/harness-callers.test.ts ("who may call a tool"), as
 // harness.callers.<case>. Verbatim apart from the adaptations in HarnessSupport.cs and ChatSupport.cs, and these:
-// - `Type.Object({})` is ToolRegistration.EmptyParameters; a probe stores what each nested call returned by tool name.
+// - `obj({})` is ToolsSchema150.EmptyObject; a probe stores what each nested call returned by tool name.
 // - Upstream runs these on MemoryStorage only; so do they here.
 // Authored, after them (harness.callers.deferred.*): deferred tools without tool_search, whose tool and its tool-search.test.ts cases are
 // ToolSearchCases.cs (tool-search.*): what Agent.Tools, Agent.Deferred and Agent.Callable list for a deferred tool, loaded by modelTools'
@@ -31,7 +31,7 @@ internal static class CallersTests
         {
             Name = name,
             Description = name,
-            Parameters = ToolRegistration.EmptyParameters,
+            Parameters = ToolsSchema150.EmptyObject,
             Execute = (_, _, _) => Task.FromResult(new ToolExecutionResult { Output = JsonValue.Array(FauxText($"{name} ran")) }),
         });
         return extra is null ? tool : extra(tool);
@@ -50,7 +50,7 @@ internal static class CallersTests
         {
             Name = "probe",
             Description = "probe",
-            Parameters = ToolRegistration.EmptyParameters,
+            Parameters = ToolsSchema150.EmptyObject,
             Execute = async (_, api, callContext) =>
             {
                 foreach (var name in names) received[name] = await api.ExecuteToolAsync(name, JsonObjectValue.Empty, callContext);

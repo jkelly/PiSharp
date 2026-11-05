@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/test/images-wasm-module.test.ts, as images.wasm-module.<case>.
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/test/images-wasm-module.test.ts, as images.wasm-module.<case>.
 // Upstream checks that createPhotonImages() takes Photon's WebAssembly as a compiled module (the form Cloudflare Workers pass), in a file of
 // its own so Photon is not yet initialized: a 1x1 GIF comes back as it is only once it decodes, which fails without an initialized Photon.
 // PiSharp has no WebAssembly module: ImageProcessors.Create() takes the codec object itself (Images.cs). The case checks the same outcome

@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): coding-agent/src/core/tools/renderers/index.ts.
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): coding-agent/src/core/tools/renderers/index.ts.
 // Built-in tool renderers, without the tools themselves, plus the renderers the built-in tool definitions carry (edit draws its
 // own shell, codemode and MCP tools have their own renderers) and an adapter for extension renderers (async rows).
 using System.Text;
@@ -107,7 +107,7 @@ internal static class ExtensionToolRendererAdapter
         var argsJson = context.Args?.ToJsonString() ?? "null";
         var extensionContext = new ExtensionToolRenderContext(context.ToolName, context.ToolCallId, JsonData.Parse(argsJson), context.Cwd,
             context.ExecutionStarted, context.ArgsComplete, context.IsPartial, context.Expanded, context.ShowImages, context.IsError,
-            context.DurationMs is { } duration ? (long)duration : null, context.OutputPad);
+            context.DurationMs is { } duration ? (long)duration : null, context.OutputPad) { Keybindings = HostKeybindingHints.Instance };
         var key = new StringBuilder().Append(slotKey).Append('\u0000').Append(argsJson).Append('\u0000').Append(context.Cwd).Append('\u0000')
             .Append(context.ExecutionStarted).Append(context.ArgsComplete).Append(context.IsPartial).Append(context.Expanded)
             .Append(context.ShowImages).Append(context.IsError).Append('\u0000').Append(context.DurationMs).Append('\u0000').Append(context.OutputPad)

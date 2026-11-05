@@ -12,7 +12,8 @@
       "pisharp.ai": {
         "type": "Project",
         "dependencies": {
-          "PiSharp.Contracts": "[1.0.0, )"
+          "PiSharp.Contracts": "[1.0.0, )",
+          "PiSharp.Telemetry": "[1.0.0, )"
         }
       },
       "pisharp.codingagent": {
@@ -49,6 +50,9 @@
         "dependencies": {
           "PiSharp.Contracts": "[1.0.0, )"
         }
+      },
+      "pisharp.telemetry": {
+        "type": "Project"
       },
       "publishedconsumer": {
         "type": "Project",

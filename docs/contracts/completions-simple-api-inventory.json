@@ -27,7 +27,7 @@
         "DirectOptions",
         "HttpOptions",
         "TransportPreference",
-        "TelemetryContext",
+        "Telemetry",
         "Metadata",
         "Environment",
         "TimeoutMilliseconds",

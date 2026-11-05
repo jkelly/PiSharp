@@ -1,9 +1,10 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/test/examples/06-harness.ts, 07-configuration.ts,
-// 08-harness-conversations.ts, 09-context.ts, 10-registry-reload.ts, 11-extension-state.ts, 12-tasks.ts and 13-recovery.ts.
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/test/examples/05-harness.ts, 06-configuration.ts,
+// 07-harness-conversations.ts, 08-context.ts, 09-registry-reload.ts, 10-extension-state.ts, 11-tasks.ts and 12-recovery.ts.
 // Each prints what upstream's console.log prints, with JSON in place of util.inspect (so a property whose value is undefined is absent).
-// Upstream's createModels() with no provider is EmptyDurableModels; 11's faux provider is ScriptedModels. On a file backend, 06, 07, 11 and
-// 12 reopen their storage in a new Session and read back what they stored. 13 is itself a close-and-reopen example: on memory it keeps its
-// storage in a temporary SQLite file as upstream does, and on a file backend it reopens the runner's storage.
+// Upstream's createModels() with no provider is EmptyDurableModels; 10's faux provider is ScriptedModels. On a file backend, 05, 06, 10 and
+// 11 reopen their storage in a new Session and read back what they stored. 12 is itself a close-and-reopen example: on memory it keeps its
+// storage in a temporary SQLite file as upstream does, and on a file backend it reopens the runner's storage. Pi v1.5.0 sync (area sleep):
+// 12's pause between ticks is a durable sleep (runtime.SleepUntilAsync), as f75b3240a's 13-recovery.ts (v1.5.0's 12-recovery.ts) has it.
 using PiSharp.Durable.Chord;
 using PiSharp.Durable.Sqlite;
 using PiSharp.Durable.Storage;
@@ -12,9 +13,9 @@ namespace PiSharp.Durable.Examples;
 
 public static partial class Examples
 {
-    /// <summary><c>Type.Object({ path: Type.String() })</c>, as TypeBox prints it.</summary>
+    /// <summary><c>obj({ path: str() })</c>, as pi-schema builds it (Pi v1.5.0).</summary>
     private static readonly JsonObjectValue PathParameters =
-        (JsonObjectValue)JsonValue.Parse("""{"type":"object","required":["path"],"properties":{"path":{"type":"string"}}}""");
+        (JsonObjectValue)JsonValue.Parse("""{"type":"object","properties":{"path":{"type":"string"}},"required":["path"],"additionalProperties":false}""");
 
     private static ToolExecutionResult TextResult(string text) => new()
     {
@@ -25,7 +26,7 @@ public static partial class Examples
 
     private static string JsonNames(IEnumerable<string> names) => Json(JsonValue.Array(names.Select(name => (JsonValue)name)));
 
-    // 06: open a Harness with a registry of extensions.
+    // 05: open a Harness with a registry of extensions.
     private static async Task HarnessAsync(Func<Task<IStorage>> open, TextWriter output)
     {
         // A Harness is a Session plus conversation handles and durable tasks. Extension code (tools, prompt sections, hooks, tasks) comes in
@@ -76,7 +77,7 @@ public static partial class Examples
         public override ConversationStreamOptions? Stream { get => new() { TimeoutMs = timeoutMs() }; init { } }
     }
 
-    // 07: per-conversation agent choices and Harness-wide settings.
+    // 06: per-conversation agent choices and Harness-wide settings.
     private static async Task ConfigurationAsync(Func<Task<IStorage>> open, TextWriter output)
     {
         static AppTool ExampleTool(string name, string description) => Define.Tool(new AppTool
@@ -155,7 +156,7 @@ public static partial class Examples
             await output.WriteLineAsync("stored: " + Json(await reopened.SnapshotAsync(Agents.AgentDoc, root.Id, Context))));
     }
 
-    // 08: conversation handles, typed entries, created conversations, and forks.
+    // 07: conversation handles, typed entries, created conversations, and forks.
     private static async Task HarnessConversationsAsync(Func<Task<IStorage>> open, TextWriter output)
     {
         var harness = await Harness.OpenAsync(await open(), new HarnessOptions { Models = EmptyDurableModels.Instance, Registry = Registry.Create() }, Context);
@@ -186,7 +187,7 @@ public static partial class Examples
         await harness.CloseAsync(Context);
     }
 
-    // 09: transcript history and model context.
+    // 08: transcript history and model context.
     private static async Task ContextAsync(Func<Task<IStorage>> open, TextWriter output)
     {
         var harness = await Harness.OpenAsync(await open(), new HarnessOptions { Models = EmptyDurableModels.Instance, Registry = Registry.Create() }, Context);
@@ -304,7 +305,7 @@ public static partial class Examples
         await harness.CloseAsync(Context);
     }
 
-    // 10: reload extension code through the registry.
+    // 09: reload extension code through the registry.
     private static async Task RegistryReloadAsync(Func<Task<IStorage>> open, TextWriter output)
     {
         static ToolRegistration ExampleTool(string name, string description) => Define.Tool(new ToolRegistration
@@ -346,9 +347,9 @@ public static partial class Examples
 
     // A todo list per conversation. Rewindable with AsOf, so a fork starts with the todos its parent had at the fork entry.
     private static readonly RewindableConversationDocToken Todos = Documents.DefineRewindableConversationDoc("example.todos", 1, DocumentFork.AsOf,
-        () => JsonValue.Object([new("items", JsonValue.Array([]))]));
+        () => JsonValue.Object([new("items", JsonValue.Array([]))]), checkpointWhen: (_, _, _) => false);
 
-    // 11: an extension that keeps its own per-conversation document.
+    // 10: an extension that keeps its own per-conversation document.
     private static async Task ExtensionStateAsync(Func<Task<IStorage>> open, TextWriter output)
     {
         // The tool writes the document; the section shows it to the model before every request. Nothing needs to create it up front:
@@ -362,7 +363,7 @@ public static partial class Examples
                 {
                     Name = "todo",
                     Description = "Add an item to your todo list",
-                    Parameters = (JsonObjectValue)JsonValue.Parse("""{"type":"object","required":["item"],"properties":{"item":{"type":"string"}}}"""),
+                    Parameters = (JsonObjectValue)JsonValue.Parse("""{"type":"object","properties":{"item":{"type":"string"}},"required":["item"],"additionalProperties":false}"""),
                     Execute = async (args, api, callContext) =>
                     {
                         var item = StringArg(args, "item");
@@ -413,7 +414,7 @@ public static partial class Examples
             await output.WriteLineAsync("todos: " + Json(await reopened.SnapshotAsync(Todos, root.Id, Context))));
     }
 
-    // 12: run a durable task.
+    // 11: run a durable task.
     private static async Task TasksAsync(Func<Task<IStorage>> open, TextWriter output)
     {
         // A task is a small state machine. Its state, the checkpoint, is saved after every step, so after a crash the next open continues
@@ -451,7 +452,7 @@ public static partial class Examples
         var harness = await Harness.OpenAsync(await open(), new HarnessOptions { Models = EmptyDurableModels.Instance, Registry = registry }, Context);
         var root = await harness.RootAsync(Context);
         // Every task names its owner. This one belongs to the conversation; a task can also own child tasks and wait for them
-        // (24-child-tasks.ts).
+        // (23-child-tasks.ts).
         var paymentId = await root.CommitAsync(tx => tx.CreateTaskAsync(payment, JsonValue.Object([new("amount", 5)]),
             new TaskOptions(TaskOwnership.Conversation)), Context);
         // The finished task record is the durable receipt.
@@ -467,7 +468,7 @@ public static partial class Examples
         });
     }
 
-    // 13: close, reopen, and continue where a task stopped.
+    // 12: close, reopen, and continue where a task stopped.
     private static async Task RecoveryAsync(Func<Task<IStorage>> open, TextWriter output)
     {
         // Everything a task needs to continue is in storage, so a new Harness over the same storage picks up where the last one stopped.
@@ -505,14 +506,15 @@ public static partial class Examples
                         await output.WriteLineAsync($"tick {n}");
                     }
                     await reachedTick(n, runtime.Signal);
-                    // Save the outcome: the next tick, or the final result.
+                    // Save the outcome: the final result, or the next tick after a short sleep. The sleep is stored with the checkpoint, so the
+                    // task holds no invocation meanwhile, and a Harness opened later continues it once its time has come.
                     var to = (int)((JsonNumberValue)((JsonObjectValue)task.Input)["to"]).Value;
-                    await runtime.CommitAsync((_, _) => n == to
-                        ? NextTaskState.Completed($"counted to {n}")
-                        : NextTaskState.Running(JsonValue.Object([new("phase", "tick"), new("n", n + 1)])), taskContext);
-                    // Wait a little between ticks. Closing the Harness cancels this wait; the checkpoint saved above is where the next Harness
-                    // continues.
-                    await runtime.SleepAsync(runtime.Now() + 50, taskContext);
+                    if (n == to)
+                    {
+                        await runtime.CommitAsync((_, _) => NextTaskState.Completed($"counted to {n}"), taskContext);
+                        return;
+                    }
+                    await runtime.SleepUntilAsync(runtime.Now() + 50, JsonValue.Object([new("phase", "tick"), new("n", n + 1)]), taskContext);
                 },
             },
             Abort = (_, runtime, taskContext) => runtime.CommitAsync((_, _) => NextTaskState.Aborted(), taskContext),

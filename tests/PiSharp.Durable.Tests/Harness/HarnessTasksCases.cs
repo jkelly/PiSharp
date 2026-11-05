@@ -1,9 +1,8 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/test/harness-tasks.test.ts. Verbatim apart from the adaptations in
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/test/harness-tasks.test.ts. Verbatim apart from the adaptations in
 // HarnessSupport.cs and these:
 // - Upstream runs this file on MemoryStorage (ControlledStorage where it holds commits); here every case runs on the storage the group is
 //   given, wrapped in ControlledStorage where upstream uses it (HarnessBackendCases.cs adds JSONL and SQLite passes).
 // - "observes a failed agent resolution": the settings getter that throws is a HarnessSettings subclass overriding Extensions.
-// - "rejects a sleep ...": upstream's AbortError is OperationCanceledException.
 // - "reads committed documents ...": the flush that lets the step after the phase end the invocation is the InvocationEnded barrier.
 // - "resumes a waiting task ...": the flush after the third phase start is an Eventually for the waiting state it then asserts.
 // - "does not signal a running abort handler ...", "keeps a terminal outcome committed by an abort handler ...": the flush that lets the
@@ -13,6 +12,36 @@
 //   order; here the abort handler waits for a deferred released after that call, so the second call still sees a live task.
 // - Expectations upstream asserts inside handlers are collected and asserted by the test body, so a failure names itself instead of
 //   surfacing as a faulted task.
+// - Pi v1.5.0 sync (area sleep): f75b3240a replaces runtime.sleep with sleepUntil, so the ended-invocation check calls SleepUntilAsync and
+//   the two in-phase sleep cases are gone (HarnessSleepCases.cs covers durable sleep).
+// - Pi v1.5.0 sync (area telemetry): upstream's withSignal derives through withAbortSignal(signal, context) since 2ec55d808, which keeps
+//   the context's values and telemetry span; DurableContext.WithCancel() already derives the same way, so the cases are unchanged.
+// - Pi v1.5.0 sync (area observers, 8b0caefc2): the ended-invocation watch listener records value.text, a watch's value being never null.
+// - Pi v1.5.0 sync (area restarts, 440a5fcdb's task close cases, b3a29f111's end state): a close writes the tasks it stopped back as
+//   pending, so five task-close cases expect that last commit: "stops without outcomes ...", "writes no fault when close seals ...",
+//   "starts no abort handler whose reservation settles ...", "rejects a runtime commit that was queued ..." and "joins a reservation
+//   that settles ...". storage.commits.at(-2) is ControlledStorage.Commits[^2].
+// - Pi v1.5.0 sync (area group-commit-scheduler, e5c6182ba): "writes no fault when close seals ..." and "rejects a runtime commit that was
+//   queued ..." hold the Session line with a commit whose callback waits (HoldLine, upstream holdLine), as a held storage call no longer
+//   holds the line.
+// - Pi v1.5.0 sync (area publication-caches, 8b0caefc2 and e5c6182ba): the document-scan count of "commits results with entries ..." wraps
+//   the group's storage in DocumentScans (upstream CountingStorage over MemoryStorage) and reads the Session's IndexSizes (upstream
+//   documentCacheSizes). The "publication at adoption" block runs on the group's storage: "memory" is ControlledStorage over it and
+//   "work-after-adopt" LateResolvingStorage (SessionSupport.cs), the storage name ending the case id. In "signals a newly marked run ...",
+//   the abort handler waits until the order is asserted, as the abort invocation's terminal commit would otherwise race the assertion on
+//   another thread. "stores a host listener's own commit before the reconcile commit ..." reads the stored commits after close, as no commit
+//   lands then. `publication.kind === "stored"` is !IsMemory, harness.closed is Closed, and infos are OpenedRoot.Infos. With this block
+//   every v1.5.0 test of the file is here (49 cases on each backend), so the citation moves to v1.5.0.
+// - "commits results with entries ...": the child task runs beside the writer's answer phase and ends first by upstream's microtask order;
+//   here it is on the thread pool, so the case waits for it before it counts the task documents its end drops (a busy runner read 1).
+// - PiSharp's own case, no upstream counterpart: "stores a host listener's own commit before the reconcile commit while a busy pool holds
+//   the scheduler's work" is the case above with the interleaving a loaded runner gave it on SQL Server. Two holds: HeldPool, set as the
+//   scheduler's Dispatch, keeps every piece of work the scheduler hands the thread pool from just before the parent's `completing` commit
+//   on, and ControlledStorage.HoldCommits holds the child's terminal commit in its storage call; the pool's work then runs
+//   (HeldPool.Release), and the commit lands. The case waits for the scheduler to quiesce before it sets the hold, so no pass is pending
+//   then, and asks for an idle wait right after, whose reconcile pass a busy pool would keep pending with the `completing` commit's request.
+//   Upstream enqueues a pass in a microtask, before anything the test does next; a pass that reaches the line only while the child's
+//   terminal commit is stored waits at its gate ahead of the host listener's commit, and stores the parent's terminal record first.
 using System.Collections.Concurrent;
 using PiSharp.Durable;
 using PiSharp.Durable.Chord;
@@ -23,6 +52,56 @@ using static SessionTests;
 internal static partial class HarnessTests
 {
     private static readonly JsonValue RunStep = O("""{"phase":"run"}""");
+
+    /// <summary>A held Session line (upstream <c>holdLine</c>'s result): <see cref="Entered"/> completes once the holding commit's callback
+    /// runs; the jobs queued after it start once <see cref="Release"/> is called.</summary>
+    internal sealed record LineHold(Task Entered, Action Release);
+
+    /// <summary>Holds the Session line with a commit whose callback waits: the jobs queued after it start once it is released (upstream
+    /// <c>holdLine</c>, Pi v1.5.0 e5c6182ba).</summary>
+    internal static LineHold HoldLine(IHarness harness)
+    {
+        var entered = new Deferred();
+        var release = new Deferred();
+        _ = harness.CommitAsync(async _ =>
+        {
+            entered.Resolve();
+            await release.Task;
+        }, Context);
+        return new LineHold(entered.Task, release.Resolve);
+    }
+
+    /// <summary>A busy thread pool for the scheduler (DurableTaskScheduler.Dispatch): it holds the work the scheduler hands the pool until
+    /// <see cref="Release"/>, which runs it on the calling thread, in order, as a worker that frees up would; later work goes to the pool.</summary>
+    private sealed class HeldPool
+    {
+        private readonly Lock gate = new();
+        private List<Action>? held = [];
+
+        public void Post(Action work)
+        {
+            lock (gate)
+            {
+                if (held is not null)
+                {
+                    held.Add(work);
+                    return;
+                }
+            }
+            ThreadPool.UnsafeQueueUserWorkItem(static work => work(), work, preferLocal: false);
+        }
+
+        public void Release()
+        {
+            List<Action> works;
+            lock (gate)
+            {
+                works = held ?? [];
+                held = null;
+            }
+            foreach (var work in works) work();
+        }
+    }
 
     /// <summary>A one-phase task; the default abort handler settles aborted with reason "test" (upstream <c>oneStep</c>).</summary>
     private static DurableTask OneStep(string name, Func<RunningTask, ITaskRuntime, DurableContext, Task> run,
@@ -46,14 +125,18 @@ internal static partial class HarnessTests
         conversation.CommitAsync(tx => tx.CreateTaskAsync(task, JsonValue.Null,
             new TaskOptions(TaskOwnership.Conversation) { Background = background ? true : null }), Context);
 
-    private sealed record OpenedRoot(IHarness Harness, IRegistry Registry, SyncList<Exception> Reports, IConversation Root);
+    private sealed record OpenedRoot(IHarness Harness, IRegistry Registry, SyncList<Exception> Reports, IConversation Root)
+    {
+        /// <summary>What each report was about, at the same index (upstream <c>infos</c>).</summary>
+        public SyncList<ReportInfo> Infos { get; init; } = new();
+    }
 
     private static async Task<OpenedRoot> OpenRoot(IStorage storage, IReadOnlyList<DurableTask> tasks, Func<double>? now = null,
-        HarnessSettings? settings = null)
+        HarnessSettings? settings = null, PiSharp.Telemetry.ITelemetryContext? telemetry = null)
     {
-        var opened = await OpenTasks(storage, tasks, now: now, settings: settings);
+        var opened = await OpenTasks(storage, tasks, now: now, settings: settings, telemetry: telemetry);
         var root = await opened.Harness.RootAsync(Context);
-        return new OpenedRoot(opened.Harness, opened.Registry, opened.Reports, root);
+        return new OpenedRoot(opened.Harness, opened.Registry, opened.Reports, root) { Infos = opened.Infos };
     }
 
     /// <summary>Starts <c>AbortTaskAsync()</c> and resolves once its mark is durable, before it has joined the run (upstream
@@ -195,7 +278,7 @@ internal static partial class HarnessTests
 
         yield return Case(prefix + "task-phases.commits-results-with-entries-atomically-keeps-memos-until-terminal-and-retires-task-documents", async () =>
         {
-            var progress = Documents.DefineTaskDoc("test.task-progress", 1, () => O("""{"lines":[]}"""));
+            var progress = Documents.DefineTaskDoc("test.task-progress", 1, () => O("""{"lines":[]}"""), checkpointWhen: (_, _, _) => false);
             var answer = Entries.DefineEntry("answer");
             var child = OneStep("test.child", async (_, runtime, ctx) => await runtime.CommitAsync((_, _) => Completed(null), ctx));
             TaskId? childId = null;
@@ -242,7 +325,8 @@ internal static partial class HarnessTests
                 },
                 Abort = (_, _, _) => Task.CompletedTask,
             });
-            var (harness, _, _, root) = await OpenRoot(storage(), [writer, child]);
+            var counting = new DocumentScans(storage());
+            var (harness, _, _, root) = await OpenRoot(counting, [writer, child]);
             var conversation = await harness.CreateConversationAsync(new ConversationCreateOptions(ConversationOwnership.Ownerless), Context);
             var id = await conversation.CommitAsync(tx => tx.CreateTaskAsync(writer, JsonValue.Null, new TaskOptions(TaskOwnership.Conversation)), Context);
             harness.Resume();
@@ -257,8 +341,13 @@ internal static partial class HarnessTests
             Equal(conversation.Id, entry?.ConversationId, "entry conversation");
             SameJson("""["wrote"]""", progressSeen, "progress seen");
             Check(await harness.SnapshotAsync(progress, id, Context) is null, "task document retired");
+            var childReceipt = await harness.WaitForTaskAsync(childId!.Value, Context);
+            // The Session indexed the documents of the tasks it created, so no terminal commit scanned for them, and it dropped each task's
+            // entry at its end.
+            Equal(0, counting.Scans, "document scans");
+            Equal(0, ((DurableHarness)harness).IndexSizes.TaskDocuments, "task documents");
             Equal(receipt, await harness.GetTaskAsync(id, Context), "getTask");
-            Equal(conversation.Id, (await harness.WaitForTaskAsync(childId!.Value, Context)).ConversationId, "child conversation");
+            Equal(conversation.Id, childReceipt.ConversationId, "child conversation");
             Check(root.Id != conversation.Id, "distinct conversations");
             await harness.CloseAsync(Context);
         });
@@ -521,11 +610,11 @@ internal static partial class HarnessTests
 
         yield return Case(prefix + "task-runtime.rejects-runtime-operations-after-the-invocation-ends-and-stops-its-watches", async () =>
         {
-            var notes = Documents.DefineSessionDoc("test.task-notes", 1, () => O("""{"text":""}"""));
+            var notes = Documents.DefineSessionDoc("test.task-notes", 1, () => O("""{"text":""}"""), checkpointWhen: (_, _, _) => false);
             ITaskRuntime? captured = null;
             Task<WatchEnd>? watchClosed = null;
             var delivered = new SyncList<string>();
-            var absentDoc = Documents.DefineSessionDoc("test.task-absent", 1, () => O("""{"text":""}"""));
+            var absentDoc = Documents.DefineSessionDoc("test.task-absent", 1, () => O("""{"text":""}"""), checkpointWhen: (_, _, _) => false);
             object? absent = "unset";
             DurableContext? handlerContext = null;
             var watcher = OneStep("test.watcher", async (_, runtime, ctx) =>
@@ -534,9 +623,9 @@ internal static partial class HarnessTests
                 handlerContext = ctx;
                 absent = await runtime.WatchDocAsync(absentDoc, ctx);
                 var watch = await runtime.WatchDocAsync(notes, ctx);
-                watch!.Start((value, _, _) =>
+                watch!.Start((call, _) =>
                 {
-                    delivered.Add(value is null ? "retired" : S(value["text"]));
+                    delivered.Add(S(Change(call).Value["text"]));
                     return Task.CompletedTask;
                 });
                 watchClosed = watch.Closed;
@@ -557,7 +646,7 @@ internal static partial class HarnessTests
             await RejectsAsync(() => runtime.CommitAsync((_, _) => { }, Context), "invocation has ended", "commit");
             await RejectsAsync(() => runtime.MemoAsync("x", Context), "invocation has ended", "memo read");
             await RejectsAsync(() => runtime.MemoAsync("x", 1, Context), "invocation has ended", "memo write");
-            await RejectsAsync(() => runtime.SleepAsync(0, Context), "invocation has ended", "sleep");
+            await RejectsAsync(() => runtime.SleepUntilAsync(0, RunStep, Context), "invocation has ended", "sleep");
             await RejectsAsync(() => runtime.WatchDocAsync(notes, Context), "invocation has ended", "watch");
             // The handler's own context is cancelled by now; the ended invocation still wins.
             await RejectsAsync(() => runtime.AgentAsync(handlerContext!), "invocation has ended", "agent");
@@ -568,7 +657,8 @@ internal static partial class HarnessTests
 
         yield return Case(prefix + "task-runtime.reads-committed-documents-and-context-through-the-runtime-and-forwards-the-clock-and-reports", async () =>
         {
-            var notes = Documents.DefineRewindableConversationDoc("test.runtime-notes", 1, DocumentFork.AsOf, () => O("""{"text":""}"""));
+            var notes = Documents.DefineRewindableConversationDoc("test.runtime-notes", 1, DocumentFork.AsOf, () => O("""{"text":""}"""),
+                checkpointWhen: (_, _, _) => false);
             ITaskRuntime? captured = null;
             var seen = new SyncList<JsonValue?>();
             var reader = OneStep("test.reader", async (_, runtime, ctx) =>
@@ -639,7 +729,7 @@ internal static partial class HarnessTests
 
         yield return Case(prefix + "task-runtime.stops-a-watch-whose-acquisition-finishes-after-the-invocation-ended", async () =>
         {
-            var notes = Documents.DefineSessionDoc("test.late-watch", 1, () => O("""{"text":""}"""));
+            var notes = Documents.DefineSessionDoc("test.late-watch", 1, () => O("""{"text":""}"""), checkpointWhen: (_, _, _) => false);
             var controlled = Controlled();
             Task<object?>? watching = null;
             Gate? held = null;
@@ -666,65 +756,6 @@ internal static partial class HarnessTests
             await harness.CloseAsync(Context);
         });
 
-        yield return Case(prefix + "task-runtime.sleeps-until-the-harness-clock-reaches-the-deadline-rechecking-after-each-timer", async () =>
-        {
-            double clock = 1_000;
-            var woke = new Deferred();
-            var sleeper = OneStep("test.sleeper", async (_, runtime, ctx) =>
-            {
-                await runtime.SleepAsync(900, ctx);
-                await runtime.SleepAsync(1_005, ctx);
-                woke.Resolve();
-                await runtime.CommitAsync((_, _) => Completed(null), ctx);
-            });
-            var (harness, _, _, root) = await OpenRoot(storage(), [sleeper], now: () => Volatile.Read(ref clock));
-            var id = await Start(root, sleeper);
-            harness.Resume();
-            // The clock stands still, so real timers keep firing without waking the task.
-            await Task.Delay(30);
-            Check(!await Settled(woke.Task), "still sleeping");
-            Volatile.Write(ref clock, 1_005);
-            await harness.WaitForTaskAsync(id, Context);
-            await harness.CloseAsync(Context);
-        });
-
-        yield return Case(prefix + "task-runtime.rejects-a-sleep-when-the-invocation-is-signalled-or-the-sleeps-own-context-is-cancelled", async () =>
-        {
-            var results = new SyncList<string>();
-            var sleeping = new Deferred();
-            double Later() => DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() + 60_000;
-            var signalled = OneStep("test.sleep-signalled", async (_, runtime, ctx) =>
-            {
-                sleeping.Resolve();
-                try { await runtime.SleepAsync(Later(), ctx); }
-                catch (Exception error)
-                {
-                    results.Add($"signalled:{error.GetType().Name}");
-                    throw;
-                }
-            });
-            var cancelledTask = OneStep("test.sleep-cancelled", async (_, runtime, ctx) =>
-            {
-                var controller = Context.WithCancel();
-                var pending = runtime.SleepAsync(Later(), controller.Context);
-                controller.Cancel(new InvalidOperationException("stop sleeping"));
-                try { await pending; }
-                catch (Exception error) { results.Add($"cancelled:{error.Message}"); }
-                await runtime.CommitAsync((_, _) => Completed(null), ctx);
-            });
-            var (harness, _, _, root) = await OpenRoot(storage(), [signalled, cancelledTask]);
-            var signalledId = await Start(root, signalled);
-            var cancelledId = await Start(root, cancelledTask);
-            harness.Resume();
-            await harness.WaitForTaskAsync(cancelledId, Context);
-            await sleeping.Task;
-            await harness.AbortTaskAsync(signalledId, Context);
-            SameJson("""{"status":"aborted","reason":"test"}""", Outcome(await harness.WaitForTaskAsync(signalledId, Context)), "outcome");
-            // Upstream's AbortError is OperationCanceledException.
-            Seq(["cancelled:stop sleeping", "signalled:OperationCanceledException"], results.Snapshot(), "results");
-            await harness.CloseAsync(Context);
-        });
-
         // ─── task scheduling ───
 
         yield return Case(prefix + "task-scheduling.fails-the-harness-on-a-failed-reservation-commit-reopening-runs-the-task", async () =>
@@ -747,7 +778,7 @@ internal static partial class HarnessTests
             harness.Resume();
             var waiting = harness.WaitForTaskAsync(id, Context);
             var end = await harness.Closed;
-            Equal(new SessionEnd(SessionEndReason.Failed, failure), end, "closed");
+            Equal(SessionEnd.Failed(failure), end, "closed");
             Seq([failure], reports.Snapshot(), "reports");
             // The pending wait and every later call get SessionFailed with the storage error.
             Same(failure, (await ThrowsAsync<SessionFailedException>(() => waiting, "pending wait")).InnerException, "wait cause");
@@ -780,7 +811,7 @@ internal static partial class HarnessTests
             var (harness, _, reports, root) = await OpenRoot(controlled, [throws]);
             var id = await Start(root, throws);
             harness.Resume();
-            Equal(new SessionEnd(SessionEndReason.Failed, failure), await harness.Closed, "closed");
+            Equal(SessionEnd.Failed(failure), await harness.Closed, "closed");
             Equal(1, Volatile.Read(ref runs), "runs");
             Seq([failure], reports.Snapshot(), "reports");
             await harness.CloseAsync(Context);
@@ -1213,7 +1244,12 @@ internal static partial class HarnessTests
             proceed.Resolve();
             await closing;
             Equal(TaskAbortResult.Marked, await aborting, "abort");
-            Equal(commits, controlled.CommitCount, "no commit while closing");
+            // No outcome: close writes only the stopped task back as pending, so a reopen counts no restart.
+            Equal(commits + 1, controlled.CommitCount, "only the write-back while closing");
+            var written = controlled.LastCommit;
+            Check(written.Length == 1 && written[0] is TaskWrite { Value: { AbortRequested: true, State: PendingTaskState pending } back } &&
+                back.Id == id && JsonValue.DeepEquals(pending.Checkpoint, O("""{"phase":"two"}""")),
+                $"close writes the marked task back as pending at phase two: {string.Join(", ", written)}");
             Seq(["one"], phases.Snapshot(), "phases");
             Check(!Volatile.Read(ref abortRan), "no abort handler");
             Check(record is { AbortRequested: true, State: RunningTaskState running } && JsonValue.DeepEquals(running.Checkpoint, O("""{"phase":"two"}""")),
@@ -1223,7 +1259,7 @@ internal static partial class HarnessTests
 
         yield return Case(prefix + "task-close.seals-admission-before-signalling-handlers-and-stops-watches-before-joining-them", async () =>
         {
-            var notes = Documents.DefineSessionDoc("test.close-notes", 1, () => O("""{"text":""}"""));
+            var notes = Documents.DefineSessionDoc("test.close-notes", 1, () => O("""{"text":""}"""), checkpointWhen: (_, _, _) => false);
             var reached = new Deferred();
             Task? fromListener = null;
             IHarness? harnessRef = null;
@@ -1244,18 +1280,18 @@ internal static partial class HarnessTests
             await reached.Task;
             await harness.CloseAsync(Context);
             await RejectsAsync(() => fromListener!, "closed", "commit from the signal listener");
-            Equal(WatchEnd.SessionClosed, watchEnd, "watch end");
+            Equal(WatchEnd.Ended, watchEnd, "watch end");
         });
 
         yield return Case(prefix + "task-close.writes-no-fault-when-close-seals-while-the-step-after-a-failed-phase-is-queued", async () =>
         {
             var controlled = Controlled();
-            Gate? held = null;
+            LineHold? held = null;
             IHarness? harnessRef = null;
-            var throws = OneStep("test.close-fault", (_, runtime, _) =>
+            var throws = OneStep("test.close-fault", (_, _, _) =>
             {
-                held = controlled.HoldCommits();
-                _ = harnessRef!.CommitAsync(async tx => { await tx.AppendEntryAsync(runtime.ConversationId, new EntryDraft { Kind = "blocker" }); }, Context);
+                // The step after this phase queues behind a job that holds the line.
+                held = HoldLine(harnessRef!);
                 throw new InvalidOperationException("would fault");
             });
             var (harness, _, _, root) = await OpenRoot(controlled, [throws]);
@@ -1268,7 +1304,8 @@ internal static partial class HarnessTests
             var closing = harness.CloseAsync(Context);
             held.Release();
             await closing;
-            Seq(["pending", "running"], TaskWrites(controlled, id).Select(record => WireName(record.State.Status)), "task writes");
+            // Created, reserved, and written back as pending by close: no fault.
+            Seq(["pending", "running", "pending"], TaskWrites(controlled, id).Select(record => WireName(record.State.Status)), "task writes");
         });
 
         yield return Case(prefix + "task-close.starts-no-abort-handler-whose-reservation-settles-while-closing", async () =>
@@ -1290,22 +1327,25 @@ internal static partial class HarnessTests
             held.Release();
             await closing;
             Check(!Volatile.Read(ref ran), "no abort handler");
-            var writes = controlled.LastCommit.OfType<TaskWrite>().Select(write => write.Value).ToList();
+            // The reservation landed; close wrote the task back as pending.
+            var writes = controlled.Commits[^2].OfType<TaskWrite>().Select(write => write.Value).ToList();
             Check(writes.Count == 1 && writes[0].Id == id && writes[0].AbortRequested && writes[0].State.Status == DurableTaskStatus.Running,
-                $"last commit reserves the marked task: {string.Join(", ", writes)}");
+                $"the commit before the last reserves the marked task: {string.Join(", ", writes)}");
+            var written = controlled.LastCommit;
+            Check(written.Length == 1 && written[0] is TaskWrite { Value: { AbortRequested: true, State.Status: DurableTaskStatus.Pending } back } && back.Id == id,
+                $"close writes the marked task back as pending: {string.Join(", ", written)}");
         });
 
         yield return Case(prefix + "task-close.rejects-a-runtime-commit-that-was-queued-on-the-line-when-close-sealed-it", async () =>
         {
             var controlled = Controlled();
             Task<object?>? queued = null;
-            Gate? held = null;
+            LineHold? held = null;
             IHarness? harnessRef = null;
             var proceed = new Deferred();
             var queuedTask = OneStep("test.close-queued-commit", async (_, runtime, _) =>
             {
-                held = controlled.HoldCommits();
-                _ = harnessRef!.CommitAsync(async tx => { await tx.AppendEntryAsync(runtime.ConversationId, new EntryDraft { Kind = "blocker" }); }, Context);
+                held = HoldLine(harnessRef!);
                 queued = Catch<object?>(async () => { await runtime.CommitAsync((_, _) => Completed(null), Context); return null; });
                 // Ignores the close signal, so the invocation is still alive when the queued commit reaches the line.
                 await proceed.Task;
@@ -1322,7 +1362,8 @@ internal static partial class HarnessTests
             Check((await queued!)?.ToString()?.Contains("Harness is closed") == true, "queued commit rejects");
             proceed.Resolve();
             await closing;
-            Equal(2, TaskWrites(controlled, id).Count, "task writes");
+            // Created, reserved, and written back as pending by close; the queued outcome never landed.
+            Seq(["pending", "running", "pending"], TaskWrites(controlled, id).Select(record => WireName(record.State.Status)), "task writes");
         });
 
         yield return Case(prefix + "task-close.starts-no-next-phase-when-close-seals-during-a-step-that-decided-to-continue", async () =>
@@ -1392,10 +1433,406 @@ internal static partial class HarnessTests
             held.Release();
             await closing;
             Check(!Volatile.Read(ref ran), "no handler");
-            var writes = controlled.LastCommit.OfType<TaskWrite>().Select(write => write.Value).ToList();
+            // The reservation landed; close wrote the task back as pending.
+            var writes = controlled.Commits[^2].OfType<TaskWrite>().Select(write => write.Value).ToList();
             Check(writes.Count == 1 && writes[0].Id == id && writes[0].State.Status == DurableTaskStatus.Running,
-                $"last commit reserves the task: {string.Join(", ", writes)}");
+                $"the commit before the last reserves the task: {string.Join(", ", writes)}");
+            var written = controlled.LastCommit;
+            Check(written.Length == 1 && written[0] is TaskWrite { Value: { State.Status: DurableTaskStatus.Pending } back } && back.Id == id,
+                $"close writes the task back as pending: {string.Join(", ", written)}");
         });
+
+        // ─── publication at adoption ───
+
+        // Both storages: one that resolves right after adopting, one that still works after it (JSONL's sidecar reclaim).
+        var storages = new (string Name, Func<ControlledStorage> Open)[]
+        {
+            ("memory", Controlled),
+            ("work-after-adopt", () => new LateResolvingStorage(storage())),
+        };
+
+        yield return Case(prefix + "publication-at-adoption.resumes-task-and-idle-waits-only-once-observecommits-observers-saw-the-terminal-commit", async () =>
+        {
+            var gate = new Deferred();
+            var gated = GatedTask("test.wake-gated", gate.Task);
+            var (harness, _, _, root) = await OpenRoot(new LateResolvingStorage(storage()), [gated]);
+            var seen = new ConcurrentDictionary<TaskId, bool>();
+            harness.ObserveCommits(new CommitObserver((publication, _) =>
+            {
+                foreach (var change in publication.Changes)
+                    if (change is TaskWrite { Value: { State.Status: DurableTaskStatus.Terminal } record }) seen[record.Id] = true;
+            }, _ => { }));
+            var id = await Start(root, gated);
+            harness.Resume();
+            async Task<bool> Seen(Task wait)
+            {
+                await wait;
+                return seen.ContainsKey(id);
+            }
+            var task = Seen(harness.WaitForTaskAsync(id, Context));
+            var idle = Seen(harness.WaitForIdleAsync(Context));
+            var conversationIdle = Seen(root.WaitForIdleAsync(Context));
+            gate.Resolve();
+            Seq([true, true, true], await Task.WhenAll(task, idle, conversationIdle), "seen when each wait resumed");
+            await harness.CloseAsync(Context);
+        });
+
+        foreach (var (name, open) in storages)
+        {
+            yield return Case(prefix + $"publication-at-adoption.runs-host-listeners-before-the-waits-a-terminal-commit-resolves-{name}", async () =>
+            {
+                var controlled = open();
+                var gate = new Deferred();
+                var gated = GatedTask("test.order-gated", gate.Task);
+                var (harness, _, _, root) = await OpenRoot(controlled, [gated]);
+                var order = new SyncList<string>();
+                var id = await Start(root, gated);
+                harness.ObserveCommits(new CommitObserver((publication, _) =>
+                {
+                    if (Terminal(publication, id)) order.Add($"host adopting={Lower(controlled.Adopting)}");
+                }, _ => { }));
+                harness.Resume();
+                var waited = Then(harness.WaitForTaskAsync(id, Context), () => order.Add("wait"));
+                gate.Resolve();
+                await waited;
+                Seq(["host adopting=false", "wait"], order.Snapshot(), "order");
+                await harness.CloseAsync(Context);
+            });
+
+            yield return Case(prefix + $"publication-at-adoption.signals-a-newly-marked-run-after-host-listeners-saw-the-mark-outside-the-storages-adopt-{name}", async () =>
+            {
+                var controlled = open();
+                var reached = new Deferred();
+                var release = new Deferred();
+                var order = new SyncList<string>();
+                // The abort handler waits until the order is asserted, so its terminal commit, which keeps the mark, adds no "host" before it.
+                var signalled = OneStep("test.order-signalled", async (_, runtime, _) =>
+                {
+                    runtime.Signal.Register(() => order.Add($"abort adopting={Lower(controlled.Adopting)}"));
+                    reached.Resolve();
+                    await Aborted(runtime.Signal);
+                }, async (runtime, ctx) =>
+                {
+                    await release.Task;
+                    await runtime.CommitAsync((_, _) => AbortedWith("test"), ctx);
+                });
+                var (harness, _, _, root) = await OpenRoot(controlled, [signalled]);
+                var id = await Start(root, signalled);
+                harness.ObserveCommits(new CommitObserver((publication, _) =>
+                {
+                    foreach (var change in publication.Changes)
+                        if (change is TaskWrite { Value: { AbortRequested: true } record } && record.Id == id) order.Add("host");
+                }, _ => { }));
+                harness.Resume();
+                await reached.Task;
+                Equal(TaskAbortResult.Marked, await harness.AbortTaskAsync(id, Context), "abort");
+                Seq(["host", "abort adopting=false"], order.Snapshot(), "order");
+                release.Resolve();
+                await harness.CloseAsync(Context);
+            });
+        }
+
+        yield return Case(prefix + "publication-at-adoption.resolves-a-waitforidle-called-while-the-storage-stores-the-commit-at-its-publication-after-host-listeners", async () =>
+        {
+            var late = new LateResolvingStorage(storage());
+            var gate = new Deferred();
+            var gated = GatedTask("test.gap-idle", gate.Task);
+            var (harness, _, _, root) = await OpenRoot(late, [gated]);
+            var order = new SyncList<string>();
+            var id = await Start(root, gated);
+            harness.ObserveCommits(new CommitObserver((publication, _) =>
+            {
+                if (Terminal(publication, id)) order.Add("host");
+            }, _ => { }));
+            var gapped = new Deferred();
+            Task? idle = null;
+            late.Gap = writes =>
+            {
+                if (!EndsTask(writes)) return false;
+                idle = Then(harness.WaitForIdleAsync(Context), () => order.Add($"idle committing={Lower(late.Committing)}"));
+                gapped.Resolve();
+                return true;
+            };
+            harness.Resume();
+            gate.Resolve();
+            await gapped.Task;
+            await idle!;
+            Seq(["host", "idle committing=false"], order.Snapshot(), "order");
+            await harness.CloseAsync(Context);
+        });
+
+        yield return Case(prefix + "publication-at-adoption.publishes-a-commit-the-storage-rejects-after-adopting-it-resolves-its-waits-then-fails-the-session", async () =>
+        {
+            var late = new LateResolvingStorage(storage());
+            var telemetry = new PiSharp.Telemetry.InMemoryTelemetryContext();
+            var gate = new Deferred();
+            var gated = GatedTask("test.reject-after-adopt", gate.Task);
+            var opened = await OpenRoot(late, [gated], telemetry: telemetry);
+            var (harness, _, _, root) = opened;
+            var id = await Start(root, gated);
+            var seen = new SyncList<string>();
+            harness.ObserveCommits(new CommitObserver((publication, _) =>
+            {
+                if (Terminal(publication, id)) seen.Add("terminal");
+            }, _ => { }));
+            late.RejectAfterAdopt = EndsTask;
+            harness.Resume();
+            var waited = harness.WaitForTaskAsync(id, Context);
+            gate.Resolve();
+            SameJson("""{"status":"completed","result":null}""", Outcome(await waited), "outcome");
+            Seq(["terminal"], seen.Snapshot(), "seen");
+            var end = await harness.Closed;
+            Equal(SessionEndKind.Failed, end.Kind, "end");
+            Equal("reclaim failed", end.Error?.Message, "end error");
+            Check(opened.Infos.Snapshot().Contains(ReportInfo.StorageFailed), "storage_failed reported");
+            Seq([1.0, -1.0], ActiveTasks(telemetry), "pi.durable.tasks.active");
+        });
+
+        yield return Case(prefix + "publication-at-adoption.counts-a-task-created-by-a-commit-the-storage-rejects-after-adopting-it-and-its-close-balances-it", async () =>
+        {
+            var late = new LateResolvingStorage(storage());
+            var telemetry = new PiSharp.Telemetry.InMemoryTelemetryContext();
+            var idleTask = OneStep("test.reject-created", (_, _, _) => Task.CompletedTask);
+            var (harness, _, _, root) = await OpenRoot(late, [idleTask], telemetry: telemetry);
+            late.RejectAfterAdopt = writes => writes.Any(write => write is TaskWrite);
+            await RejectsAsync(() => Start(root, idleTask), "reclaim failed", "start");
+            Equal(SessionEndKind.Failed, (await harness.Closed).Kind, "end");
+            Seq([1.0, -1.0], ActiveTasks(telemetry), "pi.durable.tasks.active");
+        });
+
+        yield return Case(prefix + "publication-at-adoption.keeps-a-task-wait-resolved-when-a-host-listener-closes-the-harness-on-the-terminal-commit", async () =>
+        {
+            var gate = new Deferred();
+            var gated = GatedTask("test.close-in-listener", gate.Task);
+            var (harness, _, _, root) = await OpenRoot(storage(), [gated]);
+            var id = await Start(root, gated);
+            Task? closing = null;
+            harness.ObserveCommits(new CommitObserver((publication, _) =>
+            {
+                if (Terminal(publication, id)) closing = harness.CloseAsync(Context);
+            }, _ => { }));
+            harness.Resume();
+            var waited = harness.WaitForTaskAsync(id, Context);
+            gate.Resolve();
+            SameJson("""{"status":"completed","result":null}""", Outcome(await waited), "outcome");
+            await closing!;
+        });
+
+        yield return Case(prefix + "publication-at-adoption.ends-a-task-wait-when-the-harness-closes-while-the-terminal-commit-is-stored-and-still-stores-it", async () =>
+        {
+            var late = new LateResolvingStorage(storage()) { KeepOpenForReopen = true };
+            var gate = new Deferred();
+            var gated = GatedTask("test.close-in-gap", gate.Task);
+            var (harness, _, _, root) = await OpenRoot(late, [gated]);
+            var id = await Start(root, gated);
+            var gapped = new Deferred();
+            Task? closing = null;
+            late.Gap = writes =>
+            {
+                if (!EndsTask(writes)) return false;
+                closing = harness.CloseAsync(Context);
+                gapped.Resolve();
+                return true;
+            };
+            harness.Resume();
+            var waited = Catch(async () => Outcome(await harness.WaitForTaskAsync(id, Context)));
+            gate.Resolve();
+            await gapped.Task;
+            await closing!;
+            // Close ends the waits before it drains the commit in flight, which is published and stored all the same.
+            var result = await waited;
+            Check(result is Exception { Message: var message } && message.Contains("closed"), $"the wait ends with close: {result}");
+            Equal(SessionEndKind.Closed, (await harness.Closed).Kind, "end");
+            var reopened = await OpenRoot(late.Reopen(), [gated]);
+            Equal(DurableTaskStatus.Terminal, (await reopened.Harness.GetTaskAsync(id, Context))?.State.Status, "status after reopen");
+            await reopened.Harness.CloseAsync(Context);
+        });
+
+        yield return Case(prefix + "publication-at-adoption.fails-the-session-with-the-storage-error-when-it-rejects-after-adopting-and-reports-an-observers-throw", async () =>
+        {
+            var late = new LateResolvingStorage(storage());
+            var opened = await OpenRoot(late, []);
+            var (harness, _, reports, root) = opened;
+            var bug = new InvalidOperationException("observer bug");
+            FollowCommits(harness, (publication, _) =>
+            {
+                if (!publication.IsMemory && publication.Changes.Any(change => change is EntryWrite)) throw bug;
+            });
+            late.RejectAfterAdopt = writes => writes.Any(write => write is EntryWrite);
+            await RejectsAsync(() => root.CommitAsync(tx => tx.AppendEntryAsync(root.Id, new EntryDraft { Kind = "note", Data = JsonObjectValue.Empty }),
+                Context), "reclaim failed", "commit");
+            var end = await harness.Closed;
+            Equal(SessionEndKind.Failed, end.Kind, "end");
+            Equal("reclaim failed", end.Error?.Message, "end error");
+            var index = reports.Snapshot().IndexOf(bug);
+            Check(index >= 0, "the observer's throw is reported");
+            Equal(ReportInfo.ListenerError, opened.Infos[index], "observer info");
+            Check(opened.Infos.Snapshot().Contains(ReportInfo.StorageFailed), "storage_failed reported");
+        });
+
+        yield return Case(prefix + "publication-at-adoption.stores-a-host-listeners-own-commit-before-the-reconcile-commit-that-the-same-publication-asks-for", async () =>
+        {
+            var controlled = Controlled();
+            var gate = new Deferred();
+            var child = GatedTask("test.order-child", gate.Task);
+            var parent = OneStep("test.order-parent", async (task, runtime, ctx) =>
+            {
+                await runtime.CommitAsync(async (tx, _) =>
+                {
+                    await tx.CreateTaskAsync(child, JsonValue.Null, new TaskOptions(TaskOwnership.Task(task.Id)));
+                }, ctx);
+                // The child is still live, so the outcome is held as `completing` until a reconcile pass finalizes it.
+                await runtime.CommitAsync((_, _) => Completed(null), ctx);
+            });
+            var (harness, _, _, root) = await OpenRoot(controlled, [parent, child]);
+            var parentId = await Start(root, parent);
+            harness.Resume();
+            await Eventually(async () => (await harness.GetTaskAsync(parentId, Context))?.State.Status == DurableTaskStatus.Completing);
+            harness.ObserveCommits(new CommitObserver((publication, observerContext) =>
+            {
+                var ended = publication.Changes.Any(change =>
+                    change is TaskWrite { Value: var record } && record.Id != parentId && record.State.Status == DurableTaskStatus.Terminal);
+                if (ended) _ = root.CommitAsync(tx => tx.AppendEntryAsync(root.Id, new EntryDraft { Kind = "note", Data = JsonObjectValue.Empty }), Context);
+            }, _ => { }));
+            var before = controlled.CommitCount;
+            gate.Resolve();
+            await harness.WaitForTaskAsync(parentId, Context);
+            // Read after close: no commit can land meanwhile.
+            await harness.CloseAsync(Context);
+            var kinds = controlled.Commits.Skip(before).Select(writes =>
+            {
+                if (writes.Any(write => write is EntryWrite)) return "host entry";
+                if (writes.OfType<TaskWrite>().FirstOrDefault() is not { Value: { State.Status: DurableTaskStatus.Terminal } task }) return "other";
+                return task.Id == parentId ? "parent terminal" : "child terminal";
+            });
+            Seq(["child terminal", "host entry", "parent terminal"], kinds.Where(kind => kind != "other"), "stored order");
+        });
+
+        // PiSharp's own (see the file header).
+        yield return Case(prefix + "publication-at-adoption.stores-a-host-listeners-own-commit-before-the-reconcile-commit-while-a-busy-pool-holds-the-schedulers-work", async () =>
+        {
+            var controlled = Controlled();
+            var gate = new Deferred();
+            var finish = new Deferred();
+            var created = new Deferred<TaskId>();
+            var child = GatedTask("test.busy-pool-child", gate.Task);
+            var parent = OneStep("test.busy-pool-parent", async (task, runtime, ctx) =>
+            {
+                await runtime.CommitAsync(async (tx, _) =>
+                {
+                    created.Resolve(await tx.CreateTaskAsync(child, JsonValue.Null, new TaskOptions(TaskOwnership.Task(task.Id))));
+                }, ctx);
+                await finish.Task;
+                await runtime.CommitAsync((_, _) => Completed(null), ctx);
+            });
+            var (harness, _, _, root) = await OpenRoot(controlled, [parent, child]);
+            var parentId = await Start(root, parent);
+            harness.Resume();
+            var childId = await created.Task;
+            await Eventually(async () => (await harness.GetTaskAsync(childId, Context))?.State.Status == DurableTaskStatus.Running);
+            // No pass is pending, so none the pool started on its own takes the requests below.
+            var scheduler = ((DurableHarness)harness).Scheduler;
+            await scheduler.QuiesceAsync();
+            // From here on, the pool starts nothing the scheduler hands it. An idle wait asks for a reconcile pass outside a publication,
+            // so the pass is pending when the parent's `completing` commit asks for one.
+            var pool = new HeldPool();
+            scheduler.Dispatch = pool.Post;
+            var idle = harness.WaitForIdleAsync(Context);
+            finish.Resolve();
+            await Eventually(async () => (await harness.GetTaskAsync(parentId, Context))?.State.Status == DurableTaskStatus.Completing);
+            await InvocationEnded(harness, parentId);
+            harness.ObserveCommits(new CommitObserver((publication, observerContext) =>
+            {
+                var ended = publication.Changes.Any(change =>
+                    change is TaskWrite { Value: var record } && record.Id != parentId && record.State.Status == DurableTaskStatus.Terminal);
+                if (ended) _ = root.CommitAsync(tx => tx.AppendEntryAsync(root.Id, new EntryDraft { Kind = "note", Data = JsonObjectValue.Empty }), Context);
+            }, _ => { }));
+            var before = controlled.CommitCount;
+            var storing = controlled.HoldCommits();
+            gate.Resolve();
+            await storing.Entered;
+            // The pool frees up while the child's terminal commit is stored, then the commit lands.
+            pool.Release();
+            storing.Release();
+            await harness.WaitForTaskAsync(parentId, Context);
+            await idle;
+            await harness.CloseAsync(Context);
+            var kinds = controlled.Commits.Skip(before).Select(writes =>
+            {
+                if (writes.Any(write => write is EntryWrite)) return "host entry";
+                if (writes.OfType<TaskWrite>().FirstOrDefault() is not { Value: { State.Status: DurableTaskStatus.Terminal } task }) return "other";
+                return task.Id == parentId ? "parent terminal" : "child terminal";
+            });
+            Seq(["child terminal", "host entry", "parent terminal"], kinds.Where(kind => kind != "other"), "stored order");
+        });
+
+        yield return Case(prefix + "publication-at-adoption.calls-a-host-listener-added-on-a-harness-during-a-publication-only-when-one-was-registered-at-it", async () =>
+        {
+            var controlled = Controlled();
+            var (harness, _, _, root) = await OpenRoot(controlled, []);
+            Task<EntryRecord> Note() => root.CommitAsync(tx => tx.AppendEntryAsync(root.Id, new EntryDraft { Kind = "note", Data = JsonObjectValue.Empty }), Context);
+            var late = new SyncList<Seq>();
+            CommitObservation? stopLate = null;
+            // Runs once, during the next publication, after its dispatch was queued or not.
+            Action? during = null;
+            FollowCommits(harness, (_, _) => Interlocked.Exchange(ref during, null)?.Invoke());
+            // No host listener at the publication, although the Harness's own observers run: no dispatch, so the late one misses it.
+            Volatile.Write(ref during, () =>
+            {
+                stopLate = harness.ObserveCommits(new CommitObserver((publication, _) => late.Add(publication.Seq), _ => { }));
+            });
+            await Note();
+            await Flush();
+            Seq([], late.Snapshot(), "late, at the publication it was added in");
+            await Note();
+            Equal(1, late.Count, "late, at the next");
+            stopLate!.Detach();
+            // One registered at adopt: the dispatch reads the listeners when it runs, the late one included.
+            harness.ObserveCommits(new CommitObserver((_, _) => { }, _ => { }));
+            var second = new SyncList<Seq>();
+            Volatile.Write(ref during, () =>
+            {
+                harness.ObserveCommits(new CommitObserver((publication, _) => second.Add(publication.Seq), _ => { }));
+            });
+            await Note();
+            Equal(1, second.Count, "second, at the publication it was added in");
+            await harness.CloseAsync(Context);
+        });
+    }
+
+    /// <summary>Whether <paramref name="publication"/> makes task <paramref name="id"/> terminal (upstream <c>terminal</c>).</summary>
+    private static bool Terminal(CommitPublication publication, TaskId id) =>
+        publication.Changes.Any(change => change is TaskWrite { Value: var record } && record.Id == id && record.State.Status == DurableTaskStatus.Terminal);
+
+    /// <summary>Whether <paramref name="writes"/> make a task terminal (upstream <c>endsTask</c>).</summary>
+    private static bool EndsTask(IReadOnlyList<StorageWrite> writes) =>
+        writes.Any(write => write is TaskWrite { Value.State.Status: DurableTaskStatus.Terminal });
+
+    /// <summary>Runs <paramref name="then"/> once <paramref name="wait"/> resumes (upstream's <c>.then(() => order.push(...))</c>).</summary>
+    private static async Task Then(Task wait, Action then)
+    {
+        await wait;
+        then();
+    }
+
+    private static string Lower(bool value) => value ? "true" : "false";
+
+    /// <summary>The values of the <c>pi.durable.tasks.active</c> counter, in order.</summary>
+    private static List<double> ActiveTasks(PiSharp.Telemetry.InMemoryTelemetryContext telemetry) =>
+        [.. telemetry.GetMetrics().Where(metric => metric.Name == "pi.durable.tasks.active").Select(metric => metric.Value)];
+
+    /// <summary>Controlled storage counting its document scans (upstream's <c>CountingStorage</c> over MemoryStorage).</summary>
+    private sealed class DocumentScans(IStorage inner) : ControlledStorage(inner)
+    {
+        private int scans;
+
+        public int Scans => Volatile.Read(ref scans);
+
+        public override Task<Page<DocumentRecord>> ScanDocumentsAsync(DocumentQuery query, int limit, JsonObjectValue? cursor, DurableContext context)
+        {
+            Interlocked.Increment(ref scans);
+            return base.ScanDocumentsAsync(query, limit, cursor, context);
+        }
     }
 
     /// <summary>Every committed write of task <paramref name="id"/>, in commit order.</summary>

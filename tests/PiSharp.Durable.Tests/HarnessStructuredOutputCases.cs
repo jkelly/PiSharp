@@ -1,12 +1,16 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/test/harness-structured-output.test.ts ("structured output"), as
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/test/harness-structured-output.test.ts ("structured output"), as
 // harness.structured-output.<case>. Verbatim apart from the adaptations in HarnessSupport.cs and ChatSupport.cs, and these:
-// - Schemas are the JSON TypeBox prints: `Type.Object({ count: Type.Number() })` is Count, `Type.Null()` is {"type":"null"}, and
-//   `Type.Object({})` is ToolRegistration.EmptyParameters.
+// - Schemas are the JSON pi-schema builds (Pi v1.5.0, area tools-schema): `obj({ count: num() })` is Count, `nul()` is {"type":"null"},
+//   and `obj({})` is ToolsSchema150.EmptyObject.
 // - A result's `toHaveProperty("structuredOutput")` is NestedToolExecutionResult.StructuredOutput being null (absent; a JSON null is
 //   JsonValue.Null), and a stored message's is its JSON key; toEqual and toMatchObject compare the result's JSON (ToJson), whose durationMs
 //   and taskId are matched as numbers.
 // - `new NodeExecutionEnv({ cwd })` is LocalExecutionEnv (Git Bash on Windows).
 // - Upstream runs these on MemoryStorage; so do they here.
+// Pi v1.5.0 sync (area events, f3255de76): "stores exactly what callers and events get ..." no longer compares watchEvents' nested tool
+// ends (removed): a client reads a live caller's nested results from the same documents the stored results come from.
+// Pi v1.5.0 sync (area vocabulary, 5f312dac4): the committed results are read with an ObserveCommits observer (upstream
+// observeCommits({ advance, end })) from the nested-call documents' changes of kind change (DocumentValueChange).
 using System.Collections.Immutable;
 using PiSharp.Durable;
 using PiSharp.Durable.Chord;
@@ -29,7 +33,7 @@ internal static class StructuredOutputTests
 {
     private static readonly DurableContext Context = DurableContext.Background;
 
-    private static readonly JsonObjectValue Count = O("""{"type":"object","required":["count"],"properties":{"count":{"type":"number"}}}""");
+    private static readonly JsonObjectValue Count = O("""{"type":"object","properties":{"count":{"type":"number"}},"required":["count"],"additionalProperties":false}""");
 
     /// <summary>A tool that returns <paramref name="result"/>, with <paramref name="schema"/> as its structuredOutputSchema.</summary>
     private static ToolRegistration Returning(string name, ToolExecutionResult result, JsonObjectValue? schema = null,
@@ -37,7 +41,7 @@ internal static class StructuredOutputTests
     {
         var tool = Define.Tool(new ToolRegistration
         {
-            Name = name, Description = name, Parameters = ToolRegistration.EmptyParameters, StructuredOutputSchema = schema,
+            Name = name, Description = name, Parameters = ToolsSchema150.EmptyObject, StructuredOutputSchema = schema,
             Execute = (_, _, _) => Task.FromResult(result),
         });
         return extra is null ? tool : extra(tool);
@@ -53,7 +57,7 @@ internal static class StructuredOutputTests
     {
         Name = "probe",
         Description = "probe",
-        Parameters = ToolRegistration.EmptyParameters,
+        Parameters = ToolsSchema150.EmptyObject,
         Execute = async (_, api, callContext) =>
         {
             await calls(api, callContext);
@@ -138,34 +142,24 @@ internal static class StructuredOutputTests
             var (harness, root) = await OpenChat(new MemoryStorage(), setup);
             // The result each nested call's document got, as committed.
             var stored = new SyncList<JsonValue>();
-            harness.SubscribeCommits((publication, _) =>
+            harness.ObserveCommits(new CommitObserver((publication, _) =>
             {
                 foreach (var change in publication.Changes)
                 {
-                    if (change is not DocumentCommitChange { Record.Kind: "pi.tool.nested-call" } document) continue;
-                    if (document.Value is { } value && value.TryGetValue("result", out var result) && document.Ops.Length > 0) stored.Add(result);
+                    if (change is not DocumentValueChange { Record.Kind: "pi.tool.nested-call" } document) continue;
+                    if (document.Value.TryGetValue("result", out var result) && document.Ops.Length > 0) stored.Add(result);
                 }
-            });
-            var stream = await harness.WatchEventsAsync(root.Id, Context);
-            var ends = new SyncList<NestedToolExecutionResult>();
-            stream.Start((batch, _) =>
-            {
-                foreach (var item in batch)
-                    if (item is ToolExecutionEndEvent { ParentToolCallId: not null } end) ends.Add(end.Result!);
-                return Task.CompletedTask;
-            });
+            }, _ => { }));
             await (await root.SubmitAsync(SubmissionDraft.Input("go"), Context)).WaitAsync(Context);
             await harness.WaitForIdleAsync(Context);
-            await stream.StopAsync();
             await harness.CloseAsync(Context);
 
             var results = received.Snapshot();
             MatchJson("""{"structuredOutput":"a","isError":false}""", results[0].ToJson(), "plain");
             MatchJson("""{"structuredOutput":null,"isError":false}""", results[1].ToJson(), "nothing");
             Check(!results[0].ToJson().ContainsKey("output"), "no output");
+            // A client reads a live caller's nested results from the same documents.
             Equal(JsonValue.Array(results.Select(result => (JsonValue)result.ToJson())).ToJson(), JsonValue.Array(stored.Snapshot()).ToJson(), "stored");
-            Equal(JsonValue.Array(results.Select(result => (JsonValue)result.ToJson())).ToJson(),
-                JsonValue.Array(ends.Snapshot().Select(result => (JsonValue)result.ToJson())).ToJson(), "ends");
         });
 
         yield return Case(prefix + "gives-callers-a-schema-tool-s-validated-structured-output-which-the-transcript-does-not-store", async () =>
@@ -182,7 +176,7 @@ internal static class StructuredOutputTests
             Check(!stored.ContainsKey("structuredOutput"), "no structuredOutput in the transcript");
         });
 
-        yield return Case(prefix + "turns-structured-output-that-breaks-the-schema-into-an-error-result-for-callers-and-a-report-for-the-model-s-calls", async () =>
+        yield return Case("harness.structured-output.turns-structured-output-that-breaks-the-schema-into-an-error-result-for-callers-and-a-report-for-the-model-s-calls", async () =>
         {
             (string Name, ToolExecutionResult Result, bool Schema, string Message)[] cases =
             [
@@ -249,7 +243,7 @@ internal static class StructuredOutputTests
             {
                 Name = "throws",
                 Description = "throws",
-                Parameters = ToolRegistration.EmptyParameters,
+                Parameters = ToolsSchema150.EmptyObject,
                 StructuredOutputSchema = Count,
                 Execute = (_, _, _) => throw new InvalidOperationException("permission denied"),
             }));

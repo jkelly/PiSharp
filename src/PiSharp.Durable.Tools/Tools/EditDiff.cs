@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/src/tools/edit-diff.ts
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/src/tools/edit-diff.ts
 // Shared diff computation for the edit tool. Upstream's `diff` package (jsdiff 8.0.4) is JsDiff.cs. Strings are UTF-16 as in JavaScript:
 // offsets, lengths and substrings count UTF-16 code units, and Unicode normalization leaves lone surrogates as they are.
 using System.Globalization;

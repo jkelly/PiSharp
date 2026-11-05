@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/src/core/extensions/runner.ts (emitUIPromptEvent queues
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/coding-agent/src/core/extensions/runner.ts (emitUIPromptEvent queues
 // each emit with queueMicrotask, so the emits of one source start in the order they were raised; emit awaits every handler in turn).
 namespace PiSharp.Cli.Extensions;
 

@@ -7,10 +7,11 @@ using PiSharp.Contracts;
 // packages/coding-agent/src/core/{agent-session,session-manager,session-export,usage-totals,cache-stats,cache-warmer,crash-log,
 // bug-report}.ts, core/export-html/**, core/extensions/**, modes/rpc/** and modes/interactive/session-share.ts by reading;
 // never captured from an upstream run. Fake endpoints and processes answer in process; no network or live credentials are used.
+// Synced to Pi v1.5.0 under decision 0013: the report's sourceSha names v1.5.0, and the expectations stay authored from reading the pinned sources, never captured.
 // Every static method of Program whose name ends in "Cases" and returns IEnumerable<(string, Func<Task>)> is a case group.
 internal static partial class Program
 {
-    internal const string Upstream = "06a466935536f8c9bcacb2d5efc0fc021be1bdff";
+    internal const string Upstream = "f9a26365568127461c47a07a37dcb42c140a3ac5";
 
     private static async Task<int> Main(string[] args)
     {

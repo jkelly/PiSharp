@@ -35,9 +35,9 @@ public sealed class CompletionsSimpleRequestFactory : IChatTransport
             throw Fail(CompletionsRequestFailure.UnsupportedContent);
         // Pi forwards these values through buildBaseOptions. Completions does not
         // serialize telemetry/metadata or use the WebSocket preference/deadline.
+        // The telemetry span is a typed object reference, not opaque data: it is retained, never serialized.
         // The configured direct cache retention is explicit and wins over env;
         // scoped env therefore supplies no implicit credentials, proxy or client mutation.
-        AdmitOpaqueOption(options.TelemetryContext);
         AdmitOpaqueOption(options.Metadata, requireObject: true);
         AdmitOpaqueOption(options.Environment, requireObject: true, stringValues: true);
         try

@@ -159,14 +159,21 @@ public static class Display
         _ => (status ?? "", ""),
     };
 
-    /// <summary>A task state in words.</summary>
-    public static (string Text, string Tone) TaskStatus(TaskNode task) => task.Aborting == true ? ("Stopping", "warn") : task.State.Status switch
+    /// <summary>A task state in words; a task that cannot run says why (TaskNode.Blocked).</summary>
+    public static (string Text, string Tone) TaskStatus(TaskNode task) => task.Aborting == true ? ("Stopping", "warn") : task.Blocked switch
     {
-        "running" => ("Running", "ok"),
-        "waiting" => ("Waiting", "warn"),
-        "completing" => ("Finishing", "ok"),
-        "pending" or "ready" => ("Queued", ""),
-        var status => (status, ""),
+        "missing_task" => ("Blocked: no definition", "danger"),
+        "task_too_old" => ("Blocked: definition too old", "danger"),
+        "migration_failed" => ("Blocked: migration failed", "danger"),
+        { } => ("Blocked", "danger"),
+        null => task.State.Status switch
+        {
+            "running" => ("Running", "ok"),
+            "waiting" => ("Waiting", "warn"),
+            "completing" => ("Finishing", "ok"),
+            "pending" or "ready" => ("Queued", ""),
+            var status => (status, ""),
+        },
     };
 
     /// <summary>A task's name: its label, or its kind.</summary>

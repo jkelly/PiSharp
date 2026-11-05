@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/src/codemode/codemode.ts and codemode/index.ts, the
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/src/codemode/codemode.ts and codemode/index.ts, the
 // `@earendil-works/pi-durable/codemode` entry point. Upstream's CODEMODE_MODULE_VERSION, CODEMODE_TOOL_NAME, createCodemodeTool,
 // createCodemodeExtension, CodemodeStoreDoc, CodemodeRunDoc and CodemodeJournalDoc are DurableCodemode.ModuleVersion, ToolName, CreateTool,
 // CreateExtension, StoreDoc, RunDoc and JournalDoc; CodemodeToolOptions, CodemodeGlobal and CodemodeNamespace keep their names; the
@@ -18,7 +18,12 @@
 // - The calls launchCovered() launches together are admitted together (ToolExecutionApi.AdmitTogether): upstream's executeTool() calls of
 //   one synchronous stretch enqueue their admission commits back to back, while the Harness admits calls a tool makes after an await one at
 //   a time. Script arguments that are not an object reach the nested call as they are (ToolExecutionApi.ExecuteToolAsync over a JsonValue).
-// - Date.now() is the system clock in whole milliseconds; crypto.getRandomValues is RandomNumberGenerator.
+// - api.now(), the Harness clock (HarnessOptions.Now), is IToolExecutionApi.Now: the script's start, its deadline, its results' times and
+//   its wall time read it (Pi v1.5.0, f75b3240a), and a result that arrives after the outcome is decided is dropped instead of reading the
+//   ended call's clock (ec1be23eb). crypto.getRandomValues is RandomNumberGenerator.
+// - toCodemodeIdentifier, which upstream imports from pi-codemode/declarations so that loading the extension leaves the WASM QuickJS runtime
+//   unloaded (bb65e3e49), is PiSharp.Codemode's CodemodeIdentifier.ToIdentifier, which starts no engine. cut()'s ownedSlice is JsString.Cut's
+//   substring, which .NET always copies.
 using System.Collections.Immutable;
 using System.Runtime.ExceptionServices;
 using System.Security.Cryptography;
@@ -91,23 +96,27 @@ public static class DurableCodemode
     public const int DefaultInlineBudget = CodemodeDescribe.DefaultInlineBudget;
 
     /// <summary><c>pi.codemode.run</c> (task scope): <c>{ start?, outputDir?, result? }</c>.</summary>
-    internal static TaskDocToken RunDoc { get; } = Documents.DefineTaskDoc("pi.codemode.run", 1, () => JsonObjectValue.Empty);
+    internal static TaskDocToken RunDoc { get; } = Documents.DefineTaskDoc("pi.codemode.run", 1, () => JsonObjectValue.Empty,
+        // The document retires with its task.
+        checkpointWhen: (_, _, _) => false);
 
     /// <summary><c>pi.codemode.journal</c> (task scope): <c>{ entries: [{ id, at, issuedAfter?, global? }], firstIssued? }</c>.</summary>
     internal static TaskDocToken JournalDoc { get; } =
-        Documents.DefineTaskDoc("pi.codemode.journal", 1, () => (JsonObjectValue)JsonValue.Parse("""{"entries":[]}"""));
+        Documents.DefineTaskDoc("pi.codemode.journal", 1, () => (JsonObjectValue)JsonValue.Parse("""{"entries":[]}"""),
+            // The document retires with its task.
+            checkpointWhen: (_, _, _) => false);
 
     /// <summary>
     /// What scripts keep with <c>store()</c> and read with <c>load()</c>, per conversation (upstream <c>CodemodeStoreDoc</c>,
     /// <c>pi.codemode.store</c>, <c>{ values }</c>). Rewindable and copied as of the fork point, so a fork sees the values as they were when its
-    /// entry was committed.
+    /// entry was committed. A change made once 64 deltas follow the newest base is stored as a base, bounding replay.
     /// </summary>
     public static RewindableConversationDocToken StoreDoc { get; } = Documents.DefineRewindableConversationDoc("pi.codemode.store", 1, DocumentFork.AsOf,
-        () => (JsonObjectValue)JsonValue.Parse("""{"values":{}}"""));
+        () => (JsonObjectValue)JsonValue.Parse("""{"values":{}}"""), checkpointWhen: (_, _, info) => info.DeltasSinceBase >= 64);
 
-    /// <summary><c>Type.Object({ code: Type.String({ description: "Raw JavaScript source." }) })</c>, as TypeBox prints it.</summary>
+    /// <summary><c>obj({ code: str({ description: "Raw JavaScript source." }) }, { open: true })</c>, as pi-schema builds it.</summary>
     internal static readonly JsonObjectValue Parameters = (JsonObjectValue)JsonValue.Parse(
-        """{"type":"object","required":["code"],"properties":{"code":{"type":"string","description":"Raw JavaScript source."}}}""");
+        """{"type":"object","properties":{"code":{"type":"string","description":"Raw JavaScript source."}},"required":["code"]}""");
 
     /// <summary>Outputs bounded by the script's own token budget; the Harness's limits only stop a runaway.</summary>
     internal static readonly CodemodeOutput.Limits OutputLimits = new(4 * 1024 * 1024, 100_000);
@@ -255,7 +264,7 @@ internal sealed class DurableCodemodeCall
         this.context = context;
     }
 
-    private static double Now() => DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+    private double Now() => api.Now();
 
     /// <summary>Runs <paramref name="action"/> on the call's scheduler, after what is queued there.</summary>
     private void Post(Action action) => Task.Factory.StartNew(() =>
@@ -914,6 +923,8 @@ internal sealed class DurableCodemodeCall
             else Diverge($"call {call.Id} is {Describe(call)}: {DurableErrors.MessageOf(error)}");
             return;
         }
+        // A result after the outcome is decided has nowhere to go, and the call's API has ended.
+        if (Stopped) return;
         queue.Add(new Finished(call.Id, Now(), outcome, global));
         _ = Pump();
     }
@@ -1092,8 +1103,9 @@ internal sealed class DurableCodemodeCall
         {
             var own = NamespaceOfTool(tool.Name);
             if (inNamespace is JsonStringValue wanted && (own is null || !MatchesNamespace(own, wanted.Value))) return [];
-            string[] text = [tool.Name, tool.Name.Replace('_', ' '), tool.Description, own?.Name ?? "", own?.Description ?? ""];
-            return new[] { new SearchDocument(tool.Name, string.Join(" ", text)) };
+            var namespaceText = own is null ? "" : string.Join(" ", own.Name, own.Description ?? "", own.Instructions ?? "");
+            // `Description` is the tool's sample: its description and declaration, with the parameters' names and descriptions.
+            return new[] { new SearchDocument(tool.Name, tool.Description, namespaceText) };
         }).ToList();
         return JsonValue.Array(Search.RankDocuments(query.Value, documents, max >= int.MaxValue ? int.MaxValue : (int)max).Select(name =>
         {

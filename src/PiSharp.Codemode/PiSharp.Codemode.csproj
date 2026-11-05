@@ -1,4 +1,8 @@
 <Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <!-- The worker lifetime hooks (CodemodeSandboxOptions.AcquireWorker, OnWorkerStarted) are [Experimental]. -->
+    <NoWarn>$(NoWarn);PISHARP_CODEMODE001</NoWarn>
+  </PropertyGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="PiSharp.Codemode.Tests" />
     <InternalsVisibleTo Include="PiSharp.Cli" />

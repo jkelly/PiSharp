@@ -1,7 +1,8 @@
 // Decision 0012: composite steps. Run, Parallel and ForEach start child workflow tasks owned by the run's task and wait for them in the
 // commit that creates them (one durable Waiting state); their "<step>#join" phase reads the outcomes and merges them into the Data.
 // Aborting the run cascades to the children. WaitForSignal waits on the run document's signal queue, so a signal sent before the run gets
-// there is kept, and consumes one signal in the commit that records it.
+// there is kept, and consumes one signal in the commit that records it. Pi v1.5.0 sync (area sleep): its deadline waits on runtime.SetTimer
+// timers that recheck the Harness clock, as ITaskRuntime.SleepAsync is gone.
 using PiSharp.CustomAgents.Workflows.Hosting;
 using PiSharp.Durable;
 using PiSharp.Durable.Chord;
@@ -293,7 +294,9 @@ internal sealed class SignalStep<TData, TSignal>(string name, string signal, Act
         }
     }
 
-    /// <summary>Waits until the run document holds a matching signal or <paramref name="deadline"/> passes.</summary>
+    /// <summary>Waits until the run document holds a matching signal or <paramref name="deadline"/> passes. The run document is a
+    /// conversation family member, which outlives the task (pi-durable 1.5.0's watch follows its address: a retirement is a call, and a run
+    /// document created again at the key arrives on the same watch); the watch is stopped once the wait ends, so it never outlives it.</summary>
     private async Task WaitForChangeAsync(ITaskRuntime runtime, RunningTask task, string key, double? deadline, DurableContext context)
     {
         var arrived = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -303,14 +306,14 @@ internal sealed class SignalStep<TData, TSignal>(string name, string signal, Act
         {
             if (watch is not null)
             {
-                watch.Start((value, _, _) =>
+                watch.Start((call, _) =>
                 {
-                    if (First(value) is not null) arrived.TrySetResult();
+                    if (call is WatchValueCall<JsonObjectValue> change && First(change.Value) is not null) arrived.TrySetResult();
                     return Task.CompletedTask;
                 });
                 if (First(watch.Value) is not null) arrived.TrySetResult();
             }
-            var sleep = deadline is { } due ? runtime.SleepAsync(due, sleeping.Context) : Task.Delay(Timeout.Infinite, sleeping.Context.CancellationToken);
+            var sleep = deadline is { } due ? DelayUntilAsync(runtime, due, sleeping.Context) : Task.Delay(Timeout.Infinite, sleeping.Context.CancellationToken);
             await Task.WhenAny(arrived.Task, sleep).ConfigureAwait(false);
             context.ThrowIfCancellationRequested();
         }
@@ -318,6 +321,28 @@ internal sealed class SignalStep<TData, TSignal>(string name, string signal, Act
         {
             sleeping.Cancel();
             if (watch is not null) await watch.StopAsync().ConfigureAwait(false);
+        }
+    }
+
+    /// <summary>Waits inside a phase until the Harness clock reaches <paramref name="until"/>, on <see cref="ITaskRuntime.SetTimer"/> timers
+    /// that recheck the clock when they fire; rejects when <paramref name="context"/> or the invocation is cancelled.</summary>
+    private static async Task DelayUntilAsync(ITaskRuntime runtime, double until, DurableContext context)
+    {
+        while (true)
+        {
+            context.ThrowIfCancellationRequested();
+            var remaining = until - runtime.Now();
+            if (remaining <= 0) return;
+            var fired = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var disarm = runtime.SetTimer(() => fired.TrySetResult(), remaining);
+            try
+            {
+                await context.WaitAsync(fired.Task).ConfigureAwait(false);
+            }
+            finally
+            {
+                disarm();
+            }
         }
     }
 

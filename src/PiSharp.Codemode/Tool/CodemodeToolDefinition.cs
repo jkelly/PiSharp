@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/src/extensions/codemode/tool.ts and
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/coding-agent/src/extensions/codemode/tool.ts and
 // packages/coding-agent/src/extensions/codemode/index.ts (readMode, readInlineBudget).
 using System.Collections.Immutable;
 using System.Text.Json;
@@ -147,37 +147,58 @@ public static class CodemodeToolDefinition
         return string.Join("\n\n", sections);
     }
 
+    /// <summary>A member of a JSON object as <c>JSON.parse</c> leaves it (the last of duplicate keys); null when absent.</summary>
+    private static JsonElement? Member(JsonElement value, string name)
+    {
+        var entries = ModelOperationJson.ObjectEntries(value);
+        return entries.Any(entry => entry.Key == name) ? entries.First(entry => entry.Key == name).Value : null;
+    }
+
     /// <summary>The field names of an object schema, <c>{ output, exit_code, full_output_path? }</c>, with the fields of object-typed
-    /// fields <paramref name="depth"/> levels deep: <c>{ content, structuredContent?: { results } }</c>. Null for other schemas.</summary>
+    /// fields <paramref name="depth"/> levels deep: <c>{ content, structuredContent?: { results } }</c>, and the value of <c>const</c>
+    /// fields: <c>{ action: "start", id }</c>. Null for other schemas.</summary>
     private static string? DescribeFields(JsonElement schema, int depth)
     {
         if (schema.ValueKind != JsonValueKind.Object) return null;
-        var entries = ModelOperationJson.ObjectEntries(schema);
-        JsonElement? Field(string name) => entries.Any(entry => entry.Key == name) ? entries.First(entry => entry.Key == name).Value : null;
-        if (Field("type") is not { ValueKind: JsonValueKind.String } type || type.GetString() != "object" ||
-            Field("properties") is not { ValueKind: JsonValueKind.Object } properties) return null;
-        var required = Field("required") is { ValueKind: JsonValueKind.Array } list
+        if (Member(schema, "type") is not { ValueKind: JsonValueKind.String } type || type.GetString() != "object" ||
+            Member(schema, "properties") is not { ValueKind: JsonValueKind.Object } properties) return null;
+        var required = Member(schema, "required") is { ValueKind: JsonValueKind.Array } list
             ? list.EnumerateArray().Where(item => item.ValueKind == JsonValueKind.String).Select(item => item.GetString()!).ToHashSet(StringComparer.Ordinal) : [];
         var fields = ModelOperationJson.ObjectEntries(properties).Select(field =>
         {
-            var nested = depth > 0 ? DescribeFields(field.Value, depth - 1) : null;
+            var nested = field.Value.ValueKind == JsonValueKind.Object && Member(field.Value, "const") is { } constant ? Js.Stringify(constant)
+                : depth > 0 ? DescribeFields(field.Value, depth - 1) : null;
             return $"{field.Key}{(required.Contains(field.Key) ? "" : "?")}{(nested is null ? "" : ": " + nested)}";
         });
         return $"{{ {string.Join(", ", fields)} }}";
     }
 
+    /// <summary>The field names of each variant of an <c>anyOf</c>/<c>oneOf</c> whose variants are all objects, joined by <c>|</c>.</summary>
+    private static string? DescribeUnionFields(JsonElement schema)
+    {
+        if (schema.ValueKind != JsonValueKind.Object) return null;
+        var variants = Member(schema, "anyOf") is { ValueKind: not JsonValueKind.Null } anyOf ? anyOf : Member(schema, "oneOf");
+        if (variants is not { ValueKind: JsonValueKind.Array } array || array.GetArrayLength() == 0) return null;
+        var described = array.EnumerateArray().Select(variant => DescribeFields(variant, 0)).ToList();
+        return described.All(fields => fields is not null) ? string.Join(" | ", described) : null;
+    }
+
     /// <summary>What a script call resolves to, in one line: <c>a string</c>, the field names of an object (see
-    /// <see cref="DescribeFields"/>), or the rendered type for anything else.</summary>
-    private static string DescribeOutput(JsonData? schema)
+    /// <see cref="DescribeFields"/>), the field names of each object in a union, the rendered type when it fits on one line, or a
+    /// pointer to <c>describeTool()</c> for anything longer. The full type of a large schema would otherwise be sent with every
+    /// request (#11501).</summary>
+    private static string DescribeOutput(string name, JsonData? schema)
     {
         var type = CodemodeDeclarations.RenderToolOutputType(schema?.Value);
         if (type == "string") return "a string";
-        var fields = schema is null ? null : DescribeFields(schema.Value, 1);
-        return $"`{fields ?? CodemodeDeclarations.OneLine(type)}`";
+        var fields = schema is null ? null : DescribeFields(schema.Value, 1) ?? DescribeUnionFields(schema.Value);
+        if (fields is not null) return $"`{fields}`";
+        if (!type.Contains('\n', StringComparison.Ordinal)) return $"`{type}`";
+        return $"a value; `await describeTool({Js.Stringify(name)})` shows its type";
     }
 
     private static string DescribeScriptCall(CodemodeNestedTool tool) =>
-        $"{Js.Trim(tool.Description)}\n\nCodemode: `tools.{CodemodeIdentifier.ToIdentifier(tool.Name)}(args)` resolves to {DescribeOutput(ToDeclaration(tool).OutputSchema)}.";
+        $"{Js.Trim(tool.Description)}\n\nCodemode: `tools.{CodemodeIdentifier.ToIdentifier(tool.Name)}(args)` resolves to {DescribeOutput(tool.Name, ToDeclaration(tool).OutputSchema)}.";
 
     /// <summary>The loadout presentation (tool.ts prepareCodemodeLoadout). <c>on</c>: declared callable tools say how scripts
     /// call them, and the codemode description lists callable tools without <c>direct</c> exposure. <c>only</c>: the

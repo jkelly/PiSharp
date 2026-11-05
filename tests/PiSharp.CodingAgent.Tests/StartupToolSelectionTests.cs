@@ -20,7 +20,7 @@ internal static class StartupToolSelectionTests
         (Prefix + "merged modifiers preserve ordered user project semantics", Merge),
         (Prefix + "RPC CLI precedence aliases ordering duplicates and explicit empty", RpcSelection),
         (Prefix + "unknown unavailable names are ignored and missing CLI values reject", Invalid),
-        (Prefix + "resumed RPC settings override recorded tools and absent leaves them", Resume),
+        (Prefix + "resumed RPC keeps recorded tools over settings and absent leaves them", Resume),
         (Prefix + "one shot create and resume apply settings and CLI empty", OneShot),
         (Prefix + "unavailable recorded Bash is pending without override and explicit selection resumes safely", ResumeAdmissionBoundary),
         (Prefix + "admitted extension settings append CLI empty and named selection", AdmittedExtension),
@@ -101,15 +101,20 @@ internal static class StartupToolSelectionTests
         { await host.Response("ready", "get_state"); Equal(0, await host.Finish()); }
         Names(["edit", "ls"], await DurableTools(fixture)); Equal(0, fs.Reads.Count);
         fs.Text[fixture.User] = "{\"defaultTools\":[\"write\",\"read\",\"-write\",\"+ls\"]}";
-        // The settings selection (read, ls) is applied in memory at open; the next prompt records its delta from the recorded edit, ls.
+        // Pi 1.5.0 (6f2f164ab, #10887; core.resume-active-tools): the settings selection (read, ls) no longer overrides the recorded
+        // tools. Without --tools, sdk.ts sets usesDefaultTools and the AgentSession constructor's _restoreToolsFromTranscript keeps the
+        // recorded edit, ls; the open writes nothing and the next prompt records no tool change.
         var recorded = await Bytes(fixture);
         await using (var host = new StartupSettingsTests.Host(fixture, fs, ["--user-settings", fixture.User], "open"))
         {
             await host.Response("ready", "get_state"); Equal(true, (await Bytes(fixture)).SequenceEqual(recorded));
             await host.MaterializeConversation(); Equal(0, await host.Finish());
         }
-        // pi-ai getCurrentTools replays that delta (edit removed, read added) in declaration order: the transcript restores ls, read.
-        Names(["ls", "read"], await DurableTools(fixture)); Equal(true, Extends(await Bytes(fixture), recorded));
+        // The setting was read (and would apply to a new session), but the resumed session kept its recorded tools.
+        Equal(1, fs.Reads.Count); Names(["edit", "ls"], await DurableTools(fixture));
+        var resumed = await Bytes(fixture); Equal(true, Extends(resumed, recorded));
+        Equal(false, Encoding.UTF8.GetString(resumed, recorded.Length, resumed.Length - recorded.Length)
+            .Split('\n', StringSplitOptions.RemoveEmptyEntries).Any(line => JsonNode.Parse(line)!["message"]?["role"]?.GetValue<string>() == "system"));
     }
     private static async Task OneShot()
     {
@@ -157,7 +162,10 @@ internal static class StartupToolSelectionTests
         foreach (var flags in new[] { new[] { "--tools", "read" }, new[] { "--tools", "" }, new[] { "--user-settings", fixture.User } })
         {
             await File.WriteAllBytesAsync(path, original);
-            var selected = flags.Contains("") ? Array.Empty<string>() : new[] { "read" };
+            // Pi 1.5.0 (6f2f164ab, #10887; core.resume-active-tools): only --tools with plain names (or an explicit empty list) replaces
+            // the recorded loadout. With the defaultTools setting alone, sdk.ts sets usesDefaultTools and _restoreToolsFromTranscript
+            // keeps the recorded loadout over the setting's read: the unavailable Bash stays pending and nothing is active.
+            var selected = flags.Contains("") || flags.Contains("--user-settings") ? Array.Empty<string>() : new[] { "read" };
             // The open applies the selection in memory without acquiring Bash; the next prompt records it.
             await using (var host = new StartupSettingsTests.Host(fixture, null, flags, "open"))
             {

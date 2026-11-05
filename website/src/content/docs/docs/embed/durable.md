@@ -3,10 +3,10 @@ title: Durable library
 description: "Build crash-safe agents on PiSharp.Durable: the harness, storage, tools and tests."
 ---
 
-`PiSharp.Durable` is the library behind [`pisharp durable`](/docs/guides/durable/). It is a port of Pi's `pi-durable` v1.2.0 package: an agent harness that commits every model turn, streamed partial, tool call and queued message to storage before anything sees it. Open the same storage after a crash and the harness finishes what was running. This page shows how to build your own agent on it.
+`PiSharp.Durable` is the library behind [`pisharp durable`](/docs/guides/durable/). It is a port of Pi's `pi-durable` v1.5.0 package: an agent harness that commits every model turn, streamed partial, tool call and queued message to storage before anything sees it. Open the same storage after a crash and the harness finishes what was running. This page shows how to build your own agent on it.
 
 :::caution[Experimental]
-The durable libraries ship as experimental from PiSharp 1.2.0.1, and the members marked "(from 1.2.0.2)" from 1.2.0.2. Every public type carries `[Experimental("PISHARP_DURABLE001")]`, and the API may change or be removed in any release without notice.
+The durable libraries ship as experimental from PiSharp 1.2.0.1, the members marked "(from 1.2.0.2)" from 1.2.0.2, and those marked "(from 1.5.0)" from 1.5.0. Every public type carries `[Experimental("PISHARP_DURABLE001")]`, and the API may change or be removed in any release without notice. PiSharp 1.5.0 follows `pi-durable` v1.5.0 and breaks code and storage written for 1.2.0.x: see [Upgrading from 1.2.0.x](#upgrading-from-120x).
 :::
 
 ## Install
@@ -19,9 +19,9 @@ Add the packages and suppress the experimental diagnostic:
   <NoWarn>$(NoWarn);PISHARP_DURABLE001</NoWarn>
 </PropertyGroup>
 <ItemGroup>
-  <PackageReference Include="PiSharp.Durable" Version="1.2.0.2" />
-  <PackageReference Include="PiSharp.Durable.Sqlite" Version="1.2.0.2" />
-  <PackageReference Include="PiSharp.Durable.Tools" Version="1.2.0.2" />
+  <PackageReference Include="PiSharp.Durable" Version="1.5.0" />
+  <PackageReference Include="PiSharp.Durable.Sqlite" Version="1.5.0" />
+  <PackageReference Include="PiSharp.Durable.Tools" Version="1.5.0" />
 </ItemGroup>
 ```
 
@@ -30,6 +30,23 @@ Add the packages and suppress the experimental diagnostic:
 | `PiSharp.Durable` | `PiSharp.Durable`, `PiSharp.Durable.Chord`, `PiSharp.Durable.Storage`, `PiSharp.Durable.Storage.Jsonl`, `PiSharp.Durable.Env`, `PiSharp.Durable.Testing` | Sessions, the harness, tasks, JSON values, memory and JSONL storage, the execution environment contract, conformance kits |
 | `PiSharp.Durable.Sqlite` | `PiSharp.Durable.Sqlite` | SQLite storage over `Microsoft.Data.Sqlite` |
 | `PiSharp.Durable.Tools` | `PiSharp.Durable.Tools`, `PiSharp.Durable.Tools.Env` | The local execution environment, the coding tools, `tool_search`, durable code mode, and, from 1.2.0.2, the media tools |
+
+The harness's telemetry types come from `PiSharp.Telemetry`, which `PiSharp.Durable` references. Durable's storage on Chord v2's store (`PiSharp.Durable.Store`) and Chord v2 itself (`PiSharp.Chord`) are in the repository but not packaged yet: they wait for Chord's host, which a later phase of the v1.5.0 sync ports.
+
+## Upgrading from 1.2.0.x
+
+PiSharp 1.5.0 follows `pi-durable` v1.5.0, which changed the API and the stored formats:
+
+- **Getters became watches.** `ISession.DocumentStateAsync`, `IConversation.ViewStateAsync` and `IHarness.TaskGraphAsync` are gone; use `WatchDocAsync`, `IConversation.WatchAsync` and `IHarness.WatchTaskGraphAsync`, whose `Value` is the current value. See [Watching and observing](#watching-and-observing).
+- **Agent events are gone.** Upstream removed `watchEvents` and its event types. A renderer renders the conversation view instead. PiSharp keeps a projection of the v1.2.0 events inside the CLI's device host (`PiSharp.Durable.Hosting`, not a package) for its wire format; libraries don't get it.
+- **Watch listeners take tagged calls.** A listener gets a `WatchCall<T>` (a `WatchValueCall<T>` with `Value`, `Ops` and `Retired`, or a `WatchFailedCall<T>`) and a context. A document watch follows its address, so a retirement no longer ends it.
+- **Renamed members.** `SubscribeCommits` is `ObserveCommits(CommitObserver)`; `SessionEnd` has a `Kind` (`Closed` or `Failed`, with its `Error`); a document change in a commit is tagged `change` or `retire`; `OnReport` takes one `Report` tagged by kind (see [Harness options](#harness-options)); `TaskInspectionKind.Ready` is `Pending`.
+- **Every document definition states `checkpointWhen`.** `Documents.DefineConversationDoc` and the other `Define*Doc` methods take a required `DocumentCheckpointPredicate`, before the optional migration. Pass `(_, _, _) => false` to keep ordinary changes as deltas.
+- **Custom storage commits batches.** `IStorage.CommitAsync(batches, receive, context)` stores several commits in one call and returns a `CommitResult`. `StorageConformance` checks the contract; `CommitWritesAsync` in `PiSharp.Durable.Testing` commits one batch.
+- **Stored formats moved on, with no way back.** Opening a 1.2.0.x SQLite file migrates it to schema version 2, which PiSharp 1.2.0.x refuses to open. Tasks and documents the new version writes (`pi.tool` version 3, `pi.generation` version 2, `pi.live` version 3) are too new for 1.2.0.x, which leaves such tasks blocked (`task_too_old`). Keep a copy of a session before you open it with 1.5.0 if you may need to go back.
+- **One-time effects.** The built-in tools are declared with a different key order, so the next turn of a 1.2.0.x conversation records their declarations once more. A model request that was in flight when a 1.2.0.x process died counts as a failed attempt and waits for the retry backoff, instead of being sent again.
+- **Streamed progress is deferred.** Partial answers and tool output are stored about once a second, so a crash loses up to about a second of streamed text. `ProgressSettings.PersistWithinMs = 0` stores each one at once.
+- **The examples were renumbered** to upstream v1.5.0's names (see [Samples](#samples)).
 
 ## How it fits together
 
@@ -222,14 +239,21 @@ To write your own model access, implement `IDurableModels`. `GetModel`, `StreamS
 
 | `HarnessOptions` | Meaning |
 | --- | --- |
-| `Models` | Required. The model access generation uses. |
-| `Registry` | Required. The registry; it may keep changing while the harness runs. |
+| `Models` | The model access generation uses. Set it or `CurrentModels`. |
+| `CurrentModels` | (from 1.5.0) A function returning the current model access, called at each use, so you can replace your model configuration without reopening the harness. |
+| `Identity` | (from 1.5.0) The `ClientIdentity` of every model request through the harness, tools and hooks included. PiSharp's default sends no attribution. |
+| `Registry` | Required. The registry (an `IRegistryReader`; `Registry.Create()` returns one); it may keep changing while the harness runs. |
 | `Settings` | Harness-wide run policy (`HarnessSettings`). |
+| `CurrentSettings` | (from 1.5.0) A function returning the current `HarnessSettings`, called at each use. Set it or `Settings`. |
 | `Env` | `Func<EnvTarget, DurableContext, Task<IExecutionEnv?>>`: builds a conversation's execution environment at each use. `EnvTarget` carries the conversation id, its agent's `Cwd` and a document reader. Without it, tools that need files or a shell fail with an error result. |
 | `ConversationCreated` | Runs in every commit that creates or forks a conversation, after the built-in documents exist. |
-| `Now` | The harness clock in milliseconds. |
-| `TimeProvider` | Timers for sleeps and idle expiry. Default `TimeProvider.System`. |
-| `OnReport` | Receives failures that don't fail the calling operation, such as a throwing hook, and the error that fails the session. |
+| `Now` | The harness clock in milliseconds. Sleeping tasks store their deadlines on it, so every process that opens one storage must use the same clock. |
+| `TimeProvider` | The default clock and timers. Default `TimeProvider.System`. |
+| `SetTimer` | (from 1.5.0) Arms every timer of the session, the scheduler and its tasks: progress pacing, freeing idle memory and, without `OnWake`, resuming sleeping tasks. Default: `TimeProvider`'s timers. See [Sleeping and waking](#sleeping-and-waking). |
+| `OnWake` | (from 1.5.0) For a host that wakes its process itself: the harness then arms no timer for sleeps and calls this with `Wake()` whenever it changes. |
+| `Telemetry` | (from 1.5.0) A host-owned `ITelemetryContext` for the harness's spans, events and metrics. See [Telemetry](#telemetry). |
+| `OnReport` | Receives failures that don't fail the calling operation, such as a throwing hook or a faulted task, and the error that fails the session. From 1.5.0 it gets one `Report`: the `Error` and its `Kind` (`StorageFailed`, `TaskFaulted`, `TaskInterrupted`, `MigrationFailed`, `TaskOutdated`, `TaskError`, `ExtensionError`, `HostError` or `ListenerError`), with the `Task`, `Extension`, `ConversationId`, `Callback`, `Reason` or `Restarts` where they apply. |
+| `ReadOnly` | (from 1.5.0) Opens a viewer of a session another process drives: nothing is recovered, every commit with writes throws `ReadOnlySessionException`, and nothing runs. |
 
 `HarnessSettings` is read at every use and never copied, so you can derive from it and override getters to follow a settings file. A null property takes the default:
 
@@ -238,12 +262,14 @@ To write your own model access, implement `IDurableModels`. `GetModel`, `StreamS
 | `Extensions` | Every installed extension, in install order. |
 | `Stream` | `ConversationStreamOptions`: `Transport`, `TimeoutMs`, `MaxRetries`, `MaxRetryDelayMs`, `Headers`, `Metadata`, `CacheRetention`, `Deferred`. |
 | `Retry` | `RetrySettings`: enabled, 3 retries, 2000 ms base delay, 60000 ms longest delay. |
-| `Compaction` | `CompactionSettings`: enabled, `ReserveTokens` 16384, `KeepRecentTokens` 20000, `BackgroundTokens` 32768 (0 turns background compaction off). |
-| `Progress` | `ProgressSettings`: commit partial answers and tool output at most every 100 ms. |
+| `Compaction` | `CompactionSettings`: enabled, `ReserveTokens` 16384, `KeepRecentTokens` 20000, `BackgroundTokens` 32768 (0 turns background compaction off). From 1.5.0, `ModelOverrides`, keyed by `"provider/modelId"`, replaces these fields for one model. |
+| `Progress` | `ProgressSettings`: commit partial answers and tool output at most every 100 ms (`PartialIntervalMs`, `OutputIntervalMs`), and store them within 1000 ms (`PersistWithinMs`, from 1.5.0; 0 stores each at once). See [Deferred commits](#deferred-commits). |
 | `ToolExecution` | `ToolExecutionMode.Parallel`. |
 | `SteeringMode`, `FollowUpMode` | `QueueMode.OneAtATime`. |
 | `ContextRetentionMs` | 600000: how long an idle conversation keeps its last context in memory. |
 | `DocumentRetentionMs` | Ten minutes: how long an unobserved document stays loaded. |
+| `AfterFailedRun` | (from 1.5.0) `Keep`: what a run that fails (a model error, no model, its turn limit, crashes) does with the inputs queued behind it. `Continue` starts the next run with them, `Withdraw` settles them unanswered. |
+| `RestartLimit` | (from 1.5.0) 5: how many times in a row a crash, eviction or reset may cut a task off before it ends instead of running again. `double.PositiveInfinity` never ends one. |
 
 ## The harness
 
@@ -251,7 +277,8 @@ To write your own model access, implement `IDurableModels`. `GetModel`, `StreamS
 
 | Member | What it does |
 | --- | --- |
-| `Resume()` | Starts task scheduling. Idempotent. |
+| `Resume()` | Starts task scheduling. Idempotent. Sleeping tasks that are due become runnable, so a host's wakeup calls it. |
+| `Wake()` | (from 1.5.0) When the session next needs a running process: `Active` while some task can run or runs, `At` for the earliest sleep. |
 | `RootAsync(context, agent, init)` | The root conversation (id 1), created on the first call. |
 | `ConversationAsync(id, context)` | A conversation by id, or null. |
 | `CreateConversationAsync(options, context)` | Creates a conversation. `ConversationCreateOptions(ownership)` takes an `Agent` change and an `Init` callback. |
@@ -259,10 +286,11 @@ To write your own model access, implement `IDurableModels`. `GetModel`, `StreamS
 | `SubmissionAsync`, `AbortSubmissionAsync` | A submission by id, or abort one. |
 | `WaitForIdleAsync(context)` | Waits until no task is runnable. |
 | `UsageAsync(context)` | The summed token usage of every conversation. |
-| `TaskGraphAsync`, `WatchTaskGraphAsync` | The live task graph (see [Inbox and task graph](#inbox-and-task-graph)). |
+| `WatchTaskGraphAsync` | A watch of the live task graph (see [Inbox and task graph](#inbox-and-task-graph)). `TaskGraphAsync` is gone from 1.5.0: read the watch's `Value`. |
+| `ObserveConversationAsync`, `ObserveTaskGraphAsync` | (from 1.5.0) Synchronous observers of a conversation's view and of the task graph. See [Watching and observing](#watching-and-observing). |
 | `InspectAsync(context)` | A diagnostic snapshot of tasks and scheduling. |
 
-From `ISession` it has `CommitAsync` (four overloads over an `ITx`), `SnapshotAsync` and `WatchDocAsync` for documents, `DocumentStateAsync`, `SubscribeCommits`, `SubscribeClose`, `Closed` and `CloseAsync`. `Session.Create(storage)` gives you a bare session without agents; examples 00 to 05 use one.
+From `ISession` it has `CommitAsync` (four overloads over an `ITx`, each with optional `CommitOptions`), `SnapshotAsync` and `WatchDocAsync` for documents, `ObserveDocAsync`, `ObserveCommits` (a `CommitObserver` of stored commits), `SubscribeClose`, `Closed` (a `SessionEnd` of kind `Closed` or `Failed`) and `CloseAsync`. `Session.Create(storage)` gives you a bare session without agents; examples 00 to 04 use one.
 
 ## Conversations
 
@@ -274,14 +302,15 @@ From `ISession` it has `CommitAsync` (four overloads over an `ITx`), `SnapshotAs
 | `AgentAsync(context)` | The agent choices resolved against the registry: model, thinking level, extensions, tools, sections, instructions, cwd. |
 | `ConfigureAsync(change, context)` | Applies an `AgentChange`. |
 | `SubmitAsync(draft, context)` | Queues an input or a passive write; returns an `ISubmission`. |
+| `SubmitAsync(tx, draft)` | (from 1.5.0) Admits a submission inside your own commit, with the same rules, and returns its id. |
 | `CompactAsync(instructions, context)` | Starts a manual compaction task. |
 | `ResetAsync(handoff, context)` | Starts the context over from a reset entry. |
 | `CommitAsync(...)` | A transaction scoped to this conversation. |
 | `ContextAsync(context, at)` | The transcript and the model context at the head or at an entry. |
-| `EntriesAsync(query, limit, cursor, context)` | A page of entries. |
+| `EntriesAsync(query, limit, cursor, context)` | A page of the raw history, which compaction never changes. |
 | `ForkAsync(at, options, context)` | A new conversation that shares history up to an entry. |
 | `AbortAsync`, `WaitForIdleAsync` | Abort the running turn, or wait until the conversation is idle. |
-| `ViewStateAsync`, `WatchAsync` | A view of the conversation for a UI, and a watch of it. |
+| `WatchAsync(context, window)` | A watch of the conversation's view for a UI: a window of its newest entries and its documents. `ViewStateAsync` is gone from 1.5.0. |
 
 `AgentChange` sets the agent choices. A set field replaces the stored one, `Patch<T>.Clear` clears it, and a null field changes nothing:
 
@@ -295,8 +324,11 @@ From `ISession` it has `CommitAsync` (four overloads over an `ITx`), `SnapshotAs
 | `Instructions` | Text rendered after every extension section |
 | `Cwd` | Working directory, passed to `HarnessOptions.Env` |
 | `ServiceTier` | (from 1.2.0.2) `auto`, `normal`, `economy`, `priority`, `fast` or `ultrafast`. A child conversation starts with its owner's. See [Service tiers](/docs/guides/service-tiers/). |
+| `MaxTurns` | (from 1.5.0) The tool rounds one run may take, an integer of 1 or more. The round that reaches it runs its tools, then the run ends unanswered and `pi.live.runFailure` says `turn_limit`. Task-owned children and forks inherit it. |
 
-`SubmissionDraft.Input(content, whenBusy, requestId, entry)` makes an input. `whenBusy` decides what happens while the conversation is working: `WhenBusy.Steer` places it at the next boundary of the running turn, `WhenBusy.FollowUp` waits until the turn ends, and `WhenBusy.Reject` throws `ConversationBusyException`. A `requestId` deduplicates within the conversation, so a retried submit after a crash doesn't queue twice. `SubmissionDraft.Write(entry, requestId)` appends an entry without starting a turn.
+`SubmissionDraft.Input(content, whenBusy, requestId, entry)` makes an input. `whenBusy` decides what happens while the conversation is working: `WhenBusy.Steer` places it at the next boundary of the running turn, `WhenBusy.FollowUp` waits until the turn ends, and `WhenBusy.Reject` throws `ConversationBusyException`. A `requestId` deduplicates within the conversation, so a retried submit after a crash doesn't queue twice. `SubmissionDraft.Write(entry, requestId)` appends an entry without starting a turn. From 1.5.0, `SubmissionDraft.Continue(requestId)` starts a run on the context as it is, without a user message, on an idle conversation only, and an input with `whenIdle: WhenIdle.Reject` throws `ConversationIdleException` instead of starting a run on an idle conversation.
+
+When a run's newest turn ends without an answer, `pi.live` keeps why in `runFailure`: `model_error`, `no_model`, `aborted`, `reset`, `faulted`, `orphaned`, `interrupted`, `restart_limit`, `nothing_to_answer` or `turn_limit`, with the run's task and inputs.
 
 `ISubmission.WaitAsync` returns a `SubmissionRecord` with `Status` (`Queued`, `Placed`, `Done`, `Unanswered`), `Type` (`Input` or `Write`), `Entry`, `Answer`, `Reason` and `Detail`.
 
@@ -342,6 +374,8 @@ Each tool call is a `pi.tool` task. Before it runs the tool, it commits an inten
 - Otherwise the call settles as failed with the result "Tool *name* was interrupted and may have partially run", and the conversations the call owned are aborted. The model sees that result and decides what to do.
 
 A child task of a tool that is not replay-safe is abandoned after a restart, because nothing will wait for it.
+
+From 1.5.0 a crash loop ends: open counts each task a crash, eviction or reset cut off, and once a task reaches `HarnessSettings.RestartLimit` it ends instead of running again (a tool call with an error result, a run with `runFailure` reason `restart_limit`, a task of your own `faulted`), reported to `OnReport`. A model request the process died during is a failed attempt under the retry settings, not a request sent again.
 
 A replay-safe tool must be safe to run twice. Memos make that practical: `api.MemoAsync(name, candidate, context)` stores a value for this call unless one exists and returns the one that won, and `api.MemoAsync(name, context)` reads it. Store a key before the side effect and pass it to a service that ignores repeated keys:
 
@@ -418,7 +452,45 @@ Console.WriteLine((done.State as SettlingTaskState)?.Outcome.ToJson());
 await harness.CloseAsync(context);
 ```
 
-`sendReport` stands for your side effect. A crash after the send and before the memo sends again, so that step must still tolerate a repeat. `NextTaskState` also has `Running(checkpoint)`, `Waiting(checkpoint, on, policy)` to wait for child tasks, and `Failed(message, detail)`. `harness.AbortTaskAsync(id)` runs the `Abort` handler instead of the phases.
+`sendReport` stands for your side effect. A crash after the send and before the memo sends again, so that step must still tolerate a repeat. `NextTaskState` also has `Running(checkpoint)`, `Waiting(checkpoint, on, policy)` to wait for child tasks, `Sleeping(checkpoint, until)` and `Failed(message, detail)`. `harness.AbortTaskAsync(id)` runs the `Abort` handler instead of the phases.
+
+### Sleeping and waking
+
+From 1.5.0 a task waits for time by ending its phase asleep. The sleep is stored, so the task holds nothing while it sleeps, survives restarts and resumes at the checkpoint once the harness clock reaches `until`:
+
+```csharp
+["wait"] = (task, runtime, taskContext) =>
+    runtime.SleepUntilAsync(runtime.Now() + 60_000, JsonValue.Object([new("phase", "deliver")]), taskContext),
+```
+
+There is no sleep in the middle of a phase: a phase reruns from its top after a restart, so put the work after the wait in the next phase. `NextTaskState.Sleeping(checkpoint, until)` from `runtime.CommitAsync` is the same sleep, committed with other writes. The built-in retry backoffs and deferred-response polls sleep this way too, and `ITaskRuntime.SetTimer` arms a timer that ends with the invocation.
+
+The harness's timers go through `HarnessOptions.SetTimer` and its times through `Now`, so a fake clock and fake timers drive a whole harness in tests. While scheduling runs, a timer resumes sleeping tasks when they are due. A host whose process can be stopped wakes it itself instead: with `OnWake`, the harness arms no timer for sleeps and tells the host what `Wake()` says whenever that changes. The host keeps its own wakeup armed for `At`, and while `Active`, and calls `Resume()` when it fires.
+
+### Work at the end of a run
+
+From 1.5.0, `GenerationHooks.AfterRun` runs after a run answered and returns tasks for the end of the run, built with `Define.RunEndTask(task, input)`. The answer is committed first; the run stays busy until the tasks end, so input sent meanwhile waits for them too. The hook gets a `RunSummary` (`Reason`, `First`, `Answer`, `Last`), and `api.EntriesAsync` reads the run's own entries between `First` and `Last` from the raw history, which a compaction never changes:
+
+```csharp
+AfterRun = async (run, api, hookContext) =>
+{
+    var range = new EntryQueryBounds { MinEntryId = run.First, MaxEntryId = run.Last, Order = ScanOrder.Ascending };
+    var page = await api.EntriesAsync(range, 1000, null, hookContext);
+    var edited = page.Items.Any(entry => entry.Kind == "pi.tool-result");
+    return edited ? [Define.RunEndTask(runTests, JsonValue.Object([new("attempt", 1)]))] : null;
+},
+```
+
+`IHookApi.EntryAsync` and `ITaskRuntime.EntriesAsync` read the same history. A tool round whose result asks for a handoff no longer ends the run: the reset entry is written and the same run continues in the new context, so the submission settles with the eventual answer. Example `32-tests-after-edits` runs a project's tests after every run that edited files.
+
+## Your own documents
+
+`Documents.DefineConversationDoc(kind, version, fork, initial, checkpointWhen, migrate)` and the other `Define*Doc` methods define a document. From 1.5.0 `checkpointWhen` is required: it returns true to store a change as a complete value instead of a delta. `(_, _, _) => false` keeps changes as deltas, which suits a document that retires with its task.
+
+```csharp
+static readonly ConversationDocToken Notes = Documents.DefineConversationDoc("example.notes", 1, DocumentFork.Current,
+    () => JsonValue.Object([new("text", "")]), checkpointWhen: (_, _, _) => false);
+```
 
 ## Inbox and task graph
 
@@ -429,12 +501,37 @@ The other built-in documents are `Live.LiveDoc` (`pi.live`: the partial answer a
 The task graph shows every live task and who owns it:
 
 ```csharp
-using var graph = await harness.TaskGraphAsync(context);
+var graph = await harness.WatchTaskGraphAsync(context);
 foreach (var (id, node) in graph.Value.Tasks)
-    Console.WriteLine($"{id.Value} {node.Kind} {node.State.Status} {node.State.Phase} owner={node.Owner?.Value}");
+    Console.WriteLine($"{id.Value} {node.Kind} {node.State.Status} {node.State.Phase} owner={node.Owner?.Value} blocked={node.Blocked}");
+await graph.StopAsync();
 ```
 
-`graph.Subscribe(...)` delivers each new graph, and `TaskGraph.ToJson()` prints it as `{"tasks": {...}}`. `pisharp durable`'s `/tasks` panel is built on this.
+`graph.Start(...)` delivers each new graph, and `TaskGraph.ToJson()` prints it as `{"tasks": {...}}`. A node's `Blocked` (from 1.5.0) says why a live task cannot run: `MissingTask`, `TaskTooOld` or `MigrationFailed`. `pisharp durable`'s `/tasks` panel is built on this.
+
+## Watching and observing
+
+A watch (`IWatchHandle<T>`) has the current `Value` and one listener, which you install with `Start`. Calls never overlap: commits made while the listener runs arrive in the next call, folded, with the newest value and the operations that turn the previous value into it. `StopAsync` ends a watch, and `Closed` completes when it ends.
+
+```csharp
+var notes = await harness.WatchDocAsync(Notes, root.Id, context);
+notes?.Start(async (call, _) =>
+{
+    if (call is WatchValueCall<JsonObjectValue> change)
+        Console.WriteLine($"{change.Value.ToJson()} retired={change.Retired}");
+});
+```
+
+From 1.5.0:
+
+- **A document watch follows its address** (kind, scope and key), not one document. A retirement arrives as a call with `Retired` set and the last value, and a document created there later arrives in a later call.
+- **A conversation's view is a window.** `IConversation.WatchAsync(context, window)` starts with the newest 50 entries (`ConversationWindow.Min`), takes appends, and drops its oldest entries in one step once it holds more than `Max`. `ConversationTranscript` merges every value of such a watch into what a client has, marks gaps, and loads earlier pages on demand. Example `31-transcript` shows it.
+- **Observers** see every change, unfolded, synchronously at its publication: `ObserveDocAsync`, `ObserveConversationAsync` and `ObserveTaskGraphAsync` take an `Observer<T>` (an advance callback and an end callback) and return an `Observation<T>` with the value at attachment and `Detach()`. An observer must not block or call the session. `ObserveCommits(CommitObserver)` observes stored commits the same way.
+- **There are no agent events.** Render the conversation view; its operations say what changed.
+
+## Deferred commits
+
+From 1.5.0 a commit can wait in memory: `CommitAsync(..., new CommitOptions(CommitPersistence.Deferred(withinMs)))`. A deferred commit that only changes existing conversation documents is adopted in memory at once, so watches and observers see it, and stored with the next commit that reads or writes those documents, at close, or within `withinMs` (default `ProgressSettings.PersistWithinMs`, 1000 ms). Any other commit is stored at once. A crash loses what is held, so defer only state whose loss is acceptable. The harness defers its own progress commits: streamed partial answers and running tool output.
 
 ## Storage
 
@@ -442,9 +539,9 @@ foreach (var (id, node) in graph.Value.Tasks)
 | --- | --- | --- |
 | `MemoryStorage` | `new MemoryStorage()` | Nothing survives the process. For tests and samples. |
 | `JsonlStorage` | `await JsonlStorage.OpenAsync(directory, context, options)` | Append-only JSONL files. `JsonlStorageOptions.Fsync` controls flushing. Keeps the records it wrote in memory, so long sessions grow; see [known issues](/docs/guides/durable/#known-issues). |
-| `SqliteStorage` | `await SqliteStorage.OpenAsync(path, options)` | One database file. `SqliteStorageOptions` has `WalAutoCheckpointPages` and `BusyTimeoutMs`. What `pisharp durable` uses. |
+| `SqliteStorage` | `await SqliteStorage.OpenAsync(path, options)` | One database file. `SqliteStorageOptions` has `WalAutoCheckpointPages`, `BusyTimeoutMs` and, from 1.5.0, `Prefix`, which prefixes every table and index name so the durable tables can share a database with your own. What `pisharp durable` uses. |
 
-The formats are upstream's, so Pi's `pi-durable` v1.2.0 and PiSharp read each other's storage. To survive a crash, open the same file again:
+The formats follow upstream's. PiSharp's tests open, resume and rewrite sessions that Pi's `pi-durable` v1.2.0 wrote, comparing with v1.5.0's forms of those records; no session written by `pi-durable` v1.5.0 has been compared yet. SQLite files are at schema version 2 from 1.5.0, which adds the sleeping task status; opening an older file migrates it, and there is no way back (see [Upgrading from 1.2.0.x](#upgrading-from-120x)). To survive a crash, open the same file again:
 
 ```csharp
 using PiSharp.Durable;
@@ -467,6 +564,8 @@ await reopened.CloseAsync(context);
 ```
 
 Here `options` is your `HarnessOptions`. Keep one writer per storage: the storage classes take no lock across processes. `pisharp durable` adds its own lock directory next to each session.
+
+From 1.5.0 a session no longer waits for each commit to be stored before it starts the next one: commits that arrive while a storage call is in flight go out together in the next call (group commit), each with its own sequence number and outcome, published in order. Work runs on while earlier commits are being stored, until it touches something one of them wrote. The session also keeps recently read records, the newest entry of each conversation and the documents of live tasks in memory, so an ordinary agent run reads little from storage. [durable-benchmarks.md](https://github.com/jkelly/PiSharp/blob/main/docs/durable-benchmarks.md) has PiSharp's own throughput numbers, measured on one machine.
 
 ## Built-in tools
 
@@ -519,6 +618,7 @@ var root = await harness.RootAsync(DurableContext.Background, new AgentChange
 | `ConformanceRunner` | `RegisterStorageConformance` and `RegisterEnvConformance` register the cases with an `IConformanceTestRunner` (`Describe`, `It`, `Assertions`) for runners shaped like upstream's. |
 | `ConformanceAssertions.Create(failure)` | Assertions that throw your runner's exception. |
 | `StorageBenchmark` | Upstream's storage benchmarks. |
+| `CommitWritesAsync` | (from 1.5.0) An extension that commits one batch through `IStorage.CommitAsync`, for tests of a storage. |
 
 Each case has a `Name`, a `Slug` for test ids and a `Run` function. Run them from any test framework:
 
@@ -533,16 +633,34 @@ foreach (var testCase in StorageConformance.Create(use => use(new MemoryStorage(
 }
 ```
 
-To test your own agent, script the model as in [A first agent](#a-first-agent), close the harness partway through, open the same storage again and check what it finishes. PiSharp's crash tests go further and kill a real process at checkpoints.
+To test your own agent, script the model as in [A first agent](#a-first-agent), close the harness partway through, open the same storage again and check what it finishes. Pass `Now` and `SetTimer` to run it on a fake clock. PiSharp's crash tests go further and kill a real process at checkpoints.
+
+## Telemetry
+
+From 1.5.0, `HarnessOptions.Telemetry` takes a host-owned `ITelemetryContext` from `PiSharp.Telemetry`, with optional propagation and metrics; without one, nothing is recorded. `DurableTelemetry.Schema` lists its typed spans, events and metrics. Attributes hold record IDs and fixed categories, never messages, arguments or results; the IDs point to the transcript. Every async call takes a `DurableContext`, which carries cancellation and its current span (`DurableContext.Background` never cancels and records nothing).
+
+- **`pi.durable.submit`** covers a public submission and its commit. For `SubmitAsync(tx, draft)` it covers the admission only: its result is provisional until your commit is stored, and the commit's events go to your commit's context. Each input starts a new trace linked to its caller's current span, and a write is a child of its caller. A duplicate `RequestId` keeps the original submission and its carrier.
+- **`pi.durable.phase`** covers one run or abort phase of a task, with its decision commit; never the next phase, a durable wait or a restart. It names the task, the phase, the attempt, whether it resumed and its outcome, and for a tool phase the tool and call. Nested tasks and background compactions inherit the phase that created them, and model requests get its context. Hooks add no spans.
+- **Failures.** A faulted, failed or orphaned outcome sets error status with `task_faulted`, `task_failed` or `task_orphaned` and the outcome's diagnostic, cut to 500 characters. Diagnostics can contain caller content; no exception detail is recorded. An aborted outcome keeps status ok.
+- **Reports.** Every `OnReport` report also becomes a `pi.durable.report` event on its current span, with only its kind, a fixed reason, the extension and the task ID. `pi.durable.reports` counts reports by kind. The `OnReport` callback is unchanged.
+- **Events.** Committed entries and settled submissions emit `pi.durable.entry` and `pi.durable.submission`, a running task's committed phase change `pi.durable.checkpoint`, and a nested call answered from its stored result `pi.durable.replay`.
+- **Propagation** stores an opaque trace carrier on submission and task records, without a storage migration, so a phase that runs after a restart joins the trace it started in (its first invocation after a reopen is marked resumed). `TaskOptions.Trace` inherits the creator's carrier when null; `TaskTrace.Of` sets one and `TaskTrace.Root` starts at the adapter root without storing one. A run started for several queued inputs takes the first input's trace and links the others.
+- **Metrics** record `pi.durable.phase.duration` (milliseconds, by task, phase and outcome) and `pi.durable.tasks.active` (live tasks by task name), without record IDs. Closing the Harness releases its active counts.
+
+## Registries from Chord
+
+Upstream v1.5.0's `registryReader` adapts a registry composed by Chord v2's host, so a harness follows the extensions its plugins contribute. PiSharp has it as `RegistryReader.Create` in `PiSharp.Durable.Store`, which is not packaged yet. Chord v2's host, which composes such a registry, is not ported yet (a later phase of the v1.5.0 sync), so today only tests build the registry value by hand.
 
 ## Samples
 
-[`samples/Durable.Examples`](https://github.com/jkelly/PiSharp/tree/main/samples/Durable.Examples) ports upstream's examples. They run offline on scripted models, except 16. Run all of them, or pick by number or name:
+[`samples/Durable.Examples`](https://github.com/jkelly/PiSharp/tree/main/samples/Durable.Examples) ports upstream v1.5.0's examples 00 to 34, under v1.5.0's names. They run offline on scripted models, except 15. Run all of them, or pick by number or name:
 
 ```powershell
-dotnet run --project samples/Durable.Examples -- 14 20
-dotnet run --project samples/Durable.Examples -- --storage sqlite --dir ./examples-out 13-recovery
+dotnet run --project samples/Durable.Examples -- 13 19
+dotnet run --project samples/Durable.Examples -- --storage sqlite --dir ./examples-out 12-recovery
 ```
+
+PiSharp 1.2.0.x numbered them as upstream v1.2.0 did: v1.5.0 dropped `04-chord-state`, so the examples after it moved down by one, and added 31 to 37.
 
 | Example | Shows |
 | --- | --- |
@@ -550,34 +668,39 @@ dotnet run --project samples/Durable.Examples -- --storage sqlite --dir ./exampl
 | `01-documents` | A rewindable document next to the entries, read now and as of an entry. |
 | `02-forks` | Fork a conversation at an entry; documents follow their fork setting. |
 | `03-owned-conversations` | A background task that owns a child conversation, created in one commit. |
-| `04-chord-state` | A document exposed as read-only replicated state. |
-| `05-watches` | A serialized async watch of a document. |
-| `06-harness` | Open a harness with a registry; create the root conversation. |
-| `07-configuration` | Per-conversation agent choices and live harness settings. |
-| `08-harness-conversations` | Conversation handles, typed entries, creating and forking conversations. |
-| `09-context` | Transcript history and model context: heads, edits, synthesized results. |
-| `10-registry-reload` | Reload an extension by reinstalling it; wrap and uninstall. |
-| `11-extension-state` | An extension with its own per-conversation document. |
-| `12-tasks` | A durable task state machine with phases and abort. |
-| `13-recovery` | Close and reopen; the task continues and a memo prevents a duplicate effect. |
-| `14-chat` | A chat turn on a scripted model. |
-| `15-system-prompt` | Sections, wrapped sections, per-conversation instructions, an environment that follows the cwd. |
-| `16-real-model` | Stream from OpenAI through `NativeDurableModels` (needs `OPENAI_API_KEY`). |
-| `17-coding-tools` | The coding tools over `LocalExecutionEnv`, with tool hooks timing a call. |
-| `18-print` | Print mode: one prompt, one answer, like `pi -p`. |
-| `19-json` | JSON mode: agent events or raw view frames as JSON lines. |
-| `20-inbox` | Submissions while busy: follow-up, steer, write, withdraw, reject. |
-| `21-late-join` | A client that attaches mid-run gets the current state, then changes. |
-| `22-subagent-foreground` | A subagent tool, and a UI attaching to the child. |
-| `23-subagent-background` | Persistent background subagents that survive a restart. |
-| `24-child-tasks` | A task that owns child tasks, and the task graph. |
-| `25-compaction` | A long chat summarized to keep the context small. |
-| `26-coding-agent` | A small coding agent with settings backed by a file. |
-| `27-plan-mode` | A read-only planning mode that restores the tools when it ends. |
-| `28-reviewer` | A reviewer agent on a cheaper model beside the main one. |
-| `29-sandbox-per-conversation` | A sandbox per conversation, recorded in a document. |
-| `30-tool-override` | Replace `bash` for some conversations, and wrap whichever `bash` wins. |
-| `31-reload-and-restart` | Reload an extension while a call runs, then restart. |
+| `04-watches` | A serialized async watch of a document; commits made while it is busy arrive folded. |
+| `05-harness` | Open a harness with a registry; create the root conversation. |
+| `06-configuration` | Per-conversation agent choices and live harness settings. |
+| `07-harness-conversations` | Conversation handles, typed entries, creating and forking conversations. |
+| `08-context` | Transcript history and model context: heads, edits, synthesized results. |
+| `09-registry-reload` | Reload an extension by reinstalling it; wrap and uninstall. |
+| `10-extension-state` | An extension with its own per-conversation document. |
+| `11-tasks` | A durable task state machine with phases and abort. |
+| `12-recovery` | Close and reopen; the task continues and a memo prevents a duplicate effect. |
+| `13-chat` | A chat turn on a scripted model. |
+| `14-system-prompt` | Sections, wrapped sections, per-conversation instructions, an environment that follows the cwd. |
+| `15-real-model` | Stream from OpenAI through `NativeDurableModels` (needs `OPENAI_API_KEY`). |
+| `16-coding-tools` | The coding tools over `LocalExecutionEnv`, with tool hooks timing a call. |
+| `17-print` | Print mode: one prompt, one answer, like `pi -p`. |
+| `18-json` | JSON mode: the conversation view's frames as JSON lines. |
+| `19-inbox` | Submissions while busy: follow-up, steer, write, withdraw, reject. |
+| `20-late-join` | A client that attaches mid-run gets the current state, then changes. |
+| `21-subagent-foreground` | A subagent tool, and a UI attaching to the child. |
+| `22-subagent-background` | Persistent background subagents that survive a restart. |
+| `23-child-tasks` | A task that owns child tasks that sleep, and the task graph. |
+| `24-compaction` | A long chat summarized to keep the context small. |
+| `25-coding-agent` | A small coding agent with settings backed by a file. |
+| `26-plan-mode` | A read-only planning mode that restores the tools when it ends. |
+| `27-reviewer` | A reviewer agent on a cheaper model beside the main one. |
+| `28-sandbox-per-conversation` | A sandbox per conversation, recorded in a document. |
+| `29-tool-override` | Replace `bash` for some conversations, and wrap whichever `bash` wins. |
+| `30-reload-and-restart` | Reload an extension while a call runs, then restart. |
+| `31-transcript` | (from 1.5.0) A client's transcript over the windowed conversation view, with gaps and earlier pages loaded on demand. |
+| `32-tests-after-edits` | (from 1.5.0) An `AfterRun` hook runs the tests after every run that edited files; a failure starts a fix run. |
+| `33-turn-limit-and-continue` | (from 1.5.0) A turn limit stops a long run; a continue resumes it without a user message. |
+| `34-submit-in-commit` | (from 1.5.0) Messages that only steer a running agent, admitted inside the host's own commit. |
+
+Upstream's `35-durable-on-the-store`, `36-durable-views` and `37-harness-registry` run Durable on Chord v2's host, which is not ported yet; they come with it.
 
 [`samples/Durable.Chat`](https://github.com/jkelly/PiSharp/tree/main/samples/Durable.Chat) sends one prompt to a real model, prints the answer, then reopens the storage and prints the stored answer. Its API key comes from the provider's environment variable:
 
@@ -587,4 +710,4 @@ dotnet run --project samples/Durable.Chat -- --provider anthropic --model claude
 
 Its options are `--provider`, `--model`, `--thinking <level>`, `--storage memory|jsonl|sqlite` (default sqlite), `--dir <path>`, `--continue` to reopen `--dir`, and `--tools [--cwd <path>]` to give the model `read`, `write`, `edit` and `bash`.
 
-Upstream's [`pi-durable` README](https://github.com/earendil-works/pi/blob/v1.2.0/packages/durable/README.md) and [specification](https://github.com/earendil-works/pi/blob/v1.2.0/packages/durable/docs/spec.md) describe the design in depth.
+Upstream's [`pi-durable` README](https://github.com/earendil-works/pi/blob/v1.5.0/packages/durable/README.md), [specification](https://github.com/earendil-works/pi/blob/v1.5.0/packages/durable/docs/spec.md) and [group commit design](https://github.com/earendil-works/pi/blob/v1.5.0/packages/durable/docs/group-commit.md) describe the design in depth.

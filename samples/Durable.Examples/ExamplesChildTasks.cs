@@ -1,9 +1,13 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/test/examples/24-child-tasks.ts. Upstream times its fake bank with
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/test/examples/23-child-tasks.ts. Upstream times its fake bank with
 // Date.now() and setTimeout; here an ExampleClock drives the Harness clock (HarnessOptions.TimeProvider), so a payment's sleep ends only when
 // the example advances the clock, and two barriers stand in for what Node's event loop orders: a declined card is declined only after the
 // checkout's other payments were charged (upstream runs every reserved payment's first step before the decline's commit lands), and the
 // example inspects or stops the payments once all four were charged (upstream waits 20 ms). Upstream keeps the storage in a temporary SQLite
 // file; here that holds on the memory run, and a file backend reopens the runner's storage. Abort handlers print in task order.
+// Pi v1.5.0 sync (area sleep): a payment waits for the bank's confirmation in a durable sleep, charge then confirm, as f75b3240a's
+// 24-child-tasks.ts (v1.5.0's 23-child-tasks.ts) has it, so the tree prints the charged payments as sleeping; the example prints the tree
+// once every charged payment is asleep (upstream waits 20 ms). Area watches (92ab53602): the tree is read from a task graph watch, which
+// is then stopped. Since the closeout it carries v1.5.0's name (b9fb2b854).
 using PiSharp.Durable.Chord;
 using PiSharp.Durable.Sqlite;
 using PiSharp.Durable.Storage;
@@ -12,7 +16,7 @@ namespace PiSharp.Durable.Examples;
 
 public static partial class Examples
 {
-    // 24: a task that owns child tasks: a checkout charges four payments at once and waits for them. The task graph view prints the
+    // 23: a task that owns child tasks: a checkout charges four payments at once and waits for them. The task graph view prints the
     // checkout's tree while its payments run.
     private static async Task ChildTasksAsync(Func<Task<IStorage>> open, TextWriter output)
     {
@@ -49,7 +53,7 @@ public static partial class Examples
         {
             Name = "example.payment",
             Version = 1,
-            Initial = _ => JsonValue.Object([new("phase", "charge"), new("at", clock.NowMs() + 100)]),
+            Initial = _ => JsonValue.Object([new("phase", "charge")]),
             Phases = new Dictionary<string, TaskPhaseHandler>
             {
                 ["charge"] = async (task, runtime, taskContext) =>
@@ -64,13 +68,19 @@ public static partial class Examples
                     }
                     lock (charged) charged.Add(card);
                     var others = (await Cards(runtime, checkout, taskContext)).Count(other => !other.StartsWith("expired", StringComparison.Ordinal));
+                    // The bank confirms after a moment: wait for it without holding an invocation.
+                    await runtime.SleepUntilAsync(runtime.Now() + 100, JsonValue.Object([new("phase", "confirm")]), taskContext);
+                    // Barrier: counted once the sleep is stored, so the example prints the tree with every charged payment asleep.
                     lock (chargedPerCheckout)
                     {
                         var (count, all) = Charges(checkout);
                         chargedPerCheckout[checkout] = (count + 1, all);
                         if (count + 1 == others) all.TrySetResult();
                     }
-                    await runtime.SleepAsync(((JsonNumberValue)((JsonObjectValue)task.Checkpoint)["at"]).Value, taskContext);
+                },
+                ["confirm"] = async (task, runtime, taskContext) =>
+                {
+                    var card = Card(task);
                     await runtime.CommitAsync((_, _) => NextTaskState.Completed(JsonValue.Object([new("card", card)])), taskContext);
                 },
             },
@@ -159,7 +169,9 @@ public static partial class Examples
         id = await Checkout(root, "visa-5", "visa-6", "visa-7", "visa-8");
         harness.Resume();
         await Charges(id).All.Task;
-        using (var graph = await harness.TaskGraphAsync(Context)) await PrintGraph(graph.Value);
+        var graph = await harness.WatchTaskGraphAsync(Context);
+        await PrintGraph(graph.Value);
+        await graph.StopAsync();
         await harness.AbortTaskAsync(id, Context);
         await output.WriteLineAsync($"  checkout: {Outcome(await harness.WaitForTaskAsync(id, Context))}");
 
@@ -169,7 +181,7 @@ public static partial class Examples
         await harness.CloseAsync(Context);
         harness = await Open();
         root = await harness.RootAsync(Context);
-        // The payments' moment passes; their sleeps, rerun from the saved checkpoints, end at once.
+        // The payments' moment passes; their sleeps, stored with their checkpoints, come due and each confirms.
         clock.Advance(TimeSpan.FromSeconds(1));
         await output.WriteLineAsync($"  checkout: {Outcome(await harness.WaitForTaskAsync(id, Context))}");
 

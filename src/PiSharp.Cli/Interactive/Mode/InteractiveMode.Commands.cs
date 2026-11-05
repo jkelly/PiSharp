@@ -430,6 +430,7 @@ internal sealed partial class InteractiveMode
         {
             var result = await ExternalEditor.EditInExternalEditorAsync(editorCommand, content);
             if (result.Status == "complete") editor.SetText(result.Content ?? "");
+            else ShowStatus(result.Message ?? "");
         }
         finally
         {
@@ -481,6 +482,7 @@ internal sealed partial class InteractiveMode
             await RefreshCommandsAsync();
             RebuildChatFromMessages();
             keybindings.Reload();
+            ConfigureExtensionEditor();
             if ((customHeader ?? builtInHeader) is IExpandable header) header.SetExpanded(toolOutputExpanded);
             Themes.SetRegisteredThemes(context.Startup.Resources.Themes.Select(registered => (registered.Name, registered.Path)));
             ApplyRuntimeSettings();

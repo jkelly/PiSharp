@@ -1,5 +1,5 @@
 // Authored for the examples (no upstream counterpart): a manual clock in place of Node's timers, for the examples whose upstream output
-// depends on setTimeout (21-late-join, 23-subagent-background, 24-child-tasks). Passed as HarnessOptions.TimeProvider it drives the Harness
+// depends on setTimeout (20-late-join, 22-subagent-background, 23-child-tasks). Passed as HarnessOptions.TimeProvider it drives the Harness
 // clock, sleeps and throttles; the examples' own pauses and scripted streaming wait on it too. Nothing moves until the example advances it,
 // so a slow machine cannot reorder what upstream's event loop orders by time.
 using PiSharp.Durable.Chord;
@@ -171,12 +171,13 @@ public sealed class ExampleClock(DateTimeOffset start) : TimeProvider
 
     private sealed class ObservedStorage(IStorage inner, ExampleClock clock) : IStorage
     {
-        public async Task<Seq> CommitAsync(IReadOnlyList<StorageWrite> writes, DurableContext context)
+        public async Task<CommitResult> CommitAsync(IReadOnlyList<IReadOnlyList<StorageWrite>> batches, Action<int, Seq> receive, DurableContext context)
         {
             Interlocked.Increment(ref clock.commitsInFlight);
-            try { return await inner.CommitAsync(writes, context).ConfigureAwait(false); }
+            try { return await inner.CommitAsync(batches, receive, context).ConfigureAwait(false); }
             finally { Interlocked.Decrement(ref clock.commitsInFlight); }
         }
+        public void Publishing(Action publish, DurableContext context) => inner.Publishing(publish, context);
         public Task<TId> MintIdAsync<TId>() where TId : struct, IDurableId<TId> => inner.MintIdAsync<TId>();
         public Task<ConversationRecord?> GetConversationAsync(ConversationId id, DurableContext context) => inner.GetConversationAsync(id, context);
         public Task<Page<ConversationRecord>> ScanConversationsAsync(ConversationQuery query, int limit, JsonObjectValue? cursor, DurableContext context) =>

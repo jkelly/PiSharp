@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/test/harness-scheduler-retention.test.ts. Scheduler memory is bounded
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/test/harness-scheduler-retention.test.ts. Scheduler memory is bounded
 // by live work: an ended task or a conversation edge is kept only while live work is below it, and a chain dropped that way is loaded again
 // from storage when work appears below it. Verbatim on SQLite, as upstream, apart from the adaptations of HarnessSchedulerSupport.cs (the
 // index sizes are read once the scheduler's pending passes have run) and these:
@@ -11,6 +11,11 @@
 // - "aborts work created in a forgotten conversation below an abort-marked owner before it runs": P must still be cancelling when `late`
 //   is created. Upstream's `keep` finishes its abort only after the case's commits through microtask order; here `keep`'s abort handler
 //   waits for its gate abort.keep, opened once `late` has been checked, and the case then also waits for P's outcome.
+// - Pi v1.5.0 sync (area group-commit-scheduler, e5c6182ba): "holds a live owner for work later created in a forgotten conversation ..."
+//   no longer counts the chain's reads, and v1.2.0's "keeps a scope busy while the chain of new work below a forgotten conversation loads"
+//   is v1.5.0's "loads the chain of new work below a forgotten conversation before admitting it, and keeps the scope busy": the creation's
+//   admission loads the chain for the memberships it writes, so the commit waits for the held read of B after a reopen (HookedStorage's
+//   OnTaskRead, upstream's patched storage.task).
 using System.Collections.Concurrent;
 using PiSharp.Durable;
 using PiSharp.Durable.Chord;
@@ -48,15 +53,7 @@ internal static partial class SchedulerTests
         yield return Case(prefix + "holds-a-live-owner-for-work-later-created-in-a-forgotten-conversation-loading-its-chain-again", async () =>
         {
             var fixture = new RetentionFixture();
-            var storage = await OpenSqlite(SqlitePath("retention-reload"));
-            var reads = 0;
-            storage.OnTask = _ => Interlocked.Increment(ref reads);
-            storage.OnConversation = _ =>
-            {
-                Interlocked.Increment(ref reads);
-                return Task.CompletedTask;
-            };
-            var (harness, root) = await fixture.Open(storage);
+            var (harness, root) = await fixture.Open();
             // Live P -> ended B -> ended A -> conversation C, empty: forgotten.
             var (p, b, c) = await root.CommitAsync(async tx =>
             {
@@ -70,12 +67,11 @@ internal static partial class SchedulerTests
             fixture.Gates.Open("b");
             await harness.WaitForTaskAsync(b, Context);
             var before = await Sizes(harness);
-            var loaded = Volatile.Read(ref reads);
             var conversation = (await harness.ConversationAsync(c, Context))!;
             var d = await conversation.CommitAsync(tx => tx.CreateTaskAsync(fixture.Hold, Named("d"), OwnConversation()), Context);
             fixture.Gates.Open("p");
+            // P holds for D: the scheduler loaded the chain from C up to P again.
             await Eventually(async () => (await RecordOf(harness, p)).State.Status == DurableTaskStatus.Completing);
-            Check(Volatile.Read(ref reads) > loaded, "the chain was read again");
             fixture.Gates.Open("d");
             Equal("completed", await OutcomeOf(harness, d), "d outcome");
             Equal("completed", await OutcomeOf(harness, p), "p outcome");
@@ -171,10 +167,11 @@ internal static partial class SchedulerTests
             await harness.CloseAsync(Context);
         });
 
-        yield return Case(prefix + "keeps-a-scope-busy-while-the-chain-of-new-work-below-a-forgotten-conversation-loads", async () =>
+        yield return Case(prefix + "loads-the-chain-of-new-work-below-a-forgotten-conversation-before-admitting-it-and-keeps-the-scope-busy", async () =>
         {
             var fixture = new RetentionFixture();
-            var storage = await OpenSqlite(SqlitePath("retention-busy"));
+            var path = SqlitePath("retention-busy");
+            var storage = await OpenSqlite(path);
             var (harness, root) = await fixture.Open(storage);
             var (b, c) = await root.CommitAsync(async tx =>
             {
@@ -184,28 +181,33 @@ internal static partial class SchedulerTests
             }, Context);
             fixture.Gates.Open("b");
             await harness.WaitForTaskAsync(b, Context);
-            // Hold the chain load's read of C: the second read once holding, after the creating commit's own.
+            await harness.CloseAsync(Context);
+            // Reopen, so that B is in no cache: the chain load reads it from Storage. Hold that read.
+            var reopened = await OpenSqlite(path);
             var held = new Deferred();
             var reached = new Deferred();
             var holding = false;
-            var readsOfC = 0;
-            storage.OnConversation = async id =>
+            reopened.OnTaskRead = async id =>
             {
-                if (Volatile.Read(ref holding) && id == c && Interlocked.Increment(ref readsOfC) == 2)
+                if (Volatile.Read(ref holding) && id == b)
                 {
                     reached.Resolve();
                     await held.Task;
                 }
             };
-            var conversation = (await harness.ConversationAsync(c, Context))!;
+            var (second, _) = await fixture.Open(reopened);
+            var conversation = (await second.ConversationAsync(c, Context))!;
             Volatile.Write(ref holding, true);
-            await conversation.CommitAsync(tx => tx.CreateTaskAsync(fixture.Hold, Named("d"), OwnConversation()), Context);
+            var committing = conversation.CommitAsync(tx => tx.CreateTaskAsync(fixture.Hold, Named("d"), OwnConversation()), Context);
+            // Its admission loads the chain, for the memberships it writes: the commit waits for the read.
             await reached.Task;
-            Check(!await Settled(harness.WaitForIdleAsync(Context)), "busy while the chain loads");
+            Check(!await Settled(committing), "the commit waits for the chain load");
             held.Resolve();
+            await committing;
+            Check(!await Settled(second.WaitForIdleAsync(Context)), "busy while d is live");
             fixture.Gates.Open("d");
-            await harness.WaitForIdleAsync(Context);
-            await harness.CloseAsync(Context);
+            await second.WaitForIdleAsync(Context);
+            await second.CloseAsync(Context);
         });
 
         yield return Case(prefix + "keeps-a-chain-when-one-commit-ends-its-last-task-and-creates-new-work-below-it", async () =>

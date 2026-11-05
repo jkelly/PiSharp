@@ -169,6 +169,7 @@ internal sealed class DeviceService(DurableDeviceHost host, DurableDeviceServerO
                 Conversations = [.. node.Conversations.Select(id => id.Value)],
                 Label = label,
                 CallId = callId,
+                Blocked = node.Blocked is { } blocked ? TaskInspectionState.ReasonName(blocked) : null,
             });
         }
         return nodes;
@@ -387,8 +388,9 @@ internal sealed class DeviceService(DurableDeviceHost host, DurableDeviceServerO
     public static async Task<List<JsonObject>> ActiveEntriesAsync(HostedSession session, long agentId, CancellationToken cancellationToken)
     {
         var conversation = await ConversationAsync(session, agentId, cancellationToken).ConfigureAwait(false);
-        using var view = await conversation.ViewStateAsync(Context(cancellationToken)).ConfigureAwait(false);
-        return [.. view.Value.Entries.Select(entry => (JsonObject)ToNode(entry.ToJson())!)];
+        // What the model sees: pi-durable 1.5.0's view is a window over the whole transcript, not the active context.
+        var active = await conversation.ContextAsync(Context(cancellationToken)).ConfigureAwait(false);
+        return [.. active.Entries.Select(entry => (JsonObject)ToNode(entry.ToJson())!)];
     }
 
     /// <summary>One page of all entries, oldest first, with an opaque cursor.</summary>

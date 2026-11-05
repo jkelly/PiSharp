@@ -7,8 +7,18 @@
 // The same file's getModelsOfType, getAvailableOfType, getModelOfType, classify and generateImages, which pi-durable 1.2.0's code mode calls
 // for scripts' models.* (work list area d), run over PiSharp.AI's ModelOperationsRegistry (the coding agent's port of the same functions) with
 // the registered providers' catalogs.
+// Pi v1.5.0 sync (area model-requests): a request's identity reaches its ChatRequest (pi-ai's StreamOptions.identity, adc5fa9f8), and its
+// onPayload (pi-ai's StreamOptions.onPayload, which pi-durable 1.5.0's beforeProviderRequest hook uses, d280e1ffa) applies to the JSON
+// request bodies of its native routes, and of its host routes whose HTTP handler is wrapped for it (PayloadHandler). PiSharp.AI's own
+// payload hooks are per transport and fixed when the transport is built, so they cannot carry a per-request callback.
+// Pi v1.5.0 sync (area telemetry): as pi-ai's Models does (models.ts' observeModelRequest around lazyStream, 2ec55d808), a request with
+// telemetry records one pi.ai.request span around the whole stream, setup failures included, and a deferred poll (streamDeferred,
+// fetchDeferred) one pi.ai.poll span, through PiSharp.AI's AiTelemetry; cancelDeferred records none. The request's ChatRequest carries no
+// span, so the chat run does not record a second one. A failing telemetry adapter never changes a request: observation stops and its span
+// settles. Classifier and image calls forward the span with their options; as pi-ai's, they record no span of their own.
 using System.Collections.Immutable;
 using System.Runtime.CompilerServices;
+using System.Text;
 using System.Text.Json;
 using PiSharp.AI;
 using PiSharp.AI.Catalogs;
@@ -18,6 +28,7 @@ using PiSharp.Contracts;
 using PiSharp.Contracts.ModelOperations;
 using PiSharp.Durable.Chord;
 using PiSharp.Durable.Internal.PiAi;
+using PiSharp.Telemetry;
 
 namespace PiSharp.Durable;
 
@@ -124,7 +135,8 @@ public sealed class NativeDurableModels : IDurableModels, IDisposable
         environment = options.Environment ?? (_ => null);
         resolveApiKey = options.ResolveApiKey;
         hostTransport = options.HostTransport;
-        handler = options.HttpHandler ?? new SocketsHttpHandler { AllowAutoRedirect = false };
+        // Disposing the wrapper disposes the inner handler; a caller-owned handler's wrapper is never disposed.
+        handler = new PayloadHandler(options.HttpHandler ?? new SocketsHttpHandler { AllowAutoRedirect = false });
         ownsHandler = options.HttpHandler is null;
         time = options.TimeProvider ?? TimeProvider.System;
         var host = options.ModelOperations;
@@ -228,7 +240,12 @@ public sealed class NativeDurableModels : IDurableModels, IDisposable
         operations.Value.GetModelOfType(TypeOf(type), provider, id) is { } model ? Json(model) : null;
 
     /// <inheritdoc/>
-    public async Task<JsonObjectValue> ClassifyAsync(JsonObjectValue model, JsonObjectValue context, CancellationToken cancellationToken)
+    public Task<JsonObjectValue> ClassifyAsync(JsonObjectValue model, JsonObjectValue context, CancellationToken cancellationToken) =>
+        ClassifyAsync(model, context, null, cancellationToken);
+
+    /// <inheritdoc/>
+    public async Task<JsonObjectValue> ClassifyAsync(JsonObjectValue model, JsonObjectValue context, DurableRequestOptions? options,
+        CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(model);
         ArgumentNullException.ThrowIfNull(context);
@@ -243,12 +260,18 @@ public sealed class NativeDurableModels : IDurableModels, IDisposable
         {
             return DurableModelOperations.ClassifierError(model, error.Message, cancellationToken.IsCancellationRequested);
         }
-        var result = await operations.Value.ClassifyAsync(classifier, parsed, null, cancellationToken).ConfigureAwait(false);
+        var request = options?.Telemetry is { } telemetry ? new ClassifierOptions { Telemetry = telemetry } : null;
+        var result = await operations.Value.ClassifyAsync(classifier, parsed, request, cancellationToken).ConfigureAwait(false);
         return (JsonObjectValue)Chord.JsonValue.FromData(ModelOperationJson.WriteClassifierResult(result));
     }
 
     /// <inheritdoc/>
-    public async Task<JsonObjectValue> GenerateImagesAsync(JsonObjectValue model, JsonObjectValue context, CancellationToken cancellationToken)
+    public Task<JsonObjectValue> GenerateImagesAsync(JsonObjectValue model, JsonObjectValue context, CancellationToken cancellationToken) =>
+        GenerateImagesAsync(model, context, null, cancellationToken);
+
+    /// <inheritdoc/>
+    public async Task<JsonObjectValue> GenerateImagesAsync(JsonObjectValue model, JsonObjectValue context, DurableRequestOptions? options,
+        CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(model);
         ArgumentNullException.ThrowIfNull(context);
@@ -263,7 +286,8 @@ public sealed class NativeDurableModels : IDurableModels, IDisposable
         {
             return DurableModelOperations.ImagesError(model, error.Message, cancellationToken.IsCancellationRequested);
         }
-        var result = await operations.Value.GenerateImagesAsync(image, parsed, null, cancellationToken).ConfigureAwait(false);
+        var request = options?.Telemetry is { } telemetry ? new ImagesOptions { Telemetry = telemetry } : null;
+        var result = await operations.Value.GenerateImagesAsync(image, parsed, request, cancellationToken).ConfigureAwait(false);
         return (JsonObjectValue)Chord.JsonValue.FromData(ModelOperationJson.WriteAssistantImages(result));
     }
 
@@ -273,7 +297,47 @@ public sealed class NativeDurableModels : IDurableModels, IDisposable
     {
         ArgumentNullException.ThrowIfNull(model);
         ObjectDisposedException.ThrowIf(Volatile.Read(ref disposed) != 0, this);
-        return StreamAsync(model, messages, options, cancellationToken);
+        var stream = StreamAsync(model, messages, options, cancellationToken);
+        return options?.Telemetry is { } telemetry ? ObserveAsync(stream, model, telemetry, options.Reasoning, poll: false) : stream;
+    }
+
+    /// <summary>pi-ai's <c>observeModelRequest</c> around a lazy stream: a <c>pi.ai.request</c> (<c>pi.ai.poll</c>) span under
+    /// <paramref name="telemetry"/> from the stream's start to its end, fed every event and the final message, or none when the reader stops
+    /// early. A throwing adapter ends the observation and settles the span; the stream is unchanged.</summary>
+    private async IAsyncEnumerable<StreamEvent> ObserveAsync(IAsyncEnumerable<StreamEvent> events, DurableModel model, ITelemetrySpan telemetry,
+        string? reasoning, bool poll, [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    {
+        AiRequestObserver? observer;
+        try { observer = AiTelemetry.ObserveModelRequest(model.Descriptor, telemetry, reasoning, poll, time); }
+        catch (Exception) { observer = null; }
+        AssistantMessage? final = null;
+        try
+        {
+            await foreach (var value in events.WithCancellation(cancellationToken).ConfigureAwait(false))
+            {
+                if (observer is not null)
+                {
+                    try { observer.OnEvent(value); }
+                    catch (Exception)
+                    {
+                        Settle(observer, null);
+                        observer = null;
+                    }
+                }
+                if (value is StreamTerminalEvent terminal) final = terminal.Message;
+                yield return value;
+            }
+        }
+        finally
+        {
+            if (observer is not null) Settle(observer, final);
+        }
+
+        static void Settle(AiRequestObserver observer, AssistantMessage? message)
+        {
+            try { observer.OnResult(message); }
+            catch (Exception) { /* The span settled in OnResult's own finally; the failure is the adapter's. */ }
+        }
     }
 
     private async IAsyncEnumerable<StreamEvent> StreamAsync(DurableModel model, ImmutableArray<Chord.JsonValue> messages, DurableStreamOptions? options,
@@ -298,7 +362,10 @@ public sealed class NativeDurableModels : IDurableModels, IDisposable
         var idle = options?.TimeoutMs is { } milliseconds && double.IsFinite(milliseconds) && milliseconds > 0
             ? TimeSpan.FromMilliseconds(Math.Min(milliseconds, int.MaxValue)) : (TimeSpan?)null;
         var client = new ChatClient(prepared.Transport) { TimeProvider = time };
-        await using var run = await client.StartWithAbortSettlementAsync(prepared.Request, linked.Token, timestamp).ConfigureAwait(false);
+        // The run's producer starts here and carries the payload scope to every HTTP send of this request.
+        var started = PayloadHandler.Start(options?.OnPayload is { } onPayload ? new PayloadScope(onPayload, model) : null,
+            () => client.StartWithAbortSettlementAsync(prepared.Request, linked.Token, timestamp));
+        await using var run = await started.ConfigureAwait(false);
         await using var events = run.ReadEventsAsync().GetAsyncEnumerator(CancellationToken.None);
         while (true)
         {
@@ -337,7 +404,10 @@ public sealed class NativeDurableModels : IDurableModels, IDisposable
         {
             var levels = routed is IThinkingLevelTransport capability ? capability.GetSupportedThinkingLevels(model.Descriptor) : ["off"];
             var hosted = ThinkingLevels.Clamp(levels, options?.Reasoning ?? "off");
-            return new(routed, null, new ChatRequest(model.Descriptor, Transcript(messages), timestamp) { ThinkingLevel = hosted, SessionId = options?.SessionId, ServiceTier = options?.ServiceTier });
+            return new(routed, null, new ChatRequest(model.Descriptor, Transcript(messages), timestamp)
+            {
+                ThinkingLevel = hosted, SessionId = options?.SessionId, ServiceTier = options?.ServiceTier, Identity = options?.Identity,
+            });
         }
         if (!providers.ContainsKey(model.Provider)) throw new InvalidOperationException($"Unknown provider: {model.Provider}");
         var metadata = Metadata(model);
@@ -367,7 +437,10 @@ public sealed class NativeDurableModels : IDurableModels, IDisposable
                 provider.Dispose();
                 provider = NativeModelRoutes.Bind(descriptor, metadata, key, settings with { MaxTokens = thinkingCap }, handler);
             }
-            var request = new ChatRequest(descriptor, transcript, timestamp) { ThinkingLevel = level, SessionId = options?.SessionId, ServiceTier = options?.ServiceTier };
+            var request = new ChatRequest(descriptor, transcript, timestamp)
+            {
+                ThinkingLevel = level, SessionId = options?.SessionId, ServiceTier = options?.ServiceTier, Identity = options?.Identity,
+            };
             return new(provider.Transport, provider, request);
         }
         catch
@@ -445,27 +518,50 @@ public sealed class NativeDurableModels : IDurableModels, IDisposable
 
     /// <summary>pi-ai <c>streamDeferred</c>: no PiSharp.AI transport implements deferred responses (nor does any pi-ai 1.2.0 provider but the faux test provider), so the
     /// stream ends with an error message naming the gap, as pi-ai's does for a provider without <c>fetchDeferred</c>.</summary>
-    public async IAsyncEnumerable<StreamEvent> StreamDeferred(DurableModel model, DurableDeferredHandle handle,
-        [EnumeratorCancellation] CancellationToken cancellationToken)
+    public IAsyncEnumerable<StreamEvent> StreamDeferred(DurableModel model, DurableDeferredHandle handle, CancellationToken cancellationToken) =>
+        StreamDeferred(model, handle, null, cancellationToken);
+
+    /// <summary><see cref="StreamDeferred(DurableModel, DurableDeferredHandle, CancellationToken)"/>; with telemetry, the poll is a
+    /// <c>pi.ai.poll</c> span.</summary>
+    public IAsyncEnumerable<StreamEvent> StreamDeferred(DurableModel model, DurableDeferredHandle handle, DurableRequestOptions? options,
+        CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(model);
         ArgumentNullException.ThrowIfNull(handle);
+        var stream = DeferredAsync(model, cancellationToken);
+        return options?.Telemetry is { } telemetry ? ObserveAsync(stream, model, telemetry, null, poll: true) : stream;
+    }
+
+    private async IAsyncEnumerable<StreamEvent> DeferredAsync(DurableModel model, [EnumeratorCancellation] CancellationToken cancellationToken)
+    {
         await Task.CompletedTask.ConfigureAwait(false);
         yield return new StreamError(StopReason.Error, ErrorMessage(model, time.GetUtcNow().ToUnixTimeMilliseconds(), StopReason.Error, DeferredGap(model)));
     }
 
-    /// <summary>pi-ai <c>fetchDeferred</c>: the error message of <see cref="StreamDeferred"/>.</summary>
-    public async Task<AssistantMessage> FetchDeferredAsync(DurableModel model, DurableDeferredHandle handle, CancellationToken cancellationToken)
+    /// <summary>pi-ai <c>fetchDeferred</c>: the error message of <see cref="StreamDeferred(DurableModel, DurableDeferredHandle, CancellationToken)"/>.</summary>
+    public Task<AssistantMessage> FetchDeferredAsync(DurableModel model, DurableDeferredHandle handle, CancellationToken cancellationToken) =>
+        FetchDeferredAsync(model, handle, null, cancellationToken);
+
+    /// <summary><see cref="FetchDeferredAsync(DurableModel, DurableDeferredHandle, CancellationToken)"/>; with telemetry, the poll is a
+    /// <c>pi.ai.poll</c> span.</summary>
+    public async Task<AssistantMessage> FetchDeferredAsync(DurableModel model, DurableDeferredHandle handle, DurableRequestOptions? options,
+        CancellationToken cancellationToken)
     {
         AssistantMessage? final = null;
-        await foreach (var value in StreamDeferred(model, handle, cancellationToken).ConfigureAwait(false))
+        await foreach (var value in StreamDeferred(model, handle, options, cancellationToken).ConfigureAwait(false))
             if (value is StreamTerminalEvent terminal) final = terminal.Message;
         return final!;
     }
 
     /// <summary>pi-ai <c>cancelDeferred</c>: throws <see cref="NotSupportedException"/>, as pi-ai throws for a provider without
     /// <c>cancelDeferred</c>.</summary>
-    public Task CancelDeferredAsync(DurableModel model, DurableDeferredHandle handle, CancellationToken cancellationToken)
+    public Task CancelDeferredAsync(DurableModel model, DurableDeferredHandle handle, CancellationToken cancellationToken) =>
+        CancelDeferredAsync(model, handle, null, cancellationToken);
+
+    /// <summary><see cref="CancelDeferredAsync(DurableModel, DurableDeferredHandle, CancellationToken)"/>; as pi-ai's, it records no
+    /// span.</summary>
+    public Task CancelDeferredAsync(DurableModel model, DurableDeferredHandle handle, DurableRequestOptions? options,
+        CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(model);
         ArgumentNullException.ThrowIfNull(handle);
@@ -490,5 +586,62 @@ public sealed class NativeDurableModels : IDurableModels, IDisposable
 
         public IReadOnlyList<DurableModel> Of(FrozenModelCatalog catalog) => cache.GetValue(catalog, owned =>
             [.. owned.Models.Where(model => model.Type == CatalogModelType.Chat).Select(FromCatalog)]);
+    }
+
+    /// <summary>The <see cref="DurableStreamOptions.OnPayload"/> of the request whose HTTP sends run in this scope, and its model.</summary>
+    internal sealed record PayloadScope(Func<Chord.JsonValue, DurableModel, CancellationToken, Task<Chord.JsonValue?>> OnPayload, DurableModel Model);
+
+    /// <summary>
+    /// Applies a request's <see cref="DurableStreamOptions.OnPayload"/> at the HTTP boundary, as PiSharp.Cli's extension provider hooks do:
+    /// a JSON request body sent inside the request's scope is the provider payload, and a replacement is sent in its place (a SigV4-signed
+    /// request is signed again over it). The body is read only when a scope is active; an unchanged payload sends the original bytes. Wrap a
+    /// host route's handler with <see cref="Wrap"/> so the same callback reaches it.
+    /// </summary>
+    internal sealed class PayloadHandler(HttpMessageHandler inner) : DelegatingHandler(inner)
+    {
+        private static readonly AsyncLocal<PayloadScope?> Current = new();
+        private static readonly HttpRequestOptionsKey<bool> Applied = new("PiSharp.Durable.PayloadApplied");
+
+        /// <summary><paramref name="inner"/> (null: a handler of its own that follows no redirects) with the request scope's payload
+        /// callback applied.</summary>
+        internal static HttpMessageHandler Wrap(HttpMessageHandler? inner) => new PayloadHandler(inner ?? new SocketsHttpHandler { AllowAutoRedirect = false });
+
+        /// <summary>Runs <paramref name="start"/> in <paramref name="scope"/>, so the work it starts carries it; a null scope clears an
+        /// enclosing one, so a request made inside a payload callback runs none.</summary>
+        internal static T Start<T>(PayloadScope? scope, Func<T> start)
+        {
+            var previous = Current.Value;
+            Current.Value = scope;
+            try { return start(); }
+            finally { Current.Value = previous; }
+        }
+
+        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            if (Current.Value is { } scope && request.Content is { } content && !request.Options.TryGetValue(Applied, out _) &&
+                content.Headers.ContentType?.MediaType?.EndsWith("json", StringComparison.OrdinalIgnoreCase) == true)
+            {
+                request.Options.Set(Applied, true);
+                // The callback and the send run outside the scope: a request the callback makes is not this request's payload.
+                Current.Value = null;
+                var text = await content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+                Chord.JsonValue? payload = null;
+                try { payload = Chord.JsonValue.Parse(text); }
+                catch (FormatException) { }
+                if (payload is not null && await scope.OnPayload(payload, scope.Model, cancellationToken).ConfigureAwait(false) is { } replaced &&
+                    !ReferenceEquals(replaced, payload))
+                {
+                    var body = new StringContent(replaced.ToJson(), Encoding.UTF8);
+                    foreach (var header in content.Headers)
+                        if (!header.Key.Equals("Content-Length", StringComparison.OrdinalIgnoreCase) && !header.Key.Equals("Content-Type", StringComparison.OrdinalIgnoreCase))
+                            body.Headers.TryAddWithoutValidation(header.Key, header.Value);
+                    body.Headers.ContentType = content.Headers.ContentType;
+                    request.Content = body;
+                    content.Dispose();
+                    if (request.Options.TryGetValue(ProviderRequestSigning.Resign, out var resign)) await resign(request, cancellationToken).ConfigureAwait(false);
+                }
+            }
+            return await base.SendAsync(request, cancellationToken).ConfigureAwait(false);
+        }
     }
 }

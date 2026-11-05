@@ -25,7 +25,8 @@ public static class UserInteraction
     /// approval: <c>{kind: "plan-approval", plan, planFile?, directory, createdAt, response?: {status: "approved"|"rejected"|"cancelled",
     /// stop?, feedback?, at}}</c>. A document without <c>kind</c> was never created by the tool.
     /// </summary>
-    public static TaskDocToken InteractionDoc { get; } = Documents.DefineTaskDoc("pisharp.interaction", 1, () => JsonObjectValue.Empty);
+    public static TaskDocToken InteractionDoc { get; } = Documents.DefineTaskDoc("pisharp.interaction", 1, () => JsonObjectValue.Empty,
+        checkpointWhen: (_, _, _) => false);
 
     /// <summary>The <c>user-interaction</c> extension. Hosts that cannot show the user a question (a subagent's child conversation, a
     /// headless run) should not select it.</summary>
@@ -71,8 +72,11 @@ public static class UserInteraction
     {
         ArgumentNullException.ThrowIfNull(conversation);
         ArgumentNullException.ThrowIfNull(context);
-        using var state = await conversation.ViewStateAsync(context).ConfigureAwait(false);
-        return PendingIn(state.Value);
+        // A one-off read: the acquisition value of a view watch, which stops at once (pi-durable 1.5.0 removed viewState()). Only its
+        // documents count, so its window holds one entry.
+        var watch = await conversation.WatchAsync(context, new ConversationWindow { Min = 1 }).ConfigureAwait(false);
+        try { return PendingIn(watch.Value); }
+        finally { await watch.StopAsync().ConfigureAwait(false); }
     }
 
     /// <summary>
@@ -124,23 +128,28 @@ internal static class InteractionWait
     /// <summary>
     /// Waits until the call's interaction document has a response and returns the document. Checks the watch's acquisition revision first;
     /// later revisions are delivered in order once the listener starts. Cancellation of <paramref name="context"/> (an abort, a close) ends
-    /// the wait with an <see cref="OperationCanceledException"/>; a watch that ends otherwise fails it.
+    /// the wait with an <see cref="OperationCanceledException"/>; a retirement of the document without a response, or a watch that ends
+    /// otherwise, fails it. A document watch follows its address since pi-durable 1.5.0 (a retirement is a call, not its end), so the
+    /// retirement is tested here, and the watch is stopped either way.
     /// </summary>
     public static async Task<JsonObjectValue> WaitForResponseAsync(IToolExecutionApi api, DurableContext context)
     {
-        var watch = await api.WatchDocAsync(UserInteraction.InteractionDoc, api.TaskId, context).ConfigureAwait(false)
-            ?? throw new InvalidOperationException($"Tool call {api.CallId} has no interaction document");
+        // The caller committed the document before it published its pending state, which a host can act on at once: a document gone by
+        // the time the watch starts was retired in between, as one retired once the watch runs.
+        var watch = await api.WatchDocAsync(UserInteraction.InteractionDoc, api.TaskId, context).ConfigureAwait(false) ?? throw Retired(api);
         try
         {
-            if (UserInteraction.ResponseOf(watch.Value) is not null) return watch.Value!;
+            if (UserInteraction.ResponseOf(watch.Value) is not null) return watch.Value;
             var answered = new TaskCompletionSource<JsonObjectValue>(TaskCreationOptions.RunContinuationsAsynchronously);
-            watch.Start((value, _, _) =>
+            watch.Start((call, _) =>
             {
-                if (UserInteraction.ResponseOf(value) is not null) answered.TrySetResult(value!);
+                if (call is not WatchValueCall<JsonObjectValue> change) return Task.CompletedTask;
+                if (UserInteraction.ResponseOf(change.Value) is not null) answered.TrySetResult(change.Value);
+                else if (change.Retired) answered.TrySetException(Retired(api));
                 return Task.CompletedTask;
             });
             _ = watch.Closed.ContinueWith(closed => answered.TrySetException(
-                    new InvalidOperationException($"The interaction watch of tool call {api.CallId} ended: {closed.Result.Reason}", closed.Result.Error)),
+                    new InvalidOperationException($"The interaction watch of tool call {api.CallId} ended: {closed.Result.Kind}", closed.Result.Error as Exception)),
                 CancellationToken.None, TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
             return await context.WaitAsync(answered.Task).ConfigureAwait(false);
         }
@@ -149,4 +158,7 @@ internal static class InteractionWait
             await watch.StopAsync().ConfigureAwait(false);
         }
     }
+
+    private static InvalidOperationException Retired(IToolExecutionApi api) =>
+        new($"The interaction document of tool call {api.CallId} was retired");
 }

@@ -1,18 +1,23 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/test/examples/21-late-join.ts. Upstream's timing comes from Node's
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/test/examples/20-late-join.ts. Upstream's timing comes from Node's
 // timers: the tool pauses 100 ms between lines, pi-ai's faux provider streams the answer at 40 tokens per second, and the client joins after
 // 500 ms. Here all of it runs on an ExampleClock: the Harness clock and its throttles (HarnessOptions.TimeProvider), the tool's pauses, and
 // PacedModels' streaming (faux pacing, token size 1). The example drives the clock like Node's event loop, firing one timer at a time and
 // letting everything it started settle before the next, so the joins, throttled commits and partials land as they do under Node. It prints
 // what upstream's console.log prints, with JSON in place of util.inspect. On a file backend the storage is reopened and the transcript read
 // back.
+// Pi v1.5.0 sync (area events, f3255de76): the client is the conversation view alone, as in v1.5.0's 20-late-join.ts: the event client of
+// watchEvents (removed) is gone, and the view's listener also prints the streamed answer's partial when its text changes and the view's
+// entries once the run ended. Area tools-schema: the count tool's obj({}) is ToolRegistration's default empty parameters. Area vocabulary
+// (5f312dac4): the view's listener takes the tagged call and skips one that is not a value. Since the closeout the example carries
+// v1.5.0's name (b9fb2b854).
 using PiSharp.Durable.Chord;
 
 namespace PiSharp.Durable.Examples;
 
 public static partial class Examples
 {
-    // 21: a client attaches while a run is already underway. It gets the current state first, the conversation view or the snapshot event,
-    // and then only what changes after that.
+    // 20: a client attaches while a run is already underway. It gets the current state first, the conversation view, and then only what
+    // changes after that.
     private static async Task LateJoinAsync(Func<Task<IStorage>> open, TextWriter output)
     {
         var clock = new ExampleClock();
@@ -51,53 +56,40 @@ public static partial class Examples
         // Join while the tool is halfway through.
         await clock.RunForAsync(500);
 
-        // Structural client: the view holds the committed transcript and documents, including the running tool's output.
-        var view = await root.ViewStateAsync(Context);
+        // The view holds the newest entries and the documents, including the running tool's output and, later, the answer being streamed.
+        var view = await root.WatchAsync(Context);
         static JsonObjectValue? FirstSlot(ConversationView value) =>
             value.Doc("pi.live") is { } live && live.TryGetValue("tools", out var tools) && tools is JsonArrayValue { Count: > 0 } slots
                 ? slots[0] as JsonObjectValue
                 : null;
         static string Field(JsonObjectValue? slot, string name) =>
             slot is not null && slot.TryGetValue(name, out var value) && value is JsonStringValue text ? text.Value : "";
+        // The text of the first text block of the streamed answer's partial, "" without one.
+        static string Partial(JsonObjectValue live) =>
+            live.TryGetValue("generation", out var generation) && generation is JsonObjectValue state && state.TryGetValue("message", out var message) &&
+            message is JsonObjectValue partial && partial.TryGetValue("content", out var content) && content is JsonArrayValue blocks &&
+            blocks.OfType<JsonObjectValue>().FirstOrDefault(block => Field(block, "type") == "text") is { } text ? Field(text, "text") : "";
         await output.WriteLineAsync("view entries: " + JsonNames(view.Value.Entries.Select(entry => entry.Kind)));
         var joined = FirstSlot(view.Value);
         await output.WriteLineAsync($"view tool slot: {Field(joined, "status")} {Json(JsonValue.String(Field(joined, "output")))}");
-        var subscription = view.Subscribe((value, _, _) =>
+        var shown = "";
+        view.Start((call, _) =>
         {
-            var slot = FirstSlot(value);
-            if (Field(slot, "status") == "running") output.WriteLine("view output now: " + Json(JsonValue.String(Field(slot, "output"))));
-        });
-        await clock.SettleAsync();
-
-        // Event client: the snapshot event carries the same state; later events apply on top of it.
-        var stream = await harness.WatchEventsAsync(root.Id, Context);
-        await output.WriteLineAsync("snapshot tools: " + JsonNames(stream.Snapshot.Tools.OfType<JsonObjectValue>()
-            .Select(slot => $"{Field(slot, "name")} {Field(slot, "status")}")));
-        var text = stream.Snapshot.Tools.Count > 0 ? Field(stream.Snapshot.Tools[0] as JsonObjectValue, "output") : "";
-        stream.Start(async (events, _) =>
-        {
-            foreach (var agentEvent in events)
-            {
-                if (agentEvent is ToolExecutionUpdateEvent { Output: { } change })
-                {
-                    text = change.Apply(text);
-                    await output.WriteLineAsync("event output now: " + Json(JsonValue.String(text)));
-                }
-                else if (agentEvent is MessageUpdateEvent update)
-                {
-                    var deltas = string.Concat(update.Changes.OfType<TextDeltaChange>().Where(change => change.Kind == "text_delta").Select(change => change.Delta));
-                    await output.WriteLineAsync("event text delta: " + Json(JsonValue.String(deltas)));
-                }
-                else await output.WriteLineAsync("event: " + agentEvent.Type);
-            }
+            if (call is not WatchValueCall<ConversationView> { Value: var value }) return Task.CompletedTask;
+            var state = value.Doc("pi.live") ?? JsonObjectValue.Empty;
+            if (FirstSlot(value) is var slot && Field(slot, "status") == "running")
+                output.WriteLine("view output now: " + Json(JsonValue.String(Field(slot, "output"))));
+            var partial = Partial(state);
+            if (partial != shown && partial != "") output.WriteLine("view answer now: " + Json(JsonValue.String(partial)));
+            shown = partial;
+            if (!state.ContainsKey("run")) output.WriteLine("view entries: " + JsonNames(value.Entries.Select(entry => entry.Kind)));
+            return Task.CompletedTask;
         });
 
         await clock.RunUntilAsync(submission.WaitAsync(Context));
         await clock.RunUntilAsync(harness.WaitForIdleAsync(Context));
         await clock.SettleAsync();
-        await stream.StopAsync();
-        subscription.Dispose();
-        view.Dispose();
+        await view.StopAsync();
         await harness.CloseAsync(Context);
 
         await ReopenAsync(open, output, async reopened =>

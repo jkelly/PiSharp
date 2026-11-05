@@ -43,7 +43,7 @@ Type `/` to search the commands of the current session. PiSharp has all of Pi's 
 | `/compact [instructions]` | Compacts the context now, with optional instructions for the summary. |
 | `/export [path]` | Writes the session as HTML, or as JSONL when the path ends in `.jsonl`. |
 | `/import <path.jsonl>` | Replaces the current session with a session file, after you confirm. |
-| `/share` | Uploads the session as a secret GitHub gist and prints a link. See [Sessions](/docs/guides/sessions/#export-and-share). |
+| `/share` | Uploads the session as a Radius artifact or a secret GitHub gist and prints a link. See [Sessions](/docs/guides/sessions/#export-and-share). |
 | `/copy` | Copies the last answer to the clipboard. |
 | `/bug [description]` | Writes a bug report and opens a GitHub issue for it. See below. |
 | `/trust` | Saves a trust decision for this project. |

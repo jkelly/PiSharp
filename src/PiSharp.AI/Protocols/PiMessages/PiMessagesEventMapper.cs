@@ -14,7 +14,8 @@ public sealed class PiMessagesEventMapper
     private readonly PiMessagesOptions _options;
     private readonly JsonObject _partial;
     private readonly JsonArray _content = new();
-    private readonly Dictionary<int, string> _toolJson = [];
+    // pi-messages.ts toolArguments: each call's arguments stream, every delta read once; the last partial shown per call.
+    private readonly Dictionary<int, (ToolCallArgumentsStream Stream, JsonData Shown)> _toolArguments = [];
     private readonly HashSet<string> _undefined = new(StringComparer.Ordinal);
     private readonly AssistantStreamReducer _reducer;
     private bool _started, _terminal;
@@ -55,6 +56,8 @@ public sealed class PiMessagesEventMapper
             _partial["stopReason"] = PiWireJson.StopReasonName(reason); _partial["usage"] = Node(value.GetProperty("usage"));
             Optional(_partial, value, "responseId", "responseId", "/responseId");
             if (type == "error") Optional(_partial, value, "errorMessage", "errorMessage", "/errorMessage");
+            // The concrete model the provider used (for example a virtual model's), when the event carries it.
+            if (value.TryGetProperty("responseModel", out var responseModel)) _partial["responseModel"] = Node(responseModel);
             if (value.TryGetProperty("providerThinkingLevel", out var thinking)) _partial["providerThinkingLevel"] = Node(thinking);
             if (value.TryGetProperty("rewrite", out var rewrite) && rewrite.ValueKind != JsonValueKind.Null)
                 Diagnostic(new JsonObject { ["type"] = "pi_messages_rewrite", ["timestamp"] = _request.Timestamp, ["details"] = Node(rewrite) });
@@ -76,7 +79,7 @@ public sealed class PiMessagesEventMapper
                 case "toolcall_start":
                     var id = PiMessagesData.String(value, "id"); var name = PiMessagesData.String(value, "toolName");
                     Add(index, new JsonObject { ["type"] = "toolCall", ["id"] = id, ["name"] = name, ["arguments"] = new JsonObject() });
-                    _toolJson.Add(index, ""); frame = new ToolCallStarted(index, new(id, name, JsonData.EmptyObject)); break;
+                    _toolArguments.Add(index, (new(), JsonData.EmptyObject)); frame = new ToolCallStarted(index, new(id, name, JsonData.EmptyObject)); break;
                 case "text_delta":
                     var textDelta = PiMessagesData.String(value, "delta"); var text = Block(index, "text"); text["text"] = text["text"]!.GetValue<string>() + textDelta;
                     frame = new TextDelta(index, textDelta); break;
@@ -84,8 +87,14 @@ public sealed class PiMessagesEventMapper
                     var thinkingDelta = PiMessagesData.String(value, "delta"); var block = Block(index, "thinking"); block["thinking"] = block["thinking"]!.GetValue<string>() + thinkingDelta;
                     frame = new ThinkingDelta(index, thinkingDelta); break;
                 case "toolcall_delta":
-                    var delta = PiMessagesData.String(value, "delta"); var call = Block(index, "toolCall"); var raw = _toolJson[index] + delta;
-                    call["arguments"] = JsonNode.Parse(StreamingJson.Parse(raw).ToString(), documentOptions: PiSharp.Contracts.JsonData.DocumentOptions); _toolJson[index] = raw; frame = new ToolCallDelta(index, delta); break;
+                    var delta = PiMessagesData.String(value, "delta"); var call = Block(index, "toolCall"); var arguments = _toolArguments[index];
+                    var partialArguments = arguments.Stream.Append(delta);
+                    if (!ReferenceEquals(partialArguments, arguments.Shown))
+                    {
+                        call["arguments"] = JsonNode.Parse(partialArguments.ToString(), documentOptions: PiSharp.Contracts.JsonData.DocumentOptions);
+                        _toolArguments[index] = (arguments.Stream, partialArguments);
+                    }
+                    frame = new ToolCallDelta(index, delta); break;
                 case "text_end":
                     var endedText = Block(index, "text"); endedText["text"] = PiMessagesData.String(value, "content");
                     Optional(endedText, value, "contentSignature", "textSignature", "/content/" + index + "/textSignature");
@@ -99,7 +108,7 @@ public sealed class PiMessagesEventMapper
                     var endedCall = Block(index, "toolCall"); var finalCall = value.GetProperty("toolCall");
                     if (finalCall.ValueKind != JsonValueKind.Object) throw PiMessagesData.Fail(PiMessagesFailure.MalformedStream);
                     // Pinned Pi uses Object.assign: the final arguments are any JSON value it carries, or the streamed
-                    // parseStreamingJson value when it carries none. Merge into a detached candidate so
+                    // partial arguments when it carries none. Merge into a detached candidate so
                     // an invalid type/identity cannot overwrite the accepted partial.
                     var mergedCall = endedCall.DeepClone().AsObject();
                     foreach (var property in finalCall.EnumerateObject()) mergedCall[property.Name] = Node(property.Value);
@@ -110,7 +119,7 @@ public sealed class PiMessagesEventMapper
                     frame = new ToolCallEnded(index, authoritativeCall);
                     // Final identity, arguments, duplicate IDs, live block and content
                     // limits are validated before the source partial accepts replacement.
-                    _reducer.Apply(frame); _content[index] = mergedCall; _toolJson.Remove(index);
+                    _reducer.Apply(frame); _content[index] = mergedCall; _toolArguments.Remove(index);
                     return Capture(frame, value, type);
                 default: throw PiMessagesData.Fail(PiMessagesFailure.UnsupportedContent);
             }

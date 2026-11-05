@@ -22,6 +22,7 @@ Boolean variables differ in what they accept. Where a row says `1`, only `1` tur
 | --- | --- | --- |
 | `PI_OFFLINE` | `1`, `true` or `yes` turns off startup network use: the model catalog refresh, the version check and the `rg`/`fd` download. `--offline` sets it. | unset |
 | `PI_SKIP_VERSION_CHECK` | Any value skips the check for a newer `PiSharp.Cli` on NuGet. `--offline` sets it. | unset |
+| `PI_SELF_UPDATE_COMMAND` | The command `pisharp update` runs to update PiSharp itself, split on whitespace, with `{packageName}`, `{version}` and `{installSpec}` placeholders. It wins over the `selfUpdateCommand` setting. See [Custom update command](/docs/reference/cli/#custom-update-command). | unset |
 | `HTTP_PROXY`, `HTTPS_PROXY`, `NO_PROXY` | Proxy for provider requests, read by .NET's HTTP stack. The `httpProxy` setting fills the first two when they're unset. | unset |
 | `PI_OAUTH_CALLBACK_HOST` | Host of the local callback server that browser sign-ins redirect to. | `127.0.0.1` |
 | `PI_SHARE_VIEWER_URL` | Base URL of the link `/share` prints. The gist id is added after `#`. | `https://pi.dev/session/` |
@@ -65,6 +66,7 @@ PiSharp also reads these to detect the terminal, as Pi does, and never changes t
 | --- | --- | --- |
 | `PISHARP_NODE` | The Node executable for TypeScript and JavaScript extensions. | `node` on `PATH` |
 | `PISHARP_NODE_BRIDGE` | A folder holding `host.mjs`, to use instead of the bundled Node bridge host. | the bundled `node-bridge/pi-host` |
+| `PI_CODEMODE_MAX_WORKERS` | Code mode workers alive at once across all sessions in the process, as a positive integer. Each worker's script may use up to 256 MiB. Raise it when one process runs several sessions. Further scripts wait for a free worker. Read for each script. | `2` |
 | `PISHARP_CODEMODE_WORKER_STACK_BYTES` | Stack size of the code mode engine thread, in bytes. Values under 1 MiB are ignored. | 256 MiB (64 MiB in a 32-bit process) |
 
 See [Node bridge](/docs/extensions/node-bridge/) and [Code mode](/docs/guides/codemode/#limits).

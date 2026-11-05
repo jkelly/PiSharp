@@ -363,9 +363,12 @@ internal static class PiMessagesNativeDiagnosticTests
         var scenarios = new (string Name, string Delta, int Characters, int Depth, NativeChatFailureCode Code)[]
         {
             ("characters", new string(' ', 4097), 4096, 32, NativeChatFailureCode.ResourceLimit),
-            ("depth", new string('[', 9), 1024, 8, NativeChatFailureCode.ResourceLimit),
-            // pi-messages.ts:255-259 previews every toolcall_delta with parseStreamingJson (JSON.parse keeps 2^53, a lone surrogate
-            // and the last duplicate name), so these deltas apply and the body then ends without a terminal event (pi-messages.ts:423).
+            // Pi f9a26365 pi-messages.ts previews each toolcall_delta with ToolCallArgumentsStream.append, whose partial shows a root
+            // that is not an object as {}: the depth limit is reached inside an object, and an array root previews as no arguments.
+            ("depth", "{\"a\":" + new string('[', 8), 1024, 8, NativeChatFailureCode.ResourceLimit),
+            ("array-root", new string('[', 9), 1024, 8, NativeChatFailureCode.UnexpectedEof),
+            // The preview keeps 2^53, a lone surrogate and the last duplicate name, as JSON.parse does, so these deltas apply and the
+            // body then ends without a terminal event.
             ("number", """{"value":9007199254740992}""", 1024, 32, NativeChatFailureCode.UnexpectedEof),
             ("unicode", "{\"value\":\"\\ud800\"}", 1024, 32, NativeChatFailureCode.UnexpectedEof),
             ("duplicate", """{"value":1,"value":2}""", 1024, 32, NativeChatFailureCode.UnexpectedEof)

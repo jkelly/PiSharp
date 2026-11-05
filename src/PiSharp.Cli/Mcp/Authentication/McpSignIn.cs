@@ -1,6 +1,9 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/src/extensions/mcp/oauth.ts (McpOAuthSettings,
-// callbackSettings, mergeScopes, signInMcpServer, waitForAuthorizationResponse, responseFromRedirectUrl, listenForCallback),
-// packages/coding-agent/src/extensions/mcp/runtime.ts oauthSettings and packages/mcp/src/oauth/provider.ts state().
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/coding-agent/src/extensions/mcp/oauth.ts (McpOAuthSettings,
+// callbackSettings, mergeScopes, offersClientMetadataDocument, createProvider's clientMetadataDocument, signInMcpServer,
+// waitForAuthorizationResponse, responseFromRedirectUrl, listenForCallback), packages/coding-agent/src/extensions/mcp/runtime.ts
+// oauthSettings and packages/mcp/src/oauth/provider.ts state(). Intentional difference (owner decision 2026-11-05, "Use safe
+// defaults"): PiSharp is treated as a rebranded build, so `auto` never offers pi's Client ID Metadata Document (upstream's
+// rebrand guard reads APP_NAME, which is "pi" in PiSharp); see OffersClientMetadataDocument.
 using System.Collections.Immutable;
 using System.Security.Cryptography;
 using System.Text.Json;
@@ -61,7 +64,8 @@ public static class McpSignIn
 {
     private const string CallbackHost = "127.0.0.1";
     private const string CallbackPath = "/callback";
-    /// <summary>Where pi.dev serves pi's Client ID Metadata Documents: `client.json` and `&lt;callback ID&gt;/client.json`.</summary>
+    /// <summary>Where pi.dev serves pi's Client ID Metadata Documents: `client.json` and `&lt;callback ID&gt;/client.json`. Only an
+    /// explicit `oauth.clientRegistration: "cimd"` presents them, as upstream's does in a rebranded build.</summary>
     public static readonly Uri ClientMetadataBaseUrl = new("https://pi.dev/oauth");
 
     /// <summary>Where the loopback callback listens and the redirect URI it serves.</summary>
@@ -87,6 +91,15 @@ public static class McpSignIn
         return merged.Length > 0 ? string.Join(' ', merged) : null;
     }
 
+    /// <summary>
+    /// <c>offersClientMetadataDocument</c>: whether sign-in may identify with pi's Client ID Metadata Document instead of registering.
+    /// Upstream's <c>auto</c> (the default) offers it unless <c>clientId</c> or <c>clientName</c> is set, the callback is not one the
+    /// documents list, or <c>APP_NAME</c> is not "pi". PiSharp's APP_NAME is "pi", but it is not pi, so (owner decision 2026-11-05)
+    /// it takes the rebranded-build branch: <c>auto</c> never offers the document and registers dynamically, or keeps a registered
+    /// client. <c>dcr</c> never offers it; an explicit <c>cimd</c> always does, as upstream's does for every build.
+    /// </summary>
+    internal static bool OffersClientMetadataDocument(McpOAuthSettings settings) => (settings.ClientRegistration ?? "auto") == "cimd";
+
     internal static ImmutableArray<string> RegisteredRedirectUrls(JsonData? client) =>
         client is { } value && value.Value.ValueKind == JsonValueKind.Object && value.Value.TryGetProperty("redirect_uris", out var uris) &&
             uris.ValueKind == JsonValueKind.Array ? uris.EnumerateArray().Where(uri => uri.ValueKind == JsonValueKind.String).Select(uri => uri.GetString()!).ToImmutableArray() : [];
@@ -102,10 +115,10 @@ public static class McpSignIn
         var registered = RegisteredRedirectUrls(stored?.ClientInformation).FirstOrDefault();
         var preferredPort = callbackOptions.Port ?? (registered is not null && Uri.TryCreate(registered, UriKind.Absolute, out var registeredUri) &&
             !registeredUri.IsDefaultPort ? registeredUri.Port : null);
-        var cimd = settings.ClientRegistration == "cimd";
+        var offersDocument = OffersClientMetadataDocument(settings);
         var callback = Listen(callbackOptions,
             // The redirect URI of a server-specific Client ID Metadata Document.
-            cimd ? [$"{CallbackPath}/{McpOAuthClientMetadataDocuments.CallbackId(options.ServerUrl)}"] : [],
+            offersDocument ? [$"{CallbackPath}/{McpOAuthClientMetadataDocuments.CallbackId(options.ServerUrl)}"] : [],
             preferredPort, callbackOptions.Port is not null);
         var redirectUrl = callbackOptions.FixedRedirectUrl ?? callback.RedirectUrl;
         McpDefaultOAuthHost? host = null; Exception? failure = null;
@@ -115,10 +128,12 @@ public static class McpSignIn
             {
                 // Every sign-in gets a fresh `state` parameter.
                 var next = stored with { OAuthState = null };
-                // A registered client cannot use another redirect URI, and its tokens belong to it. A Client ID Metadata
-                // Document is not stored, so with one, a stored client was registered before and is replaced.
-                var keepClient = !string.IsNullOrEmpty(settings.ClientId) ||
-                    (cimd ? stored.ClientInformation is null : RegisteredRedirectUrls(stored.ClientInformation).Contains(redirectUrl));
+                // A registered client cannot use another redirect URI, and its tokens belong to it. `cimd` replaces a registered
+                // client; `auto` keeps it. A Client ID Metadata Document is not stored, so tokens without a stored client belong to
+                // the document, and are kept only while the document is offered (in PiSharp, only under `cimd`).
+                var keepClient = !string.IsNullOrEmpty(settings.ClientId) || (stored.ClientInformation is not null
+                    ? settings.ClientRegistration != "cimd" && RegisteredRedirectUrls(stored.ClientInformation).Contains(redirectUrl)
+                    : offersDocument);
                 if (!keepClient) next = next with { ClientInformation = null, Tokens = null, TokensExpireAt = null };
                 await store.SaveAsync(next).ConfigureAwait(false);
             }
@@ -149,7 +164,9 @@ public static class McpSignIn
                     await store.SaveAsync((current ?? new McpOAuthState(options.ServerUrl.AbsoluteUri)) with { OAuthState = state }).ConfigureAwait(false);
                     return state;
                 },
-                ClientMetadataDocumentBase: cimd ? ClientMetadataBaseUrl : null,
+                // Upstream's createProvider: the document when offered; an explicit `cimd` fails without server support
+                // (McpOAuthClientMetadataDocuments.Create), and `auto` never reaches it in PiSharp.
+                ClientMetadataDocumentBase: offersDocument ? ClientMetadataBaseUrl : null,
                 AuthorizationServerMetadataUrl: settings.AuthServerMetadataUrl, RequestTimeout: options.RequestTimeout));
             // A server asking for more scope gets it on top of the configured scope and, since the challenge may list only the
             // missing scopes, on top of the scope granted so far. A refresh keeps the granted scope, so a step-up skips it.

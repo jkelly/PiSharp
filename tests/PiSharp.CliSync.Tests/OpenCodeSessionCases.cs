@@ -11,7 +11,7 @@ internal static partial class Program
     private static Task LiveOpenCodeSessionHeader() => WithLiveRoot("live-opencode-session", async root =>
     {
         foreach (var (provider, model) in new[] { ("opencode", "claude-haiku-4-5"), ("opencode", "gemini-3-flash"), ("opencode", "big-pickle"),
-            ("opencode", "gpt-5"), ("opencode-go", "deepseek-v4-flash"), ("opencode-go", "claude-haiku-5-5") })
+            ("opencode", "gpt-5"), ("opencode-go", "deepseek-v4.1-flash"), ("opencode-go", "claude-haiku-5-5") })
         {
             var endpoint = new LiveEndpoint(_ => new HttpResponseMessage(HttpStatusCode.BadRequest)
             { Content = new StringContent("""{"error":{"message":"capture","type":"invalid_request_error"}}""", Encoding.UTF8, "application/json") });

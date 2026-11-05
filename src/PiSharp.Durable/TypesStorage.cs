@@ -1,5 +1,7 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/src/types.ts (scans, cursors, document addressing, storage writes
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/src/types.ts (scans, cursors, document addressing, storage writes
 // and the Storage interface; split from Types.cs). Spec §10 is the normative contract.
+// Pi v1.5.0 sync (area storage-batches): Storage.commit(batches, receive, context) and CommitResult, the optional publishing scope, and
+// mintId's narrowed contract.
 using System.Collections.Immutable;
 using PiSharp.Durable.Chord;
 using PiSharp.Durable.Internal;
@@ -275,6 +277,12 @@ public sealed record DocumentRetireWrite(DocumentId Id) : StorageWrite
     public override JsonObjectValue ToJson() => new RecordJson.Writer().Add("type", Type).Add("id", Id.ToJson()).Build();
 }
 
+/// <summary>What <see cref="IStorage.CommitAsync"/> stored (upstream <c>CommitResult</c>): the number of durable batches, and why the next
+/// one was refused, if one was.</summary>
+/// <param name="Stored">How many of the batches, from the first, are durable.</param>
+/// <param name="Refused">Why the batch after them was refused (upstream <c>refused</c>), or null when none was.</param>
+public sealed record CommitResult(int Stored, Exception? Refused = null);
+
 /// <summary>
 /// Atomic persistence boundary for Session records (upstream <c>Storage</c>, spec §10).
 /// <para>Storage trusts the owning Session to supply semantically valid records, references, ancestry and transitions. Implementations
@@ -287,11 +295,30 @@ public sealed record DocumentRetireWrite(DocumentId Id) : StorageWrite
 /// </summary>
 public interface IStorage
 {
-    /// <summary>Atomically persists one batch and returns its sequence. Once it completes, later reads through this storage observe it.</summary>
-    Task<Seq> CommitAsync(IReadOnlyList<StorageWrite> writes, DurableContext context);
+    /// <summary>
+    /// Persists <paramref name="batches"/> in order, each as one ordinary atomic commit with its own sequence, checked against the state the
+    /// earlier ones left, in as few round trips as the backend can. Every batch has at least one write: a commit without writes never
+    /// reaches Storage, so the Session never sends an empty batch. Stops at the first batch Durable's own checks refuse (global IDs,
+    /// document actions, copy resolution): the batches before it are durable, it and the ones after are not.
+    /// <para>Calls <paramref name="receive"/>(index, seq) once per durable batch, in order, synchronously, after all of them are durable and
+    /// before the next commit starts. Completes with the number of durable batches and the refusal, if any. Fails for an unknown outcome
+    /// (connection lost, statement or commit failed); <paramref name="receive"/> calls made before the failure still stand.
+    /// <paramref name="receive"/> is a durability receipt, not publication: the Session publishes later. Once it completed, later reads
+    /// through this storage observe the stored batches.</para>
+    /// </summary>
+    Task<CommitResult> CommitAsync(IReadOnlyList<IReadOnlyList<StorageWrite>> batches, Action<int, Seq> receive, DurableContext context);
 
-    /// <summary>Returns a fresh candidate from the Session-global numeric ID namespace, greater than every ID minted or stored before, also
-    /// across reopen: scans order by ID as creation order, and the Harness relies on it.</summary>
+    /// <summary>
+    /// Optional (upstream <c>publishing?</c>): runs <paramref name="publish"/>, the Session's publication of one stored or held commit (its
+    /// cache write-through, adoption and observers), inside this storage's own scope, such as a store's attached host batch, so what the
+    /// publication marks lands together. An implementation calls <paramref name="publish"/> exactly once, now or soon after; the Session
+    /// publishes the next commit only once it ran. This default has no scope of its own and runs it at once, which is what the Session does
+    /// for a storage without one.
+    /// </summary>
+    void Publishing(Action publish, DurableContext context) => publish();
+
+    /// <summary>Returns a fresh candidate from the Session-global numeric ID namespace, greater than every ID minted since this storage was
+    /// opened and every ID stored, also across reopen: scans order by ID as creation order, and the Harness relies on it.</summary>
     Task<TId> MintIdAsync<TId>() where TId : struct, IDurableId<TId>;
 
     /// <summary>Looks up one conversation by exact ID.</summary>

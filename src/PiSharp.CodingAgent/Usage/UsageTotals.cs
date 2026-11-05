@@ -57,9 +57,15 @@ public static class UsageTotalsCalculator
         return new(first.Input + second.Input, first.Output + second.Output, first.CacheRead + second.CacheRead,
             first.CacheWrite + second.CacheWrite, first.TotalTokens + second.TotalTokens,
             new(first.Cost.Input + second.Cost.Input, first.Cost.Output + second.Cost.Output, first.Cost.CacheRead + second.Cost.CacheRead,
-                first.Cost.CacheWrite + second.Cost.CacheWrite, first.Cost.Total + second.Cost.Total),
+                first.Cost.CacheWrite + second.Cost.CacheWrite, first.Cost.Total + second.Cost.Total,
+                // Pi f9a26365 usage-totals.ts: a sum is provider-reported only when every part is.
+                JsonFields.Empty.Set("totalFromProvider", JsonData.Parse(TotalFromProvider(first) && TotalFromProvider(second) ? "true" : "false"))),
             extras.Values.Count == 0 ? null : extras);
     }
+
+    // `cost.totalFromProvider === true`: absent or any other value means a catalog estimate.
+    private static bool TotalFromProvider(TokenUsage usage) =>
+        usage.Cost.ExtraProperties?.TryGet("totalFromProvider", out var value) == true && value?.Value.ValueKind == JsonValueKind.True;
 
     /// <summary>Group model-attributed usage by <c>provider/model</c> (assistant messages use <c>responseModel</c> when present)
     /// and all other usage into <see cref="ToolsAndSummariesKey"/>; empty groups are dropped and the rest sorted by cost,

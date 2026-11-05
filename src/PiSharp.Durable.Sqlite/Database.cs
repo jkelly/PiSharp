@@ -1,5 +1,8 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/src/storage/sqlite/database.ts
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/chord/src/sqlite/database.ts and packages/chord/src/sqlite/index.ts, which
+// packages/durable/src/storage/sqlite/database.ts re-exports
 //
+// Upstream moved these interfaces into Chord's SQLite layer, and Durable re-exports them. PiSharp keeps them here under their names, since
+// its Chord SQLite layer stays in PiSharp.Durable.Sqlite (the migration runner and the prefix check are in Migrations.cs and Schema.cs).
 // Upstream's SqliteValue is null | number | bigint | string | Uint8Array; here a binding is null, long (or int), double, string or byte[],
 // and a result column is null, long, double, string or byte[]. Upstream returns rows as plain objects; here a row is an ordered,
 // read-only map from column name to value.
@@ -13,8 +16,11 @@ namespace PiSharp.Durable.Sqlite;
 /// <summary>
 /// Asynchronous SQL operations shared by a database and its transaction handles (upstream <c>SqliteExecutor</c>).
 /// <para><see cref="ExecAsync"/> runs SQL text without bindings and may contain several statements. <see cref="RunAsync"/>,
-/// <see cref="GetAsync"/> and <see cref="AllAsync"/> execute one statement with positional <c>?</c> bindings. Adapters may cache prepared
-/// statements by SQL text, so callers pass values as bindings instead of interpolating them.</para>
+/// <see cref="GetAsync"/> and <see cref="AllAsync"/> execute one statement with positional <c>?</c> bindings. <see cref="RunCountedAsync"/>
+/// runs one like <see cref="RunAsync"/> and returns the rows it inserted, updated or deleted, as SQLite's <c>changes()</c> counts them (index
+/// writes and rows changed by triggers do not count); it may cost a statement more than <see cref="RunAsync"/>, so callers that need no
+/// count use <see cref="RunAsync"/>. Adapters may cache prepared statements by SQL text, so callers pass values as bindings instead of
+/// interpolating them.</para>
 /// </summary>
 public interface ISqliteExecutor
 {
@@ -24,6 +30,10 @@ public interface ISqliteExecutor
     /// <summary>Runs one statement with positional bindings: null, <see cref="long"/>, <see cref="int"/>, <see cref="double"/>,
     /// <see cref="string"/> or <see cref="byte"/>[].</summary>
     Task RunAsync(string sql, params object?[] parameters);
+
+    /// <summary>Runs one statement with positional bindings, as <see cref="RunAsync"/> does, and returns the rows it inserted, updated or
+    /// deleted (upstream <c>runCounted</c>).</summary>
+    Task<long> RunCountedAsync(string sql, params object?[] parameters);
 
     /// <summary>Runs one statement and returns its first row, or null when it returns none.</summary>
     Task<SqliteRow?> GetAsync(string sql, params object?[] parameters);

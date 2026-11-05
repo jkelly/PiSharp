@@ -76,22 +76,22 @@ internal sealed class CrashStorage(IStorage inner, Func<IReadOnlyList<StorageWri
     /// <summary>What a failing batch throws.</summary>
     public static IOException Failure(string checkpoint) => new($"crash: injected storage failure at {checkpoint}");
 
-    public async Task<Seq> CommitAsync(IReadOnlyList<StorageWrite> writes, DurableContext context)
+    public async Task<CommitResult> CommitAsync(IReadOnlyList<IReadOnlyList<StorageWrite>> batches, Action<int, Seq> receive, DurableContext context)
     {
-        var hit = Volatile.Read(ref fired) == 0 && matches(writes) && Interlocked.Exchange(ref fired, 1) == 0;
+        var hit = Volatile.Read(ref fired) == 0 && batches.Any(matches) && Interlocked.Exchange(ref fired, 1) == 0;
         if (hit && fail) throw Failure(checkpoint);
         if (hit && !after)
         {
             CrashGate.Emit("CHECKPOINT " + checkpoint);
             await CrashGate.Never();
         }
-        var seq = await inner.CommitAsync(writes, context);
+        var result = await inner.CommitAsync(batches, receive, context);
         if (hit)
         {
             CrashGate.Emit("CHECKPOINT " + checkpoint);
             await CrashGate.Never();
         }
-        return seq;
+        return result;
     }
 
     public Task<TId> MintIdAsync<TId>() where TId : struct, IDurableId<TId> => inner.MintIdAsync<TId>();
@@ -126,7 +126,8 @@ internal static class CrashScenarios
 {
     internal static readonly DurableContext Ctx = DurableContext.Background;
 
-    /// <summary>Appended to every chat answer, so the slow child stream of <c>chat.stream</c> commits many partials.</summary>
+    /// <summary>Appended to every chat answer, so the slow child stream of <c>chat.stream</c> and <c>chat.stream-stored</c> commits many
+    /// partials.</summary>
     internal static readonly string Padding = " " + new string('.', 400);
 
     /// <summary>A commit-boundary checkpoint: the batch it matches, and whether the kill comes after the batch landed; a failing one makes
@@ -167,6 +168,11 @@ internal static class CrashScenarios
     internal static bool AbortMark(IReadOnlyList<StorageWrite> writes) => writes.OfType<TaskWrite>().Any(write =>
         write.Value.AbortRequested && write.Value.State is LiveTaskState);
 
+    /// <summary>A store of held pi.live changes on their own that holds a partial message (Pi v1.5.0 sync, area deferred-commits: the window's
+    /// timer stores what deferred partial commits held).</summary>
+    internal static bool StoredPartial(IReadOnlyList<StorageWrite> writes) =>
+        writes is [DocumentChangeWrite change] && change.Content.ToJson().ToJson().Contains("\"message\"", StringComparison.Ordinal);
+
     /// <summary>The commit trigger of a checkpoint; null for checkpoints the scenario code reaches itself.</summary>
     internal static CommitTrigger? Trigger(string scenario, string checkpoint) => (scenario, checkpoint) switch
     {
@@ -185,6 +191,7 @@ internal static class CrashScenarios
         ("submit", "admit-after") => new(Admission("r1"), true),
         ("submit", "queued-admit-after") => new(Admission("r2"), true),
         ("abort", _) => new(AbortMark, true),
+        ("chat", "stream-stored") => new(StoredPartial, true),
         _ => null,
     };
 
@@ -197,12 +204,13 @@ internal static class CrashScenarios
     // ─── Setup ──────────────────────────────────────────────────────────────
 
     /// <summary>The models, registry and settings of a scenario. Identical in both processes except for the child's gates, holds and its
-    /// slow <c>chat.stream</c> model.</summary>
+    /// slow <c>chat.stream</c> and <c>chat.stream-stored</c> model and their progress windows, and the retry backoff: 60 s in the chat
+    /// child, 1 ms in the parent, which retries a charged attempt.</summary>
     internal static ChatSetup BuildSetup(string scenario, string checkpoint, CrashGate gate, string workDir)
     {
         // The ask-user and plan-approval scenarios (InteractionCrashScenarios.cs).
         if (InteractionCrash.Uses(scenario)) return InteractionCrash.BuildSetup(scenario, workDir);
-        var slow = gate.Child && scenario == "chat" && checkpoint == "stream";
+        var slow = gate.Child && scenario == "chat" && checkpoint is "stream" or "stream-stored";
         var setup = new ChatSetup(new FauxModels(new FauxOptions
         {
             Api = "faux-crash",
@@ -211,9 +219,15 @@ internal static class CrashScenarios
             MaxTokenSize = slow ? 1 : null,
         }));
         setup.Progress = new ProgressSettings { PartialIntervalMs = 5 };
+        // Pi v1.5.0 sync (area deferred-commits): chat.stream's partials stay in memory until the kill; chat.stream-stored's are stored
+        // within 20 ms, so the kill after the first such store lands.
+        if (slow) setup.Progress = new ProgressSettings { PartialIntervalMs = 5, PersistWithinMs = checkpoint == "stream" ? double.PositiveInfinity : 20 };
+        // Pi v1.5.0 sync (area restarts): a request in flight at the kill is a charged attempt (durable.interrupted-request); the reopened
+        // host retries it after 1 ms. The child's chat backoff stays 60 s, so chat.retry kills while it sleeps.
+        if (!gate.Child) setup.Retry = new RetrySettings { Enabled = true, MaxRetries = 2, BaseDelayMs = 1 };
         if (scenario == "chat")
         {
-            setup.Retry = new RetrySettings { Enabled = true, MaxRetries = 2, BaseDelayMs = 60_000 };
+            if (gate.Child) setup.Retry = new RetrySettings { Enabled = true, MaxRetries = 2, BaseDelayMs = 60_000 };
             HarnessTests.AddSection(setup.Registry, "preamble", async (_, _) =>
             {
                 await gate.At("prepare");
@@ -336,8 +350,8 @@ internal static class CrashScenarios
             if (Fails(checkpoint))
             {
                 var end = await harness.Closed.WaitAsync(TimeSpan.FromSeconds(30));
-                if (end.Reason != SessionEndReason.Failed || end.Error?.Message != CrashStorage.Failure(checkpoint).Message)
-                    throw new InvalidOperationException($"The Harness ended with {end.Reason} ({end.Error?.Message}), not with the injected failure");
+                if (end.Kind != SessionEndKind.Failed || end.Error?.Message != CrashStorage.Failure(checkpoint).Message)
+                    throw new InvalidOperationException($"The Harness ended with {end.Kind} ({end.Error?.Message}), not with the injected failure");
                 CrashGate.Emit("CHECKPOINT " + checkpoint);
                 await CrashGate.Never();
             }

@@ -1,5 +1,7 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/test/harness-conversations.test.ts. Verbatim apart from the
-// adaptations in HarnessSupport.cs and HarnessConversationsSupport.cs, and these:
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/test/harness-conversations.test.ts (5c1736f82, 92ab53602), ported in
+// the Pi v1.5.0 sync (areas checkpoint-when and watches): NoteDoc states checkpointWhen, and the snapshot case reads a document watch's
+// acquisition value, as documentState() is gone. Verbatim apart from the adaptations in HarnessSupport.cs and
+// HarnessConversationsSupport.cs, and these:
 // - Every case runs on the storage the group is given (ControlledStorage-wrapped where upstream uses ControlledStorage); "keeps root and
 //   conversation identity and state across reopen" runs on a reopenable store (a SQLite file, as upstream, and a JSONL directory), and is
 //   skipped by the plain SQLite group, whose factory opens a fresh file per call. Storage closes with the Harness before every reopen.
@@ -24,7 +26,7 @@ internal static partial class HarnessConversationTests
         new("^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$");
 
     private static readonly RewindableConversationDocToken NoteDoc = Documents.DefineRewindableConversationDoc("test.note", 1, DocumentFork.AsOf,
-        () => O("""{"text":""}"""));
+        () => O("""{"text":""}"""), checkpointWhen: (_, _, _) => false);
 
     private static readonly Entry MessageEntry = Entries.DefineEntry("message");
 
@@ -402,9 +404,9 @@ internal static partial class HarnessConversationTests
             await harness.CommitAsync(async tx => (await tx.DocAsync(NoteDoc, root.Id)).Set("text", "second"), Context);
             SameJson("""{"text":"second"}""", await harness.SnapshotAsync(NoteDoc, root.Id, Context), "snapshot");
             SameJson("""{"text":"first"}""", await harness.SnapshotAsOfAsync(NoteDoc, root.Id, entry.Id, Context), "snapshot as of");
-            var state = await harness.DocumentStateAsync(NoteDoc, root.Id, Context);
-            SameJson("""{"text":"second"}""", state?.Value, "document state");
-            state?.Dispose();
+            var watch = await harness.WatchDocAsync(NoteDoc, root.Id, Context);
+            SameJson("""{"text":"second"}""", watch?.Value, "document watch");
+            if (watch is not null) await watch.StopAsync();
             await harness.CloseAsync(Context);
         });
     }

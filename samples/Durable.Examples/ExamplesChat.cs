@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/test/examples/14-chat.ts and 15-system-prompt.ts. Upstream stands in for a
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/test/examples/13-chat.ts and 14-system-prompt.ts. Upstream stands in for a
 // model with pi-ai's faux provider; here ScriptedModels does (see ScriptedModels.cs), so the examples run offline. Each prints what
 // upstream's console.log prints, as JSON. On a file backend the storage is then reopened in a plain Session and the durable transcript is
 // read back.
@@ -20,7 +20,7 @@ public static partial class Examples
 
     private static string Kinds(IEnumerable<EntryRecord> entries) => Json(JsonValue.Array(entries.Select(entry => (JsonValue)entry.Kind)));
 
-    // 14: a chat turn.
+    // 13: a chat turn.
     private static async Task ChatAsync(Func<Task<IStorage>> open, TextWriter output)
     {
         // ScriptedModels stands in for a real model: it answers each request with the next scripted text.
@@ -58,7 +58,7 @@ public static partial class Examples
         });
     }
 
-    // 15: system prompt sections and per-conversation instructions.
+    // 14: system prompt sections and per-conversation instructions.
     private static async Task SystemPromptAsync(Func<Task<IStorage>> open, TextWriter output)
     {
         var models = new ScriptedModels("Done.", "Done.", "Done.");
@@ -167,7 +167,7 @@ public static partial class Examples
         public Task<Result<Unit, FileError>> CreateDirAsync(string path, CreateDirOptions? options, DurableContext context) =>
             files.CreateDirAsync(path, options, context);
         public Task<Result<Unit, FileError>> RemoveAsync(string path, RemoveOptions? options, DurableContext context) => files.RemoveAsync(path, options, context);
-        public Task<Result<IFileWatcher, FileError>> WatchAsync(IReadOnlyList<WatchTarget> targets, Action<WatchChange> onChange, DurableContext context) =>
+        public Task<Result<IFileWatcher, FileError>> WatchAsync(IReadOnlyList<WatchTarget> targets, Action<FileChange> onChange, DurableContext context) =>
             files.WatchAsync(targets, onChange, context);
         public Task<Result<string, FileError>> CreateTempDirAsync(string? prefix, DurableContext context) => files.CreateTempDirAsync(prefix, context);
         public Task<Result<string, FileError>> CreateTempFileAsync(TempFileOptions? options, DurableContext context) => files.CreateTempFileAsync(options, context);

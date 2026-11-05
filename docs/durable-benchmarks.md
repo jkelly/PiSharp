@@ -2,12 +2,12 @@
 
 Report only. These numbers are a snapshot of one machine; nothing in CI passes or fails on them. The `benchmarks.smoke` case in `tests/PiSharp.Durable.Tests` runs every benchmark at a tiny size so the ports keep working, and asserts completion only.
 
-PiSharp ports ten upstream benchmarks of Pi v1.2.0 (`06a466935536f8c9bcacb2d5efc0fc021be1bdff`) in `benchmarks/PiSharp.Durable.Benchmarks`, over the storage benchmark kit `src/PiSharp.Durable/Testing/StorageBenchmark.cs` (upstream `src/testing/storage-benchmark.ts`):
+PiSharp ports eleven upstream benchmarks of `pi-durable` in `benchmarks/PiSharp.Durable.Benchmarks`: ten that Pi v1.2.0 (`06a466935536f8c9bcacb2d5efc0fc021be1bdff`) has, ported then, and `conversation-view-bench.ts`, new in v1.5.0. The Pi v1.5.0 sync checked them against v1.5.0 (`f9a26365568127461c47a07a37dcb42c140a3ac5`), which their citations name, and added three PiSharp-authored ones. They run over the storage benchmark kit `src/PiSharp.Durable/Testing/StorageBenchmark.cs` (upstream `src/testing/storage-benchmark.ts`):
 
 | upstream | PiSharp | what it measures |
 |---|---|---|
-| `test/storage.bench.ts` (`npm run bench:storage`) | `StorageBench.cs` (`storage`) | read, write and reopen latency of memory, SQLite and JSONL storage |
-| `test/storage-memory.ts` (`npm run bench:storage:memory`) | `StorageMemory.cs` (`storage-memory`) | heap, RSS and disk footprint after the seed, one child process per backend and scale |
+| `test/storage.bench.ts` (`npm run bench:storage`) | `StorageBench.cs` (`storage`) | read, write and reopen latency of memory, SQLite, the store and JSONL storage |
+| `test/storage-memory.ts` (`npm run bench:storage:memory`) | `StorageMemory.cs` (`storage-memory`) | heap, RSS and disk footprint after the seed, one child process per backend (memory, SQLite, the store and JSONL) and scale |
 | `test/tool-output-bench.ts` (`npm run bench:tool-output`) | `ToolOutputBench.cs` (`tool-output`) | the tool task, progress throttle and `pi.live` commits at low, normal and high output rates, the 1 GiB firehose and `cat` |
 | `test/document-append-bench.ts` (`npm run bench:document-append`, new in v1.2.0) | `DocumentAppendBench.cs` (`document-append [N,...]`) | one commit per appended item: one array in one document against one family member per item |
 | `test/session-document-cache-bench.ts` (`npm run bench:document-cache`, new in v1.2.0) | `SessionDocumentCacheBench.cs` (`document-cache [N,...]`), with `HeapRetained.cs` (`test/heap-retained.ts`) | the Session document cache at four retentions: cached documents, retained bytes per conversation and the cost of reading an old conversation's document again |
@@ -16,9 +16,14 @@ PiSharp ports ten upstream benchmarks of Pi v1.2.0 (`06a466935536f8c9bcacb2d5efc
 | `test/nested-tools-bench.ts` (new in v1.2.0) | `NestedToolsBench.cs` (`nested-tools [streaming\|nesting]`) | commits, bytes written by write type, stored size and heap of 200 to 2,000 streaming or fast nested calls, at depth 1 and 2 |
 | `test/nested-images-bench.ts` (new in v1.2.0) | `NestedImagesBench.cs` (`nested-images [count]`) | 1 MiB images passed between nested calls inline or by a `NestedCallDoc` reference |
 | `test/codemode-bench.ts` (`npm run bench:codemode`, new in v1.2.0) | `CodemodeBench.cs` (`codemode [N,...]`) | durable code mode's overhead: N calls of a trivial tool, sequential or parallel, from a code mode script (journaled) and from a plain tool's nested calls, on SQLite |
-| none: PiSharp-authored, Node twin `benchmarks/PiSharp.Durable.Benchmarks/node/scheduler-scale-bench.ts` | `SchedulerScaleBench.cs` (`scheduler-scale [fanout N,...] [chain N,...]`) | the scheduler's fan-out (one tool creating N child tasks at once) and owned chains of N tasks settling bottom-up |
+| `test/conversation-view-bench.ts` (new in v1.5.0) | `ConversationViewBench.cs` (`conversation-view [sqlite\|store\|both]`) | starting, resuming and keeping watches of a conversation of thousands of entries: time, window entries and heap, on SQLite and the store |
+| none: PiSharp-authored, Node twin `benchmarks/PiSharp.Durable.Benchmarks/node/scheduler-scale-bench.ts` (fan-out and chain only) | `SchedulerScaleBench.cs` (`scheduler-scale [fanout N,...] [chain N,...] [conversations N,...]`) | the scheduler's fan-out (one tool creating N child tasks at once), owned chains of N tasks settling bottom-up, and one-tool runs while the scheduler keeps N idle conversations' context ranges |
+| none: PiSharp-authored, for Pi v1.5.0's partial commits (upstream bounds the same path in a test) | `PartialCommitsBench.cs` (`partial-commits [N,...]`) | the partial commits of one long streamed answer, a text and then a tool call of about N characters each: commits, bytes allocated and time per phase |
+| none: PiSharp-authored, for Pi v1.5.0's group commit (upstream measured it with an uncommitted probe, `docs/group-commit.md` section 9) | `StorageBench.cs` (`storage-throughput [latency ms,...] [conversations N,...]`) | commits per second of one Session and runs per second of one Harness with N conversations working at once, over memory storage behind a fixed round trip and over SQLite, with the storage calls, the commits each call carried and the Storage reads per commit or run |
 
-Run them with `dotnet run -c Release --project benchmarks/PiSharp.Durable.Benchmarks -- [storage] [storage-memory] [tool-output] [document-append [N,...]] [document-cache [N,...]] [scheduler-memory [N,...]] [scheduler-scale [fanout N,...] [chain N,...]] [scheduler-fanout [N,...]] [nested-tools [streaming|nesting]] [nested-images [count]] [codemode [N,...]]`. There is no benchmark library and no new dependency. The timing loops mirror upstream's.
+Run them with `dotnet run -c Release --project benchmarks/PiSharp.Durable.Benchmarks -- [storage] [storage-memory] [tool-output] [document-append [N,...]] [document-cache [N,...]] [scheduler-memory [N,...]] [scheduler-scale [fanout N,...] [chain N,...] [conversations N,...]] [scheduler-fanout [N,...]] [nested-tools [streaming|nesting]] [nested-images [count]] [codemode [N,...]] [partial-commits [N,...]] [conversation-view [sqlite|store|both]] [storage-throughput [latency ms,...] [conversations N,...]]`. There is no benchmark library and no new dependency. The timing loops mirror upstream's.
+
+The store backend (`store`) is Durable's storage on Chord's store over one SQLite file (StoreStorage, `PiSharp.Durable.Store`, which the v1.5.0 sync added). `storage` and `storage-memory` gained it in that sync, after the storage latency and footprint tables below were measured on 2026-10-13, so those tables have no store rows yet. `conversation-view` measures it in its own table; with no backend argument it reads upstream's `PI_DURABLE_BENCH_STORAGE` (`store`, else SQLite).
 
 ## Machine
 
@@ -248,6 +253,7 @@ Pi v1.2.0 rewrote the scheduler (work list area c): no pass visits every live ta
 - **The unchanged Node time is the benchmark's `release()`**, which polls with `setTimeout(0)` until the task waits, about 11 ms a cycle on Windows. With a release that opens the gate before or after the task waits, as PiSharp's does, Node runs 1,000 cycles in 1.1 s and 10,000 in 11.3 s; PiSharp takes 1.6 s and 11.3 s.
 - **A later message reads the same chain in both:** the old conversation and its ended tool task, two reads from the scheduler's chain load. The seventh read under the unchanged Node run is its final `waitForTask`, which finds the late task already terminal after the polling delay; without the polling Node reads 6 too.
 - **A cycle retains about 4.6 to 4.9 KB in PiSharp and 3.8 to 5.2 KB under Node.** The benchmark runs with the default ten-minute document retention, so each subagent conversation's documents stay cached; the scheduler keeps none of the ended cycles.
+- **Pi v1.5.0 sync, area publication-caches** (2026-11-05, one run, PiSharp only): a later message reads 1 record after 1,000 cycles and 2 after 10,000, instead of 6, because the Session's record cache serves the old conversation and its ended tool task, which it wrote. The 1 and 2 fit the cache's bounds (not traced): 1,000 cycles end more tasks than the 256 ended tasks it keeps, and 10,000 also create more conversations than the 4,096 it keeps. The cycles take 2,196 and 13,663 ms and retain 5,399 and 4,750 B per cycle (5.1 and 45.3 MiB), the cache's bounded records included. `benchmarks.smoke` checks 0 reads after 3 cycles.
 
 **Scale** (`scheduler-scale`, memory storage; the Node twin runs the same scenarios on the pinned upstream). Commits are equal in all three for every size.
 
@@ -265,6 +271,33 @@ Pi v1.2.0 rewrote the scheduler (work list area c): no pass visits every live ta
 - **Owned chains settle in linear time.** Before, a 500-task chain took 2.4 s and a 2,000-task chain almost 18 minutes; now 31 ms and 76 ms, and 20,000 tasks 0.8 s, close to Node (upstream's changelog: 500 tasks took 12 s before, 50 ms after, 20,000 take 1.5 s).
 - **Fan-out is linear in both runtimes, and PiSharp matches Node from 500 children up.** The first PiSharp row includes JIT warm-up. Before the rewrite it was about four to seven times slower, as each pass scanned every live child.
 - Upstream's own fan-out benchmark (nested calls, area a) reports 8,000 nested calls in 2.7 s instead of 18.8 s; see the next section.
+
+**Pi v1.5.0 sync, area scheduler-idle** (2026-11-05; Pi 35dfa7573, durable 1.5.0 Changed#8). This area measures PiSharp only. The Node twin does not run the new `conversations` scenario, and upstream v1.5.0 was not run. The runs use memory storage and alternate between two builds, three times each; the table shows the medians. "Before" is the branch's base `0f4a25c2` built with the same `SchedulerScaleBench.cs`, and "after" is the area's head. Other work was running on the machine.
+
+`conversations` keeps N idle conversations' context ranges in the scheduler: N ownerless conversations with one entry each, all read by one task. It then times 128 one-tool runs (a tool call, then a text), round robin over the conversations. Every run makes 12 commits in both builds.
+
+| scenario | N | before | after | commits |
+|---|---:|---:|---:|---:|
+| conversations | 1 | 2.15 ms per run (465 runs/s) | 2.71 ms per run (370 runs/s) | 1,536 |
+| conversations | 256 | 2.34 ms (427 runs/s) | 2.04 ms (491 runs/s) | 1,536 |
+| conversations | 1,024 | 3.36 ms (298 runs/s) | 1.85 ms (541 runs/s) | 1,536 |
+| conversations | 2,048 | 4.64 ms (216 runs/s) | 1.81 ms (552 runs/s) | 1,536 |
+| conversations | 4,096 | 7.60 ms (132 runs/s) | 1.88 ms (531 runs/s) | 1,536 |
+| fan-out | 250 | 241 ms | 223 ms | 514 |
+| fan-out | 500 | 77 ms | 41 ms | 1,014 |
+| fan-out | 1,000 | 237 ms | 70 ms | 2,014 |
+| fan-out | 2,000 | 434 ms | 166 ms | 4,014 |
+| fan-out | 4,000 | 923 ms | 404 ms | 8,014 |
+| chain | 500 | 38 ms | 66 ms | 504 |
+| chain | 2,000 | 237 ms | 265 ms | 2,004 |
+| chain | 20,000 | 3,408 ms | 2,050 ms | 20,004 |
+
+- **The time per run no longer grows with the kept conversations.** Before the change, every commit that changed a task walked every kept context. A run took 2.2 ms with 1 kept conversation and 7.6 ms with 4,096. After it, a commit settles only the conversations above its changed tasks, and a run takes 1.8 to 2.0 ms from 256 conversations up.
+- **The 1-conversation row is noise.** Both builds take 2 to 3 ms per run there. In a separate run of seven rows with 1 to 64 conversations, both builds took 2.6 to 3.4 ms per run.
+- **No comparison with upstream is made.** Upstream's commit message reports one Session doing one-tool runs: 2,048 conversations went from 100 to 805 runs/s, and 4,096 from 46 to 772. That workload is not in the upstream repository. This scenario is PiSharp's own, so the two sets of numbers cannot be compared.
+- **Fan-out is about twice as fast.** While invocations run, `Wake()` no longer scans the live tasks.
+- **Chains: PiSharp's walk differs from upstream's.** Upstream's `#addScopesAbove` stops only at a conversation, so a commit that creates or finalizes a chain walks every task's owners, which is quadratic in the depth. This comes from reading the code, not from running upstream. Ported as written, the 20,000-deep chain took 7.9 to 8.4 s here, and `harness.ownership.tracks-ownership-chains-deeper-than-the-call-stack` took 17 s instead of 2 s. PiSharp also stops a walk at a task that an earlier walk of the same publication passed. The scopes are the same (see the `Scheduler.cs` header), and the chain takes 2.1 s.
+- **The 500-deep chain row is noisy.** It runs right after the 4,000-task fan-out. In a run with only a 250-task fan-out before it, four 500-deep chains took 31 to 53 ms after the change and 58 to 100 ms before it, and two 2,000-deep chains took about 200 ms after and 318 to 445 ms before.
 
 ## Nested tool calls (`scheduler-fanout-bench.ts`, `nested-tools-bench.ts`, `nested-images-bench.ts`)
 
@@ -320,6 +353,173 @@ Work list area d. Measured on 2026-10-15, same machine, two runs each with Node 
 - **Commits are upstream's** for every plain run and every sequential script: a sequential script costs two commits per call on top of its nested call's own, the journal entry and the acknowledged count, as upstream's design says.
 - **A parallel script's journal batches follow timing.** Results that finish together are journaled in one commit. Under Node every result that is ready when a commit lands joins the next one; PiSharp's nested calls finish on several threads, so a few more batches form (322 to 326 commits for 100 calls, 3,040 to 3,050 for 1,000, against Node's 322 and 3,020).
 - **Code mode's own cost** in a sequential script, over the plain tool's: 1.3 ms per call at 100 calls and 0.4 ms at 1,000 under Node; in PiSharp 2.8 ms at 100 calls (its first script, with the engine's warm-up) and none measurable at 1,000. Parallel scripts cost little in either. PiSharp's plain sequential calls are slower than Node's (2.2 against 1.3 ms per call at 1,000), as in the fan-out rows above.
+
+## Partial commits (`partial-commits`)
+
+Pi v1.5.0 sync, durable area partial-commits. Measured on 2026-11-04, same machine, one run each. Upstream has no benchmark for this path: its changelog reports about 20 s of CPU and a 100 MB heap peak for a 500 KB tool call before the fix, and its test (`harness-view-run.test.ts`, "commits a growing text and tool call at a cost that follows the new text"; `harness.view-run.streamed-partials.*` here) bounds the per-commit ratio of a 400 KB answer over a 40 KB one below 2. The benchmark streams the answer in 256-character pieces through the real generation task on memory storage, with a partial interval of 0 and each piece waiting for its commit, so every piece that changes the partial gets one commit.
+
+| size | phase | before: commits | before: KiB/commit | before: total | after: commits | after: KiB/commit | after: total |
+|---:|---|---:|---:|---:|---:|---:|---:|
+| 40,000 | text | 165 | 303.5 | 48.9 MiB | 165 | 26.5 | 4.3 MiB |
+| 40,000 | tool call | 1 | 16,681.9 | 16.3 MiB | 180 | 33.6 | 5.9 MiB |
+| 400,000 | text | 1,641 | 2,480.8 | 3,975.6 MiB | 1,641 | 26.0 | 41.6 MiB |
+| 400,000 | tool call | 1 | 1,603,567.9 | 1,566.0 MiB | 1,797 | 31.4 | 55.1 MiB |
+| 500,000 | text | 2,051 | 3,047.0 | 6,102.9 MiB | 2,051 | 26.0 | 52.1 MiB |
+| 500,000 | tool call | 1 | 2,670,936.1 | 2,608.3 MiB | 2,247 | 31.4 | 68.9 MiB |
+
+- **Before**, each text commit reassigned the whole growing string, which Chord compared with the committed one and .NET copied: the per-commit cost grew with the length (10.0 times from 40,000 to 500,000 characters). A tool call's partial kept the arguments it started with (`{}`) until the call ended, so its pieces committed nothing and the call's end committed it whole.
+- **After**, a commit appends what text and thinking grew by and applies the argument changes of PiSharp.AI's `StreamingJsonParser` since the last commit, and an appended `JsonStringValue` defers its concatenation until it is read. The per-commit cost is flat in both phases (ratios 0.98 and 0.93), and the partials now show the streamed arguments, as upstream's do.
+- The 500,000-character text phase took 2,332 ms before and 161 ms after.
+
+## Conversation view (`conversation-view-bench.ts`)
+
+Pi v1.5.0 sync, durable area view: `PiSharp.Durable.Benchmarks conversation-view both` (ConversationViewBench.cs), measured on 2026-11-04, same machine, one run, each scenario in its own child process. Upstream prints its table and records no numbers, and no upstream run was taken here. The view is a window over the transcript (the newest 50 entries at start, up to 100 while a watch runs), so starting and resuming a watch do not scan the conversation's 5,000 entries, and a watch's heap stays flat while 20,000 entries are appended.
+
+| scenario | storage | p50 ms | µs per commit | window entries | heap with watches MiB | first entry collected | CPU ms | wall ms |
+|---|---|---:|---:|---:|---:|---:|---:|---:|
+| watch start, 5000 entries | sqlite | 0.44 | | 50 | | | 31 | 24 |
+| resume 20 back, 5000 entries | sqlite | 0.22 | | 20 | | | 16 | 22 |
+| append x1 per commit, 1 watch | sqlite | | 96.6 | 61 | 0.5 | | 188 | 209 |
+| append x1 per commit, 4 watches | sqlite | | 91.4 | 61 | 0.5 | | 203 | 201 |
+| append x50 per commit, 4 watches | sqlite | | 1,785.8 | 50 | 0.5 | | 406 | 375 |
+| pi.live only, 4 watches | sqlite | | 122.9 | | | | 672 | 630 |
+| long-lived watch, 20000 appends | sqlite | | | 59 | 0.5 | yes | 1,906 | 1,487 |
+| watch start, 5000 entries | store | 0.43 | | 50 | | | 31 | 23 |
+| resume 20 back, 5000 entries | store | 0.23 | | 20 | | | 31 | 22 |
+| append x1 per commit, 1 watch | store | | 203.2 | 61 | 0.7 | | 500 | 423 |
+| append x1 per commit, 4 watches | store | | 207.8 | 61 | 0.7 | | 594 | 435 |
+| append x50 per commit, 4 watches | store | | 2,301.7 | 50 | 0.7 | | 547 | 483 |
+| pi.live only, 4 watches | store | | 215.4 | | | | 1,531 | 1,094 |
+| long-lived watch, 20000 appends | store | | | 59 | 0.8 | yes | 4,016 | 2,721 |
+
+- The heap is the GC heap after two blocking full collections (upstream: `heapUsed` after two `gc()` calls). It was 0.4 to 0.7 MiB before each scenario, so neither the stored history nor the watches' windows stay on it.
+- Delivery waits poll with `Task.Delay(1)`, which ticks at the timer resolution (15.6 ms on Windows), so the per-commit times include up to one tick spread over a scenario's commits.
+
+## Group commit throughput (`storage-throughput`)
+
+Pi v1.5.0 sync, durable areas group-commit (the Session half of Pi `e5c6182ba`), group-commit-scheduler (its scheduler half, in the second table) and publication-caches (its read caches, in the third and fourth tables). `PiSharp.Durable.Benchmarks storage-throughput` (StorageBench.cs), measured on 2026-11-05, same machine and runtime, so the numbers are machine-local. In the first table, *before* is the benchmark at `5eb9562c` (the commit before area group-commit, with the same StorageBench.cs), built from an archive copy, and *after* is area group-commit's branch, one run each. Each Session row times 512 commits split across N conversations, each conversation committing in sequence, and each Harness row times 128 runs of one faux text reply. The memory backend sits behind a fixed round trip on every storage call. "Per s" is commits or runs per second, and "commits per call" is the mean group size, the commits each storage call carried.
+
+Upstream's changelog (durable 1.5.0) quotes about 5 to 440 agent runs per second for one Harness with 128 conversations over storage with a 4 ms round trip (median run 25 s to 0.28 s), measured with the probe that `docs/group-commit.md` section 9 describes; the probe is not in the repository, so no upstream run was taken here, and **no parity is claimed**. In the first two tables a PiSharp Harness run still read from Storage on the line, because the read caches that let a normal run make no storage reads (durable 1.5.0's Changed#4) came with area publication-caches, measured last.
+
+| scenario | backend | round trip ms | conversations | before: per s | before: commits per call | after: per s | after: commits per call | after / before |
+|---|---|---:|---:|---:|---:|---:|---:|---:|
+| session commits | memory | 0 | 1 | 55,937 | 1.00 | 45,559 | 1.00 | 0.81 |
+| session commits | memory | 0 | 8 | 202,172 | 1.00 | 129,097 | 1.00 | 0.64 |
+| session commits | memory | 0 | 32 | 204,008 | 1.00 | 121,255 | 1.00 | 0.59 |
+| session commits | memory | 0 | 128 | 211,553 | 1.00 | 130,240 | 1.00 | 0.62 |
+| session commits | memory | 1 | 1 | 491 | 1.00 | 480 | 1.00 | 0.98 |
+| session commits | memory | 1 | 8 | 494 | 1.00 | 963 | 1.00 | 1.95 |
+| session commits | memory | 1 | 32 | 494 | 1.00 | 972 | 1.00 | 1.97 |
+| session commits | memory | 1 | 128 | 491 | 1.00 | 969 | 1.00 | 1.97 |
+| session commits | memory | 4 | 1 | 124 | 1.00 | 124 | 1.00 | 1.00 |
+| session commits | memory | 4 | 8 | 124 | 1.00 | 247 | 1.00 | 1.99 |
+| session commits | memory | 4 | 32 | 124 | 1.00 | 248 | 1.00 | 2.00 |
+| session commits | memory | 4 | 128 | 124 | 1.00 | 248 | 1.00 | 2.00 |
+| session commits | sqlite | 0 | 1 | 11,073 | 1.00 | 9,847 | 1.00 | 0.89 |
+| session commits | sqlite | 0 | 8 | 14,771 | 1.00 | 11,176 | 1.00 | 0.76 |
+| session commits | sqlite | 0 | 32 | 11,286 | 1.00 | 12,733 | 1.00 | 1.13 |
+| session commits | sqlite | 0 | 128 | 13,029 | 1.00 | 9,979 | 1.00 | 0.77 |
+| session changes | memory | 0 | 1 | 119,654 | 1.00 | 73,888 | 1.00 | 0.62 |
+| session changes | memory | 0 | 8 | 145,525 | 1.00 | 88,112 | 1.00 | 0.61 |
+| session changes | memory | 0 | 32 | 86,501 | 1.00 | 86,576 | 1.00 | 1.00 |
+| session changes | memory | 0 | 128 | 148,924 | 1.00 | 86,387 | 1.00 | 0.58 |
+| session changes | memory | 1 | 1 | 946 | 1.00 | 938 | 1.00 | 0.99 |
+| session changes | memory | 1 | 8 | 968 | 1.00 | 4,175 | 4.49 | 4.31 |
+| session changes | memory | 1 | 32 | 971 | 1.00 | 19,170 | 21.33 | 19.74 |
+| session changes | memory | 1 | 128 | 977 | 1.00 | 57,611 | 73.14 | 58.97 |
+| session changes | memory | 4 | 1 | 248 | 1.00 | 248 | 1.00 | 1.00 |
+| session changes | memory | 4 | 8 | 247 | 1.00 | 1,091 | 4.41 | 4.42 |
+| session changes | memory | 4 | 32 | 248 | 1.00 | 5,398 | 22.26 | 21.77 |
+| session changes | memory | 4 | 128 | 248 | 1.00 | 16,632 | 73.14 | 67.06 |
+| session changes | sqlite | 0 | 1 | 9,686 | 1.00 | 9,172 | 1.00 | 0.95 |
+| session changes | sqlite | 0 | 8 | 8,490 | 1.00 | 10,618 | 1.00 | 1.25 |
+| session changes | sqlite | 0 | 32 | 10,055 | 1.00 | 11,073 | 1.00 | 1.10 |
+| session changes | sqlite | 0 | 128 | 7,718 | 1.00 | 8,279 | 1.00 | 1.07 |
+| harness runs | memory | 0 | 1 | 652.2 | 1.00 | 580.2 | 1.00 | 0.89 |
+| harness runs | memory | 0 | 8 | 4,433 | 1.00 | 3,624 | 1.00 | 0.82 |
+| harness runs | memory | 0 | 32 | 3,592 | 1.00 | 3,068 | 1.00 | 0.85 |
+| harness runs | memory | 0 | 128 | 2,969 | 1.00 | 2,757 | 1.00 | 0.93 |
+| harness runs | memory | 4 | 1 | 10.7 | 1.00 | 10.7 | 1.00 | 1.00 |
+| harness runs | memory | 4 | 8 | 11.7 | 1.00 | 11.6 | 1.00 | 0.99 |
+| harness runs | memory | 4 | 32 | 11.8 | 1.00 | 11.6 | 1.00 | 0.98 |
+| harness runs | memory | 4 | 128 | 11.8 | 1.00 | 11.8 | 1.00 | 1.00 |
+| harness runs | sqlite | 0 | 1 | 726.0 | 1.00 | 632.8 | 1.00 | 0.87 |
+| harness runs | sqlite | 0 | 8 | 794.9 | 1.00 | 777.7 | 1.00 | 0.98 |
+| harness runs | sqlite | 0 | 32 | 883.4 | 1.00 | 819.5 | 1.00 | 0.93 |
+| harness runs | sqlite | 0 | 128 | 827.8 | 1.00 | 905.3 | 1.00 | 1.09 |
+
+- **Session commits (entry appends) did not batch yet** (1.00 commits per call everywhere). Each `AppendEntryAsync` read its conversation record from Storage on the line, a round trip that serialized the jobs until area publication-caches gave the entry path its record cache (below). The line no longer waits for the previous commit's publication, so one job's read overlaps the commit before it: about twice the commits per second at 1 and 4 ms once 8 or more conversations work at once (124 to 248 at 4 ms).
+- **Session changes (a cached conversation document) batch.** Such a commit reads nothing from Storage, so every part admitted while a call is in flight goes in the next call: 73 commits per call at 128 conversations, 248 to 16,632 commits per second at 4 ms and 977 to 57,611 at 1 ms. One conversation still pays one round trip per commit, as upstream's does.
+- **Harness runs did not change in area group-commit, by design.** `DurableHarness` kept the line waiting for publication (`LineWaitsForPublication`) until area group-commit-scheduler ported the scheduler's regions and membership keys, so its runs still committed one at a time: 11.8 runs per second at 4 ms with 128 conversations before and after (median run 9,319 and 9,336 ms), not upstream's 440.
+- **Memory storage at 0 ms costs more CPU per commit after.** Session commits fall from about 200,000 to about 130,000 per second at 8 or more conversations (19 to 41 % fewer across the memory rows at 0 ms), and Harness runs are 7 to 18 % slower, because the writer's admission, its publication hop and the outcome fences replace a direct call. Upstream's changelog reports the same direction for in-memory storage with no latency ("up to 25% fewer runs per second"). Its gain of about 30 % with local SQLite at 128 conversations is a Harness number, and PiSharp's Harness did not batch yet; the SQLite rows here move both ways within the noise.
+
+**Area group-commit-scheduler** (the Harness half). The barrier is gone: the scheduler's decisions record and touch the keys they read, every commit writes its membership keys, and Harness line jobs overlap storage calls. Harness rows only, two runs each (the second with `latency 0,4`); *before* is the benchmark at `5f7043a5` (area group-commit merged, barrier mode), built from an archive copy, *after* is area group-commit-scheduler's branch. Each cell gives run 1, run 2; "after / before" compares the means. Commits per run (4.0 with one conversation, 3.0 to 3.5 with more) and commits per call (1.00) are the same in every row before and after. The Session rows were taken again too and match the first table's *after* column within the noise (the Session code did not change).
+
+| backend | round trip ms | conversations | before: runs per s | before: median run ms | after: runs per s | after: median run ms | after / before |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| memory | 0 | 1 | 585.0, 519.2 | 0.5, 0.7 | 549.6, 506.0 | 0.6, 0.6 | 0.96 |
+| memory | 0 | 8 | 3,900, 2,290 | 1.6, 2.9 | 3,329, 2,444 | 1.9, 2.8 | 0.93 |
+| memory | 0 | 32 | 3,215, 2,939 | 9.5, 11.8 | 2,833, 2,089 | 10.3, 15.0 | 0.80 |
+| memory | 0 | 128 | 2,700, 3,014 | 34.3, 31.6 | 2,067, 1,838 | 45.6, 44.2 | 0.68 |
+| memory | 4 | 1 | 10.7, 10.7 | 93.1, 93.3 | 11.2, 11.2 | 89.2, 89.2 | 1.05 |
+| memory | 4 | 8 | 11.7, 11.6 | 681.0, 689.7 | 13.7, 13.7 | 584.4, 584.8 | 1.18 |
+| memory | 4 | 32 | 11.7, 11.8 | 2,667, 2,670 | 13.8, 13.8 | 2,285, 2,277 | 1.17 |
+| memory | 4 | 128 | 11.8, 11.8 | 9,323, 9,318 | 13.8, 13.8 | 8,015, 8,023 | 1.17 |
+| sqlite | 0 | 1 | 638.0, 704.2 | 1.3, 1.2 | 597.9, 666.4 | 1.4, 1.2 | 0.94 |
+| sqlite | 0 | 8 | 843.9, 945.5 | 9.4, 8.2 | 790.7, 820.0 | 9.9, 9.2 | 0.90 |
+| sqlite | 0 | 32 | 857.8, 928.7 | 36.0, 31.8 | 770.3, 863.9 | 38.8, 35.8 | 0.91 |
+| sqlite | 0 | 128 | 900.2, 790.0 | 104.5, 127.2 | 831.2, 958.5 | 114.7, 105.8 | 1.06 |
+
+- **Harness runs at 4 ms gain about 17 % with 8 or more conversations, not upstream's 88-fold.** 11.6 to 11.8 runs per second become 13.7 to 13.8 (median run 9,320 to 8,020 ms at 128), because a job's reads now overlap the storage call of the commit before it. The runs still do not batch (1.00 commits per call): a run reads records and entries from Storage on the line, and a read on the line holds the line for its round trip, so the 128 conversations' jobs take turns. 9.3 s for 128 runs amounts to about 2,300 round trips of 4 ms in sequence, about 18 a run, of which 3 are its commits. Upstream's 440 runs per second rest on a normal run making no storage reads (the record cache, conversation tails, the task-document index and kept context ranges), which is area publication-caches' (below).
+- **Memory storage at 0 ms costs more CPU per run after**: 4 to 32 % fewer runs per second, the most at 128 conversations. This was not profiled; the scheduler now records and touches the keys of every decision, computes each commit's membership keys and starts the reservation passes a publication kicks on the thread pool. Upstream reports up to 25 % fewer runs per second for in-memory storage with no latency. The SQLite rows move both ways within the run-to-run spread.
+- **Nested tool calls and fan-out are unchanged** (`nested-tools`, `scheduler-fanout`; before `5f7043a5`, after this branch, one run each, and a second fan-out run at 4,000 and 8,000 calls). Commits are equal (fan-out 765 to 24,015; nested calls 614, 696, 6,014 and 6,817), except one JSONL run of 200 calls at depth 2 that stored 695 commits against 696 before. Timings stay within the spread between runs: fan-out at 4,000 calls 2,060 and 2,936 ms before, 2,690 and 3,048 ms after; 2,000 nested calls at depth 2, 2,480 to 2,600 ms on SQLite and 7,326 to 7,360 ms on JSONL.
+
+**Area publication-caches** (the read caches, conversation tails, the task-document index, kept context ranges and the publication order; the cache part of Pi `e5c6182ba`). Two runs of the default `storage-throughput` (all rows), on 2026-11-05, same machine; *before* is the *after* column of the table above it (area group-commit-scheduler's branch; for the Session rows the first table's *after*, one run), *after* is area publication-caches' branch. The benchmark now also counts Storage reads (every `LatencyStorage` read call, including SQLite's, where it adds no round trip) per commit or run. Each cell gives run 1, run 2; "after / before" compares the means.
+
+Harness runs:
+
+| backend | round trip ms | conversations | before: runs per s | after: runs per s | after: median run ms | after: commits per call | after: reads per run | after / before |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| memory | 0 | 1 | 549.6, 506.0 | 471.7, 488.2 | 0.7, 0.7 | 1.00, 1.00 | 0.01 | 0.91 |
+| memory | 0 | 8 | 3,329, 2,444 | 2,926, 2,908 | 2.3, 2.4 | 1.00, 1.00 | 0.06 | 1.01 |
+| memory | 0 | 32 | 2,833, 2,089 | 2,579, 2,956 | 11.9, 10.1 | 1.00, 1.00 | 0.25 | 1.12 |
+| memory | 0 | 128 | 2,067, 1,838 | 1,367, 1,883 | 50.4, 33.6 | 1.00, 1.00 | 1.00 | 0.83 |
+| memory | 4 | 1 | 11.2, 11.2 | 58.1, 58.0 | 17.2, 17.2 | 1.00, 1.00 | 0.01 | 5.2 |
+| memory | 4 | 8 | 13.7, 13.7 | 154.5, 152.8 | 50.0, 53.5 | 2.37, 2.37 | 0.06 | 11.2 |
+| memory | 4 | 32 | 13.8, 13.8 | 584.8, 607.5 | 47.6, 47.3 | 8.20, 8.70 | 0.25 | 43.2 |
+| memory | 4 | 128 | 13.8, 13.8 | 1,798, 1,820 | 62.3, 57.8 | 32.17, 32.17 | 1.00 | 131 |
+| sqlite | 0 | 1 | 597.9, 666.4 | 703.1, 619.6 | 1.2, 1.2 | 1.00, 1.00 | 0.01 | 1.05 |
+| sqlite | 0 | 8 | 790.7, 820.0 | 968.6, 976.2 | 6.9, 6.9 | 1.04, 1.05 | 0.06 | 1.21 |
+| sqlite | 0 | 32 | 770.3, 863.9 | 1,044, 1,130 | 28.4, 26.1 | 1.18, 1.08 | 0.25 | 1.33 |
+| sqlite | 0 | 128 | 831.2, 958.5 | 1,378, 1,129 | 87.4, 82.6 | 2.78, 1.47 | 1.00 | 1.40 |
+
+Session commits (entry appends):
+
+| backend | round trip ms | conversations | before: commits per s | after: commits per s | after: commits per call | after / before |
+|---|---:|---:|---:|---:|---:|---:|
+| memory | 0 | 1 | 45,559 | 46,032, 44,317 | 1.00, 1.00 | 0.99 |
+| memory | 0 | 8 | 129,097 | 118,818, 120,323 | 1.00, 1.00 | 0.93 |
+| memory | 0 | 32 | 121,255 | 112,222, 106,600 | 1.00, 1.00 | 0.90 |
+| memory | 0 | 128 | 130,240 | 99,354, 114,629 | 1.00, 1.00 | 0.82 |
+| memory | 1 | 1 | 480 | 936, 934 | 1.00, 1.00 | 1.95 |
+| memory | 1 | 8 | 963 | 4,238, 4,196 | 4.61, 4.57 | 4.38 |
+| memory | 1 | 32 | 972 | 18,398, 19,123 | 22.26, 23.27 | 19.3 |
+| memory | 1 | 128 | 969 | 49,025, 53,022 | 73.14, 73.14 | 52.7 |
+| memory | 4 | 1 | 124 | 247, 247 | 1.00, 1.00 | 1.99 |
+| memory | 4 | 8 | 247 | 1,117, 1,080 | 4.53, 4.38 | 4.45 |
+| memory | 4 | 32 | 248 | 5,158, 5,381 | 21.33, 22.26 | 21.2 |
+| memory | 4 | 128 | 248 | 17,234, 20,284 | 73.14, 85.33 | 75.6 |
+| sqlite | 0 | 1 | 9,847 | 11,896, 12,920 | 1.00, 1.00 | 1.26 |
+| sqlite | 0 | 8 | 11,176 | 12,878, 13,045 | 1.00, 1.00 | 1.16 |
+| sqlite | 0 | 32 | 12,733 | 11,847, 13,189 | 1.00, 1.00 | 0.98 |
+| sqlite | 0 | 128 | 9,979 | 13,079, 11,013 | 1.00, 1.00 | 1.21 |
+
+- **A Harness run reads from Storage once per conversation, in its first run: the scan of its entries for its first context, which the kept range then serves.** 0.01, 0.06, 0.25 and 1.00 reads per run are 1, 8, 32 and 128 reads for 128 runs (the reads were traced to `ScanEntriesAsync` once while measuring). Before, a run made about 15 reads on the line (the table above estimates 18 round trips a run, 3 of them its commits). Every later run of a conversation reads nothing, which is durable 1.5.0's Changed#4 ("a normal agent run makes no storage reads") as this benchmark measures it.
+- **Harness runs at 4 ms batch now**: 2.4 to 32 commits per call with 8 to 128 conversations, and 13.8 runs per second at 128 conversations become about 1,800 (median run 8,020 ms becomes about 60 ms). One conversation still pays its commits' round trips in sequence (four commits a run, 17.2 ms). Upstream's changelog quotes about 440 runs per second for 128 conversations at 4 ms (median run 0.28 s) with a probe that is not in the repository. PiSharp's row is a different workload, 128 runs of one faux text reply, one per conversation, timed over about 70 ms, so the two numbers are not comparable and **no parity is claimed**; what both show is that the runs no longer take turns on Storage round trips.
+- **Session entry appends batch now** (73 commits per call at 128 conversations, as session changes did already): `AppendEntryAsync` finds its conversation in the record cache and the newest entry in the conversation tails, so it reads nothing (0.00 reads per commit in every row). 248 commits per second at 4 ms with 128 conversations become 17,234 and 20,284. One conversation gains about twice, as each commit no longer pays a read's round trip before its own. Session changes (not tabulated) move within -10 to +23 % of the first table's single *after* run, as they read nothing before either, except one conversation at 0 ms: 73,888 per second in the first table, 50,441 and 48,977 here (each sample times about 10 ms; not profiled).
+- **Memory storage at 0 ms is not faster with the caches.** A MemoryStorage read costs microseconds, so serving it from memory saves little, while every publication now applies its batch to the caches and the tails and every read takes the cache's lock. The Harness rows at 0 ms land within the spread of the run before (0.83 to 1.12) and stay below the barrier mode measured before area group-commit-scheduler (for 128 conversations 2,700 and 3,014 runs per second there, 1,367 and 1,883 here); Session entry appends lose up to 18 % at 128 conversations. This was not profiled. Upstream's changelog reports up to 25 % fewer runs per second for in-memory storage with no latency.
+- **Local SQLite gains 21 to 40 % with 8 or more conversations**, batching 1.04 to 2.78 commits per call, and SQLite entry appends 16 to 26 % except at 32 conversations. Upstream's changelog reports about 30 % more runs per second with local SQLite at 128 conversations; that is the same direction, not a measured comparison.
+- **SQL Server storage (decision 0007) is not measured**: StorageBench has no MSSQL backend, and adding one gives the benchmark project a new project reference (PiSharp.Durable.MSSQL) and a packages.lock.json change, which this area does not make. Its network round trips are what the 1 and 4 ms rows stand in for.
 
 ## Throughput target
 

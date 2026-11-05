@@ -8,10 +8,11 @@ using System.Text.Json;
 // oauth.ts, cli.ts, resources.ts, extensions/tool-search, core/mcp-servers.ts, docs/mcp.md) and their tests
 // (test/suite/agent-session-mcp.test.ts, test/mcp-*.test.ts) by reading, never captured from an upstream run. Fake MCP servers, a fake
 // authorization server and a fake Anthropic endpoint answer in process; no network or live credentials are used. Updated to Pi v1.2.0
-// (06a46693): no resource listing at connect, structured content of any JSON type, reachesTools.
+// (06a46693): no resource listing at connect, structured content of any JSON type, reachesTools. Synced to Pi v1.5.0 under decision
+// 0013 (the report's sourceSha), still by reading.
 internal static partial class Program
 {
-    private const string Upstream = "06a466935536f8c9bcacb2d5efc0fc021be1bdff";
+    private const string Upstream = "f9a26365568127461c47a07a37dcb42c140a3ac5";
 
     private static async Task<int> Main(string[] args)
     {

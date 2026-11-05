@@ -1,14 +1,19 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/test/harness-task-graph.test.ts. Verbatim apart from the adaptations in
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/test/harness-task-graph.test.ts. Verbatim apart from the adaptations in
 // HarnessSupport.cs and SessionSupport.cs, and these:
 // - Backends. Upstream runs four cases on MemoryStorage (one through ControlledStorage) and the reopen case on a SQLite file. Nothing in
 //   them depends on the backend, so HarnessTaskGraphCases() runs them on MemoryStorage with the reopen case on a SQLite file as upstream
 //   (harness.task-graph.*), HarnessTaskGraphJsonlCases() on fresh JSONL directories, the reopen case reopening one
 //   (harness.task-graph.jsonl.*), and HarnessTaskGraphSqliteCases() the four others on fresh SQLite files (harness.task-graph.sqlite.*).
 // - A TaskGraph is a typed class; toEqual compares ToJson(), toBe is ReferenceEquals, and statuses() is a sorted list of "kind#id status".
-// - flush() is Drained(): a Session line barrier, after which every state and watch delivery of the commits before it has run (see
+// - flush() is Drained(): a Session line barrier, after which every watch delivery of the commits before it has run (see
 //   HarnessViewCases.cs). eventually() is Eventually.
 // - The watch listener's replay check, an expect inside the listener upstream, is collected and asserted by the test body.
 // - An aborted controller is a DurableCancellation cancelled with Exception("cancelled"), which is what the acquisition rejects with.
+// Pi v1.5.0 sync (area watches, 92ab53602): Harness.taskGraph() is gone, so the cases observe through watchTaskGraph(), started where its
+// value must stay current; a listener takes one value call (Change(call)).
+// Pi v1.5.0 sync (area observers, 8b0caefc2): "advances with the conversation view at the publication of the one commit that changes both"
+// (v1.5.0's wording: 8b0caefc2 published inside the storage's adopt, which area publication-caches settles) observes through
+// observeConversation() and observeTaskGraph() on ControlledStorage over each backend.
 using System.Collections.Immutable;
 using PiSharp.Durable;
 using PiSharp.Durable.Chord;
@@ -155,12 +160,13 @@ internal static class TaskGraphTests
             var (harness, _, _) = await OpenTasks(await fresh(), [parentTask, childTask]);
             var root = await harness.RootAsync(Context);
             var seen = new SyncList<TaskGraph>();
-            async Task<AttachedReplicatedState<TaskGraph>> Observe()
+            async Task<IWatchHandle<TaskGraph>> Observe()
             {
-                var opened = await harness.TaskGraphAsync(Context);
-                opened.Subscribe((value, _, delivery) =>
+                var opened = await harness.WatchTaskGraphAsync(Context);
+                opened.Start((call, _) =>
                 {
-                    if (delivery.Kind == ReplicatedStateDeliveryKind.Update) seen.Add(value);
+                    seen.Add(Change(call).Value);
+                    return Task.CompletedTask;
                 });
                 return opened;
             }
@@ -170,7 +176,7 @@ internal static class TaskGraphTests
             async Task Rebuild()
             {
                 var advanced = graph.Value;
-                graph.Dispose();
+                await graph.StopAsync();
                 graph = await Observe();
                 Check(!ReferenceEquals(graph.Value, advanced), "a rebuilt revision is a new value");
                 SameGraph(advanced.ToJson(), graph.Value, "rebuilt");
@@ -221,7 +227,7 @@ internal static class TaskGraphTests
                 Check(!JsonValue.DeepEquals(all[index].ToJson(), all[index - 1].ToJson()), $"revision {index} repeats its predecessor: {all[index]}");
             // The commit that created the two conversations published one revision setting them.
             Check(all.Any(value => value.Node(parent)?.Conversations.Length == 2), "a revision with both conversations");
-            graph.Dispose();
+            await graph.StopAsync();
             await harness.CloseAsync(Context);
         });
 
@@ -256,7 +262,7 @@ internal static class TaskGraphTests
                 }, Context);
                 firstRun.Harness.Resume();
                 await Eventually(async () => (await firstRun.Harness.InspectAsync(Context)).Tasks.All(task => task.State.Kind == TaskInspectionKind.Running));
-                var running = await firstRun.Harness.TaskGraphAsync(Context);
+                var running = await firstRun.Harness.WatchTaskGraphAsync(Context);
                 Seq([$"test.graph-work#{foreground.Value} running", $"test.graph-work#{background.Value} running"], Statuses(running.Value), "running");
                 await firstRun.Harness.CloseAsync(Context);
 
@@ -271,8 +277,9 @@ internal static class TaskGraphTests
                 JsonValue replica = watch.Value.ToJson();
                 var frames = new SyncList<ImmutableArray<Op>>();
                 var mismatches = new SyncList<string>();
-                watch.Start((value, ops, _) =>
+                watch.Start((call, _) =>
                 {
+                    var (value, ops, _) = Change(call);
                     replica = DeltaApply.Apply(replica, ops);
                     if (!JsonValue.DeepEquals(replica, value.ToJson())) mismatches.Add($"replayed {replica.ToJson()}, delivered {value}");
                     frames.Add(ops);
@@ -328,7 +335,8 @@ internal static class TaskGraphTests
             });
             var (harness, _, _) = await OpenTasks(await fresh(), [spawner]);
             var root = await harness.RootAsync(Context);
-            var graph = await harness.TaskGraphAsync(Context);
+            var graph = await harness.WatchTaskGraphAsync(Context);
+            graph.Start((_, _) => Task.CompletedTask);
             var id = await root.CommitAsync(async tx =>
             {
                 var entry = await tx.AppendEntryAsync(root.Id, new EntryDraft { Kind = "note" });
@@ -338,10 +346,10 @@ internal static class TaskGraphTests
             await Eventually(() => (graph.Value.Node(id)?.Conversations.Length ?? 0) == 2);
             var advanced = graph.Value;
             Seq(created.Snapshot().Order(), advanced.Node(id)!.Conversations.Select(conversation => conversation.Value), "conversations");
-            graph.Dispose();
-            var rebuilt = await harness.TaskGraphAsync(Context);
+            await graph.StopAsync();
+            var rebuilt = await harness.WatchTaskGraphAsync(Context);
             SameGraph(advanced.ToJson(), rebuilt.Value, "rebuilt");
-            rebuilt.Dispose();
+            await rebuilt.StopAsync();
             gate.Resolve();
             await harness.WaitForTaskAsync(id, Context);
             await harness.CloseAsync(Context);
@@ -363,13 +371,13 @@ internal static class TaskGraphTests
             await blocking;
             await RejectsAsync(() => cancelled, "cancelled", "cancelled acquisition");
             // No observer kept the mount: each new observer builds a new revision.
-            var first = await harness.TaskGraphAsync(Context);
+            var first = await harness.WatchTaskGraphAsync(Context);
             var value = first.Value;
-            first.Dispose();
-            var second = await harness.TaskGraphAsync(Context);
+            await first.StopAsync();
+            var second = await harness.WatchTaskGraphAsync(Context);
             Check(!ReferenceEquals(second.Value, value), "a new revision");
             SameGraph(value.ToJson(), second.Value, "same graph");
-            second.Dispose();
+            await second.StopAsync();
             await harness.CloseAsync(Context);
         });
 
@@ -397,13 +405,14 @@ internal static class TaskGraphTests
             var (harness, _, _) = await OpenTasks(await fresh(), [memo]);
             var root = await harness.RootAsync(Context);
             var id = await StartOwned(root, memo);
-            var first = await harness.TaskGraphAsync(Context);
-            var second = await harness.TaskGraphAsync(Context);
+            var first = await harness.WatchTaskGraphAsync(Context);
+            var second = await harness.WatchTaskGraphAsync(Context);
             Same(first.Value, second.Value, "one mount");
             var updates = new SyncList<string>();
-            first.Subscribe((value, _, delivery) =>
+            first.Start((call, _) =>
             {
-                if (delivery.Kind == ReplicatedStateDeliveryKind.Update) updates.Add(value.Node(id) is { } node ? StatusName(node.State.Status) : "gone");
+                updates.Add(Change(call).Value.Node(id) is { } node ? StatusName(node.State.Status) : "gone");
+                return Task.CompletedTask;
             });
             harness.Resume();
             await reached.Task;
@@ -415,13 +424,35 @@ internal static class TaskGraphTests
             await Drained(harness);
             Seq(["running", "gone"], updates.Snapshot(), "updates");
             var last = first.Value;
-            first.Dispose();
-            second.Dispose();
+            await first.StopAsync();
+            await second.StopAsync();
             // No observer is left, so the mount was dropped: a new observer builds a new revision.
-            var rebuilt = await harness.TaskGraphAsync(Context);
+            var rebuilt = await harness.WatchTaskGraphAsync(Context);
             SameGraph(last.ToJson(), rebuilt.Value, "rebuilt");
             Check(!ReferenceEquals(rebuilt.Value, last), "a new revision");
-            rebuilt.Dispose();
+            await rebuilt.StopAsync();
+            await harness.CloseAsync(Context);
+        });
+
+        yield return Case(prefix + "advances-with-the-conversation-view-at-the-publication-of-the-one-commit-that-changes-both", async () =>
+        {
+            var storage = new ControlledStorage(await fresh());
+            var (parent, child) = GatesNever();
+            var (harness, _, _) = await OpenTasks(storage, [parent, child]);
+            var root = await harness.RootAsync(Context);
+            var seen = new SyncList<string>();
+            Observer<T> Record<T>(string name) => new((_, _) => seen.Add($"{name} adopting={storage.Adopting.ToString().ToLowerInvariant()}"), _ => { });
+            var view = await harness.ObserveConversationAsync(root.Id, Record<ConversationView>("view"), Context);
+            var graph = await harness.ObserveTaskGraphAsync(Record<TaskGraph>("graph"), Context);
+            await root.CommitAsync(async tx =>
+            {
+                await tx.AppendEntryAsync(root.Id, new EntryDraft { Kind = "note" });
+                await tx.CreateTaskAsync(parent, JsonValue.Null, new TaskOptions(TaskOwnership.Conversation));
+            }, Context);
+            // Both at the one publication, after Storage stored it, in no promised order.
+            Seq(["graph adopting=false", "view adopting=false"], seen.Snapshot().Order(StringComparer.Ordinal), "seen");
+            view.Detach();
+            graph.Detach();
             await harness.CloseAsync(Context);
         });
     }

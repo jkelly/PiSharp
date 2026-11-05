@@ -171,15 +171,15 @@ internal static partial class Program
             var probe = new PiToolsManager(sandbox.Root, _ => null);
             byte[] Pack(string tool, string version, string binary)
             {
-                var asset = PiToolsManager.Tools[tool].AssetName(version, probe.Platform, probe.Architecture)!;
+                var asset = PiToolsManager.Tools[tool].AssetName(version, PiToolsManager.ReleaseTarget(probe.Platform, probe.Architecture)!);
                 var folder = asset.EndsWith(".zip", StringComparison.Ordinal) ? asset[..^4] : asset[..^7];
                 var entry = folder + "/" + PiToolsManager.Tools[tool].BinaryName + ExecutableSuffix;
                 return asset.EndsWith(".zip", StringComparison.Ordinal) ? Zip(entry, File.ReadAllBytes(binary)) : TarGz(entry, File.ReadAllBytes(binary));
             }
             var fdVersion = probe.Platform == "darwin" && probe.Architecture == "x64" ? "10.3.0" : "10.2.0";
             var releases = new Releases()
-                .Latest("BurntSushi/ripgrep", "14.1.1").Asset("BurntSushi/ripgrep", "14.1.1", PiToolsManager.Tools["rg"].AssetName("14.1.1", probe.Platform, probe.Architecture)!, Pack("rg", "14.1.1", realRg))
-                .Latest("sharkdp/fd", "v" + fdVersion).Asset("sharkdp/fd", "v" + fdVersion, PiToolsManager.Tools["fd"].AssetName(fdVersion, probe.Platform, probe.Architecture)!, Pack("fd", fdVersion, realFd));
+                .Latest("BurntSushi/ripgrep", "14.1.1").Asset("BurntSushi/ripgrep", "14.1.1", PiToolsManager.Tools["rg"].AssetName("14.1.1", PiToolsManager.ReleaseTarget(probe.Platform, probe.Architecture)!), Pack("rg", "14.1.1", realRg))
+                .Latest("sharkdp/fd", "v" + fdVersion).Asset("sharkdp/fd", "v" + fdVersion, PiToolsManager.Tools["fd"].AssetName(fdVersion, PiToolsManager.ReleaseTarget(probe.Platform, probe.Architecture)!), Pack("fd", fdVersion, realFd));
             sandbox.Write(Path.Combine(sandbox.Cwd, "notes.txt"), "first line\nthe needle is here\n");
             sandbox.Write(Path.Combine(sandbox.Cwd, "src", "other.md"), "nothing to see\n");
             sandbox.Respond = (_, index) => index switch

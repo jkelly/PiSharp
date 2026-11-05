@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/ai/src/utils/json-parse.ts.
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/ai/src/utils/json-parse.ts.
 // The partial stage ports partial-json 0.1.7 parse() with Allow.ALL, Copyright (c) 2023 Promplate Dev Team (MIT).
 using System.Globalization;
 using System.Text;
@@ -107,7 +107,7 @@ public static class StreamingJson
                     var digits = JsSlice(json, index + 2, index + 6);
                     if (digits.Length == 4 && digits.All(char.IsAsciiHexDigit)) { repaired.Append("\\u").Append(digits); index += 5; continue; }
                 }
-                if (next is '"' or '\\' or '/' or 'b' or 'f' or 'n' or 'r' or 't' or 'u') { repaired.Append('\\').Append(next); index += 1; continue; }
+                if (next is '"' or '\\' or '/' or 'b' or 'f' or 'n' or 'r' or 't') { repaired.Append('\\').Append(next); index += 1; continue; }
                 repaired.Append("\\\\");
                 continue;
             }
@@ -120,6 +120,40 @@ public static class StreamingJson
             else repaired.Append(character);
         }
         return repaired.ToString();
+    }
+
+    /// <summary>
+    /// json-parse.ts <c>parseToolCallArguments</c>: the model's complete argument text of a finished tool call. Unlike
+    /// <see cref="Parse"/>, it never keeps a partially parsed prefix: text that is not a JSON object, even after <see cref="RepairJson"/>,
+    /// gives <c>{}</c> and an <c>argumentsError</c> that describes the problem and includes the text, so tool validation can report it
+    /// back to the model. Empty or whitespace-only text is <c>{}</c> without an error.
+    /// </summary>
+    [System.Diagnostics.CodeAnalysis.Experimental("PISHARP_AI001")]
+    public static ToolCallArgumentsResult ParseToolCallArguments(string? json)
+    {
+        if (json is null || JsTrim(json).Length == 0) return new ToolCallArgumentsResult(JsonData.EmptyObject);
+        try
+        {
+            var parsed = JsonParseWithRepair(json);
+            if (parsed.Value.ValueKind != JsonValueKind.Object) throw new JsonException("Tool arguments must be a JSON object");
+            return new ToolCallArgumentsResult(parsed);
+        }
+        catch (JsonException error)
+        {
+            return new ToolCallArgumentsResult(JsonData.EmptyObject, $"{error.Message}\n\nReceived arguments:\n{json}");
+        }
+    }
+
+    // json-parse.ts parseJsonWithRepair: JSON.parse, then JSON.parse of the repair when it changed the text.
+    private static JsonData JsonParseWithRepair(string json)
+    {
+        try { return JsonParse(json); }
+        catch (JsonException)
+        {
+            var repaired = RepairJson(json);
+            if (!string.Equals(repaired, json, StringComparison.Ordinal)) return JsonParse(repaired);
+            throw;
+        }
     }
 
     private static Value ParseValue(string? partialJson)
@@ -513,9 +547,7 @@ public static class StreamingJson
                 builder.Append(']');
                 break;
             case ObjectValue obj:
-                var members = obj.Order.Select((key, position) => (key, position, arrayIndex: ArrayIndex(key)))
-                    .OrderBy(item => item.arrayIndex is null ? 1 : 0).ThenBy(item => item.arrayIndex ?? 0).ThenBy(item => item.position)
-                    .Select(item => item.key).ToList();
+                var members = PropertyOrder(obj.Order);
                 builder.Append('{');
                 for (var index = 0; index < members.Count; index++)
                 {
@@ -544,6 +576,12 @@ public static class StreamingJson
         return builder?.ToString() ?? text;
     }
 
+    // OrdinaryOwnPropertyKeys: array-index names first in ascending order, then the other names in insertion order.
+    internal static List<string> PropertyOrder(IEnumerable<string> names) =>
+        names.Select((key, position) => (key, position, arrayIndex: ArrayIndex(key)))
+            .OrderBy(item => item.arrayIndex is null ? 1 : 0).ThenBy(item => item.arrayIndex ?? 0).ThenBy(item => item.position)
+            .Select(item => item.key).ToList();
+
     private static uint? ArrayIndex(string name)
     {
         if (name.Length is 0 or > 10 || name.Length > 1 && name[0] == '0') return null;
@@ -556,7 +594,7 @@ public static class StreamingJson
         return value < uint.MaxValue ? (uint)value : null;
     }
 
-    private static void Quote(StringBuilder builder, string text)
+    internal static void Quote(StringBuilder builder, string text)
     {
         builder.Append('"');
         for (var index = 0; index < text.Length; index++)
@@ -590,6 +628,13 @@ public static class StreamingJson
 
     private static bool IsJsWhiteSpace(char character) => character is '\t' or '\n' or '\v' or '\f' or '\r' or ' ' or '\u00a0' or '\u1680'
         or (>= '\u2000' and <= '\u200a') or '\u2028' or '\u2029' or '\u202f' or '\u205f' or '\u3000' or '\ufeff';
+
+    /// <summary>Whether <c>text.trim()</c> is empty: only ECMAScript WhiteSpace and LineTerminator characters, or none.</summary>
+    internal static bool IsJsBlank(string text)
+    {
+        foreach (var character in text) if (!IsJsWhiteSpace(character)) return false;
+        return true;
+    }
 
     private static string JsTrim(string text)
     {

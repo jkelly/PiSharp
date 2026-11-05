@@ -8,13 +8,17 @@
 //   indexed through a persisted SHA-256 of its text, and queries compare both the hash and the text. Text columns use a binary collation, so
 //   that comparisons are exact whatever the database's default collation is.
 // - Tables carry a durable_ prefix, since the default schema dbo may hold other tables.
+// Schema version 2 (Pi v1.5.0 sync, area sqlite) adds the sleeping task status, as upstream's SQLite schema version 2 does. SQL Server
+// changes a CHECK constraint in place, so the migration drops version 1's unnamed status check and adds a named one, where SQLite rebuilds
+// the table. An older PiSharp (1.2.0.x) refuses a schema this version migrated ("newer than supported version").
 using System.Collections.Immutable;
 
 namespace PiSharp.Durable.MSSQL;
 
 /// <summary>One immutable step of the schema history.</summary>
 /// <param name="Version">The schema version after this step; versions are contiguous from 1.</param>
-/// <param name="Statements">The T-SQL statements, run in order; <c>{schema}</c> stands for the quoted schema name.</param>
+/// <param name="Statements">The T-SQL statements, run in order; <c>{schema}</c> stands for the quoted schema name, and the binding <c>@p0</c>
+/// holds the schema name itself.</param>
 public sealed record SqlServerMigration(int Version, ImmutableArray<string> Statements);
 
 /// <summary>The durable SQL Server schema and its migration runner.</summary>
@@ -136,6 +140,24 @@ public static class SqlServerMigrations
         "CREATE INDEX durable_document_revisions_by_kind ON {schema}.durable_document_revisions (store_id, document_id, kind, seq DESC)",
     ];
 
+    // Version 2 adds the sleeping task status. Version 1's status check has a name SQL Server generated, so it is found in the catalog.
+    private static readonly ImmutableArray<string> SleepingStatus =
+    [
+        """
+        DECLARE @drop NVARCHAR(MAX);
+        SELECT @drop = N'ALTER TABLE ' + QUOTENAME(@p0) + N'.durable_tasks DROP CONSTRAINT ' + QUOTENAME(checks.name)
+        FROM sys.check_constraints AS checks
+        JOIN sys.columns AS columns ON columns.object_id = checks.parent_object_id AND columns.column_id = checks.parent_column_id
+        WHERE checks.parent_object_id = OBJECT_ID(QUOTENAME(@p0) + N'.durable_tasks') AND columns.name = N'status';
+        IF @drop IS NULL THROW 50000, N'Durable SQL Server tasks table has no status check to replace', 1;
+        EXEC (@drop);
+        """,
+        """
+        ALTER TABLE {schema}.durable_tasks ADD CONSTRAINT durable_tasks_status
+            CHECK (status IN (N'pending', N'running', N'waiting', N'sleeping', N'completing', N'terminal'))
+        """,
+    ];
+
     /// <summary>The <c>durable_schema</c> table that records the applied version; created when missing.</summary>
     private const string SchemaTable = """
         IF OBJECT_ID(QUOTENAME(@p0) + N'.durable_schema', N'U') IS NULL
@@ -145,7 +167,7 @@ public static class SqlServerMigrations
         """;
 
     /// <summary>Immutable, ordered schema history. Append new migrations after the initial schema ships.</summary>
-    public static ImmutableArray<SqlServerMigration> Migrations { get; } = [new(1, InitialSchema)];
+    public static ImmutableArray<SqlServerMigration> Migrations { get; } = [new(1, InitialSchema), new(2, SleepingStatus)];
 
     /// <summary>The newest schema version.</summary>
     public static int CurrentSchemaVersion { get; } = Migrations.IsEmpty ? 0 : Migrations[^1].Version;
@@ -191,7 +213,7 @@ public static class SqlServerMigrations
             foreach (var migration in migrations)
             {
                 if (migration.Version <= version) continue;
-                foreach (var statement in migration.Statements) await transaction.RunAsync(Render(statement, quoted)).ConfigureAwait(false);
+                foreach (var statement in migration.Statements) await transaction.RunAsync(Render(statement, quoted), schema).ConfigureAwait(false);
                 await transaction.RunAsync(Render("UPDATE {schema}.durable_schema SET version = @p0 WHERE singleton = 1", quoted), migration.Version)
                     .ConfigureAwait(false);
             }

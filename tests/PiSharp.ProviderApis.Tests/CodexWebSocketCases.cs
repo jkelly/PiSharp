@@ -37,7 +37,7 @@ internal static partial class Program
     private static (OpenAICodexResponsesTransport Transport, ModelDescriptor Model, FixedTime Time) CodexOver(CodexServer server, string transport,
         string? sessionId = null, OpenAICodexResponsesOptions? options = null, HttpMessageInvoker? invoker = null)
     {
-        var row = CatalogRow("openai-codex", "gpt-5.5");
+        var row = CatalogRow("openai-codex", "gpt-5.6-sol");
         var raw = (JsonObject)JsonNode.Parse(row.Raw.ToString())!; raw["baseUrl"] = server.BaseUrl;
         var time = new FixedTime(1_800_000_000_000);
         options = (options ?? new()) with { SessionId = sessionId, Transport = () => transport, Time = time, WebSocketInvoker = invoker };
@@ -69,7 +69,7 @@ internal static partial class Program
             Check(handshake.Header("authorization") == "Bearer " + CodexToken && handshake.Header("chatgpt-account-id") == "acct-123" &&
                 handshake.Header("openai-beta") == "responses_websockets=2026-02-06" && handshake.Header("session-id") == "sess-ws-handshake" &&
                 handshake.Header("x-client-request-id") == "sess-ws-handshake" && handshake.Header("originator") == "pi" &&
-                handshake.Header("user-agent") == "pi/1.2.0" && handshake.Header("accept") is null && handshake.Header("content-type") is null &&
+                handshake.Header("user-agent") == PiSharp.AI.ClientIdentities.FormatUserAgent(null) && handshake.Header("accept") is null && handshake.Header("content-type") is null &&
                 handshake.Header("upgrade")?.Equals("websocket", StringComparison.OrdinalIgnoreCase) == true &&
                 handshake.Header("sec-websocket-version") == "13" &&
                 handshake.Header("sec-websocket-extensions")?.StartsWith("permessage-deflate", StringComparison.Ordinal) == true,

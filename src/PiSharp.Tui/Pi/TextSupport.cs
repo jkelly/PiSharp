@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/tui/src/kill-ring.ts, undo-stack.ts, word-navigation.ts, fuzzy.ts.
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/tui/src/kill-ring.ts, undo-stack.ts, word-navigation.ts, fuzzy.ts.
 using System.Globalization;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -170,23 +170,41 @@ public static partial class Fuzzy
     public static FuzzyMatch Match(string query, string text)
     {
         var queryLower = query.ToLowerInvariant(); var textLower = text.ToLowerInvariant();
+        double ScorePositions(int[] positions)
+        {
+            int lastMatch = -1, consecutive = 0; double score = 0;
+            foreach (var i in positions)
+            {
+                if (lastMatch == i - 1) { consecutive++; score -= consecutive * 5; }
+                else { consecutive = 0; if (lastMatch >= 0) score += (i - lastMatch - 1) * 2; }
+                if (i == 0 || TextUtils.IsJsWhitespace(textLower[i - 1]) || textLower[i - 1] is '-' or '_' or '.' or '/' or ':') score -= 10;
+                score += i * 0.1;
+                lastMatch = i;
+            }
+            return score;
+        }
         FuzzyMatch MatchQuery(string normalized)
         {
             if (normalized.Length == 0) return new(true, 0);
             if (normalized.Length > textLower.Length) return new(false, 0);
-            int queryIndex = 0, lastMatch = -1, consecutive = 0; double score = 0;
-            while (queryIndex < normalized.Length)
+            // Greedy alignment: each query character at its first occurrence after the previous one.
+            var positions = new int[normalized.Length]; var lastMatch = -1;
+            for (var queryIndex = 0; queryIndex < normalized.Length; queryIndex++)
             {
                 var i = textLower.IndexOf(normalized[queryIndex], lastMatch + 1);
-                if (i == -1) break;
-                var boundary = i == 0 || TextUtils.IsJsWhitespace(textLower[i - 1]) || textLower[i - 1] is '-' or '_' or '.' or '/' or ':';
-                if (lastMatch == i - 1) { consecutive++; score -= consecutive * 5; }
-                else { consecutive = 0; if (lastMatch >= 0) score += (i - lastMatch - 1) * 2; }
-                if (boundary) score -= 10;
-                score += i * 0.1;
-                lastMatch = i; queryIndex++;
+                if (i == -1) return new(false, 0);
+                positions[queryIndex] = lastMatch = i;
             }
-            if (queryIndex < normalized.Length) return new(false, 0);
+            var score = ScorePositions(positions);
+            // The greedy alignment can scatter the query over an earlier, unrelated part of the text, e.g. "opus" in
+            // "openrouter openrouter/anthropic/claude-opus" takes o, p, u from "openrouter". Also score every contiguous occurrence
+            // and keep the best alignment.
+            for (var start = textLower.IndexOf(normalized, StringComparison.Ordinal); start != -1;
+                 start = textLower.IndexOf(normalized, start + 1, StringComparison.Ordinal))
+            {
+                for (var k = 0; k < positions.Length; k++) positions[k] = start + k;
+                score = Math.Min(score, ScorePositions(positions));
+            }
             if (normalized == textLower) score -= 100;
             return new(true, score);
         }

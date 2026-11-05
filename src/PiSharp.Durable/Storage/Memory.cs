@@ -1,10 +1,12 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/src/storage/memory.ts.
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/src/storage/memory.ts.
 //
 // Upstream clones every retained write and every read result, and deep-freezes prepared writes, to simulate the ownership boundary that
 // serialization gives SQLite and JSONL (spec §4, §11.1). Records and JSON values here are immutable, so sharing them is already detached:
 // no caller can change a retained value or a read result, and the copies are omitted. Upstream runs on one JavaScript thread; this port
 // takes one lock per operation so that concurrent reads never observe a half-applied commit. The Session still serializes commits.
 // The batch validation, addressing and paging rules are shared with SqliteStorage (StorageRules.cs).
+// Pi v1.5.0 (f9a26365568127461c47a07a37dcb42c140a3ac5, area storage-batches): the batch commit. Area sleep: the status index has the
+// sleeping status, as every DurableTaskStatus value has one (upstream f75b3240a).
 using System.Collections.Immutable;
 using PiSharp.Durable.Chord;
 
@@ -90,8 +92,49 @@ public sealed class MemoryStorage : IStorage
     private long nextSeq = 1;
     private bool closed;
 
-    /// <inheritdoc/>
-    public Task<Seq> CommitAsync(IReadOnlyList<StorageWrite> writes, DurableContext context) => Run(() => PrepareCommit(writes).Apply());
+    /// <summary>A test seam for upstream's subclass whose prepared commit's <c>apply</c> throws: runs before <see cref="CommitAsync"/>
+    /// applies each prepared batch, and a throw stands for that batch's apply throwing.</summary>
+    internal Action<PreparedMemoryCommit>? BeforeApply { get; set; }
+
+    /// <summary>
+    /// Applies <paramref name="batches"/> one by one, each checked against the state the earlier ones left (<see cref="PrepareCommit"/>,
+    /// which only checks and detaches, so a batch it refuses changed nothing); stops at the first one refused. Memory is durable at once; the
+    /// receipts follow the last batch. The batches apply under one lock, so a concurrent read observes all of them or none.
+    /// </summary>
+    public Task<CommitResult> CommitAsync(IReadOnlyList<IReadOnlyList<StorageWrite>> batches, Action<int, Seq> receive, DurableContext context) => Run(() =>
+    {
+        StorageRules.CheckCommitArguments(batches, receive);
+        var seqs = new List<Seq>();
+        Exception? refused = null;
+        try
+        {
+            lock (gate)
+            {
+                AssertOpen();
+                foreach (var writes in batches)
+                {
+                    PreparedMemoryCommit prepared;
+                    try
+                    {
+                        prepared = PrepareCommit(writes);
+                    }
+                    catch (Exception error)
+                    {
+                        refused = error;
+                        break;
+                    }
+                    BeforeApply?.Invoke(prepared);
+                    seqs.Add(prepared.Apply());
+                }
+            }
+        }
+        finally
+        {
+            // Also when a batch's apply throws: the batches applied before it are stored, and their receipts stand.
+            for (var index = 0; index < seqs.Count; index++) receive(index, seqs[index]);
+        }
+        return new CommitResult(seqs.Count, refused);
+    });
 
     /// <summary>Validates and detaches one commit without changing observable state. <paramref name="seq"/> defaults to the next
     /// sequence; a replaying backend passes the sequence it recorded, which must not be below the next one.</summary>

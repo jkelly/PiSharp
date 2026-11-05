@@ -79,9 +79,10 @@ public static class GoogleRequestProjector
                     if (!strict && Text(sampling, "strict") == "require") throw GoogleData.Fail(GoogleFailure.UnsupportedValue);
                     strictAny |= strict;
                 }
-                // google-shared.ts convertTools: { name, description, parametersJsonSchema }.
+                // google-shared.ts convertTools: { name, description, parametersJsonSchema }, const rewritten as enum.
                 var declaration = new JsonObject { ["name"] = Text(tool, "name") };
                 if (tool.ContainsKey("description")) declaration["description"] = tool["description"]?.DeepClone();
+                RewriteConstAsEnum(parameters);
                 declaration["parametersJsonSchema"] = parameters;
                 declarations.Add(declaration);
             }
@@ -288,8 +289,9 @@ public static class GoogleRequestProjector
                 else { var text = Text(block, "text") ?? throw GoogleData.Fail(GoogleFailure.UnsupportedValue); texts.Add(text); previousPlaceholder = text == "(tool image omitted: model does not support images)"; }
             }
             var value = string.Join("\n", texts);
+            // google-shared.ts: hasText = textResult.trim().length > 0, so whitespace-only output counts as empty.
             var response = new JsonObject { ["name"] = Text(tool, "toolName") ?? Text(tool, "name"),
-                ["response"] = new JsonObject { [error ? "error" : "output"] = value.Length > 0 ? Sanitize(value) : imageParts.Count > 0 ? "(see attached image)" : "" } };
+                ["response"] = new JsonObject { [error ? "error" : "output"] = !IsBlank(value) ? Sanitize(value) : imageParts.Count > 0 ? "(see attached image)" : "" } };
             var id = Text(tool, "toolCallId") ?? Text(tool, "id") ?? "";
             if (includeId) response["id"] = id;
             var multimodal = Major(model.Id) is null or >= 3;
@@ -344,7 +346,8 @@ public static class GoogleRequestProjector
                     if (!ValidSignature(signature)) signature = null;
                     if (type is "text" or "thinking")
                     {
-                        if (type == "thinking" && block?["redacted"]?.GetValue<bool>() == true && !same) continue;
+                        // transformMessages drops thinking from another model instead of replaying it as text.
+                        if (type == "thinking" && !same) continue;
                         var text = Text(block, type == "text" ? "text" : "thinking") ?? "";
                         if (IsBlank(text) && signature is null) continue;
                         var part = new JsonObject { ["text"] = Sanitize(text) };
@@ -378,10 +381,11 @@ public static class GoogleRequestProjector
     private static string ContentText(JsonNode? content) => content is JsonValue value ? value.GetValue<string>() :
         string.Join("\n", (content as JsonArray ?? new JsonArray()).Where(x => Text(x, "type") == "text").Select(x => Text(x, "text") ?? ""));
     internal static int? Major(string id) => Regex.Match(id.ToLowerInvariant(), @"^gemini(?:-live)?-(\d+)") is { Success: true } m && int.TryParse(m.Groups[1].Value, out var n) ? n : null;
-    private static bool UsesLevel(string id)
+    // usesGoogleThinkingLevel: Gemini 3 Pro/Flash, Gemini 4 and later (#10890), the flash aliases and both Gemma 4 forms.
+    internal static bool UsesLevel(string id)
     {
         var normalized = id.ToLowerInvariant();
-        return Regex.IsMatch(normalized, @"gemini-3(?:\.[0-9]+)?-(?:pro|flash)|gemma-?4") || normalized is "gemini-flash-latest" or "gemini-flash-lite-latest";
+        return Regex.IsMatch(normalized, @"gemini-3(?:\.[0-9]+)?-(?:pro|flash)|gemini-(?:[4-9]|[1-9][0-9])|gemma-?4") || normalized is "gemini-flash-latest" or "gemini-flash-lite-latest";
     }
     private static bool ValidSignature(string? value) => value is { Length: > 0 } && value.Length % 4 == 0 && Regex.IsMatch(value, @"^[A-Za-z0-9+/]+={0,2}$");
     private static bool IsIndex(string key) => uint.TryParse(key, System.Globalization.NumberStyles.None,
@@ -399,6 +403,30 @@ public static class GoogleRequestProjector
             else result.Append(char.IsSurrogate(c) ? '\uFFFD' : c);
         }
         return result.ToString();
+    }
+    // google-shared.ts rewriteConstAsEnum (Pi f9a26365568127461c47a07a37dcb42c140a3ac5): Gemini ignores `const` in parametersJsonSchema but
+    // honors `enum`, so a string or number const becomes a one-value enum when no enum is present. Only subschema keywords and the name maps'
+    // values are schemas; a property named const or enum is a name, not a keyword.
+    private static readonly HashSet<string> SchemaNameMaps = new(StringComparer.Ordinal)
+        { "properties", "patternProperties", "$defs", "definitions", "dependentSchemas", "dependencies" };
+    private static readonly HashSet<string> Subschemas = new(StringComparer.Ordinal)
+    {
+        "additionalProperties", "unevaluatedProperties", "propertyNames", "items", "prefixItems", "additionalItems", "unevaluatedItems",
+        "contains", "allOf", "anyOf", "oneOf", "not", "if", "then", "else", "contentSchema",
+    };
+    internal static void RewriteConstAsEnum(JsonNode? schema, bool nameMap = false)
+    {
+        if (schema is JsonArray items) { foreach (var item in items) RewriteConstAsEnum(item); return; }
+        if (schema is not JsonObject value) return;
+        foreach (var (key, child) in value)
+        {
+            if (nameMap || Subschemas.Contains(key)) RewriteConstAsEnum(child);
+            else if (SchemaNameMaps.Contains(key)) RewriteConstAsEnum(child, true);
+        }
+        if (nameMap || !value.TryGetPropertyValue("const", out var constant) || value.ContainsKey("enum")) return;
+        if (constant is not JsonValue scalar || scalar.GetValueKind() is not (JsonValueKind.String or JsonValueKind.Number)) return;
+        value.Remove("const");
+        value["enum"] = new JsonArray(scalar);
     }
     private static void MakeStrict(JsonNode node)
     {

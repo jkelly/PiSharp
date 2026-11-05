@@ -1,7 +1,9 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): coding-agent/src/modes/interactive/components/login-dialog.ts.
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): coding-agent/src/modes/interactive/components/login-dialog.ts.
 // Upstream shows every prompt (including AuthPrompt type "secret": API keys and tokens) in a plain Input and echoes the
 // submitted value as "> value". That stays the default here. ShowPrompt's opt-in `secret` flag is a PiSharp addition: it
 // renders the typed value and the submitted echo as one '*' per grapheme, leaving the value itself unchanged.
+using System.Globalization;
+using System.Text;
 using PiSharp.AI.Authentication.OAuth;
 using PiSharp.Tui.Pi;
 using static PiSharp.Cli.Interactive.Mode.ThemeGlobals;
@@ -20,6 +22,9 @@ internal sealed partial class LoginDialogComponent : Container, IFocusable, IInp
     private AuthUrlComponent? authUrl;
     private readonly CancellationTokenSource abortController = new();
     private TaskCompletionSource<string>? inputPromise;
+    /// <summary>The device-code confirm action (copy the code, open the page) and its hint row, until it is used or replaced.</summary>
+    private (bool OpenBrowserOnConfirm, bool CopyCodeOnConfirm, string UserCode, string VerificationUri, Container Hint)? deviceCodeAction;
+    private Container? deviceCodeHint;
     private readonly Action<bool, string?> onComplete;
 
     // Focusable implementation - propagate to input for IME cursor positioning
@@ -32,8 +37,39 @@ internal sealed partial class LoginDialogComponent : Container, IFocusable, IInp
 
     /// <summary>utils/open-browser.ts openBrowser, called by <see cref="ShowAuth"/>.</summary>
     public Action<string> OpenBrowser { get; init; } = PiSharp.Cli.Commands.McpCommand.OpenBrowser;
-    /// <summary>utils/clipboard.ts copyToClipboard for the auth URL; null uses <see cref="AuthUrlComponent.DefaultCopyToClipboard"/>.</summary>
+    /// <summary>utils/clipboard.ts copyToClipboard for the auth URL and the device code; null uses
+    /// <see cref="AuthUrlComponent.DefaultCopyToClipboard"/>.</summary>
     public Func<string, Task>? CopyToClipboard { get; init; }
+
+    /// <summary>Source webUrl: the <c>http:</c> or <c>https:</c> URL <paramref name="value"/> names, normalized, or null. The shared launcher
+    /// also opens files and custom protocols, so login only opens web URLs. Control characters are percent-encoded (as the URL
+    /// serializer does), so none can end a terminal hyperlink early.</summary>
+    internal static string? WebUrl(string value)
+    {
+        // URL parsing strips leading and trailing C0 controls and spaces and removes tabs and newlines.
+        var start = 0;
+        var end = value.Length;
+        while (start < end && value[start] <= ' ') start++;
+        while (end > start && value[end - 1] <= ' ') end--;
+        var encoded = new StringBuilder(end - start);
+        foreach (var ch in value.AsSpan(start, end - start))
+        {
+            if (ch is '\t' or '\n' or '\r') continue;
+            if (ch < ' ' || ch == '\u007f') encoded.Append('%').Append(((int)ch).ToString("X2", CultureInfo.InvariantCulture));
+            else encoded.Append(ch);
+        }
+        if (!Uri.TryCreate(encoded.ToString(), UriKind.Absolute, out var uri) || uri.Scheme is not ("http" or "https") || uri.Host.Length == 0) return null;
+        var href = uri.AbsoluteUri;
+        return href.Any(char.IsControl) ? null : href;
+    }
+
+    /// <summary>Source displayUrl: <paramref name="value"/> normalized as a web URL, else with control characters replaced: an untrusted
+    /// string printed as is could end a hyperlink early or send its own escape sequences to the terminal.</summary>
+    internal static string DisplayUrl(string value) => WebUrl(value) ?? TextUtils.ReplaceControlCharacters(value);
+
+    /// <summary>Source webLink: <paramref name="text"/> as a terminal hyperlink to <paramref name="url"/> when that is a web URL, else
+    /// plain text.</summary>
+    internal static string WebLink(string text, string url) => WebUrl(url) is { } target ? TerminalImage.Hyperlink(text, target) : text;
 
     /// <param name="onComplete">(success, message).</param>
     public LoginDialogComponent(ITui tui, string providerId, Action<bool, string?> onComplete, string? providerNameOverride = null, string? titleOverride = null)
@@ -87,8 +123,16 @@ internal sealed partial class LoginDialogComponent : Container, IFocusable, IInp
             if (ReferenceEquals(contentContainer.Children[i], view)) contentContainer.Children[i] = new Text($"> {shown}", 0, 0);
     }
 
+    private void ClearDeviceCodeAction()
+    {
+        if (deviceCodeHint is not null) contentContainer.RemoveChild(deviceCodeHint);
+        deviceCodeHint = null;
+        deviceCodeAction = null;
+    }
+
     private void Cancel()
     {
+        ClearDeviceCodeAction();
         abortController.Cancel();
         if (inputPromise is { } pending)
         {
@@ -101,9 +145,11 @@ internal sealed partial class LoginDialogComponent : Container, IFocusable, IInp
     /// <summary>Called by onAuth callback - show URL and optional instructions.</summary>
     public void ShowAuth(string url, string? instructions = null)
     {
+        ClearDeviceCodeAction();
         contentContainer.Clear();
         contentContainer.AddChild(new Spacer(1));
-        authUrl = new AuthUrlComponent(tui, url, CopyToClipboard);
+        var target = WebUrl(url);
+        authUrl = new AuthUrlComponent(tui, target ?? TextUtils.ReplaceControlCharacters(url), CopyToClipboard);
         contentContainer.AddChild(authUrl);
 
         if (!string.IsNullOrEmpty(instructions))
@@ -112,31 +158,79 @@ internal sealed partial class LoginDialogComponent : Container, IFocusable, IInp
             contentContainer.AddChild(new Text(theme.Fg("warning", instructions), 1, 0));
         }
 
-        OpenBrowser(url);
+        if (target is not null) OpenBrowser(target);
         tui.RequestRender();
     }
 
-    /// <summary>Called by onDeviceCode callback - show URL and user code.</summary>
-    public void ShowDeviceCode(string userCode, string verificationUri)
+    /// <summary>Called by onDeviceCode callback - show URL and user code. Unless the provider turned both off
+    /// (<paramref name="openBrowserOnConfirm"/>, <paramref name="copyCodeOnConfirm"/>: absent means true), a hint row offers
+    /// <c>tui.select.confirm</c> to copy the code and open the verification page; it then reports progress in the same row.</summary>
+    public void ShowDeviceCode(string userCode, string verificationUri, bool? openBrowserOnConfirm = null, bool? copyCodeOnConfirm = null)
     {
         authUrl = null;
+        var openBrowser = openBrowserOnConfirm ?? true;
+        var copyCode = copyCodeOnConfirm ?? true;
+        ClearDeviceCodeAction();
         contentContainer.Clear();
         contentContainer.AddChild(new Spacer(1));
-        var linkedUrl = $"\u001b]8;;{verificationUri}\u0007{verificationUri}\u001b]8;;\u0007";
-        contentContainer.AddChild(new Text(theme.Fg("accent", linkedUrl), 1, 0));
+        var shownUrl = DisplayUrl(verificationUri);
+        contentContainer.AddChild(new Text(theme.Fg("accent", WebLink(shownUrl, shownUrl)), 1, 0));
 
         var clickHint = OperatingSystem.IsMacOS() ? "Cmd+click to open" : "Ctrl+click to open";
-        var hyperlink = $"\u001b]8;;{verificationUri}\u0007{clickHint}\u001b]8;;\u0007";
-        contentContainer.AddChild(new Text(theme.Fg("dim", hyperlink), 1, 0));
+        contentContainer.AddChild(new Text(theme.Fg("dim", WebLink(clickHint, verificationUri)), 1, 0));
         contentContainer.AddChild(new Spacer(1));
         contentContainer.AddChild(new Text(theme.Fg("warning", $"Enter code: {userCode}"), 1, 0));
 
+        if (!Signal.IsCancellationRequested && (openBrowser || copyCode))
+        {
+            var actionLabel = openBrowser ? copyCode ? "to open browser and copy code" : "to open browser" : "to copy code";
+            // Reuse this single row for progress/result text, including in narrow terminals.
+            var hint = new Container();
+            hint.AddChild(new TruncatedText($"({KeybindingHints.KeyHint("tui.select.confirm", actionLabel)})", 1, 0));
+            contentContainer.AddChild(hint);
+            deviceCodeHint = hint;
+            deviceCodeAction = (openBrowser, copyCode, userCode, verificationUri, hint);
+        }
         tui.RequestRender();
+    }
+
+    private void SetDeviceCodeStatus(Container hint, string message)
+    {
+        if (Signal.IsCancellationRequested || !focused || !contentContainer.Children.Contains(hint)) return;
+        hint.Clear();
+        hint.AddChild(new TruncatedText(theme.Fg("dim", message), 1, 0));
+        tui.RequestRender();
+    }
+
+    private void ActivateDeviceCode((bool OpenBrowserOnConfirm, bool CopyCodeOnConfirm, string UserCode, string VerificationUri, Container Hint) action)
+    {
+        SetDeviceCodeStatus(action.Hint, action.CopyCodeOnConfirm ? "Copying code..." : "Browser open requested");
+        if (action.CopyCodeOnConfirm)
+        {
+            // Do not delay polling or browser opening while clipboard tools are running; the result is reported on the UI loop.
+            Task copy;
+            try { copy = (CopyToClipboard ?? AuthUrlComponent.DefaultCopyToClipboard ?? throw new InvalidOperationException("Clipboard is not available"))(action.UserCode); }
+            catch (Exception error) { copy = Task.FromException(error); }
+            _ = copy.ContinueWith(done => tui.Loop.Post(() => SetDeviceCodeStatus(action.Hint, done.IsCompletedSuccessfully ? "Code copied to clipboard" : "Copy code manually")),
+                CancellationToken.None, TaskContinuationOptions.None, TaskScheduler.Default);
+        }
+        if (action.OpenBrowserOnConfirm)
+        {
+            try
+            {
+                if (WebUrl(action.VerificationUri) is { } target) OpenBrowser(target);
+            }
+            catch (Exception)
+            {
+                // Launcher failures must not interrupt login.
+            }
+        }
     }
 
     /// <summary>Show input for manual code/URL entry (for callback server providers).</summary>
     public Task<string> ShowManualInput(string prompt)
     {
+        ClearDeviceCodeAction();
         input.SetValue("");
         inputMasked = false;
         contentContainer.AddChild(new Spacer(1));
@@ -155,6 +249,7 @@ internal sealed partial class LoginDialogComponent : Container, IFocusable, IInp
     /// <param name="secret">PiSharp addition (upstream has no masking): render the value masked, for AuthPrompt type "secret".</param>
     public Task<string> ShowPrompt(string message, string? placeholder = null, bool secret = false)
     {
+        ClearDeviceCodeAction();
         inputMasked = secret;
         contentContainer.AddChild(new Spacer(1));
         contentContainer.AddChild(new Text(theme.Fg("text", message), 1, 0));
@@ -181,6 +276,7 @@ internal sealed partial class LoginDialogComponent : Container, IFocusable, IInp
     public void ShowDetails(IEnumerable<string> lines)
     {
         authUrl = null;
+        ClearDeviceCodeAction();
         contentContainer.Clear();
         contentContainer.AddChild(new Spacer(1));
         foreach (var line in lines) contentContainer.AddChild(new Text(line, 1, 0));
@@ -194,9 +290,9 @@ internal sealed partial class LoginDialogComponent : Container, IFocusable, IInp
         contentContainer.AddChild(new Text(theme.Fg("text", message), 1, 0));
         foreach (var link in links ?? [])
         {
-            var text = !string.IsNullOrEmpty(link.Label) ? $"{link.Label}: {link.Url}" : link.Url;
-            var hyperlink = $"\u001b]8;;{link.Url}\u0007{text}\u001b]8;;\u0007";
-            contentContainer.AddChild(new Text(theme.Fg("accent", hyperlink), 1, 0));
+            var url = DisplayUrl(link.Url);
+            var text = !string.IsNullOrEmpty(link.Label) ? $"{link.Label}: {url}" : url;
+            contentContainer.AddChild(new Text(theme.Fg("accent", WebLink(text, url)), 1, 0));
         }
         if (showCloseHint)
         {
@@ -234,6 +330,15 @@ internal sealed partial class LoginDialogComponent : Container, IFocusable, IInp
         if (authUrl is not null && kb.Matches(data, "app.message.copy"))
         {
             _ = authUrl.Copy();
+            return;
+        }
+
+        if (deviceCodeAction is { } action && inputPromise is null && !Signal.IsCancellationRequested && focused && kb.Matches(data, "tui.select.confirm"))
+        {
+            // Consume once so a repeated Enter cannot launch multiple browsers or clipboard writes.
+            deviceCodeAction = null;
+            ActivateDeviceCode(action);
+            tui.RequestRender();
             return;
         }
 

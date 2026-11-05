@@ -107,16 +107,22 @@ internal static class InteractionTests
     /// <summary>Waits until the conversation's committed view has pending interactions satisfying <paramref name="until"/>.</summary>
     internal static async Task<IReadOnlyList<PendingInteraction>> WaitPending(IConversation conversation, Func<IReadOnlyList<PendingInteraction>, bool> until)
     {
-        using var state = await conversation.ViewStateAsync(Ctx);
+        // A view watch, started at once (pi-durable 1.5.0 removed viewState()): its acquisition value, then each later revision.
+        var watch = await conversation.WatchAsync(Ctx);
         var reached = new TaskCompletionSource<IReadOnlyList<PendingInteraction>>(TaskCreationOptions.RunContinuationsAsynchronously);
         void Check(ConversationView view)
         {
             var pending = UserInteraction.PendingIn(view);
             if (until(pending)) reached.TrySetResult(pending);
         }
-        using var subscription = state.Subscribe((view, _, _) => Check(view));
-        Check(state.Value);
-        return await reached.Task.WaitAsync(Timeout);
+        Check(watch.Value);
+        watch.Start((call, _) =>
+        {
+            Check(Change(call).Value);
+            return Task.CompletedTask;
+        });
+        try { return await reached.Task.WaitAsync(Timeout); }
+        finally { await watch.StopAsync(); }
     }
 
     /// <summary>Waits for <paramref name="count"/> pending interactions and returns them.</summary>
@@ -165,7 +171,7 @@ internal static class InteractionTests
     internal static async Task ClosedByFailure(IHarness harness)
     {
         var end = await harness.Closed.WaitAsync(Timeout);
-        Equal(SessionEndReason.Failed, end.Reason, "Harness end");
+        Equal(SessionEndKind.Failed, end.Kind, "Harness end");
     }
 
     /// <summary>The live tasks after the conversation went idle.</summary>

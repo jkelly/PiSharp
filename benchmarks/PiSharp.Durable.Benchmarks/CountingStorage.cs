@@ -22,13 +22,18 @@ internal sealed class CountingStorage(IStorage inner, Action? onCommit = null) :
     /// <summary>Logical bytes written so far, by write type.</summary>
     public Dictionary<string, long> Written() => WriteTypes.ToDictionary(type => type, type => written.GetValueOrDefault(type), StringComparer.Ordinal);
 
-    public Task<Seq> CommitAsync(IReadOnlyList<StorageWrite> writes, DurableContext context)
+    public Task<CommitResult> CommitAsync(IReadOnlyList<IReadOnlyList<StorageWrite>> batches, Action<int, Seq> receive, DurableContext context)
     {
-        Interlocked.Increment(ref commits);
-        onCommit?.Invoke();
-        foreach (var write in writes) written.AddOrUpdate(write.Type, write.ToJson().ToJson().Length, (_, total) => total + write.ToJson().ToJson().Length);
-        return inner.CommitAsync(writes, context);
+        foreach (var writes in batches)
+        {
+            Interlocked.Increment(ref commits);
+            onCommit?.Invoke();
+            foreach (var write in writes) written.AddOrUpdate(write.Type, write.ToJson().ToJson().Length, (_, total) => total + write.ToJson().ToJson().Length);
+        }
+        return inner.CommitAsync(batches, receive, context);
     }
+
+    public void Publishing(Action publish, DurableContext context) => inner.Publishing(publish, context);
 
     public Task<TId> MintIdAsync<TId>() where TId : struct, IDurableId<TId> => inner.MintIdAsync<TId>();
     public Task<StoredDocument?> GetDocumentAsync(DocumentId id, DocumentPoint at, DurableContext context) => inner.GetDocumentAsync(id, at, context);

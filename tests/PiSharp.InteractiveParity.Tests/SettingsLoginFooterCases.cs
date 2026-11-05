@@ -224,7 +224,7 @@ internal static class SettingsLoginFooterCases
                 Row(true, "Auto-compact", "true"), Row(false, "Auto-resize images", "true"), Row(false, "Block images", "false"),
                 Row(false, "Skill commands", "true"), Row(false, "Show hardware cursor", "false"), Row(false, "Editor padding", "1"),
                 Row(false, "Output padding", "1"), Row(false, "Autocomplete max items", "7"), Row(false, "Clear on shrink", "false"),
-                Row(false, "Terminal progress", "true"), "  (1/32)", "", "  Automatically compact context when it gets too large", "",
+                Row(false, "Terminal progress", "true"), "  (1/33)", "", "  Automatically compact context when it gets too large", "",
                 "  Type to search · Enter/Space to change · Esc to cancel", new string('─', 100)], selector.Render(100), "settings selector");
             // Scrolled to the end: the last ten rows, theme selected.
             var list = selector.GetSettingsList();
@@ -233,7 +233,7 @@ internal static class SettingsLoginFooterCases
             // start = min(31 - 10 / 2, 32 - 10) = 22: rows 22 (double-escape action) to 31 (theme).
             Equal(Row(false, "Double-escape action", "tree"), lines[2].TrimEnd(), "first visible row at the end");
             Equal(Row(true, "Theme", "dark"), lines[11].TrimEnd(), "theme row");
-            Equal("  (32/32)", lines[12], "position");
+            Equal("  (33/33)", lines[12], "position");
         }));
 
         yield return ("set.settings.stepped-submenu-back-and-cancel", Sync(() =>
@@ -679,12 +679,13 @@ internal static class SettingsLoginFooterCases
             dialog.ShowDeviceCode("ABCD-1234", "https://github.test/device");
             dialog.ShowWaiting("Waiting for authentication...");
             var clickHint = OperatingSystem.IsMacOS() ? "Cmd+click to open" : "Ctrl+click to open";
-            Lines([new string('─', 50), " Copilot setup", "", " https://github.test/device", $" {clickHint}", "", " Enter code: ABCD-1234", "",
+            Lines([new string('─', 50), " Copilot setup", "", " https://github.test/device", $" {clickHint}", "", " Enter code: ABCD-1234",
+                " (enter to open browser and copy code)", "", // Pi 1.5.0: the device-code confirm hint
                 " Waiting for authentication...", " (escape/ctrl+c to cancel)", new string('─', 50)], dialog.Render(50), "device code");
             dialog.ShowDetails(["line one"]);
             dialog.ShowInfo("Configured outside pi.", [new PiSharp.AI.Authentication.OAuth.AuthInfoLink("https://docs.test", "Docs")], showCloseHint: true);
             dialog.ShowProgress("Working...");
-            Lines([new string('─', 50), " Copilot setup", "", " line one", "", " Configured outside pi.", " Docs: https://docs.test", "",
+            Lines([new string('─', 50), " Copilot setup", "", " line one", "", " Configured outside pi.", " Docs: https://docs.test/", "", // Pi 1.5.0: shown normalized (webUrl)
                 " (escape/ctrl+c to close)", " Working...", new string('─', 50)], dialog.Render(50), "details and info");
         }));
 

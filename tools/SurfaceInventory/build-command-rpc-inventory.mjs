@@ -163,10 +163,12 @@ export function buildInventory({ template, readOld, readNew, commit, tree, tag, 
     agentEvents: unionMembers(text(AGENT_TYPES), 'AgentEvent'), sessionEvents: unionMembers(text(SESSION), 'AgentSessionEvent'), assistantEvents: unionMembers(text(AI_TYPES), 'AssistantMessageEvent'),
   });
   const before = censusAt(oldText), after = censusAt(newText);
-  const rowsOf = kind => template.rows.filter(row => row.classification === kind);
+  // Rows an earlier refresh marked removed upstream are in neither census; they are carried forward as they are.
+  const live = row => !row.targetStatus?.removedUpstream;
+  const rowsOf = kind => template.rows.filter(row => row.classification === kind && live(row));
   const flagRows = rowsOf('built-in-parser-flag');
   assert.deepEqual(before.flags.map(row => row.spellings.join('|')), flagRows.map(row => [row.name, ...row.aliases].join('|')), 'Parser census differs from template');
-  const rootRows = template.rows.filter(row => row.classification.startsWith('public-root-'));
+  const rootRows = template.rows.filter(row => row.classification.startsWith('public-root-') && live(row));
   assert.deepEqual(before.root.map(row => [row.name, row.typeOnly, row.origin, row.start, row.end].join()), rootRows.map(row => [row.name, row.typeOnly, row.exportOrigin, row.source.location.startOffset, row.source.location.endOffset].join()), 'Root export census differs from template');
   assert.deepEqual([...new Set(before.help)], rowsOf('help-declared-subcommand').map(row => row.name), 'Help subcommand census differs');
   assert.deepEqual(before.entries, [...rowsOf('published-root-entry-declaration'), ...rowsOf('separate-package-subpath-entry-declaration')].map(row => row.name), 'Package entry census differs');
@@ -209,6 +211,16 @@ export function buildInventory({ template, readOld, readNew, commit, tree, tag, 
       const next = after.flags.find(item => item.start > branch.start);
       if (next && end > next.start) end = row.name === '--' ? next.start : next.start; // a branch ends where the next begins
     }
+    // A help or slash-registry line whose text changed is found again by its key: the command before the help description
+    // column, or the registry entry's name. The anchor keeps its indentation and its distance to the line end.
+    const keyed = row.classification.startsWith('help-') ? /^.*?\S(?=\s{2,})/ : row.classification === 'built-in-slash-registry-entry' ? /^\{ name: "[^"]+",/ : null;
+    if (key === 'source' && keyed && (start < 0 || end < 0)) {
+      const lead = oldBody.slice(oldBody.lastIndexOf('\n', loc.startOffset - 1) + 1, loc.startOffset), prefix = keyed.exec(oldBody.slice(loc.startOffset, loc.endOffset))?.[0];
+      assert(prefix && /^\s*$/.test(lead), 'Line key: ' + where);
+      const found = [...body.matchAll(new RegExp('^' + (lead + prefix).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gm'))];
+      assert.equal(found.length, 1, 'Line not found once by its key: ' + where);
+      start = found[0].index + lead.length; end = body.indexOf('\n', start) - (oldBody.indexOf('\n', loc.endOffset) - loc.endOffset);
+    }
     assert(start >= 0 && end >= 0 && end > start, 'Anchor could not be relocated: ' + where);
     if (body.slice(start, end) !== oldBody.slice(loc.startOffset, loc.endOffset)) changes.relocatedText.push(where);
     return locate(body, start, end);
@@ -222,6 +234,8 @@ export function buildInventory({ template, readOld, readNew, commit, tree, tag, 
       setRefFields(ref, commit, readNew(ref.path), location);
     }
     const span = newText(row.source.path).slice(row.source.location.startOffset, row.source.location.endOffset);
+    // A statement that quotes its source line follows the line's new text.
+    if (original && row.observed?.statement === oldText(original.source.path).slice(original.source.location.startOffset, original.source.location.endOffset).trim()) row.observed.statement = span.trim();
     if ('sourceBranch' in row) row.sourceBranch = span.trim();
     if ('sourceDeclaration' in row) row.sourceDeclaration = span;
     if (typeof row.declaration === 'string') row.declaration = TRIMMED.has(row.classification) ? span.trim() : span;
@@ -234,6 +248,7 @@ export function buildInventory({ template, readOld, readNew, commit, tree, tag, 
   const removedRoot = new Set(before.root.filter(row => !after.root.some(item => item.name === row.name)).map(row => row.name));
   const removedFlags = new Set(before.flags.filter(row => !after.flags.some(item => item.spellings[0] === row.spellings[0])).map(row => row.spellings[0]));
   for (const original of template.rows) {
+    if (!live(original)) { rows.push(structuredClone(original)); continue; }
     const removed = (original.classification.startsWith('public-root-') && removedRoot.has(original.name)) || (original.classification === 'built-in-parser-flag' && removedFlags.has(original.name)) ||
       ((original.classification === 'published-root-entry-declaration' || original.classification === 'separate-package-subpath-entry-declaration') && removedEntries.has(original.name));
     if (removed) {
@@ -248,11 +263,13 @@ export function buildInventory({ template, readOld, readNew, commit, tree, tag, 
   const body = newText(INDEX);
   for (const [index, item] of after.root.entries()) {
     if (before.root.some(row => row.name === item.name)) continue;
-    // Sibling: the nearest earlier root export of the same origin and kind.
-    const sibling = [...after.root.slice(0, index)].reverse().find(row => row.origin === item.origin && row.typeOnly === item.typeOnly && before.root.some(old => old.name === row.name));
+    // Sibling: the nearest earlier root export of the same origin and kind, else the nearest later one, else the nearest
+    // earlier one of the same kind from another origin (whose origin is renamed too).
+    const kin = row => row.typeOnly === item.typeOnly && before.root.some(old => old.name === row.name), earlier = [...after.root.slice(0, index)].reverse();
+    const sibling = earlier.find(row => row.origin === item.origin && kin(row)) ?? after.root.slice(index + 1).find(row => row.origin === item.origin && kin(row)) ?? earlier.find(kin);
     assert(sibling, 'No sibling row to clone for root export ' + item.name);
     const template_ = template.rows.find(row => row.id === 'sdk.root.' + sibling.name);
-    const row = rename(structuredClone(template_), [[sibling.name, item.name]]);
+    const row = rename(structuredClone(template_), [[sibling.name, item.name], ...(sibling.origin === item.origin ? [] : [[sibling.origin, item.origin]])]);
     row.source.location = locate(body, item.start, item.end); row.originalSymbol = item.originalSymbol;
     const predecessor = after.root[index - 1].name;
     insertAfter('sdk.root.' + predecessor, finishRow(row, null));

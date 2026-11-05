@@ -22,6 +22,11 @@ public sealed class TurnRunner
     [System.Diagnostics.CodeAnalysis.Experimental("PISHARP_TIERS001")]
     public Func<string?>? ServiceTier { get; init; }
 
+    /// <summary>Source agent-loop.ts: the agent identity, merged over <see cref="AgentConfiguration.DefaultIdentity"/> and under the
+    /// request's own identity, field by field, on every request. Null leaves requests as they are.</summary>
+    [System.Diagnostics.CodeAnalysis.Experimental("PISHARP_IDENTITY001")]
+    public ClientIdentity? Identity { get; init; }
+
     /// <param name="sessionId">Source agent.sessionId: stamped on every request that has none (prompt-cache keys, session headers).</param>
     public TurnRunner(ChatClient client, ToolBatchScheduler scheduler, string? thinkingLevel = null, string? sessionId = null)
         : this(client, scheduler, thinkingLevel) => this.sessionId = sessionId;
@@ -54,6 +59,7 @@ public sealed class TurnRunner
         if (thinkingLevel is not null) request = request with { ThinkingLevel = thinkingLevel };
         if (sessionId is not null && request.SessionId is null) request = request with { SessionId = sessionId };
         if (request.ServiceTier is null && ServiceTier?.Invoke() is { } tier) request = request with { ServiceTier = tier };
+        if (Identity is not null) request = request with { Identity = ClientIdentities.Merge(AgentConfiguration.DefaultIdentity, Identity, request.Identity) };
         ChatResult chat;
         var deliveryToken = settleAbort ? CancellationToken.None : cancellationToken;
         var assistantStarted = false;

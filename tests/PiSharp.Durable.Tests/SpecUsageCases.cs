@@ -1,15 +1,18 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/test/spec-usage.test.ts. The usage examples of docs/spec.md,
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/test/spec-usage.test.ts. The usage examples of docs/spec.md,
 // compile-checked: each block is written in C# against the ported API, with the names the spec leaves to the application declared in
 // SpecNames below; SpecUsage.Examples() is never called, because those names have no values. Adaptations:
 // - TypeScript's type-level check (expectTypeOf(examples).returns.toHaveProperty("sequences")) is a reflection check of Examples()' return
 //   type; "compiles" is this file compiling.
-// - Spec names declared with `declare` are members of SpecNames that throw; pi-ai messages and tool calls are wire JSON; a TypeBox schema
+// - Spec names declared with `declare` are members of SpecNames that throw; pi-ai messages and tool calls are wire JSON; a pi-schema schema
 //   is its JSON Schema object.
 // - An onYield hook returns the continuing user input itself (GenerationHooks.OnYield), not upstream's { continue } wrapper, so
 //   requestSecondPass returns that input.
 // - HarnessSettings getters are overridden properties of a HarnessSettings subclass.
 // - `delete live.generation` and `escaped!.generation = undefined` are DraftObject.Delete("generation").
 // - Upstream's `UserSettings implements HarnessSettings` stores the manager in a field; here it is a primary-constructor parameter.
+// Pi v1.5.0 sync (area view, f3255de76): the "transcript" example of Section 9.3 (a client's transcript over the windowed view) is
+// v1.5.0's. Pi v1.5.0 sync (area vocabulary, 5f312dac4): its watch listener takes the tagged call, as upstream's onValue(...) wraps it:
+// a WatchValueCall renders, any other call is skipped.
 using System.Collections.Immutable;
 using PiSharp.Durable;
 using PiSharp.Durable.Chord;
@@ -64,6 +67,8 @@ internal static class SpecNames
     public static DurableTask Anchor => None<DurableTask>();
     public static DurableTask Reporter => None<DurableTask>();
     public static ToolRegistration SubagentTool => None<ToolRegistration>();
+    public static IConversation Conversation => None<IConversation>();
+    public static void Render(ConversationTranscriptView view) => None<object>();
 
     internal interface ISettingsManager
     {
@@ -152,7 +157,7 @@ internal static class SpecUsage
         // ─── Section 7.2: hooks reading extension state ──────────────────────────────
 
         var planModeDoc = Documents.DefineConversationDoc("app.plan-mode", 1, DocumentFork.Current,
-            () => JsonValue.Object([KeyValuePair.Create("enabled", (JsonValue)JsonValue.Boolean(false))]));
+            () => JsonValue.Object([KeyValuePair.Create("enabled", (JsonValue)JsonValue.Boolean(false))]), checkpointWhen: (_, _, _) => false);
         var planMode = new Extension
         {
             Name = "plan-mode",
@@ -182,7 +187,7 @@ internal static class SpecUsage
                 {
                     Name = "subagent",
                     Description = "Delegate a self-contained task to a subagent and get its answer back.",
-                    Parameters = (JsonObjectValue)JsonValue.Parse("""{"type":"object","required":["task"],"properties":{"task":{"type":"string"}}}"""),
+                    Parameters = (JsonObjectValue)JsonValue.Parse("""{"type":"object","properties":{"task":{"type":"string"}},"required":["task"],"additionalProperties":false}"""),
                     Replay = ToolReplay.Safe,
                     Execute = async (args, api, callContext) =>
                     {
@@ -288,7 +293,7 @@ internal static class SpecUsage
                 // Absent: the conversation runs locally. Only conversations with this document run in a container.
                 // Subagents do not copy it: their creator writes it too when they should run in the container.
                 var containerDoc = Documents.DefineConversationDoc("app.container", 1, DocumentFork.Current,
-                    () => JsonValue.Object([KeyValuePair.Create("image", (JsonValue)"node:22")]));
+                    () => JsonValue.Object([KeyValuePair.Create("image", (JsonValue)"node:22")]), checkpointWhen: (_, _, _) => false);
                 var harness = await Harness.OpenAsync(SpecNames.Storage, new HarnessOptions
                 {
                     Models = SpecNames.Models,
@@ -355,6 +360,25 @@ internal static class SpecUsage
                 });
             },
 
+            // Section 9.3: a client's transcript over the windowed view.
+            Transcript = async () =>
+            {
+                var conversation = SpecNames.Conversation;
+                var transcript = new ConversationTranscript((query, limit, ctx) => conversation.EntriesAsync(query, limit, null, ctx));
+                var watch = await conversation.WatchAsync(context);
+                SpecNames.Render(transcript.Merge(watch.Value));
+                watch.Start((call, _) =>
+                {
+                    if (call is WatchValueCall<ConversationView> { Value: var value }) SpecNames.Render(transcript.Merge(value));
+                    return Task.CompletedTask;
+                });
+                // A marker scrolled into view:
+                SpecNames.Render(await transcript.LoadEarlierAsync(context));
+                // Reconnect after a drop:
+                var resumed = await conversation.WatchAsync(context, transcript.Resume);
+                return resumed;
+            },
+
             // Section 4: table reads before the first table write; documents stay usable.
             TableRules = async () =>
             {
@@ -404,6 +428,7 @@ internal sealed class SpecSequences
     public required Func<Task<IHarness>> ContainerEnv { get; init; }
     public required Func<Task<IHarness>> Host { get; init; }
     public required Func<ITx, Task> Spawn { get; init; }
+    public required Func<Task<IWatchHandle<ConversationView>>> Transcript { get; init; }
     public required Func<Task> TableRules { get; init; }
     public required Func<Task> RevokedDraft { get; init; }
 }

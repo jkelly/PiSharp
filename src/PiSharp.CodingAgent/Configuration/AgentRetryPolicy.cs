@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/ai/src/utils/retry.ts.
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/ai/src/utils/retry.ts.
 using System.Text.RegularExpressions;
 using PiSharp.Contracts;
 
@@ -40,21 +40,28 @@ public sealed record AgentRetryPolicy
     }
 
     private static readonly Regex Permanent = Pattern(
-        "GoUsageLimitError|FreeUsageLimitError|Monthly usage limit reached|available balance|insufficient_quota|out of budget|quota exceeded|billing|subscription_sharing_usage_limit_exceeded");
+        "GoUsageLimitError|FreeUsageLimitError|Monthly usage limit reached|available balance|insufficient_quota|out of budget|quota exceeded|billing|subscription_sharing_usage_limit_exceeded|subscription_sharing_workplace_individual_usage_limit_exceeded|\"code\"\\s*:\\s*\"?1308(?![0-9])");
     private static readonly Regex Transient = Pattern(
-        "overloaded|server_busy|servers are currently busy|currently experiencing high demand|model is at capacity|rate.?limit|too many requests|429|500|502|503|504|520|524|service.?unavailable|server.?error|internal.?error|provider.?returned.?(?:an.?)?error|exceeded request buffer limit while retrying upstream|network.?error|connection.?error|connection.?refused|connection.?lost|other side closed|fetch failed|getaddrinfo|ENOTFOUND|EAI_AGAIN|upstream.?connect|reset before headers|socket hang up|socket connection was closed|timed? out|timeout|terminated|websocket.?closed|websocket.?error|ended without|stream ended before message_stop|stream ended before a terminal response event|http2 request did not get a response|pending stream has been canceled|retry delay|you can retry your request|try your request again|please retry your request|ResourceExhausted|subscription_sharing_usage_unavailable|subscription_sharing_user_unavailable");
+        "overloaded|server_busy|servers are currently busy|currently experiencing high demand|model is at capacity|rate.?limit|too many requests|(?<![a-z0-9])(?:429|500|502|503|504|520|524)(?![a-z0-9])|service.?(?:is.?)?(?:temporarily.?)?unavailable|server.?error|internal.?error|provider.?returned.?(?:an.?)?error|exceeded request buffer limit while retrying upstream|unable to forward upstream|upstream.?request.?failed|upstream_stream_read_error|stream was interrupted|http/?2 stream failed|network.?error|connection.?error|connection.?refused|connection.?lost|other side closed|fetch failed|request to \\S+ failed, reason:|getaddrinfo|ENOTFOUND|EAI_AGAIN|upstream.?connect|reset before headers|socket hang up|socket connection was closed|timed? out|timeout|terminated|websocket.?closed|websocket.?error|ended without|stream ended before message_stop|stream ended before a terminal response event|http2 request did not get a response|stream disconnected before completion|pending stream has been canceled|retry delay|you can retry your request|try your request again|please retry your request|ResourceExhausted|subscription_sharing_usage_unavailable|subscription_sharing_user_unavailable");
 
+    // JavaScript's \s set; .NET's differs (U+0085 in, U+FEFF out).
+    private const string JsSpace = "\\u0009-\\u000D\\u0020\\u00A0\\u1680\\u2000-\\u200A\\u2028\\u2029\\u202F\\u205F\\u3000\\uFEFF";
+
+    // Escapes such as \s keep their case; the status lookarounds' [a-z0-9] is upper-cased with the rest, as the text is.
     private static Regex Pattern(string expression) => new(
-        Canonicalize(expression).Replace(".?", "[^\\r\\n\\u2028\\u2029]?", StringComparison.Ordinal),
+        Canonicalize(expression, escapes: true).Replace(".?", "[^\\r\\n\\u2028\\u2029]?", StringComparison.Ordinal)
+            .Replace("\\s", "[" + JsSpace + "]", StringComparison.Ordinal).Replace("\\S", "[^" + JsSpace + "]", StringComparison.Ordinal),
         RegexOptions.CultureInvariant);
 
-    private static string Canonicalize(string text) => string.Create(text.Length, text, static (target, source) =>
+    private static string Canonicalize(string text, bool escapes = false) => string.Create(text.Length, (text, escapes), static (target, state) =>
     {
+        var (source, keepEscapes) = state;
         for (var index = 0; index < source.Length; index++)
         {
             var value = source[index]; var upper = char.ToUpperInvariant(value);
             // JavaScript non-Unicode /i does not fold non-ASCII characters into ASCII.
             target[index] = value >= 128 && upper < 128 ? value : upper;
+            if (keepEscapes && value == '\\' && index + 1 < source.Length) { index++; target[index] = source[index]; }
         }
     });
 }

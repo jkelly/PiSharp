@@ -72,16 +72,17 @@ public sealed class CompletionsTranscriptProjector
             if (options.ToolDeclarations?.SupportsOpenAIGrammarTools == true)
                 _grammarInputs = new CompletionsToolDeclarationProjector(options.ToolDeclarations).GrammarInputProperties(request, token);
             CompletionsToolDeclarationProjector? additions = null;
-            var anchorsAdditions = false;
+            var folded = int.MaxValue;
             if (options.SupportsMidConversationSystemMessages && options.SupportsMidConversationToolAdditions)
             {
                 additions = new(options.ToolDeclarations);
                 _ = additions.Project(request, token); // Validate every declaration before splitting it across messages.
-                anchorsAdditions = CompletionsToolDeclarationProjector.CanAnchorAdditions(request, token);
+                folded = CompletionsToolDeclarationProjector.FoldedSystemMessages(request, token);
             }
             if (!options.SupportsMidConversationSystemMessages) entries = FoldSystems(entries);
             entries = Pair(entries);
             string? lastRole = null;
+            var systemIndex = 0;
             for (var index = 0; index < entries.Count; index++)
             {
                 token.ThrowIfCancellationRequested(); var entry = entries[index]; var body = entry.Body.Value;
@@ -90,7 +91,8 @@ public sealed class CompletionsTranscriptProjector
                 switch (entry.Role)
                 {
                     case "system":
-                        if (index > 0 && anchorsAdditions && body.TryGetProperty("toolsAdded", out var added) && added.GetArrayLength() != 0)
+                        // Pi 1.5.0 convertMessages: system messages past the folded ones carry their additions in place.
+                        if (systemIndex++ >= folded && body.TryGetProperty("toolsAdded", out var added) && added.GetArrayLength() != 0)
                         {
                             var tools = additions!.Project(request with { Messages = [new("system", entry.Body)] }, token);
                             // Tool-bearing instructions always use system, before their separately rendered
@@ -175,7 +177,8 @@ public sealed class CompletionsTranscriptProjector
                 }
                 var resultText = string.Join("\n", pieces);
                 var result = new JsonObject { ["role"] = "tool",
-                    ["content"] = resultText.Length != 0 ? resultText : hasImages ? "(see attached image)" : "(no tool output)",
+                    // openai-completions.ts: hasText = textResult.trim().length > 0, so whitespace-only output gets the placeholder.
+                    ["content"] = !StreamingJson.IsJsBlank(resultText) ? resultText : hasImages ? "(see attached image)" : "(no tool output)",
                     ["tool_call_id"] = entry.ResultWireId ?? String(body, "toolCallId") };
                 if (options.RequiresToolResultName && body.TryGetProperty("toolName", out var name) && Text(name).Length != 0) result["name"] = Text(name);
                 _output.Add(result);
@@ -279,9 +282,8 @@ public sealed class CompletionsTranscriptProjector
                     case "text": var text = String(part, "text"); if (text.Trim().Length != 0) texts.Add(text); break;
                     case "thinking":
                         var thinking = String(part, "thinking"); var signature = Optional(part, "thinkingSignature");
-                        var redacted = part.TryGetProperty("redacted", out var redaction) && redaction.ValueKind == JsonValueKind.True;
-                        if (!same && redacted) break;
-                        if (!same) { if (thinking.Trim().Length != 0) texts.Add(thinking); break; }
+                        // transformMessages drops thinking from another model instead of replaying it as text.
+                        if (!same) break;
                         if (details is null && signature is not null) details = ParseDetails(signature);
                         if (thinking.Trim().Length != 0) thoughts.Add((thinking, signature)); break;
                     case "toolCall":

@@ -16,7 +16,10 @@ $repo = (Resolve-Path (Join-Path $PSScriptRoot '../..')).Path
 . (Join-Path $repo 'tools/release/native-sdk-package.ps1')
 
 $libraries = @(
-    'PiSharp.Contracts', 'PiSharp.AI', 'PiSharp.Agent', 'PiSharp.Sessions', 'PiSharp.Tools', 'PiSharp.Tools.Skia', 'PiSharp.CodingAgent',
+    'PiSharp.Contracts',
+    # Decision 0013: the experimental pi-telemetry port (1.5.0), before PiSharp.AI, which depends on it.
+    'PiSharp.Telemetry',
+    'PiSharp.AI', 'PiSharp.Agent', 'PiSharp.Sessions', 'PiSharp.Tools', 'PiSharp.Tools.Skia', 'PiSharp.CodingAgent',
     'PiSharp.PromptTemplates.Yaml', 'PiSharp.Rpc', 'PiSharp.Tui', 'PiSharp.Extensions.Abstractions',
     'PiSharp.Extensions.Runtime', 'PiSharp.Extensions.Agent', 'PiSharp.ExtensionHost', 'PiSharp.Compatibility.Node', 'PiSharp.Codemode',
     # Decision 0005: the experimental durable port (1.2.0.1), in dependency order.

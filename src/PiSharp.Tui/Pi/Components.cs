@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/tui/src/components/text.ts, truncated-text.ts, box.ts, spacer.ts,
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/tui/src/components/text.ts, truncated-text.ts, box.ts, spacer.ts,
 // loader.ts, cancellable-loader.ts, input.ts, select-list.ts.
 namespace PiSharp.Tui.Pi;
 
@@ -17,7 +17,12 @@ public class Text : IComponent
     { this.text = text; this.paddingX = paddingX; this.paddingY = paddingY; this.customBg = customBg; }
 
     public string Value => text;
-    public void SetText(string value) { text = value; cachedText = null; cachedWidth = null; cachedLines = null; }
+    public void SetText(string value)
+    {
+        // Renderers often set the same text on every update; keep the wrapped lines then.
+        if (value == text) return;
+        text = value; cachedText = null; cachedWidth = null; cachedLines = null;
+    }
     public void SetCustomBgFn(Func<string, string>? value) { customBg = value; cachedText = null; cachedWidth = null; cachedLines = null; }
     public void SetPaddingX(int value) { paddingX = value; Invalidate(); }
     public virtual void Invalidate() { cachedText = null; cachedWidth = null; cachedLines = null; }
@@ -439,6 +444,8 @@ public sealed class SelectList : IComponent, IInputHandler, IMouseHandler
     public Action<SelectItem>? OnSelect { get; set; }
     public Action? OnCancel { get; set; }
     public Action<SelectItem>? OnSelectionChange { get; set; }
+    /// <summary>Fullscreen viewport keys, such as PageUp/PageDown, page the focused list instead of scrolling the transcript.</summary>
+    public bool CapturesViewportInput => true;
 
     public SelectList(IEnumerable<SelectItem> items, int maxVisible, SelectListTheme theme, SelectListLayoutOptions? layout = null)
     { this.items = [.. items]; filtered = this.items; this.maxVisible = maxVisible; this.theme = theme; this.layout = layout ?? new(); }
@@ -500,10 +507,17 @@ public sealed class SelectList : IComponent, IInputHandler, IMouseHandler
     public void HandleInput(string data)
     {
         var kb = KeybindingsManager.Global;
+        var pageIndex = KeybindingsManager.GetSelectPageIndex(kb, data, selectedIndex, filtered.Count, maxVisible);
         if (kb.Matches(data, "tui.select.up"))
         { selectedIndex = selectedIndex == 0 ? filtered.Count - 1 : selectedIndex - 1; NotifySelectionChange(); }
         else if (kb.Matches(data, "tui.select.down"))
         { selectedIndex = selectedIndex == filtered.Count - 1 ? 0 : selectedIndex + 1; NotifySelectionChange(); }
+        // Page up/down: move by one visible page, clamped to the list bounds.
+        else if (pageIndex is { } page)
+        {
+            if (filtered.Count == 0 || page == selectedIndex) return;
+            selectedIndex = page; NotifySelectionChange();
+        }
         else if (kb.Matches(data, "tui.select.confirm")) { if (selectedIndex >= 0 && selectedIndex < filtered.Count) OnSelect?.Invoke(filtered[selectedIndex]); }
         else if (kb.Matches(data, "tui.select.cancel")) OnCancel?.Invoke();
     }

@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/src/modes/interactive/theme/theme.ts.
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/coding-agent/src/modes/interactive/theme/theme.ts.
 // Ported to plain ESM for the PiSharp Node extension bridge (TypeScript types stripped mechanically; behaviour unchanged except for the marked PiSharp adaptations).
 import * as fs from "node:fs";
 import * as path from "node:path";
@@ -6,7 +6,7 @@ import { backgroundAnsi, colorToHex, colorToOklch, foregroundAnsi, getTerminalCo
 import chalk from "./vendor/chalk.mjs";
 import { getCustomThemesDir, getThemesDir } from "./coding-agent/config.mjs";
 import { closeWatcher, watchWithErrorHandler } from "./coding-agent/utils/fs-watch.mjs";
-import { highlight, supportsLanguage } from "./coding-agent/syntax-highlight.mjs";
+import { getHighlightLanguageCount, highlight, supportsLanguage } from "./coding-agent/syntax-highlight.mjs";
 import { stripBom } from "./coding-agent/utils/text.mjs";
 import { generateSystemThemeColors, SYSTEM_THEME_NAME, terminalAppearance } from "./coding-agent/modes/interactive/theme/system-theme.mjs";
 import { THEME_TOKENS } from "./coding-agent/modes/interactive/theme/theme-tokens.mjs";
@@ -448,6 +448,9 @@ export const theme = new Proxy({}, {
         return t[prop];
     }
 });
+function getGlobalTheme() {
+    return globalThis[THEME_KEY];
+}
 function setGlobalTheme(t) {
     globalThis[THEME_KEY] = t;
     globalThis[THEME_KEY_OLD] = t;
@@ -658,7 +661,27 @@ export function highlightCode(code, lang) {
     try {
         return highlight(code, opts).split("\n");
     } catch  {
-        return code.split("\n");
+        return code.split("\n").map((line)=>theme.fg("mdCodeBlock", line));
+    }
+}
+export class CodeHighlighter {
+    last;
+    highlight(code, lang) {
+        const currentTheme = getGlobalTheme();
+        const languageCount = getHighlightLanguageCount();
+        const last = this.last;
+        if (last?.code === code && last.lang === lang && last.theme === currentTheme && last.languageCount === languageCount) {
+            return last.lines;
+        }
+        const lines = highlightCode(code, lang);
+        this.last = {
+            code,
+            lang,
+            theme: currentTheme,
+            languageCount,
+            lines
+        };
+        return lines;
     }
 }
 export function getLanguageFromPath(filePath) {
@@ -743,22 +766,7 @@ export function getMarkdownTheme(themeOverride) {
         italic: (text)=>theme.italic(text),
         underline: (text)=>theme.underline(text),
         strikethrough: (text)=>theme.strikethrough(text),
-        highlightCode: (code, lang)=>{
-            const validLang = lang && supportsLanguage(lang) ? lang : undefined;
-            if (!validLang) {
-                return code.split("\n").map((line)=>theme.fg("mdCodeBlock", line));
-            }
-            const opts = {
-                language: validLang,
-                ignoreIllegals: true,
-                theme: getCliHighlightTheme(theme)
-            };
-            try {
-                return highlight(code, opts).split("\n");
-            } catch  {
-                return code.split("\n").map((line)=>theme.fg("mdCodeBlock", line));
-            }
-        }
+        highlightCode
     };
 }
 export function getSelectListTheme(themeOverride) {

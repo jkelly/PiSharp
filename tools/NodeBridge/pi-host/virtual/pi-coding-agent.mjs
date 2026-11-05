@@ -236,6 +236,25 @@ export function formatDimensionNote(result) {
 	const scale = result.originalWidth / result.width;
 	return `[Image: original ${result.originalWidth}x${result.originalHeight}, displayed at ${result.width}x${result.height}. Multiply coordinates by ${scale.toFixed(2)} to map to original image.]`;
 }
+
+// Pi f9a26365 (MIT): packages/coding-agent/src/core/tools/render-utils.ts formatReadLineRange.
+function parseLineNumber(value) {
+	if (typeof value === "string" && value.trim() !== "") value = Number(value);
+	return typeof value === "number" && Number.isFinite(value) ? value : undefined;
+}
+
+/** Format finite numbers or numeric strings as a read line range, omitting malformed ranges. */
+export function formatReadLineRange(offset, limit) {
+	// Strict schemas represent omitted optional arguments as null.
+	if (offset == null && limit == null) return "";
+	const start = offset == null ? 1 : parseLineNumber(offset);
+	if (start === undefined) return "";
+	if (limit == null) return `:${start}`;
+	const count = parseLineNumber(limit);
+	if (count === undefined) return "";
+	const end = start + count - 1;
+	return `:${start}${end ? `-${end}` : ""}`;
+}
 export const resizeImage = hostFunction("resizeImage");
 export { detectSupportedImageMimeTypeFromFile } from "./coding-agent/utils/mime.mjs";
 export { getPowerShellConfig, getShellConfig } from "./coding-agent/utils/shell.mjs";

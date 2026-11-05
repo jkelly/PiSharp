@@ -1,10 +1,18 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/src/testing/storage-conformance.ts.
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/src/testing/storage-conformance.ts, every v1.5.0 case (see below).
 // The semantic conformance suite every backend runs (spec §10), directly and after reopen. Cases keep upstream's names, inputs and
 // expected values. Two cases are adapted because records and JSON values are immutable here: "detaches retained writes and every returned
 // record" and "detaches prototype-like JSON keys ..." change the caller's own builders (and builders made from read results) where
 // upstream mutates the committed and returned objects, and assert storage is unaffected; JavaScript prototype checks have no analogue
 // (JSON objects are dictionaries) and are dropped. Upstream's mutations of caller-owned arrays after a commit are likewise impossible and
 // omitted.
+// Pi v1.5.0 (f9a26365568127461c47a07a37dcb42c140a3ac5, area storage-batches): every case writes through CommitWrites.CommitWritesAsync
+// (upstream commitWrites) and sees its storage through ReceiptCheckedStorage (upstream checkReceipts), and the batch-commit cases are
+// ported: a receipt before resolving and none for a refusal, batches in order checked against the earlier ones, the prefix before the
+// first refusal, a refusal by a batch's own malformed actions, and a copy resolved against the earlier batches. A refusal is an exception
+// here, so upstream's String(refused) ("Error: <message>") is its Message. Area store-storage adds v1.5.0's create-and-change case
+// ("refuses a creation and a change of one document in one commit, in either order"). The sleeping case v1.5.0 adds came with area sleep,
+// and area admission adds the continue-submission case ("stores continue submissions, which have no entry and are never queued",
+// fb524dd2e), so every v1.5.0 case is here, in upstream's order, and the citation moves to v1.5.0.
 using System.Collections.Immutable;
 using PiSharp.Durable.Chord;
 using PiSharp.Durable.Chord.Delta;
@@ -20,10 +28,11 @@ public static class StorageConformance
     public static IReadOnlyList<StorageConformanceCase> Create(StorageConformanceProvider withStorage)
     {
         ArgumentNullException.ThrowIfNull(withStorage);
-        StorageConformanceCase Case(string name, Func<IStorage, Task> test) => new(name, () => withStorage(test));
+        StorageConformanceCase Case(string name, Func<IStorage, Task> test) => new(name, () => withStorage(storage => test(new ReceiptCheckedStorage(storage))));
         return
         [
             Case("reserves ID 1 for the immutable root conversation", ReservesRootConversation),
+            Case("receives a durable commit once before resolving, and never a refused one", ReceivesDurableCommitOnce),
             Case("commits mixed table writes atomically and rolls all of them back on failure", CommitsMixedTableWritesAtomically),
             Case("detaches retained writes and every returned record", DetachesRetainedWritesAndReturnedRecords),
             Case("detaches prototype-like JSON keys without changing object prototypes", DetachesPrototypeLikeKeys),
@@ -35,17 +44,24 @@ public static class StorageConformance
             Case("scans tables in either ID order and continues a cursor in its order", ScansTablesInEitherOrder),
             Case("replaces complete task records and pages filtered task scans", ReplacesTaskRecords),
             Case("stores owners and scans waiting and completing tasks by status", StoresOwnersAndWaitingTasks),
+            Case("stores and scans sleeping tasks by status", StoresSleepingTasks),
             Case("indexes request IDs per conversation and replaces complete submission records", IndexesRequestIds),
             Case("stores passive write submissions without input-only lifecycle states", StoresPassiveWrites),
+            Case("stores continue submissions, which have no entry and are never queued", StoresContinueSubmissions),
             Case("reconstructs rewindable documents and preserves half-open incarnations", ReconstructsRewindableDocuments),
             Case("streams long document tails across root replacement deltas", StreamsLongDocumentTails),
             Case("copies stored document bases independently and rejects ambiguous sources", CopiesDocumentBases),
             Case("uses bases for version transitions and rejects historical reads of current-only documents", UsesBasesForVersionTransitions),
             Case("indexes logical addresses and exact-scope scans independently", IndexesLogicalAddresses),
             Case("keeps document lifecycle failures atomic and gives create-plus-retire an empty lifetime", KeepsDocumentLifecycleAtomic),
+            Case("refuses a creation and a change of one document in one commit, in either order", RefusesCreateAndChange),
             Case("rolls back record tables and secondary indexes when a document command fails", RollsBackOnDocumentFailure),
             Case("keeps indexed string identities lossless", KeepsStringIdentitiesLossless),
             Case("keeps one global record ID namespace and rejects exhausted ID minting", KeepsOneIdNamespace),
+            Case("commits batches in order, each with its seq, checked against the earlier ones", CommitsBatchesInOrder),
+            Case("stores the batches before the first one refused, and none after it", StoresBatchesBeforeFirstRefused),
+            Case("refuses a later batch its own malformed actions fail, keeping the batches before it", RefusesMalformedLaterBatch),
+            Case("resolves a batched copy against the state the earlier batches left", ResolvesBatchedCopy),
             Case("rejects every operation after close", RejectsAfterClose),
         ];
     }
@@ -57,6 +73,35 @@ public static class StorageConformance
         Equal<ConversationRecord?>(new ConversationRecord(ConversationId.Root), await storage.GetConversationAsync(ConversationId.Root, Context), "root record");
         await Rejects(() => Commit(storage, new ConversationWrite(new(ConversationId.Root))),
             $"ID {ConversationId.Root} already belongs to conversation", "recreating the root");
+    }
+
+    private static async Task ReceivesDurableCommitOnce(IStorage storage)
+    {
+        var rootId = await CreateRoot(storage);
+        var events = new List<string>();
+        var entryId = await storage.MintIdAsync<EntryId>();
+        Task<CommittedEntry?>? read = null;
+        Seq? seq = null;
+        var result = await storage.CommitAsync([[new EntryWrite(Entry(entryId, rootId))]], (_, received) =>
+        {
+            seq = received;
+            events.Add($"receive {received}");
+            // The batch is durable when it is received: a read started now observes it.
+            read = storage.GetEntryAsync(entryId, Context);
+        }, Context);
+        events.Add($"resolve {result.Stored}");
+        ItemsEqual([$"receive {seq}", "resolve 1"], events, "receipt and resolution");
+        NotNull(read, "read started at the receipt");
+        Equal(seq, (await read!)?.CommitSeq, "commit seq the read at the receipt observes");
+
+        events.Clear();
+        var refused = await storage.CommitAsync([[new ConversationWrite(new(rootId))]], (_, received) => events.Add($"receive {received}"), Context);
+        Equal(0, refused.Stored, "batches stored by a refused commit");
+        Equal($"ID {rootId} already belongs to conversation", refused.Refused?.Message, "refusal");
+        ItemsEqual([], events, "receipts of a refused commit");
+
+        var next = await Commit(storage, new EntryWrite(Entry(await storage.MintIdAsync<EntryId>(), rootId)));
+        Greater(next.Value, seq!.Value.Value, "seq of the commit after the refusal");
     }
 
     private static async Task CommitsMixedTableWritesAtomically(IStorage storage)
@@ -415,6 +460,25 @@ public static class StorageConformance
         ItemsEqual([terminal], await Scan(DurableTaskStatus.Terminal), "terminal scan");
     }
 
+    // Pi v1.5.0 sync (area sleep): upstream f75b3240a's sleeping case.
+    private static async Task StoresSleepingTasks(IStorage storage)
+    {
+        var rootId = await CreateRoot(storage);
+        var sleepingId = await storage.MintIdAsync<TaskId>();
+        var sleeping = PendingTask(sleepingId, rootId) with
+        {
+            State = new SleepingTaskState(O("{\"phase\":\"next\"}"), 61_000), Memos = O("{\"kept\":true}"),
+        };
+        await Commit(storage, new TaskWrite(sleeping));
+        Equal<TaskRecord?>(sleeping, await storage.GetTaskAsync(sleepingId, Context), "sleeping task");
+        async Task<ImmutableArray<TaskRecord>> Scan(DurableTaskStatus status) => (await storage.ScanTasksAsync(new() { Status = status }, 10, null, Context)).Items;
+        ItemsEqual([sleeping], await Scan(DurableTaskStatus.Sleeping), "sleeping scan");
+        var running = sleeping with { State = new RunningTaskState(O("{\"phase\":\"next\"}")) };
+        await Commit(storage, new TaskWrite(running));
+        ItemsEqual([], await Scan(DurableTaskStatus.Sleeping), "sleeping scan after waking");
+        ItemsEqual([running], await Scan(DurableTaskStatus.Running), "running scan");
+    }
+
     private static async Task IndexesRequestIds(IStorage storage)
     {
         var rootId = await CreateRoot(storage);
@@ -481,6 +545,34 @@ public static class StorageConformance
         Equal<SubmissionRecord?>(done, await storage.GetSubmissionByRequestAsync(rootId, "passive-done", Context), "done write by request");
         Equal<SubmissionRecord?>(unanswered, await storage.GetSubmissionAsync(failedId, Context), "unanswered write");
         Equal<SubmissionRecord?>(unanswered, await storage.GetSubmissionByRequestAsync(rootId, "passive-failed", Context), "unanswered write by request");
+    }
+
+    private static async Task StoresContinueSubmissions(IStorage storage)
+    {
+        var rootId = await CreateRoot(storage);
+        var doneId = await storage.MintIdAsync<SubmissionId>();
+        var failedId = await storage.MintIdAsync<SubmissionId>();
+        var placedDone = new SubmissionRecord
+        {
+            Id = doneId, ConversationId = rootId, RequestId = "continue-done", Type = SubmissionType.Continue, Status = SubmissionStatus.Placed,
+        };
+        var placedFailed = new SubmissionRecord
+        {
+            Id = failedId, ConversationId = rootId, RequestId = "continue-failed", Type = SubmissionType.Continue, Status = SubmissionStatus.Placed,
+        };
+        await Commit(storage, new SubmissionWrite(placedDone), new SubmissionWrite(placedFailed));
+        Equal<SubmissionRecord?>(placedDone, await storage.GetSubmissionAsync(doneId, Context), "placed continue");
+        ItemsEqual([placedDone, placedFailed], (await storage.ScanSubmissionsAsync(new() { Status = SubmissionStatus.Placed }, 10, null, Context)).Items,
+            "placed continues");
+
+        var done = placedDone with { Status = SubmissionStatus.Done, Answer = await storage.MintIdAsync<EntryId>() };
+        var unanswered = placedFailed with { Status = SubmissionStatus.Unanswered, Reason = "nothing_to_answer" };
+        await Commit(storage, new SubmissionWrite(done), new SubmissionWrite(unanswered));
+        Equal<SubmissionRecord?>(done, await storage.GetSubmissionAsync(doneId, Context), "done continue");
+        Equal<SubmissionRecord?>(done, await storage.GetSubmissionByRequestAsync(rootId, "continue-done", Context), "done continue by request");
+        Equal<SubmissionRecord?>(unanswered, await storage.GetSubmissionAsync(failedId, Context), "unanswered continue");
+        Equal<SubmissionRecord?>(unanswered, await storage.GetSubmissionByRequestAsync(rootId, "continue-failed", Context),
+            "unanswered continue by request");
     }
 
     private static async Task ReconstructsRewindableDocuments(IStorage storage)
@@ -719,6 +811,21 @@ public static class StorageConformance
         Null(await storage.FindDocumentAsync(new(record.Kind, DocumentScope.Conversation(rootId), "empty"), emptyAt, Context), "create-plus-retire address");
     }
 
+    private static async Task RefusesCreateAndChange(IStorage storage)
+    {
+        await CreateRoot(storage);
+        foreach (var order in (string[])["create first", "change first"])
+        {
+            var id = await storage.MintIdAsync<DocumentId>();
+            StorageWrite create = new DocumentCreateWrite(new() { Id = id, Kind = "twice", Key = order, Scope = DocumentScope.Session },
+                DocumentContent.Base(1, O("{\"x\":1}")));
+            StorageWrite change = new DocumentChangeWrite(id, DocumentContent.Delta(1, Ops("[[\"s\",[\"x\"],2]]")));
+            StorageWrite[] writes = order == "create first" ? [create, change] : [change, create];
+            await Rejects(() => Commit(storage, writes), "more than one content command", order);
+            Null(await storage.GetDocumentAsync(id, DocumentPoint.Current, Context), order + ": document");
+        }
+    }
+
     private static async Task RollsBackOnDocumentFailure(IStorage storage)
     {
         var rootId = await CreateRoot(storage);
@@ -805,12 +912,144 @@ public static class StorageConformance
         await Rejects(() => storage.MintIdAsync<EntryId>(), "ID space is exhausted", "minting again after the last safe ID");
     }
 
+    private static async Task CommitsBatchesInOrder(IStorage storage)
+    {
+        var rootId = await CreateRoot(storage);
+        var firstId = await storage.MintIdAsync<EntryId>();
+        var lastId = await storage.MintIdAsync<EntryId>();
+        var documentId = await storage.MintIdAsync<DocumentId>();
+        var receipts = new List<(int Index, Seq Seq)>();
+        Task<CommittedEntry?>? read = null;
+        var result = await storage.CommitAsync(
+        [
+            [
+                new EntryWrite(Entry(firstId, rootId)),
+                new DocumentCreateWrite(new DocumentCreate
+                {
+                    Id = documentId, Kind = "batch.doc", Scope = DocumentScope.Conversation(rootId), History = DocumentHistory.Latest, Fork = DocumentFork.Initial,
+                }, DocumentContent.Base(1, O("{\"count\":1}"))),
+            ],
+            // Changes the document the batch before created.
+            [new DocumentChangeWrite(documentId, DocumentContent.Delta(1, Ops("[[\"s\",[\"count\"],2]]")))],
+            [new EntryWrite(Entry(lastId, rootId))],
+        ], (index, seq) =>
+        {
+            receipts.Add((index, seq));
+            // Receipts follow the last durable batch: a read started at the first observes it.
+            read ??= storage.GetEntryAsync(lastId, Context);
+        }, Context);
+        Equal(new CommitResult(3), result, "result");
+        IdsEqual([0, 1, 2], receipts.Select(receipt => (long)receipt.Index), "receipt indexes");
+        var (first, second, last) = (receipts[0].Seq, receipts[1].Seq, receipts[2].Seq);
+        Greater(second.Value, first.Value, "seq of the second batch");
+        Greater(last.Value, second.Value, "seq of the last batch");
+        NotNull(read, "read started at the first receipt");
+        Equal<Seq?>(last, (await read!)?.CommitSeq, "commit seq the read at the first receipt observes");
+        Equal<Seq?>(first, (await storage.GetEntryAsync(firstId, Context))?.CommitSeq, "commit seq of the first batch's entry");
+        Same("{\"count\":2}", (await storage.GetDocumentAsync(documentId, DocumentPoint.Current, Context))?.Value, "document the batches created and changed");
+        var next = await Commit(storage, new EntryWrite(Entry(await storage.MintIdAsync<EntryId>(), rootId)));
+        Greater(next.Value, last.Value, "seq of the next commit");
+    }
+
+    private static async Task StoresBatchesBeforeFirstRefused(IStorage storage)
+    {
+        var rootId = await CreateRoot(storage);
+        var firstId = await storage.MintIdAsync<EntryId>();
+        var afterId = await storage.MintIdAsync<EntryId>();
+        var receipts = new List<long>();
+        var result = await storage.CommitAsync(
+        [
+            [new EntryWrite(Entry(firstId, rootId))],
+            // Refused against the state the first batch left: the ID is taken now.
+            [new TaskWrite(PendingTask(await storage.MintIdAsync<TaskId>(), rootId)), new EntryWrite(Entry(firstId, rootId))],
+            [new EntryWrite(Entry(afterId, rootId))],
+        ], (index, _) => receipts.Add(index), Context);
+        Equal(1, result.Stored, "batches stored");
+        Equal($"ID {firstId} already belongs to entry", result.Refused?.Message, "refusal");
+        IdsEqual([0], receipts, "receipts");
+        NotNull(await storage.GetEntryAsync(firstId, Context), "entry of the first batch");
+        Null(await storage.GetEntryAsync(afterId, Context), "entry of the batch after the refused one");
+        IdsEqual([], TaskIds(await storage.ScanTasksAsync(new TaskQuery(), 10, null, Context)), "tasks of the refused batch");
+
+        // A refused first batch stores nothing; the storage goes on.
+        var refused = await storage.CommitAsync([[new ConversationWrite(new(rootId))]], (index, _) => receipts.Add(index), Context);
+        Equal(0, refused.Stored, "batches stored by a refused first batch");
+        Equal($"ID {rootId} already belongs to conversation", refused.Refused?.Message, "refusal of the first batch");
+        IdsEqual([0], receipts, "receipts after a refused first batch");
+        await Commit(storage, new EntryWrite(Entry(afterId, rootId)));
+        NotNull(await storage.GetEntryAsync(afterId, Context), "entry committed after the refusals");
+    }
+
+    private static async Task RefusesMalformedLaterBatch(IStorage storage)
+    {
+        var rootId = await CreateRoot(storage);
+        var documentId = await storage.MintIdAsync<DocumentId>();
+        await Commit(storage, new DocumentCreateWrite(new DocumentCreate { Id = documentId, Kind = "staged", Scope = DocumentScope.Session },
+            DocumentContent.Base(1, O("{\"n\":1}"))));
+        var firstId = await storage.MintIdAsync<EntryId>();
+        var secondId = await storage.MintIdAsync<EntryId>();
+        var afterId = await storage.MintIdAsync<EntryId>();
+        var receipts = new List<long>();
+        var result = await storage.CommitAsync(
+        [
+            [new EntryWrite(Entry(firstId, rootId))],
+            // Malformed in itself, whatever is stored: one document retired twice.
+            [new EntryWrite(Entry(secondId, rootId)), new DocumentRetireWrite(documentId), new DocumentRetireWrite(documentId)],
+            [new EntryWrite(Entry(afterId, rootId))],
+        ], (index, _) => receipts.Add(index), Context);
+        Equal(1, result.Stored, "batches stored");
+        NotNull(result.Refused, "refusal");
+        IdsEqual([0], receipts, "receipts");
+        NotNull(await storage.GetEntryAsync(firstId, Context), "entry of the first batch");
+        Null(await storage.GetEntryAsync(secondId, Context), "entry of the malformed batch");
+        Null(await storage.GetEntryAsync(afterId, Context), "entry of the batch after the malformed one");
+        Same("{\"n\":1}", (await storage.GetDocumentAsync(documentId, DocumentPoint.Current, Context))?.Value, "document the malformed batch retires");
+    }
+
+    private static async Task ResolvesBatchedCopy(IStorage storage)
+    {
+        var rootId = await CreateRoot(storage);
+        var childId = await storage.MintIdAsync<ConversationId>();
+        var sourceId = await storage.MintIdAsync<DocumentId>();
+        var copyId = await storage.MintIdAsync<DocumentId>();
+        DocumentCreate Record(DocumentId id, ConversationId conversationId) => new()
+        {
+            Id = id, Kind = "batch.copy", Scope = DocumentScope.Conversation(conversationId), History = DocumentHistory.Rewindable, Fork = DocumentFork.AsOf,
+        };
+        var seqs = new List<Seq>();
+        var result = await storage.CommitAsync(
+        [
+            [new DocumentCreateWrite(Record(sourceId, rootId), DocumentContent.Base(1, O("{\"count\":1}")))],
+            [new DocumentChangeWrite(sourceId, DocumentContent.Delta(1, Ops("[[\"s\",[\"count\"],2]]")))],
+            [new ConversationWrite(new(childId)), new DocumentCopyWrite(Record(copyId, childId), new(sourceId, DocumentPoint.Current))],
+        ], (_, seq) => seqs.Add(seq), Context);
+        Equal(new CommitResult(3), result, "result");
+        Same("{\"count\":2}", (await storage.GetDocumentAsync(copyId, DocumentPoint.Current, Context))?.Value, "copy");
+        Same("{\"count\":1}", (await storage.GetDocumentAsync(sourceId, DocumentPoint.At(seqs[0]), Context))?.Value, "source at the first batch");
+
+        // A copy whose source the same batch changes is refused before the batch writes anything.
+        var laterId = await storage.MintIdAsync<ConversationId>();
+        var laterCopyId = await storage.MintIdAsync<DocumentId>();
+        var refused = await storage.CommitAsync(
+        [
+            [
+                new ConversationWrite(new(laterId)),
+                new DocumentCopyWrite(Record(laterCopyId, laterId), new(sourceId, DocumentPoint.Current)),
+                new DocumentChangeWrite(sourceId, DocumentContent.Delta(1, Ops("[[\"s\",[\"count\"],3]]"))),
+            ],
+        ], (_, _) => { }, Context);
+        Equal(0, refused.Stored, "batches stored by the refused copy");
+        NotNull(refused.Refused, "refusal of the copy");
+        Null(await storage.GetConversationAsync(laterId, Context), "conversation of the refused batch");
+        Same("{\"count\":2}", (await storage.GetDocumentAsync(sourceId, DocumentPoint.Current, Context))?.Value, "source after the refused copy");
+    }
+
     private static async Task RejectsAfterClose(IStorage storage)
     {
         await CreateRoot(storage);
         await storage.CloseAsync(Context);
         await Rejects(() => storage.GetConversationAsync(ConversationId.Root, Context), "closed", "read after close");
-        await Rejects(() => Commit(storage), "closed", "commit after close");
+        await Rejects(() => Commit(storage, new ConversationWrite(new(ConversationId.Root))), "closed", "commit after close");
         await Rejects(() => storage.MintIdAsync<ConversationId>(), "closed", "mint after close");
     }
 
@@ -829,7 +1068,65 @@ public static class StorageConformance
     private static EntryRecord Entry(EntryId id, ConversationId conversationId, string kind = "message") =>
         new() { Id = id, ConversationId = conversationId, Kind = kind };
 
-    private static Task<Seq> Commit(IStorage storage, params StorageWrite[] writes) => storage.CommitAsync(writes, Context);
+    private static Task<Seq> Commit(IStorage storage, params StorageWrite[] writes) => storage.CommitWritesAsync(writes, Context);
+
+    /// <summary>
+    /// <paramref name="storage"/> with every commit checked against the receipt contract (upstream <c>checkReceipts</c>): one receipt per
+    /// stored batch, in order, with increasing seqs, all before the call settles.
+    /// </summary>
+    private sealed class ReceiptCheckedStorage(IStorage storage) : IStorage
+    {
+        public async Task<CommitResult> CommitAsync(IReadOnlyList<IReadOnlyList<StorageWrite>> batches, Action<int, Seq> receive, DurableContext context)
+        {
+            var seqs = new List<Seq>();
+            var settled = false;
+            void Recording(int index, Seq seq)
+            {
+                Ok(!settled, "Storage.CommitAsync() received a batch after it settled");
+                Equal(seqs.Count, index, "receipt index");
+                if (seqs.Count > 0) Greater(seq.Value, seqs[^1].Value, "receipt seq");
+                seqs.Add(seq);
+                receive(index, seq);
+            }
+            try
+            {
+                var result = await storage.CommitAsync(batches, Recording, context);
+                Equal(result.Stored, seqs.Count, "receipts of the stored batches");
+                return result;
+            }
+            finally
+            {
+                settled = true;
+            }
+        }
+
+        public void Publishing(Action publish, DurableContext context) => storage.Publishing(publish, context);
+        public Task<TId> MintIdAsync<TId>() where TId : struct, IDurableId<TId> => storage.MintIdAsync<TId>();
+        public Task<ConversationRecord?> GetConversationAsync(ConversationId id, DurableContext context) => storage.GetConversationAsync(id, context);
+        public Task<Page<ConversationRecord>> ScanConversationsAsync(ConversationQuery query, int limit, JsonObjectValue? cursor, DurableContext context) =>
+            storage.ScanConversationsAsync(query, limit, cursor, context);
+        public Task<CommittedEntry?> GetEntryAsync(EntryId id, DurableContext context) => storage.GetEntryAsync(id, context);
+        public Task<CommittedEntry?> GetEntryAsync(ConversationId conversationId, EntryId id, DurableContext context) =>
+            storage.GetEntryAsync(conversationId, id, context);
+        public Task<EntryRecord?> FindLatestHeadMarkerAsync(ConversationId conversationId, EntryId? atOrBeforeEntryId, DurableContext context) =>
+            storage.FindLatestHeadMarkerAsync(conversationId, atOrBeforeEntryId, context);
+        public Task<Page<EntryRecord>> ScanEntriesAsync(EntryQuery query, int limit, JsonObjectValue? cursor, DurableContext context) =>
+            storage.ScanEntriesAsync(query, limit, cursor, context);
+        public Task<TaskRecord?> GetTaskAsync(TaskId id, DurableContext context) => storage.GetTaskAsync(id, context);
+        public Task<Page<TaskRecord>> ScanTasksAsync(TaskQuery query, int limit, JsonObjectValue? cursor, DurableContext context) =>
+            storage.ScanTasksAsync(query, limit, cursor, context);
+        public Task<SubmissionRecord?> GetSubmissionAsync(SubmissionId id, DurableContext context) => storage.GetSubmissionAsync(id, context);
+        public Task<Page<SubmissionRecord>> ScanSubmissionsAsync(SubmissionQuery query, int limit, JsonObjectValue? cursor, DurableContext context) =>
+            storage.ScanSubmissionsAsync(query, limit, cursor, context);
+        public Task<SubmissionRecord?> GetSubmissionByRequestAsync(ConversationId conversationId, string requestId, DurableContext context) =>
+            storage.GetSubmissionByRequestAsync(conversationId, requestId, context);
+        public Task<DocumentRecord?> FindDocumentAsync(DocumentAddress address, DocumentPoint at, DurableContext context) =>
+            storage.FindDocumentAsync(address, at, context);
+        public Task<StoredDocument?> GetDocumentAsync(DocumentId id, DocumentPoint at, DurableContext context) => storage.GetDocumentAsync(id, at, context);
+        public Task<Page<DocumentRecord>> ScanDocumentsAsync(DocumentQuery query, int limit, JsonObjectValue? cursor, DurableContext context) =>
+            storage.ScanDocumentsAsync(query, limit, cursor, context);
+        public Task CloseAsync(DurableContext context) => storage.CloseAsync(context);
+    }
 
     private static JsonValue J(string json) => JsonValue.Parse(json);
     private static JsonObjectValue O(string json) => (JsonObjectValue)JsonValue.Parse(json);

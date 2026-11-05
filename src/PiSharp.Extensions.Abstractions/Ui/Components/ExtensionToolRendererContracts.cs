@@ -1,8 +1,23 @@
 // Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/src/core/extensions/types.ts
 // (ToolRenderContext, ToolRenderers, ToolRendererResolver, ExtensionAPI.registerToolRenderer).
+using System.Diagnostics.CodeAnalysis;
 using PiSharp.Contracts;
 
 namespace PiSharp.Extensions;
+
+/// <summary>
+/// Pi 1.5.0 KeybindingHints: the host's configured keybindings, formatted for display. Renderers use these instead of a lookup of
+/// their own, which may not see the user's keybindings.
+/// </summary>
+[Experimental("PISHARP_EXTUI001")]
+public interface IExtensionKeybindingHints
+{
+    /// <summary>Configured keys for a keybinding id, for example <c>"ctrl+o"</c>. Empty when the id has no keys.</summary>
+    string KeyText(string keybinding);
+
+    /// <summary>Configured keys followed by a description, styled as a hint, for example <c>"ctrl+o to expand"</c>.</summary>
+    string KeyHint(string keybinding, string description);
+}
 
 /// <summary>Source renderShell: "default" draws the host's row shell around the renderer's rows; "self" draws its own.</summary>
 public enum ExtensionToolRenderShell { Default, Self }
@@ -15,7 +30,12 @@ public enum ExtensionToolRenderShell { Default, Self }
 /// </summary>
 public sealed record ExtensionToolRenderContext(string ToolName, string ToolCallId, JsonData Arguments, string WorkingDirectory,
     bool ExecutionStarted, bool ArgumentsComplete, bool IsPartial, bool Expanded, bool ShowImages, bool IsError,
-    long? DurationMs, int OutputPad);
+    long? DurationMs, int OutputPad)
+{
+    /// <summary>Pi 1.5.0 ToolRenderContext keyText/keyHint: the host's keybindings, or null when the host shows none.</summary>
+    [Experimental("PISHARP_EXTUI001")]
+    public IExtensionKeybindingHints? Keybindings { get; init; }
+}
 
 public delegate Task<ExtensionCustomComponentRows> ExtensionToolCallRenderer(ExtensionToolRenderContext context, int width,
     CancellationToken cancellationToken);

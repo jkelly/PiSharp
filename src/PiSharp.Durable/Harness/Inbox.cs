@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/src/harness/inbox.ts. Items are stored as upstream's JSON:
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/src/harness/inbox.ts. Items are stored as upstream's JSON:
 // {id, mode: "steer" | "followUp", content, entry?} (entry the input's InputEntry as {kind, data?}) or {id, mode: "write", entry}, where
 // entry is the write's EntryDraft as plain JSON {kind, head?, model?, data?, edits?} (head an entry ID or "self"). The conversation view of
 // the inbox is view.ts's.
@@ -31,9 +31,9 @@ public static class Inbox
         public EntryId? Head { get; set; } = head;
     }
 
-    /// <summary>Selected user items, in ID order, and whether a <c>head: "self"</c> write (a reset) was placed (upstream
-    /// <c>BoundaryResult</c>).</summary>
-    internal sealed record BoundaryResult(ImmutableArray<SubmissionId> Users, bool Reset);
+    /// <summary>Selected user items, in ID order, the first entry the boundary placed, a write's or a user item's (a run it starts begins
+    /// there, <c>LiveRun.first</c>), and whether a <c>head: "self"</c> write (a reset) was placed (upstream <c>BoundaryResult</c>).</summary>
+    internal sealed record BoundaryResult(ImmutableArray<SubmissionId> Users, EntryId? First, bool Reset);
 
     /// <summary>
     /// Reads what a boundary needs, with the queue modes of <paramref name="settings"/> (upstream <c>prepareBoundary</c>). Table reads must
@@ -67,6 +67,7 @@ public static class Inbox
         var writes = snapshot.Select((item, index) => (item, index)).Where(pair => Mode(pair.item) == "write").Select(pair => pair.index).ToList();
         var users = Pick("steer", boundary.SteeringMode).Concat(final ? Pick("followUp", boundary.FollowUpMode) : []).Order().ToList();
 
+        EntryId? first = null;
         foreach (var index in writes)
         {
             var item = snapshot[index];
@@ -79,6 +80,7 @@ public static class Inbox
             var entry = await tx.AppendEntryAsync(boundary.ConversationId, draft).ConfigureAwait(false);
             if (draft.Head is { } head) boundary.Head = head.IsSelf ? entry.Id : head.Id;
             tx.PlaceSubmission(ItemSubmission(item), entry.Id);
+            first ??= entry.Id;
         }
         var placed = ImmutableArray.CreateBuilder<SubmissionId>();
         foreach (var index in users)
@@ -88,9 +90,10 @@ public static class Inbox
                 item.TryGetValue("entry", out var placedAs) ? InputEntryFromJson((JsonObjectValue)placedAs) : null, now).ConfigureAwait(false);
             tx.PlaceSubmission(ItemSubmission(item), entry.Id);
             placed.Add(ItemSubmission(item));
+            first ??= entry.Id;
         }
         foreach (var index in writes.Concat(users).OrderDescending()) items.RemoveAt(index);
-        return new BoundaryResult(placed.ToImmutable(), reset);
+        return new BoundaryResult(placed.ToImmutable(), first, reset);
     }
 
     /// <summary>
@@ -151,17 +154,17 @@ public static class Inbox
 
     /// <summary>
     /// Withdraws every queued input of a conversation, as <c>Conversation.AbortAsync()</c> and abort cascades do (upstream
-    /// <c>withdrawQueuedInputs</c>): each settles <c>unanswered</c> with <c>aborted</c> and leaves the inbox; queued writes stay for later
-    /// placement.
+    /// <c>withdrawQueuedInputs</c>): each settles <c>unanswered</c> with <paramref name="reason"/> (default <c>aborted</c>; a failed run's
+    /// <c>run_failed</c>) and leaves the inbox; queued writes stay for later placement.
     /// </summary>
-    public static async Task WithdrawQueuedInputsAsync(ITx tx, ConversationId conversationId)
+    public static async Task WithdrawQueuedInputsAsync(ITx tx, ConversationId conversationId, string reason = "aborted")
     {
         var items = (await tx.DocAsync(InboxDoc, conversationId).ConfigureAwait(false)).GetArray("items");
         for (var index = items.Count - 1; index >= 0; index--)
         {
             var item = (JsonObjectValue)items.Get(index);
             if (item["mode"] is JsonStringValue { Value: "write" }) continue;
-            tx.SettleSubmission(new SubmissionId(ItemId(item)), SubmissionSettlement.Unanswered("aborted"));
+            tx.SettleSubmission(new SubmissionId(ItemId(item)), SubmissionSettlement.Unanswered(reason));
             items.RemoveAt(index);
         }
     }

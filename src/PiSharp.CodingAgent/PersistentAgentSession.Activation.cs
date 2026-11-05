@@ -46,7 +46,8 @@ public sealed partial class PersistentAgentSession
             // A catalog change during the run still owes its reconfiguration, even when the selection returns to the recorded names.
             replace = _pendingActivation?.ReplaceDeclarations == true;
         }
-        var normalized = registry.NormalizeActiveTools(names, cancellationToken);
+        // Pi 1.5.0 _applyToolLoadout: tools that stay active keep their order and new ones are appended.
+        var normalized = SessionRuntimeRegistry.KeepOrder(previous, registry.NormalizeActiveTools(names, cancellationToken));
         if (previous.SequenceEqual(normalized, StringComparer.Ordinal))
         { lock (_gate) { ThrowActivationAvailable(); cancellationToken.ThrowIfCancellationRequested();
             if (_activationEpoch != epoch) throw new InvalidOperationException("Activation selection changed during preparation.");

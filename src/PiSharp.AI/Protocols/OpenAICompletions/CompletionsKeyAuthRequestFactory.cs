@@ -37,6 +37,10 @@ public sealed record CompletionsKeyAuthRequestOptions(double? MaxTokens = null, 
     /// <summary>PiSharp-only: <c>service_tier</c> (OpenAI and OpenRouter: auto, default, flex, priority, fast, ultrafast); null omits it.</summary>
     [System.Diagnostics.CodeAnalysis.Experimental("PISHARP_TIERS001")]
     public string? ServiceTier { get; init; }
+    /// <summary>Source StreamOptions.identity (Pi 1.5.0 identity.ts): the User-Agent and attribution headers, below the model,
+    /// session and request headers. Null: a detailed User-Agent and no attribution.</summary>
+    [System.Diagnostics.CodeAnalysis.Experimental("PISHARP_IDENTITY001")]
+    public ClientIdentity? Identity { get; init; }
 }
 
 /// <summary>Pure configured key request construction. No send, environment, clock, credential discovery or retry.</summary>
@@ -68,8 +72,8 @@ public sealed class CompletionsKeyAuthRequestFactory
         CompletionsTranscriptProjectionOptions? projectionOptions = null, CompletionsKeyAuthRequestOptions? options = null)
     {
         _options = options ?? new(); _projectionOptions = projectionOptions ?? new();
-        _withScope = (session, tier) => new(endpoint, expectedModel, projectionOptions,
-            _options with { SessionId = session ?? _options.SessionId, ServiceTier = tier ?? _options.ServiceTier });
+        _withScope = (session, tier, identity) => new(endpoint, expectedModel, projectionOptions,
+            _options with { SessionId = session ?? _options.SessionId, ServiceTier = tier ?? _options.ServiceTier, Identity = identity ?? _options.Identity });
         if (endpoint is null || expectedModel is null || !endpoint.IsAbsoluteUri || endpoint.Scheme is not ("http" or "https") ||
             endpoint.UserInfo.Length != 0 || endpoint.Fragment.Length != 0 ||
             expectedModel.Api != "openai-completions" || !Identity(expectedModel.Id) || !Identity(expectedModel.Provider) ||
@@ -96,7 +100,8 @@ public sealed class CompletionsKeyAuthRequestFactory
             endpoint.AbsoluteUri.Contains("openrouter.ai", StringComparison.Ordinal) ? CompletionsReasoningFormat.OpenRouter : CompletionsReasoningFormat.OpenAI)) ==
             CompletionsReasoningFormat.OpenRouter ? "openrouter" : "openai";
         _cacheControlFormat = expectedModel.Provider == "openrouter" && expectedModel.Id.StartsWith("anthropic/", StringComparison.Ordinal) ? "anthropic" : null;
-        ResolvedWireOptions = new() { SupportsOpenAIGrammarTools = _projectionOptions.ToolDeclarations?.SupportsOpenAIGrammarTools == true };
+        ResolvedWireOptions = new() { SupportsOpenAIGrammarTools = _projectionOptions.ToolDeclarations?.SupportsOpenAIGrammarTools == true,
+            OpenRouterReportedCost = ProviderShared.ProviderCost.IsOpenRouter(expectedModel.Provider, endpoint.AbsoluteUri) };
         if (_options.ModelMetadata is { } metadata)
         {
             var binding = BindModelMetadata(metadata);
@@ -163,8 +168,10 @@ public sealed class CompletionsKeyAuthRequestFactory
             catch (Exception error) when (error is JsonException or InvalidOperationException or KeyNotFoundException)
             { throw Fail(CompletionsRequestFailure.InvalidConfiguration); }
         }
-        var headers = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase)
-        { ["accept"] = "application/json", ["user-agent"] = "PiSharp", ["x-stainless-retry-count"] = "0" };
+        var headers = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase) { ["accept"] = "application/json" };
+        // Pi 1.5.0 openai-completions.ts createClient: defaultHeaders { ...getIdentityHeaders(model, identity), ...model.headers }.
+        foreach (var (name, value) in ClientIdentities.GetIdentityHeaders(expectedModel.Provider, endpoint.AbsoluteUri, _options.Identity)) headers[name] = value;
+        headers["x-stainless-retry-count"] = "0";
         long supplied = 0;
         ReadHeaders(_options.ModelHeaders, headers, ref supplied);
         if (_options.SessionId is { } session)
@@ -189,16 +196,18 @@ public sealed class CompletionsKeyAuthRequestFactory
     }
 
     // StreamOptions.sessionId per request: a factory configured without a session id binds the request's (cached per id). PiSharp-only:
-    // the request's service tier (ChatRequest.ServiceTier) also selects a factory configured with that tier.
-    private readonly Func<string?, string?, CompletionsKeyAuthRequestFactory> _withScope;
-    private readonly System.Collections.Concurrent.ConcurrentDictionary<(string?, string?), CompletionsKeyAuthRequestFactory> _scoped = new();
+    // the request's service tier (ChatRequest.ServiceTier) also selects a factory configured with that tier. StreamOptions.identity
+    // (ChatRequest.Identity) merges over the configured identity the same way.
+    private readonly Func<string?, string?, ClientIdentity?, CompletionsKeyAuthRequestFactory> _withScope;
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<(string?, string?, ClientIdentity?), CompletionsKeyAuthRequestFactory> _scoped = new();
     private CompletionsKeyAuthRequestFactory? ScopedTo(ChatRequest? request)
     {
         var session = _options.SessionId is null ? request?.SessionId : null;
         var tier = request?.ServiceTier is { } requested && ServiceTiers.OpenAI(requested, _model.Provider) is { } wire && wire != _options.ServiceTier ? wire : null;
-        if (session is null && tier is null) return null;
+        var identity = request?.Identity is { } asked && ClientIdentities.Merge(_options.Identity, asked) is { } merged && merged != _options.Identity ? merged : null;
+        if (session is null && tier is null && identity is null) return null;
         if (_scoped.Count > 32) _scoped.Clear();
-        return _scoped.GetOrAdd((session, tier), key => _withScope(key.Item1, key.Item2));
+        return _scoped.GetOrAdd((session, tier, identity), key => _withScope(key.Item1, key.Item2, key.Item3));
     }
 
     public HttpRequestMessage Create(ChatRequest request, string explicitApiKey, CancellationToken cancellationToken = default)
@@ -467,7 +476,7 @@ public sealed class CompletionsKeyAuthRequestFactory
             }
             return new(options, projection, cacheFormat, Object(compat, "openRouterRouting"), Object(model, "samplingParams"), priority,
                 new(SupportsFinishReason: Flag("supportsFinishReason", true), Rates: new(Rate("input"), Rate("output"), Rate("cacheRead"), Rate("cacheWrite")) { Tiers = tiers.ToImmutable() })
-                    { SupportsOpenAIGrammarTools = grammarTools }, thinkingFormat, budgetField, modelMaxTokens,
+                    { SupportsOpenAIGrammarTools = grammarTools, OpenRouterReportedCost = isOpenRouter }, thinkingFormat, budgetField, modelMaxTokens,
                 Object(compat, "chatTemplateKwargs"), Object(compat, "chatTemplateArgs"), Flag("zaiToolStream", false),
                 Object(model, "samplingParamsByThinkingLevel"));
         }

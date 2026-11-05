@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/src/modes/print-mode.ts (runPrintMode),
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/coding-agent/src/modes/print-mode.ts (runPrintMode),
 // packages/coding-agent/src/modes/json-event.ts and packages/coding-agent/src/modes/rpc/rpc-client.ts (waiting for agent_settled).
 using System.Text.Json;
 using System.Text.Json.Nodes;

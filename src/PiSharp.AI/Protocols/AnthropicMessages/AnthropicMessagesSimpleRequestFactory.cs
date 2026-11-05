@@ -102,8 +102,10 @@ public sealed class AnthropicMessagesSimpleRequestFactory : IChatTransport
     {
         cancellationToken.ThrowIfCancellationRequested(); AdmitKey(_options.ApiKey);
         var resolved = Resolve(request, cancellationToken); var factory = Bind(resolved);
-        // stream(): a managed response records the effort it was sent with (omitted effort is "high").
-        var messages = _midEffort ? (_options.MessagesOptions ?? new()) with { ProviderThinkingLevel = resolved.Effort ?? "high" } : _options.MessagesOptions;
+        // buildParams providerThinkingLevel: a managed response records the effort it was sent with (omitted effort is "high"),
+        // none while thinking is disabled (Pi 1.5.0 dc939913f).
+        var effortMessages = _midEffort && !(_reasoning && !resolved.ThinkingEnabled && _supportsOff);
+        var messages = effortMessages ? (_options.MessagesOptions ?? new()) with { ProviderThinkingLevel = resolved.Effort ?? "high" } : _options.MessagesOptions;
         if (_options.Hooks is not null)
             return AnthropicMessagesHttpSseTransport.FromPrepared(_client, (current, token) => factory.Prepare(current, _options.ApiKey!, token),
                 _options.HttpOptions, messages, _options.Hooks).StreamAsync(request, cancellationToken);

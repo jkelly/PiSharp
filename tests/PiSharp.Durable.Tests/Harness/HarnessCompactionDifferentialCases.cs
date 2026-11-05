@@ -7,6 +7,12 @@
 // fixture also pins the summarization prompts and the serialized conversation. The scenarios run here on memory, JSONL and SQLite and must
 // produce the same records, IDs included. backgroundFailure and blockingFailure (new in v1.2.0) check pi.live.compactionFailure and a
 // blocking threshold failure that fails its run without a request.
+// Pi v1.5.0 sync (area model-requests): the cases compare with the capture's authored v1.5.0 form (ModelRequests150.cs), not the
+// capture itself: v1.5.0 records the requested thinking level on each message it classifies. A byte comparison needs a recapture.
+// Pi v1.5.0 sync (area run-failure, f3255de76): and with RunFailure150.cs's: blockingFailure's pi.live holds the failed run's runFailure.
+// Pi v1.5.0 sync (area tool-tasks, 1c6928b30): and with ToolTasks150.cs's: generation tasks at pi.generation version 2.
+// Pi v1.5.0 sync (area live-turns, 5f312dac4): and with LiveV3150.cs's: pi.live's compactionFailure names its trigger (no dump holds a run).
+// Pi v1.5.0 sync (area run-end, 7e15f9601): and blockingFailure's runFailure carries its run's first entry, its input's (LiveV3150.cs).
 using PiSharp.Durable;
 using PiSharp.Durable.Chord;
 using PiSharp.Durable.Internal;
@@ -37,8 +43,9 @@ internal static class CompactionDifferentialTests
     private const string Overflow = "prompt is too long: 250000 tokens > 200000 maximum";
     private static readonly CompactionSettings Manual = new() { Enabled = false, ReserveTokens = 1000, KeepRecentTokens = 150, BackgroundTokens = 0 };
 
-    private static readonly Lazy<JsonObjectValue> Upstream = new(() => (JsonObjectValue)JsonValue.Parse(
-        File.ReadAllText(Path.Combine(RepositoryRoot(), "tests", "PiSharp.Durable.Tests", "Fixtures", "v1.2.0", "compaction.upstream.json"))));
+    // Pi v1.5.0 (area model-requests): the capture's authored v1.5.0 form (see the file header).
+    private static readonly Lazy<JsonObjectValue> Upstream = new(() => LiveV3150.Differential(ToolTasks150.Differential(RunFailure150.Compaction((JsonObjectValue)ModelRequests150.Authored(
+        JsonValue.Parse(File.ReadAllText(Path.Combine(RepositoryRoot(), "tests", "PiSharp.Durable.Tests", "Fixtures", "v1.2.0", "compaction.upstream.json"))))))));
 
     private static string Text(string label, int tokens) => CompactionTests.Text(label, tokens);
     private static JsonObjectValue Answer(string content) => FauxAssistantMessage(content, timestamp: T);

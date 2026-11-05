@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/tui/src/components/settings-list.ts and components/image.ts.
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/tui/src/components/settings-list.ts and components/image.ts.
 namespace PiSharp.Tui.Pi;
 
 /// <summary>A settings row: cycles through <see cref="Values"/> or opens a <see cref="Submenu"/>.</summary>
@@ -31,6 +31,8 @@ public sealed class SettingsList : IComponent, IInputHandler, IMouseHandler
     private IComponent? submenu;
     private int? submenuItemIndex;
     private string? navigateAfterClose;
+    /// <summary>Fullscreen viewport keys, such as PageUp/PageDown, page the focused list instead of scrolling the transcript.</summary>
+    public bool CapturesViewportInput => true;
 
     public SettingsList(IEnumerable<SettingItem> items, int maxVisible, SettingsListTheme theme, Action<string, string> onChange, Action onCancel, bool enableSearch = false)
     {
@@ -117,8 +119,10 @@ public sealed class SettingsList : IComponent, IInputHandler, IMouseHandler
     {
         if (submenu is not null) { (submenu as IInputHandler)?.HandleInput(data); return; }
         var kb = KeybindingsManager.Global; var display = DisplayItems;
+        var pageIndex = KeybindingsManager.GetSelectPageIndex(kb, data, selectedIndex, display.Count, maxVisible);
         if (kb.Matches(data, "tui.select.up")) { if (display.Count == 0) return; selectedIndex = selectedIndex == 0 ? display.Count - 1 : selectedIndex - 1; }
         else if (kb.Matches(data, "tui.select.down")) { if (display.Count == 0) return; selectedIndex = selectedIndex == display.Count - 1 ? 0 : selectedIndex + 1; }
+        else if (pageIndex is { } page) { if (display.Count == 0) return; selectedIndex = page; }
         else if (kb.Matches(data, "tui.select.confirm") || data == " " && (!searchEnabled || searchInput?.GetValue().Length == 0)) ActivateItem();
         else if (kb.Matches(data, "tui.select.cancel")) onCancel();
         else if (searchEnabled && searchInput is not null) { searchInput.HandleInput(data); filtered = Fuzzy.Filter(items, searchInput.GetValue(), item => item.Label); selectedIndex = 0; }

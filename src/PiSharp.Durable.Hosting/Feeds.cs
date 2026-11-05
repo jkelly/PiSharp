@@ -1,12 +1,15 @@
 // PiSharp-only (decision 0008): IAsyncEnumerable adapters over pi-durable's callback watches, for the device server's SSE streams. Each
 // listener writes into a bounded channel and waits while it is full, so a slow reader slows the watch, and the watch's own overflow rule
-// (spec §9.4: undelivered batches beyond its limit become one snapshot) takes over. Nothing is replayed: a new feed starts from a snapshot.
+// (Pi v1.2.0's spec §9.4: undelivered batches beyond its limit become one snapshot) takes over. Nothing is replayed: a new feed starts from a
+// snapshot. Pi v1.5.0 sync (area events): pi-durable 1.5.0 removed watchEvents; the agent feed reads Hosting's projection of v1.2.0's
+// events (AgentEvents.cs), the only consumer of the typed events.
 using System.Threading.Channels;
 using PiSharp.Durable.Chord;
 
 namespace PiSharp.Durable.Hosting;
 
-/// <summary>One agent's event batches: a snapshot at attachment, then one batch per commit (pi-durable <c>watchEvents</c>).</summary>
+/// <summary>One agent's event batches: a snapshot at attachment, then one batch per commit (<see cref="AgentEvents.WatchEventsAsync"/>, Pi
+/// v1.2.0's <c>watchEvents</c>).</summary>
 public sealed class AgentEventFeed : IAsyncDisposable
 {
     private readonly IAgentEventStream stream;
@@ -28,7 +31,7 @@ public sealed class AgentEventFeed : IAsyncDisposable
         var stream = await harness.WatchEventsAsync(conversation, DurableContext.Background).ConfigureAwait(false);
         var feed = new AgentEventFeed(stream, capacity);
         stream.Start((events, context) => feed.channel.Writer.WriteAsync(events, context.CancellationToken).AsTask());
-        _ = stream.Closed.ContinueWith(closed => feed.channel.Writer.TryComplete(closed.IsCompletedSuccessfully ? closed.Result.Error : closed.Exception),
+        _ = stream.Closed.ContinueWith(closed => feed.channel.Writer.TryComplete(closed.IsCompletedSuccessfully ? closed.Result.Error as Exception : closed.Exception),
             CancellationToken.None, TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
         return feed;
     }
@@ -69,9 +72,9 @@ public sealed class TaskGraphFeed : IAsyncDisposable
     {
         var feed = new TaskGraphFeed(await harness.WatchTaskGraphAsync(DurableContext.Background).ConfigureAwait(false));
         var initial = feed.watch.Value;
-        feed.watch.Start((graph, _, _) =>
+        feed.watch.Start((call, _) =>
         {
-            feed.channel.Writer.TryWrite(graph);
+            if (call is WatchValueCall<TaskGraph> graph) feed.channel.Writer.TryWrite(graph.Value);
             return Task.CompletedTask;
         });
         _ = feed.watch.Closed.ContinueWith(_ => feed.channel.Writer.TryComplete(), CancellationToken.None, TaskContinuationOptions.ExecuteSynchronously,

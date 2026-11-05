@@ -40,7 +40,7 @@ internal static partial class AgentDirectory
         KeyValuePair.Create("byConversation", (JsonValue)JsonObjectValue.Empty),
         KeyValuePair.Create("counters", (JsonValue)JsonObjectValue.Empty),
         KeyValuePair.Create("waits", (JsonValue)JsonObjectValue.Empty),
-    ]));
+    ]), checkpointWhen: (_, _, _) => false);
 
     [System.Text.RegularExpressions.GeneratedRegex("^[a-z][a-z0-9_.-]{0,47}(#[0-9]{1,6})?$")]
     private static partial System.Text.RegularExpressions.Regex AddressPattern();

@@ -48,16 +48,16 @@ internal static class TaskGraphDifferentialTests
         var watch = await harness.WatchTaskGraphAsync(Context);
         var initial = watch.Value;
         var frames = new SyncList<string>();
-        watch.Start((_, ops, _) =>
+        watch.Start((call, _) =>
         {
-            frames.Add(OpsJson(ops));
+            frames.Add(OpsJson(Change(call).Ops));
             return Task.CompletedTask;
         });
         async Task<TaskGraph> Fresh()
         {
-            var state = await harness.TaskGraphAsync(Context);
-            var value = state.Value;
-            state.Dispose();
+            var fresh = await harness.WatchTaskGraphAsync(Context);
+            var value = fresh.Value;
+            await fresh.StopAsync();
             return value;
         }
         var snapshots = new List<KeyValuePair<string, JsonValue>>();

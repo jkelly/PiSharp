@@ -44,12 +44,13 @@ public sealed partial class OpenRouterImages : IImagesApi
             if (options.OnPayload is { } onPayload && await onPayload(payload.DeepClone(), model, cancellationToken).ConfigureAwait(false) is { } replaced)
                 payload = replaced;
             var text = ProviderRequest.Stringify(payload);
-            // OpenAI SDK defaults (as the native Completions port sends them), then the merged model and option headers;
-            // a null option value only removes a model header of that name.
+            // OpenAI SDK defaults (as the native Completions port sends them), then the merged identity (Pi 1.5.0 getIdentityHeaders),
+            // model and option headers; a null option value only removes an identity or model header of that name.
             var headers = ProviderRequest.MergeHeaders(
-                [new("accept", "application/json"), new("content-type", "application/json"), new("user-agent", "PiSharp"),
+                [new("accept", "application/json"), new("content-type", "application/json"),
                  new("x-stainless-retry-count", "0"), new("authorization", "Bearer " + options.ApiKey)],
-                ProviderRequest.Nullable(ProviderRequest.MergeHeaders(ProviderRequest.Nullable(model.Headers), options.Headers)));
+                ProviderRequest.Nullable(ProviderRequest.MergeHeaders(ProviderRequest.Nullable(ClientIdentities.GetIdentityHeaders(model.Provider, model.BaseUrl, options.Identity)),
+                    ProviderRequest.Nullable(model.Headers), options.Headers)));
             var url = new Uri(model.BaseUrl + (model.BaseUrl.EndsWith('/') ? "chat/completions" : "/chat/completions"));
             var http = ProviderRequest.Http(options);
             var (response, body) = await ProviderRequest.RetryAsync(async () =>
@@ -140,7 +141,7 @@ public sealed partial class OpenRouterImages : IImagesApi
         static double Tokens(double value) => value;
         return ProviderRequest.Usage(Tokens(input), Tokens(completion), Tokens(cacheRead), Tokens(cacheWrite),
             Tokens(input + completion + cacheRead + cacheWrite),
-            (inputCost, outputCost, readCost, writeCost, inputCost + outputCost + readCost + writeCost));
+            (inputCost, outputCost, readCost, writeCost, inputCost + outputCost + readCost + writeCost), totalFromProvider: false);
     }
 
     /// <summary>OpenAI SDK <c>APIError</c>: the message is built from the parsed body's <c>error</c> member (or the raw text

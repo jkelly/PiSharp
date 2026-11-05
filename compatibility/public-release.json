@@ -1,17 +1,17 @@
 {
   "schemaVersion": 1,
   "product": "PiSharp",
-  "version": "1.2.0.2",
-  "proposedReleaseTag": "v1.2.0.2",
+  "version": "1.5.0",
+  "proposedReleaseTag": "v1.5.0",
   "upstream": {
     "repository": "https://github.com/earendil-works/pi",
-    "tag": "v1.2.0",
-    "commit": "06a466935536f8c9bcacb2d5efc0fc021be1bdff"
+    "tag": "v1.5.0",
+    "commit": "f9a26365568127461c47a07a37dcb42c140a3ac5"
   },
   "versionMeaning": "Upstream porting baseline, not a claim of complete behavioral parity.",
-  "productAndPackageVersion": "1.2.0.2",
+  "productAndPackageVersion": "1.5.0",
   "assemblyIdentityPolicy": {
-    "defaultSdkDerivedVersion": "1.2.0.2",
+    "defaultSdkDerivedVersion": "1.5.0.0",
     "fixedSupervisorAssembly": "PiSharp.ExtensionHost",
     "fixedSupervisorAssemblyVersion": "1.0.0.0",
     "fixedSupervisorReason": "Retain the exact existing approved system-import identity; no loader guard is relaxed."
@@ -21,23 +21,12 @@
     "versionSpecificPackageConsumptionQualified": false,
     "fullProviderParity": false,
     "completeNativeGateReady": false,
-    "status": "Released 2026-11-02: a C#-only release on the Pi v1.2.0 baseline that releases the PiSharp-only media library and tools (decision 0007, PISHARP_MEDIA001), service tiers (PISHARP_TIERS001), custom agents as three new [Experimental] packages (decision 0012, PISHARP_AGENTS001), questions and plan mode in pisharp durable and the durable device server commands (decisions 0008-0010), plus pisharp fixes. The Web Agent, Durable Web, Durable.MSSQL and Web.Common are not packed; Durable.Hosting, Durable.Server, Durable.Client and ModelRuntime ship inside the PiSharp.Cli tool but not as packages."
-  },
-  "releaseCandidate": {
-    "branch": "release/1.2.0.2",
-    "decisions": ["docs/decisions/0007-media-generation.md", "docs/decisions/0012-custom-agents.md", "docs/decisions/0008-durable-network-host-and-web.md"],
-    "experimental": ["PiSharp.AI.Media (PISHARP_MEDIA001)", "service tiers (PISHARP_TIERS001)", "PiSharp.CustomAgents", "PiSharp.CustomAgents.JavaScript", "PiSharp.CustomAgents.Scripting", "MaintainedCatalogOverlay (PISHARP_CATALOG001)", "pisharp durable ask_user_question and plan mode", "pisharp durable serve, token and device commands"],
-    "sourceOnly": ["PiSharp.WebAgent", "PiSharp.Durable.Web", "PiSharp.Durable.MSSQL", "PiSharp.Durable.Hosting", "PiSharp.Durable.Server", "PiSharp.Durable.Client", "PiSharp.ModelRuntime", "PiSharp.Web.Common"],
-    "notes": "docs/release-notes/1.2.0.2.md",
-    "changelog": "website/src/content/changelog/1.2.0.2.md"
+    "status": "Version metadata prepared for the Pi v1.5.0 sync (decision 0013); fresh versioned lock, build, package and consumer evidence required."
   },
   "publication": {
-    "tagCreated": true,
-    "binaryReleasePublished": true,
-    "nugetPackagesPublished": true,
-    "publishedOn": "2026-11-02",
-    "tagCommit": "92e2f8b42223e275cde2b03eea880529ee81f464",
-    "releaseRun": "41376026307"
+    "tagCreated": false,
+    "binaryReleasePublished": false,
+    "nugetPackagesPublished": false
   },
   "previousReleases": [
     {
@@ -155,6 +144,18 @@
       "publishedOn": "2026-10-17",
       "tagCommit": "b2a558a5e3f2480a7443789d08af88f76197df00",
       "releaseRun": "38993151457"
+    },
+    {
+      "version": "1.2.0.2",
+      "tag": "v1.2.0.2",
+      "upstreamTag": "v1.2.0",
+      "upstreamCommit": "06a466935536f8c9bcacb2d5efc0fc021be1bdff",
+      "tagCreated": true,
+      "githubReleasePublished": true,
+      "nugetPackagesPublished": true,
+      "publishedOn": "2026-11-02",
+      "tagCommit": "92e2f8b42223e275cde2b03eea880529ee81f464",
+      "releaseRun": "41376026307"
     }
   ],
   "historicalArtifacts": "Earlier private versions and their qualification receipts retain their original identities; no artifact is renamed or relabeled."

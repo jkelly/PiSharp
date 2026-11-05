@@ -1,10 +1,10 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/test/harness-prompt.test.ts (describes "system prompt preparation" and
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/test/harness-prompt.test.ts (describes "system prompt preparation" and
 // "tool loadout preparation"). Verbatim apart from the adaptations in HarnessSupport.cs, and these:
 // - Backends. Upstream runs these on MemoryStorage. harness.prompt.* does the same; harness.prompt.jsonl.* and harness.prompt.sqlite.* rerun
 //   the cases that plan against a stored conversation on a fresh JSONL directory and a fresh SQLite file. The three cases that use no
 //   storage run once. Each case closes its Harness at the end.
 // - Section maps are ordered (key, text) pairs: `[...map]` and `Object.entries(desired)` compare as sequences of pairs.
-// - pi-ai's TypeBox `Type.Object({})` is its JSON Schema `{"type":"object","properties":{}}`.
+// - pi-schema's `obj({})` is its JSON Schema `{"type":"object","properties":{},"additionalProperties":false}`.
 using PiSharp.Durable;
 using PiSharp.Durable.Chord;
 using PiSharp.Durable.Internal.PiAi;
@@ -93,7 +93,7 @@ internal static class PromptTests
 
     /// <summary>A pi-ai tool declaration (upstream <c>declaration</c>).</summary>
     private static JsonObjectValue Declaration(string name, string? description = null) =>
-        Obj(("name", name), ("description", description ?? name), ("parameters", O("""{"type":"object","properties":{}}""")));
+        Obj(("name", name), ("description", description ?? name), ("parameters", O("""{"type":"object","properties":{},"additionalProperties":false}""")));
 
     /// <summary>Plans tools only, appends the plan, checks that replay offers <paramref name="tools"/> in order, and returns each message's
     /// changes as <c>{removed?, added?, sections?}</c> (upstream <c>applyTools</c>).</summary>
@@ -140,8 +140,8 @@ internal static class PromptTests
             }));
             var reports = new List<Exception>();
             var shown = new Dictionary<string, string> { ["failing"] = "<failing>\nold\n</failing>", ["cwd"] = "stale" };
-            var agent = Agents.ResolveAgent(null, registry.Snapshot(), Agents.ResolveSettings(null), error => throw error);
-            var desired = await HarnessPrompt.RenderSectionsAsync(agent.Sections, Input, shown, reports.Add, Context);
+            var agent = Agents.ResolveAgent(null, registry.Snapshot(), Agents.ResolveSettings(null), (error, _) => throw error);
+            var desired = await HarnessPrompt.RenderSectionsAsync(agent.Sections, Input, shown, (error, _) => reports.Add(error), Context);
             SamePairs([Pair("preamble", "You are helpful."), Pair("cwd", "<cwd>\n/repo (git)\n</cwd>"), Pair("failing", "<failing>\nold\n</failing>")],
                 desired, "desired");
             Seq(["render failed", "also failed"], reports.Select(error => error.Message), "reports");
@@ -152,7 +152,7 @@ internal static class PromptTests
             var controller = Context.WithCancel();
             controller.Cancel(new InvalidOperationException("cancelled"));
             var failing = Section("a", (_, _) => throw new InvalidOperationException("cancelled"));
-            await RejectsAsync(() => HarnessPrompt.RenderSectionsAsync([failing], Input, new Dictionary<string, string>(), _ => { }, controller.Context),
+            await RejectsAsync(() => HarnessPrompt.RenderSectionsAsync([failing], Input, new Dictionary<string, string>(), (_, _) => { }, controller.Context),
                 "cancelled", "render");
         });
 

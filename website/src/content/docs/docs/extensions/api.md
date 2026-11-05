@@ -82,7 +82,7 @@ The list also names the contract features that every current host has: `before-a
 
 ## Tools
 
-A tool is an `ExtensionToolDescriptor(RegistrationId, Name, Description, Parameters, ExecuteAsync)`. `Parameters` is the JSON Schema of the arguments. The host validates the model's arguments against it before your callback runs.
+A tool is an `ExtensionToolDescriptor(RegistrationId, Name, Description, Parameters, ExecuteAsync)`. `Parameters` is the JSON Schema of the arguments. The host validates the model's arguments against it before your callback runs. It checks JSON Schema 2020-12 as Pi 1.5.0 does, after coercing loosely typed values such as `"42"` for a number, and a `$ref` that names nothing rejects only the values at its place.
 
 The callback is `ExtensionToolCallback`: `(JsonData arguments, IExtensionToolContext context, CancellationToken token) => ValueTask<JsonData>`. It returns Pi's tool result object:
 
@@ -100,7 +100,7 @@ The descriptor also has these optional `init` properties:
 | Property | Default | Meaning |
 | --- | --- | --- |
 | `PrepareInitialArgumentsAsync` | null | Rewrites the raw arguments before validation, as Pi's `prepareArguments` does. If it throws, the call fails with the exception's message. |
-| `ParametersOrigin` | `ToolSchemaOrigin.JsonSchema` | How `Parameters` was produced. `TypeBox` also converts TypeBox 1.x schemas. |
+| `ParametersOrigin` | `ToolSchemaOrigin.JsonSchema` | How `Parameters` was produced. Since Pi 1.5.0 every schema is validated and coerced the same way, so it does not change the result. |
 | `ValidationParameters` | null | A different schema to validate against. Null validates against `Parameters`. |
 | `Exposure` | `ToolExposure.Direct` | `Direct` declares the tool to the model. `ModelOnly` declares it but code mode can't call it. `Codemode` makes it callable only from code mode scripts. `Deferred` declares it once `tool_search` finds it. `Hidden` makes it unreachable. |
 | `Namespace` | null | A `ToolNamespace(Name, Description)` that groups the tool in code mode and `tool_search`. |

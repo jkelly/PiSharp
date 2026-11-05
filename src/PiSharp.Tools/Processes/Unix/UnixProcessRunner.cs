@@ -32,7 +32,8 @@ public sealed class UnixProcessRunner : ISeparatedProcessRunner
         CancellationToken cancellationToken = default) => await Start(request, onUpdate, cancellationToken).Completion.ConfigureAwait(false);
     public async ValueTask<SeparatedProcessRunResult> RunSeparatedAsync(ProcessRequest request, CancellationToken cancellationToken = default)
     {
-        using var capture = new SeparatedProcessCapture(_options.StructuredMaxBytes);
+        using var capture = request.CaptureLimitBytes is { } limit
+            ? new SeparatedProcessCapture(_options.StructuredMaxBytes, limit) : new SeparatedProcessCapture(_options.StructuredMaxBytes);
         return capture.Result(await StartCore(request, null, capture, cancellationToken).Completion.ConfigureAwait(false));
     }
     private UnixProcessOperation StartCore(ProcessRequest request, ProcessOutputCallback? onUpdate,
@@ -64,6 +65,16 @@ public sealed class UnixProcessRunner : ISeparatedProcessRunner
             var launch = operation.Track(_admission.LaunchAsync(request, caller).AsTask());
             lease = await launch.ConfigureAwait(false);
             if (lease is null) throw new InvalidOperationException("Admission returned no lease.");
+        }
+        // The admission refused a command that cannot start before launching anything (PosixSpawnProcessAdmission, as NativeProcessRunner
+        // refuses one): a failed run with that diagnostic and nothing to clean up, which callers report as Node's spawn error does.
+        catch (ProcessLaunchException refused) when (refused.CleanupConfirmed && lease is null)
+        {
+            Add(refused.Diagnostic);
+            cleaned = true;
+            await FinishOutputAsync().ConfigureAwait(false);
+            if (timer is not null) await ObserveValueAsync(() => timer.DisposeAsync(), ProcessDiagnostic.CleanupFailed).ConfigureAwait(false);
+            return Result(caller.IsCancellationRequested ? ProcessRunStatus.Canceled : ProcessRunStatus.Failed);
         }
         catch (Exception error)
         {
@@ -168,6 +179,8 @@ public sealed class UnixProcessRunner : ISeparatedProcessRunner
                     if (read == 0) break;
                     if (read != bytes.Length) Array.Resize(ref bytes, read);
                     capture?.Append(standardError, bytes);
+                    // A reached capture limit stops the process group; the status still follows its actual exit.
+                    if (capture is { LimitReached: true }) stop.TrySetResult(ProcessRunStatus.Exited);
                     var originalWrite = chunks.Writer.WriteAsync(bytes, reads.Token).AsTask();
                     try { await originalWrite.ConfigureAwait(false); }
                     catch (Exception error)

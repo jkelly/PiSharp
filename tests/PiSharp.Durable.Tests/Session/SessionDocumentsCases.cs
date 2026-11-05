@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/test/session-documents.test.ts. Verbatim apart from the adaptations
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/test/session-documents.test.ts. Verbatim apart from the adaptations
 // in SessionSupport.cs and these:
 // - "copies assigned values per placement": placements are immutable JsonValue trees, so a placement cannot be mutated afterwards and two
 //   placements of one value may share it; the case checks the values and that the caller's later replacement does not reach the document.
@@ -8,6 +8,8 @@
 //   exactly as upstream's cases arrange it. The negative "line stays held" check yields instead of flushing (the line is held).
 // - "reloads an unloaded document from Storage": the reload is shown by the storage read, not a new object (an immutable stored value may
 //   be handed out again).
+// - Pi v1.5.0 sync (area vocabulary, 5f312dac4): a published document change is a DocumentValueChange (kind change) or a
+//   DocumentRetireChange (kind retire); toEqual of the retirement is record equality, and the context case observes with ObserveCommits.
 using PiSharp.Durable;
 using PiSharp.Durable.Chord;
 using PiSharp.Durable.Chord.Delta;
@@ -23,16 +25,18 @@ internal static partial class SessionTests
         {
             Interlocked.Increment(ref liveInitCount);
             return O(liveInitial);
-        });
-        var rewindableLiveDoc = Documents.DefineRewindableConversationDoc("test.live", 1, DocumentFork.AsOf, () => O(liveInitial));
-        var liveDocV2 = Documents.DefineConversationDoc("test.live", 2, DocumentFork.Initial, () => O(liveInitial));
-        var counterDoc = Documents.DefineSessionDoc("test.counter", 1, () => O("{\"count\":0}"));
+        }, checkpointWhen: (_, _, _) => false);
+        var rewindableLiveDoc = Documents.DefineRewindableConversationDoc("test.live", 1, DocumentFork.AsOf, () => O(liveInitial),
+            checkpointWhen: (_, _, _) => false);
+        var liveDocV2 = Documents.DefineConversationDoc("test.live", 2, DocumentFork.Initial, () => O(liveInitial),
+            checkpointWhen: (_, _, _) => false);
+        var counterDoc = Documents.DefineSessionDoc("test.counter", 1, () => O("{\"count\":0}"), checkpointWhen: (_, _, _) => false);
         var seeds = new List<string>();
         var memberDoc = Documents.DefineSessionDocFamily("test.member", 1, seed =>
         {
             lock (seeds) seeds.Add(S(seed));
             return Obj(("seed", seed), ("hits", 0));
-        });
+        }, checkpointWhen: (_, _, _) => false);
 
         async Task<(ControlledStorage Storage, Session Session, List<CommitPublication> Publications, ConversationId ConversationId)> SetupLive()
         {
@@ -64,7 +68,7 @@ internal static partial class SessionTests
             SameJson("{\"message\":\"hello\",\"items\":[],\"nested\":{\"count\":0},\"other\":{\"label\":\"x\"}}", snapshot, "snapshot");
             await Flush(session);
             var publication = Last(publications);
-            var published = DocumentChanges(publication)[0];
+            var published = DocumentValues(publication)[0];
             Equal(publication.Seq, published.Record.CreatedAt, "createdAt");
             Same(snapshot, published.Value, "published value");
             Equal<ConversationId?>(conversationId, published.ConversationId, "conversation");
@@ -110,7 +114,7 @@ internal static partial class SessionTests
             }, Context);
             await Flush(session);
             var snapshot = (await session.SnapshotAsync(liveDoc, conversationId, Context))!;
-            var published = DocumentChanges(Last(publications))[0];
+            var published = DocumentValues(Last(publications))[0];
             Same(snapshot, published.Value, "published value");
             var admitted = storage.LastAdmitted.OfType<DocumentChangeWrite>().Single();
             var delta = admitted.Content as DocumentDelta ?? throw new InvalidOperationException("Expected delta");
@@ -172,7 +176,7 @@ internal static partial class SessionTests
             var after = (await session.SnapshotAsync(liveDoc, conversationId, Context))!;
             Check(JsonValue.DeepEquals(before, after), "equal value");
             Check(!ReferenceEquals(before, after), "a new revision");
-            Check(DocumentChanges(Last(publications))[0].Ops.Length > 0, "published operations");
+            Check(DocumentValues(Last(publications))[0].Ops.Length > 0, "published operations");
         });
 
         yield return Case(prefix + "revokes-escaped-drafts-when-the-callback-settles", async () =>
@@ -287,7 +291,7 @@ internal static partial class SessionTests
             {
                 initialized++;
                 return O("{\"count\":0}");
-            });
+            }, checkpointWhen: (_, _, _) => false);
             var gate = storage.HoldFindDocument();
             var mints = storage.MintCount;
             Task? pending = null;
@@ -340,7 +344,7 @@ internal static partial class SessionTests
         {
             var (storage, session, _) = Open(storageFactory);
             var conversationId = await CreateConversation(session);
-            var nullDoc = Documents.DefineSessionDoc("test.date", 1, () => null!);
+            var nullDoc = Documents.DefineSessionDoc("test.date", 1, () => null!, checkpointWhen: (_, _, _) => false);
             await RejectsAsync(() => session.CommitAsync(tx => tx.DocAsync(nullDoc), Context), "must return a JSON object", "initializer");
             var commits = storage.CommitCount;
             await ThrowsAsync<ArgumentNullException>(() => session.CommitAsync(async tx =>
@@ -443,12 +447,15 @@ internal static partial class SessionTests
             var publication = Last(publications);
             var changes = DocumentChanges(publication);
             var (retired, created) = (changes[0], changes[1]);
-            Check(retired.Record.Id == oldId && retired.Value is null && retired.Ops.IsEmpty, "retired change");
+            Equal<DocumentCommitChange>(new DocumentRetireChange(retired.Record, conversationId), retired, "retired change");
+            Check(retired.Record.Id == oldId, "retired ID");
             Equal<Seq?>(publication.Seq, retired.Record.RetiredAt, "retiredAt");
             Check(created.Record.Id != oldId, "new ID");
             Equal(publication.Seq, created.Record.CreatedAt, "createdAt");
-            Check(S(created.Value!["message"]) == "new" && ((JsonArrayValue)created.Value["items"]).Count == 0 && created.Ops.IsEmpty, "created change");
-            Same(created.Value, await session.SnapshotAsync(liveDoc, conversationId, Context), "snapshot is the new incarnation");
+            Check(created is DocumentValueChange { Kind: DocumentCommitChangeKind.Change, Ops.IsEmpty: true } createdValue &&
+                S(createdValue.Value["message"]) == "new" && ((JsonArrayValue)createdValue.Value["items"]).Count == 0, "created change");
+            Same((created as DocumentValueChange)?.Value, await session.SnapshotAsync(liveDoc, conversationId, Context),
+                "snapshot is the new incarnation");
 
             await session.CommitAsync(tx => tx.RetireDocAsync(liveDoc, conversationId), Context);
             Check(await session.SnapshotAsync(liveDoc, conversationId, Context) is null, "retired");
@@ -549,7 +556,7 @@ internal static partial class SessionTests
             var (_, session, publications, conversationId) = await SetupLive();
             var published = Count(publications);
             DurableContext? listenerContext = null;
-            var subscription = session.SubscribeCommits((_, delivered) => listenerContext = delivered);
+            var observation = session.ObserveCommits(new CommitObserver((_, delivered) => listenerContext = delivered, _ => { }));
             var result = await session.CommitAsync(async tx =>
             {
                 (await tx.DocAsync(liveDoc, conversationId))["message"] = "m";
@@ -558,7 +565,7 @@ internal static partial class SessionTests
             Equal("done", result, "result");
             Same(Context, listenerContext, "listener context");
             Equal(published + 1, Count(publications), "publications");
-            subscription.Dispose();
+            observation.Detach();
         });
 
         yield return Case(prefix + "publishes-close-synchronously-and-supports-unsubscription", async () =>

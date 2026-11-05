@@ -1,10 +1,11 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/tui/src/components/settings-list.ts.
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/tui/src/components/settings-list.ts.
 // Ported to plain ESM for the PiSharp Node extension bridge (TypeScript types stripped mechanically; behaviour unchanged).
 import { fuzzyFilter } from "../fuzzy.mjs";
-import { getKeybindings } from "../keybindings.mjs";
+import { getKeybindings, getSelectPageIndex } from "../keybindings.mjs";
 import { truncateToWidth, visibleWidth, wrapTextWithAnsi } from "../utils.mjs";
 import { Input } from "./input.mjs";
 export class SettingsList {
+    capturesViewportInput = true;
     items;
     filteredItems;
     theme;
@@ -161,12 +162,16 @@ export class SettingsList {
         }
         const kb = getKeybindings();
         const displayItems = this.getDisplayItems();
+        const pageIndex = getSelectPageIndex(kb, data, this.selectedIndex, displayItems.length, this.maxVisible);
         if (kb.matches(data, "tui.select.up")) {
             if (displayItems.length === 0) return;
             this.selectedIndex = this.selectedIndex === 0 ? displayItems.length - 1 : this.selectedIndex - 1;
         } else if (kb.matches(data, "tui.select.down")) {
             if (displayItems.length === 0) return;
             this.selectedIndex = this.selectedIndex === displayItems.length - 1 ? 0 : this.selectedIndex + 1;
+        } else if (pageIndex !== undefined) {
+            if (displayItems.length === 0) return;
+            this.selectedIndex = pageIndex;
         } else if (kb.matches(data, "tui.select.confirm") || data === " " && (!this.searchEnabled || this.searchInput?.getValue().length === 0)) {
             this.activateItem();
         } else if (kb.matches(data, "tui.select.cancel")) {

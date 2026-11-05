@@ -36,7 +36,7 @@ internal sealed class ToolTestEnv(string cwd) : IExecutionEnv
     public Task<Result<ITextLineReader, FileError>> OpenTextLineReaderAsync(string path, DurableContext context) => Unsupported<ITextLineReader>();
     public Task<Result<ImmutableArray<string>, FileError>> ReadTextLinesAsync(string path, ReadTextLinesOptions? options, DurableContext context) =>
         Unsupported<ImmutableArray<string>>();
-    public Task<Result<IFileWatcher, FileError>> WatchAsync(IReadOnlyList<WatchTarget> targets, Action<WatchChange> onChange, DurableContext context) =>
+    public Task<Result<IFileWatcher, FileError>> WatchAsync(IReadOnlyList<WatchTarget> targets, Action<FileChange> onChange, DurableContext context) =>
         Unsupported<IFileWatcher>();
     public Task<Result<string, FileError>> CreateTempDirAsync(string? prefix, DurableContext context) => Unsupported<string>();
     public Task<Result<string, FileError>> CreateTempFileAsync(TempFileOptions? options, DurableContext context) => Unsupported<string>();

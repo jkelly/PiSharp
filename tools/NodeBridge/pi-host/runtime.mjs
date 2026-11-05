@@ -9,9 +9,11 @@
 // agent, the session and the UI; the ExtensionAPI's actions and the context's getters call the host (getters synchronously, as the
 // upstream API is synchronous). The per-event reductions below are upstream's runner loops over one extension's handlers; the host
 // folds the per-extension results across extensions in load order the same way.
+import { constants as bufferConstants } from 'node:buffer';
 import { spawn } from 'node:child_process';
 import { EventEmitter } from 'node:events';
 import path from 'node:path';
+import { StringDecoder } from 'node:string_decoder';
 import { pathToFileURL } from 'node:url';
 
 export const STALE_MESSAGE = 'This extension ctx is stale after session replacement or reload. Do not use a captured pi or command ctx after ctx.newSession(), ctx.fork(), ctx.switchSession(), or ctx.reload(). For newSession, fork, and switchSession, move post-replacement work into withSession and use the ctx passed to withSession. For reload, do not use the old ctx after await ctx.reload().';
@@ -35,29 +37,51 @@ export function createEventBus(onEmit) {
   };
 }
 
-/** Source execCommand: spawn without a shell, collect stdout/stderr, SIGTERM then SIGKILL on abort or timeout. */
-export function execCommand(command, args, cwd, options) {
-  return new Promise((resolve) => {
-    let proc;
-    try { proc = spawn(command, args, { cwd, shell: false, stdio: ['ignore', 'pipe', 'pipe'] }); }
-    catch { resolve({ stdout: '', stderr: '', code: 1, killed: false }); return; }
-    let stdout = '', stderr = '', killed = false, timeoutId;
-    const killProcess = () => {
-      if (killed) return; killed = true; proc.kill('SIGTERM');
-      setTimeout(() => { if (!proc.killed) proc.kill('SIGKILL'); }, 5000).unref();
-    };
-    if (options?.signal) { if (options.signal.aborted) killProcess(); else options.signal.addEventListener('abort', killProcess, { once: true }); }
-    if (options?.timeout && options.timeout > 0) timeoutId = setTimeout(killProcess, options.timeout);
-    proc.stdout?.on('data', (data) => { stdout += data.toString(); });
-    proc.stderr?.on('data', (data) => { stderr += data.toString(); });
-    const done = (code) => {
-      if (timeoutId) clearTimeout(timeoutId);
-      options?.signal?.removeEventListener('abort', killProcess);
-      resolve({ stdout, stderr, code: code ?? 0, killed });
-    };
-    proc.on('error', () => done(1));
-    proc.on('close', (code) => done(code));
-  });
+const DEFAULT_EXEC_MAX_BUFFER = Math.min(256 * 1024 * 1024, bufferConstants.MAX_STRING_LENGTH);
+const FORCE_KILL_DELAY_MS = 5000;
+
+/** Source execCommand: argv without a shell, `timeout`/`signal` stop the child with SIGTERM and then SIGKILL after five seconds,
+ * stdout and stderr together are capped at `maxBuffer` bytes (the command is stopped and the result is `truncated`), and output is
+ * decoded across chunk boundaries. A child that could not start resolves with its error in stderr and code 1. */
+export async function execCommand(command, args, cwd, options) {
+  const maxBuffer = options?.maxBuffer ?? DEFAULT_EXEC_MAX_BUFFER;
+  if (!Number.isInteger(maxBuffer) || maxBuffer < 0 || maxBuffer > bufferConstants.MAX_STRING_LENGTH) {
+    throw new RangeError(`maxBuffer must be an integer between 0 and ${bufferConstants.MAX_STRING_LENGTH} bytes`);
+  }
+  let proc;
+  try { proc = spawn(command, args, { cwd, shell: false, stdio: ['ignore', 'pipe', 'pipe'] }); }
+  catch (error) { return { stdout: '', stderr: message(error), code: 1, killed: false, truncated: false }; }
+  let stdout = '', stderr = '', outputBytes = 0, truncated = false, killed = false, timeoutId, forceKillId;
+  const stdoutDecoder = new StringDecoder('utf8'), stderrDecoder = new StringDecoder('utf8');
+  const killProcess = () => {
+    if (killed) return;
+    killed = true;
+    proc.kill('SIGTERM');
+    // proc.killed only says a signal was sent; escalate while the child has not actually exited.
+    forceKillId = setTimeout(() => { if (proc.exitCode === null && proc.signalCode === null) proc.kill('SIGKILL'); }, FORCE_KILL_DELAY_MS);
+  };
+  if (options?.signal) { if (options.signal.aborted) killProcess(); else options.signal.addEventListener('abort', killProcess, { once: true }); }
+  if (options?.timeout && options.timeout > 0) timeoutId = setTimeout(killProcess, options.timeout);
+  // Keep only the bytes within the combined cap; on overflow close both pipes so writing descendants cannot hold the result open.
+  const takeWithinCap = (data) => {
+    if (truncated) return undefined;
+    const remaining = maxBuffer - outputBytes;
+    if (data.length <= remaining) { outputBytes += data.length; return data; }
+    truncated = true;
+    proc.stdout?.destroy(); proc.stderr?.destroy();
+    killProcess();
+    return remaining > 0 ? data.subarray(0, remaining) : undefined;
+  };
+  proc.stdout?.on('data', (data) => { const chunk = takeWithinCap(data); if (chunk) stdout += stdoutDecoder.write(chunk); });
+  proc.stderr?.on('data', (data) => { const chunk = takeWithinCap(data); if (chunk) stderr += stderrDecoder.write(chunk); });
+  let code;
+  try { code = await new Promise((resolve, reject) => { proc.once('error', reject); proc.once('close', resolve); }); }
+  catch (error) { code = 1; if (!stderr) stderr = message(error); }
+  finally { clearTimeout(timeoutId); clearTimeout(forceKillId); options?.signal?.removeEventListener('abort', killProcess); }
+  // On truncation an incomplete UTF-8 suffix is dropped rather than flushed as a replacement character.
+  if (!truncated) { stdout += stdoutDecoder.end(); stderr += stderrDecoder.end(); }
+  const exitCode = code ?? 0;
+  return { stdout, stderr, code: truncated && exitCode === 0 ? 1 : exitCode, killed, truncated };
 }
 
 function isUserBashEventResult(value) {
@@ -563,8 +587,11 @@ export class ExtensionRuntime {
         const done = (result) => { bridge.notify('component.done', { id }); runtime.disposeComponent(id); resolve(result); };
         try { id = runtime.createComponent((tui, theme, keybindings) => factory(tui, theme, keybindings, done)); }
         catch (error) { reject(error); return; }
-        const overlayOptions = typeof options?.overlayOptions === 'function' ? options.overlayOptions() : options?.overlayOptions;
-        bridge.call('ui.custom', { ctx, component: id, overlay: options?.overlay === true, overlayOptions: overlayOptions ?? null })
+        // Pi 1.3.0: without overlayOptions an overlay takes the component's width property, if it has one.
+        const width = runtime.components.get(id)?.component?.width;
+        const overlayOptions = (typeof options?.overlayOptions === 'function' ? options.overlayOptions() : options?.overlayOptions) ?? (width ? { width } : undefined);
+        // Pi 1.5.0: blocked reports program status while the inline component is visible (overlays ignore it).
+        bridge.call('ui.custom', { ctx, component: id, overlay: options?.overlay === true, overlayOptions: overlayOptions ?? null, blocked: options?.blocked ?? null })
           .catch((error) => { runtime.disposeComponent(id); reject(error); });
       })),
       pasteToEditor: (text) => bridge.notify('ui.publish', { ctx, op: 'pasteToEditor', args: [text] }),
@@ -637,6 +664,24 @@ export class ExtensionRuntime {
     this.keybindingsConfig = keybindings ?? {};
     this.editorActions = actions ?? [];
     for (const id of this.editorIds ?? []) { const editor = this.components.get(id)?.component; if (editor) this.wireEditor(id, editor); }
+  }
+  /**
+   * Pi 1.5.0 KeybindingHints for render contexts and options: keybinding-hints.ts keyText/keyHint over the mode's effective
+   * keybindings (editor.configure), so renderers show the user's keys whichever pi-coding-agent copy they import.
+   */
+  keybindingHints() {
+    const runtime = this;
+    const part = (value) => (process.platform === 'darwin' && value.toLowerCase() === 'alt' ? 'option' : value);
+    const keyText = (keybinding) => {
+      const value = runtime.keybindingsConfig?.[keybinding];
+      const keys = value === undefined ? [] : Array.isArray(value) ? value : [value];
+      return keys.length === 0 ? '' : keys.join('/').split('/').map((key) => key.split('+').map(part).join('+')).join('/');
+    };
+    const keyHint = (keybinding, description) => {
+      const theme = runtime.theme();
+      return theme ? theme.fg('dim', keyText(keybinding)) + theme.fg('muted', ` ${description}`) : `${keyText(keybinding)} ${description}`;
+    };
+    return { keyText, keyHint };
   }
   editorKeybindings() {
     const runtime = this;
@@ -713,9 +758,19 @@ export class ExtensionRuntime {
   renderComponent(id, width) {
     const record = this.components.get(id);
     if (!record?.component) return [];
-    return (record.component.render(width) ?? []).map(String);
+    const lines = (record.component.render(width) ?? []).map(String);
+    this.reportCaptures(record);
+    return lines;
   }
-  inputComponent(id, data) { const component = this.components.get(id)?.component; component?.handleInput?.(data); }
+  inputComponent(id, data) { const record = this.components.get(id); record?.component?.handleInput?.(data); if (record) this.reportCaptures(record); }
+  /** Pi 1.5.0 Component.capturesViewportInput: the host keeps the last value (component.captures) for its viewport scroll keys. */
+  reportCaptures(record) {
+    let captures = false;
+    try { captures = record.component?.capturesViewportInput === true; } catch { /* a throwing getter reports false */ }
+    if (captures === (record.captures === true)) return;
+    record.captures = captures;
+    this.bridge.notify('component.captures', { id: record.id, value: captures });
+  }
   disposeComponent(id) { const record = this.components.get(id); if (!record) return; this.components.delete(id); try { record.component?.dispose?.(); } catch { /* ignore */ } }
 
   // ---------------------------------------------------------------------------------------------------------------- dispatch
@@ -962,7 +1017,7 @@ export class ExtensionRuntime {
       args: params.args, toolCallId: key, invalidate: () => this.bridge.notify('render.invalidate', { toolCallId: key }), state: state.state, cwd: this.cwd,
       executionStarted: params.executionStarted === true, argsComplete: params.argsComplete !== false, isPartial: params.isPartial === true,
       expanded: params.expanded === true, showImages: params.showImages === true, isError: params.isError === true, durationMs: params.durationMs ?? undefined,
-      outputPad: params.outputPad ?? 0,
+      outputPad: params.outputPad ?? 0, ...this.keybindingHints(),
     };
     const out = { handled: true, renderShell: renderers.renderShell ?? 'default' };
     if (params.slot === 'call') {
@@ -981,7 +1036,7 @@ export class ExtensionRuntime {
     for (const ext of this.extensions) {
       const renderer = ext.messageRenderers.get(params.customType);
       if (!renderer) continue;
-      const component = renderer(params.message, { expanded: params.expanded === true }, this.theme());
+      const component = renderer(params.message, { expanded: params.expanded === true, ...this.keybindingHints() }, this.theme());
       return { handled: true, lines: component ? component.render(params.width) : [] };
     }
     return { handled: false };
@@ -991,7 +1046,7 @@ export class ExtensionRuntime {
     for (const ext of this.extensions) {
       const renderer = ext.entryRenderers.get(params.customType);
       if (!renderer) continue;
-      const component = renderer(params.entry, { expanded: params.expanded === true }, this.theme());
+      const component = renderer(params.entry, { expanded: params.expanded === true, ...this.keybindingHints() }, this.theme());
       return { handled: true, lines: component ? component.render(params.width) : [] };
     }
     return { handled: false };

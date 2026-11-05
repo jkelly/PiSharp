@@ -14,6 +14,15 @@ public sealed record ChatRequest(ModelDescriptor Model, ImmutableArray<Transcrip
     /// ultrafast); each protocol maps it to its own field, and protocols without tiers ignore it. Null keeps the transport's own.</summary>
     [System.Diagnostics.CodeAnalysis.Experimental("PISHARP_TIERS001")]
     public string? ServiceTier { get; init; }
+    /// <summary>Source StreamOptions.identity (identity.ts): how the request identifies the calling app, merged field by field
+    /// over the transport's own identity. Null keeps the transport's (by default a detailed User-Agent and no attribution).</summary>
+    [System.Diagnostics.CodeAnalysis.Experimental("PISHARP_IDENTITY001")]
+    public ClientIdentity? Identity { get; init; }
+    /// <summary>Source ProviderRequestOptions.telemetry (types.ts): the explicit parent span of this logical request's telemetry. A
+    /// <see cref="ChatRun"/> records a <c>pi.ai.request</c> span under it, with metrics through its <c>Metrics</c> capability
+    /// (<see cref="AiTelemetry"/>). Transports receive it with the request but never serialize it. Null records nothing.</summary>
+    [System.Diagnostics.CodeAnalysis.Experimental("PISHARP_TELEMETRY001")]
+    public PiSharp.Telemetry.ITelemetrySpan? Telemetry { get; init; }
 }
 
 /// <summary>Explicit per-model native request support, independent of catalog/UI claims.</summary>

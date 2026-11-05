@@ -1,7 +1,9 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/test/harness-cancellation-barrier.test.ts: work below a cancelled
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/test/harness-cancellation-barrier.test.ts: work below a cancelled
 // owner starts no run phase, even before its cascade mark commits, and restart marks give way to requests. Verbatim on MemoryStorage, as
 // upstream, apart from the adaptations of HarnessSchedulerSupport.cs and these:
-// - HoldMarks (upstream `class HoldMarks extends MemoryStorage`) is a HookedStorage over MemoryStorage.
+// - HoldMarks (upstream `class HoldMarks extends MemoryStorage`) is a HookedStorage over MemoryStorage. Pi v1.5.0 sync (area
+//   group-commit-scheduler, e5c6182ba): it holds a Storage call any batch of which marks the target (HookedStorage.OnCommit runs per batch,
+//   before the call; upstream's batches.flat()), and the direct storage writes go through CommitWritesAsync (upstream commitWrites).
 // - Upstream writes records straight to the storage (storage.commit([...])) with spreads; here StorageWrite.Task (TaskWrite) of the record
 //   with the changed fields.
 // - "does not start its next phase while the cascade that marks it has not committed" lets pending work progress with five flushes, as
@@ -14,6 +16,7 @@ using static Program;
 using static SchedulerTests;
 using static SessionTests;
 using Deferred = HarnessTests.Deferred;
+using PiSharp.Durable.Testing;
 
 internal static partial class Program
 {
@@ -107,7 +110,7 @@ internal static partial class SchedulerTests
             var owner = (await storage.GetTaskAsync(parent, Context))!;
             var failedRecord = (await storage.GetTaskAsync(failed, Context))!;
             var waiting = NextTaskState.Waiting(O("""{"phase":"work"}"""), [failed, child], JoinPolicy.FailFast);
-            await storage.CommitAsync(
+            await storage.CommitWritesAsync(
             [
                 new TaskWrite(owner with { AbortRequested = true, AbortReason = TaskAbortReason.Restart, State = waiting }),
                 new TaskWrite(failedRecord with { State = NextTaskState.Failed("failed") }),
@@ -170,7 +173,7 @@ internal static partial class SchedulerTests
                 tx.CreateTaskAsync(dormant, JsonValue.Null, OwnConversation(conversation.Id, abandonOnRestart: true)), Context);
             var child = await session.CommitAsync(tx => tx.CreateTaskAsync(dormant, JsonValue.Null, OwnedBy(holder)), Context);
             var record = (await storage.GetTaskAsync(holder, Context))!;
-            await storage.CommitAsync([new TaskWrite(record with { State = new CompletingTaskState(new CompletedTaskOutcome(JsonValue.Null)) })], Context);
+            await storage.CommitWritesAsync([new TaskWrite(record with { State = new CompletingTaskState(new CompletedTaskOutcome(JsonValue.Null)) })], Context);
             var (harness, _, _) = await OpenTasks(storage, [dormant]);
             try
             {

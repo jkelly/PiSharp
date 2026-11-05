@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/src/core/keybindings.ts (KEYBINDINGS, migrations,
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/coding-agent/src/core/keybindings.ts (KEYBINDINGS, migrations,
 // KeybindingsManager.create/reload, toKeybindingsConfig), src/core/key-id-schema.ts (KeybindingValueSchema) and
 // src/modes/interactive/components/keybinding-hints.ts (keyText, keyDisplayText, keyHint, rawKeyHint).
 using System.Text.Json.Nodes;
@@ -175,4 +175,12 @@ internal static class KeybindingHints
     public static string KeyDisplayText(string keybinding) => FormatKeys(TuiKeybindingsManager.Global.GetKeys(keybinding), capitalize: true);
     public static string KeyHint(string keybinding, string description) => Themes.Current.Fg("dim", KeyText(keybinding)) + Themes.Current.Fg("muted", " " + description);
     public static string RawKeyHint(string key, string description) => Themes.Current.Fg("dim", FormatKeyText(key)) + Themes.Current.Fg("muted", " " + description);
+}
+
+/// <summary>Pi 1.5.0 KeybindingHints for extension renderers: keyText and keyHint over the host's keybindings.</summary>
+internal sealed class HostKeybindingHints : PiSharp.Extensions.IExtensionKeybindingHints
+{
+    public static HostKeybindingHints Instance { get; } = new();
+    public string KeyText(string keybinding) => KeybindingHints.KeyText(keybinding);
+    public string KeyHint(string keybinding, string description) => KeybindingHints.KeyHint(keybinding, description);
 }

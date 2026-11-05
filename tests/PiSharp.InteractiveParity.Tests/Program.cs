@@ -10,7 +10,7 @@ using PiSharp.Cli.Interactive.Mode;
 // is a static class whose name ends in "Cases" with a static All() returning (Id, Run) pairs. Unix-only cases skip on Windows.
 internal static class Program
 {
-    private const string Upstream = "06a466935536f8c9bcacb2d5efc0fc021be1bdff";
+    private const string Upstream = "f9a26365568127461c47a07a37dcb42c140a3ac5"; // Report label: synced to Pi v1.5.0 (decision 0013), still authored by reading, never captured.
 
     private static async Task<int> Main(string[] args)
     {

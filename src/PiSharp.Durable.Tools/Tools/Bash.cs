@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/src/tools/bash.ts
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/src/tools/bash.ts
 // Timeouts stay in seconds as JavaScript numbers; messages print them as JavaScript does. Upstream's `prepare` may return a promise or
 // nothing; here it returns a ValueTask. v1.2.0: a nonzero exit is an error result with an exit_code diagnostic instead of a throw, and both
 // tools declare structuredOutputSchema and return {output, truncated, fullOutputPath?, exitCode} (upstream ShellStructuredOutput).
@@ -51,15 +51,16 @@ internal static class BashTool
 {
     private const double MaxTimeoutSeconds = 2_147_483_647 / 1000.0;
 
-    /// <summary><c>Type.Object({ command, timeout? })</c> as TypeBox prints it, for <paramref name="shell"/>.</summary>
+    /// <summary><c>obj({ command, timeout: opt(...) }, { open: true })</c> as pi-schema builds it, for <paramref name="shell"/>: open, as the
+    /// tools accepted extra arguments when their schemas were TypeBox's.</summary>
     internal static JsonObjectValue ParametersFor(string shell) => (JsonObjectValue)JsonValue.Parse(
-        """{"type":"object","required":["command"],"properties":{"command":{"type":"string","description":""" + "\"" + shell +
-        """ command to execute"},"timeout":{"type":"number","description":"Timeout in seconds (optional, no default timeout)"}}}""");
+        """{"type":"object","properties":{"command":{"type":"string","description":""" + "\"" + shell +
+        """ command to execute"},"timeout":{"type":"number","description":"Timeout in seconds (optional, no default timeout)"}},"required":["command"]}""");
 
     /// <summary>What a program that calls <c>bash</c> or <c>powershell</c> receives (upstream <c>shellStructuredOutputSchema</c>), as
-    /// TypeBox prints it.</summary>
+    /// pi-schema builds it.</summary>
     internal static readonly JsonObjectValue StructuredOutputSchema = (JsonObjectValue)JsonValue.Parse(
-        """{"type":"object","required":["output","truncated","exitCode"],"properties":{"output":{"type":"string","description":"Combined stdout and stderr: the retained tail, as the model sees it"},"truncated":{"type":"boolean","description":"Whether earlier output was dropped"},"fullOutputPath":{"type":"string","description":"File with the complete output, when it was spilled"},"exitCode":{"type":"number"}}}""");
+        """{"type":"object","properties":{"output":{"type":"string","description":"Combined stdout and stderr: the retained tail, as the model sees it"},"truncated":{"type":"boolean","description":"Whether earlier output was dropped"},"fullOutputPath":{"type":"string","description":"File with the complete output, when it was spilled"},"exitCode":{"type":"number"}},"required":["output","truncated","exitCode"]}""");
 
     private static string Description(string shell) =>
         $"Execute a {shell} command in the current working directory. Returns combined stdout and stderr. Output is truncated to last {Truncation.DefaultMaxLines} lines or {Truncation.DefaultMaxBytes / 1024}KB (whichever is hit first). If truncated, full output is saved to a temp file. Optionally provide a timeout in seconds.";

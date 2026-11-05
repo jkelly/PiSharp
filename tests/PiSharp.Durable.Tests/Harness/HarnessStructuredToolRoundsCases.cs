@@ -1,14 +1,21 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/test/harness-structured.test.ts, describe "tool rounds": the three
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/test/harness-structured.test.ts, describe "tool rounds": the three
 // tests the tool task (P9) unblocks, "owns its tool tasks, waits for them, and hands the run to a conversation-owned generation", "aborts a
 // parallel round with its generation: tools first, then the generation, with every result written" and "answers the unstarted calls of an
 // aborted sequential round with aborted results, in call order", and the one generation alone (P8) unblocked, "keeps run control with a
 // faulted generation until its owned work drains, and retries a rejected final commit", which Pi v1.2.0 turned into "... and fails the
 // Harness on a failed final commit" (area b of the sync). "ends a turn at the generation's hold, before its
-// successor's turn starts" and the "tool rounds and events" tests listen to agent events and are in HarnessStructuredEventsCases.cs.
+// successor's turn starts" and the "tool rounds and events" tests listen to agent events; area events (f3255de76) moved them to AgentEventsCases.cs, and HarnessStructuredCases.cs has v1.5.0's view forms.
 // Adaptations beyond those of HarnessStructuredSupport.cs and ChatSupport.cs: invalidFinalStream is GenerationTests.InvalidFinalStream (a
 // non-finite usage count instead of a function, see HarnessGenerationCases.cs); upstream's module-level blockingTool and toolCalls are
 // BlockingRoundTool and ToolCalls below; `Promise.all([one.started, two.started])` is Task.WhenAll; "aborts a parallel round ..." orders the
 // two tools' aborts with a barrier (see there).
+// Pi v1.5.0 sync (area deferred-commits, 6c2fd73b0): "... fails the Harness on a failed final commit" stores progress at once
+// (progress.persistWithinMs 0), as upstream's does.
+// Pi v1.5.0 sync (area run-end, 7e15f9601): both runFailure values carry the run's first, "<number>" for expect.any(Number) (MatchExactly).
+// Pi v1.5.0 sync (area run-failure, f3255de76): the aborted and the faulted run leave f3255de76's pi.live.runFailure where v1.2.0 expected
+// an empty pi.live. The faulted run's detail is Chord's "Value contains a non-finite number and is not strict JSON", where upstream's is
+// "Value contains a non-JSON function; expected strict JSON" (the invalid final message above).
+// Pi v1.5.0 sync (closeout): the tools upstream declares with pi-schema's obj({}) declare ToolsSchema150.EmptyObject (area tools-schema).
 using PiSharp.Durable;
 using PiSharp.Durable.Chord;
 using static ChatTests;
@@ -30,6 +37,7 @@ internal static partial class StructuredTests
         {
             Name = name,
             Description = $"The {name} tool",
+            Parameters = ToolsSchema150.EmptyObject,
             ExecutionMode = ToolExecutionMode.Sequential,
             Execute = async (_, api, callContext) =>
             {
@@ -63,6 +71,7 @@ internal static partial class StructuredTests
             {
                 Name = "noop",
                 Description = "Does nothing",
+                Parameters = ToolsSchema150.EmptyObject,
                 Execute = (_, _, _) => Task.FromResult(new ToolExecutionResult { Output = JsonArrayValue.Empty }),
             }));
             setup.Faux.SetResponses(ToolCalls(("noop", "c1"), ("noop", "c2")), FauxAssistantMessage("done"));
@@ -102,7 +111,9 @@ internal static partial class StructuredTests
             MatchJson("""{"status":"unanswered","reason":"aborted"}""", (await submission.WaitAsync(Context)).ToJson(), "settled");
             var results = (await AllEntries(root)).Where(entry => entry.Kind == "pi.tool-result").ToList();
             Seq(["c1", "c2"], results.Select(entry => S(((JsonObjectValue)entry.Model![0])["toolCallId"])), "results");
-            SameJson("{}", await harness.SnapshotAsync(Live.LiveDoc, root.Id, Context), "live");
+            // Pi v1.5.0 (area run-failure): pi.live records the abort.
+            MatchExactly($$$"""{"runFailure":{"taskId":{{{generation.Value}}},"inputs":[{{{submission.Id.Value}}}],"reason":"aborted","first":"<number>"}}""",
+                await harness.SnapshotAsync(Live.LiveDoc, root.Id, Context), "live");
             Equal(TaskOutcomeStatus.Aborted, ((SettlingTaskState)(await harness.WaitForTaskAsync(generation, Context)).State).Outcome.Status, "generation");
             await harness.CloseAsync(Context);
         });
@@ -136,6 +147,9 @@ internal static partial class StructuredTests
             var nodes = new Nodes();
             var setupBase = Setup();
             var setup = setupBase.WithModels(new ModelsOverride(setupBase.Models) { StreamSimpleOverride = (_, _, _, token) => GenerationTests.InvalidFinalStream(token) });
+            // The partial is stored at once, so the failed final commit leaves it for the reopened run to convert; held, it would be lost
+            // with the failed Session.
+            setup.Progress = new ProgressSettings { PersistWithinMs = 0 };
             AddTask(setup.Registry, nodes.Node);
             IHarness? opened = null;
             AddHooks(setup.Registry, HarnessTasks.GenerationTask, new GenerationHooks
@@ -172,7 +186,7 @@ internal static partial class StructuredTests
             storage.Fail = generation;
             nodes.Open("abort.hooked");
             // The final commit, with the run's cleanup, fails: nothing of the cleanup lands, and the Harness fails.
-            Equal(new SessionEnd(SessionEndReason.Failed, storage.Failure), await harness.Closed, "closed");
+            Equal(SessionEnd.Failed(storage.Failure), await harness.Closed, "closed");
             Same(storage.Failure, (await ThrowsAsync<SessionFailedException>(() => submission.WaitAsync(Context), "wait")).InnerException, "cause");
             await harness.CloseAsync(Context);
             // Reopening finalizes the run; the partial becomes one aborted entry.
@@ -181,7 +195,9 @@ internal static partial class StructuredTests
             opened = reopened;
             var again = (await reopened.SubmissionAsync(submission.Id, Context))!;
             MatchJson("""{"status":"unanswered","reason":"faulted"}""", (await again.WaitAsync(Context)).ToJson(), "settled");
-            SameJson("{}", await reopened.SnapshotAsync(Live.LiveDoc, reopenedRoot.Id, Context), "live");
+            // Pi v1.5.0 (area run-failure): pi.live records the fault, with the C# detail (see the header).
+            MatchExactly($$$"""{"runFailure":{"taskId":"<number>","inputs":[{{{submission.Id.Value}}}],"reason":"faulted","detail":"Value contains a non-finite number and is not strict JSON","first":"<number>"}}""",
+                await reopened.SnapshotAsync(Live.LiveDoc, reopenedRoot.Id, Context), "live");
             Seq(["pi.user", "pi.assistant"], await Kinds(reopenedRoot), "kinds");
             await reopened.CloseAsync(Context);
             await controlled.Inner.CloseAsync(Context);

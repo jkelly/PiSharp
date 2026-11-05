@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/src/tools/index.ts
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/src/tools/index.ts
 // Upstream's createXTool functions are CodingTools.CreateXTool; createCodingTools is CodingTools.CreateCodingTools and its CodingTools
 // extension is CodingTools.Extension. Each call creates a new registration, as upstream's factories do. None sets `replay`, so every coding
 // tool keeps the default, unsafe: a call interrupted by a crash or close is answered as interrupted instead of rerun.

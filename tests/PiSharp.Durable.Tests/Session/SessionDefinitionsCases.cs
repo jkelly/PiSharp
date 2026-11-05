@@ -1,33 +1,78 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/test/session-definitions.test.ts. The two type-level cases
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/test/session-definitions.test.ts. The two type-level cases
 // (expectTypeOf and @ts-expect-error) are compile-time checks here: TypeChecks below must compile, and each @ts-expect-error line is kept
 // as a comment naming the overload that does not exist. Their runtime parts (the snapshot calls of the first type case) run as upstream's
 // do. "version 1.5" cannot be written: versions are int.
+// Pi v1.5.0 sync: every definition states checkpointWhen (area checkpoint-when), the document state checks are gone with
+// Session.documentState() (area watches), and DocumentWatch<T> is WatchHandle<Readonly<T>>, never null, so every WatchDocAsync overload
+// returns IWatchHandle<JsonObjectValue> (area watch-folding).
+using System.Reflection;
 using PiSharp.Durable;
 using PiSharp.Durable.Chord;
 using PiSharp.Durable.Chord.Delta;
 using static Program;
 
+internal static partial class Program
+{
+    private static IEnumerable<(string, Func<Task>)> SessionDefinitionsCheckpointWhenCases() => SessionTests.DefinitionsCheckpointWhen();
+}
+
 internal static partial class SessionTests
 {
-    private static readonly SessionDocToken DefinitionsSessionDoc = Documents.DefineSessionDoc("t.session", 1, () => O("{\"value\":0}"));
+    private static readonly SessionDocToken DefinitionsSessionDoc = Documents.DefineSessionDoc("t.session", 1, () => O("{\"value\":0}"),
+        checkpointWhen: (_, _, _) => false);
     private static readonly ConversationDocToken DefinitionsLatestDoc =
-        Documents.DefineConversationDoc("t.latest", 1, DocumentFork.Current, () => O("{\"value\":0}"));
+        Documents.DefineConversationDoc("t.latest", 1, DocumentFork.Current, () => O("{\"value\":0}"), checkpointWhen: (_, _, _) => false);
     private static readonly RewindableConversationDocToken DefinitionsRewindableDoc =
-        Documents.DefineRewindableConversationDoc("t.rewindable", 1, DocumentFork.AsOf, () => O("{\"value\":0}"));
-    private static readonly TaskDocToken DefinitionsTaskDoc = Documents.DefineTaskDoc("t.task", 1, () => O("{\"value\":0}"));
+        Documents.DefineRewindableConversationDoc("t.rewindable", 1, DocumentFork.AsOf, () => O("{\"value\":0}"), checkpointWhen: (_, _, _) => false);
+    private static readonly TaskDocToken DefinitionsTaskDoc = Documents.DefineTaskDoc("t.task", 1, () => O("{\"value\":0}"),
+        checkpointWhen: (_, _, _) => false);
     private static readonly SessionDocFamilyToken DefinitionsSessionFamily =
-        Documents.DefineSessionDocFamily("t.session-family", 1, seed => Obj(("value", seed)));
+        Documents.DefineSessionDocFamily("t.session-family", 1, seed => Obj(("value", seed)), checkpointWhen: (_, _, _) => false);
     private static readonly RewindableConversationDocFamilyToken DefinitionsConversationFamily =
-        Documents.DefineRewindableConversationDocFamily("t.conversation-family", 1, DocumentFork.Initial, seed => Obj(("value", seed)));
-    private static readonly TaskDocFamilyToken DefinitionsTaskFamily = Documents.DefineTaskDocFamily("t.task-family", 1, seed => Obj(("value", seed)));
+        Documents.DefineRewindableConversationDocFamily("t.conversation-family", 1, DocumentFork.Initial, seed => Obj(("value", seed)),
+            checkpointWhen: (_, _, _) => false);
+    private static readonly TaskDocFamilyToken DefinitionsTaskFamily = Documents.DefineTaskDocFamily("t.task-family", 1, seed => Obj(("value", seed)),
+        checkpointWhen: (_, _, _) => false);
+
+    /// <summary>Upstream's "requires an explicit checkpoint predicate for documents and families".</summary>
+    internal static IEnumerable<(string, Func<Task>)> DefinitionsCheckpointWhen()
+    {
+        // Pi v1.5.0 (area checkpoint-when). Upstream's two @ts-expect-error lines are compile-time checks here too, since checkpointWhen is a
+        // required, non-nullable parameter of every factory:
+        // @ts-expect-error document definitions require checkpointWhen:        Documents.DefineSessionDoc("t.missing-checkpoint", 1, initial)
+        // @ts-expect-error document family definitions require checkpointWhen: Documents.DefineSessionDocFamily("t.missing-family-checkpoint",
+        //                                                                       1, seed => ...)
+        // The case checks the same by reflection, and that a null predicate, which C# still lets a caller pass, is rejected. It reads no
+        // storage, so it runs once rather than on every session.* backend.
+        yield return Case("session.definitions.requires-an-explicit-checkpoint-predicate-for-documents-and-families", () =>
+        {
+            var factories = typeof(Documents).GetMethods(BindingFlags.Public | BindingFlags.Static)
+                .Where(method => method.Name.StartsWith("Define", StringComparison.Ordinal)).ToList();
+            Equal(8, factories.Count, "one factory per scope, singleton and family");
+            var nullability = new NullabilityInfoContext();
+            foreach (var factory in factories)
+            {
+                var parameter = factory.GetParameters().SingleOrDefault(parameter => parameter.Name == "checkpointWhen")
+                    ?? throw new InvalidOperationException($"{factory.Name} takes no checkpointWhen");
+                Check(!parameter.IsOptional && !parameter.HasDefaultValue, $"{factory.Name} requires checkpointWhen");
+                Equal(typeof(DocumentCheckpointPredicate), parameter.ParameterType, $"{factory.Name} predicate type");
+                Equal(NullabilityState.NotNull, nullability.Create(parameter).WriteState, $"{factory.Name} predicate nullability");
+            }
+            Program.Throws<ArgumentNullException>(() => Documents.DefineSessionDoc("t.missing-checkpoint", 1, () => O("{\"value\":0}"), null!),
+                "a document without a predicate");
+            Program.Throws<ArgumentNullException>(() => Documents.DefineSessionDocFamily("t.missing-family-checkpoint", 1,
+                seed => Obj(("value", seed)), null!), "a family without a predicate");
+        });
+    }
 
     private static IEnumerable<(string, Func<Task>)> Definitions(string prefix, Func<IStorage> storageFactory)
     {
         yield return Case(prefix + "validates-persisted-version-semantics", () =>
         {
-            Rejects(Program.Throws<ArgumentException>(() => Documents.DefineSessionDoc("k", 0, () => O("{\"value\":0}")), "version 0"), "positive integer", "version 0");
+            Rejects(Program.Throws<ArgumentException>(() => Documents.DefineSessionDoc("k", 0, () => O("{\"value\":0}"),
+                checkpointWhen: (_, _, _) => false), "version 0"), "positive integer", "version 0");
             // Upstream: version 1.5 also rejects; a C# version is an int.
-            Equal("", Documents.DefineSessionDoc("", 1, () => O("{\"value\":0}")).Definition.Kind, "empty kind");
+            Equal("", Documents.DefineSessionDoc("", 1, () => O("{\"value\":0}"), checkpointWhen: (_, _, _) => false).Definition.Kind, "empty kind");
             Equal("t.session", DefinitionsSessionDoc.Definition.Kind, "kind");
         });
 
@@ -110,14 +155,7 @@ internal static partial class SessionTests
         _ = rewound;
         // @ts-expect-error latest conversation, Session and task documents keep no history: SnapshotAsOfAsync takes only rewindable tokens.
 
-        Task<AttachedReplicatedState<JsonObjectValue?>?> state = session.DocumentStateAsync(DefinitionsSessionDoc, Context);
-        state = session.DocumentStateAsync(DefinitionsLatestDoc, conversationId, Context);
-        state = session.DocumentStateAsync(DefinitionsTaskDoc, taskId, Context);
-        state = session.DocumentStateAsync(DefinitionsSessionFamily, "k", Context);
-        state = session.DocumentStateAsync(DefinitionsConversationFamily, conversationId, "k", Context);
-        state = session.DocumentStateAsync(DefinitionsTaskFamily, taskId, "k", Context);
-        _ = state;
-        Task<IWatchHandle<JsonObjectValue?>?> watch = session.WatchDocAsync(DefinitionsSessionDoc, Context);
+        Task<IWatchHandle<JsonObjectValue>?> watch = session.WatchDocAsync(DefinitionsSessionDoc, Context);
         watch = session.WatchDocAsync(DefinitionsLatestDoc, conversationId, Context);
         watch = session.WatchDocAsync(DefinitionsTaskDoc, taskId, Context);
         watch = session.WatchDocAsync(DefinitionsSessionFamily, "k", Context);

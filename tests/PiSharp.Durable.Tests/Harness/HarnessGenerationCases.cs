@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/test/harness-generation.test.ts. Verbatim apart from the adaptations in
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/test/harness-generation.test.ts. Verbatim apart from the adaptations in
 // HarnessSupport.cs and ChatSupport.cs, and these:
 // - Backends. Upstream runs this file on MemoryStorage (ControlledStorage over memory where it inspects commits). harness.generation.* does
 //   the same; harness.generation.jsonl.* and harness.generation.sqlite.* rerun every storage-backed case on a fresh JSONL directory and a
@@ -11,6 +11,27 @@
 //   strict JSON either, and the detail contains Chord's "non-finite number".
 // - `expect(seen[0]!.signal).toBeInstanceOf(AbortSignal)` checks that the request's cancellation token can be cancelled.
 // - `toContainEqual(new Error(text))` checks for a report whose message is the text.
+// Pi v1.5.0 sync (area model-requests): "records the requested thinking level on answers, streamed and polled" (d5b3de22d), which is
+// harness.generation.records-the-requested-thinking-level-on-answers-streamed-and-polled, and "attributes model requests to pi by default
+// and merges the Harness identity over it" (adc5fa9f8), which is
+// harness.generation.sends-the-harness-default-identity-and-merges-the-harness-identity-over-it: upstream's default identity is
+// { attribution: PI_ATTRIBUTION }; PiSharp's Harness.DefaultIdentity is empty, so a Harness without an identity sends none (the owner's
+// choice: no attribution, decision 0013, core.client-identity-attribution). Both also run as harness.generation.jsonl.* and
+// harness.generation.sqlite.*.
+// Pi v1.5.0 sync (area reports): "resolves settings over the built-in defaults" expects afterFailedRun: "keep" (a30c2a81d); the closeout
+// added its restartLimit assertions (area restarts' default 5, 0 resolving to 5 and infinity kept, a30c2a81d).
+// Pi v1.5.0 sync (area deferred-commits, 6c2fd73b0): livePublications observes commits as memory adopts them, and "resolves settings over
+// the built-in defaults" expects progress.persistWithinMs 1000, the default for -1, and 0 kept. "stores partials as deltas ..." stores
+// deferred partials within 100 ms, as e5c6182ba's does.
+// Pi v1.5.0 sync (area run-failure, f3255de76): the cases whose run ends without an answer expect f3255de76's pi.live.runFailure where
+// v1.2.0 expected an empty pi.live; the faulted run's detail contains "non-finite number" (see above). Area run-end (7e15f9601): each one's
+// toEqual carries first, "<number>" for expect.any(Number) (MatchExactly).
+// Pi v1.5.0 sync (area vocabulary, 5f312dac4): livePublications follows commits with SessionTests.FollowCommits (upstream followCommits,
+// was observeCommits) and reads the document changes of kind change (DocumentValueChange).
+// Pi v1.5.0 sync (area tool-tasks, 1c6928b30): "orphans a blocked run task with full run cleanup" stores the run under the generation
+// definition's version plus one (pi.generation is version 2), as v1.5.0's does.
+// Pi v1.5.0 sync (area live-turns, f6a9db1d8): that case's run is { taskId, inputs, turns: 0 }, as pi.live.run carries turns.
+#pragma warning disable PISHARP_IDENTITY001 // PiSharp.AI's ClientIdentity (Pi v1.5.0) is experimental.
 using System.Collections.Immutable;
 using System.Text.RegularExpressions;
 using PiSharp.Contracts;
@@ -58,14 +79,14 @@ internal static class GenerationTests
         return taskId!.Value;
     }
 
-    /// <summary>Every published <c>pi.live</c> value (upstream <c>livePublications</c>).</summary>
+    /// <summary>Every published <c>pi.live</c> value, deferred ones as memory adopts them (upstream <c>livePublications</c>).</summary>
     private static SyncList<JsonObjectValue> LivePublications(IHarness harness)
     {
         var values = new SyncList<JsonObjectValue>();
-        harness.SubscribeCommits((publication, _) =>
+        FollowCommits(harness, (publication, _) =>
         {
             foreach (var change in publication.Changes)
-                if (change is DocumentCommitChange { Record.Kind: "pi.live", Value: { } value }) values.Add(value);
+                if (change is DocumentValueChange { Record.Kind: "pi.live", Value: var value }) values.Add(value);
         });
         return values;
     }
@@ -120,6 +141,8 @@ internal static class GenerationTests
         {
             var setup = Setup(new FauxOptions { TokensPerSecond = 200, MinTokenSize = 1, MaxTokenSize = 1 });
             setup.Faux.SetResponses(FauxAssistantMessage(new string('w', 200)));
+            // Store deferred partials well within the stream, so some reach Storage before the answer.
+            setup.Progress = new ProgressSettings { PersistWithinMs = 100 };
             var storage = new ControlledStorage(fresh());
             var (harness, root) = await OpenChat(storage, setup);
             var record = await storage.FindDocumentAsync(new DocumentAddress("pi.live", DocumentScope.Conversation(root.Id)), DocumentPoint.Current, Context);
@@ -147,7 +170,8 @@ internal static class GenerationTests
             SameJson("""{"status":"aborted"}""", OutcomeJson(await harness.WaitForTaskAsync(taskId, Context)), "outcome");
             // The earlier settlement stays; the run's own settlement leaves it unchanged.
             MatchJson("""{"status":"unanswered","reason":"withdrawn"}""", (await submission.StatusAsync(Context)).ToJson(), "submission");
-            SameJson("{}", await LiveOf(harness, root), "live");
+            // Pi v1.5.0 (area run-failure): a run ends without an answer even when its inputs were settled already.
+            MatchExactly($$$"""{"runFailure":{"taskId":{{{taskId.Value}}},"inputs":[{{{submission.Id.Value}}}],"reason":"aborted","first":"<number>"}}""", await LiveOf(harness, root), "live");
             await harness.CloseAsync(Context);
         });
 
@@ -167,8 +191,10 @@ internal static class GenerationTests
             var tasks = await TasksOf(harness, root);
             SameJson("""{"status":"terminal","outcome":{"status":"failed","error":{"message":"Model faux/missing is not available","detail":{"reason":"no_model"}}}}""",
                 tasks[0].State.ToJson(), "task state");
-            SameJson("{}", await LiveOf(harness, root), "root live");
-            SameJson("{}", await LiveOf(harness, plain), "plain live");
+            // Pi v1.5.0 (area run-failure): each conversation's pi.live records why its run ended without an answer.
+            MatchExactly($$$"""{"runFailure":{"taskId":{{{tasks[0].Id.Value}}},"inputs":["<number>"],"reason":"no_model","detail":"Model faux/missing is not available","first":"<number>"}}""",
+                await LiveOf(harness, root), "root live");
+            MatchJson("""{"reason":"no_model","detail":"No model is configured"}""", (await LiveOf(harness, plain))?["runFailure"], "plain live");
             await harness.CloseAsync(Context);
         });
 
@@ -289,7 +315,7 @@ internal static class GenerationTests
             var converted = (JsonObjectValue)entries[1].Model![0];
             Equal("aborted", S(converted["stopReason"]), "stop reason");
             Check(TextOf(converted)!.StartsWith(TextOf(partial)!, StringComparison.Ordinal), "the converted entry extends the partial");
-            SameJson("{}", await LiveOf(harness, root), "live");
+            MatchExactly($$$"""{"runFailure":{"taskId":{{{taskId.Value}}},"inputs":[{{{submission.Id.Value}}}],"reason":"aborted","first":"<number>"}}""", await LiveOf(harness, root), "live");
             SameJson("""{"status":"aborted"}""", OutcomeJson(await harness.WaitForTaskAsync(taskId, Context)), "outcome");
             await harness.CloseAsync(Context);
         });
@@ -307,7 +333,7 @@ internal static class GenerationTests
             await harness.AbortTaskAsync(taskId, Context);
             MatchJson("""{"status":"unanswered","reason":"aborted"}""", (await submission.WaitAsync(Context)).ToJson(), "settled");
             Equal(1, setup.Faux.State.CancelledDeferred.Count, "cancelled");
-            SameJson("{}", await LiveOf(harness, root), "live");
+            MatchExactly($$$"""{"runFailure":{"taskId":{{{taskId.Value}}},"inputs":[{{{submission.Id.Value}}}],"reason":"aborted","first":"<number>"}}""", await LiveOf(harness, root), "live");
             await harness.CloseAsync(Context);
         });
 
@@ -329,7 +355,7 @@ internal static class GenerationTests
             await harness.AbortTaskAsync(taskId, Context);
             MatchJson("""{"status":"unanswered","reason":"aborted"}""", (await submission.WaitAsync(Context)).ToJson(), "settled");
             Check(setup.Reports.Snapshot().Any(error => error.Message == "cancel failed"), "the cancel failure is reported");
-            SameJson("{}", await LiveOf(harness, root), "live");
+            MatchExactly($$$"""{"runFailure":{"taskId":{{{taskId.Value}}},"inputs":[{{{submission.Id.Value}}}],"reason":"aborted","first":"<number>"}}""", await LiveOf(harness, root), "live");
             await harness.CloseAsync(Context);
         });
 
@@ -362,6 +388,50 @@ internal static class GenerationTests
             Equal(sessionId, second.SessionId, "second session");
             Check(second.Headers is null, "second headers");
             await harness.CloseAsync(Context);
+        });
+
+        yield return Case(prefix + "records-the-requested-thinking-level-on-answers-streamed-and-polled", async () =>
+        {
+            var setup = Setup(new FauxOptions { PendingFetches = 1, PollAfterMs = 1 });
+            setup.Faux.SetResponses(FauxAssistantMessage("streamed"), FauxAssistantMessage("polled"));
+            var (harness, root) = await OpenChat(fresh(), setup);
+            harness.Resume();
+            async Task<JsonValue?> Answer(string content)
+            {
+                var settled = await (await Submit(root, content)).WaitAsync(Context);
+                if (settled.Status != SubmissionStatus.Done || settled.Type != SubmissionType.Input) throw new InvalidOperationException($"Unexpected {settled.Status}");
+                return (await root.CommitAsync(tx => tx.GetEntryAsync(Entries.AssistantEntry, settled.Answer!.Value), Context))?.Model?[0];
+            }
+            await root.ConfigureAsync(new AgentChange { ThinkingLevel = "high" }, Context);
+            MatchJson("""{"thinkingLevel":"high"}""", await Answer("one"), "streamed answer");
+            setup.Stream = new ConversationStreamOptions { Deferred = true };
+            MatchJson("""{"thinkingLevel":"high"}""", await Answer("two"), "polled answer");
+            Equal(2, setup.Faux.State.DeferredFetchCount, "fetches");
+            await harness.CloseAsync(Context);
+        });
+
+        yield return Case(prefix + "sends-the-harness-default-identity-and-merges-the-harness-identity-over-it", async () =>
+        {
+            var seen = new SyncList<PiSharp.AI.ClientIdentity?>();
+            FauxStep Capture() => FauxStep.From(request =>
+            {
+                seen.Add(request.Options?.Identity);
+                return FauxAssistantMessage("ok");
+            });
+            var acme = new PiSharp.AI.ClientAttribution("acme", "https://acme.example");
+            foreach (var identity in new PiSharp.AI.ClientIdentity?[] { null, new() { UserAgent = PiSharp.AI.ClientUserAgent.Short, Attribution = acme } })
+            {
+                var setup = Setup();
+                setup.Identity = identity;
+                setup.Faux.SetResponses(Capture());
+                var (harness, root) = await OpenChat(fresh(), setup);
+                harness.Resume();
+                await (await Submit(root, "hi")).WaitAsync(Context);
+                await harness.CloseAsync(Context);
+            }
+            // Upstream's first is { attribution: PI_ATTRIBUTION }: PiSharp's default identity adds nothing.
+            Seq([new PiSharp.AI.ClientIdentity(), new PiSharp.AI.ClientIdentity { Attribution = acme, UserAgent = PiSharp.AI.ClientUserAgent.Short }],
+                seen.Snapshot(), "identities");
         });
 
         // Regression coverage for #10424.
@@ -472,7 +542,8 @@ internal static class GenerationTests
 
         yield return Case(prefix + "renders-sections-that-read-conversation-documents-through-input-read", async () =>
         {
-            var agentDoc = Documents.DefineConversationDoc("test.agent", 1, DocumentFork.Current, () => O("""{"cwd":"/","kind":"main"}"""));
+            var agentDoc = Documents.DefineConversationDoc("test.agent", 1, DocumentFork.Current, () => O("""{"cwd":"/","kind":"main"}"""),
+                checkpointWhen: (_, _, _) => false);
             var setup = Setup();
             AddSection(setup.Registry, "cwd", async (input, ctx) =>
                 (await input.Read.SnapshotAsync(agentDoc, input.ConversationId, ctx)) is { } state ? S(state["cwd"]) : null);
@@ -540,7 +611,10 @@ internal static class GenerationTests
             Seq(["pi.user", "pi.assistant"], entries.Select(entry => entry.Kind), "kinds");
             MatchJson("""{"role":"assistant","stopReason":"aborted"}""", entries[1].Model![0], "converted");
             Equal("partial", TextOf(entries[1].Model![0]), "converted text");
-            SameJson("{}", await LiveOf(harness, root), "live");
+            // Pi v1.5.0 (area run-failure): the fault's detail names the value that is not strict JSON (see the header).
+            var live = await LiveOf(harness, root);
+            MatchExactly($$$"""{"runFailure":{"taskId":"<number>","inputs":[{{{submission.Id.Value}}}],"reason":"faulted","detail":"<string>","first":"<number>"}}""", live, "live");
+            Rejects(new InvalidOperationException(S(((JsonObjectValue)live!["runFailure"])["detail"])), "non-finite number", "failure detail");
             var tasks = await TasksOf(harness, root);
             MatchJson("""{"status":"terminal","outcome":{"status":"faulted"}}""", tasks[0].State.ToJson(), "state");
             await harness.CloseAsync(Context);
@@ -554,7 +628,7 @@ internal static class GenerationTests
             var definition = HarnessTasks.GenerationTask.Definition;
             var newer = Tasks.DefineTask(new TaskDefinition
             {
-                Name = definition.Name, Version = 2, Initial = definition.Initial, Phases = definition.Phases, Abort = definition.Abort,
+                Name = definition.Name, Version = definition.Version + 1, Initial = definition.Initial, Phases = definition.Phases, Abort = definition.Abort,
             });
             var (taskId, submissionId) = await ((DurableHarness)harness).CommitWithAsync(async tx =>
             {
@@ -565,7 +639,7 @@ internal static class GenerationTests
                     ConversationId = root.Id, Type = SubmissionType.Input, Status = SubmissionStatus.Placed, Entry = entry.Id,
                 });
                 var id = await tx.CreateTaskAsync(newer, JsonObjectValue.Empty, new TaskOptions(TaskOwnership.Conversation) { ConversationId = root.Id });
-                (await tx.DocAsync(Live.LiveDoc, root.Id)).Set("run", Obj(("taskId", id.ToJson()), ("inputs", JsonValue.Array(submission.Id.ToJson()))));
+                (await tx.DocAsync(Live.LiveDoc, root.Id)).Set("run", Obj(("taskId", id.ToJson()), ("inputs", JsonValue.Array(submission.Id.ToJson())), ("turns", 0)));
                 return (id, submission.Id);
             }, Context);
             harness.Resume();
@@ -574,7 +648,8 @@ internal static class GenerationTests
             SameJson("""{"status":"orphaned","reason":"task_too_old"}""", OutcomeJson(await harness.WaitForTaskAsync(taskId, Context)), "outcome");
             MatchJson("""{"status":"unanswered","reason":"task_too_old"}""",
                 (await (await harness.SubmissionAsync(submissionId, Context))!.StatusAsync(Context)).ToJson(), "submission");
-            SameJson("{}", await LiveOf(harness, root), "live");
+            SameJson($$$"""{"runFailure":{"taskId":{{{taskId.Value}}},"inputs":[{{{submissionId.Value}}}],"reason":"orphaned","detail":"task_too_old"}}""",
+                await LiveOf(harness, root), "live");
             await harness.CloseAsync(Context);
         });
     }
@@ -589,17 +664,25 @@ internal static class GenerationTests
             SameJson("""
                 {"stream":{},"retry":{"enabled":true,"maxRetries":3,"baseDelayMs":2000,"maxAgentDelayMs":60000},
                  "compaction":{"enabled":true,"reserveTokens":16384,"keepRecentTokens":20000,"backgroundTokens":32768},
-                 "progress":{"partialIntervalMs":100,"outputIntervalMs":100},"toolExecution":"parallel","steeringMode":"one-at-a-time",
-                 "followUpMode":"one-at-a-time","contextRetentionMs":600000}
+                 "progress":{"partialIntervalMs":100,"outputIntervalMs":100,"persistWithinMs":1000},"toolExecution":"parallel","steeringMode":"one-at-a-time",
+                 "followUpMode":"one-at-a-time","contextRetentionMs":600000,"afterFailedRun":"keep","restartLimit":5}
                 """, JsonObjectValue.From(resolved.Where(property => property.Key != "documentRetentionMs")), "defaults");
+            Equal(5d, Agents.ResolveSettings(new HarnessSettings { RestartLimit = 0 }).RestartLimit, "restartLimit 0");
+            Equal(double.PositiveInfinity, Agents.ResolveSettings(new HarnessSettings { RestartLimit = double.PositiveInfinity }).RestartLimit,
+                "restartLimit infinity");
             MatchJson("""{"retry":{"enabled":false,"maxRetries":3,"baseDelayMs":2000},"compaction":{"enabled":true,"backgroundTokens":0}}""",
                 SettingsJson(Agents.ResolveSettings(new HarnessSettings
                 {
                     Retry = new RetrySettings { Enabled = false },
                     Compaction = new CompactionSettings { BackgroundTokens = 0 },
                 })), "overrides");
-            SameJson("""{"partialIntervalMs":100,"outputIntervalMs":500}""",
+            SameJson("""{"partialIntervalMs":100,"outputIntervalMs":500,"persistWithinMs":1000}""",
                 SettingsJson(Agents.ResolveSettings(new HarnessSettings { Progress = new ProgressSettings { OutputIntervalMs = 500 } }))["progress"], "progress");
+            // Not a number of milliseconds, 0 or more: the default.
+            Check(Agents.ResolveSettings(new HarnessSettings { Progress = new ProgressSettings { PersistWithinMs = -1 } }).Progress.PersistWithinMs == 1000,
+                "persistWithinMs -1 resolves to the default");
+            Check(Agents.ResolveSettings(new HarnessSettings { Progress = new ProgressSettings { PersistWithinMs = 0 } }).Progress.PersistWithinMs == 0,
+                "persistWithinMs 0 is kept");
         });
 
         yield return Case(prefix + "rejects-a-registry-without-the-built-in-tasks", async () =>
@@ -622,12 +705,20 @@ internal static class GenerationTests
                 : Obj(("enabled", settings.Retry.Enabled), ("maxRetries", settings.Retry.MaxRetries), ("baseDelayMs", settings.Retry.BaseDelayMs))),
             ("compaction", Obj(("enabled", settings.Compaction.Enabled), ("reserveTokens", settings.Compaction.ReserveTokens),
                 ("keepRecentTokens", settings.Compaction.KeepRecentTokens), ("backgroundTokens", settings.Compaction.BackgroundTokens))),
-            ("progress", Obj(("partialIntervalMs", settings.Progress.PartialIntervalMs), ("outputIntervalMs", settings.Progress.OutputIntervalMs))),
+            ("progress", Obj(("partialIntervalMs", settings.Progress.PartialIntervalMs), ("outputIntervalMs", settings.Progress.OutputIntervalMs),
+                ("persistWithinMs", settings.Progress.PersistWithinMs))),
             ("toolExecution", settings.ToolExecution == ToolExecutionMode.Parallel ? "parallel" : "sequential"),
             ("steeringMode", settings.SteeringMode == QueueMode.All ? "all" : "one-at-a-time"),
             ("followUpMode", settings.FollowUpMode == QueueMode.All ? "all" : "one-at-a-time"),
             ("contextRetentionMs", settings.ContextRetentionMs),
             ("documentRetentionMs", settings.DocumentRetentionMs),
+            ("afterFailedRun", settings.AfterFailedRun switch
+            {
+                AfterFailedRun.Continue => "continue",
+                AfterFailedRun.Withdraw => "withdraw",
+                _ => "keep",
+            }),
+            ("restartLimit", settings.RestartLimit),
         };
         return Obj([.. properties]);
     }

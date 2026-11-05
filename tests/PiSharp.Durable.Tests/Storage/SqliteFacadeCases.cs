@@ -1,10 +1,20 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/test/sqlite-facade.test.ts, against SqliteConnectionDatabase (the
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/test/sqlite-facade.test.ts, against SqliteConnectionDatabase (the
 // node:sqlite adapter's counterpart). Upstream observes microtask timing with `await Promise.resolve()`; these cases use explicit gates and
 // check that the queued task has not completed. Adapted: upstream counts prepare() calls by subclassing DatabaseSync; here the adapter
 // counts the statements it prepares (SqliteConnectionDatabase.PrepareCounts).
+// Pi v1.5.0 (f9a26365568127461c47a07a37dcb42c140a3ac5) moved the driver cases to packages/chord/test/sqlite/node.test.ts; the
+// storage.sqlite.facade.* cases for the driver keep their ids, and the driver cases new in v1.5.0 are chord.sqlite.node.*: connection
+// settings, runCounted (with helpers.ts's runChanges), and the outcome of a transaction (slice 6b D4). Adapted there: upstream makes
+// BEGIN IMMEDIATE, COMMIT or ROLLBACK throw by replacing DatabaseSync.exec; here BEGIN IMMEDIATE fails inside a transaction the
+// connection already began, COMMIT on a deferred foreign key violation, and ROLLBACK after the callback committed. Not ported: upstream's
+// re-export identity case (the C# types are the same types, with no re-export) and the 256-statement cache case (row
+// chord.sqlite-statement-cache, phase 6). The authored chord.sqlite.node.counts-no-rows-that-triggers-change pins that trigger writes do
+// not count. The storage commits go through v1.5.0's commitWrites (CommitWritesAsync, area storage-batches).
+using Microsoft.Data.Sqlite;
 using PiSharp.Durable;
 using PiSharp.Durable.Chord;
 using PiSharp.Durable.Sqlite;
+using PiSharp.Durable.Testing;
 
 internal static partial class Program
 {
@@ -14,15 +24,15 @@ internal static partial class Program
         {
             var connection = await SqliteConnectionDatabase.OpenAsync(":memory:");
             var storage = await SqliteStorage.OpenAsync(connection);
-            await storage.CommitAsync([new ConversationWrite(new(ConversationId.Root))], SqliteContext);
-            await storage.CommitAsync([.. Enumerable.Range(0, 100).Select(index =>
+            await storage.CommitWritesAsync([new ConversationWrite(new(ConversationId.Root))], SqliteContext);
+            await storage.CommitWritesAsync([.. Enumerable.Range(0, 100).Select(index =>
                 (StorageWrite)new EntryWrite(new() { Id = new EntryId(index + 2), ConversationId = ConversationId.Root, Kind = "cached" }))], SqliteContext);
-            await storage.CommitAsync([new EntryWrite(new() { Id = new EntryId(102), ConversationId = ConversationId.Root, Kind = "cached-again" })],
+            await storage.CommitWritesAsync([new EntryWrite(new() { Id = new EntryId(102), ConversationId = ConversationId.Root, Kind = "cached-again" })],
                 SqliteContext);
             Equal("cached", (await storage.GetEntryAsync(new EntryId(2), SqliteContext))?.Entry.Kind, "first entry");
             Equal("cached-again", (await storage.GetEntryAsync(new EntryId(102), SqliteContext))?.Entry.Kind, "last entry");
             Equal("ID 1 already belongs to conversation", (await ThrowsAsync<InvalidOperationException>(
-                () => storage.CommitAsync([new ConversationWrite(new(ConversationId.Root))], SqliteContext), "duplicate root")).Message, "message");
+                () => storage.CommitWritesAsync([new ConversationWrite(new(ConversationId.Root))], SqliteContext), "duplicate root")).Message, "message");
             Equal("cached", (await storage.GetEntryAsync(new EntryId(2), SqliteContext))?.Entry.Kind, "entry after the rejection");
             var repeated = connection.PrepareCounts.Where(pair => pair.Value > 1).Select(pair => pair.Key).ToArray();
             Check(repeated.Length == 0, "statements prepared more than once: " + string.Join(" | ", repeated));
@@ -90,9 +100,13 @@ internal static partial class Program
             await write;
             Equal("", Rows(await beforeWrite), "rows before the write");
             Equal("{\"value\":2}", Rows(await afterWrite), "rows after the write");
+            await database.CloseAsync();
+        });
 
-            var storage = await SqliteStorage.OpenAsync(database);
-            var commit = storage.CommitAsync([new ConversationWrite(new(ConversationId.Root))], SqliteContext);
+        yield return Case("storage.sqlite.facade.reads-storage-commits-in-call-order", async () =>
+        {
+            var storage = await SqliteStorage.OpenAsync(await SqliteConnectionDatabase.OpenAsync(":memory:"));
+            var commit = storage.CommitWritesAsync([new ConversationWrite(new(ConversationId.Root))], SqliteContext);
             var read = storage.GetConversationAsync(ConversationId.Root, SqliteContext);
             await commit;
             Equal(new ConversationRecord(ConversationId.Root), await read, "read queued after the commit");
@@ -149,7 +163,7 @@ internal static partial class Program
         {
             var storage = await SqliteStorage.OpenAsync(await SqliteConnectionDatabase.OpenAsync(":memory:"));
             var entryId = new EntryId(2);
-            await storage.CommitAsync([new ConversationWrite(new(ConversationId.Root)),
+            await storage.CommitWritesAsync([new ConversationWrite(new(ConversationId.Root)),
                 new EntryWrite(new() { Id = entryId, ConversationId = ConversationId.Root, Kind = "probe" })], SqliteContext);
             var scan = storage.ScanEntriesAsync(new EntryQuery(ConversationId.Root), 10, null, SqliteContext);
             var entry = storage.GetEntryAsync(ConversationId.Root, entryId, SqliteContext);
@@ -200,6 +214,136 @@ internal static partial class Program
             await database.CloseAsync();
         });
 
+        yield return Case("chord.sqlite.node.configures-connection-defaults-and-accepts-explicit-settings", async () =>
+        {
+            foreach (var options in new[] { new SqliteStorageOptions(), new SqliteStorageOptions { BusyTimeoutMs = 123, WalAutoCheckpointPages = 0 } })
+            {
+                var database = await SqliteConnectionDatabase.OpenAsync(":memory:", options);
+                try
+                {
+                    Equal($"{{\"timeout\":{options.BusyTimeoutMs ?? 5_000}}}", (await database.GetAsync("PRAGMA busy_timeout"))?.ToString(), "busy timeout");
+                    Equal($"{{\"wal_autocheckpoint\":{options.WalAutoCheckpointPages ?? 1_000}}}",
+                        (await database.GetAsync("PRAGMA wal_autocheckpoint"))?.ToString(), "WAL auto-checkpoint");
+                    Equal("{\"synchronous\":1}", (await database.GetAsync("PRAGMA synchronous"))?.ToString(), "synchronous");
+                }
+                finally
+                {
+                    await database.CloseAsync();
+                }
+            }
+        });
+
+        yield return Case("chord.sqlite.node.reports-the-rows-a-statement-changed-without-index-writes", async () =>
+        {
+            var database = await SqliteConnectionDatabase.OpenAsync(":memory:");
+            try
+            {
+                Equal(RunChangesExpected, await RunChanges(database), "changes");
+                var inTransaction = await database.TransactionAsync(handle =>
+                    handle.RunCountedAsync("INSERT INTO changes_probe VALUES (?, ?, ?)", "t", "t/1", 1L));
+                Equal(1L, inTransaction, "changes in a transaction");
+            }
+            finally
+            {
+                await database.CloseAsync();
+            }
+        });
+
+        yield return Case("chord.sqlite.node.counts-no-rows-that-triggers-change", async () =>
+        {
+            var database = await SqliteConnectionDatabase.OpenAsync(":memory:");
+            try
+            {
+                await database.ExecAsync("CREATE TABLE trigger_probe (id INTEGER PRIMARY KEY, n INTEGER NOT NULL) STRICT");
+                await database.ExecAsync("CREATE TABLE trigger_log (n INTEGER NOT NULL) STRICT");
+                await database.ExecAsync("""
+                    CREATE TRIGGER trigger_probe_inserted AFTER INSERT ON trigger_probe BEGIN
+                        INSERT INTO trigger_log (n) VALUES (new.n), (new.n + 1);
+                    END;
+                    CREATE TRIGGER trigger_probe_updated AFTER UPDATE ON trigger_probe BEGIN
+                        INSERT INTO trigger_log (n) SELECT n FROM trigger_log;
+                    END;
+                    """);
+                Equal(1L, await database.RunCountedAsync("INSERT INTO trigger_probe (id, n) VALUES (?, ?)", 1L, 10L), "insert");
+                Equal(1L, await database.RunCountedAsync("UPDATE trigger_probe SET n = ? WHERE id = ?", 20L, 1L), "update");
+                Equal(0L, await database.RunCountedAsync("UPDATE trigger_probe SET n = ? WHERE id = ?", 30L, 2L), "update of no row");
+                Equal("{\"count\":4}", (await database.GetAsync("SELECT count(*) AS count FROM trigger_log"))?.ToString(), "rows the triggers wrote");
+            }
+            finally
+            {
+                await database.CloseAsync();
+            }
+        });
+
+        yield return Case("chord.sqlite.node.transaction-outcome.rejects-with-the-callbacks-own-error-after-a-rollback", async () =>
+        {
+            var database = await SqliteConnectionDatabase.OpenAsync(":memory:");
+            var own = new InvalidOperationException("refused");
+            await database.ExecAsync("CREATE TABLE t (n INTEGER)");
+            var outcome = database.TransactionAsync(async handle =>
+            {
+                await handle.RunAsync("INSERT INTO t VALUES (1)");
+                throw own;
+            });
+            Check(ReferenceEquals(own, await ThrowsAsync<InvalidOperationException>(() => outcome, "outcome")), "the callback's own error");
+            Equal("", Rows(await database.AllAsync("SELECT n FROM t")), "rows");
+            await database.CloseAsync();
+        });
+
+        yield return Case("chord.sqlite.node.transaction-outcome.rejects-with-another-error-when-begin-immediate-fails", async () =>
+        {
+            var connection = new SqliteConnection("Data Source=:memory:;Pooling=False");
+            connection.Open();
+            var database = new SqliteConnectionDatabase(connection);
+            using (var begin = connection.CreateCommand())
+            {
+                begin.CommandText = "BEGIN";
+                begin.ExecuteNonQuery();
+            }
+            var called = false;
+            var error = await ThrowsAsync<SqliteException>(() => database.TransactionAsync(_ =>
+            {
+                called = true;
+                return Task.FromResult(1);
+            }), "outcome");
+            Check(error.Message.Contains("cannot start a transaction within a transaction", StringComparison.Ordinal),
+                "BEGIN IMMEDIATE failed: " + error.Message);
+            Check(!called, "the callback never ran");
+            await database.ExecAsync("ROLLBACK");
+            await database.CloseAsync();
+        });
+
+        yield return Case("chord.sqlite.node.transaction-outcome.rejects-with-another-error-when-commit-fails", async () =>
+        {
+            var database = await SqliteConnectionDatabase.OpenAsync(":memory:");
+            await database.ExecAsync("PRAGMA foreign_keys = ON");
+            await database.ExecAsync("CREATE TABLE parent (id INTEGER PRIMARY KEY)");
+            await database.ExecAsync("CREATE TABLE child (parent_id INTEGER REFERENCES parent (id) DEFERRABLE INITIALLY DEFERRED)");
+            var error = await ThrowsAsync<SqliteException>(() => database.TransactionAsync(async handle =>
+            {
+                await handle.RunAsync("INSERT INTO child (parent_id) VALUES (?)", 5L);
+                return 1;
+            }), "outcome");
+            Check(error.Message.Contains("FOREIGN KEY constraint failed", StringComparison.Ordinal), "COMMIT failed: " + error.Message);
+            Equal("", Rows(await database.AllAsync("SELECT parent_id FROM child")), "rolled back");
+            Equal(2, await database.TransactionAsync(_ => Task.FromResult(2)), "a later transaction");
+            await database.CloseAsync();
+        });
+
+        yield return Case("chord.sqlite.node.transaction-outcome.rejects-with-an-aggregate-error-not-the-callbacks-error-when-its-rollback-fails", async () =>
+        {
+            var database = await SqliteConnectionDatabase.OpenAsync(":memory:");
+            var own = new InvalidOperationException("refused");
+            var error = await ThrowsAsync<Exception>(() => database.TransactionAsync<int>(async handle =>
+            {
+                await handle.ExecAsync("COMMIT");
+                return await Task.FromException<int>(own);
+            }), "outcome");
+            Check(error is AggregateException, "an AggregateException: " + error.GetType().Name);
+            Check(!ReferenceEquals(error, own), "not the callback's error");
+            await database.CloseAsync();
+        });
+
         yield return Case("storage.sqlite.facade.awaits-async-transaction-settlement-and-adopts-ids-only-after-success", async () =>
         {
             var database = new ControlledSettlementDatabase(await SqliteConnectionDatabase.OpenAsync(":memory:"));
@@ -211,7 +355,7 @@ internal static partial class Program
             var storage = await opening;
 
             database.ControlNextSettlement(SettlementMode.Delay);
-            var committing = storage.CommitAsync([new EntryWrite(new() { Id = new EntryId(100), ConversationId = ConversationId.Root, Kind = "settled" })],
+            var committing = storage.CommitWritesAsync([new EntryWrite(new() { Id = new EntryId(100), ConversationId = ConversationId.Root, Kind = "settled" })],
                 SqliteContext);
             await Task.Delay(20);
             Check(!committing.IsCompleted, "the commit waits for its settlement");
@@ -221,7 +365,7 @@ internal static partial class Program
             Equal(101L, (await storage.MintIdAsync<EntryId>()).Value, "minting after settlement");
 
             database.ControlNextSettlement(SettlementMode.Reject);
-            var rejected = storage.CommitAsync([new EntryWrite(new() { Id = new EntryId(200), ConversationId = ConversationId.Root, Kind = "rejected" })],
+            var rejected = storage.CommitWritesAsync([new EntryWrite(new() { Id = new EntryId(200), ConversationId = ConversationId.Root, Kind = "rejected" })],
                 SqliteContext);
             Equal(102L, (await storage.MintIdAsync<EntryId>()).Value, "minting before the rejection");
             database.Settle();
@@ -238,11 +382,11 @@ internal static partial class Program
             for (var yields = 0; yields < 16; yields++)
             {
                 var storage = await SqliteStorage.OpenAsync(await SqliteConnectionDatabase.OpenAsync(":memory:"));
-                await storage.CommitAsync([new DocumentCreateWrite(new DocumentCreate { Id = id, Kind = "replaced", Scope = DocumentScope.Session },
+                await storage.CommitWritesAsync([new DocumentCreateWrite(new DocumentCreate { Id = id, Kind = "replaced", Scope = DocumentScope.Session },
                     DocumentContent.Base(1, (JsonObjectValue)J("{\"value\":1}")))], SqliteContext);
                 var read = storage.GetDocumentAsync(id, DocumentPoint.Current, SqliteContext);
                 for (var index = 0; index < yields; index++) await Task.Yield();
-                var replace = storage.CommitAsync([new DocumentChangeWrite(id, DocumentContent.Base(1, (JsonObjectValue)J("{\"value\":2}")))], SqliteContext);
+                var replace = storage.CommitWritesAsync([new DocumentChangeWrite(id, DocumentContent.Base(1, (JsonObjectValue)J("{\"value\":2}")))], SqliteContext);
                 await Task.WhenAll(read, replace);
                 var value = (await read)?.Value;
                 Check(value is not null && (JsonValue.DeepEquals(J("{\"value\":1}"), value) || JsonValue.DeepEquals(J("{\"value\":2}"), value)),
@@ -253,6 +397,31 @@ internal static partial class Program
     }
 
     private static string Rows(IEnumerable<SqliteRow> rows) => string.Join("|", rows.Select(row => row.ToString()));
+
+    /// <summary>Upstream's runChanges (packages/chord/test/sqlite/helpers.ts): the rows each kind of statement changes, as RunCountedAsync
+    /// reports them, on a table with two indexes, so that a driver counting index writes would report more.</summary>
+    private static async Task<string> RunChanges(ISqliteExecutor database)
+    {
+        await database.ExecAsync("CREATE TABLE changes_probe (id TEXT PRIMARY KEY, path TEXT NOT NULL, n INTEGER NOT NULL) STRICT, WITHOUT ROWID");
+        await database.ExecAsync("CREATE INDEX changes_probe_path ON changes_probe (path, id)");
+        await database.ExecAsync("CREATE INDEX changes_probe_n ON changes_probe (n, id)");
+        for (var i = 0; i < 10; i++) await database.RunAsync("INSERT INTO changes_probe VALUES (?, ?, ?)", $"k{i}", $"a/{i}", (long)i);
+        (string Kind, long Rows)[] changes =
+        [
+            ("insert", await database.RunCountedAsync("INSERT INTO changes_probe VALUES (?, ?, ?)", "x", "a/x", 99L)),
+            ("update", await database.RunCountedAsync("UPDATE changes_probe SET path = ? WHERE id = ?", "b/x", "x")),
+            ("none", await database.RunCountedAsync("UPDATE changes_probe SET n = 0 WHERE id = ?", "absent")),
+            ("bulk", await database.RunCountedAsync("UPDATE changes_probe SET path = 'c/' || substr(path, 3) WHERE path >= 'a/' AND path < 'a0'")),
+            ("upsert", await database.RunCountedAsync("INSERT INTO changes_probe VALUES (?, ?, ?) ON CONFLICT (id) DO UPDATE SET n = excluded.n",
+                "x", "b/x", 5L)),
+            ("delete", await database.RunCountedAsync("DELETE FROM changes_probe WHERE id = ?", "x")),
+            ("bulkDelete", await database.RunCountedAsync("DELETE FROM changes_probe WHERE path >= 'c/' AND path < 'c0'")),
+        ];
+        return string.Join(",", changes.Select(change => $"{change.Kind}={change.Rows}"));
+    }
+
+    /// <summary>Upstream's RUN_CHANGES: what RunChanges reports on every driver.</summary>
+    private const string RunChangesExpected = "insert=1,update=1,none=0,bulk=10,upsert=1,delete=1,bulkDelete=10";
 
     private enum SettlementMode { Immediate, Delay, Reject }
 
@@ -265,6 +434,7 @@ internal static partial class Program
 
         public Task ExecAsync(string sql) => inner.ExecAsync(sql);
         public Task RunAsync(string sql, params object?[] parameters) => inner.RunAsync(sql, parameters);
+        public Task<long> RunCountedAsync(string sql, params object?[] parameters) => inner.RunCountedAsync(sql, parameters);
         public Task<SqliteRow?> GetAsync(string sql, params object?[] parameters) => inner.GetAsync(sql, parameters);
         public Task<IReadOnlyList<SqliteRow>> AllAsync(string sql, params object?[] parameters) => inner.AllAsync(sql, parameters);
         public Task CloseAsync() => inner.CloseAsync();

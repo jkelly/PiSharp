@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/test/harness-support.ts and packages/durable/test/task-support.ts
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/test/harness-support.ts and packages/durable/test/task-support.ts
 // (session-support.ts's ControlledStorage, context and helpers are in Session/SessionSupport.cs). The harness.* case groups run on any
 // storage: HarnessCases() runs them on MemoryStorage, HarnessBackendCases.cs reruns the task groups on JSONL and SQLite.
 //
@@ -13,6 +13,10 @@
 // - createModels() is EmptyDurableModels; pi-ai's faux provider is FauxModels in ChatSupport.cs.
 // - vi.useFakeTimers is ManualTimeProvider passed as HarnessOptions.TimeProvider (with Now reading it); it counts live timers as
 //   vi.getTimerCount() does.
+// - Pi v1.5.0 sync (area sleep): openTasks takes onWake and setTimer, as f75b3240a's task-support.ts does.
+// - Pi v1.5.0 sync (area telemetry): openTasks takes HarnessOptions.Telemetry, as 8b0caefc2's task-support.ts does.
+// - Pi v1.5.0 sync (area vocabulary, 5f312dac4): onReport takes one Report, so openHarness hands its callback report.Error and openTasks
+//   keeps each report's ReportInfo (in place since area reports); tool()'s obj({}) is ToolRegistration.EmptyParameters (area tools-schema).
 using PiSharp.Durable;
 using PiSharp.Durable.Chord;
 using static Program;
@@ -55,7 +59,7 @@ internal static partial class HarnessTests
         {
             Models = models ?? EmptyDurableModels.Instance,
             Registry = registry,
-            OnReport = onReport,
+            OnReport = onReport is null ? null : report => onReport(report.Error),
             Settings = settings,
         }, Context);
         return new OpenedHarness(harness, registry);
@@ -189,27 +193,43 @@ internal static partial class HarnessTests
     /// </summary>
     internal static Task InvocationEnded(IHarness harness, TaskId id) => ((DurableHarness)harness).Scheduler.InvocationDone(id);
 
-    /// <summary>A Harness, the registry it reads, and every failure passed to <c>OnReport</c>.</summary>
-    internal sealed record OpenedTasks(IHarness Harness, IRegistry Registry, SyncList<Exception> Reports);
+    /// <summary>A Harness, the registry it reads, and every failure passed to <c>OnReport</c>; <see cref="Infos"/> holds what each was
+    /// about, at the same index (upstream <c>infos</c>).</summary>
+    internal sealed record OpenedTasks(IHarness Harness, IRegistry Registry, SyncList<Exception> Reports)
+    {
+        public SyncList<ReportInfo> Infos { get; init; } = new();
+    }
 
-    /// <summary>Opens a Harness whose registry holds <paramref name="tasks"/>; failures passed to <c>OnReport</c> are collected (upstream
-    /// <c>openTasks</c>).</summary>
+    /// <summary>Opens a Harness whose registry holds <paramref name="tasks"/>; failures passed to <c>OnReport</c> are collected, their infos
+    /// in <c>Infos</c> (upstream <c>openTasks</c>).</summary>
     internal static async Task<OpenedTasks> OpenTasks(IStorage storage, IReadOnlyList<DurableTask> tasks, IRegistry? registry = null,
-        Func<double>? now = null, HarnessSettings? settings = null, TimeProvider? timeProvider = null, IDurableModels? models = null)
+        Func<double>? now = null, HarnessSettings? settings = null, TimeProvider? timeProvider = null, IDurableModels? models = null,
+        SetTimer? setTimer = null, Action<Wake>? onWake = null, PiSharp.Telemetry.ITelemetryContext? telemetry = null)
     {
         registry ??= Registry.Create();
         if (tasks.Count > 0) registry.Install(Define.Extension(new Extension { Name = "tasks", Tasks = [.. tasks] }));
         var reports = new SyncList<Exception>();
+        var infos = new SyncList<ReportInfo>();
         var harness = await Harness.OpenAsync(storage, new HarnessOptions
         {
             Models = models ?? EmptyDurableModels.Instance,
             Registry = registry,
-            OnReport = reports.Add,
+            OnReport = report =>
+            {
+                lock (reports)
+                {
+                    reports.Add(report.Error);
+                    infos.Add(report.Info);
+                }
+            },
             Now = now,
             Settings = settings,
             TimeProvider = timeProvider,
+            SetTimer = setTimer,
+            OnWake = onWake,
+            Telemetry = telemetry,
         }, Context);
-        return new OpenedTasks(harness, registry, reports);
+        return new OpenedTasks(harness, registry, reports) { Infos = infos };
     }
 
     /// <summary>Next state that completes a task with <paramref name="result"/> (upstream <c>completed</c>).</summary>

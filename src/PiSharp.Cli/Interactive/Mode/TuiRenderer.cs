@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): coding-agent/src/modes/interactive/tui-renderer.ts (createInteractiveTui,
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): coding-agent/src/modes/interactive/tui-renderer.ts (createInteractiveTui,
 // createInteractiveTuiReference) and coding-agent/src/modes/interactive/chat-viewport.ts (createChatViewport).
 using PiSharp.Tui.Pi;
 

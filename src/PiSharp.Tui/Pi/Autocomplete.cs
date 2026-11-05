@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/tui/src/autocomplete.ts.
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/tui/src/autocomplete.ts.
 using System.Diagnostics;
 using System.Text;
 
@@ -68,15 +68,17 @@ public sealed class CombinedAutocompleteProvider(IReadOnlyList<SlashCommand> com
 
     private static string ToDisplayPath(string value) => value.Replace('\\', '/');
 
+    // Upstream's escapeRegex: only the JavaScript regex metacharacters, which fd's Rust regex accepts escaped.
+    private static string EscapeRegex(string value) => System.Text.RegularExpressions.Regex.Replace(value, @"[.*+?^${}()|[\]\\]", @"\$&");
+
     private static string BuildFdPathQuery(string query)
     {
         var normalized = ToDisplayPath(query);
-        if (!normalized.Contains('/')) return normalized;
+        if (!normalized.Contains('/')) return EscapeRegex(normalized);
         var trailing = normalized.EndsWith('/');
         var trimmed = normalized.Trim('/');
         if (trimmed.Length == 0) return normalized;
-        var segments = trimmed.Split('/', StringSplitOptions.RemoveEmptyEntries).Select(System.Text.RegularExpressions.Regex.Escape).ToList();
-        if (segments.Count == 0) return normalized;
+        var segments = trimmed.Split('/', StringSplitOptions.RemoveEmptyEntries).Select(EscapeRegex).ToList();
         const string separator = @"[\\/]";
         return string.Join(separator, segments) + (trailing ? separator : "");
     }

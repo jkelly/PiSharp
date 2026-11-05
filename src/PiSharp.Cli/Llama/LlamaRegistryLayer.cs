@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/src/extensions/llama/provider.ts (the built-in llama.cpp
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/coding-agent/src/extensions/llama/provider.ts (the built-in llama.cpp
 // provider: auth.apiKey check/resolve, refreshModels and its api-key login method) and packages/coding-agent/src/extensions/index.ts
 // (builtInExtensions). Web Agent W2 (WU2): ModelRegistry and ProviderAuthCatalog moved to PiSharp.ModelRuntime, so the provider joins
 // them through IRegistryProviderLayer and ProviderAuthCatalog.BuiltinExtensions and stays in the CLI.

@@ -1,18 +1,26 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/test/harness-inbox.test.ts. Verbatim apart from the adaptations in
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/test/harness-inbox.test.ts. Verbatim apart from the adaptations in
 // HarnessSupport.cs and ChatSupport.cs, and these:
 // - Backends. Upstream opens these on MemoryStorage and reopens a SQLite file for the reopen cases. harness.inbox.* does the same;
 //   harness.inbox.jsonl.* and harness.inbox.sqlite.* rerun every case on a fresh JSONL directory and a fresh SQLite file, and
 //   harness.inbox.jsonl.* reopens a JSONL directory for the reopen cases (harness.inbox.sqlite.* leaves them to harness.inbox.*).
 // - Inbox items `[id, mode]` compare as the strings "id mode".
-// - `Type.Object({})` is NoParameters, the JSON TypeBox prints for it.
+// - `obj({})` is NoParameters, the JSON pi-schema builds for it (Pi v1.5.0, area tools-schema).
 // - "reads queue modes when the final boundary's commit runs on the Session line": upstream waits for onYield and then flushes once, so the
 //   answer's boundary commit has queued behind the held commit before the test changes the mode. Here the onYield hook records the Session
 //   line's backlog, and the test waits (a deterministic barrier) until a further job, the boundary commit, waits on the line.
 // - `class RecordingStorage extends MemoryStorage { override commit() }` is RecordingStorage, a decorator over the case's storage.
-// - The stubborn and handoff tools return their empty results as ToolExecutionResult.Content: upstream's v1.2.0 `output` is area a's
-//   rename of that field, which renames it in every test at once.
 // - The usage cases call UsageLedger.RecordUsageAsync for upstream's `recordUsage`, and HarnessOptions.Settings' Retry for
 //   `setup.settings.retry`.
+// - Pi v1.5.0 sync (area vocabulary, 5f312dac4): the commit listeners are ObserveCommits observers (a CommitObserver; upstream
+//   observeCommits({ advance, end })), and the ones that read operations read the document changes of kind change (DocumentValues).
+// - Pi v1.5.0 sync (area run-end, 38ff99177): a handoff continues the run in the new context. "ends the run with a pi.reset entry when a
+//   tool requests a handoff" is v1.5.0's six handoff cases, from "continues the run in a new context when a tool requests a handoff" to
+//   "ends the run after the handoff when the round also terminates"; "writes the last handoff in call order and then runs queued follow-ups
+//   in the new context" is "writes only the last handoff in call order and runs queued follow-ups after the continuing run", which answers
+//   in the new context before the follow-up. recordRequest is RecordRequest, which the queued-reset case uses too; Type.Object({}) is
+//   NoParameters.
+// - Pi v1.5.0 sync (area group-commit, e5c6182ba): a held storage call no longer holds the line, so "reads queue modes when the final
+//   boundary's commit runs on the Session line" occupies it with a commit whose callback waits, as v1.5.0's does.
 using PiSharp.Durable;
 using PiSharp.Durable.Chord;
 using PiSharp.Durable.Sqlite;
@@ -53,8 +61,8 @@ internal static class InboxTests
 {
     private static readonly DurableContext Context = DurableContext.Background;
 
-    /// <summary><c>Type.Object({})</c>.</summary>
-    private static readonly JsonObjectValue NoParameters = O("""{"type":"object","properties":{}}""");
+    /// <summary><c>obj({})</c>.</summary>
+    private static readonly JsonObjectValue NoParameters = ToolsSchema150.EmptyObject;
 
     private static readonly JsonObjectValue Usage1 =
         O("""{"input":1,"output":2,"cacheRead":3,"cacheWrite":4,"totalTokens":10,"cost":{"input":0.1,"output":0.2,"cacheRead":0.3,"cacheWrite":0.4,"total":1}}""");
@@ -98,6 +106,14 @@ internal static class InboxTests
     private static readonly JsonObjectValue Hold = FauxAssistantMessage([FauxToolCall("hold", JsonObjectValue.Empty, "c1")], stopReason: "toolUse");
 
     private static Task<SubmissionRecord> Status(ISubmission submission) => submission.StatusAsync(Context);
+
+    /// <summary>A faux response that records the request's messages as <c>role:text</c> and answers <paramref name="text"/> (upstream
+    /// <c>recordRequest</c>, 38ff99177).</summary>
+    private static FauxStep RecordRequest(SyncList<List<string>> requests, string text) => FauxStep.From(request =>
+    {
+        requests.Add([.. request.Messages.Select(message => $"{S(((JsonObjectValue)message)["role"])}:{TextOf(message) ?? ""}")]);
+        return Answer(text);
+    });
 
     private static Task<ISubmission> Submit(IConversation conversation, string text, WhenBusy? whenBusy = null, string? requestId = null) =>
         conversation.SubmitAsync(SubmissionDraft.Input(text, whenBusy, requestId), Context);
@@ -240,22 +256,22 @@ internal static class InboxTests
             await first.Reached;
             var f1 = await Submit(root, "f1");
             var f2 = await Submit(root, "f2");
-            // Occupy the line, let the answer queue its boundary commit behind it, then change the mode.
-            var held = storage.HoldCommits();
-            var marker = Documents.DefineSessionDoc("test.marker", 1, () => O("""{"n":0}"""));
-            var occupying = root.CommitAsync(async tx =>
+            // Occupy the line with a commit whose callback waits, let the answer queue its boundary commit behind it, then change the mode.
+            var entered = new HarnessTests.Deferred();
+            var release = new HarnessTests.Deferred();
+            var occupying = root.CommitAsync(async _ =>
             {
-                var doc = await tx.DocAsync(marker);
-                doc.Set("n", N(doc.Get("n")) + 1);
+                entered.Resolve();
+                await release.Task;
             }, Context);
-            await held.Entered;
+            await entered.Task;
             first.Release();
             var backlog = await yielded.Task;
-            // Deterministic barrier for upstream's flush(): the boundary commit waits on the line behind the held commit.
+            // Deterministic barrier for upstream's flush(): the boundary commit waits on the line behind the waiting callback.
             await Eventually(() => session.LineBacklog > backlog);
             await Flush();
             setup.FollowUpMode = QueueMode.All;
-            held.Release();
+            release.Resolve();
             await occupying;
             var settled = await f2.WaitAsync(Context);
             SettledLike(settled, f1.Id, await Status(f1), "f1");
@@ -291,12 +307,7 @@ internal static class InboxTests
             var gate = new HarnessTests.Deferred();
             HoldTool(setup, gate);
             var requests = new SyncList<List<string>>();
-            var record = FauxStep.From(request =>
-            {
-                requests.Add([.. request.Messages.Select(message => $"{S(((JsonObjectValue)message)["role"])}:{TextOf(message) ?? ""}")]);
-                return Answer("fresh");
-            });
-            setup.Faux.SetResponses(Hold, record);
+            setup.Faux.SetResponses(Hold, RecordRequest(requests, "fresh"));
             var (harness, root) = await OpenChat(fresh(), setup);
             var input = await Submit(root, "a");
             await ToolRunning(harness, root);
@@ -399,12 +410,132 @@ internal static class InboxTests
             await harness.CloseAsync(Context);
         });
 
-        yield return Case(prefix + "ends-the-run-with-a-pi-reset-entry-when-a-tool-requests-a-handoff", async () =>
+        // Pi v1.5.0 (area run-end, 38ff99177): a handoff continues the run in the new context.
+        yield return Case(prefix + "continues-the-run-in-a-new-context-when-a-tool-requests-a-handoff", async () =>
         {
             var setup = Setup();
             var gate = new HarnessTests.Deferred();
             gate.Resolve();
             HoldTool(setup, gate, Empty with { Control = new ToolControl { Handoff = "continue here" } });
+            var requests = new SyncList<List<string>>();
+            setup.Faux.SetResponses(Hold, RecordRequest(requests, "after handoff"));
+            var (harness, root) = await OpenChat(fresh(), setup);
+            var settled = await (await Submit(root, "a")).WaitAsync(Context);
+            var entries = await AllEntries(root);
+            Done(settled, entries[^1].Id, "settled");
+            Seq(["pi.user:a", "pi.assistant", "pi.tool-result", "pi.reset:continue here", "pi.assistant:after handoff"], Transcript(entries), "transcript");
+            var reset = entries.First(entry => Entries.ResetEntry.Is(entry));
+            Equal(reset.Id, reset.Head, "reset head");
+            Equal(1, requests.Count, "requests");
+            Seq(["system:", "user:continue here"], requests[0], "request");
+            Equal(2, setup.Faux.State.CallCount, "calls");
+            SameJson("{}", await harness.SnapshotAsync(Live.LiveDoc, root.Id, Context), "live");
+            await harness.CloseAsync(Context);
+        });
+
+        yield return Case(prefix + "places-queued-writes-and-steers-after-the-handoff-text-and-adds-the-steers-to-the-continuing-run", async () =>
+        {
+            var setup = Setup();
+            var gate = new HarnessTests.Deferred();
+            HoldTool(setup, gate, Empty with { Control = new ToolControl { Handoff = "continue here" } });
+            var requests = new SyncList<List<string>>();
+            setup.Faux.SetResponses(Hold, RecordRequest(requests, "after handoff"));
+            var (harness, root) = await OpenChat(fresh(), setup);
+            var input = await Submit(root, "a");
+            await ToolRunning(harness, root);
+            var steer = await Submit(root, "s", WhenBusy.Steer);
+            var write = await Write(root, QueuedNote("w"));
+            gate.Resolve();
+            await input.WaitAsync(Context);
+            var entries = await AllEntries(root);
+            Seq(["pi.user:a", "pi.assistant", "pi.tool-result", "pi.reset:continue here", "note:w", "pi.user:s", "pi.assistant:after handoff"],
+                Transcript(entries), "transcript");
+            Equal(1, requests.Count, "requests");
+            Seq(["system:", "user:continue here", "user:w", "user:s"], requests[0], "request");
+            foreach (var submission in new[] { input, steer }) Done(await Status(submission), entries[^1].Id, $"submission {submission.Id.Value}");
+            Done(await Status(write), null, "write");
+            await harness.CloseAsync(Context);
+        });
+
+        yield return Case(prefix + "holds-a-follow-up-queued-across-a-handoff-until-the-continuing-run-s-final-boundary", async () =>
+        {
+            var setup = Setup();
+            var gate = new HarnessTests.Deferred();
+            HoldTool(setup, gate, Empty with { Control = new ToolControl { Handoff = "continue here" } });
+            var after = Gated(Answer("after handoff"));
+            setup.Faux.SetResponses(Hold, after.Step, Answer("follow-up"));
+            var (harness, root) = await OpenChat(fresh(), setup);
+            var input = await Submit(root, "a");
+            await ToolRunning(harness, root);
+            var followUp = await Submit(root, "f");
+            gate.Resolve();
+            await after.Reached;
+            Equal(SubmissionStatus.Placed, (await Status(input)).Status, "input while the continuing run answers");
+            Seq([$"{followUp.Id.Value} followUp"], await InboxItems(harness, root), "inbox");
+            after.Release();
+            await followUp.WaitAsync(Context);
+            var entries = await AllEntries(root);
+            Seq(["pi.user:a", "pi.assistant", "pi.tool-result", "pi.reset:continue here", "pi.assistant:after handoff", "pi.user:f", "pi.assistant:follow-up"],
+                Transcript(entries), "transcript");
+            var answers = Assistants(entries);
+            Done(await Status(input), answers[1].Id, "input");
+            Done(await Status(followUp), answers[2].Id, "follow-up");
+            await harness.CloseAsync(Context);
+        });
+
+        yield return Case(prefix + "ends-a-handed-off-run-at-a-queued-reset-and-runs-earlier-follow-ups-after-it", async () =>
+        {
+            var setup = Setup();
+            var gate = new HarnessTests.Deferred();
+            HoldTool(setup, gate, Empty with { Control = new ToolControl { Handoff = "continue here" } });
+            var requests = new SyncList<List<string>>();
+            setup.Faux.SetResponses(Hold, RecordRequest(requests, "fresh"));
+            var (harness, root) = await OpenChat(fresh(), setup);
+            var input = await Submit(root, "a");
+            await ToolRunning(harness, root);
+            var followUp = await Submit(root, "f");
+            await root.ResetAsync(null, Context);
+            gate.Resolve();
+            await followUp.WaitAsync(Context);
+            Unanswered(await Status(input), "reset", "input");
+            Seq(["pi.user:a", "pi.assistant", "pi.tool-result", "pi.reset:continue here", "pi.reset", "pi.user:f", "pi.assistant:fresh"],
+                Transcript(await AllEntries(root)), "transcript");
+            Equal(1, requests.Count, "requests");
+            Seq(["system:", "user:f"], requests[0], "request");
+            Equal(2, setup.Faux.State.CallCount, "calls");
+            await harness.CloseAsync(Context);
+        });
+
+        yield return Case(prefix + "hands-off-again-in-a-later-round-of-the-same-run", async () =>
+        {
+            var setup = Setup();
+            var handoffs = 0;
+            AddTool(setup.Registry, Define.Tool(new ToolRegistration
+            {
+                Name = "hold",
+                Description = "Hands off",
+                Parameters = NoParameters,
+                Execute = (_, _, _) => Task.FromResult(Empty with { Control = new ToolControl { Handoff = $"h{Interlocked.Increment(ref handoffs)}" } }),
+            }));
+            setup.Faux.SetResponses(Hold, Hold, Answer("done"));
+            var (harness, root) = await OpenChat(fresh(), setup);
+            var settled = await (await Submit(root, "a")).WaitAsync(Context);
+            var entries = await AllEntries(root);
+            Seq(["pi.user:a", "pi.assistant", "pi.tool-result", "pi.reset:h1", "pi.assistant", "pi.tool-result", "pi.reset:h2", "pi.assistant:done"],
+                Transcript(entries), "transcript");
+            Done(settled, entries[^1].Id, "settled");
+            var messages = (await root.ContextAsync(Context)).Messages;
+            Seq(["system:", "user:h2", "assistant:done"], messages.Select(message => $"{S(((JsonObjectValue)message)["role"])}:{TextOf(message) ?? ""}"),
+                "context");
+            await harness.CloseAsync(Context);
+        });
+
+        yield return Case(prefix + "ends-the-run-after-the-handoff-when-the-round-also-terminates", async () =>
+        {
+            var setup = Setup();
+            var gate = new HarnessTests.Deferred();
+            gate.Resolve();
+            HoldTool(setup, gate, Empty with { Control = new ToolControl { Handoff = "continue here", Terminate = true } });
             setup.Faux.SetResponses(Hold);
             var (harness, root) = await OpenChat(fresh(), setup);
             var settled = await (await Submit(root, "a")).WaitAsync(Context);
@@ -412,7 +543,6 @@ internal static class InboxTests
             var calling = entries.First(entry => entry.Kind == "pi.assistant");
             Done(settled, calling.Id, "settled");
             Seq(["pi.user:a", "pi.assistant", "pi.tool-result", "pi.reset:continue here"], Transcript(entries), "transcript");
-            Equal(entries[^1].Id, entries[^1].Head, "reset head");
             Equal(1, setup.Faux.State.CallCount, "calls");
             SameJson("{}", await harness.SnapshotAsync(Live.LiveDoc, root.Id, Context), "live");
             await harness.CloseAsync(Context);
@@ -509,11 +639,11 @@ internal static class InboxTests
             setup.Faux.SetResponses(first.Step, Answer("second"));
             var (harness, root) = await OpenChat(fresh(), setup);
             var ops = new SyncList<JsonValue>();
-            harness.SubscribeCommits((publication, _) =>
+            harness.ObserveCommits(new CommitObserver((publication, _) =>
             {
-                foreach (var change in DocumentChanges(publication))
+                foreach (var change in DocumentValues(publication))
                     if (change.Record.Kind == "pi.inbox" && change.Ops.Length > 0) ops.Add(J(OpsJson(change.Ops)));
-            });
+            }, _ => { }));
             var input = await Submit(root, "a");
             await first.Reached;
             var w1 = await Write(root, QueuedNote("w"));
@@ -671,7 +801,7 @@ internal static class InboxTests
             await harness.CloseAsync(Context);
         });
 
-        yield return Case(prefix + "writes-the-last-handoff-in-call-order-and-then-runs-queued-follow-ups-in-the-new-context", async () =>
+        yield return Case(prefix + "writes-only-the-last-handoff-in-call-order-and-runs-queued-follow-ups-after-the-continuing-run", async () =>
         {
             var setup = Setup();
             var firstGate = new HarnessTests.Deferred();
@@ -690,7 +820,7 @@ internal static class InboxTests
             }));
             var round = FauxAssistantMessage([FauxToolCall("hold", JsonObjectValue.Empty, "c1"), FauxToolCall("later", JsonObjectValue.Empty, "c2")],
                 stopReason: "toolUse");
-            setup.Faux.SetResponses(round, Answer("follow-up"));
+            setup.Faux.SetResponses(round, Answer("after handoff"), Answer("follow-up"));
             var (harness, root) = await OpenChat(fresh(), setup);
             var input = await Submit(root, "a");
             await ToolRunning(harness, root);
@@ -699,8 +829,10 @@ internal static class InboxTests
             await Eventually(async () => await LiveAt(harness, root, "tools", 1, "status") is JsonStringValue { Value: "done" });
             firstGate.Resolve();
             await f.WaitAsync(Context);
-            Done(await Status(input), null, "input");
-            Seq(["pi.tool-result", "pi.reset:two", "pi.user:f", "pi.assistant:follow-up"], Transcript(await AllEntries(root)).TakeLast(4), "transcript");
+            var entries = await AllEntries(root);
+            Seq(["pi.user:a", "pi.assistant", "pi.tool-result", "pi.tool-result", "pi.reset:two", "pi.assistant:after handoff", "pi.user:f", "pi.assistant:follow-up"],
+                Transcript(entries), "transcript");
+            Done(await Status(input), Assistants(entries)[1].Id, "input");
             await harness.CloseAsync(Context);
         });
 
@@ -748,11 +880,11 @@ internal static class InboxTests
             var items = new List<ISubmission>();
             foreach (var text in new[] { "x", "y", "z" }) items.Add(await Submit(root, text));
             var ops = new SyncList<string>();
-            harness.SubscribeCommits((publication, _) =>
+            harness.ObserveCommits(new CommitObserver((publication, _) =>
             {
-                foreach (var change in DocumentChanges(publication))
+                foreach (var change in DocumentValues(publication))
                     if (change.Record.Kind == "pi.inbox" && change.Ops.Length > 0) ops.Add(OpsJson(change.Ops));
-            });
+            }, _ => { }));
             await items[1].AbortAsync(Context);
             Equal(1, ops.Count, "inbox changes");
             SameJson("""[["p",["items"],1,1,[]]]""", J(ops[0]), "removal");
@@ -767,11 +899,11 @@ internal static class InboxTests
             var first = Gated(Answer("first"));
             setup.Faux.SetResponses(first.Step, Answer("second"));
             var (harness, root) = await OpenChat(storage, setup);
-            harness.SubscribeCommits((publication, _) =>
+            harness.ObserveCommits(new CommitObserver((publication, _) =>
             {
                 foreach (var change in DocumentChanges(publication))
                     if (change.Record.Kind == "pi.inbox") storage.InboxId = change.Record.Id;
-            });
+            }, _ => { }));
             var input = await Submit(root, "a");
             await first.Reached;
             await Submit(root, "f1");
@@ -902,15 +1034,15 @@ internal static class InboxTests
             setup.Faux.SetResponses(Answer("one"), Answer("two"));
             var (harness, root) = await OpenChat(fresh(), setup);
             var commits = new SyncList<(int Entries, JsonArrayValue Ops)>();
-            harness.SubscribeCommits((publication, _) =>
+            harness.ObserveCommits(new CommitObserver((publication, _) =>
             {
-                foreach (var change in DocumentChanges(publication))
+                foreach (var change in DocumentValues(publication))
                 {
                     if (change.Record.Kind != "pi.usage") continue;
                     var entries = publication.Changes.Count(other => other.Type == "entry");
                     commits.Add((entries, (JsonArrayValue)J(OpsJson(change.Ops))));
                 }
-            });
+            }, _ => { }));
             await (await Submit(root, "a")).WaitAsync(Context);
             await (await Submit(root, "b")).WaitAsync(Context);
             await Delivered(harness);
@@ -940,9 +1072,9 @@ internal static class InboxTests
         }
         public SyncList<string> Written { get; } = new();
 
-        public Task<Seq> CommitAsync(IReadOnlyList<StorageWrite> writes, DurableContext context)
+        public Task<CommitResult> CommitAsync(IReadOnlyList<IReadOnlyList<StorageWrite>> batches, Action<int, Seq> receive, DurableContext context)
         {
-            foreach (var write in writes)
+            foreach (var write in batches.SelectMany(writes => writes))
             {
                 if (write is not DocumentChangeWrite change || change.Id != InboxId) continue;
                 Written.Add(change.Content switch
@@ -952,7 +1084,7 @@ internal static class InboxTests
                     _ => "delta",
                 });
             }
-            return inner.CommitAsync(writes, context);
+            return inner.CommitAsync(batches, receive, context);
         }
 
         public Task<TId> MintIdAsync<TId>() where TId : struct, IDurableId<TId> => inner.MintIdAsync<TId>();

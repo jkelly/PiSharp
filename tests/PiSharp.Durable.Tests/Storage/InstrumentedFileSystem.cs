@@ -3,7 +3,7 @@ using PiSharp.Durable.Chord;
 using PiSharp.Durable.Env;
 using PiSharp.Durable.Env.Local;
 
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/test/jsonl-storage.test.ts (InstrumentedEnv). A fault-injecting
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/test/jsonl-storage.test.ts (InstrumentedEnv). A fault-injecting
 // IFileSystem over the local file system: it records every append, flush, write, rename and remove as "<operation>:<file name>" and
 // fails the configured call of one operation before it runs, after it ran ("after": the effect happened but the call reports failure),
 // or after writing only the first half of the bytes ("short": a torn append or write). Upstream subclasses NodeExecutionEnv; this
@@ -132,7 +132,7 @@ internal sealed class InstrumentedFileSystem(IFileSystem inner) : IFileSystem
     public Task<Result<ITextLineReader, FileError>> OpenTextLineReaderAsync(string path, DurableContext context) => inner.OpenTextLineReaderAsync(path, context);
     public Task<Result<ImmutableArray<string>, FileError>> ReadTextLinesAsync(string path, ReadTextLinesOptions? options, DurableContext context) =>
         inner.ReadTextLinesAsync(path, options, context);
-    public Task<Result<IFileWatcher, FileError>> WatchAsync(IReadOnlyList<WatchTarget> targets, Action<WatchChange> onChange, DurableContext context) =>
+    public Task<Result<IFileWatcher, FileError>> WatchAsync(IReadOnlyList<WatchTarget> targets, Action<FileChange> onChange, DurableContext context) =>
         inner.WatchAsync(targets, onChange, context);
     public Task<Result<string, FileError>> CreateTempDirAsync(string? prefix, DurableContext context) => inner.CreateTempDirAsync(prefix, context);
     public Task<Result<string, FileError>> CreateTempFileAsync(TempFileOptions? options, DurableContext context) => inner.CreateTempFileAsync(options, context);

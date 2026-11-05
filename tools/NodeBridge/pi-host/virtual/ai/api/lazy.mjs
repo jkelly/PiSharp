@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/ai/src/api/lazy.ts.
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/ai/src/api/lazy.ts.
 // Ported to plain ESM for the PiSharp Node extension bridge (TypeScript types stripped mechanically; behaviour unchanged).
 import { AssistantMessageEventStream } from "../utils/event-stream.mjs";
 function createSetupErrorMessage(model, error, timestamp) {
@@ -30,23 +30,38 @@ function createSetupErrorMessage(model, error, timestamp) {
 function hasResult(source) {
     return typeof source.result === "function";
 }
-async function forwardStream(target, source) {
+async function forwardStream(target, source, observer, observeResult) {
+    let result;
     for await (const event of source){
         target.push(event);
+        observer?.onEvent?.(event);
+        if (event.type === "done") result = event.message;
+        else if (event.type === "error") result = event.error;
     }
-    target.end(hasResult(source) ? await source.result() : undefined);
+    if (hasResult(source)) result = await source.result();
+    target.end(result);
+    observeResult(result);
 }
-export function lazyStream(model, setup) {
+export function lazyStream(model, setup, observer) {
     const startedAt = Date.now();
     const outer = new AssistantMessageEventStream();
-    setup().then((inner)=>forwardStream(outer, inner)).catch((error)=>{
+    let observedResult = false;
+    const observeResult = (result)=>{
+        if (observedResult) return;
+        observedResult = true;
+        observer?.onResult?.(result);
+    };
+    setup().then((inner)=>forwardStream(outer, inner, observer, observeResult)).catch((error)=>{
         const message = createSetupErrorMessage(model, error, startedAt);
-        outer.push({
+        const event = {
             type: "error",
             reason: "error",
             error: message
-        });
+        };
+        outer.push(event);
+        observer?.onEvent?.(event);
         outer.end(message);
+        observeResult(message);
     });
     return outer;
 }

@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/src/core/crash-log.ts.
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/coding-agent/src/core/crash-log.ts.
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
@@ -95,7 +95,7 @@ public static class CrashLog
     /// <see cref="MaxCrashRecords"/>. Returns null when nothing was written. A .NET exception's message is
     /// <see cref="Exception.Message"/> (its type name when empty) and its stack is <see cref="Exception.ToString"/>, which
     /// starts with the type and message as a JavaScript <c>error.stack</c> does; any other value is stringified.</summary>
-    public static CrashRecord? RecordCrash(string kind, object? error, string? sessionFile, string cwd, string path, string version = "1.2.0",
+    public static CrashRecord? RecordCrash(string kind, object? error, string? sessionFile, string cwd, string path, string version = BugReport.PiVersion,
         TimeProvider? timeProvider = null)
     {
         try

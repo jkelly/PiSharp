@@ -1,14 +1,21 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/test/session-document-retention.test.ts. The Session's document
-// cache is bounded by use: unattached documents leave it after the retention period and load from Storage again; documents with a watch or a
-// document state never leave it. Verbatim apart from the adaptations in SessionSupport.cs, HarnessSupport.cs and ChatSupport.cs, and these:
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/test/session-document-retention.test.ts. The Session's document
+// cache is bounded by use: unattached documents leave it after the retention period and load from Storage again; documents with a watch
+// never leave it. Verbatim apart from the adaptations in SessionSupport.cs, HarnessSupport.cs and ChatSupport.cs, and these:
 // - A retention is a double?, so upstream's `"soon" as unknown as number` (a value of the wrong type) has no counterpart; NaN and -5 remain.
 // - "keeps no timer where timers cannot be unreferenced, and evicts on commits": .NET timers never keep a process alive, so the Session
 //   always keeps one (see Session.cs) and has no timerless mode to enter. The case checks the part that holds either way: the end of each
 //   commit evicts what expired, before any timer could fire.
 // - "writes after a reload continue the stored deltas and bases": the batches are ControlledStorage.Commits, as upstream's patched commit
 //   records them.
-// - "gives the same events ...": the run flushes the Session line before it stops the event stream, as the inbox cases do (a C# wait
+// - "gives the same views ...": the run flushes the Session line before it detaches the view history, as the inbox cases do (a C# wait
 //   resumes on its own listener, upstream's after all listeners and the deliveries they queued).
+// Pi v1.5.0 sync (area watches, 92ab53602): Session.documentState() is gone, so the cases that held a state hold a watch, started where its
+// value must stay current (two cases renamed with them). Area watch-folding (8b0caefc2): a watch follows its address and its value is
+// never null, so "does not keep a replacement cached for an observer of the retired incarnation" is 8b0caefc2's "pins only what is at the
+// address a watch follows". Area events (f3255de76): "gives the same events with documents evicted right after use as with documents
+// kept" is v1.5.0's "gives the same views ...": it compares the view history (LiveSupport.cs's viewHistory) where v1.2.0 compared
+// watchEvents' events (removed). Area group-commit (e5c6182ba): upstream's patched commit records every batch of a call, as
+// ControlledStorage.Commits does. Area tools-schema (6536f8012): the steps tool's obj({}) is ToolsSchema150.EmptyObject.
 using PiSharp.Durable;
 using PiSharp.Durable.Chord;
 using PiSharp.Durable.Storage;
@@ -28,19 +35,24 @@ internal static class DocumentRetentionTests
     private static readonly DurableContext Context = DurableContext.Background;
 
     private static readonly ConversationDocToken CounterDoc =
-        Documents.DefineConversationDoc("test.retention.counter", 1, DocumentFork.Initial, () => O("""{"count":0}"""));
+        Documents.DefineConversationDoc("test.retention.counter", 1, DocumentFork.Initial, () => O("""{"count":0}"""),
+            checkpointWhen: (_, _, _) => false);
     private static readonly RewindableConversationDocToken RewindableDoc =
-        Documents.DefineRewindableConversationDoc("test.retention.rewindable", 1, DocumentFork.AsOf, () => O("""{"count":0}"""));
+        Documents.DefineRewindableConversationDoc("test.retention.rewindable", 1, DocumentFork.AsOf, () => O("""{"count":0}"""),
+            checkpointWhen: (_, _, _) => false);
     /// <summary>A third-party conversation family: one member per event.</summary>
     private static readonly ConversationDocFamilyToken EventDoc =
-        Documents.DefineConversationDocFamily("test.retention.event", 1, DocumentFork.Initial, seq => Obj(("seq", seq)));
-    private static readonly SessionDocToken SessionCounterDoc = Documents.DefineSessionDoc("test.retention.session-counter", 1, () => O("""{"count":0}"""));
+        Documents.DefineConversationDocFamily("test.retention.event", 1, DocumentFork.Initial, seq => Obj(("seq", seq)),
+            checkpointWhen: (_, _, _) => false);
+    private static readonly SessionDocToken SessionCounterDoc = Documents.DefineSessionDoc("test.retention.session-counter", 1, () => O("""{"count":0}"""),
+        checkpointWhen: (_, _, _) => false);
     /// <summary>A session document whose checkpoint predicate throws, so the commit that changes it fails while it settles.</summary>
     private static readonly SessionDocToken Failing = Documents.DefineSessionDoc("test.retention.failing", 1, () => O("""{"count":0}"""),
         checkpointWhen: (_, _, _) => throw new InvalidOperationException("checkpoint failed"));
     /// <summary>A conversation document any Harness test can read.</summary>
     private static readonly ConversationDocToken TestDoc =
-        Documents.DefineConversationDoc("test.retention.harness", 1, DocumentFork.Initial, () => O("""{"count":0}"""));
+        Documents.DefineConversationDoc("test.retention.harness", 1, DocumentFork.Initial, () => O("""{"count":0}"""),
+            checkpointWhen: (_, _, _) => false);
 
     /// <summary>The default retention of this run, as Program.cs set it from PI_DURABLE_DOCUMENT_RETENTION_MS.</summary>
     private static double DefaultForRun => SetupDocumentRetention.DefaultForRun;
@@ -118,25 +130,26 @@ internal static class DocumentRetentionTests
             await session.CloseAsync(Context);
         });
 
-        yield return Case(prefix + "never-evicts-a-document-a-watch-or-a-document-state-observes-and-evicts-it-once-the-last-detaches", async () =>
+        yield return Case(prefix + "never-evicts-a-document-a-watch-observes-and-evicts-it-once-the-last-watch-detaches", async () =>
         {
             var (storage, session, clock) = Open(1_000);
             var conversationId = await CreateConversation(session);
             await Bump(session, conversationId);
             var watch = (await session.WatchDocAsync(CounterDoc, conversationId, Context))!;
-            var state = (await session.DocumentStateAsync(CounterDoc, conversationId, Context))!;
+            var kept = (await session.WatchDocAsync(CounterDoc, conversationId, Context))!;
+            kept.Start((_, _) => Task.CompletedTask);
             var seen = new SyncList<double>();
-            watch.Start((value, _, _) =>
+            watch.Start((call, _) =>
             {
-                seen.Add(value is null ? -1 : N(value["count"]));
+                seen.Add(N(Change(call).Value["count"]));
                 return Task.CompletedTask;
             });
+            static double CountOf(JsonObjectValue value) => N(value["count"]);
             clock.Now += 1_000_000;
             await Bump(session, conversationId);
             await SettleLine(session);
             // Still cached: a read long after its retention passed loads nothing from Storage.
-            Equal(2.0, N(state.Value!["count"]), "state");
-            await Eventually(() => seen.Snapshot().Contains(2));
+            await Eventually(() => seen.Snapshot().Contains(2) && CountOf(kept.Value) == 2);
             var reads = storage.DocumentReadCount;
             clock.Now += 1_000_000;
             await TouchSessionCounter(session);
@@ -147,8 +160,8 @@ internal static class DocumentRetentionTests
             clock.Now += 1_000_000;
             await Bump(session, conversationId);
             await SettleLine(session);
-            Equal(3.0, N(state.Value!["count"]), "state after the watch stopped");
-            state.Dispose();
+            await Eventually(() => CountOf(kept.Value) == 3);
+            await kept.StopAsync();
             clock.Now += 1_000_000;
             await NoOp(session);
             await TouchSessionCounter(session);
@@ -310,18 +323,23 @@ internal static class DocumentRetentionTests
             await session.CloseAsync(Context);
         });
 
-        yield return Case(prefix + "does-not-keep-a-replacement-cached-for-an-observer-of-the-retired-incarnation", async () =>
+        yield return Case(prefix + "pins-only-what-is-at-the-address-a-watch-follows-nothing-while-retired-then-the-new-incarnation", async () =>
         {
             var (_, session, _) = Open(0);
             var conversationId = await CreateConversation(session);
             await Bump(session, conversationId);
-            var state = (await session.DocumentStateAsync(CounterDoc, conversationId, Context))!;
+            var watch = (await session.WatchDocAsync(CounterDoc, conversationId, Context))!;
+            watch.Start((_, _) => Task.CompletedTask);
             await session.CommitAsync(tx => tx.RetireDocAsync(CounterDoc, conversationId), Context);
-            Check(state.Value is null, "retired");
-            await Bump(session, conversationId, 5);
             await Evicted(session);
-            SameJson("""{"count":5}""", await session.SnapshotAsync(CounterDoc, conversationId, Context), "replacement");
-            state.Dispose();
+            Equal(0, session.DocumentCacheSizes.Attached, "attached while retired");
+            await Bump(session, conversationId, 5);
+            await SettleLine(session);
+            var sizes = session.DocumentCacheSizes;
+            Equal((1, 1), (sizes.Cached, sizes.Attached), "the new incarnation, pinned");
+            await Eventually(() => N(watch.Value["count"]) == 5);
+            await watch.StopAsync();
+            await Evicted(session);
             await session.CloseAsync(Context);
         });
 
@@ -332,7 +350,7 @@ internal static class DocumentRetentionTests
             await Bump(session, conversationId);
             await Evicted(session);
             var gate = storage.HoldFindDocument();
-            var attaching = session.DocumentStateAsync(CounterDoc, conversationId, Context);
+            var attaching = session.WatchDocAsync(CounterDoc, conversationId, Context);
             await gate.Entered;
             var closing = session.CloseAsync(Context);
             gate.Release();
@@ -342,15 +360,15 @@ internal static class DocumentRetentionTests
             await storage.Inner.CloseAsync(Context);
         });
 
-        yield return Case(prefix + "evicts-on-its-timer-without-a-commit-and-tolerates-a-detach-called-twice", async () =>
+        yield return Case(prefix + "evicts-on-its-timer-without-a-commit-and-tolerates-a-stop-called-twice", async () =>
         {
             var storage = new ControlledStorage(new MemoryStorage());
             var session = new Session(storage, null, () => 20);
             var conversationId = await CreateConversation(session);
             await Bump(session, conversationId);
-            var state = (await session.DocumentStateAsync(CounterDoc, conversationId, Context))!;
-            state.Dispose();
-            state.Dispose();
+            var watch = (await session.WatchDocAsync(CounterDoc, conversationId, Context))!;
+            await watch.StopAsync();
+            await watch.StopAsync();
             var until = DateTime.UtcNow.AddSeconds(2);
             while (session.DocumentCacheSizes.Cached > 0 && DateTime.UtcNow < until) await Task.Delay(10);
             Equal(0, session.DocumentCacheSizes.Cached, "cached");
@@ -359,9 +377,10 @@ internal static class DocumentRetentionTests
 
         yield return Case(prefix + "migrates-a-document-again-after-its-eviction", async () =>
         {
-            var v1 = Documents.DefineSessionDoc("test.retention.migrating", 1, () => O("""{"count":1}"""));
+            var v1 = Documents.DefineSessionDoc("test.retention.migrating", 1, () => O("""{"count":1}"""), checkpointWhen: (_, _, _) => false);
             var migrations = 0;
             var v2 = Documents.DefineSessionDoc("test.retention.migrating", 2, () => O("""{"count":0,"migrated":true}"""),
+                checkpointWhen: (_, _, _) => false,
                 migrate: (value, _) =>
                 {
                     Interlocked.Increment(ref migrations);
@@ -449,7 +468,7 @@ internal static class DocumentRetentionTests
             }
         });
 
-        yield return Case(prefix + "gives-the-same-events-with-documents-evicted-right-after-use-as-with-documents-kept", async () =>
+        yield return Case(prefix + "gives-the-same-views-with-documents-evicted-right-after-use-as-with-documents-kept", async () =>
         {
             static async Task<List<string>> Run(double documentRetentionMs)
             {
@@ -460,7 +479,7 @@ internal static class DocumentRetentionTests
                 {
                     Name = "steps",
                     Description = "Streams three steps",
-                    Parameters = O("""{"type":"object","properties":{}}"""),
+                    Parameters = ToolsSchema150.EmptyObject,
                     Execute = async (_, api, _) =>
                     {
                         foreach (var step in new[] { "a\n", "b\n", "c\n" })
@@ -474,40 +493,41 @@ internal static class DocumentRetentionTests
                 setup.Faux.SetResponses(FauxAssistantMessage([FauxToolCall("steps", JsonObjectValue.Empty, "s1")], stopReason: "toolUse"),
                     FauxAssistantMessage([FauxText("done")]));
                 var (harness, root) = await OpenChat(new MemoryStorage(), setup);
-                var stream = await harness.WatchEventsAsync(root.Id, Context);
-                var events = new SyncList<AgentEvent>();
-                stream.Start((batch, _) =>
-                {
-                    foreach (var item in batch) events.Add(item);
-                    return Task.CompletedTask;
-                });
+                var history = await LiveTests.ViewHistory(harness, root.Id);
                 await (await root.SubmitAsync(SubmissionDraft.Input("go"), Context)).WaitAsync(Context);
                 await harness.WaitForIdleAsync(Context);
                 // A C# wait resumes on its own listener, upstream's after all listeners and the deliveries they queued: flush the line so
-                // the last commit's events are delivered before the stream stops.
+                // the last commit's views are recorded before the history detaches.
                 await ((Session)harness).FlushLineAsync();
-                await stream.StopAsync();
+                history.Detach();
                 await harness.CloseAsync(Context);
-                // Ids and times differ between runs; the sequence of event types and tool outputs must not.
-                return [.. events.Snapshot().Select(item => item.Type == "tool_execution_update"
-                    ? "update:" + (item.ToJson().TryGetValue("output", out var output) ? output.ToJson() : "undefined")
-                    : item.Type)];
+                // Ids and times differ between runs; the sequence of entries, run states, and tool outputs must not.
+                static string Field(JsonObjectValue slot, string name) => slot.TryGetValue(name, out var value) ? S(value) : "";
+                return [.. history.Views.Select(view =>
+                {
+                    var live = LiveTests.LiveOf(view);
+                    var tools = live.TryGetValue("tools", out var slots) ? ((JsonArrayValue)slots).OfType<JsonObjectValue>()
+                        .Select(slot => $"{Field(slot, "callId")}:{Field(slot, "status")}:{Field(slot, "output")}") : [];
+                    var kinds = string.Join(",", view.Entries.Select(entry => entry.Kind));
+                    return $"{kinds} run:{(live.ContainsKey("run") ? "true" : "false")} generation:{(live.ContainsKey("generation") ? "true" : "false")} {string.Join(" ", tools)}";
+                })];
             }
-            Seq(await Run(600_000), await Run(0), "events");
+            Seq(await Run(0), await Run(600_000), "views");
         });
 
         yield return Case(prefix + "keeps-a-reloaded-newer-version-cached-while-an-observer-of-the-older-one-is-attached", async () =>
         {
-            var v1 = Documents.DefineSessionDoc("test.retention.versioned", 1, () => O("""{"count":3}"""));
+            var v1 = Documents.DefineSessionDoc("test.retention.versioned", 1, () => O("""{"count":3}"""), checkpointWhen: (_, _, _) => false);
             var v2 = Documents.DefineSessionDoc("test.retention.versioned", 2, () => O("""{"count":0,"v2":true}"""),
+                checkpointWhen: (_, _, _) => false,
                 migrate: (value, _) => Obj(("count", value["count"]), ("v2", true)));
             var (_, session, _) = Open(0);
             await session.CommitAsync(async tx => await tx.DocAsync(v1), Context);
-            var state = (await session.DocumentStateAsync(v1, Context))!;
+            var watch = (await session.WatchDocAsync(v1, Context))!;
             SameJson("""{"count":3,"v2":true}""", await session.SnapshotAsync(v2, Context), "v2");
             await SettleLine(session);
             Equal(1, session.DocumentCacheSizes.Cached, "cached while attached");
-            state.Dispose();
+            await watch.StopAsync();
             await Evicted(session);
             await session.CloseAsync(Context);
         });

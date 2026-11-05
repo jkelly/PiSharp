@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/src/tools/edit.ts (v1.2.0 renamed the result's content to output)
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/src/tools/edit.ts (v1.2.0 renamed the result's content to output)
 using PiSharp.Durable.Chord;
 using PiSharp.Durable.Env;
 
@@ -7,9 +7,9 @@ namespace PiSharp.Durable.Tools;
 /// <summary>Upstream <c>createEditTool</c>.</summary>
 internal static class EditTool
 {
-    /// <summary><c>Type.Object({ path, edits: Type.Array(Type.Object({ oldText, newText })) })</c> as TypeBox prints it.</summary>
+    /// <summary><c>obj({ path, edits: arr(obj({ oldText, newText }, { open: true })) }, { open: true })</c> as pi-schema builds it.</summary>
     internal static readonly JsonObjectValue Parameters = (JsonObjectValue)JsonValue.Parse(
-        """{"type":"object","required":["path","edits"],"properties":{"path":{"type":"string","description":"Path to the file to edit (relative or absolute)"},"edits":{"type":"array","items":{"type":"object","required":["oldText","newText"],"properties":{"oldText":{"type":"string","description":"Exact text for one targeted replacement. It must be unique in the original file and must not overlap with any other edits[].oldText in the same call."},"newText":{"type":"string","description":"Replacement text for this targeted edit."}}},"description":"One or more targeted replacements. Each edit is matched against the original file, not incrementally. Do not include overlapping or nested edits. If two changes touch the same block or nearby lines, merge them into one edit instead."}}}""");
+        """{"type":"object","properties":{"path":{"type":"string","description":"Path to the file to edit (relative or absolute)"},"edits":{"type":"array","items":{"type":"object","properties":{"oldText":{"type":"string","description":"Exact text for one targeted replacement. It must be unique in the original file and must not overlap with any other edits[].oldText in the same call."},"newText":{"type":"string","description":"Replacement text for this targeted edit."}},"required":["oldText","newText"]},"description":"One or more targeted replacements. Each edit is matched against the original file, not incrementally. Do not include overlapping or nested edits. If two changes touch the same block or nearby lines, merge them into one edit instead."}},"required":["path","edits"]}""");
 
     public static ToolRegistration Create() => Define.Tool(new ToolRegistration
     {

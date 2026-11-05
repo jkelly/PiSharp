@@ -294,8 +294,13 @@ internal sealed partial class PiExtensionHost
                 else ComponentInvalidated?.Invoke(parameters.GetProperty("id").GetString()!); // IMPL-I: widget, header and footer components
                 return;
             case "component.done":
+                _componentCaptures.TryRemove(parameters.GetProperty("id").GetString()!, out _);
                 if (_components.TryRemove(parameters.GetProperty("id").GetString()!, out var done))
                     await done.Ui.SignalCustomComponentDoneAsync(done.Identity).ConfigureAwait(false);
+                return;
+            case "component.captures":
+                if (parameters.GetProperty("value").ValueKind == JsonValueKind.True) _componentCaptures[parameters.GetProperty("id").GetString()!] = true;
+                else _componentCaptures.TryRemove(parameters.GetProperty("id").GetString()!, out _);
                 return;
             case "userBash.data":
             {
@@ -805,8 +810,28 @@ internal sealed partial class PiExtensionHost
         await ui.OpenCustomComponentAsync(new ExtensionCustomComponentCallbacks(identity,
             async (width, _, cancellation) => PiNodeOwner.Rows(await Node.RequestAsync("component.render", new JsonObject { ["id"] = componentId, ["width"] = width }, cancellation).ConfigureAwait(false)),
             async (data, _, cancellation) => await Node.RequestAsync("component.input", new JsonObject { ["id"] = componentId, ["data"] = data }, cancellation).ConfigureAwait(false),
-            async _ => { _components.TryRemove(componentId, out var _); await Node.RequestAsync("component.dispose", new JsonObject { ["id"] = componentId }).ConfigureAwait(false); }), token).ConfigureAwait(false);
+            async _ => { _components.TryRemove(componentId, out var _); _componentCaptures.TryRemove(componentId, out var _); await Node.RequestAsync("component.dispose", new JsonObject { ["id"] = componentId }).ConfigureAwait(false); })
+        { Blocked = CustomComponentBlocked(p), Overlay = CustomComponentOverlay(p), CapturesViewportInput = () => ComponentCapturesViewportInput(componentId) },
+            token).ConfigureAwait(false);
     }
+
+    /// <summary>Pi 1.3.0 ctx.ui.custom() <c>overlay: true</c> with its overlayOptions (the bridge resolves a function once); null inline.</summary>
+    internal static ExtensionCustomComponentOverlay? CustomComponentOverlay(JsonElement p) =>
+        p.TryGetProperty("overlay", out var overlay) && overlay.ValueKind == JsonValueKind.True
+            ? new(p.TryGetProperty("overlayOptions", out var options) && options.ValueKind == JsonValueKind.Object ? options.Clone() : null) : null;
+
+    /// <summary>Pi 1.5.0 Component.capturesViewportInput of a Node component, as the bridge last reported it (component.captures after a
+    /// render or an input).</summary>
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, bool> _componentCaptures = new(StringComparer.Ordinal);
+    internal bool ComponentCapturesViewportInput(string componentId) => _componentCaptures.TryGetValue(componentId, out var captures) && captures;
+
+    /// <summary>Pi 1.5.0 ctx.ui.custom() <c>blocked: { kind, message }</c>; overlays ignore it.</summary>
+    internal static ExtensionCustomComponentBlocked? CustomComponentBlocked(JsonElement p) =>
+        !(p.TryGetProperty("overlay", out var overlay) && overlay.ValueKind == JsonValueKind.True) &&
+        p.TryGetProperty("blocked", out var blocked) && blocked.ValueKind == JsonValueKind.Object &&
+        blocked.TryGetProperty("kind", out var kind) && kind.ValueKind == JsonValueKind.String &&
+        blocked.TryGetProperty("message", out var message) && message.ValueKind == JsonValueKind.String
+            ? new(kind.GetString()!, message.GetString()!) : null;
 
     // ----------------------------------------------------------------------------------------------------------------- tools and commands
 

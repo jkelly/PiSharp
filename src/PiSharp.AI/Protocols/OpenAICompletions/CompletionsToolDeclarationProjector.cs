@@ -153,29 +153,35 @@ public sealed class CompletionsToolDeclarationProjector
         // Validate and charge the whole declaration history even when only its initial tools
         // belong at request level. Later declarations still consume the configured budgets.
         var current = Project(request, token);
-        if (!supportsAdditions || !CanAnchorAdditions(request, token)) return current;
-        return Project(request with { Messages = request.Messages.Length != 0 && request.Messages[0].Role == "system"
-            ? [request.Messages[0]] : [] }, token);
+        if (!supportsAdditions) return current;
+        var folded = FoldedSystemMessages(request, token);
+        return Project(request with { Messages = [.. request.Messages.Where(entry => entry.Role == "system").Take(folded)] }, token);
     }
 
-    internal static bool CanAnchorAdditions(ChatRequest request, CancellationToken token)
+    // Pi 1.5.0 transcript.ts resolveTranscriptTools(messages, "additions"): the number of leading system messages whose tool
+    // changes the request-level list holds. Tool messages cannot remove or redefine tools, so the list becomes the tool state
+    // after the last removal or redeclaration and only later additions stay anchored (the cached prefix changes once per removal).
+    internal static int FoldedSystemMessages(ChatRequest request, CancellationToken token)
     {
+        // findLastNonAdditiveToolChange: a name declared before counts as a redeclaration even after its removal, including an
+        // identical definition (Kimi K3 ignores a removed tool that a later tool message declares again).
         var names = new HashSet<string>(StringComparer.Ordinal);
+        int index = -1, last = -1;
         foreach (var entry in request.Messages)
         {
             token.ThrowIfCancellationRequested();
             if (entry.Role != "system") continue;
+            index++;
             var body = entry.WireBody.Value;
-            if (body.TryGetProperty("toolsRemoved", out var removed) && removed.GetArrayLength() != 0) return false;
+            if (body.TryGetProperty("toolsRemoved", out var removed) && removed.GetArrayLength() != 0) last = index;
             if (body.TryGetProperty("toolsAdded", out var added))
                 foreach (var tool in added.EnumerateArray())
                 {
                     token.ThrowIfCancellationRequested();
-                    // Source falls back for every redeclaration, including identical definitions.
-                    if (!names.Add(CompletionsJson.String(tool, "name"))) return false;
+                    if (!names.Add(CompletionsJson.String(tool, "name"))) last = index;
                 }
         }
-        return true;
+        return Math.Max(request.Messages.Length != 0 && request.Messages[0].Role == "system" ? 1 : 0, last + 1);
     }
 }
 

@@ -1,6 +1,6 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/src/modes/interactive/theme/theme.ts (Theme class, theme
-// loading, the global theme, the custom theme watcher, getAvailableThemesWithPaths, highlightCode, getLanguageFromPath and the TUI
-// theme helpers). Theme JSON loading, validation and the system theme reuse PiThemeHost (src/PiSharp.CodingAgent/Export).
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/coding-agent/src/modes/interactive/theme/theme.ts (Theme class, theme
+// loading, the global theme, the custom theme watcher, getAvailableThemesWithPaths, highlightCode, CodeHighlighter, getLanguageFromPath
+// and the TUI theme helpers). Theme JSON loading, validation and the system theme reuse PiThemeHost (src/PiSharp.CodingAgent/Export).
 using PiSharp.CodingAgent.Export;
 using PiSharp.Tui.Pi;
 using TuiColor = PiSharp.Tui.Pi.Color;
@@ -361,13 +361,16 @@ internal static class Themes
     public static bool IsLightTheme(string? themeName = null) => LoadTheme(themeName ?? currentThemeName ?? SystemThemeName).Appearance == "light";
 
     // ---------------------------------------------------------------- TUI helpers
+    /// <summary>The theme instance behind the global theme (getGlobalTheme), null before one is loaded.</summary>
+    internal static Theme? GlobalTheme => current;
+
     public static IReadOnlyList<string> HighlightCode(string code, string? lang)
     {
         var theme = Current;
         var validLang = lang is { Length: > 0 } && SyntaxHighlight.SupportsLanguage(lang) ? lang : null;
         if (validLang is null) return code.Split('\n').Select(line => theme.Fg("mdCodeBlock", line)).ToList();
         try { return SyntaxHighlight.Highlight(code, validLang, theme).Split('\n'); }
-        catch { return code.Split('\n'); }
+        catch { return code.Split('\n').Select(line => theme.Fg("mdCodeBlock", line)).ToList(); }
     }
 
     private static readonly Dictionary<string, string> ExtensionLanguages = new(StringComparer.Ordinal)
@@ -406,13 +409,7 @@ internal static class Themes
         Italic = text => Current.Italic(text),
         Underline = text => Current.Underline(text),
         Strikethrough = text => Current.Strikethrough(text),
-        HighlightCode = (code, lang) =>
-        {
-            var validLang = lang is { Length: > 0 } && SyntaxHighlight.SupportsLanguage(lang) ? lang : null;
-            if (validLang is null) return code.Split('\n').Select(line => Current.Fg("mdCodeBlock", line)).ToList();
-            try { return [.. SyntaxHighlight.Highlight(code, validLang, Current).Split('\n')]; }
-            catch { return code.Split('\n').Select(line => Current.Fg("mdCodeBlock", line)).ToList(); }
-        },
+        HighlightCode = (code, lang) => [.. HighlightCode(code, lang)],
         CodeBlockIndent = codeBlockIndent
     };
 
@@ -442,4 +439,27 @@ internal static class ThemeGlobals
 #pragma warning disable IDE1006
     public static Theme theme => Themes.Current;
 #pragma warning restore IDE1006
+}
+
+/// <summary>Source CodeHighlighter: highlights code for one owner, such as a tool row, and reuses the last result while the code, the
+/// language, the theme and the registered grammars stay the same. Each owner keeps its own highlighter, so cached results live as
+/// long as the code they show instead of in a process-wide cache.</summary>
+internal sealed class CodeHighlighter
+{
+    private sealed record Last(string Code, string? Lang, Theme? Theme, int LanguageCount, IReadOnlyList<string> Lines);
+    private Last? last;
+
+    /// <summary>Like <see cref="Themes.HighlightCode"/>. The result is shared with later calls, so callers must not modify it.</summary>
+    public IReadOnlyList<string> Highlight(string code, string? lang)
+    {
+        // Renderers cannot tell a theme change from any other redraw, so the highlighter checks what its result depends on.
+        var currentTheme = Themes.GlobalTheme;
+        var languageCount = SyntaxHighlight.GetHighlightLanguageCount();
+        if (last is { } previous && previous.Code == code && previous.Lang == lang && ReferenceEquals(previous.Theme, currentTheme)
+            && previous.LanguageCount == languageCount)
+            return previous.Lines;
+        var lines = Themes.HighlightCode(code, lang);
+        last = new Last(code, lang, currentTheme, languageCount, lines);
+        return lines;
+    }
 }

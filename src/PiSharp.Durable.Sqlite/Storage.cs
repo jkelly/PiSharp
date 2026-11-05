@@ -1,9 +1,13 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/src/storage/sqlite/storage.ts
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/src/storage/sqlite/storage.ts
 //
 // The queries, orderings and JSON columns are upstream's. Records are stored as their JSON text (Chord JsonValue.ToJson, which matches
 // JSON.stringify), and indexed strings (task kinds, request IDs, document kinds and keys) are stored JSON-encoded, as upstream does to
 // keep lone UTF-16 surrogates lossless. Batch validation is shared with MemoryStorage (StorageRules): each check reads the rows it needs
 // first and then applies the same rule, in upstream's order. Upstream also exports this class from storage/sqlite/index.ts.
+// Every table name comes from one SqliteSchema, rendered with the optional prefix of SqliteStorageOptions (upstream's
+// SqliteStorageOptions.prefix), and openNodeSqliteStorage's prefix check before the file opens (packages/durable/src/storage/sqlite/node.ts)
+// is OpenAsync(path, options). A batch commit runs in one transaction with no savepoints: each batch's checks, copy resolution included,
+// read through a watched executor before the batch writes anything, so a failing check is a refusal only when no database call failed.
 using System.Collections.Immutable;
 using PiSharp.Durable.Chord;
 using PiSharp.Durable.Chord.Delta;
@@ -14,9 +18,9 @@ namespace PiSharp.Durable.Sqlite;
 /// <summary>Portable SQLite implementation of the durable storage contract (upstream <c>SqliteStorage</c>, spec §11).</summary>
 public sealed class SqliteStorage : IStorage
 {
-    private const string MetadataSql = "SELECT next_id, next_seq FROM durable_metadata WHERE singleton = 1";
-
     private readonly ISqliteDatabase db;
+    private readonly SqliteTableNames tables;
+    private readonly string metadataSql;
     private readonly Lock gate = new();
     private long nextId;
     private bool closed;
@@ -24,23 +28,28 @@ public sealed class SqliteStorage : IStorage
     private int admittedReads;
     private TaskCompletionSource? readsDrained;
 
-    private SqliteStorage(ISqliteDatabase db, long nextId)
+    private SqliteStorage(ISqliteDatabase db, SqliteSchema schema, long nextId)
     {
         this.db = db;
+        tables = schema.Tables;
+        metadataSql = MetadataSql(tables);
         this.nextId = nextId;
     }
 
     /// <summary>Initializes storage over an owned database facade (upstream <c>SqliteStorage.open</c>): applies pending migrations and
-    /// loads the ID allocator. On failure the database is closed.</summary>
-    public static async Task<SqliteStorage> OpenAsync(ISqliteDatabase db)
+    /// loads the ID allocator. <see cref="SqliteStorageOptions.Prefix"/> namespaces every table and index; the connection settings of
+    /// <paramref name="options"/> do not apply to a database the caller opened. On failure, an invalid prefix included, the database is
+    /// closed.</summary>
+    public static async Task<SqliteStorage> OpenAsync(ISqliteDatabase db, SqliteStorageOptions? options = null)
     {
         ArgumentNullException.ThrowIfNull(db);
         try
         {
-            await SqliteMigrations.ApplyAsync(db).ConfigureAwait(false);
-            var metadata = await db.GetAsync(MetadataSql).ConfigureAwait(false) ??
+            var schema = SqliteSchema.Create(options?.Prefix);
+            await SqliteMigrations.ApplyAsync(db, schema).ConfigureAwait(false);
+            var metadata = await db.GetAsync(MetadataSql(schema.Tables)).ConfigureAwait(false) ??
                 throw new InvalidOperationException("Durable SQLite metadata is missing");
-            return new SqliteStorage(db, ParseNextId(metadata));
+            return new SqliteStorage(db, schema, ParseNextId(metadata));
         }
         catch
         {
@@ -56,38 +65,133 @@ public sealed class SqliteStorage : IStorage
         }
     }
 
-    /// <summary>Opens or creates file-backed durable storage (upstream <c>openNodeSqliteStorage</c>).</summary>
-    public static async Task<SqliteStorage> OpenAsync(string path, SqliteStorageOptions? options = null) =>
-        await OpenAsync(await SqliteConnectionDatabase.OpenAsync(path, options).ConfigureAwait(false)).ConfigureAwait(false);
-
-    /// <inheritdoc/>
-    public async Task<Seq> CommitAsync(IReadOnlyList<StorageWrite> writes, DurableContext context)
+    /// <summary>Opens or creates file-backed durable storage, optionally under a table prefix (upstream <c>openNodeSqliteStorage</c>). An
+    /// invalid prefix fails before the file is opened.</summary>
+    public static async Task<SqliteStorage> OpenAsync(string path, SqliteStorageOptions? options = null)
     {
-        ArgumentNullException.ThrowIfNull(writes);
-        foreach (var write in writes) ArgumentNullException.ThrowIfNull(write, nameof(writes));
+        if (options?.Prefix is { } prefix) SqliteSchemaPrefix.Validate(prefix);
+        return await OpenAsync(await SqliteConnectionDatabase.OpenAsync(path, options).ConfigureAwait(false), options).ConfigureAwait(false);
+    }
+
+    private static string MetadataSql(SqliteTableNames tables) => $"SELECT next_id, next_seq FROM {tables.DurableMetadata} WHERE singleton = 1";
+
+    /// <summary>
+    /// Commits <paramref name="batches"/> in one SQL transaction, each with its own seq. Each batch is checked before it writes anything,
+    /// against the state the earlier ones left, and the first one refused ends the batch: the transaction commits the ones before it. No
+    /// savepoints, which Durable Objects do not allow: the checks run before the writes instead.
+    /// </summary>
+    public async Task<CommitResult> CommitAsync(IReadOnlyList<IReadOnlyList<StorageWrite>> batches, Action<int, Seq> receive, DurableContext context)
+    {
+        StorageRules.CheckCommitArguments(batches, receive);
         long candidateNextId;
         lock (gate)
         {
             AssertOpen();
-            candidateNextId = CandidateNextId(writes);
+            candidateNextId = nextId;
         }
-        var documentActions = StorageRules.PrepareDocumentActions(writes);
-        var seq = await db.TransactionAsync(async transaction =>
+        var seqs = new List<Seq>();
+        Exception? refused = null;
+        await db.TransactionAsync(async transaction =>
         {
-            var metadata = await transaction.GetAsync(MetadataSql).ConfigureAwait(false) ??
-                throw new InvalidOperationException("Durable SQLite metadata is missing");
-            var committedSeq = Ids.SeqFromNumber(metadata.GetInt64("next_seq"));
-            await CheckGlobalIds(transaction, writes).ConfigureAwait(false);
-            await CheckDocumentActions(transaction, documentActions).ConfigureAwait(false);
-            foreach (var write in writes) await ApplyTableWrite(transaction, write, committedSeq).ConfigureAwait(false);
-            await ApplyDocumentActions(transaction, documentActions, committedSeq).ConfigureAwait(false);
-            await transaction.RunAsync("UPDATE durable_metadata SET next_id = ?, next_seq = ? WHERE singleton = 1",
-                Math.Max(ParseNextId(metadata), candidateNextId).ToString(System.Globalization.CultureInfo.InvariantCulture),
-                committedSeq.Value + 1).ConfigureAwait(false);
-            return committedSeq;
+            var metadata = await ReadMetadata(transaction).ConfigureAwait(false);
+            var next = metadata.GetInt64("next_seq");
+            // Whether a database call of a batch's checks failed: then the failure is an unknown outcome, not a refusal.
+            var watched = new WatchedExecutor(transaction);
+            foreach (var writes in batches)
+            {
+                OrderedDictionary<long, DocumentBatchAction> documentActions;
+                // Only Durable's own checks refuse a batch, before it wrote anything: the ones before it stand. A failure of the database
+                // rejects the call, and rolls back the batches before it with the transaction.
+                watched.Failed = false;
+                try
+                {
+                    documentActions = StorageRules.PrepareDocumentActions(writes);
+                    await CheckBatch(watched, writes, documentActions).ConfigureAwait(false);
+                }
+                catch (Exception error) when (!watched.Failed)
+                {
+                    refused = error;
+                    break;
+                }
+                var seq = Ids.SeqFromNumber(next++);
+                await ApplyBatch(transaction, writes, documentActions, seq).ConfigureAwait(false);
+                seqs.Add(seq);
+                candidateNextId = StorageRules.CandidateNextId(candidateNextId, writes);
+            }
+            if (seqs.Count > 0) await WriteMetadata(transaction, Math.Max(ParseNextId(metadata), candidateNextId), next).ConfigureAwait(false);
         }).ConfigureAwait(false);
         lock (gate) nextId = Math.Max(nextId, candidateNextId);
-        return seq;
+        // COMMIT returned: the stored batches are durable.
+        for (var index = 0; index < seqs.Count; index++) receive(index, seqs[index]);
+        return new CommitResult(seqs.Count, refused);
+    }
+
+    private async Task<SqliteRow> ReadMetadata(ISqliteExecutor executor) =>
+        await executor.GetAsync(metadataSql).ConfigureAwait(false) ?? throw new InvalidOperationException("Durable SQLite metadata is missing");
+
+    private Task WriteMetadata(ISqliteExecutor executor, long nextId, long nextSeq) =>
+        executor.RunAsync($"UPDATE {tables.DurableMetadata} SET next_id = ?, next_seq = ? WHERE singleton = 1",
+            nextId.ToString(System.Globalization.CultureInfo.InvariantCulture), nextSeq);
+
+    /// <summary>Durable's own checks of one batch, copy resolution included, before it writes anything.</summary>
+    private async Task CheckBatch(ISqliteExecutor executor, IReadOnlyList<StorageWrite> writes, OrderedDictionary<long, DocumentBatchAction> documentActions)
+    {
+        await CheckGlobalIds(executor, writes).ConfigureAwait(false);
+        await CheckDocumentActions(executor, documentActions).ConfigureAwait(false);
+        await ResolveCopies(executor, documentActions).ConfigureAwait(false);
+    }
+
+    private async Task ApplyBatch(ISqliteExecutor executor, IReadOnlyList<StorageWrite> writes, OrderedDictionary<long, DocumentBatchAction> documentActions, Seq seq)
+    {
+        foreach (var write in writes) await ApplyTableWrite(executor, write, seq).ConfigureAwait(false);
+        await ApplyDocumentActions(executor, documentActions, seq).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// <paramref name="executor"/>, setting <see cref="Failed"/> when one of its calls throws, synchronously or by faulting or canceling its
+    /// task (upstream <c>watchCalls</c>): then a failing check is the database's, not one of Durable's own. It forwards every call of
+    /// <see cref="ISqliteExecutor"/>, <see cref="RunCountedAsync"/> included.
+    /// </summary>
+    private sealed class WatchedExecutor(ISqliteExecutor executor) : ISqliteExecutor
+    {
+        /// <summary>Whether a database call failed since this was last reset (upstream <c>CheckCalls.failed</c>).</summary>
+        public bool Failed { get; set; }
+
+        public Task ExecAsync(string sql) => Watched(() => executor.ExecAsync(sql));
+
+        public Task RunAsync(string sql, params object?[] parameters) => Watched(() => executor.RunAsync(sql, parameters));
+
+        public Task<long> RunCountedAsync(string sql, params object?[] parameters) => Watched(() => executor.RunCountedAsync(sql, parameters));
+
+        public Task<SqliteRow?> GetAsync(string sql, params object?[] parameters) => Watched(() => executor.GetAsync(sql, parameters));
+
+        public Task<IReadOnlyList<SqliteRow>> AllAsync(string sql, params object?[] parameters) => Watched(() => executor.AllAsync(sql, parameters));
+
+        private async Task Watched(Func<Task> call)
+        {
+            try
+            {
+                await call().ConfigureAwait(false);
+            }
+            catch
+            {
+                Failed = true;
+                throw;
+            }
+        }
+
+        private async Task<T> Watched<T>(Func<Task<T>> call)
+        {
+            try
+            {
+                return await call().ConfigureAwait(false);
+            }
+            catch
+            {
+                Failed = true;
+                throw;
+            }
+        }
     }
 
     /// <inheritdoc/>
@@ -112,7 +216,7 @@ public sealed class SqliteStorage : IStorage
     public async Task<ConversationRecord?> GetConversationAsync(ConversationId id, DurableContext context)
     {
         AssertOpenLocked();
-        var row = await db.GetAsync("SELECT record FROM conversations WHERE id = ?", id.Value).ConfigureAwait(false);
+        var row = await db.GetAsync($"SELECT record FROM {tables.Conversations} WHERE id = ?", id.Value).ConfigureAwait(false);
         return row is null ? null : ConversationRecord.FromJson(Record(row));
     }
 
@@ -136,7 +240,7 @@ public sealed class SqliteStorage : IStorage
             parameters.Add(ownerTask.Value);
         }
         parameters.Add((long)limit + 1);
-        var rows = await db.AllAsync($"SELECT record FROM conversations WHERE {string.Join(" AND ", clauses)} ORDER BY id {direction} LIMIT ?",
+        var rows = await db.AllAsync($"SELECT record FROM {tables.Conversations} WHERE {string.Join(" AND ", clauses)} ORDER BY id {direction} LIMIT ?",
             [.. parameters]).ConfigureAwait(false);
         return StorageRules.MakePage([.. rows.Select(row => ConversationRecord.FromJson(Record(row)))], limit, start.Order, value => value.Id.Value);
     }
@@ -167,7 +271,7 @@ public sealed class SqliteStorage : IStorage
             conversation = await ReadConversation(visibleIn).ConfigureAwait(false) ??
                 throw new StorageRequestException($"Unknown conversation: {visibleIn}");
         }
-        var row = await db.GetAsync("SELECT record, commit_seq FROM entries WHERE id = ?", id.Value).ConfigureAwait(false);
+        var row = await db.GetAsync($"SELECT record, commit_seq FROM {tables.Entries} WHERE id = ?", id.Value).ConfigureAwait(false);
         if (row is null) return null;
         var entry = EntryRecord.FromJson(Record(row));
         if (conversation is not null)
@@ -192,9 +296,9 @@ public sealed class SqliteStorage : IStorage
         while (true)
         {
             var row = upper is not { } bound
-                ? await db.GetAsync("SELECT record FROM entries WHERE conversation_id = ? AND head IS NOT NULL ORDER BY id DESC LIMIT 1",
+                ? await db.GetAsync($"SELECT record FROM {tables.Entries} WHERE conversation_id = ? AND head IS NOT NULL ORDER BY id DESC LIMIT 1",
                     conversation.Id.Value).ConfigureAwait(false)
-                : await db.GetAsync("SELECT record FROM entries WHERE conversation_id = ? AND head IS NOT NULL AND id <= ? ORDER BY id DESC LIMIT 1",
+                : await db.GetAsync($"SELECT record FROM {tables.Entries} WHERE conversation_id = ? AND head IS NOT NULL AND id <= ? ORDER BY id DESC LIMIT 1",
                     conversation.Id.Value, bound).ConfigureAwait(false);
             if (row is not null) return EntryRecord.FromJson(Record(row));
             if (conversation.Parent is not { } parent) return null;
@@ -227,7 +331,7 @@ public sealed class SqliteStorage : IStorage
                 parameters.Add(max);
             }
             parameters.Add((long)limit + 1 - values.Count);
-            var rows = await db.AllAsync($"SELECT record FROM entries WHERE {string.Join(" AND ", clauses)} ORDER BY id DESC LIMIT ?",
+            var rows = await db.AllAsync($"SELECT record FROM {tables.Entries} WHERE {string.Join(" AND ", clauses)} ORDER BY id DESC LIMIT ?",
                 [.. parameters]).ConfigureAwait(false);
             values.AddRange(rows.Select(row => EntryRecord.FromJson(Record(row))));
             if (values.Count > limit || conversation.Parent is not { } parent) break;
@@ -272,7 +376,7 @@ public sealed class SqliteStorage : IStorage
                 parameters.Add(top);
             }
             parameters.Add((long)limit + 1 - values.Count);
-            var rows = await db.AllAsync($"SELECT record FROM entries WHERE {string.Join(" AND ", clauses)} ORDER BY id ASC LIMIT ?",
+            var rows = await db.AllAsync($"SELECT record FROM {tables.Entries} WHERE {string.Join(" AND ", clauses)} ORDER BY id ASC LIMIT ?",
                 [.. parameters]).ConfigureAwait(false);
             values.AddRange(rows.Select(row => EntryRecord.FromJson(Record(row))));
             if (values.Count > limit) break;
@@ -284,7 +388,7 @@ public sealed class SqliteStorage : IStorage
     public async Task<TaskRecord?> GetTaskAsync(TaskId id, DurableContext context)
     {
         AssertOpenLocked();
-        var row = await db.GetAsync("SELECT record FROM tasks WHERE id = ?", id.Value).ConfigureAwait(false);
+        var row = await db.GetAsync($"SELECT record FROM {tables.Tasks} WHERE id = ?", id.Value).ConfigureAwait(false);
         return row is null ? null : TaskRecord.FromJson(Record(row));
     }
 
@@ -323,7 +427,7 @@ public sealed class SqliteStorage : IStorage
             parameters.Add(background ? 1L : 0L);
         }
         parameters.Add((long)limit + 1);
-        var rows = await db.AllAsync($"SELECT record FROM tasks WHERE {string.Join(" AND ", clauses)} ORDER BY id {direction} LIMIT ?",
+        var rows = await db.AllAsync($"SELECT record FROM {tables.Tasks} WHERE {string.Join(" AND ", clauses)} ORDER BY id {direction} LIMIT ?",
             [.. parameters]).ConfigureAwait(false);
         return StorageRules.MakePage([.. rows.Select(row => TaskRecord.FromJson(Record(row)))], limit, start.Order, value => value.Id.Value);
     }
@@ -332,7 +436,7 @@ public sealed class SqliteStorage : IStorage
     public async Task<SubmissionRecord?> GetSubmissionAsync(SubmissionId id, DurableContext context)
     {
         AssertOpenLocked();
-        var row = await db.GetAsync("SELECT record FROM submissions WHERE id = ?", id.Value).ConfigureAwait(false);
+        var row = await db.GetAsync($"SELECT record FROM {tables.Submissions} WHERE id = ?", id.Value).ConfigureAwait(false);
         return row is null ? null : SubmissionRecord.FromJson(Record(row));
     }
 
@@ -356,7 +460,7 @@ public sealed class SqliteStorage : IStorage
             parameters.Add(WireName(status));
         }
         parameters.Add((long)limit + 1);
-        var rows = await db.AllAsync($"SELECT record FROM submissions WHERE {string.Join(" AND ", clauses)} ORDER BY id {direction} LIMIT ?",
+        var rows = await db.AllAsync($"SELECT record FROM {tables.Submissions} WHERE {string.Join(" AND ", clauses)} ORDER BY id {direction} LIMIT ?",
             [.. parameters]).ConfigureAwait(false);
         return StorageRules.MakePage([.. rows.Select(row => SubmissionRecord.FromJson(Record(row)))], limit, start.Order, value => value.Id.Value);
     }
@@ -366,7 +470,7 @@ public sealed class SqliteStorage : IStorage
     {
         ArgumentNullException.ThrowIfNull(requestId);
         AssertOpenLocked();
-        var row = await db.GetAsync("SELECT record FROM submissions WHERE conversation_id = ? AND request_id = ?",
+        var row = await db.GetAsync($"SELECT record FROM {tables.Submissions} WHERE conversation_id = ? AND request_id = ?",
             conversationId.Value, EncodeIndexedString(requestId)).ConfigureAwait(false);
         return row is null ? null : SubmissionRecord.FromJson(Record(row));
     }
@@ -378,13 +482,13 @@ public sealed class SqliteStorage : IStorage
         AssertOpenLocked();
         var parts = AddressParts.Of(address.Kind, address.Scope, address.Key);
         var sql = at.IsCurrent
-            ? """
-              SELECT record FROM documents
+            ? $"""
+              SELECT record FROM {tables.Documents}
               WHERE kind = ? AND scope_kind = ? AND owner_id = ? AND family = ? AND key_value = ?
               AND retired_at IS NULL ORDER BY created_at DESC LIMIT 1
               """
-            : """
-              SELECT record FROM documents
+            : $"""
+              SELECT record FROM {tables.Documents}
               WHERE kind = ? AND scope_kind = ? AND owner_id = ? AND family = ? AND key_value = ?
               AND created_at <= ? AND (retired_at IS NULL OR retired_at > ?)
               ORDER BY created_at DESC LIMIT 1
@@ -434,7 +538,7 @@ public sealed class SqliteStorage : IStorage
             parameters.AddRange([seq.Value, seq.Value]);
         }
         parameters.Add((long)limit + 1);
-        var rows = await db.AllAsync($"SELECT record FROM documents WHERE {string.Join(" AND ", clauses)} ORDER BY id LIMIT ?",
+        var rows = await db.AllAsync($"SELECT record FROM {tables.Documents} WHERE {string.Join(" AND ", clauses)} ORDER BY id LIMIT ?",
             [.. parameters]).ConfigureAwait(false);
         return StorageRules.MakePage([.. rows.Select(row => DocumentRecord.FromJson(Record(row)))], limit, ScanOrder.Ascending, value => value.Id.Value);
     }
@@ -486,28 +590,28 @@ public sealed class SqliteStorage : IStorage
 
     private async Task<ConversationRecord?> ReadConversation(ConversationId id)
     {
-        var row = await db.GetAsync("SELECT record FROM conversations WHERE id = ?", id.Value).ConfigureAwait(false);
+        var row = await db.GetAsync($"SELECT record FROM {tables.Conversations} WHERE id = ?", id.Value).ConfigureAwait(false);
         return row is null ? null : ConversationRecord.FromJson(Record(row));
     }
 
-    private static async Task<StoredDocument?> MaterializeDocument(ISqliteExecutor executor, DocumentId id, DocumentPoint at)
+    private async Task<StoredDocument?> MaterializeDocument(ISqliteExecutor executor, DocumentId id, DocumentPoint at)
     {
-        var row = await executor.GetAsync("SELECT record FROM documents WHERE id = ?", id.Value).ConfigureAwait(false);
+        var row = await executor.GetAsync($"SELECT record FROM {tables.Documents} WHERE id = ?", id.Value).ConfigureAwait(false);
         if (row is null) return null;
         var record = DocumentRecord.FromJson(Record(row));
         if (!at.IsCurrent && StorageRules.IsCurrentOnly(record))
             throw new StorageRequestException($"Document {id} does not retain historical content");
         if (!StorageRules.IsAliveAt(record, at)) return null;
         var upper = at.Seq?.Value ?? Ids.MaxSafeInteger;
-        var documentBase = await executor.GetAsync("""
-            SELECT seq, kind, version, content FROM document_revisions
+        var documentBase = await executor.GetAsync($"""
+            SELECT seq, kind, version, content FROM {tables.DocumentRevisions}
             WHERE document_id = ? AND kind = 'base' AND seq <= ? ORDER BY seq DESC LIMIT 1
             """, id.Value, upper).ConfigureAwait(false) ?? throw new InvalidOperationException($"Document {id} is missing a required base");
         var baseVersion = checked((int)documentBase.GetInt64("version"));
         var baseValue = JsonValue.Parse(documentBase.GetString("content")) as JsonObjectValue ??
             throw new InvalidOperationException($"Document {id} base is not a JSON object");
-        var tail = await executor.AllAsync("""
-            SELECT seq, kind, version, content FROM document_revisions
+        var tail = await executor.AllAsync($"""
+            SELECT seq, kind, version, content FROM {tables.DocumentRevisions}
             WHERE document_id = ? AND seq > ? AND seq <= ? ORDER BY seq
             """, id.Value, documentBase.GetInt64("seq"), upper).ConfigureAwait(false);
         var value = StorageRules.Replay(id, baseVersion, baseValue, tail,
@@ -516,40 +620,30 @@ public sealed class SqliteStorage : IStorage
         return new StoredDocument(record, baseVersion, value, tail.Count);
     }
 
-    private long CandidateNextId(IReadOnlyList<StorageWrite> writes)
-    {
-        var candidate = nextId;
-        foreach (var write in writes)
-        {
-            if (StorageRules.Claim(write) is { } claim) candidate = Math.Max(candidate, claim.Id + 1);
-        }
-        return candidate;
-    }
-
-    private static async Task CheckGlobalIds(ISqliteExecutor executor, IReadOnlyList<StorageWrite> writes)
+    private async Task CheckGlobalIds(ISqliteExecutor executor, IReadOnlyList<StorageWrite> writes)
     {
         var owners = new Dictionary<long, StorageTable?>();
         foreach (var write in writes)
         {
             if (StorageRules.Claim(write) is not { } claim || owners.ContainsKey(claim.Id)) continue;
-            var row = await executor.GetAsync("SELECT record_type FROM record_ids WHERE id = ?", claim.Id).ConfigureAwait(false);
+            var row = await executor.GetAsync($"SELECT record_type FROM {tables.RecordIds} WHERE id = ?", claim.Id).ConfigureAwait(false);
             owners[claim.Id] = row is null ? null : ParseTable(row.GetString("record_type"));
         }
         StorageRules.CheckGlobalIds(writes, id => owners[id]);
     }
 
-    private static async Task CheckDocumentActions(ISqliteExecutor executor, OrderedDictionary<long, DocumentBatchAction> actions)
+    private async Task CheckDocumentActions(ISqliteExecutor executor, OrderedDictionary<long, DocumentBatchAction> actions)
     {
         var stored = new Dictionary<long, DocumentCheckState?>();
         var current = new Dictionary<string, long?>(StringComparer.Ordinal);
         foreach (var (id, action) in actions)
         {
-            var row = await executor.GetAsync("SELECT record FROM documents WHERE id = ?", id).ConfigureAwait(false);
+            var row = await executor.GetAsync($"SELECT record FROM {tables.Documents} WHERE id = ?", id).ConfigureAwait(false);
             var existing = row is null ? null : DocumentRecord.FromJson(Record(row));
             int? lastVersion = null;
             if (existing is not null && action.Content is DocumentDelta)
             {
-                var previous = await executor.GetAsync("SELECT version FROM document_revisions WHERE document_id = ? ORDER BY seq DESC LIMIT 1", id)
+                var previous = await executor.GetAsync($"SELECT version FROM {tables.DocumentRevisions} WHERE document_id = ? ORDER BY seq DESC LIMIT 1", id)
                     .ConfigureAwait(false);
                 lastVersion = previous is null ? null : checked((int)previous.GetInt64("version"));
             }
@@ -562,35 +656,35 @@ public sealed class SqliteStorage : IStorage
         StorageRules.CheckDocumentActions(actions, id => stored[id], key => current[key]);
     }
 
-    private static async Task<long?> CurrentDocumentId(ISqliteExecutor executor, IDocumentDescriptor address)
+    private async Task<long?> CurrentDocumentId(ISqliteExecutor executor, IDocumentDescriptor address)
     {
         var parts = AddressParts.Of(address.Kind, address.Scope, address.Key);
-        var row = await executor.GetAsync("""
-            SELECT id FROM documents
+        var row = await executor.GetAsync($"""
+            SELECT id FROM {tables.Documents}
             WHERE kind = ? AND scope_kind = ? AND owner_id = ? AND family = ? AND key_value = ? AND retired_at IS NULL
             LIMIT 1
             """, parts.Kind, parts.ScopeKind, parts.OwnerId, parts.Family, parts.KeyValue).ConfigureAwait(false);
         return row?.GetInt64("id");
     }
 
-    private static async Task ApplyTableWrite(ISqliteExecutor executor, StorageWrite write, Seq seq)
+    private async Task ApplyTableWrite(ISqliteExecutor executor, StorageWrite write, Seq seq)
     {
         switch (write)
         {
             case ConversationWrite { Value: var value }:
                 await ClaimId(executor, value.Id.Value, StorageTable.Conversation).ConfigureAwait(false);
-                await executor.RunAsync("INSERT INTO conversations (id, owner_conversation_id, owner_task_id, record) VALUES (?, ?, ?, ?)",
+                await executor.RunAsync($"INSERT INTO {tables.Conversations} (id, owner_conversation_id, owner_task_id, record) VALUES (?, ?, ?, ?)",
                     value.Id.Value, value.Owner?.ConversationId.Value, value.Owner?.TaskId.Value, value.ToJson().ToJson()).ConfigureAwait(false);
                 break;
             case EntryWrite { Value: var value }:
                 await ClaimId(executor, value.Id.Value, StorageTable.Entry).ConfigureAwait(false);
-                await executor.RunAsync("INSERT INTO entries (id, conversation_id, head, commit_seq, record) VALUES (?, ?, ?, ?, ?)",
+                await executor.RunAsync($"INSERT INTO {tables.Entries} (id, conversation_id, head, commit_seq, record) VALUES (?, ?, ?, ?, ?)",
                     value.Id.Value, value.ConversationId.Value, value.Head?.Value, seq.Value, value.ToJson().ToJson()).ConfigureAwait(false);
                 break;
             case TaskWrite { Value: var value }:
                 await ClaimId(executor, value.Id.Value, StorageTable.Task).ConfigureAwait(false);
-                await executor.RunAsync("""
-                    INSERT INTO tasks (id, conversation_id, kind, status, abort_requested, background, record)
+                await executor.RunAsync($"""
+                    INSERT INTO {tables.Tasks} (id, conversation_id, kind, status, abort_requested, background, record)
                     VALUES (?, ?, ?, ?, ?, ?, ?)
                     ON CONFLICT(id) DO UPDATE SET conversation_id = excluded.conversation_id, kind = excluded.kind,
                     status = excluded.status, abort_requested = excluded.abort_requested,
@@ -600,8 +694,8 @@ public sealed class SqliteStorage : IStorage
                 break;
             case SubmissionWrite { Value: var value }:
                 await ClaimId(executor, value.Id.Value, StorageTable.Submission).ConfigureAwait(false);
-                await executor.RunAsync("""
-                    INSERT INTO submissions (id, conversation_id, request_id, status, record) VALUES (?, ?, ?, ?, ?)
+                await executor.RunAsync($"""
+                    INSERT INTO {tables.Submissions} (id, conversation_id, request_id, status, record) VALUES (?, ?, ?, ?, ?)
                     ON CONFLICT(id) DO UPDATE SET conversation_id = excluded.conversation_id,
                     request_id = excluded.request_id, status = excluded.status, record = excluded.record
                     """, value.Id.Value, value.ConversationId.Value, value.RequestId is null ? null : EncodeIndexedString(value.RequestId),
@@ -610,33 +704,40 @@ public sealed class SqliteStorage : IStorage
         }
     }
 
-    private static Task ClaimId(ISqliteExecutor executor, long id, StorageTable table) =>
-        executor.RunAsync("INSERT OR IGNORE INTO record_ids (id, record_type) VALUES (?, ?)", id, StorageRules.Name(table));
+    private Task ClaimId(ISqliteExecutor executor, long id, StorageTable table) =>
+        executor.RunAsync($"INSERT OR IGNORE INTO {tables.RecordIds} (id, record_type) VALUES (?, ?)", id, StorageRules.Name(table));
 
-    private static async Task ApplyDocumentActions(ISqliteExecutor executor, OrderedDictionary<long, DocumentBatchAction> actions, Seq seq)
+    /// <summary>Resolves each copy to a base of its source's state before this batch, which may not change the source.</summary>
+    private async Task ResolveCopies(ISqliteExecutor executor, OrderedDictionary<long, DocumentBatchAction> actions)
     {
         foreach (var (id, action) in actions)
         {
-            var content = action.Content;
-            if (action.Copy is { } copy)
+            if (action.Copy is not { } copy) continue;
+            try
             {
-                try
-                {
-                    var stored = await MaterializeDocument(executor, copy.Id, copy.At).ConfigureAwait(false) ??
-                        throw new InvalidOperationException($"Fork source document {copy.Id} cannot be read");
-                    StorageRules.CheckCopySource(stored, action.Create!);
-                    content = DocumentContent.Base(stored.Version, stored.Value);
-                }
-                catch (Exception error) { throw new InvalidOperationException($"Document copy {id} was rejected", error); }
+                var stored = await MaterializeDocument(executor, copy.Id, copy.At).ConfigureAwait(false) ??
+                    throw new InvalidOperationException($"Fork source document {copy.Id} cannot be read");
+                StorageRules.CheckCopySource(stored, action.Create!);
+                action.Content = DocumentContent.Base(stored.Version, stored.Value);
             }
+            catch (Exception error) { throw new InvalidOperationException($"Document copy {id} was rejected", error); }
+        }
+    }
+
+    private async Task ApplyDocumentActions(ISqliteExecutor executor, OrderedDictionary<long, DocumentBatchAction> actions, Seq seq)
+    {
+        foreach (var (id, action) in actions)
+        {
+            // Copies are resolved to their content by ResolveCopies.
+            var content = action.Content;
             DocumentRecord record;
             if (action.Create is not null)
             {
                 record = action.Create.ToRecord(seq, action.Retire ? seq : null);
                 var parts = AddressParts.Of(record.Kind, record.Scope, record.Key);
                 await ClaimId(executor, id, StorageTable.Document).ConfigureAwait(false);
-                await executor.RunAsync("""
-                    INSERT INTO documents
+                await executor.RunAsync($"""
+                    INSERT INTO {tables.Documents}
                     (id, kind, family, key_value, scope_kind, owner_id, created_at, retired_at, record)
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """, id, parts.Kind, parts.Family, parts.KeyValue, parts.ScopeKind, parts.OwnerId, seq.Value,
@@ -644,21 +745,21 @@ public sealed class SqliteStorage : IStorage
             }
             else
             {
-                var row = (await executor.GetAsync("SELECT record FROM documents WHERE id = ?", id).ConfigureAwait(false))!;
+                var row = (await executor.GetAsync($"SELECT record FROM {tables.Documents} WHERE id = ?", id).ConfigureAwait(false))!;
                 record = DocumentRecord.FromJson(Record(row));
             }
 
             if (content is not null)
             {
                 if (content is DocumentBase && StorageRules.IsCurrentOnly(record))
-                    await executor.RunAsync("DELETE FROM document_revisions WHERE document_id = ?", id).ConfigureAwait(false);
+                    await executor.RunAsync($"DELETE FROM {tables.DocumentRevisions} WHERE document_id = ?", id).ConfigureAwait(false);
                 var encodedContent = content switch
                 {
                     DocumentBase documentBase => documentBase.Value.ToJson(),
                     DocumentDelta delta => JsonValue.Array(delta.Ops.Select(op => (JsonValue)op.ToJson())).ToJson(),
                     _ => throw new InvalidOperationException($"Document {id} has unknown content"),
                 };
-                await executor.RunAsync("INSERT INTO document_revisions (document_id, seq, kind, version, content) VALUES (?, ?, ?, ?, ?)",
+                await executor.RunAsync($"INSERT INTO {tables.DocumentRevisions} (document_id, seq, kind, version, content) VALUES (?, ?, ?, ?, ?)",
                     id, seq.Value, content is DocumentBase ? "base" : "delta", (long)content.Version, encodedContent).ConfigureAwait(false);
             }
 
@@ -667,11 +768,11 @@ public sealed class SqliteStorage : IStorage
                 if (action.Create is null)
                 {
                     record = record with { RetiredAt = seq };
-                    await executor.RunAsync("UPDATE documents SET retired_at = ?, record = ? WHERE id = ?", seq.Value, record.ToJson().ToJson(), id)
+                    await executor.RunAsync($"UPDATE {tables.Documents} SET retired_at = ?, record = ? WHERE id = ?", seq.Value, record.ToJson().ToJson(), id)
                         .ConfigureAwait(false);
                 }
                 if (StorageRules.IsCurrentOnly(record))
-                    await executor.RunAsync("DELETE FROM document_revisions WHERE document_id = ?", id).ConfigureAwait(false);
+                    await executor.RunAsync($"DELETE FROM {tables.DocumentRevisions} WHERE document_id = ?", id).ConfigureAwait(false);
             }
         }
     }

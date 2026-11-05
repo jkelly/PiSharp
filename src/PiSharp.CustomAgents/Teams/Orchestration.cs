@@ -29,7 +29,7 @@ internal static class Requests
 
     /// <summary><c>{state, kind, from, fromConversationId?, to, child, input, entry, messageId?, toolTaskId?, routed?}</c>, keyed by request ID.</summary>
     public static SessionDocFamilyToken Doc { get; } = Documents.DefineSessionDocFamily("pisharp.agents.request", 1,
-        seed => seed as JsonObjectValue ?? JsonObjectValue.Empty);
+        seed => seed as JsonObjectValue ?? JsonObjectValue.Empty, checkpointWhen: (_, _, _) => false);
 
     public static Task<DraftObject> OpenAsync(ITx tx, string id) => tx.DocAsync(Doc, id, JsonObjectValue.Empty);
 
@@ -128,7 +128,7 @@ internal static class Orchestration
         Task<TaskRecord>? callerEnded = null;
         var changed = new SemaphoreSlim(0);
         var watch = await runtime.WatchDocAsync(Requests.Doc, requestId, context).ConfigureAwait(false);
-        watch?.Start((_, _, _) => { changed.Release(); return Task.CompletedTask; });
+        watch?.Start((_, _) => { changed.Release(); return Task.CompletedTask; });
         try
         {
             // Each commit below either moves the task on (and the handler returns) or finds the request moved by someone else first and
@@ -391,7 +391,7 @@ internal static class Orchestration
         var deadline = await DeadlineAsync(team, api, "deadline:" + requestId, timeout, context).ConfigureAwait(false);
         var changed = new SemaphoreSlim(0);
         var watch = interactive ? await api.WatchDocAsync(Mailboxes.Doc, caller.Address, context).ConfigureAwait(false) : null;
-        watch?.Start((_, _, _) => { changed.Release(); return Task.CompletedTask; });
+        watch?.Start((_, _) => { changed.Release(); return Task.CompletedTask; });
         var settle = submission.WaitAsync(context);
         try
         {
@@ -546,7 +546,7 @@ internal static class Orchestration
             deadline = await DeadlineAsync(team, api, "deadline:" + requestId, timeout, context).ConfigureAwait(false);
         var changed = new SemaphoreSlim(0);
         var watch = await port.Observer.WatchDocAsync(Mailboxes.Doc, asker.Address, context).ConfigureAwait(false);
-        watch?.Start((_, _, _) => { changed.Release(); return Task.CompletedTask; });
+        watch?.Start((_, _) => { changed.Release(); return Task.CompletedTask; });
         try
         {
             while (true)

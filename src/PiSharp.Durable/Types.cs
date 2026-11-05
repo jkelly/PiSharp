@@ -1,11 +1,24 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/src/types.ts (table records: conversations, entries, submissions,
-// tasks). The rest of types.ts is split across Ids.cs (IDs and sequences), TypesDocuments.cs (document records and content) and
-// TypesStorage.cs (scans, writes and the Storage contract); the Session, Tx and task-runtime surfaces join with P3 and P7.
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/src/types.ts (table records: conversations, entries, submissions,
+// tasks, and task states and options). The rest of types.ts is split across Ids.cs (IDs and sequences), TypesDocuments.cs (document
+// records and content), TypesStorage.cs (scans, writes and the Storage contract), TypesSession.cs (entry drafts, commit publications, the
+// Tx and Session surfaces), TypesTasks.cs (the task runtime and hook runner), TypesReports.cs (reports), Tasks.cs (task definitions and
+// phase handlers), Documents.cs (document definitions and tokens) and Timers.cs (SetTimer).
 //
 // Records hold JSON as immutable JsonValue trees, so storage needs none of upstream's structuredClone/freeze detachment: a value cannot
 // change after it is handed over. Each record has ToJson/FromJson with a fixed key order (see each type) and JavaScript number and
 // string formatting; FromJson enforces the discriminated shapes that upstream's types enforce at compile time. Record equality is
 // JavaScript deep equality of that JSON (vitest's toEqual).
+//
+// Pi v1.5.0 sync (area telemetry): submission and task records carry the adapter-owned trace carriers of 2ec55d808 (SubmissionRecord.Trace,
+// TaskRecord.Trace and Links; TaskOptions.Trace and Links, TaskTrace for upstream's `TelemetryCarrier | "root"`), written in upstream's key
+// order. Without propagation none is written, so such records stay byte-identical to v1.2.0's.
+// Pi v1.5.0 sync (area sleep, f75b3240a): a live task may be sleeping (DurableTaskStatus.Sleeping, SleepingTaskState with its checkpoint
+// and until). Pi v1.5.0 sync (area restarts, a30c2a81d and b3a29f111): TaskRecord.Restarts counts how many times in a row a crash,
+// eviction or reset cut the task off while it ran (open counts them), appended by the open that counts one.
+//
+// Pi v1.5.0 sync (area admission, fb524dd2e, #11043): SubmissionRecord gains the continue variant (SubmissionType.Continue: placed without
+// an entry, done with an answer, unanswered with a reason), so a record's status alone no longer says whether it has an entry: check its
+// type too. Its JSON writes `type` as every record does (`"continue"`); input and write records are unchanged.
 using System.Collections.Immutable;
 using PiSharp.Durable.Chord;
 using PiSharp.Durable.Internal;
@@ -119,7 +132,13 @@ public sealed record TaskOwnership
 /// <summary>Creation options for a durable task (upstream <c>TaskOptions</c>).</summary>
 public sealed record TaskOptions(TaskOwnership Ownership)
 {
-    /// <summary>Default: the owner task's conversation, or the transaction's bound conversation.</summary>
+    /// <summary>The task's trace (upstream <c>trace</c>): null inherits the creating commit's context, <see cref="TaskTrace.Root"/> starts
+    /// at the adapter root without a stored carrier, and <see cref="TaskTrace.Of"/> stores a carrier.</summary>
+    public TaskTrace? Trace { get; init; }
+    /// <summary>Immutable creation-time links (upstream <c>links</c>), attached to the spans of the task's first invocation.</summary>
+    public IReadOnlyList<IReadOnlyDictionary<string, string>>? Links { get; init; }
+    /// <summary>Default: the owner task's conversation, or the transaction's bound conversation; required for conversation-owned tasks
+    /// created by Session commits that are not bound to a conversation.</summary>
     public ConversationId? ConversationId { get; init; }
     /// <summary>Conversation-owned tasks only: excluded from ordinary idle waits, conversation aborts and cascades.</summary>
     public bool? Background { get; init; }
@@ -129,6 +148,22 @@ public sealed record TaskOptions(TaskOwnership Ownership)
     /// cascades to its ordinary owned work, before any of it runs again (upstream <c>abandonOnRestart</c>).
     /// </summary>
     public bool? AbandonOnRestart { get; init; }
+}
+
+/// <summary>A task's trace at creation (upstream <c>TaskOptions["trace"]</c>, a <c>TelemetryCarrier | "root"</c>): a stored carrier, or the
+/// adapter root.</summary>
+public sealed record TaskTrace
+{
+    private TaskTrace(IReadOnlyDictionary<string, string>? carrier) { Carrier = carrier; }
+
+    /// <summary><c>"root"</c>: phases start at the adapter root, and the record stores no carrier.</summary>
+    public static TaskTrace Root { get; } = new((IReadOnlyDictionary<string, string>?)null);
+
+    /// <summary>A carrier to store, as propagation injected it.</summary>
+    public static TaskTrace Of(IReadOnlyDictionary<string, string> carrier) => new(carrier ?? throw new ArgumentNullException(nameof(carrier)));
+
+    /// <summary>The carrier; null for <see cref="Root"/>.</summary>
+    public IReadOnlyDictionary<string, string>? Carrier { get; }
 }
 
 /// <summary>Whether a context edit omits or replaces its target's model messages.</summary>
@@ -243,13 +278,15 @@ public sealed record EntryRecord
     public override string ToString() => ToJson().ToJson();
 }
 
-/// <summary>Whether a submission is user input or a passive entry write.</summary>
+/// <summary>Whether a submission is user input, a passive entry write, or a continue (a run started without a user message).</summary>
 public enum SubmissionType
 {
     /// <summary><c>"input"</c>.</summary>
     Input,
     /// <summary><c>"write"</c>.</summary>
     Write,
+    /// <summary><c>"continue"</c>: a run started without a user message; it places no entry and is never queued (Pi v1.5.0).</summary>
+    Continue,
 }
 
 /// <summary>The lifecycle status of a submission.</summary>
@@ -257,9 +294,9 @@ public enum SubmissionStatus
 {
     /// <summary>Admitted but not yet represented in the transcript.</summary>
     Queued,
-    /// <summary>An input added to the transcript and owned by an active run.</summary>
+    /// <summary>An input added to the transcript, or a continue, owned by an active run.</summary>
     Placed,
-    /// <summary>An answered input or an appended passive write.</summary>
+    /// <summary>An answered input or continue, or an appended passive write.</summary>
     Done,
     /// <summary>Terminal: the submission can no longer be answered or placed.</summary>
     Unanswered,
@@ -272,13 +309,16 @@ public interface ISubmissionFields
     ConversationId ConversationId { get; }
     /// <summary>Host-provided deduplication key, scoped to the conversation.</summary>
     string? RequestId { get; }
-    /// <summary>Input or passive write.</summary>
+    /// <summary>The adapter-owned carrier of the admission span (upstream <c>trace</c>); absent without propagation.</summary>
+    IReadOnlyDictionary<string, string>? Trace { get; }
+    /// <summary>Input, passive write or continue.</summary>
     SubmissionType Type { get; }
     /// <summary>The lifecycle status.</summary>
     SubmissionStatus Status { get; }
-    /// <summary>The transcript entry; required when placed or done, optional for an unanswered input, otherwise absent.</summary>
+    /// <summary>The transcript entry; required when an input or write is placed or done, optional for an unanswered input, otherwise absent
+    /// (a continue never has one).</summary>
     EntryId? Entry { get; }
-    /// <summary>The answer entry of a done input; otherwise absent.</summary>
+    /// <summary>The answer entry of a done input or continue; otherwise absent.</summary>
     EntryId? Answer { get; }
     /// <summary>Why an unanswered submission was not answered; otherwise absent.</summary>
     string? Reason { get; }
@@ -286,9 +326,10 @@ public interface ISubmissionFields
     JsonValue? Detail { get; }
 }
 
-/// <summary>Durable lifecycle of one admitted user input or passive entry write (upstream <c>SubmissionRecord</c>). Which fields a
-/// status allows follows upstream's union exactly; <see cref="Validate"/> and <see cref="FromJson"/> enforce it. JSON key order is
-/// upstream's: the Session creates <c>{ ...create, id }</c> (<c>conversationId, requestId, type, status, entry, answer, reason, detail</c>,
+/// <summary>Durable lifecycle of one admitted user input, passive entry write, or continue (upstream <c>SubmissionRecord</c>). Which fields
+/// a type and status allow follows upstream's union exactly (narrow by <see cref="Type"/> and <see cref="Status"/>: a placed or done
+/// continue has no <see cref="Entry"/>); <see cref="Validate"/> and <see cref="FromJson"/> enforce it. JSON key order is
+/// upstream's: the Session creates <c>{ ...create, id }</c> (<c>conversationId, requestId, trace, type, status, entry, answer, reason, detail</c>,
 /// each when present, then <c>id</c>), and a placement or settlement spreads the current record, so a field it adds (a queued input's
 /// <c>entry</c>, an <c>answer</c>, a <c>reason</c>) follows <c>id</c>. <see cref="KeyOrder"/> carries the creation order, or the decoded
 /// JSON's, through <c>with</c>.</summary>
@@ -300,6 +341,8 @@ public sealed record SubmissionRecord : ISubmissionFields
     public required ConversationId ConversationId { get; init; }
     /// <inheritdoc/>
     public string? RequestId { get; init; }
+    /// <inheritdoc/>
+    public IReadOnlyDictionary<string, string>? Trace { get; init; }
     /// <inheritdoc/>
     public required SubmissionType Type { get; init; }
     /// <inheritdoc/>
@@ -328,7 +371,7 @@ public sealed record SubmissionRecord : ISubmissionFields
     {
         const string what = "submission record";
         var value = RecordJson.Object(json, what);
-        RecordJson.OnlyKeys(value, what, "id", "conversationId", "requestId", "type", "status", "entry", "answer", "reason", "detail");
+        RecordJson.OnlyKeys(value, what, "id", "conversationId", "requestId", "trace", "type", "status", "entry", "answer", "reason", "detail");
         var create = SubmissionShape.Read(value, what);
         return (create.WithId(RecordJson.Id<SubmissionId>(value, "id", what)) with { KeyOrder = RecordJson.KeysOf(value) }).Validate();
     }
@@ -349,6 +392,8 @@ public sealed record SubmissionCreate : ISubmissionFields
     /// <inheritdoc/>
     public string? RequestId { get; init; }
     /// <inheritdoc/>
+    public IReadOnlyDictionary<string, string>? Trace { get; init; }
+    /// <inheritdoc/>
     public required SubmissionType Type { get; init; }
     /// <inheritdoc/>
     public required SubmissionStatus Status { get; init; }
@@ -367,7 +412,7 @@ public sealed record SubmissionCreate : ISubmissionFields
     /// <summary>The record with <paramref name="id"/>: upstream's <c>{ ...create, id }</c>, whose later fields follow <c>id</c>.</summary>
     public SubmissionRecord WithId(SubmissionId id) => new()
     {
-        Id = id, ConversationId = ConversationId, RequestId = RequestId, Type = Type, Status = Status, Entry = Entry, Answer = Answer,
+        Id = id, ConversationId = ConversationId, RequestId = RequestId, Trace = Trace, Type = Type, Status = Status, Entry = Entry, Answer = Answer,
         Reason = Reason, Detail = Detail, KeyOrder = [.. ToJson().Keys, "id"],
     };
 
@@ -379,7 +424,7 @@ public sealed record SubmissionCreate : ISubmissionFields
     {
         const string what = "submission create";
         var value = RecordJson.Object(json, what);
-        RecordJson.OnlyKeys(value, what, "conversationId", "requestId", "type", "status", "entry", "answer", "reason", "detail");
+        RecordJson.OnlyKeys(value, what, "conversationId", "requestId", "trace", "type", "status", "entry", "answer", "reason", "detail");
         return SubmissionShape.Read(value, what).Validate();
     }
 
@@ -397,7 +442,7 @@ public sealed class SubmissionSettlement : DurableValue
         Status = status; Answer = answer; Reason = reason; Detail = detail;
     }
 
-    /// <summary>An answered input.</summary>
+    /// <summary>An answered input or continue.</summary>
     public static SubmissionSettlement Done(EntryId answer) => new(SubmissionStatus.Done, answer, null, null);
 
     /// <summary>A submission that can no longer be answered.</summary>
@@ -421,7 +466,8 @@ public sealed class SubmissionSettlement : DurableValue
 internal static class SubmissionShape
 {
     public static RecordJson.Writer Write(RecordJson.Writer writer, ISubmissionFields value) => writer
-        .Add("conversationId", value.ConversationId.ToJson()).Add("requestId", value.RequestId).Add("type", WireName.Of(value.Type))
+        .Add("conversationId", value.ConversationId.ToJson()).Add("requestId", value.RequestId).Add("trace", RecordJson.Carrier(value.Trace))
+        .Add("type", WireName.Of(value.Type))
         .Add("status", WireName.Of(value.Status)).Add("entry", value.Entry?.ToJson()).Add("answer", value.Answer?.ToJson())
         .Add("reason", value.Reason).Add("detail", value.Detail);
 
@@ -429,6 +475,7 @@ internal static class SubmissionShape
     {
         ConversationId = RecordJson.Id<ConversationId>(value, "conversationId", what),
         RequestId = RecordJson.OptionalString(value, "requestId", what),
+        Trace = RecordJson.OptionalCarrier(value, "trace", what),
         Type = RecordJson.Enum<SubmissionType>(value, "type", what),
         Status = RecordJson.Enum<SubmissionStatus>(value, "status", what),
         Entry = RecordJson.OptionalId<EntryId>(value, "entry", what),
@@ -450,6 +497,10 @@ internal static class SubmissionShape
             (SubmissionType.Write, SubmissionStatus.Queued) => (Field.Forbidden, Field.Forbidden, Field.Forbidden, Field.Forbidden),
             (SubmissionType.Write, SubmissionStatus.Done) => (Field.Required, Field.Forbidden, Field.Forbidden, Field.Forbidden),
             (SubmissionType.Write, SubmissionStatus.Unanswered) => (Field.Forbidden, Field.Forbidden, Field.Required, Field.Optional),
+            // Never queued; placed and settled without an entry of its own.
+            (SubmissionType.Continue, SubmissionStatus.Placed) => (Field.Forbidden, Field.Forbidden, Field.Forbidden, Field.Forbidden),
+            (SubmissionType.Continue, SubmissionStatus.Done) => (Field.Forbidden, Field.Required, Field.Forbidden, Field.Forbidden),
+            (SubmissionType.Continue, SubmissionStatus.Unanswered) => (Field.Forbidden, Field.Forbidden, Field.Required, Field.Optional),
             _ => throw RecordJson.Invalid(what, $"a {WireName.Of(value.Type)} submission cannot be {WireName.Of(value.Status)}"),
         };
         Check(entry, value.Entry is not null, "entry");
@@ -619,6 +670,9 @@ public enum DurableTaskStatus
     Running,
     /// <summary>Parked until every task it waits on is terminal.</summary>
     Waiting,
+    /// <summary>Parked without an invocation until the Harness clock reaches its time, then resumes at its checkpoint; an abort mark does
+    /// not wait for it.</summary>
+    Sleeping,
     /// <summary>Outcome decided; terminal once no ordinary owned work below is live.</summary>
     Completing,
     /// <summary>Permanently settled.</summary>
@@ -635,7 +689,7 @@ public enum JoinPolicy
 }
 
 /// <summary>Complete durable execution state of a task (upstream <c>TaskState</c>): a live state carries a checkpoint, a settling state
-/// an outcome. JSON key order: <c>status, checkpoint, on, policy</c> or <c>status, outcome</c>.</summary>
+/// an outcome. JSON key order: <c>status, checkpoint, on, policy</c>, <c>status, checkpoint, until</c> or <c>status, outcome</c>.</summary>
 public abstract class TaskState : DurableValue
 {
     private protected TaskState() { }
@@ -662,6 +716,10 @@ public abstract class TaskState : DurableValue
                 return new WaitingTaskState(RecordJson.Required(value, "checkpoint", what),
                     [.. RecordJson.Array(RecordJson.Required(value, "on", what), "on", what).Select(id => TaskId.FromNumber(RecordJson.Integer(id, "on", what)))],
                     RecordJson.Enum<JoinPolicy>(value, "policy", what));
+            case DurableTaskStatus.Sleeping:
+                RecordJson.OnlyKeys(value, what, "status", "checkpoint", "until");
+                return new SleepingTaskState(RecordJson.Required(value, "checkpoint", what),
+                    RecordJson.OptionalNumber(value, "until", what) ?? throw RecordJson.Invalid(what, "missing field \"until\""));
             default:
             {
                 RecordJson.OnlyKeys(value, what, "status", "outcome");
@@ -672,7 +730,7 @@ public abstract class TaskState : DurableValue
     }
 }
 
-/// <summary>A state that can still run: pending, running or waiting. It carries the complete durable state execution resumes from.</summary>
+/// <summary>A state that can still run: pending, running, waiting or sleeping. It carries the complete durable state execution resumes from.</summary>
 public abstract class LiveTaskState : TaskState
 {
     private protected LiveTaskState(JsonValue checkpoint) { Checkpoint = checkpoint ?? throw new ArgumentNullException(nameof(checkpoint)); }
@@ -722,6 +780,19 @@ public sealed class WaitingTaskState(JsonValue checkpoint, ImmutableArray<TaskId
         .Add("on", JsonValue.Array(On.Select(id => (JsonValue)id.ToJson()))).Add("policy", WireName.Of(Policy)).Build();
 }
 
+/// <summary><c>{status: "sleeping", checkpoint, until}</c>: parked without an invocation until the Harness clock reaches <see cref="Until"/>,
+/// then resumes at its checkpoint. An abort mark does not wait for it.</summary>
+public sealed class SleepingTaskState(JsonValue checkpoint, double until) : LiveTaskState(checkpoint)
+{
+    /// <inheritdoc/>
+    public override DurableTaskStatus Status => DurableTaskStatus.Sleeping;
+    /// <summary>Milliseconds on the <see cref="HarnessOptions.Now"/> clock.</summary>
+    public double Until { get; } = until;
+    /// <inheritdoc/>
+    public override JsonObjectValue ToJson() => new RecordJson.Writer().Add("status", "sleeping").Add("checkpoint", Checkpoint)
+        .Number("until", Until).Build();
+}
+
 /// <summary><c>{status: "completing", outcome}</c>: outcome decided, terminal once no ordinary owned work below is live.</summary>
 public sealed class CompletingTaskState(TaskOutcome outcome) : SettlingTaskState(outcome)
 {
@@ -737,11 +808,11 @@ public sealed class TerminalTaskState(TaskOutcome outcome) : SettlingTaskState(o
 }
 
 /// <summary>Complete replacement record for one durable task state machine (upstream <c>TaskRecord&lt;JsonValue, JsonValue,
-/// JsonValue&gt;</c>; typed task views join with the runtime in P7). JSON key order is upstream's: <c>id, conversationId, kind, version, input,
-/// owner, background, abortRequested, abandonOnRestart, state</c> as the Session creates a record, then <c>startedAt</c> (stamped on the first
+/// JsonValue&gt;</c>; a handler reads its task as a RunningTask, Tasks.cs). JSON key order is upstream's: <c>id, conversationId, kind, version, input,
+/// trace, links, owner, background, abortRequested, abandonOnRestart, state</c> as the Session creates a record, then <c>startedAt</c> (stamped on the first
 /// change to running), <c>memos</c> (added by a running invocation, dropped with the outcome) and <c>endedAt</c>, each appended by a spread of
-/// the current record; <c>abortReason</c> is appended by the mark that sets it. <see cref="KeyOrder"/> keeps a decoded or marked record's own
-/// order through <c>with</c>.</summary>
+/// the current record; <c>abortReason</c> is appended by the mark that sets it, and <c>restarts</c> by the open that counts a cut-off.
+/// <see cref="KeyOrder"/> keeps a decoded or marked record's own order through <c>with</c>.</summary>
 public sealed record TaskRecord
 {
     /// <summary>The task ID.</summary>
@@ -754,6 +825,11 @@ public sealed record TaskRecord
     public required int Version { get; init; }
     /// <summary>Original task input retained while the task is live or terminal.</summary>
     public required JsonValue Input { get; init; }
+    /// <summary>The adapter-owned carrier of the context that created this task (upstream <c>trace</c>); its phase invocations extract it as
+    /// their parent. Absent without propagation, or for a task created with <see cref="TaskTrace.Root"/>. Immutable.</summary>
+    public IReadOnlyDictionary<string, string>? Trace { get; init; }
+    /// <summary>Creation-time links (upstream <c>links</c>), attached to the spans of the task's first invocation. Immutable.</summary>
+    public IReadOnlyList<IReadOnlyDictionary<string, string>>? Links { get; init; }
     /// <summary>Owning task of a child task; absent for a task its conversation owns. Immutable.</summary>
     public TaskId? Owner { get; init; }
     /// <summary>Whether this conversation-owned task is excluded from ordinary idle waits, conversation aborts and cascades.</summary>
@@ -776,6 +852,13 @@ public sealed record TaskRecord
     public double? StartedAt { get; init; }
     /// <summary>Wall-clock milliseconds of the change to terminal, stamped by the Session.</summary>
     public double? EndedAt { get; init; }
+    /// <summary>
+    /// How many times in a row a crash, eviction or reset cut the task off while it ran, without the task changing its state since; open
+    /// counts them, and a close does not. At <see cref="HarnessSettings.RestartLimit"/> the task ends (the built-in tasks end themselves,
+    /// visibly; the scheduler faults any other kind), and a generation reads it to charge an interrupted model request as a failed attempt.
+    /// Absent while the task was not cut off.
+    /// </summary>
+    public int? Restarts { get; init; }
     /// <summary>The JSON key order of a decoded record (see <see cref="RecordJson.Ordered"/>); default: the creation order above.</summary>
     internal ImmutableArray<string> KeyOrder { get; init; }
 
@@ -789,18 +872,18 @@ public sealed record TaskRecord
     /// <summary>The persisted JSON.</summary>
     public JsonObjectValue ToJson() => RecordJson.Ordered(new RecordJson.Writer()
         .Add("id", Id.ToJson()).Add("conversationId", ConversationId.ToJson()).Add("kind", Kind).Number("version", Version).Add("input", Input)
-        .Add("owner", Owner?.ToJson()).Add("background", Background).Add("abortRequested", AbortRequested)
+        .Add("trace", RecordJson.Carrier(Trace)).Add("links", RecordJson.Carriers(Links)).Add("owner", Owner?.ToJson()).Add("background", Background).Add("abortRequested", AbortRequested)
         .Add("abandonOnRestart", AbandonOnRestart ? JsonValue.Boolean(true) : null).Add("state", State.ToJson())
         .Number("startedAt", StartedAt).Add("memos", Memos).Number("endedAt", EndedAt)
-        .Add("abortReason", AbortReason is { } reason ? WireName.Of(reason) : null).Build(), KeyOrder);
+        .Add("abortReason", AbortReason is { } reason ? WireName.Of(reason) : null).Number("restarts", Restarts).Build(), KeyOrder);
 
     /// <summary>Decodes and validates <see cref="ToJson"/>.</summary>
     public static TaskRecord FromJson(JsonValue json)
     {
         const string what = "task record";
         var value = RecordJson.Object(json, what);
-        RecordJson.OnlyKeys(value, what, "id", "conversationId", "kind", "version", "input", "owner", "background", "abortRequested",
-            "abortReason", "abandonOnRestart", "state", "memos", "startedAt", "endedAt");
+        RecordJson.OnlyKeys(value, what, "id", "conversationId", "kind", "version", "input", "trace", "links", "owner", "background", "abortRequested",
+            "abortReason", "abandonOnRestart", "state", "memos", "startedAt", "endedAt", "restarts");
         return new TaskRecord
         {
             Id = RecordJson.Id<TaskId>(value, "id", what),
@@ -808,6 +891,8 @@ public sealed record TaskRecord
             Kind = RecordJson.String(value, "kind", what),
             Version = RecordJson.Version(value, "version", what),
             Input = RecordJson.Required(value, "input", what),
+            Trace = RecordJson.OptionalCarrier(value, "trace", what),
+            Links = RecordJson.OptionalCarriers(value, "links", what),
             Owner = RecordJson.OptionalId<TaskId>(value, "owner", what),
             Background = RecordJson.Boolean(value, "background", what),
             AbortRequested = RecordJson.Boolean(value, "abortRequested", what),
@@ -822,6 +907,12 @@ public sealed record TaskRecord
             Memos = RecordJson.Optional(value, "memos") is { } memos ? RecordJson.Object(memos, "task memos") : null,
             StartedAt = RecordJson.OptionalNumber(value, "startedAt", what),
             EndedAt = RecordJson.OptionalNumber(value, "endedAt", what),
+            Restarts = RecordJson.OptionalInteger(value, "restarts", what) switch
+            {
+                null => null,
+                >= 0 and <= int.MaxValue and var restarts => (int)restarts,
+                _ => throw RecordJson.Invalid(what, "field \"restarts\" must be a non-negative integer"),
+            },
             KeyOrder = RecordJson.KeysOf(value),
         }.Validate();
     }

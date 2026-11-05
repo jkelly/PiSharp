@@ -27,7 +27,8 @@ public static class SubmissionAnswers
             text is JsonStringValue value ? value.Value : ""));
     }
 
-    /// <summary>A <see cref="SendResult"/> for a submission record: settled with its answer, or <paramref name="unsettled"/>.</summary>
+    /// <summary>A <see cref="SendResult"/> for a submission record: settled with its answer, or <paramref name="unsettled"/>. A done input or
+    /// continue carries its answer; a done write has none, so it settles without text.</summary>
     internal static async Task<SendResult> ResultAsync(IHarness harness, SubmissionRecord record, SendStatus unsettled, DurableContext context) =>
         record.Status switch
         {

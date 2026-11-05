@@ -36,6 +36,15 @@ public sealed record ResponsesKeyAuthRequestOptions(
     [System.Text.Json.Serialization.JsonIgnore] public Func<JsonData, ModelDescriptor, CancellationToken, ValueTask<JsonData?>>? OnPayload { get; init; }
     [System.Text.Json.Serialization.JsonIgnore] public Func<JsonData, ModelDescriptor, CancellationToken, ValueTask>? OnResponse { get; init; }
     [System.Text.Json.Serialization.JsonIgnore] public Func<JsonData, ModelDescriptor, CancellationToken, ValueTask>? OnProviderStreamEvent { get; init; }
+    /// <summary>Source StreamOptions.identity (Pi 1.5.0 identity.ts): the User-Agent and attribution headers, below the model,
+    /// session and request headers. Null: a detailed User-Agent and no attribution.</summary>
+    [System.Diagnostics.CodeAnalysis.Experimental("PISHARP_IDENTITY001")]
+    [System.Text.Json.Serialization.JsonIgnore] public ClientIdentity? Identity { get; init; }
+    /// <summary>Pi 1.5.0 openai-responses.ts getCompat <c>supportsMidConvoEffort</c>, from model metadata: the thinking level travels as
+    /// configuration_update input items under a fixed <c>reasoning.effort</c>, so a level change keeps the prompt cache.</summary>
+    internal bool SupportsMidConversationEffort { get; init; }
+    /// <summary>The model metadata's <c>baseUrl</c>, for isChatGPTSignIn.</summary>
+    internal string? ModelBaseUrl { get; init; }
 }
 
 public enum ResponsesKeyAuthRequestFailure
@@ -70,12 +79,25 @@ public sealed class ResponsesKeyAuthRequestFactory
     private readonly string _modelJson;
     private readonly string _suffix;
     private readonly string _reasoningSuffix;
+    // Pi 1.5.0 openai-responses.ts CONFIGURATION_UPDATE_REQUEST_EFFORT: the fixed reasoning.effort while configuration_update items
+    // carry the thinking level.
+    private const string ConfigurationUpdateRequestEffort = "medium";
+    private readonly string? _configurationUpdateEffort, _managedReasoningSuffix;
+    private readonly ResponsesTranscriptProjector? _managedProjector;
     private readonly string _toolChoiceSuffix;
     private readonly string _cacheRetention;
     private readonly JsonData? _levelSamplingParams;
     internal sealed record ServiceTierBinding(string? RequestedTier);
     internal static readonly HttpRequestOptionsKey<ServiceTierBinding> RequestedServiceTierKey = new("PiSharp.Responses.RequestedServiceTier");
     internal string? RequestedServiceTier => _options.ServiceTier;
+    /// <summary>
+    /// Pi 1.5.0 openai-responses.ts getConfigurationUpdateEffort for a credential: null unless the model sends its level as
+    /// configuration_update items. isChatGPTSignIn: OpenAI API keys start with <c>sk-</c>, so another credential sent to the openai
+    /// provider at <c>https://api.openai.com/v1</c> is a Sign in with ChatGPT access token, which rejects those items.
+    /// </summary>
+    internal string? ConfigurationUpdateEffort(string apiKey) => _configurationUpdateEffort is not null &&
+        !(_model.Provider == "openai" && _options.ModelBaseUrl == "https://api.openai.com/v1" && !apiKey.StartsWith("sk-", StringComparison.Ordinal))
+        ? _configurationUpdateEffort : null;
     internal ResponsesKeyAuthRequestOptions Policy => _options;
     private const string Prefix = "{\"model\":";
     private const string InputField = ",\"input\":";
@@ -84,8 +106,8 @@ public sealed class ResponsesKeyAuthRequestFactory
         ResponsesTranscriptProjectionOptions projectionOptions, ResponsesKeyAuthRequestOptions? options = null)
     {
         _options = options ?? new();
-        _withScope = (session, tier) => new(endpoint, expectedModel, projectionOptions,
-            _options with { SessionId = session ?? _options.SessionId, ServiceTier = tier ?? _options.ServiceTier });
+        _withScope = (session, tier, identity) => new(endpoint, expectedModel, projectionOptions,
+            _options with { SessionId = session ?? _options.SessionId, ServiceTier = tier ?? _options.ServiceTier, Identity = identity ?? _options.Identity });
         if (_options.OnPayload?.GetInvocationList().Length > 1 || _options.OnResponse?.GetInvocationList().Length > 1 ||
             _options.OnProviderStreamEvent?.GetInvocationList().Length > 1)
             throw Failure(ResponsesKeyAuthRequestFailure.InvalidConfiguration);
@@ -119,6 +141,15 @@ public sealed class ResponsesKeyAuthRequestFactory
             throw Failure(ResponsesKeyAuthRequestFailure.InvalidConfiguration);
         _toolChoiceSuffix = ToolChoiceField();
         _reasoningSuffix = ReasoningFields(projectionOptions.Reasoning, expectedModel.Provider);
+        // Pi 1.5.0 openai-responses.ts getConfigurationUpdateEffort: the chosen level through the thinkingLevelMap. Thinking off sends
+        // reasoning.effort as before.
+        if (_options.SupportsMidConversationEffort && _options.ReasoningEffort is { } chosen)
+        {
+            var levels = _options.ThinkingLevelMap?.Value ?? default;
+            _configurationUpdateEffort = levels.ValueKind == JsonValueKind.Object && levels.TryGetProperty(chosen, out var mapped) &&
+                mapped.ValueKind == JsonValueKind.String ? mapped.GetString()! : chosen;
+            _managedReasoningSuffix = ReasoningFields(projectionOptions.Reasoning, expectedModel.Provider, ConfigurationUpdateRequestEffort);
+        }
         if (_options.ModelSamplingParamsByThinkingLevel is { } byLevel)
         {
             if (Encoding.UTF8.GetByteCount(byLevel.ToString()) > _options.MaximumPayloadBytes) throw Failure(ResponsesKeyAuthRequestFailure.ResourceLimit);
@@ -130,7 +161,11 @@ public sealed class ResponsesKeyAuthRequestFactory
         }
         _cacheRetention = _options.CacheRetention ?? (_options.Environment?.GetValue("PI_CACHE_RETENTION") == "long" ? "long" : "short");
         var session = _cacheRetention == "none" ? null : ClampSessionId(_options.SessionId);
-        try { _projector = new(projectionOptions); }
+        try
+        {
+            _projector = new(projectionOptions);
+            if (_configurationUpdateEffort is { } effort) _managedProjector = new(projectionOptions with { ConfigurationUpdateEffort = effort });
+        }
         catch (ArgumentException) { throw Failure(ResponsesKeyAuthRequestFailure.InvalidConfiguration); }
         _endpoint = endpoint;
         _model = expectedModel;
@@ -160,16 +195,18 @@ public sealed class ResponsesKeyAuthRequestFactory
     }
 
     // StreamOptions.sessionId per request: a factory configured without a session id binds the request's (cached per id). PiSharp-only:
-    // the request's service tier (ChatRequest.ServiceTier) also selects a factory configured with that tier.
-    private readonly Func<string?, string?, ResponsesKeyAuthRequestFactory> _withScope;
-    private readonly System.Collections.Concurrent.ConcurrentDictionary<(string?, string?), ResponsesKeyAuthRequestFactory> _scoped = new();
+    // the request's service tier (ChatRequest.ServiceTier) also selects a factory configured with that tier. StreamOptions.identity
+    // (ChatRequest.Identity) merges over the configured identity the same way.
+    private readonly Func<string?, string?, ClientIdentity?, ResponsesKeyAuthRequestFactory> _withScope;
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<(string?, string?, ClientIdentity?), ResponsesKeyAuthRequestFactory> _scoped = new();
     private ResponsesKeyAuthRequestFactory? ScopedTo(ChatRequest? request)
     {
         var session = _options.SessionId is null ? request?.SessionId : null;
         var tier = request?.ServiceTier is { } requested && ServiceTiers.OpenAI(requested, _model.Provider) is { } wire && wire != _options.ServiceTier ? wire : null;
-        if (session is null && tier is null) return null;
+        var identity = request?.Identity is { } asked && ClientIdentities.Merge(_options.Identity, asked) is { } merged && merged != _options.Identity ? merged : null;
+        if (session is null && tier is null && identity is null) return null;
         if (_scoped.Count > 32) _scoped.Clear();
-        return _scoped.GetOrAdd((session, tier), key => _withScope(key.Item1, key.Item2));
+        return _scoped.GetOrAdd((session, tier, identity), key => _withScope(key.Item1, key.Item2, key.Item3));
     }
 
     public HttpRequestMessage Create(ChatRequest request, string explicitApiKey, CancellationToken cancellationToken = default)
@@ -187,18 +224,22 @@ public sealed class ResponsesKeyAuthRequestFactory
             cancellationToken.ThrowIfCancellationRequested();
             if (character is < '!' or > '~') throw Failure(ResponsesKeyAuthRequestFailure.InvalidKey);
         }
-        var projected = _projector.ProjectInput(request, cancellationToken);
-        var tools = _projector.ProjectTools(request, cancellationToken);
+        // Sign in with ChatGPT rejects configuration_update items, so it keeps sending the level as reasoning.effort.
+        var managed = ConfigurationUpdateEffort(explicitApiKey) is not null;
+        var projector = managed ? _managedProjector! : _projector;
+        var reasoningSuffix = managed ? _managedReasoningSuffix! : _reasoningSuffix;
+        var projected = projector.ProjectInput(request, cancellationToken);
+        var tools = projector.ProjectTools(request, cancellationToken);
         CheckDepth(projected.Value, 1, cancellationToken); // Include the new payload object.
         CheckDepth(tools.Value, 1, cancellationToken);
         var input = projected.ToString();
         var toolField = tools.Value.GetArrayLength() == 0 ? "" : ",\"tools\":" + tools.ToString();
         var bytes = (long)Encoding.UTF8.GetByteCount(Prefix) + Encoding.UTF8.GetByteCount(_modelJson) +
             Encoding.UTF8.GetByteCount(InputField) + Encoding.UTF8.GetByteCount(input) + Encoding.UTF8.GetByteCount(_suffix) +
-            Encoding.UTF8.GetByteCount(toolField) + Encoding.UTF8.GetByteCount(_toolChoiceSuffix) + Encoding.UTF8.GetByteCount(_reasoningSuffix) + 1;
+            Encoding.UTF8.GetByteCount(toolField) + Encoding.UTF8.GetByteCount(_toolChoiceSuffix) + Encoding.UTF8.GetByteCount(reasoningSuffix) + 1;
         if (bytes > _options.MaximumPayloadBytes) throw Failure(ResponsesKeyAuthRequestFailure.ResourceLimit);
         cancellationToken.ThrowIfCancellationRequested();
-        var payload = Encoding.UTF8.GetBytes(Prefix + _modelJson + InputField + input + _suffix + toolField + _toolChoiceSuffix + _reasoningSuffix + "}");
+        var payload = Encoding.UTF8.GetBytes(Prefix + _modelJson + InputField + input + _suffix + toolField + _toolChoiceSuffix + reasoningSuffix + "}");
         if (_options.ModelSamplingParams is not null || _levelSamplingParams is not null || _options.SamplingParams is not null)
         {
             var root = JsonNode.Parse(payload, documentOptions: PiSharp.Contracts.JsonData.DocumentOptions)!.AsObject();
@@ -242,10 +283,11 @@ public sealed class ResponsesKeyAuthRequestFactory
         }
     }
 
-    // Pi createClient: model headers, session affinity, then request headers.
+    // Pi createClient: identity headers (Pi 1.5.0 getIdentityHeaders), model headers, session affinity, then request headers.
     private Dictionary<string, string?> RequestHeaders(CancellationToken token)
     {
         var headers = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
+        foreach (var (name, value) in ClientIdentities.GetIdentityHeaders(_model.Provider, _endpoint.AbsoluteUri, _options.Identity)) headers[name] = value;
         long supplied = 0;
         void Merge(JsonData? source)
         {
@@ -327,7 +369,7 @@ public sealed class ResponsesKeyAuthRequestFactory
     }
     // Pi d86654abb8862e201933517d6f1fce9f88dd117f, openai-responses.ts:buildParams.
     // Model capability comes from the same explicit profile as transcript projection.
-    private string ReasoningFields(bool reasoning, string provider)
+    private string ReasoningFields(bool reasoning, string provider, string? fixedEffort = null)
     {
         if (_options.ReasoningEffort is not (null or "minimal" or "low" or "medium" or "high" or "xhigh" or "max") ||
             _options.ReasoningSummary is not (null or "auto" or "detailed" or "concise"))
@@ -359,8 +401,8 @@ public sealed class ResponsesKeyAuthRequestFactory
         var include = provider == "xai";
         if (_options.ReasoningEffort is not null || _options.ReasoningSummary is not null)
         {
-            var effort = _options.ReasoningEffort is { } requested ?
-                Mapped(requested, out var mapped) && mapped.ValueKind == JsonValueKind.String ? mapped.GetString()! : requested : "medium";
+            var effort = fixedEffort ?? (_options.ReasoningEffort is { } requested ?
+                Mapped(requested, out var mapped) && mapped.ValueKind == JsonValueKind.String ? mapped.GetString()! : requested : "medium");
             fields = ",\"reasoning\":{\"effort\":" + JsonSerializer.Serialize(effort) +
                 ",\"summary\":" + JsonSerializer.Serialize(_options.ReasoningSummary ?? "auto") + "}";
             include = true;

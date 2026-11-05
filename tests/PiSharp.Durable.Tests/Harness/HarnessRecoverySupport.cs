@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): the support of packages/durable/test/harness-tasks-recovery.test.ts (its sqlitePath,
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): the support of packages/durable/test/harness-tasks-recovery.test.ts (its sqlitePath,
 // createIn, TransferService, transferTask and versioned helpers, plus vitest's toMatchObject). The harness.tasks-recovery.* groups live in
 // their own class so their helpers never collide with other harness.* groups; the shared support of HarnessSupport.cs is reached through
 // using static, and SessionTests.Deferred is shadowed by an alias.
@@ -90,9 +90,6 @@ internal static partial class HarnessRecoveryTests
         _ => JsonValue.DeepEquals(expected, actual),
     };
 
-    /// <summary>The <c>error.cause</c> a scheduler report carries.</summary>
-    private static object? Cause(Exception report) => report.Data["cause"];
-
     /// <summary>Upstream <c>String(error)</c>: the error's name and message.</summary>
     private static string Describe(Exception error) => $"{error.GetType().Name}: {error.Message}";
 
@@ -168,7 +165,7 @@ internal static partial class HarnessRecoveryTests
     });
 
     /// <summary>Every write of task <paramref name="id"/> committed to <paramref name="storage"/>, in commit order. Read after close, so no
-    /// commit lands meanwhile; close writes no task state.</summary>
+    /// commit lands meanwhile; close writes back only the tasks it stopped (Pi v1.5.0 sync, area restarts).</summary>
     private static List<TaskRecord> WritesOf(ControlledStorage storage, TaskId id)
     {
         var count = storage.CommitCount;

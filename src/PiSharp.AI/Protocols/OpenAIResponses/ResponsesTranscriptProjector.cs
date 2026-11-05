@@ -23,6 +23,13 @@ public sealed record ResponsesTranscriptProjectionOptions(
     /// (Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/ai/src/api/openai-responses-shared.ts, api/transform-messages.ts).
     /// </summary>
     public bool? ModelSupportsImages { get; init; }
+
+    /// <summary>
+    /// Pi 1.5.0 openai-responses-shared.ts <c>configurationUpdateEffort</c>: the effort of the reply being generated, sent as
+    /// <c>configuration_update</c> input items instead of a changing <c>reasoning.effort</c>. One goes before each earlier reply of
+    /// this model with the level recorded on it (<c>providerThinkingLevel</c>) and one with this effort at the end. Null sends none.
+    /// </summary>
+    internal string? ConfigurationUpdateEffort { get; init; }
 }
 
 public enum ResponsesProjectionFailure
@@ -177,6 +184,13 @@ public sealed class ResponsesTranscriptProjector
                 {
                     var before = _output.Count; ProjectAssistant(entry.Assistant!, messageIndex);
                     if (_output.Count == before) continue;
+                    // Pi 1.5.0 convertResponsesMessages: an earlier reply of this model replays its recorded level before its items.
+                    if (options.ConfigurationUpdateEffort is not null && SameModel(entry.Assistant!) &&
+                        entry.Assistant!.ExtraProperties?.TryGet("providerThinkingLevel", out var recorded) == true && recorded!.Value.ValueKind == JsonValueKind.String)
+                    {
+                        Add(ConfigurationUpdate(recorded.Value.GetString()!));
+                        var update = _output[^1]; _output.RemoveAt(_output.Count - 1); _output.Insert(before, update);
+                    }
                 }
                 else
                 {
@@ -185,6 +199,7 @@ public sealed class ResponsesTranscriptProjector
                 }
                 if (!leadingSystem) messageIndex++;
             }
+            if (options.ConfigurationUpdateEffort is { } effort) Add(ConfigurationUpdate(effort));
             token.ThrowIfCancellationRequested();
             return JsonData.Parse(_output.ToJsonString(OutputJson));
         }
@@ -204,10 +219,10 @@ public sealed class ResponsesTranscriptProjector
                             case ThinkingContent thinking:
                                 var redacted = Bool(thinking.ExtraProperties, "redacted");
                                 var signature = OptionalString(thinking.ExtraProperties, "thinkingSignature");
-                                if (redacted && !same) break;
-                                if (same && !string.IsNullOrEmpty(signature)) content.Add(thinking);
+                                // transformMessages drops thinking from another model instead of replaying it as text.
+                                if (!same) break;
+                                if (!string.IsNullOrEmpty(signature)) content.Add(thinking);
                                 else if (redacted) throw Failure(ResponsesProjectionFailure.UnsupportedSignature);
-                                else if (thinking.Thinking.Trim().Length != 0 && !same) content.Add(new TextContent(thinking.Thinking));
                                 break;
                             case TextContent text: content.Add(same ? text : new TextContent(text.Text)); break;
                             case ToolCallContent tool:
@@ -460,6 +475,8 @@ public sealed class ResponsesTranscriptProjector
                 }
             }
         }
+        private static JsonObject ConfigurationUpdate(string effort) =>
+            new() { ["type"] = "configuration_update", ["reasoning"] = new JsonObject { ["effort"] = effort } };
         private void Add(JsonNode item)
         {
             token.ThrowIfCancellationRequested(); var serialized = item.ToJsonString(OutputJson);
@@ -485,13 +502,15 @@ public sealed class ResponsesTranscriptProjector
         // Pi abe508 openai-responses-shared.ts convertToolResultOutput (after transform-messages.ts downgradeUnsupportedImages).
         private JsonNode ToolOutput(JsonElement body)
         {
-            if (options.ModelSupportsImages is null) { var text = ContentText(body, true); return text.Length == 0 ? "(no tool output)" : text; }
+            // hasText = textResult.trim().length > 0: whitespace-only output counts as empty.
+            if (options.ModelSupportsImages is null) { var text = ContentText(body, true); return StreamingJson.IsJsBlank(text) ? "(no tool output)" : text; }
             var parts = MediaParts(body, true);
             var result = string.Join('\n', parts.Where(part => part.Data is null).Select(part => part.Text));
             var images = parts.Where(part => part.Data is not null).ToList();
-            if (images.Count == 0 || options.ModelSupportsImages != true) return result.Length != 0 ? result : images.Count > 0 ? "(see attached image)" : "(no tool output)";
+            var hasText = !StreamingJson.IsJsBlank(result);
+            if (images.Count == 0 || options.ModelSupportsImages != true) return hasText ? result : images.Count > 0 ? "(see attached image)" : "(no tool output)";
             var output = new JsonArray();
-            if (result.Length != 0) output.Add(new JsonObject { ["type"] = "input_text", ["text"] = result });
+            if (hasText) output.Add(new JsonObject { ["type"] = "input_text", ["text"] = result });
             foreach (var image in images) output.Add(new JsonObject { ["type"] = "input_image", ["detail"] = "auto", ["image_url"] = "data:" + image.Text + ";base64," + image.Data });
             return output;
         }

@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/codemode/src/runtime/protocol.ts. Messages between the host and the
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/codemode/src/runtime/protocol.ts. Messages between the host and the
 // engine (a thread or a child process). Tool arguments, results and values cross as JSON strings, as in the original. The
 // deterministic fields (VmStartData.deterministic, a result's seq, now and properties, done's during, started and idle) serve
 // CodemodeSandbox.Start(); `exhausted` reports an interrupt budget used up, which inline.ts turns into a timeout in its launcher.

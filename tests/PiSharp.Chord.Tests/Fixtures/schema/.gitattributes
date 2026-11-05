@@ -1,0 +1,3 @@
+# Upstream test files (Pi packages/chord/test/next/schema), kept byte for byte: SchemaSwitchCases.cs pins their blob ids.
+* -text
+.gitattributes -text

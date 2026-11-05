@@ -213,8 +213,8 @@ internal static class SessionSelectorCases
         yield return ("ses.search.relevance-score-then-modified", Sync(() =>
         {
             var result1 = SessionSelectorSearch.FilterAndSortSessions(
-                [M("late", "2026-01-03T00:00:00.000Z", "xxxx brave"), M("early", "2026-01-01T00:00:00.000Z", "brave xxxx")], "\"brave\"", SortMode.Relevance);
-            Equal("early,late", string.Join(",", result1.Select(s => s.Id)), "score order");
+                [M("message", "2026-01-03T00:00:00.000Z", "brave"), M("name", "2026-01-01T00:00:00.000Z", "xxxx", "Brave work")], "\"brave\"", SortMode.Relevance);
+            Equal("name,message", string.Join(",", result1.Select(s => s.Id)), "score order (Pi 1.5.0: a name match ranks first)");
             var result2 = SessionSelectorSearch.FilterAndSortSessions(
                 [M("older", "2026-01-01T00:00:00.000Z", "brave"), M("newer", "2026-01-03T00:00:00.000Z", "brave")], "\"brave\"", SortMode.Relevance);
             Equal("newer,older", string.Join(",", result2.Select(s => s.Id)), "tie-break by modified desc");

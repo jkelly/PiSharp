@@ -5,6 +5,10 @@
 // runtime.lock-lost.<case> are PiSharp-only too: a lost session lock (removed, or taken over by another process) fails the session the same
 // way, where upstream's proper-lockfile onCompromised throws and ends the process. The lock renews every second and goes stale after 2 s
 // (the shortest proper-lockfile allows), and each case waits for the failure itself rather than for a fixed time.
+// Pi v1.5.0 sync (area view): runtime.transcript.<case> check DurableView.Transcript, the active transcript the TUI renders and counts
+// context tokens from, now that the conversation view's entries are a window over the whole transcript: it stays the shown conversation's
+// ContextView.Entries past the window's 100 entries, and starts at the summary after a compaction while the window keeps the history.
+// Area live-turns: the recorded pi.live.compactionFailure names its trigger (pi.live version 2).
 using PiSharp.Cli.Durable;
 using PiSharp.Cli.Pi;
 using PiSharp.Durable;
@@ -36,7 +40,7 @@ internal static partial class Program
                 var view = await UntilView(durable.View, current => current.Failure is not null, "the session failed");
                 Equal("disk is full", view.Failure, "the storage error");
                 var end = await durable.Harness.Closed.WaitAsync(TimeSpan.FromSeconds(20));
-                Equal(SessionEndReason.Failed, end.Reason, "the Harness closed failed");
+                Equal(SessionEndKind.Failed, end.Kind, "the Harness closed failed");
                 // The failed call's error, the Harness's report of it and later refused requests are no notices: the failure says it once.
                 await durable.Controller.SubmitAsync("more", WhenBusy.Steer);
                 await durable.Controller.CompactAsync(null);
@@ -111,7 +115,7 @@ internal static partial class Program
                 Equal($"the session lock was lost (removed, or taken over by another process): {lockPath}", view.Failure, "the failure");
                 Check(durable.Location.LockLost is not null && durable.Location.Lock.Compromised, "the lock is lost");
                 var end = await durable.Harness.Closed.WaitAsync(TimeSpan.FromSeconds(30));
-                Equal(SessionEndReason.Failed, end.Reason, "the Harness closed failed");
+                Equal(SessionEndKind.Failed, end.Kind, "the Harness closed failed");
                 // Nothing more reaches the storage: the request is refused and becomes no notice besides the failure.
                 await durable.Controller.SubmitAsync("after the loss", WhenBusy.Steer);
                 await durable.Controller.CompactAsync(null);
@@ -199,11 +203,51 @@ internal static partial class Program
             var failed = await UntilView(durable.View, view => view.Conversation.Doc("pi.live") is { } live &&
                 live.TryGetValue("compactionFailure", out var failure) && failure is JsonObjectValue, "pi.live.compactionFailure");
             var recorded = (JsonObjectValue)failed.Conversation.Doc("pi.live")!["compactionFailure"];
-            Equal("\"manual\"", recorded["reason"].ToJson(), "reason");
+            Equal("\"manual\"", recorded["trigger"].ToJson(), "trigger");
             Check(((JsonStringValue)recorded["error"]).Value.Contains("summarizer down", StringComparison.Ordinal), "error: " + recorded.ToJson());
             await Task.Delay(300);
             Check(!durable.View.Current.Notices.Any(notice => notice.Message.StartsWith("Compaction", StringComparison.Ordinal)),
                 "no notice besides the live failure: " + string.Join(" | ", durable.View.Current.Notices.Select(notice => notice.Message)));
+        }),
+
+        Case("runtime.transcript.keeps-the-active-transcript-past-the-view-window", async () =>
+        {
+            await using var agent = new TestAgent("transcript-window");
+            await using var durable = await agent.OpenAsync(ScriptedStreams.Queue(ScriptedReply.Answer("one")));
+            await durable.Controller.SubmitAsync("first", WhenBusy.Steer);
+            await UntilView(durable.View, view => LastAnswer(view) == "one" && Idle(view), "answered");
+            var root = (await durable.Harness.ConversationAsync(ConversationId.Root, DurableRuntime.Context))!;
+            for (var index = 0; index < 120; index++)
+            {
+                var data = JsonValue.Object([new("index", index)]);
+                await root.CommitAsync(tx => tx.AppendEntryAsync(root.Id, new EntryDraft { Kind = "app.note", Data = data }), DurableRuntime.Context);
+            }
+            var expected = (await root.ContextAsync(DurableRuntime.Context)).Entries;
+            var view = await UntilView(durable.View, current => current.Transcript is [.., var last] && last.Id == expected[^1].Id, "the newest note");
+            Check(view.Conversation.Entries.Length <= 100, $"the view is a window: {view.Conversation.Entries.Length} entries");
+            Equal(string.Join(",", expected.Select(entry => entry.Id.Value)), string.Join(",", view.Transcript.Select(entry => entry.Id.Value)), "the active transcript");
+            Equal("pi.user", view.Transcript[0].Kind, "from the first input");
+        }),
+
+        Case("runtime.transcript.starts-at-the-summary-after-a-compaction", async () =>
+        {
+            await using var agent = new TestAgent("transcript-compaction", settings: """
+                {"defaultProvider":"faux","defaultModel":"faux-1","retry":{"enabled":false},"compaction":{"keepRecentTokens":1}}
+                """);
+            var streams = ScriptedStreams.Queue(ScriptedReply.Answer("one"), ScriptedReply.Answer("two"), ScriptedReply.Answer("the summary"));
+            await using var durable = await agent.OpenAsync(streams);
+            await durable.Controller.SubmitAsync("first", WhenBusy.Steer);
+            await UntilView(durable.View, view => LastAnswer(view) == "one" && Idle(view), "first answer");
+            await durable.Controller.SubmitAsync("second", WhenBusy.Steer);
+            await UntilView(durable.View, view => LastAnswer(view) == "two" && Idle(view), "second answer");
+            await durable.Controller.CompactAsync(null);
+            var view = await UntilView(durable.View, current => current.Transcript is [{ Kind: "pi.compaction" }, ..], "the summary first");
+            var root = (await durable.Harness.ConversationAsync(ConversationId.Root, DurableRuntime.Context))!;
+            var expected = (await root.ContextAsync(DurableRuntime.Context)).Entries;
+            Equal(string.Join(",", expected.Select(entry => entry.Id.Value)), string.Join(",", view.Transcript.Select(entry => entry.Id.Value)), "the active transcript");
+            // The window keeps the history: the inputs the summary replaced, then the summary where it was written.
+            Equal("first,second", string.Join(",", view.Conversation.Entries.Where(entry => entry.Kind == "pi.user").Select(UserText)), "the window's inputs");
+            Equal("pi.compaction", view.Conversation.Entries[^1].Kind, "the summary last in the window");
         }),
 
         Case("runtime.tool-search.installed-but-not-offered", async () =>
@@ -288,11 +332,12 @@ internal static partial class Program
         generation is JsonObjectValue current && current.TryGetValue("message", out var message) && message is JsonObjectValue partial &&
         ScriptedRequest.Text(partial).Length > 0;
 
-    /// <summary>The conversation's view now.</summary>
+    /// <summary>The conversation's view now: the acquisition value of a view watch, which stops at once.</summary>
     private static async Task<ConversationView> ViewOf(IConversation conversation)
     {
-        using var state = await conversation.ViewStateAsync(DurableRuntime.Context);
-        return state.Value;
+        var watch = await conversation.WatchAsync(DurableRuntime.Context);
+        try { return watch.Value; }
+        finally { await watch.StopAsync(); }
     }
 
     /// <summary>Whether <paramref name="view"/> runs a turn.</summary>
@@ -344,14 +389,14 @@ internal static partial class Program
         /// <summary>Commits the backend completed.</summary>
         public int Commits => Volatile.Read(ref commits);
 
-        public Task<Seq> CommitAsync(IReadOnlyList<StorageWrite> writes, DurableContext context) =>
-            fail ? Task.FromException<Seq>(new IOException("disk is full")) : CountedAsync(inner.CommitAsync(writes, context));
+        public Task<CommitResult> CommitAsync(IReadOnlyList<IReadOnlyList<StorageWrite>> batches, Action<int, Seq> receive, DurableContext context) =>
+            fail ? Task.FromException<CommitResult>(new IOException("disk is full")) : CountedAsync(inner.CommitAsync(batches, receive, context));
 
-        private async Task<Seq> CountedAsync(Task<Seq> commit)
+        private async Task<CommitResult> CountedAsync(Task<CommitResult> commit)
         {
-            var seq = await commit;
-            Interlocked.Increment(ref commits);
-            return seq;
+            var result = await commit;
+            Interlocked.Add(ref commits, result.Stored);
+            return result;
         }
         public Task<TId> MintIdAsync<TId>() where TId : struct, IDurableId<TId> => inner.MintIdAsync<TId>();
         public Task<ConversationRecord?> GetConversationAsync(ConversationId id, DurableContext context) => inner.GetConversationAsync(id, context);

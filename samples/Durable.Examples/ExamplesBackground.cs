@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/test/examples/23-subagent-background.ts. Upstream uses OpenAI when
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/test/examples/22-subagent-background.ts. Upstream uses OpenAI when
 // OPENAI_API_KEY is set and otherwise pi-ai's faux provider, routing each request by its last message and streaming at 50 tokens per second.
 // Here PacedModels always stands in with the same route and pacing (token size fixed at 4, upstream's is drawn between 3 and 5), and the
 // Harness clock, the streaming and the example's waits all run on an ExampleClock that the example drives like Node's event loop: one timer
@@ -7,6 +7,12 @@
 // holds on the memory run, and a file backend restarts on the runner's storage. The transcript prints without ANSI colors, as upstream does
 // when stdout is not a terminal. Intentional difference (decision 0005): upstream's tool still returns its replies as v1.1.0's `content`,
 // which v1.2.0 renamed to `output`, so under v1.2.0 its replies are empty; Reply returns them as Output, as the example means.
+// Pi v1.5.0 sync (area events, f3255de76): follow() watches the main conversation's view and prints the entries appended since the newest
+// it saw, as v1.5.0's 22-subagent-background.ts does, where v1.2.0 printed the message_end events of watchEvents (removed). Area
+// tools-schema: the subagent tool's parameters are pi-schema's obj({ action: oneOf([...]), ... }) as JSON Schema; area checkpoint-when:
+// app.subagents states checkpointWhen. Area vocabulary (5f312dac4): follow()'s listener takes the tagged call and skips one that is not
+// a value. Since the closeout it carries v1.5.0's name
+// (b9fb2b854).
 using System.Collections.Immutable;
 using System.Text.RegularExpressions;
 using PiSharp.Durable.Chord;
@@ -23,7 +29,7 @@ public static partial class Examples
     // document that maps subagent names to their conversations ({conversationId, reported: answers already reported}) and the reporter task
     // of each subagent tool call. A fork of the main conversation starts without subagents.
     private static readonly ConversationDocToken Subagents = Documents.DefineConversationDoc("app.subagents", 1, DocumentFork.Initial,
-        () => JsonValue.Object([new("agents", JsonObjectValue.Empty), new("reporters", JsonObjectValue.Empty)]));
+        () => JsonValue.Object([new("agents", JsonObjectValue.Empty), new("reporters", JsonObjectValue.Empty)]), checkpointWhen: (_, _, _) => false);
 
     private static TaskPhaseHandler Terminal(Func<TaskState> state) => (_, runtime, taskContext) => runtime.CommitAsync((_, _) => state(), taskContext);
 
@@ -104,7 +110,7 @@ public static partial class Examples
                 "followUp: true queues it after the current answer instead of steering), stop (name: aborts its current work), " +
                 "status (name, or all subagents without one). Answers are reported back to you when they arrive.",
             Parameters = (JsonObjectValue)JsonValue.Parse("""
-                {"type":"object","required":["action"],"properties":{"action":{"anyOf":[{"const":"spawn","type":"string"},{"const":"send","type":"string"},{"const":"stop","type":"string"},{"const":"status","type":"string"}]},"name":{"type":"string"},"message":{"type":"string"},"followUp":{"type":"boolean"}}}
+                {"type":"object","properties":{"action":{"enum":["spawn","send","stop","status"]},"name":{"type":"string"},"message":{"type":"string"},"followUp":{"type":"boolean"}},"required":["action"],"additionalProperties":false}
                 """),
             // A call interrupted by a crash is not rerun: repeating `stop` could stop newer work.
             Replay = ToolReplay.Unsafe,
@@ -213,7 +219,7 @@ public static partial class Examples
         return string.Join("\n", Enumerable.Range(1, 135).Select(index => $"Chapter {index}: more whaling."));
     }
 
-    // 23: persistent background subagents. One subagent tool lets the main agent start named subagents, message them (steer or follow up),
+    // 22: persistent background subagents. One subagent tool lets the main agent start named subagents, message them (steer or follow up),
     // stop them mid-answer, and list them. Subagents keep working while the main agent answers the user, and each answer is delivered back
     // to the main agent as a new message once it arrives. Everything survives a restart: the example closes the Harness while a subagent
     // works and reopens it.
@@ -248,12 +254,16 @@ public static partial class Examples
         // Prints the main conversation's messages as they are committed. Subagents work in their own conversations.
         async Task Follow(IHarness harness, ConversationId id)
         {
-            var stream = await harness.WatchEventsAsync(id, Context);
-            stream.Start(async (events, _) =>
+            var watch = await (await harness.ConversationAsync(id, Context))!.WatchAsync(Context);
+            var newest = watch.Value.Entries.IsEmpty ? 0 : watch.Value.Entries[^1].Id.Value;
+            watch.Start(async (call, _) =>
             {
-                foreach (var agentEvent in events)
+                if (call is not WatchValueCall<ConversationView> { Value: var value }) return;
+                var entries = value.Entries.Where(entry => entry.Id.Value > newest).ToList();
+                if (!value.Entries.IsEmpty) newest = value.Entries[^1].Id.Value;
+                foreach (var entry in entries)
                 {
-                    if (agentEvent is not MessageEndEvent end || end.Entry.Model?[0] is not JsonObjectValue message) continue;
+                    if (entry.Model?[0] is not JsonObjectValue message) continue;
                     switch (Str(message, "role"))
                     {
                         case "user":

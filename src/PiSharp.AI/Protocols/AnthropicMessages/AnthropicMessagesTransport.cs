@@ -23,6 +23,9 @@ public sealed record AnthropicMessagesOptions(int MaximumEvents = int.MaxValue, 
     public string? ProviderThinkingLevel { get; init; }
     /// <summary>Read when a completed response receives its anthropic_input_transformations diagnostic (upstream: Date.now()).</summary>
     public TimeProvider Clock { get; init; } = TimeProvider.System;
+    // anthropic-messages.ts isOpenRouterModel(model): the model's base URL names openrouter.ai (a provider id of openrouter is
+    // read from the request). Set from the model metadata.
+    internal bool OpenRouterReportedCost { get; init; }
 }
 public enum AnthropicMessagesFailure { SourceFailed, MalformedStream, UnexpectedEof, ResourceLimit, ProviderError, Cancelled, CleanupFailed }
 
@@ -152,6 +155,7 @@ public sealed partial class AnthropicMessagesTransport : IChatTransport
         private int _syncedDiagnostics;
         private readonly ImmutableArray<string> _currentToolNames;
         private AnthropicTokenRates _rates;
+        private readonly bool _openRouter;
         private readonly AssistantStreamReducer _reducer;
         private readonly Dictionary<int, Slot> _slots = [];
         private readonly HashSet<int> _fallbackIndices = [];
@@ -176,6 +180,7 @@ public sealed partial class AnthropicMessagesTransport : IChatTransport
                 string.IsNullOrWhiteSpace(request.Model.Id) || string.IsNullOrWhiteSpace(request.Model.Provider)) throw Protocol();
             Unicode(request.Model.Id); Unicode(request.Model.Provider);
             _options = options; _rates = options.Rates ?? new();
+            _openRouter = options.OpenRouterReportedCost || ProviderCost.IsOpenRouter(request.Model.Provider, null);
             _currentToolNames = options.OAuthToolNames ? CurrentTools(request, options) : [];
             if (options.ProviderThinkingLevel is { } level) _properties = _properties.Set("providerThinkingLevel", TextData(level));
             _requestDiagnostics = requestDiagnostics; SyncDiagnostics();
@@ -328,9 +333,9 @@ public sealed partial class AnthropicMessagesTransport : IChatTransport
                         ended.Properties.Set("thinkingSignature", TextData(ended.Signature.ToString()))));
                     else if (content is ToolCallContent tool)
                     {
-                        // anthropic-messages.ts content_block_stop: block.arguments = parseStreamingJson(block.partialJson).
-                        var arguments = StreamingJson.Parse(_reducer.GetToolJsonPreview(ended.Index));
-                        Emit(new ToolCallEnded(ended.Index, tool with { Arguments = arguments }));
+                        // anthropic-messages.ts content_block_stop: Object.assign(block, open.arguments.finish()), so malformed
+                        // arguments end as {} with argumentsError.
+                        Emit(new ToolCallEnded(ended.Index, _reducer.FinishToolArguments(ended.Index).AssignTo(tool)));
                     }
                     else throw Protocol();
                     ended.Ended = true; break;
@@ -348,7 +353,8 @@ public sealed partial class AnthropicMessagesTransport : IChatTransport
                         }
                         else if (stop == "sensitive") _stopErrorMessage = "Provider stopped with: sensitive";
                     }
-                    if (value.TryGetProperty("usage", out var usage) && usage.ValueKind != JsonValueKind.Null) ReadUsage(Object(usage), initial: false);
+                    // calculateCost runs on every message_delta; only the usage fields it carries update the counts.
+                    ReadUsage(value.TryGetProperty("usage", out var usage) && usage.ValueKind != JsonValueKind.Null ? Object(usage) : NoUsage, initial: false);
                     break;
                 case "message_stop":
                     RequireMessage(); _messageStopped = true; break;
@@ -414,6 +420,7 @@ public sealed partial class AnthropicMessagesTransport : IChatTransport
             StreamTerminalEvent terminal = failure is null ? new StreamDone(reason, final) : new StreamError(reason, final);
             _reducer.Apply(terminal); return (StreamTerminalEvent)CaptureEmission(terminal);
         }
+        private static readonly JsonElement NoUsage = JsonDocument.Parse("{}").RootElement.Clone();
         private void ReadUsage(JsonElement usage, bool initial)
         {
             var input = Count(usage, "input_tokens", initial ? 0 : _usage.Input);
@@ -438,9 +445,20 @@ public sealed partial class AnthropicMessagesTransport : IChatTransport
                 OriginalAnthropicUsageCostProjection.Create(_rates, counts, _cacheWrite1h)));
             var cost = binary64.Value;
             if (cost.EnumerateObject().Any(field => !field.Value.TryGetDouble(out var number) || !double.IsFinite(number))) throw Protocol();
+            // message_delta: calculateCost, then applyOpenRouterReportedCost from the delta's usage for an OpenRouter model.
+            var reported = !initial && _openRouter ? ProviderCost.OpenRouterReportedTotal(usage) : null;
+            if (reported is { } billed)
+            {
+                binary64 = JsonData.Parse(Contracts.Compatibility.EcmaScriptJsonProjection.Project(JsonSerializer.Serialize(new
+                {
+                    input = cost.GetProperty("input").GetDouble(), output = cost.GetProperty("output").GetDouble(),
+                    cacheRead = cost.GetProperty("cacheRead").GetDouble(), cacheWrite = cost.GetProperty("cacheWrite").GetDouble(), total = billed
+                })));
+                cost = binary64.Value;
+            }
             _usage = new(input, output, read, write, total, new(cost.GetProperty("input").GetDecimal(), cost.GetProperty("output").GetDecimal(),
                 cost.GetProperty("cacheRead").GetDecimal(), cost.GetProperty("cacheWrite").GetDecimal(), cost.GetProperty("total").GetDecimal(),
-                SourceBinary64Cost: binary64), extras);
+                ProviderCost.TotalFromProvider(reported is not null), binary64), extras);
         }
         private void Transformations(JsonElement value)
         {

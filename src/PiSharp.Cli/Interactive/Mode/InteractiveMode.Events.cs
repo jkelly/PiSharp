@@ -456,6 +456,11 @@ internal sealed partial class InteractiveMode
     private ToolRenderers? GetRegisteredToolDefinition(string toolName) =>
         context.ResolveToolRenderers?.Invoke(toolName) ?? BuiltInToolRenderers.Resolve(toolName);
 
+    /// <summary>agent-session.ts exportToHtml's createToolHtmlRenderer: the HTML export pre-renders tools with the transcript's renderers,
+    /// the current theme and the session cwd.</summary>
+    internal PiSharp.CodingAgent.Export.IToolHtmlRenderer CreateExportToolRenderer() =>
+        ExportToolHtmlRenderer.Create(GetRegisteredToolDefinition, Themes.Current, Cwd);
+
     /// <summary>A `{ truncated: true }` truncation result for bash output (interactive-mode.ts).</summary>
     private static PiSharp.Agent.Tools.ToolOutputTruncationResult TruncatedOutput(string? content) => new(content ?? "", true, null, 0, 0, 0, 0, false, false, 0, 0);
 
@@ -486,7 +491,10 @@ internal sealed partial class InteractiveMode
         chatContainer.AddChild(component);
     }
 
-    private void AddMessageToChat(JsonObject message, bool populateHistory = false)
+    /// <param name="messageId">The persisted entry id when the message is rendered from session entries (Pi 1.5.0 addMessageToChat
+    /// options.messageId); null for live messages.</param>
+    /// <param name="timestamp">The persisted entry ISO timestamp, under the same rule.</param>
+    private void AddMessageToChat(JsonObject message, bool populateHistory = false, string? messageId = null, string? timestamp = null)
     {
         switch (S(message["role"]))
         {
@@ -537,22 +545,24 @@ internal sealed partial class InteractiveMode
                     if (skillBlock.UserMessage is { } userMessage)
                     {
                         chatContainer.AddChild(new Spacer(1));
-                        chatContainer.AddChild(new UserMessageComponent(userMessage, GetMarkdownThemeWithSettings(), outputPad, GetMarkdownTransformers()));
+                        chatContainer.AddChild(new UserMessageComponent(userMessage, GetMarkdownThemeWithSettings(), outputPad, GetMarkdownTransformers(), messageId, timestamp));
                     }
                 }
-                else chatContainer.AddChild(new UserMessageComponent(textContent, GetMarkdownThemeWithSettings(), outputPad, GetMarkdownTransformers()));
+                else chatContainer.AddChild(new UserMessageComponent(textContent, GetMarkdownThemeWithSettings(), outputPad, GetMarkdownTransformers(), messageId, timestamp));
                 if (populateHistory) editor.AddToHistory(textContent);
                 break;
             }
             case "assistant":
-                chatContainer.AddChild(new AssistantMessageComponent(message, hideThinkingBlock, GetMarkdownThemeWithSettings(), hiddenThinkingLabel, outputPad, GetMarkdownTransformers()));
+                chatContainer.AddChild(new AssistantMessageComponent(message, hideThinkingBlock, GetMarkdownThemeWithSettings(), hiddenThinkingLabel, outputPad, GetMarkdownTransformers(),
+                    messageId, timestamp));
                 break;
         }
     }
 
     /// <summary>A session item: a context message, a custom/usage entry, or a compaction cost notice.</summary>
     private abstract record RenderSessionItem;
-    private sealed record MessageItem(JsonObject Message) : RenderSessionItem;
+    /// <summary>A context message with the id and timestamp of the entry it came from (Pi 1.5.0 renderSessionEntries messageMeta).</summary>
+    private sealed record MessageItem(JsonObject Message, string? EntryId = null, string? EntryTimestamp = null) : RenderSessionItem;
     private sealed record EntryItem(JsonObject Entry) : RenderSessionItem;
     private sealed record CostItem(string Kind, JsonObject Usage) : RenderSessionItem;
 
@@ -577,11 +587,11 @@ internal sealed partial class InteractiveMode
                 case CostItem cost:
                     AddCompactionCostNotice(cost.Kind, cost.Usage); continue;
             }
-            var message = ((MessageItem)item).Message;
+            var (message, messageId, timestamp) = (MessageItem)item;
             var role = S(message["role"]);
             if (role == "assistant")
             {
-                AddMessageToChat(message);
+                AddMessageToChat(message, messageId: messageId, timestamp: timestamp);
                 var stopReason = S(message["stopReason"]);
                 if (message["content"] is JsonArray content)
                     foreach (var block in content.OfType<JsonObject>().Where(block => S(block["type"]) == "toolCall"))
@@ -610,7 +620,7 @@ internal sealed partial class InteractiveMode
                 var id = S(message["toolCallId"]) ?? "";
                 if (renderedPendingTools.Remove(id, out var component)) component.UpdateResult(message);
             }
-            else AddMessageToChat(message, populateHistory);
+            else AddMessageToChat(message, populateHistory, messageId, timestamp);
         }
         foreach (var (id, component) in renderedPendingTools) pendingTools[id] = component;
         ui.RequestRender();
@@ -625,7 +635,7 @@ internal sealed partial class InteractiveMode
             var type = SessionEntries.Type(entry);
             if (type == "custom" || type == "usage" && S(entry["kind"]) == "cache_warm") { items.Add(new EntryItem(entry)); continue; }
             var messages = SessionEntries.SessionEntryToContextMessages(entry);
-            items.AddRange(messages.Select(message => new MessageItem(message)));
+            items.AddRange(messages.Select(message => new MessageItem(message, S(entry["id"]), S(entry["timestamp"]))));
             if (type is "compaction" or "branch_summary" && entry["usage"] is JsonObject usage && messages.Count > 0) items.Add(new CostItem(type, usage));
         }
         RenderSessionItems(items, updateFooter, populateHistory);

@@ -1,6 +1,7 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): coding-agent/src/modes/interactive/components/assistant-message.ts.
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): coding-agent/src/modes/interactive/components/assistant-message.ts.
 // The AssistantMessage is a JsonObject in pi-ai's shape: { role: "assistant", content: [{ type: "text", text } | { type: "thinking",
-// thinking } | { type: "toolCall", ... } | ...], stopReason, errorMessage, ... }.
+// thinking } | { type: "toolCall", ... } | ...], stopReason, errorMessage, ... }. QueueStreamingContent is PiSharp's: it keeps only
+// the latest streamed update until the next render.
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using PiSharp.Tui.Pi;
@@ -21,11 +22,16 @@ internal sealed class AssistantMessageComponent : Container
     private string hiddenThinkingLabel;
     private int outputPad;
     private readonly IReadOnlyList<MarkdownTransformer> markdownTransformers;
+    private readonly string? messageId;
+    private readonly string? timestamp;
     private JsonObject? lastMessage;
     private bool hasToolCalls;
     private bool isStreaming;
     private bool contentUpdatePending;
     private readonly Dictionary<int, bool> thinkingVisibilityOverrides = [];
+    /// <summary>The Markdown blocks of the last update. The next update reuses each at the same position for the same kind of content, so
+    /// a streamed answer keeps the blocks it already rendered, also once the stream ends.</summary>
+    private List<(string Kind, Markdown Markdown)> markdownSlots = [];
 
     public AssistantMessageComponent(
         JsonObject? message = null,
@@ -33,8 +39,12 @@ internal sealed class AssistantMessageComponent : Container
         MarkdownTheme? markdownTheme = null,
         string hiddenThinkingLabel = "Thinking...",
         int outputPad = 1,
-        IReadOnlyList<MarkdownTransformer>? markdownTransformers = null)
+        IReadOnlyList<MarkdownTransformer>? markdownTransformers = null,
+        string? messageId = null,
+        string? timestamp = null)
     {
+        this.messageId = messageId;
+        this.timestamp = timestamp;
         this.hideThinkingBlock = hideThinkingBlock;
         this.markdownTheme = markdownTheme ?? Themes.GetMarkdownTheme();
         this.hiddenThinkingLabel = hiddenThinkingLabel;
@@ -70,6 +80,8 @@ internal sealed class AssistantMessageComponent : Container
     public void SetOutputPad(int padding)
     {
         outputPad = padding;
+        // Markdown takes its padding at construction.
+        markdownSlots = [];
         if (lastMessage is not null) UpdateContent(lastMessage);
     }
 
@@ -92,11 +104,32 @@ internal sealed class AssistantMessageComponent : Container
 
         // Clear content container
         contentContainer.Clear();
+        var previousSlots = markdownSlots;
+        markdownSlots = [];
+        Markdown MarkdownBlock(string kind, string text, Func<Markdown> create)
+        {
+            var index = markdownSlots.Count;
+            var markdown = index < previousSlots.Count && previousSlots[index].Kind == kind ? previousSlots[index].Markdown : create();
+            markdown.SetText(text);
+            markdownSlots.Add((kind, markdown));
+            return markdown;
+        }
+
+        // Spacers are added lazily, right before the next visible content block. This puts a blank line before the first visible block
+        // and after each visible thinking run that is followed by more visible content, while hidden thinking runs without a label
+        // contribute nothing.
+        var needsSpacer = true;
+        void AddVisibleChild(IComponent child)
+        {
+            if (needsSpacer)
+            {
+                contentContainer.AddChild(new Spacer(1));
+                needsSpacer = false;
+            }
+            contentContainer.AddChild(child);
+        }
 
         var content = Content(message);
-        var hasVisibleContent = content.Any(IsVisible);
-
-        if (hasVisibleContent) contentContainer.AddChild(new Spacer(1));
 
         // Render content in order
         var thinkingRunIndex = 0;
@@ -108,8 +141,9 @@ internal sealed class AssistantMessageComponent : Container
             {
                 // Assistant text messages with no background - trim the text
                 // Set paddingY=0 to avoid extra spacing before tool executions
-                contentContainer.AddChild(new Markdown(TextUtils.JsTrim(Str(block, "text") ?? ""), outputPad, 0, markdownTheme, null,
-                    new MarkdownOptions(Transform: MarkdownTransform.CreateMarkdownTransform(MarkdownMessageType.Assistant, this.isStreaming, markdownTransformers))));
+                var text = TextUtils.JsTrim(Str(block, "text") ?? "");
+                AddVisibleChild(MarkdownBlock("text", text, () => new Markdown(text, outputPad, 0, markdownTheme, null,
+                    new MarkdownOptions(Transform: MarkdownTransform.CreateMarkdownTransform(MarkdownMessageType.Assistant, () => this.isStreaming, markdownTransformers, messageId, timestamp)))));
             }
             else if (type == "thinking")
             {
@@ -125,29 +159,30 @@ internal sealed class AssistantMessageComponent : Container
 
                 if (thinkingBlocks.Count == 0) continue;
 
-                // Add spacing only when another visible assistant content block follows.
-                // This avoids a superfluous blank line before separately-rendered tool execution blocks.
-                var hasVisibleContentAfter = content.Skip(i + 1).Any(IsVisible);
-
                 var runIndex = thinkingRunIndex++;
                 var hidden = thinkingVisibilityOverrides.TryGetValue(runIndex, out var overridden) ? overridden : hideThinkingBlock;
+                // A hidden run with an empty label renders nothing, including no spacing.
+                if (hidden && TextUtils.JsTrim(hiddenThinkingLabel).Length == 0) continue;
+                var joinedThinking = string.Join("\n\n", thinkingBlocks);
                 IComponent thinkingComponent = hidden
                     ? new Text(theme.Italic(theme.Fg("thinkingText", hiddenThinkingLabel)), outputPad, 0)
-                    : new Markdown(
-                        string.Join("\n\n", thinkingBlocks),
+                    : MarkdownBlock("thinking", joinedThinking, () => new Markdown(
+                        joinedThinking,
                         outputPad,
                         0,
                         markdownTheme,
                         new DefaultTextStyle(Color: text => theme.Fg("thinkingText", text), Italic: true),
-                        new MarkdownOptions(Transform: MarkdownTransform.CreateMarkdownTransform(MarkdownMessageType.AssistantThinking, this.isStreaming, markdownTransformers)));
-                contentContainer.AddChild(new MouseRegion(thinkingComponent, mouseEvent =>
+                        new MarkdownOptions(Transform: MarkdownTransform.CreateMarkdownTransform(MarkdownMessageType.AssistantThinking, () => this.isStreaming, markdownTransformers, messageId, timestamp))));
+                AddVisibleChild(new MouseRegion(thinkingComponent, mouseEvent =>
                 {
                     if (mouseEvent.Type != TuiMouseEventType.Click || mouseEvent.Button != TuiMouseButton.Left) return null;
                     thinkingVisibilityOverrides[runIndex] = !hidden;
                     if (lastMessage is not null) UpdateContent(lastMessage);
                     return new TuiMouseEventResult(Handled: true);
                 }));
-                if (hasVisibleContentAfter) contentContainer.AddChild(new Spacer(1));
+                // Add spacing only when another visible assistant content block follows.
+                // This avoids a superfluous blank line before separately-rendered tool execution blocks.
+                needsSpacer = true;
             }
         }
 
@@ -188,14 +223,6 @@ internal sealed class AssistantMessageComponent : Container
         isStreaming = true;
         contentUpdatePending = true;
     }
-
-    private static bool IsVisible(JsonObject? c) =>
-        Str(c, "type") switch
-        {
-            "text" => TextUtils.JsTrim(Str(c, "text") ?? "").Length > 0,
-            "thinking" => TextUtils.JsTrim(Str(c, "thinking") ?? "").Length > 0,
-            _ => false
-        };
 
     private static List<JsonObject?> Content(JsonObject message) =>
         message["content"] is JsonArray array ? [.. array.Select(node => node as JsonObject)] : [];

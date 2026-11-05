@@ -34,6 +34,8 @@ internal sealed class SettingsConfig
     public string FollowUpMode { get; init; } = "one-at-a-time";
     /// <summary>"sse" | "websocket" | "websocket-cached" | "auto".</summary>
     public string Transport { get; init; } = "auto";
+    /// <summary>"auto" | "gist" | "radius".</summary>
+    public string SessionShareDestination { get; init; } = "auto";
     public int HttpIdleTimeoutMs { get; init; } = 300_000;
     /// <summary>"off" | "streaming" | "idle".</summary>
     public string CacheWarmingMode { get; init; } = "streaming";
@@ -90,6 +92,7 @@ internal sealed class SettingsCallbacks
     public Action<string> OnSteeringModeChange { get; init; } = _ => { };
     public Action<string> OnFollowUpModeChange { get; init; } = _ => { };
     public Action<string> OnTransportChange { get; init; } = _ => { };
+    public Action<string> OnSessionShareDestinationChange { get; init; } = _ => { };
     public Action<int> OnHttpIdleTimeoutMsChange { get; init; } = _ => { };
     public Action<string> OnCacheWarmingModeChange { get; init; } = _ => { };
     /// <summary>(provider, modelId, level).</summary>
@@ -474,6 +477,14 @@ internal sealed class SettingsSelectorComponent : Container
             },
             new()
             {
+                Id = "share-destination",
+                Label = "Session share destination",
+                Description = "Where to upload sessions with /share (auto prefers Radius when authenticated, otherwise GitHub Gist)",
+                CurrentValue = config.SessionShareDestination,
+                Values = ["auto", "gist", "radius"],
+            },
+            new()
+            {
                 Id = "http-idle-timeout",
                 Label = "HTTP idle timeout",
                 Description = "Maximum idle gap while waiting for HTTP headers or body chunks. Disable for local models that pause longer than five minutes.",
@@ -837,6 +848,7 @@ internal sealed class SettingsSelectorComponent : Container
                 case "steering-mode": callbacks.OnSteeringModeChange(newValue); break;
                 case "follow-up-mode": callbacks.OnFollowUpModeChange(newValue); break;
                 case "transport": callbacks.OnTransportChange(newValue); break;
+                case "share-destination": callbacks.OnSessionShareDestinationChange(newValue); break;
                 case "http-idle-timeout":
                     foreach (var choice in HttpIdleTimeoutChoices.All)
                         if (choice.Label == newValue) { callbacks.OnHttpIdleTimeoutMsChange(choice.TimeoutMs); break; }

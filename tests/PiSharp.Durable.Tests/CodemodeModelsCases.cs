@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/test/codemode-models.test.ts ("code mode models.*"), as
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/test/codemode-models.test.ts ("code mode models.*"), as
 // codemode.models.<case>. Verbatim apart from the adaptations in HarnessSupport.cs and ChatSupport.cs, and these:
 // - pi-ai's `createProvider({ id: "test", models, classifiers, images })` set on the chat's models is TestProviderModels, an IDurableModels
 //   over the faux models that adds the test provider's classifier and image models (pi-ai model JSON) and their implementations, as

@@ -1,4 +1,6 @@
 using System.Text.RegularExpressions;
+using PiSharp.Durable.Chord;
+using PiSharp.Durable.Chord.Delta;
 using PiSharp.Durable.Examples;
 
 // Milestone M0 (decision 0005): samples/Durable.Examples ports Pi packages/durable/test/examples 00-05; P8 adds 14-chat and
@@ -27,6 +29,44 @@ using PiSharp.Durable.Examples;
 // does (JsonModeEventsLines checks that identity on the capture's other assistant message_start lines).
 // Work list area h ran every example of the pinned Pi v1.2.0 under Node without API keys: each prints what is pinned here, but for
 // 23-subagent-background (see there).
+// Pi v1.5.0 sync (area harness-options): 09-context's "request messages" line and the position of 25-compaction's "(system prompt)" lines
+// are authored, not captured: under #10904 (5713c9507) the first pi.system entry after the head marker (or the transcript's first) is the
+// baseline and leads the context past assistant messages, where Pi v1.2.0 printed it after them. The lines follow v1.5.0's context.ts and
+// examples/24-compaction.ts's printing; no v1.5.0 run was captured. Area tools-schema: 19's lines declare the built-in tools with
+// pi-schema's key order ("properties" before "required"), authored from the v1.2.0 capture (ToolsSchema150.cs), not captured.
+// Area sleep: 24-child-tasks's tree lines print the charged payments as sleeping, authored from f75b3240a's 24-child-tasks.ts (v1.5.0's
+// 23-child-tasks.ts, whose payments end their charge phase in runtime.sleepUntil), not captured; 13-recovery's lines are unchanged.
+// Area watches: 04-chord-state is gone, as upstream deleted it with Session.documentState() (92ab53602). 21-late-join's view is a watch
+// (Conversation.watch()), which makes no call at start, so the line the v1.2.0 state printed as it hydrated ("view output now" with the
+// first five lines) is gone; authored from 92ab53602's 21-late-join.ts (v1.5.0's 20-late-join.ts), not captured.
+// Area watch-folding: 05-watches runs v1.5.0's 04-watches.ts (d8d99950a): its first call stays busy while three commits land, which arrive
+// folded into the second call (the three appends to `text` as one append op), and it prints each update's ops and the number of calls;
+// authored from 04-watches.ts and Chord's PendingOps (appends at one path merge), not captured.
+// Area view (f3255de76): 32-transcript is v1.5.0's 31-transcript.ts; its lines are authored from that example and the windowed view's
+// rules (a watch starts with the newest min entries, a resume from the entry after the newest held), not captured. Its file backends count
+// the stored chat entries.
+// Area admission (cc9c52310): 35-submit-in-commit is v1.5.0's 34-submit-in-commit.ts; its lines are authored from that example, not
+// captured: the submission ID is the one this port mints, and the recorded visitors print as JSON in place of util.inspect. Its file
+// backends read the host's record back.
+// Area live-turns (f6a9db1d8): 34-turn-limit-and-continue is v1.5.0's 33-turn-limit-and-continue.ts; its lines are authored from that
+// example (console.log's arguments joined with spaces), not captured. Its file backends read the transcript's kinds back. 19-json's ops
+// lines take LiveV3150.cs's authored form too (pi.live version 3): the run's set has turns 0, and the frame that starts the tool round
+// sets run.turns 1 after its pi.live ops; its state lines, replayed from them, show the run's turns.
+// Area run-end (7e15f9601): 33-tests-after-edits is v1.5.0's 32-tests-after-edits.ts; its lines are authored from that example
+// (console.log's arguments joined with spaces), not captured. Its file backends read the transcript's kinds back. 19-json's ops lines
+// take LiveV3150.cs's run-end form too: the run's set carries first, the entry its input appended.
+// Area events (f3255de76): v1.5.0 removed watchEvents, and the examples that printed agent events print the view, as upstream's do. 19-json
+// runs v1.5.0's two modes (18-json.ts), ops on the runner's storage and state on MemoryStorage: the ops lines stay the v1.2.0 capture's
+// authored forms (JsonModeOpsLines), and the state lines are authored from them, not captured: JsonModeStateLines replays each frame's ops
+// on the view and prints each value as 18-json.ts's --state mode does (the entries appended since the newest seen, and pi.live). The v1.2.0
+// events capture (examples-19-json-events.upstream.jsonl) is no longer compared. 21-late-join is v1.5.0's 20-late-join.ts (view lines
+// only: the tool's output while it runs, the answer's partial as its text changes, the entries once the run ended), and 22- and
+// 23-subagent follow the view (v1.5.0's 21- and 22-subagent); their lines are authored from those examples and the v1.2.0 lines, which
+// showed the same output and partial texts as events, not captured.
+// Pi v1.5.0 sync (closeout, b9fb2b854): the examples carry v1.5.0's names, so each example's lines below start with its v1.5.0 name (04-watches
+// through 34-submit-in-commit; 35-37 wait for phase 6's Chord host). The notes above, and those of earlier areas below, name the examples
+// by the numbers they had when each area ported them: Pi v1.2.0's (05-watches through 31-reload-and-restart), and 32- through 35- for
+// v1.5.0's 31- through 34-. The fixture file names (examples-19-json-*.upstream.jsonl) keep the v1.2.0 name they were captured under.
 internal static partial class Program
 {
     private static readonly string[] CodingToolsTranscript =
@@ -44,9 +84,13 @@ internal static partial class Program
         "pi.assistant",
     ];
 
-    // Declared before ExamplesUpstreamOutput, which spreads them.
-    private static readonly string[] JsonModeEvents = JsonModeEventsLines(JsonModeFixture("events", "v1.2.0"));
-    private static readonly string[] JsonModeOps = JsonModeOpsLines(JsonModeFixture("ops", "v1.2.0"), JsonModeFixture("ops"));
+    // Declared before ExamplesUpstreamOutput, which spreads them. Pi v1.5.0 (area tools-schema): authored forms of the capture, with the
+    // built-in tools declared in pi-schema's key order (ToolsSchema150.cs); (area model-requests) and with the thinking level each classified
+    // message records (ModelRequests150.cs). (Area events) the state mode's lines are authored from the ops lines (JsonModeStateLines).
+    // (Area live-turns) and with pi.live's run turns (LiveV3150.cs).
+    private static readonly string[] JsonModeOps = LiveV3150.OpsLines(
+        [.. JsonModeOpsLines(JsonModeFixture("ops", "v1.2.0"), JsonModeFixture("ops")).Select(line => ModelRequests150.AuthoredText(ToolsSchema150.AuthoredText(line)))]);
+    private static readonly string[] JsonModeState = JsonModeStateLines(JsonModeOps);
     private static readonly string[] ReviewerTranscript =
     [
         "> Review user.ts.",
@@ -72,44 +116,45 @@ internal static partial class Program
         "supervisor task: 3",
         "child conversation: {\"id\":4,\"owner\":{\"conversationId\":2,\"taskId\":3}}",
         "registry: {\"agents\":{\"researcher\":{\"conversationId\":4,\"requestId\":\"researcher:first-message:3\"}}}",
-        "== 04-chord-state",
-        "Chord notes: hydrate 0 {\"text\":\"first\"}",
-        "Chord notes: update 1 {\"text\":\"published through Chord\"}",
-        "== 05-watches",
+        "== 04-watches",
         "watch baseline: {\"text\":\"first\"}",
-        "watch update: {\"text\":\"observed asynchronously\"}",
-        "== 06-harness",
+        // Authored for Pi v1.5.0 (area watch-folding, see the header): the busy first call, then three commits folded into one append.
+        "watch update: {\"text\":\"observed\"} [[\"s\",[\"text\"],\"observed\"]]",
+        "watch update: {\"text\":\"observed asynchronously, folded!\"} [[\"a\",[\"text\"],\" asynchronously, folded!\"]]",
+        "listener calls: 2",
+        "== 05-harness",
         "root: 1 {\"text\":\"root notes\"}",
         "stored agent: {\"thinkingLevel\":\"low\"}",
         HarnessResolved,
-        "== 07-configuration",
+        "== 06-configuration",
         """default tools: ["read","write","grep"]""",
         ConfigurationStored,
         """model: {"provider":"anthropic","modelId":"claude-sonnet-4-5"} thinking: high tools: ["write","read"]""",
         """without search: ["read","write"]""",
         """files uninstalled: ["grep"]""",
         ConfigurationReinstalled,
-        "== 08-harness-conversations",
+        "== 07-harness-conversations",
         "typed entry: true example",
         "helper thinking: minimal",
         "fork thinking: high",
         "lookup: true",
-        "== 09-context",
+        "== 08-context",
         """raw active entries: ["message","message","message","message","pi.system","message","message","edit","note"]""",
-        """request messages: ["user: read files a and b","assistant: reading call(a) call(b)","result(a)","result(b)","system: {\"cwd\":\"<cwd>/repo</cwd>\"}","assistant: a and b look fine"]""",
+        // Authored for Pi v1.5.0 (#10904, see the header): the baseline leads.
+        """request messages: ["system: {\"cwd\":\"<cwd>/repo</cwd>\"}","user: read files a and b","assistant: reading call(a) call(b)","result(a)","result(b)","assistant: a and b look fine"]""",
         """fork messages: ["user: read a and b","assistant: reading call(a) call(b)","result(a) error","result(b) error"]""",
         """after summary: summary ["user: Summary: a and b are fine."]""",
         """newest stored entries: ["summary","note","edit"] more: true""",
-        "== 10-registry-reload",
+        "== 09-registry-reload",
         """after reload: ["read: Read a file","grep: Search files, faster"]""",
         """with audit: ["read: Read a file (audited)","grep: Search files, faster"]""",
         """after uninstall: ["read: Read a file","grep: Search files, faster"]""",
-        "== 11-extension-state",
+        "== 10-extension-state",
         ExtensionStateTodos,
         ExtensionStateSystem,
-        "== 12-tasks",
+        "== 11-tasks",
         PaymentOutcome,
-        "== 13-recovery",
+        "== 12-recovery",
         "tick 1",
         "tick 2",
         """closed; saved checkpoint: {"status":"pending","checkpoint":{"phase":"tick","n":2}} memos: {"printed-1":true,"printed-2":true}""",
@@ -117,31 +162,31 @@ internal static partial class Program
         "tick 4",
         "tick 5",
         """after reopen: {"status":"completed","result":"counted to 5"}""",
-        "== 14-chat",
+        "== 13-chat",
         ChatAnswer,
         ChatTranscript,
-        "== 15-system-prompt",
+        "== 14-system-prompt",
         "root system prompt: [" + RootPrompt + "]",
         """subagent system prompt: [{"role":"system","content":"","sections":{"preamble":"You are a coding agent. Be terse.","cwd":"<cwd>\n/repo\n</cwd>","instructions":"<instructions>\nOnly read; never edit files.\n</instructions>"},"timestamp":<time>}]""",
         RootAfterCwdChange,
-        "== 16-real-model",
+        "== 15-real-model",
         // The tests run the examples with an environment that has no OPENAI_API_KEY.
         "skipped: OPENAI_API_KEY is not set",
-        "== 17-coding-tools",
+        "== 16-coding-tools",
         "cat /tmp/1gb.txt took <ms> ms",
         "status: done",
         .. CodingToolsTranscript,
         "answer: [{\"type\":\"text\",\"text\":\"The file now greets durable.\"}]",
         "file: \"hello durable\\n\"",
         CodingToolsStorage,
-        "== 18-print",
+        "== 17-print",
         PrintAnswer,
-        "== 19-json",
-        "mode: events",
-        .. JsonModeEvents,
+        "== 18-json",
         "mode: ops",
         .. JsonModeOps,
-        "== 20-inbox",
+        "mode: state",
+        .. JsonModeState,
+        "== 19-inbox",
         "rejected: Conversation 1 is busy",
         "withdraw: aborted",
         // Pi v1.2.0 (#10407): the data-only note is appended at once, not queued.
@@ -153,31 +198,22 @@ internal static partial class Program
         "note: done ",
         "withdrawn: unanswered aborted",
         InboxTranscript,
-        "== 21-late-join",
+        "== 20-late-join",
         // Upstream's util.inspect prints [ 'pi.user', 'pi.system', 'pi.assistant' ] and [ 'count running' ].
         """view entries: ["pi.user","pi.system","pi.assistant"]""",
         @"view tool slot: running ""1\n2\n3\n4\n5\n""",
-        @"view output now: ""1\n2\n3\n4\n5\n""",
-        """snapshot tools: ["count running"]""",
-        .. LateJoinOutput(6, "view output now: ", "event output now: "),
-        "event: tool_execution_end",
-        "event: message_start",
-        "event: message_end",
-        "event: turn_end",
-        "event: turn_start",
-        "event: message_start",
-        "event text delta: \"en, and this ans\"",
-        "event text delta: \"wer streams slow\"",
-        "event: message_end",
-        "event: turn_end",
-        "event: run_end",
-        "event: submission",
+        .. LateJoinOutput(6, "view output now: "),
+        // The answer's committed partials: Pi v1.2.0's event lines here streamed them as message_start ("Counted to t") and the text deltas
+        // "en, and this ans" and "wer streams slow".
+        "view answer now: \"Counted to t\"",
+        "view answer now: \"Counted to ten, and this ans\"",
+        "view answer now: \"Counted to ten, and this answer streams slow\"",
         LateJoinLastLine,
-        "== 22-subagent-foreground",
+        "== 21-subagent-foreground",
         "tool subagent({\"task\":\"Name three prime numbers.\"})",
         "  assistant: 2, 3, and 5.",
         SubagentAnswer,
-        "== 23-subagent-background",
+        "== 22-subagent-background",
         // Pi v1.2.0's 23-subagent-background.ts, unchanged since v1.1.0, still returns its tool replies as `content`, which v1.2.0 renamed to
         // `output`, so under v1.2.0 every reply is empty (Node prints "  → " and "OK. "). The C# tool returns them as Output, as the example
         // means and as v1.1.0 ran it (an intentional difference, decision 0005).
@@ -207,7 +243,7 @@ internal static partial class Program
         "OK. Sent to reader.",
         "> reader: Moby Dick.",
         "Noted.",
-        "== 24-child-tasks",
+        "== 23-child-tasks",
         "One card is declined:",
         "  payment visa-1 aborted, refunded",
         "  payment visa-3 aborted, refunded",
@@ -216,10 +252,10 @@ internal static partial class Program
         "  checkout: failed",
         "The customer cancels:",
         "  example.checkout 12: waiting on 13, 14, 15, 16",
-        "    example.payment 13: running",
-        "    example.payment 14: running",
-        "    example.payment 15: running",
-        "    example.payment 16: running",
+        "    example.payment 13: sleeping",
+        "    example.payment 14: sleeping",
+        "    example.payment 15: sleeping",
+        "    example.payment 16: sleeping",
         "  payment visa-5 aborted, refunded",
         "  payment visa-6 aborted, refunded",
         "  payment visa-7 aborted, refunded",
@@ -229,7 +265,7 @@ internal static partial class Program
         "The process stops while the payments run, and a new one continues:",
         "  payments: completed, completed, completed, completed",
         "  checkout: completed",
-        "== 25-compaction",
+        "== 24-compaction",
         "after \"Where should we stay?\" (answered): 2 messages in context, 2 entries stored",
         "  user      Where should we stay?",
         "  assistant A detailed answer to \"Where should we stay?\": details details details ",
@@ -246,19 +282,19 @@ internal static partial class Program
         "  assistant A detailed answer to \"Which day trips?\": details details details detai",
         "after \"Any museums?\" (answered): 7 messages in context, 10 entries stored",
         "  (threshold compaction summary first)",
+        "  system    (system prompt)",
         "  user      The conversation history before this point was compacted into the foll",
         "  assistant A detailed answer to \"What should we eat?\": details details details de",
         "  user      Which day trips?",
         "  assistant A detailed answer to \"Which day trips?\": details details details detai",
         "  user      Any museums?",
-        "  system    (system prompt)",
         "  assistant A detailed answer to \"Any museums?\": details details details details d",
         "after \"Nightlife?\" (answered): 5 messages in context, 14 entries stored",
         "  (threshold compaction summary first)",
+        "  system    (system prompt)",
         "  user      The conversation history before this point was compacted into the foll",
         "  assistant A detailed answer to \"Any museums?\": details details details details d",
         "  user      Nightlife?",
-        "  system    (system prompt)",
         "  assistant A detailed answer to \"Nightlife?\": details details details details det",
         "manual compaction finished; its summary is queued",
         "after the answer, the summary is done",
@@ -270,24 +306,24 @@ internal static partial class Program
         "  assistant A detailed answer to \"How do we get around?\": details details details ",
         "after \"What should we pack?\" (answered): 7 messages in context, 20 entries stored",
         "  (manual compaction summary first)",
+        "  system    (system prompt)",
         "  user      The conversation history before this point was compacted into the foll",
         "  assistant A detailed answer to \"Nightlife?\": details details details details det",
         "  user      How do we get around?",
         "  assistant A detailed answer to \"How do we get around?\": details details details ",
         "  user      What should we pack?",
-        "  system    (system prompt)",
         "  assistant A detailed answer to \"What should we pack?\": details details details d",
         "after \"Summarize the plan for my partner\" (model_error): 4 messages in context, 24 entries stored",
         "  (threshold compaction summary first)",
+        "  system    (system prompt)",
         "  user      The conversation history before this point was compacted into the foll",
         "  assistant A detailed answer to \"What should we pack?\": details details details d",
-        "  user      Summarize the plan for my partner",
         CompactionLastLine,
-        "== 26-coding-agent",
+        "== 25-coding-agent",
         // pwd prints the temporary workspace; both sides compare it as <workspace>.
         "bash ran in: <workspace>",
         CodingAgentLastLine,
-        "== 27-plan-mode",
+        "== 26-plan-mode",
         """tools: ["read","write","edit","bash"]""",
         """plan mode tools: ["read","submit_plan"]""",
         PlanSteps,
@@ -295,23 +331,83 @@ internal static partial class Program
         // Upstream's util.inspect prints `removed: undefined`; JSON drops the undefined field.
         """system: {"sections":{"plan_mode":"<plan_mode>\nYou are in plan mode. Read the code, then call submit_plan. Change nothing.\n</plan_mode>"},"added":["read","submit_plan"]}""",
         PlanModeLastLine,
-        "== 28-reviewer",
+        "== 27-reviewer",
         """reviewer: small ["coding-tools","reviewer"] ["read"] true""",
         .. ReviewerTranscript,
-        "== 29-sandbox-per-conversation",
+        "== 28-sandbox-per-conversation",
         "alice's sandbox: from alice",
         BobsSandbox,
-        "== 30-tool-override",
+        "== 29-tool-override",
         "plain conversation: venv:",
         PythonConversation,
         TimedBashCalls,
-        "== 31-reload-and-restart",
+        "== 30-reload-and-restart",
         "call running during the reload: v1",
         "next call: v2",
         "after restart, before install: []",
         // Upstream's util.inspect prints [ 'version' ].
         "after install: [\"version\"]",
+        // Pi v1.5.0 sync (area view): v1.5.0's 31-transcript.ts, authored (see the file header).
+        "== 31-transcript",
+        "attach                       [load earlier] 191..200",
+        "15 more, live                [load earlier] 191..215",
+        "load earlier                 [load earlier] 171..215",
+        "resume after 40 missed       [load earlier] 171..215 [load more] 246..255",
+        "fill gap                     [load earlier] 171..235 [load more] 246..255",
+        "fill gap                     [load earlier] 171..255",
+        "resume after 3 missed        window: 3 entries",
+        TranscriptLastLine,
+        // Pi v1.5.0 sync (area run-end): v1.5.0's 32-tests-after-edits.ts, authored (see the file header).
+        "== 32-tests-after-edits",
+        "answered: done",
+        "busy with after-run tasks: true",
+        "  [tests, attempt 1] add(1, 2): expected 3, got -1",
+        "  [tests, attempt 2] 1 passed",
+        "> Clean up math.ts.",
+        "agent: I cleaned up add.",
+        "tests: add(1, 2): expected 3, got -1",
+        "> Are the tests green now?",
+        "agent: Not yet: add subtracts. The fix is queued next.",
+        "> The tests failed: add(1, 2): expected 3, got -1. Fix it.",
+        "agent: Fixed: add adds now.",
+        TestsAfterEditsLastLine,
+        // Pi v1.5.0 sync (area live-turns): v1.5.0's 33-turn-limit-and-continue.ts, authored (see the file header).
+        "== 33-turn-limit-and-continue",
+        "first run: unanswered turn_limit (2 turns)",
+        "second continue while busy: ConversationBusy",
+        "first continue: unanswered turn_limit",
+        "second continue: done (runFailure cleared)",
+        "> Do the four steps.",
+        "  tool: step 1 done",
+        "  tool: step 2 done",
+        "  tool: step 3 done",
+        "  tool: step 4 done",
+        "agent: All four steps are done.",
+        TurnLimitLastLine,
+        // Pi v1.5.0 sync (area admission): v1.5.0's 34-submit-in-commit.ts, authored (see the file header).
+        "== 34-submit-in-commit",
+        "ana: the agent isn't working now",
+        "ana's message is submission 14",
+        "bob is muted",
+        "> Build the project.",
+        "> ana: Add a test for the build.",
+        "agent: Built, and I added the test Ana asked for.",
+        SubmitInCommitRecorded,
     ];
+
+    private const string TurnLimitTranscript =
+        """transcript: ["pi.user","pi.system","pi.assistant","pi.tool-result","pi.assistant","pi.tool-result","pi.assistant","pi.tool-result","pi.assistant","pi.tool-result","pi.assistant"]""";
+
+    private const string SubmitInCommitRecorded = """recorded: [{"from":"ana","text":"Add a test for the build."}]""";
+
+    private const string TestsAfterEditsLastLine = "tests: 1 passed";
+
+    private const string TestsAfterEditsTranscript =
+        """transcript: ["pi.user","pi.system","pi.assistant","pi.tool-result","pi.assistant","app.tests","pi.user","pi.assistant","pi.user","pi.assistant","pi.tool-result","pi.assistant","app.tests"]""";
+
+    private const string TurnLimitLastLine = "continue after the answer: unanswered nothing_to_answer";
+
+    private const string TranscriptLastLine = "                             [load earlier] 171..258";
 
     private const string HarnessResolved = """resolved: low ["files"] ["read"]""";
     private const string ConfigurationStored =
@@ -324,8 +420,9 @@ internal static partial class Program
     private const string CodingToolsStorage = "storage: <dir>";
     private const string SubagentAnswer = "assistant: The subagent says: 2, 3, and 5.";
     private const string InboxTranscript = """transcript: ["pi.user","app.note","pi.assistant","pi.user","pi.user","pi.assistant"]""";
-    // Repeated within 25-compaction's output; the read-back follows its last occurrence, the example's last line.
-    private const string CompactionLastLine = "  system    (system prompt)";
+    // 25-compaction's last line; the read-back follows it. Pi v1.5.0 sync (area harness-options): the system prompt that ended the example
+    // under Pi v1.2.0 now leads its context (#10904, see the header).
+    private const string CompactionLastLine = "  user      Summarize the plan for my partner";
     private const string BobsSandbox = "bob's sandbox: from bob";
     private const string PythonConversation = "python conversation: venv: <project>/.venv";
     private const string TimedBashCalls = "timed bash calls: 2";
@@ -334,22 +431,34 @@ internal static partial class Program
         [RepositoryRoot(), "tests", "PiSharp.Durable.Tests", "Fixtures", .. version is null ? Array.Empty<string>() : [version],
             $"examples-19-json-{mode}.upstream.jsonl"]));
 
-    /// <summary>The v1.2.0 events of 19 with a pending message_start carrying its final message (see the file header).</summary>
-    private static string[] JsonModeEventsLines(string[] v120)
+    /// <summary>
+    /// The state mode's lines of 19 (v1.5.0's 18-json.ts --state, area events), authored from the ops lines (see the file header): the first
+    /// view's entries and pi.live, then for each frame the view its ops rebuild, as the entries appended since the newest seen (left out
+    /// when none were) and its pi.live (left out when it has none, as JSON.stringify leaves out undefined).
+    /// </summary>
+    private static string[] JsonModeStateLines(string[] ops)
     {
-        var lines = v120.ToArray();
-        for (var index = 0; index < lines.Length; index++)
+        static JsonArrayValue EntriesOf(JsonObjectValue view) => (JsonArrayValue)view["entries"];
+        static long IdOf(JsonValue entry) => (long)((JsonNumberValue)((JsonObjectValue)entry)["id"]).Value;
+        static string Line(JsonValue? entries, JsonObjectValue view)
         {
-            using var start = System.Text.Json.JsonDocument.Parse(lines[index]);
-            if (start.RootElement.GetProperty("type").GetString() != "message_start" ||
-                !start.RootElement.GetProperty("message").TryGetProperty("stopReason", out var stopReason)) continue;
-            var end = lines.Skip(index + 1).First(line => line.StartsWith("{\"type\":\"message_end\",", StringComparison.Ordinal));
-            using var endDocument = System.Text.Json.JsonDocument.Parse(end);
-            var final = "{\"type\":\"message_start\",\"message\":" + endDocument.RootElement.GetProperty("entry").GetProperty("model")[0].GetRawText() + "}";
-            if (stopReason.GetString() == "pending") lines[index] = final;
-            else Equal(lines[index], final, "example 19 events: a completed message_start carries its message_end's message");
+            var properties = new List<KeyValuePair<string, JsonValue>>();
+            if (entries is not null) properties.Add(new("entries", entries));
+            if (((JsonObjectValue)view["docs"]).TryGetValue("pi.live", out var live)) properties.Add(new("live", live));
+            return JsonValue.Object(properties).ToJson();
         }
-        return lines;
+        var view = (JsonObjectValue)((JsonObjectValue)JsonValue.Parse(ops[0]))["view"];
+        var newest = EntriesOf(view) is { Count: > 0 } first ? IdOf(first[^1]) : 0;
+        var lines = new List<string> { Line(EntriesOf(view), view) };
+        foreach (var line in ops.Skip(1))
+        {
+            var frame = (JsonArrayValue)((JsonObjectValue)JsonValue.Parse(line))["ops"];
+            view = (JsonObjectValue)DeltaApply.Apply(view, frame.Select(Op.FromJson));
+            var appended = EntriesOf(view).Where(entry => IdOf(entry) > newest).ToList();
+            if (EntriesOf(view) is { Count: > 0 } entries) newest = IdOf(entries[^1]);
+            lines.Add(Line(appended.Count == 0 ? null : JsonValue.Array(appended), view));
+        }
+        return [.. lines];
     }
 
     /// <summary>The v1.2.0 ops of 19 without the progress commits of a partial streaming message (see the file header); what remains has as many
@@ -367,16 +476,16 @@ internal static partial class Program
         return lines;
     }
 
-    private const string LateJoinLastLine = "event: usage_changed";
+    // 21-late-join's last line: the view's entries once the run ended (v1.5.0's 20-late-join.ts, area events).
+    private const string LateJoinLastLine = """view entries: ["pi.user","pi.system","pi.assistant","pi.tool-result","pi.assistant"]""";
 
-    // The output lines 21-late-join prints once the client joined: each committed line, first from the view, then from the event stream.
-    private static IEnumerable<string> LateJoinOutput(int from, string view, string events)
+    // The output lines 21-late-join prints once the client joined: each committed line, from the view.
+    private static IEnumerable<string> LateJoinOutput(int from, string view)
     {
         for (var n = from; n <= 10; n++)
         {
             var text = string.Concat(Enumerable.Range(1, n).Select(line => line + @"\n"));
             yield return $"{view}\"{text}\"";
-            yield return $"{events}\"{text}\"";
         }
     }
 
@@ -414,8 +523,7 @@ internal static partial class Program
             "child conversation: {\"id\":4,\"owner\":{\"conversationId\":2,\"taskId\":3}}",
             "registry: {\"agents\":{\"researcher\":{\"conversationId\":4,\"requestId\":\"researcher:first-message:3\"}}}",
         ],
-        ["Chord notes: update 1 {\"text\":\"published through Chord\"}"] = ["Chord notes: hydrate 0 {\"text\":\"published through Chord\"}"],
-        ["watch update: {\"text\":\"observed asynchronously\"}"] = ["watch baseline: {\"text\":\"observed asynchronously\"}"],
+        ["listener calls: 2"] = ["watch baseline: {\"text\":\"observed asynchronously, folded!\"}"],
         [HarnessResolved] = ["root: 1 {\"text\":\"root notes\"}", "stored agent: {\"thinkingLevel\":\"low\"}"],
         // The last configure call selected exactly files and search, and cleared the tool selection.
         [ConfigurationReinstalled] =
@@ -436,11 +544,15 @@ internal static partial class Program
         [BobsSandbox] = ["alice's write: Successfully wrote to note.txt", "bob's write: Successfully wrote to note.txt"],
         [TimedBashCalls] = [PythonConversation],
         [PrintAnswer] = [PrintAnswer],
-        [JsonModeOps[^1]] = ["""transcript: ["pi.user","pi.system","pi.assistant","pi.tool-result","pi.assistant"]"""],
+        [JsonModeState[^1]] = ["""transcript: ["pi.user","pi.system","pi.assistant","pi.tool-result","pi.assistant"]"""],
         [LateJoinLastLine] = ["""transcript: ["pi.user","pi.system","pi.assistant","pi.tool-result","pi.assistant"]"""],
         [CodingAgentLastLine] = ["bash ran in: <workspace>", CodingAgentLastLine],
         [PlanModeLastLine] = [PlanSteps],
         [ReviewerTranscript[^1]] = ReviewerTranscript,
+        [TranscriptLastLine] = ["stored: 258 chat entries, the newest \"line 258\""],
+        [SubmitInCommitRecorded] = [SubmitInCommitRecorded],
+        [TurnLimitLastLine] = [TurnLimitTranscript],
+        [TestsAfterEditsLastLine] = [TestsAfterEditsTranscript],
     };
 
     private static IEnumerable<(string, Func<Task>)> ExamplesCases()

@@ -371,6 +371,12 @@ internal sealed class DraftEmitter(ChangeContext context)
             foreach (var (key, raw) in node.Writes)
             {
                 if (ops.Count > MaxDeltaOperations) return;
+                // A key only AppendText changed: its op is the text appended, with no comparison of the old and new strings.
+                if (node.Appends is not null && node.Appends.TryGetValue(key, out var appended))
+                {
+                    ops.Add(new AppendOp(path.Add(key), appended));
+                    continue;
+                }
                 var before = node.Readded?.ContainsKey(key) == true || !node.Base.TryGetValue(key, out var existing) ? null : existing;
                 EmitChanged(path.Add(key), before, node.SlotCurrent(key, raw));
             }
@@ -494,6 +500,8 @@ internal sealed class DraftEmitter(ChangeContext context)
             return false;
         if (before is JsonStringValue { Value: var previous } && after is JsonStringValue { Value: var next })
         {
+            // O(length): the prefix check reads the whole string on every change, even when the writer only appended. Streaming writers
+            // use DraftObject.AppendText, which skips it. The op text is a range, a string of its own.
             if (next.Length > previous.Length && next.StartsWith(previous, StringComparison.Ordinal))
             {
                 ops.Add(new AppendOp(path, next[previous.Length..]));

@@ -156,6 +156,8 @@ internal sealed partial class PiExtensionHost : IPiNodeHostPeer, IAsyncDisposabl
         }, token).ConfigureAwait(false);
         host.Modules = init is { ValueKind: JsonValueKind.Object } value && value.TryGetProperty("modules", out var modules) && modules.ValueKind == JsonValueKind.String
             ? modules.GetString()! : "compatibility";
+        // A Node host that starts after the mode configured the editor (the first TypeScript extension of a reload) gets the keybindings.
+        await host.ResendEditorConfigurationAsync(token).ConfigureAwait(false);
     }
 
     private PiNodeHost Node => _node ?? throw new InvalidOperationException("The Node extension host is not running.");
@@ -191,11 +193,11 @@ internal sealed partial class PiExtensionHost : IPiNodeHostPeer, IAsyncDisposabl
     /// at the end.</summary>
     internal void Reorder(IEnumerable<string> paths)
     {
-        var order = paths.Select(Path.GetFullPath).ToList();
+        var order = paths.Select(PiSourceInfo.ResourcePathKey).ToList();
         lock (_extensions)
         {
             _order = [.. order];
-            var ranked = _extensions.Select((extension, position) => (extension, rank: order.FindIndex(path => PiPaths.Comparer.Equals(path, extension.ResolvedPath)), position))
+            var ranked = _extensions.Select((extension, position) => (extension, rank: order.IndexOf(PiSourceInfo.ResourcePathKey(extension.ResolvedPath)), position))
                 .OrderBy(item => item.rank < 0 ? int.MaxValue : item.rank).ThenBy(item => item.position).Select(item => item.extension).ToList();
             _extensions.Clear(); _extensions.AddRange(ranked);
         }

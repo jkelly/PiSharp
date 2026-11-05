@@ -1,12 +1,12 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/src/core/skills.ts.
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/coding-agent/src/core/skills.ts.
 // Ported to plain ESM for the PiSharp Node extension bridge (TypeScript types stripped mechanically; behaviour unchanged).
 import { existsSync, readdirSync, readFileSync, statSync } from "fs";
 import ignore from "../../vendor/ignore.mjs";
 import { basename, dirname, join, relative, resolve, sep } from "path";
 import { CONFIG_DIR_NAME, getAgentDir } from "../config.mjs";
 import { parseFrontmatter } from "../utils/frontmatter.mjs";
-import { canonicalizePath, resolvePath } from "../utils/paths.mjs";
-import { createSyntheticSourceInfo } from "./source-info.mjs";
+import { isPathWithin, resolvePath } from "../utils/paths.mjs";
+import { createSyntheticSourceInfo, getResourcePathKey } from "./source-info.mjs";
 const MAX_NAME_LENGTH = 64;
 const MAX_DESCRIPTION_LENGTH = 1024;
 const IGNORE_FILE_NAMES = [
@@ -282,7 +282,7 @@ export function formatSkillsForPrompt(skills, fileReadTool = "read") {
     const lines = [
         "\n\nThe following skills provide specialized instructions for specific tasks.",
         fileReadTool === "read" ? "Use the read tool to load a skill's file when the task matches its description." : fileReadTool === "bash" ? "Use bash to load a skill's file when the task matches its description." : "Load a skill's file when the task matches its description.",
-        "When a skill file references a relative path, resolve it against the skill directory (parent of SKILL.md / dirname of the path) and use that absolute path in tool commands.",
+        "Resolve relative paths against the skill's directory (parent of SKILL.md). Use absolute paths in tool calls.",
         "",
         "<available_skills>"
     ];
@@ -310,7 +310,7 @@ export function loadSkills(options) {
     function addSkills(result) {
         allDiagnostics.push(...result.diagnostics);
         for (const skill of result.skills){
-            const realPath = canonicalizePath(skill.filePath);
+            const realPath = getResourcePathKey(skill.filePath);
             if (realPathSet.has(realPath)) {
                 continue;
             }
@@ -339,18 +339,10 @@ export function loadSkills(options) {
     }
     const userSkillsDir = join(resolvedAgentDir, "skills");
     const projectSkillsDir = resolve(resolvedCwd, CONFIG_DIR_NAME, "skills");
-    const isUnderPath = (target, root)=>{
-        const normalizedRoot = resolve(root);
-        if (target === normalizedRoot) {
-            return true;
-        }
-        const prefix = normalizedRoot.endsWith(sep) ? normalizedRoot : `${normalizedRoot}${sep}`;
-        return target.startsWith(prefix);
-    };
     const getSource = (resolvedPath)=>{
         if (!includeDefaults) {
-            if (isUnderPath(resolvedPath, userSkillsDir)) return "user";
-            if (isUnderPath(resolvedPath, projectSkillsDir)) return "project";
+            if (isPathWithin(userSkillsDir, resolvedPath)) return "user";
+            if (isPathWithin(projectSkillsDir, resolvedPath)) return "project";
         }
         return "path";
     };

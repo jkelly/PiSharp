@@ -2,6 +2,9 @@
 // an agent stream's snapshot, event batches, inbox and documents become a transcript; a session stream's frames become its agents, tasks and
 // usage; a hub's network frames become the device tree. They hold plain state and know nothing of rendering, so the web hub and a terminal
 // share them. PiSharp additions: nested tool calls (pi-durable 1.2.0 nestedTools and parentToolCallId) and compaction failures.
+// Pi v1.5.0 sync (area run-failure): why the newest run ended without an answer (pi-durable 1.5.0 pi.live.runFailure), from the
+// snapshot's runFailure and a run_end's failure; a run_start of a later batch clears it, one in the batch that recorded it (a continue
+// after a failure, or the run a reset's queued input starts) keeps it, as pi.live does. A batch is one commit's events.
 using System.Text.Json.Nodes;
 
 namespace PiSharp.Durable.Client;
@@ -14,6 +17,7 @@ public sealed class AgentModel
     private readonly Dictionary<string, LiveTool> nested = new(StringComparer.Ordinal);
     private JsonObject? live;
     private long order;
+    private bool failedInBatch;
 
     /// <summary>The transcript: the active context's entries, the live message, then running tools.</summary>
     public IReadOnlyList<TranscriptItem> Items { get; private set; } = [];
@@ -44,6 +48,9 @@ public sealed class AgentModel
 
     /// <summary>The newest compaction failure since a compaction last succeeded.</summary>
     public string? CompactionFailure { get; private set; }
+
+    /// <summary>Why the newest run ended without an answer (<c>pi.live.runFailure</c>), until a later run starts; null when it answered.</summary>
+    public RunFailureInfo? RunFailure { get; private set; }
 
     /// <summary>Recent task failures, newest last (at most 10).</summary>
     public IReadOnlyList<string> Notices { get; private set; } = [];
@@ -93,6 +100,7 @@ public sealed class AgentModel
                 Inbox = ReadInbox(frame["inbox"]);
                 break;
             case "batch":
+                failedInBatch = false;
                 if (frame["events"] is JsonArray events)
                     foreach (var item in events.OfType<JsonObject>()) Event(item);
                 break;
@@ -142,6 +150,7 @@ public sealed class AgentModel
             ? (Number(retry, "at"), Transcript.Str(retry, "error") ?? "") : null;
         Compactions = [.. Array(snapshot, "compactions").Select(compaction => Transcript.Id(compaction, "taskId"))];
         CompactionFailure = snapshot["compactionFailure"] is JsonObject failure ? Transcript.Str(failure, "error") ?? "Compaction failed." : null;
+        RunFailure = RunFailureInfo.Read(snapshot["runFailure"]);
         Ready = true;
     }
 
@@ -170,10 +179,17 @@ public sealed class AgentModel
                 return;
             case "run_start":
                 Running = true;
+                // A run started in the commit that recorded the failure keeps it.
+                if (!failedInBatch) RunFailure = null;
                 return;
             case "run_end":
                 Running = false;
                 live = null;
+                if (RunFailureInfo.Read(item["failure"]) is { } failed)
+                {
+                    RunFailure = failed;
+                    failedInBatch = true;
+                }
                 return;
             case "message_start":
                 if (item["message"] is JsonObject started && Transcript.Str(started, "role") == "assistant") live = (JsonObject)started.DeepClone();
@@ -363,6 +379,20 @@ public sealed record PendingCall(long TaskId, string CallId, string Tool, JsonOb
 {
     /// <summary>Whether it is a plan review.</summary>
     public bool IsPlan => Transcript.Str(Details, "kind") == "pisharp.plan-approval";
+}
+
+/// <summary>Why a run ended without an answer (pi-durable 1.5.0 <c>pi.live.runFailure</c>).</summary>
+/// <param name="Reason"><c>model_error</c>, <c>no_model</c>, <c>aborted</c>, <c>reset</c>, <c>faulted</c>, <c>orphaned</c>, <c>interrupted</c>,
+/// <c>restart_limit</c>, <c>nothing_to_answer</c> or <c>turn_limit</c>.</param>
+/// <param name="Detail">The error text, the missing model, the fault, the orphan reason, or what was cut off; null when there is none.</param>
+/// <param name="Inputs">The run's inputs, which settled <c>unanswered</c>.</param>
+public sealed record RunFailureInfo(string Reason, string? Detail, IReadOnlyList<long> Inputs)
+{
+    /// <summary>Reads a <c>runFailure</c> object; null for anything else.</summary>
+    public static RunFailureInfo? Read(JsonNode? node) => node is JsonObject failure && Transcript.Str(failure, "reason") is { } reason
+        ? new RunFailureInfo(reason, Transcript.Str(failure, "detail"),
+            failure["inputs"] is JsonArray inputs ? [.. inputs.OfType<JsonValue>().Select(id => id.TryGetValue<double>(out var value) ? (long)value : 0)] : [])
+        : null;
 }
 
 /// <summary>One session's agents, live tasks and usage, from its stream.</summary>

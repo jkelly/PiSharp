@@ -14,7 +14,8 @@ namespace PiSharp.Durable.Hosting;
 internal static class AppTools
 {
     /// <summary>Marks a tool call's transcript entry as written, so a rerun does not write it twice.</summary>
-    private static readonly TaskDocToken EntryReceipt = Documents.DefineTaskDoc("pisharp.entry-receipt", 1, () => JsonObjectValue.Empty);
+    private static readonly TaskDocToken EntryReceipt = Documents.DefineTaskDoc("pisharp.entry-receipt", 1, () => JsonObjectValue.Empty,
+        checkpointWhen: (_, _, _) => false);
 
     /// <summary>Marks the session a <c>start_session</c> call created.</summary>
     internal const string StateChangeEntry = "pisharp.state-change";

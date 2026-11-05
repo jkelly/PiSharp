@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/src/utils/output-files.ts (LocalProcessOutputStorage).
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/coding-agent/src/utils/output-files.ts (LocalProcessOutputStorage).
 using System.Collections.Immutable;
 using System.Threading.Channels;
 using PiSharp.Agent.Tools;
@@ -23,6 +23,9 @@ public sealed record ProcessRequest(string Executable, ImmutableArray<string> Ar
     /// <summary>Bytes written to the child's standard input before it is closed (source commandTransport "stdin"). Null
     /// gives the child an empty standard input.</summary>
     public byte[]? StandardInput { get; init; }
+    /// <summary>Separated runs only: stop the process once stdout and stderr together reach this many bytes, keeping the bytes
+    /// within it (source execCommand maxBuffer). Null leaves only the per-pipe structured bound.</summary>
+    [System.Diagnostics.CodeAnalysis.Experimental("PISHARP_EXEC001")] public long? CaptureLimitBytes { get; init; }
 }
 
 public sealed record ProcessRunnerOptions(int MaximumRawBytes = 64 * 1024 * 1024,
@@ -123,7 +126,8 @@ public sealed class NativeProcessRunner : ISeparatedProcessRunner
 
     public async ValueTask<SeparatedProcessRunResult> RunSeparatedAsync(ProcessRequest request, CancellationToken cancellationToken = default)
     {
-        using var capture = new SeparatedProcessCapture(_options.StructuredMaxBytes);
+        using var capture = request.CaptureLimitBytes is { } limit
+            ? new SeparatedProcessCapture(_options.StructuredMaxBytes, limit) : new SeparatedProcessCapture(_options.StructuredMaxBytes);
         var original = await RunCoreAsync(request, null, capture, cancellationToken).ConfigureAwait(false);
         return capture.Result(original);
     }
@@ -278,6 +282,8 @@ public sealed class NativeProcessRunner : ISeparatedProcessRunner
                     if (count == 0) break;
                     if (count != bytes.Length) Array.Resize(ref bytes, count);
                     capture?.Append(standardError, bytes);
+                    // A reached capture limit stops the process; the status still follows its actual exit.
+                    if (capture is { LimitReached: true }) stop.TrySetResult(ProcessRunStatus.Exited);
                     Interlocked.Exchange(ref lastActivity, _clock.GetTimestamp());
                     activity.Writer.TryWrite(0);
                     await chunks.Writer.WriteAsync(bytes, reads.Token).ConfigureAwait(false);

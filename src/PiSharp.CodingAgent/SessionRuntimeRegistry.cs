@@ -4,6 +4,7 @@ using PiSharp.AI;
 using PiSharp.Agent;
 using PiSharp.Contracts;
 using PiSharp.Sessions.Context;
+using PiSharp.Sessions.Serialization;
 using PiSharp.CodingAgent.ToolSelection;
 
 namespace PiSharp.CodingAgent;
@@ -45,6 +46,10 @@ public sealed record SessionRuntimeRegistryOptions(int MaximumModels = 128, int 
     public bool BindNestedCallsToSessionOwner { get; init; }
     public AllowedToolSelection? LifetimeToolSelection { get; init; }
     public ImmutableArray<string>? InitialActiveToolNames { get; init; }
+    /// <summary>sdk.ts usesDefaultTools: a session opened with <see cref="InitialActiveToolNames"/> restores its branch's loadout
+    /// instead (with the selection's <c>+name</c>/<c>-name</c> modifiers). Null follows <see cref="LifetimeToolSelection"/>, or
+    /// without one restores only when no initial names are given.</summary>
+    internal bool? UsesDefaultTools { get; init; }
     public Action<string, Exception>? ReportLoadoutDiagnostic { get; init; }
     /// <summary>Borrowed generation-bound drain of captured prepare diagnostics. Admitted reporter work must be directly joined.</summary>
     public Func<CancellationToken, ValueTask>? DrainLoadoutDiagnostics { get; init; }
@@ -171,6 +176,8 @@ public sealed partial class SessionRuntimeRegistry
 
     public AllowedToolSelection? LifetimeToolSelection => _options.LifetimeToolSelection;
     internal ImmutableArray<string>? InitialActiveToolNames => _options.InitialActiveToolNames;
+    /// <summary>Source _usesDefaultTools: whether opening a session restores its branch's loadout over the initial names.</summary>
+    internal bool UsesDefaultTools => _options.UsesDefaultTools ?? _options.LifetimeToolSelection?.UsesDefaultTools ?? _options.InitialActiveToolNames is null;
     internal SessionRuntimeRegistry RetainToolSelection(AllowedToolSelection? lifetime)
     {
         if (lifetime is null || ReferenceEquals(lifetime, LifetimeToolSelection)) return this;
@@ -242,6 +249,47 @@ public sealed partial class SessionRuntimeRegistry
                 selected.Add(name);
         }
         return selected.ToImmutable();
+    }
+
+    /// <summary>Source _applyToolLoadout (Pi 1.5.0): the active tools are a set. Tools that stay active keep their
+    /// <paramref name="current"/> order and newly active ones are appended in the requested order, so reordering the same names
+    /// changes neither the loadout nor the prompt.</summary>
+    internal static ImmutableArray<string> KeepOrder(ImmutableArray<string> current, ImmutableArray<string> requested)
+    {
+        var wanted = requested.ToHashSet(StringComparer.Ordinal);
+        return [.. current.Where(wanted.Contains).Concat(requested).Distinct(StringComparer.Ordinal)];
+    }
+
+    /// <summary>
+    /// Source _restoreToolsFromTranscript (Pi 1.5.0): the loadout every system message on the <paramref name="branch"/> records,
+    /// including those before a compaction (pi-ai getCurrentTools), plus registered extension tools the branch never added or
+    /// removed that activate on registration (registered after it recorded its loadout; built-in tools follow defaultTools
+    /// instead), with the selection's <c>+name</c>/<c>-name</c> modifiers when <paramref name="applyModifiers"/>, ordered after the
+    /// <paramref name="current"/> tools (_applyToolLoadout). Null when the branch records no loadout: the current tools stay.
+    /// </summary>
+    internal ImmutableArray<string>? RestoreBranchTools(ImmutableArray<SessionEntry> branch, ImmutableArray<string> current, bool applyModifiers,
+        CancellationToken cancellationToken)
+    {
+        var names = new List<string>(); var mentioned = new HashSet<string>(StringComparer.Ordinal); var recorded = false;
+        foreach (var entry in branch)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (entry.Kind != SessionEntryKind.Message) continue;
+            var message = entry.WireBody.Value.GetProperty("message");
+            if (message.GetProperty("role").GetString() != "system") continue;
+            recorded = true;
+            if (message.TryGetProperty("toolsRemoved", out var removed) && removed.ValueKind != JsonValueKind.Null)
+                foreach (var reference in Array(removed)) { var name = Name(reference); mentioned.Add(name); names.Remove(name); }
+            if (message.TryGetProperty("toolsAdded", out var added) && added.ValueKind != JsonValueKind.Null)
+                foreach (var declaration in Array(added)) { var name = Name(declaration); mentioned.Add(name); if (!names.Contains(name)) names.Add(name); }
+            if (names.Count > _options.MaximumDeclarations) throw Error(SessionRuntimeRegistryFailure.ResourceLimit);
+        }
+        if (!recorded) return null;
+        names.AddRange(_registeredTools.Where(tool => tool.IsExtension && ToolExposureSemantics.ActivatesOnRegistration(tool.Exposure, tool.DefaultActive))
+            .Select(tool => Name(tool.Declaration.Value)).Where(name => !mentioned.Contains(name)));
+        var restored = applyModifiers && _options.LifetimeToolSelection is { } lifetime
+            ? ToolNamePatterns.ApplyModifiers(names, lifetime.DefaultToolModifiers) : [.. names];
+        return KeepOrder(current, restored);
     }
 
     /// <summary>
@@ -363,10 +411,14 @@ public sealed partial class SessionRuntimeRegistry
     /// instead of rejected, and a recorded declaration that differs from its binding is replaced by the binding's. Left-out
     /// tools the lifetime selection allows stay pending (source _isAllowedTool). <see cref="SessionRestoredLoadout.RequiresRecord"/>
     /// tells the caller to record the restored loadout before use, so later transcript resolutions see only bound declarations.
+    /// Pi 1.5.0: the loadout is the branch's (<see cref="RestoreBranchTools"/>), restored at open over the initial names only when
+    /// the session uses the default tools (<see cref="UsesDefaultTools"/>, with the selection's modifiers), and at tree navigation
+    /// (<paramref name="currentTools"/>: the session's tools, whose order is kept) without modifiers. Explicit initial names
+    /// (--tools with plain names, --no-tools, --no-builtin-tools) replace it.
     /// </summary>
     internal SessionRestoredLoadout ResolveRestored(SessionContextProjection context, ModelDescriptor? fallbackModel,
         CancellationToken cancellationToken, ImmutableArray<string>? initialActiveToolNames = null, ModelDescriptor? selectedModel = null,
-        SessionContextModel? tolerated = null, string? thinkingLevel = null)
+        SessionContextModel? tolerated = null, string? thinkingLevel = null, ImmutableArray<string>? currentTools = null)
     {
         ArgumentNullException.ThrowIfNull(context);
         cancellationToken.ThrowIfCancellationRequested();
@@ -385,19 +437,28 @@ public sealed partial class SessionRuntimeRegistry
         var restore = new RestoreLog();
         // sdk.ts createAgentSession: the restored (or default) level is clamped to the model's capabilities, never refused.
         var level = ThinkingLevels.Clamp(catalog.Thinking[(model.Model.Provider, model.Model.Id)], thinkingLevel ?? context.ThinkingLevel);
+        var restored = initialActiveToolNames is null || UsesDefaultTools
+            ? RestoreBranchTools(context.Ancestry, currentTools ?? initialActiveToolNames ?? [], applyModifiers: currentTools is null, cancellationToken) : null;
         var selection = ResolveCatalog(catalog, model.Model, context.LlmMessages, level, cancellationToken,
-            initialActiveToolNames: initialActiveToolNames, restore: restore);
+            initialActiveToolNames: restored ?? initialActiveToolNames, restore: restore, restoring: restored is not null);
+        if (restored is { } names)
+        {
+            // _setActiveTools ignores names that are not registered (or hidden, or not activatable); allowed ones stay pending.
+            var active = selection.Configuration.Tools.Select(tool => tool.Name).ToImmutableArray();
+            return new(selection, [.. names.Where(name => !active.Contains(name, StringComparer.Ordinal) && _options.LifetimeToolSelection?.IsAllowed(name) != false)],
+                restore.Replaced || !active.SequenceEqual(restore.Recorded, StringComparer.Ordinal));
+        }
         // Source _isAllowedTool: names that --tools/--exclude-tools keep out of the catalog never become pending.
         return new(selection, [.. restore.Skipped.Where(name => _options.LifetimeToolSelection?.IsAllowed(name) != false)],
             restore.Skipped.Count != 0 || restore.Replaced);
     }
 
-    private sealed class RestoreLog { public readonly List<string> Skipped = []; public bool Replaced; }
+    private sealed class RestoreLog { public readonly List<string> Skipped = []; public bool Replaced; public ImmutableArray<string> Recorded = []; }
 
     private SessionRuntimeSelection ResolveCatalog(ModelCatalog catalog, ModelDescriptor model, ImmutableArray<TranscriptEntry> messages,
         string thinkingLevel = "off", CancellationToken cancellationToken = default, bool prepareLoadout = true,
         ToolLoadoutPresentation? preparedLoadout = null, ImmutableArray<string>? initialActiveToolNames = null, RestoreLog? restore = null,
-        ImmutableArray<string>? activeOrder = null)
+        ImmutableArray<string>? activeOrder = null, bool restoring = false)
     {
         cancellationToken.ThrowIfCancellationRequested();
         var binding = Model(model, catalog);
@@ -437,6 +498,7 @@ public sealed partial class SessionRuntimeRegistry
                     active[name] = JsonData.FromElement(declaration);
                 }
         }
+        if (restore is not null) restore.Recorded = [.. order];
         if (initialActiveToolNames is { } initial)
         {
             if (initial.IsDefault || initial.Length > _options.MaximumDeclarations) throw Error(SessionRuntimeRegistryFailure.ResourceLimit);
@@ -450,7 +512,9 @@ public sealed partial class SessionRuntimeRegistry
                 // Source constructor/_buildRuntime: initial names that are not registered are dropped by _applyToolLoadout,
                 // and they do not become pending (only restored and reloaded loadouts do).
                 if (_options.LifetimeToolSelection?.IsAllowed(name) == false || !_tools.TryGetValue(name, out var tool)) continue;
-                if (tool.Exposure is not (ToolExposure.Direct or ToolExposure.ModelOnly)) continue;
+                // A restored loadout (restoring) keeps any non-hidden tool that may be declared, as _applyToolLoadout does.
+                if (restoring ? tool.Exposure == ToolExposure.Hidden || _options.LifetimeToolSelection?.IsActivatable(name, tool.Exposure, _tools.ContainsKey("tool_search")) == false
+                    : tool.Exposure is not (ToolExposure.Direct or ToolExposure.ModelOnly)) continue;
                 // A recorded declaration that remains selected must match its binding, unless a restored loadout replaces it.
                 if (active.TryGetValue(name, out var recorded) && !SameDeclaration(recorded.Value, tool.Declaration.Value, cancellationToken))
                 {
@@ -525,8 +589,11 @@ public sealed partial class SessionRuntimeRegistry
             } };
         }
         cancellationToken.ThrowIfCancellationRequested();
+        // Source sdk.ts: every request carries getClientIdentity's identity, over the agent's default (CodingAgentClientIdentity).
+#pragma warning disable PISHARP_IDENTITY001
         return new(new AgentConfiguration(binding.Model, binding.Transport, definitions, binding.ToolHooks, binding.ExecutionMode, hooks)
-            { ThinkingLevel = thinkingLevel, ServiceTier = _options.ServiceTier },
+            { ThinkingLevel = thinkingLevel, ServiceTier = _options.ServiceTier, Identity = CodingAgentClientIdentity.Get() },
+#pragma warning restore PISHARP_IDENTITY001
             rawDeclarations.ToImmutable()) { LoadoutDiagnostics = loadoutDiagnostics, ModelCatalogRevision = catalog.Revision, Invoker = invoker };
 
         void Count()

@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/tui/src/components/editor.ts and packages/tui/src/editor-component.ts.
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/tui/src/components/editor.ts and packages/tui/src/editor-component.ts.
 using System.Globalization;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -57,6 +57,8 @@ public partial class Editor : IEditorComponent, IFocusable, IMouseHandler
     private List<string> triggerCharacters = ["@", "#"];
     private SelectList? autocompleteList;
     private string? autocompleteState;
+    /// <summary>The open autocomplete menu receives fullscreen viewport keys, such as PageUp/PageDown.</summary>
+    public bool CapturesViewportInput => autocompleteState is not null;
     private string autocompletePrefix = "";
     private int autocompleteMaxVisible = 5;
     private CancellationTokenSource? autocompleteAbort;
@@ -398,7 +400,8 @@ public partial class Editor : IEditorComponent, IFocusable, IMouseHandler
         if (autocompleteState is not null && autocompleteList is not null)
         {
             if (kb.Matches(data, "tui.select.cancel")) { CancelAutocomplete(); return; }
-            if (kb.Matches(data, "tui.select.up") || kb.Matches(data, "tui.select.down")) { autocompleteList.HandleInput(data); return; }
+            if (kb.Matches(data, "tui.select.up") || kb.Matches(data, "tui.select.down") || kb.Matches(data, "tui.select.pageUp") ||
+                kb.Matches(data, "tui.select.pageDown")) { autocompleteList.HandleInput(data); return; }
             if (kb.Matches(data, "tui.input.tab"))
             {
                 if (autocompleteList.GetSelectedItem() is { } selected && autocompleteProvider is not null)

@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/test/tools.test.ts, as tools.<group>.<case>, on LocalExecutionEnv
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/test/tools.test.ts, as tools.<group>.<case>, on LocalExecutionEnv
 // (upstream NodeExecutionEnv). Verbatim apart from these adaptations:
 // - The tools take validated JSON arguments and the api is FakeToolApi (ToolsSupport.cs), upstream's fakeApi, whose agent names no model
 //   (read then treats the model as one that sees images); jsdiff's applyPatch is ToolRunner.ApplyPatch. Upstream's renamed `streamed` (what

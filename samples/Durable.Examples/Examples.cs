@@ -1,13 +1,21 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/test/examples/00-conversation.ts through 05-watches.ts (06-harness.ts
-// through 13-recovery.ts are in ExamplesHarness.cs; 14-chat.ts and 15-system-prompt.ts are in ExamplesChat.cs; 16-real-model.ts, 18-print.ts,
-// 26-coding-agent.ts, 27-plan-mode.ts and 28-reviewer.ts are in ExamplesAgents.cs; 17-coding-tools.ts, 29-sandbox-per-conversation.ts and
-// 30-tool-override.ts are in ExamplesTools.cs; 19-json.ts is in ExamplesJson.cs; 20-inbox.ts is in ExamplesInbox.cs; 21-late-join.ts is in
-// ExamplesLateJoin.cs; 22-subagent-foreground.ts is in ExamplesSubagent.cs; 23-subagent-background.ts is in ExamplesBackground.cs;
-// 24-child-tasks.ts is in ExamplesChildTasks.cs; 25-compaction.ts is in ExamplesCompaction.cs; 31-reload-and-restart.ts is in
-// ExamplesReload.cs).
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/test/examples/00-conversation.ts through 04-watches.ts (05-harness.ts
+// through 12-recovery.ts are in ExamplesHarness.cs; 13-chat.ts and 14-system-prompt.ts are in ExamplesChat.cs; 15-real-model.ts, 17-print.ts,
+// 25-coding-agent.ts, 26-plan-mode.ts and 27-reviewer.ts are in ExamplesAgents.cs; 16-coding-tools.ts, 28-sandbox-per-conversation.ts and
+// 29-tool-override.ts are in ExamplesTools.cs; 18-json.ts is in ExamplesJson.cs; 19-inbox.ts is in ExamplesInbox.cs; 20-late-join.ts is in
+// ExamplesLateJoin.cs; 21-subagent-foreground.ts is in ExamplesSubagent.cs; 22-subagent-background.ts is in ExamplesBackground.cs;
+// 23-child-tasks.ts is in ExamplesChildTasks.cs; 24-compaction.ts is in ExamplesCompaction.cs; 30-reload-and-restart.ts is in
+// ExamplesReload.cs; 31-transcript.ts is in ExamplesTranscript.cs; 32-tests-after-edits.ts is in ExamplesTestsAfterEdits.cs;
+// 33-turn-limit-and-continue.ts is in ExamplesTurnLimitAndContinue.cs; 34-submit-in-commit.ts is in ExamplesSubmitInCommit.cs).
+// 35-durable-on-the-store.ts, 36-durable-views.ts and 37-harness-registry.ts run a Chord host (createHost, defineFacet), which phase 6 of
+// the v1.5.0 sync ports; they are not here yet.
 // Each example prints what upstream's console.log prints, as JSON. Upstream runs every example on a fresh MemoryStorage; here each one
 // can also run on its own JSONL directory or SQLite file, and then the storage is reopened in a new Session and read back (milestone M0
 // of decision 0005: the examples survive close and reopen).
+// Pi v1.5.0 sync (closeout, b9fb2b854): the examples carry v1.5.0's names. Upstream renumbered them when it deleted 04-chord-state (area
+// watches, 92ab53602: Session.documentState() is gone), so 05-watches became 04-watches and every later example moved down one; the
+// examples v1.5.0 added (31-transcript through 34-submit-in-commit) follow. A file's notes from earlier areas may name an example by its
+// v1.2.0 number. Area watch-folding (d8d99950a, 8b0caefc2 and 5f312dac4): 04-watches has a busy first call, three commits folded into the
+// second, and the ops printed with each update.
 using PiSharp.Durable.Chord;
 using PiSharp.Durable.Sqlite;
 using PiSharp.Durable.Storage;
@@ -26,7 +34,7 @@ public enum ExampleStorage
     Sqlite,
 }
 
-/// <summary>Upstream durable examples 00-31.</summary>
+/// <summary>Upstream durable examples 00-34 of Pi v1.5.0, by their v1.5.0 names (35-37 need the Chord host of phase 6).</summary>
 public static partial class Examples
 {
     // Every Session call takes a context, which is used for cancellation. Background means "never cancel".
@@ -36,7 +44,8 @@ public static partial class Examples
     // what the document looked like when a particular entry was written. AsOf: a fork starts with the value these notes had at the fork
     // entry (see 02-forks).
     private static readonly RewindableConversationDocToken Notes =
-        Documents.DefineRewindableConversationDoc("example.notes", 1, DocumentFork.AsOf, () => JsonValue.Object([new("text", "")]));
+        Documents.DefineRewindableConversationDoc("example.notes", 1, DocumentFork.AsOf, () => JsonValue.Object([new("text", "")]),
+            checkpointWhen: (_, _, _) => false);
 
     private delegate Task Example(Func<Task<IStorage>> open, TextWriter output);
 
@@ -46,34 +55,37 @@ public static partial class Examples
         ("01-documents", DocumentsAsync),
         ("02-forks", ForksAsync),
         ("03-owned-conversations", OwnedConversationsAsync),
-        ("04-chord-state", ChordStateAsync),
-        ("05-watches", WatchesAsync),
-        ("06-harness", HarnessAsync),
-        ("07-configuration", ConfigurationAsync),
-        ("08-harness-conversations", HarnessConversationsAsync),
-        ("09-context", ContextAsync),
-        ("10-registry-reload", RegistryReloadAsync),
-        ("11-extension-state", ExtensionStateAsync),
-        ("12-tasks", TasksAsync),
-        ("13-recovery", RecoveryAsync),
-        ("14-chat", ChatAsync),
-        ("15-system-prompt", SystemPromptAsync),
-        ("16-real-model", RealModelAsync),
-        ("17-coding-tools", CodingToolsAsync),
-        ("18-print", PrintAsync),
-        ("19-json", JsonModeAsync),
-        ("20-inbox", InboxAsync),
-        ("21-late-join", LateJoinAsync),
-        ("22-subagent-foreground", SubagentForegroundAsync),
-        ("23-subagent-background", SubagentBackgroundAsync),
-        ("24-child-tasks", ChildTasksAsync),
-        ("25-compaction", CompactionAsync),
-        ("26-coding-agent", CodingAgentAsync),
-        ("27-plan-mode", PlanModeAsync),
-        ("28-reviewer", ReviewerAsync),
-        ("29-sandbox-per-conversation", SandboxPerConversationAsync),
-        ("30-tool-override", ToolOverrideAsync),
-        ("31-reload-and-restart", ReloadAndRestartAsync),
+        ("04-watches", WatchesAsync),
+        ("05-harness", HarnessAsync),
+        ("06-configuration", ConfigurationAsync),
+        ("07-harness-conversations", HarnessConversationsAsync),
+        ("08-context", ContextAsync),
+        ("09-registry-reload", RegistryReloadAsync),
+        ("10-extension-state", ExtensionStateAsync),
+        ("11-tasks", TasksAsync),
+        ("12-recovery", RecoveryAsync),
+        ("13-chat", ChatAsync),
+        ("14-system-prompt", SystemPromptAsync),
+        ("15-real-model", RealModelAsync),
+        ("16-coding-tools", CodingToolsAsync),
+        ("17-print", PrintAsync),
+        ("18-json", JsonModeAsync),
+        ("19-inbox", InboxAsync),
+        ("20-late-join", LateJoinAsync),
+        ("21-subagent-foreground", SubagentForegroundAsync),
+        ("22-subagent-background", SubagentBackgroundAsync),
+        ("23-child-tasks", ChildTasksAsync),
+        ("24-compaction", CompactionAsync),
+        ("25-coding-agent", CodingAgentAsync),
+        ("26-plan-mode", PlanModeAsync),
+        ("27-reviewer", ReviewerAsync),
+        ("28-sandbox-per-conversation", SandboxPerConversationAsync),
+        ("29-tool-override", ToolOverrideAsync),
+        ("30-reload-and-restart", ReloadAndRestartAsync),
+        ("31-transcript", TranscriptExampleAsync),
+        ("32-tests-after-edits", TestsAfterEditsAsync),
+        ("33-turn-limit-and-continue", TurnLimitAndContinueAsync),
+        ("34-submit-in-commit", SubmitInCommitAsync),
     ];
 
     /// <summary>The example names, in order.</summary>
@@ -84,7 +96,7 @@ public static partial class Examples
     /// <param name="root">The directory file backends store each example under; required unless <paramref name="storage"/> is memory.</param>
     /// <param name="output">Where the examples print.</param>
     /// <param name="only">Example numbers (<c>00</c>) or names (<c>00-conversation</c>).</param>
-    /// <param name="environment">Reads environment variables (16-real-model's OPENAI_API_KEY); default the process environment.</param>
+    /// <param name="environment">Reads environment variables (15-real-model's OPENAI_API_KEY); default the process environment.</param>
     public static async Task RunAsync(ExampleStorage storage, string? root, TextWriter output, IReadOnlyCollection<string>? only = null,
         Func<string, string?>? environment = null)
     {
@@ -242,7 +254,7 @@ public static partial class Examples
         // Latest keeps only the current value. Initial means forks of this conversation start without a registry, so a child doesn't
         // inherit its parent's list of agents.
         var agentRegistry = Documents.DefineConversationDoc("example.agent-registry", 1, DocumentFork.Initial,
-            () => JsonValue.Object([new("agents", JsonValue.Object([]))]));
+            () => JsonValue.Object([new("agents", JsonValue.Object([]))]), checkpointWhen: (_, _, _) => false);
 
         var main = await session.CommitAsync(tx => tx.CreateConversationAsync(ConversationOwnership.Ownerless), Context);
 
@@ -280,37 +292,7 @@ public static partial class Examples
         });
     }
 
-    // 04: expose a document through Chord.
-    private static async Task ChordStateAsync(Func<Task<IStorage>> open, TextWriter output)
-    {
-        var session = Session.Create(await open());
-        var chat = await session.CommitAsync(async tx =>
-        {
-            var conversation = await tx.CreateConversationAsync(ConversationOwnership.Ownerless);
-            (await tx.DocAsync(Notes, conversation.Id)).Set("text", "first");
-            return conversation;
-        }, Context);
-
-        // DocumentStateAsync never creates a document. It returns a hydrated read-only Chord state bound to the current concrete
-        // incarnation.
-        var notesState = await session.DocumentStateAsync(Notes, chat.Id, Context) ?? throw new InvalidOperationException("notes are absent");
-        var stopNotes = notesState.Subscribe((value, _, delivery) =>
-            output.WriteLine($"Chord notes: {delivery.Kind.ToString().ToLowerInvariant()} {delivery.Sequence} {Json(value)}"));
-        await session.CommitAsync(async tx => (await tx.DocAsync(Notes, chat.Id)).Set("text", "published through Chord"), Context);
-        stopNotes.Dispose();
-        notesState.Dispose();
-
-        await session.CloseAsync(Context);
-        await ReopenAsync(open, output, async reopened =>
-        {
-            var state = await reopened.DocumentStateAsync(Notes, chat.Id, Context) ?? throw new InvalidOperationException("notes are absent");
-            using (state.Subscribe((value, _, delivery) =>
-                output.WriteLine($"Chord notes: {delivery.Kind.ToString().ToLowerInvariant()} {delivery.Sequence} {Json(value)}"))) { }
-            state.Dispose();
-        });
-    }
-
-    // 05: serialize asynchronous document work with a watch.
+    // 04: serialize asynchronous document work with a watch.
     private static async Task WatchesAsync(Func<Task<IStorage>> open, TextWriter output)
     {
         var session = Session.Create(await open());
@@ -321,18 +303,37 @@ public static partial class Examples
             return conversation;
         }, Context);
 
-        // A watch starts from one stable acquisition revision. Slow callbacks never overlap; exact committed frames buffer, with a
-        // full-value reset after 100.
+        // A watch starts from one stable acquisition revision. Callbacks never overlap: commits made while one runs arrive folded into the
+        // next call, which gets the newest value and ops that turn the previously delivered value into it (one full-value replacement
+        // [["r", value]] once more than 10,000 ops pile up).
         var notesWatch = await session.WatchDocAsync(Notes, chat.Id, Context) ?? throw new InvalidOperationException("notes are absent");
         await output.WriteLineAsync("watch baseline: " + Json(notesWatch.Value));
-        var delivered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        notesWatch.Start(async (value, _, _) =>
+        var busy = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var done = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var calls = 0;
+        notesWatch.Start(async (call, _) =>
         {
-            await output.WriteLineAsync("watch update: " + Json(value));
-            delivered.TrySetResult();
+            // Calls are tagged: a failed call is a failure a source recovers from, which Durable never sends (its failures end the watch,
+            // see Closed).
+            if (call is not WatchValueCall<JsonObjectValue> change) return;
+            var ops = JsonValue.Array(change.Ops.Select(op => (JsonValue)op.ToJson()));
+            await output.WriteLineAsync("watch update: " + Json(change.Value) + " " + Json(ops));
+            // The first call stays busy, as a slow consumer would, while three more commits land.
+            if (Interlocked.Increment(ref calls) == 1) await busy.Task;
+            else done.TrySetResult();
         });
-        await session.CommitAsync(async tx => (await tx.DocAsync(Notes, chat.Id)).Set("text", "observed asynchronously"), Context);
-        await delivered.Task;
+        await session.CommitAsync(async tx => (await tx.DocAsync(Notes, chat.Id)).Set("text", "observed"), Context);
+        foreach (var more in new[] { " asynchronously", ", folded", "!" })
+        {
+            await session.CommitAsync(async tx =>
+            {
+                var notes = await tx.DocAsync(Notes, chat.Id);
+                notes.Set("text", ((JsonStringValue)notes.Get("text")!).Value + more);
+            }, Context);
+        }
+        busy.TrySetResult();
+        await done.Task;
+        await output.WriteLineAsync("listener calls: " + Volatile.Read(ref calls));
         await notesWatch.StopAsync();
 
         await session.CloseAsync(Context);

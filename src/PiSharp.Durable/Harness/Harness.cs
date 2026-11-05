@@ -1,10 +1,53 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/src/harness/harness.ts. The Harness extends the Session kernel, as
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/src/harness/harness.ts. The Harness extends the Session kernel, as
 // upstream's HarnessImpl extends SessionImpl. Every component reads and writes through the Session's Storage guard; safeReport, safeNow,
-// documentRetentionMs, report, assertUsable and the open failure's close are v1.2.0's. Upstream's SCHEDULER_INDEX_SIZES symbol getter, for
-// tests, is the internal SchedulerIndexSizes property (the test project sees internals).
+// documentRetentionMs, report, assertUsable and the open failure's close are v1.2.0's, as the later areas below changed them. Upstream's
+// SCHEDULER_INDEX_SIZES and SCHEDULER_IDLE_STATE symbol getters, for tests, are the internal SchedulerIndexSizes and SchedulerIdleState
+// properties (the test project sees internals).
+//
+// Pi v1.5.0 sync (area harness-options): HarnessOptions.CurrentModels and CurrentSettings, upstream's function forms of models and
+// settings, read at each use (7ec1f648e; currentModels and currentSettings), and HarnessOptions.ReadOnly (be14d9732). The calls that
+// resume the scheduler are async, so a read-only Harness's ReadOnlySessionException faults their task, as upstream made them async.
+// Pi v1.5.0 sync (area model-requests): HarnessOptions.Identity over DEFAULT_HARNESS_IDENTITY, applied by currentModels through
+// withClientIdentity (adc5fa9f8, 04a93bad8). Upstream's default attributes requests to pi (PI_ATTRIBUTION); PiSharp's is empty and adds no
+// attribution, as PiSharp.Agent's DefaultIdentity: the owner chose no attribution (decision 0013, core.client-identity-attribution).
+// Pi v1.5.0 sync (area sleep): HarnessOptions.SetTimer reaches the Session (document sweeps) and the scheduler as hostTimers, each over
+// the default timers of HarnessOptions.TimeProvider; wake() and HarnessOptions.OnWake (f75b3240a, ec1be23eb).
+// Pi v1.5.0 sync (area reports): OnReport takes one Report, an error with its ReportInfo (a30c2a81d). safeReport passes the info on (its
+// pi.durable.reports counter and event are area telemetry's), safeNow reports host_error now, and the scheduler's timers host_error
+// setTimer; an agent resolution names the conversation and the extension whose wrapper failed. The task graph reads blocked reasons from
+// the scheduler (440a5fcdb). One safeNow serves the Session and the Harness, as upstream's one `now` does, so a broken clock reports once.
+// Pi v1.5.0 sync (area telemetry, 2ec55d808): HarnessOptions.Telemetry reaches the scheduler (phase spans, durations, active tasks) and
+// submissions (submit spans); without it every span is a no-op. safeReport counts each report in pi.durable.reports by type and records
+// pi.durable.report on the reporting context's span with its fixed attributes (type, reason, extension, task.id), never the error; both are
+// contained, as the report is the last place an error goes. Reports carry the context of what raised them (ReportSink).
+// Pi v1.5.0 sync (area watches, 92ab53602): the state getters Conversation.viewState() and Harness.taskGraph() are removed; their watches
+// stay (Conversation.watch(), Harness.watchTaskGraph()).
+// Pi v1.5.0 sync (area deferred-commits, 6c2fd73b0): Conversation.commit() takes CommitOptions, and the Session reads
+// settings.progress.persistWithinMs at each use, as the default window of a deferred commit.
+// Pi v1.5.0 sync (area observers, 8b0caefc2): Harness.observeConversation() and observeTaskGraph() check the Harness is usable, then
+// attach through the view and graph mounts (ConversationViews.ObserveAsync, TaskGraphView.ObserveAsync); a refusal faults the task.
+// Pi v1.5.0 sync (area view, f3255de76): Conversation.watch() and Harness.observeConversation() pass their ConversationWindow on.
+// Pi v1.5.0 sync (area restarts, b3a29f111): the scheduler learns which built-in kinds end themselves at settings.restartLimit
+// (Live.LimitsRestarts), and its join writes at close through Session.WriteAtCloseAsync; safeReport records task_interrupted's reason,
+// extension and task ID, as task_faulted's.
+// Pi v1.5.0 sync (area admission, cc9c52310): Conversation.submit(tx, draft) and ConversationHandle.submit(tx, draft) admit inside the
+// caller's commit (Submissions.AdmitAsync), as C# overloads of SubmitAsync; the handle's form checks the invocation's abort itself, as the
+// caller's commit carries its own context. Upstream's runtime test of the first argument is overload resolution here.
+// Pi v1.5.0 sync (area run-end, 65fba65b2): Conversation.entries() builds its scan with HarnessUtil.ConversationEntries, shared with
+// TaskRuntime.entries().
+// Pi v1.5.0 sync (area group-commit-scheduler, e5c6182ba): the Harness's line jobs overlap storage like a plain Session's (the serialized
+// line a Harness kept, LineWaitsForPublication, is gone): every read on the line goes through the line's Storage (ReadOnLineAsync's
+// IStorage argument, upstream readOnLine((storage) => ...)), which waits for what an unpublished commit wrote, and a commit's task and
+// conversation changes write their ownership memberships from the scheduler's indexes (MembershipKeysAsync, upstream membershipKeys).
+// Submissions, the conversation views and the task graph read through it too, so they no longer take the guarded Storage.
+// Pi v1.5.0 sync (area scheduler-idle, 35dfa7573): SchedulerIdleState, upstream's SCHEDULER_IDLE_STATE getter. With it the file matches
+// harness.ts at v1.5.0 as a whole, apart from the decided empty DefaultIdentity (area model-requests, above). harness.ts has no
+// registryReader part; registry-reader.ts is its own file.
 using System.Collections.Immutable;
+using PiSharp.AI;
 using PiSharp.Durable.Chord;
 using PiSharp.Durable.Env;
+using PiSharp.Telemetry;
 
 namespace PiSharp.Durable;
 
@@ -12,14 +55,27 @@ namespace PiSharp.Durable;
 public static class Harness
 {
     /// <summary>
+    /// The request identity under every Harness's <see cref="HarnessOptions.Identity"/> (upstream <c>DEFAULT_HARNESS_IDENTITY</c>).
+    /// Upstream's attributes requests to Pi (<c>{ attribution: PI_ATTRIBUTION }</c>); PiSharp's is empty, so the Harness adds no attribution
+    /// and requests keep PiSharp.AI's defaults (the default attribution is the owner's decision, core.client-identity-attribution).
+    /// </summary>
+    public static ClientIdentity DefaultIdentity { get; } = new();
+
+    /// <summary>
     /// Opens a Harness over <paramref name="storage"/>: surviving <c>running</c> tasks become <c>pending</c>, and nothing runs until
-    /// <see cref="IHarness.Resume"/> or a call that asks for progress. The registry may keep changing while the Harness runs.
+    /// <see cref="IHarness.Resume"/> or a call that asks for progress. The registry may keep changing while the Harness runs. A read-only
+    /// Harness (<see cref="HarnessOptions.ReadOnly"/>) recovers nothing and writes nothing.
     /// </summary>
     public static async Task<IHarness> OpenAsync(IStorage storage, HarnessOptions options, DurableContext context)
     {
         ArgumentNullException.ThrowIfNull(storage);
         ArgumentNullException.ThrowIfNull(options);
         ArgumentNullException.ThrowIfNull(context);
+        if (options.Models is null == options.CurrentModels is null)
+            throw new ArgumentException(options.Models is null ? "HarnessOptions needs Models or CurrentModels" : "HarnessOptions takes Models or CurrentModels, not both",
+                nameof(options));
+        if (options.Settings is not null && options.CurrentSettings is not null)
+            throw new ArgumentException("HarnessOptions takes Settings or CurrentSettings, not both", nameof(options));
         context.ThrowIfCancellationRequested();
         var snapshot = options.Registry.Snapshot();
         var missing = Registry.BuiltinTasks.Where(task => snapshot.GetTask(task.Definition.Name) is null).ToList();
@@ -51,6 +107,10 @@ public static class Harness
     }
 }
 
+/// <summary>Where the Harness's components send an error with what it is about and, when there is one, the context of the operation it came
+/// from, whose span records it (upstream <c>report(error, info, context?)</c>).</summary>
+internal delegate void ReportSink(Exception error, ReportInfo info, DurableContext? context = null);
+
 /// <summary>The Session kernel extended with conversation handles, a registry and the task scheduler (upstream <c>HarnessImpl</c>).</summary>
 internal sealed class DurableHarness : Session, IHarness
 {
@@ -58,51 +118,66 @@ internal sealed class DurableHarness : Session, IHarness
 
     private readonly IStorage storage;
     private readonly HarnessOptions options;
-    private readonly Action<Exception> report;
+    private readonly Func<HarnessSettings?> hostSettings;
+    private readonly ReportSink report;
     private readonly DurableTaskScheduler scheduler;
     private readonly Submissions submissions;
     private readonly ConversationViews views;
     private readonly TaskGraphView taskGraph;
 
     public DurableHarness(IStorage rawStorage, HarnessOptions options, DurableContext context)
-        : this(rawStorage, options, context, SafeReport(options.OnReport))
+        : this(rawStorage, options, context, SafeReport(options.OnReport, options.Telemetry), CurrentSettings(options))
     {
     }
 
-    private DurableHarness(IStorage rawStorage, HarnessOptions options, DurableContext context, Action<Exception> report)
-        // Read at each use, as all settings are, but only this field: it is read on every commit.
-        : base(rawStorage, SafeNow(Clock(options), options.Now is not null, report), () => options.Settings?.DocumentRetentionMs)
+    private DurableHarness(IStorage rawStorage, HarnessOptions options, DurableContext context, ReportSink report,
+        Func<HarnessSettings?> hostSettings)
+        : this(rawStorage, options, context, report, hostSettings, SafeNow(Clock(options), options.Now is not null, (error, info) => report(error, info)))
+    {
+    }
+
+    private DurableHarness(IStorage rawStorage, HarnessOptions options, DurableContext context, ReportSink report,
+        Func<HarnessSettings?> hostSettings, Func<double> now)
+        // Read at each use, as all settings are, but only these fields: they are read on every commit.
+        : base(rawStorage, now, () => hostSettings()?.DocumentRetentionMs, options.ReadOnly, options.SetTimer, options.TimeProvider,
+            () => hostSettings()?.Progress?.PersistWithinMs)
     {
         // Every component reads and writes through the Session's failure guard: rawStorage serves only the base constructor.
         var storage = GuardedStorage;
         this.storage = storage;
         this.options = options;
+        this.hostSettings = hostSettings;
         this.report = report;
-        Now = SafeNow(Clock(options), options.Now is not null, report);
+        Now = now;
         scheduler = new DurableTaskScheduler(new DurableTaskSchedulerOptions
         {
             Session = this,
             Storage = storage,
             Registry = options.Registry,
-            Models = options.Models,
+            Models = CurrentModels(options),
             Agent = (id, snapshot, callContext) => ResolveAgentAsync(id, snapshot, callContext),
-            Settings = () => Agents.ResolveSettings(options.Settings),
+            Settings = () => Agents.ResolveSettings(hostSettings()),
             Env = BuildEnvAsync,
             Now = Now,
-            TimeProvider = options.TimeProvider ?? TimeProvider.System,
+            OnWake = options.OnWake,
+            Timers = new HostTimers(options.SetTimer, NativeTimer.Of(options.TimeProvider ?? TimeProvider.System),
+                error => report(error, ReportInfo.HostError(HostCallback.SetTimer))),
             Report = report,
+            Telemetry = options.Telemetry,
             SettleOutcome = (tx, record, outcome) => Live.SettleSchedulerOutcomeAsync(tx, record, outcome),
             WithdrawInputs = (tx, id) => Inbox.WithdrawQueuedInputsAsync(tx, id),
             Conversation = async (id, binding, callContext) =>
             {
-                var record = await ReadOnLineAsync(() => storage.GetConversationAsync(id, callContext)).ConfigureAwait(false);
+                var record = await ReadOnLineAsync(line => line.GetConversationAsync(id, callContext)).ConfigureAwait(false);
                 return record is null ? null : new BoundConversation(id, binding, scheduler!, submissions!);
             },
             Context = context.WithoutCancellation(),
+            ReadOnly = options.ReadOnly,
+            LimitsRestarts = Live.LimitsRestarts.Contains,
         });
-        submissions = new Submissions(this, storage, Now, () => Agents.ResolveSettings(options.Settings), () => scheduler.Resume());
-        views = new ConversationViews(this, storage);
-        taskGraph = new TaskGraphView(this, storage);
+        submissions = new Submissions(this, Now, () => Agents.ResolveSettings(hostSettings()), () => scheduler.Resume(), options.Telemetry);
+        views = new ConversationViews(this);
+        taskGraph = new TaskGraphView(this, scheduler.BlockedReasonOf, scheduler.SubscribeBlocked);
     }
 
     /// <summary>The Harness clock.</summary>
@@ -115,10 +190,34 @@ internal sealed class DurableHarness : Session, IHarness
     /// <summary>Internal, for tests: sizes of the scheduler's ownership indexes (upstream <c>[SCHEDULER_INDEX_SIZES]</c>).</summary>
     internal SchedulerIndexSizes SchedulerIndexSizes => scheduler.IndexSizes;
 
+    /// <summary>Internal, for tests: the kept contexts' idle state and its disagreements with a full recompute (upstream
+    /// <c>[SCHEDULER_IDLE_STATE]</c>).</summary>
+    internal SchedulerIdleState SchedulerIdleState => scheduler.IdleState;
+
     internal Submissions Submissions => submissions;
 
     /// <summary>The conversation view mounts (upstream <c>host.views</c>).</summary>
     internal ConversationViews Views => views;
+
+    /// <summary><c>HarnessOptions.Models</c> as a function with <see cref="HarnessOptions.Identity"/> applied (upstream <c>currentModels</c>):
+    /// plain models are wrapped once, so every call returns the same view; a function's result is wrapped at each call.</summary>
+    private static Func<IDurableModels> CurrentModels(HarnessOptions options)
+    {
+        var merged = ClientIdentities.Merge(Harness.DefaultIdentity, options.Identity) ?? Harness.DefaultIdentity;
+        if (options.CurrentModels is { } current) return () => DurableModelIdentity.WithClientIdentity(current(), merged);
+        var models = options.Models ?? throw new ArgumentException("HarnessOptions needs Models or CurrentModels", nameof(options));
+        var wrapped = DurableModelIdentity.WithClientIdentity(models, merged);
+        return () => wrapped;
+    }
+
+    /// <summary><c>HarnessOptions.Settings</c> as a function (upstream <c>currentSettings</c>): plain settings, or none, are returned at every
+    /// call.</summary>
+    private static Func<HarnessSettings?> CurrentSettings(HarnessOptions options)
+    {
+        if (options.CurrentSettings is { } current) return current;
+        var settings = options.Settings;
+        return () => settings;
+    }
 
     private static Func<double> Clock(HarnessOptions options)
     {
@@ -128,15 +227,35 @@ internal sealed class DurableHarness : Session, IHarness
     }
 
     /// <summary><c>OnReport</c> that cannot fail (upstream <c>safeReport</c>): it is the last place an error goes, so its own throw is
-    /// dropped.</summary>
-    internal static Action<Exception> SafeReport(Action<Exception>? onReport) => error => Contained(() => onReport?.Invoke(error), _ => { });
+    /// dropped. It hears one <see cref="Durable.Report"/>, the error with what it is about. Each report then counts in
+    /// <c>pi.durable.reports</c> by type and, with a context, is a <c>pi.durable.report</c> event on its span, with the report's fixed
+    /// attributes and never the error; a throwing telemetry adapter is dropped too.</summary>
+    internal static ReportSink SafeReport(Action<Report>? onReport, ITelemetryContext? telemetry = null)
+    {
+        var reports = TelemetrySchema.CreateTypedMetrics((telemetry ?? NoopTelemetry.Context).Metrics ?? NoopTelemetry.Metrics,
+            DurableTelemetry.Schema).Counter("pi.durable.reports");
+        return (error, info, context) =>
+        {
+            if (onReport is not null) Contained(() => onReport(new Report(info, error)), _ => { });
+            var attributes = DurableTelemetry.ReportAttributes(info);
+            try
+            {
+                reports.Add(1, new SpanAttributes { ["type"] = ReportInfo.KindName(info.Kind) });
+                context?.Telemetry.AddEvent("pi.durable.report", attributes);
+            }
+            catch (Exception)
+            {
+                // Dropped: see above.
+            }
+        };
+    }
 
     /// <summary>
     /// The host clock, falling back to the system clock when it throws (upstream <c>safeNow</c>): a broken clock must not stop commits. The
     /// first throw is reported; the clock is read in every task change, so later ones are not. <paramref name="host"/> is false for the
     /// Harness's own TimeProvider clock, which needs no guard.
     /// </summary>
-    internal static Func<double> SafeNow(Func<double> now, bool host, Action<Exception> report)
+    internal static Func<double> SafeNow(Func<double> now, bool host, Action<Exception, ReportInfo> report)
     {
         if (!host) return now;
         var reported = 0;
@@ -149,14 +268,15 @@ internal sealed class DurableHarness : Session, IHarness
             catch (Exception error)
             {
                 // Set first: a report handler that reads the clock again must not report again.
-                if (Interlocked.Exchange(ref reported, 1) == 0) report(error);
+                if (Interlocked.Exchange(ref reported, 1) == 0) report(error, ReportInfo.HostError(HostCallback.Now));
                 return DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
             }
         };
     }
 
-    /// <summary>The Session's failure and listener errors go to <c>OnReport</c>.</summary>
-    internal override void Report(Exception error) => report(error);
+    /// <summary>The Session's failure and listener errors go to <c>OnReport</c>, with what they are about and the context they came
+    /// from.</summary>
+    internal override void Report(Exception error, ReportInfo info, DurableContext? context = null) => report(error, info, context);
 
     /// <summary>Resolves a conversation's committed <c>pi.agent</c> against <paramref name="snapshot"/>, or the current one, and the current
     /// settings.</summary>
@@ -164,7 +284,8 @@ internal sealed class DurableHarness : Session, IHarness
     {
         var registry = snapshot ?? options.Registry.Snapshot();
         var state = await SnapshotAsync(Agents.AgentDoc, id, context).ConfigureAwait(false);
-        return Agents.ResolveAgent(state, registry, Agents.ResolveSettings(options.Settings), report);
+        return Agents.ResolveAgent(state, registry, Agents.ResolveSettings(hostSettings()),
+            (error, extension) => report(error, new ReportInfo(ReportKind.ExtensionError) { ConversationId = id, Extension = extension }, context));
     }
 
     /// <summary>Builds a conversation's environment from its current <c>cwd</c>; null without an <c>Env</c> option.</summary>
@@ -185,13 +306,19 @@ internal sealed class DurableHarness : Session, IHarness
         scheduler.Resume();
     }
 
-    public Task<TaskRecord?> GetTaskAsync(TaskId id, DurableContext context) => ReadOnLineAsync(() => storage.GetTaskAsync(id, context));
+    public Wake Wake()
+    {
+        AssertUsable();
+        return scheduler.Wake();
+    }
 
-    public Task<HarnessInspection> InspectAsync(DurableContext context) => ReadOnLineAsync(async () =>
+    public Task<TaskRecord?> GetTaskAsync(TaskId id, DurableContext context) => ReadOnLineAsync(line => line.GetTaskAsync(id, context));
+
+    public Task<HarnessInspection> InspectAsync(DurableContext context) => ReadOnLineAsync(async line =>
     {
         var (scheduling, tasks) = await scheduler.InspectAsync(options.Registry.Snapshot()).ConfigureAwait(false);
         Task<List<SubmissionRecord>> Scan(SubmissionStatus status) => HarnessUtil.ScanAll(cursor =>
-            storage.ScanSubmissionsAsync(new SubmissionQuery { Status = status }, ScanPageSize, cursor, context));
+            line.ScanSubmissionsAsync(new SubmissionQuery { Status = status }, ScanPageSize, cursor, context));
         var submissions = (await Scan(SubmissionStatus.Queued).ConfigureAwait(false))
             .Concat(await Scan(SubmissionStatus.Placed).ConfigureAwait(false))
             .OrderBy(submission => submission.Id.Value).ToImmutableArray();
@@ -205,23 +332,23 @@ internal sealed class DurableHarness : Session, IHarness
 
     public Task<TaskAbortResult> AbortTaskAsync(TaskId id, DurableContext context) => scheduler.AbortAsync(id, context);
 
-    public Task<TaskRecord> WaitForTaskAsync(TaskId id, DurableContext context)
+    public async Task<TaskRecord> WaitForTaskAsync(TaskId id, DurableContext context)
     {
         scheduler.Resume();
-        return scheduler.WaitForTaskAsync(id, context);
+        return await scheduler.WaitForTaskAsync(id, context).ConfigureAwait(false);
     }
 
-    public Task WaitForIdleAsync(DurableContext context)
+    public async Task WaitForIdleAsync(DurableContext context)
     {
         scheduler.Resume();
-        return scheduler.WaitForIdleAsync(null, context);
+        await scheduler.WaitForIdleAsync(null, context).ConfigureAwait(false);
     }
 
     /// <summary>Sums every conversation's committed <c>pi.usage</c>. Each document is read at its own point; totals only grow.</summary>
     public async Task<JsonObjectValue> UsageAsync(DurableContext context)
     {
-        var conversations = await ReadOnLineAsync(() => HarnessUtil.ScanAll(cursor =>
-            storage.ScanConversationsAsync(new ConversationQuery(), ScanPageSize, cursor, context))).ConfigureAwait(false);
+        var conversations = await ReadOnLineAsync(line => HarnessUtil.ScanAll(cursor =>
+            line.ScanConversationsAsync(new ConversationQuery(), ScanPageSize, cursor, context))).ConfigureAwait(false);
         var total = UsageLedger.UsageDoc.Definition.Initial();
         foreach (var conversation in conversations)
         {
@@ -231,9 +358,24 @@ internal sealed class DurableHarness : Session, IHarness
         return total;
     }
 
-    public Task<AttachedReplicatedState<TaskGraph>> TaskGraphAsync(DurableContext context) => taskGraph.StateAsync(context);
-
     public Task<IWatchHandle<TaskGraph>> WatchTaskGraphAsync(DurableContext context) => taskGraph.WatchAsync(context);
+
+    public async Task<Observation<TaskGraph>> ObserveTaskGraphAsync(Observer<TaskGraph> observer, DurableContext context)
+    {
+        AssertUsable();
+        ArgumentNullException.ThrowIfNull(observer);
+        ArgumentNullException.ThrowIfNull(context);
+        return await taskGraph.ObserveAsync(observer, context).ConfigureAwait(false);
+    }
+
+    public async Task<Observation<ConversationView>> ObserveConversationAsync(ConversationId id, Observer<ConversationView> observer,
+        DurableContext context, ConversationWindow? window = null)
+    {
+        AssertUsable();
+        ArgumentNullException.ThrowIfNull(observer);
+        ArgumentNullException.ThrowIfNull(context);
+        return await views.ObserveAsync(id, observer, context, window).ConfigureAwait(false);
+    }
 
     public Task<IConversation> RootAsync(DurableContext context, AgentChange? agent = null, ConversationInit? init = null) =>
         CreateAsync(CreateTarget.Root, agent, init, context);
@@ -241,7 +383,7 @@ internal sealed class DurableHarness : Session, IHarness
     public async Task<IConversation?> ConversationAsync(ConversationId id, DurableContext context)
     {
         AssertUsable();
-        var record = await ReadOnLineAsync(() => storage.GetConversationAsync(id, context)).ConfigureAwait(false);
+        var record = await ReadOnLineAsync(line => line.GetConversationAsync(id, context)).ConfigureAwait(false);
         return record is null ? null : new ConversationImpl(record.Id, this);
     }
 
@@ -253,6 +395,9 @@ internal sealed class DurableHarness : Session, IHarness
 
     /// <summary>Signals and joins task invocations after the close listeners and before Storage closes; writes no task outcome.</summary>
     internal override Task BeforeCloseAsync() => scheduler.JoinAsync();
+
+    /// <summary>The ownership memberships a commit's task changes write, from the scheduler's indexes (upstream <c>membershipKeys</c>).</summary>
+    internal override ValueTask<IReadOnlyList<string>> MembershipKeysAsync(Transaction tx) => scheduler.MembershipKeysAsync(tx);
 
     internal async Task<IConversation> CreateAsync(CreateTarget target, AgentChange? agent, ConversationInit? init, DurableContext context)
     {
@@ -314,6 +459,8 @@ internal sealed class ConversationImpl(ConversationId id, DurableHarness harness
 
     public Task<ISubmission> SubmitAsync(SubmissionDraft submission, DurableContext context) => harness.Submissions.SubmitAsync(Id, submission, context);
 
+    public Task<SubmissionId> SubmitAsync(ITx tx, SubmissionDraft submission) => harness.Submissions.AdmitAsync(tx, Id, submission);
+
     /// <summary>Admits a write of a <c>pi.reset</c> entry with <c>head: "self"</c>, carrying <paramref name="handoff"/> as a user message when
     /// given; a busy conversation places it at its next boundary.</summary>
     public async Task ResetAsync(string? handoff, DurableContext context)
@@ -328,34 +475,34 @@ internal sealed class ConversationImpl(ConversationId id, DurableHarness harness
     }
 
     /// <summary>Creates a manual compaction task with its live status in one commit (upstream <c>compact</c>).</summary>
-    public Task<TaskId> CompactAsync(string? instructions, DurableContext context)
+    public async Task<TaskId> CompactAsync(string? instructions, DurableContext context)
     {
         harness.Scheduler.Resume();
-        return harness.CommitWithAsync(tx => Compaction.CreateCompactionAsync(tx, Id, "manual", instructions), context);
+        return await harness.CommitWithAsync(tx => Compaction.CreateCompactionAsync(tx, Id, "manual", instructions), context).ConfigureAwait(false);
     }
 
-    public Task<T> CommitAsync<T>(Func<ITx, Task<T>> change, DurableContext context)
+    public Task<T> CommitAsync<T>(Func<ITx, Task<T>> change, DurableContext context, CommitOptions? options = null)
     {
         ArgumentNullException.ThrowIfNull(change);
-        return harness.CommitWithAsync(tx => change(tx), context, new TransactionScope(Id));
+        return harness.CommitWithAsync(tx => change(tx), context, new TransactionScope(Id), options);
     }
 
-    public Task CommitAsync(Func<ITx, Task> change, DurableContext context)
+    public Task CommitAsync(Func<ITx, Task> change, DurableContext context, CommitOptions? options = null)
     {
         ArgumentNullException.ThrowIfNull(change);
-        return harness.CommitWithAsync(tx => change(tx), context, new TransactionScope(Id));
+        return harness.CommitWithAsync(tx => change(tx), context, new TransactionScope(Id), options);
     }
 
-    public Task<T> CommitAsync<T>(Func<ITx, T> change, DurableContext context)
+    public Task<T> CommitAsync<T>(Func<ITx, T> change, DurableContext context, CommitOptions? options = null)
     {
         ArgumentNullException.ThrowIfNull(change);
-        return harness.CommitWithAsync(tx => Task.FromResult(change(tx)), context, new TransactionScope(Id));
+        return harness.CommitWithAsync(tx => Task.FromResult(change(tx)), context, new TransactionScope(Id), options);
     }
 
-    public Task CommitAsync(Action<ITx> change, DurableContext context)
+    public Task CommitAsync(Action<ITx> change, DurableContext context, CommitOptions? options = null)
     {
         ArgumentNullException.ThrowIfNull(change);
-        return harness.CommitWithAsync(tx => change(tx), context, new TransactionScope(Id));
+        return harness.CommitWithAsync(tx => change(tx), context, new TransactionScope(Id), options);
     }
 
     public Task<ContextView> ContextAsync(DurableContext context, EntryId? at = null) =>
@@ -364,8 +511,8 @@ internal sealed class ConversationImpl(ConversationId id, DurableHarness harness
     public Task<Page<EntryRecord>> EntriesAsync(EntryQueryBounds query, int limit, JsonObjectValue? cursor, DurableContext context)
     {
         ArgumentNullException.ThrowIfNull(query);
-        var bounded = new EntryQuery(Id) { MinEntryId = query.MinEntryId, MaxEntryId = query.MaxEntryId, Order = query.Order };
-        return harness.ReadOnLineAsync(() => harness.Storage.ScanEntriesAsync(bounded, limit, cursor, context));
+        var scan = HarnessUtil.ConversationEntries(Id, query);
+        return harness.ReadOnLineAsync(line => line.ScanEntriesAsync(scan, limit, cursor, context));
     }
 
     public Task<IConversation> ForkAsync(EntryId at, ConversationCreateOptions options, DurableContext context)
@@ -374,21 +521,20 @@ internal sealed class ConversationImpl(ConversationId id, DurableHarness harness
         return harness.CreateAsync(DurableHarness.CreateTarget.Fork(Id, at, options.Ownership), options.Agent, options.Init, context);
     }
 
-    public Task AbortAsync(DurableContext context, ConversationAbortOptions? options = null)
+    public async Task AbortAsync(DurableContext context, ConversationAbortOptions? options = null)
     {
         harness.Scheduler.Resume();
-        return harness.Scheduler.AbortConversationAsync(Id, options?.Background == true, context);
+        await harness.Scheduler.AbortConversationAsync(Id, options?.Background == true, context).ConfigureAwait(false);
     }
 
-    public Task WaitForIdleAsync(DurableContext context)
+    public async Task WaitForIdleAsync(DurableContext context)
     {
         harness.Scheduler.Resume();
-        return harness.Scheduler.WaitForIdleAsync(Id, context);
+        await harness.Scheduler.WaitForIdleAsync(Id, context).ConfigureAwait(false);
     }
 
-    public Task<AttachedReplicatedState<ConversationView>> ViewStateAsync(DurableContext context) => harness.Views.StateAsync(Id, context);
-
-    public Task<IWatchHandle<ConversationView>> WatchAsync(DurableContext context) => harness.Views.WatchAsync(Id, context);
+    public Task<IWatchHandle<ConversationView>> WatchAsync(DurableContext context, ConversationWindow? window = null) =>
+        harness.Views.WatchAsync(Id, context, window);
 
     public override string ToString() => $"Conversation {Id}";
 }
@@ -402,12 +548,25 @@ internal sealed class BoundConversation(ConversationId id, InvocationBinding bin
 {
     public ConversationId Id { get; } = id;
 
-    /// <summary>Admits user input; the returned submission's operations are bound to the invocation too.</summary>
+    /// <summary>Admits a submission; the returned submission's operations are bound to the invocation too.</summary>
     public async Task<ISubmission> SubmitAsync(SubmissionDraft submission, DurableContext context)
     {
         binding.Check();
         var admitted = await submissions.SubmitAsync(Id, submission, context.WithSignal(binding.Signal)).ConfigureAwait(false);
         return new BoundSubmission(admitted, binding);
+    }
+
+    /// <summary>Admits a submission inside the caller's commit; rejects once the invocation is aborted or ended.</summary>
+    public Task<SubmissionId> SubmitAsync(ITx tx, SubmissionDraft submission)
+    {
+        try
+        {
+            binding.Check();
+            // The caller's commit carries its own context, so the invocation's abort is checked here.
+            if (binding.Signal.Token.IsCancellationRequested) throw binding.Signal.Error();
+        }
+        catch (Exception error) { return Task.FromException<SubmissionId>(error); }
+        return submissions.AdmitAsync(tx, Id, submission);
     }
 
     public async Task AbortAsync(DurableContext context, ConversationAbortOptions? options = null)

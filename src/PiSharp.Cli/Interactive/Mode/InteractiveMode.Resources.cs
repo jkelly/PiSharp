@@ -29,7 +29,7 @@ internal static class SlashCommands
         new("scoped-models", "Enable/disable models for Ctrl+P cycling"),
         new("export", "Export session (HTML default, or specify path: .html/.jsonl)"),
         new("import", "Import and resume a session from a JSONL file"),
-        new("share", "Share session as a secret GitHub gist"),
+        new("share", "Share session via a Radius artifact or a GitHub gist"),
         new("bug", "Report a PiSharp bug as a GitHub issue", "<description>"),
         new("copy", "Copy last agent message to clipboard"),
         new("name", "Set session display name"),
@@ -189,8 +189,7 @@ internal sealed partial class InteractiveMode
 
     private string FormatDisplayPath(string p)
     {
-        var home = context.Startup.Home;
-        return p.StartsWith(home, StringComparison.Ordinal) ? "~" + p[home.Length..] : p;
+        return PiSharp.Cli.Pi.PiPaths.ShortenHomePath(p, context.Startup.Home);
     }
 
     private string FormatExtensionDisplayPath(string path) =>
@@ -480,7 +479,7 @@ internal sealed partial class InteractiveMode
                 loadedResourcesContainer.AddChild(new ThemedText(() => $"{theme.Fg("warning", $"[{title}]")}\n{FormatDiagnostics(list, sourceInfos)}", 0, 0));
                 loadedResourcesContainer.AddChild(new Spacer(1));
             }
-            AddDiagnostics("Skill conflicts", diagnostics.Skills);
+            AddDiagnostics("Skill warnings", diagnostics.Skills);
             AddDiagnostics("Prompt conflicts", diagnostics.Prompts);
             var extensionDiagnostics = diagnostics.Extensions.ToList();
             var builtinNames = new HashSet<string>(SlashCommands.Builtin.Select(command => command.Name), StringComparer.Ordinal);

@@ -14,8 +14,8 @@
 // wait for the release; known non-header pins (constants, generated-module commits, JSON
 // inventories) are reported, not rewritten.
 //
-// Usage: node repin-sources.mjs --upstream <Pi git repo containing both tags> [--from v1.1.0] [--to v1.2.0] [--report <path>]
-//          [--worklist compatibility/sync-1.2.0-worklist.json] [--applicability compatibility/sync-1.2.0-applicability.json]
+// Usage: node repin-sources.mjs --upstream <Pi git repo containing both tags> [--from v1.2.0] [--to v1.5.0] [--report <path>]
+//          [--worklist compatibility/sync-1.5.0-worklist.json] [--applicability compatibility/sync-1.5.0-applicability.json]
 //          [--paths <regex>] [--decision <path>] [--write]
 // Without --write it only reports. The work list keeps any top-level keys it does not generate
 // (for example the authored nonHeaderPins section).
@@ -26,8 +26,8 @@ import { fileURLToPath } from "node:url";
 
 const repo = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const self = "tools/CompatibilityReport/repin-sources.mjs";
-const args = { from: "v1.1.0", to: "v1.2.0", worklist: "compatibility/sync-1.2.0-worklist.json", applicability: "compatibility/sync-1.2.0-applicability.json",
-  decision: "docs/decisions/0006-pi-1.2.0-sync.md" };
+const args = { from: "v1.2.0", to: "v1.5.0", worklist: "compatibility/sync-1.5.0-worklist.json", applicability: "compatibility/sync-1.5.0-applicability.json",
+  decision: "docs/decisions/0013-pi-1.5.0-sync.md" };
 for (let index = 2; index < process.argv.length; index++) {
   const name = process.argv[index];
   if (!name.startsWith("--")) throw new Error(`Unexpected argument ${name}`);
@@ -73,13 +73,17 @@ const historical = [
   [/^website\/src\/content\/changelog\//, "changelog entries record what each release was built from"],
   [/(^|\/)CHANGELOG\.md$/, "changelog history"],
   [/^docs\/decisions\/0002-pi-1\.1\.0-sync\.md$/, "the v1.1.0 sync decision"],
-  [/^docs\/decisions\/0006-pi-1\.2\.0-sync\.md$/, "names the commit the v1.2.0 sync starts from"],
+  [/^docs\/decisions\/0006-pi-1\.2\.0-sync\.md$/, "the v1.2.0 sync decision"],
+  [/^docs\/decisions\/0013-pi-1\.5\.0-sync\.md$/, "names the commit the v1.5.0 sync starts from"],
   [/^compatibility\/sync-1\.1\.0-applicability\.json$/, "the v1.1.0 sync record"],
-  [/^compatibility\/sync-1\.2\.0-(applicability|worklist)\.json$/, "names the commit the v1.2.0 sync starts from"],
-  [/^compatibility\/target\.lock\.json$/, "previousTarget names the v1.1.0 lock"],
+  [/^compatibility\/sync-1\.2\.0-(applicability|worklist)\.json$/, "the v1.2.0 sync record"],
+  [/^compatibility\/sync-1\.5\.0-(applicability|worklist)\.json$/, "names the commit the v1.5.0 sync starts from"],
+  [/^compatibility\/target\.lock\.json$/, "previousTarget names the previous target lock"],
   [/^compatibility\/target\.v1\.1\.0\.lock\.json$/, "the preserved v1.1.0 target lock"],
+  [/^compatibility\/target\.v1\.2\.0\.lock\.json$/, "the preserved v1.2.0 target lock"],
   [/^compatibility\/.*\.v1\.1\.0(\.overlay)?\.json$/, "inventory generated for the v1.1.0 target (validated against target.v1.1.0.lock.json)"],
-  [/^compatibility\/.*\.v1\.2\.0\.json$/, "inventory generated for the v1.2.0 target; its v1.1.0 commit is refresh provenance (the previous inventory and each row's previous source) and the anchors of entries removed upstream at v1.2.0"],
+  [/^compatibility\/.*\.v1\.2\.0(\.overlay)?\.json$/, "inventory generated for the v1.2.0 target (validated against target.v1.2.0.lock.json); any v1.1.0 commit in it is refresh provenance and the anchors of entries removed upstream at v1.2.0"],
+  [/^compatibility\/.*\.v1\.5\.0(\.overlay)?\.json$/, "inventory generated for the v1.5.0 target from the v1.2.0 inventories; any v1.2.0 commit in it is refresh provenance and the removedUpstream marks carried from v1.2.0"],
   [/^compatibility\/public-release\.json$/, "previousReleases record the upstream commit each published release tracked"],
   [/^docs\/compatibility\/baseline\.md$/, "describes the previous target"],
   [/^docs\/plans\/(full-parity-v1\.1\.0\.md|post-port-pi-v1-upgrade\.md)$/, "the v1.1.0 plans"],
@@ -89,15 +93,15 @@ const historical = [
   // Branch feature/pi-durable (decision 0005).
   [/^src\/PiSharp\.Cli\/Durable\/|^tests\/PiSharp\.DurableCli\.Tests\//, "`pisharp durable` ports Pi v1.1.0's experimental durable agent, which upstream deleted in v1.2.0; PiSharp-only by owner decision (decision 0005)"],
   [/^tests\/PiSharp\.Durable\.Tests\/Fixtures\/|^tools\/DurableFixtures\//, "fixtures and capture scripts record the upstream they were captured from; recapture them with the area that changes them"],
-  [/^compatibility\/durable-port-map\.json$|^tools\/DurablePortMap\/build-port-map\.mjs$/, "the durable port map diffs against the previous pin and keeps removed files' v1.1.0 blobs"],
-  [/^compatibility\/durable-sync-1\.2\.0-(worklist|repin)\.json$/, "names the commit the durable v1.2.0 sync starts from"],
+  [/^compatibility\/durable-port-map\.json$|^tools\/DurablePortMap\/build-port-map\.mjs$/, "the durable port map pins its own upstream commits; build-port-map.mjs re-pins it with the durable area"],
+  [/^compatibility\/durable-sync-1\.2\.0-(worklist|repin)\.json$/, "the durable v1.2.0 sync record"],
   [/^docs\/decisions\/0005-pi-durable-experimental\.md$/, "records the first durable pin"],
-  [/^\.github\/workflows\/durable\.yml$/, "fetches the previous pin for the port map's diff"],
+  [/^\.github\/workflows\/durable\.yml$/, "fetches the durable port map's pins; moves when the port map is re-pinned"],
   [new RegExp(`^${self.replace(/[.]/g, "\\.")}$`), "this tool"],
 ];
 const releaseDocs = [
-  [/^README\.md$/, "describes the published release's baseline; update with the 1.2.0 release"],
-  [/^website\/src\/content\/docs\//, "describes the published release's baseline; update with the 1.2.0 release"],
+  [/^README\.md$/, `describes the published release's baseline; update with the ${args.to.slice(1)} release`],
+  [/^website\/src\/content\/docs\//, `describes the published release's baseline; update with the ${args.to.slice(1)} release`],
 ];
 // Pins that are not citation headers: reported with their own handling, never rewritten here.
 const nonHeaderFiles = [
@@ -111,7 +115,7 @@ const nonHeaderLines = [
 ];
 
 // ------------------------------------------------------------------ citation parsing
-const PACKAGES = "agent|ai|tui|codemode|mcp|coding-agent|telemetry|chord|durable|env|client|server|protocol";
+const PACKAGES = "agent|ai|tui|codemode|mcp|coding-agent|schema|telemetry|chord|durable|env|evals|client|server|protocol";
 const PACKAGE_PATH = new RegExp(`(?:packages/)?(?:${PACKAGES})/(?:src|docs|scripts|schemas|examples|install-lock|test|package\\.json|CHANGELOG\\.md|README\\.md)(?:[\\w.\\-/*]|\\{[^}\\s]*\\})*`, "g");
 const RELATIVE_PATH = /(?<![\w./{}*-])(?:[\w.*-]|\{[^}\s]*\}|\/)+\.(?:ts|tsx|json|md)\b/g;
 const COMMENT = /^\s*(\/\/\/?|#|\*|<!--|\/\*\*?)/;
@@ -192,6 +196,7 @@ const rowsFor = path => applicability.rows.filter(row => row.upstream.some(entry
   return entry === path || (entry.includes("*") && path.startsWith(pattern)) || path.startsWith(entry + "/") || entry.startsWith(path + "/");
 }));
 const areaOf = file => [
+  [/PiSharp\.Durable|DurablePortMap/, "durable"],
   [/NodeBridge|Compatibility\.Node|Extensions\/Pi\/PiNode|Extensions\/Pi\/PiExtensionHost/, "node-bridge"],
   [/Codemode/, "codemode"], [/Mcp/, "mcp"], [/PiSharp\.Tui|Interactive|HljsGrammars|GrokMermaid/, "tui"],
   [/PiSharp\.AI|Models|Catalog|Provider|Anthropic|Mistral|Azure|Google|OpenAI/, "ai"],
@@ -232,6 +237,12 @@ for (const file of files) {
       } else {
         const text = citationText(lines, index, column);
         let parsed = pathsIn(text.after);
+        // "<path> (commit <sha>; ...)" and "<path> at <sha>" name their source before the commit: check those paths too,
+        // even when the text after it names other files.
+        if (/(\(commit|\bat)\s*`?$/.test(text.before)) {
+          const before = pathsIn(text.before);
+          parsed = { paths: [...new Set([...before.paths, ...parsed.paths])], unresolved: [...before.unresolved, ...parsed.unresolved] };
+        }
         if (parsed.paths.length === 0) parsed = pathsIn(text.before);
         if (parsed.paths.length === 0) {
           report.unparsed.push({ file, line: index + 1, text: lines[index].trim().slice(0, 200) });

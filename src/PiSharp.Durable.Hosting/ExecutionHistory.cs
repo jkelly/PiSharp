@@ -1,4 +1,5 @@
 // Decision 0009: authoritative history from durable task/entry records, rather than a lossy secondary projection.
+// Pi v1.5.0 sync (area sleep): an execution asleep (a repeat phase's pause, a retry backoff) lists as sleeping, and the filter takes it.
 using PiSharp.Durable.Chord;
 
 namespace PiSharp.Durable.Hosting;
@@ -11,7 +12,7 @@ public sealed partial class HostedSession
     {
         if (limit is < 1 or > 100 || query?.Length > 200 || kind is not (null or "" or "job" or "chat"))
             throw new HostInvalidException("Use a limit of 1–100, a query up to 200 characters and kind job or chat.");
-        if (status is not (null or "" or "pending" or "running" or "waiting" or "completing" or "completed" or "failed" or "aborted" or "declined"))
+        if (status is not (null or "" or "pending" or "running" or "waiting" or "sleeping" or "completing" or "completed" or "failed" or "aborted" or "declined"))
             throw new HostInvalidException("Invalid execution status.");
         var context = Context(cancellationToken);
         var opened = GetHarness();

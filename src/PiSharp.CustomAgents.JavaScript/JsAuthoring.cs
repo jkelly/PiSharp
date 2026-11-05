@@ -38,7 +38,7 @@ public static partial class JsAuthoring
 
     /// <summary><c>pisharp.agents.created-tools</c>: <c>{ tools: { name: { description, parameters, code, by } } }</c>.</summary>
     internal static SessionDocToken Doc { get; } = Documents.DefineSessionDoc("pisharp.agents.created-tools", 1,
-        () => (JsonObjectValue)JsonValue.Parse("""{"tools":{}}"""));
+        () => (JsonObjectValue)JsonValue.Parse("""{"tools":{}}"""), checkpointWhen: (_, _, _) => false);
 
     private static readonly JsonObjectValue CreateParameters = (JsonObjectValue)JsonValue.Parse("""
         {"type":"object","required":["name","description","code"],"properties":{

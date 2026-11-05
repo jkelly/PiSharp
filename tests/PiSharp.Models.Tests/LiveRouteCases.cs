@@ -264,7 +264,7 @@ internal static partial class Program
         var continuing = await new SettingsModelSelection(null, null, null).ResolveAsync(settings, runtime, null, true, CancellationToken.None);
         Equal("openai/gpt-oss-20b", continuing.Model.Id, "continuing sessions use the saved default");
         var initial = await new SettingsModelSelection(null, null, null).ResolveAsync(null, runtime, null, false, CancellationToken.None);
-        Equal("openai/gpt-5.5", initial.Model.Provider + "/" + initial.Model.Id, "first available provider default");
+        Equal("openai/gpt-6.1-sol", initial.Model.Provider + "/" + initial.Model.Id, "first available provider default");
         // findInitialModel: a saved default that does not exist, or whose provider has no configured auth, falls back to the first
         // available model instead of being refused.
         foreach (var (provider, id, what) in new[] { ("openai", "no-such-model", "unknown default"), ("anthropic", "claude-sonnet-4-5", "default without auth") })
@@ -272,7 +272,7 @@ internal static partial class Program
             var saved = new PiSharp.CodingAgent.Configuration.StartupSettingsSnapshot(JsonData.Parse(JsonSerializer.Serialize(new { defaultProvider = provider, defaultModel = id })),
                 PiSharp.Agent.AgentPendingInputMode.OneAtATime, PiSharp.Agent.AgentPendingInputMode.OneAtATime, []);
             var fallen = await new SettingsModelSelection(null, null, null).ResolveAsync(saved, runtime, null, false, CancellationToken.None);
-            Equal("openai/gpt-5.5", fallen.Model.Provider + "/" + fallen.Model.Id, what);
+            Equal("openai/gpt-6.1-sol", fallen.Model.Provider + "/" + fallen.Model.Id, what);
         }
         var none = await ThrowsAsync<LiveSessionException>(() => new SettingsModelSelection(null, null, null)
             .ResolveAsync(null, new LiveSessionRuntime(Env(), () => null), null, false, CancellationToken.None), "nothing available");

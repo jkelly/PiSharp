@@ -22,7 +22,7 @@ public static partial class SystemPrompts
 
     /// <summary>The agent's checklist: <c>{enabled: [ids]}</c>; a fork starts with its parent's current list.</summary>
     public static ConversationDocToken ChecklistDoc { get; } = Documents.DefineConversationDoc("pisharp.system-prompts", 1, DocumentFork.Current,
-        () => JsonObjectValue.Empty);
+        () => JsonObjectValue.Empty, checkpointWhen: (_, _, _) => false);
 
     /// <summary>The prompt files of <paramref name="directory"/> (<c>*.md</c>, by name); none when it does not exist.</summary>
     public static IReadOnlyList<PromptFile> Load(string? directory)

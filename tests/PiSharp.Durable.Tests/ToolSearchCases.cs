@@ -1,18 +1,24 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/test/tool-search.test.ts ("deferred tools and tool_search"), as
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/test/tool-search.test.ts ("deferred tools and tool_search"), as
 // tool-search.<case>. Verbatim apart from the adaptations in HarnessSupport.cs and ChatSupport.cs, and these:
-// - `Type.Object({ number: Type.Optional(Type.Number({ description: "Issue number" })) })` is its JSON as TypeBox prints it.
+// - `obj({ number: opt(num({ description: "Issue number" })) })` is its JSON as pi-schema builds it, and `obj({})` is
+//   ToolsSchema150.EmptyObject.
 // - `expect.objectContaining({ toolsAdded: [expect.objectContaining({ name })] })` checks that toolsAdded holds exactly that one declaration.
 // Authored, after them:
 // - tool-search.errors.*: what the model gets for an empty query or a limit that is not a positive integer, a huge limit, and the first line
 //   of a multi-line description. The expected tool results were printed by the pinned upstream tool under Node (its chat-support.ts setup).
 // - tool-search.declaration: the tool's name, description, parameters, callers and replay, and its extension.
-// - tool-search.search.*: Search.Tokenize and Search.RankDocuments (upstream search.ts) on inputs whose results the pinned upstream
-//   search.ts printed under Node: camelCase and acronym splits, the naive stemmer, stop words, non-ASCII text (U+0130 and the Kelvin sign
-//   lowercase to ASCII letters), empty and limit edge cases, and ties keeping document order.
+// - tool-search.search.*: Search.Tokenize and Search.RankDocuments (upstream search.ts) on inputs whose results Pi v1.2.0's search.ts
+//   printed under Node: camelCase and acronym splits, the naive stemmer, stop words, non-ASCII text, empty and limit edge cases, and ties
+//   keeping document order. The documents' texts repeat the name, as v1.2.0's tool_search wrote them. v1.5.0's rules (search.ts read at
+//   f9a26365, not run) give the same results, except search.tokenize.06, whose expectation is authored from them: NFC, letters and marks
+//   of any script kept, ICU word segmentation (the words with U+00EF, U+00E9 and U+0130, lowercased as JavaScript does, stay whole; the
+//   Kelvin sign is K after NFC). search.loads-the-tool-the-query-names runs upstream c7372af42's thread_read example through the tool.
 // - tool-search.ranking-differential.*: Search against main's port of the coding agent's ranking (PiSharp.Extensions.Abstractions'
 //   ToolSearch.Tokenize, ToolSearch.CreateDocument and Bm25Ranker; upstream coding-agent extensions/tool-search/tool.ts, the same
-//   algorithm search.ts copies) over seeded random texts, queries and schemas, U+0130 included: both lowercase it as JavaScript does
-//   (main since PR #19; see Search.cs), and the search.* cases pin JavaScript's result.
+//   algorithm search.ts copies; both at Pi 1.5.0) over seeded random texts, queries, schemas, names and namespace texts, U+0130 included:
+//   both lowercase it as JavaScript does (main since PR #19; see Search.cs), and the search.* cases pin JavaScript's result. Both segment
+//   with the same system ICU, so they agree on Chinese, Japanese and Thai; where that ICU differs from the one V8 bundles, both differ
+//   from upstream alike (Search.cs).
 using System.Text;
 using System.Text.Json;
 using PiSharp.Durable;
@@ -38,7 +44,7 @@ internal static class ToolSearchTests
     private static readonly DurableContext Context = DurableContext.Background;
 
     private static readonly JsonObjectValue IssueParameters =
-        O("""{"type":"object","properties":{"number":{"type":"number","description":"Issue number"}}}""");
+        O("""{"type":"object","properties":{"number":{"type":"number","description":"Issue number"}},"additionalProperties":false}""");
 
     private static ToolRegistration Tool(string name, string description, Func<ToolRegistration, ToolRegistration>? extra = null)
     {
@@ -88,6 +94,15 @@ internal static class ToolSearchTests
         [.. entries.Where(entry => entry.Kind == "pi.tool-result").Select(entry =>
             string.Concat(((JsonArrayValue)((JsonObjectValue)entry.Model![0])["content"]).Select(item =>
                 ((JsonObjectValue)item).TryGetValue("text", out var text) ? S(text) : "")))];
+
+    // True while main's ranker and Search.cs follow different Pi versions, as between phase 2 of the Pi 1.5.0 sync (main's
+    // tools.tool-search-name-weight and tools.tool-search-unicode-words) and phase 4 (durable.tool-search-ranking and
+    // durable.tool-search-unicode); both follow Pi 1.5.0 now.
+    private static readonly bool RankersDiffer = false;
+    private static void AwaitDurableResync()
+    {
+        if (RankersDiffer) throw new CaseSkippedException("main's ranker follows Pi 1.5.0; Search.cs moves with the phase 4 durable re-sync");
+    }
 
     internal static IEnumerable<(string, Func<Task>)> Cases(string prefix)
     {
@@ -141,7 +156,7 @@ internal static class ToolSearchTests
             {
                 Name = "grow",
                 Description = "grow",
-                Parameters = ToolRegistration.EmptyParameters,
+                Parameters = ToolsSchema150.EmptyObject,
                 Execute = (_, _, _) => Task.FromResult(new ToolExecutionResult
                 {
                     Output = JsonArrayValue.Empty, Control = new ToolControl { AddTools = ["github_get_issue", "alpha", "ghost"] },
@@ -253,7 +268,7 @@ internal static class ToolSearchTests
             Equal("# Tool discovery\n\nSearches over deferred tool metadata with BM25 and exposes matching tools for the next model call.\n\n" +
                 "Some of the tools, such as tools of MCP servers, may not have been provided to you upfront, and you should use this tool " +
                 "(`tool_search`) to search for the required tools. For MCP tool discovery, always use `tool_search`.", tool.Description, "description");
-            Equal("""{"type":"object","required":["query"],"properties":{"query":{"type":"string","description":"Search query for deferred tools."},"limit":{"type":"number","description":"Maximum number of tools to return. Defaults to 8."}}}""",
+            Equal("""{"type":"object","properties":{"query":{"type":"string","description":"Search query for deferred tools."},"limit":{"type":"number","description":"Maximum number of tools to return. Defaults to 8."}},"required":["query"]}""",
                 tool.Parameters.ToJson(), "parameters");
             Seq([ToolCaller.Model], tool.Callers!.Value, "callers");
             Equal(ToolReplay.Safe, tool.Replay, "replay");
@@ -272,8 +287,31 @@ internal static class ToolSearchTests
             yield return Case(prefix + $"search.rank.{index + 1:00}-{Slug(query)}", () =>
                 Seq(names, Search.RankDocuments(query, RankDocuments, limit), $"RankDocuments({JsonValue.String(query).ToJson()}, {limit})"));
 
+        // Upstream c7372af42's example (#11331): the search text no longer repeats the name, which the ranker weighs as a field of its own,
+        // and a query that is exactly a tool's name loads that tool, not the one that mentions its words more.
+        yield return Case("tool-search.search.loads-the-tool-the-query-names", async () =>
+        {
+            var chat = ChatTests.Setup();
+            AddTool(chat.Registry, Tool("mcp__app__queue_read", "Read a queued message of this thread.", tool => tool with { Deferred = true }));
+            var threadRead = Tool("mcp__app__thread_read", "Read durable state and a paginated timeline from any thread. The default view returns user " +
+                "messages, assistant messages and plans. Continue with afterPosition until hasMore is false.", tool => tool with { Deferred = true });
+            AddTool(chat.Registry, threadRead);
+            chat.Registry.Install(ToolSearch.CreateExtension());
+            Equal("Read durable state and a paginated timeline from any thread. The default view returns user messages, assistant messages and plans. " +
+                "Continue with afterPosition until hasMore is false. number Issue number", ToolSearch.SearchText(threadRead), "search text");
+            chat.Faux.SetResponses(Call("tool_search", Obj(("query", "thread_read"), ("limit", 1))), Done);
+            var (harness, root) = await OpenChat(new MemoryStorage(), chat);
+            await (await root.SubmitAsync(SubmissionDraft.Input("go"), Context)).WaitAsync(Context);
+            Seq(["Loaded 1 tool. They are available from your next call:\n- mcp__app__thread_read: Read durable state and a paginated timeline from " +
+                "any thread. The default view returns user messages, assistant messages and plans. Continue with afterPosition until hasMore is false."],
+                ToolResultTexts(await AllEntries(root)), "tool results");
+            SameJson("""{"add":["mcp__app__thread_read"]}""", await ModelTools(harness, root), "modelTools");
+            await harness.CloseAsync(Context);
+        });
+
         yield return Case(prefix + "ranking-differential.tokenize", () =>
         {
+            AwaitDurableResync();
             var next = Random(1);
             for (var trial = 0; trial < 2000; trial++)
             {
@@ -284,6 +322,7 @@ internal static class ToolSearchTests
 
         yield return Case(prefix + "ranking-differential.rank", () =>
         {
+            AwaitDurableResync();
             var next = Random(2);
             for (var trial = 0; trial < 500; trial++)
             {
@@ -300,8 +339,36 @@ internal static class ToolSearchTests
             }
         });
 
+        yield return Case("tool-search.ranking-differential.rank-fields", () =>
+        {
+            AwaitDurableResync();
+            var next = Random(4);
+            for (var trial = 0; trial < 500; trial++)
+            {
+                var count = (int)(next() * 10);
+                // Names with a server prefix, and some with any word of the list (non-ASCII, spaces, U+FEFF) appended.
+                var names = Enumerable.Range(0, count).Select(_ => (next() < 0.5 ? "mcp__" + RandomName(next) + "__" : "") + RandomName(next) +
+                    (next() < 0.25 ? "-" + Words[(int)(next() * Words.Length)] : "")).ToList();
+                var documents = names.Select(name =>
+                    new SearchDocument(name, RandomText(next, (int)(next() * 20)), next() < 0.4 ? RandomText(next, (int)(next() * 10)) : "")).ToList();
+                // Sometimes the query is a tool's name, its local name, or its name with other words, which the exact-name rule and the
+                // whole-name bonus decide.
+                var pick = count == 0 ? "" : names[(int)(next() * count)];
+                var shape = next();
+                var query = count == 0 || shape < 0.55 ? RandomText(next, 1 + (int)(next() * 4))
+                    : shape < 0.7 ? pick : shape < 0.85 ? pick.Split("__")[^1] : $"{RandomText(next, 1)} {pick.Split("__")[^1]}";
+                var limit = 1 + (int)(next() * 8);
+#pragma warning disable PISHARP_TOOLSEARCH001 // ToolSearchDocument.NamespaceText (main's experimental namespace field)
+                var main = new MainBm25Ranker().Rank(query, [.. documents.Select(document =>
+                    new MainToolSearchDocument(document.Name, document.Text) { NamespaceText = document.NamespaceText })], limit);
+#pragma warning restore PISHARP_TOOLSEARCH001
+                Seq(main.Select(match => match.Name), Search.RankDocuments(query, documents, limit), $"trial {trial}: {JsonValue.String(query).ToJson()} limit {limit}");
+            }
+        });
+
         yield return Case(prefix + "ranking-differential.search-text", () =>
         {
+            AwaitDurableResync();
             var next = Random(3);
             for (var trial = 0; trial < 500; trial++)
             {
@@ -320,7 +387,7 @@ internal static class ToolSearchTests
         });
     }
 
-    // ─── Goldens printed by the pinned upstream under Node (see the file header) ───
+    // ─── Goldens printed by Pi v1.2.0 under Node (see the file header) ──────
 
     private static readonly (string Slug, string Args, string Result, string? ModelTools)[] ErrorCases =
     [
@@ -346,7 +413,7 @@ internal static class ToolSearchTests
         ("github_list_repos", ["github", "list", "repo"]),
         ("Searches issues boxes classes buses glasses wishes quizzes", ["search", "issue", "box", "class", "buse", "glass", "wish", "quizz"]),
         ("The tool is for a user, and it's ready", ["tool", "user", "s", "ready"]),
-        ("na\u00EFve caf\u00E9 \u0130stanbul KELVIN-\u212A sign", ["na", "ve", "caf", "i", "stanbul", "kelvin", "k", "sign"]),
+        ("na\u00EFve caf\u00E9 \u0130stanbul KELVIN-\u212A sign", ["na\u00EFve", "caf\u00E9", "i\u0307stanbul", "kelvin", "k", "sign"]),
         ("ABCDef123gHI jklMNOpq", ["abc", "def123g", "hi", "jkl", "mn", "opq"]),
         ("  --  ", []),
         ("", []),

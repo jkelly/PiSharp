@@ -1,8 +1,8 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/src/utils/paths.ts.
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/coding-agent/src/utils/paths.ts.
 // Ported to plain ESM for the PiSharp Node extension bridge (TypeScript types stripped mechanically; behaviour unchanged).
 import { realpathSync, statSync } from "node:fs";
 import { homedir } from "node:os";
-import { isAbsolute, join, resolve as nodeResolvePath, relative, sep } from "node:path";
+import { isAbsolute, join, resolve as nodeResolvePath, posix, relative, sep, win32 } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnProcessSync } from "./child-process.mjs";
 const UNICODE_SPACES = /[\u00A0\u2000-\u200A\u202F\u205F\u3000]/g;
@@ -12,6 +12,30 @@ export function canonicalizePath(path) {
     } catch  {
         return path;
     }
+}
+export function getPathComparisonKey(path) {
+    const pathApi = getPlatformPathApi();
+    const resolvedPath = pathApi.resolve(path);
+    return pathApi === win32 ? resolvedPath.toLowerCase() : resolvedPath;
+}
+function getPlatformPathApi() {
+    return process.platform === "win32" ? win32 : posix;
+}
+export function pathsEqual(left, right) {
+    return getPathComparisonKey(left) === getPathComparisonKey(right);
+}
+export function isPathWithin(parent, child) {
+    const parentKey = getPathComparisonKey(parent);
+    const childKey = getPathComparisonKey(child);
+    if (childKey === parentKey) return true;
+    const pathSep = getPlatformPathApi().sep;
+    return childKey.startsWith(parentKey.endsWith(pathSep) ? parentKey : `${parentKey}${pathSep}`);
+}
+export function shortenHomePath(path, homeDir = homedir()) {
+    const pathApi = getPlatformPathApi();
+    if (!homeDir || !pathApi.isAbsolute(path) || !isPathWithin(homeDir, path)) return path;
+    const relativePath = pathApi.relative(homeDir, path);
+    return relativePath ? `~${pathApi.sep}${relativePath}` : "~";
 }
 export function getFileRevision(path) {
     try {

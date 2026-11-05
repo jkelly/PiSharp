@@ -125,7 +125,7 @@ internal sealed class SessionList : IComponent, IFocusable, IInputHandler
     private readonly TuiKeybindingsManager keybindings;
     private bool showPath;
     private string? confirmingDeletePath;
-    private readonly string? currentSessionCanonicalPath;
+    private readonly string? currentSessionPathKey;
     public Action<string>? OnSelect { get; set; }
     public Action? OnCancel { get; set; }
     public Action OnExit { get; set; } = () => { };
@@ -156,7 +156,7 @@ internal sealed class SessionList : IComponent, IFocusable, IInputHandler
         this.sortMode = sortMode;
         this.nameFilter = nameFilter;
         this.keybindings = keybindings;
-        currentSessionCanonicalPath = CanonicalizePath(currentSessionFilePath);
+        currentSessionPathKey = SessionPathKey(currentSessionFilePath);
         FilterSessions("");
 
         // Handle Enter in search input - select current item
@@ -166,7 +166,8 @@ internal sealed class SessionList : IComponent, IFocusable, IInputHandler
         };
     }
 
-    private static string? CanonicalizePath(string? path) => string.IsNullOrEmpty(path) ? path : PiPaths.Canonicalize(path);
+    /// <summary>Comparison key for a session file path; follows symlinks and ignores case on Windows.</summary>
+    private static string? SessionPathKey(string? path) => string.IsNullOrEmpty(path) ? path : PiPaths.ComparisonKey(PiPaths.Canonicalize(path));
 
     public void SetSortMode(SortMode sortMode)
     {
@@ -200,16 +201,16 @@ internal sealed class SessionList : IComponent, IFocusable, IInputHandler
         var byPath = new Dictionary<string, SessionTreeNode>(StringComparer.Ordinal);
         foreach (var session in sessions)
         {
-            var sessionPath = CanonicalizePath(session.Path) ?? session.Path;
+            var sessionPath = SessionPathKey(session.Path) ?? session.Path;
             byPath[sessionPath] = new SessionTreeNode(session, session.Modified.ToUnixTimeMilliseconds());
         }
 
         var roots = new List<SessionTreeNode>();
         foreach (var session in sessions)
         {
-            var sessionPath = CanonicalizePath(session.Path) ?? session.Path;
+            var sessionPath = SessionPathKey(session.Path) ?? session.Path;
             var node = byPath[sessionPath];
-            var parentPath = CanonicalizePath(session.ParentSessionPath);
+            var parentPath = SessionPathKey(session.ParentSessionPath);
             if (!string.IsNullOrEmpty(parentPath) && byPath.TryGetValue(parentPath, out var parent)) parent.Children.Add(node);
             else roots.Add(node);
         }
@@ -297,8 +298,8 @@ internal sealed class SessionList : IComponent, IFocusable, IInputHandler
 
     private bool IsCurrentSessionPath(string path)
     {
-        if (string.IsNullOrEmpty(currentSessionCanonicalPath)) return false;
-        return (CanonicalizePath(path) ?? path) == currentSessionCanonicalPath;
+        if (string.IsNullOrEmpty(currentSessionPathKey)) return false;
+        return (SessionPathKey(path) ?? path) == currentSessionPathKey;
     }
 
     public void Invalidate() { }
@@ -414,9 +415,7 @@ internal sealed class SessionList : IComponent, IFocusable, IInputHandler
     {
         var home = Environment.GetEnvironmentVariable(OperatingSystem.IsWindows() ? "USERPROFILE" : "HOME") is { Length: > 0 } fromEnv
             ? fromEnv : Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
-        if (string.IsNullOrEmpty(path)) return path;
-        if (path.StartsWith(home, StringComparison.Ordinal)) return "~" + path[home.Length..];
-        return path;
+        return PiSharp.Cli.Pi.PiPaths.ShortenHomePath(path, home);
     }
 
     internal static string FormatSessionDate(DateTimeOffset date, DateTimeOffset? now = null)
@@ -535,7 +534,7 @@ internal sealed class SessionList : IComponent, IFocusable, IInputHandler
 }
 
 /// <summary>Component that renders a session selector.</summary>
-internal sealed class SessionSelectorComponent : Container, IFocusable, IInputHandler
+internal sealed class SessionSelectorComponent : Container, IComponent, IFocusable, IInputHandler
 {
     /// <summary>Source DynamicBorder (dynamic-border.ts), kept local to this file.</summary>
     private sealed class DynamicBorder(Func<string, string>? color = null) : IComponent
@@ -658,6 +657,9 @@ internal sealed class SessionSelectorComponent : Container, IFocusable, IInputHa
             return [left + new string(' ', spacing) + rightText, hintLine1, hintLine2];
         }
     }
+
+    /// <summary>The list receives fullscreen viewport keys (PageUp/PageDown); the rename input does not.</summary>
+    public bool CapturesViewportInput => mode != "rename";
 
     public void HandleInput(string data)
     {

@@ -1,7 +1,10 @@
 // Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/src/storage/sqlite/node.ts
 //
 // Upstream adapts node:sqlite's DatabaseSync; this port adapts a Microsoft.Data.Sqlite connection (decision 0005) with the same serial
-// operation queue, statement cache, transaction handles and pragmas. Differences, each forced by the binding:
+// operation queue, statement cache, transaction handles and pragmas. In Pi v1.5.0 the driver moved to packages/chord/src/sqlite/node.ts
+// (f9a26365568127461c47a07a37dcb42c140a3ac5), and Durable's node.ts re-exports it and keeps openNodeSqliteStorage (SqliteStorage.OpenAsync
+// over a path). RunCountedAsync follows v1.5.0; the citation stays on v1.2.0 until the statement cache keeps only the 256 most recently
+// used statements, as v1.5.0's does (row chord.sqlite-statement-cache, phase 6). Differences, each forced by the binding:
 // - Microsoft.Data.Sqlite binds parameters by name, so each unnamed "?" outside literals and comments is numbered ("?1", "?2", ...) when a
 //   statement is prepared; callers still pass positional values.
 // - Connections are opened with Pooling=False so that closing releases the file (Windows keeps pooled files open and locked).
@@ -16,7 +19,9 @@ using Microsoft.Data.Sqlite;
 
 namespace PiSharp.Durable.Sqlite;
 
-/// <summary>Connection settings for a durable storage file (upstream <c>NodeSqliteStorageOptions</c>).</summary>
+/// <summary>Connection settings for a durable storage file, plus the storage's table prefix (upstream <c>NodeSqliteStorageOptions</c>:
+/// <c>NodeSqliteDatabaseOptions</c> and <c>SqliteStorageOptions</c>). <see cref="SqliteConnectionDatabase.OpenAsync"/> reads only the
+/// connection settings, and <see cref="SqliteStorage.OpenAsync(ISqliteDatabase, SqliteStorageOptions?)"/> only the prefix.</summary>
 public sealed record SqliteStorageOptions
 {
     /// <summary>SQLite WAL auto-checkpoint threshold in pages. SQLite and this adapter default to 1,000; 0 disables it.</summary>
@@ -24,6 +29,11 @@ public sealed record SqliteStorageOptions
 
     /// <summary>Time SQLite waits for a competing file lock. SQLite defaults to 0; this adapter defaults to 5,000 ms.</summary>
     public int? BusyTimeoutMs { get; init; }
+
+    /// <summary>Prefix for every table and index in the durable schema, so that a database can hold the durable tables beside a host's
+    /// own. It must be a SQLite identifier and must not use SQLite's reserved <c>sqlite_</c> prefix (<see cref="SqliteSchemaPrefix"/>).
+    /// Existing data is not migrated when this changes.</summary>
+    public string? Prefix { get; init; }
 }
 
 /// <summary>Runs operations in call order. An operation starts immediately when nothing is running or waiting; otherwise it waits for
@@ -95,6 +105,16 @@ public abstract class SqliteConnectionExecutor : ISqliteExecutor
             command.ExecuteNonQuery();
             return true;
         });
+    }
+
+    /// <inheritdoc/>
+    /// <remarks>Microsoft.Data.Sqlite reports SQLite's <c>changes()</c> for the statement, as node:sqlite's <c>run().changes</c> does
+    /// upstream; the count costs nothing more than <see cref="RunAsync"/>.</remarks>
+    public Task<long> RunCountedAsync(string sql, params object?[] parameters)
+    {
+        ArgumentNullException.ThrowIfNull(sql);
+        ArgumentNullException.ThrowIfNull(parameters);
+        return RunOperation(() => (long)Statements.Bind(Connection, sql, parameters).ExecuteNonQuery());
     }
 
     /// <inheritdoc/>

@@ -78,7 +78,6 @@ public sealed class AzureResponsesRequestFactory
             // SDK 7.19.0's deployment endpoint set excludes /responses. Deployment remains in the body.
             Endpoint = new(normalized.TrimEnd('/') + "/responses?api-version=" + Uri.EscapeDataString(version));
             var headers = ImmutableDictionary.CreateBuilder<string, string?>(StringComparer.OrdinalIgnoreCase);
-            headers["user-agent"] = "PiSharp";
             AddHeaders(_metadata.TryGetProperty("headers", out var modelHeaders) ? modelHeaders : default, headers);
             AddHeaders(options.Headers?.Value ?? default, headers);
             _headers = headers.ToImmutable();
@@ -136,6 +135,9 @@ public sealed class AzureResponsesRequestFactory
         if (_options.Hooks.OnPayload is { } hook)
         { var replacement = await hook(payload, _model, token).ConfigureAwait(false); token.ThrowIfCancellationRequested(); if (replacement is not null) payload = AdmitPayload(replacement, token); }
         var headers = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase) { ["api-key"] = explicitApiKey, ["accept"] = "application/json" };
+        // Pi 1.5.0 azure-openai-responses.ts createClient: { ...getIdentityHeaders(model, identity), ...model.headers }, then the
+        // request headers; the request's identity merges over the configured one.
+        foreach (var (name, value) in ClientIdentities.HeadersFor(_model.Provider, Endpoint.AbsoluteUri, _options.Identity, request.Identity)) headers[name] = value;
         foreach (var field in _headers) if (field.Value is null) headers.Remove(field.Key); else headers[field.Key] = field.Value;
         if (!headers.TryGetValue("api-key", out var admitted) || string.IsNullOrEmpty(admitted)) throw Fail(AzureResponsesFailure.UnsupportedOptions);
         AdmitKey(admitted); headers["content-type"] = "application/json";

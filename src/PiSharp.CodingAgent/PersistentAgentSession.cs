@@ -342,7 +342,8 @@ public sealed partial class PersistentAgentSession : IAsyncDisposable
             acquired.Claim(); runtime = acquired;
             var registry = runtime.Registry.RetainToolSelection(configured.LifetimeToolSelection);
             cancellationToken.ThrowIfCancellationRequested();
-            // Without initial names the transcript's loadout is restored by name with the current bindings (Pi 0.99.2).
+            // Without initial names, or with the default tools (Pi 1.5.0 usesDefaultTools), the branch's loadout is restored by name
+            // with the current bindings; explicit initial names replace it.
             var loadout = await registry.PrepareAndDrainAsync(() => registry.ResolveRestored(context, fallbackModel, cancellationToken,
                 registry.InitialActiveToolNames, configured.SelectedModel), cancellationToken).ConfigureAwait(false);
             // sdk.ts createAgentSession: a session without messages (an empty or header-only file, a new session) records its model
@@ -392,7 +393,7 @@ public sealed partial class PersistentAgentSession : IAsyncDisposable
             // applied in memory and the file is not written; the next request records a loadout that differs from the recorded one.
             // Restored tools that are not registered yet, such as MCP tools whose server is still connecting, stay pending.
             opened.RestoreUnrecordedTools(loadout.RequiresRecord || !restored.SequenceEqual(opened.RecordedActiveToolNames(context, cancellationToken), StringComparer.Ordinal),
-                registry.InitialActiveToolNames is null ? loadout.Pending : []);
+                loadout.Pending);
             return opened;
         }
         catch (Exception admission)
@@ -521,8 +522,10 @@ public sealed partial class PersistentAgentSession : IAsyncDisposable
                 Add("thinking_level_change", writer => writer.WriteString("thinkingLevel", level));
             // Source setActiveToolsByName: a selection applies in memory, and the next request records its difference from the declared
             // tools (declareToolChanges) with the prompt sections it changes. setModel/setThinkingLevel write only their own entries.
-            var selectedTools = update.ActiveToolNames is { } activeNames ? _registry!.NormalizeActiveTools(activeNames, work) : (ImmutableArray<string>?)null;
+            // Pi 1.5.0 _applyToolLoadout: tools that stay active keep their order and new ones are appended.
             var currentNames = _configuration.Tools.Select(tool => tool.Name).ToImmutableArray();
+            var selectedTools = update.ActiveToolNames is { } activeNames
+                ? SessionRuntimeRegistry.KeepOrder(currentNames, _registry!.NormalizeActiveTools(activeNames, work)) : (ImmutableArray<string>?)null;
             if (update.SystemMessage is { } system)
             {
                 if (system.Role != "system" || system.WireBody is null)

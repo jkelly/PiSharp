@@ -1,7 +1,8 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/src/documents.ts, plus the document definition and token types of
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/src/documents.ts, plus the document definition and token types of
 // packages/durable/src/types.ts (spec §3.1, §3.6). Upstream's defineDoc/defineDocFamily overloads pick the token type from the definition's
 // scope and history literals; here one factory per scope returns that token type, so the Session's typed access overloads (P3) are
 // selected by token type exactly as upstream's are. Document values are JsonObjectValue; upstream's static value type T is not carried.
+// checkpointWhen has no default (Pi v1.5.0): each factory takes it as a required parameter after initial, before the optional migrate.
 using PiSharp.Durable.Chord;
 using PiSharp.Durable.Chord.Delta;
 
@@ -10,7 +11,8 @@ namespace PiSharp.Durable;
 /// <summary>Converts a stored value of an older version to a complete current-version value; pure.</summary>
 public delegate JsonObjectValue DocumentMigration(JsonObjectValue value, int fromVersion);
 
-/// <summary>Returns true to store an ordinary change as a complete base instead of a delta (spec §3.5).</summary>
+/// <summary>Required policy: returns true to store an ordinary change as a complete base instead of a delta (spec §3.5).
+/// <c>(_, _, _) =&gt; false</c> keeps ordinary changes as deltas.</summary>
 public delegate bool DocumentCheckpointPredicate(JsonObjectValue value, IReadOnlyList<Op> ops, CheckpointInfo info);
 
 /// <summary>The erased definition of a singleton document or document family (upstream <c>AnyDocDefinition</c>).</summary>
@@ -19,10 +21,12 @@ public sealed class DocDefinition
     private readonly Func<JsonValue?, JsonObjectValue> initial;
 
     internal DocDefinition(string kind, int version, DocumentScopeKind scope, DocumentHistory? history, DocumentFork? fork, bool family,
-        Func<JsonValue?, JsonObjectValue> initial, DocumentMigration? migrate, DocumentCheckpointPredicate? checkpointWhen)
+        Func<JsonValue?, JsonObjectValue> initial, DocumentMigration? migrate, DocumentCheckpointPredicate checkpointWhen)
     {
         ArgumentNullException.ThrowIfNull(kind);
         ArgumentNullException.ThrowIfNull(initial);
+        // Upstream v1.5.0 requires checkpointWhen in the definition's type; a C# caller can still pass null.
+        ArgumentNullException.ThrowIfNull(checkpointWhen);
         if (version < 1) throw new ArgumentException($"Document {kind} version must be a positive integer");
         if (history == DocumentHistory.Latest && fork == DocumentFork.AsOf)
             throw new ArgumentException($"Document {kind} cannot fork \"asOf\" without history \"rewindable\"");
@@ -46,8 +50,8 @@ public sealed class DocDefinition
     public bool Family { get; }
     /// <summary>Converts an older stored version; absent when older versions are rejected.</summary>
     public DocumentMigration? Migrate { get; }
-    /// <summary>Selects complete bases for ordinary changes; absent means never.</summary>
-    public DocumentCheckpointPredicate? CheckpointWhen { get; }
+    /// <summary>Selects complete bases for ordinary changes; required, with no default.</summary>
+    public DocumentCheckpointPredicate CheckpointWhen { get; }
 
     /// <summary>The initial value: <c>initial()</c> for a singleton, <c>initial(seed)</c> for a family member.</summary>
     public JsonObjectValue Initial(JsonValue? seed = null) =>
@@ -107,55 +111,55 @@ public static class Documents
 {
     /// <summary>Defines a Session-scoped singleton document.</summary>
     public static SessionDocToken DefineSessionDoc(string kind, int version, Func<JsonObjectValue> initial,
-        DocumentMigration? migrate = null, DocumentCheckpointPredicate? checkpointWhen = null) =>
+        DocumentCheckpointPredicate checkpointWhen, DocumentMigration? migrate = null) =>
         new(Singleton(kind, version, DocumentScopeKind.Session, null, null, initial, migrate, checkpointWhen));
 
     /// <summary>Defines a latest-only conversation singleton document; <paramref name="fork"/> is <see cref="DocumentFork.Current"/> or
     /// <see cref="DocumentFork.Initial"/>.</summary>
     public static ConversationDocToken DefineConversationDoc(string kind, int version, DocumentFork fork, Func<JsonObjectValue> initial,
-        DocumentMigration? migrate = null, DocumentCheckpointPredicate? checkpointWhen = null) =>
+        DocumentCheckpointPredicate checkpointWhen, DocumentMigration? migrate = null) =>
         ConversationDocToken.Latest(Singleton(kind, version, DocumentScopeKind.Conversation, DocumentHistory.Latest, fork, initial, migrate, checkpointWhen));
 
     /// <summary>Defines a rewindable conversation singleton document.</summary>
     public static RewindableConversationDocToken DefineRewindableConversationDoc(string kind, int version, DocumentFork fork,
-        Func<JsonObjectValue> initial, DocumentMigration? migrate = null, DocumentCheckpointPredicate? checkpointWhen = null) =>
+        Func<JsonObjectValue> initial, DocumentCheckpointPredicate checkpointWhen, DocumentMigration? migrate = null) =>
         new(Singleton(kind, version, DocumentScopeKind.Conversation, DocumentHistory.Rewindable, fork, initial, migrate, checkpointWhen));
 
     /// <summary>Defines a task-scoped singleton document.</summary>
     public static TaskDocToken DefineTaskDoc(string kind, int version, Func<JsonObjectValue> initial,
-        DocumentMigration? migrate = null, DocumentCheckpointPredicate? checkpointWhen = null) =>
+        DocumentCheckpointPredicate checkpointWhen, DocumentMigration? migrate = null) =>
         new(Singleton(kind, version, DocumentScopeKind.Task, null, null, initial, migrate, checkpointWhen));
 
     /// <summary>Defines a Session-scoped document family.</summary>
     public static SessionDocFamilyToken DefineSessionDocFamily(string kind, int version, Func<JsonValue, JsonObjectValue> initial,
-        DocumentMigration? migrate = null, DocumentCheckpointPredicate? checkpointWhen = null) =>
+        DocumentCheckpointPredicate checkpointWhen, DocumentMigration? migrate = null) =>
         new(Family(kind, version, DocumentScopeKind.Session, null, null, initial, migrate, checkpointWhen));
 
     /// <summary>Defines a latest-only conversation document family; <paramref name="fork"/> is <see cref="DocumentFork.Current"/> or
     /// <see cref="DocumentFork.Initial"/>.</summary>
     public static ConversationDocFamilyToken DefineConversationDocFamily(string kind, int version, DocumentFork fork,
-        Func<JsonValue, JsonObjectValue> initial, DocumentMigration? migrate = null, DocumentCheckpointPredicate? checkpointWhen = null) =>
+        Func<JsonValue, JsonObjectValue> initial, DocumentCheckpointPredicate checkpointWhen, DocumentMigration? migrate = null) =>
         ConversationDocFamilyToken.Latest(Family(kind, version, DocumentScopeKind.Conversation, DocumentHistory.Latest, fork, initial, migrate, checkpointWhen));
 
     /// <summary>Defines a rewindable conversation document family.</summary>
     public static RewindableConversationDocFamilyToken DefineRewindableConversationDocFamily(string kind, int version, DocumentFork fork,
-        Func<JsonValue, JsonObjectValue> initial, DocumentMigration? migrate = null, DocumentCheckpointPredicate? checkpointWhen = null) =>
+        Func<JsonValue, JsonObjectValue> initial, DocumentCheckpointPredicate checkpointWhen, DocumentMigration? migrate = null) =>
         new(Family(kind, version, DocumentScopeKind.Conversation, DocumentHistory.Rewindable, fork, initial, migrate, checkpointWhen));
 
     /// <summary>Defines a task-scoped document family.</summary>
     public static TaskDocFamilyToken DefineTaskDocFamily(string kind, int version, Func<JsonValue, JsonObjectValue> initial,
-        DocumentMigration? migrate = null, DocumentCheckpointPredicate? checkpointWhen = null) =>
+        DocumentCheckpointPredicate checkpointWhen, DocumentMigration? migrate = null) =>
         new(Family(kind, version, DocumentScopeKind.Task, null, null, initial, migrate, checkpointWhen));
 
     private static DocDefinition Singleton(string kind, int version, DocumentScopeKind scope, DocumentHistory? history, DocumentFork? fork,
-        Func<JsonObjectValue> initial, DocumentMigration? migrate, DocumentCheckpointPredicate? checkpointWhen)
+        Func<JsonObjectValue> initial, DocumentMigration? migrate, DocumentCheckpointPredicate checkpointWhen)
     {
         ArgumentNullException.ThrowIfNull(initial);
         return new(kind, version, scope, history, fork, family: false, _ => initial(), migrate, checkpointWhen);
     }
 
     private static DocDefinition Family(string kind, int version, DocumentScopeKind scope, DocumentHistory? history, DocumentFork? fork,
-        Func<JsonValue, JsonObjectValue> initial, DocumentMigration? migrate, DocumentCheckpointPredicate? checkpointWhen)
+        Func<JsonValue, JsonObjectValue> initial, DocumentMigration? migrate, DocumentCheckpointPredicate checkpointWhen)
     {
         ArgumentNullException.ThrowIfNull(initial);
         return new(kind, version, scope, history, fork, family: true,

@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/src/images/node.ts
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/src/images/node.ts
 // Upstream's Node loader reads Photon's WebAssembly from the installed package and prepares images in a worker thread, so a large photo does
 // not block the event loop. Here the codec is a .NET object the host passes (Images.cs), and the worker is a dedicated background thread
 // (NodeWorker.cs) that takes requests in order and exits after IdleMs without one; the next image starts a new one. A background thread does

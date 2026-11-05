@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <!-- The Chord v2 port (PiSharp.Chord) is [Experimental("PISHARP_CHORD001")]; the pi-schema port it builds on is PISHARP_SCHEMA001, and
+         the pi-telemetry port its context carries (the counters' in-memory adapter) PISHARP_TELEMETRY001. -->
+    <NoWarn>$(NoWarn);PISHARP_CHORD001;PISHARP_SCHEMA001;PISHARP_TELEMETRY001</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../src/PiSharp.Chord/PiSharp.Chord.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- Test-only: the store's SQL cases (Store/*Cases.cs) run the SQL that PiSharp.Chord renders in an in-memory SQLite database, as
+         upstream's tests do with node:sqlite. PiSharp.Chord itself references no SQLite driver and no PiSharp.Durable project (decision
+         0013); these are the packages PiSharp.Durable.Sqlite admits (decision 0005), at the same exact pins. -->
+    <PackageReference Include="Microsoft.Data.Sqlite" Version="[10.0.12]" />
+    <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" Version="[2.1.12]" />
+    <PackageReference Include="SQLitePCLRaw.core" Version="[2.1.12]" />
+    <PackageReference Include="SQLitePCLRaw.lib.e_sqlite3" Version="[2.1.12]" />
+    <PackageReference Include="SQLitePCLRaw.provider.e_sqlite3" Version="[2.1.12]" />
+  </ItemGroup>
+</Project>

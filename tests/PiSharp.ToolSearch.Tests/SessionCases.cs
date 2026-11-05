@@ -125,17 +125,20 @@ internal static partial class Program
                 Equal(1, RecordedAdditions(session).Count(names => names.Contains("mcp__docs__fetch")), "recorded once");
             }
             var ids = 0;
-            // Reopened from the transcript with the docs server connected: the loaded tool is restored.
+            // Reopened from the transcript with the docs server connected: the loaded tool is restored. mcp__web__search, a direct
+            // extension tool the branch never added or removed, activates like a newly registered tool (Pi 1.5.0
+            // _restoreToolsFromTranscript).
             await using (var reopened = await PersistentAgentSession.OpenWithRegistryAsync(path, SearchRegistry(), () => 9, () => "reopened-" + ++ids))
-                Names(["read", ToolSearch.Name, "mcp__docs__fetch"], reopened.GetActiveTools(), "restored from the transcript");
+                Names(["read", ToolSearch.Name, "mcp__docs__fetch", "mcp__web__search"], reopened.GetActiveTools(), "restored from the transcript");
             // Reopened while the docs server is still connecting: pending until it registers its tools.
             var connecting = await PersistentAgentSession.OpenWithRegistryAsync(path, SearchRegistry(docs: false), () => 9, () => "reopened-" + ++ids);
             await using var owner = new ReplaceableAgentSession(connecting, (_, _) => throw new InvalidOperationException("No replacement expected."));
-            Names(["read", ToolSearch.Name], connecting.GetActiveTools(), "registered part restored");
+            Names(["read", ToolSearch.Name, "mcp__web__search"], connecting.GetActiveTools(), "registered part restored");
             Names(["mcp__docs__fetch"], connecting.PendingToolNames, "loaded tool pending");
             await owner.PrepareAndPublishToolCatalogAsync(owner.Current, (expected, _) => ValueTask.FromResult(new PreparedSessionToolCatalog(
                 expected.WithToolCatalog(SearchCatalog(), null), owner.Current.Session.GetActiveTools(), () => { })));
-            Names(["read", ToolSearch.Name, "mcp__docs__fetch"], owner.Current.Session.GetActiveTools(), "pending loaded tool activates on registration");
+            Names(["read", ToolSearch.Name, "mcp__web__search", "mcp__docs__fetch"], owner.Current.Session.GetActiveTools(),
+                "pending loaded tool activates on registration");
         }
         finally { Directory.Delete(Path.GetDirectoryName(path)!, recursive: true); }
     }

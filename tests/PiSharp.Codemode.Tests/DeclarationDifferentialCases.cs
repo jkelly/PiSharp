@@ -95,7 +95,11 @@ internal static partial class Program
                 int? budget = item.TryGetProperty("inlineBudget", out var inline) ? inline.GetInt32() : null;
                 var changes = CodemodeToolDefinition.PrepareLoadout(loadout, mode, models: false, budget, tool => tool.OutputSchema);
                 var expected = item.GetProperty("changes");
-                var expectedDescriptions = expected.GetProperty("descriptions").EnumerateObject().ToDictionary(entry => entry.Name, entry => entry.Value.GetString()!);
+                // Pi 1.5.0 (f6ee9ce9c, sync150.output-type-summaries) shows a const field's value in the "resolves to" summary; these goldens
+                // are Pi 1.2.0's. The adjustment is authored from tool.ts at f9a26365, not recorded: t4 is the only golden tool with a const field.
+                var expectedDescriptions = expected.GetProperty("descriptions").EnumerateObject().ToDictionary(entry => entry.Name,
+                    entry => entry.Name == "mcp__docs__t4" ? entry.Value.GetString()!.Replace("{ $ref?, default?, data? }", "{ $ref?, default?: {\"$ref\":\"#/x\"}, data? }", StringComparison.Ordinal)
+                        : entry.Value.GetString()!);
                 foreach (var (name, text) in expectedDescriptions)
                     if (!changes.Descriptions.TryGetValue(name, out var actual) || actual != text)
                         mismatches.Add($"{mode}/{budget} description of {name}:\nexpected:\n{text}\nactual:\n{actual}");

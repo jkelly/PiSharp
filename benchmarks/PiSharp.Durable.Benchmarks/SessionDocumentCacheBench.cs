@@ -1,9 +1,10 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/test/session-document-cache-bench.ts. Session document cache
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/test/session-document-cache-bench.ts. Session document cache
 // benchmark: a Harness on SQLite creates N conversations and runs one short task in each, as a long-running agent with subagents does; then,
 // at a few retention settings, reports the documents left in the cache, the bytes live objects retain per conversation (HeapRetained.cs),
 // and the cost of reading a document of an old conversation again. Upstream's performance.now() is a Stopwatch; createModels() is a models
 // catalog without providers (the task makes no request). Upstream casts the Harness to SessionImpl for its internal readOnLine() and
 // documentCacheSizes; this assembly reaches the Session's internal FlushLineAsync and DocumentCacheSizes by reflection.
+// Pi v1.5.0 sync (area deferred-commits): DocumentCacheSizes also counts the documents with held changes.
 using System.Diagnostics;
 using System.Globalization;
 using System.Reflection;
@@ -126,8 +127,8 @@ public static class SessionDocumentCacheBench
 
         public Task FlushLineAsync() => (Task)Flush.Invoke(session, null)!;
 
-        public (int Cached, int Idle, int Attached, int Sweeps) DocumentCacheSizes =>
-            ((int Cached, int Idle, int Attached, int Sweeps))Sizes.GetValue(session)!;
+        public (int Cached, int Idle, int Attached, int Sweeps, int Held) DocumentCacheSizes =>
+            ((int Cached, int Idle, int Attached, int Sweeps, int Held))Sizes.GetValue(session)!;
     }
 
     /// <summary>Upstream's arguments: comma-separated sizes, or the defaults.</summary>

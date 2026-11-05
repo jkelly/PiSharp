@@ -40,6 +40,10 @@ public static partial class NativeProviderFactory
     /// <summary>Binds catalog <c>cost</c> (with prompt-length tiers) and <c>compat.allowedFallbackModels</c> costs to Messages options.</summary>
     public static AnthropicMessagesOptions? AnthropicMessagesOptionsForModel(JsonData? metadata, AnthropicMessagesOptions? options = null)
     {
+        // Pi f9a26365 openrouter-cost.ts isOpenRouterModel: a model whose baseUrl names openrouter.ai reports its billed total.
+        if (metadata is { Value.ValueKind: JsonValueKind.Object } described && described.Value.TryGetProperty("baseUrl", out var baseUrl) &&
+            baseUrl.ValueKind == JsonValueKind.String && Protocols.ProviderShared.ProviderCost.IsOpenRouter(null, baseUrl.GetString()))
+            options = (options ?? new()) with { OpenRouterReportedCost = true };
         if (metadata is null || !metadata.Value.TryGetProperty("cost", out var cost) || cost.ValueKind == JsonValueKind.Null) return options;
         try
         {

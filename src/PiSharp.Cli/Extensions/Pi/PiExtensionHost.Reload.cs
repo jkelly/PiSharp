@@ -18,6 +18,10 @@ internal sealed partial class PiExtensionHost
     /// <summary>Every registry owner id this host activated, with its extension path (MCP servers and diagnostics report paths).</summary>
     private readonly Dictionary<string, string> _ownerPaths = new(StringComparer.Ordinal);
 
+    /// <summary>The warnings of configured packages that could not be installed by the last load or reload (resource-loader.ts
+    /// collectPackageInstallWarnings), by package source.</summary>
+    internal ImmutableArray<(string Path, string Warning)> PackageWarnings { get; set; } = [];
+
     /// <summary>The extension entry points a reload loads (packageManager.resolve() again); the loaded paths when unset.</summary>
     internal Func<CancellationToken, Task<IReadOnlyList<string>>>? ResolveReloadPaths { get; set; }
 
@@ -47,7 +51,7 @@ internal sealed partial class PiExtensionHost
         {
             generation = ++_runtimeGeneration;
             _extensions.Clear(); _errors.Clear();
-            _order = [.. paths.Select(Path.GetFullPath)];
+            _order = [.. paths.Select(PiSourceInfo.ResourcePathKey)];
             if (result is { } reloaded)
             {
                 foreach (var item in reloaded.GetProperty("results").EnumerateArray())

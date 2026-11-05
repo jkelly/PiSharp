@@ -1,10 +1,16 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/test/examples/22-subagent-foreground.ts. Its product code is the same
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/test/examples/21-subagent-foreground.ts. Its product code is the same
 // foreground subagent as Pi v1.1.0's packages/coding-agent/src/experimental/durable/subagent.ts, which v1.2.0 deleted
 // (src/PiSharp.Cli/Durable/DurableSubagent.cs, PiSharp-only since; decision 0005). Upstream
 // uses OpenAI when OPENAI_API_KEY is set and pi-ai's faux provider otherwise; here ScriptedModels always stands in, so the example runs
 // offline. Two ordering barriers keep Node's event-loop order, under which the UI attaches to the child before the child answers and prints
 // the child's answer before the parent's: the child's reply waits until the UI attached to the child, and the parent's final reply until the
 // child's answer was printed. On a file backend the storage is then reopened and the child conversation and transcripts read back.
+// Pi v1.5.0 sync (area events, f3255de76): the UI watches each conversation's view, as v1.5.0's 21-subagent-foreground.ts does: it prints
+// the text and tool calls of the pi.assistant entries appended since the newest it saw, and attaches to the child a running subagent call
+// names in its pi.live slot's details, where v1.2.0 printed watchEvents' message_end and tool_execution_start events (removed). Area
+// tools-schema: the subagent tool's parameters are pi-schema's obj({ task: str({ description }) }) as JSON Schema. Area vocabulary
+// (5f312dac4): each view listener takes the tagged call and skips one that is not a value. Since the closeout the example carries
+// v1.5.0's name (b9fb2b854).
 using PiSharp.Durable.Chord;
 
 namespace PiSharp.Durable.Examples;
@@ -37,7 +43,7 @@ public static partial class Examples
                     Name = "subagent",
                     Description = "Delegate a self-contained task to a subagent and get its answer back.",
                     Parameters = (JsonObjectValue)JsonValue.Parse(
-                        """{"type":"object","required":["task"],"properties":{"task":{"type":"string","description":"What the subagent should do"}}}"""),
+                        """{"type":"object","properties":{"task":{"type":"string","description":"What the subagent should do"}},"required":["task"],"additionalProperties":false}"""),
                     // Safe to rerun after a crash: a rerun finds the child it already created and the submission it already made.
                     Replay = ToolReplay.Safe,
                     Execute = async (args, api, callContext) =>
@@ -78,7 +84,7 @@ public static partial class Examples
         return subagent;
     }
 
-    // 22: a foreground subagent tool, with the UI attaching to the child through the call's running details.
+    // 21: a foreground subagent tool, with the UI attaching to the child through the call's running details.
     private static async Task SubagentForegroundAsync(Func<Task<IStorage>> open, TextWriter output)
     {
         // ─── Host setup ─────────────────────────────────────────────────────────────
@@ -96,37 +102,47 @@ public static partial class Examples
         var harness = await Harness.OpenAsync(await open(), new HarnessOptions { Models = models, Registry = registry }, Context);
         var root = await harness.RootAsync(Context, new AgentChange { Model = Faux });
 
-        // ─── UI: the parent's events, with each subagent's events indented under its call ───
+        // ─── UI: the parent's transcript, with each subagent's indented under its call ───
 
         var gate = new SemaphoreSlim(1, 1);
-        async Task Print(string indent, AgentEvent agentEvent)
+        // Print an assistant entry's text and tool calls.
+        async Task Print(string indent, EntryRecord entry)
         {
-            if (agentEvent is MessageEndEvent { Entry.Kind: "pi.assistant" } end)
+            if (entry.Kind != "pi.assistant" || entry.Model?[0] is not JsonObjectValue message || message["role"] is not JsonStringValue { Value: "assistant" }) return;
+            foreach (var block in ((JsonArrayValue)message["content"]).OfType<JsonObjectValue>())
             {
-                var text = TextOf(end.Entry.Model?[0] as JsonObjectValue);
-                if (text != "") await output.WriteLineAsync($"{indent}assistant: {text}");
-                if (indent.Length > 0) childPrinted.TrySetResult();
-                else if (text != "") parentPrinted.TrySetResult();
+                if (block["type"] is JsonStringValue { Value: "text" } && block["text"] is JsonStringValue { Value: { Length: > 0 } text })
+                {
+                    await output.WriteLineAsync($"{indent}assistant: {text}");
+                    if (indent.Length > 0) childPrinted.TrySetResult();
+                    else parentPrinted.TrySetResult();
+                }
+                if (block["type"] is JsonStringValue { Value: "toolCall" })
+                    await output.WriteLineAsync($"{indent}tool {((JsonStringValue)block["name"]).Value}({block["arguments"].ToJson()})");
             }
-            else if (agentEvent is ToolExecutionStartEvent start) await output.WriteLineAsync($"{indent}tool {start.ToolName}({start.Args.ToJson()})");
         }
         var attached = new HashSet<ConversationId>();
-        var streams = new List<IAgentEventStream>();
         async Task Attach(ConversationId id, string indent)
         {
             attached.Add(id);
-            var stream = await harness.WatchEventsAsync(id, Context);
-            streams.Add(stream);
-            stream.Start(async (events, _) =>
+            var watch = await (await harness.ConversationAsync(id, Context))!.WatchAsync(Context);
+            var newest = watch.Value.Entries.IsEmpty ? 0 : watch.Value.Entries[^1].Id.Value;
+            watch.Start(async (call, _) =>
             {
+                if (call is not WatchValueCall<ConversationView> { Value: var value }) return;
                 await gate.WaitAsync();
                 try
                 {
-                    foreach (var agentEvent in events)
+                    foreach (var entry in value.Entries) if (entry.Id.Value > newest) await Print(indent, entry);
+                    if (!value.Entries.IsEmpty) newest = value.Entries[^1].Id.Value;
+                    // A running subagent call names its child conversation in its details.
+                    var slots = value.Doc("pi.live") is { } live && live.TryGetValue("tools", out var tools) && tools is JsonArrayValue array
+                        ? array.OfType<JsonObjectValue>() : [];
+                    foreach (var slot in slots)
                     {
-                        await Print(indent, agentEvent);
-                        if (agentEvent is not ToolExecutionUpdateEvent { Details: JsonObjectValue details } || !details.TryGetValue("conversationId", out var value)) continue;
-                        var child = new ConversationId((long)((JsonNumberValue)value).Value);
+                        if (!slot.TryGetValue("details", out var details) || details is not JsonObjectValue named ||
+                            !named.TryGetValue("conversationId", out var conversationId) || conversationId is not JsonNumberValue number) continue;
+                        var child = new ConversationId((long)number.Value);
                         if (attached.Contains(child)) continue;
                         await Attach(child, indent + "  ");
                         childAttached.TrySetResult();
@@ -140,9 +156,8 @@ public static partial class Examples
         var submission = await root.SubmitAsync(SubmissionDraft.Input("Use the subagent tool to find three prime numbers, then tell me what it said."), Context);
         await submission.WaitAsync(Context);
         await harness.WaitForIdleAsync(Context);
-        // Event callbacks run after their commit; let the last one print.
+        // Watch callbacks run after their commit; let the last ones print.
         await parentPrinted.Task;
-        foreach (var stream in streams) await stream.StopAsync();
         await harness.CloseAsync(Context);
 
         await ReopenAsync(open, output, async reopened =>

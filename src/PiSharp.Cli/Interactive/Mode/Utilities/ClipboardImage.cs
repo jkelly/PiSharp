@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): coding-agent/src/utils/clipboard-image.ts.
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): coding-agent/src/utils/clipboard-image.ts.
 // Photon (loadPhoton/convertToPng) is replaced by ClipboardEnvironment.ImageCodec (SkiaSharp by default, as the read tool uses).
 using System.Text;
 using System.Text.RegularExpressions;

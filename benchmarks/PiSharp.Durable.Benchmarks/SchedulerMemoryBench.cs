@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/test/scheduler-memory-bench.ts. Scheduler memory benchmark: under one
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/test/scheduler-memory-bench.ts. Scheduler memory benchmark: under one
 // live parent task, N subagent cycles run and end: a tool task owned by the parent, a conversation owned by the tool task, and a task in that
 // conversation. Reports the scheduler's ownership index sizes and the bytes live objects retain (HeapRetained.cs) once all cycles ended, then
 // the storage reads a later message into an old subagent conversation costs. On SQLite, so durable history stays out of the heap.
@@ -167,7 +167,8 @@ public static class SchedulerMemoryBench
             return inner.GetConversationAsync(id, context);
         }
 
-        public Task<Seq> CommitAsync(IReadOnlyList<StorageWrite> writes, DurableContext context) => inner.CommitAsync(writes, context);
+        public Task<CommitResult> CommitAsync(IReadOnlyList<IReadOnlyList<StorageWrite>> batches, Action<int, Seq> receive, DurableContext context) =>
+            inner.CommitAsync(batches, receive, context);
         public Task<TId> MintIdAsync<TId>() where TId : struct, IDurableId<TId> => inner.MintIdAsync<TId>();
         public Task<StoredDocument?> GetDocumentAsync(DocumentId id, DocumentPoint at, DurableContext context) => inner.GetDocumentAsync(id, at, context);
         public Task<DocumentRecord?> FindDocumentAsync(DocumentAddress address, DocumentPoint at, DurableContext context) =>

@@ -28,8 +28,8 @@ public sealed class AnthropicMessagesAuthenticatedRequestFactory
         AnthropicMessagesKeyAuthRequestOptions? options = null)
     {
         _options = options ?? new();
-        _withScope = (session, tier) => new(baseUri, expectedModel, projectionOptions, authentication,
-            AnthropicMessagesKeyAuthRequestFactory.TierOptions(_options with { SessionId = session ?? _options.SessionId }, tier, expectedModel));
+        _withScope = (session, tier, identity) => new(baseUri, expectedModel, projectionOptions, authentication,
+            AnthropicMessagesKeyAuthRequestFactory.TierOptions(_options with { SessionId = session ?? _options.SessionId, Identity = identity ?? _options.Identity }, tier, expectedModel));
         _createWithoutPreferredStrict = () => new(baseUri, expectedModel, projectionOptions with { DisablePreferredStrictTools = true }, authentication, _options);
         ArgumentNullException.ThrowIfNull(authentication); _authentication = authentication;
         if (authentication.Kind == AuthenticationKind.WorkloadIdentityFederation
@@ -58,11 +58,12 @@ public sealed class AnthropicMessagesAuthenticatedRequestFactory
         var merged = new Dictionary<string, string?>(StringComparer.Ordinal);
         long supplied = 0;
         ReadHeaders(_options.RuntimeHeaders, merged, ref supplied);
-        var configured = new Dictionary<string, string?>(StringComparer.Ordinal)
-        {
-            ["User-Agent"] = "PiSharp", ["accept"] = "application/json",
-            ["anthropic-dangerous-direct-browser-access"] = "true"
-        };
+        var configured = new Dictionary<string, string?>(StringComparer.Ordinal);
+        // Pi 1.5.0 anthropic-messages.ts createClient: the API key path sends getIdentityHeaders(model, identity) below every other
+        // header; the OAuth path sends Claude Code's identity headers instead of the client identity.
+        if (!authentication.UseOAuthProjection)
+            foreach (var (name, value) in ClientIdentities.GetIdentityHeaders(expectedModel.Provider, baseUri.AbsoluteUri, _options.Identity)) configured[name] = value;
+        configured["accept"] = "application/json"; configured["anthropic-dangerous-direct-browser-access"] = "true";
         if (_options.SessionAffinityHeader is not ("x-session-affinity" or "x-session-id"))
             throw Fail(AnthropicMessagesKeyAuthRequestFailure.InvalidConfiguration);
         if (_options.SessionId is not null)
@@ -109,16 +110,18 @@ public sealed class AnthropicMessagesAuthenticatedRequestFactory
     private AnthropicMessagesAuthenticatedRequestFactory WithoutPreferredStrict() =>
         Volatile.Read(ref _withoutPreferredStrict) ?? Interlocked.CompareExchange(ref _withoutPreferredStrict, _createWithoutPreferredStrict(), null) ?? _withoutPreferredStrict!;
     // StreamOptions.sessionId per request: a factory configured without a session id binds the request's (cached per id). PiSharp-only:
-    // the request's service tier (ChatRequest.ServiceTier) also selects a factory configured with that tier.
-    private readonly Func<string?, string?, AnthropicMessagesAuthenticatedRequestFactory> _withScope;
-    private readonly System.Collections.Concurrent.ConcurrentDictionary<(string?, string?), AnthropicMessagesAuthenticatedRequestFactory> _scoped = new();
+    // the request's service tier (ChatRequest.ServiceTier) also selects a factory configured with that tier. StreamOptions.identity
+    // (ChatRequest.Identity) merges over the configured identity the same way.
+    private readonly Func<string?, string?, ClientIdentity?, AnthropicMessagesAuthenticatedRequestFactory> _withScope;
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<(string?, string?, ClientIdentity?), AnthropicMessagesAuthenticatedRequestFactory> _scoped = new();
     private AnthropicMessagesAuthenticatedRequestFactory? ScopedTo(ChatRequest? request)
     {
         var session = _options.SessionId is null ? request?.SessionId : null;
         var tier = request?.ServiceTier is { } requested && ServiceTiers.Normalize(requested) is { } wire && wire != _options.PiSharpTier ? wire : null;
-        if (session is null && tier is null) return null;
+        var identity = request?.Identity is { } asked && ClientIdentities.Merge(_options.Identity, asked) is { } merged && merged != _options.Identity ? merged : null;
+        if (session is null && tier is null && identity is null) return null;
         if (_scoped.Count > 32) _scoped.Clear();
-        return _scoped.GetOrAdd((session, tier), key => _withScope(key.Item1, key.Item2));
+        return _scoped.GetOrAdd((session, tier, identity), key => _withScope(key.Item1, key.Item2, key.Item3));
     }
 
     public HttpRequestMessage Create(ChatRequest request, CancellationToken cancellationToken = default)

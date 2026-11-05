@@ -1,5 +1,5 @@
 // jsdiff 8.0.4 (BSD-3-Clause, Copyright (c) 2009-2015, Kevin Decker; see THIRD-PARTY-NOTICES.md): libesm/diff/base.js, libesm/diff/line.js
-// and libesm/patch/create.js, reduced to what packages/durable/src/tools/edit-diff.ts (Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff) calls:
+// and libesm/patch/create.js, reduced to what packages/durable/src/tools/edit-diff.ts (Pi f9a26365568127461c47a07a37dcb42c140a3ac5) calls:
 // diffLines without options and createTwoFilesPatch with FILE_HEADERS_ONLY and a context size, both synchronous and without a timeout.
 // The Myers walk, its tie-breaking and the hunk construction follow the JavaScript line for line, so the output is byte-identical.
 using System.Globalization;

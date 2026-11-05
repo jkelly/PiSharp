@@ -1,7 +1,9 @@
 // Support for the tui.* cases: a fake view source and controller over hand-built DurableViews, and the TUI running on a VirtualTerminal
-// (tests/PiSharp.InteractiveParity.Tests/VirtualTerminal.cs, linked). PiSharp.Durable builds ConversationView and TaskGraph values only
-// internally (they come from a Harness's mounts), so the fake builds them through their non-public constructors with the JSON shapes the
-// Harness writes: entries carry pi-ai wire messages in `model`, and the built-in documents are pi.agent, pi.live, pi.inbox and pi.usage.
+// (tests/PiSharp.InteractiveParity.Tests/VirtualTerminal.cs, linked). PiSharp.Durable builds TaskGraph values only internally (they come
+// from a Harness's mounts), so the fake builds them through their non-public constructors; a ConversationView has a public constructor
+// since pi-durable 1.5.0. Both carry the JSON shapes the Harness writes: entries carry pi-ai wire messages in `model`, and the built-in
+// documents are pi.agent, pi.live, pi.inbox and pi.usage. A view's Transcript, the active transcript the TUI renders, is the
+// conversation's entries.
 using System.Collections.Concurrent;
 using System.Collections.Immutable;
 using System.Reflection;
@@ -50,10 +52,9 @@ internal static partial class TuiTests
     public static EntryRecord AssistantEntry(long id, string text, string? usage = null) =>
         Entry(id, "pi.assistant", AssistantWire($"[{TextBlock(text)}]", usage: usage));
 
-    /// <summary>A ConversationView with <paramref name="entries"/> and the documents of <paramref name="docsJson"/>.</summary>
+    /// <summary>A ConversationView with <paramref name="entries"/>, the whole transcript, and the documents of <paramref name="docsJson"/>.</summary>
     public static ConversationView Conversation(IEnumerable<EntryRecord> entries, string docsJson = "{}", ConversationId? id = null) =>
-        (ConversationView)Activator.CreateInstance(typeof(ConversationView), BindingFlags.NonPublic | BindingFlags.Instance, null,
-            [new ConversationRecord(id ?? RootId), entries.ToImmutableArray(), J(docsJson)], null)!;
+        new(new ConversationRecord(id ?? RootId), [.. entries], null, J(docsJson));
 
     public const string AgentDoc = """{"model":{"provider":"faux","modelId":"faux-1"},"thinkingLevel":"medium"}""";
 
@@ -70,7 +71,7 @@ internal static partial class TuiTests
     public static DurableView View(ConversationView conversation, IEnumerable<DurableNotice>? notices = null, TaskGraph? tasks = null,
         ImmutableArray<DurableConversationSummary>? conversations = null) =>
         new(new DurableSessionInfo("session-1", "/sessions/session-1", Cwd), conversation, conversations ?? Conversations, Models,
-            [.. notices ?? []], tasks);
+            [.. notices ?? []], tasks) { Transcript = conversation.Entries };
 
     public static DurableView View(IEnumerable<EntryRecord> entries, string? live = null, string? inbox = null, string? usage = null,
         string agent = AgentDoc, IEnumerable<DurableNotice>? notices = null, TaskGraph? tasks = null)
@@ -85,15 +86,15 @@ internal static partial class TuiTests
     // ─── task graphs ─────────────────────────────────────────────────────────
 
     public static TaskGraphState State(DurableTaskStatus status, string? phase, ImmutableArray<TaskId>? on = null, JoinPolicy? policy = null,
-        TaskOutcomeStatus? outcome = null) =>
+        TaskOutcomeStatus? outcome = null, double? until = null) =>
         (TaskGraphState)typeof(TaskGraphState).GetConstructors(BindingFlags.NonPublic | BindingFlags.Instance).Single()
-            .Invoke([status, phase, on ?? [], policy, outcome]);
+            .Invoke([status, phase, on ?? [], policy, outcome, until]);
 
     public static TaskGraphNode Node(long id, string kind, ConversationId conversation, TaskGraphState state, long? owner = null,
-        bool background = false, bool abortRequested = false, long[]? conversations = null) =>
+        bool background = false, bool abortRequested = false, long[]? conversations = null, BlockedReason? blocked = null) =>
         (TaskGraphNode)typeof(TaskGraphNode).GetConstructors(BindingFlags.NonPublic | BindingFlags.Instance).Single()
             .Invoke([new TaskId(id), kind, conversation, owner is null ? null : new TaskId(owner.Value), background, abortRequested, state,
-                (conversations ?? []).Select(value => new ConversationId(value)).ToImmutableArray()]);
+                (conversations ?? []).Select(value => new ConversationId(value)).ToImmutableArray(), blocked]);
 
     public static TaskGraph Graph(params TaskGraphNode[] nodes) =>
         (TaskGraph)typeof(TaskGraph).GetConstructors(BindingFlags.NonPublic | BindingFlags.Instance).Single()

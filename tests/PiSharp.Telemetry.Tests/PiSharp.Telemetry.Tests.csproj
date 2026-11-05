@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <!-- The pi-telemetry port (PiSharp.Telemetry) and PiSharp.AI's request tracing are [Experimental("PISHARP_TELEMETRY001")]. -->
+    <NoWarn>$(NoWarn);PISHARP_TELEMETRY001</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../src/PiSharp.AI/PiSharp.AI.csproj" />
+    <ProjectReference Include="../../src/PiSharp.Telemetry/PiSharp.Telemetry.csproj" />
+  </ItemGroup>
+</Project>

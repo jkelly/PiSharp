@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/env/src/list-files.ts (`listFilesOver`'s bound validation, abort checks and
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/env/src/list-files.ts (`listFilesOver`'s bound validation, abort checks and
 // error mapping) and packages/env/daemon/src/list.rs (the walk, its defaults, bounds and truncation). Upstream implements `listFiles` only in
 // pi-env (decision 0005 leaves pi-env out), whose LocalExecutionEnv lists through a daemon on the same machine; LocalFileSystem lists in
 // process with the daemon's semantics instead.

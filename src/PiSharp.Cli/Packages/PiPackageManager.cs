@@ -153,7 +153,7 @@ internal sealed class PiPackageManager
         all.AddRange(Packages("project").Select(package => (package, "project")));
         all.AddRange(Packages("user").Select(package => (package, "user")));
         var packageSources = DedupePackages(all);
-        await ResolvePackageSources(packageSources, accumulator, onMissing, cancellationToken).ConfigureAwait(false);
+        var installFailures = await ResolvePackageSources(packageSources, accumulator, onMissing, cancellationToken).ConfigureAwait(false);
 
         var globalBaseDir = agentDir;
         var projectBaseDir = Path.Join(cwd, PiConfig.ConfigDirName);
@@ -174,7 +174,7 @@ internal sealed class PiPackageManager
             AddResource(accumulator.Maps["extensions"], path, new() { Source = "builtin", Scope = projectEnabled is null ? "user" : "project", Origin = "top-level" },
                 projectEnabled ?? IsEnabledByOverrides(path, StringsOf(settings.Global, "extensions"), globalBaseDir));
         }
-        return ToResolvedPaths(accumulator);
+        return ToResolvedPaths(accumulator) with { InstallFailures = installFailures };
     }
 
     /// <summary>Source resolveExtensionSources (<c>-e</c>): <c>builtin:</c> names and package sources resolved in the temporary, project
@@ -189,8 +189,8 @@ internal sealed class PiPackageManager
             AddResource(accumulator.Maps["extensions"], source, new() { Source = "builtin", Scope = scope, Origin = "top-level" }, true);
         var packageSources = list.Where(source => !source.StartsWith(BuiltinPathPrefix, StringComparison.Ordinal))
             .Select(source => (new PiPackageEntry(source, JsonValue.Create(source)), scope)).ToList();
-        await ResolvePackageSources(packageSources, accumulator, null, cancellationToken).ConfigureAwait(false);
-        return ToResolvedPaths(accumulator);
+        var installFailures = await ResolvePackageSources(packageSources, accumulator, null, cancellationToken).ConfigureAwait(false);
+        return ToResolvedPaths(accumulator) with { InstallFailures = installFailures };
     }
 
     /// <summary>Source listConfiguredPackages: user entries, then project entries.</summary>
@@ -290,13 +290,14 @@ internal sealed class PiPackageManager
                 case PiGitSource git: gitCandidates.Add((source, scope, git)); break;
             }
         }
-        var checks = await RunWithConcurrency(npmCandidates.Select(entry => (Func<Task<bool>>)(() => ShouldUpdateNpmSource(entry.Parsed, entry.Scope, cancellationToken))).ToList(),
+        var checks = await RunWithConcurrency(npmCandidates.Select(entry => (Func<Task<NpmUpdateCheck>>)(() => ShouldUpdateNpmSource(entry.Parsed, entry.Scope, cancellationToken))).ToList(),
             UpdateCheckConcurrency).ConfigureAwait(false);
-        var userUpdates = new List<(string Source, PiNpmSource Parsed)>(); var projectUpdates = new List<(string Source, PiNpmSource Parsed)>();
+        var userUpdates = new List<NpmUpdateTarget>(); var projectUpdates = new List<NpmUpdateTarget>();
         for (var index = 0; index < npmCandidates.Count; index++)
         {
-            if (!checks[index]) continue;
-            (npmCandidates[index].Scope == "user" ? userUpdates : projectUpdates).Add((npmCandidates[index].Source, npmCandidates[index].Parsed));
+            if (!checks[index].ShouldUpdate) continue;
+            (npmCandidates[index].Scope == "user" ? userUpdates : projectUpdates).Add(new(npmCandidates[index].Source, npmCandidates[index].Parsed,
+                checks[index].InstalledVersion, checks[index].TargetVersion));
         }
         var tasks = new List<Task>();
         if (userUpdates.Count > 0) tasks.Add(UpdateNpmBatch(userUpdates, "user", cancellationToken));
@@ -310,20 +311,24 @@ internal sealed class PiPackageManager
         await Task.WhenAll(tasks).ConfigureAwait(false);
     }
 
-    private async Task<bool> ShouldUpdateNpmSource(PiNpmSource source, string scope, CancellationToken cancellationToken)
+    private sealed record NpmUpdateCheck(bool ShouldUpdate, string? InstalledVersion = null, string? TargetVersion = null);
+    private sealed record NpmUpdateTarget(string Source, PiNpmSource Parsed, string? InstalledVersion, string? TargetVersion);
+
+    private async Task<NpmUpdateCheck> ShouldUpdateNpmSource(PiNpmSource source, string scope, CancellationToken cancellationToken)
     {
         var installedPath = GetManagedNpmInstallPath(source, scope);
         var installedVersion = Path.Exists(installedPath) ? GetInstalledNpmVersion(installedPath) : null;
-        if (installedVersion is null) return true;
+        if (installedVersion is null) return new(true);
         try
         {
             var target = await GetLatestNpmVersion(source.Version is not null ? source.Spec : source.Name, source.Range, cancellationToken).ConfigureAwait(false);
-            return PiSemver.Gt(target, installedVersion);
+            return new(PiSemver.Gt(target, installedVersion), installedVersion, target);
         }
-        catch (Exception error) when (error is not OperationCanceledException) { return true; }
+        // Preserve the update when the version lookup fails.
+        catch (Exception error) when (error is not OperationCanceledException) { return new(true, installedVersion); }
     }
 
-    private async Task UpdateNpmBatch(List<(string Source, PiNpmSource Parsed)> sources, string scope, CancellationToken cancellationToken)
+    private async Task UpdateNpmBatch(List<NpmUpdateTarget> sources, string scope, CancellationToken cancellationToken)
     {
         if (sources.Count == 0) return;
         var label = sources.Count == 1 ? sources[0].Source : $"{scope} npm packages";
@@ -335,6 +340,21 @@ internal sealed class PiPackageManager
             EnsureNpmProject(installRoot);
             await RunNpmCommand(GetNpmInstallArgs(specs, installRoot), null, cancellationToken).ConfigureAwait(false);
         }).ConfigureAwait(false);
+        ReportUnchangedNpmUpdates(sources, scope);
+    }
+
+    /// <summary>Source reportUnchangedNpmUpdates: npm can resolve stale registry metadata shortly after a publish and install the old
+    /// version without an error, so an announced update that left the installed version unchanged is reported.</summary>
+    private void ReportUnchangedNpmUpdates(List<NpmUpdateTarget> sources, string scope)
+    {
+        foreach (var entry in sources)
+        {
+            if (entry.InstalledVersion is null || entry.TargetVersion is null) continue;
+            var versionAfter = GetInstalledNpmVersion(GetManagedNpmInstallPath(entry.Parsed, scope));
+            if (versionAfter != entry.InstalledVersion) continue;
+            EmitProgress(new("progress", "update", entry.Source,
+                $"{entry.Source} is still {versionAfter} (registry reports {entry.TargetVersion}); npm registry metadata may be stale, try again in a few minutes"));
+        }
     }
 
     /// <summary>Source checkForAvailableUpdates: unpinned installed npm packages with a newer version and git checkouts behind their
@@ -369,9 +389,10 @@ internal sealed class PiPackageManager
         return [.. results.OfType<PiPackageUpdate>()];
     }
 
-    private async Task ResolvePackageSources(List<(PiPackageEntry Package, string Scope)> sources, Accumulator accumulator,
-        Func<string, Task<PiMissingSourceAction>>? onMissing, CancellationToken cancellationToken)
+    private async Task<ImmutableArray<PiPackageInstallFailure>> ResolvePackageSources(List<(PiPackageEntry Package, string Scope)> sources,
+        Accumulator accumulator, Func<string, Task<PiMissingSourceAction>>? onMissing, CancellationToken cancellationToken)
     {
+        var installFailures = ImmutableArray.CreateBuilder<PiPackageInstallFailure>();
         foreach (var (package, scope) in sources)
         {
             var sourceText = package.Source;
@@ -395,13 +416,32 @@ internal sealed class PiPackageManager
                     if (action == PiMissingSourceAction.Skip) return false;
                     if (action == PiMissingSourceAction.Error) throw new PiPackageException($"Missing source: {resolvedSource}");
                 }
-                await InstallParsedSource(parsed, resolvedScope, cancellationToken).ConfigureAwait(false);
-                return true;
+                // A source that cannot be installed (no network, missing package, failing git prepare step) must not abort startup.
+                // Skip its resources, like offline mode does, and report the failure.
+                try
+                {
+                    await InstallParsedSource(parsed, resolvedScope, cancellationToken).ConfigureAwait(false);
+                    return true;
+                }
+                catch (Exception error) when (error is not OperationCanceledException)
+                {
+                    installFailures.Add(new(resolvedSource, resolvedScope, error.Message));
+                    return false;
+                }
             }
             if (parsed is PiNpmSource npm)
             {
                 var installedPath = GetNpmInstallPath(npm, resolvedScope);
-                if (!Path.Exists(installedPath) || !InstalledNpmMatchesConfiguredVersion(npm, installedPath))
+                var needsInstall = !Path.Exists(installedPath) || !InstalledNpmMatchesConfiguredVersion(npm, installedPath);
+                if (!needsInstall && resolvedScope == "temporary" && !npm.Pinned &&
+                    await NpmHasAvailableUpdate(npm, installedPath, cancellationToken).ConfigureAwait(false))
+                {
+                    // Temporary (-e) sources have no update command, so unpinned ones refresh on load like temporary git sources.
+                    // Like update, install name@latest for an unversioned spec: a bare name keeps the range already saved.
+                    try { await InstallNpm(npm with { Spec = npm.Version is not null ? npm.Spec : $"{npm.Name}@latest" }, resolvedScope, true, cancellationToken).ConfigureAwait(false); }
+                    catch (Exception error) when (error is not OperationCanceledException) { } // keep the cached install
+                }
+                if (needsInstall)
                 {
                     if (!await InstallMissing().ConfigureAwait(false)) continue;
                     installedPath = GetNpmInstallPath(npm, resolvedScope);
@@ -417,12 +457,13 @@ internal sealed class PiPackageManager
                 {
                     if (!await InstallMissing().ConfigureAwait(false)) continue;
                 }
-                else if (resolvedScope == "temporary" && !git.Pinned && !OfflineModeEnabled)
-                    await RefreshTemporaryGitSource(git, resolvedSource, cancellationToken).ConfigureAwait(false);
+                else if (resolvedScope == "temporary" && !OfflineModeEnabled)
+                    await RefreshTemporaryGitSource(git, resolvedSource, installedPath, cancellationToken).ConfigureAwait(false);
                 metadata.BaseDir = installedPath; metadata.PackageRoot = installedPath;
                 CollectPackageResources(installedPath, accumulator, filter, metadata);
             }
         }
+        return installFailures.ToImmutable();
     }
 
     private (string Source, string Scope)? FindAutoloadDeltaBase(PiPackageEntry package, string scope, List<(PiPackageEntry Package, string Scope)> sources)
@@ -468,7 +509,7 @@ internal sealed class PiPackageManager
     {
         PiNpmSource npm => $"npm:{npm.Name}",
         PiGitSource git => $"git:{git.Host}/{git.Path}",
-        PiLocalSource local => $"local:{ResolvePath(local.Path)}",
+        PiLocalSource local => $"local:{PiPaths.ComparisonKey(ResolvePath(local.Path))}",
         _ => source
     };
 
@@ -476,7 +517,7 @@ internal sealed class PiPackageManager
     {
         PiNpmSource npm => $"npm:{npm.Name}",
         PiGitSource git => $"git:{git.Host}/{git.Path}",
-        PiLocalSource local => $"local:{ResolvePathFromBase(local.Path, GetBaseDirForScope(scope))}",
+        PiLocalSource local => $"local:{PiPaths.ComparisonKey(ResolvePathFromBase(local.Path, GetBaseDirForScope(scope)))}",
         _ => source
     };
 
@@ -520,7 +561,8 @@ internal sealed class PiPackageManager
     {
         PiNpmSource npm => $"npm:{npm.Name}",
         PiGitSource git => $"git:{git.Host}/{git.Path}",
-        PiLocalSource local => scope is not null ? $"local:{ResolvePathFromBase(local.Path, GetBaseDirForScope(scope))}" : $"local:{ResolvePath(local.Path)}",
+        PiLocalSource local => scope is not null ? $"local:{PiPaths.ComparisonKey(ResolvePathFromBase(local.Path, GetBaseDirForScope(scope)))}"
+            : $"local:{PiPaths.ComparisonKey(ResolvePath(local.Path))}",
         _ => source
     };
 
@@ -587,7 +629,7 @@ internal sealed class PiPackageManager
     {
         "bun" => ["install", "--omit=dev", "--omit=peer"],
         "pnpm" => ["install", "--prod", "--config.auto-install-peers=false", "--config.strict-peer-dependencies=false", "--config.strict-dep-builds=false"],
-        "npm" => ["install", "--omit=dev", "--legacy-peer-deps"],
+        "npm" => ["install", "--omit=dev", "--legacy-peer-deps", "--no-audit", "--no-fund"],
         _ => ["install"]
     };
 
@@ -597,12 +639,15 @@ internal sealed class PiPackageManager
         return processes.RunSync(command, [.. prefix, .. args]);
     }
 
-    /// <summary>Source getNpmInstallArgs: peer resolution disabled for managed installs.</summary>
-    internal ImmutableArray<string> GetNpmInstallArgs(IReadOnlyList<string> specs, string installRoot) => GetPackageManagerName() switch
+    /// <summary>Source getNpmInstallArgs: peer resolution disabled for managed installs, and npm audit and fund advice skipped (npm audit
+    /// fix would run without --legacy-peer-deps and install pi peers).</summary>
+    // npm writes broken nested package-lock.json paths when --prefix goes through a symlink, so an existing root is resolved first.
+    internal ImmutableArray<string> GetNpmInstallArgs(IReadOnlyList<string> specs, string root) => NpmInstallArgs(specs, PiPaths.Canonicalize(root));
+    private ImmutableArray<string> NpmInstallArgs(IReadOnlyList<string> specs, string installRoot) => GetPackageManagerName() switch
     {
         "bun" => ["install", .. specs, "--cwd", installRoot, "--omit=peer"],
         "pnpm" => ["install", .. specs, "--prefix", installRoot, "--config.auto-install-peers=false", "--config.strict-peer-dependencies=false", "--config.strict-dep-builds=false"],
-        _ => ["install", .. specs, "--prefix", installRoot, "--legacy-peer-deps"]
+        _ => ["install", .. specs, "--prefix", installRoot, "--legacy-peer-deps", "--no-audit", "--no-fund"]
     };
 
     private async Task InstallNpm(PiNpmSource source, string scope, bool temporary, CancellationToken cancellationToken)
@@ -614,12 +659,13 @@ internal sealed class PiPackageManager
 
     private async Task UninstallNpm(PiNpmSource source, string scope, CancellationToken cancellationToken)
     {
-        var installRoot = GetNpmInstallRoot(scope, false);
-        if (!Path.Exists(installRoot)) return;
+        var root = GetNpmInstallRoot(scope, false);
+        if (!Path.Exists(root)) return;
+        var installRoot = PiPaths.Canonicalize(root); // npm writes broken nested package-lock.json paths through a symlinked --prefix
         var name = GetPackageManagerName();
         if (name == "bun") { await RunNpmCommand(["uninstall", source.Name, "--cwd", installRoot], null, cancellationToken).ConfigureAwait(false); return; }
         List<string> args = ["uninstall", source.Name, "--prefix", installRoot];
-        if (name != "pnpm") args.Add("--legacy-peer-deps");
+        if (name != "pnpm") args.AddRange(["--legacy-peer-deps", "--no-audit", "--no-fund"]); // npm audit fix would run without --legacy-peer-deps and install pi peers.
         await RunNpmCommand(args, null, cancellationToken).ConfigureAwait(false);
     }
 
@@ -922,16 +968,19 @@ internal sealed class PiPackageManager
 
     private async Task CleanAndInstallGitDependencies(string targetDir, string markerPath, CancellationToken cancellationToken)
     {
-        // Extensions should be pristine; if cleaning fails after deleting dependencies, repair them so the extension still loads.
+        // Extensions should be pristine. On Windows, files loaded by another process (a native module of this extension in another
+        // session) cannot be deleted, so git clean fails: still install the new commit's dependencies, but keep the marker so the
+        // next update retries the clean.
+        var cleaned = true;
         try { await processes.RunAsync("git", ["clean", "-fdx"], targetDir, cancellationToken).ConfigureAwait(false); }
         catch (Exception error) when (error is not OperationCanceledException)
         {
-            try { await RepairMissingGitDependencies(targetDir, cancellationToken).ConfigureAwait(false); }
-            catch (Exception ignored) when (ignored is not OperationCanceledException) { }
-            throw;
+            cleaned = false;
+            EmitProgress(new("progress", "update", targetDir,
+                $"Could not remove all untracked files in {targetDir} ({error.Message}). Files may be in use by another pi session; close it and run the update again."));
         }
         if (File.Exists(Path.Join(targetDir, "package.json"))) await RunNpmCommand(GetGitDependencyInstallArgs(), targetDir, cancellationToken).ConfigureAwait(false);
-        DeleteFile(markerPath);
+        if (cleaned) DeleteFile(markerPath);
     }
 
     private async Task EnsureGitRef(string targetDir, IReadOnlyList<string> fetchArgs, string reference, CancellationToken cancellationToken)
@@ -953,12 +1002,23 @@ internal sealed class PiPackageManager
         await CleanAndInstallGitDependencies(targetDir, markerPath, cancellationToken).ConfigureAwait(false);
     }
 
-    private async Task RefreshTemporaryGitSource(PiGitSource source, string sourceText, CancellationToken cancellationToken)
+    private async Task RefreshTemporaryGitSource(PiGitSource source, string sourceText, string installedPath, CancellationToken cancellationToken)
     {
         if (OfflineModeEnabled) return;
-        try { await WithProgress("pull", sourceText, $"Refreshing {sourceText}...", () => UpdateGit(source, "temporary", cancellationToken)).ConfigureAwait(false); }
-        catch (Exception error) when (error is not OperationCanceledException) { }
+        try
+        {
+            // A ref can name a moving branch, so refs refresh too; only a commit hash that is already checked out skips the fetch.
+            if (source.Ref is { } reference && CommitHashPattern.IsMatch(reference))
+            {
+                var head = await Capture("git", ["rev-parse", "HEAD"], installedPath, cancellationToken).ConfigureAwait(false);
+                if (PiArgs.JsTrim(head).ToLowerInvariant().StartsWith(reference.ToLowerInvariant(), StringComparison.Ordinal)) return;
+            }
+            await WithProgress("pull", sourceText, $"Refreshing {sourceText}...", () => UpdateGit(source, "temporary", cancellationToken)).ConfigureAwait(false);
+        }
+        catch (Exception error) when (error is not OperationCanceledException) { } // keep the cached temporary checkout
     }
+    private static readonly System.Text.RegularExpressions.Regex CommitHashPattern = new("^[0-9a-f]{7,64}$",
+        System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.CultureInvariant);
 
     private void RemoveGit(PiGitSource source, string scope)
     {
@@ -1049,6 +1109,8 @@ internal sealed class PiPackageManager
 
     private bool CollectPackageResources(string packageRoot, Accumulator accumulator, PiPackageEntry? filter, PiPathMetadata metadata)
     {
+        var manifest = PiManifest.Read(Path.Join(packageRoot, "package.json"));
+        metadata.ChangelogPath = ResolvePackageChangelogPath(packageRoot, manifest);
         if (filter is not null)
         {
             foreach (var resourceType in ResourceTypes)
@@ -1061,8 +1123,7 @@ internal sealed class PiPackageManager
             }
             return true;
         }
-        var manifest = PiManifest.Read(Path.Join(packageRoot, "package.json"));
-        if (manifest is not null)
+        if (manifest is { HasResourceFields: true })
         {
             foreach (var resourceType in ResourceTypes) AddManifestEntries(manifest.Get(resourceType), packageRoot, resourceType, accumulator.Maps[resourceType], metadata);
             return true;
@@ -1076,6 +1137,27 @@ internal sealed class PiPackageManager
             hasAnyDir = true;
         }
         return hasAnyDir;
+    }
+
+    /// <summary>Pi 1.5.0 resolvePackageChangelogPath: <c>pi.changelogPath</c>, else <c>CHANGELOG.md</c>, resolved against the package root;
+    /// only an existing file whose real path is inside the package's real root counts. An empty <c>changelogPath</c> turns it off.</summary>
+    internal static string? ResolvePackageChangelogPath(string packageRoot, PiManifest? manifest)
+    {
+        var changelogPath = manifest?.ChangelogPath ?? "CHANGELOG.md";
+        if (changelogPath.Length == 0) return null;
+        var resolvedPath = NodeResolve(packageRoot, changelogPath);
+        if (!Path.Exists(resolvedPath)) return null;
+        if (!IsPathInside(PiPaths.Canonicalize(packageRoot), PiPaths.Canonicalize(resolvedPath))) return null;
+        try { return IsFile(resolvedPath) ? resolvedPath : null; }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException) { return null; }
+    }
+
+    /// <summary>Pi 1.5.0 isPathInside: <paramref name="child"/> lies below <paramref name="parent"/> (node path.relative).</summary>
+    private static bool IsPathInside(string parent, string child)
+    {
+        var relativePath = Path.GetRelativePath(parent, child);
+        return relativePath != "." && relativePath != ".." && !relativePath.StartsWith(".." + Path.DirectorySeparatorChar, StringComparison.Ordinal) &&
+            !Path.IsPathRooted(relativePath);
     }
 
     private void CollectDefaultResources(string packageRoot, string resourceType, OrderedDictionary<string, (PiPathMetadata, bool)> target, PiPathMetadata metadata)
@@ -1155,7 +1237,7 @@ internal sealed class PiPackageManager
         var userAgentsSkillsDir = Path.Join(home, ".agents", "skills");
         var projectTrusted = settings.ProjectTrusted;
         var projectAgentsSkillDirs = projectTrusted
-            ? CollectAncestorAgentsSkillDirs(cwd).Where(directory => Path.GetFullPath(directory) != Path.GetFullPath(userAgentsSkillsDir)).ToList() : [];
+            ? CollectAncestorAgentsSkillDirs(cwd).Where(directory => !PiPaths.PathsEqual(directory, userAgentsSkillsDir)).ToList() : [];
 
         void Add(string resourceType, List<string> paths, PiPathMetadata metadata, List<string> overrides, string baseDir)
         {
@@ -1226,7 +1308,7 @@ internal sealed class PiPackageManager
             var seen = new HashSet<string>(StringComparer.Ordinal);
             return [.. accumulator.Maps[type].Select(pair => new PiResolvedResource(pair.Key, pair.Value.Enabled, pair.Value.Metadata))
                 .OrderBy(resource => ResourcePrecedenceRank(resource.Metadata))
-                .Where(resource => seen.Add(resource.Path.StartsWith(BuiltinPathPrefix, StringComparison.Ordinal) ? resource.Path : PiPaths.Canonicalize(resource.Path)))];
+                .Where(resource => seen.Add(PiSharp.Cli.Extensions.Pi.PiSourceInfo.ResourcePathKey(resource.Path)))];
         }
         return new(Map("extensions"), Map("skills"), Map("prompts"), Map("themes"));
     }

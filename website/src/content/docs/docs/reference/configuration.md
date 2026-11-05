@@ -65,6 +65,19 @@ When the same thing is set in several places, the first one wins:
 
 `settings.json`, `models.json`, `keybindings.json` and theme files accept a `$schema` key, so editors can check them against Pi's published schemas, for example `"$schema": "https://pi.dev/schemas/models.schema.json"`. PiSharp ships the same schemas and checks `models.json`, key bindings and themes against them. A theme may only use the documented fields; put your own colors under `vars`.
 
+### models.json fields
+
+PiSharp checks `models.json` against Pi 1.5.0's schema, byte for byte the one Pi publishes. Pi's [models.json reference](https://github.com/earendil-works/pi/blob/v1.5.0/packages/coding-agent/docs/models-configuration.md) describes each provider, model, override and compatibility field. Editors show the same descriptions from the schema.
+
+System One classifier models (`typesafe-system-one` and `cloudflare-workers-ai-system-one`) read two `compat` fields:
+
+| Field | Values | Effect |
+| --- | --- | --- |
+| `imageInput` | `"assets"`, `"images"` or `"state-image-urls"` | How the service takes images. `assets` is TypeSafe's map of PNG and JPEG assets. `images` is Clef's list of at most four PNG, JPEG or WebP data URLs. `state-image-urls` puts image parts in front of the state, as OpenRouter expects. Without it, PiSharp detects the form from the provider, base URL and model id. |
+| `sendImageOptInHeader` | `true` or `false` | Whether a request with images sends `TypeSafe-Danger-Zone-Images: true`. It defaults to on for `typesafe-system-one`, unless the model is detected as OpenRouter. |
+
+Built-in classifier models that take images set them in the catalog. In Pi, a provider's `compat` in `models.json` sets them too; `models` and `modelOverrides` entries apply to chat models only. PiSharp's classifier calls don't read `models.json` yet. See [Differences from Pi](/docs/guides/providers/#differences-from-pi).
+
 ## Sessions
 
 Sessions are saved in `~/.pi/agent/sessions/<folder>/`, one JSONL file per session, in Pi's format. Pi and PiSharp list and resume each other's sessions. `--no-session` keeps a session in memory only. See [Sessions](/docs/guides/sessions/).
@@ -106,7 +119,7 @@ A built-in that is off registers nothing: no `codemode` or `tool_search` tool, n
 
 `bash` finds its shell as Pi does: Git Bash (or `bash.exe` on your `PATH`) on Windows, and `/bin/bash`, then `bash`, then `sh` on Linux and macOS. Set `shellPath` to choose another. `shellCommandPrefix` runs before every command, for the model's `bash` and for your `!` commands.
 
-`grep` and `find` use `rg` and `fd` from `~/.pi/agent/bin` or your `PATH`. If one is missing, PiSharp downloads it from its GitHub releases the first time it's needed, as Pi does. `PI_OFFLINE=1` stops the download. See [Built-in tools](/docs/reference/tools/).
+`grep` and `find` use `rg` and `fd` from `~/.pi/agent/bin` or your `PATH`. If one is missing, PiSharp downloads it from its GitHub releases the first time it's needed, as Pi does, on x64 and arm64 only. `PI_OFFLINE=1` stops the download. See [Built-in tools](/docs/reference/tools/).
 
 ## Config values that run commands
 

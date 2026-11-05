@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/test/harness-submissions.test.ts. Verbatim apart from the adaptations in
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/test/harness-submissions.test.ts. Verbatim apart from the adaptations in
 // HarnessSupport.cs and ChatSupport.cs, and these:
 // - Backends. Upstream runs these on ControlledStorage over memory and reopens a SQLite file for the reopen case. harness.submissions.*
 //   does the same; harness.submissions.jsonl.* and harness.submissions.sqlite.* rerun the storage-agnostic cases on ControlledStorage over a
@@ -7,6 +7,14 @@
 // - `{ ...context, abortSignal: controller.signal }` is a DurableContext.WithCancel() context; `controller.abort(new Error(text))` cancels it
 //   with that exception as the reason.
 // - `defineEntry<{ n: number }>` is a JsonObjectValue-typed entry kind; `const n: number = counter.data.n` reads the number.
+// Pi v1.5.0 sync (area admission, fb524dd2e): the idle-input case narrows the record by type too, as continue submissions are placed
+// without an entry.
+// Pi v1.5.0 sync (area group-commit-scheduler, e5c6182ba): "rejects a wait whose submission read spans the start of close" reads the
+// submission through a reopened Harness, as only a reopened one reads it from Storage once the Session caches the submissions it writes
+// (area publication-caches); the ControlledStorage stays open for the reopen (KeepOpenForReopen).
+// Pi v1.5.0 sync (area publication-caches, e5c6182ba): "resumes a wait only once observeCommits() observers saw the commit that settled it"
+// runs on LateResolvingStorage (SessionSupport.cs) over the group's storage; `new Set<SubmissionId>()` is a ConcurrentDictionary, as the
+// observer runs on the publishing thread.
 using System.Collections.Immutable;
 using PiSharp.Durable;
 using PiSharp.Durable.Chord;
@@ -87,7 +95,7 @@ internal static class SubmissionsTests
             var submission = await Submit(root, "hi");
             await busy.Reached;
             var record = await submission.StatusAsync(Context);
-            if (record.Status != SubmissionStatus.Placed) throw new InvalidOperationException($"Unexpected {record.Status}");
+            if (record.Type != SubmissionType.Input || record.Status != SubmissionStatus.Placed) throw new InvalidOperationException($"Unexpected {record.Status}");
             var entry = await root.CommitAsync(tx => tx.GetEntryAsync(Entries.UserEntry, record.Entry!.Value), Context);
             SameJson("""[{"role":"user","content":"hi","timestamp":42}]""", entry?.Model, "user entry");
             var live = await harness.SnapshotAsync(Live.LiveDoc, root.Id, Context);
@@ -169,11 +177,18 @@ internal static class SubmissionsTests
 
         yield return Case(prefix + "rejects-a-wait-whose-submission-read-spans-the-start-of-close", async () =>
         {
-            var storage = new HeldReads(Controlled());
+            var controlled = Controlled();
+            controlled.KeepOpenForReopen = true;
+            var storage = new HeldReads(controlled);
             var setup = Setup();
-            setup.Faux.SetResponses(Unanswered().Step);
-            var (harness, root) = await OpenChat(storage, setup);
-            var submission = await Submit(root, "hi");
+            setup.Faux.SetResponses(Unanswered().Step, Unanswered().Step);
+            var first = await OpenChat(storage, setup);
+            var id = (await Submit(first.Root, "hi")).Id;
+            await first.Harness.CloseAsync(Context);
+            // Reopen: the Session caches the submissions it writes, so only a reopened one reads it from Storage.
+            controlled.Reopen();
+            var (harness, _) = await OpenChat(storage, setup);
+            var submission = (await harness.SubmissionAsync(id, Context))!;
             storage.Hold = true;
             var waiting = submission.WaitAsync(Context);
             await storage.Entered.Task;
@@ -280,6 +295,23 @@ internal static class SubmissionsTests
             Seq(["pi.user", "pi.assistant"], new[] { Entries.UserEntry.Kind, Entries.AssistantEntry.Kind }, "built-in kinds");
             await harness.CloseAsync(Context);
         });
+
+        yield return Case(prefix + "resumes-a-wait-only-once-observecommits-observers-saw-the-commit-that-settled-it", async () =>
+        {
+            var setup = Setup();
+            setup.Faux.SetResponses(FauxAssistantMessage("hi"));
+            var (harness, root) = await OpenChat(new LateResolvingStorage(fresh()), setup);
+            var settled = new System.Collections.Concurrent.ConcurrentDictionary<SubmissionId, bool>();
+            harness.ObserveCommits(new CommitObserver((publication, _) =>
+            {
+                foreach (var change in publication.Changes)
+                    if (change is SubmissionWrite { Value: { Status: SubmissionStatus.Done } record }) settled[record.Id] = true;
+            }, _ => { }));
+            var submission = await Submit(root, "hello");
+            await submission.WaitAsync(Context);
+            Equal(true, settled.ContainsKey(submission.Id), "settled before the wait resumed");
+            await harness.CloseAsync(Context);
+        });
     }
 
     /// <summary>Holds the first submission read after <see cref="Hold"/> is set until <see cref="Release"/> (upstream <c>HeldReads</c>).</summary>
@@ -299,7 +331,8 @@ internal static class SubmissionsTests
             return await inner.GetSubmissionAsync(id, context);
         }
 
-        public Task<Seq> CommitAsync(IReadOnlyList<StorageWrite> writes, DurableContext context) => inner.CommitAsync(writes, context);
+        public Task<CommitResult> CommitAsync(IReadOnlyList<IReadOnlyList<StorageWrite>> batches, Action<int, Seq> receive, DurableContext context) =>
+            inner.CommitAsync(batches, receive, context);
         public Task<TId> MintIdAsync<TId>() where TId : struct, IDurableId<TId> => inner.MintIdAsync<TId>();
         public Task<StoredDocument?> GetDocumentAsync(DocumentId id, DocumentPoint at, DurableContext context) => inner.GetDocumentAsync(id, at, context);
         public Task<DocumentRecord?> FindDocumentAsync(DocumentAddress address, DocumentPoint at, DurableContext context) =>

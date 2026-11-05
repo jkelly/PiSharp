@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/tui/src/utils.ts.
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/tui/src/utils.ts.
 using System.Text;
 using System.Text.RegularExpressions;
 using PiSharp.Tui.Input;
@@ -124,6 +124,46 @@ public static partial class TextUtils
         }
         return result.ToString();
     }
+
+    // The escape sequences of a string, in order, without its visible text.
+    private static string ExtractAnsiCodes(string str)
+    {
+        var result = new StringBuilder(); var i = str.IndexOf('\u001b');
+        while (i != -1)
+        {
+            var length = AnsiCodeLength(str, i);
+            if (length > 0) { result.Append(str, i, length); i += length; }
+            else i++;
+            i = i < str.Length ? str.IndexOf('\u001b', i) : -1;
+        }
+        return result.ToString();
+    }
+
+    /// <summary>Whether a token's visible text is only whitespace. Codes closing a styled word attach to the following space,
+    /// e.g. <c>"\x1b[22m "</c>, so they are skipped. A lone ESC is visible text.</summary>
+    private static bool IsWhitespaceToken(string token)
+    {
+        var i = 0;
+        while (i < token.Length)
+        {
+            var code = token[i];
+            if (code == '\u001b')
+            {
+                var length = AnsiCodeLength(token, i);
+                if (length == 0) return false;
+                i += length;
+            }
+            else if (code == ' ' || code is >= '\t' and <= '\r') i++;
+            else if (code < 0x80 || !IsJsWhitespace(code)) return false;
+            else i++;
+        }
+        return true;
+    }
+
+    [GeneratedRegex(@"[\u0000-\u001f\u007f-\u009f]+", RegexOptions.CultureInvariant)] private static partial Regex ControlCharacters();
+    /// <summary>Replaces each run of C0 and C1 control characters (ESC, BEL, newlines, ...) with one space (<c>replaceControlCharacters</c>).</summary>
+    [System.Diagnostics.CodeAnalysis.Experimental("PISHARP_TUI001")]
+    public static string ReplaceControlCharacters(string str) => ControlCharacters().Replace(str, " ");
 
     /// <summary>Iterates text runs between escape sequences: (isAnsi, value).</summary>
     private static IEnumerable<(bool Ansi, string Value)> Runs(string line)
@@ -303,7 +343,9 @@ public static partial class TextUtils
         }
         public string GetActiveBackgroundCode() => bg is null ? "" : "\u001b[" + bg + "m";
         public bool HasActiveCodes => bold || dim || italic || underline || blink || inverse || hidden || strikethrough || fg is not null || bg is not null || link is not null;
-        public string GetLineEndReset() => (underline ? "\u001b[24m" : "") + (link is null ? "" : "\u001b]8;;" + link.Terminator);
+        /// <summary>Underline and strikethrough are closed so they do not bleed into padding; an open OSC 8 link is closed and
+        /// re-opened on the next line by <see cref="GetActiveCodes"/>.</summary>
+        public string GetLineEndReset() => (underline ? "\u001b[24m" : "") + (strikethrough ? "\u001b[29m" : "") + (link is null ? "" : "\u001b]8;;" + link.Terminator);
     }
 
     private static void UpdateTracker(string text, AnsiCodeTracker tracker)
@@ -404,12 +446,13 @@ public static partial class TextUtils
         foreach (var token in SplitIntoTokensWithAnsi(line))
         {
             var tokenWidth = VisibleWidth(token);
-            var whitespace = JsTrim(token).Length == 0;
+            var whitespace = IsWhitespaceToken(token);
             if (tokenWidth > width && !whitespace)
             {
                 if (currentLine.Length > 0)
                 {
-                    currentLine += tracker.GetLineEndReset();
+                    // Trim before adding the reset, which would otherwise block the final trim.
+                    currentLine = JsTrimEnd(currentLine) + tracker.GetLineEndReset();
                     wrapped.Add(currentLine); currentLine = ""; currentWidth = 0;
                 }
                 var broken = BreakLongWord(token, width, tracker);
@@ -419,11 +462,21 @@ public static partial class TextUtils
             }
             if (currentWidth + tokenWidth > width && currentWidth > 0)
             {
-                var lineToWrap = JsTrimEnd(currentLine) + tracker.GetLineEndReset();
-                wrapped.Add(lineToWrap);
-                if (whitespace) { currentLine = tracker.GetActiveCodes(); currentWidth = 0; }
-                else { currentLine = tracker.GetActiveCodes() + token; currentWidth = tokenWidth; }
+                var lineToWrap = JsTrimEnd(currentLine);
+                if (whitespace)
+                {
+                    // The dropped space may carry codes (e.g. closing a styled word). Keep them on the wrapped line so the style ends
+                    // there and is not re-opened on the next line.
+                    lineToWrap += ExtractAnsiCodes(token);
+                    UpdateTracker(token, tracker);
+                }
+                wrapped.Add(lineToWrap + tracker.GetLineEndReset());
+                if (whitespace) { currentLine = tracker.GetActiveCodes(); currentWidth = 0; continue; }
+                currentLine = tracker.GetActiveCodes() + token; currentWidth = tokenWidth;
             }
+            // Whitespace wider than an empty line: plain spaces are trimmed at the end, but codes after them (e.g. a trailing reset)
+            // would block that and leave the line wider than width. Keep only the codes.
+            else if (whitespace && currentWidth + tokenWidth > width && token.Contains('\u001b')) currentLine += ExtractAnsiCodes(token);
             else { currentLine += token; currentWidth += tokenWidth; }
             UpdateTracker(token, tracker);
         }

@@ -1,5 +1,12 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/src/core/source-info.ts.
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/coding-agent/src/core/source-info.ts.
 // Ported to plain ESM for the PiSharp Node extension bridge (TypeScript types stripped mechanically; behaviour unchanged).
+import { canonicalizePath, getPathComparisonKey } from "../utils/paths.mjs";
+export function getSourcePackageKey(identity) {
+    return JSON.stringify({
+        source: identity.source,
+        scope: identity.scope
+    });
+}
 export const BUILTIN_PATH_PREFIX = "builtin:";
 export function getSyntheticPathSource(path) {
     if (path.startsWith(BUILTIN_PATH_PREFIX)) return "builtin";
@@ -9,13 +16,19 @@ export function getSyntheticPathSource(path) {
 export function isSyntheticPath(path) {
     return path.startsWith(BUILTIN_PATH_PREFIX) || path.startsWith("<");
 }
+export function getResourcePathKey(path) {
+    return isSyntheticPath(path) ? path : getPathComparisonKey(canonicalizePath(path));
+}
 export function createSourceInfo(path, metadata) {
     return {
         path,
         source: metadata.source,
         scope: metadata.scope,
         origin: metadata.origin,
-        baseDir: metadata.baseDir
+        baseDir: metadata.baseDir,
+        ...metadata.changelogPath ? {
+            changelogPath: metadata.changelogPath
+        } : {}
     };
 }
 export function createSyntheticSourceInfo(path, options) {
@@ -24,6 +37,9 @@ export function createSyntheticSourceInfo(path, options) {
         source: options.source,
         scope: options.scope ?? "temporary",
         origin: options.origin ?? "top-level",
-        baseDir: options.baseDir
+        baseDir: options.baseDir,
+        ...options.changelogPath ? {
+            changelogPath: options.changelogPath
+        } : {}
     };
 }

@@ -1,10 +1,16 @@
 <Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <!-- The pi.exec capture limit (source execCommand maxBuffer) is [Experimental]; the runners here apply it. -->
+    <NoWarn>$(NoWarn);PISHARP_EXEC001</NoWarn>
+  </PropertyGroup>
   <ItemGroup>
     <!-- The SkiaSharp image codec shares the RGBA raster, Lanczos3 resampling and EXIF orientation. -->
     <InternalsVisibleTo Include="PiSharp.Tools.Skia" />
     <!-- Branch feature/pi-durable (decision 0005): the durable execution environment reuses the Windows job-object process lifetime and
          the spawn preflight. Branch-only seam; flag for removal if the durable port does not merge. -->
     <InternalsVisibleTo Include="PiSharp.Durable.Tools" />
+    <!-- Pi 1.5.0 clipboard-command.ts: the CLI's clipboard helpers start detached on Linux and macOS (SpawnDetachedHelper). -->
+    <InternalsVisibleTo Include="PiSharp.Cli" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../PiSharp.Agent/PiSharp.Agent.csproj" />

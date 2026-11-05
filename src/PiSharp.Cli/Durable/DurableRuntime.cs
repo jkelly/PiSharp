@@ -9,6 +9,14 @@
 // process) fails the Session the same way; upstream's proper-lockfile onCompromised throws, which ends its process.
 // PiSharp-only (decision 0005, "PiSharp-only additions"): the controller answers ask_user_question, reviews plans and switches plan mode,
 // each through the PiSharp.Durable.Tools host API in one commit of the shown conversation.
+// Since pi-durable 1.5.0 (Pi v1.5.0 sync, area watches): Durable has no state getters (viewState(), taskGraph()), so the view follows a
+// watch of the shown conversation's view (Conversation.watch()) and the open task panel a task graph watch (Harness.watchTaskGraph()),
+// each started at its acquisition value, which the view shows at once. Area vocabulary (5f312dac4): subagents are found by a commit
+// observer (Harness.observeCommits() with a CommitObserver; was subscribeCommits()), and a failed Session's SessionEnd is of kind Failed.
+// Pi v1.5.0 sync (area view): the view watch's entries are a window over the whole transcript (newest 50, dropping the oldest past 100), so
+// the view also carries the shown conversation's active transcript, which the TUI renders: read with Conversation.context() when a watch
+// starts, advanced by the entries each later value appends (the 1.2.0 view's head-marker cut), and read again when entries left the
+// window before a value showed them.
 using System.Collections.Immutable;
 using System.Text.RegularExpressions;
 using PiSharp.Cli.Commands;
@@ -151,7 +159,8 @@ internal static partial class DurableRuntime
                 Registry = registry,
                 Settings = harnessSettings,
                 Env = envs.EnvAsync,
-                OnReport = reports.Report,
+                // The CLI shows the error; what it is about (Report.Info) adds nothing it prints.
+                OnReport = report => reports.Report(report.Error),
             }, Context).ConfigureAwait(false);
             location.OnLockLost(((Session)harness).Fail);
             var initial = location.Created ? DurableHarnessSetup.FindInitialAgentModel(settings, models) : null;
@@ -201,8 +210,9 @@ internal static partial class DurableRuntime
 /// does. It covers the commits the Harness makes while it opens, before the loss can fail its Session directly.</summary>
 internal sealed class LockGuardedStorage(IStorage inner, DurableSessionLocation location) : IStorage
 {
-    public Task<Seq> CommitAsync(IReadOnlyList<StorageWrite> writes, DurableContext context) =>
-        location.LockLost is { } lost ? Task.FromException<Seq>(lost) : inner.CommitAsync(writes, context);
+    public Task<CommitResult> CommitAsync(IReadOnlyList<IReadOnlyList<StorageWrite>> batches, Action<int, Seq> receive, DurableContext context) =>
+        location.LockLost is { } lost ? Task.FromException<CommitResult>(lost) : inner.CommitAsync(batches, receive, context);
+    public void Publishing(Action publish, DurableContext context) => inner.Publishing(publish, context);
     public Task<TId> MintIdAsync<TId>() where TId : struct, IDurableId<TId> => inner.MintIdAsync<TId>();
     public Task<ConversationRecord?> GetConversationAsync(ConversationId id, DurableContext context) => inner.GetConversationAsync(id, context);
     public Task<Page<ConversationRecord>> ScanConversationsAsync(ConversationQuery query, int limit, JsonObjectValue? cursor, DurableContext context) =>
@@ -276,20 +286,18 @@ internal sealed class DurableSession : IOpenDurable, IDurableViewSource, IDurabl
     private bool notifying;
     private long nextNotice = 1;
     private volatile IConversation current;
-    private AttachedReplicatedState<ConversationView> conversation;
-    private IDisposable unsubscribe;
-    private IDisposable? unsubscribeCommits;
+    private IWatchHandle<ConversationView> conversation;
+    private CommitObservation? commitObservation;
     private IDisposable? unsubscribeClose;
     /// <summary>Set when the Harness begins to close: ours, or a failed Session's.</summary>
     private volatile bool ended;
-    private AttachedReplicatedState<TaskGraph>? tasks;
-    private IDisposable? unsubscribeTasks;
+    private IWatchHandle<TaskGraph>? tasks;
     private Task queue = Task.CompletedTask;
     private Task? closing;
 
     private DurableSession(DurableSessionLocation location, DurableExecutionEnvs envs, IHarness harness, DurableModels models, PiSettings settings,
-        IConversation root, AttachedReplicatedState<ConversationView> conversation, IReadOnlyList<DurableConversationSummary> summaries,
-        IRegistryReader registry, Func<ConversationId, string> planDirectory)
+        IConversation root, IWatchHandle<ConversationView> conversation, ImmutableArray<EntryRecord> transcript,
+        IReadOnlyList<DurableConversationSummary> summaries, IRegistryReader registry, Func<ConversationId, string> planDirectory)
     {
         this.location = location; this.envs = envs; this.harness = harness; this.models = models; Settings = settings;
         this.registry = registry; this.planDirectory = planDirectory;
@@ -298,17 +306,49 @@ internal sealed class DurableSession : IOpenDurable, IDurableViewSource, IDurabl
         this.conversation = conversation;
         state = new DurableView(new DurableSessionInfo(location.Id, location.Directory, location.Cwd), conversation.Value, [.. summaries],
             ModelSummaries(), []);
-        state = WithShown(state, conversation.Value);
-        unsubscribe = conversation.Subscribe((value, _, _) => Update(view => WithShown(view, value)));
+        state = WithShown(state, conversation.Value, transcript);
+        Follow(conversation, root);
     }
 
-    /// <summary>The view showing <paramref name="value"/>, a revision of the shown conversation, with its nested calls gathered; another
-    /// conversation's revision starts them afresh.</summary>
-    private static DurableView WithShown(DurableView view, ConversationView value)
+    /// <summary>Shows each later revision of <paramref name="watch"/>, the view watch of <paramref name="shown"/>, the shown conversation, with
+    /// its active transcript, until another replaces it (a call already running when the switch stopped it shows nothing).</summary>
+    private void Follow(IWatchHandle<ConversationView> watch, IConversation shown) => watch.Start(async (call, _) =>
+    {
+        if (call is not WatchValueCall<ConversationView> change || !ReferenceEquals(conversation, watch)) return;
+        var before = Current;
+        var transcript = await TranscriptAsync(shown, before.Conversation, before.Transcript, change.Value).ConfigureAwait(false);
+        Update(view => ReferenceEquals(conversation, watch) ? WithShown(view, change.Value, transcript) : view);
+    });
+
+    /// <summary>The view showing <paramref name="value"/>, a revision of the shown conversation, with its active transcript and its nested
+    /// calls gathered; another conversation's revision starts them afresh.</summary>
+    private static DurableView WithShown(DurableView view, ConversationView value, ImmutableArray<EntryRecord> transcript)
     {
         var none = ImmutableSortedDictionary<long, DurableNestedCall>.Empty;
         var calls = view.Conversation.Conversation.Id == value.Conversation.Id ? view.NestedCalls ?? none : none;
-        return view with { Conversation = value, NestedCalls = DurableNestedCall.Merge(calls, value) };
+        return view with { Conversation = value, Transcript = transcript, NestedCalls = DurableNestedCall.Merge(calls, value) };
+    }
+
+    /// <summary>
+    /// The active transcript of <paramref name="shown"/> once it shows <paramref name="value"/>, its view after <paramref name="previous"/>:
+    /// <paramref name="transcript"/> advanced by the entries past its newest that <paramref name="value"/>'s window holds. The window holds
+    /// every entry after its <see cref="ConversationView.Before"/>, so it shows each of them unless entries left it before this value; then
+    /// the transcript is read again (Conversation.context()). The newest entry is always active, so the transcript's newest ID is the
+    /// newest entry it has taken.
+    /// </summary>
+    internal static async Task<ImmutableArray<EntryRecord>> TranscriptAsync(IConversation shown, ConversationView previous,
+        ImmutableArray<EntryRecord> transcript, ConversationView value)
+    {
+        if (previous.Conversation.Id == value.Conversation.Id && previous.Entries == value.Entries) return transcript;
+        // The head marker leads the active transcript; the entries after it are in ID order.
+        long? newest = transcript.IsEmpty ? null : Math.Max(transcript[0].Id.Value, transcript[^1].Id.Value);
+        if (value.Before is not { } before || (newest is { } seen && before.Value <= seen))
+        {
+            foreach (var entry in value.Entries)
+                if (newest is null || entry.Id.Value > newest) transcript = ConversationContext.AppendActive(transcript, entry);
+            return transcript;
+        }
+        return (await shown.ContextAsync(Context).ConfigureAwait(false)).Entries;
     }
 
     /// <summary>The label of a conversation in the switcher.</summary>
@@ -318,8 +358,10 @@ internal sealed class DurableSession : IOpenDurable, IDurableViewSource, IDurabl
         DurableModels models, PiSettings settings, IConversation root, IReadOnlyList<DurableConversationSummary> summaries,
         DurableInitialModel? initial, DurableReports reports, IRegistryReader registry, Func<ConversationId, string> planDirectory)
     {
-        var view = await root.ViewStateAsync(Context).ConfigureAwait(false);
-        var session = new DurableSession(location, envs, harness, models, settings, root, view, summaries, registry, planDirectory);
+        var view = await root.WatchAsync(Context).ConfigureAwait(false);
+        // Read after the watch starts, so it has at least the entries the watch showed; later values add only newer ones.
+        var transcript = (await root.ContextAsync(Context).ConfigureAwait(false)).Entries;
+        var session = new DurableSession(location, envs, harness, models, settings, root, view, transcript, summaries, registry, planDirectory);
         // Since pi-durable 1.2.0 a storage error fails and closes the Harness (SessionFailed); the view then says so (durable work list area l).
         // Close listeners run as the close begins, before the failed call's caller sees its error and before the failure is reported, so
         // neither becomes a notice besides the failure.
@@ -329,8 +371,8 @@ internal sealed class DurableSession : IOpenDurable, IDurableViewSource, IDurabl
         {
             if (!session.ended) session.Notice(DurableNoticeLevel.Warning, error.Message);
         });
-        // Subagents appear as their conversations are created. A commit listener only records; it calls no Session API.
-        session.unsubscribeCommits = harness.SubscribeCommits((publication, _) => session.OnCommit(publication));
+        // Subagents appear as their conversations are created. A commit observer only records; it calls no Session API.
+        session.commitObservation = harness.ObserveCommits(new CommitObserver((publication, _) => session.OnCommit(publication), _ => { }));
         var saved = DurableRuntime.ModelOf(DurableRuntime.AgentOf(session.Current.Conversation));
         if (saved is null) session.Notice(DurableNoticeLevel.Warning, "No model configured; select one with /model.");
         else if (models.GetModel(saved.Provider, saved.ModelId) is null)
@@ -435,11 +477,11 @@ internal sealed class DurableSession : IOpenDurable, IDurableViewSource, IDurabl
     private void MarkFailed(Exception cause) => Update(view => view.Failure is null ? view with { Failure = cause.Message } : view);
 
     /// <summary>Marks the view failed when the Harness closes because its Session failed (<c>ISession.Closed</c> settles with
-    /// <see cref="SessionEndReason.Failed"/>). Our own close settles it with <see cref="SessionEndReason.Closed"/>.</summary>
+    /// <see cref="SessionEndKind.Failed"/>). Our own close settles it with <see cref="SessionEndKind.Closed"/>.</summary>
     private async Task WatchClosedAsync()
     {
         var end = await harness.Closed.ConfigureAwait(false);
-        if (end.Reason == SessionEndReason.Failed) MarkFailed(end.Error ?? new InvalidOperationException("unknown error"));
+        if (end.Kind == SessionEndKind.Failed) MarkFailed(end.Error ?? new InvalidOperationException("unknown error"));
     }
 
     private void OnCommit(CommitPublication publication)
@@ -624,16 +666,19 @@ internal sealed class DurableSession : IOpenDurable, IDurableViewSource, IDurabl
             Update(view => view with { Tasks = null });
             return;
         }
-        var graph = await harness.TaskGraphAsync(Context).ConfigureAwait(false);
+        var graph = await harness.WatchTaskGraphAsync(Context).ConfigureAwait(false);
         tasks = graph;
-        unsubscribeTasks = graph.Subscribe((value, _, _) => Update(view => view with { Tasks = value }));
+        Update(view => view with { Tasks = graph.Value });
+        graph.Start((call, _) =>
+        {
+            if (call is WatchValueCall<TaskGraph> change && ReferenceEquals(tasks, graph)) Update(view => view with { Tasks = change.Value });
+            return Task.CompletedTask;
+        });
     });
 
     private void CloseTasks()
     {
-        unsubscribeTasks?.Dispose();
-        unsubscribeTasks = null;
-        tasks?.Dispose();
+        _ = tasks?.StopAsync();
         tasks = null;
     }
 
@@ -641,12 +686,13 @@ internal sealed class DurableSession : IOpenDurable, IDurableViewSource, IDurabl
     public Task SwitchConversationAsync(ConversationId id) => Command(async () =>
     {
         var next = await harness.ConversationAsync(id, Context).ConfigureAwait(false) ?? throw new InvalidOperationException($"Conversation {id.Value} does not exist");
-        var nextState = await next.ViewStateAsync(Context).ConfigureAwait(false);
-        unsubscribe.Dispose();
-        conversation.Dispose();
+        var nextWatch = await next.WatchAsync(Context).ConfigureAwait(false);
+        var transcript = (await next.ContextAsync(Context).ConfigureAwait(false)).Entries;
+        _ = conversation.StopAsync();
         current = next;
-        conversation = nextState;
-        unsubscribe = nextState.Subscribe((value, _, _) => Update(view => WithShown(view, value)));
+        conversation = nextWatch;
+        Update(view => WithShown(view, nextWatch.Value, transcript));
+        Follow(nextWatch, next);
     });
 
     // ─── Questions and plan mode (PiSharp-only, decision 0005) ──────────────
@@ -723,17 +769,16 @@ internal sealed class DurableSession : IOpenDurable, IDurableViewSource, IDurabl
 
     private async Task CloseAsync()
     {
-        unsubscribe.Dispose();
-        unsubscribeCommits?.Dispose();
+        commitObservation?.Detach();
         unsubscribeClose?.Dispose();
-        conversation.Dispose();
+        _ = conversation.StopAsync();
         CloseTasks();
         try
         {
             // Close writes no outcome: a running turn resumes with --continue. A failed session closed itself already; what its close
             // rethrows is the failure the view shows.
             try { await harness.CloseAsync(Context).ConfigureAwait(false); }
-            catch (Exception) when (Current.Failure is not null || harness.Closed is { IsCompleted: true, Result.Reason: SessionEndReason.Failed })
+            catch (Exception) when (Current.Failure is not null || harness.Closed is { IsCompleted: true, Result.Kind: SessionEndKind.Failed })
             {
             }
             await envs.CleanupAsync(Context).ConfigureAwait(false);

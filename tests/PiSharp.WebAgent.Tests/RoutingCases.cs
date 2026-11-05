@@ -353,7 +353,7 @@ internal static partial class Program
             Equal(3, host.Provider.Requests.Count, "three provider requests");
             Check(host.Provider.Requests.Any(request => request.Url.Host == "api.anthropic.com") && host.Provider.Requests.Count(request => request.Url.Host == "api.openai.com") == 2,
                 "the summary and main routes of OpenAI and Anthropic's route were used");
-            // The client's name (user-agent: PiSharp) is not metadata, so the key is searched for everywhere else; the planted values everywhere.
+            // The client's user-agent is not metadata, so the key is searched for everywhere else; the planted values everywhere.
             var full = host.Provider.Text;
             var withoutAgent = string.Join("\n", host.Provider.Requests.Select(request => request.Key + "\n" + string.Join("\n",
                 request.Headers.Where(header => header.Key != "user-agent").Select(header => header.Key + ": " + header.Value)) + "\n" + request.Body));

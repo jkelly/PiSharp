@@ -1,11 +1,18 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/tui/src/components/markdown.ts.
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/tui/src/components/markdown.ts.
 // Ported to plain ESM for the PiSharp Node extension bridge (TypeScript types stripped mechanically; behaviour unchanged).
 import { Marked, Tokenizer } from "../../vendor/marked.mjs";
+import markedCjkFriendly from "../../vendor/marked-cjk-friendly.mjs";
 import { renderLatex } from "../latex.mjs";
 import { getCapabilities, hyperlink, isImageLine } from "../terminal-image.mjs";
-import { applyBackgroundToLine, flattenLines, visibleWidth, wrapTextWithAnsi } from "../utils.mjs";
+import { applyBackgroundToLine, cjkPunctuationRegex, flattenLines, visibleWidth, wrapTextWithAnsi } from "../utils.mjs";
 const STRICT_STRIKETHROUGH_REGEX = /^(~~)(?=[^\s~])((?:\\.|[^\\])*?(?:\\.|[^\s~\\]))\1(?=[^~]|$)/;
-class StrictStrikethroughTokenizer extends Tokenizer {
+class MarkdownTokenizer extends Tokenizer {
+    url(src) {
+        const token = super.url(src);
+        if (!token) return undefined;
+        const punctuationIndex = token.raw.search(cjkPunctuationRegex);
+        return punctuationIndex < 0 ? token : super.url(token.raw.slice(0, punctuationIndex));
+    }
     del(src) {
         const match = STRICT_STRIKETHROUGH_REGEX.exec(src);
         if (!match) {
@@ -82,9 +89,20 @@ function tokenizeInlineLatex(source) {
         text
     };
 }
+const TABLE_DELIMITER_ROW_REGEX = /^ {0,3}\|?[ \t]*:?-+:?[ \t]*(?:\|[ \t]*:?-+:?[ \t]*)*\|?[ \t]*$/;
+function containsTableStart(source) {
+    const lines = source.split("\n");
+    for(let index = 0; index < lines.length - 1; index++){
+        const delimiterRow = lines[index + 1];
+        if ((delimiterRow.includes("|") || lines[index].includes("|")) && TABLE_DELIMITER_ROW_REGEX.test(delimiterRow)) {
+            return true;
+        }
+    }
+    return false;
+}
 function tokenizeBlockLatex(source) {
     const dollarMatch = /^ {0,3}\$\$[ \t]*(?:\n)?([\s\S]*?)\$\$[ \t]*(?:\n|$)/.exec(source);
-    if (dollarMatch?.[1]) {
+    if (dollarMatch?.[1] && !containsTableStart(dollarMatch[1])) {
         return {
             type: "latexBlock",
             raw: dollarMatch[0],
@@ -92,7 +110,7 @@ function tokenizeBlockLatex(source) {
         };
     }
     const bracketMatch = /^ {0,3}\\\[[ \t]*(?:\n)?([\s\S]*?)\\\][ \t]*(?:\n|$)/.exec(source);
-    if (bracketMatch?.[1]) {
+    if (bracketMatch?.[1] && !containsTableStart(bracketMatch[1])) {
         return {
             type: "latexBlock",
             raw: bracketMatch[0],
@@ -100,7 +118,7 @@ function tokenizeBlockLatex(source) {
         };
     }
     const pendingBracket = /^ {0,3}\\\[[ \t]*(?:\n)?([\s\S]*)$/.exec(source);
-    if (pendingBracket) {
+    if (pendingBracket?.[1] && !containsTableStart(pendingBracket[1])) {
         return {
             type: "latexBlock",
             raw: pendingBracket[0],
@@ -109,7 +127,7 @@ function tokenizeBlockLatex(source) {
         };
     }
     const pendingDollar = /^ {0,3}\$\$[ \t]*(?:\n)?([\s\S]*)$/.exec(source);
-    if (pendingDollar?.[1] && looksLikePendingDollarMath(pendingDollar[1])) {
+    if (pendingDollar?.[1] && looksLikePendingDollarMath(pendingDollar[1]) && !containsTableStart(pendingDollar[1])) {
         return {
             type: "latexBlock",
             raw: pendingDollar[0],
@@ -165,9 +183,12 @@ function trimPartialClosingFences(tokens) {
 }
 const markdownParser = new Marked();
 markdownParser.setOptions({
-    tokenizer: new StrictStrikethroughTokenizer()
+    tokenizer: new MarkdownTokenizer()
 });
 markdownParser.use({
+    tokenizer: {
+        emStrong: markedCjkFriendly().tokenizer?.emStrong
+    },
     extensions: [
         ...LATEX_MARKDOWN_EXTENSIONS
     ]
@@ -184,6 +205,8 @@ export class Markdown {
     cachedWidth;
     cachedLines;
     cachedTokens;
+    blocks;
+    blockHighlightedCode;
     constructor(text, paddingX, paddingY, theme, defaultTextStyle, options){
         this.text = text;
         this.paddingX = paddingX;
@@ -196,9 +219,14 @@ export class Markdown {
     }
     setText(text) {
         this.text = text;
-        this.invalidate();
+        this.clearRenderCache();
     }
     invalidate() {
+        this.clearRenderCache();
+        this.blocks = undefined;
+        this.defaultStylePrefix = undefined;
+    }
+    clearRenderCache() {
         this.cachedText = undefined;
         this.cachedWidth = undefined;
         this.cachedLines = undefined;
@@ -210,6 +238,7 @@ export class Markdown {
         const contentWidth = Math.max(1, width - this.paddingX * 2);
         const text = this.options.transform?.(this.text, contentWidth) ?? this.text;
         if (!text || text.trim() === "") {
+            this.blocks = undefined;
             const result = [];
             this.cachedText = this.text;
             this.cachedWidth = width;
@@ -227,57 +256,71 @@ export class Markdown {
                 tokens
             });
         }
-        const renderedLines = [];
+        const reuseBlocks = Object.keys(tokens.links).length === 0;
+        const previousBlocks = this.blocks?.deref();
+        const blocks = new Map();
+        this.blocks = new WeakRef(blocks);
+        const contentLines = [];
         for(let i = 0; i < tokens.length; i++){
             const token = tokens[i];
-            const nextToken = tokens[i + 1];
-            const tokenLines = this.renderToken(token, contentWidth, nextToken?.type);
-            for (const tokenLine of tokenLines){
-                renderedLines.push(tokenLine);
+            const nextTokenType = tokens[i + 1]?.type;
+            const reused = reuseBlocks ? blocks.get(token.raw) ?? previousBlocks?.get(token.raw) : undefined;
+            const block = reused ?? {
+                width: -1,
+                nextTokenType,
+                lines: [],
+                highlightedCode: new Map()
+            };
+            if (block.width !== width || block.nextTokenType !== nextTokenType) {
+                this.renderBlock(block, token, nextTokenType, width, contentWidth);
             }
-        }
-        const wrappedLines = [];
-        for (const line of renderedLines){
-            if (isImageLine(line)) {
-                wrappedLines.push(line);
-            } else {
-                for (const wrappedLine of wrapTextWithAnsi(line, contentWidth)){
-                    wrappedLines.push(wrappedLine);
-                }
-            }
-        }
-        const leftMargin = " ".repeat(this.paddingX);
-        const rightMargin = " ".repeat(this.paddingX);
-        const bgFn = this.defaultTextStyle?.bgColor;
-        const contentLines = [];
-        for (const line of wrappedLines){
-            if (isImageLine(line)) {
+            if (reuseBlocks) blocks.set(token.raw, block);
+            for (const line of block.lines){
                 contentLines.push(line);
-                continue;
-            }
-            const lineWithMargins = leftMargin + line + rightMargin;
-            if (bgFn) {
-                contentLines.push(applyBackgroundToLine(lineWithMargins, width, bgFn));
-            } else {
-                const visibleLen = visibleWidth(lineWithMargins);
-                const paddingNeeded = Math.max(0, width - visibleLen);
-                contentLines.push(lineWithMargins + " ".repeat(paddingNeeded));
             }
         }
+        const bgFn = this.defaultTextStyle?.bgColor;
         const emptyLine = " ".repeat(width);
         const emptyLines = [];
         for(let i = 0; i < this.paddingY; i++){
             const line = bgFn ? applyBackgroundToLine(emptyLine, width, bgFn) : emptyLine;
             emptyLines.push(line);
         }
+        flattenLines(emptyLines);
         const result = emptyLines.concat(contentLines, emptyLines);
-        flattenLines(result);
         this.cachedText = this.text;
         this.cachedWidth = width;
         this.cachedLines = result;
         return result.length > 0 ? result : [
             ""
         ];
+    }
+    renderBlock(block, token, nextTokenType, width, contentWidth) {
+        this.blockHighlightedCode = block.highlightedCode;
+        const leftMargin = " ".repeat(this.paddingX);
+        const rightMargin = " ".repeat(this.paddingX);
+        const bgFn = this.defaultTextStyle?.bgColor;
+        const lines = [];
+        for (const line of this.renderToken(token, contentWidth, nextTokenType)){
+            if (isImageLine(line)) {
+                lines.push(line);
+                continue;
+            }
+            for (const wrappedLine of wrapTextWithAnsi(line, contentWidth)){
+                const lineWithMargins = leftMargin + wrappedLine + rightMargin;
+                if (bgFn) {
+                    lines.push(applyBackgroundToLine(lineWithMargins, width, bgFn));
+                } else {
+                    const paddingNeeded = Math.max(0, width - visibleWidth(lineWithMargins));
+                    lines.push(lineWithMargins + " ".repeat(paddingNeeded));
+                }
+            }
+        }
+        this.blockHighlightedCode = undefined;
+        flattenLines(lines);
+        block.lines = lines;
+        block.width = width;
+        block.nextTokenType = nextTokenType;
     }
     applyDefaultStyle(text) {
         if (!this.defaultTextStyle) {
@@ -383,9 +426,12 @@ export class Markdown {
             case "latexBlock":
                 {
                     const latexToken = token;
-                    const rendered = !latexToken.pending && this.options.renderLatex !== false ? renderLatex(latexToken.text, {
+                    let rendered = !latexToken.pending && this.options.renderLatex !== false ? renderLatex(latexToken.text, {
                         display: true
-                    }) ?? latexToken.raw.trim() : latexToken.raw.trim();
+                    }) : undefined;
+                    if (rendered === undefined || rendered.split("\n").some((line)=>visibleWidth(line) > width)) {
+                        rendered = latexToken.raw.trim();
+                    }
                     for (const line of rendered.split("\n")){
                         lines.push(this.applyDefaultStyle(line));
                     }
@@ -399,8 +445,13 @@ export class Markdown {
                     const indent = this.theme.codeBlockIndent ?? "  ";
                     lines.push(this.theme.codeBlockBorder(`\`\`\`${token.lang || ""}`));
                     if (this.theme.highlightCode) {
-                        const highlightedLines = this.theme.highlightCode(token.text, token.lang);
-                        for (const hlLine of highlightedLines){
+                        const key = `${token.lang ?? ""}\0${token.text}`;
+                        let highlighted = this.blockHighlightedCode?.get(key);
+                        if (!highlighted) {
+                            highlighted = this.theme.highlightCode(token.text, token.lang);
+                            this.blockHighlightedCode?.set(key, highlighted);
+                        }
+                        for (const hlLine of highlighted){
                             lines.push(`${indent}${hlLine}`);
                         }
                     } else {
@@ -438,7 +489,16 @@ export class Markdown {
                         const lineWithReappliedStyle = line.replace(/\x1b\[0m/g, `\x1b[0m${quoteStylePrefix}`);
                         return quoteStyle(lineWithReappliedStyle);
                     };
-                    const quoteContentWidth = Math.max(1, width - 2);
+                    if (width < 3) {
+                        const quoteTokens = token.tokens || [];
+                        for(let i = 0; i < quoteTokens.length; i++){
+                            for (const line of this.renderToken(quoteTokens[i], width, quoteTokens[i + 1]?.type, styleContext)){
+                                lines.push(line);
+                            }
+                        }
+                        break;
+                    }
+                    const quoteContentWidth = width - 2;
                     const quoteInlineStyleContext = {
                         applyText: (text)=>text,
                         stylePrefix: quoteStylePrefix
@@ -448,7 +508,9 @@ export class Markdown {
                     for(let i = 0; i < quoteTokens.length; i++){
                         const quoteToken = quoteTokens[i];
                         const nextQuoteToken = quoteTokens[i + 1];
-                        renderedQuoteLines.push(...this.renderToken(quoteToken, quoteContentWidth, nextQuoteToken?.type, quoteInlineStyleContext));
+                        for (const line of this.renderToken(quoteToken, quoteContentWidth, nextQuoteToken?.type, quoteInlineStyleContext)){
+                            renderedQuoteLines.push(line);
+                        }
                     }
                     while(renderedQuoteLines.length > 0 && renderedQuoteLines[renderedQuoteLines.length - 1] === ""){
                         renderedQuoteLines.pop();

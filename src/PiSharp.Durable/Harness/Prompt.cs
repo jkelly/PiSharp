@@ -1,6 +1,7 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/src/harness/prompt.ts. Section maps are insertion-ordered as
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/src/harness/prompt.ts. Section maps are insertion-ordered as
 // JavaScript Maps are (set in place, delete, re-adding appends); a section patch is a JSON object, so its keys enumerate in JavaScript's
-// object order, exactly as upstream's Object.fromEntries. Tools are pi-ai wire declarations.
+// object order, exactly as upstream's Object.fromEntries. Tools are pi-ai wire declarations. Pi v1.5.0 sync (area reports): a failing
+// section is reported with the section, so the caller can name its extension (a30c2a81d).
 using System.Collections.Immutable;
 using PiSharp.Durable.Chord;
 using PiSharp.Durable.Internal.PiAi;
@@ -30,11 +31,11 @@ internal static class HarnessPrompt
 
     /// <summary>
     /// Renders the agent's sections in order (upstream <c>renderSections</c>). A null text omits a section; tagged text is wrapped as
-    /// <c>&lt;key&gt;\n...\n&lt;/key&gt;</c>. A section that throws keeps its shown text, if any, and is reported; errors after
-    /// <paramref name="context"/> is cancelled propagate.
+    /// <c>&lt;key&gt;\n...\n&lt;/key&gt;</c>. A section that throws keeps its shown text, if any, and is reported with the section; errors
+    /// after <paramref name="context"/> is cancelled propagate.
     /// </summary>
     public static async Task<OrderedDictionary<string, string>> RenderSectionsAsync(IReadOnlyList<PromptSection> sections, PromptInput input,
-        IReadOnlyDictionary<string, string> shown, Action<Exception> report, DurableContext context)
+        IReadOnlyDictionary<string, string> shown, Action<Exception, PromptSection> report, DurableContext context)
     {
         var desired = new OrderedDictionary<string, string>(StringComparer.Ordinal);
         foreach (var section in sections)
@@ -47,7 +48,7 @@ internal static class HarnessPrompt
             catch (Exception error)
             {
                 if (context.IsCancellationRequested) throw;
-                report(error);
+                report(error, section);
                 if (shown.TryGetValue(section.Key, out var kept)) desired[section.Key] = kept;
                 continue;
             }

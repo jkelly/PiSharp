@@ -78,6 +78,14 @@ internal sealed class CustomEditor : Editor
         // Check extension-registered shortcuts first
         if (OnExtensionShortcut?.Invoke(data) == true) return;
 
+        // Selection page keys move an open autocomplete menu before app actions run.
+        // This lets users bind Ctrl+V even though it pastes images by default.
+        if (IsShowingAutocomplete() && (keybindings.Matches(data, "tui.select.pageUp") || keybindings.Matches(data, "tui.select.pageDown")))
+        {
+            base.HandleInput(data);
+            return;
+        }
+
         // Check for clipboard paste keybinding
         if (keybindings.Matches(data, "app.clipboard.pasteImage"))
         {

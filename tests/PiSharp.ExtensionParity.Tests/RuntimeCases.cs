@@ -30,13 +30,16 @@ internal static partial class Program
         Equal("2.7.0", Version("jiti"), "jiti");
         Check(packages.All(item => item["integrity"]!.GetValue<string>().StartsWith("sha512-", StringComparison.Ordinal) || item["integrity"]!.GetValue<string>().StartsWith("sha1-", StringComparison.Ordinal)), "integrity hashes");
         Check(File.Exists(Path.Combine(modules, "@earendil-works", "pi-coding-agent", "dist", "core", "extensions", "loader.js")), "coding agent installed");
-        // The installer's own pins: every @earendil-works package of the release at exactly 1.2.0. Pi 1.2.0 no longer depends on
-        // @earendil-works/chord, so neither the overrides nor the install name it.
+        // The installer's own pins: every @earendil-works package of the release at exactly 1.2.0, and undici at Pi 1.5.0's 8.12.3
+        // (bridge.undici-gondolin-advisories). Pi 1.2.0 no longer depends on @earendil-works/chord, so neither the overrides nor the
+        // install name it.
         var manifest = PiNodeRuntime.PackageJson();
         Equal("1.2.0", manifest["dependencies"]!["@earendil-works/pi-coding-agent"]!.GetValue<string>(), "pinned coding agent");
-        Names(["@earendil-works/pi-agent-core", "@earendil-works/pi-ai", "@earendil-works/pi-codemode", "@earendil-works/pi-mcp", "@earendil-works/pi-telemetry", "@earendil-works/pi-tui"],
+        Names(["@earendil-works/pi-agent-core", "@earendil-works/pi-ai", "@earendil-works/pi-codemode", "@earendil-works/pi-mcp", "@earendil-works/pi-telemetry", "@earendil-works/pi-tui", "undici"],
             manifest["overrides"]!.AsObject().Select(item => item.Key).Order(StringComparer.Ordinal), "overrides");
-        Check(manifest["overrides"]!.AsObject().All(item => item.Value!.GetValue<string>() == "1.2.0"), "every override at 1.2.0");
+        Check(manifest["overrides"]!.AsObject().Where(item => item.Key.StartsWith("@earendil-works/", StringComparison.Ordinal)).All(item => item.Value!.GetValue<string>() == "1.2.0"), "every Pi override at 1.2.0");
+        Check(packages.Where(item => item["name"]!.GetValue<string>() == "undici").Select(item => item["version"]!.GetValue<string>()).DefaultIfEmpty("none").All(version => version == "8.12.3"),
+            "undici installed at 8.12.3");
         Check(packages.Where(item => item["name"]!.GetValue<string>().StartsWith("@earendil-works/", StringComparison.Ordinal)).All(item => item["version"]!.GetValue<string>() == "1.2.0"), "every Pi package at 1.2.0");
         Check(!packages.Any(item => item["name"]!.GetValue<string>() == "@earendil-works/chord"), "chord is not installed");
         return Task.CompletedTask;

@@ -28,7 +28,7 @@ internal static partial class Program
         await File.WriteAllTextAsync(authPath, $$$"""{"openai-codex":{"type":"oauth","refresh":"r","access":"{{{CodexToken}}}","expires":4000000000000,"accountId":"acct-123"}}""");
         var runtime = new LiveSessionRuntime(_ => null, () => new StalledUpgrade(), authPath)
         { HomeDirectory = directory, Transport = () => "websocket", WebSocketConnectTimeout = TimeSpan.FromMilliseconds(150) };
-        var selection = LiveSessionSelection.Parse("openai-codex", "gpt-5.5", "512");
+        var selection = LiveSessionSelection.Parse("openai-codex", "gpt-5.6-sol", "512");
         await using var connection = selection.Connect(runtime);
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(5));
         var events = await Collect(connection.CreateTransport(), Hi(selection.Model), timeout.Token);
@@ -65,7 +65,7 @@ internal static partial class Program
         Check(bedrock.Url == "https://bedrock-runtime.us-east-1.amazonaws.com/model/amazon.nova-lite-v1%3A0/converse-stream" &&
             bedrock.Header("authorization")!.StartsWith("AWS4-HMAC-SHA256 Credential=AKIDLIVE/", StringComparison.Ordinal), "bedrock live route");
         Check(bedrock.Body.Contains("\"maxTokens\":512", StringComparison.Ordinal), "bedrock output cap");
-        var codex = await Send("openai-codex", "gpt-5.5");
+        var codex = await Send("openai-codex", "gpt-5.6-sol");
         Check(codex.Url == "https://chatgpt.com/backend-api/codex/responses" && codex.Header("chatgpt-account-id") == "acct-123" &&
             codex.Header("authorization") == "Bearer " + CodexToken, "codex live route");
         var copilot = await Send("github-copilot", "kimi-k3");
@@ -84,7 +84,7 @@ internal static partial class Program
         var openai = await Send("openai", "gpt-4.1");
         Check(openai.Url == "https://api.openai.com/v1/responses" && openai.Header("authorization") == "Bearer chatgpt-access", "stored ChatGPT OAuth on the openai route");
         // Unconfigured routed providers refuse the session with the source guidance.
-        var missing = await Throws<LiveSessionException>(() => Task.FromResult(LiveSessionSelection.Parse("openai-codex", "gpt-5.5", "512").Connect(Runtime(new(), Path.Combine(directory, "none.json")))));
+        var missing = await Throws<LiveSessionException>(() => Task.FromResult(LiveSessionSelection.Parse("openai-codex", "gpt-5.6-sol", "512").Connect(Runtime(new(), Path.Combine(directory, "none.json")))));
         Check(missing.Code == "MissingLiveApiKey" && missing.Message == "Run /login to sign in to OpenAI Codex before launching the live session.", "codex without login");
         var noVertex = await Throws<LiveSessionException>(() => Task.FromResult(LiveSessionSelection.Parse("google-vertex", "gemini-2.5-flash", "512").Connect(Runtime(new(), Path.Combine(directory, "none.json")))));
         Equal("MissingLiveApiKey", noVertex.Code, "vertex without credentials");

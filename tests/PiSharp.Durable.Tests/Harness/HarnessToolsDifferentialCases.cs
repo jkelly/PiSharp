@@ -3,7 +3,12 @@
 // pi.inbox, pi.usage, pi.agent and pi.provider documents) that the pinned pi-durable writes for the scenarios below with pi-ai's faux
 // provider on MemoryStorage, as printed by Fixtures/capture-tool-rounds.mjs. It is normalized as HarnessChatDifferentialCases.cs's fixture
 // is, and compared the same way: as JSON values and by their exact text. The scenarios run here on memory, JSONL and
-// SQLite and must produce the same records, IDs included. Parameters are the JSON TypeBox prints for the scenarios' schemas.
+// SQLite and must produce the same records, IDs included. Parameters are the JSON TypeBox prints for the scenarios' schemas. Pi v1.5.0
+// (area tools-schema): rejections expects pi-schema's validation message, authored from the capture (ToolsSchema150.cs), not captured.
+// Pi v1.5.0 sync (area model-requests): the cases compare with the capture's authored v1.5.0 form (ModelRequests150.cs), not the
+// capture itself: v1.5.0 records the requested thinking level on each message it classifies. A byte comparison needs a recapture.
+// Pi v1.5.0 sync (area tool-tasks, 1c6928b30): and with ToolTasks150.cs's: tasks at pi.tool version 3 and pi.generation version 2, and
+// round's first call, to echo, which its request did not offer, answered by its own flagged pi.tool task.
 using PiSharp.Durable;
 using PiSharp.Durable.Chord;
 using PiSharp.Durable.Sqlite;
@@ -31,8 +36,10 @@ internal static class ToolsDifferentialTests
     private static readonly DurableContext Context = DurableContext.Background;
     private const double T = 1000;
 
-    private static readonly Lazy<JsonObjectValue> Upstream = new(() => (JsonObjectValue)JsonValue.Parse(
-        File.ReadAllText(Path.Combine(RepositoryRoot(), "tests", "PiSharp.Durable.Tests", "Fixtures", "v1.2.0", "tool-rounds.upstream.json"))));
+    // Pi v1.5.0 (area model-requests): the capture's authored v1.5.0 form (see the file header).
+    private static readonly Lazy<JsonObjectValue> Upstream = new(() => ToolTasks150.Differential((JsonObjectValue)ModelRequests150.Authored(JsonValue.Parse(
+        File.ReadAllText(Path.Combine(RepositoryRoot(), "tests", "PiSharp.Durable.Tests", "Fixtures", "v1.2.0", "tool-rounds.upstream.json")))),
+        ("round", "c1")));
 
     private static readonly JsonObjectValue Usage =
         O("""{"input":1,"output":2,"cacheRead":0,"cacheWrite":0,"totalTokens":3,"cost":{"input":0.5,"output":0.25,"cacheRead":0,"cacheWrite":0,"total":0.75}}""");
@@ -52,9 +59,13 @@ internal static class ToolsDifferentialTests
         }),
     });
 
-    private static void Same(string scenario, JsonValue actual, params string[] path)
+    private static void Same(string scenario, JsonValue actual, params string[] path) => Same(scenario, actual, null, path);
+
+    /// <summary><see cref="Same(string, JsonValue, string[])"/> against <paramref name="authored"/>'s form of the capture, when given.</summary>
+    private static void Same(string scenario, JsonValue actual, Func<JsonValue, JsonValue>? authored, params string[] path)
     {
         var expected = path.Aggregate((JsonValue)Upstream.Value[scenario], (value, key) => ((JsonObjectValue)value)[key]);
+        if (authored is not null) expected = authored(expected);
         Check(JsonValue.DeepEquals(expected, actual), $"{scenario}: expected {expected.ToJson()}, actual {actual.ToJson()}");
         Equal(expected.ToJson(), actual.ToJson(), $"{scenario}: key order");
         // The documents are built by the Harness, so their key order is upstream's too.
@@ -143,7 +154,8 @@ internal static class ToolsDifferentialTests
             var storage = fresh();
             var (harness, root) = await Open(setup, storage);
             await (await root.SubmitAsync(SubmissionDraft.Input("go"), Context)).WaitAsync(Context);
-            Same("rejections", await ChatDifferentialTests.Dump(harness, storage, root.Id));
+            // Pi v1.5.0 (area tools-schema): pi-schema's validation message, authored from the capture (ToolsSchema150.cs).
+            Same("rejections", await ChatDifferentialTests.Dump(harness, storage, root.Id), ToolsSchema150.Authored);
             await harness.CloseAsync(Context);
         });
 

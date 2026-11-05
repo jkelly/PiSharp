@@ -1,9 +1,9 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/src/env/index.ts (the portable FileSystem capability: its text-line,
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/src/env/index.ts (the portable FileSystem capability: its text-line,
 // binary and directory readers, line scans, watches, temporary files and the optional listFiles). Upstream's `string | Uint8Array` contents
-// are bytes here, with UTF-8 string overloads in FileSystemExtensions; upstream's `{ paths } | { overflow } | { error }` WatchChange union is
-// the WatchChange record hierarchy. The optional `listFiles?` member is a default interface method that fails with not_supported, which
-// callers already treat as a missing method; ListFilesOptions keeps upstream's `number` bounds as doubles so a fractional or negative bound
-// is refused with invalid, as upstream refuses it.
+// are bytes here, with UTF-8 string overloads in FileSystemExtensions; upstream's FileChange union, tagged by `kind` (`paths`, `overflow`,
+// `failed`), is the FileChange record hierarchy, whose Kind names the tag. The optional `listFiles?` member is a default interface method
+// that fails with not_supported, which callers already treat as a missing method; ListFilesOptions keeps upstream's `number` bounds as
+// doubles so a fractional or negative bound is refused with invalid, as upstream refuses it.
 using System.Collections.Immutable;
 using System.Text;
 using PiSharp.Durable.Chord;
@@ -118,27 +118,56 @@ public sealed record WatchTarget(string Path)
     public WatchExclusions? Exclude { get; init; }
 }
 
-/// <summary>
-/// What changed (upstream <c>WatchChange</c>): <see cref="WatchPathsChange"/>, something at or below each path may have changed (calls may be
-/// spurious; a change is never missed while the watcher is healthy); <see cref="WatchOverflowChange"/>, coverage was uncertain for a while,
-/// so rescan everything that is watched; <see cref="WatchErrorChange"/>, the watcher stopped and no calls follow.
-/// </summary>
-public abstract record WatchChange
+/// <summary>The tag of a <see cref="FileChange"/> (upstream <c>FileChange.kind</c>).</summary>
+public enum FileChangeKind
 {
-    private protected WatchChange() { }
+    /// <summary><c>paths</c>: <see cref="FilePathsChange"/>.</summary>
+    Paths,
+    /// <summary><c>overflow</c>: <see cref="FileOverflowChange"/>.</summary>
+    Overflow,
+    /// <summary><c>failed</c>: <see cref="FileFailedChange"/>.</summary>
+    Failed,
 }
 
-/// <summary>Something at or below each path may have changed; a directory path covers its whole subtree (upstream <c>{ paths }</c>).</summary>
+/// <summary>
+/// What changed, tagged by <see cref="Kind"/> (upstream <c>FileChange</c>): <see cref="FilePathsChange"/>, something at or below each path may
+/// have changed (calls may be spurious; a change is never missed while the watcher is healthy); <see cref="FileOverflowChange"/>, coverage was
+/// uncertain for a while, so rescan everything that is watched; <see cref="FileFailedChange"/>, the watcher stopped with an error and no calls
+/// follow.
+/// </summary>
+public abstract record FileChange
+{
+    private protected FileChange() { }
+
+    /// <summary>Which change this is.</summary>
+    public abstract FileChangeKind Kind { get; }
+}
+
+/// <summary>Something at or below each path may have changed; a directory path covers its whole subtree (upstream
+/// <c>{ kind: "paths", paths }</c>).</summary>
 /// <param name="Paths">Absolute paths, sorted ordinally.</param>
-public sealed record WatchPathsChange(ImmutableArray<string> Paths) : WatchChange;
+public sealed record FilePathsChange(ImmutableArray<string> Paths) : FileChange
+{
+    /// <inheritdoc/>
+    public override FileChangeKind Kind => FileChangeKind.Paths;
+}
 
-/// <summary>Coverage was uncertain for a while (lost events, reconnect): rescan everything that is watched (upstream <c>{ overflow: true }</c>).</summary>
-public sealed record WatchOverflowChange : WatchChange;
+/// <summary>Coverage was uncertain for a while (lost events, reconnect): rescan everything that is watched (upstream
+/// <c>{ kind: "overflow" }</c>). It carries nothing else.</summary>
+public sealed record FileOverflowChange : FileChange
+{
+    /// <inheritdoc/>
+    public override FileChangeKind Kind => FileChangeKind.Overflow;
+}
 
-/// <summary>The watcher stopped, for example because the watched tree grew past the environment's limit; no calls follow (upstream
-/// <c>{ error }</c>).</summary>
+/// <summary>The watcher stopped with <see cref="Error"/>, for example because the watched tree grew past the environment's limit; no calls
+/// follow (upstream <c>{ kind: "failed", error }</c>).</summary>
 /// <param name="Error">Why it stopped.</param>
-public sealed record WatchErrorChange(FileError Error) : WatchChange;
+public sealed record FileFailedChange(FileError Error) : FileChange
+{
+    /// <inheritdoc/>
+    public override FileChangeKind Kind => FileChangeKind.Failed;
+}
 
 /// <summary>How reliably a watcher reports changes (upstream <c>FileWatcher.mode</c>).</summary>
 public enum WatchMode
@@ -157,7 +186,7 @@ public interface IFileWatcher
     WatchMode Mode { get; }
 
     /// <summary>Stops watching; no change callback starts after this completes. Idempotent.</summary>
-    Task CloseAsync(DurableContext context);
+    Task StopAsync(DurableContext context);
 }
 
 /// <summary>Pages of one directory's entries (upstream <c>DirReader</c>).</summary>
@@ -294,11 +323,11 @@ public interface IFileSystem
 
     /// <summary>
     /// Reports changes to files and directories, for hosts that load resources from the environment. When the returned watcher exists,
-    /// coverage is established: a host that watches before it loads cannot miss a change made during the load. See <see cref="WatchChange"/>
+    /// coverage is established: a host that watches before it loads cannot miss a change made during the load. See <see cref="FileChange"/>
     /// for what is reported and <see cref="IFileWatcher.Mode"/> for how reliably. <paramref name="onChange"/> runs on a background thread, one
     /// call at a time; an exception it throws is ignored.
     /// </summary>
-    Task<Result<IFileWatcher, FileError>> WatchAsync(IReadOnlyList<WatchTarget> targets, Action<WatchChange> onChange, DurableContext context);
+    Task<Result<IFileWatcher, FileError>> WatchAsync(IReadOnlyList<WatchTarget> targets, Action<FileChange> onChange, DurableContext context);
 
     /// <summary>Creates a new, empty directory under the environment's temporary directory; its name starts with
     /// <paramref name="prefix"/> (default <c>tmp-</c>).</summary>

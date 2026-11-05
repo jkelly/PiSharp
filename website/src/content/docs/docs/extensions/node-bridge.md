@@ -24,7 +24,7 @@ PiSharp starts Node only when an extension needs it. Without extensions, or with
 
 ## Pi's own packages
 
-The first time a TypeScript extension loads, PiSharp installs Pi 1.2.0's npm packages (`@earendil-works/pi-coding-agent`, `pi-ai`, `pi-tui` and `pi-agent-core`, with `typebox` and `jiti`) into `~/.pi/agent/pisharp/pi-runtime/1.2.0`, using your npm. Every package's integrity is checked against the npm registry before it's used. Extensions then load through Pi's own `jiti` setup, so imports such as `@earendil-works/pi-coding-agent` resolve to the real code.
+The first time a TypeScript extension loads, PiSharp installs Pi 1.2.0's npm packages (`@earendil-works/pi-coding-agent`, `pi-ai`, `pi-tui` and `pi-agent-core`, with `typebox` and `jiti`) into `~/.pi/agent/pisharp/pi-runtime/1.2.0`, using your npm. Every `@earendil-works` package is pinned to exactly 1.2.0. `undici`, which `pi-coding-agent` uses for HTTP, is overridden to exactly 8.12.3, the version Pi 1.5.0 moved to for security advisories (Pi 1.2.0 pins 8.10.2). The runtime stays on Pi 1.2.0's packages because Pi 1.5.0's `pi-agent-core` attributes agent requests to Pi by default, which PiSharp doesn't do. A runtime installed by an earlier PiSharp, whose `package.json` lacks the override, is installed again on next use. Every package's integrity is checked against the npm registry before it's used. Extensions then load through Pi's own `jiti` setup, so imports such as `@earendil-works/pi-coding-agent` resolve to the real code.
 
 `PISHARP_PI_RUNTIME_DIR` moves this folder.
 
@@ -33,6 +33,14 @@ If the install can't run (offline, no npm, or a failed install), extensions stil
 ## What works
 
 The whole `ExtensionAPI`: tools, commands, shortcuts, flags, message and tool renderers, providers (chat, classifier and image), virtual models, MCP servers, the event bus, and every extension event. [Extension events](/docs/extensions/events/) lists the events and when each one fires. `ctx.ui` dialogs, widgets and custom components show in the terminal UI and over RPC.
+
+Pi 1.5.0's additions work too. Tool, message and entry renderers get `keyText()` and `keyHint()`, which read the terminal UI's current keybindings. An inline `ctx.ui.custom()` component with a `blocked: { kind, message }` option reports pi as blocked in its OSC 7501 program status while it is open (overlays ignore the option). Markdown transformers see `messageId` and `timestamp` for messages restored from the session file.
+
+Dialogs and inline custom components stack in the editor slot, as in Pi 1.4.0. A `select`, `confirm`, `input` or `editor` dialog, or an inline `ctx.ui.custom()` component, hides the one that is showing. When it closes, the one below shows again. Every dialog still settles when it is answered, times out or is aborted, and the blocked program status follows the dialog that is showing. If an extension calls `ctx.ui.setEditorComponent()` while a dialog is open, the dialog keeps its place and focus. The new editor shows when the last dialog closes.
+
+`ctx.ui.custom(factory, { overlay: true, overlayOptions })` opens the component as an overlay on top of the screen, as in Pi 1.3.0. Its `done()` hides the overlay it opened, even when another overlay opened above it. The overlay options are `width`, `minWidth`, `maxHeight`, `anchor`, `offsetX`, `offsetY`, `row`, `col`, `margin` and `nonCapturing`. Without `overlayOptions` the overlay takes the component's `width`. A function `overlayOptions` is called once, when the overlay opens. Two parts don't cross the bridge: the `visible` callback and `onHandle`, the handle Pi passes back for showing and hiding the overlay.
+
+A component's `capturesViewportInput` (Pi 1.5.0) reaches the full-screen viewport, so a custom component or an extension editor with a menu open gets the scroll keys. PiSharp reads the value after each render and each key. The key hints keep the terminal UI's keybindings after `/reload`.
 
 `ctx.ui.setTheme()` switches the theme in the terminal UI and saves it, as in Pi. `pi.sendMessage(…, { triggerTurn: true })` starts its turn at once, also from inside a command's handler. Packages loaded with `-e` add their skills, prompt templates and themes as well as their extensions.
 

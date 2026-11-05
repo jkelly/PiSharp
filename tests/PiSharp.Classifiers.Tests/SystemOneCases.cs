@@ -27,7 +27,9 @@ internal static partial class Program
             var result = await TypeSafeSystemOneClassifier.Instance.ClassifyAsync(Jev, SystemOneContext,
                 new ClassifierOptions { ApiKey = "secret", Http = http.Client, Temperature = 1.5 });
             Equal("https://api.typesafe.ai/v1/systemone", http.Requests[0].Url, "url");
-            Names(["authorization", "content-type"], http.Requests[0].Headers.Keys.Order(StringComparer.Ordinal), "headers");
+            // Pi 1.5.0 classifier-shared.ts sends getIdentityHeaders first: the detailed pi/<version> User-Agent.
+            Names(["authorization", "content-type", "user-agent"], http.Requests[0].Headers.Keys.Order(StringComparer.Ordinal), "headers");
+            Check(http.Requests[0].Headers["user-agent"].StartsWith("pi/1.5.0 (", StringComparison.Ordinal), "identity user-agent");
             Equal("Bearer secret", http.Requests[0].Headers["authorization"], "authorization");
             // System One has no temperature field; the option is ignored.
             Body($$$"""{"model":"jev-latest","state":{"text":"The deployment succeeded, thank you."},"questions":{{{SystemOneQuestionsBody}}}}""", http.Requests[0].Body, "typesafe");
@@ -60,11 +62,11 @@ internal static partial class Program
             var http = FakeHttp.Always(() => FakeHttp.Json("{}"));
             var other = await TypeSafeSystemOneClassifier.Instance.ClassifyAsync(Jev with { Api = "cloudflare-workers-ai-system-one" }, SystemOneContext,
                 new ClassifierOptions { ApiKey = "secret", Http = http.Client });
-            var images = await TypeSafeSystemOneClassifier.Instance.ClassifyAsync(Jev with { Input = ["text", "image"] },
+            var images = await TypeSafeSystemOneClassifier.Instance.ClassifyAsync(Jev,
                 SystemOneContext with { Images = [new("aW1hZ2U=", "image/png")] }, new ClassifierOptions { ApiKey = "secret", Http = http.Client });
             Equal(0, http.Requests.Count, "requests");
             Equal("Unsupported classifier API: cloudflare-workers-ai-system-one", other.ErrorMessage, "other api");
-            Equal("System One API does not support image input", images.ErrorMessage, "images");
+            Equal("System One API does not support image input for jev-latest", images.ErrorMessage, "images");
             Equal(ModelOperationStopReason.Error, images.StopReason, "stop");
         }),
         ("system-one.headers-merge-case-insensitively-with-null-suppression", async () =>

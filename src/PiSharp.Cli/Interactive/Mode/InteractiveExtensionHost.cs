@@ -28,6 +28,8 @@ internal interface IInteractiveExtensionHost
     bool HasMarkdownTransformers { get; }
     string TransformMarkdown(string markdown, JsonObject context);
     IReadOnlyList<LoadedResource> LoadedExtensions();
+    /// <summary>Each loaded extension's sourceInfo (path, source, scope, origin, baseDir, changelogPath), in load order.</summary>
+    IReadOnlyList<JsonObject> ExtensionSourceInfos() => [];
     IReadOnlyList<ResourceDiagnostic> Diagnostics();
     /// <summary>ctx.ui.setEditorComponent: the extension editor with this component id (null when the host has none). Its events run
     /// through <paramref name="post"/> on the mode's loop; <paramref name="action"/> resolves the mode's app actions by name.</summary>
@@ -122,7 +124,10 @@ internal sealed class PiInteractiveExtensionHost(PiExtensionHost host) : IIntera
 
     public IReadOnlyList<LoadedResource> LoadedExtensions() => [.. host.Extensions.Select(extension => new LoadedResource(extension.Path, null))];
 
-    public IReadOnlyList<ResourceDiagnostic> Diagnostics() => [.. host.Errors.Select(error => new ResourceDiagnostic("error", error.Error, error.Path))];
+    public IReadOnlyList<JsonObject> ExtensionSourceInfos() => [.. host.Extensions.Select(host.SourceInfoOf)];
+
+    public IReadOnlyList<ResourceDiagnostic> Diagnostics() => [.. host.Errors.Select(error => new ResourceDiagnostic("error", error.Error, error.Path)),
+        .. host.PackageWarnings.Select(warning => new ResourceDiagnostic("warning", warning.Warning, warning.Path))];
 
     private readonly ConcurrentDictionary<string, NodeEditorComponent> editors = new(StringComparer.Ordinal);
 
@@ -144,8 +149,11 @@ internal sealed class PiInteractiveExtensionHost(PiExtensionHost host) : IIntera
 }
 
 /// <summary>A component that lives in the extension host: its rows are fetched per width until it asks to be redrawn.</summary>
-internal sealed class ExtensionRowsComponent(Func<int, IReadOnlyList<string>> render, Action<string>? input = null) : IComponent, IInputHandler
+internal sealed class ExtensionRowsComponent(Func<int, IReadOnlyList<string>> render, Action<string>? input = null, Func<bool>? captures = null)
+    : IComponent, IInputHandler
 {
+    /// <summary>Pi 1.5.0: the extension component's capturesViewportInput (false when the extension reports none).</summary>
+    public bool CapturesViewportInput => captures?.Invoke() == true;
     private readonly Dictionary<int, List<string>> cache = [];
     public List<string> Render(int width)
     {

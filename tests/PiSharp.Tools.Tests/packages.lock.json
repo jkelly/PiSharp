@@ -36,10 +36,14 @@
       "pisharp.ai": {
         "type": "Project",
         "dependencies": {
-          "PiSharp.Contracts": "[1.1.0.1, )"
+          "PiSharp.Contracts": "[1.1.0.1, )",
+          "PiSharp.Telemetry": "[1.1.0.1, )"
         }
       },
       "pisharp.contracts": {
+        "type": "Project"
+      },
+      "pisharp.telemetry": {
         "type": "Project"
       },
       "pisharp.tools": {

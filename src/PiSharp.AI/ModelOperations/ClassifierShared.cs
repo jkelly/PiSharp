@@ -70,7 +70,8 @@ internal static class ClassifierShared
         if (options.OnPayload is { } onPayload && await onPayload(body.DeepClone(), model, signal).ConfigureAwait(false) is { } replaced)
             payload = replaced;
         var text = ProviderRequest.Stringify(payload);
-        var headers = ProviderRequest.MergeHeaders(
+        // Pi 1.5.0 classifier-shared.ts: providerHeadersToRecord(getIdentityHeaders(model, identity), auth, model.headers, options.headers).
+        var headers = ProviderRequest.MergeHeaders(ProviderRequest.Nullable(ClientIdentities.GetIdentityHeaders(model.Provider, model.BaseUrl, options.Identity)),
             [new("authorization", "Bearer " + options.ApiKey), new("content-type", "application/json")],
             ProviderRequest.Nullable(model.Headers), options.Headers);
         var http = ProviderRequest.Http(options);
@@ -98,7 +99,8 @@ internal static class ClassifierShared
         var hasOutput = usage.TryGetProperty("output_tokens", out var outputTokens);
         if (!hasInput && !hasOutput) return null;
         var input = TokenCount(hasInput ? inputTokens : null); var output = TokenCount(hasOutput ? outputTokens : null);
-        return ProviderRequest.Usage(input, output, 0, 0, input + output, model.Cost.Calculate(input, output, 0, 0));
+        // Pi f9a26365 models.ts calculateCost records totalFromProvider false.
+        return ProviderRequest.Usage(input, output, 0, 0, input + output, model.Cost.Calculate(input, output, 0, 0), totalFromProvider: false);
     }
 
     internal static JsonElement? Field(JsonElement value, string name) =>

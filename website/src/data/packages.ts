@@ -2,6 +2,7 @@ export type Package = { id: string; description: string; group: 'Core' | 'Fronte
 
 export const packages: Package[] = [
 	{ id: 'PiSharp.Contracts', group: 'Core', nuget: true, description: 'Shared message, streaming and JSON contracts used by every other package.' },
+	{ id: 'PiSharp.Telemetry', group: 'Core', nuget: true, experimental: true, description: "A port of Pi's telemetry contract: spans, links, carriers, metrics and typed schemas, with no-op and in-memory adapters. Requests are traced only when a host passes a span; nothing is sent anywhere." },
 	{ id: 'PiSharp.AI', group: 'Core', nuget: true, description: "Streaming LLM transports for every Pi chat API, Pi's model catalogs, provider logins, and the classifier and image APIs. Also the experimental media library and service tiers." },
 	{ id: 'PiSharp.Agent', group: 'Core', nuget: true, description: 'The agent loop: turns, tool invocation and batching, steering and follow-up queues.' },
 	{ id: 'PiSharp.Tools', group: 'Core', nuget: true, description: 'Built-in file and process tools with output truncation and safe file mutation.' },

@@ -13,7 +13,7 @@ using PiSharp.Cli.Pi;
 // against (PiNodeRuntime, verified against the public registry); without it the cases run on the compatibility modules. No real credentials, no real home or agent directory.
 internal static partial class Program
 {
-    private const string Upstream = "06a466935536f8c9bcacb2d5efc0fc021be1bdff";
+    private const string Upstream = "f9a26365568127461c47a07a37dcb42c140a3ac5"; // Report label: synced to Pi v1.5.0 (decision 0013); extensions still run on the Pi 1.2.0 npm packages (PiNodeRuntime.PiVersion, owner decision 2026-11-05).
 
     private static async Task<int> Main(string[] args)
     {
@@ -41,6 +41,12 @@ internal static partial class Program
         cases.AddRange(CloseoutCases());
         cases.AddRange(LeftoverCases());
         cases.AddRange(Sync120Cases());
+        cases.AddRange(Sync150Cases());
+        cases.AddRange(Sync150PackageCases());
+        cases.AddRange(Sync150ProviderCases());
+        cases.AddRange(Sync150BridgeCases());
+        cases.AddRange(Sync150CliCases());
+        cases.AddRange(Sync150RuntimeCases());
         var filter = Environment.GetEnvironmentVariable("EXTPARITY_FILTER");
         if (!string.IsNullOrEmpty(filter)) cases = [.. cases.Where(test => test.Id.Contains(filter, StringComparison.Ordinal))];
         var results = new List<object>(); var failures = 0; var skipped = 0;

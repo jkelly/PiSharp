@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/test/codemode.test.ts ("durable code mode" as codemode.<case>,
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/test/codemode.test.ts ("durable code mode" as codemode.<case>,
 // "durable code mode output and tool search" as codemode.output.<case>). Verbatim apart from the adaptations in HarnessSupport.cs and
 // ChatSupport.cs, and these:
 // - `openNodeSqliteStorage(path)` is SqliteStorage.OpenAsync over a file in a fresh temporary directory; NodeExecutionEnv is
@@ -6,8 +6,9 @@
 // - The sandbox is PiSharp.Codemode's CodemodeSandbox (64 MiB, engines on threads as the test host sets no worker launcher, as upstream's run
 //   on worker threads). Upstream's wrapper of `sandbox.start`, which counts runs and hands each to `vm.onStart`, is
 //   CodemodeToolOptions.OnRunStarted.
-// - The tools' Parameters are the JSON TypeBox prints for `Type.Object({ text: Type.Optional(Type.String()), id: Type.Optional(Type.Number())
-//   })`; a test's own Exit schema likewise.
+// - The tools' Parameters are the JSON pi-schema builds for `obj({ text: opt(str()), id: opt(num()) })`; a test's own Exit schema
+//   likewise (Pi v1.5.0, area tools-schema). A tool upstream declares with `obj({})` and calls with `{}` keeps the default,
+//   ToolRegistration.EmptyParameters.
 // - toMatchObject of the details' calls checks the listed fields; `harness.close(context).catch(() => {})` ignores the close's failure.
 // - The journal and run documents (CodemodeJournalDoc, CodemodeRunDoc) are DurableCodemode.JournalDoc and RunDoc; a test's
 //   `journal.entries[0]!.issuedAfter = 7` and the like are draft writes in a Harness commit.
@@ -15,6 +16,20 @@
 //   count of all journal commits (fewer than 10). The other commits only record acknowledged counts, and their number is timing: a commit
 //   here runs off the call's scheduler, so the VM acknowledges results while it is in flight, and those make one more commit after it (5 to
 //   54 journal commits in all, by VM and storage speed; 10 on a macOS runner).
+// - checks-a-rerun-s-calls-against-an-earlier-attempt-s-before-admitting-any-later-call restarts once its echo call ran: the call it does
+//   not await runs as a nested task beside the hold's, which can reach its block first on the thread pool, where upstream's echo runs
+//   first (a busy runner restarted with no echo run).
+// - Pi v1.5.0 sync (area sleep): drops-a-global-s-result-that-arrives-after-the-script-finished is ec1be23eb's case; upstream's
+//   process.on("unhandledRejection") is TaskScheduler.UnobservedTaskException after a full collection.
+// - Pi v1.5.0 sync (area codemode): upstream's replays-results-in-the-order-they-arrived-not-the-order-the-calls-were-made releases call 1
+//   once call 2 finished (slows.finishedCall, e17e2e105); here once call 2's result is in the journal (a commit observer). A nested result
+//   reaches the script after its task's terminal commit and a snapshot of its call document, so a call 1 released as call 2 finished can
+//   still arrive first on the thread pool (a busy runner journaled [1,2], mostly without document retention). Two authored cases check that
+//   code mode reads the Harness clock (f75b3240a), which upstream's suite does not:
+//   codemode.reads-the-script-s-start-its-results-times-and-its-wall-time-from-the-harness-clock and
+//   codemode.measures-the-script-s-deadline-on-the-harness-clock-across-a-restart, both with HarnessOptions.Now as a test clock.
+// - Pi v1.5.0 sync (area vocabulary, 5f312dac4): journals-results-that-finish-together-in-one-commit counts the journal commits with an
+//   ObserveCommits observer (a CommitObserver; upstream observeCommits({ advance, end })) over the document changes of kind change.
 using System.Collections.Concurrent;
 using System.Text.RegularExpressions;
 using PiSharp.Codemode;
@@ -40,8 +55,8 @@ internal static partial class CodemodeTests
 {
     private static readonly DurableContext Context = DurableContext.Background;
 
-    /// <summary><c>Type.Object({ text: Type.Optional(Type.String()), id: Type.Optional(Type.Number()) })</c>.</summary>
-    internal static readonly JsonObjectValue Parameters = O("""{"type":"object","properties":{"text":{"type":"string"},"id":{"type":"number"}}}""");
+    /// <summary><c>obj({ text: opt(str()), id: opt(num()) })</c>.</summary>
+    internal static readonly JsonObjectValue Parameters = O("""{"type":"object","properties":{"text":{"type":"string"},"id":{"type":"number"}},"additionalProperties":false}""");
 
     internal static ToolRegistration Tool(string name, ToolExecute execute, ToolReplay replay = ToolReplay.Unsafe) =>
         Define.Tool(new ToolRegistration { Name = name, Description = name, Parameters = Parameters, Execute = execute, Replay = replay });
@@ -76,10 +91,13 @@ internal static partial class CodemodeTests
 
     internal sealed class Slows
     {
-        private readonly ConcurrentDictionary<long, Deferred> gates = new();
+        private readonly ConcurrentDictionary<long, Deferred> gates = new(), done = new();
         public SyncList<long> Finished { get; } = new();
         public Deferred Gate(long id) => gates.GetOrAdd(id, _ => new Deferred());
         public void Release(long id) => Gate(id).Resolve();
+        /// <summary>Resolves once call <paramref name="id"/> has finished.</summary>
+        public Task FinishedCall(long id) => Done(id).Task;
+        internal Deferred Done(long id) => done.GetOrAdd(id, _ => new Deferred());
     }
 
     /// <summary>
@@ -127,6 +145,7 @@ internal static partial class CodemodeTests
                 var id = ((JsonObjectValue)args).TryGetValue("id", out var value) && value is JsonNumberValue number ? (long)number.Value : 0;
                 await Slows.Gate(id).Task;
                 Slows.Finished.Add(id);
+                Slows.Done(id).Resolve();
                 return TextResult($"slow {IdArg(args)}");
             }));
         }
@@ -155,10 +174,17 @@ internal static partial class CodemodeTests
     /// themselves.</summary>
     internal static async Task<ResultText> ResultOf(IConversation root)
     {
+        var (text, isError) = await FullResultOf(root);
+        return new ResultText(Header.Replace(text, "", 1), isError);
+    }
+
+    /// <summary>The code mode call's result text with its header.</summary>
+    internal static async Task<ResultText> FullResultOf(IConversation root)
+    {
         var entry = (await AllEntries(root)).First(candidate => candidate.Kind == "pi.tool-result");
         var message = (JsonObjectValue)entry.Model![0];
         var text = string.Concat(((JsonArrayValue)message["content"]).Cast<JsonObjectValue>().Select(item => S(item["type"]) == "text" ? S(item["text"]) : ""));
-        return new ResultText(Header.Replace(text, "", 1), message["isError"] is JsonBooleanValue { Value: true });
+        return new ResultText(text, message["isError"] is JsonBooleanValue { Value: true });
     }
 
     private static void SameText(ResultText expected, ResultText actual, string what)
@@ -180,14 +206,16 @@ internal static partial class CodemodeTests
 
     /// <summary>
     /// Run <paramref name="code"/> until <c>holds.Reached</c>, close the Harness (a restart), let <paramref name="between"/> change the stored
-    /// state, then reopen with <c>hold</c> no longer blocking and wait for the answer (upstream <c>restart</c>).
+    /// state, then reopen with <c>hold</c> no longer blocking and wait for the answer (upstream <c>restart</c>). <paramref name="onOpen"/> sees
+    /// the first Harness before the script starts.
     /// </summary>
     internal static async Task<Restarted> Restart(Chat chat, string code, Func<IHarness, TaskId, Task>? between = null,
-        Func<IHarness, TaskId, Task>? beforeClose = null)
+        Func<IHarness, TaskId, Task>? beforeClose = null, Action<IHarness>? onOpen = null)
     {
         var path = SqlitePath();
         chat.Setup.Faux.SetResponses(Script(code), Done);
         var opened = await OpenChat(await SqliteStorage.OpenAsync(path), chat.Setup);
+        onOpen?.Invoke(opened.Harness);
         var id = (await opened.Root.SubmitAsync(SubmissionDraft.Input("go"), Context)).Id;
         await chat.Holds.Reached.Task;
         if (beforeClose is not null) await beforeClose(opened.Harness, await ScriptTask(opened.Harness));
@@ -264,10 +292,14 @@ internal static partial class CodemodeTests
                 				await tools.hold({});
                 				return order;
                 """;
-            // 2 finishes first, then 1.
+            // 2 finishes first, then 1: 1 is released once 2's result is in the journal.
             chat.Slows.Release(2);
-            _ = Eventually(() => chat.Slows.Finished.Snapshot().Contains(2)).ContinueWith(_ => chat.Slows.Release(1), TaskScheduler.Default);
-            var restarted = await Restart(chat, code);
+            var restarted = await Restart(chat, code, onOpen: harness => harness.ObserveCommits(new CommitObserver((publication, _) =>
+            {
+                foreach (var change in publication.Changes)
+                    if (change is DocumentValueChange { Record.Kind: "pi.codemode.journal", Value: var journal } && ((JsonArrayValue)journal["entries"]).Count > 0)
+                        chat.Slows.Release(1);
+            }, _ => { })));
             SameText(new("[2,1]", false), restarted.Result, "result");
             SameCounts(new() { ["2,1"] = 1 }, chat.EchoCounts(), "echo");
             await restarted.Harness.CloseAsync(Context);
@@ -544,7 +576,9 @@ internal static partial class CodemodeTests
                     // As if the restart came before the first journal commit.
                     journal.GetArray("entries").SetLength(0);
                     return Task.CompletedTask;
-                }));
+                }),
+                // The echo call runs beside the hold, and before it reaches its block by upstream's order.
+                beforeClose: (_, _) => Eventually(() => chat.Echo.ContainsKey("a")));
             Equal(true, restarted.Result.IsError, "isError");
             // The first run already made more calls than before.
             Contains(restarted.Result.Text, "its first run made 3 calls, where it had made 2", "result");
@@ -643,6 +677,33 @@ internal static partial class CodemodeTests
             await restarted.Harness.CloseAsync(Context);
         });
 
+        yield return Case(prefix + "drops-a-global-s-result-that-arrives-after-the-script-finished", async () =>
+        {
+            var late = new TaskCompletionSource<JsonValue?>(TaskCreationOptions.RunContinuationsAsynchronously);
+            var chat = new Chat([Global("slowly", _ => late.Task), Global("quickly", _ => Task.FromResult<JsonValue?>("quick"))]);
+            chat.Setup.Faux.SetResponses(Script("const pending = slowly(); await quickly(); return 1;"), Done);
+            var rejections = new ConcurrentQueue<Exception>();
+            EventHandler<UnobservedTaskExceptionEventArgs> onRejection = (_, args) => rejections.Enqueue(args.Exception);
+            TaskScheduler.UnobservedTaskException += onRejection;
+            try
+            {
+                var (harness, root) = await OpenChat(await SqliteStorage.OpenAsync(SqlitePath()), chat.Setup);
+                await (await root.SubmitAsync(SubmissionDraft.Input("go"), Context)).WaitAsync(Context);
+                SameText(new("1", false), await ResultOf(root), "result");
+                // The script's tool call has ended; its pending global resolves now.
+                late.SetResult("late");
+                await Task.Delay(20);
+                GC.Collect();
+                GC.WaitForPendingFinalizers();
+                Equal(0, rejections.Count, "unhandled rejections");
+                await harness.CloseAsync(Context);
+            }
+            finally
+            {
+                TaskScheduler.UnobservedTaskException -= onRejection;
+            }
+        });
+
         yield return Case(prefix + "rejects-a-failed-tool-call-with-its-error-text-and-structured-output", async () =>
         {
             var chat = new Chat();
@@ -658,7 +719,7 @@ internal static partial class CodemodeTests
         yield return Case(prefix + "resolves-a-schema-tool-s-error-result-that-carries-its-value-and-rejects-one-without-with-its-text", async () =>
         {
             var chat = new Chat();
-            var exit = O("""{"type":"object","required":["output","exitCode"],"properties":{"output":{"type":"string"},"exitCode":{"type":"number"}}}""");
+            var exit = O("""{"type":"object","properties":{"output":{"type":"string"},"exitCode":{"type":"number"}},"required":["output","exitCode"],"additionalProperties":false}""");
             AddTool(chat.Setup.Registry, Define.Tool(new ToolRegistration
             {
                 Name = "run",
@@ -697,7 +758,7 @@ internal static partial class CodemodeTests
             {
                 Name = "picture",
                 Description = "picture",
-                Parameters = O("""{"type":"object","required":["caption"],"properties":{"caption":{"type":"boolean"}}}"""),
+                Parameters = O("""{"type":"object","properties":{"caption":{"type":"boolean"}},"required":["caption"],"additionalProperties":false}"""),
                 Execute = (args, _, _) => Task.FromResult(new ToolExecutionResult
                 {
                     Output = JsonValue.Array(
@@ -777,6 +838,48 @@ internal static partial class CodemodeTests
             await restarted.Harness.CloseAsync(Context);
         });
 
+        // Authored (Pi v1.5.0, area codemode): upstream moved code mode onto the Harness clock (f75b3240a) without a case for it.
+        yield return Case(prefix + "reads-the-script-s-start-its-results-times-and-its-wall-time-from-the-harness-clock", async () =>
+        {
+            var now = 1_000_000L;
+            var chat = new Chat([Global("advance", _ =>
+            {
+                Interlocked.Add(ref now, 2_500);
+                return Task.FromResult<JsonValue?>("advanced");
+            })]);
+            chat.Setup.Now = () => Interlocked.Read(ref now);
+            chat.Setup.Faux.SetResponses(Script("const t0 = Date.now(); await advance(); return [t0, Date.now()];"), Done);
+            var (harness, root) = await OpenChat(await SqliteStorage.OpenAsync(SqlitePath()), chat.Setup);
+            await (await root.SubmitAsync(SubmissionDraft.Input("go"), Context)).WaitAsync(Context);
+            // The script starts at the Harness clock, its clock moves to the time its result arrived, and the wall time is the clock's 2.5 s.
+            SameText(new("Script completed\nWall time 2.5 seconds\nOutput:\n[1000000,1002500]", false), await FullResultOf(root), "result");
+            await harness.CloseAsync(Context);
+        });
+
+        // Authored (Pi v1.5.0, area codemode), as times-a-script-out-across-a-restart-without-admitting-new-calls with the Harness clock.
+        yield return Case(prefix + "measures-the-script-s-deadline-on-the-harness-clock-across-a-restart", async () =>
+        {
+            var now = 1_000_000L;
+            var chat = new Chat();
+            chat.Setup.Now = () => Interlocked.Read(ref now);
+            var restarted = await Restart(chat, """
+                // @options: {"timeout_ms": 60000}
+                				await tools.hold({}); await tools.echo({ text: "late" });
+                """, async (opened, task) =>
+                {
+                    var start = (JsonObjectValue)(await opened.SnapshotAsync(DurableCodemode.RunDoc, task, Context))!["start"];
+                    Equal(1_000_000.0, N(start["startedAt"]), "startedAt");
+                    Equal(1_060_000.0, N(start["deadline"]), "deadline");
+                    // A minute passes on the Harness clock while next to none passes on the system clock.
+                    Interlocked.Add(ref now, 60_000);
+                });
+            Equal(true, restarted.Result.IsError, "isError");
+            Contains(restarted.Result.Text, "Script timed out: its deadline passed while it was interrupted.", "result");
+            Equal(0, chat.Echo.Count, "echo runs");
+            Equal(1, chat.VmStarts, "VM starts");
+            await restarted.Harness.CloseAsync(Context);
+        });
+
         yield return Case(prefix + "returns-a-decided-outcome-after-a-restart-without-running-the-script-again", async () =>
         {
             var chat = new Chat();
@@ -846,15 +949,15 @@ internal static partial class CodemodeTests
             var (harness, root) = await OpenChat(await SqliteStorage.OpenAsync(SqlitePath()), chat.Setup);
             // After each journal commit: its entries, and the acknowledged counts it holds (firstIssued and each issuedAfter).
             var journals = new ConcurrentQueue<(int Entries, int Counts)>();
-            harness.SubscribeCommits((publication, _) =>
+            harness.ObserveCommits(new CommitObserver((publication, _) =>
             {
                 foreach (var change in publication.Changes)
-                    if (change is DocumentCommitChange { Record.Kind: "pi.codemode.journal", Value: { } journal })
+                    if (change is DocumentValueChange { Record.Kind: "pi.codemode.journal", Value: var journal })
                     {
                         var entries = ((JsonArrayValue)journal["entries"]).Cast<JsonObjectValue>().ToList();
                         journals.Enqueue((entries.Count, (journal.ContainsKey("firstIssued") ? 1 : 0) + entries.Count(entry => entry.ContainsKey("issuedAfter"))));
                     }
-            });
+            }, _ => { }));
             await (await root.SubmitAsync(SubmissionDraft.Input("go"), Context)).WaitAsync(Context);
             SameText(new("50", false), await ResultOf(root), "result");
             var commits = journals.ToList();
@@ -997,6 +1100,31 @@ internal static partial class CodemodeTests
             Check(saved.Success, "saved: " + ran.Text);
             Equal(png, Convert.ToBase64String(await File.ReadAllBytesAsync(saved.Groups[1].Value)), "file");
             Check(((JsonArrayValue)ran.Message["content"]).Cast<JsonObjectValue>().Any(item => S(item["type"]) == "image"), "image block");
+        });
+
+        // Pi v1.5.0 (area tools-schema, #11015): read declares a structuredOutputSchema, so a script gets an image's block and a text
+        // file's text.
+        yield return Case("codemode.output.resolves-the-built-in-read-with-an-image-s-block-which-image-shows-and-with-a-text-file-s-text", async () =>
+        {
+            const string png = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==";
+            var files = Temp("codemode-read");
+            await File.WriteAllBytesAsync(Path.Combine(files, "pixel.png"), Convert.FromBase64String(png));
+            await File.WriteAllTextAsync(Path.Combine(files, "note.txt"), "hello");
+            var chat = new Chat();
+            AddTool(chat.Setup.Registry, CodingTools.CreateReadTool());
+            var picture = JsonValue.String(Path.Combine(files, "pixel.png")).ToJson();
+            var note = JsonValue.String(Path.Combine(files, "note.txt")).ToJson();
+            var ran = await RunScript($$"""
+                const picture = await tools.read({ path: {{picture}} });
+                text([picture.type, picture.mimeType, picture.data.length].join(" "));
+                image(picture);
+                text(await tools.read({ path: {{note}} }));
+                """, chat);
+            Check(!ran.IsError, "isError: " + ran.Text);
+            Contains(ran.Text, $"image image/png {png.Length}", "image block");
+            Check(Regex.IsMatch(ran.Text, @"\[Image saved to \S+ \(image/png, \d+ bytes\)\]", RegexOptions.CultureInvariant), "saved: " + ran.Text);
+            Contains(ran.Text, "hello", "text file");
+            Check(((JsonArrayValue)ran.Message["content"]).Cast<JsonObjectValue>().Any(item => S(item["type"]) == "image"), "image content");
         });
 
         yield return Case(prefix + "calls-a-deferred-tool-the-model-is-not-offered-and-finds-it-in-all-tools", async () =>

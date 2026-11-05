@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/codemode/src/declarations.ts.
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/codemode/src/declarations.ts.
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using PiSharp.Contracts;
@@ -17,7 +17,6 @@ public static partial class CodemodeDeclarations
     [GeneratedRegex("\r?\n")] private static partial Regex LineBreak();
     /// <summary>Characters that end a <c>//</c> comment.</summary>
     [GeneratedRegex("[\r\n\u2028\u2029]")] private static partial Regex LineTerminators();
-    [GeneratedRegex(@"\s+")] private static partial Regex Whitespace();
 
     /// <summary>JSON Schema keywords with a number or string value shown as <c>@keyword value</c> property tags.</summary>
     private static readonly string[] TagKeywords =
@@ -76,9 +75,6 @@ public static partial class CodemodeDeclarations
         var untagged = Render(false);
         return untagged.Length <= max ? untagged : "unknown";
     }
-
-    /// <summary>The output type collapsed to one line (tool.ts describeOutput's fallback).</summary>
-    internal static string OneLine(string type) => Whitespace().Replace(type, " ");
 
     private static string RenderGlobal(string head, CodemodeTool global, string indent)
     {

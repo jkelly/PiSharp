@@ -26,6 +26,10 @@ public sealed record AnthropicMessagesKeyAuthRequestOptions(double? MaxTokens = 
     /// <summary>PiSharp-only: the canonical PiSharp tier these fields came from.</summary>
     [System.Diagnostics.CodeAnalysis.Experimental("PISHARP_TIERS001")]
     public string? PiSharpTier { get; init; }
+    /// <summary>Source StreamOptions.identity (Pi 1.5.0 identity.ts): the user-agent and attribution headers, below the session,
+    /// model and request headers. Null: a detailed user-agent and no attribution.</summary>
+    [System.Diagnostics.CodeAnalysis.Experimental("PISHARP_IDENTITY001")]
+    public ClientIdentity? Identity { get; init; }
 }
 
 /// <summary>PiSharp-only: the service tier fields of an Anthropic request, written after the payload's own fields.</summary>
@@ -85,7 +89,8 @@ public sealed class AnthropicMessagesKeyAuthRequestFactory
         AnthropicMessagesRequestOptions projectionOptions, AnthropicMessagesKeyAuthRequestOptions? options = null)
     {
         _options = options ?? new();
-        _withScope = (session, tier) => new(baseUri, expectedModel, projectionOptions, TierOptions(_options with { SessionId = session ?? _options.SessionId }, tier, expectedModel));
+        _withScope = (session, tier, identity) => new(baseUri, expectedModel, projectionOptions,
+            TierOptions(_options with { SessionId = session ?? _options.SessionId, Identity = identity ?? _options.Identity }, tier, expectedModel));
         _createWithoutPreferredStrict = () => new(baseUri, expectedModel, projectionOptions with { DisablePreferredStrictTools = true }, _options);
         if (baseUri is null || expectedModel is null || projectionOptions is null ||
             !double.IsFinite(_options.MaximumTokenMagnitude) || _options.MaximumTokenMagnitude <= 0 ||
@@ -110,8 +115,11 @@ public sealed class AnthropicMessagesKeyAuthRequestFactory
         var configured = new Dictionary<string, string?>(StringComparer.Ordinal)
         {
             ["accept"] = "application/json", ["anthropic-version"] = "2023-06-01",
-            ["anthropic-dangerous-direct-browser-access"] = "true", ["user-agent"] = "PiSharp"
+            ["anthropic-dangerous-direct-browser-access"] = "true"
         };
+        // Pi 1.5.0 anthropic-messages.ts createClient (API key path): getIdentityHeaders(model, identity) below every other header.
+        foreach (var (name, value) in ClientIdentities.GetIdentityHeaders(expectedModel.Provider, baseUri.AbsoluteUri, _options.Identity))
+            configured[name == "User-Agent" ? "user-agent" : name] = value;
         if (_options.SessionAffinityHeader is not ("x-session-affinity" or "x-session-id"))
             throw Fail(AnthropicMessagesKeyAuthRequestFailure.InvalidConfiguration);
         if (_options.SessionId is not null)
@@ -156,16 +164,18 @@ public sealed class AnthropicMessagesKeyAuthRequestFactory
     private AnthropicMessagesKeyAuthRequestFactory WithoutPreferredStrict() =>
         Volatile.Read(ref _withoutPreferredStrict) ?? Interlocked.CompareExchange(ref _withoutPreferredStrict, _createWithoutPreferredStrict(), null) ?? _withoutPreferredStrict!;
     // StreamOptions.sessionId per request: a factory configured without a session id binds the request's (cached per id). PiSharp-only:
-    // the request's service tier (ChatRequest.ServiceTier) also selects a factory configured with that tier.
-    private readonly Func<string?, string?, AnthropicMessagesKeyAuthRequestFactory> _withScope;
-    private readonly System.Collections.Concurrent.ConcurrentDictionary<(string?, string?), AnthropicMessagesKeyAuthRequestFactory> _scoped = new();
+    // the request's service tier (ChatRequest.ServiceTier) also selects a factory configured with that tier. StreamOptions.identity
+    // (ChatRequest.Identity) merges over the configured identity the same way.
+    private readonly Func<string?, string?, ClientIdentity?, AnthropicMessagesKeyAuthRequestFactory> _withScope;
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<(string?, string?, ClientIdentity?), AnthropicMessagesKeyAuthRequestFactory> _scoped = new();
     private AnthropicMessagesKeyAuthRequestFactory? ScopedTo(ChatRequest? request)
     {
         var session = _options.SessionId is null ? request?.SessionId : null;
         var tier = request?.ServiceTier is { } requested && ServiceTiers.Normalize(requested) is { } wire && wire != _options.PiSharpTier ? wire : null;
-        if (session is null && tier is null) return null;
+        var identity = request?.Identity is { } asked && ClientIdentities.Merge(_options.Identity, asked) is { } merged && merged != _options.Identity ? merged : null;
+        if (session is null && tier is null && identity is null) return null;
         if (_scoped.Count > 32) _scoped.Clear();
-        return _scoped.GetOrAdd((session, tier), key => _withScope(key.Item1, key.Item2));
+        return _scoped.GetOrAdd((session, tier, identity), key => _withScope(key.Item1, key.Item2, key.Item3));
     }
 
     /// <summary>Options carrying a PiSharp tier's Anthropic fields.</summary>

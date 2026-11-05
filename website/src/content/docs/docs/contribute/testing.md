@@ -80,6 +80,8 @@ The release and the macOS workflow run these. Each covers one area of Pi, with e
 | `PiSharp.ToolSearch.Tests` | The built-in `tool_search` tool and deferred MCP exposure. |
 | `PiSharp.Classifiers.Tests` | The classifier and image generation APIs. |
 | `PiSharp.Models.Tests` | Model catalogs and model selection. `--tarball <pi-ai package>` also compares the embedded catalog shards with a published `pi-ai` package, byte for byte. |
+| `PiSharp.Schema.Tests` | JSON Schema validation of tool arguments, ported from Pi's pi-schema: the JSON-Schema-Test-Suite for drafts 2020-12 and 7 with pi-schema's known failures, coercion, formats and unresolved references. |
+| `PiSharp.Telemetry.Tests` | The telemetry port of Pi v1.5.0's pi-telemetry (`PiSharp.Telemetry`) and pi-ai's request tracing, with expectations written from the pinned upstream tests. |
 | `PiSharp.Codemode.Tests` | [Code mode](/docs/guides/codemode/) on Jint, with declaration goldens from the upstream packages. It is also the code mode worker process its cases start. |
 | `PiSharp.ProviderApis.Tests` | Provider APIs and authentication: Bedrock, Codex, Copilot, Cloudflare and AWS signing. |
 | `PiSharp.CliParity.Tests` | The CLI, configuration and resources, and session file goldens in `SessionFormat/*.scenario.json`, captured from Pi v1.1.0. |
@@ -224,7 +226,7 @@ The workflows live in [`.github/workflows`](https://github.com/jkelly/PiSharp/tr
 
 | Workflow | Triggers | Runs on | What it runs |
 | --- | --- | --- | --- |
-| [`macos.yml`](https://github.com/jkelly/PiSharp/blob/main/.github/workflows/macos.yml) | Pull requests and pushes to `main`; manual | `macos-15` (Apple Silicon) | The 17 release suites other than `Durable` and `DurableCli`, one job each with Node.js 22. Then it packs every package, installs the `PiSharp.Cli` tool from them, and checks `pisharp --version` and `--help`. |
+| [`macos.yml`](https://github.com/jkelly/PiSharp/blob/main/.github/workflows/macos.yml) | Pull requests and pushes to `main`; manual | `macos-15` (Apple Silicon) | The 19 release suites other than `Durable`, `DurableCli` and `CustomAgents`, one job each with Node.js 22. Then it packs every package, installs the `PiSharp.Cli` tool from them, and checks `pisharp --version` and `--help`. |
 | [`durable.yml`](https://github.com/jkelly/PiSharp/blob/main/.github/workflows/durable.yml) | Pushes and pull requests to `main` and `feature/pi-durable`; manual | Windows, Ubuntu and `macos-15` | `Durable`, `Durable` again with `PI_DURABLE_DOCUMENT_RETENTION_MS=0`, and `DurableCli`. A second job publishes `Durable.Tests` for `win-x64`, `linux-x64`, `linux-musl-x64` and `osx-arm64` and checks that each carries its SQLite native library, byte for byte. A third fetches Pi and checks that `compatibility/durable-port-map.json` matches it. |
 | [`custom-agents.yml`](https://github.com/jkelly/PiSharp/blob/main/.github/workflows/custom-agents.yml) | Pushes and pull requests to `main` and `feature/custom-agents`; manual | Windows, Ubuntu and `macos-15` | `CustomAgents`, then the research sample on scripted models, checking that it writes a report. |
 | [`release.yml`](https://github.com/jkelly/PiSharp/blob/main/.github/workflows/release.yml) | A pushed `v*` tag; manual dry run | Ubuntu | All 20 release suites, then packing and publishing. See [Releasing](/docs/contribute/releasing/#the-release-workflow). |

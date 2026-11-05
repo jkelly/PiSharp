@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/test/examples/31-reload-and-restart.ts. Upstream stands in for a model
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/test/examples/30-reload-and-restart.ts. Upstream stands in for a model
 // with pi-ai's faux provider; here ScriptedModels does, so the example runs offline. It prints what upstream's console.log prints, as JSON.
 // The example restarts the process itself, so it needs storage that survives close: upstream always uses a SQLite file, and so does the
 // memory run here (a temporary one); a file backend reopens its own location.
@@ -10,7 +10,7 @@ namespace PiSharp.Durable.Examples;
 
 public static partial class Examples
 {
-    // 31: reload an extension while a call runs, then restart the process. Running work finishes on the code it started with; stored choices
+    // 30: reload an extension while a call runs, then restart the process. Running work finishes on the code it started with; stored choices
     // are names, so they survive a restart and bind to whatever code the new process installs.
     private static async Task ReloadAndRestartAsync(Func<Task<IStorage>> open, TextWriter output)
     {
@@ -26,6 +26,8 @@ public static partial class Examples
                 {
                     Name = "version",
                     Description = "Report the tool's code version",
+                    // pi-schema's obj({}).
+                    Parameters = (JsonObjectValue)JsonValue.Parse("""{"type":"object","properties":{},"additionalProperties":false}"""),
                     Execute = async (_, _, _) =>
                     {
                         started();

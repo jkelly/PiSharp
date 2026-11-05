@@ -1,18 +1,19 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/test/harness-lifecycle.test.ts. Verbatim apart from the adaptations in
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/test/harness-lifecycle.test.ts. Verbatim apart from the adaptations in
 // HarnessSupport.cs, ChatSupport.cs and Session/SessionSupport.cs, and these:
-// - The stubborn tool of "joins ... before closing storage" returns its empty result as ToolExecutionResult.Content: upstream's v1.2.0
-//   `output` is area a's rename of that field (compatibility/durable-sync-1.2.0-worklist.json), which renames it in every test at once.
 // - Backends. Upstream opens these on MemoryStorage (some through ControlledStorage) and reopens a SQLite file for "lets a new Harness open
 //   the same Storage once close resolved". harness.lifecycle.* does the same; harness.lifecycle.jsonl.* reruns every case on JSONL (the
 //   reopen case reopening a JSONL directory) and harness.lifecycle.sqlite.* reruns the cases that need no reopen on a fresh SQLite file.
 // - `{...context, abortSignal}` is DurableContext.WithCancel(); `controller.abort(error)` is Cancel(error).
+//   Pi v1.5.0 sync (area telemetry): upstream's withSignal derives through withAbortSignal(signal, context) since 2ec55d808, which keeps
+//   the context's values and telemetry span; WithCancel() already derives the same way, so the cases are unchanged.
 // - `class FailingClose extends ControlledStorage` is FailingCloseStorage, a decorator over ControlledStorage.
-// - "leaves no subscription behind ...": upstream replaces `harness.subscribeCommits` to count the subscriptions made after the patch. A
-//   C# method cannot be replaced, so the case counts the Session's commit listeners (by reflection) against the count before the cancelled
-//   acquisitions; it reads the same thing: no observer subscription outlives a cancelled acquisition. Since v1.2.0 document observers
-//   subscribe through the internal observeCommits, which upstream's patched subscribeCommits no longer sees; the count includes those
-//   listeners, so the check still covers them.
+// - "leaves no subscription behind ...": upstream replaces the Session's internal `followCommits` (v1.5.0, 5f312dac4; v1.2.0 replaced
+//   `harness.subscribeCommits`) to count the subscriptions made after the patch. A C# method cannot be replaced, so the case counts the
+//   Session's commit listeners (by reflection: the ObserveCommits observers and the internal FollowCommits followers) against the count
+//   before the cancelled acquisitions; it reads the same thing: no observer subscription outlives a cancelled acquisition.
 // - `/closed/.test(String(error))` tests the exception's message.
+// Pi v1.5.0 sync (area watches, 92ab53602): the state getters are gone, so "publishes no frame to watches ..." (renamed with them), the
+// cancelled-acquisition case, the close-gate tables and the read-only viewer case use the watches alone, and a close ends a watch Ended.
 using System.Reflection;
 using PiSharp.Durable;
 using PiSharp.Durable.Chord;
@@ -23,6 +24,7 @@ using static ChatTests;
 using static HarnessTests;
 using static Program;
 using static SessionTests;
+using PiSharp.Durable.Testing;
 
 internal static partial class Program
 {
@@ -118,7 +120,7 @@ internal static class LifecycleTests
             AbortRequested = false,
             State = NextTaskState.Running(O("""{"phase":"run"}""")),
         };
-        await storage.CommitAsync([new ConversationWrite(new ConversationRecord(conversationId)), new TaskWrite(task)], Context);
+        await storage.CommitWritesAsync([new ConversationWrite(new ConversationRecord(conversationId)), new TaskWrite(task)], Context);
     }
 
     /// <summary>How many commit listeners the Harness's Session holds.</summary>
@@ -195,7 +197,7 @@ internal static class LifecycleTests
             {
                 Models = EmptyDurableModels.Instance,
                 Registry = Registry.Create(),
-                OnReport = reports.Add,
+                OnReport = report => reports.Add(report.Error),
             }, Context);
             await RejectsAsync(() => opening, "disk full", "open");
             // The storage failure that failed open is the cause; the close that fails after it adds no report.
@@ -360,28 +362,22 @@ internal static class LifecycleTests
             await harness.CloseAsync(Context);
         });
 
-        yield return Case(prefix + "publishes-no-frame-to-states-and-watches-from-a-commit-that-settles-during-close", async () =>
+        yield return Case(prefix + "publishes-no-frame-to-watches-from-a-commit-that-settles-during-close", async () =>
         {
-            var notes = Documents.DefineSessionDoc("test.close-frames", 1, () => O("""{"text":""}"""));
+            var notes = Documents.DefineSessionDoc("test.close-frames", 1, () => O("""{"text":""}"""), checkpointWhen: (_, _, _) => false);
             var storage = new ControlledStorage(await fresh());
             var (harness, _, _) = await OpenTasks(storage, []);
             var root = await harness.RootAsync(Context);
             await harness.CommitAsync(async tx => (await tx.DocAsync(notes)).Set("text", "before"), Context);
-            var docState = (await harness.DocumentStateAsync(notes, Context))!;
             var docWatch = (await harness.WatchDocAsync(notes, Context))!;
-            var viewState = await root.ViewStateAsync(Context);
             var viewWatch = await root.WatchAsync(Context);
-            var graphState = await harness.TaskGraphAsync(Context);
             var graphWatch = await harness.WatchTaskGraphAsync(Context);
             var frames = new SyncList<string>();
-            graphState.Subscribe((_, _, delivery) => { if (delivery.Kind == ReplicatedStateDeliveryKind.Update) frames.Add("graphState"); });
-            graphWatch.Start((_, _, _) => { frames.Add("graphWatch"); return Task.CompletedTask; });
-            docState.Subscribe((_, _, delivery) => { if (delivery.Kind == ReplicatedStateDeliveryKind.Update) frames.Add("docState"); });
-            viewState.Subscribe((_, _, delivery) => { if (delivery.Kind == ReplicatedStateDeliveryKind.Update) frames.Add("viewState"); });
-            docWatch.Start((_, _, _) => { frames.Add("docWatch"); return Task.CompletedTask; });
-            viewWatch.Start((_, _, _) => { frames.Add("viewWatch"); return Task.CompletedTask; });
-            var docValue = docState.Value;
-            var viewValue = viewState.Value;
+            graphWatch.Start((_, _) => { frames.Add("graphWatch"); return Task.CompletedTask; });
+            docWatch.Start((_, _) => { frames.Add("docWatch"); return Task.CompletedTask; });
+            viewWatch.Start((_, _) => { frames.Add("viewWatch"); return Task.CompletedTask; });
+            var docValue = docWatch.Value;
+            var viewValue = viewWatch.Value;
 
             var held = storage.HoldCommits();
             var committing = harness.CommitAsync(async tx =>
@@ -397,19 +393,19 @@ internal static class LifecycleTests
             await closing;
             await Flush();
             Seq([], frames.Snapshot(), "frames");
-            Same(docValue, docState.Value, "doc state value");
-            Same(viewValue, viewState.Value, "view state value");
-            SameJson("""{"tasks":{}}""", graphState.Value.ToJson(), "graph state value");
-            Equal(WatchEnd.SessionClosed, await graphWatch.Closed, "graph watch end");
-            Equal(WatchEnd.SessionClosed, await docWatch.Closed, "doc watch end");
-            Equal(WatchEnd.SessionClosed, await viewWatch.Closed, "view watch end");
+            Same(docValue, docWatch.Value, "doc watch value");
+            Same(viewValue, viewWatch.Value, "view watch value");
+            SameJson("""{"tasks":{}}""", graphWatch.Value.ToJson(), "graph watch value");
+            Equal(WatchEnd.Ended, await graphWatch.Closed, "graph watch end");
+            Equal(WatchEnd.Ended, await docWatch.Closed, "doc watch end");
+            Equal(WatchEnd.Ended, await viewWatch.Closed, "view watch end");
             // The commit itself settled.
             Check(storage.LastCommit.Any(write => write is EntryWrite), "entry committed");
         });
 
         yield return Case(prefix + "leaves-no-subscription-behind-a-watch-acquisition-cancelled-on-the-line", async () =>
         {
-            var notes = Documents.DefineSessionDoc("test.cancelled-watch", 1, () => O("""{"text":""}"""));
+            var notes = Documents.DefineSessionDoc("test.cancelled-watch", 1, () => O("""{"text":""}"""), checkpointWhen: (_, _, _) => false);
             var storage = new ControlledStorage(await fresh());
             var (harness, _, _) = await OpenTasks(storage, []);
             var root = await harness.RootAsync(Context);
@@ -438,12 +434,12 @@ internal static class LifecycleTests
             find.Release();
             await RejectsAsync(() => viewWatch, "cancelled", "view watch");
             // No observer kept the mount: the next observer builds a new one, and the one after that another.
-            var first = await root.ViewStateAsync(Context);
+            var first = await root.WatchAsync(Context);
             var firstValue = first.Value;
-            first.Dispose();
-            var second = await root.ViewStateAsync(Context);
+            await first.StopAsync();
+            var second = await root.WatchAsync(Context);
             Check(!ReferenceEquals(firstValue, second.Value), "a new mount");
-            second.Dispose();
+            await second.StopAsync();
             await harness.CloseAsync(Context);
         });
 
@@ -473,9 +469,7 @@ internal static class LifecycleTests
                 ("reset", () => root.ResetAsync(null, Context)),
                 ("abort", () => root.AbortAsync(Context)),
                 ("conversationIdle", () => root.WaitForIdleAsync(Context)),
-                ("viewState", () => root.ViewStateAsync(Context)),
                 ("watch", () => root.WatchAsync(Context)),
-                ("taskGraph", () => harness.TaskGraphAsync(Context)),
                 ("watchTaskGraph", () => harness.WatchTaskGraphAsync(Context)),
                 ("status", () => submission.StatusAsync(Context)),
                 ("wait", () => submission.WaitAsync(Context)),
@@ -503,8 +497,8 @@ internal static class LifecycleTests
 
         yield return Case(prefix + "completes-reads-queued-at-the-seal-and-rejects-queued-waits-and-acquisitions-that-would-follow-commits", async () =>
         {
-            var notes = Documents.DefineSessionDoc("test.queued-at-seal", 1, () => O("""{"text":""}"""));
-            var absent = Documents.DefineSessionDoc("test.queued-absent", 1, () => O("""{"text":""}"""));
+            var notes = Documents.DefineSessionDoc("test.queued-at-seal", 1, () => O("""{"text":""}"""), checkpointWhen: (_, _, _) => false);
+            var absent = Documents.DefineSessionDoc("test.queued-absent", 1, () => O("""{"text":""}"""), checkpointWhen: (_, _, _) => false);
             var pending = OneStep("test.queued-pending");
             var storage = new ControlledStorage(await fresh());
             var (harness, _, _) = await OpenTasks(storage, []);
@@ -523,13 +517,10 @@ internal static class LifecycleTests
                 ("snapshot", Settle(() => harness.SnapshotAsync(notes, Context))),
                 ("settledWait", Settle(() => write.WaitAsync(Context))),
                 ("absentWatch", Settle(() => harness.WatchDocAsync(absent, Context))),
-                ("absentState", Settle(() => harness.DocumentStateAsync(absent, Context))),
                 ("waitForTask", Settle(() => harness.WaitForTaskAsync(taskId, Context))),
-                ("documentState", Settle(() => harness.DocumentStateAsync(notes, Context))),
                 ("watchDoc", Settle(() => harness.WatchDocAsync(notes, Context))),
-                ("viewState", Settle(() => root.ViewStateAsync(Context))),
                 ("watch", Settle(() => root.WatchAsync(Context))),
-                ("taskGraph", Settle(() => harness.TaskGraphAsync(Context))),
+                ("watchTaskGraph", Settle(() => harness.WatchTaskGraphAsync(Context))),
             };
             var closing = harness.CloseAsync(Context);
             held.Release();
@@ -541,13 +532,10 @@ internal static class LifecycleTests
                 "snapshot: resolved",
                 "settledWait: resolved",
                 "absentWatch: undefined",
-                "absentState: undefined",
                 "waitForTask: closed",
-                "documentState: closed",
                 "watchDoc: closed",
-                "viewState: closed",
                 "watch: closed",
-                "taskGraph: closed",
+                "watchTaskGraph: closed",
             ], outcomes, "outcomes");
             await closing;
         });
@@ -576,23 +564,20 @@ internal static class LifecycleTests
         yield return Case(prefix + "never-schedules-from-a-read-only-viewer", async () =>
         {
             var (harness, root, id, submissionId, ran) = await Paused();
-            var notes = Documents.DefineSessionDoc("test.viewer-notes", 1, () => O("""{"text":""}"""));
+            var notes = Documents.DefineSessionDoc("test.viewer-notes", 1, () => O("""{"text":""}"""), checkpointWhen: (_, _, _) => false);
             await harness.CommitAsync(async tx => { await tx.DocAsync(notes); }, Context);
             await harness.InspectAsync(Context);
             await harness.GetTaskAsync(id, Context);
             await harness.UsageAsync(Context);
             await harness.ConversationAsync(root.Id, Context);
             await harness.SnapshotAsync(notes, Context);
-            (await harness.DocumentStateAsync(notes, Context))!.Dispose();
             await (await harness.WatchDocAsync(notes, Context))!.StopAsync();
             var submission = (await harness.SubmissionAsync(submissionId, Context))!;
             await submission.StatusAsync(Context);
             await root.AgentAsync(Context);
             await root.ContextAsync(Context);
             await root.EntriesAsync(new EntryQueryBounds(), 10, null, Context);
-            (await root.ViewStateAsync(Context)).Dispose();
             await (await root.WatchAsync(Context)).StopAsync();
-            (await harness.TaskGraphAsync(Context)).Dispose();
             await (await harness.WatchTaskGraphAsync(Context)).StopAsync();
             await Flush();
             await Flush();
@@ -655,7 +640,7 @@ internal static class LifecycleTests
                 $"blocked: {string.Join(", ", inspected.Select(task => task.State))}");
             var installed = AddTask(first.Registry, DefineLate("v1"));
             inspected = (await first.Harness.InspectAsync(Context)).Tasks;
-            Check(inspected.Length == 1 && inspected[0].State.Kind == TaskInspectionKind.Ready, $"ready: {string.Join(", ", inspected.Select(task => task.State))}");
+            Check(inspected.Length == 1 && inspected[0].State.Kind == TaskInspectionKind.Pending, $"pending: {string.Join(", ", inspected.Select(task => task.State))}");
             // The same extension name replaces the definition in place, still before resume.
             installed.Dispose();
             AddTask(first.Registry, DefineLate("v2"));
@@ -676,7 +661,8 @@ internal sealed class FailingCloseStorage(ControlledStorage inner) : IStorage
         throw new InvalidOperationException("close failed");
     }
 
-    public Task<Seq> CommitAsync(IReadOnlyList<StorageWrite> writes, DurableContext context) => inner.CommitAsync(writes, context);
+    public Task<CommitResult> CommitAsync(IReadOnlyList<IReadOnlyList<StorageWrite>> batches, Action<int, Seq> receive, DurableContext context) =>
+        inner.CommitAsync(batches, receive, context);
     public Task<TId> MintIdAsync<TId>() where TId : struct, IDurableId<TId> => inner.MintIdAsync<TId>();
     public Task<StoredDocument?> GetDocumentAsync(DocumentId id, DocumentPoint at, DurableContext context) => inner.GetDocumentAsync(id, at, context);
     public Task<DocumentRecord?> FindDocumentAsync(DocumentAddress address, DocumentPoint at, DurableContext context) =>

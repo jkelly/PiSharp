@@ -5,14 +5,16 @@ using PiSharp.Durable.Testing;
 // and test/tool-output-bench.ts (ported at v1.1.0, unchanged in v1.2.0) over src/PiSharp.Durable/Testing/StorageBenchmark.cs (src/testing/storage-benchmark.ts), and Pi v1.2.0
 // test/document-append-bench.ts, test/session-document-cache-bench.ts, test/scheduler-memory-bench.ts, test/scheduler-fanout-bench.ts,
 // test/nested-tools-bench.ts, test/nested-images-bench.ts and test/codemode-bench.ts, plus the PiSharp-authored scheduler-scale
-// (SchedulerScaleBench.cs). The
+// (SchedulerScaleBench.cs) and partial-commits (PartialCommitsBench.cs). The
 // benchmarks are report only (docs/durable-benchmarks.md).
 // This smoke case runs each of them at a tiny size so they cannot rot: one sample per storage scenario on every backend (each scenario's
 // result is checked before it is timed), the footprint worker on every backend in-process, a short rate round closed mid-round and
 // replayed, a firehose, a repetitive firehose, a bash cat of 1 MiB, 20 document appends of each kind, three conversations at each
-// document retention, three subagent cycles under a live parent, a fan-out of four child tasks and a chain of five, four nested calls, two
-// tiny nested-tools scenarios, the four nested-images variants of two images, and the four code mode rows of three echo calls. It asserts
-// completion,
+// document retention, three subagent cycles under a live parent, a fan-out of four child tasks, a chain of five and the 128 one-tool runs
+// over two kept conversations (area scheduler-idle), four nested calls, two tiny nested-tools scenarios, the four nested-images variants
+// of two images, the four code mode rows of three echo calls, and a 2,000 character partial-commits answer (PartialCommitsBench.cs, Pi v1.5.0 sync area partial-commits), and every conversation-view scenario
+// over 120 entries on SQLite and the store (ConversationViewBench.cs, area view: test/conversation-view-bench.ts), and storage-throughput
+// with two conversations and no round trip on memory and SQLite (StorageBench.cs, area group-commit). It asserts completion,
 // the number of results and the scheduler's bounded indexes, never a timing.
 internal static partial class Program
 {
@@ -26,11 +28,11 @@ internal static partial class Program
             var one = new BenchOptions(0, 1, 0, 0);
             var output = new StringWriter();
             var results = await StorageBench.RunAsync(new StorageBenchOptions { Scale = tiny, Read = one, Write = one, Reopen = one, TempRoot = root }, output);
-            // 12 read and 3 write scenarios on three backends, and reopen on the two persistent ones.
-            Equal(12 * 3 + 3 * 3 + 2, results.Count, "storage benchmark results");
+            // 12 read and 3 write scenarios on four backends (the store's since area store-storage), and reopen on the three persistent ones.
+            Equal(12 * 4 + 3 * 4 + 3, results.Count, "storage benchmark results");
             Check(results.All(result => result.Samples == 1), "one sample each");
 
-            foreach (var backend in new[] { BenchBackend.Memory, BenchBackend.Sqlite, BenchBackend.Jsonl })
+            foreach (var backend in new[] { BenchBackend.Memory, BenchBackend.Sqlite, BenchBackend.Store, BenchBackend.Jsonl })
             {
                 var footprint = await StorageMemory.RunWorkerAsync(backend, tiny, root);
                 Equal(StorageBench.Name(backend), footprint.Backend, "footprint backend");
@@ -75,13 +77,17 @@ internal static partial class Program
 
             var memoryOutput = new StringWriter();
             var memoryRows = await SchedulerMemoryBench.RunAsync([3], memoryOutput, tempRoot: root);
-            Check(memoryRows is [{ Cycles: 3, Settled: 0, Edges: <= 1, LateReads: > 0 }], "one scheduler-memory row with bounded indexes");
+            // Pi v1.5.0 (area publication-caches): the record cache serves the old conversation and its ended tool task, which the Session
+            // wrote, so a later message reads nothing while they are kept (CachedStorage's capacities).
+            Check(memoryRows is [{ Cycles: 3, Settled: 0, Edges: <= 1, LateReads: 0 }], "one scheduler-memory row with bounded indexes");
             Check(memoryOutput.ToString().StartsWith("cycles | ms", StringComparison.Ordinal), "scheduler-memory table: " + memoryOutput);
             Equal(SchedulerMemoryBench.DefaultSizes, SchedulerMemoryBench.ParseSizes(null), "scheduler-memory default sizes");
             var scaleOutput = new StringWriter();
-            var scaleRows = await SchedulerScaleBench.RunAsync([4], [5], scaleOutput);
-            Check(scaleRows is [{ Scenario: "fanout", Size: 4, Commits: > 0 }, { Scenario: "chain", Size: 5, Commits: > 0 }], "scheduler-scale rows");
+            var scaleRows = await SchedulerScaleBench.RunAsync([4], [5], [2], scaleOutput);
+            Check(scaleRows is [{ Scenario: "fanout", Size: 4, Commits: > 0 }, { Scenario: "chain", Size: 5, Commits: > 0 },
+                { Scenario: "conversations", Size: 2, Commits: > 0 }], "scheduler-scale rows");
             Check(scaleOutput.ToString().StartsWith("fanout | ms", StringComparison.Ordinal), "scheduler-scale table: " + scaleOutput);
+            Check(scaleOutput.ToString().Contains("conversations | runs", StringComparison.Ordinal), "scheduler-scale conversations table: " + scaleOutput);
 
             var fanoutOutput = new StringWriter();
             var fanoutRows = await SchedulerFanoutBench.RunAsync([4], fanoutOutput);
@@ -105,6 +111,45 @@ internal static partial class Program
                 "codemode rows: each shape plain and in code mode, code mode journaling on top");
             Check(codemodeOutput.ToString().StartsWith("sequential n=3: plain ", StringComparison.Ordinal), "codemode lines: " + codemodeOutput);
             Equal("100,1000", string.Join(",", CodemodeBench.ParseSizes(null)), "codemode default sizes");
+            var partialOutput = new StringWriter();
+            var partialRows = await PartialCommitsBench.RunAsync([2_000], partialOutput);
+            Check(partialRows is [{ Size: 2_000, Text.Commits: > 0, ToolCall.Commits: > 0 }], "one partial-commits row, both phases committing");
+            Check(partialOutput.ToString().StartsWith("size=2000: text ", StringComparison.Ordinal), "partial-commits line: " + partialOutput);
+            Equal("40000,400000,500000", string.Join(",", PartialCommitsBench.ParseSizes(null)), "partial-commits default sizes");
+            // Pi v1.5.0 sync (area view): every conversation-view scenario, tiny, in this process, on SQLite and on the store.
+            foreach (var storage in new[] { "sqlite", "store" })
+            {
+                ConversationViewScenario[] views =
+                [
+                    new() { Kind = "start", Entries = 120, Storage = storage },
+                    new() { Kind = "resume", Entries = 120, Storage = storage },
+                    new() { Kind = "append", Entries = 120, Watches = 2, Burst = 1, Commits = 20, Storage = storage },
+                    new() { Kind = "append", Entries = 120, Watches = 2, Burst = 5, Commits = 10, Storage = storage },
+                    new() { Kind = "stream", Entries = 120, Watches = 2, Commits = 20, Storage = storage },
+                    new() { Kind = "long-lived", Entries = 150, Storage = storage },
+                ];
+                var windows = new List<double>();
+                foreach (var scenario in views)
+                {
+                    var metrics = await ConversationViewBench.RunScenarioAsync(scenario);
+                    Check(metrics.ContainsKey("cpuMs") && metrics.ContainsKey("wallMs") && metrics.ContainsKey("heapBeforeMiB"), scenario.Label + ": totals");
+                    if (metrics.TryGetValue("windowEntries", out var window)) windows.Add(window);
+                    Check(ConversationViewBench.Row(scenario, metrics).StartsWith("| " + scenario.Label + " | " + storage + " |", StringComparison.Ordinal),
+                        scenario.Label + ": row");
+                }
+                // The default window: the newest 50 of a start, the 20 since `from` of a resume, at most 100 for a started watch.
+                Check(windows is [50, 20, >= 50 and <= 100, >= 50 and <= 100, >= 50 and <= 100], $"{storage} windows: {string.Join(", ", windows)}");
+            }
+            Equal(7, ConversationViewBench.Scenarios().Count, "conversation-view scenario count");
+            // Pi v1.5.0 sync (area group-commit): storage-throughput with two conversations and no round trip, in this process.
+            var throughputOutput = new StringWriter();
+            var throughputRows = await StorageBench.ThroughputAsync([0], [2], throughputOutput, root);
+            Equal("session commits,session commits,session changes,session changes,harness runs,harness runs",
+                string.Join(",", throughputRows.Select(row => row.Scenario)), "storage-throughput rows: memory and SQLite each");
+            Check(throughputRows.All(row => row.Work > 0 && row.StorageCalls > 0 && row.Commits >= row.StorageCalls), "storage-throughput counts");
+            // Pi v1.5.0 sync (area publication-caches): with the read caches a run reads Storage only for its conversation's first context.
+            Check(throughputRows.All(row => row.Reads <= row.Conversations), "storage-throughput reads: " + throughputOutput);
+            Check(throughputOutput.ToString().StartsWith("scenario        | backend", StringComparison.Ordinal), "storage-throughput table: " + throughputOutput);
             Directory.Delete(root, recursive: true);
         });
     }

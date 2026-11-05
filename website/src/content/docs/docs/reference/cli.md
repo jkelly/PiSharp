@@ -41,11 +41,11 @@ Piped stdin is added in front of the first prompt. `@path` arguments add a text 
 
 | Option | Meaning |
 | --- | --- |
-| `--model <pattern>` | Model by id, `provider/id` or fuzzy match, with an optional `:<thinking>` suffix, such as `sonnet:high`. |
+| `--model <pattern>` | Model by id, `provider/id` or fuzzy match, with an optional `:<thinking>` suffix, such as `sonnet:high`. If several providers offer the match, PiSharp takes the one with credentials; otherwise it asks for `--provider`. A provider id that contains `/` works in `provider/id`. |
 | `--provider <name>` | Provider to search for `--model`. Requires `--model`. |
-| `--models <patterns>` | Comma-separated model patterns for `Ctrl+P` cycling. Globs (`anthropic/*`, `*sonnet*`), fuzzy matches and `:<thinking>` suffixes work. |
+| `--models <patterns>` | Comma-separated model patterns for `Ctrl+P` cycling. Globs (`anthropic/*`, `*sonnet*`), fuzzy matches and `:<thinking>` suffixes work. A model that several providers offer is added once for each, with a warning. |
 | `--thinking <level>` | `off`, `minimal`, `low`, `medium`, `high`, `xhigh` or `max`. An unknown level is a warning, not an error. |
-| `--api-key <key>` | API key for this run, instead of the environment or `auth.json`. Requires a model from `--model` or `--models`. |
+| `--api-key <key>` | API key for this run, instead of the environment or `auth.json`. Requires a model from `--model` or `--models`. It doesn't choose between providers that offer the same model. |
 | `--tier <tier>`, `--service-tier <tier>` | Service tier: `auto`, `normal`, `economy`, `priority`, `fast` or `ultrafast` (experimental). See below. |
 | `--list-models [search]` | Lists the models you can use, with an optional fuzzy search, then exits. The search can't start with `-` or `@`. |
 
@@ -180,15 +180,27 @@ Sources take Pi's forms: `npm:@foo/bar`, `git:github.com/user/repo`, `git:git@gi
 | `--models` | Refreshes the model catalogs only and prints `Model catalogs refreshed`. |
 | `--all` | Updates packages, then PiSharp. |
 | `--extension <source>` | Updates one package. |
-| `--force` | Reinstalls PiSharp even if it is current. Moot, since self-update isn't possible (below). |
+| `--force` | Runs the custom update command even if PiSharp is current (below). |
 
 `--all`, `--models` and `--extension` can't be combined with each other, with `--self` or `--extensions`, or with a positional source.
 
-PiSharp can't update itself this way. `pisharp update`, `update self` and `update --all` end with `error: pisharp cannot self-update this installation.` and exit 1 (`--all` updates the packages first). Update the tool with:
+Without a custom update command, PiSharp can't update itself. `pisharp update`, `update self` and `update --all` end with `error: pisharp cannot self-update this installation.`, name the two ways to set a command, and exit 1 (`--all` updates the packages first). Update the tool with:
 
 ```sh
 dotnet tool update -g PiSharp.Cli
 ```
+
+### Custom update command
+
+Set `PI_SELF_UPDATE_COMMAND` so `pisharp update` runs your update command, as Pi 1.5.0 does:
+
+```sh
+export PI_SELF_UPDATE_COMMAND="dotnet tool update -g {packageName} --version {version}"
+```
+
+`pisharp update` asks NuGet for the newest `PiSharp.Cli` and runs the command only when that version is newer than the running PiSharp, or with `--force`. Otherwise it prints `pisharp is already up to date`. Pi asks pi.dev instead; this is an intentional difference. The command fills `{packageName}` (`PiSharp.Cli`), `{version}` and `{installSpec}` (`PiSharp.Cli@<version>`). It runs without a shell, and the value is split on spaces with no quoting. For arguments with spaces, use the `selfUpdateCommand` setting in `~/.pi/agent/settings.json`, an argv array such as `["dotnet", "tool", "update", "-g", "{packageName}", "--version", "{version}"]`. A project's `.pi/settings.json` can't set it. The variable wins over the setting.
+
+Exit code 0 doesn't prove the update worked, so PiSharp then checks the installed version, first in its own installation and then with `pisharp --version` on your `PATH`. If that isn't the new version, it says so in yellow.
 
 ## auth
 
@@ -226,14 +238,14 @@ pisharp auth check --provider anthropic --json
 | `mcp add <server> [options] --url <url>` | Adds or replaces a Streamable HTTP server. |
 | `mcp remove <server> [-l]` | Removes a server. |
 | `mcp list [--json]` | Shows each server's state, tools and errors. Exits 1 if a server fails. |
-| `mcp login <server> [--timeout <seconds>]` | Signs in to an OAuth server through the browser. The default time limit is 300 seconds. |
-| `mcp logout <server>` | Deletes the server's stored OAuth credentials. |
+| `mcp login <server> [-l] [--timeout <seconds>]` | Signs in to an OAuth server through the browser. The default time limit is 300 seconds. |
+| `mcp logout <server> [-l]` | Deletes the server's stored OAuth credentials. |
 
 `add` options:
 
 | Option | Applies to | Meaning |
 | --- | --- | --- |
-| `-l`, `--local` | add, remove | Uses the project's `.pi/mcp.json` instead of the global file. |
+| `-l`, `--local` | add, remove, login, logout | Uses the project's `.pi/mcp.json` instead of the global file. For `login` and `logout`, the server must be defined there. |
 | `--env <KEY=VALUE>` | stdio | Environment variable for the server. Repeatable. |
 | `--cwd <dir>` | stdio | Working folder for the server. |
 | `--header <KEY=VALUE>` | HTTP | Request header. Repeatable. |
@@ -242,6 +254,7 @@ pisharp auth check --provider anthropic --json
 | `--oauth-client-secret <secret>` | HTTP | OAuth client secret. May be `${NAME}` or `!command`. |
 | `--oauth-callback-port <port>` | HTTP | Fixed OAuth callback port. |
 | `--oauth-client-name <name>` | HTTP | Client name sent when registering with the OAuth server. |
+| `--oauth-client-registration <mode>` | HTTP | `auto` (default), `cimd` or `dcr`. PiSharp's `auto` registers a client dynamically. See [MCP](/docs/guides/mcp/#sign-in-with-oauth). |
 | `--exposure <mode>` | both | `codemode` (default), `deferred`, `direct` or `hidden`. |
 | `--description <text>` | both | What the server offers, shown in the system prompt. |
 

@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/src/core/session-manager.ts.
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/coding-agent/src/core/session-manager.ts.
 // Ported to plain ESM for the PiSharp Node extension bridge (TypeScript types stripped mechanically; behaviour unchanged).
 import { getCurrentSystemMessage, uuidv7 } from "../../pi-ai.mjs";
 import { randomUUID } from "crypto";
@@ -8,7 +8,7 @@ import { basename, join, resolve } from "path";
 import { createInterface } from "readline";
 import { StringDecoder } from "string_decoder";
 import { APP_NAME, getAgentDir as getDefaultAgentDir, getSessionsDir } from "../config.mjs";
-import { normalizePath, resolvePath } from "../utils/paths.mjs";
+import { normalizePath, pathsEqual, resolvePath } from "../utils/paths.mjs";
 import { createBranchSummaryMessage, createCompactionSummaryMessage, createCustomMessage } from "./messages.mjs";
 export const CURRENT_SESSION_VERSION = 3;
 function createSessionId() {
@@ -220,7 +220,7 @@ export function buildContextEntries(entries, leafId, byId) {
     contextEntries.push(...path.slice(compactionIdx + 1));
     return contextEntries;
 }
-function projectContextEntry(entry, edit) {
+export function projectContextEntry(entry, edit) {
     const messages = sessionEntryToContextMessages(entry);
     if (!edit) return messages;
     const replacement = edit.replacement;
@@ -394,7 +394,7 @@ function getSessionHeaderCwd(header) {
     return typeof cwd === "string" ? cwd : undefined;
 }
 function sessionCwdMatches(cwd, resolvedCwd) {
-    return cwd !== undefined && cwd !== "" && resolvePath(cwd) === resolvedCwd;
+    return cwd !== undefined && cwd !== "" && pathsEqual(resolvePath(cwd), resolvedCwd);
 }
 export function findMostRecentSession(sessionDir, cwd) {
     const resolvedSessionDir = normalizePath(sessionDir);
@@ -691,7 +691,7 @@ export class SessionManager {
         return this.sessionDir;
     }
     usesDefaultSessionDir() {
-        return this.sessionDir === getDefaultSessionDirPath(this.cwd);
+        return pathsEqual(this.sessionDir, getDefaultSessionDirPath(this.cwd));
     }
     getSessionId() {
         return this.sessionId;
@@ -720,10 +720,18 @@ export class SessionManager {
         }
     }
     _appendEntry(entry) {
+        const previousLeafId = this.leafId;
         this.fileEntries.push(entry);
         this.byId.set(entry.id, entry);
         this.leafId = entry.id;
-        this._persist(entry);
+        try {
+            this._persist(entry);
+        } catch (error) {
+            this.fileEntries.pop();
+            this.byId.delete(entry.id);
+            this.leafId = previousLeafId;
+            throw error;
+        }
     }
     appendMessage(message) {
         const entry = {
@@ -1158,7 +1166,7 @@ export class SessionManager {
     }
     static continueRecent(cwd, sessionDir) {
         const dir = sessionDir ? normalizePath(sessionDir) : getDefaultSessionDir(cwd);
-        const filterCwd = sessionDir !== undefined && dir !== getDefaultSessionDirPath(cwd);
+        const filterCwd = sessionDir !== undefined && !pathsEqual(dir, getDefaultSessionDirPath(cwd));
         const mostRecent = findMostRecentSession(dir, filterCwd ? cwd : undefined);
         if (mostRecent) {
             return new SessionManager(cwd, dir, mostRecent, true);
@@ -1200,19 +1208,22 @@ export class SessionManager {
             cwd: resolvedTargetCwd,
             parentSession: resolvedSourcePath
         };
-        writeFileSync(newSessionFile, `${JSON.stringify(newHeader)}\n`, {
-            flag: "wx"
-        });
-        for (const entry of sourceEntries){
-            if (entry.type !== "session") {
-                appendFileSync(newSessionFile, `${JSON.stringify(entry)}\n`);
+        const fd = openSync(newSessionFile, "wx");
+        try {
+            writeFileSync(fd, `${JSON.stringify(newHeader)}\n`);
+            for (const entry of sourceEntries){
+                if (entry.type !== "session") {
+                    writeFileSync(fd, `${JSON.stringify(entry)}\n`);
+                }
             }
+        } finally{
+            closeSync(fd);
         }
         return new SessionManager(resolvedTargetCwd, dir, newSessionFile, true);
     }
     static findById(cwd, id, sessionDir) {
         const dir = sessionDir ? normalizePath(sessionDir) : getDefaultSessionDir(cwd);
-        const filterCwd = sessionDir !== undefined && dir !== getDefaultSessionDirPath(cwd);
+        const filterCwd = sessionDir !== undefined && !pathsEqual(dir, getDefaultSessionDirPath(cwd));
         const resolvedCwd = resolvePath(cwd);
         try {
             for (const file of readdirSync(dir)){
@@ -1228,7 +1239,7 @@ export class SessionManager {
     }
     static async list(cwd, sessionDir, onProgress, signal) {
         const dir = sessionDir ? normalizePath(sessionDir) : getDefaultSessionDir(cwd);
-        const filterCwd = sessionDir !== undefined && dir !== getDefaultSessionDirPath(cwd);
+        const filterCwd = sessionDir !== undefined && !pathsEqual(dir, getDefaultSessionDirPath(cwd));
         const resolvedCwd = resolvePath(cwd);
         const includeSession = (session)=>!filterCwd || sessionCwdMatches(session.cwd, resolvedCwd);
         const progress = onProgress ? (loaded, total, partialSessions)=>onProgress(loaded, total, partialSessions?.filter(includeSession)) : undefined;

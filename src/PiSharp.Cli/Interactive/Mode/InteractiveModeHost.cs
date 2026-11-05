@@ -36,6 +36,8 @@ internal static class InteractiveModeHost
         var trustStore = new ProjectTrustStore(startup.AgentDir, startup.Home);
         var crashLogPath = PiSharp.Cli.Diagnostics.CrashReporting.DefaultCrashLogPath();
         var login = TryCreateLogin();
+        // exportToHtml's tool renderer comes from the mode once it exists (the transcript's renderers and theme).
+        Func<PiSharp.CodingAgent.Export.IToolHtmlRenderer?>? createExportToolRenderer = null;
         var context = new InteractiveModeContext
         {
             Rpc = client, Settings = settings, Startup = startup, Terminal = terminal, Loop = loop,
@@ -56,13 +58,13 @@ internal static class InteractiveModeHost
             ExportToHtml = (rpc, path, themeName) => Task.Run(() => PiSharp.CodingAgent.Export.AgentSessionExport.ExportToHtmlAsync(
                 startup.Host.CurrentSession ?? throw new InvalidOperationException("The session is not ready."),
                 new PiSharp.CodingAgent.Export.SessionHtmlExportHost(new PiSharp.CodingAgent.Export.PiThemeHost { AgentDirectory = startup.AgentDir },
-                    settings.ThemeSetting, startup.Cwd), path, themeName)),
+                    settings.ThemeSetting, startup.Cwd, () => createExportToolRenderer?.Invoke()), path, themeName)),
             ShareSession = (ui, themeName, abort) =>
             {
                 var session = startup.Host.CurrentSession ?? throw new InvalidOperationException("The session is not ready.");
                 var share = PiSharp.CodingAgent.Export.AgentSessionExport.ShareSession(session,
                     new PiSharp.CodingAgent.Export.SessionHtmlExportHost(new PiSharp.CodingAgent.Export.PiThemeHost { AgentDirectory = startup.AgentDir },
-                        settings.ThemeSetting, startup.Cwd), themeName);
+                        settings.ThemeSetting, startup.Cwd, () => createExportToolRenderer?.Invoke()), themeName) with { Destination = settings.SessionShareDestination };
                 return new PiSharp.CodingAgent.Export.SessionShare().ShareSessionAsync(share, ui, abort);
             },
             ImportSessionFile = path => ImportSessionFile(path, startup),
@@ -97,6 +99,7 @@ internal static class InteractiveModeHost
                 // sdk.ts modelFallbackMessage: a model a continued session could not restore, or formatNoModelsAvailableMessage.
                 ModelFallbackMessage = options.Selection.FallbackMessage
             }));
+            createExportToolRenderer = mode.CreateExportToolRenderer;
             observeMode?.Invoke(mode);
             host = Task.Run(() => RpcSessionCommand.RunWithPresentationAsync(rpcArgs, connection.Input, connection.Output, hostDiagnostics, mode,
                 hostCancellation.Token, userShutdown: () => Volatile.Read(ref userQuit) != 0 && !token.IsCancellationRequested, mcpHost: mcpHost,
@@ -182,9 +185,10 @@ internal static class InteractiveModeHost
         var directory = startup.Host.CurrentSession?.Path is { } current ? Path.GetDirectoryName(current)! : startup.SessionDir ?? Path.GetDirectoryName(path)!;
         Directory.CreateDirectory(directory);
         var target = Path.Join(directory, Path.GetFileName(path));
-        if (File.Exists(target) && !string.Equals(Path.GetFullPath(target), Path.GetFullPath(path), OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal))
-            target = Path.Join(directory, $"{Path.GetFileNameWithoutExtension(path)}-{Guid.NewGuid():N}.jsonl");
-        if (!string.Equals(Path.GetFullPath(target), Path.GetFullPath(path), StringComparison.Ordinal)) File.Copy(path, target);
+        // agent-session-runtime.ts: a file already in the session directory (with any casing on Windows) is not copied onto itself.
+        var alreadyStored = PiPaths.PathsEqual(target, path);
+        if (!alreadyStored && File.Exists(target)) target = Path.Join(directory, $"{Path.GetFileNameWithoutExtension(path)}-{Guid.NewGuid():N}.jsonl");
+        if (!alreadyStored) File.Copy(path, target);
         return target;
     }
 
@@ -195,15 +199,10 @@ internal static class InteractiveModeHost
         PosixSuspend.Run(stop, resume);
     }
 
-    /// <summary>pi-ai isRetryableAssistantError: transient provider failures the retry loop handles.</summary>
-    internal static bool IsRetryableAssistantError(JsonObject message)
-    {
-        if (SessionEntries.Str(message["stopReason"]) != "error") return false;
-        var error = SessionEntries.Str(message["errorMessage"]) ?? "";
-        return System.Text.RegularExpressions.Regex.IsMatch(error,
-            @"overloaded|rate.?limit|too many requests|429|500|502|503|504|service.?unavailable|server error|internal error|connection.?error|connection.?refused|other side closed|fetch failed|upstream.?connect|reset before headers|terminated|retry delay",
-            System.Text.RegularExpressions.RegexOptions.IgnoreCase);
-    }
+    /// <summary>pi-ai isRetryableAssistantError: transient provider failures the retry loop handles (the same classifier the retry loop uses).</summary>
+    internal static bool IsRetryableAssistantError(JsonObject message) =>
+        SessionEntries.Str(message["stopReason"]) == "error" &&
+        PiSharp.CodingAgent.Configuration.AgentRetryPolicy.IsRetryableError(PiSharp.Contracts.StopReason.Error, SessionEntries.Str(message["errorMessage"]));
 }
 
 [System.Runtime.Versioning.UnsupportedOSPlatform("windows")]

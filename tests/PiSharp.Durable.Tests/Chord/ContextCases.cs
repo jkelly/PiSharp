@@ -1,10 +1,16 @@
 using PiSharp.Durable.Chord;
+using PiSharp.Telemetry;
 
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/chord/test/context.test.ts. Adaptations: an AbortController whose abort
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/chord/test/context.test.ts. Adaptations: an AbortController whose abort
 // carries a reason is DurableContext.WithCancel() (a CancellationTokenSource carries no reason), so the parent controller of
 // "inherits parent cancellation" is Background.WithCancel(), equivalent to withAbortSignal(controller.signal, BACKGROUND_CONTEXT); an
 // abort-event listener is a token registration; `value(key)` returning undefined is TryGet returning false. The last case is native:
 // it pins the CancellationToken interop that has no upstream counterpart.
+// Pi v1.5.0 sync (area telemetry, 48909d987, 2ec55d808, 92ab53602): Context.telemetry on the roots, and the two telemetry cases of
+// f9a26365's context.test.ts. withTelemetry and traceIn are DurableContext's WithTelemetry and TraceInAsync; withContextValue is With;
+// abortSignal identity is CancellationToken equality. JavaScript throws any value; .NET throws exceptions, so the failure that must
+// come back "the same value" is one exception instance, thrown and rejected. These three commits are every change to the file since
+// v1.2.0 (92ab53602 is also area chord-watch's, which leaves this file to this area), so the citation is on v1.5.0.
 internal static partial class Program
 {
     private static IEnumerable<(string, Func<Task>)> ChordContextCases() =>
@@ -14,6 +20,8 @@ internal static partial class Program
             var key = new ContextKey<string>("value");
             Check(!ReferenceEquals(DurableContext.Todo, DurableContext.Background), "TODO and BACKGROUND are distinct");
             Check(!DurableContext.Todo.HasCancellation, "TODO has no abort signal");
+            Check(ReferenceEquals(NoopTelemetry.Context, DurableContext.Todo.Telemetry), "TODO telemetry is the no-op span");
+            Check(ReferenceEquals(NoopTelemetry.Context, DurableContext.Background.Telemetry), "BACKGROUND telemetry is the no-op span");
             Check(!DurableContext.Todo.TryGet(key, out _), "TODO has no values");
             Equal("[Context BACKGROUND_CONTEXT]", DurableContext.Background.ToString(), "BACKGROUND string");
             Equal("[Context TODO_CONTEXT]", DurableContext.Todo.ToString(), "TODO string");
@@ -67,6 +75,82 @@ internal static partial class Program
             Check(!cleanup.HasCancellation, "cleanup has no abort signal");
             Equal(CancellationToken.None, cleanup.CancellationToken, "cleanup token");
             Equal("preserved", cleanup.Get(key), "cleanup keeps values");
+        }),
+        Case("chord.context.derives-telemetry-independently-from-values-and-cancellation", async () =>
+        {
+            var telemetry = new InMemoryTelemetryContext();
+            var other = new InMemoryTelemetryContext();
+            await telemetry.StartSpanAsync("caller", parent => other.StartSpanAsync("other", async otherSpan =>
+            {
+                var key = new ContextKey<string>("principal");
+                var controller = DurableContext.Background.WithCancel();
+                var @base = controller.Context.With(key, "owner");
+                var context = @base.WithTelemetry(parent);
+                var replaced = context.WithTelemetry(otherSpan);
+                Check(ReferenceEquals(NoopTelemetry.Context, @base.Telemetry), "base telemetry");
+                Check(ReferenceEquals(parent, context.Telemetry), "context telemetry");
+                Check(ReferenceEquals(otherSpan, replaced.Telemetry), "replaced telemetry");
+                Equal("owner", replaced.Get(key), "replaced value");
+                Equal(@base.CancellationToken, replaced.CancellationToken, "replaced abort signal");
+                Check(ReferenceEquals(parent, context.WithoutCancellation().Telemetry), "withoutAbortSignal keeps telemetry");
+                await context.TraceInAsync("outer", async child =>
+                {
+                    Equal("owner", child.Get(key), "child value");
+                    Equal(context.CancellationToken, child.CancellationToken, "child abort signal");
+                    child.Telemetry.AddEvent("started");
+                    await child.TraceInAsync("inner", nested =>
+                    {
+                        nested.Telemetry.AddLink(new SpanLink(child.Telemetry));
+                        return 42;
+                    });
+                    return 0;
+                });
+                var spans = telemetry.GetSpans();
+                var (caller, outer, inner) = (spans[0], spans[1], spans[2]);
+                Equal<int?>(caller.Id, outer.ParentId, "outer parent");
+                Equal<int?>(outer.Id, inner.ParentId, "inner parent");
+                Check(inner.Links[0].Context.SequenceEqual(outer.Context), "inner links to outer");
+                Check(ReferenceEquals(parent, context.Telemetry), "context telemetry after traceIn");
+                controller.Cancel();
+                Check(context.IsCancellationRequested, "context aborted");
+            }));
+        }),
+        Case("chord.context.isolates-concurrent-tracein-branches-and-preserves-callback-results-and-errors", async () =>
+        {
+            var telemetry = new InMemoryTelemetryContext();
+            await telemetry.StartSpanAsync("caller", async parent =>
+            {
+                var context = DurableContext.Background.WithTelemetry(parent);
+                var gate = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+                var first = context.TraceInAsync("first", async child =>
+                {
+                    await gate.Task;
+                    return await child.TraceInAsync("first.child", _ => "first");
+                });
+                var second = context.TraceInAsync("second", async child =>
+                {
+                    var result = await child.TraceInAsync("second.child", _ => "second");
+                    gate.TrySetResult();
+                    return result;
+                });
+                Check((await Task.WhenAll(first, second)).SequenceEqual(["first", "second"]), "results");
+                var spans = telemetry.GetSpans();
+                foreach (var name in new[] { "first", "second" })
+                {
+                    var branch = spans.First(span => span.Name == name);
+                    Equal<int?>(branch.Id, spans.First(span => span.Name == $"{name}.child").ParentId, $"{name}.child parent");
+                }
+                var failure = new InvalidOperationException("same value");
+                Check(ReferenceEquals(failure, await ThrowsAsync<InvalidOperationException>(
+                    () => context.TraceInAsync("throw", new Func<DurableContext, int>(_ => throw failure)), "throw")), "a throw rejects with the same value");
+                Check(ReferenceEquals(failure, await ThrowsAsync<InvalidOperationException>(
+                    () => context.TraceInAsync("reject", _ => Task.FromException<int>(failure)), "reject")), "a rejection rejects with the same value");
+                Equal(42, await DurableContext.Background.TraceInAsync("noop", child =>
+                {
+                    child.Telemetry.AddLink(new SpanLink(parent));
+                    return 42;
+                }), "noop result");
+            });
         }),
         Case("chord.context.stops-waiting-when-the-invocation-is-cancelled", async () =>
         {

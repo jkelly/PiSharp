@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): coding-agent/src/modes/interactive/components/session-selector-search.ts.
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): coding-agent/src/modes/interactive/components/session-selector-search.ts.
 // Sessions are PiSharp's PiSessionInfo (the source SessionInfo: path, id, cwd, name, parentSessionPath, created, modified,
 // messageCount, firstMessage, allMessagesText).
 using System.Text;
@@ -40,7 +40,79 @@ internal static class SessionSelectorSearch
         return builder.ToString();
     }
 
-    private static string GetSessionSearchText(PiSessionInfo session) => $"{session.Id} {session.Name ?? ""} {session.AllMessagesText} {session.Cwd}";
+    // Match tiers, best first. Each token is scored by the best field it matches; tiers dominate fuzzy scores so an exact hit anywhere
+    // beats a scattered subsequence in a short field.
+    private const int TierName = 0; // query text appears in the session name
+    private const int TierText = 1; // query text appears in the session id, messages, or cwd
+    private const int TierFuzzy = 2; // query characters appear scattered in the session name or cwd
+    private const double TierWeight = 1_000_000;
+
+    private sealed class LowercaseCache(string source, string lower)
+    {
+        public string Source { get; } = source;
+        public string Lower { get; } = lower;
+        public string? Normalized { get; set; }
+    }
+
+    /// <summary>Lowercased message text per session. AllMessagesText holds every user/assistant message and can be megabytes, so it is
+    /// lowercased once instead of on every keystroke.</summary>
+    private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<PiSessionInfo, LowercaseCache> MessageTextCache = new();
+
+    private static LowercaseCache GetMessageText(PiSessionInfo session)
+    {
+        if (MessageTextCache.TryGetValue(session, out var cached) && ReferenceEquals(cached.Source, session.AllMessagesText)) return cached;
+        cached = new LowercaseCache(session.AllMessagesText, session.AllMessagesText.ToLowerInvariant());
+        MessageTextCache.AddOrUpdate(session, cached);
+        return cached;
+    }
+
+    private static string GetNormalizedMessageText(PiSessionInfo session)
+    {
+        var cached = GetMessageText(session);
+        return cached.Normalized ??= TextUtils.JsTrim(CollapseWhitespace(cached.Lower));
+    }
+
+    private static double TierScore(int tier, double score = 0) => tier * TierWeight + score;
+
+    /// <summary>Exact (case-insensitive) text match. Messages and ids are only matched exactly: scattered matches in them are noise.</summary>
+    private static double? MatchLiteralToken(PiSessionInfo session, string value)
+    {
+        var name = session.Name?.ToLowerInvariant() ?? "";
+        if (name.Contains(value, StringComparison.Ordinal)) return TierScore(TierName, Fuzzy.Match(value, name).Score);
+        if (session.Id.ToLowerInvariant().Contains(value, StringComparison.Ordinal)) return TierScore(TierText);
+        if (GetMessageText(session).Lower.Contains(value, StringComparison.Ordinal)) return TierScore(TierText);
+        if (session.Cwd.ToLowerInvariant().Contains(value, StringComparison.Ordinal)) return TierScore(TierText);
+        return null;
+    }
+
+    private static double? MatchFuzzyToken(PiSessionInfo session, string value)
+    {
+        if (MatchLiteralToken(session, value.ToLowerInvariant()) is { } literal) return literal;
+        double? best = null;
+        foreach (var field in new[] { session.Name ?? "", session.Cwd })
+        {
+            var m = Fuzzy.Match(value, field);
+            if (m.Matches && (best is null || m.Score < best)) best = m.Score;
+        }
+        return best is { } score ? TierScore(TierFuzzy, score) : null;
+    }
+
+    private static double? MatchPhraseToken(PiSessionInfo session, string phrase)
+    {
+        var name = NormalizeWhitespaceLower(session.Name ?? "");
+        if (name.Contains(phrase, StringComparison.Ordinal)) return TierScore(TierName, Fuzzy.Match(phrase, name).Score);
+        if (session.Id.ToLowerInvariant().Contains(phrase, StringComparison.Ordinal)) return TierScore(TierText);
+        if (GetNormalizedMessageText(session).Contains(phrase, StringComparison.Ordinal)) return TierScore(TierText);
+        if (NormalizeWhitespaceLower(session.Cwd).Contains(phrase, StringComparison.Ordinal)) return TierScore(TierText);
+        return null;
+    }
+
+    private static double? MatchRegex(PiSessionInfo session, Regex regex)
+    {
+        if (!string.IsNullOrEmpty(session.Name) && regex.IsMatch(session.Name)) return TierScore(TierName);
+        if (regex.IsMatch(session.Id) || regex.IsMatch(session.AllMessagesText) || regex.IsMatch(session.Cwd)) return TierScore(TierText);
+        return null;
+    }
 
     public static bool HasSessionName(PiSessionInfo session) => session.Name is { } name && TextUtils.JsTrim(name).Length > 0;
 
@@ -107,39 +179,29 @@ internal static class SessionSelectorSearch
         return new("tokens", tokens, null);
     }
 
+    /// <summary>Each field is matched separately, so a token never matches across field boundaries. Different tokens may match
+    /// different fields (Pi 1.5.0, 8c03fef4d).</summary>
     public static MatchResult MatchSession(PiSessionInfo session, ParsedSearchQuery parsed)
     {
-        var text = GetSessionSearchText(session);
-
         if (parsed.Mode == "regex")
         {
             if (parsed.Regex is null) return new(false, 0);
-            var match = parsed.Regex.Match(text);
-            if (!match.Success) return new(false, 0);
-            return new(true, match.Index * 0.1);
+            return MatchRegex(session, parsed.Regex) is { } regexScore ? new(true, regexScore) : new(false, 0);
         }
 
-        if (parsed.Tokens.Count == 0) return new(true, 0);
-
         double totalScore = 0;
-        string? normalizedText = null;
-
         foreach (var token in parsed.Tokens)
         {
+            double? score;
             if (token.Kind == "phrase")
             {
-                normalizedText ??= NormalizeWhitespaceLower(text);
                 var phrase = NormalizeWhitespaceLower(token.Value);
                 if (phrase.Length == 0) continue;
-                var idx = normalizedText.IndexOf(phrase, StringComparison.Ordinal);
-                if (idx < 0) return new(false, 0);
-                totalScore += idx * 0.1;
-                continue;
+                score = MatchPhraseToken(session, phrase);
             }
-
-            var m = Fuzzy.Match(token.Value, text);
-            if (!m.Matches) return new(false, 0);
-            totalScore += m.Score;
+            else score = MatchFuzzyToken(session, token.Value);
+            if (score is null) return new(false, 0);
+            totalScore += score.Value;
         }
 
         return new(true, totalScore);

@@ -5,14 +5,16 @@
 // rebuild keeps the status and note already recorded for a file. Against the previous pin it also records what changed upstream
 // (upstreamChange, previousBlobSha1, changedLines), and a ported file whose recorded blob is not the pinned one becomes needs-sync, with
 // portedBlobSha1 naming the blob the C# was ported from, so no row claims a port of upstream text it has not seen.
+// A recorded file that neither pin has stays only while PiSharp keeps its port (pisharp-only, with removedIn).
 import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 
-const UPSTREAM_COMMIT = '06a466935536f8c9bcacb2d5efc0fc021be1bdff'; // Pi v1.2.0
-const UPSTREAM_VERSION = '1.2.0';
-const PREVIOUS_COMMIT = 'abe508e1b89912adde45528136c3221eb69acdd7'; // Pi v1.1.0, the first pin
-const PREVIOUS_VERSION = '1.1.0';
-const SYNC_PHASE = `sync-${UPSTREAM_VERSION}`; // phase of files new in the pinned commit; compatibility/durable-sync-1.2.0-worklist.json groups them
+const UPSTREAM_COMMIT = 'f9a26365568127461c47a07a37dcb42c140a3ac5'; // Pi v1.5.0
+const UPSTREAM_VERSION = '1.5.0';
+const PREVIOUS_COMMIT = '06a466935536f8c9bcacb2d5efc0fc021be1bdff'; // Pi v1.2.0, the second pin (the first was v1.1.0, abe508e1)
+const PREVIOUS_VERSION = '1.2.0';
+const SYNC_PHASE = `sync-${UPSTREAM_VERSION}`; // phase of files new in the pinned commit; the work list groups them
+const WORKLIST = `compatibility/durable-sync-${UPSTREAM_VERSION}-worklist.json`;
 const OUT = 'compatibility/durable-port-map.json';
 const args = process.argv.slice(2);
 const upstream = args[args.indexOf('--upstream') + 1];
@@ -41,6 +43,9 @@ const pascal = name => name.split(/[-_.]/).filter(Boolean).map(word => word[0].t
 // Upstream renames between the two pins (git's similarity detection), new path -> old path.
 const renamedFrom = new Map(git('diff', '--name-status', '-M', PREVIOUS_COMMIT, UPSTREAM_COMMIT, '--', 'packages/durable', 'packages/chord')
   .trim().split('\n').map(line => line.split('\t')).filter(([status]) => status.startsWith('R')).map(([, from, to]) => [to, from]));
+// Renames git's similarity detection misses over the whole range: upstream's renumbering (b9fb2b854) moved 05-watches.ts to
+// 04-watches.ts, which later commits rewrote.
+renamedFrom.set('packages/durable/test/examples/04-watches.ts', 'packages/durable/test/examples/05-watches.ts');
 const renamedTo = new Map([...renamedFrom].map(([to, from]) => [from, to]));
 
 // The planned C# location of an upstream file: [pisharp, phase] or [null, null, status, note].
@@ -52,12 +57,18 @@ function sourcePlan(path) {
   const sub = path.slice(durableSource.length + 1), parts = sub.split('/'), base = parts.at(-1).replace(/(\.d)?\.ts$/, '');
   if (sub === 'storage/sqlite/cloudflare.ts') return [null, null, 'excluded', 'Cloudflare Durable Object adapter (decision 0005)'];
   if (sub === 'images/cloudflare.ts') return [null, null, 'excluded', 'Cloudflare Images adapter (decision 0005: Cloudflare adapters are out of scope)'];
+  if (sub === 'storage/indexeddb.ts') return [null, null, 'excluded', 'Browser storage over IndexedDB (decision 0013, targets .NET cannot run; applicability row durable.indexeddb-storage is no-op)'];
   if (sub.endsWith('.d.ts')) return [null, null, 'excluded', 'Ambient type declarations for a WebAssembly module; no C# counterpart'];
   let [phase, project, dir] = ['P2', 'PiSharp.Durable', ''];
-  if (parts[0] === 'harness') [phase, project, dir] = [harnessPhase[base] ?? 'P6', 'PiSharp.Durable', 'Harness'];
+  // Area registry-reader: registryReader needs Chord v2's registry value, so it is the adapter project PiSharp.Durable.Store's (decision
+  // 0013, phase 4).
+  if (sub === 'harness/registry-reader.ts') [phase, project, dir] = ['P6', 'PiSharp.Durable.Store', ''];
+  else if (parts[0] === 'harness') [phase, project, dir] = [harnessPhase[base] ?? 'P6', 'PiSharp.Durable', 'Harness'];
   else if (parts[0] === 'session') [phase, project, dir] = ['P3', 'PiSharp.Durable', 'Session'];
   else if (parts[0] === 'storage' && parts.length > 2 && parts[1] === 'sqlite') [phase, project, dir] = ['P5', 'PiSharp.Durable.Sqlite', ''];
   else if (parts[0] === 'storage' && parts.length > 2 && parts[1] === 'jsonl') [phase, project, dir] = ['P4', 'PiSharp.Durable', 'Storage/Jsonl'];
+  // Area store-storage: StoreStorage needs Chord v2 types, so it is the adapter project PiSharp.Durable.Store (decision 0013, phase 4).
+  else if (parts[0] === 'storage' && parts.length > 2 && parts[1] === 'store') [phase, project, dir] = ['P2', 'PiSharp.Durable.Store', ''];
   else if (parts[0] === 'storage') [phase, project, dir] = ['P2', 'PiSharp.Durable', 'Storage'];
   else if (parts[0] === 'env' && base === 'index') [phase, project, dir] = ['P4', 'PiSharp.Durable', 'Env'];
   else if (parts[0] === 'env') [phase, project, dir] = ['P9', 'PiSharp.Durable.Tools', 'Env'];
@@ -76,9 +87,21 @@ const chordFiles = new Map([
   ['packages/chord/src/delta/revision-validator.ts', 'Chord/Delta/RevisionValidator.cs'],
   ['packages/chord/src/json.ts', 'Chord/JsonValue.cs'], ['packages/chord/src/services/state.ts', 'Chord/ReplicatedState.cs'],
   ['packages/chord/src/state.ts', 'Chord/ReplicatedState.cs'],
-  ['packages/chord/src/services/state-internals.ts', 'Chord/ReplicatedState.cs'], ['packages/chord/src/types.ts', 'Chord/Types.cs']]);
+  ['packages/chord/src/services/state-internals.ts', 'Chord/ReplicatedState.cs'], ['packages/chord/src/types.ts', 'Chord/Types.cs'],
+  // Pi v1.5.0: what pi-durable imports from Chord's watch, delta, output and sqlite entry points. The output module moved from
+  // packages/durable/src/harness/output.ts; the SQLite layer stays in PiSharp.Durable.Sqlite.
+  ['packages/chord/src/watch.ts', 'Chord/Watch.cs'], ['packages/chord/src/delta/pending.ts', 'Chord/Delta/Pending.cs'],
+  ['packages/chord/src/output.ts', 'Harness/Output.cs'],
+  ['packages/chord/src/sqlite/index.ts', 'src/PiSharp.Durable.Sqlite/Database.cs'],
+  ['packages/chord/src/sqlite/database.ts', 'src/PiSharp.Durable.Sqlite/Database.cs'],
+  ['packages/chord/src/sqlite/migrations.ts', 'src/PiSharp.Durable.Sqlite/Migrations.cs'],
+  ['packages/chord/src/sqlite/schema.ts', 'src/PiSharp.Durable.Sqlite/Schema.cs'],
+  ['packages/chord/src/sqlite/node.ts', 'src/PiSharp.Durable.Sqlite/ConnectionDatabase.cs'],
+  ['packages/chord/src/sqlite/cloudflare.ts', null]]);
 function chordPlan(path) {
-  return [`src/PiSharp.Durable/${chordFiles.get(path)}`, 'P1', 'planned',
+  const target = chordFiles.get(path);
+  if (!target) return [null, null, 'excluded', 'Cloudflare Durable Object SQLite driver (decision 0005: Cloudflare adapters are out of scope)'];
+  return [target.startsWith('src/') ? target : `src/PiSharp.Durable/${target}`, 'P1', 'planned',
     path.includes('tracker') ? 'An explicit copy-on-write draft API replaces the Proxy tracker (decision 0005)' : undefined];
 }
 
@@ -89,12 +112,17 @@ function testPlan(path) {
   const base = path.split('/').at(-1).replace('.test.ts', '').replace(/\.ts$/, '');
   if (base.includes('cloudflare')) return [null, null, 'excluded', 'Cloudflare adapter'];
   if (base.endsWith('-e2e')) return [null, null, 'skipped', 'Needs live provider credentials'];
+  if (base.includes('indexeddb')) return [null, null, 'excluded', 'Tests the browser IndexedDB storage (applicability row durable.indexeddb-storage is no-op)'];
+  if (base === 'codemode-imports') return [null, null, 'skipped', "Not applicable: checks that importing the code mode extension leaves pi-codemode's WASM QuickJS runtime unloaded, a JavaScript module-graph property; PiSharp has no such runtime (applicability row durable.codemode-declarations-import is no-op)"];
   const phase = base.startsWith('harness-') ? testPhase[base.slice(8)] ?? 'P11'
     : path.includes('/examples/') || base.includes('bench') ? 'P13'
     : base.startsWith('session') ? 'P3' : base.startsWith('sqlite') ? 'P5' : base.startsWith('jsonl') ? 'P4'
     : /^(env|tools)/.test(base) ? 'P9' : /^(memory|storage|types)/.test(base) ? 'P2' : base.startsWith('chord') ? 'P3' : 'P11';
   // heap-retained.ts is a helper of the memory benchmarks.
   if (base.includes('bench') || base === 'heap-retained') return [`benchmarks/PiSharp.Durable.Benchmarks/${pascal(base)}.cs`, phase];
+  // An example is a sample program, which ExamplesCases.cs runs; shared test helpers keep their name.
+  if (path.includes('/examples/')) return [`samples/Durable.Examples/Examples${pascal(base.replace(/^\d+-/, ''))}.cs`, phase];
+  if (base.endsWith('-support') || base === 'store-storage-node') return [`tests/PiSharp.Durable.Tests/${pascal(base)}.cs`, phase];
   return [`tests/PiSharp.Durable.Tests/${pascal(base)}Cases.cs`, phase];
 }
 
@@ -103,12 +131,10 @@ const sections = [
   { files: commit => walk(commit, durableSource).filter(path => path.endsWith('.ts')), plan: sourcePlan },
   { files: commit => [...chordFiles.keys()].filter(path => blobAt(commit, path)), plan: chordPlan },
   { files: commit => walk(commit, 'packages/durable/test').filter(path => path.endsWith('.ts')), plan: testPlan },
-  // Upstream deleted its experimental durable agent in v1.2.0; `pisharp durable` keeps the v1.1.0 port (decision 0005).
-  { files: commit => walk(commit, 'packages/coding-agent/src/experimental/durable').filter(path => path.endsWith('.ts')),
-    plan: path => [`src/PiSharp.Cli/Durable/Durable${pascal(path.split('/').at(-1).slice(0, -3))}.cs`, 'P12'] },
 ];
 
-const previous = existsSync(OUT) ? new Map(JSON.parse(readFileSync(OUT, 'utf8')).files.map(row => [row.upstream, row])) : new Map();
+const recorded = existsSync(OUT) ? JSON.parse(readFileSync(OUT, 'utf8')) : { files: [] };
+const previous = new Map(recorded.files.map(row => [row.upstream, row]));
 const rows = [];
 for (const section of sections) {
   const current = new Set(section.files(UPSTREAM_COMMIT));
@@ -130,28 +156,37 @@ for (const section of sections) {
       if (old.status === 'ported' && blob && old.blobSha1 !== blob) [row.status, row.portedBlobSha1] = ['needs-sync', old.blobSha1];
     }
     if (!blob) {
-      if (path.startsWith('packages/coding-agent/src/experimental/durable/')) row.status = 'pisharp-only';
-      else if (['ported', 'needs-sync', 'in-progress'].includes(row.status)) row.status = 'removed-upstream';
+      if (['ported', 'needs-sync', 'in-progress'].includes(row.status)) row.status = 'removed-upstream';
     } else if (row.upstreamChange === 'added' && (!old || old.status === 'planned')) row.phase = row.phase && SYNC_PHASE;
     rows.push(row);
   }
 }
+// Recorded rows whose file is at neither pin: upstream deleted it before the previous pin. A port PiSharp keeps (pisharp-only: the
+// experimental durable agent upstream deleted in v1.2.0, which `pisharp durable` keeps, decision 0005) stays as recorded, with removedIn
+// naming the release that deleted it; a port an earlier sync retired (removed-upstream) leaves the map.
+for (const old of recorded.files) {
+  if (old.status !== 'pisharp-only' || rows.some(row => row.upstream === old.upstream)) continue;
+  const { upstreamChange, previousBlobSha1, changedLines: changed, renamedFrom: moved, successor, ...kept } = old;
+  rows.push({ ...kept, removedIn: old.removedIn ?? (upstreamChange === 'removed' ? recorded.upstreamVersion : undefined) });
+}
 // The pre-rename path, when a renamed file's old path has no row of its own: point at the successor.
 for (const row of rows) if (row.upstreamChange === 'removed' && renamedTo.has(row.upstream)) row.successor = renamedTo.get(row.upstream);
-// Upstream moved replicated state out of services/ (the host runtime that replaced it is out of scope); state.ts took over both files.
-for (const row of rows) if (row.upstream === 'packages/chord/src/services/state-internals.ts' && row.upstreamChange === 'removed')
-  row.successor = 'packages/chord/src/state.ts';
+// Successors git cannot see: in v1.2.0 upstream moved replicated state out of services/ (the host runtime that replaced it is out of
+// scope) and state.ts took over both files; in v1.5.0 Chord's shared Watch took over Durable's watch implementation (42cb822f1).
+const successors = { 'packages/chord/src/services/state-internals.ts': 'packages/chord/src/state.ts',
+  'packages/durable/src/session/observation.ts': 'packages/chord/src/watch.ts' };
+for (const row of rows) if (successors[row.upstream] && row.upstreamChange === 'removed') row.successor = successors[row.upstream];
 
 const count = predicate => rows.filter(predicate).length;
 const text = JSON.stringify({
   schemaVersion: 2, upstreamCommit: UPSTREAM_COMMIT, upstreamVersion: UPSTREAM_VERSION, previousCommit: PREVIOUS_COMMIT,
   previousVersion: PREVIOUS_VERSION, decision: 'docs/decisions/0005-pi-durable-experimental.md',
-  worklist: 'compatibility/durable-sync-1.2.0-worklist.json',
+  worklist: WORKLIST,
   statusMeaning: { planned: 'Not started.', 'in-progress': 'Being ported.',
     ported: 'Ported from the blob in blobSha1, with the listed upstream tests passing.',
     'needs-sync': 'Ported from an earlier upstream blob (portedBlobSha1); the pinned blob differs and the C# has not caught up yet.',
     'removed-upstream': 'Ported from the previous pin (blobSha1 is that blob); the pinned commit deleted the file. The C# stays until the sync retires or replaces it (successor names the file that took over, if any).',
-    'pisharp-only': 'Upstream deleted the file; PiSharp keeps its port of the previous pin (blobSha1) as a PiSharp-only feature by owner decision (decision 0005).',
+    'pisharp-only': 'Upstream deleted the file (removedIn names the release that did, when it is not the pinned one); PiSharp keeps its port of the last upstream blob (blobSha1) as a PiSharp-only feature by owner decision (decision 0005).',
     excluded: 'Out of scope per decision 0005.', skipped: 'Test not portable offline; the note gives the reason.' },
   upstreamChangeMeaning: { added: `New in v${UPSTREAM_VERSION}.`, modified: `Changed between v${PREVIOUS_VERSION} and v${UPSTREAM_VERSION} (previousBlobSha1, changedLines).`,
     renamed: `Moved in v${UPSTREAM_VERSION} (renamedFrom, previousBlobSha1, changedLines).`, removed: `Deleted in v${UPSTREAM_VERSION}; blobSha1 and lines are the v${PREVIOUS_VERSION} file.` },
@@ -161,7 +196,8 @@ if (args.includes('--check')) {
 } else writeFileSync(OUT, text);
 const statuses = {};
 for (const row of rows) statuses[row.status] = (statuses[row.status] ?? 0) + 1;
-console.log(`${rows.length} files; ${JSON.stringify(statuses)}; upstream ${JSON.stringify({ unchanged: count(row => !row.upstreamChange),
+console.log(`${rows.length} files; ${JSON.stringify(statuses)}; upstream ${JSON.stringify({ unchanged: count(row => !row.upstreamChange && !row.removedIn),
   modified: count(row => row.upstreamChange === 'modified'), renamed: count(row => row.upstreamChange === 'renamed'),
-  added: count(row => row.upstreamChange === 'added'), removed: count(row => row.upstreamChange === 'removed') })}; ${
+  added: count(row => row.upstreamChange === 'added'), removed: count(row => row.upstreamChange === 'removed'),
+  removedEarlier: count(row => row.removedIn) })}; ${
   rows.filter(row => ['planned', 'needs-sync'].includes(row.status)).reduce((sum, row) => sum + (row.changedLines ?? row.lines), 0)} lines to sync`);

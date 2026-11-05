@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/src/env/node.ts (the FileSystem half of NodeExecutionEnv: path
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/src/env/node.ts (the FileSystem half of NodeExecutionEnv: path
 // resolution, error mapping, the text-line, binary and directory readers, line scans, watches, temporary files and every file operation;
 // the watcher itself is LocalFileWatcher, node-watch.ts). The Shell half is LocalExecutionEnv in the durable tools project, which builds on
 // this class. NodeExecutionEnv has no `listFiles`; this class implements the optional method as pi-env's LocalExecutionEnv does, with its
@@ -313,7 +313,7 @@ public class LocalFileSystem : IFileSystem
         });
 
     /// <inheritdoc/>
-    public virtual async Task<Result<IFileWatcher, FileError>> WatchAsync(IReadOnlyList<WatchTarget> targets, Action<WatchChange> onChange,
+    public virtual async Task<Result<IFileWatcher, FileError>> WatchAsync(IReadOnlyList<WatchTarget> targets, Action<FileChange> onChange,
         DurableContext context)
     {
         ArgumentNullException.ThrowIfNull(targets);
@@ -324,7 +324,7 @@ public class LocalFileSystem : IFileSystem
             var watcher = await LocalFileWatcher.OpenAsync(targets, ResolvePath, onChange, watchOptions).ConfigureAwait(false);
             if (context.IsCancellationRequested)
             {
-                await watcher.CloseAsync(context).ConfigureAwait(false);
+                await watcher.StopAsync(context).ConfigureAwait(false);
                 return Aborted(null);
             }
             return watcher;
@@ -356,7 +356,7 @@ public class LocalFileSystem : IFileSystem
     }
 
     /// <inheritdoc/>
-    /// <remarks>The file system holds nothing between calls; <see cref="IFileWatcher"/>s are closed by their owners.</remarks>
+    /// <remarks>The file system holds nothing between calls; <see cref="IFileWatcher"/>s are stopped by their owners.</remarks>
     public virtual Task CleanupAsync(DurableContext context) => Task.CompletedTask;
 
     /// <summary>Resolves <paramref name="path"/> like upstream <c>resolvePath</c>: <c>~</c> and <c>~/</c> name the home directory, a

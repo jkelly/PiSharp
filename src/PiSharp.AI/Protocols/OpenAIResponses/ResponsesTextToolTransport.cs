@@ -5,6 +5,7 @@ using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using PiSharp.Contracts.Compatibility;
+using PiSharp.AI.Protocols.ProviderShared;
 using PiSharp.Contracts;
 
 namespace PiSharp.AI.Protocols.OpenAIResponses;
@@ -53,6 +54,8 @@ public sealed record ResponsesTextToolOptions(
 {
     /// <summary>Model compat <c>supportsOpenAIGrammarTools</c>: selects each custom tool call's grammar input property.</summary>
     public bool SupportsOpenAIGrammarTools { get; init; }
+    /// <summary>Pi 1.5.0 openai-responses.ts: the configuration_update effort, recorded on the output as <c>providerThinkingLevel</c>.</summary>
+    internal string? ProviderThinkingLevel { get; init; }
 }
 
 /// <summary>A bounded parsed-DTO adapter. Owns the returned source enumerator, never performs HTTP or executes tools.</summary>
@@ -168,8 +171,13 @@ public sealed class ResponsesTextToolTransport : IChatTransport
             ? $"{(request.Model.Provider == "openai" ? "OpenAI" : request.Model.Provider)} API error ({(int)status}): {failure.Message}" : failure.Message);
         return DisplayError(message);
     }
+    // Sign in with ChatGPT shares the subscription's usage limit with other apps; on ChatGPT Business plans the workspace admin also sets a
+    // per-user limit.
     private static string DisplayError(string message) => message.Contains("subscription_sharing_usage_limit_exceeded", StringComparison.Ordinal)
-        ? message + "\nCheck your ChatGPT usage: https://chatgpt.com/settings/usage" : message;
+        ? message + "\nCheck your ChatGPT usage: https://chatgpt.com/settings/usage"
+        : message.Contains("subscription_sharing_workplace_individual_usage_limit_exceeded", StringComparison.Ordinal)
+            ? message + "\nYou've reached your ChatGPT workspace's usage limit. Ask your workspace admin to increase it at admin.openai.com → Workspace → Usage limits."
+            : message;
 
     private static StreamProtocolException Protocol() => new("Invalid or unsupported Responses text/tool stream.");
     private static StreamLimitException Limit() => new("Responses text/tool stream exceeds configured limits.");
@@ -208,11 +216,12 @@ public sealed class ResponsesTextToolTransport : IChatTransport
 
     private sealed class Slot(int index, string kind, string itemId, string? callId = null, string? name = null)
     {
-        // constrained-sampling.ts GrammarToolInputJsonBuffer for custom_tool_call input.
+        // constrained-sampling.ts GrammarToolInputJsonBuffer for custom_tool_call input, and the JSON text of the item's initial
+        // input, sent with the first delta (openai-responses-shared.ts CustomInput.unsent).
         public string? CustomProperty;
-        public string CustomInput = "";
-        public string BufferInput = "";
+        public readonly StringBuilder CustomInput = new();
         public bool BufferStarted, BufferClosed;
+        public string Unsent = "";
         public readonly int Index = index;
         public readonly string Kind = kind;
         public readonly string ItemId = itemId;
@@ -253,8 +262,10 @@ public sealed class ResponsesTextToolTransport : IChatTransport
             _modelId = request.Model.Id;
             _request = request;
             _rates = rates;
+            // Pi 1.5.0 stream(): a managed reply records its configuration_update effort on the output before any request work.
+            if (options.ProviderThinkingLevel is { } level) _properties = _properties.Set("providerThinkingLevel", StringData(level));
             var message = new AssistantMessage(request.Model.Api, request.Model.Provider, request.Model.Id,
-                request.Timestamp, [], TokenUsage.Zero, StopReason.Pending);
+                request.Timestamp, [], TokenUsage.Zero, StopReason.Pending, options.ProviderThinkingLevel is null ? null : _properties);
             Start = new(message);
             _reducer = new(message, new(options.MaximumContentSlots, options.MaximumContentCharacters));
             _reducer.Apply(Start);
@@ -342,11 +353,11 @@ public sealed class ResponsesTextToolTransport : IChatTransport
                     break;
                 case "response.custom_tool_call_input.delta":
                     if (Active(value, "custom_tool_call") is not { } custom) break;
-                    CustomInput(custom, custom.CustomInput + String(value, "delta", allowEmpty: true), false, Emit);
+                    SendCustomInput(custom, AppendCustomInput(custom, String(value, "delta", allowEmpty: true)), Emit);
                     break;
                 case "response.custom_tool_call_input.done":
                     if (Active(value, "custom_tool_call") is not { } customDone) break;
-                    CustomInput(customDone, String(value, "input", allowEmpty: true), true, Emit);
+                    SendCustomInput(customDone, CloseCustomInput(customDone, String(value, "input", allowEmpty: true)), Emit);
                     break;
                 case "response.output_item.done":
                     var item = Object(value.GetProperty("item"));
@@ -388,26 +399,24 @@ public sealed class ResponsesTextToolTransport : IChatTransport
                     }
                     else if (slot.Kind == "custom_tool_call")
                     {
-                        CustomInput(slot, OptionalStringOrNull(item, "input") ?? slot.CustomInput, true, Emit);
+                        SendCustomInput(slot, CloseCustomInput(slot, OptionalStringOrNull(item, "input")), Emit);
                         var started = (ToolCallContent)_reducer.Snapshot().Content[slot.Index];
                         var customFields = started.ExtraProperties ?? JsonFields.Empty;
                         if (OptionalString(item, "namespace") is { } customNamespace) customFields = customFields.Set("namespace", StringData(customNamespace));
-                        var input = new JsonObject { [slot.CustomProperty!] = slot.CustomInput };
+                        var input = new JsonObject { [slot.CustomProperty!] = slot.CustomInput.ToString() };
                         Emit(new ToolCallEnded(slot.Index, new(started.Id, started.Name, JsonData.Parse(input.ToJsonString(SignatureJson)), customFields)));
                     }
                     else
                     {
+                        // openai-responses-shared.ts output_item.done: if (item.arguments) args.replace(item.arguments), then
+                        // Object.assign(block, args.finish()), so malformed arguments end as {} with argumentsError; then the namespace.
                         var raw = OptionalString(item, "arguments");
                         if (string.IsNullOrEmpty(raw)) raw = _reducer.GetToolJsonPreview(slot.Index);
-                        if (raw.Length == 0) raw = "{}";
-                        // openai-responses-shared.ts output_item.done: parseStreamingJson(item.arguments || partialJson || "{}").
-                        JsonData final;
-                        try { final = StreamingJson.Parse(raw); }
-                        catch (JsonException) { throw Protocol(); }
                         var original = (ToolCallContent)_reducer.Snapshot().Content[slot.Index];
-                        var fields = original.ExtraProperties ?? JsonFields.Empty;
-                        if (OptionalString(item, "namespace") is { } ns) fields = fields.Set("namespace", StringData(ns));
-                        Emit(new ToolCallEnded(slot.Index, new(original.Id, original.Name, final, fields)));
+                        var final = StreamingJson.ParseToolCallArguments(raw).AssignTo(new(original.Id, original.Name, JsonData.EmptyObject, original.ExtraProperties));
+                        if (OptionalString(item, "namespace") is { } ns)
+                            final = new(final.Id, final.Name, final.Arguments, (final.ExtraProperties ?? JsonFields.Empty).Set("namespace", StringData(ns)));
+                        Emit(new ToolCallEnded(slot.Index, final));
                     }
                     slot.Ended = true;
                     _slots.Remove(outputIndex);
@@ -457,7 +466,9 @@ public sealed class ResponsesTextToolTransport : IChatTransport
                     if (_stopReason == StopReason.Error)
                         _properties = _properties.Set("errorMessage", StringData(!string.IsNullOrEmpty(incompleteReason) ?
                             "Response incomplete: " + incompleteReason : "Response incomplete without a provider reason"));
-                    if (response.TryGetProperty("usage", out var usage)) _usage = Usage(Object(usage));
+                    // openai-responses-shared.ts: calculateCost runs on response.completed with or without usage, so a usage-less
+                    // completion still records its zero catalog cost (totalFromProvider false).
+                    _usage = response.TryGetProperty("usage", out var usage) ? Usage(Object(usage)) : _usage with { Cost = Binary64Cost(0, 0, 0, 0, 0) };
                     ApplyServiceTier(OptionalStringOrNull(response, "service_tier") ?? _options.ServiceTier);
                     foreach (var finished in _content.Where(s => s.Kind == "reasoning" && s.Ended && !s.ThinkingEnded))
                         EndThinking(finished, Emit);
@@ -547,7 +558,7 @@ public sealed class ResponsesTextToolTransport : IChatTransport
                 // Pi abe508 openai-responses-shared.ts: the input property of the declared grammar tool, else "input".
                 _grammarInputs ??= ResponsesGrammar.InputProperties(_request, _options.SupportsOpenAIGrammarTools, CancellationToken.None);
                 slot.CustomProperty = _grammarInputs.TryGetValue(slot.Name!, out var property) ? property : "input";
-                slot.CustomInput = OptionalStringOrNull(item, "input") ?? "";
+                slot.Unsent = AppendCustomInput(slot, OptionalStringOrNull(item, "input") ?? "") ?? "";
                 var fields = JsonFields.Empty;
                 if (OptionalString(item, "namespace") is { } ns) fields = fields.Set("namespace", StringData(ns));
                 emit(new ToolCallStarted(slot.Index, new(slot.CallId + "|" + itemId, slot.Name!, JsonData.EmptyObject, fields)));
@@ -557,24 +568,50 @@ public sealed class ResponsesTextToolTransport : IChatTransport
             return slot;
         }
 
-        // constrained-sampling.ts appendGrammarToolInputJsonDelta: stream the raw input as the JSON text {"<property>":"<input>"}.
-        private static void CustomInput(Slot slot, string next, bool close, Action<StreamEvent> emit)
+        // constrained-sampling.ts appendGrammarToolInputJsonDelta: append the new piece of input and return its piece of the JSON text
+        // {"<property>":"<input>"}, null for an empty piece. Costs time linear in the piece.
+        private static string? AppendCustomInput(Slot slot, string inputDelta)
         {
+            if (slot.BufferClosed) throw Protocol();
+            if (inputDelta.Length == 0) return null;
+            slot.CustomInput.Append(inputDelta);
+            return CustomJsonStart(slot) + Quoted(inputDelta)[1..^1];
+        }
+
+        // constrained-sampling.ts closeGrammarToolInputJson: close the input and return the rest of the JSON text. A final input the
+        // provider sends must continue the streamed one; closing again with the same input returns null.
+        private static string? CloseCustomInput(Slot slot, string? finalInput)
+        {
+            var streamed = slot.CustomInput;
+            var continues = finalInput is not null && finalInput.Length >= streamed.Length && streamed.Equals(finalInput.AsSpan(0, streamed.Length));
             if (slot.BufferClosed)
             {
-                if (close && next == slot.BufferInput) return;
+                if (finalInput is null || continues && finalInput.Length == streamed.Length) return null;
                 throw Protocol();
             }
-            if (!next.StartsWith(slot.BufferInput, StringComparison.Ordinal)) throw Protocol();
-            var inputDelta = next[slot.BufferInput.Length..];
-            slot.CustomInput = next;
-            if (!close && inputDelta.Length == 0) return;
-            var delta = new StringBuilder();
-            if (!slot.BufferStarted) { delta.Append('{').Append(Quoted(slot.CustomProperty!)).Append(":\""); slot.BufferStarted = true; }
-            delta.Append(Quoted(inputDelta)[1..^1]);
-            slot.BufferInput = next;
-            if (close) { delta.Append("\"}"); slot.BufferClosed = true; }
-            emit(new ToolCallDelta(slot.Index, delta.ToString()));
+            if (finalInput is not null && !continues) throw Protocol();
+            var rest = finalInput is null ? "" : finalInput[streamed.Length..];
+            streamed.Append(rest);
+            slot.BufferClosed = true;
+            return CustomJsonStart(slot) + Quoted(rest)[1..^1] + "\"}";
+        }
+
+        private static string CustomJsonStart(Slot slot)
+        {
+            if (slot.BufferStarted) return "";
+            slot.BufferStarted = true;
+            return "{" + Quoted(slot.CustomProperty!) + ":\"";
+        }
+
+        // openai-responses-shared.ts sendCustomInput: the item's initial input goes out with the first piece.
+        private static void SendCustomInput(Slot slot, string? jsonDelta, Action<StreamEvent> emit)
+        {
+            if (slot.Unsent.Length != 0)
+            {
+                jsonDelta = slot.Unsent + jsonDelta;
+                slot.Unsent = "";
+            }
+            if (jsonDelta is not null) emit(new ToolCallDelta(slot.Index, jsonDelta));
         }
 
         // getSlot(event.output_index, type): the open slot of that output_index when it has the type, matched by index alone
@@ -671,7 +708,7 @@ public sealed class ResponsesTextToolTransport : IChatTransport
             var data = JsonData.Parse(Contracts.Compatibility.EcmaScriptJsonProjection.Project(JsonSerializer.Serialize(new { input, output, cacheRead = read, cacheWrite = write, total })));
             var value = data.Value;
             return new(value.GetProperty("input").GetDecimal(), value.GetProperty("output").GetDecimal(), value.GetProperty("cacheRead").GetDecimal(),
-                value.GetProperty("cacheWrite").GetDecimal(), value.GetProperty("total").GetDecimal(), SourceBinary64Cost: data);
+                value.GetProperty("cacheWrite").GetDecimal(), value.GetProperty("total").GetDecimal(), ProviderCost.TotalFromProvider(false), data);
         }
 
         private void CheckJson(JsonElement value, int depth)

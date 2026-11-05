@@ -266,7 +266,7 @@ internal sealed class PlanScopedEnv(IExecutionEnv inner, string root) : IExecuti
     public Task<Result<Unit, FileError>> RemoveAsync(string path, RemoveOptions? options, DurableContext context) =>
         Checked(path, context, () => inner.RemoveAsync(path, options, context));
 
-    public Task<Result<IFileWatcher, FileError>> WatchAsync(IReadOnlyList<WatchTarget> targets, Action<WatchChange> onChange, DurableContext context) =>
+    public Task<Result<IFileWatcher, FileError>> WatchAsync(IReadOnlyList<WatchTarget> targets, Action<FileChange> onChange, DurableContext context) =>
         Refused<IFileWatcher>("watch files", null);
     public Task<Result<string, FileError>> CreateTempDirAsync(string? prefix, DurableContext context) => Refused<string>("create temporary directories", null);
     public Task<Result<string, FileError>> CreateTempFileAsync(TempFileOptions? options, DurableContext context) => Refused<string>("create temporary files", null);

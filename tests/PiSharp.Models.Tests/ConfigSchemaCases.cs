@@ -27,11 +27,11 @@ internal static partial class Program
 
     private static void SchemasEmbedded()
     {
-        // git ls-tree v1.2.0 packages/coding-agent/schemas
+        // git ls-tree v1.5.0 packages/coding-agent/schemas (keybindings and theme unchanged since v1.2.0)
         var blobs = new Dictionary<string, string>
         {
-            [PiConfigurationSchemas.ModelsFileName] = "40e27fa3ebee59118b0db6373435479d5fc1baeb",
-            [PiConfigurationSchemas.SettingsFileName] = "81cfc5fb198d0e1bb7dd3fd782dd9553c023f97d",
+            [PiConfigurationSchemas.ModelsFileName] = "c51a82c358ef1d92d4b2a2481be1e9d37258057e", // v1.5.0
+            [PiConfigurationSchemas.SettingsFileName] = "c331ae27a714e2fca19f9bb7b95f67f7f2f6e367", // v1.5.0
             [PiConfigurationSchemas.KeybindingsFileName] = "aa3b3e9be501475ce465855ee676abe32b8b9c2e",
             [PiConfigurationSchemas.ThemeFileName] = "95350a58db931d116d982d3212dbfd2c5c946760",
         };

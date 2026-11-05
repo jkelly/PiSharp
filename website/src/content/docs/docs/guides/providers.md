@@ -43,7 +43,7 @@ Some providers need more than a key:
 | `google-vertex` | Google Vertex AI | `google-vertex` | `GOOGLE_CLOUD_API_KEY`, or Application Default Credentials | |
 | `groq` | Groq | `openai-completions` | `GROQ_API_KEY` | |
 | `huggingface` | Hugging Face | `openai-completions` | `HF_TOKEN` | |
-| `kimi-coding` | Kimi For Coding | `anthropic-messages` | `KIMI_API_KEY` | Kimi Code (subscription) |
+| `kimi-coding` | Kimi For Coding | `openai-completions` | `KIMI_API_KEY` | Kimi Code (subscription) |
 | `meta` | Meta | `openai-responses` | `META_API_KEY` | Meta (Muse subscription) |
 | `minimax` | MiniMax | `anthropic-messages` | `MINIMAX_API_KEY` | |
 | `minimax-cn` | MiniMax CN | `anthropic-messages` | `MINIMAX_CN_API_KEY` | |
@@ -54,7 +54,7 @@ Some providers need more than a key:
 | `openai` | OpenAI | `openai-responses`, `openai-decisions` | `OPENAI_API_KEY` | OpenAI (ChatGPT subscription) |
 | `openai-codex` | OpenAI Codex (legacy) | `openai-codex-responses` | none | OpenAI (ChatGPT Plus/Pro), the only method |
 | `opencode` | OpenCode Zen | `anthropic-messages`, `google-generative-ai`, `openai-completions`, `openai-responses`, `typesafe-system-one` | `OPENCODE_API_KEY` | |
-| `opencode-go` | OpenCode Go | `anthropic-messages`, `openai-completions`, `openai-responses` | `OPENCODE_API_KEY` | |
+| `opencode-go` | OpenCode Go | `anthropic-messages`, `google-generative-ai`, `openai-completions`, `openai-responses` | `OPENCODE_API_KEY` | |
 | `openrouter` | OpenRouter | `anthropic-messages`, `openai-completions`, `openrouter-images`, `typesafe-system-one` | `OPENROUTER_API_KEY` | OpenRouter OAuth |
 | `qwen-token-plan` | Qwen Token Plan | `openai-completions` | `QWEN_TOKEN_PLAN_API_KEY` | |
 | `qwen-token-plan-cn` | Qwen Token Plan CN | `openai-completions` | `QWEN_TOKEN_PLAN_CN_API_KEY` | |
@@ -79,7 +79,7 @@ Each model names the API it speaks. These are the chat APIs, all ported from Pi:
 
 | API | Used by |
 | --- | --- |
-| `anthropic-messages` | Anthropic's Messages API, and providers that offer it, such as MiniMax, Kimi and GitHub Copilot. |
+| `anthropic-messages` | Anthropic's Messages API, and providers that offer it, such as MiniMax and GitHub Copilot. |
 | `openai-completions` | OpenAI Chat Completions and the many compatible endpoints. |
 | `openai-responses` | OpenAI's Responses API, also used by xAI, Meta and gateways. |
 | `azure-openai-responses` | The Responses API on Azure OpenAI. |
@@ -107,11 +107,22 @@ With an OpenRouter key or sign-in, the refresh also asks OpenRouter which chat m
 
 ## Your own endpoints and models
 
-`~/.pi/agent/models.json` adds providers and models, or overrides built-in ones, in Pi's format. A `baseUrl` there also works for built-in providers, for example to send Anthropic requests through a proxy. Add `"$schema": "https://pi.dev/schemas/models.schema.json"` so your editor can check the file.
+`~/.pi/agent/models.json` adds providers and models, or overrides built-in ones, in Pi's format. A `baseUrl` there also works for built-in providers, for example to send Anthropic requests through a proxy. Add `"$schema": "https://pi.dev/schemas/models.schema.json"` so your editor can check the file. [Configuration](/docs/reference/configuration/#modelsjson-fields) links the field reference.
+
+As in Pi 1.5.0, `kimi-coding` speaks Chat Completions at `https://api.kimi.com/coding/v1`. A `baseUrl` override for it must now end in `/v1`. An override written for the old Anthropic endpoint, `https://api.kimi.com/coding`, is not rewritten for you.
 
 ## Classifier and image models
 
 Pi's classifier APIs (OpenAI decisions, TypeSafe and Cloudflare system-one, llama.cpp) and OpenRouter image generation work. Codemode scripts reach them through `models.classify()` and `models.generateImages()`, and extensions through `ctx.modelRegistry`. TypeScript and C# extensions can register their own classifier and image providers. See [Code mode](/docs/guides/codemode/#models-from-scripts).
+
+System One classifiers whose model lists `image` input take images, as in Pi 1.5.0. Each service takes them in its own form:
+
+- TypeSafe's own API takes PNG and JPEG images as assets, with the `TypeSafe-Danger-Zone-Images: true` opt-in header.
+- Clef on Cloudflare Workers AI takes at most four PNG, JPEG or WebP images.
+- TypeSafe's models on Workers AI take PNG and JPEG assets, without the header.
+- OpenRouter takes the images in front of the state.
+
+A classifier without image input still refuses images. The form comes from the model's `compat`, or is detected from the provider, base URL and model id. See [`models.json` fields](/docs/reference/configuration/#modelsjson-fields).
 
 ## Service tiers
 
@@ -132,7 +143,9 @@ The WebSocket connection gets 15 seconds to open. PiSharp doesn't read Pi's `web
 
 ## Differences from Pi
 
-- Requests to Anthropic, Azure, Bedrock, Mistral and OpenAI-compatible endpoints carry a `PiSharp` user agent instead of the SDK's.
+- Chat requests carry Pi's detailed user agent, `pi/1.5.0 (<platform>; dotnet/<version>; <arch>)`, with the runtime naming .NET where Pi names Node. Bedrock sends `pi/1.5.0` as the whole user agent, since PiSharp has no AWS SDK user agent to append it to.
+- PiSharp sends no attribution headers. Pi attributes OpenRouter, NVIDIA NIM and OpenCode requests to pi (`https://pi.dev`) while install telemetry is on; PiSharp never does. OpenCode requests with a session carry `x-opencode-client: pisharp`, where Pi sends `x-opencode-client: pi` only while attribution is on.
 - PiSharp's zstd frames are valid zstd but not byte for byte what Node's zstd writes.
+- Classifier calls use the built-in catalog entries. A `baseUrl` or provider `compat` for them in `models.json` doesn't reach them yet.
 
 The [Parity](/parity/) page lists the smaller differences.

@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/test/types.test.ts, its third test ("types submissions, task waits,
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/test/types.test.ts, its third test ("types submissions, task waits,
 // compaction, and tasks erased into extensions"); TypesCases.cs has the other two. Upstream's test is compile-time only (expectTypeOf and
 // @ts-expect-error); so is most of this one: TypedWaits below is compiled, never run, and pins the C# types of the same calls. What C# can
 // check at run time, it checks: the two submission shapes, and that the shapes upstream rejects at compile time cannot be built here either

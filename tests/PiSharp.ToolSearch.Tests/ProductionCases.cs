@@ -13,7 +13,8 @@ using PiSharp.Extensions.Mcp.Runtime;
 // and fake MCP servers. Upstream: extensions/mcp/index.ts (`deferred` servers connect in the background, ensureDiscoveryActive
 // activates tool_search or warns, renderServersSection), extensions/tool-search (the tool), core/agent-session.ts
 // (_isAllowedTool/_isActivatable: --tools/--exclude-tools keep tool_search out, which leaves deferred tools unreachable) and
-// core/sdk.ts (a CLI session applies its initial selection instead of restoring the transcript's).
+// core/sdk.ts with agent-session.ts _restoreToolsFromTranscript (Pi 1.5.0: a CLI session with the default tools restores the
+// transcript's loadout).
 internal static partial class Program
 {
     private sealed record Seen(string Url, string? Body);
@@ -245,9 +246,10 @@ internal static partial class Program
     });
 
 
-    // A CLI session reopened from its file applies the initial selection (core/sdk.ts initialActiveToolNames), as upstream:
-    // tool_search is active again, the tool it loaded is not declared until it is loaded again.
-    private static Task CliReopenAppliesInitialSelection() => WithRoot("reopen", DeferredDocs, async (root, fixture) =>
+    // A CLI session with the default tools reopened from its file restores the loadout its transcript records (Pi 1.5.0
+    // agent-session.ts _restoreToolsFromTranscript, sdk.ts usesDefaultTools): tool_search and the tool it loaded are declared
+    // again once the deferred server registers its tools, without searching again.
+    private static Task CliReopenRestoresLoadedTool() => WithRoot("reopen", DeferredDocs, async (root, fixture) =>
     {
         var first = new Endpoint(() => Call("toolu_search", "tool_search", new { query = "documentation", limit = 1 }), () => Text("loaded"));
         await using (var rpc = new Rpc(Args(root, "new-lazy"), first, fixture.Host()))
@@ -258,17 +260,17 @@ internal static partial class Program
         }
         Names([LoadedSearch], ToolResults(first.Snapshot()[1]), "loaded before reopening");
         fixture.Connected = new(TaskCreationOptions.RunContinuationsAsynchronously);
-        var second = new Endpoint(() => Call("toolu_again", "tool_search", new { query = "documentation", limit = 1 }), () => Text("again"));
+        var second = new Endpoint(() => Text("again"));
         await using (var rpc = new Rpc(Args(root, "open"), second, fixture.Host()))
         {
             await Connected(fixture, rpc);
-            await rpc.Prompt("p2", "load docs again");
+            await rpc.Prompt("p2", "use the docs");
             Equal(0, await rpc.Finish(), "reopen exit code; " + rpc.Error);
         }
         var requests = second.Snapshot();
-        Check(ToolNames(requests[0]).Contains("tool_search") && !ToolNames(requests[0]).Contains("mcp__docs__search"), "initial selection after reopening: " + string.Join(",", ToolNames(requests[0])));
-        Names([LoadedSearch], ToolResults(requests[1]), "loaded again");
-        Check(ToolNames(requests[1]).Contains("mcp__docs__search"), "declared after loading again");
+        Equal(1, requests.Length, "one request after reopening");
+        Check(ToolNames(requests[0]).Contains("tool_search") && ToolNames(requests[0]).Contains("mcp__docs__search"),
+            "loaded tool restored after reopening: " + string.Join(",", ToolNames(requests[0])));
     });
 
     // _isAllowedTool/_isActivatable: --tools without tool_search, or --exclude-tools tool_search, keeps tool_search out; the deferred

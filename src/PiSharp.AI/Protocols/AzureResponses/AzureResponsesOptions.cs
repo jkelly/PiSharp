@@ -32,6 +32,10 @@ public sealed record AzureResponsesOptions(JsonData ModelMetadata, ResponsesTran
     public int MaximumErrorBodyBytes { get; init; } = 65_536;
     public ResponsesHttpSseOptions HttpOptions { get; init; } = new();
     public ResponsesTextToolOptions StreamOptions { get; init; } = new();
+    /// <summary>Source StreamOptions.identity (Pi 1.5.0 identity.ts): the user-agent and attribution headers, below the model and
+    /// request headers. Null: a detailed user-agent and no attribution.</summary>
+    [System.Diagnostics.CodeAnalysis.Experimental("PISHARP_IDENTITY001")]
+    public ClientIdentity? Identity { get; init; }
     public override string ToString() => nameof(AzureResponsesOptions);
 }
 public sealed record AzureResponsesHooks(

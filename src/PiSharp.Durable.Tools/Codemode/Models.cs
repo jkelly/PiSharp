@@ -1,11 +1,13 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/src/codemode/models.ts.
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/src/codemode/models.ts.
 // - pi-ai's Models (api.models) is IDurableModels' catalog, classifier and image members (GetModelsOfType, GetAvailableOfTypeAsync,
 //   GetModelOfType, ClassifyAsync, GenerateImagesAsync); models, contexts and results are pi-ai wire JSON. A host whose IDurableModels
 //   keeps the members' defaults has no classifier or image models: the catalog lists none, so scripts get upstream's "Unknown ... model"
 //   errors.
 // - A script's argument list is JSON: an `undefined` the script passed is absent (a C# null) at the end of the list and JSON null inside it,
 //   as the sandbox's JSON round trip leaves it. `typeof`, `Array.isArray` and the record check read the JSON kind.
-// - `Type.Object({ model: Type.Unknown(), context: Type.Unknown() })` and `Type.Unknown()` are the JSON TypeBox prints for them.
+// - Pi v1.5.0 sync (area tools-schema): `obj({ model: unknown(), context: unknown() }, { open: true })` and `unknown()` are the JSON
+//   pi-schema builds for them (the same JSON Schema as v1.2.0's TypeBox, `required` after `properties`).
+// - Pi v1.5.0 sync (area telemetry, 2ec55d808): classify and generateImages pass the tool call's span as their telemetry parent.
 using System.Collections.Immutable;
 using System.Text.RegularExpressions;
 using PiSharp.Durable.Chord;
@@ -207,9 +209,10 @@ internal static partial class CodemodeModels
             : $"Unknown {type} model \"{provider.Value}/{id.Value}\". {listHint}");
     }
 
-    /// <summary><c>Type.Object({ model: Type.Unknown(), context: Type.Unknown() })</c>, as TypeBox prints it.</summary>
+    /// <summary><c>obj({ model: unknown(), context: unknown() }, { open: true })</c>, as pi-schema builds it; the structured output schema is
+    /// <c>unknown()</c>, <c>{}</c>.</summary>
     private static readonly JsonObjectValue ModelCallParameters =
-        (JsonObjectValue)JsonValue.Parse("""{"type":"object","required":["model","context"],"properties":{"model":{},"context":{}}}""");
+        (JsonObjectValue)JsonValue.Parse("""{"type":"object","properties":{"model":{},"context":{}},"required":["model","context"]}""");
 
     /// <summary>The result of a model call as the tool returns it: the whole result for the script, usage counted by the Harness.</summary>
     private static ToolExecutionResult ModelResult(string label, JsonObjectValue result)
@@ -245,7 +248,8 @@ internal static partial class CodemodeModels
                 var args = (JsonObjectValue)arguments;
                 var model = ResolveModel("models.classify", "classifier", Get(args, "model"), api.Models);
                 var checkedContext = CheckClassifierContext(Get(args, "context"));
-                var result = await api.Models.ClassifyAsync(model, checkedContext, context.CancellationToken).ConfigureAwait(false);
+                var result = await api.Models.ClassifyAsync(model, checkedContext, new DurableRequestOptions { Telemetry = context.Telemetry },
+                    context.CancellationToken).ConfigureAwait(false);
                 return ModelResult(Label("classify", model), result);
             },
         }),
@@ -261,7 +265,8 @@ internal static partial class CodemodeModels
                 var args = (JsonObjectValue)arguments;
                 var model = ResolveModel("models.generateImages", "image", Get(args, "model"), api.Models);
                 var checkedContext = CheckImagesContext(Get(args, "context"));
-                var result = await api.Models.GenerateImagesAsync(model, checkedContext, context.CancellationToken).ConfigureAwait(false);
+                var result = await api.Models.GenerateImagesAsync(model, checkedContext, new DurableRequestOptions { Telemetry = context.Telemetry },
+                    context.CancellationToken).ConfigureAwait(false);
                 return ModelResult(Label("generateImages", model), result);
             },
         }),

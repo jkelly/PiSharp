@@ -166,20 +166,25 @@ static class AnthropicMessagesTests
     {
         var empty = Terminal(await Collect([Start, ToolStart, BlockStop(99), End, Stop]));
         Assert(empty is StreamDone, "Empty source scratch failed."); Equal("{}", ((ToolCallContent)empty.Message.Content[0]).Arguments.ToString());
-        // Pi abe508 anthropic-messages.ts:803 finalizes with parseStreamingJson (json-parse.ts:104-124: JSON.parse, repairJson,
-        // partial-json, then {}), so malformed, duplicate and non-object arguments complete the turn. Expected values are the installed
-        // pi-ai 1.1.0 parseStreamingJson results; a lone surrogate is kept, as its JSON.stringify escape (see JsonUtf16).
-        foreach (var (raw, expected) in new[]
+        // Pi f9a26365 anthropic-messages.ts content_block_stop: Object.assign(block, arguments.finish()), json-parse.ts
+        // parseToolCallArguments: one JSON.parse of the complete text, then of its repairJson when that changed it. Malformed and
+        // non-object arguments still complete the turn, as {} with an argumentsError; duplicates keep the last value and a lone
+        // surrogate is kept, as its JSON.stringify escape (see JsonUtf16). Authored from that source, with V8's JSON.parse messages.
+        foreach (var (raw, expected, error) in new (string, string, string?)[]
         {
-            ("{\"secret\":\"unfinished", "{\"secret\":\"unfinished\"}"), ("{\"n\":1,\"n\":2}", "{\"n\":2}"), ("[]", "[]"), ("null", "null"),
-            ("{\"n\":1,}", "{\"n\":1}"), ("{\"x\":\"\\uD800\"}", "{\"x\":\"\\ud800\"}"), ("{\"x\":\"C:\\q\"}", "{\"x\":\"C:\\\\q\"}")
+            ("{\"secret\":\"unfinished", "{}", "Unterminated string in JSON at position 21 (line 1 column 22)"), ("{\"n\":1,\"n\":2}", "{\"n\":2}", null),
+            ("[]", "{}", "Tool arguments must be a JSON object"), ("null", "{}", "Tool arguments must be a JSON object"),
+            ("{\"n\":1,}", "{}", "Expected double-quoted property name in JSON at position 7 (line 1 column 8)"),
+            ("{\"x\":\"\\uD800\"}", "{\"x\":\"\\ud800\"}", null), ("{\"x\":\"C:\\q\"}", "{\"x\":\"C:\\\\q\"}", null)
         })
         {
             var events = await Collect([Start, ToolStart, Delta(99, "input_json_delta", raw), BlockStop(99), End, Stop]);
-            var end = Terminal(events); Assert(end is StreamDone, "parseStreamingJson final failed the turn: " + raw);
+            var end = Terminal(events); Assert(end is StreamDone, "Final arguments failed the turn: " + raw);
             Equal(1, events.OfType<ToolCallEnded>().Count());
-            Assert(JsonUtf16.DeepEquals(JsonData.Parse(expected).Value, ((ToolCallContent)end.Message.Content[0]).Arguments.Value),
-                "Final arguments differ from parseStreamingJson: " + raw);
+            var call = (ToolCallContent)end.Message.Content[0];
+            Assert(JsonUtf16.DeepEquals(JsonData.Parse(expected).Value, call.Arguments.Value), "Final arguments differ from parseToolCallArguments: " + raw);
+            var actualError = call.ExtraProperties is { } fields && fields.TryGet("argumentsError", out var value) ? value!.Value.GetString() : null;
+            Equal(error is null ? null : error + "\n\nReceived arguments:\n" + raw, actualError);
         }
         var complete = Terminal(await Collect([Start, ToolStart, Delta(99, "input_json_delta", "{\"x\":null,\"u\":\"\\u03C0\\uD83D\\uDE00\"}"), BlockStop(99), End, Stop]));
         Assert(complete is StreamDone, "Complete Unicode object rejected.");

@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/src/utils/shell.ts (getShellConfig, getShellEnv)
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/coding-agent/src/utils/shell.ts (getShellConfig, getShellEnv)
 // and utils/paths.ts (normalizePath for the shellPath setting).
 using System.Collections.Immutable;
 using System.Text.RegularExpressions;
@@ -20,7 +20,9 @@ public sealed record ShellConfiguration(string Shell, ImmutableArray<string> Arg
 /// <summary>Source getShellConfig failures ("Custom shell path not found", "No bash shell found").</summary>
 public sealed class ShellDiscoveryException(string message) : Exception(message);
 
-/// <summary>Host facts shell discovery reads. <see cref="Current"/> is the running process; tests supply their own.</summary>
+/// <summary>Host facts shell discovery reads. <see cref="Current"/> is the running process; tests supply their own. Its
+/// <see cref="FileExists"/> is <see cref="File.Exists"/>, which reads attributes without following reparse points, so a Microsoft Store
+/// app execution alias counts as present, as source shellPathExists (access F_OK) has it.</summary>
 public sealed record ShellHost(bool IsWindows, Func<string, string?> GetEnvironmentVariable, Func<string, bool> FileExists,
     string HomeDirectory)
 {
@@ -37,11 +39,44 @@ public static class ShellDiscovery
 {
     private static readonly Regex LegacyWsl = new(@"^[a-z]:\\windows\\(?:system32|sysnative)\\bash\.exe$", RegexOptions.CultureInvariant);
 
-    /// <summary>Source isLegacyWslBashPath: the inbox WSL launcher, which receives the command over standard input.</summary>
-    public static bool IsLegacyWslBashPath(string path) => LegacyWsl.IsMatch(path.Replace('/', '\\').ToLowerInvariant());
+    /// <summary>Source isLegacyWslBashPath: the inbox WSL launcher, which receives the command over standard input. It is
+    /// <c>System32\bash.exe</c> or <c>Sysnative\bash.exe</c> under <c>%SystemRoot%</c>; only when SystemRoot is unset, under
+    /// <c>&lt;drive&gt;:\Windows</c>. A SystemRoot that is not a drive path matches nothing.</summary>
+    public static bool IsLegacyWslBashPath(string path, ShellHost? host = null)
+    {
+        ArgumentNullException.ThrowIfNull(path);
+        host ??= ShellHost.Current;
+        var normalized = Win32Normalize(path).ToLowerInvariant();
+        if (host.GetEnvironmentVariable("SystemRoot") is { Length: > 0 } systemRoot)
+        {
+            if (!Regex.IsMatch(systemRoot, @"^[a-z]:[\\/]", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)) return false;
+            return new[] { "System32", "Sysnative" }.Any(directory =>
+                normalized == Win32Normalize(systemRoot + "\\" + directory + "\\bash.exe").ToLowerInvariant());
+        }
+        return LegacyWsl.IsMatch(normalized);
+    }
+
+    /// <summary>Node <c>path.win32.normalize</c>: <c>\</c> separators, repeated ones collapsed, <c>.</c> and <c>..</c> resolved.</summary>
+    private static string Win32Normalize(string path)
+    {
+        var text = path.Replace('/', '\\');
+        var root = text.Length >= 2 && text[1] == ':' ? text[..2] : "";
+        var rest = text[root.Length..];
+        var absolute = rest.StartsWith('\\');
+        var parts = new List<string>();
+        foreach (var part in rest.Split('\\', StringSplitOptions.RemoveEmptyEntries))
+        {
+            if (part == ".") continue;
+            if (part == ".." && parts.Count > 0 && parts[^1] != "..") parts.RemoveAt(parts.Count - 1);
+            else if (part != ".." || !absolute) parts.Add(part);
+        }
+        var joined = string.Join('\\', parts);
+        if (joined.Length > 0 && rest.EndsWith('\\')) joined += "\\";
+        return root + (absolute ? "\\" : "") + (joined.Length > 0 || absolute ? joined : ".");
+    }
 
     /// <summary>Source getBashShellConfig: <c>-s</c> over standard input for legacy WSL bash, otherwise <c>-c</c>.</summary>
-    public static ShellConfiguration ForBash(string shell) => IsLegacyWslBashPath(shell)
+    public static ShellConfiguration ForBash(string shell, ShellHost? host = null) => IsLegacyWslBashPath(shell, host)
         ? new(shell, ["-s"], ShellCommandTransport.Stdin) : new(shell, ["-c"]);
 
     /// <summary>
@@ -53,7 +88,7 @@ public static class ShellDiscovery
         host ??= ShellHost.Current;
         if (!string.IsNullOrEmpty(customShellPath))
         {
-            if (host.FileExists(customShellPath) || host.DirectoryExists?.Invoke(customShellPath) == true) return ForBash(customShellPath);
+            if (host.FileExists(customShellPath) || host.DirectoryExists?.Invoke(customShellPath) == true) return ForBash(customShellPath, host);
             throw new ShellDiscoveryException($"Custom shell path not found: {customShellPath}");
         }
         if (host.IsWindows)
@@ -61,16 +96,16 @@ public static class ShellDiscovery
             var paths = new List<string>();
             if (host.GetEnvironmentVariable("ProgramFiles") is { Length: > 0 } programFiles) paths.Add($"{programFiles}\\Git\\bin\\bash.exe");
             if (host.GetEnvironmentVariable("ProgramFiles(x86)") is { Length: > 0 } programFilesX86) paths.Add($"{programFilesX86}\\Git\\bin\\bash.exe");
-            foreach (var path in paths) if (host.FileExists(path)) return ForBash(path);
-            if (FindExecutableOnPath("bash.exe", host) is { } onPath) return ForBash(onPath);
+            foreach (var path in paths) if (host.FileExists(path)) return ForBash(path, host);
+            if (FindExecutableOnPath("bash.exe", host) is { } onPath) return ForBash(onPath, host);
             throw new ShellDiscoveryException("No bash shell found. Options:\n" +
                 "  1. Install Git for Windows: https://git-scm.com/download/win\n" +
                 "  2. Add your bash to PATH (Cygwin, MSYS2, etc.)\n" +
                 "  3. Set shellPath in settings.json\n\n" +
                 "Searched Git Bash in:\n" + string.Join("\n", paths.Select(path => "  " + path)));
         }
-        if (host.FileExists("/bin/bash")) return ForBash("/bin/bash");
-        if (FindExecutableOnPath("bash", host) is { } bash) return ForBash(bash);
+        if (host.FileExists("/bin/bash")) return ForBash("/bin/bash", host);
+        if (FindExecutableOnPath("bash", host) is { } bash) return ForBash(bash, host);
         // Source { shell: "sh" } relies on spawn's PATH lookup; native launches need the absolute file.
         return new(FindExecutableOnPath("sh", host) ?? "/bin/sh", ["-c"]);
     }

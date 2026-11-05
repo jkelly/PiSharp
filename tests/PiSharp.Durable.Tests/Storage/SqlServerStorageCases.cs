@@ -4,10 +4,13 @@
 // database when the run ends.
 // - storage.mssql.conformance.* and storage.mssql.reopen.conformance.* run the storage conformance kit directly and through a storage that
 //   closes and reopens the store after every commit, as the SQLite groups do.
-// - session.mssql.*, harness.tasks.mssql.*, harness.events.mssql.*, harness.ownership.mssql.* and harness.tools-recovery.mssql.* rerun
-//   those storage-agnostic suites on a fresh store per case; the ownership and recovery suites also reopen the same store.
+// - session.mssql.*, harness.tasks.mssql.*, agent-events.mssql.*, harness.ownership.mssql.* and harness.tools-recovery.mssql.* rerun
+//   those storage-agnostic suites on a fresh store per case; the ownership and recovery suites also reopen the same store. agent-events.*
+//   (AgentEventsCases.cs) was harness.events.* until the Pi v1.5.0 sync (area events) moved the event projection to PiSharp.Durable.Hosting.
 // - storage.mssql.* cover what is particular to the backend: persistence across reopen, rollback of a statement failure inside a commit,
 //   corrupt rows, the store lock, store and schema isolation, deletion, schema versions, and records that SQL Server's JSON functions refuse.
+//   Schema version 2 (Pi v1.5.0 sync, area sqlite) adds the sleeping task status, as the SQLite schema's version 2 does; the migration case
+//   builds a version 1 schema with migration 1 alone and opens storage on it.
 using Microsoft.Data.SqlClient;
 using PiSharp.Durable;
 using PiSharp.Durable.Chord;
@@ -58,7 +61,7 @@ internal static partial class Program
             var storage = await MssqlServer.OpenAsync(store);
             Equal(Ids.SeqFromNumber(1), await CreateMssqlRoot(storage), "root sequence");
             var entryId = await storage.MintIdAsync<EntryId>();
-            Equal(Ids.SeqFromNumber(2), await storage.CommitAsync([new EntryWrite(MssqlEntry(entryId))], MssqlContext), "entry sequence");
+            Equal(Ids.SeqFromNumber(2), await storage.CommitWritesAsync([new EntryWrite(MssqlEntry(entryId))], MssqlContext), "entry sequence");
             await storage.CloseAsync(MssqlContext);
 
             var reopened = await MssqlServer.OpenAsync(store);
@@ -67,7 +70,7 @@ internal static partial class Program
                 Equal<CommittedEntry?>(new CommittedEntry(MssqlEntry(entryId), Ids.SeqFromNumber(2)), await reopened.GetEntryAsync(entryId, MssqlContext),
                     "entry after reopen");
                 Equal(entryId.Value + 1, (await reopened.MintIdAsync<EntryId>()).Value, "minted ID after reopen");
-                Equal(Ids.SeqFromNumber(3), await reopened.CommitAsync([new TaskWrite(PendingMssqlTask(await reopened.MintIdAsync<TaskId>()))], MssqlContext),
+                Equal(Ids.SeqFromNumber(3), await reopened.CommitWritesAsync([new TaskWrite(PendingMssqlTask(await reopened.MintIdAsync<TaskId>()))], MssqlContext),
                     "task sequence");
             }
             finally
@@ -90,13 +93,13 @@ internal static partial class Program
                 await MssqlServer.ExecAsync($"CREATE TRIGGER {quoted}.fail_task_insert ON {quoted}.durable_tasks AFTER INSERT AS THROW 50000, N'{message}', 1;");
                 var transientId = await storage.MintIdAsync<EntryId>();
                 var transientTaskId = await storage.MintIdAsync<TaskId>();
-                var error = await ThrowsAsync<SqlException>(() => storage.CommitAsync(
+                var error = await ThrowsAsync<SqlException>(() => storage.CommitWritesAsync(
                     [new EntryWrite(MssqlEntry(transientId)), new TaskWrite(PendingMssqlTask(transientTaskId))], MssqlContext), "failing commit");
                 Equal(message, error.Message, "failure");
                 Equal<CommittedEntry?>(null, await storage.GetEntryAsync(transientId, MssqlContext), "rolled-back entry");
                 Equal<TaskRecord?>(null, await storage.GetTaskAsync(transientTaskId, MssqlContext), "rolled-back task");
                 var committedId = await storage.MintIdAsync<EntryId>();
-                Equal(Ids.SeqFromNumber(2), await storage.CommitAsync([new EntryWrite(MssqlEntry(committedId))], MssqlContext), "next sequence");
+                Equal(Ids.SeqFromNumber(2), await storage.CommitWritesAsync([new EntryWrite(MssqlEntry(committedId))], MssqlContext), "next sequence");
 
                 var storeId = await MssqlServer.StoreIdAsync(schema, store);
                 Equal(1L, await MssqlServer.ScalarAsync($"SELECT count(*) FROM {quoted}.durable_entries WHERE store_id = @p0", storeId), "entry rows");
@@ -118,7 +121,7 @@ internal static partial class Program
             {
                 await CreateMssqlRoot(storage);
                 var id = await storage.MintIdAsync<DocumentId>();
-                await storage.CommitAsync([new DocumentCreateWrite(new DocumentCreate { Id = id, Kind = "corrupt", Scope = DocumentScope.Session },
+                await storage.CommitWritesAsync([new DocumentCreateWrite(new DocumentCreate { Id = id, Kind = "corrupt", Scope = DocumentScope.Session },
                     DocumentContent.Base(1, (JsonObjectValue)J("{\"retained\":true}")))], MssqlContext);
                 await MssqlServer.ExecAsync("DELETE FROM dbo.durable_document_revisions WHERE store_id = @p0 AND document_id = @p1",
                     await MssqlServer.StoreIdAsync(SqlServerMigrations.DefaultSchema, store), id.Value);
@@ -140,13 +143,13 @@ internal static partial class Program
             {
                 await CreateMssqlRoot(storage);
                 var id = await storage.MintIdAsync<DocumentId>();
-                await storage.CommitAsync([new DocumentCreateWrite(new DocumentCreate { Id = id, Kind = "replay", Scope = DocumentScope.Session },
+                await storage.CommitWritesAsync([new DocumentCreateWrite(new DocumentCreate { Id = id, Kind = "replay", Scope = DocumentScope.Session },
                     DocumentContent.Base(1, (JsonObjectValue)J("{\"nested\":{\"value\":1},\"rows\":[]}")))], MssqlContext);
-                await storage.CommitAsync([new DocumentChangeWrite(id,
+                await storage.CommitWritesAsync([new DocumentChangeWrite(id,
                     DocumentContent.Delta(1, Ops("[[\"r\",{\"nested\":{\"value\":2},\"rows\":[{\"id\":1}]}]]")))], MssqlContext);
-                await storage.CommitAsync([new DocumentChangeWrite(id, DocumentContent.Delta(1,
+                await storage.CommitWritesAsync([new DocumentChangeWrite(id, DocumentContent.Delta(1,
                     Ops("[[\"s\",[\"nested\",\"value\"],3],[\"p\",[\"rows\"],1,0,[{\"id\":2}]],[\"m\",[\"rows\"],[1,0]]]")))], MssqlContext);
-                await storage.CommitAsync([new DocumentChangeWrite(id, DocumentContent.Delta(1, Ops("[[\"s\",[\"nested\",\"value\"],4]]")))], MssqlContext);
+                await storage.CommitWritesAsync([new DocumentChangeWrite(id, DocumentContent.Delta(1, Ops("[[\"s\",[\"nested\",\"value\"],4]]")))], MssqlContext);
                 Same("{\"nested\":{\"value\":4},\"rows\":[{\"id\":2},{\"id\":1}]}",
                     (await storage.GetDocumentAsync(id, DocumentPoint.Current, MssqlContext))!.Value, "replayed value");
 
@@ -174,13 +177,13 @@ internal static partial class Program
                 Id = id, Kind = "history", Scope = DocumentScope.Conversation(ConversationId.Root),
                 History = DocumentHistory.Rewindable, Fork = DocumentFork.AsOf,
             };
-            var createdAt = await storage.CommitAsync([new DocumentCreateWrite(record, DocumentContent.Base(1, (JsonObjectValue)J("{\"count\":0}")))],
+            var createdAt = await storage.CommitWritesAsync([new DocumentCreateWrite(record, DocumentContent.Base(1, (JsonObjectValue)J("{\"count\":0}")))],
                 MssqlContext);
             var ancientAt = createdAt;
             var recentAt = createdAt;
             for (var count = 1; count <= 40; count++)
             {
-                recentAt = await storage.CommitAsync([new DocumentChangeWrite(id, count == 20
+                recentAt = await storage.CommitWritesAsync([new DocumentChangeWrite(id, count == 20
                     ? DocumentContent.Base(1, (JsonObjectValue)J($"{{\"count\":{count}}}"))
                     : DocumentContent.Delta(1, Ops($"[[\"s\",[\"count\"],{count}]]")))], MssqlContext);
                 if (count == 5) ancientAt = recentAt;
@@ -209,16 +212,16 @@ internal static partial class Program
                 var id = await storage.MintIdAsync<DocumentId>();
                 Task<long> Revisions() =>
                     MssqlServer.ScalarAsync("SELECT count(*) FROM dbo.durable_document_revisions WHERE store_id = @p0 AND document_id = @p1", storeId, id.Value);
-                await storage.CommitAsync([new DocumentCreateWrite(new DocumentCreate { Id = id, Kind = "latest", Scope = DocumentScope.Session },
+                await storage.CommitWritesAsync([new DocumentCreateWrite(new DocumentCreate { Id = id, Kind = "latest", Scope = DocumentScope.Session },
                     DocumentContent.Base(1, (JsonObjectValue)J("{\"count\":0}")))], MssqlContext);
                 for (var count = 1; count <= 10; count++)
-                    await storage.CommitAsync([new DocumentChangeWrite(id, DocumentContent.Delta(1, Ops($"[[\"s\",[\"count\"],{count}]]")))], MssqlContext);
+                    await storage.CommitWritesAsync([new DocumentChangeWrite(id, DocumentContent.Delta(1, Ops($"[[\"s\",[\"count\"],{count}]]")))], MssqlContext);
                 Equal(11L, await Revisions(), "revisions after deltas");
-                await storage.CommitAsync([new DocumentChangeWrite(id, DocumentContent.Base(1, (JsonObjectValue)J("{\"count\":11}")))], MssqlContext);
+                await storage.CommitWritesAsync([new DocumentChangeWrite(id, DocumentContent.Base(1, (JsonObjectValue)J("{\"count\":11}")))], MssqlContext);
                 Equal(1L, await Revisions(), "revisions after a base");
-                await storage.CommitAsync([new DocumentChangeWrite(id, DocumentContent.Delta(1, Ops("[[\"r\",{\"count\":12}]]")))], MssqlContext);
+                await storage.CommitWritesAsync([new DocumentChangeWrite(id, DocumentContent.Delta(1, Ops("[[\"r\",{\"count\":12}]]")))], MssqlContext);
                 Equal(2L, await Revisions(), "revisions after one more delta");
-                await storage.CommitAsync([new DocumentRetireWrite(id)], MssqlContext);
+                await storage.CommitWritesAsync([new DocumentRetireWrite(id)], MssqlContext);
                 Equal(0L, await Revisions(), "revisions after retirement");
             }
             finally
@@ -236,12 +239,12 @@ internal static partial class Program
                 await CreateMssqlRoot(storage);
                 var large = JsonValue.Object([new("text", new string('x', 3 * 1024 * 1024) + "é\ud800")]);
                 var entryId = await storage.MintIdAsync<EntryId>();
-                await storage.CommitAsync([new EntryWrite(MssqlEntry(entryId, large))], MssqlContext);
+                await storage.CommitWritesAsync([new EntryWrite(MssqlEntry(entryId, large))], MssqlContext);
                 Same(large.ToJson(), (await storage.GetEntryAsync(entryId, MssqlContext))!.Entry.Data!, "large entry data");
 
                 var nested = J(new string('[', 200) + "1" + new string(']', 200));
                 var id = await storage.MintIdAsync<DocumentId>();
-                await storage.CommitAsync([new DocumentCreateWrite(new DocumentCreate { Id = id, Kind = "deep", Scope = DocumentScope.Session },
+                await storage.CommitWritesAsync([new DocumentCreateWrite(new DocumentCreate { Id = id, Kind = "deep", Scope = DocumentScope.Session },
                     DocumentContent.Base(1, JsonValue.Object([new("nested", nested)])))], MssqlContext);
                 Same(JsonValue.Object([new("nested", nested)]).ToJson(), (await storage.GetDocumentAsync(id, DocumentPoint.Current, MssqlContext))!.Value,
                     "deeply nested document");
@@ -329,7 +332,7 @@ internal static partial class Program
                 {
                     Equal(2L, (await storages[index].MintIdAsync<EntryId>()).Value, $"first ID of store {index}");
                     await CreateMssqlRoot(storages[index]);
-                    await storages[index].CommitAsync([new EntryWrite(MssqlEntry(new EntryId(2), JsonValue.Number(index)))], MssqlContext);
+                    await storages[index].CommitWritesAsync([new EntryWrite(MssqlEntry(new EntryId(2), JsonValue.Number(index)))], MssqlContext);
                 }
                 for (var index = 0; index < storages.Count; index++)
                 {
@@ -353,7 +356,7 @@ internal static partial class Program
             {
                 var storage = await MssqlServer.OpenAsync(store);
                 await CreateMssqlRoot(storage);
-                await storage.CommitAsync([new EntryWrite(MssqlEntry(await storage.MintIdAsync<EntryId>()))], MssqlContext);
+                await storage.CommitWritesAsync([new EntryWrite(MssqlEntry(await storage.MintIdAsync<EntryId>()))], MssqlContext);
                 await storage.CloseAsync(MssqlContext);
             }
             var deletedId = await MssqlServer.StoreIdAsync(SqlServerMigrations.DefaultSchema, deleted);
@@ -398,6 +401,55 @@ internal static partial class Program
             await ThrowsAsync<ArgumentOutOfRangeException>(() => SqlServerStorage.OpenAsync(connectionString, "store",
                 new SqlServerStorageOptions { LockTimeoutMs = -1 }), "negative lock timeout");
         });
+
+        yield return Case("storage.mssql.migrates-a-version-1-schema-to-store-sleeping-tasks", async () =>
+        {
+            var schema = MssqlServer.NewSchema() + " o'brien]";
+            var quoted = MssqlServer.Quote(schema);
+            var database = await SqlServerDatabase.OpenAsync(await MssqlServer.ConnectionStringAsync());
+            try
+            {
+                await SqlServerMigrations.ApplyAsync(database, schema, 5_000, [SqlServerMigrations.Migrations[0]]);
+            }
+            finally
+            {
+                await database.CloseAsync();
+            }
+            Equal(1L, await MssqlServer.ScalarAsync($"SELECT version FROM {quoted}.durable_schema"), "version before the migration");
+            var insert = $"""
+                INSERT INTO {quoted}.durable_tasks (store_id, id, conversation_id, kind, status, abort_requested, background, record)
+                VALUES (999, @p0, 0, N'"test.task"', @p1, 0, 0, N'{"{}"}')
+                """;
+            await MssqlServer.ExecAsync(insert, 5L, "waiting");
+            var refused = await ThrowsAsync<SqlException>(() => MssqlServer.ExecAsync(insert, 6L, "sleeping"), "sleeping task in version 1");
+            Check(refused.Message.Contains("CHECK constraint", StringComparison.Ordinal), refused.Message);
+
+            var storage = await MssqlServer.OpenAsync(MssqlServer.NewStore(), new SqlServerStorageOptions { Schema = schema });
+            try
+            {
+                Equal(2L, await MssqlServer.ScalarAsync($"SELECT version FROM {quoted}.durable_schema"), "version after the migration");
+                Equal(1L, await MssqlServer.ScalarAsync($"SELECT count(*) FROM {quoted}.durable_tasks WHERE id = 5 AND status = N'waiting'"),
+                    "the version 1 task is kept");
+                await MssqlServer.ExecAsync(insert, 6L, "sleeping");
+                Equal(1L, await MssqlServer.ScalarAsync($"SELECT count(*) FROM {quoted}.durable_tasks WHERE id = 6 AND status = N'sleeping'"),
+                    "a sleeping task");
+                await ThrowsAsync<SqlException>(() => MssqlServer.ExecAsync(insert, 7L, "asleep"), "an unknown status");
+                // Version 1's only check on the tasks table is the status check, so one check remains: the named one.
+                Equal(1L, await MssqlServer.ScalarAsync("SELECT count(*) FROM sys.check_constraints WHERE parent_object_id = OBJECT_ID(@p0)",
+                    quoted + ".durable_tasks"), "checks on the tasks table");
+                Equal(1L, await MssqlServer.ScalarAsync("""
+                    SELECT count(*) FROM sys.check_constraints WHERE parent_object_id = OBJECT_ID(@p0) AND name = N'durable_tasks_status'
+                    """, quoted + ".durable_tasks"), "the named status check");
+                var taskId = await storage.MintIdAsync<TaskId>();
+                await storage.CommitWritesAsync([new ConversationWrite(new ConversationRecord(ConversationId.Root)),
+                    new TaskWrite(PendingMssqlTask(taskId))], MssqlContext);
+                Equal(taskId, (await storage.GetTaskAsync(taskId, MssqlContext))?.Id, "a task committed after the migration");
+            }
+            finally
+            {
+                await storage.CloseAsync(MssqlContext);
+            }
+        });
     }
 
     private static IEnumerable<(string, Func<Task>)> SessionMssqlCases() =>
@@ -406,8 +458,8 @@ internal static partial class Program
     private static IEnumerable<(string, Func<Task>)> HarnessMssqlCases() =>
         MssqlServer.Configured ? HarnessTests.TaskCases("harness.tasks.mssql.", () => MssqlServer.OpenAsync().GetAwaiter().GetResult()) : [];
 
-    private static IEnumerable<(string, Func<Task>)> HarnessEventsMssqlCases() =>
-        MssqlServer.Configured ? EventTests.Cases("harness.events.mssql.", async () => await MssqlServer.OpenAsync()) : [];
+    private static IEnumerable<(string, Func<Task>)> AgentEventsMssqlCases() =>
+        MssqlServer.Configured ? EventTests.Cases("agent-events.mssql.", async () => await MssqlServer.OpenAsync()) : [];
 
     private static IEnumerable<(string, Func<Task>)> HarnessOwnershipMssqlCases() =>
         MssqlServer.Configured ? OwnershipTests.Cases("harness.ownership.mssql.", () => MssqlLocation()(), MssqlLocation) : [];
@@ -433,7 +485,7 @@ internal static partial class Program
         new() { Id = id, ConversationId = ConversationId.Root, Kind = "message", Data = data };
 
     private static Task<Seq> CreateMssqlRoot(IStorage storage) =>
-        storage.CommitAsync([new ConversationWrite(new ConversationRecord(ConversationId.Root))], MssqlContext);
+        storage.CommitWritesAsync([new ConversationWrite(new ConversationRecord(ConversationId.Root))], MssqlContext);
 
     private static TaskRecord PendingMssqlTask(TaskId id) => new()
     {
@@ -448,12 +500,12 @@ internal static partial class Program
         private IStorage current = initial;
         private bool closed;
 
-        public async Task<Seq> CommitAsync(IReadOnlyList<StorageWrite> writes, DurableContext context)
+        public async Task<CommitResult> CommitAsync(IReadOnlyList<IReadOnlyList<StorageWrite>> batches, Action<int, Seq> receive, DurableContext context)
         {
-            if (closed) return await current.CommitAsync(writes, context);
+            if (closed) return await current.CommitAsync(batches, receive, context);
             try
             {
-                return await current.CommitAsync(writes, context);
+                return await current.CommitAsync(batches, receive, context);
             }
             finally
             {
