@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/src/harness/task-graph.ts (TaskGraphState, TaskGraphNode, TaskGraph,
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/src/harness/task-graph.ts (TaskGraphState, TaskGraphNode, TaskGraph,
 // TaskGraphWatch, TaskGraphView, advance, nodeOf, stateOf, phaseOf).
 //
 // Upstream's TaskGraph is a plain JSON object {tasks: {[decimal id]: node}}; here it is a typed immutable class whose ToJson() is that
@@ -22,7 +22,7 @@
 // behind GuardedObserver<T> (ObserveAsync, upstream observe); the mount's observers are SyncObserver<TaskGraph>s, watches (WatchObserver<T>)
 // and guarded host observers, which a publication hands one value call. The Session's close ends a watch ended and a host observer failed
 // with "session closed" (CloseEnds). Pi v1.5.0 sync (area vocabulary, 5f312dac4): the internal observeCommits is followCommits
-// (Session.FollowCommits). The citation stays on v1.2.0 until the file's other areas land.
+// (Session.FollowCommits). Matches task-graph.ts at v1.5.0 apart from the adaptations above (area registry-reader, the re-pin).
 // Pi v1.5.0 sync (area events, f3255de76): the task graph view is spec §9.4, renumbered from §9.5 with the agent events' section removed.
 // Pi v1.5.0 sync (area group-commit-scheduler, e5c6182ba): the mount is built on the line through the line's Storage (ReadOnLineAsync's
 // argument), whose scans wait for every unpublished commit, so nothing a publication then applies is in the mount already; the guarded

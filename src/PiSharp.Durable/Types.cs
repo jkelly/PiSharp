@@ -1,6 +1,8 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/src/types.ts (table records: conversations, entries, submissions,
-// tasks). The rest of types.ts is split across Ids.cs (IDs and sequences), TypesDocuments.cs (document records and content) and
-// TypesStorage.cs (scans, writes and the Storage contract); the Session, Tx and task-runtime surfaces join with P3 and P7.
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/src/types.ts (table records: conversations, entries, submissions,
+// tasks, and task states and options). The rest of types.ts is split across Ids.cs (IDs and sequences), TypesDocuments.cs (document
+// records and content), TypesStorage.cs (scans, writes and the Storage contract), TypesSession.cs (entry drafts, commit publications, the
+// Tx and Session surfaces), TypesTasks.cs (the task runtime and hook runner), TypesReports.cs (reports), Tasks.cs (task definitions and
+// phase handlers), Documents.cs (document definitions and tokens) and Timers.cs (SetTimer).
 //
 // Records hold JSON as immutable JsonValue trees, so storage needs none of upstream's structuredClone/freeze detachment: a value cannot
 // change after it is handed over. Each record has ToJson/FromJson with a fixed key order (see each type) and JavaScript number and
@@ -9,8 +11,10 @@
 //
 // Pi v1.5.0 sync (area telemetry): submission and task records carry the adapter-owned trace carriers of 2ec55d808 (SubmissionRecord.Trace,
 // TaskRecord.Trace and Links; TaskOptions.Trace and Links, TaskTrace for upstream's `TelemetryCarrier | "root"`), written in upstream's key
-// order. Without propagation none is written, so such records stay byte-identical to v1.2.0's. The citation stays on v1.2.0 until the
-// file's other areas land.
+// order. Without propagation none is written, so such records stay byte-identical to v1.2.0's.
+// Pi v1.5.0 sync (area sleep, f75b3240a): a live task may be sleeping (DurableTaskStatus.Sleeping, SleepingTaskState with its checkpoint
+// and until). Pi v1.5.0 sync (area restarts, a30c2a81d and b3a29f111): TaskRecord.Restarts counts how many times in a row a crash,
+// eviction or reset cut the task off while it ran (open counts them), appended by the open that counts one.
 //
 // Pi v1.5.0 sync (area admission, fb524dd2e, #11043): SubmissionRecord gains the continue variant (SubmissionType.Continue: placed without
 // an entry, done with an answer, unanswered with a reason), so a record's status alone no longer says whether it has an entry: check its
@@ -133,7 +137,8 @@ public sealed record TaskOptions(TaskOwnership Ownership)
     public TaskTrace? Trace { get; init; }
     /// <summary>Immutable creation-time links (upstream <c>links</c>), attached to the spans of the task's first invocation.</summary>
     public IReadOnlyList<IReadOnlyDictionary<string, string>>? Links { get; init; }
-    /// <summary>Default: the owner task's conversation, or the transaction's bound conversation.</summary>
+    /// <summary>Default: the owner task's conversation, or the transaction's bound conversation; required for conversation-owned tasks
+    /// created by Session commits that are not bound to a conversation.</summary>
     public ConversationId? ConversationId { get; init; }
     /// <summary>Conversation-owned tasks only: excluded from ordinary idle waits, conversation aborts and cascades.</summary>
     public bool? Background { get; init; }
@@ -803,7 +808,7 @@ public sealed class TerminalTaskState(TaskOutcome outcome) : SettlingTaskState(o
 }
 
 /// <summary>Complete replacement record for one durable task state machine (upstream <c>TaskRecord&lt;JsonValue, JsonValue,
-/// JsonValue&gt;</c>; typed task views join with the runtime in P7). JSON key order is upstream's: <c>id, conversationId, kind, version, input,
+/// JsonValue&gt;</c>; a handler reads its task as a RunningTask, Tasks.cs). JSON key order is upstream's: <c>id, conversationId, kind, version, input,
 /// trace, links, owner, background, abortRequested, abandonOnRestart, state</c> as the Session creates a record, then <c>startedAt</c> (stamped on the first
 /// change to running), <c>memos</c> (added by a running invocation, dropped with the outcome) and <c>endedAt</c>, each appended by a spread of
 /// the current record; <c>abortReason</c> is appended by the mark that sets it, and <c>restarts</c> by the open that counts a cut-off.
