@@ -97,7 +97,7 @@ git push origin v1.2.0.2
 
 The build job runs on Ubuntu with the SDK from `global.json` and Node.js 22. It takes the version from the tag, without the `v`, and then:
 
-1. Runs the 20 offline release suites with `dotnet run`: the 17 suites the macOS workflow runs, plus `Durable`, `DurableCli` and `CustomAgents`. A tag push always runs them. See [Tests](/docs/contribute/testing/#release-suites).
+1. Runs the 22 offline release suites with `dotnet run`: the 19 suites the macOS workflow runs, plus `Durable`, `DurableCli` and `CustomAgents`. A tag push always runs them. See [Tests](/docs/contribute/testing/#release-suites).
 2. Runs `build-release-packages.ps1` with the version and the commit. See [Build the packages](#build-the-packages).
 3. Checks the CLI tool's durable payload: the durable and SQLite assemblies and their license files must be in the package, and the `e_sqlite3` native library for `win-x64`, `linux-x64`, `linux-musl-x64` and `osx-arm64` must match the SQLitePCLRaw package byte for byte.
 4. Uploads the packages and the validation reports as the `packages` artifact.
@@ -129,10 +129,10 @@ After the publish job succeeds, the release job creates the GitHub release for t
 
 It writes provenance files to `artifacts/release-inputs/`, recording the commit, version, Pi baseline and SDK. Then it packs:
 
-- The 22 libraries, with `tools/release/PiSharp.NativeSdk.targets`. The targets file sets the package id, version, description, license, readme and notices, embeds the provenance, and fails without a version, a commit, the provenance file or `net10.0`. Each package is checked by `Assert-PiSharpNativeSdkPackage`: its members, its dependencies (PiSharp siblings at exactly the release version, `[<version>]`, so a consumer can't mix packages from different releases, as Pi pins its own packages from 1.3.0; third-party packages at their pinned versions) and its assembly. The targets file is what makes `dotnet pack` write `[<version>]` for project references; NuGet would otherwise write the release version as a minimum.
+- The 23 libraries, with `tools/release/PiSharp.NativeSdk.targets`. The targets file sets the package id, version, description, license, readme and notices, embeds the provenance, and fails without a version, a commit, the provenance file or `net10.0`. Each package is checked by `Assert-PiSharpNativeSdkPackage`: its members, its dependencies (PiSharp siblings at exactly the release version, `[<version>]`, so a consumer can't mix packages from different releases, as Pi pins its own packages from 1.3.0; third-party packages at their pinned versions) and its assembly. The targets file is what makes `dotnet pack` write `[<version>]` for project references; NuGet would otherwise write the release version as a minimum.
 - The CLI, as the `PiSharp.Cli` tool with the command `pisharp`, with `tools/packaging/PiSharp.Distribution.targets`, checked by `tools/packaging/validate-distribution.ps1`.
 
-The reports go to `artifacts/validation/`. The script fails unless it ends with exactly 23 packages.
+The reports go to `artifacts/validation/`. The script fails unless it ends with exactly 24 packages.
 
 ## After the release
 

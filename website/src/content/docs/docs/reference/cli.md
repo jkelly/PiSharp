@@ -238,14 +238,14 @@ pisharp auth check --provider anthropic --json
 | `mcp add <server> [options] --url <url>` | Adds or replaces a Streamable HTTP server. |
 | `mcp remove <server> [-l]` | Removes a server. |
 | `mcp list [--json]` | Shows each server's state, tools and errors. Exits 1 if a server fails. |
-| `mcp login <server> [--timeout <seconds>]` | Signs in to an OAuth server through the browser. The default time limit is 300 seconds. |
-| `mcp logout <server>` | Deletes the server's stored OAuth credentials. |
+| `mcp login <server> [-l] [--timeout <seconds>]` | Signs in to an OAuth server through the browser. The default time limit is 300 seconds. |
+| `mcp logout <server> [-l]` | Deletes the server's stored OAuth credentials. |
 
 `add` options:
 
 | Option | Applies to | Meaning |
 | --- | --- | --- |
-| `-l`, `--local` | add, remove | Uses the project's `.pi/mcp.json` instead of the global file. |
+| `-l`, `--local` | add, remove, login, logout | Uses the project's `.pi/mcp.json` instead of the global file. For `login` and `logout`, the server must be defined there. |
 | `--env <KEY=VALUE>` | stdio | Environment variable for the server. Repeatable. |
 | `--cwd <dir>` | stdio | Working folder for the server. |
 | `--header <KEY=VALUE>` | HTTP | Request header. Repeatable. |
