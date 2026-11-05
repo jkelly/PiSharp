@@ -3,7 +3,7 @@ title: How the port tracks Pi
 description: Baselines, syncs, decision records, integrity pins and compatibility reports.
 ---
 
-PiSharp is a port of a fixed Pi release, not of whatever Pi's `main` holds. Today that release is Pi v1.2.0. This page shows where the repository records that baseline, how a sync to a new Pi release works, and where the decisions and intentional differences live. Most of these files are under [`compatibility/`](https://github.com/jkelly/PiSharp/tree/main/compatibility) and [`docs/`](https://github.com/jkelly/PiSharp/tree/main/docs). For how a Pi release maps to a PiSharp version, see [Versioning](/docs/versioning/).
+PiSharp is a port of a fixed Pi release, not of whatever Pi's `main` holds. Today the repository targets Pi v1.5.0, and the published release follows Pi v1.2.0 until the next release. This page shows where the repository records that baseline, how a sync to a new Pi release works, and where the decisions and intentional differences live. Most of these files are under [`compatibility/`](https://github.com/jkelly/PiSharp/tree/main/compatibility) and [`docs/`](https://github.com/jkelly/PiSharp/tree/main/docs). For how a Pi release maps to a PiSharp version, see [Versioning](/docs/versioning/).
 
 ## The baseline lock
 
@@ -11,9 +11,9 @@ PiSharp is a port of a fixed Pi release, not of whatever Pi's `main` holds. Toda
 
 | Field | Holds |
 | --- | --- |
-| `source` | The tag (`v1.2.0`), commit (`06a466935536f8c9bcacb2d5efc0fc021be1bdff`), tree and acquisition date. |
+| `source` | The tag (`v1.5.0`), commit (`f9a26365568127461c47a07a37dcb42c140a3ac5`), tree and acquisition date. |
 | `previousBaseline` | The v0.99.1 evidence lock, [`baseline.lock.json`](https://github.com/jkelly/PiSharp/blob/main/compatibility/baseline.lock.json), which the historical fixtures stay validated against. |
-| `previousTarget` | The previous target, Pi v1.1.0, preserved byte for byte as [`target.v1.1.0.lock.json`](https://github.com/jkelly/PiSharp/blob/main/compatibility/target.v1.1.0.lock.json). |
+| `previousTarget` | The previous target, Pi v1.2.0, preserved byte for byte as [`target.v1.2.0.lock.json`](https://github.com/jkelly/PiSharp/blob/main/compatibility/target.v1.2.0.lock.json). The v1.1.0 lock, [`target.v1.1.0.lock.json`](https://github.com/jkelly/PiSharp/blob/main/compatibility/target.v1.1.0.lock.json), is kept too. |
 | `packageVersions` | The versions of the upstream packages at that tag. |
 | `hashPolicy` | How rows are hashed: git blob bytes, with checkout bytes recorded separately, and a `git archive` tar of the commit. |
 | `referenceRuntime` | The Node.js version the reference runs used. |
@@ -85,6 +85,9 @@ Without `--write` it only reports. It never rewrites historical records such as 
 | [`sync-1.2.0-worklist.json`](https://github.com/jkelly/PiSharp/blob/main/compatibility/sync-1.2.0-worklist.json) | The generated re-pin result: 365 citations moved, none pending, and the excluded historical ones. Its `nonHeaderPins` section lists pins that are not citation headers, such as the model catalog shards. |
 | [`durable-sync-1.2.0-worklist.json`](https://github.com/jkelly/PiSharp/blob/main/compatibility/durable-sync-1.2.0-worklist.json) | The durable port's v1.2.0 work, in areas sized S to XL, with exclusions and an order. |
 | [`durable-sync-1.2.0-repin.json`](https://github.com/jkelly/PiSharp/blob/main/compatibility/durable-sync-1.2.0-repin.json) | The durable port's re-pin result, including the citations each area moved by hand. |
+| [`sync-1.5.0-worklist.json`](https://github.com/jkelly/PiSharp/blob/main/compatibility/sync-1.5.0-worklist.json) | The v1.5.0 re-pin result: 250 citations moved, the ones still on v1.2.0 with the applicability rows of each, the ones to check by hand, and the excluded historical ones. Its `nonHeaderPins` section records what became of each pin that is not a citation header. |
+| [`sync-1.5.0-applicability.json`](https://github.com/jkelly/PiSharp/blob/main/compatibility/sync-1.5.0-applicability.json) | The v1.2.0 to v1.5.0 changes: 326 rows for the 477 changelog bullets, each with its phase and release. Rows still to port have the status `port`. |
+| [`durable-sync-1.5.0-worklist.json`](https://github.com/jkelly/PiSharp/blob/main/compatibility/durable-sync-1.5.0-worklist.json) | The durable port's v1.5.0 work, in 48 areas and 27 waves, with exclusions, an order and the commits of each area. |
 
 ## Source citations and PiSharp-only files
 

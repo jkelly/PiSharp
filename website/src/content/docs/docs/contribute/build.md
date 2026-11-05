@@ -64,7 +64,7 @@ Every project gets these settings from `Directory.Build.props`:
 
 | Setting | Value | Effect |
 | --- | --- | --- |
-| `VersionPrefix` | `1.2.0.2` | The version a build reports, unless you pass `-p:VersionPrefix`. A build of `main` reports it even when it holds unreleased features. |
+| `VersionPrefix` | `1.5.0` | The version a build reports, unless you pass `-p:VersionPrefix`. A build of `main` reports it even when it holds unreleased features. |
 | `TargetFramework` | `net10.0` | |
 | `Nullable`, `ImplicitUsings` | `enable` | |
 | `TreatWarningsAsErrors` | `true` | Any compiler warning fails the build. |
@@ -115,16 +115,16 @@ Once the packages are in your cache, you can leave out `-p:RestoreSources`. The 
 To run your build as `pisharp`, pack it the way a release does and install it from the output folder. The macOS CI job does exactly this.
 
 ```powershell
-pwsh ./tools/release/build-release-packages.ps1 -Version 1.2.0.2 -SourceCommit (git rev-parse HEAD)
+pwsh ./tools/release/build-release-packages.ps1 -Version 1.5.0 -SourceCommit (git rev-parse HEAD)
 ```
 
-The script packs every library and the CLI into `artifacts/packages/`, and checks each package. It expects exactly 23 packages there when it ends, so empty the folder before you run it again. The version's first three numbers must match the Pi baseline in `compatibility/target.lock.json` (1.2.0 today), and `-SourceCommit` must be a full 40-character commit id. See [Releasing](/docs/contribute/releasing/#build-the-packages) for what it checks.
+The script packs every library and the CLI into `artifacts/packages/`, and checks each package. It expects exactly 24 packages there when it ends, so empty the folder before you run it again. The version's first three numbers must match the Pi baseline in `compatibility/target.lock.json` (1.5.0 today), and `-SourceCommit` must be a full 40-character commit id. See [Releasing](/docs/contribute/releasing/#build-the-packages) for what it checks.
 
 Then install the tool from a folder outside the repository, because the repository's `NuGet.Config` would hide nuget.org, where the tool's dependencies come from:
 
 ```powershell
 cd ..
-dotnet tool install PiSharp.Cli --tool-path ./pisharp-dev --add-source PiSharp/artifacts/packages --version 1.2.0.2
+dotnet tool install PiSharp.Cli --tool-path ./pisharp-dev --add-source PiSharp/artifacts/packages --version 1.5.0
 ./pisharp-dev/pisharp --version
 ```
 
@@ -160,8 +160,11 @@ Experimental APIs carry `[Experimental]`, and using one is a compiler error unti
 | [Custom agents](/docs/custom-agents/overview/) (experimental) | `PiSharp.CustomAgents`, `PiSharp.CustomAgents.JavaScript`, `PiSharp.CustomAgents.Scripting` | `PISHARP_AGENTS001` and `PISHARP_DURABLE001` |
 | [Media library](/docs/embed/media/) (experimental) | `PiSharp.AI`, namespace `PiSharp.AI.Media` | `PISHARP_MEDIA001` |
 | [Service tiers](/docs/guides/service-tiers/) (experimental) | `ServiceTiers` in `PiSharp.AI`, and the tier members in `PiSharp.AI`, `PiSharp.Agent` and `PiSharp.CodingAgent` | `PISHARP_TIERS001` |
+| [Telemetry](/docs/embed/telemetry/) (experimental) | `PiSharp.Telemetry`, and the telemetry members of `PiSharp.AI` | `PISHARP_TELEMETRY001` |
 
-The durable and custom agents projects mark the whole assembly, so every type in them needs the suppression. The media and tier attributes sit on single types and members. An app inside the PiSharp folder, like the samples, also inherits `Directory.Build.props`, so its warnings are errors and restore writes a lock file for it.
+The Pi 1.5.0 sync adds more ids for single types and members; the [SDK page](/docs/embed/sdk/#experimental-apis) lists them all.
+
+The durable, custom agents and telemetry projects mark the whole assembly, so every type in them needs the suppression. The media and tier attributes sit on single types and members. An app inside the PiSharp folder, like the samples, also inherits `Directory.Build.props`, so its warnings are errors and restore writes a lock file for it.
 
 ## Samples
 

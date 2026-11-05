@@ -16,7 +16,7 @@ PiSharp's version is the Pi version it matches, and a fourth number marks a C#-o
 The release scripts enforce this:
 
 - The version must match `^[0-9]+\.[0-9]+\.[0-9]+(\.[0-9]+)?(-[0-9A-Za-z.-]+)?$`.
-- Its first three numbers must equal the tag in `compatibility/target.lock.json` (`v1.2.0` today). A sync to a new Pi release therefore comes before its release. See [How the port tracks Pi](/docs/contribute/porting/).
+- Its first three numbers must equal the tag in `compatibility/target.lock.json` (`v1.5.0` today). A sync to a new Pi release therefore comes before its release. See [How the port tracks Pi](/docs/contribute/porting/).
 - A version with a `-` suffix becomes a GitHub prerelease.
 
 Every assembly gets the release version, except `PiSharp.ExtensionHost`, which keeps assembly version `1.0.0.0`.
