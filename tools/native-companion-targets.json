@@ -1057,8 +1057,8 @@
         },
         {
           "path": "tests/PiSharp.Tui.Keybindings.Tests/fixtures/source-defaults-inventory.json",
-          "bytes": 7126,
-          "sha256": "580eed87dbdba08db2558e184f76ed72049143e04bec19845b28f68df4ad7ffa"
+          "bytes": 6995,
+          "sha256": "605b2f96ef496efa3b71fabd38d0f9b287f5c61636be84ed0bb14d890533a6d4"
         },
         {
           "path": "tests/PiSharp.Tui.Keybindings.Tests/fixtures/authored-configuration-loading-cases.json",
@@ -1074,8 +1074,8 @@
         },
         {
           "relative": "fixtures/source-defaults-inventory.json",
-          "bytes": 7126,
-          "sha256": "580eed87dbdba08db2558e184f76ed72049143e04bec19845b28f68df4ad7ffa"
+          "bytes": 6995,
+          "sha256": "605b2f96ef496efa3b71fabd38d0f9b287f5c61636be84ed0bb14d890533a6d4"
         },
         {
           "relative": "fixtures/authored-configuration-loading-cases.json",
