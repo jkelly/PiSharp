@@ -1,8 +1,10 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/test/harness-scheduler-indexes.test.ts. The scheduler's in-memory
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/test/harness-scheduler-indexes.test.ts. The scheduler's in-memory
 // indexes: cases where a wrong index changes behaviour, each against what the committed records imply (spec §5.4, §5.5), and
 // TaskRuntime.ownedTasks. Verbatim on SQLite, as upstream, apart from the adaptations of HarnessSchedulerSupport.cs and these:
 // - Probe's runtime is kept as an ITaskRuntime, whose OwnedTasksAsync is upstream's ownedTasks.
 // - "rejects once its invocation has ended" reads the error message: upstream's toThrow("invocation has ended") matches a substring.
+// - Pi v1.5.0 sync (area group-commit-scheduler, e5c6182ba): the patched commits see each batch of a Storage call (HookedStorage.OnCommit),
+//   so "finalizes a chain of held owners ..." counts commits, not calls, as upstream's `for (const writes of batches) commits++` does.
 using System.Collections.Concurrent;
 using PiSharp.Durable;
 using PiSharp.Durable.Chord;

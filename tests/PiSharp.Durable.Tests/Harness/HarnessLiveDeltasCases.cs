@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/test/harness-live-deltas.test.ts. Verbatim apart from the adaptations
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/test/harness-live-deltas.test.ts. Verbatim apart from the adaptations
 // in ChatSupport.cs and HarnessSupport.cs, and these:
 // - Backends. Upstream runs this file on MemoryStorage; HarnessLiveDeltasCases() does the same (harness.live-deltas.*), and the JSONL and
 //   SQLite groups (harness.live-deltas.jsonl.*, harness.live-deltas.sqlite.*) rerun every case but "keeps a complete base exactly while
@@ -16,9 +16,10 @@
 // Pi v1.5.0 sync (area deferred-commits, 6c2fd73b0 and e5c6182ba's deferred attempt and running status): drive() and "streams partial
 // text as appends" observe commits as memory adopts them (LiveCommits, upstream observeCommits); "hands a generation over ..." and
 // "starts calls the request did not offer ..." record what was stored (StoredLiveCommits, upstream subscribeCommits), and the first takes
-// e5c6182ba's expectations without #11043's turn count (area turn-limit): the request's attempt and the tool's running status are stored
-// with the next commit. "stores a complete base exactly ..." stores deferred progress within each tool's run (persistWithinMs 50), as
-// e5c6182ba's does.
+// e5c6182ba's expectations: the request's attempt and the tool's running status are stored with the next commit. "stores a complete base
+// exactly ..." stores deferred progress within each tool's run (persistWithinMs 50), as e5c6182ba's does.
+// Pi v1.5.0 sync (area group-commit-scheduler, the file's last area): the tools declare pi-schema's obj({}) (ToolsSchema150.EmptyObject;
+// 6536f8012, area tools-schema's part).
 // Pi v1.5.0 sync (area vocabulary, 5f312dac4): LiveCommits follows commits with SessionTests.FollowCommits (upstream followCommits) and the
 // stored ones are observed with ObserveCommits (a CommitObserver; upstream observeCommits({ advance, end })); both read the document changes
 // of kind change (DocumentValues, upstream documentValues), and "stores a complete base exactly ..." skips a retirement by its kind.
@@ -62,6 +63,7 @@ internal static partial class LiveDeltaTests
     {
         Name = name,
         Description = name,
+        Parameters = ToolsSchema150.EmptyObject,
         OutputLimits = limits,
         Execute = execute,
     });

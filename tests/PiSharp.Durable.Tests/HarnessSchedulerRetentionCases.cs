@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/test/harness-scheduler-retention.test.ts. Scheduler memory is bounded
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/test/harness-scheduler-retention.test.ts. Scheduler memory is bounded
 // by live work: an ended task or a conversation edge is kept only while live work is below it, and a chain dropped that way is loaded again
 // from storage when work appears below it. Verbatim on SQLite, as upstream, apart from the adaptations of HarnessSchedulerSupport.cs (the
 // index sizes are read once the scheduler's pending passes have run) and these:

@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/test/harness-tools-recovery.test.ts. Verbatim apart from the
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/test/harness-tools-recovery.test.ts. Verbatim apart from the
 // adaptations in HarnessSupport.cs, ChatSupport.cs and HarnessToolsCases.cs, and these:
 // - Backends. Upstream reopens a SQLite file; harness.tools-recovery.* does the same, and harness.tools-recovery.jsonl.* reruns every case
 //   reopening a JSONL directory.
@@ -12,7 +12,9 @@
 // - Pi v1.5.0 sync (area deferred-commits): e5c6182ba's "reruns a safe tool whose running slot a crash after its intent lost, or a sibling
 //   stored, and shows it running". Upstream's process death leaves the first Harness open while another opens the same SQLite file; here
 //   the first Harness fails (the internal Session.Fail, as harness.deferred-progress.* crashes), so nothing more of it reaches Storage and
-//   the case runs on both backends. The citation stays on v1.2.0 until the file's other areas land.
+//   the case runs on both backends.
+// - Pi v1.5.0 sync (area group-commit-scheduler, the file's last area): tool() declares pi-schema's obj({}) (ToolsSchema150.EmptyObject;
+//   6536f8012, area tools-schema's part).
 using PiSharp.Durable;
 using PiSharp.Durable.Chord;
 using PiSharp.Durable.Env;
@@ -57,7 +59,7 @@ internal static class ToolsRecoveryTests
 
     private static ToolRegistration RecoveryTool(string name, ToolExecute execute, Func<ToolRegistration, ToolRegistration>? extra = null)
     {
-        var tool = Define.Tool(new ToolRegistration { Name = name, Description = name, Execute = execute });
+        var tool = Define.Tool(new ToolRegistration { Name = name, Description = name, Parameters = ToolsSchema150.EmptyObject, Execute = execute });
         return extra is null ? tool : extra(tool);
     }
 

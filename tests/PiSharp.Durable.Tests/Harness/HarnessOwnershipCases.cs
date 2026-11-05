@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/test/harness-ownership.test.ts. Verbatim apart from the adaptations in
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/test/harness-ownership.test.ts. Verbatim apart from the adaptations in
 // HarnessSupport.cs, ChatSupport.cs and HarnessOwnershipSupport.cs, and these:
 // - Backends. Upstream runs these on MemoryStorage and reopens a SQLite file for the reopen cases. HarnessOwnershipCases() does the same
 //   (ids harness.ownership.<test>); HarnessOwnershipJsonlCases() reruns every case on JSONL, reopen cases reopening a JSONL directory;

@@ -1,10 +1,16 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/test/nested-tools-bench.ts. Per run, one model-issued tool makes `calls`
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/test/nested-tools-bench.ts. Per run, one model-issued tool makes `calls`
 // parallel nested calls of `blob`, each streaming `bytes` of output in 8 chunks `gapMs` apart; at depth 2 it makes them through `calls / 10`
 // parallel `fan` calls of 10 each. With progress off the nested calls commit no running output. Reports commits, logical bytes written (JSON of
 // the storage writes) by write type, the stored size after each run, and the heap: its peak during a run, sampled every 5 ms, and what stays
 // after a run and a collection, both over the heap after a collection before the first run.
 // Mappings: the heap is the managed heap (GC.GetTotalMemory for samples, HeapRetained after a compacting collection), not V8's heapUsed; the
 // gaps are Task.Delay on the system clock; the faux model is FauxModels.cs's.
+// Pi v1.5.0 sync (area group-commit-scheduler, the file's last area): commits count the batches of each Storage call (CountingStorage;
+// e5c6182ba's `commits += batches.length`), so group commit's calls of several commits count as upstream's do. The tools declare
+// pi-schema's obj({ n: num() }, { open: true }) and obj({ count: num() }, { open: true }) JSON where upstream declares the closed obj()
+// (6536f8012): `fan` passes { n, count } to `blob`, and `fan2` passes it to `fan`, which a closed schema refuses (invalid_arguments; Pi
+// validates nested calls too), so upstream's v1.5.0 nested calls fail while this benchmark checks that every call succeeds. Open, they run
+// as v1.2.0's TypeBox Type.Object did.
 using System.Diagnostics;
 using System.Globalization;
 using PiSharp.Durable.Chord;
@@ -92,10 +98,10 @@ public static class NestedToolsBench
         KeyValuePair.Create("type", (JsonValue)"text"), KeyValuePair.Create("text", (JsonValue)text)));
 
     private static readonly JsonObjectValue BlobParameters =
-        (JsonObjectValue)JsonValue.Parse("""{"type":"object","required":["n"],"properties":{"n":{"type":"number"}}}""");
+        (JsonObjectValue)JsonValue.Parse("""{"type":"object","properties":{"n":{"type":"number"}},"required":["n"]}""");
 
     private static readonly JsonObjectValue FanParameters =
-        (JsonObjectValue)JsonValue.Parse("""{"type":"object","required":["count"],"properties":{"count":{"type":"number"}}}""");
+        (JsonObjectValue)JsonValue.Parse("""{"type":"object","properties":{"count":{"type":"number"}},"required":["count"]}""");
 
     private static async Task<(IReadOnlyList<Run> Runs, long ClosedBytes)> RunScenarioAsync(Scenario scenario, string? tempRoot)
     {
