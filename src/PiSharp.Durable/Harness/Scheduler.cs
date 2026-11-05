@@ -452,6 +452,26 @@ internal sealed class DurableTaskScheduler
     /// <summary>Test probe: members iterated over the scheduler's sets so far (see <see cref="iterations"/>).</summary>
     internal long SetEntries => Interlocked.Read(ref iterations.Entries);
 
+    /// <summary>Internal, for tests: starts the work the scheduler hands to the thread pool (<see cref="Post"/>: reservation drains, reconcile
+    /// passes, the wake job, the sweep job, blocked notifications) in place of the pool; null, the default, is the pool. A test holds what it
+    /// gets to stand in for a busy pool, whose workers start such work at any later time. Some sites call it under the lock, so it only takes
+    /// the work.</summary>
+    internal Action<Action>? Dispatch
+    {
+        get => Volatile.Read(ref dispatch);
+        set => Volatile.Write(ref dispatch, value);
+    }
+
+    private Action<Action>? dispatch;
+
+    /// <summary>Starts <paramref name="work"/> on the thread pool (upstream's queueMicrotask wakeups, see the file header), or hands it to
+    /// <see cref="Dispatch"/>.</summary>
+    private void Post(Action<DurableTaskScheduler> work)
+    {
+        if (Dispatch is { } hold) hold(() => work(this));
+        else ThreadPool.UnsafeQueueUserWorkItem(static state => state.Work(state.Scheduler), (Work: work, Scheduler: this), preferLocal: false);
+    }
+
     /// <summary>Loads live tasks and changes surviving <c>running</c> tasks back to <c>pending</c>, counting the restart. Dispatches nothing;
     /// a task cut off <c>settings.RestartLimit</c> times ends when it is next reserved. Read-only, it only loads them as committed: a
     /// <c>running</c> task stays as committed, running in another process.</summary>
@@ -1355,7 +1375,7 @@ internal sealed class DurableTaskScheduler
         // Queued after the host observers of a publication that asks for it (upstream: its microtask runs behind their dispatch), so a
         // commit a host observer makes there lands before the pass's commit.
         session.AfterPublication(() =>
-            ThreadPool.UnsafeQueueUserWorkItem(static scheduler => _ = scheduler.ReconcileAsync(), this, preferLocal: false));
+            Post(static scheduler => _ = scheduler.ReconcileAsync()));
     }
 
     /// <summary>
@@ -1746,7 +1766,7 @@ internal sealed class DurableTaskScheduler
         if (sweepScheduled || closing) return;
         sweepScheduled = true;
         // Enqueued from the thread pool: on an idle line the job would start inline, inside this lock.
-        ThreadPool.UnsafeQueueUserWorkItem(static scheduler =>
+        Post(static scheduler =>
         {
             Task<bool> job;
             try
@@ -1773,7 +1793,7 @@ internal sealed class DurableTaskScheduler
                 lock (owner.gate) owner.sweepScheduled = false;
             }, scheduler, CancellationToken.None, TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously,
                 System.Threading.Tasks.TaskScheduler.Default);
-        }, this, preferLocal: false);
+        });
     }
 
     /// <summary>
@@ -2328,7 +2348,7 @@ internal sealed class DurableTaskScheduler
             if (wakeRunning) return;
             wakeRunning = true;
         }
-        ThreadPool.UnsafeQueueUserWorkItem(static scheduler => scheduler.RunWake(), this, preferLocal: false);
+        Post(static scheduler => scheduler.RunWake());
     }
 
     private void RunWake()
@@ -2485,7 +2505,7 @@ internal sealed class DurableTaskScheduler
         // makes there lands before the pass's, and still before the committer's continuation.
         if (onLine) session.AfterPublication(() => _ = ReservePassAsync());
         else session.AfterPublication(() =>
-            ThreadPool.UnsafeQueueUserWorkItem(static scheduler => _ = scheduler.DrainAsync(), this, preferLocal: false));
+            Post(static scheduler => _ = scheduler.DrainAsync()));
     }
 
     /// <summary>One reservation pass outside the drain loop, for <see cref="Kick(bool)"/> on the line.</summary>
@@ -2776,7 +2796,7 @@ internal sealed class DurableTaskScheduler
         {
             lock (gate) failedMigrations[record.Id] = (fit.Task, error);
             // Blocked now without a commit: the graph and the host's wake must hear it. Queued, as upstream's microtask: this runs on the line.
-            ThreadPool.UnsafeQueueUserWorkItem(static scheduler => scheduler.NotifyBlocked(), this, preferLocal: false);
+            Post(static scheduler => scheduler.NotifyBlocked());
             ScheduleWake();
             report(error, new ReportInfo(ReportKind.MigrationFailed) { Task = ReportTaskOf(record), Extension = InstallerOf(snapshot, fit.Task) });
             return new Resolution(null, null, BlockedReason.MigrationFailed);

@@ -34,6 +34,13 @@
 //   every v1.5.0 test of the file is here (49 cases on each backend), so the citation moves to v1.5.0.
 // - "commits results with entries ...": the child task runs beside the writer's answer phase and ends first by upstream's microtask order;
 //   here it is on the thread pool, so the case waits for it before it counts the task documents its end drops (a busy runner read 1).
+// - PiSharp's own case, no upstream counterpart: "stores a host listener's own commit before the reconcile commit while a busy pool holds
+//   the scheduler's work" is the case above with the interleaving a loaded runner gave it on SQL Server. Two holds: HeldPool, set as the
+//   scheduler's Dispatch, keeps every piece of work the scheduler hands the thread pool from the parent's `completing` commit on, and
+//   ControlledStorage.HoldCommits holds the child's terminal commit in its storage call; the pool's work then runs (HeldPool.Release), and
+//   the commit lands. Upstream enqueues the reconcile pass the `completing` commit asks for in a microtask, before anything the test does
+//   next; a pass that reaches the line only while the child's terminal commit is stored waits at its gate ahead of the host listener's
+//   commit, and stores the parent's terminal record first.
 using System.Collections.Concurrent;
 using PiSharp.Durable;
 using PiSharp.Durable.Chord;
@@ -61,6 +68,38 @@ internal static partial class HarnessTests
             await release.Task;
         }, Context);
         return new LineHold(entered.Task, release.Resolve);
+    }
+
+    /// <summary>A busy thread pool for the scheduler (DurableTaskScheduler.Dispatch): it holds the work the scheduler hands the pool until
+    /// <see cref="Release"/>, which runs it on the calling thread, in order, as a worker that frees up would; later work goes to the pool.</summary>
+    private sealed class HeldPool
+    {
+        private readonly Lock gate = new();
+        private List<Action>? held = [];
+
+        public void Post(Action work)
+        {
+            lock (gate)
+            {
+                if (held is not null)
+                {
+                    held.Add(work);
+                    return;
+                }
+            }
+            ThreadPool.UnsafeQueueUserWorkItem(static work => work(), work, preferLocal: false);
+        }
+
+        public void Release()
+        {
+            List<Action> works;
+            lock (gate)
+            {
+                works = held ?? [];
+                held = null;
+            }
+            foreach (var work in works) work();
+        }
     }
 
     /// <summary>A one-phase task; the default abort handler settles aborted with reason "test" (upstream <c>oneStep</c>).</summary>
@@ -1658,6 +1697,58 @@ internal static partial class HarnessTests
             gate.Resolve();
             await harness.WaitForTaskAsync(parentId, Context);
             // Read after close: no commit can land meanwhile.
+            await harness.CloseAsync(Context);
+            var kinds = controlled.Commits.Skip(before).Select(writes =>
+            {
+                if (writes.Any(write => write is EntryWrite)) return "host entry";
+                if (writes.OfType<TaskWrite>().FirstOrDefault() is not { Value: { State.Status: DurableTaskStatus.Terminal } task }) return "other";
+                return task.Id == parentId ? "parent terminal" : "child terminal";
+            });
+            Seq(["child terminal", "host entry", "parent terminal"], kinds.Where(kind => kind != "other"), "stored order");
+        });
+
+        // PiSharp's own (see the file header).
+        yield return Case(prefix + "publication-at-adoption.stores-a-host-listeners-own-commit-before-the-reconcile-commit-while-a-busy-pool-holds-the-schedulers-work", async () =>
+        {
+            var controlled = Controlled();
+            var gate = new Deferred();
+            var finish = new Deferred();
+            var created = new Deferred<TaskId>();
+            var child = GatedTask("test.busy-pool-child", gate.Task);
+            var parent = OneStep("test.busy-pool-parent", async (task, runtime, ctx) =>
+            {
+                await runtime.CommitAsync(async (tx, _) =>
+                {
+                    created.Resolve(await tx.CreateTaskAsync(child, JsonValue.Null, new TaskOptions(TaskOwnership.Task(task.Id))));
+                }, ctx);
+                await finish.Task;
+                await runtime.CommitAsync((_, _) => Completed(null), ctx);
+            });
+            var (harness, _, _, root) = await OpenRoot(controlled, [parent, child]);
+            var parentId = await Start(root, parent);
+            harness.Resume();
+            var childId = await created.Task;
+            await Eventually(async () => (await harness.GetTaskAsync(childId, Context))?.State.Status == DurableTaskStatus.Running);
+            // From the parent's `completing` commit on, the pool starts nothing the scheduler hands it.
+            var pool = new HeldPool();
+            ((DurableHarness)harness).Scheduler.Dispatch = pool.Post;
+            finish.Resolve();
+            await Eventually(async () => (await harness.GetTaskAsync(parentId, Context))?.State.Status == DurableTaskStatus.Completing);
+            await InvocationEnded(harness, parentId);
+            harness.ObserveCommits(new CommitObserver((publication, observerContext) =>
+            {
+                var ended = publication.Changes.Any(change =>
+                    change is TaskWrite { Value: var record } && record.Id != parentId && record.State.Status == DurableTaskStatus.Terminal);
+                if (ended) _ = root.CommitAsync(tx => tx.AppendEntryAsync(root.Id, new EntryDraft { Kind = "note", Data = JsonObjectValue.Empty }), Context);
+            }, _ => { }));
+            var before = controlled.CommitCount;
+            var storing = controlled.HoldCommits();
+            gate.Resolve();
+            await storing.Entered;
+            // The pool frees up while the child's terminal commit is stored, then the commit lands.
+            pool.Release();
+            storing.Release();
+            await harness.WaitForTaskAsync(parentId, Context);
             await harness.CloseAsync(Context);
             var kinds = controlled.Commits.Skip(before).Select(writes =>
             {
