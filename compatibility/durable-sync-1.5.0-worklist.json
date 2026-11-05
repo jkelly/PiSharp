@@ -4563,7 +4563,13 @@
       "commits": [
         "5f312dac4",
         "8b0caefc2",
-        "e5c6182ba"
+        "e5c6182ba",
+        "95c3729b",
+        "68277da7",
+        "7bd42baa",
+        "0c910fc4",
+        "1b0464ec",
+        "fb2ac969"
       ],
       "notes": ".NET has no macrotask/microtask split: the area defines the C# order (Durable observers, then commit observers, then waits and abort signals) and pins it with the ported adoption and observer tests (session-adoption.test.ts, session-observers.test.ts). The Fixed#8 case matters for PiSharp's JSONL storage. Records and JSON values are immutable in PiSharp (Context.cs: upstream's freezeJson has no counterpart), so the frozen-result half holds by construction; the caches are new. SQL Server storage gains the most from the caches. Session/Observation.cs was deleted by area watches (2cce573d); its committed-state observers are Chord's Watch (Chord/Watch.cs) and the view and task graph observers, so this area no longer edits it."
     },

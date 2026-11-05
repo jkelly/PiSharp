@@ -56,11 +56,11 @@
     "changelogBullets": 477,
     "repeatedBullets": 23,
     "byStatus": {
-      "ported": 220,
-      "ported-with-deferral": 23,
+      "ported": 223,
+      "ported-with-deferral": 22,
       "already-ported": 12,
       "no-op": 25,
-      "port": 46
+      "port": 44
     },
     "byArea": {
       "ai": 58,
@@ -9081,7 +9081,7 @@
       "id": "durable.group-commit",
       "area": "durable",
       "phase": 4,
-      "status": "ported-with-deferral",
+      "status": "ported",
       "changelog": [
         "durable@1.5.0/Changed#2",
         "durable@1.5.0/Changed#6",
@@ -9128,7 +9128,12 @@
           "10fc0b80",
           "8f1d34dd",
           "368bc80d",
-          "a8c2fdd8"
+          "a8c2fdd8",
+          "95c3729b",
+          "68277da7",
+          "7bd42baa",
+          "0c910fc4",
+          "1b0464ec"
         ],
         "tests": [
           "tests/PiSharp.Durable.Tests/SessionGroupCommitCases.cs: stores-the-commits-admitted-while-a-call-is-in-flight-in-one-call-each-with-its-seq-published-in-order",
@@ -9189,16 +9194,21 @@
           "tests/PiSharp.Durable.Tests/Harness/HarnessOwnershipCases.cs: runs-a-handle-operation-queued-behind-the-abort-mark-before-the-marks-publication-and-the-cascade-aborts-it",
           "tests/PiSharp.Durable.Tests/HarnessSchedulerRetentionCases.cs: loads-the-chain-of-new-work-below-a-forgotten-conversation-before-admitting-it-and-keeps-the-scope-busy",
           "tests/PiSharp.Durable.Tests/HarnessRestartFailureCases.cs: the-restart-limit-on-the-normal-path.resolves-the-settings-no-more-often-than-before-only-a-task-that-was-cut-off-reads-the-limit",
-          "tests/PiSharp.Durable.Tests/AgentEventsCases.cs: emits-one-exact-batch-when-a-run-ends-and-a-queued-follow-up-starts-the-next"
+          "tests/PiSharp.Durable.Tests/AgentEventsCases.cs: emits-one-exact-batch-when-a-run-ends-and-a-queued-follow-up-starts-the-next",
+          "tests/PiSharp.Durable.Tests/SessionGroupCommitCases.cs: fails-the-session-for-a-throw-in-the-read-caches-write-through-and-leaves-the-later-parts-unpublished",
+          "tests/PiSharp.Durable.Tests/HarnessGroupCommitCases.cs: reads-no-task-record-from-storage-for-more-live-and-awaited-tasks-than-the-record-caches-count",
+          "tests/PiSharp.Durable.Tests/Harness/HarnessTasksCases.cs: task-phases.commits-results-with-entries-atomically-keeps-memos-until-terminal-and-retires-task-documents",
+          "tests/PiSharp.Durable.Tests/HarnessContextRangeCases.cs: is-not-advanced-when-an-entry-was-committed-while-its-scan-ran-off-the-line",
+          "tests/PiSharp.Durable.Tests/SessionCachedStorageCases.cs: serves-a-written-record-without-a-read-and-follows-later-writes",
+          "tests/PiSharp.Durable.Tests/SessionConversationTailsCases.cs: reads-once-then-follows-the-commits"
         ]
-      },
-      "deferred": "Session and Harness halves landed (areas group-commit and group-commit-scheduler): Harness line jobs overlap storage calls, the scheduler's decisions record and touch the keys they read (regions, membership keys, its own commits through CommitInternalAsync), and Changed#6 and #7 hold for the Harness. Left for area publication-caches: CachedStorage, the bounded record cache, with session-group-commit's 'fails the Session for a throw in the read caches' write-through, and leaves the later parts unpublished' and harness-group-commit's 'reads no task record from Storage for more live and awaited tasks than the record cache's count'; the conversation record cache (until then every AppendEntryAsync reads its conversation on the line, so entry commits do not batch); conversation tails; the TaskDocuments index (until then every terminal task's documents are scanned); and LineSizes' read counts."
+      }
     },
     {
       "id": "durable.commit-publication",
       "area": "durable",
       "phase": 4,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "durable@1.5.0/Changed#3",
         "durable@1.5.0/Changed#9",
@@ -9225,13 +9235,53 @@
         "tests/PiSharp.Durable.Tests/Session/SessionLineCases.cs"
       ],
       "release": "1.5.0",
-      "notes": "PiSharp publishes on the Session line after each commit (decision 0005: work deferred during publication runs right after it, as upstream's microtasks). .NET has no macrotask/microtask split, so the area defines the C# order (Durable observers, then commit observers, then waits and abort signals) and pins it with the ported adoption and observer tests. The Fixed#8 case matters for PiSharp's JSONL storage, whose reclaim can fail after adoption. Depends on durable.group-commit and durable.observe-commits."
+      "notes": "PiSharp publishes on the Session line after each commit (decision 0005: work deferred during publication runs right after it, as upstream's microtasks). .NET has no macrotask/microtask split, so the area defines the C# order (Durable observers, then commit observers, then waits and abort signals) and pins it with the ported adoption and observer tests. The Fixed#8 case matters for PiSharp's JSONL storage, whose reclaim can fail after adoption. Depends on durable.group-commit and durable.observe-commits.",
+      "evidence": {
+        "commits": [
+          "95c3729b",
+          "68277da7",
+          "7bd42baa",
+          "0c910fc4",
+          "1b0464ec"
+        ],
+        "tests": [
+          "tests/PiSharp.Durable.Tests/SessionAdoptionCases.cs: takes-the-durability-receipt-inside-the-commit-and-adopts-once-storage-resolved",
+          "tests/PiSharp.Durable.Tests/SessionAdoptionCases.cs: fails-the-session-without-discarding-when-storage-rejects-after-adoption",
+          "tests/PiSharp.Durable.Tests/SessionAdoptionCases.cs: discards-the-staged-changes-when-storage-rejects-before-adoption",
+          "tests/PiSharp.Durable.Tests/SessionAdoptionCases.cs: fails-the-session-with-its-own-adoption-error-which-never-reaches-storage",
+          "tests/PiSharp.Durable.Tests/SessionAdoptionCases.cs: fails-the-session-when-storage-resolves-without-adopting",
+          "tests/PiSharp.Durable.Tests/SessionAdoptionCases.cs: runs-its-own-observers-once-storage-resolved-and-host-listeners-one-microtask-later",
+          "tests/PiSharp.Durable.Tests/SessionAdoptionCases.cs: calls-the-host-listeners-registered-when-its-dispatch-runs-and-none-for-a-commit-published-without-one",
+          "tests/PiSharp.Durable.Tests/SessionAdoptionCases.cs: fails-the-session-after-storage-returned-for-a-throw-of-its-own-observers-the-others-and-hosts-got-the-commit",
+          "tests/PiSharp.Durable.Tests/SessionAdoptionCases.cs: publishes-a-commit-that-storage-rejects-after-adopting-it-then-fails-the-session",
+          "tests/PiSharp.Durable.Tests/SessionAdoptionCases.cs: keeps-what-host-listeners-get-exactly-what-was-stored-held-changes-included",
+          "tests/PiSharp.Durable.Tests/SessionAdoptionCases.cs: publishes-a-store-of-held-changes-to-host-listeners-once-storage-resolved",
+          "tests/PiSharp.Durable.Tests/SessionAdoptionCases.cs: publishes-a-jsonl-commit-once-the-storage-reclaimed-its-sidecar-and-resolved",
+          "tests/PiSharp.Durable.Tests/SessionAdoptionCases.cs: publishes-a-store-of-held-changes-that-storage-rejects-after-adopting-it-then-fails-the-session",
+          "tests/PiSharp.Durable.Tests/Harness/HarnessTasksCases.cs: publication-at-adoption.resumes-task-and-idle-waits-only-once-observecommits-observers-saw-the-terminal-commit",
+          "tests/PiSharp.Durable.Tests/Harness/HarnessTasksCases.cs: publication-at-adoption.runs-host-listeners-before-the-waits-a-terminal-commit-resolves-",
+          "tests/PiSharp.Durable.Tests/Harness/HarnessTasksCases.cs: publication-at-adoption.signals-a-newly-marked-run-after-host-listeners-saw-the-mark-outside-the-storages-adopt-",
+          "tests/PiSharp.Durable.Tests/Harness/HarnessTasksCases.cs: publication-at-adoption.resolves-a-waitforidle-called-while-the-storage-stores-the-commit-at-its-publication-after-host-listeners",
+          "tests/PiSharp.Durable.Tests/Harness/HarnessTasksCases.cs: publication-at-adoption.publishes-a-commit-the-storage-rejects-after-adopting-it-resolves-its-waits-then-fails-the-session",
+          "tests/PiSharp.Durable.Tests/Harness/HarnessTasksCases.cs: publication-at-adoption.counts-a-task-created-by-a-commit-the-storage-rejects-after-adopting-it-and-its-close-balances-it",
+          "tests/PiSharp.Durable.Tests/Harness/HarnessTasksCases.cs: publication-at-adoption.keeps-a-task-wait-resolved-when-a-host-listener-closes-the-harness-on-the-terminal-commit",
+          "tests/PiSharp.Durable.Tests/Harness/HarnessTasksCases.cs: publication-at-adoption.ends-a-task-wait-when-the-harness-closes-while-the-terminal-commit-is-stored-and-still-stores-it",
+          "tests/PiSharp.Durable.Tests/Harness/HarnessTasksCases.cs: publication-at-adoption.fails-the-session-with-the-storage-error-when-it-rejects-after-adopting-and-reports-an-observers-throw",
+          "tests/PiSharp.Durable.Tests/Harness/HarnessTasksCases.cs: publication-at-adoption.stores-a-host-listeners-own-commit-before-the-reconcile-commit-that-the-same-publication-asks-for",
+          "tests/PiSharp.Durable.Tests/Harness/HarnessTasksCases.cs: publication-at-adoption.calls-a-host-listener-added-on-a-harness-during-a-publication-only-when-one-was-registered-at-it",
+          "tests/PiSharp.Durable.Tests/Harness/HarnessSubmissionsCases.cs: resumes-a-wait-only-once-observecommits-observers-saw-the-commit-that-settled-it",
+          "tests/PiSharp.Durable.Tests/StoreStorageCommitCases.cs: storage.store.commit.publishes-each-commit-of-a-call-in-a-host-batch-of-its-own-after-the-calls-one-transaction",
+          "tests/PiSharp.Durable.Tests/SessionObserversCases.cs: gets-every-stored-commit-then-failed-once-the-session-closed-s1-after-its-last-publication",
+          "tests/PiSharp.Durable.Tests/SessionObserversCases.cs: reports-a-throwing-observer-detaches-it-and-ends-it-listener-error-the-others-go-on",
+          "tests/PiSharp.Durable.Tests/SessionObserversCases.cs: starts-at-the-committed-value-and-advances-at-the-publication-of-each-stored-commit-with-its-ops"
+        ]
+      }
     },
     {
       "id": "durable.read-caches",
       "area": "durable",
       "phase": 4,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "durable@1.5.0/Changed#4"
       ],
@@ -9253,7 +9303,38 @@
         "src/PiSharp.Durable/Session/ (new)"
       ],
       "release": "1.5.0",
-      "notes": "PiSharp's records and JSON values are immutable already (Context.cs header: upstream's freezeJson has no counterpart), so the frozen-result half holds by construction; the caches are missing. Depends on durable.group-commit (the caches sit under the writer). SQL Server storage gains the most."
+      "notes": "PiSharp's records and JSON values are immutable already (Context.cs header: upstream's freezeJson has no counterpart), so the frozen-result half holds by construction; the caches are missing. Depends on durable.group-commit (the caches sit under the writer). SQL Server storage gains the most.",
+      "evidence": {
+        "commits": [
+          "95c3729b",
+          "68277da7",
+          "7bd42baa",
+          "0c910fc4",
+          "1b0464ec"
+        ],
+        "tests": [
+          "tests/PiSharp.Durable.Tests/SessionCachedStorageCases.cs: serves-a-written-record-without-a-read-and-follows-later-writes",
+          "tests/PiSharp.Durable.Tests/SessionCachedStorageCases.cs: keeps-a-read-only-when-no-commit-overlapped-it",
+          "tests/PiSharp.Durable.Tests/SessionCachedStorageCases.cs: keeps-a-bounded-number-of-ended-tasks-and-every-live-one-until-it-ends",
+          "tests/PiSharp.Durable.Tests/SessionCachedStorageCases.cs: applies-a-batch-stored-with-commit-when-it-is-published-not-at-its-receipt",
+          "tests/PiSharp.Durable.Tests/SessionCachedStorageCases.cs: drops-a-read-a-publication-of-its-record-overlapped-and-keeps-versions-only-for-reads-in-flight",
+          "tests/PiSharp.Durable.Tests/SessionCachedStorageCases.cs: keeps-the-ended-tasks-a-task-waits-on-until-it-moved-on-from-its-wait",
+          "tests/PiSharp.Durable.Tests/SessionCachedStorageCases.cs: keeps-the-written-record-itself-frozen-no-copy",
+          "tests/PiSharp.Durable.Tests/SessionConversationTailsCases.cs: reads-once-then-follows-the-commits",
+          "tests/PiSharp.Durable.Tests/SessionConversationTailsCases.cs: knows-a-new-root-conversation-is-empty-and-a-fork-only-once-read-or-written",
+          "tests/PiSharp.Durable.Tests/SessionConversationTailsCases.cs: answers-a-cutoff-from-the-newest-marker-only-at-or-after-it",
+          "tests/PiSharp.Durable.Tests/SessionConversationTailsCases.cs: keeps-a-bounded-number-of-conversations-fewer-with-markers",
+          "tests/PiSharp.Durable.Tests/SessionConversationTailsCases.cs: freezes-the-markers-it-keeps",
+          "tests/PiSharp.Durable.Tests/HarnessContextRangeCases.cs: is-not-advanced-when-an-entry-was-committed-while-its-scan-ran-off-the-line",
+          "tests/PiSharp.Durable.Tests/SessionGroupCommitCases.cs: fails-the-session-for-a-throw-in-the-read-caches-write-through-and-leaves-the-later-parts-unpublished",
+          "tests/PiSharp.Durable.Tests/HarnessGroupCommitCases.cs: reads-no-task-record-from-storage-for-more-live-and-awaited-tasks-than-the-record-caches-count",
+          "tests/PiSharp.Durable.Tests/Harness/HarnessTasksCases.cs: task-phases.commits-results-with-entries-atomically-keeps-memos-until-terminal-and-retires-task-documents",
+          "tests/PiSharp.Durable.Tests/BenchmarksCases.cs: benchmarks.smoke",
+          "tests/PiSharp.Durable.Tests/Harness/HarnessContextCases.cs: extends-a-tasks-context-read-with-only-newer-entries",
+          "tests/PiSharp.Durable.Tests/Harness/HarnessContextCases.cs: keeps-a-conversations-context-read-across-its-tasks-and-for-the-retention-period-once-idle",
+          "tests/PiSharp.Durable.Tests/Harness/HarnessContextCases.cs: finds-the-baseline-among-the-entries-an-extended-read-adds"
+        ]
+      }
     },
     {
       "id": "durable.conversation-window",
