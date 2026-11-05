@@ -57,10 +57,10 @@
     "repeatedBullets": 23,
     "byStatus": {
       "ported": 220,
-      "ported-with-deferral": 22,
+      "ported-with-deferral": 23,
       "already-ported": 12,
       "no-op": 25,
-      "port": 47
+      "port": 46
     },
     "byArea": {
       "ai": 58,
@@ -9081,7 +9081,7 @@
       "id": "durable.group-commit",
       "area": "durable",
       "phase": 4,
-      "status": "port",
+      "status": "ported-with-deferral",
       "changelog": [
         "durable@1.5.0/Changed#2",
         "durable@1.5.0/Changed#6",
@@ -9115,7 +9115,58 @@
         "docs/durable-benchmarks.md"
       ],
       "release": "1.5.0",
-      "notes": "The deepest runtime change. PiSharp's Session line (Session.cs, with decision 0005's .NET mappings: line jobs, Session.Defer, the storage lease) awaits each CommitAsync before the next job. Port writer.ts and keys.ts as the line's write path over durable.storage-commit-batches. Upstream measured about 5 to 440 runs per second at 128 conversations over 4 ms storage; record PiSharp's own numbers in docs/durable-benchmarks.md. PiSharp-only SQL Server storage (decision 0007), with its network round trips, gains most. Depends on durable.storage-commit-batches; durable.commit-publication and durable.read-caches come with it."
+      "notes": "The deepest runtime change. PiSharp's Session line (Session.cs, with decision 0005's .NET mappings: line jobs, Session.Defer, the storage lease) awaits each CommitAsync before the next job. Port writer.ts and keys.ts as the line's write path over durable.storage-commit-batches. Upstream measured about 5 to 440 runs per second at 128 conversations over 4 ms storage; record PiSharp's own numbers in docs/durable-benchmarks.md. PiSharp-only SQL Server storage (decision 0007), with its network round trips, gains most. Depends on durable.storage-commit-batches; durable.commit-publication and durable.read-caches come with it.",
+      "evidence": {
+        "commits": [
+          "5eb9562c",
+          "7f5e57e5",
+          "ec8bd270",
+          "f17c1f10",
+          "6f33476e",
+          "56d30153"
+        ],
+        "tests": [
+          "tests/PiSharp.Durable.Tests/SessionGroupCommitCases.cs: stores-the-commits-admitted-while-a-call-is-in-flight-in-one-call-each-with-its-seq-published-in-order",
+          "tests/PiSharp.Durable.Tests/SessionGroupCommitCases.cs: makes-a-read-of-an-entry-id-leaked-by-an-unpublished-commit-wait-for-its-publication",
+          "tests/PiSharp.Durable.Tests/SessionGroupCommitCases.cs: makes-a-job-wait-for-an-unpublished-creation-at-a-document-address-instead-of-creating-it-again",
+          "tests/PiSharp.Durable.Tests/SessionGroupCommitCases.cs: makes-a-write-to-a-conversation-an-unpublished-commit-creates-wait-for-it",
+          "tests/PiSharp.Durable.Tests/SessionGroupCommitCases.cs: makes-each-read-of-the-entries-of-a-conversation-an-unpublished-commit-creates-wait-for-its-creation",
+          "tests/PiSharp.Durable.Tests/SessionGroupCommitCases.cs: makes-a-scan-that-cannot-be-keyed-wait-for-every-unpublished-commit",
+          "tests/PiSharp.Durable.Tests/SessionGroupCommitCases.cs: makes-a-line-read-after-an-un-awaited-commit-see-it",
+          "tests/PiSharp.Durable.Tests/SessionGroupCommitCases.cs: makes-a-reader-of-a-document-whose-held-changes-an-unpublished-commit-stores-wait-and-store-them-once",
+          "tests/PiSharp.Durable.Tests/SessionGroupCommitCases.cs: makes-a-reader-of-a-document-held-by-a-deferred-commit-behind-a-call-wait-for-it-and-store-it",
+          "tests/PiSharp.Durable.Tests/SessionGroupCommitCases.cs: delivers-a-read-a-commit-without-writes-a-callback-error-and-a-deferred-commit-after-an-earlier-commit",
+          "tests/PiSharp.Durable.Tests/SessionGroupCommitCases.cs: makes-every-outcome-after-a-fatal-failure-sessionfailed-and-keeps-the-earlier-ones",
+          "tests/PiSharp.Durable.Tests/SessionGroupCommitCases.cs: publishes-the-parts-received-before-a-call-rejects-then-rejects-them-with-its-error",
+          "tests/PiSharp.Durable.Tests/SessionGroupCommitCases.cs: fails-every-job-after-the-first-part-of-a-call-that-rejects-except-its-other-parts-with-their-storage-error",
+          "tests/PiSharp.Durable.Tests/SessionGroupCommitCases.cs: reports-sessionfailed-with-the-first-error-for-a-call-that-rejects-after-another-failure-failed-the-session",
+          "tests/PiSharp.Durable.Tests/SessionGroupCommitCases.cs: rejects-every-part-of-a-call-with-its-rejection-value",
+          "tests/PiSharp.Durable.Tests/SessionGroupCommitCases.cs: rejects-a-refused-part-with-its-refusal-and-the-parts-after-it-with-sessionfailed",
+          "tests/PiSharp.Durable.Tests/SessionGroupCommitCases.cs: leaves-the-parts-after-one-whose-adoption-throws-unpublished-rejected-with-sessionfailed",
+          "tests/PiSharp.Durable.Tests/SessionGroupCommitCases.cs: fails-the-session-for-a-deferred-commit-memory-cannot-adopt-and-still-closes",
+          "tests/PiSharp.Durable.Tests/SessionGroupCommitCases.cs: settles-a-deferred-commit-whose-adoption-throws-alone-and-closes",
+          "tests/PiSharp.Durable.Tests/SessionGroupCommitCases.cs: publishes-a-deferred-commit-only-once-the-commit-before-it-is-published",
+          "tests/PiSharp.Durable.Tests/SessionGroupCommitCases.cs: never-publishes-a-deferred-commit-behind-a-commit-that-fails",
+          "tests/PiSharp.Durable.Tests/SessionGroupCommitCases.cs: publishes-the-parts-of-one-call-a-macrotask-apart-what-one-resolves-runs-before-the-next-is-published",
+          "tests/PiSharp.Durable.Tests/SessionGroupCommitCases.cs: publishes-each-commit-inside-the-storage-s-scope-the-next-only-once-one-it-runs-later-ran",
+          "tests/PiSharp.Durable.Tests/SessionGroupCommitCases.cs: reports-a-scope-that-throws-instead-of-running-the-publication-and-publishes-the-commit",
+          "tests/PiSharp.Durable.Tests/SessionGroupCommitCases.cs: publishes-no-part-of-a-call-after-a-failure-that-a-continuation-of-an-earlier-part-caused",
+          "tests/PiSharp.Durable.Tests/SessionGroupCommitCases.cs: publishes-no-part-of-a-call-after-the-session-fails-in-a-continuation-of-an-earlier-part",
+          "tests/PiSharp.Durable.Tests/SessionGroupCommitCases.cs: checks-the-failure-when-a-storage-s-scope-runs-a-publication-it-deferred-not-when-it-was-asked-to",
+          "tests/PiSharp.Durable.Tests/SessionGroupCommitCases.cs: stores-held-changes-for-an-unload-after-the-call-in-flight",
+          "tests/PiSharp.Durable.Tests/SessionGroupCommitCases.cs: stores-held-changes-for-a-version-reload-inside-a-callback-after-the-call-in-flight",
+          "tests/PiSharp.Durable.Tests/SessionGroupCommitCases.cs: stores-held-changes-at-their-deadline-after-the-call-in-flight",
+          "tests/PiSharp.Durable.Tests/SessionGroupCommitCases.cs: drains-the-calls-in-flight-and-stores-held-changes-when-it-closes",
+          "tests/PiSharp.Durable.Tests/SessionGroupCommitCases.cs: starts-no-job-past-256-without-a-delivered-outcome-and-returns-its-line-state-to-zero-when-idle",
+          "tests/PiSharp.Durable.Tests/SessionGroupCommitCases.cs: stores-publishes-and-reads-only-what-an-order-of-the-commits-implies-seed-",
+          "tests/PiSharp.Durable.Tests/Harness/HarnessInboxCases.cs: reads-queue-modes-when-the-final-boundary-s-commit-runs-on-the-session-line",
+          "tests/PiSharp.Durable.Tests/SessionDeferredCommitsCases.cs: stores-them-at-close-after-the-commits-admitted-before-it-and-closes-storage-when-that-store-fails",
+          "tests/PiSharp.Durable.Tests/SessionDeferredCommitsCases.cs: stores-every-held-document-in-one-transaction-when-the-earliest-deadline-comes",
+          "tests/PiSharp.Durable.Tests/SessionDeferredCommitsCases.cs: stores-nothing-once-the-session-failed",
+          "tests/PiSharp.Durable.Tests/BenchmarksCases.cs: benchmarks.smoke"
+        ]
+      },
+      "deferred": "Session half landed; left for two later areas. group-commit-scheduler: the Harness runs the serialized line (DurableHarness.LineWaitsForPublication => true in Harness.cs, the only Harness change here) until the scheduler records decision regions and membership keys (upstream MembershipKeys, the scheduler's region reads and the CommitInternal exemption for its own commits in scheduler.ts, harness.ts and context.ts); then remove the override and port durable@1.5.0/Changed#6 (a wait whose commit is still being stored when the Harness closes ends with the closed error, the commit still stored and published before close completes), Changed#7 (cancellation checked when a job starts) and harness-group-commit.test.ts, and re-measure storage-throughput's harness rows (upstream: about 5 -> 440 runs/s at 128 conversations over 4 ms). publication-caches: CachedStorage and session-group-commit's 'fails the Session for a throw in the read caches' write-through, and leaves the later parts unpublished', the conversation record cache (until then every AppendEntryAsync reads its conversation on the line, so entry commits do not batch), conversation tails, the TaskDocuments index (until then every terminal task's documents are scanned) and LineSizes' read counts."
     },
     {
       "id": "durable.commit-publication",

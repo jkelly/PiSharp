@@ -4240,7 +4240,13 @@
         "deferred-commits"
       ],
       "commits": [
-        "e5c6182ba"
+        "e5c6182ba",
+        "5eb9562c",
+        "7f5e57e5",
+        "ec8bd270",
+        "f17c1f10",
+        "6f33476e",
+        "56d30153"
       ],
       "notes": "The deepest runtime change. PiSharp's Session line (Session.cs, with decision 0005's .NET mappings: line jobs, Session.Defer, the storage lease) awaits each CommitAsync before the next job; port writer.ts and keys.ts as the line's write path over the batch storage (area storage-batches). The scheduler half of e5c6182ba is area group-commit-scheduler, the read caches and the publication order area publication-caches. docs/group-commit.md is the reference. Record PiSharp's own throughput (upstream measured about 5 to 440 runs per second at 128 conversations over 4 ms storage) in docs/durable-benchmarks.md with the storage benchmark."
     },
