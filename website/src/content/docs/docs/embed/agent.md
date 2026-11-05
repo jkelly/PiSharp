@@ -3,12 +3,12 @@ title: Agent loop
 description: Run PiSharp.Agent's tool-calling loop with your own tools, hooks and events.
 ---
 
-`PiSharp.Agent` runs Pi's agent loop. It sends the transcript to the model, streams the reply, runs the tool calls the model asks for, adds the results to the transcript and asks again, until the model stops. It ports Pi's [`packages/agent`](https://github.com/earendil-works/pi/tree/v1.2.0/packages/agent). It keeps the transcript in memory only and ships no tools of its own: for a session file see [Coding agent](/docs/embed/coding-agent/), and for Pi's file and shell tools see [Built-in tools](/docs/embed/coding-agent/#built-in-tools).
+`PiSharp.Agent` runs Pi's agent loop. It sends the transcript to the model, streams the reply, runs the tool calls the model asks for, adds the results to the transcript and asks again, until the model stops. It ports Pi's [`packages/agent`](https://github.com/earendil-works/pi/tree/v1.5.0/packages/agent). It keeps the transcript in memory only and ships no tools of its own: for a session file see [Coding agent](/docs/embed/coding-agent/), and for Pi's file and shell tools see [Built-in tools](/docs/embed/coding-agent/#built-in-tools).
 
 ## Install
 
 ```powershell
-dotnet add package PiSharp.Agent --version 1.2.0.2
+dotnet add package PiSharp.Agent --version 1.5.0
 ```
 
 `PiSharp.Agent` brings `PiSharp.AI` and `PiSharp.Contracts`. Everything on this page is in the `PiSharp.Agent` namespace. [Chat and providers](/docs/embed/chat/) explains transports, models and transcript entries.

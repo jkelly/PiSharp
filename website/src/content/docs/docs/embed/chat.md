@@ -3,12 +3,12 @@ title: Chat and providers
 description: "Stream from any provider with PiSharp.AI: transports, models, auth and events."
 ---
 
-`PiSharp.AI` is the chat layer. It sends a transcript to a model and gives you back a stream of events: text, thinking, tool calls and a final message with usage and cost. It ports Pi's [`packages/ai`](https://github.com/earendil-works/pi/tree/v1.2.0/packages/ai). It never runs tools and never looks up credentials on its own: you pass the model, the endpoint and the key. For the agent loop on top of it, see [Agent loop](/docs/embed/agent/).
+`PiSharp.AI` is the chat layer. It sends a transcript to a model and gives you back a stream of events: text, thinking, tool calls and a final message with usage and cost. It ports Pi's [`packages/ai`](https://github.com/earendil-works/pi/tree/v1.5.0/packages/ai). It never runs tools and never looks up credentials on its own: you pass the model, the endpoint and the key. For the agent loop on top of it, see [Agent loop](/docs/embed/agent/).
 
 ## Install
 
 ```powershell
-dotnet add package PiSharp.AI --version 1.2.0.2
+dotnet add package PiSharp.AI --version 1.5.0
 ```
 
 `PiSharp.AI` brings `PiSharp.Contracts`, which holds the message and event types.
@@ -359,4 +359,4 @@ Service tiers ship as experimental in PiSharp 1.2.0.2. The API is marked `[Exper
 - Pi's `stream()` and `complete()` functions look up the model and its key for you. In PiSharp you build the transport explicitly from a model, an endpoint and a key.
 - Pi's built-in model list is a module export. `PiSharp.AI` reads the same catalog files, but you supply them.
 - Events and messages have the same shape as Pi's. `PiWireJson` converts them to and from Pi's JSON.
-- Service tiers are a PiSharp addition and are not in Pi v1.2.0.
+- Service tiers are a PiSharp addition and are not in Pi v1.5.0.

@@ -16,9 +16,10 @@ C#-only fixes that don't change the Pi baseline add a fourth number.
 | `1.2.0` | Synced to Pi 1.2.0 |
 | `1.2.0.1` | C#-only patch on Pi 1.2.0: the experimental durable port |
 | `1.2.0.2` | C#-only patch on Pi 1.2.0: experimental media, service tiers, custom agents and the durable device server |
+| `1.5.0` | Synced to Pi 1.5.0. Pi 1.3.0 and 1.4.0 had no PiSharp release; their changes are in 1.5.0 |
 
 Bumping the third number instead (`0.99.2`) would claim to match a Pi release that PiSharp doesn't match. NuGet and .NET both order four-part versions correctly, so `0.99.1.2` sorts after `0.99.1` and before `1.1.0`.
 
 The [changelog](/changelog/) labels each release as either a **Pi sync** or a **C# patch**. [Releasing](/docs/contribute/releasing/) describes how a release is prepared and published.
 
-Features on the `main` branch that are in no release yet are marked **Unreleased** in these docs. A build of `main` still reports the last release's version.
+Features on the `main` branch that are in no release yet are marked **Unreleased** in these docs. A build reports the `VersionPrefix` in `Directory.Build.props`, 1.5.0 today. Between releases that is the last release's version, except after a sync to a new Pi release, which moves it to the version the sync prepares.

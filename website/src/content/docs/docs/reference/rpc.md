@@ -3,7 +3,7 @@ title: RPC protocol
 description: Pi's JSONL RPC protocol in PiSharp, and the commands PiSharp adds.
 ---
 
-`pisharp --mode rpc` speaks Pi's RPC protocol on stdin and stdout, so a client written for `pi --mode rpc` works unchanged. This page lists the framing, every command and event, and the `pisharp_*` commands PiSharp adds. Pi's own documents describe each payload in full: [rpc.md](https://github.com/earendil-works/pi/blob/v1.2.0/packages/coding-agent/docs/rpc.md), [rpc-commands.md](https://github.com/earendil-works/pi/blob/v1.2.0/packages/coding-agent/docs/rpc-commands.md) and [rpc-extension-ui.md](https://github.com/earendil-works/pi/blob/v1.2.0/packages/coding-agent/docs/rpc-extension-ui.md). To serve the protocol from your own process, see [RPC host](/docs/embed/rpc/).
+`pisharp --mode rpc` speaks Pi's RPC protocol on stdin and stdout, so a client written for `pi --mode rpc` works unchanged. This page lists the framing, every command and event, and the `pisharp_*` commands PiSharp adds. Pi's own documents describe each payload in full: [rpc.md](https://github.com/earendil-works/pi/blob/v1.5.0/packages/coding-agent/docs/rpc.md), [rpc-commands.md](https://github.com/earendil-works/pi/blob/v1.5.0/packages/coding-agent/docs/rpc-commands.md) and [rpc-extension-ui.md](https://github.com/earendil-works/pi/blob/v1.5.0/packages/coding-agent/docs/rpc-extension-ui.md). To serve the protocol from your own process, see [RPC host](/docs/embed/rpc/).
 
 ## Entry points
 
@@ -28,7 +28,7 @@ When stdin closes, the server aborts a running prompt, closes open dialogs and e
 
 ## Commands
 
-These are Pi v1.2.0's commands. Fields marked `?` are optional.
+These are Pi v1.5.0's commands. Fields marked `?` are optional.
 
 | Command | Fields | Does |
 | --- | --- | --- |
@@ -150,4 +150,4 @@ When an extension asks for input, the server writes an `extension_ui_request` wi
 | `setTitle` | `title` | none |
 | `set_editor_text` | `text` | none |
 
-An answer is `{"type": "extension_ui_response", "id": "<request id>", …}` with `value`, `confirmed`, or `"cancelled": true` to dismiss the dialog. `timeout` is in milliseconds: when it passes, the dialog ends as if dismissed and a later answer is ignored. An answer with an unknown `id` is ignored too. Custom components, themes, headers and footers don't exist over RPC; [rpc-extension-ui.md](https://github.com/earendil-works/pi/blob/v1.2.0/packages/coding-agent/docs/rpc-extension-ui.md) lists what each UI call does there.
+An answer is `{"type": "extension_ui_response", "id": "<request id>", …}` with `value`, `confirmed`, or `"cancelled": true` to dismiss the dialog. `timeout` is in milliseconds: when it passes, the dialog ends as if dismissed and a later answer is ignored. An answer with an unknown `id` is ignored too. Custom components, themes, headers and footers don't exist over RPC; [rpc-extension-ui.md](https://github.com/earendil-works/pi/blob/v1.5.0/packages/coding-agent/docs/rpc-extension-ui.md) lists what each UI call does there.

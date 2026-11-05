@@ -15,7 +15,7 @@ The custom agents library ships as experimental in PiSharp 1.2.0.2, as the `PiSh
 
 `PiSharp.CustomAgents` is a C# library for building your own agents on [Pi Durable](/docs/guides/durable/), PiSharp's port of Pi's crash-safe agent harness. You define agents, their tools and multi-step workflows in code. The durable harness runs them and commits every step to storage, so a run that a crash or restart interrupts resumes where it stopped.
 
-The library is PiSharp's own. Pi v1.2.0 has no equivalent package, though it runs on the same durable harness design. [Decision 0012](https://github.com/jkelly/PiSharp/blob/main/docs/decisions/0012-custom-agents.md) records the design.
+The library is PiSharp's own. Pi v1.5.0 has no equivalent package, though it runs on the same durable harness design. [Decision 0012](https://github.com/jkelly/PiSharp/blob/main/docs/decisions/0012-custom-agents.md) records the design.
 
 ## When to use it
 
@@ -93,10 +93,10 @@ Reference the packages you need from your own `net10.0` project and suppress bot
     <NoWarn>$(NoWarn);PISHARP_DURABLE001;PISHARP_AGENTS001</NoWarn>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="PiSharp.CustomAgents" Version="1.2.0.2" />
-    <PackageReference Include="PiSharp.CustomAgents.JavaScript" Version="1.2.0.2" />
-    <PackageReference Include="PiSharp.CustomAgents.Scripting" Version="1.2.0.2" />
-    <PackageReference Include="PiSharp.Durable.Sqlite" Version="1.2.0.2" />
+    <PackageReference Include="PiSharp.CustomAgents" Version="1.5.0" />
+    <PackageReference Include="PiSharp.CustomAgents.JavaScript" Version="1.5.0" />
+    <PackageReference Include="PiSharp.CustomAgents.Scripting" Version="1.5.0" />
+    <PackageReference Include="PiSharp.Durable.Sqlite" Version="1.5.0" />
   </ItemGroup>
 </Project>
 ```

@@ -138,4 +138,4 @@ Because the site publishes from `main`, it documents features that are merged bu
 - For a CLI-only feature, say that it is in no release yet and needs a CLI built from source.
 - Don't add it to `packages.ts` until it ships as a package.
 
-No documented feature is unreleased since 1.2.0.2. A released experimental feature, such as [Pi Durable](/docs/guides/durable/) or [custom agents](/docs/custom-agents/overview/), uses an `Experimental` badge with the `caution` variant instead, and its aside names the release it shipped in. When a feature ships, remove its markers in the release preparation.
+Since 1.5.0, the only documented API in no package is `RegistryReader` in `PiSharp.Durable.Store`, and [its section](/docs/embed/durable/#registries-from-chord) says so. A released experimental feature, such as [Pi Durable](/docs/guides/durable/) or [custom agents](/docs/custom-agents/overview/), uses an `Experimental` badge with the `caution` variant instead, and its aside names the release it shipped in. When a feature ships, remove its markers in the release preparation.

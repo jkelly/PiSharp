@@ -11,7 +11,7 @@ No tag, release or package is published without the project owner's explicit go-
 
 ## Versioning
 
-PiSharp's version is the Pi version it matches, and a fourth number marks a C#-only patch on the same baseline: 1.2.0 is the Pi v1.2.0 sync, and 1.2.0.1 and 1.2.0.2 add C# work on top of it. See [Versioning](/docs/versioning/).
+PiSharp's version is the Pi version it matches, and a fourth number marks a C#-only patch on the same baseline: 1.2.0 and 1.5.0 are the Pi v1.2.0 and v1.5.0 syncs, and 1.2.0.1 and 1.2.0.2 added C# work on top of 1.2.0. See [Versioning](/docs/versioning/).
 
 The release scripts enforce this:
 
@@ -23,7 +23,7 @@ Every assembly gets the release version, except `PiSharp.ExtensionHost`, which k
 
 ## Prepare the release
 
-Releases are prepared on a `release/<version>` branch, such as `release/1.2.0.2`, and merged into `main` with a pull request. The preparation commit touches these files:
+Releases are prepared on a `release/<version>` branch, such as `release/1.5.0`, and merged into `main` with a pull request. The preparation commit touches these files:
 
 | File | Change |
 | --- | --- |
@@ -73,7 +73,7 @@ Run the release workflow by hand from the Actions tab to build and check a versi
 
 | Input | Default | Effect |
 | --- | --- | --- |
-| `version` | `1.2.0.2` | The version to build and validate. |
+| `version` | `1.5.0` | The version to build and validate. |
 | `skip_tests` | `false` | Skip the offline test suites. Only a dry run can skip them. |
 
 A dry run runs only the build job. The publish and GitHub release jobs run only for a pushed tag.
@@ -85,8 +85,8 @@ You can also build the packages locally. See [Install your build as a tool](/doc
 Once the release branch is merged, tag the merge commit and push the tag:
 
 ```sh
-git tag v1.2.0.2 <merge commit>
-git push origin v1.2.0.2
+git tag v1.5.0 <merge commit>
+git push origin v1.5.0
 ```
 
 ## The release workflow

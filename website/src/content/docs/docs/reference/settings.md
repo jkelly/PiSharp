@@ -3,7 +3,7 @@ title: Settings
 description: Every settings.json key PiSharp reads, its type, default and effect.
 ---
 
-PiSharp reads Pi v1.2.0's `settings.json` keys, with Pi's defaults, plus three keys of its own. This page lists them all, grouped by area. Pi's [Settings](https://github.com/earendil-works/pi/blob/v1.2.0/packages/coding-agent/docs/settings.md) page describes the same keys.
+PiSharp reads Pi v1.5.0's `settings.json` keys, with Pi's defaults, plus three keys of its own. This page lists them all, grouped by area. Pi's [Settings](https://github.com/earendil-works/pi/blob/v1.5.0/packages/coding-agent/docs/settings.md) page describes the same keys.
 
 PiSharp ships Pi's settings schema unchanged. Add a `$schema` key so your editor can check the file:
 

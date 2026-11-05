@@ -99,15 +99,16 @@ The third-party packages are pinned exactly, and their licenses are in [`third-p
 
 | Part | Status | Where |
 | --- | --- | --- |
-| The 22 libraries listed on the SDK page, and the `PiSharp.Cli` tool | Released on NuGet, 1.2.0.2 | [SDK](/sdk/) |
-| Durable libraries and `pisharp durable` | Released as experimental in 1.2.0.1. Every durable API carries `[Experimental("PISHARP_DURABLE001")]`. | [Pi Durable](/docs/guides/durable/) |
+| The 23 libraries listed on the SDK page, and the `PiSharp.Cli` tool | Released on NuGet, 1.5.0 | [SDK](/sdk/) |
+| Durable libraries and `pisharp durable` | Released as experimental in 1.2.0.1, and moved to `pi-durable` v1.5.0 in 1.5.0. Every durable API carries `[Experimental("PISHARP_DURABLE001")]`. | [Pi Durable](/docs/guides/durable/) |
+| Telemetry (`PiSharp.Telemetry`) | Released as experimental in 1.5.0. `[Experimental("PISHARP_TELEMETRY001")]`. | [Telemetry](/docs/embed/telemetry/) |
 | Media library (`PiSharp.AI.Media`) and the media tools | Released as experimental in 1.2.0.2. `[Experimental("PISHARP_MEDIA001")]`. | [Media](/docs/embed/media/) |
 | Service tiers | Released as experimental in 1.2.0.2. `[Experimental("PISHARP_TIERS001")]`. | [Service tiers](/docs/guides/service-tiers/) |
 | Custom agents | Released as experimental in 1.2.0.2, as three packages. `[Experimental("PISHARP_AGENTS001")]` on every public type. | [Custom agents](/docs/custom-agents/overview/) |
 | Durable device server (`pisharp durable serve`) | Released as experimental in 1.2.0.2, inside the CLI tool. `PiSharp.Durable.Hosting`, `PiSharp.Durable.Server` and `PiSharp.Durable.Client` are not packages. | [Device server](/docs/guides/durable/#device-server) |
 | `PiSharp.ModelRuntime` | Inside the CLI tool, not a package. | |
 
-The repository also holds projects that are not released at all: a local web chat app (`PiSharp.WebAgent`), a web UI for durable devices (`PiSharp.Durable.Web`), SQL Server storage for durable sessions (`PiSharp.Durable.MSSQL`) and `PiSharp.Web.Common`. To use them, build PiSharp from source: see [Build from source](/docs/contribute/build/).
+The repository also holds projects that are not released at all: a local web chat app (`PiSharp.WebAgent`), a web UI for durable devices (`PiSharp.Durable.Web`), SQL Server storage for durable sessions (`PiSharp.Durable.MSSQL`), `PiSharp.Web.Common`, and the part of Chord v2 the durable port needs (`PiSharp.Chord`, `[Experimental("PISHARP_CHORD001")]`) with durable storage on its store (`PiSharp.Durable.Store`). To use them, build PiSharp from source: see [Build from source](/docs/contribute/build/).
 
 ## Design principles
 
