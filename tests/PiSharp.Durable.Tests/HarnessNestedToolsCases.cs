@@ -25,6 +25,9 @@
 // nested calls in pi.live.nestedTools and as tool events with their parent" is v1.5.0's "reports nested calls in pi.live.nestedTools with
 // their parent". "shows a nested call's arguments in its slot ..." no longer checks a start event. A Session line barrier
 // (ViewTests.Drained) lets the synchronous observers record what the commits a wait returned after published.
+// Pi v1.5.0 sync (area tool-tasks, 1c6928b30, #11043): pi.tool is version 3. "keeps version 2 tool task input as it is" and "reserves a
+// stored version 2 task under version 3 and runs it as a model-issued call" are v1.5.0's; describe("tool task version 1 and 2 records") is
+// harness.nested-tools.version-1-and-2.* (version-1.* before), whose migrated tasks settle at version 3.
 using System.Collections.Immutable;
 using PiSharp.Durable;
 using PiSharp.Durable.Chord;
@@ -1107,19 +1110,31 @@ internal static class NestedToolsTests
             Equal("""{"phase":"call"}""", migrated.Checkpoint.ToJson(), "checkpoint");
         });
 
-        // ─── tool task version 1 records ────────────────────────────────────
+        // #11043
+        yield return Case(prefix + "keeps-version-2-tool-task-input-as-it-is", () =>
+        {
+            var migrate = HarnessTasks.ToolTask.Definition.Migrate!;
+            var model = O("""{"kind":"model","assistant":3,"callId":"c1"}""");
+            var nested = O("""{"kind":"nested","parent":7,"parentCallId":"c1","key":"k","call":{"type":"toolCall","id":"c1/k","name":"echo","arguments":{}}}""");
+            SameJson(model.ToJson(), migrate(model, O("""{"phase":"call"}"""), 2).Input, "model");
+            SameJson(nested.ToJson(), migrate(nested, O("""{"phase":"call"}"""), 2).Input, "nested");
+        });
 
-        yield return Case(prefix + "version-1.migrates-a-pending-version-1-task-and-runs-it-as-a-model-issued-call", async () =>
+        // ─── tool task version 1 and 2 records ──────────────────────────────
+
+        var stored = prefix + "version-1-and-2.";
+
+        yield return Case(stored + "migrates-a-pending-version-1-task-and-runs-it-as-a-model-issued-call", async () =>
         {
             var setup = Setup();
             var echo = new EchoTool();
             AddTool(setup.Registry, echo.Registration);
-            var (path, id) = await StoreVersion1(setup, O("""{"phase":"call"}"""));
+            var (path, id) = await StoreVersion(setup, O("""{"phase":"call"}"""));
             var (harness, root) = await OpenChat(await SqliteStorage.OpenAsync(path), setup);
             Equal(1, (await harness.GetTaskAsync(id, Context))?.Version, "stored version");
             harness.Resume();
             var settled = await harness.WaitForTaskAsync(id, Context);
-            Equal(2, settled.Version, "version");
+            Equal(3, settled.Version, "version");
             MatchJson("""{"kind":"model","callId":"c1"}""", settled.Input, "input");
             MatchJson("""{"status":"completed","result":{"kind":"model"}}""", OutcomeOf(settled), "outcome");
             Equal(1, echo.Runs, "runs");
@@ -1128,16 +1143,16 @@ internal static class NestedToolsTests
             await harness.CloseAsync(Context);
         });
 
-        yield return Case(prefix + "version-1.migrates-a-version-1-task-interrupted-after-intent-and-settles-it-interrupted", async () =>
+        yield return Case(stored + "migrates-a-version-1-task-interrupted-after-intent-and-settles-it-interrupted", async () =>
         {
             var setup = Setup();
             var echo = new EchoTool();
             AddTool(setup.Registry, echo.Registration);
-            var (path, id) = await StoreVersion1(setup, O("""{"phase":"execute","arguments":{"text":"old"},"replay":"unsafe"}"""));
+            var (path, id) = await StoreVersion(setup, O("""{"phase":"execute","arguments":{"text":"old"},"replay":"unsafe"}"""));
             var (harness, root) = await OpenChat(await SqliteStorage.OpenAsync(path), setup);
             harness.Resume();
             var settled = await harness.WaitForTaskAsync(id, Context);
-            Equal(2, settled.Version, "version");
+            Equal(3, settled.Version, "version");
             MatchJson("""{"status":"failed","result":{"kind":"model"}}""", OutcomeOf(settled), "outcome");
             Equal(0, echo.Runs, "runs");
             var result = Results(await AllEntries(root))[0];
@@ -1145,13 +1160,34 @@ internal static class NestedToolsTests
             Contains(Text(result), "Tool echo was interrupted", "text");
             await harness.CloseAsync(Context);
         });
+
+        // #11043
+        yield return Case(stored + "reserves-a-stored-version-2-task-under-version-3-and-runs-it-as-a-model-issued-call", async () =>
+        {
+            var setup = Setup();
+            var echo = new EchoTool();
+            AddTool(setup.Registry, echo.Registration);
+            var (path, id) = await StoreVersion(setup, O("""{"phase":"call"}"""), 2);
+            var (harness, root) = await OpenChat(await SqliteStorage.OpenAsync(path), setup);
+            Equal(2, (await harness.GetTaskAsync(id, Context))?.Version, "stored version");
+            harness.Resume();
+            var settled = await harness.WaitForTaskAsync(id, Context);
+            Equal(3, settled.Version, "version");
+            MatchExactly("""{"kind":"model","assistant":"<number>","callId":"c1"}""", settled.Input, "input");
+            MatchJson("""{"status":"completed","result":{"kind":"model"}}""", OutcomeOf(settled), "outcome");
+            Equal(1, echo.Runs, "runs");
+            var result = Results(await AllEntries(root))[0];
+            Equal("c1 echo old", $"{S(result["toolCallId"])} {Text(result)}", "result");
+            await harness.CloseAsync(Context);
+        });
     }
 
     /// <summary>
-    /// Stores a live tool task for call <c>c1</c> of an assistant entry, closes, and rewrites its record as version 1 stored it:
-    /// <c>{assistant, callId}</c> input at version 1, with <paramref name="checkpoint"/>. Returns the storage path and the task ID.
+    /// Stores a live tool task for call <c>c1</c> of an assistant entry, closes, and rewrites its record as <paramref name="version"/> stored
+    /// it, with <paramref name="checkpoint"/>: version 1 had <c>{assistant, callId}</c> input, version 2 added <c>kind</c>. Returns the storage
+    /// path and the task ID (upstream <c>storeVersion</c>).
     /// </summary>
-    private static async Task<(string Path, TaskId Id)> StoreVersion1(ChatSetup setup, JsonObjectValue checkpoint)
+    private static async Task<(string Path, TaskId Id)> StoreVersion(ChatSetup setup, JsonObjectValue checkpoint, int version = 1)
     {
         var path = SqlitePath("tool-v1");
         // No submission, so the Harness never starts scheduling and the task stays pending.
@@ -1173,7 +1209,8 @@ internal static class NestedToolsTests
             RunningTaskState => new RunningTaskState(checkpoint),
             var other => throw new InvalidOperationException($"unexpected state {other.Status}"),
         };
-        await storage.CommitWritesAsync([new TaskWrite(record with { Version = 1, Input = input.Remove("kind"), State = state })], Context);
+        await storage.CommitWritesAsync([new TaskWrite(record with { Version = version, Input = version == 1 ? input.Remove("kind") : input, State = state })],
+            Context);
         await storage.CloseAsync(Context);
         return (path, id);
     }

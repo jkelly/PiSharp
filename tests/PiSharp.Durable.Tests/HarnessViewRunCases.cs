@@ -13,9 +13,11 @@
 // - Tools sleep with Task.Delay where upstream uses setTimeout: their output must cross the progress throttle in real time, as upstream's
 //   does. An aborted controller is a DurableCancellation cancelled with Exception("cancelled").
 // - Not yet v1.5.0, each left to the area that ports it: a run's pi.live.run is f3255de76's { taskId, inputs } without turns and first (area
-//   live-turns); "ends a call that never runs ..." is f3255de76's form, the call not offered listed done with its result at once (v1.5.0's
-//   "ends a call that never runs through its own task, ..." lists it pending with its task, #11043: area tool-tasks). Area run-failure added
-//   the two pi.live.runFailure checks.
+//   live-turns). Area run-failure added the two pi.live.runFailure checks.
+// - Pi v1.5.0 sync (area tool-tasks, 1c6928b30, #11043): "ends a call that never runs through its own task, and a tool aborted with its
+//   generation" (...-with-its-result-at-once-... before, f3255de76's form) is v1.5.0's: the call not offered is listed pending with its task,
+//   which ends it done with its result entry. The tools declare their parameters with pi-schema's obj() (ToolsSchema150.EmptyObject,
+//   closed), as v1.5.0's do.
 // - Streamed partials (#9265): the cases moved here from HarnessEventsCases.cs (area partial-commits ported them in harness-events.test.ts's
 //   form, on the event stream); here they read the view's operations, as upstream's v1.5.0 form does. Two of them pace the faux stream on
 //   commits instead of real time (CommitPaced: .NET's timers on Windows tick every 15.6 ms), and they count allocations with
@@ -105,7 +107,8 @@ internal static class ViewRunTests
         return partials;
     }
 
-    private static readonly JsonObjectValue NoParameters = O("""{"type":"object","properties":{}}""");
+    /// <summary><c>obj({})</c>.</summary>
+    private static readonly JsonObjectValue NoParameters = ToolsSchema150.EmptyObject;
 
     private static ToolRegistration ToolOf(string name, string description, ToolExecute execute, JsonObjectValue? parameters = null) =>
         Define.Tool(new ToolRegistration { Name = name, Description = description, Parameters = parameters ?? NoParameters, Execute = execute });
@@ -166,7 +169,7 @@ internal static class ViewRunTests
                 api.Output("two\n");
                 await gate.Task;
                 return new ToolExecutionResult();
-            }, O("""{"type":"object","properties":{"n":{"type":"number"}},"required":["n"]}""")));
+            }, O("""{"type":"object","properties":{"n":{"type":"number"}},"required":["n"],"additionalProperties":false}""")));
             setup.Faux.SetResponses(FauxAssistantMessage([FauxToolCall("print", Obj(("n", 1)), "c1")], stopReason: "toolUse"),
                 FauxAssistantMessage([FauxText("done")]));
             var (harness, root) = await OpenChat(new MemoryStorage(), setup);
@@ -341,8 +344,7 @@ internal static class ViewRunTests
             await harness.CloseAsync(Context);
         });
 
-        // f3255de76's form (see the file header): v1.5.0's "ends a call that never runs through its own task, ..." is area tool-tasks'.
-        yield return Case(prefix + "ends-a-call-that-never-runs-with-its-result-at-once-and-a-tool-aborted-with-its-generation", async () =>
+        yield return Case(prefix + "ends-a-call-that-never-runs-through-its-own-task-and-a-tool-aborted-with-its-generation", async () =>
         {
             var setup = Setup();
             HarnessTests.AddTool(setup.Registry, ToolOf("wait", "Waits until aborted", async (_, _, callContext) =>
@@ -366,14 +368,15 @@ internal static class ViewRunTests
             history.Detach();
             var states = history.Live();
             var views = history.Views;
-            // The call not offered is listed done, with its result entry, in the commit of its calling answer.
+            // #11043: the call not offered is listed pending with its task in the commit of its calling answer, and its task ends it done with
+            // its result entry.
             var ghosts = SlotsOf(states, "c1");
             var listed = ghosts.FindIndex(slot => slot is not null);
-            var ghost = ghosts[listed]!;
-            Equal("done", Status(ghost), "the call not offered");
-            var listing = views[listed].Entries;
-            Seq(["pi.assistant", "pi.tool-result"], listing.Select(entry => entry.Kind).TakeLast(2), "the listing commit");
-            Equal((double)listing[^1].Id.Value, N(ghost["entry"]), "its result entry");
+            MatchJson("""{"status":"pending","unoffered":true}""", ghosts[listed], "the call not offered");
+            Check(ghosts[listed]!.ContainsKey("taskId"), $"its task: {ghosts[listed]!.ToJson()}");
+            Equal("pi.assistant", views[listed].Entries[^1].Kind, "the listing commit");
+            var ended = ghosts.FindIndex(slot => Status(slot) == "done");
+            Equal((double)views[ended].Entries[^1].Id.Value, N(ghosts[ended]!["entry"]), "its result entry");
             // The aborted tool ends with its result entry, then the run ends without an answer.
             var waits = SlotsOf(states, "c2");
             var done = waits.FindIndex(slot => Status(slot) == "done");

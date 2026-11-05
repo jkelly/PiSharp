@@ -34,6 +34,9 @@
 //   count must still be 4. "holds a faulted tool's slot and task_failed ...": upstream's "broken" tool returns a function in `details`,
 //   which is not strict JSON; the result here carries a null tool name in `control.addTools`, which makes the same result commit throw (see
 //   HarnessToolsRecoveryCases.cs).
+// - Pi v1.5.0 sync (area tool-tasks, 1c6928b30, #11043): in "ends a call that never runs and a tool aborted with its generation" the call
+//   not offered ends through its own tool task, in a commit after its calling message's, so its end follows the assistant's end without
+//   directly following it, and its order against the other call's start is not fixed: each call's events are checked on their own.
 using System.Collections.Immutable;
 using JsonNode = System.Text.Json.Nodes.JsonNode;
 using PiSharp.Contracts;
@@ -473,22 +476,27 @@ internal static partial class EventTests
             await harness.AbortTaskAsync(await RunTask(harness, root), Context);
             await submission.WaitAsync(Context);
             await ViewTests.Drained(harness);
-            // The call not offered ends after its calling message and directly before its result message.
+            // The call not offered ends after its calling message, through its own task, and directly before its result message.
             var round = listening.Events().Select(item => item switch
             {
                 MessageEndEvent end => $"end:{end.Entry.Kind}",
                 MessageStartEvent start => $"start:{Role(start.Message)}",
+                ToolExecutionEndEvent end => $"{end.Type}:{end.ToolCallId}",
                 _ => item.Type,
             }).ToList();
-            var ghostEnd = round.IndexOf("tool_execution_end");
-            Seq(["end:pi.assistant", "tool_execution_end", "start:toolResult", "end:pi.tool-result"], round.Skip(ghostEnd - 1).Take(4), "ghost end");
+            var answered = round.IndexOf("end:pi.assistant");
+            var ghostEnd = round.IndexOf("tool_execution_end:c1");
+            Check(answered >= 0 && ghostEnd > answered, $"ghost end after its calling message: [{string.Join(", ", round)}]");
+            Seq(["tool_execution_end:c1", "start:toolResult", "end:pi.tool-result"], round.Skip(ghostEnd).Take(3), "ghost end");
             var tool = listening.Events().Where(item => item.Type.StartsWith("tool_execution", StringComparison.Ordinal)).Select(item => item switch
             {
                 ToolExecutionEndEvent end => $"{end.Type}:{end.ToolCallId}:{end.Entry is not null}",
                 ToolExecutionStartEvent start => $"{start.Type}:{start.ToolCallId}:False",
                 _ => item.Type,
-            });
-            Seq(["tool_execution_end:c1:True", "tool_execution_start:c2:False", "tool_execution_end:c2:True"], tool, "tool events");
+            }).ToList();
+            Seq(["tool_execution_end:c1:True"], tool.Where(item => item.Contains(":c1:", StringComparison.Ordinal)), "the call not offered");
+            Seq(["tool_execution_start:c2:False", "tool_execution_end:c2:True"], tool.Where(item => item.Contains(":c2:", StringComparison.Ordinal)), "the aborted tool");
+            Equal(3, tool.Count, "tool events");
             await listening.Stream.StopAsync();
             await harness.CloseAsync(Context);
         });

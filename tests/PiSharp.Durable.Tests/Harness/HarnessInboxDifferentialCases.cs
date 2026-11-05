@@ -35,8 +35,9 @@ internal static class InboxDifferentialTests
     private const double T = 1000;
 
     // Pi v1.5.0 (area model-requests): the capture's authored v1.5.0 form (see the file header).
-    private static readonly Lazy<JsonObjectValue> Upstream = new(() => (JsonObjectValue)ModelRequests150.Authored(JsonValue.Parse(
-        File.ReadAllText(Path.Combine(RepositoryRoot(), "tests", "PiSharp.Durable.Tests", "Fixtures", "v1.2.0", "inbox.upstream.json")))));
+    // Pi v1.5.0 sync (area tool-tasks, 1c6928b30): and ToolTasks150.cs's, tasks at pi.tool version 3 and pi.generation version 2.
+    private static readonly Lazy<JsonObjectValue> Upstream = new(() => ToolTasks150.Differential((JsonObjectValue)ModelRequests150.Authored(JsonValue.Parse(
+        File.ReadAllText(Path.Combine(RepositoryRoot(), "tests", "PiSharp.Durable.Tests", "Fixtures", "v1.2.0", "inbox.upstream.json"))))));
 
     private static ChatSetup Chat() => new(new FauxModels(new FauxOptions { Api = "faux" }));
 

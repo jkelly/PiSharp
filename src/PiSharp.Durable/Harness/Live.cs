@@ -3,7 +3,7 @@
 // orphaned outcomes). The state is upstream's JSON: {run?: {taskId, inputs}, generation?: {attempt, message?, retry?, deferred?},
 // tools?: ToolSlot[], nestedTools?: NestedToolSlot[], compactions?: [...], compactionFailure?: {taskId, reason, error}, runFailure?:
 // {taskId, inputs, reason, detail?}}. A ToolSlot is
-// {callId, name, taskId?, status, output?, droppedBytes?, droppedLines?, details?, diagnostics?, entry?}; a NestedToolSlot is {callId,
+// {callId, name, taskId?, unoffered?, status, output?, droppedBytes?, droppedLines?, details?, diagnostics?, entry?}; a NestedToolSlot is {callId,
 // parentCallId, parentTaskId, name, taskId, arguments, status, output?, ..., summary?: {isError, durationMs?, usage?, error?}}.
 // Upstream's run writers startRun and handOver live in generation.ts, as HarnessTasks.StartRunAsync and HandOver do in Generation.cs.
 // Pi v1.5.0 sync (area deferred-commits, 6c2fd73b0): ProgressCommit (upstream PROGRESS_COMMIT), the deferred commit of streamed progress.
@@ -17,6 +17,9 @@
 // settings.restartLimit times, and the helpers their phases read (cutOffTooOften, salvageable, cutOffCount). The scheduler faults only an
 // abort handler of theirs for the limit, with detail {reason: "restart_limit"}: SettleSchedulerOutcomeAsync then ends its run aborted with
 // the limit as detail and without converting the partial, and removes a compaction's status without recording a failure.
+// Pi v1.5.0 sync (area tool-tasks, 1c6928b30): a ToolSlot's taskId is absent only for a call not started yet (a sequential round's
+// pending); a call its request did not offer starts pending with its task, flagged unoffered: true, instead of done with the entry
+// generation wrote. ToolSlotOf finds a slot in a snapshot, which a tool task's results rebuilt from the slot read before their commit.
 using System.Collections.Immutable;
 using PiSharp.Durable.Chord;
 using PiSharp.Durable.Chord.Delta;
@@ -173,6 +176,28 @@ public static class Live
             var candidate = Id(((JsonObjectValue)nested.Get(middle))["taskId"]);
             if (candidate == taskId.Value) return nested.GetObject(middle);
             if (candidate < taskId.Value) low = middle + 1;
+            else high = middle - 1;
+        }
+        return null;
+    }
+
+    /// <summary>The slot of tool task <paramref name="taskId"/> in a <c>pi.live</c> value read outside a commit, as <see cref="ToolSlot"/> finds
+    /// it in a draft (upstream <c>toolSlot</c> over a snapshot).</summary>
+    internal static JsonObjectValue? ToolSlotOf(JsonObjectValue live, TaskId taskId)
+    {
+        if (live.TryGetValue("tools", out var tools) && tools is JsonArrayValue slots)
+            foreach (var slot in slots.OfType<JsonObjectValue>())
+                if (slot.TryGetValue("taskId", out var id) && id is JsonNumberValue number && (long)number.Value == taskId.Value) return slot;
+        if (!live.TryGetValue("nestedTools", out var listed) || listed is not JsonArrayValue nested) return null;
+        var low = 0;
+        var high = nested.Count - 1;
+        while (low <= high)
+        {
+            var middle = (int)((uint)(low + high) >> 1);
+            var candidate = (JsonObjectValue)nested[middle];
+            var id = Id(candidate["taskId"]);
+            if (id == taskId.Value) return candidate;
+            if (id < taskId.Value) low = middle + 1;
             else high = middle - 1;
         }
         return null;

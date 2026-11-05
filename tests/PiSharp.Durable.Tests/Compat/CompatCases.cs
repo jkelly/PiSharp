@@ -33,9 +33,12 @@
 // tasks it stopped back as pending (written, through DeferredCommits150's plan: one more commit, before the held documents are stored).
 // A resume of a capture that left a generation's request in flight charges the attempt: the records it ends with stay the captured ones,
 // and its events show the backoff (resume events). Its scenario retries at once, as a backoff never ends on the scenarios' frozen clock.
+// Pi v1.5.0 sync (area tool-tasks, 1c6928b30): the written, resume and upgrade resumed cases also compare with ToolTasks150.cs's authored
+// forms: v1.5.0 writes pi.tool tasks at version 3 and pi.generation tasks at version 2, a written run every one of them, a resume those it
+// reserves (live when it starts) or creates; the tasks a resumed session held terminal keep the captured version.
 // - upgrade-from-v1.1.0: a v1.2.0 Harness opens copies of the v1.1.0 sessions (Fixtures/upstream-sessions) without resuming them, and
 //   resumes the resumable ones with their scenario's model, ending with the records upstream's v1.2.0 left (its v1 pi.tool tasks migrate to
-//   version 2 when they run).
+//   version 2 when they run; to version 3 since Pi v1.5.0, area tool-tasks).
 // compat.ops.* replays the ops corpus (CompatOpsCases.cs); compat.reverse.* has the pinned upstream read PiSharp's sessions under Node.
 using System.Text.RegularExpressions;
 using Microsoft.Data.Sqlite;
@@ -273,27 +276,32 @@ internal static partial class CompatTests
                         var directory = CopyFixture(scenario.Name, backend);
                         await resume(() => OpenBackend(backend, directory));
                         // Pi v1.5.0 (area model-requests): the messages the resume classifies record the thinking level (ModelRequests150.cs).
-                        SameJson(ModelRequests150.Authored(Expected(scenario.Name, "resumed.json", backend), Expected(scenario.Name, "records.json", backend)),
+                        // (area tool-tasks) the tool and generation tasks it reserves or creates at their v1.5.0 versions (ToolTasks150.cs).
+                        var before = Expected(scenario.Name, "records.json", backend);
+                        SameJson(ToolTasks150.Resumed(ModelRequests150.Authored(Expected(scenario.Name, "resumed.json", backend), before), before),
                             await Dump(await OpenBackend(backend, directory)), "resumed records");
                     });
                 yield return Case(AuthoredCase(prefix + "written"), async () =>
                 {
                     // Pi v1.5.0 (area model-requests): the messages PiSharp classifies record the thinking level (ModelRequests150.cs).
                     // (area deferred-commits) and DeferredCommits150's, the commits v1.5.0 holds and stores later.
+                    // (area tool-tasks) and ToolTasks150's, every tool and generation task at its v1.5.0 version.
+                    static JsonValue Authored(JsonValue capture) => ToolTasks150.Written(ModelRequests150.Authored(capture));
+                    static string AuthoredText(string text) => ToolTasks150.WrittenText(ModelRequests150.AuthoredText(text));
                     var deferred = DeferredCommits150.For(Path.Combine(Fixtures, scenario.Name));
                     var directory = Temp($"compat-written-{scenario.Name}-{backend}");
                     await scenario.Run(() => OpenBackend(backend, directory));
-                    SameJson(deferred.Records(ModelRequests150.Authored(Expected(scenario.Name, "records.json", backend))), await Dump(await OpenBackend(backend, directory)),
+                    SameJson(deferred.Records(Authored(Expected(scenario.Name, "records.json", backend))), await Dump(await OpenBackend(backend, directory)),
                         "records");
                     var upstream = Path.Combine(Fixtures, scenario.Name, backend);
-                    if (backend == "jsonl") SameFiles(upstream, directory, ModelRequests150.AuthoredText, deferred);
+                    if (backend == "jsonl") SameFiles(upstream, directory, AuthoredText, deferred);
                     // A copy: even a read-only connection to a WAL database leaves -wal and -shm files beside it.
                     else SameColumns(Path.Combine(CopyFixture(scenario.Name, backend), "session.sqlite"), Path.Combine(directory, "session.sqlite"),
-                        ModelRequests150.AuthoredText, deferred);
+                        AuthoredText, deferred);
                     if (scenario.Resume is { } resume)
                     {
                         await resume(() => OpenBackend(backend, directory));
-                        SameJson(deferred.Records(ModelRequests150.Authored(Expected(scenario.Name, "resumed.json", backend))),
+                        SameJson(deferred.Records(Authored(Expected(scenario.Name, "resumed.json", backend))),
                             await Dump(await OpenBackend(backend, directory)), "resumed records");
                     }
                 });
@@ -319,7 +327,9 @@ internal static partial class CompatTests
                         var directory = CopyFixture(scenario.Name, backend, Fixtures110);
                         await resume(() => OpenBackend(backend, directory));
                         // Pi v1.5.0 (area model-requests): the messages the resume classifies record the thinking level (ModelRequests150.cs).
-                        SameJson(ModelRequests150.Authored(Expected(upgrade, "resumed.json", backend), Expected(upgrade, "opened.json", backend)),
+                        // (area tool-tasks) the tool and generation tasks it reserves or creates at their v1.5.0 versions (ToolTasks150.cs).
+                        var before = Expected(upgrade, "opened.json", backend);
+                        SameJson(ToolTasks150.Resumed(ModelRequests150.Authored(Expected(upgrade, "resumed.json", backend), before), before),
                             await Dump(await OpenBackend(backend, directory)), "resumed records");
                     });
             }
@@ -378,8 +388,9 @@ internal static partial class CompatTests
                         var events = CompatEvents.Expect(expectedEvents is null ? null
                             : (JsonObjectValue)Restarts150.Charged(ModelRequests150.Authored(expectedEvents, held), held, CompatScenarios.Now), "resume");
                         await CompatEvents.Record(events, () => resume(() => OpenBackend(backend, directory)));
-                        SameJson(ModelRequests150.Authored(Expected(scenario.Name, "resumed.json", backend, root), held), await Dump(await OpenBackend(backend, directory)),
-                            "resumed records");
+                        // (area tool-tasks) the tool and generation tasks it reserves or creates at their v1.5.0 versions (ToolTasks150.cs).
+                        SameJson(ToolTasks150.Resumed(ModelRequests150.Authored(Expected(scenario.Name, "resumed.json", backend, root), held), held),
+                            await Dump(await OpenBackend(backend, directory)), "resumed records");
                         events?.Check("resume events");
                     });
                 // A scenario whose run needs a later area's port (CompatScenarios120.cs) is read only.
@@ -392,9 +403,12 @@ internal static partial class CompatTests
                     // (area deferred-commits) and DeferredCommits150's, the commits v1.5.0 holds and stores later (records only: no event,
                     // frame or observed value holds a seq).
                     // (area run-failure) and RunFailure150's, the runFailure a scenario's failed newest run leaves in pi.live.
+                    // (area tool-tasks) and ToolTasks150's, every tool and generation task at its v1.5.0 version.
                     var runFailure = RunFailure150.For(scenario.Name);
-                    JsonValue Authored(JsonValue capture) => runFailure.Authored(ModelRequests150.Authored(ToolsSchema150.Authored(capture)));
-                    string AuthoredText(string text) => runFailure.AuthoredText(ModelRequests150.AuthoredText(ToolsSchema150.AuthoredText(text)));
+                    JsonValue Authored(JsonValue capture) =>
+                        ToolTasks150.Written(runFailure.Authored(ModelRequests150.Authored(ToolsSchema150.Authored(capture))));
+                    string AuthoredText(string text) =>
+                        ToolTasks150.WrittenText(runFailure.AuthoredText(ModelRequests150.AuthoredText(ToolsSchema150.AuthoredText(text))));
                     var deferred = DeferredCommits150.For(Path.Combine(root, scenario.Name));
                     var writtenEvents = expectedEvents is null ? null : (JsonObjectValue)Authored(expectedEvents);
                     var directory = Temp($"compat-written-{scenario.Name}-{backend}");
