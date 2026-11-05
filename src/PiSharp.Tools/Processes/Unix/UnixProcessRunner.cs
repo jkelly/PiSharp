@@ -66,6 +66,16 @@ public sealed class UnixProcessRunner : ISeparatedProcessRunner
             lease = await launch.ConfigureAwait(false);
             if (lease is null) throw new InvalidOperationException("Admission returned no lease.");
         }
+        // The admission refused a command that cannot start before launching anything (PosixSpawnProcessAdmission, as NativeProcessRunner
+        // refuses one): a failed run with that diagnostic and nothing to clean up, which callers report as Node's spawn error does.
+        catch (ProcessLaunchException refused) when (refused.CleanupConfirmed && lease is null)
+        {
+            Add(refused.Diagnostic);
+            cleaned = true;
+            await FinishOutputAsync().ConfigureAwait(false);
+            if (timer is not null) await ObserveValueAsync(() => timer.DisposeAsync(), ProcessDiagnostic.CleanupFailed).ConfigureAwait(false);
+            return Result(caller.IsCancellationRequested ? ProcessRunStatus.Canceled : ProcessRunStatus.Failed);
+        }
         catch (Exception error)
         {
             operation.Fault(error);
