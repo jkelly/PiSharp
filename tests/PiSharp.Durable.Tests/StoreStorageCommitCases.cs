@@ -10,13 +10,15 @@
 //   transaction. Upstream's first figure (5, an append alone) is the backend's count of that commit's transaction.
 // - delays are Task.Delay(10) where upstream waits a macrotask; Promise.withResolvers are TaskCompletionSources.
 // - an injected failure's cause chain is the exception's InnerException chain.
-// Not ported: "refuses a batch whose rows staging cannot encode" (an id of 1.5: PiSharp's ids are longs, so no such batch can be built);
-// "publishes each commit of a call in a host batch of its own" (a Session publishing through IStorage.Publishing in a host's batch, with
-// a held first call: the Session does not publish through the storage until areas group-commit and publication-caches; the storage's own
-// Publishing in an attached batch is storage.store.commits.publishes-... in StoreStorageCases.cs).
+// - "publishes each commit of a call in a host batch of its own ..." (Pi v1.5.0 sync, area publication-caches): Chord's host (createHost)
+//   is phase 6's, so the host batch is a hand-built one attached to the store, as in StoreStorageCases.cs; the Session publishes through
+//   a ControlledStorage decorator (HostPublishing) that forwards IStorage.Publishing to the store's storage and holds the first call. The
+//   setTimeout(0) after the later commits is the Session's line tick: their line parts ran, so they wait behind the held call.
+// Not ported: "refuses a batch whose rows staging cannot encode" (an id of 1.5: PiSharp's ids are longs, so no such batch can be built).
 using PiSharp.Chord;
 using PiSharp.Chord.Data;
 using PiSharp.Chord.Sqlite;
+using PiSharp.Chord.State;
 using PiSharp.Durable;
 using PiSharp.Durable.Chord;
 using PiSharp.Durable.Sqlite;
@@ -26,6 +28,7 @@ using PiSharp.Durable.Testing;
 using static SessionTests;
 using ChordSqliteDatabase = PiSharp.Chord.Sqlite.ISqliteDatabase;
 using ISqliteExecutor = PiSharp.Chord.Sqlite.ISqliteExecutor;
+using Attachment = PiSharp.Chord.Store.Attachment;
 using ChordStore = PiSharp.Chord.Store.ChordStore;
 using StoreOptions = PiSharp.Chord.Store.StoreOptions;
 using Tables = PiSharp.Chord.Store.Tables;
@@ -340,6 +343,46 @@ internal static partial class Program
             Directory.Delete(directory, recursive: true);
         });
 
+        // ─── publication ────────────────────────────────────────────────────
+
+        yield return Case("storage.store.commit.publishes-each-commit-of-a-call-in-a-host-batch-of-its-own-after-the-calls-one-transaction", async () =>
+        {
+            var counted = await CountedStore.OpenAsync();
+            var store = counted.Store;
+            // Adapted: a hand-built host batch, attached as the host's open attaches it (as in StoreStorageCases.cs).
+            var batch = new Batch(_ => { }, null);
+            store.Attach(new Attachment(_ => { }, batch));
+            var storage = new HostPublishing(counted.Storage);
+            var session = new Session(storage);
+            var events = new SyncList<string>();
+            FollowCommits(session, (commit, _) =>
+            {
+                if (commit.IsMemory) return;
+                var seq = commit.Seq!.Value.Value;
+                events.Add($"publish {seq} running={store.Batch!.Running}");
+                batch.Flushing(_ => events.Add($"flush {seq}"));
+            });
+            // Hold the first call, so the commits after it are sent together in the next one.
+            var held = storage.HoldCommits();
+            var first = session.CommitAsync(tx => tx.AppendEntryAsync(ConversationId.Root, new EntryDraft { Kind = "a" }), StoreContext);
+            await held.Entered;
+            var rest = new[] { 1, 2, 3 }.Select(n =>
+                session.CommitAsync(tx => tx.AppendEntryAsync(ConversationId.Root, new EntryDraft { Kind = $"b{n}" }), StoreContext)).ToList();
+            // Their line parts ran: each is admitted behind the held call.
+            await session.LineTickAsync();
+            var before = counted.Transactions;
+            held.Release();
+            await Task.WhenAll([first, .. rest]);
+            SessionTests.Seq([1, 3], storage.Calls.Snapshot(), "batches per call");
+            Equal(2, counted.Transactions - before, "transactions");
+            var last = store.LastSeq;
+            SessionTests.Seq(new[] { last - 3, last - 2, last - 1, last }.SelectMany(each => new[] { $"publish {each} running=True", $"flush {each}" }),
+                events.Snapshot(), "publications");
+            await session.CloseAsync(StoreContext);
+            store.Detach();
+            await store.CloseAsync(ChordContext.Background);
+        });
+
         // ─── other users of the store ───────────────────────────────────────
 
         yield return Case("storage.store.commit.another-owners-call-waits-for-a-series-in-its-transaction-the-series-receipts-come-first", async () =>
@@ -585,6 +628,23 @@ internal sealed class StoreFaults
 
 /// <summary>A storage with its root conversation, over a store with an outbox on a SQLite file, whose backend counts its transactions and
 /// the statements of the last one, and takes faults for its next transaction (upstream <c>counted</c>).</summary>
+/// <summary>Controlled storage over a <see cref="StoreStorage"/> that publishes through it (<see cref="IStorage.Publishing"/>, which
+/// ControlledStorage leaves to the default, as upstream's MemoryStorage has none) and records how many batches each call sends (upstream's
+/// <c>calls.push(batches.length)</c>).</summary>
+internal sealed class HostPublishing(StoreStorage inner) : ControlledStorage(inner), IStorage
+{
+    public SyncList<int> Calls { get; } = new();
+
+    public override Task<CommitResult> CommitAsync(IReadOnlyList<IReadOnlyList<StorageWrite>> batches, Action<int, Seq> receive,
+        DurableContext context)
+    {
+        Calls.Add(batches.Count);
+        return base.CommitAsync(batches, receive, context);
+    }
+
+    void IStorage.Publishing(Action publish, DurableContext context) => inner.Publishing(publish, context);
+}
+
 internal sealed class CountedStore
 {
     private int transactions;

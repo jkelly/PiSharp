@@ -1,15 +1,18 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/src/harness/context.ts. Messages are pi-ai wire JSON. Records and
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/src/harness/context.ts. Messages are pi-ai wire JSON. Records and
 // JSON values are immutable here, so upstream's freezeJson has no counterpart; a kept range is shared as is, and every returned view has
 // its own arrays because ImmutableArray values are never shared mutably. Pi v1.5.0 sync (area harness-options): the harness baseline
 // leads the context past assistant messages (upstream 5713c9507, #10904); upstream's `system !== baseline` is reference equality of the
-// stored message, which Contribute passes through unchanged and an edit's replacement never is. Group commit and the windowed view
-// change this file again (areas publication-caches, group-commit and view), so the citation stays on v1.2.0. Area view (f3255de76): the
-// windowed view no longer reads the active transcript. Area events (f3255de76): activeEntries is gone with watchEvents, as upstream removed
-// it; AppendActive stays for PiSharp's readers of the active transcript (Hosting's event projection, which reads its first one from the
+// stored message, which Contribute passes through unchanged and an edit's replacement never is. Area view (f3255de76): the windowed view
+// no longer reads the active transcript. Area events (f3255de76): activeEntries is gone with watchEvents, as upstream removed it;
+// AppendActive stays for PiSharp's readers of the active transcript (Hosting's event projection, which reads its first one from the
 // context, and the durable TUI). Area group-commit-scheduler (e5c6182ba): the bounds are captured on the line through the line's Storage
-// (ReadOnLineAsync's argument), which waits for an unpublished commit of the conversation's entries; upstream reads the newest entry and
-// head marker through the Session (session.latestEntryId, latestHeadMarker), whose conversation tails and the kept range's `current` and
-// `visible` are area publication-caches'.
+// (ReadOnLineAsync's argument), which waits for an unpublished commit of the conversation's entries. Area publication-caches (e5c6182ba):
+// the newest entry and head marker come from the Session (session.latestEntryId, latestHeadMarker: its ConversationTails), so the current
+// bounds usually cost no Storage read; a cutoff already in the previous range skips its visibility read (`visible`); a range is `current`
+// when it reached the conversation's newest entry and no entry was committed while its scan ran off the line (IsKnownTail, upstream
+// knownLatestEntryId), and only a current range advances with later commits (AdvanceRange; RangeEntry serves one entry of a range).
+// PiSharp keeps a CaptureContextBoundsAsync over a Storage alone for a reader without the Session (Hosting's agent events), and
+// ReadContextAsync's lease on the line (Session.HoldStorageOpen) for the off-line derive.
 using System.Collections.Immutable;
 using PiSharp.Durable.Chord;
 

@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/test/session-support.ts. ControlledStorage decorates any IStorage
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/test/session-support.ts. ControlledStorage decorates any IStorage
 // instead of subclassing MemoryStorage, so every session.* group runs on whatever backend its factory opens: SessionCases() below runs
 // them on MemoryStorage, and P4 (JSONL) and P5 (SQLite) rerun them by calling SessionTests.All with their own prefix and factory.
 //
@@ -21,8 +21,9 @@
 // - Pi v1.5.0 sync (area group-commit, e5c6182ba): RefusingAt is upstream's refusingAt.
 // - Pi v1.5.0 sync (area publication-caches, e5c6182ba): ControlledStorage records a call's batches after its hold, and only the first one
 //   of a call it refuses, as v1.5.0's does; AfterAdopt is upstream's afterAdopt, run once after the next commit's first receipt.
-//   LateResolvingStorage is upstream's, a subclass as there (ControlledStorage's CommitAsync, GetTaskAsync and ScanEntriesAsync are virtual for
-//   it and for counting or pausing subclasses); its flush() is a short delay, as the thread pool has no macrotask turn.
+//   LateResolvingStorage is upstream's, a subclass as there (ControlledStorage's CommitAsync, GetTaskAsync, ScanEntriesAsync and
+//   ScanDocumentsAsync are virtual for it and for counting or pausing subclasses); its flush() is a short delay, as the thread pool has no
+//   macrotask turn.
 using System.Collections.Immutable;
 using PiSharp.Durable;
 using PiSharp.Durable.Chord;
@@ -380,7 +381,7 @@ internal class ControlledStorage(IStorage inner) : IStorage
         Inner.ScanSubmissionsAsync(query, limit, cursor, context);
     public Task<SubmissionRecord?> GetSubmissionByRequestAsync(ConversationId conversationId, string requestId, DurableContext context) =>
         Inner.GetSubmissionByRequestAsync(conversationId, requestId, context);
-    public Task<Page<DocumentRecord>> ScanDocumentsAsync(DocumentQuery query, int limit, JsonObjectValue? cursor, DurableContext context) =>
+    public virtual Task<Page<DocumentRecord>> ScanDocumentsAsync(DocumentQuery query, int limit, JsonObjectValue? cursor, DurableContext context) =>
         Inner.ScanDocumentsAsync(query, limit, cursor, context);
     /// <summary>Keeps the decorated storage open when the Session closes this one, so <see cref="Reopen"/> can hand it to a new Session.</summary>
     public bool KeepOpenForReopen { get; set; }

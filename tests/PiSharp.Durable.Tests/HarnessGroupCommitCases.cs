@@ -26,8 +26,8 @@
 // - "reads no task record from Storage for more live and awaited tasks than the record cache's count" (area publication-caches) counts the
 //   task reads of a ControlledStorage subclass (CountingTasks), as upstream's Counting does.
 // - "ends a task wait when the Harness closes while the terminal commit is stored, and still stores it" is PiSharp's counterpart of
-//   harness-tasks.test.ts's case of that name (durable@1.5.0 Changed#6), on a held storage call instead of LateResolvingStorage: that block
-//   of harness-tasks ("publication at adoption") is area publication-caches'.
+//   harness-tasks.test.ts's case of that name (durable@1.5.0 Changed#6), on a held storage call instead of LateResolvingStorage; that
+//   block of harness-tasks ("publication at adoption", area publication-caches) runs it on LateResolvingStorage (HarnessTasksCases.cs).
 using System.Collections.Concurrent;
 using System.Runtime.CompilerServices;
 using PiSharp.Durable;

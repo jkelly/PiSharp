@@ -114,9 +114,22 @@
 //   region's changes to the candidate sets (a reservation's dropped candidates, the finalize and failFast checks it took) are applied
 //   under the same lock as its decide (RegionAsync's apply), never by clearing a set another publication may have added to since.
 // - A reservation pass a publication kicks (Kick(bool) on the line) is enqueued in line order there but starts on the thread pool, as a
-//   publication now runs on the writer's thread rather than inside a line job, and a job must not run inside it.
-// Upstream's kept context ranges, advanced at publication (#advanceContexts, rangeEntry, knownLatestEntryId), are area
-// publication-caches'. The citation stays on v1.2.0: area scheduler-idle changes this file last and re-pins it.
+//   publication now runs on the writer's thread rather than inside a line job, and a job must not run inside it. It starts after the
+//   publication's host observers (below).
+// Pi v1.5.0 sync (area publication-caches: 8b0caefc2's publication order, e5c6182ba's kept ranges):
+// - Kept context ranges advance at publication (AdvanceContextsLocked, upstream #advanceContexts): under the lock, a stored commit's
+//   entries extend each kept range of their conversation that is current (ContextRange.Current), so a later read scans nothing
+//   (ConversationContext.RangeEntry serves a single entry from it, as upstream's rangeEntry). A read installs its range under the same lock
+//   only if its tail is still the conversation's newest known entry (ConversationContext.IsKnownTail, the Session's ConversationTails,
+//   upstream knownLatestEntryId); otherwise it keeps it not current, and the next read extends it from Storage. A range's retention starts
+//   when its conversation goes idle (KeptContext.ExpiresAt) and a read that reinstalls it keeps that expiry. Lock order: this lock, then the
+//   tails' lock (IsKnownTail), never the reverse; ConversationTails calls nothing under its lock.
+// - Nothing a publication sets off runs before the host observers saw the commit: Observe and SettleIdle take the task and idle waits
+//   they resolve (Waiters.Take) and the runs they signal, and hand them to Session.AfterPublication, which runs them on the publishing
+//   thread after its ObserveCommits observers (upstream: promise continuations and the abort microtask queued behind the host dispatch).
+//   Reservation passes (Kick) and the reconcile pass (ScheduleReconcileLocked) start there too, so a commit a host observer makes is
+//   admitted before theirs, and still before the committer's continuation. Outside a publication AfterPublication runs its work at once.
+// The citation stays on v1.2.0: area scheduler-idle changes this file last and re-pins it.
 using System.Collections;
 using System.Collections.Immutable;
 using PiSharp.Durable.Chord;
@@ -1123,7 +1136,10 @@ internal sealed class DurableTaskScheduler
     {
         if (reconcileScheduled || closing || readOnly) return;
         reconcileScheduled = true;
-        ThreadPool.UnsafeQueueUserWorkItem(static scheduler => _ = scheduler.ReconcileAsync(), this, preferLocal: false);
+        // Queued after the host observers of a publication that asks for it (upstream: its microtask runs behind their dispatch), so a
+        // commit a host observer makes there lands before the pass's commit.
+        session.AfterPublication(() =>
+            ThreadPool.UnsafeQueueUserWorkItem(static scheduler => _ = scheduler.ReconcileAsync(), this, preferLocal: false));
     }
 
     /// <summary>
@@ -2153,9 +2169,12 @@ internal sealed class DurableTaskScheduler
                 draining = true;
             }
         }
-        // Never commit synchronously from a commit or registry listener: on the line, the pass only enqueues its commit.
-        if (onLine) _ = ReservePassAsync();
-        else ThreadPool.UnsafeQueueUserWorkItem(static scheduler => _ = scheduler.DrainAsync(), this, preferLocal: false);
+        // Never commit synchronously from a commit or registry listener: on the line, the pass only enqueues its commit. At a publication
+        // either starts after its host observers (upstream: the pass's microtask runs behind their dispatch), so a commit a host observer
+        // makes there lands before the pass's, and still before the committer's continuation.
+        if (onLine) session.AfterPublication(() => _ = ReservePassAsync());
+        else session.AfterPublication(() =>
+            ThreadPool.UnsafeQueueUserWorkItem(static scheduler => _ = scheduler.DrainAsync(), this, preferLocal: false));
     }
 
     /// <summary>One reservation pass outside the drain loop, for <see cref="Kick(bool)"/> on the line.</summary>

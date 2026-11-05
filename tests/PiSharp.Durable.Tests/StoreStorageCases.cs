@@ -10,7 +10,8 @@
 //   harness owner's reads at a point agree, as upstream checks.
 // - publishes-...-inside-the-attached-hosts-batch: the host is a hand-built batch attached to the store (as the host's open does; the
 //   attachment is internal to PiSharp.Chord, reached through InternalsVisibleTo) and the publications are the storage's own Publishing
-//   calls: the Session does not publish through IStorage.Publishing until areas group-commit and publication-caches port that.
+//   calls, as upstream's are; a Session publishing through it is storage.store.commit.publishes-each-commit-of-a-call-in-a-host-batch-...
+//   (StoreStorageCommitCases.cs).
 // - counts-four-statements-...: the statements are counted by a backend wrapper (the commit cases' CountedStore), as PiSharp's
 //   DurableContext has no telemetry span to carry chord.store.statements until area telemetry; the backend counts every statement of the
 //   commit's one transaction, which is what the metric counts.
