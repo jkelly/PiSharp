@@ -71,8 +71,11 @@ internal static class NativeLoadoutDiagnosticTests
                     turn.Result.CleanupFailure
                 })
             }));
-        Check(seen.Count == beforePrompt + 1 && session.GetActiveTools().SequenceEqual(["read", "write", NativeLoadoutFailureFixture.Entry.Tool]),
-            "Pending selection was not published with exactly one preparation diagnostic.");
+        // Pi 1.5.0 agent-session.ts _applyToolLoadout (b9e3eef6c, #11514; core.active-tools-keep-order): read and the fixture tool stay
+        // active in their current order and the newly active write is appended.
+        Check(seen.Count == beforePrompt + 1 && session.GetActiveTools().SequenceEqual(["read", NativeLoadoutFailureFixture.Entry.Tool, "write"]),
+            "Pending selection was not published with exactly one preparation diagnostic. Witness: " + JsonSerializer.Serialize(new
+                { beforePrompt, diagnosticsAfterPrompt = seen.Count, active = session.GetActiveTools() }));
         await profile.DrainLoadoutDiagnosticsAsync(default);
         Check(seen.Count == beforePrompt + 1, "Prompt delivery replayed a captured occurrence.");
     }

@@ -498,7 +498,8 @@ internal static class SessionCommandTests
             if (failure != "request")
             {
                 var diagnostic=report.GetProperty("nativeDiagnostics").GetProperty("entries").EnumerateArray().Last();
-                // parseStreamingJson finalizes the malformed "{" as {} and the turn continues: the follow-up request finds the one-turn script spent.
+                // parseToolCallArguments finalizes the malformed "{" as {} with an argumentsError and the turn continues: the follow-up
+                // request finds the one-turn script spent.
                 Equal(failure == "arguments" ? "SourceFailed" : "UnexpectedEof", diagnostic.GetProperty("diagnostic").GetProperty("code").GetString());
                 Equal("declared-native-record",diagnostic.GetProperty("provenance").GetString());
                 var inspected=await Child(files,"session","inspect","--session",files.Session);
@@ -511,14 +512,19 @@ internal static class SessionCommandTests
             Equal((long)closed.OriginalBytes.Length, report.GetProperty("committedByteLength").GetInt64());
             if (failure == "arguments")
             {
-                // The {} call reaches write's validator, which refuses it before any effect; then the failed follow-up assistant.
+                // Pi 1.5.0 (87f9a3641, #10944; ai.malformed-final-tool-arguments): openai-completions.ts finishes the call with
+                // json-parse.ts parseToolCallArguments, so the malformed "{" is recorded as {} with an argumentsError holding JSON.parse's
+                // message and the raw text, and validation.ts validateToolArguments refuses it with that error before write's schema or any
+                // effect; then the failed follow-up assistant.
+                const string malformed = "Expected property name or '}' in JSON at position 1 (line 1 column 2)\n\nReceived arguments:\n{";
                 var turnMessages = closed.ValidatedPrefix.Where(record => record.Entry.Type == "message").Select(record => record.Entry.WireBody.Value.GetProperty("message"))
                     .SkipWhile(message => message.GetProperty("role").GetString() != "user" || message.GetProperty("content").GetString() != "arguments").ToArray();
                 Equal(4, turnMessages.Length); Equal("toolUse", turnMessages[1].GetProperty("stopReason").GetString());
                 var call = turnMessages[1].GetProperty("content").EnumerateArray().Single();
                 Equal("bad-arguments", call.GetProperty("id").GetString()); Equal("{}", call.GetProperty("arguments").GetRawText());
+                Equal(malformed, call.GetProperty("argumentsError").GetString());
                 Equal("bad-arguments", turnMessages[2].GetProperty("toolCallId").GetString()); Check(turnMessages[2].GetProperty("isError").GetBoolean(), "Malformed arguments acquired a successful tool result.");
-                Equal("Validation failed for tool \"write\":\n  - path: missing\n  - content: missing\n\nReceived arguments:\n{}",
+                Equal("Invalid arguments for tool \"write\": " + malformed,
                     turnMessages[2].GetProperty("content").EnumerateArray().Single().GetProperty("text").GetString());
                 Equal("error", turnMessages[3].GetProperty("stopReason").GetString());
             }
