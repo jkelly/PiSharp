@@ -56,11 +56,11 @@
     "changelogBullets": 477,
     "repeatedBullets": 23,
     "byStatus": {
-      "ported": 206,
+      "ported": 209,
       "ported-with-deferral": 23,
       "already-ported": 12,
       "no-op": 25,
-      "port": 60
+      "port": 57
     },
     "byArea": {
       "ai": 58,
@@ -8872,7 +8872,7 @@
       "id": "durable.observe-commits",
       "area": "durable",
       "phase": 4,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "durable@1.5.0/Breaking Changes#21"
       ],
@@ -8896,13 +8896,28 @@
         "tests/PiSharp.Durable.Tests/Session/SessionLineCases.cs"
       ],
       "release": "1.5.0",
-      "notes": "PiSharp has SubscribeCommits with synchronous and asynchronous overloads (TypesSession.cs; decision 0005 'Storage failures', second mapping). PiSharp-only callers: the device host's change notifications (HostedSession.cs:747) and pisharp durable (DurableRuntime.cs:333). After durable.deferred-commits they see partials only once stored. Depends on durable.observers; ordering is durable.commit-publication."
+      "notes": "PiSharp has SubscribeCommits with synchronous and asynchronous overloads (TypesSession.cs; decision 0005 'Storage failures', second mapping). PiSharp-only callers: the device host's change notifications (HostedSession.cs:747) and pisharp durable (DurableRuntime.cs:333). After durable.deferred-commits they see partials only once stored. Depends on durable.observers; ordering is durable.commit-publication.",
+      "evidence": {
+        "commits": [
+          "04a51e25",
+          "ba4bfaf9"
+        ],
+        "tests": [
+          "tests/PiSharp.Durable.Tests/SessionObserversCases.cs: gets-every-stored-commit-then-failed-once-the-session-closed-s1-after-its-last-publication",
+          "tests/PiSharp.Durable.Tests/SessionObserversCases.cs: ends-failed-with-the-error-that-failed-the-session",
+          "tests/PiSharp.Durable.Tests/SessionObserversCases.cs: gets-nothing-after-detach-which-is-idempotent-not-even-its-end",
+          "tests/PiSharp.Durable.Tests/SessionObserversCases.cs: reports-a-throwing-observer-detaches-it-and-ends-it-listener-error-the-others-go-on",
+          "tests/PiSharp.Durable.Tests/SessionDeferredCommitsCases.cs: give-observecommits-exactly-what-was-stored-and-nothing-for-a-held-commit",
+          "tests/PiSharp.Durable.Tests/HarnessStorageFailureCases.cs: reports-a-throwing-commit-or-close-listener-and-runs-the-others-the-commit-stands",
+          "tests/PiSharp.Durable.Tests/HarnessReportsCases.cs: reports.tell-extension-listener-wake-and-timer-failures-from-a-failed-session"
+        ]
+      }
     },
     {
       "id": "durable.document-commit-change",
       "area": "durable",
       "phase": 4,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "durable@1.5.0/Breaking Changes#23"
       ],
@@ -8917,13 +8932,24 @@
         "src/PiSharp.Durable/Session/Session.cs"
       ],
       "release": "1.5.0",
-      "notes": "TypesSession.cs:137 has DocumentCommitChange(Record, ConversationId, int? Version, JsonObjectValue? Value, ...) with a null value for a retirement; in C# a kind discriminator or two derived records. PiSharp-only commit consumers (the device host's HostedSession.cs, pisharp durable's DurableRuntime.cs) must not test for a null value. Land with durable.observe-commits."
+      "notes": "TypesSession.cs:137 has DocumentCommitChange(Record, ConversationId, int? Version, JsonObjectValue? Value, ...) with a null value for a retirement; in C# a kind discriminator or two derived records. PiSharp-only commit consumers (the device host's HostedSession.cs, pisharp durable's DurableRuntime.cs) must not test for a null value. Land with durable.observe-commits.",
+      "evidence": {
+        "commits": [
+          "04a51e25",
+          "ba4bfaf9"
+        ],
+        "tests": [
+          "tests/PiSharp.Durable.Tests/Session/SessionDocumentsCases.cs: retires-documents-and-creates-a-new-incarnation-at-the-same-address",
+          "tests/PiSharp.Durable.Tests/Session/SessionTablesCases.cs: retires-task-documents-at-terminal-settlement-including-documents-created-in-the-same-transaction",
+          "tests/PiSharp.Durable.Tests/SessionDeferredCommitsCases.cs: give-observecommits-exactly-what-was-stored-and-nothing-for-a-held-commit"
+        ]
+      }
     },
     {
       "id": "durable.session-end-kind",
       "area": "durable",
       "phase": 4,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "durable@1.5.0/Breaking Changes#27"
       ],
@@ -8941,7 +8967,18 @@
         "tests/PiSharp.Durable.Tests/Harness/HarnessLifecycleCases.cs"
       ],
       "release": "1.5.0",
-      "notes": "SessionEnd(SessionEndReason Reason, Exception? Error) at TypesSession.cs:199-208 becomes a Kind; a rename in C#. PiSharp-only readers: the device host (HostedSession.cs:868) and pisharp durable (DurableRuntime.cs:442 and :736)."
+      "notes": "SessionEnd(SessionEndReason Reason, Exception? Error) at TypesSession.cs:199-208 becomes a Kind; a rename in C#. PiSharp-only readers: the device host (HostedSession.cs:868) and pisharp durable (DurableRuntime.cs:442 and :736).",
+      "evidence": {
+        "commits": [
+          "04a51e25",
+          "ba4bfaf9"
+        ],
+        "tests": [
+          "tests/PiSharp.Durable.Tests/HarnessObserversCases.cs: report-a-throwing-observer-detach-it-and-end-it-with-the-error-and-keep-the-view-going",
+          "tests/PiSharp.Durable.Tests/Harness/HarnessTasksCases.cs: task-scheduling.fails-the-harness-on-a-failed-reservation-commit-reopening-runs-the-task",
+          "tests/PiSharp.Durable.Tests/Session/SessionForksCases.cs: fails-the-session-on-a-rejected-fork-commit-which-leaves-no-effect"
+        ]
+      }
     },
     {
       "id": "durable.deferred-commits",
@@ -9014,7 +9051,7 @@
           "tests/PiSharp.Durable.Tests/SessionDeferredCommitsCases.cs: stores-a-base-when-a-held-commit-selected-one-and-counts-the-store-as-one-delta-otherwise",
           "tests/PiSharp.Durable.Tests/SessionDeferredCommitsCases.cs: stores-the-whole-value-once-more-than-max-pending-ops-operations-are-held",
           "tests/PiSharp.Durable.Tests/SessionDeferredCommitsCases.cs: stores-a-base-of-the-commits-own-value-when-it-stores-an-overflowed-hold",
-          "tests/PiSharp.Durable.Tests/SessionDeferredCommitsCases.cs: give-subscribecommits-exactly-what-was-stored-and-nothing-for-a-held-commit",
+          "tests/PiSharp.Durable.Tests/SessionDeferredCommitsCases.cs: give-observecommits-exactly-what-was-stored-and-nothing-for-a-held-commit",
           "tests/PiSharp.Durable.Tests/SessionDeferredCommitsCases.cs: show-every-held-commit-to-watches-and-the-sessions-own-observers-once",
           "tests/PiSharp.Durable.Tests/SessionDeferredCommitsCases.cs: keeps-a-held-document-cached-with-retention-0-until-it-is-stored-then-lets-it-go",
           "tests/PiSharp.Durable.Tests/SessionDeferredCommitsCases.cs: retains-a-held-revision-only-until-it-is-stored",

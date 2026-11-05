@@ -3624,7 +3624,10 @@
         "watch-folding"
       ],
       "commits": [
-        "5f312dac4"
+        "5f312dac4",
+        "04a51e25",
+        "ba4bfaf9",
+        "e9ae3d4b"
       ],
       "notes": "Upstream did this as one cross-cutting rename (5f312dac4: \"stored formats are unchanged\"); its Chord half is area chord-watch, its env half area env, its pi.live trigger rename area live-turns and its report kinds area reports. PiSharp has SubscribeCommits with synchronous and asynchronous overloads (TypesSession.cs; decision 0005 'Storage failures'); PiSharp-only callers: the device host's change notifications (HostedSession.cs) and pisharp durable (DurableRuntime.cs). DocumentCommitChange: a kind discriminator or two derived records in C#; commit consumers must stop testing for a null value. SessionEnd(SessionEndReason, Exception?) becomes a Kind; readers are the device host and pisharp durable."
     },
