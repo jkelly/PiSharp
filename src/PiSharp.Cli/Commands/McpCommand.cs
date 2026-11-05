@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/src/extensions/mcp/cli.ts (HELP, parseOptions, parsePairs,
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/coding-agent/src/extensions/mcp/cli.ts (HELP, parseOptions, parsePairs,
 // runMcpCommand, add, remove, list, login, waitForRedirectUrl), packages/coding-agent/src/extensions/mcp/config.ts (addMcpServerConfig,
 // removeMcpServerConfig, editMcpServers) and packages/coding-agent/src/core/resolve-config-value.ts (templates).
 using System.Diagnostics;
@@ -92,6 +92,8 @@ internal static class McpCommand
         "                          Fixed OAuth callback port",
         "  --oauth-client-name <name>",
         "                          Client name sent when registering with the OAuth server",
+        "  --oauth-client-registration <mode>",
+        "                          auto (default), cimd, or dcr",
         "  --exposure <mode>       codemode (default), deferred, direct, or hidden",
         "  --description <text>    What the server offers, shown in the system prompt",
         "",
@@ -254,7 +256,7 @@ internal static class McpCommand
             ["local"] = OptionKind.Flag, ["url"] = OptionKind.Value, ["env"] = OptionKind.List, ["cwd"] = OptionKind.Value,
             ["header"] = OptionKind.List, ["bearer-token-env-var"] = OptionKind.Value, ["oauth-client-id"] = OptionKind.Value,
             ["oauth-client-secret"] = OptionKind.Value, ["oauth-callback-port"] = OptionKind.Value, ["oauth-client-name"] = OptionKind.Value,
-            ["exposure"] = OptionKind.Value, ["description"] = OptionKind.Value
+            ["oauth-client-registration"] = OptionKind.Value, ["exposure"] = OptionKind.Value, ["description"] = OptionKind.Value
         }, error, 2);
         if (parsed is null) return 1;
         var (positional, values, lists) = parsed;
@@ -262,7 +264,8 @@ internal static class McpCommand
         var url = values.GetValueOrDefault("url");
         if (string.IsNullOrEmpty(name) || url is null == (command.Count == 0)) { error(usage); return 1; }
         string? Value(string option) => values.GetValueOrDefault(option);
-        string[] httpOnly = ["header", "bearer-token-env-var", "oauth-client-id", "oauth-client-secret", "oauth-callback-port", "oauth-client-name"];
+        string[] httpOnly = ["header", "bearer-token-env-var", "oauth-client-id", "oauth-client-secret", "oauth-callback-port", "oauth-client-name",
+            "oauth-client-registration"];
         string[] stdioOnly = ["env", "cwd"];
         var misplaced = (url is null ? httpOnly : stdioOnly).FirstOrDefault(option => values.ContainsKey(option) || lists.ContainsKey(option));
         if (misplaced is not null) { error($"--{misplaced} only applies to {(url is null ? "HTTP servers (--url)" : "stdio servers")}."); return 1; }
@@ -281,6 +284,7 @@ internal static class McpCommand
                 oauth["callbackPort"] = double.TryParse(port.Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out var number) && double.IsFinite(number)
                     ? JsonValue.Create(number) : null;
             if (Value("oauth-client-name") is { } clientName) oauth["clientName"] = clientName;
+            if (Value("oauth-client-registration") is { } registration) oauth["clientRegistration"] = registration;
             config["url"] = url;
             if (headers.Count > 0) config["headers"] = new JsonObject(headers.Select(pair => KeyValuePair.Create(pair.Key, (JsonNode?)pair.Value)));
             if (oauth.Count > 0) config["oauth"] = oauth;

@@ -26,7 +26,13 @@ Configuring a server trusts it. Its tools can be called without a separate appro
 
 HTTP servers that use OAuth need no credentials in `mcp.json`. Sign in with `pisharp mcp login <server>`, or with `/mcp` inside a session. Tokens are stored in `~/.pi/agent/mcp-auth.json` and refreshed when they expire. `pisharp mcp logout <server>` deletes them.
 
-The `oauth` options (`clientId`, `clientSecret`, `callbackPort`, `callbackUrl`, `scope`, `clientName`, `clientRegistration: "cimd"` and `authServerMetadataUrl`) work as in Pi.
+The `oauth` options (`clientId`, `clientSecret`, `callbackPort`, `callbackUrl`, `scope`, `clientName`, `clientRegistration` and `authServerMetadataUrl`) work as in Pi, except for how PiSharp identifies itself without `clientId`. `clientRegistration` chooses it:
+
+- `auto`, the default, registers a client dynamically. A client registered before stays in use while its redirect URI matches, until you sign out. Pi's `auto` uses Pi's Client ID Metadata Document on pi.dev when the authorization server supports it. PiSharp isn't Pi, so like a rebranded build of Pi it never presents that document unless you ask for `cimd`.
+- `dcr` always registers a client dynamically.
+- `cimd` identifies as Pi's Client ID Metadata Document on pi.dev, `https://pi.dev/oauth/client.json` (or a document specific to the MCP server when the authorization server doesn't send the `iss` parameter), as Pi does. It replaces a registered client. Sign-in fails if the authorization server doesn't support documents for public clients. It can't be combined with `clientId` or `clientName`, and a `callbackUrl` must use `localhost` or `127.0.0.1` with the path `/callback`.
+
+`pisharp mcp add --oauth-client-registration <mode>` sets the mode when you add a server.
 
 ## How tools reach the model
 

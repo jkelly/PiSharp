@@ -44,6 +44,7 @@ internal static partial class Program
         };
         cases.AddRange(CompletionCases());
         cases.AddRange(Sync150CliCases());
+        cases.AddRange(Sync150OwnerDefaultsCases());
         // Linked existing contract cases (tests/PiSharp.Extensions.ContractTests/McpConfigurationTests.cs).
         cases.AddRange(McpConfigurationTests.Cases().Select(item => ("linked." + item.Name, item.Run)));
         var results = new List<object>(); var failures = 0;
@@ -303,16 +304,17 @@ internal static partial class Program
             "plainMetadata":{"url":"https://a.example/mcp","oauth":{"authServerMetadataUrl":"http://idp.example/m"}},
             "cimd":{"url":"https://a.example/mcp","oauth":{"clientRegistration":"cimd","callbackUrl":"http://localhost/callback"}},
             "dcr":{"url":"https://a.example/mcp","oauth":{"clientRegistration":"dcr","clientId":"x"}},
-            "badRegistration":{"url":"https://a.example/mcp","oauth":{"clientRegistration":"auto"}},
+            "auto":{"url":"https://a.example/mcp","oauth":{"clientRegistration":"auto","clientName":"x"}},
+            "badRegistration":{"url":"https://a.example/mcp","oauth":{"clientRegistration":"oidc"}},
             "cimdClient":{"url":"https://a.example/mcp","oauth":{"clientRegistration":"cimd","clientId":"x"}},
             "cimdPath":{"url":"https://a.example/mcp","oauth":{"clientRegistration":"cimd","callbackUrl":"http://127.0.0.1/cb"}},
             "cimdIpv6":{"url":"https://a.example/mcp","oauth":{"clientRegistration":"cimd","callbackUrl":"http://[::1]/callback"}}}}
             """), null, false);
-        Equal("named,metadata,loopbackMetadata,cimd,dcr", string.Join(',', loaded.Servers.Select(server => server.Name)));
+        Equal("named,metadata,loopbackMetadata,cimd,dcr,auto", string.Join(',', loaded.Servers.Select(server => server.Name)));
         Equal(string.Join('|', [
             "global.json: server \"unnamed\": oauth.clientName must be a non-empty string",
             "global.json: server \"plainMetadata\": oauth.authServerMetadataUrl must be an https URL, or http on localhost, 127.0.0.1, or [::1]",
-            "global.json: server \"badRegistration\": oauth.clientRegistration must be \"dcr\" or \"cimd\"",
+            "global.json: server \"badRegistration\": oauth.clientRegistration must be \"auto\", \"dcr\", or \"cimd\"",
             "global.json: server \"cimdClient\": oauth.clientRegistration \"cimd\" cannot be combined with oauth.clientId or oauth.clientName",
             "global.json: server \"cimdPath\": oauth.clientRegistration \"cimd\" requires oauth.callbackUrl on localhost or 127.0.0.1 with path /callback",
             "global.json: server \"cimdIpv6\": oauth.clientRegistration \"cimd\" requires oauth.callbackUrl on localhost or 127.0.0.1 with path /callback"]),

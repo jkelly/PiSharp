@@ -254,6 +254,7 @@ pisharp auth check --provider anthropic --json
 | `--oauth-client-secret <secret>` | HTTP | OAuth client secret. May be `${NAME}` or `!command`. |
 | `--oauth-callback-port <port>` | HTTP | Fixed OAuth callback port. |
 | `--oauth-client-name <name>` | HTTP | Client name sent when registering with the OAuth server. |
+| `--oauth-client-registration <mode>` | HTTP | `auto` (default), `cimd` or `dcr`. PiSharp's `auto` registers a client dynamically. See [MCP](/docs/guides/mcp/#sign-in-with-oauth). |
 | `--exposure <mode>` | both | `codemode` (default), `deferred`, `direct` or `hidden`. |
 | `--description <text>` | both | What the server offers, shown in the system prompt. |
 

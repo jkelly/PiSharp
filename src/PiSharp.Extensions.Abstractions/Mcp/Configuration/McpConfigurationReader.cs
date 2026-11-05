@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/src/core/mcp-servers.ts and packages/coding-agent/src/extensions/mcp/config.ts.
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/coding-agent/src/core/mcp-servers.ts and packages/coding-agent/src/extensions/mcp/config.ts.
 using System.Collections.Immutable;
 using System.Globalization;
 using System.Text;
@@ -209,6 +209,11 @@ public static class McpConfigurationReader
     /// <summary>`localhost`, `127.0.0.1` or `[::1]`, the hosts allowed plain http for credentials and metadata.</summary>
     public static bool IsLoopbackHost(string host) => host.ToLowerInvariant() is "localhost" or "127.0.0.1" or "[::1]";
 
+    /// <summary>mcp-servers.ts <c>isClientMetadataDocumentCallback</c>: whether pi's Client ID Metadata Documents list a redirect URI
+    /// for the (already validated loopback) callback, `/callback` on localhost or 127.0.0.1 on any port. Without one, the default
+    /// callback is such a URI. Upstream's `auto` also reads it; PiSharp's `auto` never offers the document, so only `cimd` does.</summary>
+    private static bool IsClientMetadataDocumentCallback(Uri? callback) => callback is null || callback.Host != "[::1]" && callback.AbsolutePath == "/callback";
+
     private static bool IsOverride(JsonElement value) =>
         !value.TryGetProperty("command", out _) && !value.TryGetProperty("url", out _) && !value.TryGetProperty("type", out _);
 
@@ -236,13 +241,14 @@ public static class McpConfigurationReader
         var named = value.TryGetProperty("clientName", out var clientName);
         if (named && (clientName.ValueKind != JsonValueKind.String || McpJson.JsTrim(clientName.GetString()!).Length == 0))
             return "oauth.clientName must be a non-empty string";
+        // "auto" (Pi 1.5.0's default) and "dcr" combine with any client name and callback; only "cimd" has requirements.
         if (value.TryGetProperty("clientRegistration", out var registration) &&
-            !(registration.ValueKind == JsonValueKind.String && registration.GetString() == "dcr"))
+            !(registration.ValueKind == JsonValueKind.String && registration.GetString() is "auto" or "dcr"))
         {
-            if (!(registration.ValueKind == JsonValueKind.String && registration.GetString() == "cimd")) return "oauth.clientRegistration must be \"dcr\" or \"cimd\"";
+            if (!(registration.ValueKind == JsonValueKind.String && registration.GetString() == "cimd")) return "oauth.clientRegistration must be \"auto\", \"dcr\", or \"cimd\"";
             if (value.TryGetProperty("clientId", out _) || named)
                 return "oauth.clientRegistration \"cimd\" cannot be combined with oauth.clientId or oauth.clientName";
-            if (callback is not null && (callback.Host == "[::1]" || callback.AbsolutePath != "/callback"))
+            if (!IsClientMetadataDocumentCallback(callback))
                 return "oauth.clientRegistration \"cimd\" requires oauth.callbackUrl on localhost or 127.0.0.1 with path /callback";
         }
         if (value.TryGetProperty("authServerMetadataUrl", out var metadataUrl))
