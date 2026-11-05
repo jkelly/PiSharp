@@ -16,6 +16,9 @@
 //   RunFailure has no such field yet, and compactionFailure keeps v1.2.0's `reason` where vocabulary (5f312dac4) renames it `trigger`.
 //   The settings bound (49 resolutions a round, #11327) is upstream's with group commit (e5c6182ba, area group-commit-scheduler), which
 //   coalesces some reconcile passes; this port, without group commit yet, measured 36 a round, so upstream's bound holds as it is.
+// - PiSharp-only (decision 0011), not upstream's: "keeps the interrupted request's stream metadata for the next attempt" checks that the
+//   attempt after an interrupted request carries the metadata the request was prepared with (a host's op and account), while its other
+//   stream options and every new request read the settings again (Generation.cs).
 using System.Collections.Concurrent;
 using System.Collections.Immutable;
 using PiSharp.Durable;
@@ -325,6 +328,45 @@ internal static class RestartFailureTests
             // The aborted partial is excluded from the next request.
             Seq(["user"], sent.Snapshot(), "sent");
             SameJson("{}", await Live(opened.Harness), "live");
+            await opened.Harness.CloseAsync(Context);
+        });
+
+        // PiSharp-only (decision 0011; see the file header).
+        yield return KilledStorages.Case(interrupted + "keeps-the-interrupted-request-s-stream-metadata-for-the-next-attempt", async killed =>
+        {
+            var path = SqlitePath();
+            var first = Streaming();
+            first.Retry = Retry(2, 1);
+            first.Stream = new ConversationStreamOptions { Metadata = O("""{"pisharp":{"account":"acct-1","op":"first"}}"""), TimeoutMs = 1000 };
+            var (id, _) = await CrashWhileStreaming(openFile, killed, path, first);
+
+            var setup = Setup();
+            setup.Retry = Retry(2, 1);
+            setup.Stream = new ConversationStreamOptions { Metadata = O("""{"pisharp":{"account":"acct-2","op":"second"}}"""), TimeoutMs = 2000 };
+            var sent = new SyncList<DurableStreamOptions?>();
+            setup.Faux.SetResponses(
+                FauxStep.From(request =>
+                {
+                    sent.Add(request.Options);
+                    return FauxAssistantMessage("answer");
+                }),
+                FauxStep.From(request =>
+                {
+                    sent.Add(request.Options);
+                    return FauxAssistantMessage("again");
+                }));
+            var opened = await Open(openFile, killed, path, setup);
+            opened.Harness.Resume();
+            Equal(SubmissionStatus.Done, (await Settled(opened.Harness, id)).Status, "status");
+            var next = (await opened.Root.SubmitAsync(SubmissionDraft.Input("again"), Context)).Id;
+            Equal(SubmissionStatus.Done, (await Settled(opened.Harness, next)).Status, "the next input");
+            var options = sent.Snapshot();
+            Equal(2, options.Count, "requests");
+            // The attempt that recovers the interrupted request: its metadata, the settings' other options.
+            SameJson("""{"pisharp":{"account":"acct-1","op":"first"}}""", options[0]?.Metadata, "the recovered attempt's metadata");
+            Equal(2000d, options[0]?.TimeoutMs, "the recovered attempt's timeout");
+            // A new request: the settings' metadata.
+            SameJson("""{"pisharp":{"account":"acct-2","op":"second"}}""", options[1]?.Metadata, "a new request's metadata");
             await opened.Harness.CloseAsync(Context);
         });
 

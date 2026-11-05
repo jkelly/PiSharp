@@ -26,7 +26,11 @@
 // phase moves to poll), and with no retry left the run ends runFailure interrupted, cancelling a polled deferred response. Every phase
 // first ends a generation cut off settings.restartLimit times (EndCutOff): runFailure restart_limit, keeping the partial and cancelling the
 // deferred response only at the limit, not past it. The abort handler cancels the deferred response a retry would poll again (DeferredOf).
-// The finish and drain phases with their cut-off ends are area run-end's (7e15f9601).
+// The finish and drain phases with their cut-off ends are area run-end's (7e15f9601). PiSharp-only (decision 0011): the next attempt after
+// an interrupted request is that request recovered, so it keeps the stream metadata the request was prepared with (a host's op and
+// account, SessionStreamMetadata): the retry checkpoint and the next prepare checkpoint carry it as metadata, pinned only when the
+// interrupted request had any, so upstream records keep their shape; the other stream options are read again at the next prepare, as
+// upstream's are.
 //
 // Mappings:
 // - Checkpoints, live state and results are upstream's JSON, built in upstream's key order: prepare {phase, attempt, compacted?, overflow?},
@@ -184,6 +188,7 @@ internal static class GenerationPhases
         var attempt = Attempt(checkpoint);
         var compacted = OptionalTask(checkpoint, "compacted");
         var overflow = checkpoint.TryGetValue("overflow", out var text) && text is JsonStringValue overflowText ? overflowText.Value : null;
+        var recovered = RecoveredMetadata(checkpoint);
         if (compacted is { } compaction && overflow is not null)
         {
             var outcome = (await runtime.OutcomesAsync([compaction], context).ConfigureAwait(false))[0];
@@ -227,7 +232,7 @@ internal static class GenerationPhases
             await runtime.CommitAsync(async (tx, _) =>
             {
                 var child = await Compaction.CreateCompactionAsync(tx, conversationId, "threshold", owner: runtime.TaskId).ConfigureAwait(false);
-                return (TaskState?)NextTaskState.Waiting(Prepare(attempt, child, null, threshold: true), [child], JoinPolicy.AllSettled);
+                return (TaskState?)NextTaskState.Waiting(Prepare(attempt, child, null, threshold: true, recovered), [child], JoinPolicy.AllSettled);
             }, context).ConfigureAwait(false);
             return;
         }
@@ -245,7 +250,7 @@ internal static class GenerationPhases
                 .Add("compacted", compacted?.ToJson())
                 .Add("model", model.ToJson())
                 .Add("thinkingLevel", agent.ThinkingLevel)
-                .Add("streamOptions", StreamOptionsJson(settings.Stream))
+                .Add("streamOptions", StreamOptionsJson(recovered is null ? settings.Stream : settings.Stream with { Metadata = recovered }))
                 // PiSharp-only (decision 0007): pinned only when set, so upstream records keep their shape.
                 .Add("serviceTier", agent.ServiceTier)
                 .Add("cutoff", tail.ToJson())
@@ -319,6 +324,7 @@ internal static class GenerationPhases
         var compacted = OptionalTask(checkpoint, "compacted");
         var until = ((JsonNumberValue)checkpoint["until"]).Value;
         var poll = checkpoint.TryGetValue("poll", out var polled) && polled is JsonObjectValue deferred ? deferred : null;
+        var recovered = RecoveredMetadata(checkpoint);
         if (Live.CutOffTooOften(task, runtime))
         {
             await EndCutOffAsync(runtime, task, context).ConfigureAwait(false);
@@ -343,7 +349,7 @@ internal static class GenerationPhases
                 return (TaskState?)NextTaskState.Running(next.Number("pollAt", pollAt).Build());
             }
             live.Set("generation", GenerationState(attempt + 1));
-            return (TaskState?)NextTaskState.Running(Prepare(attempt + 1, compacted, null));
+            return (TaskState?)NextTaskState.Running(Prepare(attempt + 1, compacted, null, metadata: recovered));
         }, context).ConfigureAwait(false);
     }
 
@@ -522,8 +528,11 @@ internal static class GenerationPhases
                 var poll = polled is null ? null : new RecordJson.Writer().Add("model", polled["model"])
                     .Add("thinkingLevel", polled.TryGetValue("thinkingLevel", out var level) ? level : null)
                     .Add("cutoff", polled["cutoff"]).Add("handle", polled["handle"]).Build();
+                // PiSharp-only (decision 0011): the request's stream metadata, for the next attempt (see the file header).
+                var metadata = polled is null && checkpoint.TryGetValue("streamOptions", out var pinned) && pinned is JsonObjectValue options &&
+                    options.TryGetValue("metadata", out var data) && data is JsonObjectValue kept ? kept : null;
                 var next = new RecordJson.Writer().Add("phase", "retry").Number("attempt", attempt).Add("compacted", compacted?.ToJson())
-                    .Number("until", until).Add("poll", poll).Build();
+                    .Number("until", until).Add("poll", poll).Add("metadata", metadata).Build();
                 return (TaskState?)NextTaskState.Sleeping(next, until);
             }
             await EndFailedRunAsync(tx, runtime, live, failure, RunEnd.Unanswered(RunFailureReason.Interrupted, text)).ConfigureAwait(false);
@@ -1159,9 +1168,17 @@ internal static class GenerationPhases
         };
     }
 
-    private static JsonObjectValue Prepare(int attempt, TaskId? compacted, string? overflow, bool threshold = false) => new RecordJson.Writer()
-        .Add("phase", "prepare").Number("attempt", attempt).Add("compacted", compacted?.ToJson()).Add("overflow", overflow)
-        .Add("threshold", threshold ? (JsonValue)true : null).Build();
+    private static JsonObjectValue Prepare(int attempt, TaskId? compacted, string? overflow, bool threshold = false, JsonObjectValue? metadata = null) =>
+        new RecordJson.Writer()
+            .Add("phase", "prepare").Number("attempt", attempt).Add("compacted", compacted?.ToJson()).Add("overflow", overflow)
+            .Add("threshold", threshold ? (JsonValue)true : null)
+            // PiSharp-only (decision 0011): an interrupted request's stream metadata, for the attempt that recovers it.
+            .Add("metadata", metadata).Build();
+
+    /// <summary>The stream metadata a retry or prepare checkpoint carries from an interrupted request (PiSharp-only, decision 0011; see the
+    /// file header); null when it carries none.</summary>
+    private static JsonObjectValue? RecoveredMetadata(JsonObjectValue checkpoint) =>
+        checkpoint.TryGetValue("metadata", out var metadata) && metadata is JsonObjectValue data ? data : null;
 
     /// <summary>Error text for a generation whose blocking compaction ended without completing (upstream <c>compactionFailure</c>).</summary>
     private static string CompactionFailure(TaskOutcome outcome) => outcome switch
