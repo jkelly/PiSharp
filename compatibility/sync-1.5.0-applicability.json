@@ -57,10 +57,10 @@
     "repeatedBullets": 23,
     "byStatus": {
       "ported": 228,
-      "ported-with-deferral": 21,
+      "ported-with-deferral": 22,
       "already-ported": 12,
       "no-op": 25,
-      "port": 40
+      "port": 39
     },
     "byArea": {
       "ai": 58,
@@ -11101,7 +11101,7 @@
       "id": "durable.registry-reader",
       "area": "durable",
       "phase": 4,
-      "status": "port",
+      "status": "ported-with-deferral",
       "changelog": [
         "durable@1.5.0/Added#15"
       ],
@@ -11117,7 +11117,24 @@
         "src/PiSharp.Durable/Harness/ (new)"
       ],
       "release": "1.5.0",
-      "notes": "Blocked on Chord v2 registries (chord@1.5.0/Added#3, group F), which phase 4 ports with the parts of Chord v2 durable needs (decision 0013, Durable). PiSharp's IRegistryReader (Harness/Types.cs) and Registry.cs need no other change."
+      "notes": "Blocked on Chord v2 registries (chord@1.5.0/Added#3, group F), which phase 4 ports with the parts of Chord v2 durable needs (decision 0013, Durable). PiSharp's IRegistryReader (Harness/Types.cs) and Registry.cs need no other change.",
+      "evidence": {
+        "commits": [
+          "b8a89902",
+          "204d2a00",
+          "be8b6ff8",
+          "2994b219"
+        ],
+        "tests": [
+          "tests/PiSharp.Durable.Tests/HarnessRegistryReaderCases.cs: harness.registry-reader.registry-reader.reads-the-composed-snapshot-a-listener-is-called-synchronously-inside-the-batch-that-composed",
+          "tests/PiSharp.Durable.Tests/HarnessRegistryReaderCases.cs: harness.registry-reader.registry-reader.wakes-a-harness-s-scheduler-a-task-blocked-on-its-missing-definition-runs-once-a-contribution-brings-it",
+          "tests/PiSharp.Durable.Tests/HarnessRegistryReaderCases.cs: harness.registry-reader.durable-s-views-from-other-objects-slice-8-5-s1.a-follower-of-a-contributed-harness-fails-when-that-harness-s-session-closes-and-follows-the-next-one",
+          "tests/PiSharp.Durable.Tests/HarnessRegistryReaderCases.cs: harness.registry-reader.contract.keeps-the-last-good-snapshot-while-compose-fails-and-calls-no-listener-for-the-failure",
+          "tests/PiSharp.Durable.Tests/HarnessRegistryReaderCases.cs: harness.registry-reader.contract.aborting-its-context-detaches-every-listener",
+          "tests/PiSharp.Durable.Tests/HarnessRegistryReaderCases.cs: harness.registry-reader.contract.its-disposer-detaches-the-listener-once-and-close-calls-none"
+        ]
+      },
+      "deferred": "Phase 6 (createHost) takes example 37 (37-harness-registry.ts as samples/Durable.Examples/ExamplesHarnessRegistry.cs, not ported: it is built on createHost, defineFacet, local objects, self.registry/open/contribute/follow/retryOn/derive and host.hold, which Durable.Examples cannot reach) and the host-built parts of harness-registry-reader.test.ts: in all three cases the host calls that build the registries (createHost, load, serve, local objects with self.writable and self.contribute, host.registry, host.get, host.close), and in the S1 case (a follower of a contributed Harness fails when that Harness's Session closes, and follows the next one) that durable.close rejects with \"session closed\", that the viewer's state is failed with a transient cause and then live, and that durable.retry() opens the next Harness (the case opens it and sets the writable). Every assertion of the other two cases, and the S1 case's assertions on Durable, pass on the hand-built registry."
     },
     {
       "id": "durable.upstream-tests",
