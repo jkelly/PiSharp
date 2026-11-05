@@ -56,11 +56,11 @@
     "changelogBullets": 477,
     "repeatedBullets": 23,
     "byStatus": {
-      "ported": 223,
-      "ported-with-deferral": 22,
+      "ported": 228,
+      "ported-with-deferral": 21,
       "already-ported": 12,
       "no-op": 25,
-      "port": 44
+      "port": 40
     },
     "byArea": {
       "ai": 58,
@@ -3863,7 +3863,7 @@
       "id": "core.agent-identity",
       "area": "coding-agent-core",
       "phase": 2,
-      "status": "ported-with-deferral",
+      "status": "ported",
       "changelog": [
         "agent@1.4.0/Added#1"
       ],
@@ -3884,21 +3884,22 @@
         "commits": [
           "e8485661",
           "c4e38fa3",
-          "9b3a2b3e"
+          "9b3a2b3e",
+          "6c708a89"
         ],
         "tests": [
           "tests/PiSharp.Agent.Tests/Sync150IdentityCases.cs: sync150.agent-identity-reaches-every-request-without-attribution",
           "tests/PiSharp.Agent.Tests/Sync150IdentityCases.cs: sync150.agent-identity-merges-under-the-request-identity",
+          "tests/PiSharp.Agent.Tests/Sync150IdentityCases.cs: sync150.agent-default-identity-carries-no-attribution",
           "tests/PiSharp.ExtensionParity.Tests/Sync150BridgeCases.cs: sync150.bridge-agent-identity-forwards-the-callers-identity-without-attribution"
         ]
-      },
-      "deferred": "DEFAULT_AGENT_IDENTITY: upstream's is { attribution: PI_ATTRIBUTION }; PiSharp's AgentConfiguration.DefaultIdentity and the bridge's DEFAULT_AGENT_IDENTITY are {} until the owner decides core.client-identity-attribution."
+      }
     },
     {
       "id": "core.client-identity-attribution",
       "area": "coding-agent-core",
       "phase": 2,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "coding-agent@1.4.0/Changed#1"
       ],
@@ -3922,7 +3923,20 @@
         "src/PiSharp.Cli/Interactive/Mode/InteractiveSettings.cs"
       ],
       "release": "1.5.0",
-      "notes": "Owner decision needed before it lands. Upstream ties attribution to install telemetry, which PiSharp does not port (decision 0004: PiSharp is not Pi and must not report as it), although the enableInstallTelemetry setting exists (InteractiveSettings.cs:252, default true). PiSharp sends no OpenRouter or NVIDIA attribution today and names itself in x-opencode-client: pisharp (NativeProviderFactory.ProviderRoutes.cs:100). Sending PI_ATTRIBUTION would credit PiSharp traffic to https://pi.dev in OpenRouter's rankings; the options are PI_ATTRIBUTION, a PiSharp attribution, or none. The User-Agent follows 0013 design point Identity (pi/1.5.0). Today the tool-download check sends <app>-coding-agent (PiToolsManager.cs:200) and the pi.dev catalog and bug report build pi/<version> themselves (RemoteModelCatalog.cs:295-296, BugReport.cs:84); move them to the shared formatter. PiSharp's NuGet update check keeps its pisharp/<version> agent (VersionCheck.cs:132, self-update design point). Depends on ai.client-identity and core.agent-identity."
+      "notes": "Owner decision needed before it lands. Upstream ties attribution to install telemetry, which PiSharp does not port (decision 0004: PiSharp is not Pi and must not report as it), although the enableInstallTelemetry setting exists (InteractiveSettings.cs:252, default true). PiSharp sends no OpenRouter or NVIDIA attribution today and names itself in x-opencode-client: pisharp (NativeProviderFactory.ProviderRoutes.cs:100). Sending PI_ATTRIBUTION would credit PiSharp traffic to https://pi.dev in OpenRouter's rankings; the options are PI_ATTRIBUTION, a PiSharp attribution, or none. The User-Agent follows 0013 design point Identity (pi/1.5.0). Today the tool-download check sends <app>-coding-agent (PiToolsManager.cs:200) and the pi.dev catalog and bug report build pi/<version> themselves (RemoteModelCatalog.cs:295-296, BugReport.cs:84); move them to the shared formatter. PiSharp's NuGet update check keeps its pisharp/<version> agent (VersionCheck.cs:132, self-update design point). Depends on ai.client-identity and core.agent-identity.",
+      "evidence": {
+        "commits": [
+          "6c708a89",
+          "93289554"
+        ],
+        "tests": [
+          "tests/PiSharp.CliParity.Tests/Sync150AttributionCases.cs: sync150.no-attribution-on-any-provider-route-with-install-telemetry-on",
+          "tests/PiSharp.CliParity.Tests/Sync150AttributionCases.cs: sync150.no-attribution-on-any-provider-route-with-install-telemetry-off",
+          "tests/PiSharp.CliParity.Tests/Sync150AttributionCases.cs: sync150.user-agent-comes-from-the-shared-formatter-at-every-call-site",
+          "tests/PiSharp.SessionParity.Tests/Sync150IdentityCases.cs: sync150.session-requests-carry-the-coding-agent-identity-without-attribution",
+          "tests/PiSharp.SessionParity.Tests/Sync150IdentityCases.cs: sync150.provider-headers-handlers-do-not-see-identity-headers"
+        ]
+      }
     },
     {
       "id": "core.summaries-model-output-limit",
@@ -4886,7 +4900,7 @@
       "id": "cli.pinned-internal-dependencies",
       "area": "coding-agent-cli",
       "phase": 2,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "coding-agent@1.3.0/Fixed#1"
       ],
@@ -4902,7 +4916,17 @@
         "src/PiSharp.Cli/Extensions/Pi/PiNodeRuntime.cs:19"
       ],
       "release": "1.5.0",
-      "notes": "The Node runtime PiSharp installs for extensions already pins every @earendil-works package exactly, with overrides (PiNodeRuntime.cs:19-38); its version moves to 1.5.0 with the bridge re-port. The CLI ships as a bundled dotnet tool (tools/packaging/PiSharp.Distribution.targets:4), but the NuGet SDK packages accept sibling dependencies as $Version, [$Version, ) or [$Version] (native-sdk-package.ps1:59-97), so a consumer can still mix releases. 0013 names the pinned dependency versions as user-visible; the owner decides whether siblings become exact [1.5.0] pins."
+      "notes": "The Node runtime PiSharp installs for extensions already pins every @earendil-works package exactly, with overrides (PiNodeRuntime.cs:19-38); its version moves to 1.5.0 with the bridge re-port. The CLI ships as a bundled dotnet tool (tools/packaging/PiSharp.Distribution.targets:4), but the NuGet SDK packages accept sibling dependencies as $Version, [$Version, ) or [$Version] (native-sdk-package.ps1:59-97), so a consumer can still mix releases. 0013 names the pinned dependency versions as user-visible; the owner decides whether siblings become exact [1.5.0] pins.",
+      "evidence": {
+        "commits": [
+          "fffb9010",
+          "52961c50"
+        ],
+        "tests": [
+          "tests/PiSharp.CliSync.Tests/Sync150PinnedDependencyCases.cs: sync150.native-sdk-pack-pins-siblings-exactly",
+          "tests/PiSharp.CliSync.Tests/Sync150PinnedDependencyCases.cs: sync150.native-sdk-validator-accepts-only-exact-sibling-pins"
+        ]
+      }
     },
     {
       "id": "cli.model-reference-resolution",
@@ -6758,7 +6782,7 @@
       "id": "mcp.oauth-client-registration-auto",
       "area": "mcp",
       "phase": 2,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "coding-agent@1.5.0/Changed#5"
       ],
@@ -6778,7 +6802,20 @@
         "src/PiSharp.Cli/Commands/McpCommand.cs"
       ],
       "release": "1.5.0",
-      "notes": "Owner decision needed (decision 0013 'MCP Client ID Metadata Documents'). PiSharp has \"dcr\" (default) and opt-in \"cimd\" (McpSignIn.cs:105), and McpConfigurationReader.cs:239-246 rejects \"auto\". Ported as is, auto makes PiSharp present Pi's own OAuth client (https://pi.dev/oauth, McpSignIn.cs:65) by default, because PiSharp's APP_NAME is \"pi\" (src/PiSharp.Cli/Pi/PiPaths.cs:13) and upstream's rebrand guard does not trigger. Options: treat PiSharp as a rebranded build so auto registers dynamically, host PiSharp's own documents, or follow upstream. Dynamic client registration already works."
+      "notes": "Owner decision needed (decision 0013 'MCP Client ID Metadata Documents'). PiSharp has \"dcr\" (default) and opt-in \"cimd\" (McpSignIn.cs:105), and McpConfigurationReader.cs:239-246 rejects \"auto\". Ported as is, auto makes PiSharp present Pi's own OAuth client (https://pi.dev/oauth, McpSignIn.cs:65) by default, because PiSharp's APP_NAME is \"pi\" (src/PiSharp.Cli/Pi/PiPaths.cs:13) and upstream's rebrand guard does not trigger. Options: treat PiSharp as a rebranded build so auto registers dynamically, host PiSharp's own documents, or follow upstream. Dynamic client registration already works.",
+      "evidence": {
+        "commits": [
+          "f2842551",
+          "93289554"
+        ],
+        "tests": [
+          "tests/PiSharp.McpSync.Tests/Sync150OwnerDefaultsCases.cs: sync150.mcp-oauth-client-registration-auto-validates",
+          "tests/PiSharp.McpSync.Tests/Sync150OwnerDefaultsCases.cs: sync150.mcp-oauth-auto-registers-and-never-presents-pi-dev",
+          "tests/PiSharp.McpSync.Tests/Sync150OwnerDefaultsCases.cs: sync150.mcp-oauth-auto-keeps-a-registered-client",
+          "tests/PiSharp.McpSync.Tests/Sync150OwnerDefaultsCases.cs: sync150.mcp-oauth-explicit-cimd-presents-pi-dev-and-replaces-a-registered-client",
+          "tests/PiSharp.McpSync.Tests/Sync150OwnerDefaultsCases.cs: sync150.mcp-add-oauth-client-registration"
+        ]
+      }
     },
     {
       "id": "mcp.readme-plain-json-schema",
@@ -7357,7 +7394,7 @@
       "id": "bridge.undici-gondolin-advisories",
       "area": "node-bridge",
       "phase": 2,
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "coding-agent@1.5.0/Fixed#50"
       ],
@@ -7373,7 +7410,18 @@
         "src/PiSharp.Cli/Extensions/Pi/PiNodeRuntime.cs"
       ],
       "release": "1.5.0",
-      "notes": "Native PiSharp does no HTTP through undici; it uses .NET HttpClient. undici reaches users only through the Node bridge's Pi runtime: PiNodeRuntime npm-installs @earendil-works/pi-coding-agent at PiVersion \"1.2.0\" (PiNodeRuntime.cs:19, :31). npm then resolves coding-agent's exact undici pin, so moving PiVersion to 1.5.0 brings 8.12.3. That move belongs to the node-bridge Pi 1.5.0 packages work in 0013; this row only records the pinned-dependency outcome (0013 Scope: pinned dependency versions are ported). Check undici 8.12.3 in the installed runtime's package-lock.json. The Gondolin example is not shipped by PiSharp (no Gondolin sample under samples/extensions), so that half needs nothing."
+      "notes": "Native PiSharp does no HTTP through undici; it uses .NET HttpClient. undici reaches users only through the Node bridge's Pi runtime: PiNodeRuntime npm-installs @earendil-works/pi-coding-agent at PiVersion \"1.2.0\" (PiNodeRuntime.cs:19, :31). npm then resolves coding-agent's exact undici pin, so moving PiVersion to 1.5.0 brings 8.12.3. That move belongs to the node-bridge Pi 1.5.0 packages work in 0013; this row only records the pinned-dependency outcome (0013 Scope: pinned dependency versions are ported). Check undici 8.12.3 in the installed runtime's package-lock.json. The Gondolin example is not shipped by PiSharp (no Gondolin sample under samples/extensions), so that half needs nothing.",
+      "evidence": {
+        "commits": [
+          "1054c492",
+          "93289554"
+        ],
+        "tests": [
+          "tests/PiSharp.ExtensionParity.Tests/Sync150RuntimeCases.cs: sync150.pi-runtime-manifest-pins-undici-and-keeps-pi-1.2.0",
+          "tests/PiSharp.ExtensionParity.Tests/Sync150RuntimeCases.cs: sync150.pi-runtime-without-the-undici-override-is-reinstalled",
+          "tests/PiSharp.ExtensionParity.Tests/RuntimeCases.cs: runtime.pi-packages-installed-with-verified-provenance"
+        ]
+      }
     },
     {
       "id": "docs.models-configuration-reference",
