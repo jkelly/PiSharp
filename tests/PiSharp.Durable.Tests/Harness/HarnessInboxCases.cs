@@ -21,6 +21,8 @@
 //   in the new context" is "writes only the last handoff in call order and runs queued follow-ups after the continuing run", which answers
 //   in the new context before the follow-up. recordRequest is RecordRequest, which the queued-reset case uses too; Type.Object({}) is
 //   NoParameters. The citation stays on v1.2.0 until the file's other areas land.
+// - Pi v1.5.0 sync (area group-commit, e5c6182ba): a held storage call no longer holds the line, so "reads queue modes when the final
+//   boundary's commit runs on the Session line" occupies it with a commit whose callback waits, as v1.5.0's does.
 using PiSharp.Durable;
 using PiSharp.Durable.Chord;
 using PiSharp.Durable.Sqlite;
@@ -256,22 +258,22 @@ internal static class InboxTests
             await first.Reached;
             var f1 = await Submit(root, "f1");
             var f2 = await Submit(root, "f2");
-            // Occupy the line, let the answer queue its boundary commit behind it, then change the mode.
-            var held = storage.HoldCommits();
-            var marker = Documents.DefineSessionDoc("test.marker", 1, () => O("""{"n":0}"""), checkpointWhen: (_, _, _) => false);
-            var occupying = root.CommitAsync(async tx =>
+            // Occupy the line with a commit whose callback waits, let the answer queue its boundary commit behind it, then change the mode.
+            var entered = new HarnessTests.Deferred();
+            var release = new HarnessTests.Deferred();
+            var occupying = root.CommitAsync(async _ =>
             {
-                var doc = await tx.DocAsync(marker);
-                doc.Set("n", N(doc.Get("n")) + 1);
+                entered.Resolve();
+                await release.Task;
             }, Context);
-            await held.Entered;
+            await entered.Task;
             first.Release();
             var backlog = await yielded.Task;
-            // Deterministic barrier for upstream's flush(): the boundary commit waits on the line behind the held commit.
+            // Deterministic barrier for upstream's flush(): the boundary commit waits on the line behind the waiting callback.
             await Eventually(() => session.LineBacklog > backlog);
             await Flush();
             setup.FollowUpMode = QueueMode.All;
-            held.Release();
+            release.Resolve();
             await occupying;
             var settled = await f2.WaitAsync(Context);
             SettledLike(settled, f1.Id, await Status(f1), "f1");

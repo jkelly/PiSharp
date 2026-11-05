@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/test/session-document-retention.test.ts. The Session's document
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/test/session-document-retention.test.ts. The Session's document
 // cache is bounded by use: unattached documents leave it after the retention period and load from Storage again; documents with a watch
 // never leave it. Verbatim apart from the adaptations in SessionSupport.cs, HarnessSupport.cs and ChatSupport.cs, and these:
 // - A retention is a double?, so upstream's `"soon" as unknown as number` (a value of the wrong type) has no counterpart; NaN and -5 remain.
@@ -14,7 +14,8 @@
 // never null, so "does not keep a replacement cached for an observer of the retired incarnation" is 8b0caefc2's "pins only what is at the
 // address a watch follows". Area events (f3255de76): "gives the same events with documents evicted right after use as with documents
 // kept" is v1.5.0's "gives the same views ...": it compares the view history (LiveSupport.cs's viewHistory) where v1.2.0 compared
-// watchEvents' events (removed). The citation stays on v1.2.0: the file's later upstream changes wait on area group-commit.
+// watchEvents' events (removed). Area group-commit (e5c6182ba): upstream's patched commit records every batch of a call, as
+// ControlledStorage.Commits does. Area tools-schema (6536f8012): the steps tool's obj({}) is ToolsSchema150.EmptyObject.
 using PiSharp.Durable;
 using PiSharp.Durable.Chord;
 using PiSharp.Durable.Storage;
