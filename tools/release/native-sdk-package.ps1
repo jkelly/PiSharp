@@ -56,7 +56,8 @@ function Assert-PiSharpNativeSdkPackage {
     $groups=$meta.SelectNodes('*[local-name()="dependencies"]/*[local-name()="group"]')
     if($groups.Count-ne1-or$groups[0].GetAttribute('targetFramework')-cnotin@('net10.0','.NETCoreApp10.0')-or
        $meta.SelectNodes('*[local-name()="dependencies"]/*[local-name()="dependency"]').Count){throw 'One exact net10 SDK dependency group required.'}
-    # Sibling packages follow the release version; external packages keep their exact pinned versions.
+    # Sibling packages are pinned to exactly the release version, [<version>] (Pi 1.5.0 pins its internal packages exactly,
+    # cli.pinned-internal-dependencies); external packages keep their exact pinned versions.
     $siblings=@{
         'PiSharp.Contracts'=@();'PiSharp.Tui'=@()
         # Decision 0013 (experimental, from 1.5.0): pi-telemetry has no dependencies, and pi-ai depends on it.
@@ -95,7 +96,7 @@ function Assert-PiSharpNativeSdkPackage {
     if($dependencies.Count-ne$expected.Count){throw 'SDK dependency identity/version differs.'}
     foreach($dependency in $dependencies){
         $id=$dependency.GetAttribute('id');$range=$dependency.GetAttribute('version')
-        $allowed=if($external.ContainsKey($id)){@($external[$id],('['+$external[$id]+']'))}else{@($Version,('['+$Version+', )'),('['+$Version+']'))}
+        $allowed=if($external.ContainsKey($id)){@($external[$id],('['+$external[$id]+']'))}else{@('['+$Version+']')}
         if(-not$expected.Remove($id)-or$range-cnotin$allowed){throw 'SDK dependency identity/version differs.'}
     }
     return [pscustomobject]@{schemaVersion=1;packageId=$PackageId;version=$Version;sourceCommit=$SourceCommit;

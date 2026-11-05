@@ -56,4 +56,14 @@
     <Error Condition="'$(PiSharpProvenanceFile)' == '' Or !Exists('$(PiSharpProvenanceFile)')" Text="Admitted native SDK provenance required." />
     <Error Condition="'$(TargetFramework)' != 'net10.0'" Text="Only the reviewed net10.0 public native SDK profile is admitted." />
   </Target>
+  <!-- Pi 1.5.0 sync, cli.pinned-internal-dependencies (owner decision 2026-11-05): Pi pins its internal packages exactly, so each
+       PiSharp package depends on its PiSharp siblings at exactly its own version, [<version>], not at that version or later.
+       NuGet reads a project reference's ProjectVersion as a version range; third-party package references are unchanged. -->
+  <Target Name="PinPiSharpSiblingVersions" AfterTargets="_GetProjectReferenceVersions" Condition="'$(PiSharpNativeSdkPackage)' == 'true'">
+    <ItemGroup>
+      <_ProjectReferencesWithVersions>
+        <ProjectVersion Condition="$([System.String]::Copy('%(Filename)').StartsWith('PiSharp.')) And !$([System.String]::Copy('%(ProjectVersion)').StartsWith('['))">[%(ProjectVersion)]</ProjectVersion>
+      </_ProjectReferencesWithVersions>
+    </ItemGroup>
+  </Target>
 </Project>

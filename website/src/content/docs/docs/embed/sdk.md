@@ -13,7 +13,7 @@ Every library is a NuGet package that targets `net10.0`. The current release is 
 dotnet add package PiSharp.CodingAgent --version 1.2.0.2
 ```
 
-A package brings the packages it is built on, so `PiSharp.CodingAgent` also gives you `PiSharp.Agent`, `PiSharp.AI`, `PiSharp.Sessions` and `PiSharp.Contracts`. All PiSharp packages share one version number. Use the same version for every PiSharp package you reference. [Versioning](/docs/versioning/) explains how the number relates to the Pi release it ports.
+A package brings the packages it is built on, so `PiSharp.CodingAgent` also gives you `PiSharp.Agent`, `PiSharp.AI`, `PiSharp.Sessions` and `PiSharp.Contracts`. All PiSharp packages share one version number. Use the same version for every PiSharp package you reference. From 1.5.0, each package depends on its PiSharp packages at exactly its own version (`[1.5.0]`), so NuGet reports a conflict instead of mixing packages from different releases, as Pi pins its own packages since 1.3.0. [Versioning](/docs/versioning/) explains how the number relates to the Pi release it ports.
 
 The CLI itself is a .NET tool, not a library:
 
