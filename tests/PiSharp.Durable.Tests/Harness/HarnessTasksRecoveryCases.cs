@@ -4,8 +4,9 @@
 //   (ControlledStorage.Crash) and its blocked handlers never return; a new Harness opens the same storage instance.
 // - String(report) is the report's type name and message. Pi v1.5.0 sync (area reports): the handover reports are read from their
 //   ReportInfo (upstream's infos, 5f312dac4), and the task_too_old case is ported.
-// - "preserves an abort mark that races the handover commit ...": the commit log is read after close instead of before it; close writes no
-//   task state, and storage.commits is not safe to read while commits may still land.
+// - "preserves an abort mark that races the handover commit ...": the commit log is read after close instead of before it; the task has
+//   ended by then, so close writes nothing of it (Pi v1.5.0 sync, area restarts: a close writes back only the tasks it stopped), and
+//   storage.commits is not safe to read while commits may still land.
 // None of the 24 tests needs generation, tools or compaction; all are ported.
 using PiSharp.Durable;
 using PiSharp.Durable.Chord;

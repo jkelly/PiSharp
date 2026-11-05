@@ -4,7 +4,7 @@
 // - openNodeSqliteStorage is SqliteStorage.OpenAsync, and head() reads durable_metadata through Microsoft.Data.Sqlite (a pool-free
 //   connection, as upstream's DatabaseSync is one connection).
 // - Area sleep: the first case checks Harness.Wake() and HarnessOptions.OnWake as upstream does.
-// - TaskRecord.restarts does not exist here yet (area restarts): the last case checks the pending status only.
+// - Area restarts: the last case checks the restart count the writable open records (TaskRecord.Restarts), as upstream does.
 // - ReadOnlySession is ReadOnlySessionException; root.commit(() => "nothing") is a CommitAsync whose callback writes nothing.
 using Microsoft.Data.Sqlite;
 using PiSharp.Durable;
@@ -141,6 +141,7 @@ internal static class ReadOnlyTests
             var writer = await OpenChat(await SqliteStorage.OpenAsync(path), Setup());
             var record = await writer.Harness.GetTaskAsync(taskId, Context);
             Equal(DurableTaskStatus.Pending, record?.State.Status, "status");
+            Equal(1, record?.Restarts, "restarts");
             await writer.Harness.CloseAsync(Context);
             await driver.Harness.CloseAsync(Context);
         });

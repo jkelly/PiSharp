@@ -8,11 +8,12 @@
 // lifecycle, ownership, structured, submissions, task-graph, tasks-recovery, tools-recovery, view); every one runs on the store fresh and,
 // where the group has reopen cases, across reopen. Not rerun: the groups of upstream's list that open their own SQLite file
 // (input-entries, nested-tools, nested-tools-restart, read-only, scheduler-indexes, scheduler-retention; ports that take no storage) and
-// the files later areas port (after-run, continue, restart-failure, tool-hooks, turn-limit). Area sleep adds harness.sleep.store.*:
+// the files later areas port (after-run, continue, tool-hooks, turn-limit). Area sleep adds harness.sleep.store.*:
 // its reopen case opens the file as a StoreStorage, and its MemoryStorage cases run on a fresh StoreStorage. Area reports adds
 // harness.blocked.store.*, opening every file as a StoreStorage. Area events (f3255de76) keeps the store run of the structured group's
 // v1.2.0 event tests, which moved to the PiSharp-only projection's cases (AgentEventsCases.cs): agent-events.store.tool-rounds.* and
-// agent-events.store.tool-rounds-and-events.* (harness.structured.store.tool-rounds(-and-events).* before).
+// agent-events.store.tool-rounds-and-events.* (harness.structured.store.tool-rounds(-and-events).* before). Area restarts adds
+// harness.restart-failure.store.*, opening every file as a StoreStorage, and its blocked cases join harness.blocked.store.*.
 using PiSharp.Durable;
 using PiSharp.Durable.Sqlite;
 
@@ -67,5 +68,6 @@ internal static partial class Program
         .. ViewTests.Cases("harness.view.store.", () => Task.FromResult(FreshStore("view-store"))),
         .. SleepTests.Cases("harness.sleep.store.", () => FreshStore("sleep-store"), path => OpenNodeSqliteStorageAsync(path)),
         .. BlockedTests.Cases("harness.blocked.store.", path => OpenNodeSqliteStorageAsync(path)),
+        .. RestartFailureTests.Cases("harness.restart-failure.store.", path => OpenNodeSqliteStorageAsync(path)),
     ];
 }

@@ -165,7 +165,7 @@ internal static partial class HarnessRecoveryTests
     });
 
     /// <summary>Every write of task <paramref name="id"/> committed to <paramref name="storage"/>, in commit order. Read after close, so no
-    /// commit lands meanwhile; close writes no task state.</summary>
+    /// commit lands meanwhile; close writes back only the tasks it stopped (Pi v1.5.0 sync, area restarts).</summary>
     private static List<TaskRecord> WritesOf(ControlledStorage storage, TaskId id)
     {
         var count = storage.CommitCount;
