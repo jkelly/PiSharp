@@ -21,7 +21,7 @@
     "versionSpecificPackageConsumptionQualified": false,
     "fullProviderParity": false,
     "completeNativeGateReady": false,
-    "status": "Release candidate on release/1.5.0: the Pi v1.2.0 to v1.5.0 sync (decision 0013), phases 0 to 4 and the close-out. Of the 283 applicability rows marked 1.5.0, 232 are ported, 19 ported with a deferral, 9 already ported and 23 no-op; the 43 rows of phases 5 to 7 (pi-env, the rest of Chord, pi-evals) follow in experimental 1.5.0.x patches. PiSharp.Telemetry is a new [Experimental] package (24 packages in all). The durable packages move to pi-durable v1.5.0, whose stored formats PiSharp 1.2.0.x cannot open. PiSharp.Chord and PiSharp.Durable.Store are not packed and not in the tool; the Web Agent, Durable Web, Durable.MSSQL and Web.Common stay unpacked, and Durable.Hosting, Durable.Server, Durable.Client and ModelRuntime ship inside the PiSharp.Cli tool but not as packages, as in 1.2.0.2. Nothing is tagged or published. Fresh versioned lock, build, package and consumer evidence is required at release; the owner gave the go-ahead on 2026-11-05."
+    "status": "Released 2026-11-06: the Pi v1.2.0 to v1.5.0 sync (decision 0013), phases 0 to 4 and the close-out. Of the 283 applicability rows marked 1.5.0, 232 are ported, 19 ported with a deferral, 9 already ported and 23 no-op; the 43 rows of phases 5 to 7 (pi-env, the rest of Chord, pi-evals) follow in experimental 1.5.0.x patches. PiSharp.Telemetry is a new [Experimental] package (24 packages in all). The durable packages move to pi-durable v1.5.0, whose stored formats PiSharp 1.2.0.x cannot open. PiSharp.Chord and PiSharp.Durable.Store are not packed and not in the tool; the Web Agent, Durable Web, Durable.MSSQL and Web.Common stay unpacked, and Durable.Hosting, Durable.Server, Durable.Client and ModelRuntime ship inside the PiSharp.Cli tool but not as packages, as in 1.2.0.2."
   },
   "releaseCandidate": {
     "branch": "release/1.5.0",
@@ -34,9 +34,12 @@
     "changelog": "website/src/content/changelog/1.5.0.md"
   },
   "publication": {
-    "tagCreated": false,
-    "binaryReleasePublished": false,
-    "nugetPackagesPublished": false
+    "tagCreated": true,
+    "binaryReleasePublished": true,
+    "nugetPackagesPublished": true,
+    "publishedOn": "2026-11-06",
+    "tagCommit": "ab4754a5f3bcd1d68a71f3eaed1b4426803921c7",
+    "releaseRun": "42138967030"
   },
   "previousReleases": [
     {
