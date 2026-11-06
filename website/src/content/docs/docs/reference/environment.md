@@ -3,7 +3,7 @@ title: Environment variables
 description: Every environment variable PiSharp reads.
 ---
 
-PiSharp reads Pi v1.2.0's environment variables under the same names, plus a few `PISHARP_*` variables of its own. This page lists them by area. `pisharp --help` prints the common ones.
+PiSharp reads Pi v1.5.0's environment variables under the same names, plus a few `PISHARP_*` variables of its own. This page lists them by area. `pisharp --help` prints the common ones.
 
 Boolean variables differ in what they accept. Where a row says `1`, only `1` turns the feature on. `PI_OFFLINE` also takes `true` and `yes`.
 

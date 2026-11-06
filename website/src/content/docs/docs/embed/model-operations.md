@@ -14,7 +14,7 @@ Embeddings, image editing, video, speech, transcription, music and reranking liv
 ## Install
 
 ```powershell
-dotnet add package PiSharp.AI --version 1.2.0.2
+dotnet add package PiSharp.AI --version 1.5.0
 ```
 
 `PiSharp.AI` brings `PiSharp.Contracts`. Add these namespaces:
@@ -83,7 +83,7 @@ Another id gives a provider that lists its models and has no APIs. When `openai`
 
 `ModelOperationsRegistry` holds providers and resolves auth on every call. It is thread-safe, and you can add, replace or remove providers at any time.
 
-`CreateBuiltin` takes released catalog shards, one provider each, and builds the built-in provider definitions over them. The shards are the JSON files of Pi's model catalog (`providers/data/<provider>.json` in `@earendil-works/pi-ai` 1.2.0). The CLI embeds the same files in [`src/PiSharp.Cli/Models`](https://github.com/jkelly/PiSharp/tree/main/src/PiSharp.Cli/Models). [Chat and providers](/docs/embed/chat/) covers `FrozenModelCatalog`.
+`CreateBuiltin` takes released catalog shards, one provider each, and builds the built-in provider definitions over them. The shards are the JSON files of Pi's model catalog (`providers/data/<provider>.json` in `@earendil-works/pi-ai` 1.5.0). The CLI embeds the same files in [`src/PiSharp.Cli/Models`](https://github.com/jkelly/PiSharp/tree/main/src/PiSharp.Cli/Models). [Chat and providers](/docs/embed/chat/) covers `FrozenModelCatalog`.
 
 ```csharp
 using PiSharp.AI.Catalogs;

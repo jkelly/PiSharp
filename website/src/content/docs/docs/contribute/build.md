@@ -24,7 +24,7 @@ git clone https://github.com/jkelly/PiSharp.git
 cd PiSharp
 ```
 
-`main` holds the latest work, including unreleased features. Each release has a tag, such as `v1.2.0.2`. Check out the tag to build exactly what shipped.
+`main` holds the latest work, including unreleased features. Each release has a tag, such as `v1.5.0`. Check out the tag to build exactly what shipped.
 
 ## Repository layout
 

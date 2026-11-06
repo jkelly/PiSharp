@@ -1105,8 +1105,8 @@
       "originalSha256": "b17d6fdf7fbef642be6a2ecfc697a74fc2c18faa613801e2809fb861be6b6291"
     },
     {
-      "currentSha256": "a6544220e7cc684c7706f7ebcb6ea14573b2977d3ebf555f03b3fc73117085e2",
-      "currentBytes": 15975,
+      "currentSha256": "9ee3f25c43aff04c2ef75d06f273cb787430558cf6d35abbe0004f373a60f581",
+      "currentBytes": 16006,
       "originalBytes": 2925,
       "path": "docs/compatibility/baseline.md",
       "originalSha256": "60becce63e58e74237d4be073fb63b8d48ef2a227f9f8e52db3754df7fd704b6"
@@ -5872,8 +5872,8 @@
       "originalSha256": "0f5f73cc466a7aa3c8939d483b171da02d34d7fff0518ab80964f1311c92e6a9"
     },
     {
-      "currentSha256": "8cd54587b7862b84daba64934f78479c57cd594fbcb262cd697609349493c2fa",
-      "currentBytes": 7106,
+      "currentSha256": "8f91ed1246dd593792d57a60e41683bfbb426a63c833ff76a94b95f806bfdb6d",
+      "currentBytes": 7511,
       "originalBytes": 3622,
       "path": "README.md",
       "originalSha256": "1b053b228b07ff43b8ba7d37d19e4ea3a1d6214731dfa4a1f2ef6f3240f292df"
@@ -17345,8 +17345,8 @@
       "originalSha256": "e19cf1c735524baa2df474154c117399e4a3ecf2c7ba98e337cd12afecc77071"
     },
     {
-      "currentSha256": "4de1c4da4af1f754ff2fd8f0d551497fe00afb2492adcb60d586cecff4395d97",
-      "currentBytes": 34060,
+      "currentSha256": "332ecf1d1274324552d0ece07e20392cf8ed5bdbeb675b620e16e64fdff7db61",
+      "currentBytes": 34781,
       "originalBytes": 11780,
       "path": "THIRD-PARTY-NOTICES.md",
       "originalSha256": "24221bb14cd6d8e6e579012398de5ef553806f67eaa182a5900d142fc20faf09"

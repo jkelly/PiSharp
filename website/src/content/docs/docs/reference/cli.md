@@ -3,7 +3,7 @@ title: Command line
 description: Every pisharp option, mode and subcommand, with exit codes.
 ---
 
-`pisharp` takes the same command line as Pi v1.2.0, plus a few PiSharp options and commands. Pi's [Command Line](https://github.com/earendil-works/pi/blob/v1.2.0/packages/coding-agent/docs/cli.md) reference applies. This page lists every option the PiSharp parser accepts, checked against the source of `pisharp --help` and the parser itself.
+`pisharp` takes the same command line as Pi v1.5.0, plus a few PiSharp options and commands. Pi's [Command Line](https://github.com/earendil-works/pi/blob/v1.5.0/packages/coding-agent/docs/cli.md) reference applies. This page lists every option the PiSharp parser accepts, checked against the source of `pisharp --help` and the parser itself.
 
 ```sh
 pisharp [options] [--] [@files...] [messages...]

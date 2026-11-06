@@ -3,7 +3,7 @@ title: Sessions
 description: Where PiSharp keeps conversations, and how to resume, branch, fork, compact, export and share them.
 ---
 
-A session is one conversation, saved as a JSONL file in Pi's format (version 3). PiSharp stores sessions where Pi does, so Pi and PiSharp list and resume each other's sessions. Each entry in the file has a parent, so a session is a tree: going back to an earlier point and continuing makes a new branch, and the old one stays. Pi's [Sessions](https://github.com/earendil-works/pi/blob/v1.2.0/packages/coding-agent/docs/sessions.md) page applies.
+A session is one conversation, saved as a JSONL file in Pi's format (version 3). PiSharp stores sessions where Pi does, so Pi and PiSharp list and resume each other's sessions. Each entry in the file has a parent, so a session is a tree: going back to an earlier point and continuing makes a new branch, and the old one stays. Pi's [Sessions](https://github.com/earendil-works/pi/blob/v1.5.0/packages/coding-agent/docs/sessions.md) page applies.
 
 ## Where sessions live
 

@@ -21,7 +21,17 @@
     "versionSpecificPackageConsumptionQualified": false,
     "fullProviderParity": false,
     "completeNativeGateReady": false,
-    "status": "Version metadata prepared for the Pi v1.5.0 sync (decision 0013); fresh versioned lock, build, package and consumer evidence required."
+    "status": "Release candidate on release/1.5.0: the Pi v1.2.0 to v1.5.0 sync (decision 0013), phases 0 to 4 and the close-out. Of the 283 applicability rows marked 1.5.0, 232 are ported, 19 ported with a deferral, 9 already ported and 23 no-op; the 43 rows of phases 5 to 7 (pi-env, the rest of Chord, pi-evals) follow in experimental 1.5.0.x patches. PiSharp.Telemetry is a new [Experimental] package (24 packages in all). The durable packages move to pi-durable v1.5.0, whose stored formats PiSharp 1.2.0.x cannot open. PiSharp.Chord and PiSharp.Durable.Store are not packed and not in the tool; the Web Agent, Durable Web, Durable.MSSQL and Web.Common stay unpacked, and Durable.Hosting, Durable.Server, Durable.Client and ModelRuntime ship inside the PiSharp.Cli tool but not as packages, as in 1.2.0.2. Nothing is tagged or published. Fresh versioned lock, build, package and consumer evidence is required at release; the owner gave the go-ahead on 2026-11-05."
+  },
+  "releaseCandidate": {
+    "branch": "release/1.5.0",
+    "decision": "docs/decisions/0013-pi-1.5.0-sync.md",
+    "applicability": "compatibility/sync-1.5.0-applicability.json",
+    "experimental": ["PiSharp.Telemetry (PISHARP_TELEMETRY001)", "PiSharp.Contracts.Schema, the pi-schema port (PISHARP_SCHEMA001)", "client identity (PISHARP_IDENTITY001)", "streaming tool-call arguments (PISHARP_AI001)", "device-code sign-in hints (PISHARP_AUTH001)", "pi.exec() output limits (PISHARP_EXEC001)", "extension UI additions (PISHARP_EXTUI001)", "code mode worker admission (PISHARP_CODEMODE001)", "ToolSearchDocument.NamespaceText (PISHARP_TOOLSEARCH001)", "TUI additions (PISHARP_TUI001)", "PiSharp.Durable, PiSharp.Durable.Tools and PiSharp.Durable.Sqlite on pi-durable v1.5.0 (PISHARP_DURABLE001)"],
+    "sourceOnly": ["PiSharp.Chord (PISHARP_CHORD001)", "PiSharp.Durable.Store", "PiSharp.WebAgent", "PiSharp.Durable.Web", "PiSharp.Durable.MSSQL", "PiSharp.Durable.Hosting", "PiSharp.Durable.Server", "PiSharp.Durable.Client", "PiSharp.ModelRuntime", "PiSharp.Web.Common"],
+    "laterPatches": "Phases 5 to 7 of decision 0013 (pi-env, the rest of Chord, pi-evals) as experimental 1.5.0.x patches on the v1.5.0 baseline.",
+    "notes": "docs/release-notes/1.5.0.md",
+    "changelog": "website/src/content/changelog/1.5.0.md"
   },
   "publication": {
     "tagCreated": false,

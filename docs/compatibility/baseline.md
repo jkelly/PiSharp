@@ -32,7 +32,7 @@ It verified all 197 files and the archive hash (252 checks).
 
 Source citations in PiSharp files that named v1.2.0 (`06a4669…`) were re-pinned to v1.5.0 by [repin-sources.mjs](../../tools/CompatibilityReport/repin-sources.mjs) only where every cited upstream file is byte-identical between the two tags: 250 citations in 250 files. The other 633 citations, in 630 files, stay on v1.2.0 until their area is ported. For the `<path> (commit <sha>)` and `<path> at <sha>` forms the tool now also reads the path before the commit: before that, it moved the THIRD-PARTY-NOTICES record of the four embedded configuration schemas on the strength of the theme files named after the commit, although the models and settings schemas changed upstream. 19 more could not be parsed and are checked by hand with their area. [sync-1.5.0-worklist.json](../../compatibility/sync-1.5.0-worklist.json) lists them all by area.
 
-The v1.5.0 event catalog and command/RPC inventory are not generated yet. Until they are, the v1.2.0 inventories are the newest; see the work list.
+The v1.5.0 event catalog and command/RPC inventory were generated in phase 1 of the sync; see [Surface inventories](#surface-inventories-v0991-preserved-v110-and-v120-refreshed).
 
 ## Previous target: Pi v1.2.0
 

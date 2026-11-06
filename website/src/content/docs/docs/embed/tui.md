@@ -3,12 +3,12 @@ title: Terminal UI
 description: Build terminal interfaces with PiSharp.Tui's components, layout and terminals.
 ---
 
-`PiSharp.Tui` is the terminal toolkit that `pisharp`'s interactive mode and `pisharp durable` are built on. It is a C# port of Pi's TUI library ([`packages/tui`](https://github.com/earendil-works/pi/tree/v1.2.0/packages/tui)), so its components, key binding ids and rendering rules are Pi's. You build a tree of components that render to lines of styled text. A TUI draws those lines with differential updates, routes keys to the focused component and draws overlays on top.
+`PiSharp.Tui` is the terminal toolkit that `pisharp`'s interactive mode and `pisharp durable` are built on. It is a C# port of Pi's TUI library ([`packages/tui`](https://github.com/earendil-works/pi/tree/v1.5.0/packages/tui)), so its components, key binding ids and rendering rules are Pi's. You build a tree of components that render to lines of styled text. A TUI draws those lines with differential updates, routes keys to the focused component and draws overlays on top.
 
 ## Install
 
 ```powershell
-dotnet add package PiSharp.Tui --version 1.2.0.2
+dotnet add package PiSharp.Tui --version 1.5.0
 ```
 
 The package targets net10.0 and has no dependencies. Its main API is in the `PiSharp.Tui.Pi` namespace; every type on this page is there unless the section says otherwise.

@@ -1,8 +1,8 @@
 {
-  "$comment": "Status per area: ported | partial | planned | wont-port | unknown. Notes and evidence are optional; evidence is a URL. Assessed against the repository, not docs claims: authored test suites, goldens captured from Pi 1.1.0 with authored Pi 1.2.0 text changes, compatibility/*.v1.2.0 inventories and overlays, and compatibility/sync-1.2.0-applicability.json. deviations lists the differences that remain, intentional ones first.",
-  "assessedOn": "2026-10-15",
-  "baseline": "Pi v1.2.0",
-  "release": "1.2.0",
+  "$comment": "Status per area: ported | partial | planned | wont-port | unknown. Notes and evidence are optional; evidence is a URL. Assessed against the repository, not docs claims: authored test suites, goldens captured from Pi 1.1.0 with authored Pi 1.2.0 text changes, compatibility/*.v1.5.0 inventories, and compatibility/sync-1.2.0-applicability.json and sync-1.5.0-applicability.json. deviations lists the differences that remain, intentional ones first.",
+  "assessedOn": "2026-11-05",
+  "baseline": "Pi v1.5.0",
+  "release": "1.5.0",
   "promises": [
     {
       "id": "behavior",
@@ -121,7 +121,7 @@
         {
           "area": "RPC commands",
           "status": "ported",
-          "notes": "All 33 Pi v1.2.0 RPC commands. A failed command answers with the error's message, thinking levels are clamped to the model, and the setters save the global settings.json, as in Pi. Under pisharp --mode rpc, bash runs in your shell with no extra options. Difference: get_session_stats fails on non-finite usage, where Pi reports null.",
+          "notes": "All 33 Pi v1.5.0 RPC commands. A failed command answers with the error's message, thinking levels are clamped to the model, and the setters save the global settings.json, as in Pi. Under pisharp --mode rpc, bash runs in your shell with no extra options. Difference: get_session_stats fails on non-finite usage, where Pi reports null.",
           "evidence": "https://github.com/jkelly/PiSharp/tree/main/tests/PiSharp.Rpc.Tests"
         },
         {
@@ -158,7 +158,7 @@
         {
           "area": "Pi's npm packages",
           "status": "ported",
-          "notes": "pi-coding-agent, pi-ai, pi-tui and pi-agent-core 1.2.0 are installed with your npm, checked against the registry's integrity, and loaded through Pi's jiti. Offline, or without npm, extensions fall back to built-in copies with a warning.",
+          "notes": "pi-coding-agent, pi-ai, pi-tui and pi-agent-core 1.2.0 are installed with your npm, checked against the registry's integrity, and loaded through Pi's jiti. Intentional: 1.5.0 keeps them on Pi 1.2.0 (see Extension Node runtime). Offline, or without npm, extensions fall back to built-in copies with a warning.",
           "evidence": "https://github.com/jkelly/PiSharp/tree/main/tests/PiSharp.ExtensionParity.Tests"
         },
         {
@@ -170,7 +170,7 @@
         {
           "area": "Event hooks",
           "status": "ported",
-          "notes": "Every v1.2.0 extension event reaches TypeScript handlers, including before_agent_start for runs a custom message starts. sendMessage with triggerTurn starts its turn at once, inside a command or from a timer, as in Pi.",
+          "notes": "Every v1.5.0 extension event reaches TypeScript handlers, including before_agent_start for runs a custom message starts. sendMessage with triggerTurn starts its turn at once, inside a command or from a timer, as in Pi.",
           "evidence": "https://github.com/jkelly/PiSharp/tree/main/tests/PiSharp.ExtensionParity.Tests"
         },
         {
@@ -188,7 +188,7 @@
         {
           "area": "Native C# extensions",
           "status": "ported",
-          "notes": "A folder with a pisharp-extension.json loads from the same places as Pi extensions, without Node, and shares the session and command list with TypeScript extensions. All 41 v1.2.0 events reach native handlers, and native extensions can register classifier and image providers. Difference: a C# extension that registers codemode, tool_search or /mcp doesn't replace the built-in one; only TypeScript extensions do.",
+          "notes": "A folder with a pisharp-extension.json loads from the same places as Pi extensions, without Node, and shares the session and command list with TypeScript extensions. All 41 v1.5.0 events reach native handlers, and native extensions can register classifier and image providers. Difference: a C# extension that registers codemode, tool_search or /mcp doesn't replace the built-in one; only TypeScript extensions do.",
           "evidence": "https://github.com/jkelly/PiSharp/tree/main/tests/PiSharp.ExtensionParity.Tests"
         }
       ]
@@ -199,17 +199,17 @@
       "title": "Intentional",
       "blurb": "Differences kept on purpose.",
       "items": [
-        { "title": "No telemetry", "notes": "PiSharp doesn't report installs to Pi's servers. PI_TELEMETRY and enableInstallTelemetry are accepted and ignored." },
+        { "title": "No telemetry", "notes": "PiSharp doesn't report installs to Pi's servers. PI_TELEMETRY and enableInstallTelemetry are accepted and ignored. PiSharp.Telemetry, Pi's telemetry contract from 1.5.0, records spans only for a host that passes one and has no exporter." },
         { "title": "Startup header", "notes": "The header says PiSharp with PiSharp's own version (for example v1.1.0.3), where Pi shows its package version." },
         { "title": "User agents", "notes": "Chat requests send Pi's detailed user agent for the Pi version PiSharp tracks, pi/1.5.0 (<platform>; dotnet/<version>; <arch>), naming .NET where Pi names Node. Bedrock sends pi/1.5.0 alone, media requests send PiSharp, and the NuGet update check sends pisharp/<version>." },
         { "title": "No attribution", "notes": "Pi attributes OpenRouter, NVIDIA NIM and OpenCode requests to pi (https://pi.dev) while install telemetry is on, and pi-agent-core does by default. PiSharp sends no attribution headers, whatever enableInstallTelemetry says (owner decision, 2026-11-05). OpenCode requests with a session carry x-opencode-client: pisharp." },
         { "title": "MCP client registration", "notes": "oauth.clientRegistration defaults to auto, as in Pi 1.5.0. PiSharp's auto always registers a client dynamically, as Pi's does in a rebranded build, so it never presents Pi's Client ID Metadata Document on pi.dev. An explicit cimd still presents it, as in Pi." },
-        { "title": "Extension Node runtime", "notes": "TypeScript extensions run against Pi 1.2.0's npm packages, with undici overridden to 8.12.3 as Pi 1.5.0 pins it, because Pi 1.5.0's pi-agent-core attributes agent requests to Pi by default." },
+        { "title": "Extension Node runtime", "notes": "TypeScript extensions run against Pi 1.2.0's npm packages, with undici overridden to 8.12.3 as Pi 1.5.0 pins it, because Pi 1.5.0's pi-agent-core attributes agent requests to Pi by default. Installed extensions therefore see Pi 1.2.0's pi-ai." },
         { "title": "Codemode worker", "notes": "Each script runs in its own worker process, so one script can't take PiSharp down. That costs about 100 to 300 ms per script. The deadline starts when the script starts running, not when the worker launches." },
         { "title": "Jint limits", "notes": "Codemode runs on Jint, not QuickJS. Memory and recursion overruns end the script instead of throwing a catchable error, and the engine's own error messages differ." },
         { "title": "/bug opens a GitHub issue", "notes": "/bug builds Pi's report and zip but never uploads them to Pi's developers. It opens a prefilled issue at github.com/jkelly/PiSharp for you to attach the zip to." },
         { "title": "Version check on NuGet", "notes": "The update check looks up the latest PiSharp.Cli on NuGet and suggests dotnet tool update -g PiSharp.Cli. It never asks pi.dev." },
-        { "title": "No self-update", "notes": "pisharp update updates packages and catalogs. Update PiSharp itself with dotnet tool update -g PiSharp.Cli." },
+        { "title": "Self-update", "notes": "pisharp update updates packages and catalogs. It updates PiSharp itself only through your own command (PI_SELF_UPDATE_COMMAND or selfUpdateCommand, as in Pi 1.5.0), which it runs when NuGet has a newer PiSharp.Cli, or with --force. Without one, update with dotnet tool update -g PiSharp.Cli." },
         { "title": "pisharp durable", "notes": "An experimental, PiSharp-only command (decision 0005), listed in pisharp --help with pisharp session. Pi v1.1.0 ran its durable agent from source and Pi v1.2.0 removed it, so Pi's help has neither line. From 1.2.0.2 it also has --help, questions, plan mode and the media tools, and pisharp durable serve, token and the device commands (decision 0008), which pisharp durable help lists and pisharp --help doesn't." },
         { "title": "Service tiers", "notes": "--tier (alias --service-tier), /tier, the tier in the footer and the serviceTier setting are PiSharp's, experimental from 1.2.0.2 (decision 0007). Pi has no service tiers. Without a tier, requests and the footer are as in Pi." }
       ]
@@ -228,7 +228,16 @@
         { "title": "TypeScript tool reach", "notes": "A TypeScript tool that declares reachesTools reaches every tool, so its calls wait for every MCP server. Pi asks the tool which servers a call may reach." },
         { "title": "Codemode row clock", "notes": "The plain codemode row that native renderer hosts get shows the total time once a script finished, but no live elapsed time. The interactive mode shows both." },
         { "title": "WebSocket connect timeout", "notes": "The websocketConnectTimeoutMs setting isn't read. The Codex WebSocket always gets 15 seconds to open, Pi's default." },
-        { "title": "Azure resource names", "notes": "Any resource name is taken as Pi takes it (decision 14). A name that leaves credentials, a fragment or a query in the URL, or a host .NET can't hold (such as one with $ or an empty label), is refused when the session starts; Pi fails only when it sends the request." }
+        { "title": "Azure resource names", "notes": "Any resource name is taken as Pi takes it (decision 14). A name that leaves credentials, a fragment or a query in the URL, or a host .NET can't hold (such as one with $ or an empty label), is refused when the session starts; Pi fails only when it sends the request." },
+        { "title": "Models-level identity", "notes": "Identity travels on each request. Pi 1.5.0's Models-level default identity (createModels({ identity })) isn't ported." },
+        { "title": "Responses tool changes", "notes": "Responses, Codex and Azure additional_tools and tool search, which Pi 1.5.0 can send, aren't implemented. Azure refuses those flags." },
+        { "title": "Classifier settings", "notes": "The CLI's classifier registry reads only the built-in catalogs, so a models.json baseUrl or compat doesn't reach classifier calls, as it does in Pi 1.5.0." },
+        { "title": "Streaming copies", "notes": "Mistral still writes a full message snapshot per frame, pi-messages capture still copies its partials, and Anthropic and Completions rebuild their failure-path partials, where Pi 1.5.0 streams them incrementally." },
+        { "title": "pi.exec() capture", "notes": "Native pi.exec() captures at most 1 MiB per pipe, whatever maxBuffer says. The Node bridge honours maxBuffer in full." },
+        { "title": "Session write failures", "notes": "After a write that may have reached the file, a native session faults and accepts no more writes. Pi 1.5.0 rolls the entry back and keeps writing. Whether PiSharp follows is open." },
+        { "title": "Overlay handles", "notes": "An overlay's onHandle and overlayOptions.visible aren't forwarded from Node extensions." },
+        { "title": "Shift+Enter on macOS", "notes": "Pi 1.5.0 treats ESC+CR with Shift held as Shift+Enter. PiSharp does on Windows, but can't read the Shift state on macOS, so it isn't detected there." },
+        { "title": "tool_search word splitting", "notes": "Text without spaces is split into words by the system's ICU, which can differ from V8's. Without ICU it stays one word." }
       ]
     }
   ],
@@ -236,7 +245,7 @@
     {
       "title": "Freeze the compatibility target",
       "status": "partial",
-      "notes": "Pinned to Pi v1.2.0, with the command, RPC and event inventories refreshed. Release profiles (P1-04) are still open."
+      "notes": "Pinned to Pi v1.5.0, with the command, RPC and event inventories refreshed. Release profiles (P1-04) are still open."
     },
     {
       "title": "Provider layer",
@@ -271,7 +280,7 @@
     {
       "title": "Hardening and packaging",
       "status": "partial",
-      "notes": "The release pipeline runs 19 offline suites on Linux, including the extension suite with Node and the two durable suites. Platform and security qualification are open."
+      "notes": "The release pipeline runs 22 offline suites on Linux, including the extension suite with Node, the two durable suites, the custom agents suite, and the schema and telemetry suites. Platform and security qualification are open."
     },
     {
       "title": "1.1.0.x gap releases",
@@ -284,14 +293,14 @@
       "notes": "Every Pi 1.2.0 change in scope is ported with tests (sync-1.2.0-applicability.json), except per-input reach for TypeScript tools and the live clock of the plain codemode row. 1.2.0.1 adds the experimental durable port, and 1.2.0.2 PiSharp-only experimental media, service tiers, custom agents and the durable device server on the same baseline."
     },
     {
-      "title": "Experimental durable port",
+      "title": "Pi 1.5.0 sync",
       "status": "partial",
-      "notes": "1.2.0.1 ships pisharp durable and the PiSharp.Durable, PiSharp.Durable.Tools and PiSharp.Durable.Sqlite packages as experimental: a port of pi-durable v1.2.0 whose every upstream file is ported or recorded as excluded (decision 0005, durable-port-map.json). Open: JSONL storage keeps its records in memory, and code mode scripts interrupted under Pi or PiSharp don't resume in the other. 1.2.0.2 adds PiSharp-only questions, plan mode, media tools and a device server (decisions 0005, 0007 and 0008), which pi-durable doesn't have."
+      "notes": "1.5.0 ships phases 0 to 4 of the sync and its close-out: every row they need is ported, ported with a deferral, already in PiSharp or a no-op (sync-1.5.0-applicability.json). 19 rows keep a deferral; the ones outside durable and Chord are listed under Still open. pi-env, the rest of Chord and pi-evals follow as experimental 1.5.0.x patches."
     },
     {
-      "title": "Pi 1.5.0 sync",
-      "status": "planned",
-      "notes": "Pi 1.3.0, 1.4.0 and 1.5.0 are synced in one step, straight to Pi 1.5.0, and ship as PiSharp 1.5.0. The sync started on 2026-11-02 on the sync/pi-1.5.0 branch. Until it ships, PiSharp tracks Pi 1.2.0."
+      "title": "Experimental durable port",
+      "status": "partial",
+      "notes": "1.2.0.1 ships pisharp durable and the PiSharp.Durable, PiSharp.Durable.Tools and PiSharp.Durable.Sqlite packages as experimental: a port of pi-durable v1.2.0 whose every upstream file is ported or recorded as excluded (decision 0005, durable-port-map.json). Open: JSONL storage keeps its records in memory, and code mode scripts interrupted under Pi or PiSharp don't resume in the other. 1.2.0.2 adds PiSharp-only questions, plan mode, media tools and a device server (decisions 0005, 0007 and 0008), which pi-durable doesn't have. 1.5.0 moves the libraries to pi-durable v1.5.0 (decision 0013): 1.2.0.x can't open what 1.5.0 writes, no session written by pi-durable v1.5.0 has been compared yet, and Chord v2's host and durable on its store wait for 1.5.0.x."
     }
   ]
 }

@@ -5,7 +5,7 @@ description: What PiSharp is, what it targets, and where to start.
 
 PiSharp is an independent native .NET implementation of the [Pi coding agent](https://pi.dev). It targets .NET 10. The agent itself runs without Node; Node is only needed for TypeScript extensions.
 
-PiSharp's version is the Pi version it matches. The current baseline is **Pi v1.2.0**, pinned to commit `06a4669`. See [How versions work](/docs/versioning/).
+PiSharp's version is the Pi version it matches. The current baseline is **Pi v1.5.0**, pinned to commit `f9a2636`. See [How versions work](/docs/versioning/).
 
 ## What's included
 
@@ -20,14 +20,16 @@ PiSharp's version is the Pi version it matches. The current baseline is **Pi v1.
 
 Every layer is a separate library. See the [SDK](/sdk/) for the full list.
 
-## New in 1.2.0.2
+## New in 1.5.0
 
-These features are new in PiSharp 1.2.0.2. They are PiSharp's own, not Pi's, and experimental: their pages are marked **Experimental**, and they may change in any release.
+PiSharp 1.5.0 moves from Pi v1.2.0 to Pi v1.5.0, with Pi 1.3.0 and 1.4.0 in between. The [changelog](/changelog/) and the [release notes](https://github.com/jkelly/PiSharp/blob/main/docs/release-notes/1.5.0.md) describe the changes, the breaking ones first.
 
-- [Custom agents](/docs/custom-agents/overview/): typed workflows, agent teams, and typed, scripted and dynamic tools, built on the durable runtime, in three new packages.
-- [Media tools](/docs/guides/media/): image, video, speech, music, transcription, embeddings and reranking, for durable sessions and from the [SDK](/docs/embed/media/).
-- [Service tiers](/docs/guides/service-tiers/): ask a provider for economy, priority or fast capacity with `--tier` and `/tier`.
-- [Durable device server](/docs/guides/durable/#device-server): `pisharp durable serve` runs many durable sessions behind an authenticated local API, with questions and plan mode in `pisharp durable`.
+- [Durable sessions](/docs/guides/durable/#upgrading-to-150) follow `pi-durable` v1.5.0. Once 1.5.0 has opened a session, PiSharp 1.2.0.x can't continue it, and the [library API](/docs/embed/durable/#upgrading-from-120x) changed.
+- [Telemetry](/docs/embed/telemetry/) (experimental): `PiSharp.Telemetry`, a new package that ports Pi's telemetry contract. Nothing is recorded unless a host asks, and nothing is sent anywhere.
+- Tool arguments are validated as JSON Schema by a port of Pi's pi-schema.
+- [`pisharp update`](/docs/reference/cli/) can run your own update command, and `/share` can upload to Radius ([`sessionShareDestination`](/docs/reference/settings/)).
+
+The custom agents, media tools, service tiers and the durable device server, new in 1.2.0.2, are still PiSharp's own and experimental.
 
 ## Where to go next
 
@@ -40,5 +42,5 @@ These features are new in PiSharp 1.2.0.2. They are PiSharp's own, not Pi's, and
 - [Parity](/parity/): how close PiSharp is to Pi today, and the differences that remain.
 
 :::note
-PiSharp is an independent port, not an official Pi release. Pi's own [documentation](https://github.com/earendil-works/pi/tree/v1.2.0/packages/coding-agent/docs) describes the behaviour PiSharp follows. Where PiSharp differs, these pages and the [Parity](/parity/) page say so.
+PiSharp is an independent port, not an official Pi release. Pi's own [documentation](https://github.com/earendil-works/pi/tree/v1.5.0/packages/coding-agent/docs) describes the behaviour PiSharp follows. Where PiSharp differs, these pages and the [Parity](/parity/) page say so.
 :::

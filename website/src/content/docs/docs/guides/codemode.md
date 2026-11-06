@@ -5,7 +5,7 @@ description: Let the model call tools from JavaScript in a sandbox, and how to t
 
 Code mode gives the model one more tool, `codemode`. Its input is a JavaScript script that calls the session's other tools and runs non-LLM models, such as classifiers and image models. Only what the script outputs reaches the model. A script can run many calls in parallel, filter large results, and chain steps without a round trip to the model for each one.
 
-PiSharp ports Pi v1.2.0's code mode. The scripts, globals, limits and messages are Pi's; the JavaScript engine is different. Pi's own page ships with PiSharp at [src/PiSharp.Cli/docs/codemode.md](https://github.com/jkelly/PiSharp/blob/main/src/PiSharp.Cli/docs/codemode.md) and is the full reference for scripts. This page covers turning it on, the settings, and what differs in PiSharp.
+PiSharp ports Pi v1.5.0's code mode. The scripts, globals, limits and messages are Pi's; the JavaScript engine is different. Pi's own page ships with PiSharp at [src/PiSharp.Cli/docs/codemode.md](https://github.com/jkelly/PiSharp/blob/main/src/PiSharp.Cli/docs/codemode.md) and is the full reference for scripts. This page covers turning it on, the settings, and what differs in PiSharp.
 
 ## Turn it on
 

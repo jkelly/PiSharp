@@ -8,8 +8,8 @@ description: "Embed the full coding agent: persistent sessions, settings, prompt
 ## Install
 
 ```powershell
-dotnet add package PiSharp.CodingAgent --version 1.2.0.2
-dotnet add package PiSharp.Tools --version 1.2.0.2
+dotnet add package PiSharp.CodingAgent --version 1.5.0
+dotnet add package PiSharp.Tools --version 1.5.0
 ```
 
 `PiSharp.CodingAgent` references `PiSharp.Agent` and `PiSharp.Sessions`, but not `PiSharp.Tools`. Add `PiSharp.Tools` yourself to get the built-in tools. Your project targets `net10.0`.
@@ -469,7 +469,7 @@ Review $1 for bugs and explain each one.
 
 ## Built-in tools
 
-`BuiltinToolCatalog` builds the built-in tools for one working folder and home folder. Relative paths resolve against the working folder, and `~` against the home folder. The tools have Pi v1.2.0's names, parameters and output; see [Built-in tools](/docs/reference/tools/) for each one.
+`BuiltinToolCatalog` builds the built-in tools for one working folder and home folder. Relative paths resolve against the working folder, and `~` against the home folder. The tools have Pi v1.5.0's names, parameters and output; see [Built-in tools](/docs/reference/tools/) for each one.
 
 ```csharp
 new BuiltinToolCatalog(workingDirectory, homeDirectory, operations, readWriteOptions, editOptions,
@@ -661,7 +661,7 @@ A share sends the whole conversation, including file contents the tools read, to
 
 ## Compared with Pi
 
-- Pi's coding agent ([`packages/coding-agent`](https://github.com/earendil-works/pi/tree/v1.2.0/packages/coding-agent)) finds the agent folder, context files, settings, skills and credentials itself. PiSharp's library takes absolute paths and decoders, and the CLI does the finding.
+- Pi's coding agent ([`packages/coding-agent`](https://github.com/earendil-works/pi/tree/v1.5.0/packages/coding-agent)) finds the agent folder, context files, settings, skills and credentials itself. PiSharp's library takes absolute paths and decoders, and the CLI does the finding.
 - Pi's tools act directly. PiSharp's tools prepare each action and ask your policy first.
 - Pi resizes images with Photon. PiSharp's default codec resizes only PNG and BMP; `PiSharp.Tools.Skia` handles the rest.
 - YAML decoding is a separate package, so you can leave YAML out.

@@ -3,14 +3,14 @@ title: Code mode library
 description: Run model-written JavaScript against your tools with PiSharp.Codemode.
 ---
 
-Code mode lets the model write a short JavaScript program instead of calling tools one at a time. The script calls tools as `await tools.<name>(args)`, runs independent calls in parallel, filters large output, and returns only what the model needs. `PiSharp.Codemode` is the library behind PiSharp's built-in `codemode` tool. It ports Pi v1.2.0's `codemode` package and the coding agent's codemode extension.
+Code mode lets the model write a short JavaScript program instead of calling tools one at a time. The script calls tools as `await tools.<name>(args)`, runs independent calls in parallel, filters large output, and returns only what the model needs. `PiSharp.Codemode` is the library behind PiSharp's built-in `codemode` tool. It ports Pi v1.5.0's `codemode` package and the coding agent's codemode extension.
 
 Pi runs scripts in QuickJS compiled to WebAssembly. PiSharp runs them in [Jint](https://github.com/sebastienros/jint) 4.16.3, a JavaScript engine written in .NET, in a child process per script. Scripts get Pi's globals and limits, and the messages the prelude, the tools and the host write are Pi's. Only the engine's own error messages differ. For the tool's settings and how it behaves in a session, see [Code mode](/docs/guides/codemode/).
 
 ## Install
 
 ```powershell
-dotnet add package PiSharp.Codemode --version 1.2.0.2
+dotnet add package PiSharp.Codemode --version 1.5.0
 ```
 
 The package depends on `PiSharp.Contracts`, `PiSharp.Extensions.Abstractions` and Jint, pinned to exactly 4.16.3. Jint's and its parser Acornima's license notices are in the package under `licenses/`. Everything is in the `PiSharp.Codemode` namespace.

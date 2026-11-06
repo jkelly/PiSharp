@@ -7,10 +7,10 @@ PiSharp is a set of .NET libraries, and the `pisharp` CLI is built from them. Yo
 
 ## Install
 
-Every library is a NuGet package that targets `net10.0`. The current release is 1.2.0.2:
+Every library is a NuGet package that targets `net10.0`. The current release is 1.5.0:
 
 ```powershell
-dotnet add package PiSharp.CodingAgent --version 1.2.0.2
+dotnet add package PiSharp.CodingAgent --version 1.5.0
 ```
 
 A package brings the packages it is built on, so `PiSharp.CodingAgent` also gives you `PiSharp.Agent`, `PiSharp.AI`, `PiSharp.Sessions` and `PiSharp.Contracts`. All PiSharp packages share one version number. Use the same version for every PiSharp package you reference. From 1.5.0, each package depends on its PiSharp packages at exactly its own version (`[1.5.0]`), so NuGet reports a conflict instead of mixing packages from different releases, as Pi pins its own packages since 1.3.0. [Versioning](/docs/versioning/) explains how the number relates to the Pi release it ports.
@@ -47,7 +47,7 @@ dotnet tool install -g PiSharp.Cli
 
 ## Packages
 
-These are the 23 packages of the 1.2.0.2 release, and `PiSharp.Telemetry`, which is new in the Pi 1.5.0 sync and not released yet. The [SDK page](/sdk/) lists the same set.
+These are the 24 packages of the 1.5.0 release, the 23 libraries and the `PiSharp.Cli` tool. `PiSharp.Telemetry` is new in 1.5.0. The [SDK page](/sdk/) lists the same set.
 
 | Package | Group | Purpose | Docs |
 | --- | --- | --- | --- |
@@ -133,16 +133,16 @@ Some APIs carry `[Experimental("<ID>")]`. The compiler reports an error when you
 | `PISHARP_TIERS001` | Service tiers: `ChatRequest.ServiceTier`, `AgentConfiguration.ServiceTier`, `SessionRuntimeRegistryOptions.ServiceTier`, the protocol request options' `ServiceTier` and the `ServiceTiers` class. See [Service tiers](/docs/guides/service-tiers/). | Released as experimental in 1.2.0.2. |
 | `PISHARP_AGENTS001` | Every public type in the custom agents packages. These also use durable types, so suppress `PISHARP_DURABLE001` too. | Released as experimental in 1.2.0.2. |
 | `PISHARP_CATALOG001` | `MaintainedCatalogOverlay` and `MaintainedCatalogResult` in `PiSharp.AI`, which apply PiSharp's maintained model catalog layer. | Released as experimental in 1.2.0.2. |
-| `PISHARP_EXTUI001` | Extension UI additions from the Pi 1.5.0 sync: `IExtensionKeybindingHints` and `ExtensionToolRenderContext.Keybindings`, `ExtensionCustomComponentBlocked`, `ExtensionCustomComponentOverlay` and `ExtensionCustomComponentCallbacks.Blocked`, `.Overlay` and `.CapturesViewportInput` in `PiSharp.Extensions.Abstractions`, and `KeyText` and `KeyHint` on the HTML export's `ToolRenderContext` and `ToolHtmlRendererDependencies` in `PiSharp.CodingAgent`. | Added in the Pi 1.5.0 sync, experimental. Not released yet. |
-| `PISHARP_IDENTITY001` | Client identity from the Pi 1.5.0 sync: `ClientIdentity`, `ClientUserAgent`, `ClientAttribution` and `ClientIdentities` in `PiSharp.AI`, the `Identity` of `ChatRequest`, the protocol options and `AgentConfiguration`, and `AgentConfiguration.DefaultIdentity`, which turns attribution off. Coding agent sessions send the detailed user agent and no attribution. PiSharp defines no attribution of its own. | Added in the Pi 1.5.0 sync, experimental. Not released yet. |
-| `PISHARP_AI001` | Streaming tool-call arguments from the Pi 1.5.0 sync, in `PiSharp.AI`: `StreamingJsonParser` with `JsonChange`, `JsonSetChange`, `JsonAppendChange` and `JsonPathSegment`, `ToolCallArgumentsStream`, `ToolCallArgumentsResult`, `StreamingJson.ParseToolCallArguments`, and `GetToolArgumentsPreview` and `FinishToolArguments` on `AssistantStreamReducer`. | Added in the Pi 1.5.0 sync, experimental. Not released yet. |
-| `PISHARP_AUTH001` | `AuthEvent.OpenBrowserOnConfirm` and `AuthEvent.CopyCodeOnConfirm`, a device-code sign-in's hints, in `PiSharp.AI`. | Added in the Pi 1.5.0 sync, experimental. Not released yet. |
-| `PISHARP_CODEMODE001` | Worker admission in `PiSharp.Codemode`: `CodemodeSandboxOptions.AcquireWorker` and `.OnWorkerStarted`. | Added in the Pi 1.5.0 sync, experimental. Not released yet. |
-| `PISHARP_EXEC001` | Output limits of `pi.exec()` and process runs: `MaxBuffer` and `Truncated` in `PiSharp.Extensions.Abstractions`, and `CaptureLimitBytes` and the combined capture limit in `PiSharp.Tools`. | Added in the Pi 1.5.0 sync, experimental. Not released yet. |
-| `PISHARP_SCHEMA001` | The port of pi-schema in `PiSharp.Contracts` (namespace `PiSharp.Contracts.Schema`): `JsonSchemaValidator`, `CoercingJsonSchemaValidator`, `JsonSchemaCompileOptions`, `JsonSchemaFormats` and their results and errors. | Added in the Pi 1.5.0 sync, experimental. Not released yet. |
-| `PISHARP_TELEMETRY001` | Every public type in `PiSharp.Telemetry`, and the telemetry members of `PiSharp.AI`. See [Telemetry](/docs/embed/telemetry/). | Added in the Pi 1.5.0 sync, experimental. Not released yet. |
-| `PISHARP_TOOLSEARCH001` | `ToolSearchDocument.NamespaceText` in `PiSharp.Extensions.Abstractions`, which ranks a tool's namespace text. | Added in the Pi 1.5.0 sync, experimental. Not released yet. |
-| `PISHARP_TUI001` | TUI additions in `PiSharp.Tui`: `KeybindingsManager.GetSelectPageIndex`, `Terminal.RestoreOnExit`, `TextUtils.ReplaceControlCharacters` and `IComponent.CapturesViewportInput`. | Added in the Pi 1.5.0 sync, experimental. Not released yet. |
+| `PISHARP_EXTUI001` | Extension UI additions from the Pi 1.5.0 sync: `IExtensionKeybindingHints` and `ExtensionToolRenderContext.Keybindings`, `ExtensionCustomComponentBlocked`, `ExtensionCustomComponentOverlay` and `ExtensionCustomComponentCallbacks.Blocked`, `.Overlay` and `.CapturesViewportInput` in `PiSharp.Extensions.Abstractions`, and `KeyText` and `KeyHint` on the HTML export's `ToolRenderContext` and `ToolHtmlRendererDependencies` in `PiSharp.CodingAgent`. | Released as experimental in 1.5.0. |
+| `PISHARP_IDENTITY001` | Client identity from the Pi 1.5.0 sync: `ClientIdentity`, `ClientUserAgent`, `ClientAttribution` and `ClientIdentities` in `PiSharp.AI`, the `Identity` of `ChatRequest`, the protocol options and `AgentConfiguration`, and `AgentConfiguration.DefaultIdentity`, which turns attribution off. Coding agent sessions send the detailed user agent and no attribution. PiSharp defines no attribution of its own. | Released as experimental in 1.5.0. |
+| `PISHARP_AI001` | Streaming tool-call arguments from the Pi 1.5.0 sync, in `PiSharp.AI`: `StreamingJsonParser` with `JsonChange`, `JsonSetChange`, `JsonAppendChange` and `JsonPathSegment`, `ToolCallArgumentsStream`, `ToolCallArgumentsResult`, `StreamingJson.ParseToolCallArguments`, and `GetToolArgumentsPreview` and `FinishToolArguments` on `AssistantStreamReducer`. | Released as experimental in 1.5.0. |
+| `PISHARP_AUTH001` | `AuthEvent.OpenBrowserOnConfirm` and `AuthEvent.CopyCodeOnConfirm`, a device-code sign-in's hints, in `PiSharp.AI`. | Released as experimental in 1.5.0. |
+| `PISHARP_CODEMODE001` | Worker admission in `PiSharp.Codemode`: `CodemodeSandboxOptions.AcquireWorker` and `.OnWorkerStarted`. | Released as experimental in 1.5.0. |
+| `PISHARP_EXEC001` | Output limits of `pi.exec()` and process runs: `MaxBuffer` and `Truncated` in `PiSharp.Extensions.Abstractions`, and `CaptureLimitBytes` and the combined capture limit in `PiSharp.Tools`. | Released as experimental in 1.5.0. |
+| `PISHARP_SCHEMA001` | The port of pi-schema in `PiSharp.Contracts` (namespace `PiSharp.Contracts.Schema`): `JsonSchemaValidator`, `CoercingJsonSchemaValidator`, `JsonSchemaCompileOptions`, `JsonSchemaFormats` and their results and errors. | Released as experimental in 1.5.0. |
+| `PISHARP_TELEMETRY001` | Every public type in `PiSharp.Telemetry`, and the telemetry members of `PiSharp.AI`. See [Telemetry](/docs/embed/telemetry/). | Released as experimental in 1.5.0. |
+| `PISHARP_TOOLSEARCH001` | `ToolSearchDocument.NamespaceText` in `PiSharp.Extensions.Abstractions`, which ranks a tool's namespace text. | Released as experimental in 1.5.0. |
+| `PISHARP_TUI001` | TUI additions in `PiSharp.Tui`: `KeybindingsManager.GetSelectPageIndex`, `Terminal.RestoreOnExit`, `TextUtils.ReplaceControlCharacters` and `IComponent.CapturesViewportInput`. | Released as experimental in 1.5.0. |
 
 Suppress the IDs you use in your project file:
 

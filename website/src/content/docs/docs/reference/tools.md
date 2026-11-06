@@ -3,7 +3,7 @@ title: Built-in tools
 description: The parameters, limits and output of each built-in tool, and the --tools grammar.
 ---
 
-PiSharp has Pi v1.2.0's built-in tools with the same names, parameters, limits and messages. A session starts with `read`, `bash`, `edit` and `write`. `grep`, `find` and `ls` are registered but off until you select them. `tool_search` and `codemode` come from [built-in extensions](/docs/reference/configuration/#built-in-extensions).
+PiSharp has Pi v1.5.0's built-in tools with the same names, parameters, limits and messages. A session starts with `read`, `bash`, `edit` and `write`. `grep`, `find` and `ls` are registered but off until you select them. `tool_search` and `codemode` come from [built-in extensions](/docs/reference/configuration/#built-in-extensions).
 
 This page describes the tools under the default `pi` [tool policy](/docs/reference/configuration/#tool-policy), where they take any path, as in Pi. Relative paths resolve against the working folder, and a leading `~` against your home folder.
 
@@ -181,7 +181,7 @@ Turn it on with `--tools +codemode` or `"defaultTools": ["+codemode"]`. MCP serv
 
 ## powershell
 
-There is no `powershell` tool in the PiSharp CLI. Pi v1.2.0 has one for Windows; PiSharp hasn't ported it to the CLI yet, and the [Parity](/parity/) page lists it as deferred. The name is reserved, and the terminal UI can show a `powershell` call from an extension. On Windows, `bash` runs through Git Bash.
+There is no `powershell` tool in the PiSharp CLI. Pi v1.5.0 has one for Windows; PiSharp hasn't ported it to the CLI yet, and the [Parity](/parity/) page lists it as deferred. The name is reserved, and the terminal UI can show a `powershell` call from an extension. On Windows, `bash` runs through Git Bash.
 
 ## Selecting tools
 

@@ -8,7 +8,7 @@ description: Read, write and transform Pi session files with PiSharp.Sessions.
 The [coding agent](/docs/embed/coding-agent/) builds its persistent sessions on this library. Use `PiSharp.Sessions` directly when you want to inspect, index, convert or generate session files without running an agent. For what users see (resume, branch, fork, compact), read the [Sessions guide](/docs/guides/sessions/). For where the files live, see [Files and locations](/docs/reference/configuration/#sessions).
 
 ```powershell
-dotnet add package PiSharp.Sessions --version 1.2.0.2
+dotnet add package PiSharp.Sessions --version 1.5.0
 ```
 
 ## Namespaces
@@ -37,7 +37,7 @@ A session file is UTF-8 JSONL without a byte order mark. The first line is the h
 {"type":"message","id":"a5b6c7d8","parentId":"c1d2e3f4","timestamp":"2026-10-28T09:15:14.871Z","message":{"role":"assistant","content":[{"type":"text","text":"There are three test projects."}],"api":"anthropic-messages","provider":"anthropic","model":"claude-sonnet-4-5","usage":{"input":1204,"output":9,"cacheRead":0,"cacheWrite":0,"totalTokens":1213,"cost":{"input":0.0036,"output":0.000135,"cacheRead":0,"cacheWrite":0,"total":0.003735}},"stopReason":"stop","timestamp":1793178914871}}
 ```
 
-This is the format Pi's session manager writes. Pi's [session format](https://github.com/earendil-works/pi/blob/v1.2.0/packages/coding-agent/docs/session-format.md) page describes it from the TypeScript side. Pi and PiSharp read each other's files.
+This is the format Pi's session manager writes. Pi's [session format](https://github.com/earendil-works/pi/blob/v1.5.0/packages/coding-agent/docs/session-format.md) page describes it from the TypeScript side. Pi and PiSharp read each other's files.
 
 ### Header
 
@@ -536,4 +536,4 @@ Every class takes an options record, and every default is a limit, not a target.
 - **No generated ids.** Migrating a version 1 file needs ids from you, and forking needs label ids from you.
 - **Bounded by default.** Every operation has limits you can raise, and the defaults are lower than Pi's.
 
-Pi's own session code is [`session-manager.ts`](https://github.com/earendil-works/pi/blob/v1.2.0/packages/coding-agent/src/core/session-manager.ts).
+Pi's own session code is [`session-manager.ts`](https://github.com/earendil-works/pi/blob/v1.5.0/packages/coding-agent/src/core/session-manager.ts).

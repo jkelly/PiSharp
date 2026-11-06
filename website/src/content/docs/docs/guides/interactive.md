@@ -3,7 +3,7 @@ title: Interactive mode
 description: The terminal UI, slash commands, key bindings and themes.
 ---
 
-`pisharp` opens Pi's terminal UI on Windows, Linux and macOS. It works as Pi's [terminal UI](https://github.com/earendil-works/pi/blob/v1.2.0/packages/coding-agent/docs/tui.md) does: the same editor, key bindings, selectors, footer, fullscreen and regular modes, inline images, Mermaid diagrams and syntax highlighting.
+`pisharp` opens Pi's terminal UI on Windows, Linux and macOS. It works as Pi's [terminal UI](https://github.com/earendil-works/pi/blob/v1.5.0/packages/coding-agent/docs/tui.md) does: the same editor, key bindings, selectors, footer, fullscreen and regular modes, inline images, Mermaid diagrams and syntax highlighting.
 
 ## Prompts, steering and shell commands
 
@@ -54,7 +54,7 @@ Type `/` to search the commands of the current session. PiSharp has all of Pi's 
 | `/mcp` | Manages MCP servers, while the `mcp` [built-in extension](/docs/reference/configuration/#built-in-extensions) is on. See [MCP](/docs/guides/mcp/). |
 | `/llama` | Manages llama.cpp models, while the `llama.cpp` built-in extension is on. See [llama.cpp](/docs/guides/llama-cpp/). |
 
-Extensions, prompt templates and skills add their own commands, as in Pi. Skills appear as `/skill:<name>` while `enableSkillCommands` is on. Extensions can't take the names `help`, `quit`, `exit`, `reload`, `settings`, `trust` or `permissions`. Pi's [Slash commands](https://github.com/earendil-works/pi/blob/v1.2.0/packages/coding-agent/docs/slash-commands.md) page describes each built-in command.
+Extensions, prompt templates and skills add their own commands, as in Pi. Skills appear as `/skill:<name>` while `enableSkillCommands` is on. Extensions can't take the names `help`, `quit`, `exit`, `reload`, `settings`, `trust` or `permissions`. Pi's [Slash commands](https://github.com/earendil-works/pi/blob/v1.5.0/packages/coding-agent/docs/slash-commands.md) page describes each built-in command.
 
 PiSharp also keeps Pi's hidden commands. `/debug` writes the rendered screen lines and the context messages to `pi-debug.log` in the agent folder, for bug reports.
 
@@ -72,7 +72,7 @@ PiSharp also keeps Pi's hidden commands. `/debug` writes the rendered screen lin
 
 ## Key bindings
 
-Key bindings follow Pi v1.2.0. `/hotkeys` lists the ones in effect, editor keys included. On Windows and in WSL, PiSharp uses Pi's Windows defaults, shown in their own column.
+Key bindings follow Pi v1.5.0. `/hotkeys` lists the ones in effect, editor keys included. On Windows and in WSL, PiSharp uses Pi's Windows defaults, shown in their own column.
 
 | Action id | Key | On Windows and WSL | What it does |
 | --- | --- | --- | --- |
@@ -119,7 +119,7 @@ PiSharp ships Pi's `system`, `dark` and `light` themes. `system` is the default 
 
 Custom themes are JSON files in Pi's format, in `~/.pi/agent/themes/` or the project's `.pi/themes/`. Choose one in `/settings`, with the `theme` setting, or with `--use-theme <name>` for one run. `--theme <path>` loads a theme file for one run. PiSharp reloads the current custom theme when you save its file.
 
-See Pi's [Themes](https://github.com/earendil-works/pi/blob/v1.2.0/packages/coding-agent/docs/themes.md) page for the format.
+See Pi's [Themes](https://github.com/earendil-works/pi/blob/v1.5.0/packages/coding-agent/docs/themes.md) page for the format.
 
 ## Clipboard
 

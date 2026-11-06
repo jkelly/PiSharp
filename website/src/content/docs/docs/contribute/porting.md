@@ -3,7 +3,7 @@ title: How the port tracks Pi
 description: Baselines, syncs, decision records, integrity pins and compatibility reports.
 ---
 
-PiSharp is a port of a fixed Pi release, not of whatever Pi's `main` holds. Today the repository targets Pi v1.5.0, and the published release follows Pi v1.2.0 until the next release. This page shows where the repository records that baseline, how a sync to a new Pi release works, and where the decisions and intentional differences live. Most of these files are under [`compatibility/`](https://github.com/jkelly/PiSharp/tree/main/compatibility) and [`docs/`](https://github.com/jkelly/PiSharp/tree/main/docs). For how a Pi release maps to a PiSharp version, see [Versioning](/docs/versioning/).
+PiSharp is a port of a fixed Pi release, not of whatever Pi's `main` holds. Today the repository and the 1.5.0 release target Pi v1.5.0. This page shows where the repository records that baseline, how a sync to a new Pi release works, and where the decisions and intentional differences live. Most of these files are under [`compatibility/`](https://github.com/jkelly/PiSharp/tree/main/compatibility) and [`docs/`](https://github.com/jkelly/PiSharp/tree/main/docs). For how a Pi release maps to a PiSharp version, see [Versioning](/docs/versioning/).
 
 ## The baseline lock
 
@@ -115,7 +115,7 @@ Some durable files read `// PiSharp-only since pi-durable 1.2.0 (...)`, for code
 | [0002](https://github.com/jkelly/PiSharp/blob/main/docs/decisions/0002-pi-1.1.0-sync.md) | The sync to Pi v1.1.0. |
 | [0003](https://github.com/jkelly/PiSharp/blob/main/docs/decisions/0003-codemode-javascript-engine.md) | Code mode runs on Jint. |
 | [0004](https://github.com/jkelly/PiSharp/blob/main/docs/decisions/0004-full-parity-owner-decisions.md) | Owner decisions for full Pi v1.1.0 parity. |
-| [0005](https://github.com/jkelly/PiSharp/blob/main/docs/decisions/0005-pi-durable-experimental.md) | The experimental pi-durable port, released as experimental in 1.2.0.1. |
+| [0005](https://github.com/jkelly/PiSharp/blob/main/docs/decisions/0005-pi-durable-experimental.md) | The experimental pi-durable port, released as experimental in 1.2.0.1 and re-synced to pi-durable v1.5.0 in 1.5.0. |
 | [0006](https://github.com/jkelly/PiSharp/blob/main/docs/decisions/0006-pi-1.2.0-sync.md) | The sync to Pi v1.2.0. |
 | [0007](https://github.com/jkelly/PiSharp/blob/main/docs/decisions/0007-media-generation.md) | Media generation, embeddings, model operations and service tiers: PiSharp-only, released as experimental in 1.2.0.2. |
 | [0007 (SQL Server)](https://github.com/jkelly/PiSharp/blob/main/docs/decisions/0007-durable-sql-server-storage.md) | SQL Server storage for durable sessions: PiSharp-only, experimental, source only. |
@@ -124,6 +124,7 @@ Some durable files read `// PiSharp-only since pi-durable 1.2.0 (...)`, for code
 | [0010](https://github.com/jkelly/PiSharp/blob/main/docs/decisions/0010-durable-application-contracts.md) | The device server's application contracts: budgets, policies, judgments, evidence, sources, research and retention. |
 | [0011](https://github.com/jkelly/PiSharp/blob/main/docs/decisions/0011-web-agent.md) | PiSharp Web Agent, a local chat app on durable sessions: PiSharp-only, source only. |
 | [0012](https://github.com/jkelly/PiSharp/blob/main/docs/decisions/0012-custom-agents.md) | Custom agents, workflows and subagents on the durable harness: released as experimental in 1.2.0.2. |
+| [0013](https://github.com/jkelly/PiSharp/blob/main/docs/decisions/0013-pi-1.5.0-sync.md) | The sync to Pi v1.5.0, with every upstream package in scope. 1.5.0 releases phases 0 to 4 and the close-out; pi-env, the rest of Chord and pi-evals follow in 1.5.0.x. |
 | [ecmascript-json-boundary](https://github.com/jkelly/PiSharp/blob/main/docs/decisions/ecmascript-json-boundary.md) | `EcmaScriptJsonProjection`: where native JSON values are turned into the text JavaScript's `JSON.stringify(JSON.parse(text))` would produce. |
 
 ## Intentional differences

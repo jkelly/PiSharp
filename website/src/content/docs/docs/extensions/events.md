@@ -3,7 +3,7 @@ title: Extension events
 description: Every event an extension can observe or handle, when it fires and what it can change.
 ---
 
-PiSharp raises Pi v1.2.0's 41 extension events. Native C# extensions and TypeScript extensions share one registry, so both get every event, in extension load order and then registration order. This page lists each event, when it fires, what it carries and what a handler can change. The C# types are on [C# extension API](/docs/extensions/api/). Pi's [Extensions](https://github.com/earendil-works/pi/blob/v1.2.0/packages/coding-agent/docs/extensions.md) page describes the same events for TypeScript.
+PiSharp raises Pi v1.5.0's 41 extension events. Native C# extensions and TypeScript extensions share one registry, so both get every event, in extension load order and then registration order. This page lists each event, when it fires, what it carries and what a handler can change. The C# types are on [C# extension API](/docs/extensions/api/). Pi's [Extensions](https://github.com/earendil-works/pi/blob/v1.5.0/packages/coding-agent/docs/extensions.md) page describes the same events for TypeScript.
 
 ## How a C# extension subscribes
 
