@@ -1,0 +1,98 @@
+[
+  {
+    "options": {
+      "TestTimeoutSeconds": 600,
+      "LockTimeoutSeconds": 30,
+      "Label": "Compatibility-r4",
+      "Project": "tests/PiSharp.Compatibility.Tests",
+      "Configuration": "Debug",
+      "SkipBuild": true,
+      "BuildTimeoutSeconds": 240
+    },
+    "environment": {}
+  },
+  {
+    "options": {
+      "TestTimeoutSeconds": 600,
+      "LockTimeoutSeconds": 30,
+      "Label": "Transport-r4",
+      "Project": "tests/PiSharp.Transport.Tests",
+      "Configuration": "Debug",
+      "SkipBuild": true,
+      "BuildTimeoutSeconds": 240
+    },
+    "environment": {}
+  },
+  {
+    "options": {
+      "TestTimeoutSeconds": 600,
+      "LockTimeoutSeconds": 30,
+      "Label": "R6-r4",
+      "Project": "tests/PiSharp.ResponsesTranscriptTools.Tests",
+      "Configuration": "Debug",
+      "SkipBuild": true,
+      "BuildTimeoutSeconds": 240
+    },
+    "environment": {}
+  },
+  {
+    "options": {
+      "TestTimeoutSeconds": 600,
+      "LockTimeoutSeconds": 30,
+      "Label": "Azure-r4",
+      "Project": "tests/PiSharp.AzureResponses.Tests",
+      "Configuration": "Debug",
+      "SkipBuild": true,
+      "BuildTimeoutSeconds": 240
+    },
+    "environment": {}
+  },
+  {
+    "options": {
+      "TestTimeoutSeconds": 600,
+      "LockTimeoutSeconds": 30,
+      "Label": "ProviderApis-r4",
+      "Project": "tests/PiSharp.ProviderApis.Tests",
+      "Configuration": "Debug",
+      "SkipBuild": true,
+      "BuildTimeoutSeconds": 240
+    },
+    "environment": {}
+  },
+  {
+    "options": {
+      "TestTimeoutSeconds": 600,
+      "LockTimeoutSeconds": 30,
+      "Label": "ProviderOffline-r4",
+      "Project": "tests/PiSharp.ProviderOfflineDifferential.Tests",
+      "Configuration": "Debug",
+      "SkipBuild": true,
+      "BuildTimeoutSeconds": 240
+    },
+    "environment": {}
+  },
+  {
+    "options": {
+      "TestTimeoutSeconds": 600,
+      "BuildTimeoutSeconds": 240,
+      "LockTimeoutSeconds": 30,
+      "Project": "tests/PiSharp.AnthropicThreads.Tests",
+      "Label": "Threads-r4",
+      "SkipBuild": true,
+      "Configuration": "Debug"
+    },
+    "environment": {}
+  },
+  {
+    "options": {
+      "TestTimeoutSeconds": 600,
+      "BuildTimeoutSeconds": 240,
+      "LockTimeoutSeconds": 30,
+      "Project": "tests/PiSharp.AnthropicSimple.Tests",
+      "Label": "AnthropicSimple-r4",
+      "SkipBuild": true,
+      "Configuration": "Debug"
+    },
+    "environment": {}
+  }
+]

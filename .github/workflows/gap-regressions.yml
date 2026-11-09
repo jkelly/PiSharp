@@ -1,0 +1,108 @@
+name: Gap regression matrix
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+  workflow_call:
+    inputs:
+      source_sha:
+        type: string
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  production-runtime-installer:
+    name: Required production Pi runtime installer
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.source_sha || github.sha }}
+      - uses: actions/setup-dotnet@v5
+        with:
+          global-json-file: global.json
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Run exact production installer provenance case
+        shell: pwsh
+        env:
+          EXTPARITY_FILTER: runtime.pi-packages-installed-with-verified-provenance
+          PISHARP_TEST_INSTALL_PI_RUNTIME: '1'
+          PISHARP_PI_RUNTIME_DIR: ${{ runner.temp }}/pisharp-production-runtime-${{ github.run_id }}-${{ github.run_attempt }}
+        run: ./tools/ci/run-gap-suites.ps1 -Group 'runtime-installer' -OutputDirectory 'artifacts/gap-ci/runtime-installer'
+      - name: Upload production installer evidence
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: gap-production-runtime-installer
+          path: |
+            artifacts/gap-ci/runtime-installer
+            ${{ runner.temp }}/pisharp-production-runtime-${{ github.run_id }}-${{ github.run_attempt }}/**/provenance.json
+            ${{ runner.temp }}/pisharp-production-runtime-${{ github.run_id }}-${{ github.run_attempt }}/**/package-lock.json
+          if-no-files-found: error
+
+  gaps:
+    name: ${{ matrix.group }} (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-15]
+        group: [core, chord, env]
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.source_sha || github.sha }}
+      - uses: actions/setup-dotnet@v5
+        with:
+          global-json-file: global.json
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Validate bounded runner offline
+        shell: pwsh
+        run: |
+          python -m unittest discover -s tools/ci -p 'test_gap_runner.py' -v
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Install the locked extension runtime fixture
+        if: matrix.group == 'core'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Path artifacts/node-runtime-150 -Force | Out-Null
+          Copy-Item tools/NodeBridge/runtime-fixture-150/package.json,tools/NodeBridge/runtime-fixture-150/package-lock.json artifacts/node-runtime-150/
+          npm ci --prefix artifacts/node-runtime-150 --ignore-scripts --no-audit --no-fund
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Install search tools (Windows)
+        if: runner.os == 'Windows'
+        run: choco install ripgrep fd --yes --no-progress
+      - name: Install search tools (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ripgrep fd-find
+          sudo ln -sf /usr/bin/fdfind /usr/local/bin/fd
+      - name: Install search tools (macOS)
+        if: runner.os == 'macOS'
+        run: brew install ripgrep fd
+      - name: Run registered regression group
+        shell: pwsh
+        run: ./tools/ci/run-gap-suites.ps1 -Group '${{ matrix.group }}' -OutputDirectory 'artifacts/gap-ci/${{ matrix.group }}'
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: gap-${{ matrix.group }}-${{ matrix.os }}
+          path: artifacts/gap-ci
+          if-no-files-found: error

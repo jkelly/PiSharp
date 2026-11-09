@@ -3,7 +3,7 @@ using System.Text;
 using System.Text.Json.Nodes;
 using PiSharp.Cli.Extensions.Pi;
 
-// The Pi packages extensions run against (owner decision: install the exact Pi 1.2.0 packages with the user's npm on first extension
+// The Pi packages extensions run against (owner decision: install the exact Pi 1.5.0 packages with the user's npm on first extension
 // use and load extensions with Pi's own jiti and getAliases; PiSharp's compatibility modules only offline or without npm).
 internal static partial class Program
 {
@@ -17,30 +17,32 @@ internal static partial class Program
 
     private static Task InstalledProvenance()
     {
-        var modules = RequirePiRuntime();
+        RequireNode();
+        var modules = SharedPiRuntime.Value.GetAwaiter().GetResult()
+            ?? throw new SkipException("NO_PRODUCTION_RUNTIME", "Production installer provenance requires explicit PISHARP_TEST_INSTALL_PI_RUNTIME=1; local fixture admission is tested separately.");
         var provenance = JsonNode.Parse(File.ReadAllText(Path.Combine(SharedPiRuntimeDirectory, PiNodeRuntime.ProvenanceFile)))!;
-        Equal("1.2.0", provenance["pi"]!.GetValue<string>(), "Pi version");
+        Equal("1.5.0", provenance["pi"]!.GetValue<string>(), "Pi version");
         Equal(true, provenance["verified"]!.GetValue<bool>(), "verified");
         Equal(SharedPiRuntimeDirectory, provenance["directory"]!.GetValue<string>(), "install directory");
         var packages = provenance["packages"]!.AsArray().Select(item => item!).ToList();
         string Version(string name) => packages.Single(item => item["name"]!.GetValue<string>() == name)["version"]!.GetValue<string>();
         foreach (var name in new[] { "@earendil-works/pi-coding-agent", "@earendil-works/pi-ai", "@earendil-works/pi-tui", "@earendil-works/pi-agent-core" })
-            Equal("1.2.0", Version(name), name);
+            Equal("1.5.0", Version(name), name);
         Equal("1.3.27", Version("typebox"), "typebox");
         Equal("2.7.0", Version("jiti"), "jiti");
         Check(packages.All(item => item["integrity"]!.GetValue<string>().StartsWith("sha512-", StringComparison.Ordinal) || item["integrity"]!.GetValue<string>().StartsWith("sha1-", StringComparison.Ordinal)), "integrity hashes");
         Check(File.Exists(Path.Combine(modules, "@earendil-works", "pi-coding-agent", "dist", "core", "extensions", "loader.js")), "coding agent installed");
-        // The installer's own pins: every @earendil-works package of the release at exactly 1.2.0, and undici at Pi 1.5.0's 8.12.3
-        // (bridge.undici-gondolin-advisories). Pi 1.2.0 no longer depends on @earendil-works/chord, so neither the overrides nor the
+        // The installer's own pins: every @earendil-works package of the release at exactly 1.5.0, and undici at Pi 1.5.0's 8.12.3
+        // (bridge.undici-gondolin-advisories). Pi 1.5.0 no longer depends on @earendil-works/chord, so neither the overrides nor the
         // install name it.
         var manifest = PiNodeRuntime.PackageJson();
-        Equal("1.2.0", manifest["dependencies"]!["@earendil-works/pi-coding-agent"]!.GetValue<string>(), "pinned coding agent");
+        Equal("1.5.0", manifest["dependencies"]!["@earendil-works/pi-coding-agent"]!.GetValue<string>(), "pinned coding agent");
         Names(["@earendil-works/pi-agent-core", "@earendil-works/pi-ai", "@earendil-works/pi-codemode", "@earendil-works/pi-mcp", "@earendil-works/pi-telemetry", "@earendil-works/pi-tui", "undici"],
             manifest["overrides"]!.AsObject().Select(item => item.Key).Order(StringComparer.Ordinal), "overrides");
-        Check(manifest["overrides"]!.AsObject().Where(item => item.Key.StartsWith("@earendil-works/", StringComparison.Ordinal)).All(item => item.Value!.GetValue<string>() == "1.2.0"), "every Pi override at 1.2.0");
+        Check(manifest["overrides"]!.AsObject().Where(item => item.Key.StartsWith("@earendil-works/", StringComparison.Ordinal)).All(item => item.Value!.GetValue<string>() == "1.5.0"), "every Pi override at 1.5.0");
         Check(packages.Where(item => item["name"]!.GetValue<string>() == "undici").Select(item => item["version"]!.GetValue<string>()).DefaultIfEmpty("none").All(version => version == "8.12.3"),
             "undici installed at 8.12.3");
-        Check(packages.Where(item => item["name"]!.GetValue<string>().StartsWith("@earendil-works/", StringComparison.Ordinal)).All(item => item["version"]!.GetValue<string>() == "1.2.0"), "every Pi package at 1.2.0");
+        Check(packages.Where(item => item["name"]!.GetValue<string>().StartsWith("@earendil-works/", StringComparison.Ordinal)).All(item => item["version"]!.GetValue<string>() == "1.5.0"), "every Pi package at 1.5.0");
         Check(!packages.Any(item => item["name"]!.GetValue<string>() == "@earendil-works/chord"), "chord is not installed");
         return Task.CompletedTask;
     }
@@ -66,12 +68,12 @@ internal static partial class Program
             }
             """);
         await using var host = await StartHost(sandbox, extension);
-        Equal("pi@1.2.0", host.Modules, "modules");
+        Equal("pi@1.5.0", host.Modules, "modules");
         Check(host.RuntimeFallback is null, "no fallback");
         var (code, _, stderr) = await sandbox.Run([.. new[] { "-p" }, .. Model, "-e", extension, "/probe"]);
         Equal(0, code, "exit; " + stderr);
         Check(!stderr.Contains("compatibility modules", StringComparison.Ordinal), "no fallback warning: " + stderr);
-        Equal("""["probe","1.2.0",true,"string","string","function",true]""", LogLines(sandbox).Single(), "real packages");
+        Equal("""["probe","1.5.0",true,"string","string","function",true]""", LogLines(sandbox).Single(), "real packages");
     }
 
     // PI_OFFLINE: nothing is installed, the compatibility modules run the extension, and the run says so.
@@ -89,7 +91,7 @@ internal static partial class Program
             """);
         var (code, _, stderr) = await sandbox.Run([.. new[] { "-p" }, .. Model, "-e", extension, "/probe"]);
         Equal(0, code, "exit; " + stderr);
-        Check(stderr.Contains("Warning: Extensions are not running against the Pi 1.2.0 packages: offline (PI_OFFLINE)", StringComparison.Ordinal), "fallback warning: " + stderr);
+        Check(stderr.Contains("Warning: Extensions are not running against the Pi 1.5.0 packages: offline (PI_OFFLINE)", StringComparison.Ordinal), "fallback warning: " + stderr);
         Check(!Directory.Exists(Path.Combine(sandbox.Root, "no-runtime")), "nothing installed offline");
         Check(LogLines(sandbox).Single().StartsWith("""["offline",""", StringComparison.Ordinal), "extension ran: " + string.Join("|", LogLines(sandbox)));
     }

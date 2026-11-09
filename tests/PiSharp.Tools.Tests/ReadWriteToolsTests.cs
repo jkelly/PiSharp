@@ -111,8 +111,8 @@ internal static class ReadWriteToolsTests
         await File.WriteAllBytesAsync(temp.File("bound"), Encoding.UTF8.GetBytes(new string('x', 16)));
         Success(await Invoke(tools, "read", new { path = "bound" }));
         await File.WriteAllBytesAsync(temp.File("bound"), Encoding.UTF8.GetBytes(new string('x', 17)));
-        var over = await Invoke(tools, "read", new { path = "bound" }); Failure(over, ToolFailureKind.ExecutionError);
-        Equal("ResourceLimit", over.Details.Value.GetProperty("fileOperation").GetProperty("code").GetString());
+        var over = await Invoke(tools, "read", new { path = "bound" }); Success(over);
+        Equal(new string('x', 17), over.Content.Single().Text);
         var policy = new Policy();
         Failure(await Invoke(tools, "write", new { path = "absent", content = "12345" }, policy: policy), ToolFailureKind.InvalidArguments);
         Equal(0, policy.Actions.Count); Check(!File.Exists(temp.File("absent")), "Oversized write created a file.");

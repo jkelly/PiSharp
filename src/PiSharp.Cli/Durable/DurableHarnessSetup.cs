@@ -56,6 +56,8 @@ internal sealed class PiHarnessSettings(PiSettings settings, IRegistryReader? re
             return new ConversationStreamOptions
             {
                 TimeoutMs = Number(provider?["timeoutMs"]) ?? (idle == 0 ? 2147483647 : idle),
+                WebsocketConnectTimeoutMs = settings.Merged.ContainsKey("websocketConnectTimeoutMs")
+                    ? PiHttpIdleTimeout.WebSocketConnectTimeoutFromSettings(settings.Merged).TotalMilliseconds : null,
                 MaxRetryDelayMs = Number(provider?["maxRetryDelayMs"]) ?? 60000,
                 MaxRetries = Number(provider?["maxRetries"]) is { } retries ? (int)Math.Clamp(retries, int.MinValue, int.MaxValue) : null,
             };

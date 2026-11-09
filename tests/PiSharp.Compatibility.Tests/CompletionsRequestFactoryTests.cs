@@ -100,7 +100,7 @@ internal static class CompletionsRequestFactoryTests
             Assistant([new ToolCallContent("call", "a", JsonData.EmptyObject)], StopReason.ToolUse),
             E("""{"role":"system","content":"","toolsRemoved":[{"name":"a"}],"timestamp":1}"""));
         using var noTools = Factory().Create(removed, Key); using var noToolsBody = JsonDocument.Parse(await noTools.Content!.ReadAsStringAsync());
-        Equal(0, noToolsBody.RootElement.GetProperty("tools").GetArrayLength());
+        Check(!noToolsBody.RootElement.TryGetProperty("tools", out _), "Disabled tools must be omitted by default even with tool history.");
         var anchored = new CompletionsTranscriptProjector(new(SupportsMidConversationSystemMessages: true)).Project(request).Value;
         Equal("tool", anchored[3].GetProperty("role").GetString());
         Equal("Update\n\nRemoved system prompt section \"z\".\n\nUpdated system prompt section \"keep\":\n\nNew\n\nUpdated system prompt section \"next\":\n\nNext", anchored[4].GetProperty("content").GetString());
@@ -164,7 +164,7 @@ internal static class CompletionsRequestFactoryTests
             object ExpectedResult(string original, string wire) => new { role = "tool", tool_call_id = wire, content = "result for " + original };
             var expected = JsonData.Parse(JsonSerializer.Serialize(new { model = model.Id,
                 messages = new[] { ExpectedCall(row.FirstWire), ExpectedResult(row.First, row.FirstWire), ExpectedCall(row.SecondWire), ExpectedResult(row.Second, row.SecondWire) },
-                stream = true, stream_options = new { include_usage = true }, store = false, tools = Array.Empty<object>() }));
+                stream = true, stream_options = new { include_usage = true }, store = false }));
             using var request = factory.Create(history, "inert-review-key"); using var body = JsonDocument.Parse(await request.Content!.ReadAsStringAsync());
             Check(Same(expected.Value, body.RootElement), "Complete noncolliding history body changed: " + row.First + "/" + row.Second);
             Check(originals.SequenceEqual(history.Messages.Select(entry => entry.WireBody.ToString())), "Accepted history source values changed.");

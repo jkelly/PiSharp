@@ -1,0 +1,112 @@
+[
+  {
+    "options": {
+      "Project": "tests/PiSharp.Models.Tests",
+      "Label": "I06-models",
+      "BuildTimeoutSeconds": 180,
+      "TestTimeoutSeconds": 240,
+      "LockTimeoutSeconds": 15
+    },
+    "environment": {}
+  },
+  {
+    "options": {
+      "Project": "tests/PiSharp.MistralConversations.Tests",
+      "Label": "R5-snapshots",
+      "BuildTimeoutSeconds": 180,
+      "TestTimeoutSeconds": 240,
+      "LockTimeoutSeconds": 15
+    },
+    "environment": {}
+  },
+  {
+    "options": {
+      "Project": "tests/PiSharp.Tui.NativeModifiers.Tests",
+      "Label": "R7-native-modifiers",
+      "BuildTimeoutSeconds": 180,
+      "TestTimeoutSeconds": 240,
+      "LockTimeoutSeconds": 15
+    },
+    "environment": {}
+  },
+  {
+    "options": {
+      "Project": "tests/PiSharp.Evals.Tests",
+      "Label": "R9-evals",
+      "BuildTimeoutSeconds": 180,
+      "TestTimeoutSeconds": 240,
+      "LockTimeoutSeconds": 15
+    },
+    "environment": {}
+  },
+  {
+    "options": {
+      "Project": "tests/PiSharp.SimpleOutputBudget.Tests",
+      "Label": "I05-budget-r3",
+      "BuildTimeoutSeconds": 180,
+      "TestTimeoutSeconds": 240,
+      "LockTimeoutSeconds": 15
+    },
+    "environment": {}
+  },
+  {
+    "options": {
+      "Project": "tests/PiSharp.AnthropicThreads.Tests",
+      "Label": "I02-threads-r3",
+      "BuildTimeoutSeconds": 180,
+      "TestTimeoutSeconds": 240,
+      "LockTimeoutSeconds": 15
+    },
+    "environment": {}
+  },
+  {
+    "options": {
+      "Project": "tests/PiSharp.ResponsesTranscriptTools.Tests",
+      "Label": "R6-tools-r2",
+      "BuildTimeoutSeconds": 180,
+      "TestTimeoutSeconds": 240,
+      "LockTimeoutSeconds": 15
+    },
+    "environment": {}
+  },
+  {
+    "options": {
+      "Project": "artifacts/gap-validation/I12Probe/I12Probe.csproj",
+      "Label": "I18-conformance",
+      "BuildTimeoutSeconds": 180,
+      "TestTimeoutSeconds": 240,
+      "LockTimeoutSeconds": 15
+    },
+    "environment": {}
+  },
+  {
+    "options": {
+      "Project": "tests/PiSharp.Env.Daemon.Tests",
+      "Label": "E02-daemon",
+      "BuildTimeoutSeconds": 180,
+      "TestTimeoutSeconds": 240,
+      "LockTimeoutSeconds": 15
+    },
+    "environment": {}
+  },
+  {
+    "options": {
+      "Project": "tests/PiSharp.Env.Connection.Tests",
+      "Label": "E01-connection",
+      "BuildTimeoutSeconds": 180,
+      "TestTimeoutSeconds": 240,
+      "LockTimeoutSeconds": 15
+    },
+    "environment": {}
+  },
+  {
+    "options": {
+      "Project": "tests/PiSharp.Env.Ssh.Tests",
+      "Label": "E07-ssh",
+      "BuildTimeoutSeconds": 180,
+      "TestTimeoutSeconds": 240,
+      "LockTimeoutSeconds": 15
+    },
+    "environment": {}
+  }
+]

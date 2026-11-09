@@ -1,0 +1,13 @@
+{
+  "options": {
+    "Project": "artifacts/gap-validation/NativeEnvDriverR6/NativeEnvDriverR6.proj",
+    "Label": "NativeAOT-final",
+    "BuildTimeoutSeconds": 1200,
+    "TestTimeoutSeconds": 300,
+    "LockTimeoutSeconds": 30,
+    "Configuration": "Debug",
+    "BuildOnly": true,
+    "BuildArguments": []
+  },
+  "environment": {}
+}

@@ -16,6 +16,9 @@ public sealed record CompletionsTranscriptProjectionOptions(bool Reasoning = fal
 {
     // ModelDescriptor currently contains identity only. Keep capability local to this provider,
     // without changing its existing positional constructor/deconstruction contract.
+    /// <summary>Use empty content for textless assistant history. Independent of inserting an assistant after a tool result.
+    /// Null inherits model compatibility when bound by the request factory; otherwise the effective default is false.</summary>
+    public bool? RequiresNonNullAssistantContent { get; init; }
     public bool ModelSupportsImages { get; init; }
 
     public bool SupportsMidConversationToolAdditions { get; init; }
@@ -310,7 +313,7 @@ public sealed class CompletionsTranscriptProjector
                     default: throw Fail(CompletionsRequestFailure.UnsupportedContent);
                 }
             }
-            var message = new JsonObject { ["role"] = "assistant", ["content"] = options.RequiresAssistantAfterToolResult ? JsonValue.Create("") : null };
+            var message = new JsonObject { ["role"] = "assistant", ["content"] = (options.RequiresAssistantAfterToolResult || options.RequiresNonNullAssistantContent == true) ? JsonValue.Create("") : null };
             if (options.RequiresThinkingAsText && thoughts.Count != 0)
             {
                 var parts = new JsonArray(new JsonObject { ["type"] = "text", ["text"] = string.Join("\n\n", thoughts.Select(item => item.Text)) });

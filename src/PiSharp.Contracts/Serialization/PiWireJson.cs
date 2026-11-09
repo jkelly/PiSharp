@@ -13,14 +13,14 @@ public static partial class PiWireJson
         JsonData.Validate(value);
         RequireString(value, "role", "assistant");
         // Only a whole nonnegative duration is typed; any other legacy value stays an opaque extra field.
-        long? duration = value.TryGetProperty("durationMs", out var measured) && measured.ValueKind == JsonValueKind.Number &&
+        long? duration = TryWireProperty(value, "durationMs", out var measured) && measured.ValueKind == JsonValueKind.Number &&
             measured.TryGetInt64(out var milliseconds) && milliseconds >= 0 ? milliseconds : null;
         string[] known = ["role", "api", "provider", "model", "timestamp", "content", "usage", "stopReason"];
         return new(
             String(value, "api"), String(value, "provider"), String(value, "model"),
-            value.GetProperty("timestamp").GetInt64(),
-            value.GetProperty("content").EnumerateArray().Select(ReadContent).ToImmutableArray(),
-            ReadUsage(value.GetProperty("usage")), ReadStopReason(String(value, "stopReason")),
+            GetWireProperty(value, "timestamp").GetInt64(),
+            GetWireProperty(value, "content").EnumerateArray().Select(ReadContent).ToImmutableArray(),
+            ReadUsage(GetWireProperty(value, "usage")), ReadStopReason(String(value, "stopReason")),
             JsonFields.FromObjectExcept(value, duration is null ? known : [.. known, "durationMs"]))
         { DurationMs = duration };
     }
@@ -33,7 +33,7 @@ public static partial class PiWireJson
             "text" => new TextContent(String(value, "text"), JsonFields.FromObjectExcept(value, "type", "text")),
             "thinking" => new ThinkingContent(String(value, "thinking"), JsonFields.FromObjectExcept(value, "type", "thinking")),
             "toolCall" => new ToolCallContent(String(value, "id"), String(value, "name"),
-                JsonData.FromElement(value.GetProperty("arguments")), JsonFields.FromObjectExcept(value, "type", "id", "name", "arguments")),
+                JsonData.FromElement(GetWireProperty(value, "arguments")), JsonFields.FromObjectExcept(value, "type", "id", "name", "arguments")),
             var kind => throw new JsonException($"Unsupported assistant content type: {kind}")
         };
     }
@@ -43,32 +43,32 @@ public static partial class PiWireJson
         JsonData.Validate(value);
         var kind = String(value, "type");
         JsonFields Extras(params string[] known) => JsonFields.FromObjectExcept(value, ["type", .. known]);
-        int Index() => value.GetProperty("contentIndex").GetInt32();
+        int Index() => GetWireProperty(value, "contentIndex").GetInt32();
         return kind switch
         {
-            "start" => new StreamStarted(ReadMessage(value.GetProperty("partial")), Extras("partial")),
-            "text_start" => new TextStarted(Index(), ReadContent(value.GetProperty("content")) as TextContent
+            "start" => new StreamStarted(ReadMessage(GetWireProperty(value, "partial")), Extras("partial")),
+            "text_start" => new TextStarted(Index(), ReadContent(GetWireProperty(value, "content")) as TextContent
                 ?? throw new JsonException("text_start must contain text."), Extras("contentIndex", "content")),
             "text_delta" => new TextDelta(Index(), String(value, "delta"), Extras("contentIndex", "delta")),
             "text_end" => new TextEnded(Index(), String(value, "content"), Extras("contentIndex", "content")),
-            "thinking_start" => new ThinkingStarted(Index(), ReadContent(value.GetProperty("content")) as ThinkingContent
+            "thinking_start" => new ThinkingStarted(Index(), ReadContent(GetWireProperty(value, "content")) as ThinkingContent
                 ?? throw new JsonException("thinking_start must contain thinking."), Extras("contentIndex", "content")),
             "thinking_delta" => new ThinkingDelta(Index(), String(value, "delta"), Extras("contentIndex", "delta")),
             "thinking_checkpoint" => new ThinkingCheckpoint(Index(), String(value, "content"), Extras("contentIndex", "content")),
             "thinking_end" => new ThinkingEnded(Index(), String(value, "content"), Extras("contentIndex", "content")),
-            "toolcall_start" => new ToolCallStarted(Index(), ReadContent(value.GetProperty("toolCall")) as ToolCallContent
+            "toolcall_start" => new ToolCallStarted(Index(), ReadContent(GetWireProperty(value, "toolCall")) as ToolCallContent
                 ?? throw new JsonException("toolcall_start must contain a tool call."), Extras("contentIndex", "toolCall")),
-            "toolcall_provisional_start" => new ToolCallProvisionalStarted(Index(), ReadContent(value.GetProperty("toolCall")) as ToolCallContent
+            "toolcall_provisional_start" => new ToolCallProvisionalStarted(Index(), ReadContent(GetWireProperty(value, "toolCall")) as ToolCallContent
                 ?? throw new JsonException("Provisional start must contain a tool call."), Extras("contentIndex", "toolCall")),
             "toolcall_header_update" => new ToolCallHeaderUpdated(Index(), String(value, "id"), String(value, "name"), Extras("contentIndex", "id", "name")),
             "toolcall_checkpoint" => new ToolCallCheckpoint(Index(), String(value, "json"), Extras("contentIndex", "json")),
             "toolcall_delta" => new ToolCallDelta(Index(), String(value, "delta"), Extras("contentIndex", "delta")),
             "toolcall_end" => new ToolCallEnded(Index(), new ToolCallContent(String(value, "id"), String(value, "name"),
-                JsonData.FromElement(value.GetProperty("arguments")), Extras("contentIndex", "id", "name", "arguments")),
+                JsonData.FromElement(GetWireProperty(value, "arguments")), Extras("contentIndex", "id", "name", "arguments")),
                 Extras("contentIndex", "id", "name", "arguments")),
-            "content_finalized" => new ContentBlockFinalized(Index(), ReadContent(value.GetProperty("content")), Extras("contentIndex", "content")),
-            "done" => new StreamDone(ReadStopReason(String(value, "reason")), ReadMessage(value.GetProperty("message")), Extras("reason", "message")),
-            "error" => new StreamError(ReadStopReason(String(value, "reason")), ReadMessage(value.GetProperty("error")), Extras("reason", "error")),
+            "content_finalized" => new ContentBlockFinalized(Index(), ReadContent(GetWireProperty(value, "content")), Extras("contentIndex", "content")),
+            "done" => new StreamDone(ReadStopReason(String(value, "reason")), ReadMessage(GetWireProperty(value, "message")), Extras("reason", "message")),
+            "error" => new StreamError(ReadStopReason(String(value, "reason")), ReadMessage(GetWireProperty(value, "error")), Extras("reason", "error")),
             _ => throw new JsonException($"Unknown stream event: {kind}")
         };
     }
@@ -134,15 +134,15 @@ public static partial class PiWireJson
     public static TokenUsage ReadUsageObject(JsonElement value) => ReadUsage(value);
     private static TokenUsage ReadUsage(JsonElement value)
     {
-        var cost = value.GetProperty("cost");
-        return new(JsonNumber.Read(value.GetProperty("input")), JsonNumber.Read(value.GetProperty("output")),
-            JsonNumber.Read(value.GetProperty("cacheRead")), JsonNumber.Read(value.GetProperty("cacheWrite")),
-            JsonNumber.Read(value.GetProperty("totalTokens")),
-            new(cost.GetProperty("input").GetDecimal(), cost.GetProperty("output").GetDecimal(),
-                cost.GetProperty("cacheRead").GetDecimal(), cost.GetProperty("cacheWrite").GetDecimal(),
-                cost.GetProperty("total").GetDecimal(), JsonFields.FromObjectExcept(cost, "input", "output", "cacheRead", "cacheWrite", "total"),
+        var cost = GetWireProperty(value, "cost");
+        return new(JsonNumber.Read(GetWireProperty(value, "input")), JsonNumber.Read(GetWireProperty(value, "output")),
+            JsonNumber.Read(GetWireProperty(value, "cacheRead")), JsonNumber.Read(GetWireProperty(value, "cacheWrite")),
+            JsonNumber.Read(GetWireProperty(value, "totalTokens")),
+            new(GetWireProperty(cost, "input").GetDecimal(), GetWireProperty(cost, "output").GetDecimal(),
+                GetWireProperty(cost, "cacheRead").GetDecimal(), GetWireProperty(cost, "cacheWrite").GetDecimal(),
+                GetWireProperty(cost, "total").GetDecimal(), JsonFields.FromObjectExcept(cost, "input", "output", "cacheRead", "cacheWrite", "total"),
                 JsonData.Parse("{" + string.Join(",", new[] { "input", "output", "cacheRead", "cacheWrite", "total" }
-                    .Select(name => JsonSerializer.Serialize(name) + ":" + cost.GetProperty(name).GetRawText())) + "}")),
+                    .Select(name => JsonUtf16.Quote(name) + ":" + GetWireProperty(cost, name).GetRawText())) + "}")),
             JsonFields.FromObjectExcept(value, "input", "output", "cacheRead", "cacheWrite", "totalTokens", "cost"))
         { ExtrasBeforeTotal = ExtraBeforeTotal(value) };
     }
@@ -151,8 +151,9 @@ public static partial class PiWireJson
     {
         foreach (var property in usage.EnumerateObject())
         {
-            if (property.Name == "totalTokens") return false;
-            if (property.Name is not ("input" or "output" or "cacheRead" or "cacheWrite" or "cost")) return true;
+            var name = JsonUtf16.GetName(property);
+            if (name == "totalTokens") return false;
+            if (name is not ("input" or "output" or "cacheRead" or "cacheWrite" or "cost")) return true;
         }
         return false;
     }
@@ -252,7 +253,24 @@ public static partial class PiWireJson
     }
 
     private static JsonData Own(JsonNode node) => JsonData.Parse(JsonUtf16.ToJsonString(node));
-    private static string String(JsonElement value, string name) => (value.GetProperty(name) is { ValueKind: JsonValueKind.String } text ? JsonUtf16.GetString(text) : value.GetProperty(name).GetString())
+
+    // Known wire fields can coexist with arbitrary UTF-16 metadata names. Native lookup may
+    // decode another escaped name during its search; only that object-name failure uses the fallback.
+    private static bool TryWireProperty(JsonElement value, string name, out JsonElement property)
+    {
+        try { return value.TryGetProperty(name, out property); }
+        catch (InvalidOperationException) when (value.ValueKind == JsonValueKind.Object)
+        {
+            var found = false; property = default;
+            foreach (var candidate in value.EnumerateObject())
+                if (JsonUtf16.GetName(candidate) == name) { property = candidate.Value; found = true; }
+            return found;
+        }
+    }
+    private static JsonElement GetWireProperty(JsonElement value, string name) =>
+        TryWireProperty(value, name, out var property) ? property : throw new KeyNotFoundException("The given key was not present in the JSON object.");
+
+    private static string String(JsonElement value, string name) => (GetWireProperty(value, name) is { ValueKind: JsonValueKind.String } text ? JsonUtf16.GetString(text) : GetWireProperty(value, name).GetString())
         ?? throw new JsonException($"{name} cannot be null.");
     private static void RequireString(JsonElement value, string name, string expected)
     {

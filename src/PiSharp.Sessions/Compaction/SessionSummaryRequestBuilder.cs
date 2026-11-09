@@ -68,7 +68,7 @@ public static class SessionSummaryRequestBuilder
             else if (message.Role == "toolResult")
             {
                 var text = Text(content, ""); if (text.Length == 0) continue;
-                Add("[Tool result]: " + (text.Length <= 2000 ? text : text[..2000] + "\n\n[... " + (text.Length - 2000) + " more characters truncated]"));
+                Add("[Tool result]: " + (text.Length <= 2000 ? text : PiSharp.Contracts.UnicodeText.SliceHead(text, 2000) + "\n\n[... " + (text.Length - 2000) + " more characters truncated]"));
             }
         }
         return string.Join("\n\n", parts);

@@ -5,6 +5,7 @@
     <NoWarn>$(NoWarn);PISHARP_CATALOG001</NoWarn>
   </PropertyGroup>
   <ItemGroup>
+    <EmbeddedResource Include="Fixtures/upstream-v1.5.0-models.schema.json" LogicalName="PiSharp.Models.Tests.UpstreamModelsSchema.json" />
     <ProjectReference Include="../../src/PiSharp.Cli/PiSharp.Cli.csproj" />
   </ItemGroup>
 </Project>

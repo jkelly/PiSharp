@@ -30,6 +30,10 @@ node_modules/
 npm-debug.log*
 yarn-error.log*
 
+# Python validation runner caches
+__pycache__/
+*.pyc
+
 # OS files
 .DS_Store
 Thumbs.db

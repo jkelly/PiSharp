@@ -16,13 +16,15 @@ public static partial class NativeProviderFactory
             var compat = metadata.Value.TryGetProperty("compat", out var value) ? value : default;
             if (compat.ValueKind is not (JsonValueKind.Undefined or JsonValueKind.Null or JsonValueKind.Object))
                 throw new InvalidOperationException();
-            bool Flag(string name)
+            bool Flag(string name, bool fallback = false)
             {
-                if (compat.ValueKind != JsonValueKind.Object || !compat.TryGetProperty(name, out var flag) || flag.ValueKind == JsonValueKind.Null) return false;
+                if (compat.ValueKind != JsonValueKind.Object || !compat.TryGetProperty(name, out var flag) || flag.ValueKind == JsonValueKind.Null) return fallback;
                 return flag.ValueKind is JsonValueKind.True or JsonValueKind.False ? flag.GetBoolean() : throw new InvalidOperationException();
             }
             // Pi abe508 openai-responses.ts getCompat: supportsOpenAIGrammarTools defaults to false.
-            return options with { ToolDeclarations = (options.ToolDeclarations ?? new()) with
+            return options with { SupportsAdditionalTools = Flag("supportsAdditionalTools", options.SupportsAdditionalTools), SupportsToolSearch = Flag("supportsToolSearch", options.SupportsToolSearch),
+                SupportsMidConversationSystemMessages = Flag("supportsMidConvoSystemMessages", options.SupportsMidConversationSystemMessages),
+                ToolDeclarations = (options.ToolDeclarations ?? new()) with
                 { SupportsStrictMode = Flag("supportsStrictMode"), SupportsOpenAIGrammarTools = Flag("supportsOpenAIGrammarTools") } };
         }
         catch (InvalidOperationException) { throw new ArgumentException("Unsupported native Responses strict compatibility metadata."); }
@@ -30,7 +32,8 @@ public static partial class NativeProviderFactory
 
     // Pi d86654abb8862e201933517d6f1fce9f88dd117f openai-responses.ts getCompat.
     // Caller-supplied full model metadata is authoritative when available. Without
-    // metadata, retain the existing explicit native compatibility option profile.
+    // metadata, retain the existing explicit native compatibility option profile. PromptCacheKeyMode is the
+    // additive exception: an explicit caller mode overrides metadata, and null inherits metadata then auto.
     private static ResponsesKeyAuthRequestOptions ResponsesCacheOptionsForModel(
         ResponsesKeyAuthRequestOptions? options, JsonData? metadata)
     {
@@ -48,8 +51,15 @@ public static partial class NativeProviderFactory
                 if (flag.ValueKind is not (JsonValueKind.True or JsonValueKind.False)) throw new InvalidOperationException();
                 return flag.GetBoolean();
             }
+            string? cacheKeyMode = null;
+            if (compat.ValueKind == JsonValueKind.Object && compat.TryGetProperty("promptCacheKeyMode", out var cacheMode) && cacheMode.ValueKind != JsonValueKind.Null)
+            {
+                cacheKeyMode = cacheMode.ValueKind == JsonValueKind.String ? cacheMode.GetString() : throw new InvalidOperationException();
+                if (cacheKeyMode is not ("auto" or "enabled" or "disabled")) throw new InvalidOperationException();
+            }
             return result with
             {
+                PromptCacheKeyMode = result.PromptCacheKeyMode ?? cacheKeyMode,
                 ModelHeaders = metadata.Value.TryGetProperty("headers", out var headers) ? JsonData.Parse(headers.GetRawText()) : null,
                 ModelSamplingParams = metadata.Value.TryGetProperty("samplingParams", out var sampling) ? JsonData.Parse(sampling.GetRawText()) : null,
                 ModelSamplingParamsByThinkingLevel = metadata.Value.TryGetProperty("samplingParamsByThinkingLevel", out var byLevel) ? JsonData.Parse(byLevel.GetRawText()) : null,

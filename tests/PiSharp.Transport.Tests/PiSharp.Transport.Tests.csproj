@@ -3,6 +3,7 @@
     <OutputType>Exe</OutputType>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="../PiSharp.Compatibility.Tests/CompletionsCurrentBodyExpectations.cs" Link="CompletionsCurrentBodyExpectations.cs" />
     <ProjectReference Include="../../src/PiSharp.AI/PiSharp.AI.csproj" />
     <ProjectReference Include="../../src/PiSharp.Agent/PiSharp.Agent.csproj" />
   </ItemGroup>

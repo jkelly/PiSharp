@@ -48,8 +48,9 @@ public sealed class UnixProcessRunner : ISeparatedProcessRunner
         var diagnostics = new HashSet<ProcessDiagnostic>();
         var gate = new object();
         var complete = true;
+        long shellExitedAt = -1, shellExitAtTimeout = -1;
         var stop = new TaskCompletionSource<ProcessRunStatus>(TaskCreationOptions.RunContinuationsAsynchronously);
-        var output = new ShellOutputAccumulator(request.SpillPath, _options, _storage);
+        var output = new ShellOutputAccumulator(request.SpillPath, capture?.OutputOptions(_options) ?? _options, _storage);
         IUnixProcessLease? lease = null;
         ITimer? timer = null;
         var cleaned = false;
@@ -61,7 +62,7 @@ public sealed class UnixProcessRunner : ISeparatedProcessRunner
         {
             // Acquire the timer before admission; do not let an effectful timer factory strand a process.
             if (request.TimeoutSeconds is not null)
-                timer = _clock.CreateTimer(_ => stop.TrySetResult(ProcessRunStatus.TimedOut), null, Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
+                timer = _clock.CreateTimer(_ => { Interlocked.Exchange(ref shellExitAtTimeout, Interlocked.Read(ref shellExitedAt)); stop.TrySetResult(ProcessRunStatus.TimedOut); }, null, Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
             var launch = operation.Track(_admission.LaunchAsync(request, caller).AsTask());
             lease = await launch.ConfigureAwait(false);
             if (lease is null) throw new InvalidOperationException("Admission returned no lease.");
@@ -137,7 +138,9 @@ public sealed class UnixProcessRunner : ISeparatedProcessRunner
         void Add(ProcessDiagnostic diagnostic) { lock (gate) diagnostics.Add(diagnostic); }
         ProcessRunResult Result(ProcessRunStatus outcome) => new(outcome, exitCode, lease?.ProcessId, lease is not null,
             cleaned && !diagnostics.Contains(ProcessDiagnostic.CleanupFailed), complete, output.Snapshot(), output.Structured(),
-            _clock.GetElapsedTime(began).TotalSeconds, diagnostics.ToImmutableArray());
+            _clock.GetElapsedTime(began).TotalSeconds, diagnostics.ToImmutableArray())
+            { ShellExitBeforeTimeout = outcome == ProcessRunStatus.TimedOut && exitCode is { } shellCode && shellExitAtTimeout >= 0
+                ? new(shellCode, Math.Round(_clock.GetElapsedTime(began, shellExitAtTimeout).TotalSeconds, 1, MidpointRounding.AwayFromZero)) : null };
         async Task ObserveAsync(Task task, ProcessDiagnostic diagnostic)
         {
             _ = operation.Track(task);
@@ -178,9 +181,11 @@ public sealed class UnixProcessRunner : ISeparatedProcessRunner
                     }
                     if (read == 0) break;
                     if (read != bytes.Length) Array.Resize(ref bytes, read);
-                    capture?.Append(standardError, bytes);
+                    var admitted = capture?.AppendAdmitted(standardError, bytes) ?? bytes.Length;
                     // A reached capture limit stops the process group; the status still follows its actual exit.
                     if (capture is { LimitReached: true }) stop.TrySetResult(ProcessRunStatus.Exited);
+                    if (admitted == 0) continue;
+                    if (admitted != bytes.Length) Array.Resize(ref bytes, admitted);
                     var originalWrite = chunks.Writer.WriteAsync(bytes, reads.Token).AsTask();
                     try { await originalWrite.ConfigureAwait(false); }
                     catch (Exception error)
@@ -204,6 +209,7 @@ public sealed class UnixProcessRunner : ISeparatedProcessRunner
         async Task NaturalDrainAsync()
         {
             await exit.ConfigureAwait(false);
+            Interlocked.Exchange(ref shellExitedAt, _clock.GetTimestamp());
             // Escaped descendants can retain a pipe forever: group stop follows a finite post-exit drain.
             var idle = operation.Track(Task.Delay(TimeSpan.FromMilliseconds(_options.PostExitIdleMilliseconds), _clock));
             await Task.WhenAny(pumps, idle).ConfigureAwait(false);

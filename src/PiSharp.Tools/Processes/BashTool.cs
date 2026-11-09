@@ -337,7 +337,10 @@ public sealed class BashTool : IToolArgumentSchemaAdapter
             return Failure(result.Output, ToolFailureKind.Canceled, "Command aborted");
         if (result.Status == ProcessRunStatus.TimedOut)
             return Failure(result.Output, ToolFailureKind.ExecutionError,
-                "Command timed out after " + timeout?.ToString("G", CultureInfo.InvariantCulture) + " seconds");
+                "Command timed out after " + timeout?.ToString("G", CultureInfo.InvariantCulture) + " seconds" +
+                (result.ShellExitBeforeTimeout is { } exited
+                    ? $". The shell exited with code {exited.ExitCode} after {exited.AfterSeconds.ToString("G", CultureInfo.InvariantCulture)} seconds, but background processes it started kept writing output until the timeout."
+                    : ""));
         if (!result.CapturedOutputComplete || result.Status == ProcessRunStatus.Failed || !result.Diagnostics.IsEmpty)
             return Failure(result.Output, ToolFailureKind.ExecutionError, "Command execution failed.");
         if (result.ExitCode is not { } code)

@@ -1,0 +1,94 @@
+[
+  {
+    "options": {
+      "Project": "tests/PiSharp.Chord.Tests",
+      "Label": "Chord-full-stable6",
+      "BuildTimeoutSeconds": 240,
+      "TestTimeoutSeconds": 600,
+      "LockTimeoutSeconds": 30,
+      "BuildArguments": [
+        "-p:RunAnalyzers=false"
+      ]
+    },
+    "environment": {}
+  },
+  {
+    "options": {
+      "Project": "tests/PiSharp.Chord.Hosting.Tests",
+      "Label": "N1-hosting-stable6",
+      "BuildTimeoutSeconds": 300,
+      "TestTimeoutSeconds": 600,
+      "LockTimeoutSeconds": 30,
+      "Configuration": "Debug",
+      "BuildArguments": [
+        "-p:RunAnalyzers=false"
+      ]
+    },
+    "environment": {}
+  },
+  {
+    "options": {
+      "Project": "tests/PiSharp.Durable.Hosting.Tests",
+      "Label": "I11-host-stable6",
+      "TestArgs": [
+        "--only",
+        "settings-forwarding."
+      ],
+      "BuildTimeoutSeconds": 180,
+      "TestTimeoutSeconds": 240,
+      "LockTimeoutSeconds": 30,
+      "BuildArguments": [
+        "-p:RunAnalyzers=false"
+      ]
+    },
+    "environment": {}
+  },
+  {
+    "options": {
+      "Project": "tests/PiSharp.Rpc.Tests",
+      "Label": "RPC-full-stable4",
+      "BuildTimeoutSeconds": 240,
+      "TestTimeoutSeconds": 480,
+      "LockTimeoutSeconds": 30,
+      "Configuration": "Debug",
+      "BuildArguments": [
+        "-p:RunAnalyzers=false"
+      ]
+    },
+    "environment": {}
+  },
+  {
+    "options": {
+      "Project": "tests/PiSharp.Durable.Tests",
+      "Label": "I17-existing-compaction-stable4",
+      "BuildTimeoutSeconds": 240,
+      "TestTimeoutSeconds": 300,
+      "LockTimeoutSeconds": 30,
+      "Configuration": "Debug",
+      "TestArgs": [
+        "--only",
+        "harness.compaction.per-model-compaction-overrides.,harness.compaction.jsonl.per-model-compaction-overrides.,harness.compaction.sqlite.per-model-compaction-overrides.,models.mapping."
+      ],
+      "BuildArguments": [
+        "-p:RunAnalyzers=false"
+      ]
+    },
+    "environment": {}
+  },
+  {
+    "options": {
+      "Project": "tests/PiSharp.InteractiveParity.Tests",
+      "Label": "R8-overlay-stable4",
+      "BuildTimeoutSeconds": 240,
+      "TestTimeoutSeconds": 300,
+      "LockTimeoutSeconds": 30,
+      "Configuration": "Debug",
+      "BuildArguments": [
+        "-p:RunAnalyzers=false"
+      ]
+    },
+    "environment": {
+      "INTERACTIVEPARITY_FILTER": "gap.overlay|sync150.overlay-custom|sync150.custom-overlay"
+    }
+  }
+]

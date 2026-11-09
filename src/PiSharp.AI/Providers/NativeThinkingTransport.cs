@@ -102,6 +102,7 @@ internal sealed class NativeThinkingProfile
 
     public string AnthropicEffort(string level) => Map is { } map && map.Value.TryGetProperty(level, out var value) && value.ValueKind == JsonValueKind.String
         ? value.GetString()! : level switch { "minimal" or "low" => "low", "medium" => "medium", _ => "high" };
-    public static int AnthropicBudget(string level, int cap) => Math.Min(cap - 1024,
-        level switch { "minimal" => 1024, "low" => 2048, "medium" => 8192, _ => 16384 });
+    public static int AnthropicBudget(string level, int cap, JsonData? budgets = null) => (int)Math.Min(cap - 1024,
+        budgets is { } custom && custom.Value.TryGetProperty(level is "xhigh" or "max" ? "high" : level, out var budget)
+            ? budget.GetDouble() : level switch { "minimal" => 1024, "low" => 2048, "medium" => 8192, _ => 16384 });
 }

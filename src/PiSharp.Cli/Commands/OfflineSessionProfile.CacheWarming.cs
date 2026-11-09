@@ -33,7 +33,7 @@ internal sealed partial class OfflineSessionProfile
                 IChatTransport replay;
                 lock (_cacheWarmGate) replay = _cacheWarmReplay ??= live.CreateCacheWarmTransport();
                 AssistantMessage? final = null;
-                await foreach (var observation in replay.StreamAsync((ChatRequest)request.Payload!, token).ConfigureAwait(false))
+                await foreach (var observation in replay.StreamAsync(PiSharp.AI.ModelOperations.CacheWarmingPolicy.PrepareReplay((ChatRequest)request.Payload!), token).ConfigureAwait(false))
                     if (observation is StreamTerminalEvent terminal) final = terminal.Message;
                 return final ?? throw new InvalidOperationException("Cache warming replay ended without a response.");
             },

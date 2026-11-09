@@ -1,3 +1,5 @@
+> Active 2026-11-08 implementation: see [context](gap-implementation-context.md), [execution plan](gap-execution-plan.md) and [audit contracts](upstream-audit-2026-11-08/contracts.md). Historical material below is preserved.
+
 # Workflow Plan
 
 Status: planning complete; all future implementation remains pending. Scope and acceptance criteria are in [the roadmap](../docs/plans/09-durable-remaining-features.md); existing/proposed APIs are in [contracts.md](contracts.md). Date: 2026-10-20.

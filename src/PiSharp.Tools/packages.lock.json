@@ -5,15 +5,15 @@
       "pisharp.agent": {
         "type": "Project",
         "dependencies": {
-          "PiSharp.AI": "[1.0.0, )",
-          "PiSharp.Contracts": "[1.0.0, )"
+          "PiSharp.AI": "[1.5.0, )",
+          "PiSharp.Contracts": "[1.5.0, )"
         }
       },
       "pisharp.ai": {
         "type": "Project",
         "dependencies": {
-          "PiSharp.Contracts": "[1.0.0, )",
-          "PiSharp.Telemetry": "[1.0.0, )"
+          "PiSharp.Contracts": "[1.5.0, )",
+          "PiSharp.Telemetry": "[1.5.0, )"
         }
       },
       "pisharp.contracts": {

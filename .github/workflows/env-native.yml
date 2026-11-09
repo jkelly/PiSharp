@@ -1,0 +1,65 @@
+name: Native environment daemon
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+  workflow_call:
+    inputs:
+      source_sha:
+        type: string
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  native:
+    name: NativeAOT daemon (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-2022, macos-15]
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.source_sha || github.sha }}
+      - uses: actions/setup-dotnet@v5
+        with:
+          global-json-file: global.json
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      # NativeAOT's documented Linux requirements, plus the C11 shim's compiler,
+      # archive tool and POSIX development headers. No cross-RID publication.
+      - name: Install Linux native toolchain
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes clang build-essential zlib1g-dev
+      - name: Check macOS developer tools
+        if: runner.os == 'macOS'
+        run: |
+          xcode-select -p
+          xcrun --find clang
+          xcrun --find ar
+      # The runner image supplies Visual Studio; the helper checks the C++
+      # workload and Windows SDK explicitly before invoking NativeAOT.
+      - name: Publish and qualify the isolated native executable
+        shell: pwsh
+        run: ./tools/Env/Publish-NativeDaemon.ps1 -SourceSha '${{ inputs.source_sha || github.sha }}' -OutputDirectory 'artifacts/env-native'
+      - uses: actions/upload-artifact@v4
+        if: success()
+        with:
+          name: pi-env-native-${{ runner.os }}-${{ runner.arch }}
+          path: artifacts/env-native/package
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: pi-env-native-evidence-${{ runner.os }}-${{ runner.arch }}
+          path: artifacts/env-native/evidence
+          if-no-files-found: error

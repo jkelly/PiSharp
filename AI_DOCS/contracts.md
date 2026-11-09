@@ -1,3 +1,5 @@
+> Active 2026-11-08 implementation: see [context](gap-implementation-context.md), [execution plan](gap-execution-plan.md) and [audit contracts](upstream-audit-2026-11-08/contracts.md). Historical material below is preserved.
+
 # Durable application contracts
 
 Planning snapshot, 2026-10-20. **Existing** means present in the worktree, including the uncommitted milestone. **Proposed** means a design for review, not an implemented/public API. F1 freezes exact signatures, DTO definitions, route placement and migration ownership before downstream implementation. Discovery tasks cannot skip unknown cancellation, confidence or fetch-transport semantics.

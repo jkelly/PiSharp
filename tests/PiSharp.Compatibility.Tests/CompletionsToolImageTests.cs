@@ -34,19 +34,27 @@ internal static class CompletionsToolImageTests
         Equal(fetch.GetProperty("bodyUtf8Sha256").GetString(), Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(rawSource))));
         using var parsedSource = JsonDocument.Parse(rawSource);
         Check(JsonElement.DeepEquals(parsedSource.RootElement, fetch.GetProperty("bodyJson")), "Complete source raw and parsed capture differ.");
-        var factory = new CompletionsKeyAuthRequestFactory(new(fetch.GetProperty("url").GetString()!), model,
-            new(RequiresAssistantAfterToolResult: captured.GetProperty("projection").GetProperty("requiresAssistantAfterToolResult").GetBoolean(),
+        var projection = new CompletionsTranscriptProjectionOptions(RequiresAssistantAfterToolResult: captured.GetProperty("projection").GetProperty("requiresAssistantAfterToolResult").GetBoolean(),
                 RequiresToolResultName: captured.GetProperty("projection").GetProperty("requiresToolResultName").GetBoolean())
-                { ModelSupportsImages = modelBody.GetProperty("input").EnumerateArray().Any(value => value.GetString() == "image") },
-            new(MaxTokens: Number(options, "maxTokens"), Temperature: Number(options, "temperature")));
-        var expectedBody = FollowPi150Body(captured);
+                { ModelSupportsImages = modelBody.GetProperty("input").EnumerateArray().Any(value => value.GetString() == "image") };
+        var direct = new CompletionsKeyAuthRequestOptions(MaxTokens: Number(options, "maxTokens"), Temperature: Number(options, "temperature"));
+        var legacyExpectedBody = FollowPi150Body(captured);
+        var endpoint = new Uri(fetch.GetProperty("url").GetString()!);
+        var factory = new CompletionsKeyAuthRequestFactory(endpoint, model, projection, direct);
+        var legacyFactory = new CompletionsKeyAuthRequestFactory(endpoint, model, projection,
+            direct with { RequiresToolsWithToolHistory = true });
+        var expectedBody = CompletionsCurrentBodyExpectations.WithoutEmptyTools(legacyExpectedBody);
         // Repeated materialization must preserve content order and borrow the same untouched canonical input.
         for (var repeat = 0; repeat < 2; repeat++)
         {
             using var http = factory.Create(request, "authored-inert-image-key");
             using var body = JsonDocument.Parse(await http.Content!.ReadAsStringAsync());
-            Check(JsonElement.DeepEquals(expectedBody, body.RootElement), "Complete request differs from the Pi/SDK capture: " + captured.GetProperty("id").GetString());
+            Check(JsonElement.DeepEquals(expectedBody, body.RootElement), "Complete current-target derivative differs (only empty tools omitted after Pi150 projection): " + captured.GetProperty("id").GetString());
             Check(originals.SequenceEqual(request.Messages.Select(entry => entry.WireBody.ToString())), "User image projection changed canonical history.");
+            // Explicit historical compatibility retains the complete immutable captured body; no fields are ignored.
+            using var legacyHttp = legacyFactory.Create(request, "authored-inert-image-key");
+            using var legacyBody = JsonDocument.Parse(await legacyHttp.Content!.ReadAsStringAsync());
+            Check(JsonElement.DeepEquals(legacyExpectedBody, legacyBody.RootElement), "Explicit legacy tools-with-history profile differs from complete captured expectation.");
         }
         Equal(1, captured.GetProperty("payloadCalls").GetInt32()); Equal(1, captured.GetProperty("responseCalls").GetInt32());
         Equal("stop", captured.GetProperty("result").GetProperty("stopReason").GetString());

@@ -31,6 +31,7 @@ internal static class AnthropicMessagesHttpSseTransportTests
         yield return ("anthropic-http.source-informed-complete-key-requests-and-header-replay", CompleteRequests);
         yield return ("anthropic-http.actual-turn-tools-next-request-wait-for-owned-cleanup-and-commit", ToolRoundTrip);
         yield return ("anthropic-http.named-events-eof-done-and-strict-admission", FramingAndAdmission);
+        yield return ("anthropic-http.escaped-surrogate-names-roundtrip-and-failed-turn-has-no-tool-authority", EscapedSurrogateNames);
         yield return ("anthropic-http.request-and-stream-budgets-before-effects", BudgetsAndConfiguration);
         yield return ("anthropic-http.cooperative-cancellation-and-early-disposal-await-cleanup", CancellationAndEarlyDispose);
         yield return ("anthropic-http.factory-send-read-status-cleanup-faults-and-fresh-ownership", FaultsAndFreshRequests);
@@ -278,11 +279,18 @@ internal static class AnthropicMessagesHttpSseTransportTests
             wire.TrimEnd('\r', '\n'), // Public reader flushes its last partial line and pending event at EOF.
             Frame("unknown-future", "{private malformed ignored") + Frame("message", "[DONE]") + wire,
             Frame("message_delta", Start) + Sse(Finish("end_turn"), Stop), // Named acceptance precedes DTO type dispatch.
+            Frame("message_delta", "{\"type\":\"ping\",\"\\uDC00\":null}") + wire, // Exercise HTTP JSON admission before DTO ping dispatch.
             wire + Frame("message", "[DONE]") + Frame("unknown", "{ignored after successful stop")
         })
         {
             using var fixture = new Fixture(new ProbeStream(Bytes(positive)));
             Check((await new ChatClient(fixture.Transport).CompleteAsync(Request())).Failure is null, "Source event selection/EOF rule changed.");
+        }
+        using (var fixture = new Fixture(new ProbeStream(Bytes(Sse(Start.Replace("msg-authored", "\\uD800", StringComparison.Ordinal), Finish("end_turn"), Stop)))))
+        {
+            var completed = await new ChatClient(fixture.Transport).CompleteAsync(Request());
+            Check(completed.Failure is null && completed.Message.ExtraProperties!.TryGet("responseId", out var id) && JsonUtf16.GetString(id!.Value) == "\uD800",
+                "Accepted escaped response ID was rejected or replaced.");
         }
         // anthropic-messages.ts:803 finalizes incomplete argument JSON with parseStreamingJson (partial-json, then {}), so the
         // turn completes as a tool use with {} arguments (installed pi-ai 1.1.0 against a local fake server: done, toolUse, {}).
@@ -297,7 +305,8 @@ internal static class AnthropicMessagesHttpSseTransportTests
             (Frame("message_start", "{private-invalid"), "SourceFailed"),
             (Frame("message_start", "[]"), "SourceFailed"),
             (Frame("message_start", Start.Replace("\"id\":\"msg-authored\"", "\"id\":\"private\",\"\\u0069d\":\"duplicate\"", StringComparison.Ordinal)), "SourceFailed"),
-            (Frame("message_start", Start.Replace("msg-authored", "\\uD800", StringComparison.Ordinal)), "SourceFailed"),
+            // The escaped ID is accepted as a string value; this fixture is incomplete, so its failure is EOF.
+            (Frame("message_start", Start.Replace("msg-authored", "\\uD800", StringComparison.Ordinal)), "UnexpectedEof"),
             (Frame("message_start", "[DONE]"), "SourceFailed"),
             (Sse(Start, Finish("end_turn")) + Frame("message", "[DONE]"), "UnexpectedEof"),
             (Frame("message", Start) + Sse(Finish("end_turn"), Stop), "MalformedStream"),
@@ -314,6 +323,31 @@ internal static class AnthropicMessagesHttpSseTransportTests
         }
         using (var fixture = new Fixture(new ProbeStream([.. Bytes("event: message_start\ndata: "), 0xff, .. Bytes("\n\n")])))
             Failed(await new ChatClient(fixture.Transport).CompleteAsync(Request()), "SourceFailed");
+    }
+
+    private static async Task EscapedSurrogateNames()
+    {
+        const string arguments = "{\"\\udc00\":\"value\"}";
+        var toolStart = ToolStart.Replace("\"input\":{}", "\"input\":{\"\\uDC00\":\"seed\"}", StringComparison.Ordinal);
+        foreach (var complete in new[] { true, false })
+        {
+            var wire = Sse(Start, toolStart, ToolDelta(arguments), ToolEnd) + (complete
+                ? Sse(Finish("tool_use"), Stop)
+                : Frame("message_delta", "{\"type\":\"message_delta\",\"delta\":{},\"usage\":{},\"usage\":{}}"));
+            using var fixture = new Fixture(new ProbeStream(Bytes(wire)));
+            var effects = new Executor();
+            var outcome = await new TurnRunner(new ChatClient(fixture.Transport), new ToolBatchScheduler([new("inspect", effects)]))
+                .RunAsync(Request(), new Sink(_ => Task.CompletedTask));
+            if (complete)
+            {
+                Check(outcome.Chat.Failure is null && effects.Calls == 1, "Valid argument names did not reach the tool executor.");
+                Check(JsonUtf16.DeepEquals(JsonData.Parse(arguments).Value, effects.Arguments!.Value), "Executor lost the escaped-surrogate key.");
+                var written = PiWireJson.WriteMessage(outcome.Chat.Message).Value.GetProperty("content")[0].GetProperty("arguments");
+                Equal("\uDC00", JsonUtf16.GetName(written.EnumerateObject().Single()));
+            }
+            else { Failed(outcome.Chat, "SourceFailed"); Equal(0, effects.Calls); }
+            Check(fixture.Response.Disposed, "Escaped-name stream escaped response cleanup.");
+        }
     }
 
     private static async Task BudgetsAndConfiguration()
@@ -337,9 +371,12 @@ internal static class AnthropicMessagesHttpSseTransportTests
         using var handler = new FakeHttpHandler((_, _) => throw new InvalidOperationException("Unexpected send.")); using var client = new HttpClient(handler);
         foreach (var options in new AnthropicMessagesHttpSseOptions[]
         {
-            new(MaximumDataEvents: 0), new(MaximumDataCharacters: 0), new(MaximumTotalDataCharacters: 0), new(MaximumJsonDepth: 65),
+            new(MaximumDataEvents: 0), new(MaximumDataCharacters: 0), new(MaximumTotalDataCharacters: 0), new(MaximumJsonDepth: JsonData.MaximumDepth + 1),
             new(Framing: new(RejectInvalidUtf8: false, EofBehavior: SseEofBehavior.DispatchPendingEvent)), new(Framing: new(RejectInvalidUtf8: true))
         }) Throws<ArgumentException>(() => new AnthropicMessagesHttpSseTransport(client, (_, _) => throw new InvalidOperationException(), options));
+        // The shared fidelity contract admits up to 1,000 levels; 65 is no longer an invalid profile.
+        foreach (var depth in new[] { 65, JsonData.MaximumDepth })
+            _ = new AnthropicMessagesHttpSseTransport(client, (_, _) => throw new InvalidOperationException(), new(MaximumJsonDepth: depth));
         foreach (var options in new AnthropicMessagesKeyAuthRequestOptions[]
         {
             new(MaxTokens: double.NaN), new(MaxTokens: double.PositiveInfinity), new(MaximumTokenMagnitude: double.NaN),

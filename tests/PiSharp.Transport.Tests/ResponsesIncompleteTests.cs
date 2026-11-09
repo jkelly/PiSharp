@@ -1,4 +1,5 @@
 using System.Net;
+using System.Runtime.CompilerServices;
 using System.Text;
 using System.Text.Json;
 using PiSharp.AI;
@@ -77,11 +78,17 @@ internal static class ResponsesIncompleteTests
         using (var unfinishedText = new Fixture(Wire(TextStart, TextDelta, Terminal())))
         {
             var result = await unfinishedText.Complete();
-            Check(result.Message.StopReason == StopReason.Error && ((TextContent)result.Message.Content.Single()).Text == "partial", "Fabricated text end");
+            // Frozen v1.5.0 openai-responses-shared.ts:625-667 finalizes incomplete text as length without inventing text_end.
+            Check(result.Failure is null && result.Message.StopReason == StopReason.Length && ((TextContent)result.Message.Content.Single()).Text == "partial", "Incomplete text length/partial changed");
+            Check(unfinishedText.Frames.OfType<TextEnded>().Count() == 0 && unfinishedText.Frames.OfType<StreamDone>().Count() == 1, "Fabricated text end or duplicate terminal");
             UsageIsRetained(result);
         }
         using (var completeButUnfinished = new Fixture(Wire(ToolStart, """{"type":"response.completed","response":{"status":"completed"}}""")))
-            Check((await completeButUnfinished.Complete()).Failure?.Kind == ChatFailureKind.MalformedStream, "Completed strict finality weakened");
+        {
+            Check((await completeButUnfinished.Complete()).Failure?.Kind == ChatFailureKind.Provider, "Completed strict finality weakened");
+            ResponsesRawContractAssertions.Error(completeButUnfinished.Frames, typeof(StreamProtocolException));
+            Check(!completeButUnfinished.Frames.OfType<ToolCallEnded>().Any(), "Unfinished tool gained an authoritative end");
+        }
         const string reasoning = """{"type":"response.output_item.done","output_index":2,"item":{"type":"reasoning","id":"rs_1","summary":[{"type":"summary_text","text":"summary"}]}}""";
         const string output = """[{"type":"reasoning","id":"rs_1","encrypted_content":"late-cipher"}]""";
         foreach (var filtered in new[] { false, true })
@@ -99,23 +106,43 @@ internal static class ResponsesIncompleteTests
     {
         foreach (var invalid in new[]
         {
-            Terminal("[]"), Terminal("false"), Terminal("{\"reason\":123}"), Terminal("{\"reason\":\"private-unrecognized\"}"),
-            Terminal().Replace("\"status\":\"incomplete\"", "\"status\":\"completed\""),
-            Terminal().Replace("\"total_tokens\":17", "\"total_tokens\":-1")
+            Terminal("[]"), Terminal("false"), Terminal("{\"reason\":123}"),
+            Terminal().Replace("\"status\":\"incomplete\"", "\"status\":\"completed\"")
         })
         {
             using var fixture = new Fixture(Wire(TextStart, TextDelta, TextEnd, invalid));
             var result = await fixture.Complete();
-            Check(result.Failure?.Kind == ChatFailureKind.MalformedStream && result.Message.StopReason == StopReason.Error, "Malformed incomplete accepted");
+            Check(result.Failure?.Kind == ChatFailureKind.Provider && result.Message.StopReason == StopReason.Error, "Malformed incomplete gained success");
+            ResponsesRawContractAssertions.Error(fixture.Frames, typeof(StreamProtocolException));
             Check(!result.Failure!.Message.Contains("private-unrecognized", StringComparison.Ordinal), "Unknown reason disclosed in diagnostic");
+        }
+        // Source reports finite usage values without a nonnegative-total invariant (frozen shared.ts total_tokens || 0).
+        using (var reported = new Fixture(Wire(TextStart, TextDelta, TextEnd, Terminal().Replace("\"total_tokens\":17", "\"total_tokens\":-1", StringComparison.Ordinal))))
+        {
+            var result = await reported.Complete();
+            Check(result.Failure is null && result.Message.StopReason == StopReason.Length && result.Message.Usage.TotalTokens == -1,
+                "Finite provider-reported total was clamped or rejected");
+            Check(reported.Frames.OfType<StreamDone>().Count() == 1 && !reported.Frames.OfType<StreamError>().Any(), "Reported usage gained duplicate/error terminal");
+        }
+        // Frozen v1.5.0 shared.ts:861-882 preserves unknown provider string reasons as an explicit error, not malformed DTO data.
+        using (var unknown = new Fixture(Wire(TextStart, TextDelta, TextEnd, Terminal("{\"reason\":\"private-unrecognized\"}"))))
+        {
+            var result = await unknown.Complete();
+            Check(result.Message.StopReason == StopReason.Error && result.Failure?.Kind == ChatFailureKind.Provider, "Unknown provider reason gained success");
+            Check(Field(result, "rawStopReason") == "incomplete.private-unrecognized" && Field(result, "errorMessage") == "Response incomplete: private-unrecognized", "Provider reason display fields changed");
+            Check(unknown.Frames.OfType<StreamError>().Count() == 1 && unknown.Frames.OfType<StreamDone>().Count() == 0 && unknown.Frames.OfType<StreamError>().Single().NativeSourceException is null, "Provider reason replaced by an invented helper failure");
+            UsageIsRetained(result);
         }
         foreach (var tail in new[] { Terminal(), TextDelta, "{broken" })
         {
             using var fixture = new Fixture(Wire(TextStart, TextDelta, TextEnd, Terminal(), tail));
-            Check((await fixture.Complete()).Failure?.Kind == ChatFailureKind.MalformedStream, "Trailing data ignored after incomplete");
+            Check((await fixture.Complete()).Failure?.Kind == ChatFailureKind.Provider, "Trailing data ignored after incomplete");
+            // The HTTP ParseDto boundary wraps malformed JSON as its original native StreamProtocolException too.
+            ResponsesRawContractAssertions.Error(fixture.Frames, typeof(StreamProtocolException));
         }
         using var eof = new Fixture(Wire(TextStart, TextDelta, TextEnd));
-        Check((await eof.Complete()).Failure?.Kind == ChatFailureKind.MalformedStream, "EOF inferred incomplete success");
+        Check((await eof.Complete()).Failure?.Kind == ChatFailureKind.Provider, "EOF inferred incomplete success");
+        ResponsesRawContractAssertions.Error(eof.Frames, typeof(StreamProtocolException));
     }
     private static async Task Cleanup()
     {
@@ -160,11 +187,19 @@ internal static class ResponsesIncompleteTests
             return base.DisposeAsync();
         }
     }
+    private sealed class RecordingTransport(IChatTransport inner, List<StreamEvent> frames) : IChatTransport
+    {
+        public async IAsyncEnumerable<StreamEvent> StreamAsync(ChatRequest request, [EnumeratorCancellation] CancellationToken token = default)
+        {
+            await foreach (var frame in inner.StreamAsync(request, token)) { frames.Add(frame); yield return frame; }
+        }
+    }
     private sealed class Fixture : IDisposable
     {
         internal readonly ResponsesReasoningTests.Handler Handler;
         private readonly HttpClient _client;
         private readonly ResponsesHttpSseTransport _transport;
+        internal readonly List<StreamEvent> Frames = [];
         internal Fixture(byte[] bytes) : this(new MemoryStream(bytes)) { }
         internal Fixture(Stream body)
         {
@@ -174,7 +209,7 @@ internal static class ResponsesIncompleteTests
             _transport = new(_client, request => factory.Create(request, "inert-incomplete-key"),
                 responsesOptions: new(Rates: new(Input: 2, Output: 3, CacheRead: 0.5m, CacheWrite: 1)));
         }
-        internal Task<ChatResult> Complete(CancellationToken token = default) => new ChatClient(_transport, capacity: 1).CompleteAsync(Request(), token);
+        internal Task<ChatResult> Complete(CancellationToken token = default) => new ChatClient(new RecordingTransport(_transport, Frames), capacity: 1).CompleteAsync(Request(), token);
         public void Dispose() => _client.Dispose();
     }
 }

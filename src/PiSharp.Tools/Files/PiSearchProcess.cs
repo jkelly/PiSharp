@@ -43,19 +43,46 @@ public static class PiSearchProcess
             stopped = true;
             try { if (!process.HasExited) process.Kill(entireProcessTree: true); } catch (InvalidOperationException) { } catch (System.ComponentModel.Win32Exception) { }
         }
-        var stderr = process.StandardError.ReadToEndAsync(CancellationToken.None);
+        var stderr = ReadErrorAsync(process.StandardError);
+        IOException? readError = null;
         using (cancellationToken.Register(Stop))
         {
             try
             {
-                while (await process.StandardOutput.ReadLineAsync(CancellationToken.None).ConfigureAwait(false) is { } line)
+                await foreach (var line in ReadLinesAsync(process.StandardOutput))
                     if (!stopped && onLine(line)) Stop();
             }
-            catch (IOException) when (stopped) { }
+            catch (IOException error) { if (!stopped) readError = error; Stop(); }
             await process.WaitForExitAsync(CancellationToken.None).ConfigureAwait(false);
         }
         var standardError = await stderr.ConfigureAwait(false);
         cancellationToken.ThrowIfCancellationRequested();
+        if (readError is not null) throw readError;
         return new(stopped ? null : process.ExitCode, standardError, stopped);
     }
+    private static async IAsyncEnumerable<string> ReadLinesAsync(StreamReader reader)
+    {
+        var buffer = new char[8192]; var line = new StringBuilder(); int count;
+        while ((count = await reader.ReadAsync(buffer.AsMemory()).ConfigureAwait(false)) != 0)
+        {
+            for (var i = 0; i < count; i++)
+            {
+                if (buffer[i] == '\n') { yield return line.ToString().TrimEnd('\r'); line.Clear(); }
+                else
+                {
+                    if (line.Length >= 4 * 1024 * 1024) throw new IOException("Search output line exceeds the supported input limit.");
+                    line.Append(buffer[i]);
+                }
+            }
+        }
+        if (line.Length != 0) yield return line.ToString().TrimEnd('\r');
+    }
+    private static async Task<string> ReadErrorAsync(StreamReader reader)
+    {
+        var buffer = new char[8192]; var result = new StringBuilder(); int count;
+        while ((count = await reader.ReadAsync(buffer.AsMemory()).ConfigureAwait(false)) != 0)
+            if (result.Length < 65536) result.Append(buffer, 0, Math.Min(count, 65536 - result.Length));
+        return result.ToString();
+    }
+
 }

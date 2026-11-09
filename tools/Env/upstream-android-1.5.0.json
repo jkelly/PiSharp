@@ -1,0 +1,16 @@
+[
+  {
+    "platform": "android", "arch": "arm64", "version": "1.5.0",
+    "path": "package/bin/pi-env-android-arm64/pi-env",
+    "sha256": "58e1ce2e3d74cf1dde785c221a948a2ada9c6cb4862029c514b1baa7f95270c8",
+    "backend": "upstream-rust", "sourceCommit": "f9a26365568127461c47a07a37dcb42c140a3ac5",
+    "license": "MIT", "testStatus": "Package integrity and ELF architecture inspected; Android runtime not executed locally. Upstream builds API24 using locked Cargo dependencies and NDK 27.2.12479018."
+  },
+  {
+    "platform": "android", "arch": "x64", "version": "1.5.0",
+    "path": "package/bin/pi-env-android-x64/pi-env",
+    "sha256": "a92e69a369ef5c5a9267718c82991fa6dc37e7ae4f5a3b4df767a771819c22d0",
+    "backend": "upstream-rust", "sourceCommit": "f9a26365568127461c47a07a37dcb42c140a3ac5",
+    "license": "MIT", "testStatus": "Package integrity and ELF architecture inspected; Android runtime not executed locally. Upstream builds API24 using locked Cargo dependencies and NDK 27.2.12479018."
+  }
+]

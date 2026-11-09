@@ -7,7 +7,7 @@ function Assert-PiSharpNativeSdkPackage {
         [Parameter(Mandatory)][ValidateSet('PiSharp.Contracts','PiSharp.AI','PiSharp.Agent','PiSharp.Sessions','PiSharp.Tools','PiSharp.Tools.Skia','PiSharp.CodingAgent',
             'PiSharp.PromptTemplates.Yaml','PiSharp.Rpc','PiSharp.Tui','PiSharp.Extensions.Abstractions','PiSharp.Extensions.Runtime',
             'PiSharp.Extensions.Agent','PiSharp.ExtensionHost','PiSharp.Compatibility.Node','PiSharp.Codemode','PiSharp.Durable','PiSharp.Durable.Tools','PiSharp.Durable.Sqlite',
-            'PiSharp.CustomAgents','PiSharp.CustomAgents.JavaScript','PiSharp.CustomAgents.Scripting','PiSharp.Telemetry')][string]$PackageId,
+            'PiSharp.CustomAgents','PiSharp.CustomAgents.JavaScript','PiSharp.CustomAgents.Scripting','PiSharp.Telemetry','PiSharp.Chord','PiSharp.Chord.Hosting','PiSharp.Durable.Store','PiSharp.Env.Protocol','PiSharp.Env')][string]$PackageId,
         [Parameter(Mandatory)][string]$Version,
         [Parameter(Mandatory)][ValidatePattern('^[0-9a-f]{40}$')][string]$SourceCommit,
         [Parameter(Mandatory)][string]$Repo,
@@ -18,6 +18,8 @@ function Assert-PiSharpNativeSdkPackage {
     $files=Get-PiSharpArchiveInventory -Path $Package -AllowNodeBridge:$nodeBridge
     $assembly='lib/net10.0/'+$PackageId+'.dll'
     $required=@($assembly,($PackageId+'.nuspec'),'LICENSE','README.md','THIRD-PARTY-NOTICES.md','provenance.json','[Content_Types].xml','_rels/.rels')
+    $gapPackage=$PackageId-cin@('PiSharp.Chord','PiSharp.Chord.Hosting','PiSharp.Durable.Store','PiSharp.Env.Protocol','PiSharp.Env')
+    if($gapPackage){$required+='docs/gap-package-admission.md'}
     if($PackageId-ceq'PiSharp.PromptTemplates.Yaml'){$required+='licenses/YamlDotNet.LICENSE.txt'}
     if($PackageId-ceq'PiSharp.Tools.Skia'){$required+=@('licenses/SkiaSharp.LICENSE.txt','licenses/SkiaSharp.THIRD-PARTY-NOTICES.txt')}
     if($PackageId-ceq'PiSharp.Codemode'){$required+=@('licenses/Jint.LICENSE.txt','licenses/Jint.CREDITS.txt','licenses/Acornima.LICENSE.txt','licenses/Acornima.NOTICE.txt')}
@@ -33,6 +35,9 @@ function Assert-PiSharpNativeSdkPackage {
     if(@($files.Keys|Where-Object{$_-cmatch'^package/services/metadata/core-properties/'}).Count-ne1){throw 'Exactly one NuGet core-properties entry required.'}
     foreach($name in @('LICENSE','README.md','THIRD-PARTY-NOTICES.md')){
         if($files[$name].sha256-cne(Get-FileHash -LiteralPath (Join-Path $Repo $name) -Algorithm SHA256).Hash.ToLowerInvariant()){throw 'SDK source/license document differs.'}
+    }
+    if($gapPackage-and$files['docs/gap-package-admission.md'].sha256-cne(Get-FileHash -LiteralPath (Join-Path $Repo 'docs/contracts/gap-package-admission.md') -Algorithm SHA256).Hash.ToLowerInvariant()){
+        throw 'Package admission contract differs from source.'
     }
     if($files[$assembly].sha256-cne(Get-FileHash -LiteralPath $BuildAssembly -Algorithm SHA256).Hash.ToLowerInvariant()-or
        $files[$assembly].bytes-ne(Get-Item -LiteralPath $BuildAssembly).Length){throw 'SDK package assembly differs from admitted build.'}
@@ -62,6 +67,11 @@ function Assert-PiSharpNativeSdkPackage {
         'PiSharp.Contracts'=@();'PiSharp.Tui'=@()
         # Decision 0013 (experimental, from 1.5.0): pi-telemetry has no dependencies, and pi-ai depends on it.
         'PiSharp.Telemetry'=@()
+        'PiSharp.Chord'=@('PiSharp.Contracts','PiSharp.Telemetry','PiSharp.Tools')
+        'PiSharp.Chord.Hosting'=@('PiSharp.Chord','PiSharp.Tools')
+        'PiSharp.Durable.Store'=@('PiSharp.Durable','PiSharp.Chord','PiSharp.Durable.Sqlite')
+        'PiSharp.Env.Protocol'=@()
+        'PiSharp.Env'=@('PiSharp.Env.Protocol','PiSharp.Durable')
         'PiSharp.AI'=@('PiSharp.Contracts','PiSharp.Telemetry');'PiSharp.Sessions'=@('PiSharp.Contracts');'PiSharp.ExtensionHost'=@('PiSharp.Contracts')
         'PiSharp.Extensions.Abstractions'=@('PiSharp.Contracts');'PiSharp.Extensions.Runtime'=@('PiSharp.Extensions.Abstractions')
         'PiSharp.Agent'=@('PiSharp.Contracts','PiSharp.AI');'PiSharp.Tools'=@('PiSharp.Agent','PiSharp.Contracts')
@@ -77,6 +87,10 @@ function Assert-PiSharpNativeSdkPackage {
         'PiSharp.CustomAgents.JavaScript'=@('PiSharp.CustomAgents','PiSharp.Codemode','PiSharp.Durable.Tools')
         'PiSharp.CustomAgents.Scripting'=@('PiSharp.CustomAgents')
     }
+    $frameworks=@($meta.SelectNodes('*[local-name()="frameworkReferences"]/*[local-name()="group"]/*[local-name()="frameworkReference"]'))
+    if($PackageId-ceq'PiSharp.Chord.Hosting'){
+        if($frameworks.Count-ne1-or$frameworks[0].GetAttribute('name')-cne'Microsoft.AspNetCore.App'){throw 'Chord.Hosting requires exactly Microsoft.AspNetCore.App.'}
+    } elseif($frameworks.Count-ne0){throw 'Unexpected SDK framework reference.'}
     $external=@{}
     if($PackageId-ceq'PiSharp.PromptTemplates.Yaml'){$external['YamlDotNet']='16.3.0'}
     # The read tool's image codec (owner decision 0004): SkiaSharp and its native assets, pinned exactly.

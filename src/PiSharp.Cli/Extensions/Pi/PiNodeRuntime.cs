@@ -1,5 +1,5 @@
 // Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/src/core/extensions/loader.ts (getAliases: extensions resolve
-// Pi's own packages, and jiti loads them) and packages/coding-agent/package.json (the Pi 1.2.0 dependency set).
+// Pi's own packages, and jiti loads them) and packages/coding-agent/package.json (the Pi 1.5.0 dependency set).
 using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Nodes;
@@ -8,24 +8,26 @@ using PiSharp.Cli.Pi;
 namespace PiSharp.Cli.Extensions.Pi;
 
 /// <summary>
-/// The Pi packages extensions run against (owner decision, 2026-10-08): on first extension use the exact Pi 1.2.0 packages are
-/// installed with the user's npm into <c>&lt;agentDir&gt;/pisharp/pi-runtime/1.2.0</c> (or <c>PISHARP_PI_RUNTIME_DIR</c>), every
+/// The Pi packages extensions run against: on first extension use the exact Pi 1.5.0 packages are
+/// installed with the user's npm into a version/policy-isolated child of <c>&lt;agentDir&gt;/pisharp/pi-runtime</c>
+/// (or <c>PISHARP_PI_RUNTIME_DIR</c>), every
 /// installed package's lockfile integrity is checked against the npm registry's <c>dist.integrity</c>, and the result is recorded in
 /// <c>provenance.json</c>. The Node host then loads extensions with Pi's own jiti and aliases, as upstream's loader does. Offline
 /// (<c>PI_OFFLINE</c>) or without npm, PiSharp's built-in compatibility modules are the fallback, and the run says so.
-/// Pi 1.5.0 sync (bridge.undici-gondolin-advisories, owner decision 2026-11-05): the runtime stays on Pi 1.2.0's packages, since
-/// Pi 1.5.0's pi-agent-core attributes agent requests to Pi by default, and undici is overridden to <see cref="UndiciVersion"/>, the
-/// version Pi 1.5.0 moved to for its security advisories (Pi 1.2.0's pi-coding-agent pins 8.10.2).
+/// Upgrade authorized 2026-11-08: pi-modules.mjs suppresses default attribution on the actual shared agent-core module before
+/// extensions load. TypeBox/jiti identity stays native; explicit extension attribution is preserved. Older caches are never altered.
 /// </summary>
 internal static class PiNodeRuntime
 {
-    internal const string PiVersion = "1.2.0";
+    internal const string PiVersion = "1.5.0";
+    internal const string RuntimePolicy = "no-default-attribution-v1";
+    internal const string CacheVersion = PiVersion + "-" + RuntimePolicy;
     internal const string ProvenanceFile = "provenance.json";
-    /// <summary>Pi 1.5.0's packages/coding-agent/package.json undici, applied to the 1.2.0 runtime as an npm override.</summary>
+    /// <summary>Pi 1.5.0's packages/coding-agent/package.json undici, retained as an exact npm override.</summary>
     internal const string UndiciVersion = "8.12.3";
 
     /// <summary>The pinned set: the packages upstream's getAliases resolves for extensions, their loader (jiti) and, through overrides,
-    /// every @earendil-works package of the 1.2.0 release at exactly 1.2.0 (Pi 1.2.0 no longer depends on @earendil-works/chord) and
+    /// every @earendil-works package in the aliases at exactly 1.5.0 and
     /// undici at exactly <see cref="UndiciVersion"/>.</summary>
     internal static JsonObject PackageJson() => new()
     {
@@ -44,9 +46,9 @@ internal static class PiNodeRuntime
         }
     };
 
-    internal static string Directory(string agentDir, Func<string, string?> environment) =>
+    internal static string Directory(string agentDir, Func<string, string?> environment) => Path.Combine(
         environment("PISHARP_PI_RUNTIME_DIR") is { Length: > 0 } configured ? Path.GetFullPath(configured)
-            : Path.Combine(agentDir, "pisharp", "pi-runtime", PiVersion);
+            : Path.Combine(agentDir, "pisharp", "pi-runtime"), CacheVersion);
 
     /// <summary>The installed and verified <c>node_modules</c>, installing first when needed. Null with a reason when the run falls
     /// back to the built-in compatibility modules.</summary>
@@ -56,6 +58,8 @@ internal static class PiNodeRuntime
         var directory = Directory(agentDir, environment);
         var nodeModules = Path.Combine(directory, "node_modules");
         if (IsInstalled(directory)) return (nodeModules, null);
+        if (System.IO.Directory.Exists(directory))
+            return (null, "the unverified runtime cache was preserved for inspection: " + directory + "; extensions use PiSharp's built-in compatibility modules");
         if (PiCommand.IsTruthyEnvFlag(environment("PI_OFFLINE")))
             return (null, "offline (PI_OFFLINE): Pi " + PiVersion + " packages are not installed; extensions use PiSharp's built-in compatibility modules");
         processes ??= new() { Output = output, ErrorOutput = output };
@@ -77,11 +81,14 @@ internal static class PiNodeRuntime
             if (undici.Count == 0 || undici.Any(version => version != UndiciVersion))
                 throw new InvalidDataException($"undici resolved to {(undici.Count == 0 ? "nothing" : string.Join(", ", undici))}, not the pinned {UndiciVersion}");
             provenance["directory"] = directory;
+            provenance["policy"] = RuntimePolicy;
             provenance["node"] = Capture(processes, OperatingSystem.IsWindows() ? "node.exe" : "node");
             provenance["npm"] = Capture(processes, npm);
             await File.WriteAllTextAsync(Path.Combine(staging, ProvenanceFile), provenance.ToJsonString(Indented) + "\n", token).ConfigureAwait(false);
             System.IO.Directory.CreateDirectory(Path.GetDirectoryName(directory)!);
-            if (System.IO.Directory.Exists(directory) && !IsInstalled(directory)) System.IO.Directory.Delete(directory, true);
+            // Never delete an old/corrupt/custom cache. A failed upgrade leaves every existing runtime available for rollback.
+            if (System.IO.Directory.Exists(directory) && !IsInstalled(directory))
+                throw new InvalidDataException("the target runtime cache already exists and is not verified; it was preserved: " + directory);
             if (!System.IO.Directory.Exists(directory)) System.IO.Directory.Move(staging, directory);
             if (!IsInstalled(directory)) throw new InvalidDataException("the installed packages could not be moved into " + directory);
             var packages = provenance["packages"]!.AsArray().Count;
@@ -116,7 +123,7 @@ internal static class PiNodeRuntime
         {
             var provenance = Path.Combine(directory, ProvenanceFile); var manifest = Path.Combine(directory, "package.json");
             if (!File.Exists(provenance) || JsonNode.Parse(File.ReadAllText(provenance)) is not JsonObject record) return false;
-            return record["pi"]?.GetValue<string>() == PiVersion && record["verified"]?.GetValue<bool>() == true &&
+            return record["pi"]?.GetValue<string>() == PiVersion && record["policy"]?.GetValue<string>() == RuntimePolicy && record["verified"]?.GetValue<bool>() == true &&
                 File.Exists(manifest) && JsonNode.DeepEquals(JsonNode.Parse(File.ReadAllText(manifest)), PackageJson()) &&
                 File.Exists(Path.Combine(directory, "node_modules", "@earendil-works", "pi-coding-agent", "package.json"));
         }

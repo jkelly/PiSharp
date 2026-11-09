@@ -1,0 +1,110 @@
+[
+  {
+    "options": {
+      "TestTimeoutSeconds": 600,
+      "LockTimeoutSeconds": 30,
+      "Label": "Compatibility-r5",
+      "Project": "tests/PiSharp.Compatibility.Tests",
+      "Configuration": "Debug",
+      "SkipBuild": true,
+      "BuildTimeoutSeconds": 240
+    },
+    "environment": {}
+  },
+  {
+    "options": {
+      "TestTimeoutSeconds": 600,
+      "LockTimeoutSeconds": 30,
+      "Label": "Transport-r5",
+      "Project": "tests/PiSharp.Transport.Tests",
+      "Configuration": "Debug",
+      "SkipBuild": true,
+      "BuildTimeoutSeconds": 240
+    },
+    "environment": {}
+  },
+  {
+    "options": {
+      "TestTimeoutSeconds": 600,
+      "LockTimeoutSeconds": 30,
+      "Label": "R6-r5",
+      "Project": "tests/PiSharp.ResponsesTranscriptTools.Tests",
+      "Configuration": "Debug",
+      "SkipBuild": true,
+      "BuildTimeoutSeconds": 240
+    },
+    "environment": {}
+  },
+  {
+    "options": {
+      "TestTimeoutSeconds": 600,
+      "LockTimeoutSeconds": 30,
+      "Label": "Azure-r5",
+      "Project": "tests/PiSharp.AzureResponses.Tests",
+      "Configuration": "Debug",
+      "SkipBuild": true,
+      "BuildTimeoutSeconds": 240
+    },
+    "environment": {}
+  },
+  {
+    "options": {
+      "TestTimeoutSeconds": 600,
+      "LockTimeoutSeconds": 30,
+      "Label": "ProviderApis-r5",
+      "Project": "tests/PiSharp.ProviderApis.Tests",
+      "Configuration": "Debug",
+      "SkipBuild": true,
+      "BuildTimeoutSeconds": 240
+    },
+    "environment": {}
+  },
+  {
+    "options": {
+      "TestTimeoutSeconds": 600,
+      "LockTimeoutSeconds": 30,
+      "Label": "ProviderOffline-r5",
+      "Project": "tests/PiSharp.ProviderOfflineDifferential.Tests",
+      "Configuration": "Debug",
+      "SkipBuild": true,
+      "BuildTimeoutSeconds": 240
+    },
+    "environment": {}
+  },
+  {
+    "options": {
+      "TestTimeoutSeconds": 600,
+      "BuildTimeoutSeconds": 240,
+      "LockTimeoutSeconds": 30,
+      "Project": "tests/PiSharp.AnthropicThreads.Tests",
+      "Label": "Threads-r5",
+      "SkipBuild": true,
+      "Configuration": "Debug"
+    },
+    "environment": {}
+  },
+  {
+    "options": {
+      "TestTimeoutSeconds": 600,
+      "BuildTimeoutSeconds": 240,
+      "LockTimeoutSeconds": 30,
+      "Project": "tests/PiSharp.AnthropicSimple.Tests",
+      "Label": "AnthropicSimple-r5",
+      "SkipBuild": true,
+      "Configuration": "Debug"
+    },
+    "environment": {}
+  },
+  {
+    "options": {
+      "SkipBuild": true,
+      "Label": "Schema-r5",
+      "TestTimeoutSeconds": 300,
+      "Configuration": "Debug",
+      "BuildTimeoutSeconds": 240,
+      "Project": "tests/PiSharp.Schema.Tests",
+      "LockTimeoutSeconds": 30
+    },
+    "environment": {}
+  }
+]

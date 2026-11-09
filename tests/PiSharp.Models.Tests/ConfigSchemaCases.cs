@@ -14,7 +14,8 @@ internal static partial class Program
 {
     private static IEnumerable<(string, Func<Task>)> ConfigSchemaCases() =>
     [
-        ("schemas.published-files-embedded-byte-for-byte", Sync(SchemasEmbedded)),
+        ("schemas.published-baselines-and-reviewed-derivative-integrity", Sync(SchemasEmbedded)),
+        ("schemas.models-derivative-only-adds-reviewed-compatibility", Sync(ModelsSchemaDerivative)),
         ("schemas.representative-documents-and-limits", Sync(SchemasRepresentative)),
         ("schemas.settings-values-runtime-accessors-reject", Sync(SchemasSettingsRuntime)),
         ("settings.dollar-schema-accepted-and-unknown-settings-kept", SettingsDollarSchema),
@@ -38,12 +39,37 @@ internal static partial class Program
         Names(blobs.Keys, PiConfigurationSchemas.FileNames, "the four published schemas");
         foreach (var (name, blob) in blobs)
         {
-            Equal(blob, GitBlob(PiConfigurationSchemas.ReadBytes(name)), name);
+            // The current models schema is a reviewed derivative; retain the original byte claim on its frozen fixture.
+            var bytes = name == PiConfigurationSchemas.ModelsFileName ? UpstreamModelsSchemaBytes() : PiConfigurationSchemas.ReadBytes(name);
+            Equal(blob, GitBlob(bytes), name + " upstream baseline");
             Equal(PiConfigurationSchemas.Url(name), JsonNode.Parse(PiConfigurationSchemas.Read(name))!["$id"]!.GetValue<string>(), name + " $id");
         }
+        Equal("d523cdf5b7535b7f4601f19812635df9312376cafeda4e93f1a75c6b82df8c1c",
+            Convert.ToHexStringLower(SHA256.HashData(PiConfigurationSchemas.ReadBytes(PiConfigurationSchemas.ModelsFileName))), "current models schema derivative SHA256");
         // The built-in themes point at the published theme schema.
         foreach (var theme in new[] { "dark.json", "light.json" })
             Equal("https://pi.dev/schemas/theme.schema.json", JsonNode.Parse(Encoding.UTF8.GetString(SessionHtmlExport.ReadAssetBytes(theme)))!["$schema"]!.GetValue<string>(), theme);
+    }
+
+    private static byte[] UpstreamModelsSchemaBytes()
+    {
+        using var stream = typeof(Program).Assembly.GetManifestResourceStream("PiSharp.Models.Tests.UpstreamModelsSchema.json")
+            ?? throw new InvalidOperationException("The original upstream models schema fixture is missing.");
+        using var buffer = new MemoryStream(); stream.CopyTo(buffer); return buffer.ToArray();
+    }
+
+    private static void ModelsSchemaDerivative()
+    {
+        var expected = JsonNode.Parse(Encoding.UTF8.GetString(UpstreamModelsSchemaBytes()))!.AsObject();
+        var properties = expected["$defs"]!["ProviderCompat"]!["properties"]!.AsObject();
+        properties["requiresNonNullAssistantContent"] = JsonNode.Parse("""{"type":"boolean","description":"Whether replayed assistant messages without text send empty string content instead of null. Default: false."}""");
+        properties["requiresToolsWithToolHistory"] = JsonNode.Parse("""{"type":"boolean","description":"Whether requests without active tools send an empty tools array when history contains tool calls or results. Default: false."}""");
+        properties["promptCacheKeyMode"] = JsonNode.Parse("""{"type":"string","enum":["auto","enabled","disabled"],"description":"Controls prompt_cache_key. Auto uses the API-specific default, enabled sends it while caching is active, disabled omits it. Default: auto."}""");
+        Check(JsonNode.DeepEquals(expected, JsonNode.Parse(PiConfigurationSchemas.Read(PiConfigurationSchemas.ModelsFileName))), "only the three reviewed compatibility properties extend the upstream schema");
+        Check(PiConfigurationSchemas.Models.CheckJson("""{"providers":{"p":{"compat":{"requiresNonNullAssistantContent":true,"requiresToolsWithToolHistory":false,"promptCacheKeyMode":"enabled"}}}}"""), "native compatibility extensions accepted");
+        Check(!PiConfigurationSchemas.Models.CheckJson("""{"providers":{"p":{"compat":{"requiresNonNullAssistantContent":"yes"}}}}"""), "nonboolean content flag rejected");
+        Check(!PiConfigurationSchemas.Models.CheckJson("""{"providers":{"p":{"compat":{"requiresToolsWithToolHistory":1}}}}"""), "nonboolean tools flag rejected");
+        Check(!PiConfigurationSchemas.Models.CheckJson("""{"providers":{"p":{"compat":{"promptCacheKeyMode":"sometimes"}}}}"""), "unknown cache mode rejected");
     }
 
     private static void SchemasRepresentative()

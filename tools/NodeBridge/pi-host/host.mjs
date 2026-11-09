@@ -182,6 +182,8 @@ async function handle(method, params, id, progressWindow = 0) {
     case 'component.render': return runtime.renderComponent(params.id, params.width);
     case 'component.input': runtime.inputComponent(params.id, params.data); return null;
     case 'component.dispose': runtime.disposeComponent(params.id); return null;
+    case 'component.overlay.ready': runtime.readyOverlay(params.id); return null;
+    case 'component.overlay.visible': return runtime.overlayVisible(params.id, params.columns, params.rows);
     case 'component.method': return plain(runtime.callComponent(params.id, params.method, params.args)) ?? null;
     case 'editor.configure': runtime.configureEditor(params.keybindings, params.actions); return null;
     case 'editor.autocomplete': runtime.setEditorAutocomplete(params.id, params.token); return null;
@@ -266,7 +268,7 @@ async function handle(method, params, id, progressWindow = 0) {
     }
     case 'events.deliver': runtime.eventBus.deliver(params.channel, params.data); return null;
     case 'invalidate': runtime.invalidate(params.message); return null;
-    case 'shutdown': shuttingDown = true; setImmediate(() => port.postMessage({ kind: 'stop' })); return null;
+    case 'shutdown': shuttingDown = true; runtime?.invalidate(); setImmediate(() => port.postMessage({ kind: 'stop' })); return null;
     default: throw new Error(`Unsupported PiSharp Node host method: ${method}`);
   }
 }

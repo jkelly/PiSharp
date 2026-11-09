@@ -1,0 +1,559 @@
+{
+  "schemaVersion": 1,
+  "scope": "Actual local Windows execution only; overlapping selections are not summed.",
+  "checkout": "14dd34b369fba6d236684da6dfc8a39a03263321",
+  "dirty": true,
+  "suites": [
+    {
+      "suite": "Compatibility",
+      "label": "Compatibility-r6",
+      "actualSelectedCount": 236,
+      "result": "passed",
+      "recordedResult": "passed",
+      "buildExit": null,
+      "testExit": 0,
+      "source": {
+        "head": "14dd34b369fba6d236684da6dfc8a39a03263321",
+        "dirty": true,
+        "beforeSha256": "4e0ffbc5d16d19cc812ccf0a13ec30803ab178be868f3cbd2cd95ae375f1de02",
+        "manifest": "E:\\AI\\PiSharp\\gap-implementation\\artifacts\\gap-validation\\Compatibility-r6-4e12dcb4d07b40b7b95c727624ffea39\\source-before.json",
+        "afterSha256": "4e0ffbc5d16d19cc812ccf0a13ec30803ab178be868f3cbd2cd95ae375f1de02",
+        "changedDuringRun": false
+      },
+      "platform": {
+        "os": "Microsoft Windows 10.0.26300",
+        "architecture": "X64"
+      },
+      "sdk": {
+        "path": "E:/AI/PiSharp/PiSharp/artifacts/sample-tools/dotnet/dotnet.exe",
+        "launcherSha256": "21a46f1e5235cf4e844b9de5429f0e198b9c97a41f0503a66442f1d639ca3ee6",
+        "configuredVersion": "10.0.401"
+      },
+      "consoleSkipObservations": [],
+      "sourcePolicyDifferenceCount": 0,
+      "receipt": "E:\\AI\\PiSharp\\gap-implementation\\artifacts\\gap-validation\\Compatibility-r6-4e12dcb4d07b40b7b95c727624ffea39\\receipt.json"
+    },
+    {
+      "suite": "Transport",
+      "label": "Transport-r6",
+      "actualSelectedCount": 245,
+      "result": "passed",
+      "recordedResult": "passed",
+      "buildExit": null,
+      "testExit": 0,
+      "source": {
+        "head": "14dd34b369fba6d236684da6dfc8a39a03263321",
+        "dirty": true,
+        "beforeSha256": "c2e0e05e52501a45c58388481f2ea7029ecf88b3ae5687d3409043c36ff7e83c",
+        "manifest": "E:\\AI\\PiSharp\\gap-implementation\\artifacts\\gap-validation\\Transport-r6-2ea9d6722493412891f8941e5dda7b78\\source-before.json",
+        "afterSha256": "c2e0e05e52501a45c58388481f2ea7029ecf88b3ae5687d3409043c36ff7e83c",
+        "changedDuringRun": false
+      },
+      "platform": {
+        "os": "Microsoft Windows 10.0.26300",
+        "architecture": "X64"
+      },
+      "sdk": {
+        "path": "E:/AI/PiSharp/PiSharp/artifacts/sample-tools/dotnet/dotnet.exe",
+        "launcherSha256": "21a46f1e5235cf4e844b9de5429f0e198b9c97a41f0503a66442f1d639ca3ee6",
+        "configuredVersion": "10.0.401"
+      },
+      "consoleSkipObservations": [],
+      "sourcePolicyDifferenceCount": 0,
+      "receipt": "E:\\AI\\PiSharp\\gap-implementation\\artifacts\\gap-validation\\Transport-r6-2ea9d6722493412891f8941e5dda7b78\\receipt.json"
+    },
+    {
+      "suite": "Schema",
+      "label": "Schema-r6",
+      "actualSelectedCount": 34,
+      "result": "passed",
+      "recordedResult": "passed",
+      "buildExit": null,
+      "testExit": 0,
+      "source": {
+        "head": "14dd34b369fba6d236684da6dfc8a39a03263321",
+        "dirty": true,
+        "beforeSha256": "791d0a1c7e39b89f0aaafa91823b8da71095d9dc519205b11ef118f3f9d0e3c5",
+        "manifest": "E:\\AI\\PiSharp\\gap-implementation\\artifacts\\gap-validation\\Schema-r6-19e8e3d7201c49369686f0b412de2414\\source-before.json",
+        "afterSha256": "791d0a1c7e39b89f0aaafa91823b8da71095d9dc519205b11ef118f3f9d0e3c5",
+        "changedDuringRun": false
+      },
+      "platform": {
+        "os": "Microsoft Windows 10.0.26300",
+        "architecture": "X64"
+      },
+      "sdk": {
+        "path": "E:/AI/PiSharp/PiSharp/artifacts/sample-tools/dotnet/dotnet.exe",
+        "launcherSha256": "21a46f1e5235cf4e844b9de5429f0e198b9c97a41f0503a66442f1d639ca3ee6",
+        "configuredVersion": "10.0.401"
+      },
+      "consoleSkipObservations": [],
+      "sourcePolicyDifferenceCount": 0,
+      "receipt": "E:\\AI\\PiSharp\\gap-implementation\\artifacts\\gap-validation\\Schema-r6-19e8e3d7201c49369686f0b412de2414\\receipt.json"
+    },
+    {
+      "suite": "Anthropic threads",
+      "label": "Threads-r6",
+      "actualSelectedCount": 4,
+      "result": "passed",
+      "recordedResult": "passed",
+      "buildExit": null,
+      "testExit": 0,
+      "source": {
+        "head": "14dd34b369fba6d236684da6dfc8a39a03263321",
+        "dirty": true,
+        "beforeSha256": "9e91fa4d9dea867924ffb0259222d9f1dc34c24e62961d9f25db2f560b2d0056",
+        "manifest": "E:\\AI\\PiSharp\\gap-implementation\\artifacts\\gap-validation\\Threads-r6-b72ba3d2d7324ab185d50fc6467fa12a\\source-before.json",
+        "afterSha256": "9e91fa4d9dea867924ffb0259222d9f1dc34c24e62961d9f25db2f560b2d0056",
+        "changedDuringRun": false
+      },
+      "platform": {
+        "os": "Microsoft Windows 10.0.26300",
+        "architecture": "X64"
+      },
+      "sdk": {
+        "path": "E:/AI/PiSharp/PiSharp/artifacts/sample-tools/dotnet/dotnet.exe",
+        "launcherSha256": "21a46f1e5235cf4e844b9de5429f0e198b9c97a41f0503a66442f1d639ca3ee6",
+        "configuredVersion": "10.0.401"
+      },
+      "consoleSkipObservations": [],
+      "sourcePolicyDifferenceCount": 0,
+      "receipt": "E:\\AI\\PiSharp\\gap-implementation\\artifacts\\gap-validation\\Threads-r6-b72ba3d2d7324ab185d50fc6467fa12a\\receipt.json"
+    },
+    {
+      "suite": "Anthropic Simple",
+      "label": "AnthropicSimple-r6",
+      "actualSelectedCount": 13,
+      "result": "passed",
+      "recordedResult": "passed",
+      "buildExit": null,
+      "testExit": 0,
+      "source": {
+        "head": "14dd34b369fba6d236684da6dfc8a39a03263321",
+        "dirty": true,
+        "beforeSha256": "ffe06ec833c1ca58eba2e53cf6866014fbfd5b3949bd66ddccfe9db1e2b57606",
+        "manifest": "E:\\AI\\PiSharp\\gap-implementation\\artifacts\\gap-validation\\AnthropicSimple-r6-6c186ceda50e4160aa1008ea9bed222f\\source-before.json",
+        "afterSha256": "ffe06ec833c1ca58eba2e53cf6866014fbfd5b3949bd66ddccfe9db1e2b57606",
+        "changedDuringRun": false
+      },
+      "platform": {
+        "os": "Microsoft Windows 10.0.26300",
+        "architecture": "X64"
+      },
+      "sdk": {
+        "path": "E:/AI/PiSharp/PiSharp/artifacts/sample-tools/dotnet/dotnet.exe",
+        "launcherSha256": "21a46f1e5235cf4e844b9de5429f0e198b9c97a41f0503a66442f1d639ca3ee6",
+        "configuredVersion": "10.0.401"
+      },
+      "consoleSkipObservations": [],
+      "sourcePolicyDifferenceCount": 0,
+      "receipt": "E:\\AI\\PiSharp\\gap-implementation\\artifacts\\gap-validation\\AnthropicSimple-r6-6c186ceda50e4160aa1008ea9bed222f\\receipt.json"
+    },
+    {
+      "suite": "Responses transcript tools",
+      "label": "R6-r6",
+      "actualSelectedCount": 1,
+      "result": "passed",
+      "recordedResult": "passed",
+      "buildExit": null,
+      "testExit": 0,
+      "source": {
+        "head": "14dd34b369fba6d236684da6dfc8a39a03263321",
+        "dirty": true,
+        "beforeSha256": "d79beec053d828faf4c3d2392f2a2f0a8e4d9fd2aae0bfdcec94369336acce52",
+        "manifest": "E:\\AI\\PiSharp\\gap-implementation\\artifacts\\gap-validation\\R6-r6-778297faf92247f69bc2e63921eee62f\\source-before.json",
+        "afterSha256": "d79beec053d828faf4c3d2392f2a2f0a8e4d9fd2aae0bfdcec94369336acce52",
+        "changedDuringRun": false
+      },
+      "platform": {
+        "os": "Microsoft Windows 10.0.26300",
+        "architecture": "X64"
+      },
+      "sdk": {
+        "path": "E:/AI/PiSharp/PiSharp/artifacts/sample-tools/dotnet/dotnet.exe",
+        "launcherSha256": "21a46f1e5235cf4e844b9de5429f0e198b9c97a41f0503a66442f1d639ca3ee6",
+        "configuredVersion": "10.0.401"
+      },
+      "consoleSkipObservations": [],
+      "sourcePolicyDifferenceCount": 0,
+      "receipt": "E:\\AI\\PiSharp\\gap-implementation\\artifacts\\gap-validation\\R6-r6-778297faf92247f69bc2e63921eee62f\\receipt.json"
+    },
+    {
+      "suite": "Azure Responses",
+      "label": "Azure-r6",
+      "actualSelectedCount": 17,
+      "result": "passed",
+      "recordedResult": "passed",
+      "buildExit": null,
+      "testExit": 0,
+      "source": {
+        "head": "14dd34b369fba6d236684da6dfc8a39a03263321",
+        "dirty": true,
+        "beforeSha256": "b9120c11b72b547c4fdbc87618453045a16bae3471259bd936bed93d943e96e9",
+        "manifest": "E:\\AI\\PiSharp\\gap-implementation\\artifacts\\gap-validation\\Azure-r6-fd80912cb3b6469b98af4e3619bf4b23\\source-before.json",
+        "afterSha256": "b9120c11b72b547c4fdbc87618453045a16bae3471259bd936bed93d943e96e9",
+        "changedDuringRun": false
+      },
+      "platform": {
+        "os": "Microsoft Windows 10.0.26300",
+        "architecture": "X64"
+      },
+      "sdk": {
+        "path": "E:/AI/PiSharp/PiSharp/artifacts/sample-tools/dotnet/dotnet.exe",
+        "launcherSha256": "21a46f1e5235cf4e844b9de5429f0e198b9c97a41f0503a66442f1d639ca3ee6",
+        "configuredVersion": "10.0.401"
+      },
+      "consoleSkipObservations": [],
+      "sourcePolicyDifferenceCount": 0,
+      "receipt": "E:\\AI\\PiSharp\\gap-implementation\\artifacts\\gap-validation\\Azure-r6-fd80912cb3b6469b98af4e3619bf4b23\\receipt.json"
+    },
+    {
+      "suite": "Provider APIs",
+      "label": "ProviderApis-r6",
+      "actualSelectedCount": 60,
+      "result": "passed",
+      "recordedResult": "passed",
+      "buildExit": null,
+      "testExit": 0,
+      "source": {
+        "head": "14dd34b369fba6d236684da6dfc8a39a03263321",
+        "dirty": true,
+        "beforeSha256": "7e3123a73568f7bbdc7d311889f7de6f7195a4d6c8548653b8274601ca289a8e",
+        "manifest": "E:\\AI\\PiSharp\\gap-implementation\\artifacts\\gap-validation\\ProviderApis-r6-0ce5ada23e0b417981adf2add63ee8e1\\source-before.json",
+        "afterSha256": "7e3123a73568f7bbdc7d311889f7de6f7195a4d6c8548653b8274601ca289a8e",
+        "changedDuringRun": false
+      },
+      "platform": {
+        "os": "Microsoft Windows 10.0.26300",
+        "architecture": "X64"
+      },
+      "sdk": {
+        "path": "E:/AI/PiSharp/PiSharp/artifacts/sample-tools/dotnet/dotnet.exe",
+        "launcherSha256": "21a46f1e5235cf4e844b9de5429f0e198b9c97a41f0503a66442f1d639ca3ee6",
+        "configuredVersion": "10.0.401"
+      },
+      "consoleSkipObservations": [],
+      "sourcePolicyDifferenceCount": 0,
+      "receipt": "E:\\AI\\PiSharp\\gap-implementation\\artifacts\\gap-validation\\ProviderApis-r6-0ce5ada23e0b417981adf2add63ee8e1\\receipt.json"
+    },
+    {
+      "suite": "Offline provider contracts",
+      "label": "ProviderOffline-r6",
+      "actualSelectedCount": 30,
+      "result": "passed",
+      "recordedResult": "passed",
+      "buildExit": null,
+      "testExit": 0,
+      "source": {
+        "head": "14dd34b369fba6d236684da6dfc8a39a03263321",
+        "dirty": true,
+        "beforeSha256": "33f2da9b8fc92718523c47289dd342a7edeb4f2ce2c2d5ea4488413a82fbcf2e",
+        "manifest": "E:\\AI\\PiSharp\\gap-implementation\\artifacts\\gap-validation\\ProviderOffline-r6-54cfdf3d20f241ddae5408d2350a6f79\\source-before.json",
+        "afterSha256": "33f2da9b8fc92718523c47289dd342a7edeb4f2ce2c2d5ea4488413a82fbcf2e",
+        "changedDuringRun": false
+      },
+      "platform": {
+        "os": "Microsoft Windows 10.0.26300",
+        "architecture": "X64"
+      },
+      "sdk": {
+        "path": "E:/AI/PiSharp/PiSharp/artifacts/sample-tools/dotnet/dotnet.exe",
+        "launcherSha256": "21a46f1e5235cf4e844b9de5429f0e198b9c97a41f0503a66442f1d639ca3ee6",
+        "configuredVersion": "10.0.401"
+      },
+      "consoleSkipObservations": [],
+      "sourcePolicyDifferenceCount": 1,
+      "receipt": "E:\\AI\\PiSharp\\gap-implementation\\artifacts\\gap-validation\\ProviderOffline-r6-54cfdf3d20f241ddae5408d2350a6f79\\receipt.json"
+    },
+    {
+      "suite": "Full Chord",
+      "label": "Chord-full-final",
+      "actualSelectedCount": 875,
+      "result": "passed",
+      "recordedResult": "passed",
+      "buildExit": 0,
+      "testExit": 0,
+      "source": {
+        "head": "14dd34b369fba6d236684da6dfc8a39a03263321",
+        "dirty": true,
+        "beforeSha256": "7955626103d51f1cfbe18260bc71730db28dd66b258db5fbed9a732422af9a26",
+        "manifest": "E:\\AI\\PiSharp\\gap-implementation\\artifacts\\gap-validation\\Chord-full-final-4a8a84d4f26e4e3ca1465d9ee204b8ac\\source-before.json",
+        "afterSha256": "7955626103d51f1cfbe18260bc71730db28dd66b258db5fbed9a732422af9a26",
+        "changedDuringRun": false
+      },
+      "platform": {
+        "os": "Microsoft Windows 10.0.26300",
+        "architecture": "X64"
+      },
+      "sdk": {
+        "path": "E:/AI/PiSharp/PiSharp/artifacts/sample-tools/dotnet/dotnet.exe",
+        "launcherSha256": "21a46f1e5235cf4e844b9de5429f0e198b9c97a41f0503a66442f1d639ca3ee6",
+        "configuredVersion": "10.0.401"
+      },
+      "consoleSkipObservations": [],
+      "sourcePolicyDifferenceCount": 0,
+      "receipt": "E:\\AI\\PiSharp\\gap-implementation\\artifacts\\gap-validation\\Chord-full-final-4a8a84d4f26e4e3ca1465d9ee204b8ac\\receipt.json"
+    },
+    {
+      "suite": "Legacy cluster",
+      "label": "LG3-cluster-stable9",
+      "actualSelectedCount": 25,
+      "result": "passed",
+      "recordedResult": "passed",
+      "buildExit": 0,
+      "testExit": 0,
+      "source": {
+        "head": "14dd34b369fba6d236684da6dfc8a39a03263321",
+        "dirty": true,
+        "beforeSha256": "37365219656ead17ed7cdbcd3e44d6b3994ba34c73d90b51a3bcd8256822674d",
+        "manifest": "E:\\AI\\PiSharp\\gap-implementation\\artifacts\\gap-validation\\LG3-cluster-stable9-f9c36549f8cf4821ad5169b8602a0fb4\\source-before.json",
+        "afterSha256": "37365219656ead17ed7cdbcd3e44d6b3994ba34c73d90b51a3bcd8256822674d",
+        "changedDuringRun": false
+      },
+      "platform": {
+        "os": "Microsoft Windows 10.0.26300",
+        "architecture": "X64"
+      },
+      "sdk": {
+        "path": "E:/AI/PiSharp/PiSharp/artifacts/sample-tools/dotnet/dotnet.exe",
+        "launcherSha256": "21a46f1e5235cf4e844b9de5429f0e198b9c97a41f0503a66442f1d639ca3ee6",
+        "configuredVersion": "10.0.401"
+      },
+      "consoleSkipObservations": [],
+      "sourcePolicyDifferenceCount": 0,
+      "receipt": "E:\\AI\\PiSharp\\gap-implementation\\artifacts\\gap-validation\\LG3-cluster-stable9-f9c36549f8cf4821ad5169b8602a0fb4\\receipt.json"
+    },
+    {
+      "suite": "Hosting",
+      "label": "N1-hosting-final",
+      "actualSelectedCount": 14,
+      "result": "passed-with-source-change",
+      "recordedResult": "passed-with-source-change",
+      "buildExit": 0,
+      "testExit": 0,
+      "source": {
+        "head": "14dd34b369fba6d236684da6dfc8a39a03263321",
+        "dirty": true,
+        "beforeSha256": "00221bd29fd97454bda2ada2a1a6324d82872fcefd0450838ecfacd4b4f05e3b",
+        "manifest": "E:\\AI\\PiSharp\\gap-implementation\\artifacts\\gap-validation\\N1-hosting-final-d2cadb7125d44a72a940241579dfc5b6\\source-before.json",
+        "afterSha256": "2695e49de6dff14ca576708fb00f60ca1f1bd1816f47b96b47910cd519c66744",
+        "changedDuringRun": true
+      },
+      "platform": {
+        "os": "Microsoft Windows 10.0.26300",
+        "architecture": "X64"
+      },
+      "sdk": {
+        "path": "E:/AI/PiSharp/PiSharp/artifacts/sample-tools/dotnet/dotnet.exe",
+        "launcherSha256": "21a46f1e5235cf4e844b9de5429f0e198b9c97a41f0503a66442f1d639ca3ee6",
+        "configuredVersion": "10.0.401"
+      },
+      "consoleSkipObservations": [],
+      "sourcePolicyDifferenceCount": 0,
+      "receipt": "E:\\AI\\PiSharp\\gap-implementation\\artifacts\\gap-validation\\N1-hosting-final-d2cadb7125d44a72a940241579dfc5b6\\receipt.json"
+    },
+    {
+      "suite": "RPC",
+      "label": "RPC-full-stable9",
+      "actualSelectedCount": 137,
+      "result": "passed",
+      "recordedResult": "passed",
+      "buildExit": 0,
+      "testExit": 0,
+      "source": {
+        "head": "14dd34b369fba6d236684da6dfc8a39a03263321",
+        "dirty": true,
+        "beforeSha256": "aeb1865f718e04d56e87e63a18d10c0cb7c8ca7daeb69bb43b9318f61a1a331e",
+        "manifest": "E:\\AI\\PiSharp\\gap-implementation\\artifacts\\gap-validation\\RPC-full-stable9-e5a55633711a4e34b7bf8fa0d66495c2\\source-before.json",
+        "afterSha256": "aeb1865f718e04d56e87e63a18d10c0cb7c8ca7daeb69bb43b9318f61a1a331e",
+        "changedDuringRun": false
+      },
+      "platform": {
+        "os": "Microsoft Windows 10.0.26300",
+        "architecture": "X64"
+      },
+      "sdk": {
+        "path": "E:/AI/PiSharp/PiSharp/artifacts/sample-tools/dotnet/dotnet.exe",
+        "launcherSha256": "21a46f1e5235cf4e844b9de5429f0e198b9c97a41f0503a66442f1d639ca3ee6",
+        "configuredVersion": "10.0.401"
+      },
+      "consoleSkipObservations": [],
+      "sourcePolicyDifferenceCount": 0,
+      "receipt": "E:\\AI\\PiSharp\\gap-implementation\\artifacts\\gap-validation\\RPC-full-stable9-e5a55633711a4e34b7bf8fa0d66495c2\\receipt.json"
+    },
+    {
+      "suite": "Settings forwarding",
+      "label": "I11-host-stable9",
+      "actualSelectedCount": 2,
+      "result": "passed-with-source-change",
+      "recordedResult": "passed-with-source-change",
+      "buildExit": 0,
+      "testExit": 0,
+      "source": {
+        "head": "14dd34b369fba6d236684da6dfc8a39a03263321",
+        "dirty": true,
+        "beforeSha256": "cb437fe710eda958866d63d461568b1b797b91fc72cecfebaf94e0167939f1b5",
+        "manifest": "E:\\AI\\PiSharp\\gap-implementation\\artifacts\\gap-validation\\I11-host-stable9-83a5cf54d3e84d98862526e557ce8cdf\\source-before.json",
+        "afterSha256": "919de265304a7d89e976490b3f577df7d275c6e7c10b15df8332d1d6cd546748",
+        "changedDuringRun": true
+      },
+      "platform": {
+        "os": "Microsoft Windows 10.0.26300",
+        "architecture": "X64"
+      },
+      "sdk": {
+        "path": "E:/AI/PiSharp/PiSharp/artifacts/sample-tools/dotnet/dotnet.exe",
+        "launcherSha256": "21a46f1e5235cf4e844b9de5429f0e198b9c97a41f0503a66442f1d639ca3ee6",
+        "configuredVersion": "10.0.401"
+      },
+      "consoleSkipObservations": [],
+      "sourcePolicyDifferenceCount": 0,
+      "receipt": "E:\\AI\\PiSharp\\gap-implementation\\artifacts\\gap-validation\\I11-host-stable9-83a5cf54d3e84d98862526e557ce8cdf\\receipt.json"
+    },
+    {
+      "suite": "Compaction/model mapping",
+      "label": "I17-existing-compaction-stable9",
+      "actualSelectedCount": 16,
+      "result": "passed-with-source-change",
+      "recordedResult": "passed-with-source-change",
+      "buildExit": 0,
+      "testExit": 0,
+      "source": {
+        "head": "14dd34b369fba6d236684da6dfc8a39a03263321",
+        "dirty": true,
+        "beforeSha256": "8f0c93c9418235cdbc51a54b7df3cc243813f953363083161e0b3509da0d7e11",
+        "manifest": "E:\\AI\\PiSharp\\gap-implementation\\artifacts\\gap-validation\\I17-existing-compaction-stable9-e6aa5fb685624437a93f8c471b467ae1\\source-before.json",
+        "afterSha256": "11a6d68996cde940e1ec30e167bb98ec67120b087786567a6896535ec9916a17",
+        "changedDuringRun": true
+      },
+      "platform": {
+        "os": "Microsoft Windows 10.0.26300",
+        "architecture": "X64"
+      },
+      "sdk": {
+        "path": "E:/AI/PiSharp/PiSharp/artifacts/sample-tools/dotnet/dotnet.exe",
+        "launcherSha256": "21a46f1e5235cf4e844b9de5429f0e198b9c97a41f0503a66442f1d639ca3ee6",
+        "configuredVersion": "10.0.401"
+      },
+      "consoleSkipObservations": [],
+      "sourcePolicyDifferenceCount": 0,
+      "receipt": "E:\\AI\\PiSharp\\gap-implementation\\artifacts\\gap-validation\\I17-existing-compaction-stable9-e6aa5fb685624437a93f8c471b467ae1\\receipt.json"
+    },
+    {
+      "suite": "Overlay",
+      "label": "Overlay-final",
+      "actualSelectedCount": 5,
+      "result": "passed",
+      "recordedResult": "passed",
+      "buildExit": null,
+      "testExit": 0,
+      "source": {
+        "head": "14dd34b369fba6d236684da6dfc8a39a03263321",
+        "dirty": true,
+        "beforeSha256": "4c4dc4285a317e9898b63fc0d5bc94fab23103c07f5ddd9781cc2d8df167dd72",
+        "manifest": "E:\\AI\\PiSharp\\gap-implementation\\artifacts\\gap-validation\\Overlay-final-79ef8611b5cb4627b90ef40aee68a4ae\\source-before.json",
+        "afterSha256": "4c4dc4285a317e9898b63fc0d5bc94fab23103c07f5ddd9781cc2d8df167dd72",
+        "changedDuringRun": false
+      },
+      "platform": {
+        "os": "Microsoft Windows 10.0.26300",
+        "architecture": "X64"
+      },
+      "sdk": {
+        "path": "E:/AI/PiSharp/PiSharp/artifacts/sample-tools/dotnet/dotnet.exe",
+        "launcherSha256": "21a46f1e5235cf4e844b9de5429f0e198b9c97a41f0503a66442f1d639ca3ee6",
+        "configuredVersion": "10.0.401"
+      },
+      "consoleSkipObservations": [],
+      "sourcePolicyDifferenceCount": 0,
+      "receipt": "E:\\AI\\PiSharp\\gap-implementation\\artifacts\\gap-validation\\Overlay-final-79ef8611b5cb4627b90ef40aee68a4ae\\receipt.json"
+    },
+    {
+      "suite": "Tools",
+      "label": "Tools-full-stable6",
+      "actualSelectedCount": 164,
+      "result": "passed-with-console-skips",
+      "recordedResult": "passed-with-console-skips",
+      "buildExit": 0,
+      "testExit": 0,
+      "source": {
+        "head": "14dd34b369fba6d236684da6dfc8a39a03263321",
+        "dirty": true,
+        "beforeSha256": "2e5e7d14f1c9a709405ae34457c0ad0bc2f0855243a95d7a8d8295ac04cb7c27",
+        "manifest": "E:\\AI\\PiSharp\\gap-implementation\\artifacts\\gap-validation\\Tools-full-stable6-6cd3dfd0de344aff8bc696ee6b642443\\source-before.json",
+        "afterSha256": "bfa87a46999eebc31ac1735c74c45a80675d167df618c3905781d7e44c23a866",
+        "changedDuringRun": true
+      },
+      "platform": {
+        "os": "Microsoft Windows 10.0.26300",
+        "architecture": "X64"
+      },
+      "sdk": {
+        "path": "E:/AI/PiSharp/PiSharp/artifacts/sample-tools/dotnet/dotnet.exe",
+        "launcherSha256": "21a46f1e5235cf4e844b9de5429f0e198b9c97a41f0503a66442f1d639ca3ee6",
+        "configuredVersion": "10.0.401"
+      },
+      "consoleSkipObservations": [
+        "INFO symlink fixture unavailable: IOException"
+      ],
+      "sourcePolicyDifferenceCount": 0,
+      "receipt": "E:\\AI\\PiSharp\\gap-implementation\\artifacts\\gap-validation\\Tools-full-stable6-6cd3dfd0de344aff8bc696ee6b642443\\receipt.json"
+    },
+    {
+      "suite": "Production installer",
+      "label": "runtime-installer-local",
+      "actualSelectedCount": 1,
+      "result": "passed-with-source-change",
+      "recordedResult": "passed-with-source-change",
+      "buildExit": 0,
+      "testExit": 0,
+      "source": {
+        "head": "14dd34b369fba6d236684da6dfc8a39a03263321",
+        "dirty": true,
+        "beforeSha256": "d3d2dfec493a5de800a990bd833e779b7aaf095b5c830b6aaa79437f9b5a37d0",
+        "manifest": "E:\\AI\\PiSharp\\gap-implementation\\artifacts\\gap-validation\\runtime-installer-local-333e21e351be480abb18775e1299e916\\source-before.json",
+        "afterSha256": "ab8593cd642cbdb8d20adac69b793959f6d891311bc920b87f09be0a2ad69020",
+        "changedDuringRun": true
+      },
+      "platform": {
+        "os": "Microsoft Windows 10.0.26300",
+        "architecture": "X64"
+      },
+      "sdk": {
+        "path": "E:/AI/PiSharp/PiSharp/artifacts/sample-tools/dotnet/dotnet.exe",
+        "launcherSha256": "21a46f1e5235cf4e844b9de5429f0e198b9c97a41f0503a66442f1d639ca3ee6",
+        "configuredVersion": "10.0.401"
+      },
+      "consoleSkipObservations": [],
+      "sourcePolicyDifferenceCount": 0,
+      "receipt": "E:\\AI\\PiSharp\\gap-implementation\\artifacts\\gap-validation\\runtime-installer-local-333e21e351be480abb18775e1299e916\\receipt.json"
+    }
+  ],
+  "native": {
+    "receipt": "artifacts/gap-validation/NativeAOT-release-final-d7bc09f1dd10420cb432aae5324ab090/receipt.json",
+    "manifest": "artifacts/env-native-local-validation-r8/evidence/manifest.json",
+    "result": "passed-with-RID-lock-only-source-change",
+    "actualSmokeChecks": 9,
+    "binarySha256": "25c85ef42b715051196bd90780b2b52ea197f615facb61802a91ef4380190c87",
+    "platform": "Windows x64"
+  },
+  "releasePackages": {
+    "receipt": "artifacts/package-consumer-final-887432f2333b42819b937a8359517be7/receipt.json",
+    "result": "passed",
+    "normalReleasePackagesBuiltAndValidated": 29,
+    "packageOnlyConsumerAdmissions": 5,
+    "sourceBeforeAfterSha256": "1b14874943524f66b87ece8e0cfaa79e7f59b520dfaafc4b2632fd9f9d75e05c",
+    "publicationAccepted": false
+  },
+  "measurements": "AI_DOCS/validation-measurements.json",
+  "sourceQualifications": "AI_DOCS/validation-source-qualifications.json",
+  "hostedExecuted": false,
+  "unqualified": [
+    "Unavailable Windows symlink branch",
+    "Linux/macOS native execution",
+    "Physical macOS modifier input",
+    "Separate native source admission",
+    "Publication"
+  ],
+  "requiredLocalFailures": []
+}

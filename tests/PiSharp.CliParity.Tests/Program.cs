@@ -36,6 +36,7 @@ internal static partial class Program
         cases.AddRange(ToolsManagerCases());
         cases.AddRange(UnixProcessCases());
         cases.AddRange(GapCases());
+        cases.AddRange(LifecycleGapCases());
         cases.AddRange(JsonSyntaxCases());
         cases.AddRange(PromptAuthCases());
         cases.AddRange(ValidationCases());

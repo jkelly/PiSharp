@@ -80,6 +80,7 @@ public static partial class NativeProviderFactory
     {
         var endpoint = new Uri(baseUrl);
         ValidateCatalog(model, endpoint, explicitApiKey, "anthropic-messages", modelMetadata);
+        projectionOptions = AnthropicCatalogCompatibility.Apply(projectionOptions, modelMetadata);
         if (model.Provider is "anthropic" or "github-copilot") throw new ArgumentException("Unsupported native model or endpoint selection.");
         var maximum = requestOptions.MaxTokens ?? projectionOptions.MaximumTokens;
         if (maximum != Math.Truncate(maximum) || maximum is <= 0 or > int.MaxValue) throw new ArgumentException("Unsupported native thinking token cap.");
@@ -127,7 +128,7 @@ public static partial class NativeProviderFactory
         var direct = directOptions with { ApiKey = explicitApiKey };
         var levels = CatalogThinkingLevels(modelMetadata);
         return Bind(model, handler, client => new NativeThinkingTransport(model, levels, level =>
-            new GoogleSimpleRequestFactory(client, model, new GoogleSimpleOptions(direct, level is null or "off" ? null : level))));
+            new GoogleSimpleRequestFactory(client, model, new GoogleSimpleOptions(direct, level is null or "off" ? null : level) { ThinkingBudgets = direct.ThinkingBudgets })));
     }
 
     /// <summary>pi-messages streamSimple for a catalog model (Radius and models.json pi-messages providers).</summary>

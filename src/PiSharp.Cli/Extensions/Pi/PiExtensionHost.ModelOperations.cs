@@ -54,6 +54,9 @@ internal sealed class PiNativeModelProviders : IExtensionModelOperationProviderH
 
 internal sealed partial class PiExtensionHost
 {
+    /// <summary>Reloads the run's models.json snapshot before a fresh extension generation observes its registry.</summary>
+    internal Func<CancellationToken, Task>? RefreshModelOperations { get; set; }
+
     /// <summary>The native extensions' classifier and image providers (every generation of the run registers here).</summary>
     internal PiNativeModelProviders NativeModelProviders { get; } = new();
 

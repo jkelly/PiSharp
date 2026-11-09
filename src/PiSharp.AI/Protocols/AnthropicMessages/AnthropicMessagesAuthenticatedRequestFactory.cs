@@ -16,6 +16,8 @@ public sealed class AnthropicMessagesAuthenticatedRequestFactory
     private readonly ModelDescriptor _model;
     private readonly AnthropicMessagesKeyAuthRequestOptions _options;
     private readonly AnthropicMessagesRequestProjector _projector;
+    private readonly AnthropicMessagesRequestOptions _threadProjection;
+    private readonly bool _automaticThreadBeta;
     private readonly ImmutableArray<KeyValuePair<string, string?>> _headers;
     private readonly AnthropicInjectedAuthenticationBinding _authentication;
 
@@ -91,15 +93,19 @@ public sealed class AnthropicMessagesAuthenticatedRequestFactory
                     .Distinct(StringComparer.Ordinal).ToImmutableArray();
         foreach (var header in configured) merged[header.Key] = header.Value;
         _headers = merged.ToImmutableArray();
+        _automaticThreadBeta = betaFeatures.IsDefault;
         try
         {
-            _projector = new(projectionOptions with
+            // Replay the response with the same effective options as the outgoing request, including
+            // OAuth tool-name conversion selected by authentication rather than the caller's defaults.
+            _threadProjection = projectionOptions with
             {
                 BetaFeatures = betaFeatures, OAuthProjection = authentication.UseOAuthProjection,
                 MaximumOutputBytes = Math.Min(projectionOptions.MaximumOutputBytes, _options.MaximumPayloadBytes),
                 MaximumOutputCharacters = Math.Min(projectionOptions.MaximumOutputCharacters, _options.MaximumPayloadBytes),
                 MaximumJsonDepth = Math.Min(projectionOptions.MaximumJsonDepth, _options.MaximumPayloadDepth)
-            });
+            };
+            _projector = new(_threadProjection);
         }
         catch (ArgumentException) { throw Fail(AnthropicMessagesKeyAuthRequestFailure.InvalidConfiguration); }
     }
@@ -145,15 +151,19 @@ public sealed class AnthropicMessagesAuthenticatedRequestFactory
         if (request is null || request.Model != _model) throw Fail(AnthropicMessagesKeyAuthRequestFailure.InvalidRequest);
         var details = prepared is null ? _projector.ProjectWithDetails(request, cancellationToken) : null;
         var projected = prepared ?? details!.Payload;
+        var threadSession = _options.SessionId ?? request.SessionId;
+        var threadEligible = AnthropicThreadContext.Eligible(_threadProjection, _model, _endpoint, threadSession);
+        if (threadEligible && _automaticThreadBeta) projected = AnthropicThreadContext.WithBeta(projected);
         CheckDepth(projected.Value, 0, cancellationToken);
         var headers = PreparedHeaders(projected);
         // Count the exact compact raw representation before allocating UTF-8 or acquiring an HTTP request/content.
         long bytes = 2; var fields = 0;
+        var utf16Root = projected.Value.EnumerateObject().Any(property => !JsonUtf16.IsWellFormed(JsonUtf16.GetName(property)));
         foreach (var property in projected.Value.EnumerateObject())
         {
-            if (property.Name == "betas") continue;
+            var name = JsonUtf16.GetName(property); if (name == "betas") continue;
             var raw = prepared is null ? Raw(property) : property.Value.GetRawText();
-            bytes += Encoding.UTF8.GetByteCount(JsonSerializer.Serialize(property.Name)) + 1L + Encoding.UTF8.GetByteCount(raw) + (fields++ == 0 ? 0 : 1);
+            bytes += Encoding.UTF8.GetByteCount(utf16Root ? JsonUtf16.Quote(name) : JsonSerializer.Serialize(name)) + 1L + Encoding.UTF8.GetByteCount(raw) + (fields++ == 0 ? 0 : 1);
             if (bytes > _options.MaximumPayloadBytes) throw Fail(AnthropicMessagesKeyAuthRequestFailure.ResourceLimit);
         }
         var tierFields = AnthropicServiceTier.Fields(_options, projected.Value).ToList();
@@ -163,15 +173,19 @@ public sealed class AnthropicMessagesAuthenticatedRequestFactory
         using var buffer = new MemoryStream((int)bytes);
         using (var writer = new Utf8JsonWriter(buffer))
         {
+            if (!AnthropicMessagesPreparedRequest.WriteUtf16Root(writer, projected,
+                property => prepared is null ? Raw(property) : property.Value.GetRawText(), tierFields, true, cancellationToken))
+            {
             writer.WriteStartObject();
             foreach (var property in projected.Value.EnumerateObject())
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                if (property.Name == "betas") continue;
-                writer.WritePropertyName(property.Name); writer.WriteRawValue(prepared is null ? Raw(property) : property.Value.GetRawText(), skipInputValidation: true);
+                var name = JsonUtf16.GetName(property); if (name == "betas") continue;
+                writer.WritePropertyName(name); writer.WriteRawValue(prepared is null ? Raw(property) : property.Value.GetRawText(), skipInputValidation: true);
             }
             foreach (var (name, value) in tierFields) writer.WriteString(name, value);
             writer.WriteEndObject();
+            }
         }
         if (buffer.Length > _options.MaximumPayloadBytes) throw Fail(AnthropicMessagesKeyAuthRequestFailure.ResourceLimit);
         cancellationToken.ThrowIfCancellationRequested();
@@ -185,6 +199,14 @@ public sealed class AnthropicMessagesAuthenticatedRequestFactory
                 else if (!result.Headers.TryAddWithoutValidation(pair.Key, pair.Value)) throw Fail(AnthropicMessagesKeyAuthRequestFailure.UnsupportedOptions);
             if (details?.HasPreferredStrictTools == true)
                 result.Options.Set(AnthropicStrictToolsFallback.RequestKey, token => WithoutPreferredStrict().CreateCore(request, token, null));
+            if (threadEligible && !request.DisableContinuation)
+            {
+                var full = AnthropicThreadJson.Parse(Encoding.UTF8.GetString(buffer.ToArray())).AsObject();
+                if (projected.Value.TryGetUtf16Property("betas", out var betas)) full["betas"] = AnthropicThreadJson.Parse(betas.GetRawText());
+                result.Options.Set(AnthropicThreadContext.RequestKey, new(_options.ThreadStore ?? AnthropicMessageThreadStore.Shared,
+                    threadSession!, _model, _endpoint.AbsoluteUri, JsonData.Parse(AnthropicThreadJson.Serialize(full)), _threadProjection,
+                    (payload, token) => CreateCore(request, token, payload)));
+            }
             cancellationToken.ThrowIfCancellationRequested(); return result;
         }
         catch (AnthropicMessagesKeyAuthRequestException) { result?.Dispose(); content?.Dispose(); throw; }
@@ -207,7 +229,7 @@ public sealed class AnthropicMessagesAuthenticatedRequestFactory
                 headers[pair.Key] = value;
             }
         headers["content-type"] = "application/json"; // SDK's JSON encoder body headers override client defaults.
-        if (projected.Value.TryGetProperty("betas", out var betas))
+        if (projected.Value.TryGetUtf16Property("betas", out var betas))
             headers["anthropic-beta"] = string.Join(',', betas.EnumerateArray().Select(value => value.GetString()));
         AnthropicServiceTier.AddBeta(headers, _options);
         if (Federation is null && !(headers.TryGetValue("x-api-key", out var admittedKey) && admittedKey.Length != 0) &&
@@ -216,7 +238,7 @@ public sealed class AnthropicMessagesAuthenticatedRequestFactory
         CheckHeaders(headers);
         return headers;
     }
-    private string Raw(JsonProperty property) => property.Name == "max_tokens" && _options.MaxTokens is { } count
+    private string Raw(JsonProperty property) => JsonUtf16.GetName(property) == "max_tokens" && _options.MaxTokens is { } count
         ? Number(count) : property.Value.GetRawText();
     // Same bounded finite-double representation as the accepted transcript projector. Full shortest-digit ECMAScript qualification remains open.
     private static string Number(double value)

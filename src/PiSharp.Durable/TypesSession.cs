@@ -584,6 +584,9 @@ public interface ITx
     Task<TypedEntry<TData>?> GetEntryAsync<TData>(Entry<TData> token, EntryId id) where TData : JsonValue;
     /// <summary>The committed task.</summary>
     Task<TaskRecord?> GetTaskAsync(TaskId id);
+    /// <summary>The committed submission. Rejects after a table write or once this transaction settles. The default preserves
+    /// source compatibility for external transaction implementations, which must override it to support this read.</summary>
+    Task<SubmissionRecord?> GetSubmissionAsync(SubmissionId id) => throw new NotSupportedException("Submission lookup is not implemented by this transaction.");
     /// <summary>Scans conversations with the caller's limit and cursor.</summary>
     Task<Page<ConversationRecord>> ScanConversationsAsync(ConversationQuery query, int limit, JsonObjectValue? cursor = null);
     /// <summary>Scans a conversation's visible entries with the caller's limit and cursor.</summary>

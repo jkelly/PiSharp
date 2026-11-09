@@ -170,6 +170,10 @@ internal static class BashToolTests
             runner.Next = (_, _, _) => ValueTask.FromResult(Result("", status, null));
             Equal(expected, (await tool.ExecuteAsync(action, default)).Content.Single().Text);
         }
+        runner.Next = (_, _, _) => ValueTask.FromResult(Result("background output", ProcessRunStatus.TimedOut, 7) with
+            { ShellExitBeforeTimeout = new(7, 0.03) });
+        Equal("background output\n\nCommand timed out after 0.1 seconds. The shell exited with code 7 after 0.03 seconds, but background processes it started kept writing output until the timeout.",
+            (await tool.ExecuteAsync(action, default)).Content.Single().Text);
         runner.Next = (_, _, _) => ValueTask.FromResult(Result("", ProcessRunStatus.Exited, null) with { CleanupConfirmed = false });
         Equal("Command execution failed.", (await tool.ExecuteAsync(action, default)).Content.Single().Text);
         foreach (var (status, expected) in new[]

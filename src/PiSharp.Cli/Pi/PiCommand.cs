@@ -30,7 +30,7 @@ internal sealed record PiHost
     internal required string Home { get; init; }
     internal required Func<string, string?> GetEnvironment { get; init; }
     internal Action<string, string?> SetEnvironment { get; init; } = (_, _) => { };
-    /// <summary>Observes the RPC mode's background catalog refresh (tests wait for it).</summary>
+    /// <summary>Observes the RPC mode's owned background catalog refresh.</summary>
     internal Action<Task>? CatalogRefreshStarted { get; init; }
     internal required TextWriter Stdout { get; init; }
     internal required TextWriter Stderr { get; init; }
@@ -53,6 +53,9 @@ internal sealed record PiHost
     /// <summary>Extensions loaded before project trust is resolved (IMPL-E: user and CLI extensions); their project_trust and
     /// resources_discover handlers take part in the run. Null without extensions.</summary>
     internal Func<string, CancellationToken, Task<PiLoadedExtensions?>>? LoadExtensions { get; init; }
+    /// <summary>Programmatic runtime collaborators for embedded hosts; null retains the normal verified installer.</summary>
+    internal string? PiModules { get; init; }
+    internal bool UseCompatibilityModules { get; init; }
     /// <summary>The non-interactive hosts' termination signals (print, JSON and RPC modes): null in tests and interactive mode.</summary>
     internal Func<ShutdownSignals>? Signals { get; init; }
     /// <summary>The HTTP handler and base URL of rg/fd release downloads (tools-manager.ts; a fake release server in tests).</summary>
@@ -575,16 +578,26 @@ internal static class PiCommand
             {
                 // main.ts: RPC refreshes the model catalogs in the background (15 s, errors ignored) unless offline; interactive mode
                 // starts its own refresh after the TUI is up.
-                if (!offline) { var refresh = RefreshCatalogsInBackground(runtime); host.CatalogRefreshStarted?.Invoke(refresh); }
-                var input = host.OpenRpcInput?.Invoke() ?? throw new InvalidOperationException("RPC standard input is unavailable.");
-                var output = host.OpenRpcOutput?.Invoke() ?? throw new InvalidOperationException("RPC standard output is unavailable.");
-                await using (input.ConfigureAwait(false))
+                var refresh = offline ? Task.CompletedTask : RefreshCatalogsInBackground(runtime);
+                var code = 1;
+                try
                 {
-                    var code = await RpcSessionCommand.RunWithPresentationAsync(["session", "rpc", .. sessionArgs], input, output, err, null!, runToken,
-                        userShutdown: userShutdown, mcpHost: mcpHost, javaScriptInput: true).ConfigureAwait(false);
-                    if (settingsWriter is not null) await settingsWriter.FlushAsync().ConfigureAwait(false);
-                    return signals?.Exit(code) ?? code;
+                    if (!offline) host.CatalogRefreshStarted?.Invoke(refresh);
+                    var input = host.OpenRpcInput?.Invoke() ?? throw new InvalidOperationException("RPC standard input is unavailable.");
+                    await using (input.ConfigureAwait(false))
+                    {
+                        var output = host.OpenRpcOutput?.Invoke() ?? throw new InvalidOperationException("RPC standard output is unavailable.");
+                        code = await RpcSessionCommand.RunWithPresentationAsync(["session", "rpc", .. sessionArgs], input, output, err, null!, runToken,
+                            userShutdown: userShutdown, mcpHost: mcpHost, javaScriptInput: true).ConfigureAwait(false);
+                        if (settingsWriter is not null) await settingsWriter.FlushAsync().ConfigureAwait(false);
+                    }
                 }
+                // A started OAuth refresh may have rotated its token already. Join the actual
+                // catalogue operation (including credential persistence), even on EOF or a first signal.
+                // The cooperative refresh timeout must never become an abandon-the-write timeout.
+                finally { await refresh.ConfigureAwait(false); }
+                // A first signal can arrive after EOF, while the credential write is draining.
+                return signals?.Exit(code) ?? code;
             }
             case PiAppMode.Interactive:
                 if (host.RunInteractive is null)

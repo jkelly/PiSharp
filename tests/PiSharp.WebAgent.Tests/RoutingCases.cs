@@ -35,6 +35,12 @@ internal static partial class Program
     internal sealed class ProviderFake : HttpMessageHandler
     {
         public ConcurrentQueue<FakeRequest> Requests { get; } = new();
+        public int DisposalCount { get; private set; }
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing) DisposalCount++;
+            base.Dispose(disposing);
+        }
 
         public Func<FakeRequest, HttpResponseMessage?>? Answer { get; set; }
 
@@ -108,7 +114,7 @@ internal static partial class Program
     {
         private readonly ServiceProvider provider;
 
-        public RoutingHost(string name, IReadOnlyDictionary<string, string>? environment = null)
+        public RoutingHost(string name, IReadOnlyDictionary<string, string>? environment = null, RoutingOptions? routingOptions = null, bool ownProvider = false)
         {
             Root = Temp(name);
             Environment = new Dictionary<string, string>(environment ?? new Dictionary<string, string>(), StringComparer.Ordinal);
@@ -117,7 +123,12 @@ internal static partial class Program
             var services = new ServiceCollection();
             services.AddLogging(logging => logging.SetMinimumLevel(LogLevel.Debug).AddProvider(new ListLoggerProvider(Logs)));
             services.AddSingleton(RoutingCredentials(Environment, Auth, Root));
-            services.AddSingleton(new RoutingOptions { ProviderHandler = Provider, CodexTransport = "sse" });
+            services.AddSingleton(routingOptions ?? new RoutingOptions
+            {
+                ProviderHandler = ownProvider ? null : Provider,
+                CreateDefaultProviderHandler = ownProvider ? () => Provider : null,
+                CodexTransport = "sse",
+            });
             services.AddWebAgentCore(Options);
             services.AddCredentialsArea(Options);
             services.AddRoutingArea(Options);

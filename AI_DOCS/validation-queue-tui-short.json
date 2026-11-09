@@ -1,0 +1,23 @@
+{
+  "options": {
+    "Project": "src/PiSharp.Tui/PiSharp.Tui.csproj",
+    "Label": "Tui-Release-analyzer-generated-data",
+    "BuildTimeoutSeconds": 120,
+    "TestTimeoutSeconds": 300,
+    "LockTimeoutSeconds": 30,
+    "Configuration": "Release",
+    "BuildOnly": true,
+    "BuildArguments": [
+      "-t:Rebuild",
+      "-p:RunAnalyzers=true",
+      "-p:RunAnalyzersDuringBuild=true",
+      "-p:ReportAnalyzer=true",
+      "-bl:artifacts/gap-validation/tui-release-analyzers.binlog;ProjectImports=None",
+      "-p:ContinuousIntegrationBuild=true",
+      "-p:VersionPrefix=1.5.0",
+      "-p:VersionSuffix=",
+      "-p:RepositoryCommit=14dd34b369fba6d236684da6dfc8a39a03263321"
+    ]
+  },
+  "environment": {}
+}

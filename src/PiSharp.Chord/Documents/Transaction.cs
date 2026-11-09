@@ -6,9 +6,8 @@
 //   handles and tables are the public ISingletonHandle, IKeyedHandle and ITable, and a handle or table another object made is refused at
 //   use, as upstream refuses whatever plugin code passes. Rows are column maps (Store/Rows.cs); a set is a value or a Func of the column
 //   references, a where a Func of them, as TableChanges takes them.
-// - Tx.start, a run of one of the object's jobs staged with the transaction's writes, imports chord/src/next/jobs (chord.next-jobs, phase
-//   6), which is not ported: ITx has no Start yet. Staged (IStaged), what a job stages, and the transaction's Stage and Staged are ported,
-//   so the jobs layer can join without changing this file.
+// - Tx.start stages one of the object's jobs through the Jobs layer. The run is available immediately, with its effect admitted only
+//   after the transaction commits. Staged (IStaged) joins its record and document writes to the same store step.
 // - Promises are Tasks. A warm draft settles at once: its task is complete when DraftAsync returns, so a continuation the callback did not
 //   await but attached synchronously runs before the commit (rule 3); a draft of a handle the transaction cannot use is a faulted task, not
 //   a throw. Commit returns null for an in-memory commit, which is synchronous (W12), and the store step's task otherwise. Upstream's race
@@ -23,6 +22,7 @@ using System.Text.Json.Nodes;
 using PiSharp.Chord.Data;
 using PiSharp.Chord.Delta;
 using PiSharp.Chord.Store;
+using PiSharp.Chord.Jobs;
 
 namespace PiSharp.Chord.Documents;
 
@@ -30,6 +30,8 @@ namespace PiSharp.Chord.Documents;
 /// to other objects.</summary>
 public interface ITx
 {
+    /// <summary>Stages an owned job; its effect begins only after this transaction commits.</summary>
+    IJobRun Start(IJobHandle job, JsonNode? args, StartOptions? options = null);
     /// <summary>The document's draft: the same one for the same document within one transaction.</summary>
     Task<JsonObject> DraftAsync(ISingletonHandle handle);
 
@@ -145,6 +147,13 @@ internal sealed class Transaction : ITx, ILineHolder
     }
 
     public SealToken Token { get; }
+
+    public IJobRun Start(IJobHandle job, JsonNode? args, StartOptions? options = null)
+    {
+        AssertOpen();
+        if (job is not HostedJob native) throw new ArgumentException("A transaction starts only Chord jobs", nameof(job));
+        return native.Stage(this, args, context, options ?? new StartOptions());
+    }
 
     /// <summary>The object whose transaction this is.</summary>
     public Documents Documents => documents;

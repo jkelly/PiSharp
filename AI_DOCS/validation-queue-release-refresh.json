@@ -1,0 +1,42 @@
+[
+  {
+    "options": {
+      "Project": "tests/PiSharp.Chord.Tests",
+      "Label": "Chord-full-final",
+      "BuildTimeoutSeconds": 240,
+      "TestTimeoutSeconds": 600,
+      "LockTimeoutSeconds": 30,
+      "BuildArguments": [
+        "--no-restore",
+        "-p:RunAnalyzers=false"
+      ]
+    },
+    "environment": {}
+  },
+  {
+    "options": {
+      "Project": "artifacts/gap-validation/NativeEnvDriverR8/NativeEnvDriverR8.proj",
+      "Label": "NativeAOT-release-final",
+      "BuildTimeoutSeconds": 1200,
+      "TestTimeoutSeconds": 300,
+      "LockTimeoutSeconds": 30,
+      "Configuration": "Debug",
+      "BuildOnly": true,
+      "BuildArguments": []
+    },
+    "environment": {}
+  },
+  {
+    "options": {
+      "Label": "Managed-Release-restore-final",
+      "LockTimeoutSeconds": 30,
+      "BuildTimeoutSeconds": 240,
+      "Configuration": "Release",
+      "BuildArguments": [],
+      "BuildOnly": true,
+      "TestTimeoutSeconds": 300,
+      "Project": "artifacts/gap-validation/ManagedReleaseRestore/ManagedReleaseRestore.proj"
+    },
+    "environment": {}
+  }
+]

@@ -94,6 +94,8 @@ internal record LiveRouteRuntime(Func<string, string?> ReadEnvironment, Func<Htt
     internal Func<string?>? Transport { get; init; }
     /// <summary>Codex WebSocket handshake deadline from websocketConnectTimeoutMs; null keeps the provider default.</summary>
     internal TimeSpan? WebSocketConnectTimeout { get; init; }
+    /// <summary>Per-request token budgets, when the Durable host pins explicit stream settings.</summary>
+    internal JsonData? ThinkingBudgets { get; init; }
 
     /// <summary>The session's environment, built once from <see cref="ReadEnvironment"/>.</summary>
     internal PiSharp.Cli.Authentication.LiveProcessEnvironment CreateEnvironment() => new(ReadEnvironment, ProviderVariables);
@@ -162,17 +164,17 @@ internal sealed class LiveSessionSelection
         return tokens;
     }
 
-    /// <summary>An exact pinned id of a built-in provider (no models.json, no pattern matching, no environment).</summary>
+    /// <summary>An exact reviewed built-in id (no models.json, no pattern matching, no environment).</summary>
     internal static LiveSessionSelection Parse(string? provider, string? model, string? maximumTokens)
     {
-        if (provider is null || !PiSharp.Cli.Models.BuiltinModelCatalog.Has(provider) || string.IsNullOrWhiteSpace(model) ||
+        if (provider is null || !(PiSharp.Cli.Models.BuiltinModelCatalog.Has(provider) || ReviewedModelCatalog.AdditionalProviders.Contains(provider)) || string.IsNullOrWhiteSpace(model) ||
             model.Length > 1024 || model.Any(char.IsControl)) throw new SessionCommandException(SessionCommandFailure.InvalidArguments);
         var tokens = ParseMaximumTokens(maximumTokens);
         FrozenModelCatalog catalog;
-        try { catalog = PiSharp.Cli.Models.BuiltinModelCatalog.Get(provider); }
+        try { catalog = ReviewedModelCatalog.Apply(provider, PiSharp.Cli.Models.BuiltinModelCatalog.Has(provider) ? PiSharp.Cli.Models.BuiltinModelCatalog.Get(provider) : null)!; }
         catch (PiSharp.Cli.Models.BuiltinCatalogException error) { throw new LiveSessionException(error.Code, error.Message); }
         if (!catalog.TryGetModel(CatalogModelType.Chat, model, out var definition) || !SupportedApi(provider, definition.DeclaredApi))
-            throw new LiveSessionException("UnknownLiveModel", "Select a chat model from the pinned provider catalog for the supported live API.");
+            throw new LiveSessionException("UnknownLiveModel", "Select a chat model from the reviewed built-in catalog for the supported live API.");
         var modelLimit = definition.Raw.Value.GetProperty("maxTokens").GetDouble();
         if (tokens > modelLimit) throw new LiveSessionException("LiveOutputLimit", "The requested output limit exceeds the selected model metadata.");
         return new(definition, tokens);
@@ -401,6 +403,7 @@ internal sealed class LiveSessionConnection(LiveSessionSelection selection, Http
     private readonly List<AnthropicInjectedTransportLease> _replacedMains = [];
     /// <summary>Azure endpoint/deployment configuration (the session's AZURE_OPENAI_* values) for provider azure.</summary>
     internal AzureEndpointOptions? Azure { get; init; }
+    internal JsonData? ThinkingBudgets { get; set; }
     /// <summary>Resolved models.json provider/model headers and <c>authHeader</c> (getApiKeyAndHeaders), sent with every request.</summary>
     internal IReadOnlyDictionary<string, string>? RequestHeaders { get; init; }
     /// <summary>The per-request auth route of amazon-bedrock, openai-codex, github-copilot, the Cloudflare providers and stored OAuth.</summary>
@@ -454,14 +457,14 @@ internal sealed class LiveSessionConnection(LiveSessionSelection selection, Http
         InjectedAuthenticationResolver.AnthropicOrganizationId, InjectedAuthenticationResolver.AnthropicServiceAccountId,
         InjectedAuthenticationResolver.AnthropicIdentityTokenFile, InjectedAuthenticationResolver.AnthropicWorkspaceId];
     private static ValueTask<AnthropicInjectedTransportLease> AcquireResolvedAsync(LiveSessionSelection selected,
-        AuthenticationResolution authentication, HttpMessageHandler? handler, int maximum, bool summary, CancellationToken token, bool thinking = false)
+        AuthenticationResolution authentication, HttpMessageHandler? handler, int maximum, bool summary, CancellationToken token, bool thinking = false, JsonData? thinkingBudgets = null)
     {
         var definition = selected.Definition; var plain = summary && !thinking;
         var projection = AnthropicThinkingCompat(new AnthropicMessagesRequestOptions(MaximumTokens: maximum,
             ModelReasoning: definition.Raw.Value.GetProperty("reasoning").GetBoolean(),
             ModelSupportsImages: definition.DeclaresImageInput, ThinkingEnabled: false,
             MaximumMessages: PiRequestBudget.RequestMessages, MaximumEntryCharacters: PiPayloadBudget.RequestEntryCharacters, MaximumInputCharacters: PiPayloadBudget.RequestPayloadBytes, MaximumOutputCharacters: PiPayloadBudget.RequestPayloadBytes, MaximumOutputBytes: PiPayloadBudget.RequestPayloadBytes,
-            CacheRetention: summary ? AnthropicCacheRetention.None : AnthropicCacheRetention.Short), definition.Raw, plain);
+            CacheRetention: summary ? AnthropicCacheRetention.None : AnthropicCacheRetention.Short) { ThinkingBudgets = thinkingBudgets }, definition.Raw, plain);
         // getApiKeyAndHeaders: models.json provider headers (authHeader with the resolved key) and model headers travel with every request.
         var configured = selected.Registry is { } registry && selected.Entry is { } entry
             ? registry.ConfiguredRequestHeaders(entry, authentication.Authentication is { Kind: not AuthenticationKind.WorkloadIdentityFederation } resolved ? resolved.Secret : null) : null;
@@ -489,6 +492,10 @@ internal sealed class LiveSessionConnection(LiveSessionSelection selection, Http
         {
             SupportsMidConversationEffort = value.TryGetProperty("compat", out var compat) && compat.ValueKind == System.Text.Json.JsonValueKind.Object &&
                 compat.TryGetProperty("supportsMidConvoEffort", out var mid) && mid.ValueKind == System.Text.Json.JsonValueKind.True,
+            SupportsTemperature = projection.SupportsTemperature && !(compat.ValueKind == System.Text.Json.JsonValueKind.Object &&
+                compat.TryGetProperty("supportsTemperature", out var temperature) && temperature.ValueKind == System.Text.Json.JsonValueKind.False),
+            SupportsMessageThreads = projection.SupportsMessageThreads ?? (compat.ValueKind == System.Text.Json.JsonValueKind.Object &&
+                compat.TryGetProperty("supportsMessageThreads", out var threads) && threads.ValueKind is System.Text.Json.JsonValueKind.True or System.Text.Json.JsonValueKind.False ? threads.GetBoolean() : null),
             SupportsThinkingOff = supportsOff, ModelReasoning = projection.ModelReasoning && (supportsOff || !summary),
             AllowedFallbackModels = NativeProviderFactory.AnthropicFallbackModels(value)
         };
@@ -594,7 +601,8 @@ internal sealed class LiveSessionConnection(LiveSessionSelection selection, Http
             !(raw.TryGetProperty("compat", out var compat) && compat.ValueKind == System.Text.Json.JsonValueKind.Object &&
               compat.TryGetProperty("forceAdaptiveThinking", out var adaptive) && adaptive.ValueKind == System.Text.Json.JsonValueKind.True) &&
             raw.TryGetProperty("maxTokens", out var modelMaximum) && modelMaximum.TryGetDouble(out var ceiling) && ceiling > 0)
-            maximum = (int)Math.Max(maximum, Math.Min(Math.Min((double)maximum + effective switch { "minimal" => 1024, "low" => 2048, "medium" => 8192, _ => 16384 },
+            maximum = (int)Math.Max(maximum, Math.Min(Math.Min((double)maximum + (ThinkingBudgets is { } budgets && budgets.Value.TryGetProperty(effective is "xhigh" or "max" ? "high" : effective, out var custom)
+                ? custom.GetDouble() : effective switch { "minimal" => 1024, "low" => 2048, "medium" => 8192, _ => 16384 }),
                 ceiling), int.MaxValue));
         // Without reasoning the request is the model's own request with reasoning undefined, which is what the session's route sends
         // at "off" (agent.ts: reasoning = level === "off" ? undefined : level); the model's metadata (thinkingLevelMap.off, fallbacks,
@@ -664,7 +672,7 @@ internal sealed class LiveSessionConnection(LiveSessionSelection selection, Http
             var provider = NativeProviderFactory.CreateAnthropic(model, new Uri(definition.BaseUrl), credential,
                 AnthropicThinkingCompat(new(MaximumTokens: maximum, ModelReasoning: reasoning, ModelSupportsImages: definition.DeclaresImageInput,
                     ThinkingEnabled: false, MaximumMessages: PiRequestBudget.RequestMessages, MaximumEntryCharacters: PiPayloadBudget.RequestEntryCharacters, MaximumInputCharacters: PiPayloadBudget.RequestPayloadBytes, MaximumOutputCharacters: PiPayloadBudget.RequestPayloadBytes, MaximumOutputBytes: PiPayloadBudget.RequestPayloadBytes,
-                    CacheRetention: summary ? AnthropicCacheRetention.None : AnthropicCacheRetention.Short), definition.Raw, plain),
+                    CacheRetention: summary ? AnthropicCacheRetention.None : AnthropicCacheRetention.Short) { ThinkingBudgets = ThinkingBudgets }, definition.Raw, plain),
                 new(MaxTokens: maximum, MaximumPayloadBytes: PiPayloadBudget.RequestPayloadBytes), handler, plain ? null : definition.Raw);
             return Own(provider);
         }
@@ -682,7 +690,7 @@ internal sealed class LiveSessionConnection(LiveSessionSelection selection, Http
                 new(Reasoning: reasoning, MaximumMessages: PiRequestBudget.RequestMessages, MaximumEntryCharacters: PiPayloadBudget.RequestEntryCharacters, MaximumInputCharacters: PiPayloadBudget.RequestPayloadBytes, MaximumOutputCharacters: PiPayloadBudget.RequestPayloadBytes, MaximumOutputBytes: PiPayloadBudget.RequestPayloadBytes,
                     ToolDeclarations: new(MaximumMessages: PiRequestBudget.RequestMessages, MaximumEntryCharacters: PiPayloadBudget.RequestEntryCharacters, MaximumInputCharacters: PiPayloadBudget.RequestPayloadBytes, MaximumOutputCharacters: PiPayloadBudget.RequestPayloadBytes, MaximumOutputBytes: PiPayloadBudget.RequestPayloadBytes)) { ModelSupportsImages = definition.DeclaresImageInput },
                 new(MaxTokens: maximum, CacheRetention: summary ? CompletionsCacheRetention.None : CompletionsCacheRetention.Short,
-                    MaximumPayloadBytes: PiPayloadBudget.RequestPayloadBytes) { ModelMetadata = definition.Raw, Headers = azureHeaders }, handler, plain ? null : definition.Raw));
+                    MaximumPayloadBytes: PiPayloadBudget.RequestPayloadBytes) { ModelMetadata = definition.Raw, Headers = azureHeaders, ThinkingBudgets = ThinkingBudgets }, handler, plain ? null : definition.Raw));
         }
         if (model.Api == "openai-completions")
         {
@@ -692,7 +700,7 @@ internal sealed class LiveSessionConnection(LiveSessionSelection selection, Http
                     ToolDeclarations: new(MaximumMessages: PiRequestBudget.RequestMessages, MaximumEntryCharacters: PiPayloadBudget.RequestEntryCharacters, MaximumInputCharacters: PiPayloadBudget.RequestPayloadBytes, MaximumOutputCharacters: PiPayloadBudget.RequestPayloadBytes, MaximumOutputBytes: PiPayloadBudget.RequestPayloadBytes))
                     { ModelSupportsImages = definition.DeclaresImageInput },
                 new(MaxTokens: maximum, CacheRetention: summary ? CompletionsCacheRetention.None : CompletionsCacheRetention.Short,
-                    MaximumPayloadBytes: PiPayloadBudget.RequestPayloadBytes) { ModelMetadata = definition.Raw }, handler, plain ? null : definition.Raw);
+                    MaximumPayloadBytes: PiPayloadBudget.RequestPayloadBytes) { ModelMetadata = definition.Raw, ThinkingBudgets = ThinkingBudgets }, handler, plain ? null : definition.Raw);
             return Own(provider);
         }
         var responses = NativeProviderFactory.CreateResponses(model, new Uri(definition.BaseUrl.TrimEnd('/') + "/responses"), credential,
@@ -723,7 +731,7 @@ internal sealed class LiveSessionConnection(LiveSessionSelection selection, Http
                     new(Reasoning: reasoning, MaximumMessages: PiRequestBudget.RequestMessages, MaximumEntryCharacters: PiPayloadBudget.RequestEntryCharacters, MaximumInputCharacters: PiPayloadBudget.RequestPayloadBytes, MaximumOutputCharacters: PiPayloadBudget.RequestPayloadBytes, MaximumOutputBytes: PiPayloadBudget.RequestPayloadBytes,
                         ToolDeclarations: new(MaximumMessages: PiRequestBudget.RequestMessages, MaximumEntryCharacters: PiPayloadBudget.RequestEntryCharacters, MaximumInputCharacters: PiPayloadBudget.RequestPayloadBytes, MaximumOutputCharacters: PiPayloadBudget.RequestPayloadBytes, MaximumOutputBytes: PiPayloadBudget.RequestPayloadBytes)) { ModelSupportsImages = definition.DeclaresImageInput },
                     new(MaxTokens: maximum, CacheRetention: summary ? CompletionsCacheRetention.None : CompletionsCacheRetention.Short,
-                        MaximumPayloadBytes: PiPayloadBudget.RequestPayloadBytes) { Headers = headers }, definition.Raw, handler, thinkingProfile: !plain);
+                        MaximumPayloadBytes: PiPayloadBudget.RequestPayloadBytes) { Headers = headers, ThinkingBudgets = ThinkingBudgets }, definition.Raw, handler, thinkingProfile: !plain);
             case "openai-responses":
                 return NativeProviderFactory.CreateCatalogResponses(model, definition.BaseUrl, credential,
                     new(Reasoning: reasoning, MaximumMessages: PiRequestBudget.RequestMessages, MaximumEntryCharacters: PiPayloadBudget.RequestEntryCharacters, MaximumInputCharacters: PiPayloadBudget.RequestPayloadBytes, MaximumOutputCharacters: PiPayloadBudget.RequestPayloadBytes) { ModelSupportsImages = definition.DeclaresImageInput },
@@ -733,11 +741,11 @@ internal sealed class LiveSessionConnection(LiveSessionSelection selection, Http
                 return NativeProviderFactory.CreateCatalogAnthropic(model, definition.BaseUrl, credential,
                     AnthropicThinkingCompat(new(MaximumTokens: maximum, ModelReasoning: reasoning, ModelSupportsImages: definition.DeclaresImageInput,
                         ThinkingEnabled: false, MaximumMessages: PiRequestBudget.RequestMessages, MaximumEntryCharacters: PiPayloadBudget.RequestEntryCharacters, MaximumInputCharacters: PiPayloadBudget.RequestPayloadBytes, MaximumOutputCharacters: PiPayloadBudget.RequestPayloadBytes, MaximumOutputBytes: PiPayloadBudget.RequestPayloadBytes,
-                        CacheRetention: summary ? AnthropicCacheRetention.None : AnthropicCacheRetention.Short), definition.Raw, plain),
+                        CacheRetention: summary ? AnthropicCacheRetention.None : AnthropicCacheRetention.Short) { ThinkingBudgets = ThinkingBudgets }, definition.Raw, plain),
                     new(MaxTokens: maximum, Headers: headers, MaximumPayloadBytes: PiPayloadBudget.RequestPayloadBytes), definition.Raw, handler, thinkingProfile: !plain);
             case "google-generative-ai":
                 return NativeProviderFactory.CreateCatalogGoogle(model, credential, definition.Raw,
-                    new PiSharp.AI.Protocols.GoogleGenerativeAI.GoogleGenerativeAIOptions(definition.Raw) { MaxTokens = maximum, Headers = headers }, handler);
+                    new PiSharp.AI.Protocols.GoogleGenerativeAI.GoogleGenerativeAIOptions(definition.Raw) { MaxTokens = maximum, Headers = headers, ThinkingBudgets = ThinkingBudgets }, handler);
             case "pi-messages":
                 return NativeProviderFactory.CreateCatalogPiMessages(model, credential, definition.Raw,
                     new PiSharp.AI.Protocols.PiMessages.PiMessagesOptions(definition.Raw)
@@ -852,9 +860,9 @@ internal sealed class LiveSessionConnection(LiveSessionSelection selection, Http
                 {
                 var (main, authentication) = await connection.CurrentResolvedAsync(cancellationToken).ConfigureAwait(false);
                 var transport = main.Transport;
-                if (summary || Replay)
+                if (summary || Replay || connection.ThinkingBudgets is not null)
                 {
-                    summaryLease = await AcquireResolvedAsync(connection.Selected, authentication, connection.Handler, maximum, summary, cancellationToken, Thinking).ConfigureAwait(false);
+                    summaryLease = await AcquireResolvedAsync(connection.Selected, authentication, connection.Handler, maximum, summary, cancellationToken, Thinking, connection.ThinkingBudgets).ConfigureAwait(false);
                     transport = summaryLease.Transport;
                 }
                 enumerator = transport.StreamAsync(request, cancellationToken).GetAsyncEnumerator(cancellationToken);

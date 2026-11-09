@@ -1,7 +1,7 @@
 // Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/src/core/extensions/loader.ts (getAliases, loadExtensionModule),
 // packages/coding-agent/src/core/extensions/jiti-loader.ts and packages/coding-agent/src/main.ts (setThemeJsonValidator, initTheme).
 //
-// The real Pi packages: PiSharp installs the exact Pi 1.2.0 packages into the agent dir (PiNodeRuntime) and names their node_modules
+// The real Pi packages: PiSharp installs the exact Pi 1.5.0 packages into the agent dir (PiNodeRuntime) and names their node_modules
 // here. Extensions are then loaded as upstream's unbundled Node build loads them: jiti from Pi's own dependencies, created for the
 // installed coding agent's loader.js, `moduleCache: false`, and getAliases (the coding agent's dist index, pi-agent-core, pi-tui, the
 // pi-ai compat/oauth/providers entries, typebox, and the @mariozechner/* and @sinclair/typebox names). Pi 1.5.0's getAliases also
@@ -20,6 +20,9 @@ function entryOf(packageDir, condition = 'import') {
 
 /** The installed Pi: jiti, the aliases, and the coding agent's theme module (one instance shared through globalThis, as in Pi). */
 export async function loadPiModules(nodeModules, themeName) {
+  // The installed SDK derives its own request identity from install-telemetry settings. Disable that default in this Node
+  // child as well; an explicitly configured environment value remains the user's choice.
+  process.env.PI_TELEMETRY ??= '0';
   const codingAgent = path.join(nodeModules, '@earendil-works', 'pi-coding-agent');
   const loaderFile = path.join(codingAgent, 'dist', 'core', 'extensions', 'loader.js');
   const loaderUrl = pathToFileURL(loaderFile).href;
@@ -34,6 +37,17 @@ export async function loadPiModules(nodeModules, themeName) {
   const packageIndex = path.resolve(path.dirname(loaderFile), '../..', 'index.js');
   const typeboxEntry = resolve('typebox'), typeboxCompileEntry = resolve('typebox/compile'), typeboxValueEntry = resolve('typebox/value');
   const piAgentCoreEntry = resolve('@earendil-works/pi-agent-core');
+  // Suppress Pi's default provider attribution in the actual shared module before any extension/coding-agent import. Mutating
+  // the exported defaults object preserves Agent, TypeBox and jiti module identity, including transitive/default import forms.
+  // Explicit identity supplied by an extension still overrides this default in upstream's mergeClientIdentity.
+  const agentCore = await import(pathToFileURL(piAgentCoreEntry).href);
+  const defaults = agentCore.DEFAULT_AGENT_IDENTITY;
+  const attribution = defaults && Object.getOwnPropertyDescriptor(defaults, 'attribution');
+  if (!defaults || typeof defaults !== 'object' || typeof agentCore.Agent !== 'function' || !attribution?.writable)
+    throw new Error('Installed Pi agent-core has no supported default identity contract');
+  defaults.attribution = null;
+  if (defaults.attribution !== null)
+    throw new Error('Installed Pi agent-core default attribution could not be disabled');
   const piTuiEntry = resolve('@earendil-works/pi-tui');
   const piAiCompatEntry = resolve('@earendil-works/pi-ai/compat');
   const piAiExtensionView = path.join(path.dirname(loaderFile), 'pi-ai-extension-view.js');

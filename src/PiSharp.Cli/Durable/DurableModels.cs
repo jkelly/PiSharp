@@ -40,7 +40,11 @@ internal sealed class DurableModels : IDurableModels, IAsyncDisposable
     private DurableModels(LiveSessionRuntime runtime, ModelRegistry registry, IDurableModels? streams)
     {
         this.runtime = runtime;
-        routeRuntime = runtime with { CreateHttpHandler = () => NativeDurableModels.PayloadHandler.Wrap(runtime.CreateHttpHandler()) };
+        routeRuntime = runtime with
+        {
+            CreateHttpHandler = () => NativeDurableModels.WrapProviderHandler(runtime.CreateHttpHandler()),
+            Transport = () => NativeDurableModels.HasActiveProviderPayloadHook ? "sse" : runtime.Transport?.Invoke(),
+        };
         Registry = registry;
         this.streams = streams;
         handler = runtime.CreateHttpHandler();
@@ -125,6 +129,19 @@ internal sealed class DurableModels : IDurableModels, IAsyncDisposable
     {
         if (Registry.Find(model.Provider, model.Id) is not { } entry || !Routable(entry)) return ValueTask.FromResult<IChatTransport?>(null);
         ObjectDisposedException.ThrowIf(Volatile.Read(ref disposed) != 0, this);
+        if (options?.ThinkingBudgets is not null || options?.WebsocketConnectTimeoutMs is not null)
+        {
+            var requestRuntime = routeRuntime with
+            {
+                ThinkingBudgets = options.ThinkingBudgets?.ToData(),
+                WebSocketConnectTimeout = options.WebsocketConnectTimeoutMs is { } timeout ? TimeSpan.FromMilliseconds(timeout) : routeRuntime.WebSocketConnectTimeout,
+            };
+            var owned = new LazyModelTransport(entry, model.Descriptor, () => Registry, requestRuntime);
+            var transport = options.MaxTokens is { } limit || options.CacheRetention == "none"
+                ? owned.Summary(options.MaxTokens is { } cap && double.IsFinite(cap) && cap >= 1 ? (int)Math.Min(cap, int.MaxValue) : (int)Math.Clamp(model.MaxTokens, 1, int.MaxValue), options.Reasoning)
+                : (IChatTransport)owned;
+            return ValueTask.FromResult<IChatTransport?>(new OwnedRequestTransport(owned, transport));
+        }
         var route = routes.GetOrAdd((model.Provider, model.Id), _ => new LazyModelTransport(entry, model.Descriptor, () => Registry, routeRuntime));
         if (options?.MaxTokens is not null || options?.CacheRetention == "none")
         {
@@ -133,6 +150,19 @@ internal sealed class DurableModels : IDurableModels, IAsyncDisposable
             return ValueTask.FromResult<IChatTransport?>(route.Summary(maximum, options?.Reasoning));
         }
         return ValueTask.FromResult<IChatTransport?>(route);
+    }
+
+    private sealed class OwnedRequestTransport(LazyModelTransport owner, IChatTransport transport) : IChatTransport, IThinkingLevelTransport
+    {
+        public ImmutableArray<string> GetSupportedThinkingLevels(ModelDescriptor model) =>
+            transport is IThinkingLevelTransport thinking ? thinking.GetSupportedThinkingLevels(model) : owner.GetSupportedThinkingLevels(model);
+
+        public async IAsyncEnumerable<StreamEvent> StreamAsync(ChatRequest request,
+            [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default)
+        {
+            await using (owner)
+                await foreach (var item in transport.StreamAsync(request, cancellationToken).ConfigureAwait(false)) yield return item;
+        }
     }
 
     /// <inheritdoc/>
@@ -154,6 +184,15 @@ internal sealed class DurableModels : IDurableModels, IAsyncDisposable
     /// <inheritdoc/>
     public Task CancelDeferredAsync(DurableModel model, DurableDeferredHandle handle, CancellationToken cancellationToken) =>
         (streams ?? native).CancelDeferredAsync(model, handle, cancellationToken);
+
+    public IAsyncEnumerable<StreamEvent> StreamDeferred(DurableModel model, DurableDeferredHandle handle, DurableRequestOptions? options,
+        CancellationToken cancellationToken) => (streams ?? native).StreamDeferred(model, handle, options, cancellationToken);
+
+    public Task<AssistantMessage> FetchDeferredAsync(DurableModel model, DurableDeferredHandle handle, DurableRequestOptions? options,
+        CancellationToken cancellationToken) => (streams ?? native).FetchDeferredAsync(model, handle, options, cancellationToken);
+
+    public Task CancelDeferredAsync(DurableModel model, DurableDeferredHandle handle, DurableRequestOptions? options,
+        CancellationToken cancellationToken) => (streams ?? native).CancelDeferredAsync(model, handle, options, cancellationToken);
 
     /// <summary>Closes the live connections.</summary>
     public async ValueTask DisposeAsync()

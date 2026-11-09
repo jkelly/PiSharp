@@ -17,7 +17,7 @@ using PiSharp.Extensions.Mcp.Runtime;
 // transcript's loadout).
 internal static partial class Program
 {
-    private sealed record Seen(string Url, string? Body);
+    private sealed record Seen(string Url, string? Body, Seen? Previous);
 
     /// <summary>Fake provider endpoint: records every request and answers each with the next scripted response.</summary>
     private sealed class Endpoint(params Func<HttpResponseMessage>[] script) : HttpMessageHandler
@@ -25,8 +25,9 @@ internal static partial class Program
         private readonly List<Seen> requests = [];
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
-            var seen = new Seen(request.RequestUri!.AbsoluteUri, request.Content is null ? null : await request.Content.ReadAsStringAsync(cancellationToken));
-            int index; lock (requests) { requests.Add(seen); index = requests.Count - 1; }
+            var body = request.Content is null ? null : await request.Content.ReadAsStringAsync(cancellationToken);
+            Seen seen; int index;
+            lock (requests) { seen = new(request.RequestUri!.AbsoluteUri, body, requests.LastOrDefault()); requests.Add(seen); index = requests.Count - 1; }
             if (seen.Url != MessagesUrl) throw new InvalidOperationException("Unexpected URL " + seen.Url);
             return index < script.Length ? script[index]() : Text("ok");
         }
@@ -179,8 +180,23 @@ internal static partial class Program
 
     private const string DeferredDocs = """{"mcpServers":{"docs":{"command":"docs-server","exposure":"deferred","description":"Documentation search."}}}""";
 
-    private static string[] ToolNames(Seen request) =>
-        JsonDocument.Parse(request.Body!).RootElement.TryGetProperty("tools", out var tools) ? [.. tools.EnumerateArray().Select(tool => tool.GetProperty("name").GetString()!)] : [];
+    // A continuation retains the tools of the response it names. Keep raw request bodies for wire/message
+    // assertions, but inspect effective declarations here as the fake Anthropic server would. Every scripted
+    // response in this fixture has message id "authored"; a create request without tools still declares none.
+    private static string[] ToolNames(Seen request)
+    {
+        using var body = JsonDocument.Parse(request.Body!);
+        if (body.RootElement.TryGetProperty("tools", out var tools))
+            return [.. tools.EnumerateArray().Select(tool => tool.GetProperty("name").GetString()!)];
+        if (body.RootElement.TryGetProperty("thread", out var thread) && thread.ValueKind == JsonValueKind.Object &&
+            thread.TryGetProperty("type", out var type) && type.GetString() == "continue")
+        {
+            Check(thread.TryGetProperty("previous_message_id", out var previous) && previous.GetString() == "authored" && request.Previous is not null,
+                "continuation must name a response from this fake server");
+            return ToolNames(request.Previous!);
+        }
+        return [];
+    }
 
     /// <summary>Every string value of the request, so prompt text is found wherever the provider projection puts it.</summary>
     private static IEnumerable<string> Strings(JsonElement value) => value.ValueKind switch

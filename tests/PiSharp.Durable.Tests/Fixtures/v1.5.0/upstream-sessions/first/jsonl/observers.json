@@ -1,0 +1,130 @@
+[
+  {
+    "type": "initial",
+    "value": {
+      "count": 0
+    }
+  },
+  {
+    "type": "document",
+    "change": {
+      "kind": "value",
+      "value": {
+        "count": 1
+      },
+      "ops": [
+        [
+          "s",
+          [
+            "count"
+          ],
+          1
+        ]
+      ],
+      "retired": false
+    }
+  },
+  {
+    "type": "commit",
+    "publication": {
+      "kind": "stored",
+      "seq": 2,
+      "changes": [
+        {
+          "type": "document",
+          "kind": "change",
+          "record": {
+            "id": 2,
+            "kind": "capture150.counter",
+            "scope": {
+              "kind": "session"
+            },
+            "createdAt": 1
+          },
+          "version": 1,
+          "value": {
+            "count": 1
+          },
+          "ops": [
+            [
+              "s",
+              [
+                "count"
+              ],
+              1
+            ]
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "type": "resolved",
+    "by": 1
+  },
+  {
+    "type": "document",
+    "change": {
+      "kind": "value",
+      "value": {
+        "count": 3
+      },
+      "ops": [
+        [
+          "s",
+          [
+            "count"
+          ],
+          3
+        ]
+      ],
+      "retired": false
+    }
+  },
+  {
+    "type": "commit",
+    "publication": {
+      "kind": "stored",
+      "seq": 3,
+      "changes": [
+        {
+          "type": "document",
+          "kind": "change",
+          "record": {
+            "id": 2,
+            "kind": "capture150.counter",
+            "scope": {
+              "kind": "session"
+            },
+            "createdAt": 1
+          },
+          "version": 1,
+          "value": {
+            "count": 3
+          },
+          "ops": [
+            [
+              "s",
+              [
+                "count"
+              ],
+              3
+            ]
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "type": "resolved",
+    "by": 2
+  },
+  {
+    "type": "document-end",
+    "kind": "failed"
+  },
+  {
+    "type": "commit-end",
+    "kind": "failed"
+  }
+]

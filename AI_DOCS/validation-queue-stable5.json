@@ -1,0 +1,217 @@
+[
+  {
+    "options": {
+      "Project": "tests/PiSharp.Chord.Tests",
+      "Label": "Chord-full-stable5",
+      "BuildTimeoutSeconds": 240,
+      "TestTimeoutSeconds": 600,
+      "LockTimeoutSeconds": 30,
+      "BuildArguments": [
+        "-p:RunAnalyzers=false"
+      ]
+    },
+    "environment": {}
+  },
+  {
+    "options": {
+      "Project": "tests/PiSharp.Durable.Hosting.Tests",
+      "Label": "I11-host-stable5",
+      "TestArgs": [
+        "--only",
+        "settings-forwarding."
+      ],
+      "BuildTimeoutSeconds": 180,
+      "TestTimeoutSeconds": 240,
+      "LockTimeoutSeconds": 30,
+      "BuildArguments": [
+        "-p:RunAnalyzers=false"
+      ]
+    },
+    "environment": {}
+  },
+  {
+    "options": {
+      "Project": "tests/PiSharp.Env.Adapter.Tests",
+      "Label": "Env-adapter-stable5",
+      "BuildTimeoutSeconds": 180,
+      "TestTimeoutSeconds": 480,
+      "LockTimeoutSeconds": 30,
+      "BuildArguments": [
+        "-p:RunAnalyzers=false"
+      ]
+    },
+    "environment": {}
+  },
+  {
+    "options": {
+      "Project": "tests/PiSharp.Chord.Legacy.Cluster.Tests",
+      "Label": "LG3-cluster-stable4",
+      "BuildTimeoutSeconds": 240,
+      "TestTimeoutSeconds": 480,
+      "LockTimeoutSeconds": 30,
+      "Configuration": "Debug",
+      "BuildArguments": [
+        "-p:RunAnalyzers=false"
+      ]
+    },
+    "environment": {}
+  },
+  {
+    "options": {
+      "Project": "tests/PiSharp.Chord.Durable.Integration.Tests",
+      "Label": "X1-integration-stable4",
+      "BuildTimeoutSeconds": 240,
+      "TestTimeoutSeconds": 480,
+      "LockTimeoutSeconds": 30,
+      "Configuration": "Debug",
+      "BuildArguments": [
+        "-p:RunAnalyzers=false"
+      ]
+    },
+    "environment": {}
+  },
+  {
+    "options": {
+      "Project": "tests/PiSharp.Tools.Tests",
+      "Label": "R4-process-stable4",
+      "BuildTimeoutSeconds": 240,
+      "TestTimeoutSeconds": 300,
+      "LockTimeoutSeconds": 30,
+      "Configuration": "Debug",
+      "TestArgs": [
+        "--filter",
+        "native process"
+      ],
+      "BuildArguments": [
+        "-p:RunAnalyzers=false"
+      ]
+    },
+    "environment": {}
+  },
+  {
+    "options": {
+      "Project": "tests/PiSharp.Rpc.Tests",
+      "Label": "RPC-full-stable4",
+      "BuildTimeoutSeconds": 240,
+      "TestTimeoutSeconds": 480,
+      "LockTimeoutSeconds": 30,
+      "Configuration": "Debug",
+      "BuildArguments": [
+        "-p:RunAnalyzers=false"
+      ]
+    },
+    "environment": {}
+  },
+  {
+    "options": {
+      "Project": "tests/PiSharp.Compatibility.Tests",
+      "Label": "Compatibility-full-stable4",
+      "BuildTimeoutSeconds": 240,
+      "TestTimeoutSeconds": 480,
+      "LockTimeoutSeconds": 30,
+      "Configuration": "Debug",
+      "BuildArguments": [
+        "-p:RunAnalyzers=false"
+      ]
+    },
+    "environment": {}
+  },
+  {
+    "options": {
+      "Project": "tests/PiSharp.Transport.Tests",
+      "Label": "Transport-full-stable4",
+      "BuildTimeoutSeconds": 240,
+      "TestTimeoutSeconds": 480,
+      "LockTimeoutSeconds": 30,
+      "Configuration": "Debug",
+      "BuildArguments": [
+        "-p:RunAnalyzers=false"
+      ]
+    },
+    "environment": {}
+  },
+  {
+    "options": {
+      "Project": "tests/PiSharp.Tools.Tests",
+      "Label": "Tools-full-stable4",
+      "BuildTimeoutSeconds": 240,
+      "TestTimeoutSeconds": 600,
+      "LockTimeoutSeconds": 30,
+      "Configuration": "Debug",
+      "BuildArguments": [
+        "-p:RunAnalyzers=false"
+      ]
+    },
+    "environment": {}
+  },
+  {
+    "options": {
+      "Project": "tests/PiSharp.Durable.Tests",
+      "Label": "I17-existing-compaction-stable4",
+      "BuildTimeoutSeconds": 240,
+      "TestTimeoutSeconds": 300,
+      "LockTimeoutSeconds": 30,
+      "Configuration": "Debug",
+      "TestArgs": [
+        "--only",
+        "harness.compaction.per-model-compaction-overrides.,harness.compaction.jsonl.per-model-compaction-overrides.,harness.compaction.sqlite.per-model-compaction-overrides.,models.mapping."
+      ],
+      "BuildArguments": [
+        "-p:RunAnalyzers=false"
+      ]
+    },
+    "environment": {}
+  },
+  {
+    "options": {
+      "Project": "tests/PiSharp.InteractiveParity.Tests",
+      "Label": "R8-overlay-stable4",
+      "BuildTimeoutSeconds": 240,
+      "TestTimeoutSeconds": 300,
+      "LockTimeoutSeconds": 30,
+      "Configuration": "Debug",
+      "BuildArguments": [
+        "-p:RunAnalyzers=false"
+      ]
+    },
+    "environment": {
+      "INTERACTIVEPARITY_FILTER": "gap.overlay|sync150.overlay-custom|sync150.custom-overlay"
+    }
+  },
+  {
+    "options": {
+      "Project": "artifacts/gap-validation/NativeEnvDriver/NativeEnvDriver.proj",
+      "Label": "NativeAOT-stable4",
+      "BuildTimeoutSeconds": 1200,
+      "TestTimeoutSeconds": 300,
+      "LockTimeoutSeconds": 30,
+      "Configuration": "Debug",
+      "BuildOnly": true,
+      "BuildArguments": []
+    },
+    "environment": {}
+  },
+  {
+    "options": {
+      "Project": "src/PiSharp.Tui/PiSharp.Tui.csproj",
+      "Label": "Tui-Release-analyzer-gate",
+      "BuildTimeoutSeconds": 600,
+      "TestTimeoutSeconds": 300,
+      "LockTimeoutSeconds": 30,
+      "Configuration": "Release",
+      "BuildOnly": true,
+      "BuildArguments": [
+        "-t:Rebuild",
+        "-p:RunAnalyzers=true",
+        "-p:RunAnalyzersDuringBuild=true",
+        "-p:ReportAnalyzer=true",
+        "-bl:artifacts/gap-validation/tui-release-analyzers.binlog;ProjectImports=None",
+        "-p:ContinuousIntegrationBuild=true",
+        "-p:VersionPrefix=1.5.0",
+        "-p:VersionSuffix=",
+        "-p:RepositoryCommit=14dd34b369fba6d236684da6dfc8a39a03263321"
+      ]
+    },
+    "environment": {}
+  }
+]

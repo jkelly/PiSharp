@@ -48,6 +48,8 @@ internal sealed class PiExtensionRun : IAsyncDisposable
         await _loading.LoadAsync(sources, () => new PiExtensionHostOptions(_cwd, _agentDir, _mode, _hasUI)
         {
             GetEnvironment = _host.GetEnvironment,
+            PiModules = _host.PiModules,
+            UseCompatibilityModules = _host.UseCompatibilityModules,
             StandardError = _stderr is null ? null : line => { lock (_stderr) { _stderr.Write(line + "\n"); _stderr.Flush(); } },
             Theme = settings.Theme,
             ProjectTrusted = _ => projectTrusted

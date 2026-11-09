@@ -170,8 +170,12 @@ internal static class Program
             Options() with { MaxTokens = double.NaN }, Options() with { Temperature = double.PositiveInfinity }, Options() with { SessionId = "\uD800" },
             Options() with { AzureApiVersion = "\uD800" }, Options() with { TimeoutMilliseconds = 0 },
             Options() with { Headers = JsonData.Parse("""{"authorization":"ignored"}""") }, Options() with { Headers = JsonData.Parse("""{"x-bad":"a\nb"}""") },
-            Options(compat: new { supportsAdditionalTools = true }), Options(compat: new { supportsToolSearch = true }), Options(compat: new { supportsOpenAIGrammarTools = true })
+            Options(compat: new { supportsAdditionalTools = "invalid" }), Options(compat: new { supportsToolSearch = "invalid" }), Options(compat: new { supportsOpenAIGrammarTools = "invalid" })
         }) Throws<AzureResponsesException>(() => Factory(invalid));
+        // R6: these declared capabilities are now supported; their typed admission remains strict.
+        foreach (var supported in new[] { Options(compat: new { supportsAdditionalTools = true }),
+            Options(compat: new { supportsToolSearch = true }), Options(compat: new { supportsOpenAIGrammarTools = true }) })
+            BodyEqual(DefaultBody, Factory(supported).ProjectPayload(request).ToString());
         await ThrowsAsync<AzureResponsesException>(async () => { using var _ = await Factory().CreateAsync(request with { Model = Model with { Id = "other" } }, Key); });
         await ThrowsAsync<AzureResponsesException>(async () => { using var _ = await Factory().CreateAsync(request, "bad\r\nkey"); });
         await ThrowsAsync<AzureResponsesException>(async () => { using var _ = await Factory(Options() with { MaximumKeyCharacters = 2 }).CreateAsync(request, Key); });

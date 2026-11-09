@@ -27,6 +27,8 @@ internal static partial class Program
         var cases = new List<(string Id, Func<Task> Run)>();
         cases.AddRange(CatalogCases());
         cases.AddRange(MaintainedCatalogCases());
+        cases.AddRange(CatalogCorrectionCases());
+        cases.AddRange(CatalogExpansionCases());
         cases.AddRange(ResolverCases());
         cases.AddRange(ModelsJsonCases());
         cases.AddRange(ConfigValueCases());
@@ -40,13 +42,20 @@ internal static partial class Program
         cases.AddRange(Sync150PackageCases());
         cases.AddRange(Sync150CatalogCases());
         cases.AddRange(Sync150CliCases());
-        var results = new List<object>(); var failures = 0;
+        var results = new List<object>(); var failures = 0; var skipped = 0;
         foreach (var test in cases)
         {
+            if (test.Id == "config-value.windows-default-shell-fallback" && !OperatingSystem.IsWindows())
+            {
+                skipped++;
+                results.Add(new { test.Id, status = "SKIP", reason = "requires-windows-cmd-exe" });
+                continue;
+            }
             try { await test.Run().WaitAsync(TimeSpan.FromSeconds(120)); results.Add(new { test.Id, status = "PASS_AUTHORED_NATIVE_ONLY" }); }
             catch (Exception error) { failures++; results.Add(new { test.Id, status = "FAIL", failure = error.ToString() }); }
         }
-        var output = new { sourceSha = Upstream, status = "AUTHORED NATIVE; NO UPSTREAM CAPTURE", cases = cases.Count, failures,
+        var output = new { sourceSha = Upstream, status = "AUTHORED NATIVE; NO UPSTREAM CAPTURE", cases = cases.Count, failures, skipped,
+            platform = OperatingSystem.IsWindows() ? "windows" : OperatingSystem.IsMacOS() ? "macos" : "linux",
             tarballVerified = Tarball is not null, genuineSourceCasesCaptured = 0, liveRoutes = LiveRoutes, results };
         var json = JsonSerializer.Serialize(output, new JsonSerializerOptions { WriteIndented = true });
         if (report is not null)

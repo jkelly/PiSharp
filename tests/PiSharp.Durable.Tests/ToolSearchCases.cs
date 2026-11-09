@@ -39,7 +39,7 @@ internal static partial class Program
 }
 
 /// <summary>The tool-search.* cases (upstream tool-search.test.ts, and the authored cases of the file header).</summary>
-internal static class ToolSearchTests
+internal static partial class ToolSearchTests
 {
     private static readonly DurableContext Context = DurableContext.Background;
 
@@ -106,6 +106,7 @@ internal static class ToolSearchTests
 
     internal static IEnumerable<(string, Func<Task>)> Cases(string prefix)
     {
+        yield return Case(prefix + "refs.local-reference-metadata", ReferenceMetadata);
         yield return Case(prefix + "offers-a-deferred-tool-only-once-tool-search-loads-it-by-appending-its-declaration", async () =>
         {
             var chat = Setup();

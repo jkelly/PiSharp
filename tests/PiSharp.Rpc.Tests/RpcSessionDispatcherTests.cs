@@ -11,7 +11,7 @@ using PiSharp.Rpc.Protocol;
 using PiSharp.Sessions.Serialization;
 using PiSharp.Sessions.Storage;
 
-internal static class RpcSessionDispatcherTests
+internal static partial class RpcSessionDispatcherTests
 {
     private static readonly TimeSpan Deadline = TimeSpan.FromSeconds(10);
     private static readonly AgentOptions NativeProgress = new(ProgressDelivery: new(Mode: ToolProgressDeliveryMode.NativeAwaited));
@@ -19,6 +19,7 @@ internal static class RpcSessionDispatcherTests
     private static readonly JsonData ModelWire = JsonData.Parse("""{"id":"rpc-model","api":"openai-responses","provider":"authored-provider","name":"Authored RPC model","baseUrl":"https://offline.invalid","reasoning":false,"input":["text","image"],"contextWindow":131072,"maxTokens":8192,"cost":{"input":0.5,"output":1.0,"cacheRead":0,"cacheWrite":0},"opaque":{"huge":1e400,"nil":null}}""");
     public static IEnumerable<(string Name, Func<Task> Run)> Cases()
     {
+        foreach (var test in IdleShutdownCases()) yield return test;
         yield return ("rpc.dispatch-real-async-prompt-state-raw-messages-and-generated-only-events", PromptAndState);
         yield return ("rpc.dispatch-real-queues-modes-abort-retention-clear-and-late-continuation", QueuesAndAbort);
         yield return ("rpc.dispatch-durable-checkpoints-precede-end-events-tools-and-next-request", DurableEvents);

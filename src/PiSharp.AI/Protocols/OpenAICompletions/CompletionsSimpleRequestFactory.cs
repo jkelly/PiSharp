@@ -1,6 +1,7 @@
 using System.Collections.Immutable;
 using System.Text.Json;
 using System.Text;
+using PiSharp.AI.Protocols.ProviderShared;
 using PiSharp.Contracts;
 using PiSharp.Contracts.Compatibility;
 
@@ -99,8 +100,7 @@ public sealed class CompletionsSimpleRequestFactory : IChatTransport
         var estimate = EstimateContext(request.Messages);
         var maximum = _options.DirectOptions.MaxTokens ?? _modelMaxTokens;
         var resolved = _options.Reasoning is { } requested ? ClampThinkingLevel(requested) : null;
-        var capped = _contextWindow <= 0 ? Math.Max(1, maximum) :
-            Math.Min(maximum, Math.Max(1, _contextWindow - estimate.Tokens - 4096));
+        var capped = SimpleOutputBudget.ClampToContext(_contextWindow, estimate.Tokens, maximum);
         CheckMagnitude(capped);
         return new(estimate, capped, GetSupportedThinkingLevels(), resolved, resolved is null or "off" ? null : resolved);
     }

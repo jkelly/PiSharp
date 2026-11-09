@@ -1,0 +1,12 @@
+{
+  "productCommit": "14dd34b369fba6d236684da6dfc8a39a03263321",
+  "expected": "reject whole call, zero receipts, earlier entry absent",
+  "resolved": true,
+  "stored": 1,
+  "refusal": "FormatException",
+  "rejection": null,
+  "receipts": [
+    0
+  ],
+  "firstEntryPersisted": true
+}

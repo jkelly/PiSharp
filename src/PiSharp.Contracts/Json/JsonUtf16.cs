@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Diagnostics.CodeAnalysis;
 using System.Buffers;
 using System.Text;
 using System.Text.Json;
@@ -302,7 +303,23 @@ public static class JsonUtf16
 
     /// <summary>A resolver for serializer options passed to <see cref="JsonNode.ToJsonString(JsonSerializerOptions?)"/> on a tree that may
     /// hold the write-only nodes above (such options must resolve their type); any other type resolves by reflection.</summary>
-    public static IJsonTypeInfoResolver Resolver { get; } = JsonTypeInfoResolver.Combine(new RawJsonResolver(), new DefaultJsonTypeInfoResolver());
+    public static IJsonTypeInfoResolver Resolver
+    {
+        [RequiresDynamicCode("The reflection fallback can require runtime code generation. Use AotResolver for JSON node trees and source-generated metadata for CLR objects.")]
+        [RequiresUnreferencedCode("The reflection fallback can require trimmed CLR members. Use AotResolver for JSON node trees and source-generated metadata for CLR objects.")]
+        get
+        {
+            lock (ResolverSync)
+                return _reflectionResolver ??= JsonTypeInfoResolver.Combine(new RawJsonResolver(), new DefaultJsonTypeInfoResolver());
+        }
+    }
+
+    /// <summary>A reflection-free resolver for JSON node trees, write-only raw nodes and the standard JSON primitives.
+    /// For other CLR values, combine it with the caller's source-generated serializer context.</summary>
+    public static IJsonTypeInfoResolver AotResolver { get; } = JsonTypeInfoResolver.Combine(new RawJsonResolver(), JsonUtf16PrimitiveContext.Default);
+
+    private static readonly object ResolverSync = new();
+    private static IJsonTypeInfoResolver? _reflectionResolver;
 
     private static JsonNode Raw(string json) => JsonValue.Create(new RawJson(json), RawJsonInfo)!;
 
@@ -323,3 +340,21 @@ public static class JsonUtf16
     private static readonly JsonTypeInfo<RawJson> RawJsonInfo =
         JsonMetadataServices.CreateValueInfo<RawJson>(new JsonSerializerOptions { TypeInfoResolver = JsonTypeInfoResolver.Combine() }, new RawJsonConverter());
 }
+
+[JsonSerializable(typeof(JsonNode))]
+[JsonSerializable(typeof(JsonElement))]
+[JsonSerializable(typeof(string))]
+[JsonSerializable(typeof(bool))]
+[JsonSerializable(typeof(char))]
+[JsonSerializable(typeof(byte))]
+[JsonSerializable(typeof(sbyte))]
+[JsonSerializable(typeof(short))]
+[JsonSerializable(typeof(ushort))]
+[JsonSerializable(typeof(int))]
+[JsonSerializable(typeof(uint))]
+[JsonSerializable(typeof(long))]
+[JsonSerializable(typeof(ulong))]
+[JsonSerializable(typeof(float))]
+[JsonSerializable(typeof(double))]
+[JsonSerializable(typeof(decimal))]
+internal partial class JsonUtf16PrimitiveContext : JsonSerializerContext { }

@@ -69,8 +69,19 @@ public sealed class AnthropicMessagesHttpSseTransport : IChatTransport
     {
         if (_hooks is not null) return StreamWithHooksAsync(request, cancellationToken);
         var diagnostics = new AnthropicRequestDiagnostics();
-        return new AnthropicMessagesTransport((current, token) => ReadDtosAsync(current, diagnostics, token), _messagesOptions)
+        var source = new AnthropicMessagesTransport((current, token) => ReadDtosAsync(current, diagnostics, token), _messagesOptions)
         { RequestDiagnostics = diagnostics }.StreamAsync(request, cancellationToken);
+        return RecordThreadAsync(source, diagnostics, cancellationToken);
+    }
+    private static async IAsyncEnumerable<StreamEvent> RecordThreadAsync(IAsyncEnumerable<StreamEvent> source,
+        AnthropicRequestDiagnostics diagnostics, [EnumeratorCancellation] CancellationToken token)
+    {
+        await foreach (var item in source.WithCancellation(token).ConfigureAwait(false))
+        {
+            if (item is StreamDone done && !token.IsCancellationRequested && diagnostics.Thread is { } thread)
+                thread.Context.Store.Complete(thread, done.Message, token);
+            yield return item;
+        }
     }
     private TimeProvider Clock => _messagesOptions?.Clock ?? TimeProvider.System;
 
@@ -110,6 +121,8 @@ public sealed class AnthropicMessagesHttpSseTransport : IChatTransport
         terminal ??= session.Failure(null, AnthropicMessagesFailure.SourceFailed);
         if (cancellationToken.IsCancellationRequested) terminal = session.Failure(terminal.Message, AnthropicMessagesFailure.Cancelled);
         else if (session.CleanupErrors.Count != 0) terminal = session.Failure(terminal.Message, AnthropicMessagesFailure.CleanupFailed);
+        if (terminal is StreamDone && session.Diagnostics.Thread is { } thread)
+            thread.Context.Store.Complete(thread, terminal.Message, cancellationToken);
         yield return terminal with
         {
             NativeSourceTask = session.PrimaryTask,
@@ -185,8 +198,9 @@ public sealed class AnthropicMessagesHttpSseTransport : IChatTransport
                         _request = prepared.CompleteClaimed(replacement, token);
                     }
                     else _request = (attempt == 0 ? transport._requestFactory(request,token) : fallback!(token)) ?? throw Protocol();
-                    actual = transport._http.PrepareOwnedAsync(_request,token).AsTask();
-                    try { _response = await Await((Task<HttpSseTransport.OwnedResponse>)actual).ConfigureAwait(false); break; }
+                    var send = transport.SendThreadRequestAsync(_request, Diagnostics, token);
+                    actual = send;
+                    try { var sent = await Await(send).ConfigureAwait(false); _request = sent.Request; _response = sent.Response; break; }
                     catch (Exception error) when (attempt == 0 && !token.IsCancellationRequested && AnthropicStrictToolsFallback.IsStrictToolLimitRejection(error) &&
                         (prepared is not null ? prepared.Fallback is not null : AnthropicStrictToolsFallback.FallbackOf(_request) is not null))
                     {
@@ -287,8 +301,8 @@ public sealed class AnthropicMessagesHttpSseTransport : IChatTransport
             // Upstream records providerThinkingLevel on the output before any request work, so pre-stream failures keep it.
             var properties = (partial?.ExtraProperties ?? WithDiagnostics(transport._messagesOptions?.ProviderThinkingLevel is { } level
                     ? JsonFields.Empty.Set("providerThinkingLevel", JsonData.Parse(JsonSerializer.Serialize(level))) : JsonFields.Empty))
-                .Set("errorMessage",JsonData.Parse(JsonSerializer.Serialize(reason == StopReason.Aborted ? "Anthropic stream was cancelled." :
-                    PrimaryError is ProviderDisplayException shown ? shown.Message : "Anthropic stream did not complete.")))
+                .Set("errorMessage",AnthropicJsonProperties.StringData(reason == StopReason.Aborted ? "Anthropic stream was cancelled." :
+                    PrimaryError is ProviderDisplayException shown ? shown.Message : "Anthropic stream did not complete."))
                 .Set("anthropicFailure",JsonData.Parse(JsonSerializer.Serialize(failure.ToString())));
             var message = partial ?? new(request.Model.Api,request.Model.Provider,request.Model.Id,request.Timestamp,[],TokenUsage.Zero,reason);
             return new StreamError(reason,message with {StopReason=reason,ExtraProperties=properties});
@@ -320,15 +334,49 @@ public sealed class AnthropicMessagesHttpSseTransport : IChatTransport
     private async Task<(HttpRequestMessage Request, HttpSseTransport.OwnedResponse Response)> SendWithStrictToolsFallbackAsync(
         HttpRequestMessage first, AnthropicRequestDiagnostics diagnostics, CancellationToken cancellationToken)
     {
-        try { return (first, await _http.PrepareOwnedAsync(first, cancellationToken).ConfigureAwait(false)); }
+        try { return await SendThreadRequestAsync(first, diagnostics, cancellationToken).ConfigureAwait(false); }
         catch (Exception error) when (!cancellationToken.IsCancellationRequested && AnthropicStrictToolsFallback.IsStrictToolLimitRejection(error) &&
             AnthropicStrictToolsFallback.FallbackOf(first) is not null)
         {
             diagnostics.Add(AnthropicStrictToolsFallback.Diagnostic(error, Clock));
             var second = AnthropicStrictToolsFallback.FallbackOf(first)!(cancellationToken) ?? throw Protocol();
-            try { var response = await _http.PrepareOwnedAsync(second, cancellationToken).ConfigureAwait(false); first.Dispose(); return (second, response); }
+            try { var sent = await SendThreadRequestAsync(second, diagnostics, cancellationToken).ConfigureAwait(false); first.Dispose(); return sent; }
             catch { second.Dispose(); throw; }
         }
+    }
+
+    private async Task<(HttpRequestMessage Request, HttpSseTransport.OwnedResponse Response)> SendThreadRequestAsync(
+        HttpRequestMessage first, AnthropicRequestDiagnostics diagnostics, CancellationToken token)
+    {
+        token.ThrowIfCancellationRequested();
+        diagnostics.Thread = null;
+        if (!first.Options.TryGetValue(AnthropicThreadContext.RequestKey, out var context) || context.Store.Prepare(context) is not { } thread)
+            return (first, await _http.PrepareOwnedAsync(first, token).ConfigureAwait(false));
+        HttpRequestMessage? current = null;
+        try
+        {
+            current = context.Rebuild(thread.Payload, token);
+            first.Dispose();
+            try
+            {
+                var response = await _http.PrepareOwnedAsync(current, token).ConfigureAwait(false);
+                diagnostics.Thread = thread;
+                return (current, response);
+            }
+            catch (Exception error) when (!token.IsCancellationRequested && AnthropicThreadAttempt.FallbackReason(error) is not null)
+            {
+                var reason = AnthropicThreadAttempt.FallbackReason(error)!;
+                diagnostics.Add(AnthropicThreadAttempt.Diagnostic(error, reason, Clock));
+                var unsupported = reason is "thread_unsupported_request" or "400";
+                current.Dispose(); current = null;
+                current = context.Rebuild(thread.RetryPayload(unsupported), token);
+                var response = await _http.PrepareOwnedAsync(current, token).ConfigureAwait(false);
+                if (unsupported) context.Store.Disable(thread);
+                else diagnostics.Thread = thread;
+                return (current, response);
+            }
+        }
+        catch { current?.Dispose(); throw; }
     }
 
     private async IAsyncEnumerable<JsonData> ReadOwnedAsync(HttpSseTransport.OwnedResponse owned, [EnumeratorCancellation] CancellationToken cancellationToken)
@@ -379,7 +427,7 @@ public sealed class AnthropicMessagesHttpSseTransport : IChatTransport
         {
             if (++depth > _options.MaximumJsonDepth) throw Limit();
             if (value.ValueKind == JsonValueKind.Object)
-                foreach (var property in value.EnumerateObject()) { Unicode(property.Name); Check(property.Value, depth); }
+                foreach (var property in value.EnumerateObject()) { _ = JsonUtf16.GetName(property); Check(property.Value, depth); }
             else foreach (var item in value.EnumerateArray()) Check(item, depth);
         }
         // The SDK JSON.parse's each event: a string value keeps a lone surrogate (as its escape in the owned value).

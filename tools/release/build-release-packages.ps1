@@ -24,6 +24,8 @@ $libraries = @(
     'PiSharp.Extensions.Runtime', 'PiSharp.Extensions.Agent', 'PiSharp.ExtensionHost', 'PiSharp.Compatibility.Node', 'PiSharp.Codemode',
     # Decision 0005: the experimental durable port (1.2.0.1), in dependency order.
     'PiSharp.Durable', 'PiSharp.Durable.Tools', 'PiSharp.Durable.Sqlite',
+    # Experimental gap admission; the daemon is a separate NativeAOT artifact, not a NuGet library.
+    'PiSharp.Chord', 'PiSharp.Chord.Hosting', 'PiSharp.Durable.Store', 'PiSharp.Env.Protocol', 'PiSharp.Env',
     # Decision 0012: the experimental custom agents (1.2.0.2), after the durable packages they build on.
     'PiSharp.CustomAgents', 'PiSharp.CustomAgents.JavaScript', 'PiSharp.CustomAgents.Scripting'
 )
@@ -42,7 +44,7 @@ if ('v' + $piVersion -cne $baseline.source.tag) {
 }
 $sdk = (Get-Content -LiteralPath (Join-Path $repo 'global.json') -Raw | ConvertFrom-Json).sdk.version
 
-$out = [IO.Path]::GetFullPath((Join-Path $repo $OutputDirectory))
+$out = [IO.Path]::GetFullPath([IO.Path]::Combine($repo, $OutputDirectory))
 $inputs = [IO.Path]::GetFullPath((Join-Path $repo 'artifacts/release-inputs'))
 $reports = [IO.Path]::GetFullPath((Join-Path $repo 'artifacts/validation'))
 foreach ($dir in @($out, $inputs, $reports)) { New-Item -ItemType Directory -Force -Path $dir | Out-Null }

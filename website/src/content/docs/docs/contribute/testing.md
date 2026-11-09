@@ -88,7 +88,7 @@ The release and the macOS workflow run these. Each covers one area of Pi, with e
 | `PiSharp.McpParity.Tests` | MCP configuration and completion. |
 | `PiSharp.SessionParity.Tests` | Events, session features, export and extension events. |
 | `PiSharp.InteractiveParity.Tests` | Interactive mode, slash commands, and the `CHANGELOG.md` sync. |
-| `PiSharp.ExtensionParity.Tests` | Extensions, the Node bridge and packages. It builds and loads the sample extensions, and needs Node.js 22.13 or later and npm. The first run installs the Pi 1.2.0 npm packages once. |
+| `PiSharp.ExtensionParity.Tests` | Extensions, the Node bridge and packages. It builds and loads the sample extensions, and needs Node.js 22.13 or later and npm. Use the committed `tools/NodeBridge/runtime-fixture-150` manifest/lock with `npm ci` and set `PISHARP_TEST_PI150_NODE_MODULES` to its installed `node_modules`. Ordinary sandbox startup does not install packages. The separate production installer provenance case requires `PISHARP_TEST_INSTALL_PI_RUNTIME=1` and a fresh private runtime cache. |
 | `PiSharp.Durable.Tests` | The [durable](/docs/guides/durable/) port, with cases ported from upstream's tests. The `compat.*` cases read sessions upstream wrote. |
 | `PiSharp.DurableCli.Tests` | `pisharp durable`, including the device server commands. |
 | `PiSharp.CustomAgents.Tests` | [Custom agents](/docs/custom-agents/overview/), from 1.2.0.2. See [Custom agents](#custom-agents). |
@@ -105,7 +105,9 @@ The macOS workflow runs all of them except `Durable` and `DurableCli`, which the
 
 ### Core suites
 
-Most of these test one library each. They are in `PiSharp.slnx`, but no workflow runs them. `tools/test-native.ps1` runs them with the companion suites, but it needs a prepared source manifest and build receipt, and checks that Node.js is absent. Run them one at a time with `dotnet run` instead.
+Most of these test one library each. `core.yml` runs all ten as Windows console jobs, including the Tools process fixtures and TUI ConPTY cases. It builds the CLI child host for CodingAgent and publishes all ten native extension fixtures for CodingAgent and Extensions.ContractTests. Build/fixture failure, missing reports, incomplete execution and skipped core cases fail the lane. Each job uploads the raw report, prerequisite stage results and a current-checkout manifest.
+
+This hosted source-build lane uses the exact SDK from `global.json` and explicitly restores from nuget.org. It is separate from `tools/test-native.ps1`, whose reviewed source manifest, pinned products, Node-absent launch boundary and companion admission remain required for that native qualification workflow. Hosted CI does not issue those admission receipts.
 
 | Suite | Covers |
 | --- | --- |
@@ -218,7 +220,7 @@ export TMPDIR="$(cd "$TMPDIR" && pwd -P)/"
 
 ## Node tests
 
-The compatibility and inventory tools have their own `node:test` files, such as `tools/CompatibilityReport/*.test.mjs` and `tools/SurfaceInventory/*.test.mjs`. Run one with `node --test <file>`. No workflow runs them.
+The compatibility and inventory tools have their own `node:test` files, such as `tools/CompatibilityReport/*.test.mjs` and `tools/SurfaceInventory/*.test.mjs`. Run one with `node --test <file>`. `core.yml` runs the applicability tests and validation-manifest tests, plus `check-worklist.mjs --offline` for shape, row, dependency, wave and local-path checks. It then fetches immutable upstream objects, verifies the frozen audit checkout `7d073328e44337d3292a7db9b0f0308f679c5e97`, and runs the release applicability, worklist and port-map checks against their exact historical objects. `PI_REQUIRE_UPSTREAM=1` makes a missing upstream checkout a failure in this second phase. The explicitly offline phase can report its upstream-only case as skipped; that is not upstream validation.
 
 ## Continuous integration
 
@@ -226,16 +228,23 @@ The workflows live in [`.github/workflows`](https://github.com/jkelly/PiSharp/tr
 
 | Workflow | Triggers | Runs on | What it runs |
 | --- | --- | --- | --- |
+| [`core.yml`](https://github.com/jkelly/PiSharp/blob/main/.github/workflows/core.yml) | Every pull request, pushes to `main`, manual, reusable | Windows; Ubuntu for applicability | Ten core console suites with build/fixture prerequisites and case manifests; offline and immutable-upstream applicability checks. |
+| [`gap-regressions.yml`](https://github.com/jkelly/PiSharp/blob/main/.github/workflows/gap-regressions.yml) | Pull requests, pushes to `main`, manual, reusable | Windows, Ubuntu, macOS | Registered core/Chord/Env console projects, bounded owned processes and actual case ledgers. A required Ubuntu job separately tests the production Pi runtime installer and provenance in a fresh cache. |
+| [`env-native.yml`](https://github.com/jkelly/PiSharp/blob/main/.github/workflows/env-native.yml) | Pull requests, pushes to `main`, manual, reusable | Windows, Ubuntu, macOS | NativeAOT daemon publish, verified notice bundle, single-executable protocol smoke and platform terminal behavior. |
 | [`macos.yml`](https://github.com/jkelly/PiSharp/blob/main/.github/workflows/macos.yml) | Pull requests and pushes to `main`; manual | `macos-15` (Apple Silicon) | The 19 release suites other than `Durable`, `DurableCli` and `CustomAgents`, one job each with Node.js 22. Then it packs every package, installs the `PiSharp.Cli` tool from them, and checks `pisharp --version` and `--help`. |
 | [`durable.yml`](https://github.com/jkelly/PiSharp/blob/main/.github/workflows/durable.yml) | Pushes and pull requests to `main` and `feature/pi-durable`; manual | Windows, Ubuntu and `macos-15` | `Durable`, `Durable` again with `PI_DURABLE_DOCUMENT_RETENTION_MS=0`, and `DurableCli`. A second job publishes `Durable.Tests` for `win-x64`, `linux-x64`, `linux-musl-x64` and `osx-arm64` and checks that each carries its SQLite native library, byte for byte. A third fetches Pi and checks that `compatibility/durable-port-map.json` matches it. |
 | [`custom-agents.yml`](https://github.com/jkelly/PiSharp/blob/main/.github/workflows/custom-agents.yml) | Pushes and pull requests to `main` and `feature/custom-agents`; manual | Windows, Ubuntu and `macos-15` | `CustomAgents`, then the research sample on scripted models, checking that it writes a report. |
-| [`release.yml`](https://github.com/jkelly/PiSharp/blob/main/.github/workflows/release.yml) | A pushed `v*` tag; manual dry run | Ubuntu | All 20 release suites, then packing and publishing. See [Releasing](/docs/contribute/releasing/#the-release-workflow). |
+| [`release.yml`](https://github.com/jkelly/PiSharp/blob/main/.github/workflows/release.yml) | A pushed `v*` tag; manual dry run | Ubuntu | All 22 release-list suites, then packing. Publication additionally requires reusable core, Durable, gap regression (including production installer) and native Env validation jobs checked out at the same release SHA; their failure blocks NuGet and GitHub publication. See [Releasing](/docs/contribute/releasing/#the-release-workflow). |
 | [`website.yml`](https://github.com/jkelly/PiSharp/blob/main/.github/workflows/website.yml) | Pushes to `main` that touch `website/**` or `compatibility/**`; manual | Ubuntu | Builds and deploys the site. See [The website](/docs/contribute/website/#deployment). |
+
+`core.yml` also runs on every pull request and pushes to `main`, and can be called with an exact `source_sha`. Release calls `durable.yml` at that same SHA for its three-OS matrix, both retention modes, hosting/server cases, SQL Server container and four SQLite publish RIDs. Its optional web and browser jobs stay enabled for standalone Durable CI and are excluded from this release gate.
+
+Core, Durable and release-list runs upload manifests generated by `tools/ci/write-validation-manifest.mjs`. A manifest records the executing checkout SHA/tree, local tracked changes, platform, run identity, prerequisite requirements, each suite and each actual case result/reason. Core also records the observed build/fixture/run stages. The report's original `sourceSha` is kept as `oracleSourceSha`; it is never relabeled as the checkout revision. Missing reports are failed receipts, and skips remain explicit `passed-with-skips` rather than unqualified passes. Core and SQL Server reject skips. Historical `IMPLEMENTATION_STATUS.md` entries and preparation receipts do not establish current-head test success.
 
 The reports of the macOS, durable and custom agents runs are uploaded as workflow artifacts. Their matrices set `fail-fast: false`, so one failing OS or suite doesn't cancel the others.
 
 :::note
-No workflow runs the core suites or the companion suites, and only the durable and custom agents workflows run on Windows. If you change a library, run its core suite yourself.
+The core, Durable and custom agents workflows run on Windows. Companion suites still require their separately prepared native qualification; they are not implied by a green core job. Run the affected library suite locally while developing.
 :::
 
 ## Add a suite
@@ -246,3 +255,7 @@ A new suite follows the same shape:
 - Case ids that are unique and stable, a `--report <fresh path>` option, and an exit code of 1 when a case fails.
 - An entry under `/tests/parity/` in `PiSharp.slnx`.
 - To run it in CI, add it to the list in `release.yml` and to the matrix in `macos.yml`. The release runs only the suites its list names.
+
+The Chord legacy codec interoperability tests require Node.js 22 or later (`node` on PATH, or `PISHARP_NODE_EXECUTABLE`). They use Node's standard zlib decoder without installing packages; the production Chord library does not require Node. Native platform results come from the matching OS lane. A passing Windows group with an unavailable symlink fixture does not qualify that branch: console skip observations remain in the manifest and fail the core no-skip gate.
+
+The dedicated gap projects are registered in `tools/ci/gap-suites.json`. Its per-platform policies name required cases and the few exact platform skips; the bounded runner rejects empty selections, missing cases, truncated output and unrecognized skips. Each stage retains its checkout and source hashes, raw stdout/stderr, prerequisite results and case ledger. A planned or interrupted run is not a passing result.

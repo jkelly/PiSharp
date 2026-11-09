@@ -122,8 +122,27 @@ public static class McpSignIn
             preferredPort, callbackOptions.Port is not null);
         var redirectUrl = callbackOptions.FixedRedirectUrl ?? callback.RedirectUrl;
         McpDefaultOAuthHost? host = null; Exception? failure = null;
+        Uri? authorizationUrl = null; string? state = null;
+        var triedStoredRefresh = false;
         try
         {
+            // A refresh belongs to the registered client and its original redirect URI. The
+            // callback listener may have moved to a free port; only the browser step needs it.
+            if (stored?.Tokens?.RefreshToken is { Length: > 0 } && stored.ClientInformation is not null &&
+                string.IsNullOrEmpty(settings.ClientId) && settings.ClientRegistration != "cimd" &&
+                options.Challenge?.IsStepUp != true)
+            {
+                host = CreateHost(registered ?? redirectUrl);
+                host.UseChallenge(options.Challenge?.ResourceMetadataUrl);
+                triedStoredRefresh = true;
+                if ((await host.AuthorizeAsync(host.Options(scope: MergeScopes(settings.Scope, options.Challenge?.Scope)), token)
+                    .ConfigureAwait(false)).Outcome == McpOAuthAuthorizationOutcome.Authorized) return;
+                await host.DisposeAsync().ConfigureAwait(false);
+                host = null;
+                token.ThrowIfCancellationRequested();
+                stored = await store.LoadAsync().ConfigureAwait(false);
+                authorizationUrl = null; state = null;
+            }
             if (stored is not null)
             {
                 // Every sign-in gets a fresh `state` parameter.
@@ -147,9 +166,8 @@ public static class McpSignIn
                 await store.SaveAsync(current with { ClientInformation = JsonData.Parse(client) }).ConfigureAwait(false);
             }
 
-            Uri? authorizationUrl = null; string? state = null;
-            host = McpDefaultOAuthHost.Install(new(options.ServerUrl, new Uri(redirectUrl),
-                McpDefaultOAuthClientMetadata.Create(settings.ClientName, redirectUrl, !string.IsNullOrEmpty(settings.ClientSecret)), store,
+            McpDefaultOAuthHost CreateHost(string hostRedirectUrl) => McpDefaultOAuthHost.Install(new(options.ServerUrl, new Uri(hostRedirectUrl),
+                McpDefaultOAuthClientMetadata.Create(settings.ClientName, hostRedirectUrl, !string.IsNullOrEmpty(settings.ClientSecret)), store,
                 options.UnixMilliseconds, _ => ValueTask.FromResult(options.RandomBytes(32)),
                 (url, _) => { authorizationUrl = url; return ValueTask.CompletedTask; },
                 (returned, _) => returned is not null && returned == state ? ValueTask.CompletedTask
@@ -168,12 +186,13 @@ public static class McpSignIn
                 // (McpOAuthClientMetadataDocuments.Create), and `auto` never reaches it in PiSharp.
                 ClientMetadataDocumentBase: offersDocument ? ClientMetadataBaseUrl : null,
                 AuthorizationServerMetadataUrl: settings.AuthServerMetadataUrl, RequestTimeout: options.RequestTimeout));
+            host = CreateHost(redirectUrl);
             // A server asking for more scope gets it on top of the configured scope and, since the challenge may list only the
             // missing scopes, on top of the scope granted so far. A refresh keeps the granted scope, so a step-up skips it.
             var challenge = options.Challenge; var stepUp = challenge?.IsStepUp == true;
             var scope = MergeScopes(settings.Scope, stepUp ? McpOAuthScope.StepUp(stored?.Tokens?.Scope, challenge!.Scope) : challenge?.Scope);
             host.UseChallenge(challenge?.ResourceMetadataUrl);
-            if ((await host.AuthorizeAsync(host.Options(scope: scope, skipRefresh: stepUp), token).ConfigureAwait(false)).Outcome == McpOAuthAuthorizationOutcome.Authorized) return;
+            if ((await host.AuthorizeAsync(host.Options(scope: scope, skipRefresh: stepUp || triedStoredRefresh), token).ConfigureAwait(false)).Outcome == McpOAuthAuthorizationOutcome.Authorized) return;
             if (authorizationUrl is null || state is null) throw new InvalidOperationException("OAuth flow did not produce an authorization URL");
             // The flow picks the redirect URI, which may be specific to the MCP server.
             var authorizationRedirectUrl = new Uri(McpOAuthCallbackServer.Query(authorizationUrl.Query.TrimStart('?'), "redirect_uri") ?? redirectUrl);

@@ -1,0 +1,146 @@
+[
+  {
+    "options": {
+      "LockTimeoutSeconds": 30,
+      "TestTimeoutSeconds": 600,
+      "Label": "Compatibility-r5-build",
+      "Project": "tests/PiSharp.Compatibility.Tests",
+      "BuildTimeoutSeconds": 240,
+      "BuildOnly": true,
+      "Configuration": "Debug",
+      "BuildArguments": [
+        "--no-restore",
+        "-p:RunAnalyzers=false"
+      ]
+    },
+    "environment": {}
+  },
+  {
+    "options": {
+      "LockTimeoutSeconds": 30,
+      "TestTimeoutSeconds": 600,
+      "Label": "Transport-r5-build",
+      "Project": "tests/PiSharp.Transport.Tests",
+      "BuildTimeoutSeconds": 240,
+      "BuildOnly": true,
+      "Configuration": "Debug",
+      "BuildArguments": [
+        "--no-restore",
+        "-p:RunAnalyzers=false"
+      ]
+    },
+    "environment": {}
+  },
+  {
+    "options": {
+      "LockTimeoutSeconds": 30,
+      "TestTimeoutSeconds": 600,
+      "Label": "R6-r5-build",
+      "Project": "tests/PiSharp.ResponsesTranscriptTools.Tests",
+      "BuildTimeoutSeconds": 240,
+      "BuildOnly": true,
+      "Configuration": "Debug",
+      "BuildArguments": [
+        "--no-restore",
+        "-p:RunAnalyzers=false"
+      ]
+    },
+    "environment": {}
+  },
+  {
+    "options": {
+      "LockTimeoutSeconds": 30,
+      "TestTimeoutSeconds": 600,
+      "Label": "Azure-r5-build",
+      "Project": "tests/PiSharp.AzureResponses.Tests",
+      "BuildTimeoutSeconds": 240,
+      "BuildOnly": true,
+      "Configuration": "Debug",
+      "BuildArguments": [
+        "--no-restore",
+        "-p:RunAnalyzers=false"
+      ]
+    },
+    "environment": {}
+  },
+  {
+    "options": {
+      "LockTimeoutSeconds": 30,
+      "TestTimeoutSeconds": 600,
+      "Label": "ProviderApis-r5-build",
+      "Project": "tests/PiSharp.ProviderApis.Tests",
+      "BuildTimeoutSeconds": 240,
+      "BuildOnly": true,
+      "Configuration": "Debug",
+      "BuildArguments": [
+        "--no-restore",
+        "-p:RunAnalyzers=false"
+      ]
+    },
+    "environment": {}
+  },
+  {
+    "options": {
+      "LockTimeoutSeconds": 30,
+      "TestTimeoutSeconds": 600,
+      "Label": "ProviderOffline-r5-build",
+      "Project": "tests/PiSharp.ProviderOfflineDifferential.Tests",
+      "BuildTimeoutSeconds": 240,
+      "BuildOnly": true,
+      "Configuration": "Debug",
+      "BuildArguments": [
+        "--no-restore",
+        "-p:RunAnalyzers=false"
+      ]
+    },
+    "environment": {}
+  },
+  {
+    "options": {
+      "TestTimeoutSeconds": 600,
+      "Label": "Threads-r5-build",
+      "BuildOnly": true,
+      "Project": "tests/PiSharp.AnthropicThreads.Tests",
+      "LockTimeoutSeconds": 30,
+      "BuildTimeoutSeconds": 240,
+      "BuildArguments": [
+        "--no-restore",
+        "-p:RunAnalyzers=false"
+      ],
+      "Configuration": "Debug"
+    },
+    "environment": {}
+  },
+  {
+    "options": {
+      "TestTimeoutSeconds": 600,
+      "Label": "AnthropicSimple-r5-build",
+      "BuildOnly": true,
+      "Project": "tests/PiSharp.AnthropicSimple.Tests",
+      "LockTimeoutSeconds": 30,
+      "BuildTimeoutSeconds": 240,
+      "BuildArguments": [
+        "--no-restore",
+        "-p:RunAnalyzers=false"
+      ],
+      "Configuration": "Debug"
+    },
+    "environment": {}
+  },
+  {
+    "options": {
+      "Label": "Schema-r5-build",
+      "Project": "tests/PiSharp.Schema.Tests",
+      "LockTimeoutSeconds": 30,
+      "Configuration": "Debug",
+      "TestTimeoutSeconds": 300,
+      "BuildArguments": [
+        "--no-restore",
+        "-p:RunAnalyzers=false"
+      ],
+      "BuildOnly": true,
+      "BuildTimeoutSeconds": 240
+    },
+    "environment": {}
+  }
+]

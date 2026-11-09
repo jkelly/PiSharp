@@ -2,6 +2,8 @@ using System.Net;
 using System.Text.Json;
 using PiSharp.AI;
 using PiSharp.AI.Providers;
+using PiSharp.AI.Protocols.OpenAIResponses;
+using PiSharp.AI.Transports;
 using PiSharp.Contracts;
 
 internal static class NativeThinkingControlTests
@@ -108,6 +110,24 @@ internal static class NativeThinkingControlTests
             }
             Check(handler.Calls == 3, "Null/off selection changed HTTP ownership.");
         }
+        // An admitted model map remains authoritative; only metadata-free request selection clears frozen raw mappings.
+        using (var mappedHandler = new Capture())
+        {
+            var mappedModel = Model("responses");
+            var frozenMap = JsonData.Parse("""{"off":"high"}""");
+            var configured = new ResponsesKeyAuthRequestOptions(ReasoningEffort: "high", ReasoningSummary: "detailed", ThinkingLevelMap: frozenMap);
+            using var mapped = NativeProviderFactory.CreateResponses(mappedModel, new("https://api.openai.com/v1/responses"), "offline-key", new(true),
+                configured, mappedHandler, Metadata(mappedModel, map: "{\"off\":\"low\"}"));
+            foreach (var level in new string?[] { null, "off", null })
+            {
+                await Send(mapped, new(mappedModel, []) { ThinkingLevel = level }, mappedHandler);
+                using var body = JsonDocument.Parse(mappedHandler.Payload!);
+                Check(body.RootElement.GetProperty("reasoning").GetProperty("effort").GetString() == (level is null ? "high" : "low"),
+                    "Admitted per-model off map was cleared or selected off leaked into the legacy profile.");
+            }
+            Check(ReferenceEquals(configured.ThinkingLevelMap, frozenMap) && frozenMap.ToString() == "{\"off\":\"high\"}" && mappedHandler.Calls == 3,
+                "Selected thinking mutated caller-owned frozen mapping/options.");
+        }
         using var rejectedHandler = new Capture();
         Throws<ArgumentException>(() => NativeProviderFactory.CreateAnthropic(Model("anthropic"), new("https://api.anthropic.com/"), "offline-key",
             new(4096, ModelReasoning: true, ThinkingEnabled: true, SupportsThinkingOff: false), handler: rejectedHandler));
@@ -200,11 +220,17 @@ internal static class NativeThinkingControlTests
         catch (HttpRequestException error) when (request.Model.Api == "openai-responses" && error.StatusCode == HttpStatusCode.BadRequest)
         { rejection = error; }
         Check(handler.Calls == calls + 1 && handler.Payload is not null, "Expected exactly one captured HTTP 400 request.");
-        // Responses propagates the status exception; the other native adapters settle with an error frame.
+        // Frozen v1.5.0 Responses acquisition/onResponse precedes Start, and its wrapper catches status errors into one error frame.
         if (request.Model.Api == "openai-responses")
         {
-            Check(rejection is not null && frames.Count == 1 && frames[0] is StreamStarted,
-                "Responses rejection must follow start without a terminal frame.");
+            var error = ResponsesRawContractAssertions.Error(frames, typeof(HttpSseRejectedException));
+            Check(rejection is null && frames.OfType<StreamStarted>().Count() == 0 && error.NativeSourceException is HttpSseRejectedException { StatusCode: HttpStatusCode.BadRequest },
+                "Responses status error escaped, lost its status, or emitted Start before rejection.");
+            Check(error.Message.Content.IsEmpty && error.Message.Model == request.Model.Id && error.Message.Provider == request.Model.Provider &&
+                error.NativeCleanupExceptions is null && !handler.Disposed && handler.ResponseContentDisposed,
+                "Responses rejected request retained response work, fabricated content, or lost model identity.");
+            Check(error.Message.ExtraProperties?.TryGet("errorMessage", out var display) == true && display!.Value.GetString() == "OpenAI API error (400): 400 offline",
+                "Responses source-formatted provider status text changed.");
             return;
         }
         Check(frames.Count > 0 && frames[^1] is StreamError && frames.OfType<StreamTerminalEvent>().Count() == 1 &&
@@ -235,8 +261,15 @@ internal static class NativeThinkingControlTests
     private sealed class Capture : HttpMessageHandler
     {
         public int Calls; public string? Payload; public bool Disposed;
+        private TrackingResponseContent? _responseContent;
+        public bool ResponseContentDisposed => _responseContent?.Disposed == true;
+        private sealed class TrackingResponseContent() : StringContent("offline")
+        {
+            public bool Disposed;
+            protected override void Dispose(bool disposing) { Disposed |= disposing; base.Dispose(disposing); }
+        }
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken token)
-        { Calls++; Payload = await request.Content!.ReadAsStringAsync(token); return new(HttpStatusCode.BadRequest) { Content = new StringContent("offline") }; }
+        { Calls++; Payload = await request.Content!.ReadAsStringAsync(token); _responseContent = new(); return new(HttpStatusCode.BadRequest) { Content = _responseContent }; }
         protected override void Dispose(bool disposing) { Disposed = true; base.Dispose(disposing); }
     }
     private static void Check(bool value, string message) { if (!value) throw new InvalidOperationException(message); }

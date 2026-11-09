@@ -23,7 +23,12 @@ internal static class CompletionsToolImageFlowTests
         foreach (var captured in source.RootElement.GetProperty("observations").EnumerateArray())
         {
             var request = Request(captured); var original = request.Messages.Select(entry => entry.WireBody.ToString()).ToArray();
-            var expectedBody = FollowPi150Body(captured);
+            var legacyExpectedBody = FollowPi150Body(captured);
+            var expectedBody = CompletionsCurrentBodyExpectations.WithoutEmptyTools(legacyExpectedBody);
+            // The explicit legacy override must still reproduce the entire captured/Pi150-projected body.
+            using (var legacy = Factory(captured, request.Model, legacyTools: true).Create(request, "authored-inert-image-key"))
+            using (var legacyBody = JsonDocument.Parse(await legacy.Content!.ReadAsStringAsync()))
+                Check(JsonElement.DeepEquals(legacyExpectedBody, legacyBody.RootElement), "Explicit legacy image request differs from the full captured expectation.");
             var body = new OwnedBody(); var content = new BodyContent(body); JsonData? actual = null; Exception? observed = null; HttpRequestMessage? sent = null; var sends = 0; var builds = 0;
             using var handler = new Handler(async (http, token) =>
             {
@@ -32,7 +37,7 @@ internal static class CompletionsToolImageFlowTests
                 {
                     Equal("POST", http.Method.Method); Equal(captured.GetProperty("requests")[0].GetProperty("url").GetString(), http.RequestUri!.AbsoluteUri);
                     actual = JsonData.Parse(await http.Content!.ReadAsStringAsync(token));
-                    Check(JsonElement.DeepEquals(expectedBody, actual.Value), "Complete actual HTTP image request differs: " + captured.GetProperty("id").GetString());
+                    Check(JsonElement.DeepEquals(expectedBody, actual.Value), "Complete current-target HTTP image derivative differs (only empty tools omitted): " + captured.GetProperty("id").GetString());
                     return new(HttpStatusCode.OK) { Content = content };
                 }
                 catch (Exception error) { observed = error; throw; }
@@ -113,10 +118,10 @@ internal static class CompletionsToolImageFlowTests
         return new(new(model.GetProperty("id").GetString()!, model.GetProperty("api").GetString()!, model.GetProperty("provider").GetString()!),
             source.GetProperty("context").GetProperty("messages").EnumerateArray().Select(value => new TranscriptEntry(value.GetProperty("role").GetString()!, JsonData.FromElement(value))).ToImmutableArray(), 123);
     }
-    private static CompletionsKeyAuthRequestFactory Factory(JsonElement source, ModelDescriptor model) => new(new(source.GetProperty("requests")[0].GetProperty("url").GetString()!), model,
+    private static CompletionsKeyAuthRequestFactory Factory(JsonElement source, ModelDescriptor model, bool legacyTools = false) => new(new(source.GetProperty("requests")[0].GetProperty("url").GetString()!), model,
         new(RequiresAssistantAfterToolResult: source.GetProperty("projection").GetProperty("requiresAssistantAfterToolResult").GetBoolean(), RequiresToolResultName: source.GetProperty("projection").GetProperty("requiresToolResultName").GetBoolean())
             { ModelSupportsImages = source.GetProperty("model").GetProperty("input").EnumerateArray().Any(value => value.GetString() == "image") },
-        new(MaxTokens: 64, Temperature: 0));
+        new(MaxTokens: 64, Temperature: 0) { RequiresToolsWithToolHistory = legacyTools });
     private static JsonDocument Fixture()
     {
         var directory = new DirectoryInfo(AppContext.BaseDirectory); while (directory is not null && !File.Exists(Path.Combine(directory.FullName, "PiSharp.slnx"))) directory = directory.Parent;

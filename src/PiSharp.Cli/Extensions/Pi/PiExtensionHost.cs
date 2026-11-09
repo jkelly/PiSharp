@@ -43,6 +43,7 @@ internal sealed record PiExtensionHostOptions(string Cwd, string AgentDir, strin
     internal string? Theme { get; init; }
     /// <summary>The Pi packages' node_modules to load extensions with; null installs or finds them (<see cref="PiNodeRuntime"/>).</summary>
     internal string? PiModules { get; init; }
+    internal bool UseCompatibilityModules { get; init; }
     internal ImmutableArray<PiTheme> Themes { get; init; } = [];
     internal Func<string, bool> ProjectTrusted { get; init; } = _ => true;
 }
@@ -146,6 +147,7 @@ internal sealed partial class PiExtensionHost : IPiNodeHostPeer, IAsyncDisposabl
         // The Pi 1.1.0 packages extensions run against (installed into the agent dir on first use; the compatibility modules offline).
         var installOutput = new PiNodeRuntimeOutput(options.StandardError);
         (host.PiModules, host.RuntimeFallback) = options.PiModules is { } configured ? (configured, null)
+            : options.UseCompatibilityModules ? (null, "compatibility modules explicitly selected by the embedding host")
             : await PiNodeRuntime.EnsureAsync(options.AgentDir, options.GetEnvironment, installOutput, null, null, token).ConfigureAwait(false);
         host._node = await PiNodeHost.StartAsync(new PiNodeHostLaunch(node, script, cwd) { StandardError = options.StandardError }, host, token).ConfigureAwait(false);
         var init = await host._node.RequestAsync("init", new JsonObject

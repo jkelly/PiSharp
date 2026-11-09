@@ -56,7 +56,7 @@ internal sealed class PiExtensionModels
     {
         var chat = await runtime.CreateModelRegistryAsync(token).ConfigureAwait(false);
         var builtin = NativeExtensionModelOperations.CreateDefaultRegistry(runtime.ReadEnvironment, runtime.AuthPath, runtime.CreateAuthHttp, runtime.Time,
-            llamaProvider: runtime.LlamaProvider);
+            runtime.LlamaProvider, chat);
         var models = new PiExtensionModels(chat, builtin) { _runtime = runtime, _host = host, _environment = runtime.ReadEnvironment };
         host.Stream = models.StreamAsync;
         models.SyncProviders();
@@ -64,6 +64,10 @@ internal sealed class PiExtensionModels
         host.RegistrationsChanged += models.SyncProviders;
         host.NativeModelProviders.Changed += models.SyncProviders;
         host.Models = models.CallAsync;
+        host.RefreshModelOperations = async refreshToken =>
+        {
+            await chat.RefreshAsync(allowNetwork: false, force: null, providers: null, refreshToken).ConfigureAwait(false);
+        };
         host.ModelJson = (provider, id) => chat.Find(provider, id) is { } model ? PiSharp.Contracts.JsonUtf16.MutableNode(model.ToJsonString()) : null;
         // The native extensions' ctx.modelRegistry is this registry too.
         host.BindModelOperations(models.Operations);
@@ -334,7 +338,9 @@ internal sealed class PiExtensionModels
                     { ErrorMessage = $"Model {model.Provider}/{model.Id} is not an image model" };
                 return PiSharp.Contracts.JsonUtf16.MutableNode(ModelOperationJson.WriteAssistantImages(result).ToString());
             }
-            case "refresh": return new JsonObject();
+            case "refresh":
+                await _chat.RefreshAsync(allowNetwork: _environment("PI_OFFLINE") is null, force: null, providers: null, token).ConfigureAwait(false);
+                return new JsonObject();
             default: throw new NotSupportedException($"ctx.modelRegistry.{op}() is not available in this PiSharp host");
         }
     }

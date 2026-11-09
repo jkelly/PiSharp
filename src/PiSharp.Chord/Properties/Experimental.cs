@@ -1,3 +1,3 @@
-// Decision 0013 (Pi 1.5.0 sync, phase 4): every public type of the Chord v2 port is experimental, as upstream's @earendil-works/chord/next
-// is. Consumers opt in by suppressing PISHARP_CHORD001.
+// Every public type of the next and distinct legacy Chord runtimes is experimental.
+// Consumers opt in by suppressing PISHARP_CHORD001; local package admission is not publication.
 [assembly: System.Diagnostics.CodeAnalysis.Experimental("PISHARP_CHORD001")]

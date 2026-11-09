@@ -286,14 +286,14 @@ internal sealed class SchemaExplainer(SchemaCompiler c, object? schema)
     /// <summary>How many of the keys of <paramref name="v"/> the branch <paramref name="s"/> (through a <c>$ref</c>) declares in <c>properties</c>.</summary>
     private int DeclaredKeys(object? s, string b, JsObject v)
     {
-        var node = s is JsObject o && o.GetOwn("$ref") is string @ref ? c.R.Resolve(@ref, b).Node : s;
+        var node = s is JsObject o && o.GetOwn("$ref") is string @ref ? c.R.Resolve(@ref, c.R.BaseFor(o, b)).Node : s;
         var properties = node is JsObject n && n.GetOwn("properties") is JsObject p ? p : new JsObject();
         return v.Keys.Count(properties.HasOwn);
     }
 
     private (string Key, List<object?> Values)? TagOf(JsArray branches, string b)
     {
-        var resolved = branches.Select(s => s is JsObject o && o.GetOwn("$ref") is string @ref ? c.R.Resolve(@ref, b).Node : s).ToList();
+        var resolved = branches.Select(s => s is JsObject o && o.GetOwn("$ref") is string @ref ? c.R.Resolve(@ref, c.R.BaseFor(o, b)).Node : s).ToList();
         if (resolved.Count == 0 || resolved[0] is not JsObject first || first.GetOwn("properties") is not JsObject firstProperties) return null;
         foreach (var key in firstProperties.Keys)
         {
@@ -328,7 +328,7 @@ internal sealed class SchemaExplainer(SchemaCompiler c, object? schema)
         var unevaluatedProperties = node.GetOwn("unevaluatedProperties");
         var unevaluatedItems = node.GetOwn("unevaluatedItems");
         var a = new SchemaAnnotations();
-        c.Annotating(c.WithoutUnevaluated(node), b)(v, a);
+        c.Annotating(c.WithoutUnevaluated(node, b), b)(v, a);
         if (v is JsObject o && unevaluatedProperties is not JsUndefined && !a.AllProps)
         {
             foreach (var k in o.Keys)

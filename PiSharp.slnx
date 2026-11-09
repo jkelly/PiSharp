@@ -34,6 +34,10 @@
     <Project Path="src/PiSharp.Durable.Web/PiSharp.Durable.Web.csproj" />
     <Project Path="src/PiSharp.Web.Common/PiSharp.Web.Common.csproj" />
     <Project Path="src/PiSharp.WebAgent/PiSharp.WebAgent.csproj" />
+    <Project Path="src/PiSharp.Chord.Hosting/PiSharp.Chord.Hosting.csproj" />
+    <Project Path="src/PiSharp.Env/PiSharp.Env.csproj" />
+    <Project Path="src/PiSharp.Env.Daemon/PiSharp.Env.Daemon.csproj" />
+    <Project Path="src/PiSharp.Env.Protocol/PiSharp.Env.Protocol.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/PiSharp.Compatibility.Tests/PiSharp.Compatibility.Tests.csproj" />
@@ -50,6 +54,24 @@
     <Project Path="tests/PiSharp.ExtensionHost.Tests/PiSharp.ExtensionHost.Tests.csproj" />
     <Project Path="tests/PiSharp.ExtensionHost.ProcessTests/PiSharp.ExtensionHost.ProcessTests.csproj" />
     <Project Path="tests/PiSharp.Compatibility.Node.ProcessTests/PiSharp.Compatibility.Node.ProcessTests.csproj" />
+    <Project Path="tests/PiSharp.AnthropicThreads.Tests/PiSharp.AnthropicThreads.Tests.csproj" />
+    <Project Path="tests/PiSharp.Chord.Legacy.Cluster.Tests/PiSharp.Chord.Legacy.Cluster.Tests.csproj" />
+    <Project Path="tests/PiSharp.ClassifierConfig.Tests/PiSharp.ClassifierConfig.Tests.csproj" />
+    <Project Path="tests/PiSharp.Env.Adapter.Tests/PiSharp.Env.Adapter.Tests.csproj" />
+    <Project Path="tests/PiSharp.Env.Connection.Tests/PiSharp.Env.Connection.Tests.csproj" />
+    <Project Path="tests/PiSharp.Env.Daemon.Tests/PiSharp.Env.Daemon.Tests.csproj" />
+    <Project Path="tests/PiSharp.Env.Process.Tests/PiSharp.Env.Process.Tests.csproj" />
+    <Project Path="tests/PiSharp.Env.Ssh.Tests/PiSharp.Env.Ssh.Tests.csproj" />
+    <Project Path="tests/PiSharp.Env.Terminal.Tests/PiSharp.Env.Terminal.Tests.csproj" />
+    <Project Path="tests/PiSharp.Env.Watch.Tests/PiSharp.Env.Watch.Tests.csproj" />
+    <Project Path="tests/PiSharp.Evals.Tests/PiSharp.Evals.Tests.csproj" />
+    <Project Path="tests/PiSharp.OpenAICompatibilityGap.Tests/PiSharp.OpenAICompatibilityGap.Tests.csproj" />
+    <Project Path="tests/PiSharp.ResponsesTranscriptTools.Tests/PiSharp.ResponsesTranscriptTools.Tests.csproj" />
+    <Project Path="tests/PiSharp.SimpleOutputBudget.Tests/PiSharp.SimpleOutputBudget.Tests.csproj" />
+    <Project Path="tests/PiSharp.Tui.NativeModifiers.Tests/PiSharp.Tui.NativeModifiers.Tests.csproj" />
+    <Project Path="tests/PiSharp.Chord.Durable.Integration.Tests/PiSharp.Chord.Durable.Integration.Tests.csproj" />
+    <Project Path="tests/PiSharp.Chord.Hosting.Tests/PiSharp.Chord.Hosting.Tests.csproj" />
+    <Project Path="tests/PiSharp.Durable150.Capture.Tests/PiSharp.Durable150.Capture.Tests.csproj" />
   </Folder>
   <Folder Name="/tests/companions/PiSharp.CompletionsAnchored.Tests/">
     <Project Path="tests/PiSharp.CompletionsAnchored.Tests/PiSharp.CompletionsAnchored.Tests.csproj" />
@@ -251,5 +273,11 @@
   </Folder>
   <Folder Name="/tests/parity/PiSharp.InteractiveParity.Tests/">
     <Project Path="tests/PiSharp.InteractiveParity.Tests/PiSharp.InteractiveParity.Tests.csproj" />
+  </Folder>
+  <Folder Name="/tools/">
+    <Project Path="tools/PiSharp.Evals/PiSharp.Evals.csproj" />
+  </Folder>
+  <Folder Name="/samples/">
+    <Project Path="samples/Durable.Chord.Examples/Durable.Chord.Examples.csproj" />
   </Folder>
 </Solution>

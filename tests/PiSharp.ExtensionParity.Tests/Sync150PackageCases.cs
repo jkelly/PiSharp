@@ -22,6 +22,7 @@ internal static partial class Program
 {
     private static IEnumerable<(string, Func<Task>)> Sync150PackageCases() =>
     [
+        ("gap.package-update-summary-offline-empty-and-git", PackageUpdateSummary),
         ("sync150.bridge-exec-max-buffer-utf8-and-spawn-errors", BridgeExecLimits),
         ("sync150.native-exec-max-buffer-truncates-stops-and-spawn-errors", NativeExecLimits),
         ("sync150.package-npm-prefix-resolves-a-linked-agent-dir", PackageNpmRealPrefix),
@@ -429,7 +430,11 @@ internal static partial class Program
         var progress = new List<PiPackageProgressEvent>();
         var manager = Manager(sandbox, J("""{"packages":["npm:stale","npm:fresh","npm:unknown"]}"""), processes: processes);
         manager.SetProgressCallback(progress.Add);
-        await manager.UpdateAsync();
+        var summary = await manager.UpdateAsync();
+        Equal(PiPackageUpdateStatus.Warning, summary.Packages.Single(p => p.Source == "npm:stale").Status, "stale registry is a typed warning");
+        Equal(PiPackageUpdateStatus.Changed, summary.Packages.Single(p => p.Source == "npm:fresh").Status, "updated version is changed");
+        Equal(("1.0.0", "2.0.0"), (summary.Packages.Single(p => p.Source == "npm:fresh").Before!, summary.Packages.Single(p => p.Source == "npm:fresh").After!), "version transition");
+        Equal(PiPackageUpdateStatus.Warning, summary.Packages.Single(p => p.Source == "npm:unknown").Status, "failed metadata lookup is surfaced");
         Check(processes.Ran("npm", ["install", "stale@latest", "fresh@latest", "unknown@latest", "--prefix", userRoot, "--legacy-peer-deps", "--no-audit", "--no-fund"]), "one batch");
         var expected = "npm:stale is still 1.0.0 (registry reports 2.0.0); npm registry metadata may be stale, try again in a few minutes";
         Names([expected], progress.Where(e => e.Type == "progress").Select(e => e.Message!), "unchanged warnings");
@@ -440,6 +445,46 @@ internal static partial class Program
         var (code, stdout, stderr) = await RunPackages(sandbox, (_, _) => Processes(), "update", "--extensions");
         Equal(0, code, "update exit; " + stderr);
         Check(stdout.Split('\n').Any(line => line.Contains(expected, StringComparison.Ordinal)), "the update command prints the warning: " + stdout);
+        Check(!stdout.Split('\n').Contains("Updated packages"), "no unconditional success summary");
+    }
+
+    private static async Task PackageUpdateSummary()
+    {
+        using var sandbox = new Sandbox("update-summary");
+        var processes = new FakeProcesses();
+        var summary = await Manager(sandbox, J("""{"packages":["npm:some-package"]}"""), processes: processes,
+            environment: new() { ["PI_OFFLINE"] = "1" }).UpdateAsync();
+        Equal(PiPackageUpdateStatus.Offline, summary.Packages.Single().Status, "offline status");
+        Equal(0, processes.Runs.Count + processes.Captures.Count, "offline performs no processes");
+        Check(summary.Lines().Single().Contains("offline mode", StringComparison.Ordinal), "offline output");
+        summary = await Manager(sandbox).UpdateAsync();
+        Check(summary.Packages.IsEmpty && summary.Lines().Single() == "No packages configured for update.", "empty summary");
+
+        const string source = "git:github.com/test/summary";
+        var head = new string('a', 40); var remote = new string('b', 40);
+        processes = new FakeProcesses
+        {
+            OnCapture = (_, args, _) => args switch
+            {
+                ["rev-parse", "HEAD"] => head,
+                ["rev-parse", "--abbrev-ref", "@{upstream}"] => "origin/main",
+                ["rev-parse", "@{upstream}"] or ["rev-parse", "@{upstream}^{commit}"] => remote,
+                _ => throw new PiPackageException("unexpected capture")
+            },
+            OnRun = (_, args, _) => { if (args[0] == "reset") head = remote; return Task.CompletedTask; }
+        };
+        var manager = Manager(sandbox, J("""{"packages":["git:github.com/test/summary"]}"""), processes: processes);
+        Directory.CreateDirectory(manager.GetGitInstallPath((PiGitSource)PiPackageSource.Parse(source), "user"));
+        summary = await manager.UpdateAsync();
+        Equal(PiPackageUpdateStatus.Changed, summary.Packages.Single().Status, "git changed");
+        Equal(new string('a', 40), summary.Packages.Single().Before!, "old commit");
+        Equal(remote, summary.Packages.Single().After!, "new commit");
+        summary = await manager.UpdateAsync();
+        Equal(PiPackageUpdateStatus.Unchanged, summary.Packages.Single().Status, "git no change");
+        remote = new string('c', 40);
+        processes.OnRun = (_, args, _) => { if (args[0] == "reset") head = remote; if (args[0] == "clean") throw new PiPackageException("locked file"); return Task.CompletedTask; };
+        summary = await manager.UpdateAsync();
+        Equal(PiPackageUpdateStatus.Warning, summary.Packages.Single().Status, "git incomplete cleanup warning");
     }
 
     // resolvePackageSources: a configured package that cannot be installed is skipped and recorded (source, scope, message) instead of

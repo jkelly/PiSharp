@@ -9,7 +9,11 @@ using PiSharp.AI.Protocols.OpenAIResponses;
 using PiSharp.AI.Protocols.MistralConversations;
 using PiSharp.Contracts;
 
-internal sealed record GoldenCase(string Name, string Source, string Scope, JsonData Expected, Func<Task<JsonData>> Run);
+internal sealed record NativePolicyExpectation(string Name, string Evidence, JsonData Expected);
+internal sealed record GoldenCase(string Name, string Source, string Scope, JsonData Expected, Func<Task<JsonData>> Run)
+{
+    internal NativePolicyExpectation? AcceptedNativePolicy { get; init; }
+}
 internal static class OfflineCases
 {
     internal static readonly List<OriginalTaskRecord> Originals = [];
@@ -64,12 +68,12 @@ internal static class OfflineCases
             var invalid = await Responses(new() { Headers = JsonData.Parse("{\"x-probe\":\"bad\\nvalue\"}") });
             return Json(new { probe = Header(value, "x-probe"), agent = Header(value, "user-agent"), deleted = Header(overridden, "x-probe"),
                 requestAgent = Header(overridden, "user-agent"), invalidBlocked = invalid.Payload is null }); }),
-        new("responses-cache-session-affinity-headers", ResponsesSource, "session affinity independent of cache and request null override", Json(new { cache = "\"fixture-session\"", session = "fixture-session", requestId = "fixture-session", noCache = (string?)null, noCacheSession = "fixture-session", deletedSession = (string?)null, deletedRequest = (string?)null }), async () => {
+        new("responses-cache-session-affinity-headers", "7d073328e44337d3292a7db9b0f0308f679c5e97 api/openai-responses.ts createClient (post-1.5 backport)", "session-id replaces historical session_id; caching-none omits affinity; caller null removes generated header", Json(new { cache = "\"fixture-session\"", session = "fixture-session", requestId = "fixture-session", noCache = (string?)null, noCacheSession = (string?)null, deletedSession = (string?)null, deletedRequest = (string?)null }), async () => {
             var value = await Responses(new(SessionId: "fixture-session"));
             var noCache = await Responses(new(SessionId: "fixture-session", CacheRetention: "none"));
-            var deleted = await Responses(new(SessionId: "fixture-session") { Headers = JsonData.Parse("{\"session_id\":null,\"x-client-request-id\":null}") });
-            return Json(new { cache = Field(value.Payload, "prompt_cache_key"), session = Header(value, "session_id"), requestId = Header(value, "x-client-request-id"),
-                noCache = Field(noCache.Payload, "prompt_cache_key"), noCacheSession = Header(noCache, "session_id"), deletedSession = Header(deleted, "session_id"), deletedRequest = Header(deleted, "x-client-request-id") }); }),
+            var deleted = await Responses(new(SessionId: "fixture-session") { Headers = JsonData.Parse("{\"session-id\":null,\"x-client-request-id\":null}") });
+            return Json(new { cache = Field(value.Payload, "prompt_cache_key"), session = Header(value, "session-id"), requestId = Header(value, "x-client-request-id"),
+                noCache = Field(noCache.Payload, "prompt_cache_key"), noCacheSession = Header(noCache, "session-id"), deletedSession = Header(deleted, "session-id"), deletedRequest = Header(deleted, "x-client-request-id") }); }),
         new("responses-model-sampling-overrides-named-field", ResponsesSource, "named/model/request merge, hook ordering and bounded JSON control", Json(new { temperature = "0.5", extension = "true", requestTemperature = "0.75", requestExtension = "null", hookTemperature = "0.75", resourceBlocked = true }), async () => {
             var value = await Responses(new(Temperature: 0.25), Metadata(extras: new() { ["samplingParams"] = new JsonObject { ["temperature"] = 0.5, ["fixture_sampling"] = true } }));
             string? hookTemperature = null;
@@ -93,7 +97,12 @@ internal static class OfflineCases
             return Json(new { topP = Field(value.Payload, "top_p"), camel = Field(value.Payload, "topP"), stop = value.Stop }); }),
         new("mistral-http-error-bom-and-response-hook", "api/mistral-conversations.ts requestMistralStream/formatMistralError .trim()", "implemented error control", Json(new { stop = "Error", starts = 0, responseHooks = 1, error = "Mistral API error (503): denied" }), async () => ErrorView(await Mistral(false, status: HttpStatusCode.ServiceUnavailable, body: "\uFEFFdenied\uFEFF"))),
         new("mistral-http-error-nel-retained", "api/mistral-conversations.ts formatMistralError .trim()", "implemented error control", Json(new { stop = "Error", starts = 0, responseHooks = 1, error = "Mistral API error (503): \u0085denied\u0085" }), async () => ErrorView(await Mistral(false, status: HttpStatusCode.ServiceUnavailable, body: "\u0085denied\u0085"))),
-        new("mistral-response-callback-original-error", "api/mistral-conversations.ts requestMistralStream/formatMistralError", "documented bounded diagnostic difference", Json(new { stop = "Error", starts = 0, responseHooks = 1, error = "offline callback failure" }), async () => ErrorView(await Mistral(false, callbackFailure: true))),
+        new("mistral-response-callback-original-error", "api/mistral-conversations.ts requestMistralStream/formatMistralError", "documented bounded diagnostic difference", Json(new { stop = "Error", starts = 0, responseHooks = 1, error = "offline callback failure" }), async () => ErrorView(await Mistral(false, callbackFailure: true)))
+        {
+            AcceptedNativePolicy = new("mistral-foreign-callback-fixed-sourcefailed-diagnostic",
+                "src/PiSharp.AI/Protocols/MistralConversations/HANDOFF.md:37",
+                Json(new { stop = "Error", starts = 0, responseHooks = 1, error = "Mistral source operation failed." }))
+        },
         new("mistral-missing-text-item-is-empty", "api/mistral-conversations.ts consumeChatStream item.text ?? empty string", "valid optional stream text field", Json(new { stop = "Stop", rawHooks = 1, content = 0 }), async () => ContentView(await Mistral(false, body: EmptyItem("{\"type\":\"text\"}")))),
         new("mistral-null-text-item-is-empty", "api/mistral-conversations.ts consumeChatStream item.text ?? empty string", "nullish stream text field", Json(new { stop = "Stop", rawHooks = 1, content = 0 }), async () => ContentView(await Mistral(false, body: EmptyItem("{\"type\":\"text\",\"text\":null}")))),
         new("mistral-missing-thinking-item-is-empty", "api/mistral-conversations.ts consumeChatStream item.thinking ?? empty array", "valid optional stream thinking field", Json(new { stop = "Stop", rawHooks = 1, content = 0 }), async () => ContentView(await Mistral(false, body: EmptyItem("{\"type\":\"thinking\"}")))),
@@ -190,7 +199,7 @@ internal static class OfflineCases
         {
             observed.Payload = JsonData.Parse(await request.Content!.ReadAsStringAsync(token));
             // Explicit diagnostic allowlist: never capture Authorization or any credential field.
-            foreach (var name in new[] { "x-probe", "x-removed", "x-affinity", "user-agent", "session_id", "x-client-request-id" })
+            foreach (var name in new[] { "x-probe", "x-removed", "x-affinity", "user-agent", "session_id", "session-id", "x-client-request-id" })
                 if (request.Headers.TryGetValues(name, out var values)) observed.Headers[name] = string.Join(", ", values);
             return new(status) { Content = new StringContent(body, Encoding.UTF8, status == HttpStatusCode.OK ? "text/event-stream" : "text/plain") };
         }

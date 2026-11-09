@@ -36,6 +36,7 @@ internal sealed partial class PiExtensionHost
     {
         var paths = ResolveReloadPaths is { } resolve ? await resolve(token).ConfigureAwait(false)
             : [.. ActivationOrder().Select(item => item.Node?.Path ?? item.Native!.Path)];
+        if (RefreshModelOperations is { } refreshModels) await refreshModels(token).ConfigureAwait(false);
         lock (_providers) _providers.Clear();
         lock (_virtualModels) _virtualModels.Clear();
         lock (_mcpServers) _mcpServers.Clear();

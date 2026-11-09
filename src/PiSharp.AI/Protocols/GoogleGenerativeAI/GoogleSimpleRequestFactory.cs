@@ -3,6 +3,7 @@
 using System.Collections.Immutable;
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using PiSharp.AI.Protocols.ProviderShared;
 using PiSharp.Contracts;
 
 namespace PiSharp.AI.Protocols.GoogleGenerativeAI;
@@ -80,7 +81,7 @@ public sealed class GoogleSimpleRequestFactory : IChatTransport
         if (request is null || request.Model != _model || request.Messages.IsDefault) throw GoogleData.Fail(GoogleFailure.Configuration);
         var estimate = GoogleSimpleContextEstimator.Estimate(request.Messages, _options);
         var maximum = _options.DirectOptions.MaxTokens ?? _modelMaxTokens;
-        maximum = _contextWindow <= 0 ? Math.Max(1, maximum) : Math.Min(maximum, Math.Max(1, _contextWindow - estimate.Tokens - 4096));
+        maximum = SimpleOutputBudget.ClampToContext(_contextWindow, estimate.Tokens, maximum);
         var clamped = _options.Reasoning is { } level ? ClampThinkingLevel(level) : null;
         string? resolved = null; var thinking = new GoogleThinkingOptions(false);
         if (clamped is not (null or "off"))

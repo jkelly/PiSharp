@@ -10,7 +10,7 @@ using PiSharp.Contracts;
 namespace PiSharp.Tools.Files;
 
 /// <summary>The grep tool of the <c>pi</c> tool policy (owner decision 0004), as grep.ts: ripgrep over any path, streamed and stopped at
-/// the match limit, context lines read from the files themselves. The explicit policy keeps <see cref="GrepTool"/>.</summary>
+/// the match limit, context lines streamed from ripgrep. The explicit policy keeps <see cref="GrepTool"/>.</summary>
 public sealed class PiGrepTool : IToolArgumentSchemaAdapter
 {
     private const double DefaultLimit = 100;
@@ -99,108 +99,100 @@ public sealed class PiGrepTool : IToolArgumentSchemaAdapter
             isDirectory = await _files.IsDirectoryAsync(searchPath, token).ConfigureAwait(false);
         }
         catch (Exception error) when (error is IOException or UnauthorizedAccessException) { throw new PiSearchException($"Path not found: {searchPath}"); }
-        var contextValue = input.Context > 0 ? input.Context : 0;
-        var effectiveLimit = Math.Max(1, input.Limit ?? DefaultLimit);
+        var contextValue = Math.Clamp(Math.Floor(input.Context), 0, int.MaxValue - 1);
+        var effectiveLimit = PiFindTool.NormalizeLimit(input.Limit, DefaultLimit);
         string FormatPath(string filePath)
         {
             if (isDirectory)
             {
-                var relative = Path.GetRelativePath(searchPath, filePath);
+                var relative = Path.GetRelativePath(searchPath, Path.GetFullPath(filePath, searchPath));
                 if (relative.Length != 0 && relative != "." && !relative.StartsWith("..", StringComparison.Ordinal) && !Path.IsPathRooted(relative))
                     return relative.Replace('\\', '/');
             }
             return Path.GetFileName(filePath);
         }
-        var fileCache = new Dictionary<string, string[]>(StringComparer.Ordinal);
-        async ValueTask<string[]> FileLines(string filePath)
-        {
-            if (fileCache.TryGetValue(filePath, out var lines)) return lines;
-            try
-            {
-                if (_authorizeRead is not null && !await _authorizeRead(filePath, token).ConfigureAwait(false)) throw new UnauthorizedAccessException();
-                // Source fs.readFile(path, "utf-8"): the whole file, undecodable bytes as U+FFFD.
-                var content = EditTool.DecodeText(await File.ReadAllBytesAsync(filePath, token).ConfigureAwait(false));
-                // Only CRLF: ripgrep counts no line end at a lone CR, so its line numbers keep matching these lines.
-                lines = content.Replace("\r\n", "\n", StringComparison.Ordinal).Split('\n');
-            }
-            catch (Exception error) when (error is IOException or UnauthorizedAccessException or ArgumentException or OutOfMemoryException) { lines = []; }
-            fileCache[filePath] = lines;
-            return lines;
-        }
         // --no-config: the tool's literal, glob and limit semantics must not depend on RIPGREP_CONFIG_PATH.
         var args = new List<string> { "--no-config", "--json", "--line-number", "--color=never", "--hidden" };
         if (input.IgnoreCase) args.Add("--ignore-case");
         if (input.Literal) args.Add("--fixed-strings");
-        if (!string.IsNullOrEmpty(input.Glob)) { args.Add("--glob"); args.Add(input.Glob); }
-        args.Add("--"); args.Add(input.Pattern); args.Add(searchPath);
+        if (!string.IsNullOrEmpty(input.Glob)) { args.Add("--glob"); args.Add(NormalizeGlob(input.Glob)); }
+        if (contextValue > 0) { args.Add("--context"); args.Add(JsNumber(contextValue)); }
+        args.Add("--"); args.Add(input.Pattern); args.Add(isDirectory ? "." : searchPath);
         // Source spawn(rg, args): Node rejects an argument with a NUL byte.
         if (NodeArgumentErrors.SpawnArguments(args) is { } spawnError) throw new PiSearchException(spawnError);
-        var matches = new List<(string FilePath, double LineNumber, string? LineText)>();
-        var matchCount = 0; var matchLimitReached = false;
+        var records = new List<(string Path, double Number, string Text, bool Match)>();
+        var matchCount = 0; var matchLimitReached = false; var linesTruncated = false;
+        long outputBytes = 0; var outputCount = 0;
+        string? lastFile = null; double trailingEnd = 0;
+        string Render(string path, double number, string text, bool match) => match
+            ? $"{FormatPath(path)}:{JsNumber(number)}: {text}" : $"{FormatPath(path)}-{JsNumber(number)}- {text}";
         PiSearchProcess.Outcome outcome;
         try
         {
-            outcome = await PiSearchProcess.RunAsync(rg, args, _paths.WorkingDirectory, _environment, line =>
+            outcome = await PiSearchProcess.RunAsync(rg, args, isDirectory ? searchPath : _paths.WorkingDirectory, _environment, line =>
             {
-                if (line.Trim().Length == 0 || matchCount >= effectiveLimit) return false;
                 try
                 {
                     using var json = JsonDocument.Parse(line);
                     var root = json.RootElement;
-                    if (root.ValueKind != JsonValueKind.Object || !root.TryGetProperty("type", out var type) || type.ValueKind != JsonValueKind.String ||
-                        type.GetString() != "match") return false;
-                    matchCount++;
-                    var data = root.TryGetProperty("data", out var value) && value.ValueKind == JsonValueKind.Object ? value : default;
-                    string? Field(string name, string inner) => data.ValueKind == JsonValueKind.Object && data.TryGetProperty(name, out var outer) &&
-                        outer.ValueKind == JsonValueKind.Object && outer.TryGetProperty(inner, out var text) && text.ValueKind == JsonValueKind.String ? text.GetString() : null;
-                    var filePath = Field("path", "text"); var lineText = Field("lines", "text");
-                    if (!string.IsNullOrEmpty(filePath) && data.TryGetProperty("line_number", out var number) && number.ValueKind == JsonValueKind.Number)
-                        matches.Add((filePath, number.GetDouble(), lineText));
+                    if (!root.TryGetProperty("type", out var type)) return false;
+                    var isMatch = type.GetString() == "match";
+                    if (!isMatch && type.GetString() != "context") return false;
+                    var data = root.GetProperty("data");
+                    string? Field(string name)
+                    {
+                        if (!data.TryGetProperty(name, out var field)) return null;
+                        if (field.TryGetProperty("text", out var text)) return text.GetString();
+                        if (field.TryGetProperty("bytes", out var bytes)) return Encoding.UTF8.GetString(Convert.FromBase64String(bytes.GetString()!));
+                        return null;
+                    }
+                    var path = Field("path"); var text = Field("lines");
+                    if (string.IsNullOrEmpty(path) || text is null || !data.TryGetProperty("line_number", out var number)) return false;
+                    var lineNumber = number.GetDouble();
+                    var inWindow = path == lastFile && lineNumber <= trailingEnd;
+                    var accepted = matchCount < effectiveLimit;
+                    if (!accepted && isMatch) matchLimitReached = true;
+                    if (accepted || inWindow)
+                    {
+                        if (text.EndsWith('\n')) { text = text[..^1]; if (text.EndsWith('\r')) text = text[..^1]; }
+                        if (text.Length > 500) { text = UnicodeText.SliceHead(text, 500) + "... [truncated]"; linesTruncated = true; }
+                        var displayMatch = isMatch && accepted;
+                        var rendered = Render(path, lineNumber, text, displayMatch);
+                        if (outputBytes - 1 <= 51200) records.Add((path, lineNumber, text, displayMatch));
+                        outputBytes += Encoding.UTF8.GetByteCount(rendered) + 1L; outputCount++;
+                        if (displayMatch)
+                        {
+                            matchCount++; lastFile = path; trailingEnd = lineNumber + contextValue;
+                        }
+                    }
+                    return matchLimitReached && !(inWindow && lineNumber < trailingEnd);
                 }
-                catch (JsonException) { return false; }
-                if (matchCount < effectiveLimit) return false;
-                matchLimitReached = true;
-                return true;
+                catch (Exception error) when (error is JsonException or FormatException or InvalidOperationException or KeyNotFoundException or ArgumentException) { return false; }
             }, token).ConfigureAwait(false);
         }
         catch (IOException error) { throw new PiSearchException($"Failed to run ripgrep: {error.Message}"); }
         if (!outcome.Stopped && outcome.ExitCode is not (0 or 1))
             throw new PiSearchException(outcome.StandardError.Trim() is { Length: > 0 } message ? message : $"ripgrep exited with code {outcome.ExitCode}");
         if (matchCount == 0) return Result("No matches found", null);
-        var linesTruncated = false; var outputLines = new List<string>();
-        string TruncateLine(string line)
-        {
-            if (line.Length <= 500) return line;
-            linesTruncated = true; return line[..500] + "... [truncated]";
-        }
-        foreach (var match in matches)
+        var outputLines = new List<string>();
+        var admitted = new Dictionary<string, bool>();
+        foreach (var record in records)
         {
             token.ThrowIfCancellationRequested();
-            var relativePath = FormatPath(match.FilePath);
-            if (contextValue == 0 && match.LineText is not null)
+            if (!admitted.TryGetValue(record.Path, out var allowed))
             {
-                var sanitized = match.LineText.Replace("\r\n", "\n", StringComparison.Ordinal).Replace("\r", "", StringComparison.Ordinal);
-                if (sanitized.EndsWith('\n')) sanitized = sanitized[..^1];
-                outputLines.Add($"{relativePath}:{JsNumber(match.LineNumber)}: {TruncateLine(sanitized)}");
-                continue;
+                var absolute = Path.GetFullPath(record.Path, isDirectory ? searchPath : _paths.WorkingDirectory);
+                allowed = _authorizeRead is null || await _authorizeRead(absolute, token).ConfigureAwait(false);
+                admitted.Add(record.Path, allowed);
             }
-            var lines = await FileLines(match.FilePath).ConfigureAwait(false);
-            if (lines.Length == 0) { outputLines.Add($"{relativePath}:{JsNumber(match.LineNumber)}: (unable to read file)"); continue; }
-            var start = contextValue > 0 ? Math.Max(1, match.LineNumber - contextValue) : match.LineNumber;
-            var end = contextValue > 0 ? Math.Min(lines.Length, match.LineNumber + contextValue) : match.LineNumber;
-            for (var current = start; current <= end; current++)
-            {
-                // lines[current - 1] ?? "": a fractional or out-of-range index is undefined in JavaScript.
-                var lineText = current == Math.Floor(current) && current >= 1 && current <= lines.Length ? lines[(int)current - 1] : "";
-                var text = TruncateLine(lineText.Replace("\r", "", StringComparison.Ordinal));
-                outputLines.Add(current == match.LineNumber ? $"{relativePath}:{JsNumber(current)}: {text}" : $"{relativePath}-{JsNumber(current)}- {text}");
-            }
+            outputLines.Add(Render(record.Path, record.Number, allowed ? record.Text : "(unable to read file)", record.Match));
         }
         var truncation = ToolOutputTruncator.Head(string.Join('\n', outputLines), new(int.MaxValue));
+        truncation = truncation with { TotalLines = outputCount, TotalBytes = (int)Math.Min(int.MaxValue, Math.Max(0, outputBytes - 1)) };
         var details = new Dictionary<string, object?>(); var notices = new List<string>();
         if (matchLimitReached)
         {
-            notices.Add($"{JsNumber(effectiveLimit)} matches limit reached. Use limit={JsNumber(effectiveLimit * 2)} for more, or refine pattern");
+            notices.Add($"{JsNumber(effectiveLimit)} matches limit reached. Use limit={JsNumber(effectiveLimit * 2d)} for more, or refine pattern");
             details["matchLimitReached"] = effectiveLimit;
         }
         if (truncation.Truncated)
@@ -210,6 +202,14 @@ public sealed class PiGrepTool : IToolArgumentSchemaAdapter
         }
         if (linesTruncated) { notices.Add("Some lines truncated to 500 chars. Use read tool to see full lines"); details["linesTruncated"] = true; }
         return Result(truncation.Content + (notices.Count == 0 ? "" : "\n\n[" + string.Join(". ", notices) + "]"), details.Count == 0 ? null : details);
+    }
+
+    private static string NormalizeGlob(string glob)
+    {
+        var prefix = glob.StartsWith('!') ? "!" : "";
+        var pattern = prefix.Length == 0 ? glob : glob[1..];
+        while (pattern.StartsWith("./", StringComparison.Ordinal)) pattern = pattern[2..];
+        return prefix + pattern;
     }
 
     internal static object TruncationDetails(ToolOutputTruncationResult truncation) => new

@@ -35,9 +35,10 @@ internal sealed class WindowsProcessLifetime : IAsyncDisposable
     public Task<int?> Exit => _exit.Task;
     public Stream StandardOutput => _stdout ?? throw new InvalidOperationException("Output is closed.");
     public Stream StandardError => _stderr ?? throw new InvalidOperationException("Output is closed.");
+    internal Stream StandardInput => _stdin ?? throw new InvalidOperationException("Input is not redirected or is closed.");
 
     public static async ValueTask<WindowsProcessLifetime> StartAsync(ProcessRequest request,
-        ProcessLifecycleCallback? observer, CancellationToken token)
+        ProcessLifecycleCallback? observer, CancellationToken token, bool keepStandardInputOpen = false)
     {
         var owned = new WindowsProcessLifetime();
         var diagnostic = ProcessDiagnostic.SpawnFailed;
@@ -48,7 +49,7 @@ internal sealed class WindowsProcessLifetime : IAsyncDisposable
             (owned._stderr, owned._stderrClient) = await PipeAsync(PipeDirection.In, token).ConfigureAwait(false);
             // A read-only null-device handle has immediate EOF. A connected named pipe whose
             // server is closed before resume does not establish this contract reliably.
-            if (request.StandardInput is not null)
+            if (keepStandardInputOpen || request.StandardInput is not null)
                 (owned._stdin, owned._stdinClient) = await PipeAsync(PipeDirection.Out, token).ConfigureAwait(false);
             else
             {
@@ -87,7 +88,7 @@ internal sealed class WindowsProcessLifetime : IAsyncDisposable
             owned._thread!.Dispose(); owned._thread = null;
             // Source commandTransport "stdin": write the command after resume, then close for EOF. Write errors are ignored
             // (source child.stdin.on("error", () => {})); a process that exits without reading breaks the pipe.
-            if (owned._stdin is { } input) owned._input = WriteInputAsync(input, request.StandardInput!);
+            if (!keepStandardInputOpen && owned._stdin is { } input) owned._input = WriteInputAsync(input, request.StandardInput!);
             return owned;
         }
         catch (Exception error)

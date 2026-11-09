@@ -132,6 +132,10 @@ public sealed record DurableStreamOptions
     public string? Transport { get; init; }
     /// <summary>HTTP request timeout.</summary>
     public double? TimeoutMs { get; init; }
+    /// <summary>WebSocket connection/open handshake timeout in milliseconds.</summary>
+    public double? WebsocketConnectTimeoutMs { get; init; }
+    /// <summary>Custom token budgets by thinking level, for token-based providers.</summary>
+    public JsonObjectValue? ThinkingBudgets { get; init; }
     /// <summary>Provider/SDK retries.</summary>
     public int? MaxRetries { get; init; }
     /// <summary>Longest server-requested retry delay to wait for.</summary>
@@ -172,6 +176,8 @@ public sealed record DurableStreamOptions
 /// <c>ModelsClassifierOptions</c> and <c>ModelsImagesOptions</c>, the field durable sets; the signal is the call's cancellation token).</summary>
 public sealed record DurableRequestOptions
 {
+    /// <summary>App attribution for this operation, merged over the models access default.</summary>
+    public ClientIdentity? Identity { get; init; }
     /// <summary>The parent span of the call's telemetry (pi-ai <c>telemetry</c>, Pi v1.5.0): a deferred poll records a <c>pi.ai.poll</c> span
     /// under it. Null: nothing is recorded.</summary>
     public ITelemetrySpan? Telemetry { get; init; }
@@ -334,8 +340,8 @@ public static class DurableModelIdentity
     /// <summary>
     /// <paramref name="models"/> with <paramref name="identity"/> as the default identity of its requests (pi-ai <c>withClientIdentity</c>):
     /// a request's <see cref="DurableStreamOptions.Identity"/> overrides it field by field, and it overrides the identity
-    /// <paramref name="models"/> was created with. Everything else is delegated unchanged. The deferred, classifier and image calls take no
-    /// identity, so they keep the identity <paramref name="models"/> gives them.
+    /// <paramref name="models"/> was created with. Everything else is delegated unchanged. Deferred, classifier and image calls carry
+    /// identity through the same field-by-field merge.
     /// </summary>
     public static IDurableModels WithClientIdentity(IDurableModels models, ClientIdentity identity)
     {
@@ -349,6 +355,9 @@ public static class DurableModelIdentity
         private DurableStreamOptions WithIdentity(DurableStreamOptions? options) =>
             (options ?? new DurableStreamOptions()) with { Identity = ClientIdentities.Merge(identity, options?.Identity) };
 
+        private DurableRequestOptions WithIdentity(DurableRequestOptions? options) =>
+            (options ?? new DurableRequestOptions()) with { Identity = ClientIdentities.Merge(identity, options?.Identity) };
+
         public DurableModel? GetModel(string provider, string modelId) => inner.GetModel(provider, modelId);
 
         public IAsyncEnumerable<StreamEvent> StreamSimple(DurableModel model, ImmutableArray<JsonValue> messages, DurableStreamOptions? options,
@@ -358,28 +367,28 @@ public static class DurableModelIdentity
             CancellationToken cancellationToken) => inner.CompleteSimpleAsync(model, messages, WithIdentity(options), cancellationToken);
 
         public IAsyncEnumerable<StreamEvent> StreamDeferred(DurableModel model, DurableDeferredHandle handle, CancellationToken cancellationToken) =>
-            inner.StreamDeferred(model, handle, cancellationToken);
+            inner.StreamDeferred(model, handle, WithIdentity((DurableRequestOptions?)null), cancellationToken);
 
         public Task<AssistantMessage> FetchDeferredAsync(DurableModel model, DurableDeferredHandle handle, CancellationToken cancellationToken) =>
-            inner.FetchDeferredAsync(model, handle, cancellationToken);
+            inner.FetchDeferredAsync(model, handle, WithIdentity((DurableRequestOptions?)null), cancellationToken);
 
         public Task CancelDeferredAsync(DurableModel model, DurableDeferredHandle handle, CancellationToken cancellationToken) =>
-            inner.CancelDeferredAsync(model, handle, cancellationToken);
+            inner.CancelDeferredAsync(model, handle, WithIdentity((DurableRequestOptions?)null), cancellationToken);
 
         public IAsyncEnumerable<StreamEvent> StreamDeferred(DurableModel model, DurableDeferredHandle handle, DurableRequestOptions? options,
-            CancellationToken cancellationToken) => inner.StreamDeferred(model, handle, options, cancellationToken);
+            CancellationToken cancellationToken) => inner.StreamDeferred(model, handle, WithIdentity(options), cancellationToken);
 
         public Task<AssistantMessage> FetchDeferredAsync(DurableModel model, DurableDeferredHandle handle, DurableRequestOptions? options,
-            CancellationToken cancellationToken) => inner.FetchDeferredAsync(model, handle, options, cancellationToken);
+            CancellationToken cancellationToken) => inner.FetchDeferredAsync(model, handle, WithIdentity(options), cancellationToken);
 
         public Task CancelDeferredAsync(DurableModel model, DurableDeferredHandle handle, DurableRequestOptions? options,
-            CancellationToken cancellationToken) => inner.CancelDeferredAsync(model, handle, options, cancellationToken);
+            CancellationToken cancellationToken) => inner.CancelDeferredAsync(model, handle, WithIdentity(options), cancellationToken);
 
         public Task<JsonObjectValue> ClassifyAsync(JsonObjectValue model, JsonObjectValue context, DurableRequestOptions? options,
-            CancellationToken cancellationToken) => inner.ClassifyAsync(model, context, options, cancellationToken);
+            CancellationToken cancellationToken) => inner.ClassifyAsync(model, context, WithIdentity(options), cancellationToken);
 
         public Task<JsonObjectValue> GenerateImagesAsync(JsonObjectValue model, JsonObjectValue context, DurableRequestOptions? options,
-            CancellationToken cancellationToken) => inner.GenerateImagesAsync(model, context, options, cancellationToken);
+            CancellationToken cancellationToken) => inner.GenerateImagesAsync(model, context, WithIdentity(options), cancellationToken);
 
         public ImmutableArray<JsonObjectValue> GetModelsOfType(string type, string? provider) => inner.GetModelsOfType(type, provider);
 
@@ -389,9 +398,9 @@ public static class DurableModelIdentity
         public JsonObjectValue? GetModelOfType(string type, string provider, string id) => inner.GetModelOfType(type, provider, id);
 
         public Task<JsonObjectValue> ClassifyAsync(JsonObjectValue model, JsonObjectValue context, CancellationToken cancellationToken) =>
-            inner.ClassifyAsync(model, context, cancellationToken);
+            inner.ClassifyAsync(model, context, WithIdentity((DurableRequestOptions?)null), cancellationToken);
 
         public Task<JsonObjectValue> GenerateImagesAsync(JsonObjectValue model, JsonObjectValue context, CancellationToken cancellationToken) =>
-            inner.GenerateImagesAsync(model, context, cancellationToken);
+            inner.GenerateImagesAsync(model, context, WithIdentity((DurableRequestOptions?)null), cancellationToken);
     }
 }

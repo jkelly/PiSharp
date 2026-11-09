@@ -3,6 +3,7 @@
     <NoWarn>$(NoWarn);PISHARP_TOOLSEARCH001</NoWarn>
   </PropertyGroup>
   <ItemGroup>
+    <InternalsVisibleTo Include="PiSharp.ToolSearch.Tests" />
     <ProjectReference Include="../PiSharp.Contracts/PiSharp.Contracts.csproj" />
   </ItemGroup>
 </Project>

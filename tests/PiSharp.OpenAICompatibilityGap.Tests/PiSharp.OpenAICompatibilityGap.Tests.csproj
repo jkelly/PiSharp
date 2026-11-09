@@ -1,0 +1,8 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><OutputType>Exe</OutputType><NoWarn>$(NoWarn);PISHARP_DURABLE001;PISHARP_TIERS001;PISHARP_TELEMETRY001;PISHARP_CHORD001</NoWarn></PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../src/PiSharp.AI/PiSharp.AI.csproj" />
+    <ProjectReference Include="../../src/PiSharp.CodingAgent/PiSharp.CodingAgent.csproj" />
+    <ProjectReference Include="../../src/PiSharp.Durable/PiSharp.Durable.csproj" />
+  </ItemGroup>
+</Project>

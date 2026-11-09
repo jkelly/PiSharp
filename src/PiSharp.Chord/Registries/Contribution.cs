@@ -79,7 +79,7 @@ internal sealed class RegistryContribution : IDependent
     // Left out since its last entry: failing (reported once), or refused (reported once).
     private Out @out = Out.None;
 
-    public RegistryContribution(RegistryRecord record, Contributor contributor, long version, ContributionContent content)
+    public RegistryContribution(RegistryRecord record, Contributor contributor, long version, ContributionContent content, object? callbackOwner = null)
     {
         ArgumentNullException.ThrowIfNull(record);
         ArgumentNullException.ThrowIfNull(content);
@@ -87,6 +87,7 @@ internal sealed class RegistryContribution : IDependent
         Contributor = contributor;
         Version = version;
         this.content = content;
+        CallbackOwner = callbackOwner;
     }
 
     private enum Out
@@ -103,6 +104,7 @@ internal sealed class RegistryContribution : IDependent
 
     /// <summary>The registry version its contributor was built against.</summary>
     public long Version { get; }
+    public object? CallbackOwner { get; }
 
     /// <summary>Its source changed (inside a batch): the registry's table is marked.</summary>
     public void Invalidate() => Record.ContributionChanged();
@@ -137,7 +139,7 @@ internal sealed class RegistryContribution : IDependent
             // A null value is a value: the entry, not its value, says whether there was one.
             if (entry is null || !RegistriesInternal.Same(entryValue, value) || !provider.Made(entry))
             {
-                entry = provider.Entry(Contributor, Version, value);
+                entry = provider.Entry(Contributor, Version, value, CallbackOwner);
                 entryValue = value;
             }
         }
@@ -177,6 +179,7 @@ internal sealed class RegistryContribution : IDependent
     private object? Adapt(object? raw, Delegate adapter, IRegistryProvider provider)
     {
         if (adapted is { } last && RegistriesInternal.Same(last.From, raw) && ReferenceEquals(last.Adapter, adapter)) return last.Value;
+        using var lease = Record.RetainCallback(adapter);
         var value = Record.Adapt(() => provider.AdaptContribution(adapter, raw));
         adapted = new Adapted(raw, adapter, value);
         return value;

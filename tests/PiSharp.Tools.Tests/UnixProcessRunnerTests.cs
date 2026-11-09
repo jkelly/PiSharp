@@ -2,6 +2,7 @@ using System.Collections.Immutable;
 using System.Text;
 using PiSharp.Tools.Processes;
 using PiSharp.Tools.Processes.Unix;
+#pragma warning disable PISHARP_EXEC001 // Exercise explicit capture with a faux admitted Unix lease.
 
 internal static class UnixProcessRunnerTests
 {
@@ -13,11 +14,40 @@ internal static class UnixProcessRunnerTests
         ("Unix owned spill disposal remains joined after physical stop", HeldSpillDisposal),
         ("Unix multicast earlier subscriber is joined and all original faults survive", MulticastOriginalOwnership),
         ("Unix faulted read OCE remains a fault after cleanup cancellation", FaultedReadCancellation),
-        ("Unix physical pipe stops precede held cancellation joins and retain every fault", PipeStopBeforeCancellationJoin)
+        ("Unix physical pipe stops precede held cancellation joins and retain every fault", PipeStopBeforeCancellationJoin),
+        ("Unix explicit combined capture supersedes raw and per-pipe limits", ExplicitCapture)
     ];
 
     private static ProcessRequest Request() => new("/admitted/program", [], "/admitted/work",
         ImmutableDictionary<string, string>.Empty, "/admitted/spill");
+    private static async Task ExplicitCapture()
+    {
+        const int size = 1024 * 1024 + 17;
+        var bytes = new byte[size]; Array.Fill(bytes, (byte)'x');
+        foreach (var limit in new[] { 2L * size, size })
+        {
+            Lease? lease = null; var remaining = 2;
+            void End() { if (Interlocked.Decrement(ref remaining) == 0) lease!.ExitCommand(); }
+            lease = new Lease(new EndNotifyingStream(bytes, End), new EndNotifyingStream(bytes, End));
+            lease.ReleaseStop.TrySetResult(true);
+            var result = await new UnixProcessRunner(new Admission(lease), new(MaximumRawBytes: 4096), new Storage())
+                .RunSeparatedAsync(Request() with { CaptureLimitBytes = limit });
+            Check(result.Process.CleanupConfirmed && result.Process.CapturedOutputComplete && lease.Disposed && result.Process.Diagnostics.IsEmpty,
+                "Explicit capture did not join Unix pipe and lease cleanup.");
+            Check(result.StandardOutput.Content.Length + result.StandardError.Content.Length == limit && result.Process.Output.RawBytes == limit,
+                "Unix explicit capture used a hidden raw or structured bound.");
+            Check(result.CaptureLimitReached == (limit < 2L * size), "Unix exact/over-limit boundary was misclassified.");
+        }
+    }
+    private sealed class EndNotifyingStream(byte[] bytes, Action end) : MemoryStream(bytes)
+    {
+        public override async ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken token = default)
+        {
+            var count = await base.ReadAsync(buffer, token);
+            if (count == 0) end();
+            return count;
+        }
+    }
     private static void Check(bool condition, string message) { if (!condition) throw new InvalidOperationException(message); }
 
     private static async Task StopBeforeCancellation()

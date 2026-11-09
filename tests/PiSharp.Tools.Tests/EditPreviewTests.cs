@@ -50,7 +50,7 @@ internal static class EditPreviewTests
         var reports = new List<object>(); var differences = new List<object>(); var displays = 0; var errors = 0;
         for (var index = 0; index < inputs.Length; index++)
         {
-            var authored = inputs[index]; var source = sources[index]; var id = authored.GetProperty("caseId").GetString()!;
+            var authored = inputs[index]; var source = GapEditExpectations.ForCase(sources[index]); var id = authored.GetProperty("caseId").GetString()!;
             Equal(id, source.GetProperty("caseId").GetString());
             var path = authored.GetProperty("path").GetString()!; Equal(path, source.GetProperty("path").GetString());
             Check(path.StartsWith("files/", StringComparison.Ordinal) && !path.Contains("..", StringComparison.Ordinal) && !path.Contains('\\') && !path.Contains(':') && !path.Contains('\0'), "Fixture path is outside the literal owned layout.");
@@ -82,7 +82,7 @@ internal static class EditPreviewTests
             Equal(missing ? 0 : 1, operations.ReadCalls); Equal(0, operations.WriteCalls); Equal(0, operations.DirectoryCalls);
             Equal(target, policy.Actions.Single().Target); Equal(target, probe.Paths.Single());
             if (outcome.Preview.Value.TryGetProperty("error", out _)) errors++; else displays++;
-            reports.Add(new { caseId = id, sourceObservation = source.Clone(), native = new
+            reports.Add(new { caseId = id, historicalObservation = sources[index].Clone(), currentC05Expectation = source.Clone(), native = new
             {
                 publicPrepared, suppliedBefore = owned.Value.Clone(), suppliedAfter = owned.Value.Clone(), preview = observed,
                 invocation = NativeResult(outcome.Invocation), finalAction = Action(policy.Actions.Single()),
@@ -92,7 +92,7 @@ internal static class EditPreviewTests
         }
         Equal(5, displays); Equal(7, errors);
         Evidence = JsonSerializer.SerializeToElement(new { schemaVersion = 1, sourceSha = SourceSha, inputSha256 = InputSha, expectedSha256 = ExpectedSha,
-            corpusCases = inputs.Length, displays, errors, compared = "Complete source preview envelopes and owned bodies, prepared public inputs, exact original and unchanged preview bytes; no field masks or string normalization.",
+            corpusCases = inputs.Length, displays, errors, compared = "Complete source preview envelopes and owned bodies, prepared public inputs, exact original and unchanged preview bytes; explicit authored C05 byte-preservation expectations for two historical cases; no broad masks.",
             mapping = "Native Preview maps directly to the source fulfilled value. Empty native Content, Details=Preview, IsError=false and no Failure/Terminate are checked separately. Source post-edit filesystem.after is retained but is not the expected readonly state.",
             cases = reports, differences, phaseAcceptanceClaimed = false });
         Check(differences.Count == 0, "Frozen preview differences: " + JsonSerializer.Serialize(differences));

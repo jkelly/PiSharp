@@ -19,6 +19,11 @@ public sealed class PiMessagesEventMapper
     private readonly HashSet<string> _undefined = new(StringComparer.Ordinal);
     private readonly AssistantStreamReducer _reducer;
     private bool _started, _terminal;
+    // Each version shares unchanged owned blocks. A frame only retains its version;
+    // no deferred factory captures the mutable mapper or a live arguments stream.
+    private ImmutableList<JsonData> _snapshotBlocks = [];
+    private long _snapshotBlockCharacters;
+    private bool _argumentsChanged;
     public PiMessagesEventMapper(ChatRequest request, PiMessagesOptions options)
     {
         ArgumentNullException.ThrowIfNull(request); ArgumentNullException.ThrowIfNull(options); options.Validate();
@@ -87,10 +92,12 @@ public sealed class PiMessagesEventMapper
                     var thinkingDelta = PiMessagesData.String(value, "delta"); var block = Block(index, "thinking"); block["thinking"] = block["thinking"]!.GetValue<string>() + thinkingDelta;
                     frame = new ThinkingDelta(index, thinkingDelta); break;
                 case "toolcall_delta":
+                    _argumentsChanged = false;
                     var delta = PiMessagesData.String(value, "delta"); var call = Block(index, "toolCall"); var arguments = _toolArguments[index];
                     var partialArguments = arguments.Stream.Append(delta);
                     if (!ReferenceEquals(partialArguments, arguments.Shown))
                     {
+                        _argumentsChanged = true;
                         call["arguments"] = JsonNode.Parse(partialArguments.ToString(), documentOptions: PiSharp.Contracts.JsonData.DocumentOptions);
                         _toolArguments[index] = (arguments.Stream, partialArguments);
                     }
@@ -154,15 +161,73 @@ public sealed class PiMessagesEventMapper
     private StreamEvent Capture(StreamEvent frame, JsonElement original, string type)
     {
         if (!_options.CaptureSourceSnapshots) return frame;
-        JsonObject value; var member = type == "done" ? "message" : type == "error" ? "error" : "partial";
-        if (type is "done" or "error") value = new JsonObject { ["type"] = type, ["reason"] = _partial["stopReason"]!.DeepClone(), [member] = _partial.DeepClone() };
+        var member = type == "done" ? "message" : type == "error" ? "error" : "partial";
+        if (original.TryGetProperty("contentIndex", out var contentIndex) &&
+            (type != "toolcall_delta" || _argumentsChanged))
+        {
+            var index = contentIndex.GetInt32();
+            var block = Own(_content[index]!);
+            ValidateNested(block.Value, 4);
+            if (index == _snapshotBlocks.Count) _snapshotBlocks = _snapshotBlocks.Add(block);
+            else
+            {
+                _snapshotBlockCharacters -= _snapshotBlocks[index].ToString().Length;
+                _snapshotBlocks = _snapshotBlocks.SetItem(index, block);
+            }
+            _snapshotBlockCharacters += block.ToString().Length;
+        }
+        var blocks = _snapshotBlocks;
+        var headerNode = new JsonObject();
+        foreach (var property in _partial)
+            headerNode[property.Key] = property.Key == "content" ? null : property.Value?.DeepClone();
+        var header = Own(headerNode);
+        ValidateNested(header.Value, 2);
+        JsonObject shell;
+        if (type is "done" or "error") shell = new JsonObject { ["type"] = type, ["reason"] = _partial["stopReason"]!.DeepClone() };
         else
         {
-            value = Node(original)!.AsObject(); value["partial"] = _partial.DeepClone();
-            if (type == "toolcall_end") value["toolCall"] = _content[original.GetProperty("contentIndex").GetInt32()]!.DeepClone();
+            shell = Node(original)!.AsObject();
+            if (shell.ContainsKey("partial")) shell["partial"] = null;
+            if (type == "toolcall_end") shell["toolCall"] = Node(blocks[original.GetProperty("contentIndex").GetInt32()].Value);
         }
+        var source = Own(shell);
+        ValidateNested(source.Value, 1);
         var paths = _undefined.Select(p => "/" + member + p).Order(StringComparer.Ordinal).ToArray();
-        return frame with { SourceEmissionSnapshot = Own(new JsonObject { ["value"] = value, ["ownUndefinedPaths"] = JsonSerializer.SerializeToNode(paths) }) };
+        // JSON escaping and UTF-8 each fit within six bytes per input UTF-16 unit.
+        // If this conservative bound is close to a configured limit, use the exact
+        // original admission path eagerly so the failing Convert is unchanged.
+        var bound = 6L * (256 + header.ToString().Length + source.ToString().Length +
+            _snapshotBlockCharacters + blocks.Count + paths.Sum(path => (long)path.Length + 4));
+        var options = _options;
+        JsonData Materialize()
+        {
+            var partial = Node(header.Value)!.AsObject();
+            var content = new JsonArray();
+            foreach (var block in blocks) content.Add(Node(block.Value));
+            partial["content"] = content;
+            var value = Node(source.Value)!.AsObject(); value[member] = partial;
+            var snapshot = new JsonObject { ["value"] = value, ["ownUndefinedPaths"] = JsonSerializer.SerializeToNode(paths) };
+            return PiMessagesData.Admit(JsonData.Parse(JsonUtf16.ToJsonString(snapshot)), options);
+        }
+        return bound <= _options.MaximumPayloadBytes
+            ? frame.WithDeferredSourceEmission(Materialize, bound * 2)
+            : frame with { SourceEmissionSnapshot = Materialize() };
+    }
+    // The envelope adds depth beyond each independently admitted immutable piece.
+    // Preserve the original Convert-time failures even when the snapshot is unread.
+    private void ValidateNested(JsonElement root, int depth)
+    {
+        var pending = new Stack<(JsonElement Value, int Depth)>(); pending.Push((root, depth));
+        while (pending.TryPop(out var item))
+        {
+            if (item.Depth > _options.MaximumJsonDepth) throw PiMessagesData.Fail(PiMessagesFailure.ResourceLimit);
+            if (item.Value.ValueKind is JsonValueKind.Object or JsonValueKind.Array && item.Depth >= JsonData.MaximumDepth)
+                throw new JsonException("Maximum JSON depth exceeded.");
+            if (item.Value.ValueKind == JsonValueKind.Object)
+                foreach (var property in item.Value.EnumerateObject()) pending.Push((property.Value, item.Depth + 1));
+            else if (item.Value.ValueKind == JsonValueKind.Array)
+                foreach (var value in item.Value.EnumerateArray()) pending.Push((value, item.Depth + 1));
+        }
     }
     private StreamEvent CaptureError(StreamError frame) => !_options.CaptureSourceSnapshots ? frame : frame with
     { SourceEmissionSnapshot = Own(new JsonObject { ["value"] = new JsonObject { ["type"] = "error", ["reason"] = PiWireJson.StopReasonName(frame.Reason), ["error"] = JsonNode.Parse(PiWireJson.WriteMessage(frame.Message).ToString(), documentOptions: PiSharp.Contracts.JsonData.DocumentOptions) }, ["ownUndefinedPaths"] = new JsonArray() }) };

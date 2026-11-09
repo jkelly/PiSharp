@@ -25,6 +25,7 @@ internal sealed partial class PiExtensionHost
     private NativeExistingSessionRegistrationActions? _actions;
     private readonly ConcurrentDictionary<string, (ExtensionShellOutputCallback Callback, Task Chain)> _shellOutputs = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<string, (IExtensionCustomComponentUi Ui, ExtensionCustomComponentIdentity Identity)> _components = new(StringComparer.Ordinal);
+    private readonly ConcurrentDictionary<string, ExtensionCustomComponentOverlayHandle> _overlayHandles = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<string, string?> _statuses = new(StringComparer.Ordinal);
 
     /// <summary>The session the extensions act on (agent-session.ts bindExtensions).</summary>
@@ -198,6 +199,10 @@ internal sealed partial class PiExtensionHost
             case "session.read": return SessionRead(Op(), Args());
             case "ui.dialog": return await DialogAsync(p, Op(), Args(), token).ConfigureAwait(false);
             case "ui.custom": await OpenComponentAsync(p, token).ConfigureAwait(false); return null;
+            // Snapshot reads must never enter the UI loop: Node may be answering a render/visibility request on that loop.
+            case "component.overlay.read":
+                return JsonSerializer.SerializeToNode(_overlayHandles.TryGetValue(p.GetProperty("id").GetString()!, out var handle)
+                    ? handle.State : new ExtensionCustomComponentOverlayState(true, false), new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase });
             case "ui.read": return UiRead(Op());
             case "ui.setTheme":
                 // interactive-mode.ts setTheme switches the theme (and saves the setting); rpc-mode.ts has no themes.
@@ -294,9 +299,16 @@ internal sealed partial class PiExtensionHost
                 else ComponentInvalidated?.Invoke(parameters.GetProperty("id").GetString()!); // IMPL-I: widget, header and footer components
                 return;
             case "component.done":
+                if (_overlayHandles.TryRemove(parameters.GetProperty("id").GetString()!, out var closedHandle)) closedHandle.Retire();
                 _componentCaptures.TryRemove(parameters.GetProperty("id").GetString()!, out _);
                 if (_components.TryRemove(parameters.GetProperty("id").GetString()!, out var done))
                     await done.Ui.SignalCustomComponentDoneAsync(done.Identity).ConfigureAwait(false);
+                return;
+            case "component.overlay.command":
+                if (_overlayHandles.TryGetValue(parameters.GetProperty("id").GetString()!, out var overlayHandle))
+                    overlayHandle.Send(parameters.GetProperty("operation").GetString()!,
+                        parameters.TryGetProperty("hidden", out var hidden) ? hidden.ValueKind == JsonValueKind.True : null,
+                        parameters.TryGetProperty("sequence", out var sequence) ? sequence.GetInt64() : 0);
                 return;
             case "component.captures":
                 if (parameters.GetProperty("value").ValueKind == JsonValueKind.True) _componentCaptures[parameters.GetProperty("id").GetString()!] = true;
@@ -810,9 +822,44 @@ internal sealed partial class PiExtensionHost
         await ui.OpenCustomComponentAsync(new ExtensionCustomComponentCallbacks(identity,
             async (width, _, cancellation) => PiNodeOwner.Rows(await Node.RequestAsync("component.render", new JsonObject { ["id"] = componentId, ["width"] = width }, cancellation).ConfigureAwait(false)),
             async (data, _, cancellation) => await Node.RequestAsync("component.input", new JsonObject { ["id"] = componentId, ["data"] = data }, cancellation).ConfigureAwait(false),
-            async _ => { _components.TryRemove(componentId, out var _); _componentCaptures.TryRemove(componentId, out var _); await Node.RequestAsync("component.dispose", new JsonObject { ["id"] = componentId }).ConfigureAwait(false); })
-        { Blocked = CustomComponentBlocked(p), Overlay = CustomComponentOverlay(p), CapturesViewportInput = () => ComponentCapturesViewportInput(componentId) },
+            async _ => {
+                _components.TryRemove(componentId, out var _); _componentCaptures.TryRemove(componentId, out var _);
+                if (_overlayHandles.TryRemove(componentId, out var handle)) handle.Retire();
+                if (IsRunning) await Node.RequestAsync("component.dispose", new JsonObject { ["id"] = componentId }).ConfigureAwait(false);
+            })
+        { Blocked = CustomComponentBlocked(p), Overlay = ComponentOverlay(p, componentId), CapturesViewportInput = () => ComponentCapturesViewportInput(componentId) },
             token).ConfigureAwait(false);
+    }
+
+    private ExtensionCustomComponentOverlay? ComponentOverlay(JsonElement p, string componentId)
+    {
+        var overlay = CustomComponentOverlay(p);
+        if (overlay is null) return null;
+        var visibilitySync = new object();
+        Task<JsonElement?>? pendingVisibility = null;
+        async Task<bool> Visible(int columns, int rows, CancellationToken cancellation)
+        {
+            Task<JsonElement?> pending;
+            lock (visibilitySync)
+            {
+                if (!IsRunning || !_components.ContainsKey(componentId)) return false;
+                // A timed-out frame must not enqueue another Node query behind a blocked predicate. Keep at most one request
+                // alive for this component; frame cancellation only bounds the waiter, never creates a replacement request.
+                pending = pendingVisibility is { IsCompleted: false } existing ? existing : pendingVisibility = Node.RequestAsync(
+                    "component.overlay.visible", new JsonObject { ["id"] = componentId, ["columns"] = columns, ["rows"] = rows });
+            }
+            return await pending.WaitAsync(cancellation).ConfigureAwait(false) is { ValueKind: JsonValueKind.True };
+        }
+        return overlay with
+        {
+            Visible = p.TryGetProperty("dynamicVisible", out var dynamicVisible) && dynamicVisible.ValueKind == JsonValueKind.True
+                ? Visible : null,
+            OnHandle = async (handle, cancellation) =>
+            {
+                _overlayHandles[componentId] = handle;
+                await Node.RequestAsync("component.overlay.ready", new JsonObject { ["id"] = componentId }, cancellation).ConfigureAwait(false);
+            }
+        };
     }
 
     /// <summary>Pi 1.3.0 ctx.ui.custom() <c>overlay: true</c> with its overlayOptions (the bridge resolves a function once); null inline.</summary>

@@ -21,6 +21,7 @@ public sealed class AzureResponsesRequestFactory
     private readonly AzureResponsesOptions _options;
     private readonly ResponsesTranscriptProjector _projector;
     private readonly JsonElement _metadata;
+    private readonly string _promptCacheKeyMode;
     private readonly ImmutableDictionary<string, string?> _headers;
     public Uri Endpoint { get; }
     public string DeploymentName { get; }
@@ -42,6 +43,16 @@ public sealed class AzureResponsesRequestFactory
         _model = model; _options = options; _metadata = options.ModelMetadata.Value;
         try
         {
+            var cacheKeyMode = "auto";
+            if (_metadata.TryGetProperty("compat", out var cacheCompat) && cacheCompat.ValueKind != JsonValueKind.Null)
+            {
+                if (cacheCompat.ValueKind != JsonValueKind.Object) throw Fail(AzureResponsesFailure.Configuration);
+                if (cacheCompat.TryGetProperty("promptCacheKeyMode", out var mode) && mode.ValueKind != JsonValueKind.Null)
+                    cacheKeyMode = mode.ValueKind == JsonValueKind.String ? mode.GetString()! : throw Fail(AzureResponsesFailure.Configuration);
+            }
+            if (cacheKeyMode is not ("auto" or "enabled" or "disabled") || options.PromptCacheKeyMode is not (null or "auto" or "enabled" or "disabled"))
+                throw Fail(AzureResponsesFailure.Configuration);
+            _promptCacheKeyMode = options.PromptCacheKeyMode ?? cacheKeyMode;
             if (_metadata.GetProperty("id").GetString() != model.Id || _metadata.GetProperty("api").GetString() != model.Api ||
                 _metadata.GetProperty("provider").GetString() != model.Provider) throw Fail(AzureResponsesFailure.Configuration);
             Bound(options.ModelMetadata.ToString());
@@ -49,14 +60,14 @@ public sealed class AzureResponsesRequestFactory
                 throw Fail(AzureResponsesFailure.UnsupportedOptions);
             foreach (var configured in options.ConfigurationValues.Values) if (configured is not null) Bound(configured);
             var compat = _metadata.TryGetProperty("compat", out var supplied) ? supplied : default;
-            if (Flag(compat, "supportsAdditionalTools", false) || Flag(compat, "supportsToolSearch", false) || Flag(compat, "supportsOpenAIGrammarTools", false))
-                throw Fail(AzureResponsesFailure.UnsupportedOptions);
             _projector = new(options.Projection with
             {
                 Reasoning = _metadata.GetProperty("reasoning").GetBoolean(),
                 SupportsDeveloperRole = Flag(compat, "supportsDeveloperRole", true),
+                SupportsAdditionalTools = Flag(compat, "supportsAdditionalTools", options.Projection.SupportsAdditionalTools),
+                SupportsToolSearch = Flag(compat, "supportsToolSearch", options.Projection.SupportsToolSearch),
                 SupportsMidConversationSystemMessages = Flag(compat, "supportsMidConvoSystemMessages", false),
-                ToolDeclarations = (options.Projection.ToolDeclarations ?? new()) with { SupportsStrictMode = Flag(compat, "supportsStrictMode", true) },
+                ToolDeclarations = (options.Projection.ToolDeclarations ?? new()) with { SupportsStrictMode = Flag(compat, "supportsStrictMode", true), SupportsOpenAIGrammarTools = Flag(compat, "supportsOpenAIGrammarTools", false) },
                 // Pi 1.0.3 renamed the provider to "azure"; a model still declaring "azure-openai-responses" normalizes ids like any other provider.
                 AllowedToolCallProviders = ImmutableHashSet.Create(StringComparer.Ordinal, "openai", "openai-codex", "opencode", "azure")
             });
@@ -93,7 +104,7 @@ public sealed class AzureResponsesRequestFactory
         if (request is null || request.Model != _model) throw Fail(AzureResponsesFailure.Request);
         var input = _projector.ProjectInput(request, token); var tools = _projector.ProjectTools(request, token);
         var root = new JsonObject { ["model"] = DeploymentName, ["input"] = JsonNode.Parse(input.ToString()), ["stream"] = true };
-        if ((_options.SessionId ?? request.SessionId) is { } session) { Bound(session); ValidateUnicode(session); root["prompt_cache_key"] = string.Concat(session.EnumerateRunes().Take(64).Select(rune => rune.ToString())); }
+        if (_promptCacheKeyMode != "disabled" && (_options.SessionId ?? request.SessionId) is { } session) { Bound(session); ValidateUnicode(session); root["prompt_cache_key"] = string.Concat(session.EnumerateRunes().Take(64).Select(rune => rune.ToString())); }
         root["store"] = false;
         if (_options.MaxTokens is { } cap && cap != 0) root["max_output_tokens"] = Math.Max(cap, 16);
         if (_options.Temperature is { } temperature) root["temperature"] = temperature;
@@ -125,7 +136,7 @@ public sealed class AzureResponsesRequestFactory
             MergeSampling(root, levelSampling);
         }
         MergeSampling(root, _options.SamplingParams?.Value ?? default);
-        return AdmitPayload(JsonData.Parse(root.ToJsonString()), token);
+        return AdmitPayload(JsonData.Parse(JsonUtf16.ToJsonString(root)), token);
     }
 
     public async ValueTask<HttpRequestMessage> CreateAsync(ChatRequest request, string explicitApiKey, CancellationToken token = default)

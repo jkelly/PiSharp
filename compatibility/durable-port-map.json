@@ -6,6 +6,10 @@
   "previousVersion": "1.2.0",
   "decision": "docs/decisions/0005-pi-durable-experimental.md",
   "worklist": "compatibility/durable-sync-1.5.0-worklist.json",
+  "currentImplementation": {
+    "mapping": "compatibility/gap-status-2026-11-08.json",
+    "statusScope": "Release-baseline status/notes and immutable upstream pins are retained; currentImplementation points to the current source mapping. Source implementation is not runtime acceptance."
+  },
   "statusMeaning": {
     "planned": "Not started.",
     "in-progress": "Being ported.",
@@ -171,7 +175,18 @@
       "upstreamChange": "modified",
       "previousBlobSha1": "2fcb8660682c0489f3083b6a68d131698838e475",
       "changedLines": 61,
-      "note": "Agents: AgentDoc (pi.agent, rewindable, fork asOf), DefaultRetryPolicy/DefaultCompactionPolicy/DefaultProgressPolicy, InstructionsKey, ResolveSettings, ConfigureAsync, AddToolsAsync, CreateAgentAsync, AgentHooks, ResolveAgent. The stored AgentState is the pi.agent JsonObjectValue; AgentChange fields are Patch<T>? (given, Clear, or unchanged). Tests: harness.registry.settings.*, harness.registry.agent-resolution.*, harness.tasks.task-phases.resolves-the-agent-* v1.2.0 (area a): modelTools (an array or {remove?, add?}) through FilterTools/OfferedTools, ToolRegistration.Callers and Deferred, Agent.Callable and Deferred, AddToolsAsync extending modelTools. Tests also harness.callers.*. v1.5.0 (work list area reports): settings.afterFailedRun resolves to keep (a30c2a81d); AgentHooks pairs each handler with the name of the extension that installed it, and ResolveAgent reports a failing hook or section as extension_error with that name (SectionExtension, ToolExtension). Tests: harness.registry.agent-resolution.collects-hooks-of-the-selected-extensions-in-extension-order-and-applies-field-defaults, harness.reports.*, harness.failed-run-inbox.*; waits on the file's other areas v1.5.0 (work list area deferred-commits, 6c2fd73b0): settings.progress.persistWithinMs (ProgressSettings.PersistWithinMs, default 1,000 ms). Tests: harness.deferred-progress.* v1.5.0 (work list area live-turns, f6a9db1d8, the last of the file's areas): AgentState.maxTurns (AgentChange.MaxTurns, a Patch<long>?; Agent.MaxTurns): configure() stores it after cwd and throws ArgumentOutOfRangeException (upstream RangeError) unless it is an integer 1 or more within JavaScript's safe integers, Clear removes it, resolveAgent passes it on; task-owned children and forks inherit it with pi.agent. 1.5, NaN and Infinity cannot be given as a long. Tests: harness.turn-limit.rejects-a-limit-that-is-not-an-integer-1-or-more, harness.turn-limit.applies-a-changed-limit-at-the-end-of-the-round-null-removes-it, harness.turn-limit.is-inherited-by-forks-and-children-which-may-set-their-own"
+      "note": "Agents: AgentDoc (pi.agent, rewindable, fork asOf), DefaultRetryPolicy/DefaultCompactionPolicy/DefaultProgressPolicy, InstructionsKey, ResolveSettings, ConfigureAsync, AddToolsAsync, CreateAgentAsync, AgentHooks, ResolveAgent. The stored AgentState is the pi.agent JsonObjectValue; AgentChange fields are Patch<T>? (given, Clear, or unchanged). Tests: harness.registry.settings.*, harness.registry.agent-resolution.*, harness.tasks.task-phases.resolves-the-agent-* v1.2.0 (area a): modelTools (an array or {remove?, add?}) through FilterTools/OfferedTools, ToolRegistration.Callers and Deferred, Agent.Callable and Deferred, AddToolsAsync extending modelTools. Tests also harness.callers.*. v1.5.0 (work list area reports): settings.afterFailedRun resolves to keep (a30c2a81d); AgentHooks pairs each handler with the name of the extension that installed it, and ResolveAgent reports a failing hook or section as extension_error with that name (SectionExtension, ToolExtension). Tests: harness.registry.agent-resolution.collects-hooks-of-the-selected-extensions-in-extension-order-and-applies-field-defaults, harness.reports.*, harness.failed-run-inbox.*; waits on the file's other areas v1.5.0 (work list area deferred-commits, 6c2fd73b0): settings.progress.persistWithinMs (ProgressSettings.PersistWithinMs, default 1,000 ms). Tests: harness.deferred-progress.* v1.5.0 (work list area live-turns, f6a9db1d8, the last of the file's areas): AgentState.maxTurns (AgentChange.MaxTurns, a Patch<long>?; Agent.MaxTurns): configure() stores it after cwd and throws ArgumentOutOfRangeException (upstream RangeError) unless it is an integer 1 or more within JavaScript's safe integers, Clear removes it, resolveAgent passes it on; task-owned children and forks inherit it with pi.agent. 1.5, NaN and Infinity cannot be given as a long. Tests: harness.turn-limit.rejects-a-limit-that-is-not-an-integer-1-or-more, harness.turn-limit.applies-a-changed-limit-at-the-end-of-the-round-null-removes-it, harness.turn-limit.is-inherited-by-forks-and-children-which-may-set-their-own",
+      "currentImplementation": {
+        "mapping": "compatibility/gap-status-2026-11-08.json",
+        "upstream": "packages/durable/src/harness/agent.ts",
+        "sourceStatus": "source-implemented",
+        "runtimeStatus": "pending-integrated-validation",
+        "sourcePaths": [
+          "src/PiSharp.Durable/Harness/Agent.cs"
+        ],
+        "note": "Additive agent/checkpoint fields need no SQL schema bump; older binaries do not enforce the new fields. External ITx implementations retain a default unsupported lookup until they implement it."
+      },
+      "historicalPisharp": "src/PiSharp.Durable/Harness/Agent.cs"
     },
     {
       "upstream": "packages/durable/src/harness/compaction.ts",
@@ -183,7 +198,18 @@
       "upstreamChange": "modified",
       "previousBlobSha1": "b05fdaae64992d1697ef0c7ce491af643e924222",
       "changedLines": 58,
-      "note": "HarnessTasks.CompactionTask (pi.compaction v1: select, summarize, retry, abort; upstream checkpoint, input, result and live status JSON), the summarization prompts and request, the pi.compaction summary entry placed by append (blocking) or write submission (conversation-owned), CompactionHooks.BeforeCompact over CompactionRequest/CompactionDecision, Conversation.CompactAsync and CompactionResult; Compaction.CreateCompactionAsync, SelectCut, SummarizedMessages, SerializeConversation and EstimateContext. Tests: harness.compaction.*, harness.compaction-differential.* (Fixtures/compaction.upstream.json) v1.2.0 (area j): a failed summarization, a missing model and the scheduler's faulted or orphaned compaction record pi.live.compactionFailure {taskId, reason, error} (Live.FailCompactionStatus), a placed summary removes it; SerializeConversation leaves thinking out. Generation.cs (area a's row) fails a generation whose blocking threshold compaction failed, faulted, was orphaned or aborted with model_error (\"Compaction failed: ...\", \"Compaction was aborted\"), its prepare checkpoint marking threshold: true; Events.cs (area a's row; PiSharp.Durable.Hosting's AgentEvents.cs since area events) adds compactionFailure to the snapshot and error to compaction_end. harness.compaction-differential.* reads Fixtures/v1.2.0/compaction.upstream.json with its backgroundFailure and blockingFailure scenarios; compat.compaction-failure.* checks the v1.2.0 capture v1.5.0 (work list area sleep): a retry backoff commits a sleep, and a retry run before its time sleeps again (f75b3240a). Tests: harness.compaction.compaction-recovery.resumes-a-retry-backoff-after-reopen v1.5.0 (work list area telemetry): the summarization request takes the phase's span as its telemetry parent, and a conversation-owned compaction's admission records only the phase's events, no submit span (2ec55d808). Tests: harness.telemetry.parents-background-compaction-to-the-prepare-phase-that-creates-it, harness.telemetry.records-internal-compaction-admissions-as-phase-events-without-a-submit-span v1.5.0 (work list area restarts, b3a29f111): select, summarize and retry fail a compaction cut off settings.restartLimit times in a row into pi.live.compactionFailure (\"Compaction was interrupted once\" or \"N times in a row\", detail reason restart_limit; FailCutOffAsync) instead of running it again; the scheduler reports it task_interrupted. Tests: harness.restart-failure.other-tasks-cut-off-restartlimit-times-in-a-row.fails-a-compaction-into-compactionfailure; v1.5.0 (work list area vocabulary, 5f312dac4): nothing of its own: 5f312dac4's change here, compactionFailure's reason as trigger, is area live-turns' (durable.live-compaction-trigger) v1.5.0 (work list area live-turns, 5f312dac4, the last of the file's areas): a compaction status names its trigger ({taskId, trigger, blocking, attempt}); the task input keeps reason. Tests: harness.compaction.*"
+      "note": "HarnessTasks.CompactionTask (pi.compaction v1: select, summarize, retry, abort; upstream checkpoint, input, result and live status JSON), the summarization prompts and request, the pi.compaction summary entry placed by append (blocking) or write submission (conversation-owned), CompactionHooks.BeforeCompact over CompactionRequest/CompactionDecision, Conversation.CompactAsync and CompactionResult; Compaction.CreateCompactionAsync, SelectCut, SummarizedMessages, SerializeConversation and EstimateContext. Tests: harness.compaction.*, harness.compaction-differential.* (Fixtures/compaction.upstream.json) v1.2.0 (area j): a failed summarization, a missing model and the scheduler's faulted or orphaned compaction record pi.live.compactionFailure {taskId, reason, error} (Live.FailCompactionStatus), a placed summary removes it; SerializeConversation leaves thinking out. Generation.cs (area a's row) fails a generation whose blocking threshold compaction failed, faulted, was orphaned or aborted with model_error (\"Compaction failed: ...\", \"Compaction was aborted\"), its prepare checkpoint marking threshold: true; Events.cs (area a's row; PiSharp.Durable.Hosting's AgentEvents.cs since area events) adds compactionFailure to the snapshot and error to compaction_end. harness.compaction-differential.* reads Fixtures/v1.2.0/compaction.upstream.json with its backgroundFailure and blockingFailure scenarios; compat.compaction-failure.* checks the v1.2.0 capture v1.5.0 (work list area sleep): a retry backoff commits a sleep, and a retry run before its time sleeps again (f75b3240a). Tests: harness.compaction.compaction-recovery.resumes-a-retry-backoff-after-reopen v1.5.0 (work list area telemetry): the summarization request takes the phase's span as its telemetry parent, and a conversation-owned compaction's admission records only the phase's events, no submit span (2ec55d808). Tests: harness.telemetry.parents-background-compaction-to-the-prepare-phase-that-creates-it, harness.telemetry.records-internal-compaction-admissions-as-phase-events-without-a-submit-span v1.5.0 (work list area restarts, b3a29f111): select, summarize and retry fail a compaction cut off settings.restartLimit times in a row into pi.live.compactionFailure (\"Compaction was interrupted once\" or \"N times in a row\", detail reason restart_limit; FailCutOffAsync) instead of running it again; the scheduler reports it task_interrupted. Tests: harness.restart-failure.other-tasks-cut-off-restartlimit-times-in-a-row.fails-a-compaction-into-compactionfailure; v1.5.0 (work list area vocabulary, 5f312dac4): nothing of its own: 5f312dac4's change here, compactionFailure's reason as trigger, is area live-turns' (durable.live-compaction-trigger) v1.5.0 (work list area live-turns, 5f312dac4, the last of the file's areas): a compaction status names its trigger ({taskId, trigger, blocking, attempt}); the task input keeps reason. Tests: harness.compaction.*",
+      "currentImplementation": {
+        "mapping": "compatibility/gap-status-2026-11-08.json",
+        "upstream": "packages/durable/src/harness/compaction.ts",
+        "sourceStatus": "source-implemented",
+        "runtimeStatus": "pending-integrated-validation",
+        "sourcePaths": [
+          "src/PiSharp.Durable/Harness/Compaction.cs"
+        ],
+        "note": "Additive agent/checkpoint fields need no SQL schema bump; older binaries do not enforce the new fields. External ITx implementations retain a default unsupported lookup until they implement it."
+      },
+      "historicalPisharp": "src/PiSharp.Durable/Harness/Compaction.cs"
     },
     {
       "upstream": "packages/durable/src/harness/context.ts",
@@ -229,7 +255,18 @@
       "upstreamChange": "modified",
       "previousBlobSha1": "d6042e537290fd429a8ddd6d732b98bab122b063",
       "changedLines": 702,
-      "note": "HarnessTasks.GenerationTask (pi.generation v1, initial {phase: prepare, attempt: 1}) with phases prepare, request, retry, poll and tools and its abort handler (GenerationPhases): section rendering and pi.system planning, threshold and overflow compaction starts, streaming through IDurableModels with throttled partial commits to pi.live.generation.message (an AssistantStreamReducer snapshot per event; the throttle timer is the Harness TimeProvider's), the beforeRequest/afterResponse/onYield/afterTools hooks (the runtime is the hooks' IHookApi), retry backoff, deferred polling and cancellation, usage recording (appendAssistant), the final boundary, the tool round hand-off (tool_unavailable results, owned tool tasks, sequential pending calls, finishToolRound with terminate/handoff/addTools controls) and startRun/handOver. Provider messages are stored as PiWireJson wire JSON; a non-finite usage count throws Chord's copyJson error. Tests: harness.generation.*, harness.generation-recovery.*, harness.chat-differential.*, harness.structured.tool-rounds.* v1.2.0: the blocking threshold flag (area j); tool tasks take {kind: \"model\", ...}, controls are read from model-issued results only, and a round handed over removes nestedTools (area a). v1.5.0 (work list area model-requests): classify records the requested thinking level on the message and the poll checkpoint pins it; a poll of a checkpoint without it records none (d5b3de22d); a request passes the beforeProviderRequest chain as DurableStreamOptions.OnPayload when the phase's agent has such a hook, a throwing hook reported and skipped (d280e1ffa). The retry checkpoint's poll.thinkingLevel is b3a29f111's (area restarts). Tests: harness.generation.records-the-requested-thinking-level-on-answers-streamed-and-polled, harness.generation-recovery.polls-a-checkpoint-stored-without-a-thinking-level-and-records-none, harness.tools.chains-beforeproviderrequest-over-every-provider-request-body, harness.tools.reports-a-throwing-beforeproviderrequest-hook-and-continues-the-chain; the compat, examples and differential captures compare as authored forms (ModelRequests150.cs); waits on the file's other areas v1.5.0 (work list area sleep): a retry backoff and a deferred poll commit a sleep, and a run before its time sleeps again, the poll before its model lookup; the partial-commit throttle arms runtime.SetTimer (f75b3240a, ec1be23eb). Tests: harness.generation-recovery.* v1.5.0 (work list area telemetry): requests, deferred polls and deferred cancels take the phase's span as their telemetry parent, and a run's generation is created with its inputs' submission IDs, so it runs in the first admission's trace and links the others (2ec55d808). Tests: harness.telemetry.starts-each-queued-input-s-run-in-its-admission-trace-and-links-input-roots-to-their-caller, harness.telemetry.links-the-other-queued-inputs-to-the-first-invocation-of-their-shared-run; waits on the file's other areas v1.5.0 (work list area partial-commits): a partial commit appends what text and thinking grew by and applies the tool-call argument changes since the last commit (PartialChanges, da412b039); the committed partial is rebuilt from a reducer snapshot only after structural events, its text growing by deferred appends (JsonStringValue.Concat) between them, and now carries the streamed arguments. Tests: harness.partial-changes.*, harness.view-run.streamed-partials.*; waits on the file's other areas v1.5.0 (work list area deferred-commits, 6c2fd73b0 and e5c6182ba): partials and a generation's attempt are deferred progress commits (Live.ProgressCommit); recovery converts only what was stored. Tests: harness.deferred-progress.*, crash.*.chat.stream, crash.*.chat.stream-stored; waits on the file's other areas v1.5.0 (work list area run-failure, f3255de76): StartRunAsync removes pi.live.runFailure unless keepFailure (a run started in the commit that ended the failed one: the failed run's continue, the reset's queued inputs); the abort, model_error (with the error text), no_model (with the message, settling no_model), reset and the failed final boundary end their runs through RunEnd. Tests: harness.run-failure.*, harness.generation.*; waits on the file's other areas v1.5.0 (work list area tool-tasks, 1c6928b30): pi.generation v2 (migrate keeps a version 1 record); every call of a round gets a tool task owned by the generation, a call to a tool its request did not offer flagged unoffered: true in its task input and its slot, where v1.2.0 appended its tool_unavailable result without a task; a sequential round keeps such a call pending and flagged until its turn, the abort handler answers an unstarted one tool_unavailable, and finishToolRound reads the controls in call order. A Harness older than v1.5.0 leaves version 2 blocked (task_too_old). Tests: harness.tool-hooks.calls-to-tools-the-request-did-not-offer.*, harness.tools.answers-calls-to-tools-the-request-did-not-offer-through-a-flagged-tool-task, compat.*, harness.chat-differential.*, harness.tools-differential.* (the captures compare as ToolTasks150.cs's authored forms); waits on areas run-end and group-commit-scheduler v1.5.0 (work list area admission, fb524dd2e): prepare ends a run whose context's last non-system message is neither user nor toolResult without a request: unanswered nothing_to_answer (RunEnd.Unanswered, the task failed \"The conversation has nothing to answer\"); the request's cutoff is the conversation's newest entry, and StartRunAsync takes placed inputs and continues. Tests: harness.continue.*, harness.run-failure.* v1.5.0 (work list area live-turns, f6a9db1d8): startRun writes run.turns 0; the commit that starts a tool round counts it as one turn; finishToolRound reads maxTurns from the phase's agent before its commit and, at the limit, ends the run like a failure (EndFailedRunAsync, RunEnd.Unanswered turn_limit with \"1 turn\" or \"N turns\"; afterFailedRun decides the queue); answer takes an onYield continuation only when the inbox holds no user item and no reset (TakesContinuation) and starts the count over. A handoff still ends its run done, ahead of the limit, until area run-end (38ff99177). Tests: harness.turn-limit.*; waits on areas run-end and group-commit-scheduler v1.5.0 (work list area run-end, 7e15f9601 and 38ff99177, #11141): pi.generation's finish and drain phases. With an afterRun hook selected, a run that answers (a final answer without a taken continuation, or a terminate round) is held in commit A: its inputs settle done, run.inputs is [] and run.afterRun {}, and the generation moves to finish {phase, run}; finish asks every hook (RunSummary) and checks the requests off the line (PrepareRunEndTasks: a rejected request is reported against its hook's extension), creates the rest as the generation's foreground children and waits in drain (allSettled), which ends the run done at the answer after the final boundary. A finish or drain cut off restartLimit times ends the run without a failure and reports task_interrupted; Stop ends it without a failure. startRun records run.first (a continue's is runFailure.first), a tool round sets it when absent, and a run without one takes its answer. A handoff appends its reset and continues the run in the new context at the postTools boundary; a terminate in the same round ends it after the reset. Tests: harness.after-run.*, harness.inbox.*, harness.turn-limit.*; waits on area group-commit-scheduler v1.5.0 (work list area group-commit-scheduler, e5c6182ba): the prepare phase reads the newest entry with tx.LatestEntryIdAsync (upstream tx.latestEntryId, Generation.cs), and the request phase's attempt is a deferred progress commit (area deferred-commits); nothing of area group-commit-scheduler is left. v1.5.0 (closeout): checked against v1.5.0; 6085986e4 (#10942, the per-model compaction policy of the threshold check and overflow recovery) is Compaction.PolicyFor, which area harness-options ported. The citation is v1.5.0."
+      "note": "HarnessTasks.GenerationTask (pi.generation v1, initial {phase: prepare, attempt: 1}) with phases prepare, request, retry, poll and tools and its abort handler (GenerationPhases): section rendering and pi.system planning, threshold and overflow compaction starts, streaming through IDurableModels with throttled partial commits to pi.live.generation.message (an AssistantStreamReducer snapshot per event; the throttle timer is the Harness TimeProvider's), the beforeRequest/afterResponse/onYield/afterTools hooks (the runtime is the hooks' IHookApi), retry backoff, deferred polling and cancellation, usage recording (appendAssistant), the final boundary, the tool round hand-off (tool_unavailable results, owned tool tasks, sequential pending calls, finishToolRound with terminate/handoff/addTools controls) and startRun/handOver. Provider messages are stored as PiWireJson wire JSON; a non-finite usage count throws Chord's copyJson error. Tests: harness.generation.*, harness.generation-recovery.*, harness.chat-differential.*, harness.structured.tool-rounds.* v1.2.0: the blocking threshold flag (area j); tool tasks take {kind: \"model\", ...}, controls are read from model-issued results only, and a round handed over removes nestedTools (area a). v1.5.0 (work list area model-requests): classify records the requested thinking level on the message and the poll checkpoint pins it; a poll of a checkpoint without it records none (d5b3de22d); a request passes the beforeProviderRequest chain as DurableStreamOptions.OnPayload when the phase's agent has such a hook, a throwing hook reported and skipped (d280e1ffa). The retry checkpoint's poll.thinkingLevel is b3a29f111's (area restarts). Tests: harness.generation.records-the-requested-thinking-level-on-answers-streamed-and-polled, harness.generation-recovery.polls-a-checkpoint-stored-without-a-thinking-level-and-records-none, harness.tools.chains-beforeproviderrequest-over-every-provider-request-body, harness.tools.reports-a-throwing-beforeproviderrequest-hook-and-continues-the-chain; the compat, examples and differential captures compare as authored forms (ModelRequests150.cs); waits on the file's other areas v1.5.0 (work list area sleep): a retry backoff and a deferred poll commit a sleep, and a run before its time sleeps again, the poll before its model lookup; the partial-commit throttle arms runtime.SetTimer (f75b3240a, ec1be23eb). Tests: harness.generation-recovery.* v1.5.0 (work list area telemetry): requests, deferred polls and deferred cancels take the phase's span as their telemetry parent, and a run's generation is created with its inputs' submission IDs, so it runs in the first admission's trace and links the others (2ec55d808). Tests: harness.telemetry.starts-each-queued-input-s-run-in-its-admission-trace-and-links-input-roots-to-their-caller, harness.telemetry.links-the-other-queued-inputs-to-the-first-invocation-of-their-shared-run; waits on the file's other areas v1.5.0 (work list area partial-commits): a partial commit appends what text and thinking grew by and applies the tool-call argument changes since the last commit (PartialChanges, da412b039); the committed partial is rebuilt from a reducer snapshot only after structural events, its text growing by deferred appends (JsonStringValue.Concat) between them, and now carries the streamed arguments. Tests: harness.partial-changes.*, harness.view-run.streamed-partials.*; waits on the file's other areas v1.5.0 (work list area deferred-commits, 6c2fd73b0 and e5c6182ba): partials and a generation's attempt are deferred progress commits (Live.ProgressCommit); recovery converts only what was stored. Tests: harness.deferred-progress.*, crash.*.chat.stream, crash.*.chat.stream-stored; waits on the file's other areas v1.5.0 (work list area run-failure, f3255de76): StartRunAsync removes pi.live.runFailure unless keepFailure (a run started in the commit that ended the failed one: the failed run's continue, the reset's queued inputs); the abort, model_error (with the error text), no_model (with the message, settling no_model), reset and the failed final boundary end their runs through RunEnd. Tests: harness.run-failure.*, harness.generation.*; waits on the file's other areas v1.5.0 (work list area tool-tasks, 1c6928b30): pi.generation v2 (migrate keeps a version 1 record); every call of a round gets a tool task owned by the generation, a call to a tool its request did not offer flagged unoffered: true in its task input and its slot, where v1.2.0 appended its tool_unavailable result without a task; a sequential round keeps such a call pending and flagged until its turn, the abort handler answers an unstarted one tool_unavailable, and finishToolRound reads the controls in call order. A Harness older than v1.5.0 leaves version 2 blocked (task_too_old). Tests: harness.tool-hooks.calls-to-tools-the-request-did-not-offer.*, harness.tools.answers-calls-to-tools-the-request-did-not-offer-through-a-flagged-tool-task, compat.*, harness.chat-differential.*, harness.tools-differential.* (the captures compare as ToolTasks150.cs's authored forms); waits on areas run-end and group-commit-scheduler v1.5.0 (work list area admission, fb524dd2e): prepare ends a run whose context's last non-system message is neither user nor toolResult without a request: unanswered nothing_to_answer (RunEnd.Unanswered, the task failed \"The conversation has nothing to answer\"); the request's cutoff is the conversation's newest entry, and StartRunAsync takes placed inputs and continues. Tests: harness.continue.*, harness.run-failure.* v1.5.0 (work list area live-turns, f6a9db1d8): startRun writes run.turns 0; the commit that starts a tool round counts it as one turn; finishToolRound reads maxTurns from the phase's agent before its commit and, at the limit, ends the run like a failure (EndFailedRunAsync, RunEnd.Unanswered turn_limit with \"1 turn\" or \"N turns\"; afterFailedRun decides the queue); answer takes an onYield continuation only when the inbox holds no user item and no reset (TakesContinuation) and starts the count over. A handoff still ends its run done, ahead of the limit, until area run-end (38ff99177). Tests: harness.turn-limit.*; waits on areas run-end and group-commit-scheduler v1.5.0 (work list area run-end, 7e15f9601 and 38ff99177, #11141): pi.generation's finish and drain phases. With an afterRun hook selected, a run that answers (a final answer without a taken continuation, or a terminate round) is held in commit A: its inputs settle done, run.inputs is [] and run.afterRun {}, and the generation moves to finish {phase, run}; finish asks every hook (RunSummary) and checks the requests off the line (PrepareRunEndTasks: a rejected request is reported against its hook's extension), creates the rest as the generation's foreground children and waits in drain (allSettled), which ends the run done at the answer after the final boundary. A finish or drain cut off restartLimit times ends the run without a failure and reports task_interrupted; Stop ends it without a failure. startRun records run.first (a continue's is runFailure.first), a tool round sets it when absent, and a run without one takes its answer. A handoff appends its reset and continues the run in the new context at the postTools boundary; a terminate in the same round ends it after the reset. Tests: harness.after-run.*, harness.inbox.*, harness.turn-limit.*; waits on area group-commit-scheduler v1.5.0 (work list area group-commit-scheduler, e5c6182ba): the prepare phase reads the newest entry with tx.LatestEntryIdAsync (upstream tx.latestEntryId, Generation.cs), and the request phase's attempt is a deferred progress commit (area deferred-commits); nothing of area group-commit-scheduler is left. v1.5.0 (closeout): checked against v1.5.0; 6085986e4 (#10942, the per-model compaction policy of the threshold check and overflow recovery) is Compaction.PolicyFor, which area harness-options ported. The citation is v1.5.0.",
+      "currentImplementation": {
+        "mapping": "compatibility/gap-status-2026-11-08.json",
+        "upstream": "packages/durable/src/harness/generation.ts",
+        "sourceStatus": "source-implemented",
+        "runtimeStatus": "pending-integrated-validation",
+        "sourcePaths": [
+          "src/PiSharp.Durable/Harness/Generation.cs"
+        ],
+        "note": "Additive agent/checkpoint fields need no SQL schema bump; older binaries do not enforce the new fields. External ITx implementations retain a default unsupported lookup until they implement it."
+      },
+      "historicalPisharp": "src/PiSharp.Durable/Harness/Generation.cs"
     },
     {
       "upstream": "packages/durable/src/harness/harness.ts",
@@ -329,7 +366,18 @@
       "phase": "sync-1.5.0",
       "status": "ported",
       "upstreamChange": "added",
-      "note": "v1.5.0 (work list area registry-reader, 6eb99ad65): RegistryReader.Create(value, context) (upstream registryReader) in PiSharp.Durable.Store, as it needs Chord v2's IRegistryValue<V> and PiSharp.Durable keeps decision 0005 §4: Snapshot() reads value.Value (the last good composition; the failure while there is none), Subscribe observes the value with an INativeObserver that calls the listener for value calls only, synchronously inside the batch that composed, and its disposer detaches once; the context is a ChordContext, whose cancellation detaches every listener. PiSharp's IRegistryReader is not generic over the tool type, so the value is an IRegistryValue<IRegistrySnapshot>. Tests: harness.registry-reader.registry-reader.* and harness.registry-reader.contract.* (authored), on a hand-built registry until phase 6 (createHost)"
+      "note": "v1.5.0 (work list area registry-reader, 6eb99ad65): RegistryReader.Create(value, context) (upstream registryReader) in PiSharp.Durable.Store, as it needs Chord v2's IRegistryValue<V> and PiSharp.Durable keeps decision 0005 §4: Snapshot() reads value.Value (the last good composition; the failure while there is none), Subscribe observes the value with an INativeObserver that calls the listener for value calls only, synchronously inside the batch that composed, and its disposer detaches once; the context is a ChordContext, whose cancellation detaches every listener. PiSharp's IRegistryReader is not generic over the tool type, so the value is an IRegistryValue<IRegistrySnapshot>. Tests: harness.registry-reader.registry-reader.* and harness.registry-reader.contract.* (authored), on a hand-built registry until phase 6 (createHost)",
+      "currentImplementation": {
+        "mapping": "compatibility/gap-status-2026-11-08.json",
+        "upstream": "packages/durable/src/harness/registry-reader.ts",
+        "sourceStatus": "source-implemented",
+        "runtimeStatus": "pending-integrated-validation",
+        "sourcePaths": [
+          "src/PiSharp.Durable.Store/RegistryReader.cs"
+        ],
+        "note": "Real-host examples and integration tests now exist; final execution and package-only consumption remain pending."
+      },
+      "historicalPisharp": "src/PiSharp.Durable.Store/RegistryReader.cs"
     },
     {
       "upstream": "packages/durable/src/harness/registry.ts",
@@ -418,7 +466,18 @@
       "upstreamChange": "modified",
       "previousBlobSha1": "0f8c5f38902a6ecf8e7aa2de3643cee47eae6ff2",
       "changedLines": 365,
-      "note": "All shapes final: ModelRef, Patch<T>, ExtensionSelection/ToolSelection, AgentChange, Agent, ToolRegistration (non-sealed record; upstream's Tool generic is record inheritance), ToolExecutionResult/ToolControl/ToolDiagnostic, PromptInput/PromptSection, HookRegistration, Wrap (ToolWrap/SectionWrap), Extension, IRegistrySnapshot/IRegistryReader/IRegistry, settings (HarnessSettings with virtual getters for live values) and policies, HarnessOptions (plus a TimeProvider seam), inspection types, ContextView, IConversation, IConversationHandle, IHarness, IHookApi, SubmissionDraft/ISubmission, GenerationHooks, ToolHooks, IToolExecutionApi (DelegatingToolExecutionApi for wrappers), CompactionHooks/CompactionResult. Type-level helpers map as in index.ts's row (AnyTask, HooksOf, HookResult, UserInput, InputSubmissionDraft; ConversationWatch is IWatchHandle<ConversationView>); tasks are JsonValue-typed (see types.ts). The pi-ai Models seam is IDurableModels in Harness/Models.cs. Tests: harness.*, types.types-submissions-task-waits-compaction-and-tasks-erased-into-extensions v1.2.0 (area a): ToolExecutionResult.Output and StructuredOutput, NestedToolExecutionResult (ToJson is what NestedCallDoc stores), NestedCallOptions, RetainedOutput, ToolCaller, ToolRegistration.StructuredOutputSchema/Callers/Deferred, ModelToolSelection and AgentChange.ModelTools, Agent.Callable/Deferred, IToolExecutionApi.ExecuteToolAsync/RetainedOutput; a ToolHookCall is the call JSON with `parent`. v1.2.0 (area d): ToolRegistration.ConstrainedSampling (pi-ai Tool.constrainedSampling, which enters the declaration). v1.5.0 (work list area model-requests): HarnessOptions.Identity (adc5fa9f8) and GenerationHooks.BeforeProviderRequest (d280e1ffa); DurableStreamOptions.Identity and OnPayload carry them (Harness/Models.cs); waits on the file's other areas v1.5.0 (work list area sleep): HarnessOptions.SetTimer and OnWake, Wake, IHarness.Wake(), TaskInspectionKind.Sleeping with Until, IToolExecutionApi.Now (f75b3240a, ec1be23eb) v1.5.0 (work list area telemetry): HarnessOptions.Telemetry, one ITelemetryContext whose propagation and metrics are optional (48909d987, 2ec55d808); DurableRequestOptions.Telemetry for the deferred, classifier and image calls, in overloads whose defaults drop it (Harness/Models.cs), observed as pi.ai.request and pi.ai.poll spans by NativeDurableModels. Tests: harness.telemetry-options.*, harness.telemetry.*; waits on the file's other areas v1.5.0 (work list area deferred-commits, 6c2fd73b0): ProgressSettings.PersistWithinMs; ITaskRuntime.CommitAsync takes CommitOptions. Tests: harness.deferred-progress.*; waits on the file's other areas v1.5.0 (work list area observers, 8b0caefc2): IHarness.ObserveConversationAsync and ObserveTaskGraphAsync. Tests: harness.observers.*; waits on the file's other areas v1.5.0 (work list area tool-tasks, 87eff524f): ToolHooks.AfterTool is documented as running on every tool task result, those the Harness writes itself included. Tests: harness.tool-hooks.*; waits on area run-end v1.5.0 (work list area admission, fb524dd2e, 6a2825113 and cc9c52310): SubmissionDraft.Continue(requestId), WhenIdle (Reject) on SubmissionDraft.Input, IConversation.SubmitAsync(ITx, SubmissionDraft) and IConversationHandle.SubmitAsync(ITx, SubmissionDraft) (overloads for upstream's runtime argument test), AbortAsync's placed input or continue, and afterFailedRun naming nothing_to_answer. Tests: harness.continue.*, harness.submit-in-commit.*; waits on area run-end v1.5.0 (work list area live-turns, f6a9db1d8, #11043): AgentChange.MaxTurns and Agent.MaxTurns; afterFailedRun and RunFailureReason name turn_limit. Tests: harness.turn-limit.*; waits on area run-end v1.5.0 (work list area run-end, 65fba65b2, 7e15f9601 and 38ff99177, the last of the file's areas): IHookApi.EntryAsync and EntriesAsync read the raw history, which compaction never changes (EntryQueryBounds, its conversation fixed); GenerationHooks.AfterRun with RunSummary (reason answer or terminate, first, answer, last) and RunEndTask; afterRun returns the requests themselves, null for none, where upstream returns { tasks }; WhenIdle counts a run waiting for its afterRun tasks as busy; ToolControl.Handoff continues the run in the new context. Tests: harness.hook-reads.*, harness.after-run.*, harness.inbox.*"
+      "note": "All shapes final: ModelRef, Patch<T>, ExtensionSelection/ToolSelection, AgentChange, Agent, ToolRegistration (non-sealed record; upstream's Tool generic is record inheritance), ToolExecutionResult/ToolControl/ToolDiagnostic, PromptInput/PromptSection, HookRegistration, Wrap (ToolWrap/SectionWrap), Extension, IRegistrySnapshot/IRegistryReader/IRegistry, settings (HarnessSettings with virtual getters for live values) and policies, HarnessOptions (plus a TimeProvider seam), inspection types, ContextView, IConversation, IConversationHandle, IHarness, IHookApi, SubmissionDraft/ISubmission, GenerationHooks, ToolHooks, IToolExecutionApi (DelegatingToolExecutionApi for wrappers), CompactionHooks/CompactionResult. Type-level helpers map as in index.ts's row (AnyTask, HooksOf, HookResult, UserInput, InputSubmissionDraft; ConversationWatch is IWatchHandle<ConversationView>); tasks are JsonValue-typed (see types.ts). The pi-ai Models seam is IDurableModels in Harness/Models.cs. Tests: harness.*, types.types-submissions-task-waits-compaction-and-tasks-erased-into-extensions v1.2.0 (area a): ToolExecutionResult.Output and StructuredOutput, NestedToolExecutionResult (ToJson is what NestedCallDoc stores), NestedCallOptions, RetainedOutput, ToolCaller, ToolRegistration.StructuredOutputSchema/Callers/Deferred, ModelToolSelection and AgentChange.ModelTools, Agent.Callable/Deferred, IToolExecutionApi.ExecuteToolAsync/RetainedOutput; a ToolHookCall is the call JSON with `parent`. v1.2.0 (area d): ToolRegistration.ConstrainedSampling (pi-ai Tool.constrainedSampling, which enters the declaration). v1.5.0 (work list area model-requests): HarnessOptions.Identity (adc5fa9f8) and GenerationHooks.BeforeProviderRequest (d280e1ffa); DurableStreamOptions.Identity and OnPayload carry them (Harness/Models.cs); waits on the file's other areas v1.5.0 (work list area sleep): HarnessOptions.SetTimer and OnWake, Wake, IHarness.Wake(), TaskInspectionKind.Sleeping with Until, IToolExecutionApi.Now (f75b3240a, ec1be23eb) v1.5.0 (work list area telemetry): HarnessOptions.Telemetry, one ITelemetryContext whose propagation and metrics are optional (48909d987, 2ec55d808); DurableRequestOptions.Telemetry for the deferred, classifier and image calls, in overloads whose defaults drop it (Harness/Models.cs), observed as pi.ai.request and pi.ai.poll spans by NativeDurableModels. Tests: harness.telemetry-options.*, harness.telemetry.*; waits on the file's other areas v1.5.0 (work list area deferred-commits, 6c2fd73b0): ProgressSettings.PersistWithinMs; ITaskRuntime.CommitAsync takes CommitOptions. Tests: harness.deferred-progress.*; waits on the file's other areas v1.5.0 (work list area observers, 8b0caefc2): IHarness.ObserveConversationAsync and ObserveTaskGraphAsync. Tests: harness.observers.*; waits on the file's other areas v1.5.0 (work list area tool-tasks, 87eff524f): ToolHooks.AfterTool is documented as running on every tool task result, those the Harness writes itself included. Tests: harness.tool-hooks.*; waits on area run-end v1.5.0 (work list area admission, fb524dd2e, 6a2825113 and cc9c52310): SubmissionDraft.Continue(requestId), WhenIdle (Reject) on SubmissionDraft.Input, IConversation.SubmitAsync(ITx, SubmissionDraft) and IConversationHandle.SubmitAsync(ITx, SubmissionDraft) (overloads for upstream's runtime argument test), AbortAsync's placed input or continue, and afterFailedRun naming nothing_to_answer. Tests: harness.continue.*, harness.submit-in-commit.*; waits on area run-end v1.5.0 (work list area live-turns, f6a9db1d8, #11043): AgentChange.MaxTurns and Agent.MaxTurns; afterFailedRun and RunFailureReason name turn_limit. Tests: harness.turn-limit.*; waits on area run-end v1.5.0 (work list area run-end, 65fba65b2, 7e15f9601 and 38ff99177, the last of the file's areas): IHookApi.EntryAsync and EntriesAsync read the raw history, which compaction never changes (EntryQueryBounds, its conversation fixed); GenerationHooks.AfterRun with RunSummary (reason answer or terminate, first, answer, last) and RunEndTask; afterRun returns the requests themselves, null for none, where upstream returns { tasks }; WhenIdle counts a run waiting for its afterRun tasks as busy; ToolControl.Handoff continues the run in the new context. Tests: harness.hook-reads.*, harness.after-run.*, harness.inbox.*",
+      "currentImplementation": {
+        "mapping": "compatibility/gap-status-2026-11-08.json",
+        "upstream": "packages/durable/src/harness/types.ts",
+        "sourceStatus": "source-implemented",
+        "runtimeStatus": "pending-integrated-validation",
+        "sourcePaths": [
+          "src/PiSharp.Durable/Harness/Types.cs"
+        ],
+        "note": "Additive agent/checkpoint fields need no SQL schema bump; older binaries do not enforce the new fields. External ITx implementations retain a default unsupported lookup until they implement it."
+      },
+      "historicalPisharp": "src/PiSharp.Durable/Harness/Types.cs"
     },
     {
       "upstream": "packages/durable/src/harness/usage.ts",
@@ -612,7 +671,18 @@
       "upstreamChange": "modified",
       "previousBlobSha1": "d97d56418ca990893f7721cee1452009da97471c",
       "changedLines": 329,
-      "note": "Transaction (ITx): table reads/writes with ReadAfterWrite, documents through the Chord tracker (DraftObject), fork copies, checkpoints, migrations, task records (CreateTaskAsync, writing abandonOnRestart before state when TaskOptions.AbandonOnRestart is true; internal SetTask; execution is P7), submissions. A lock guards its state because Tx operations may run concurrently in .NET. Tests: session.tables.*, session.documents.*, session.checkpoints-migrations.*, session.forks.*, harness.cancellation-barrier.*, types.task-record-abort-reason-and-abandon-on-restart. Record key order is upstream's per path: an entry is { ...draft, id, conversationId, head, byTaskId } (EntryRecord/EntryDraft KeyOrder), a submission { ...create, id } with later fields appended, a task's startedAt before memos; checked against upstream-written sessions by compat.*. v1.5.0 (work list area telemetry): a created task stores its trace (the option's carrier, none for root, else the carrier the commit span injects) and links; a run's generation takes its first submission's carrier as its trace and links the others'; a settled transaction drops its commit context (2ec55d808). Tests: harness.telemetry.inherits-omitted-or-undefined-task-traces-and-stores-no-carrier-for-an-explicit-root; waits on the file's other areas v1.5.0 (work list area deferred-commits, 6c2fd73b0): CommitOptions.Persistence (CommitPersistence.Immediate, Deferred(withinMs)); a held commit's document writes become HeldDocument entries (pending ops after a base) that a later own commit, a reading commit (appended at the end of its writes) or the window's store takes (Transaction.Holdable, AdoptHeld, TakeHeld, StoreHeld). Tests: session.deferred-commits.*; waits on the file's other areas v1.5.0 (work list area vocabulary, 5f312dac4): a document publication is a DocumentValueChange, or a DocumentRetireChange for a retirement (was a null value), which carries no held operations; waits on the file's other areas v1.5.0 (work list area admission, fb524dd2e and cc9c52310): a continue submission record has no entry and is never queued; the internal Context, HasTableWrite and OwnedBy(tx, host) let SubmitAsync(tx, draft) admit inside the caller's commit, and ReadAfterWriteException names Tx.<Method>(). Tests: harness.submit-in-commit.*, harness.continue.*, storage.memory.conformance.stores-continue-submissions-which-have-no-entry-and-are-never-queued; waits on the file's other areas v1.5.0 (work list area group-commit, e5c6182ba): reads go through the line's GatedStorage; a retirement touches its address, retiring a terminal task's documents touches the task's scope; WriteKeys and CreatedTaskIds (upstream writeKeys, createdTaskIds); LatestEntryIdAsync (tx.latestEntryId) and LatestHeadMarkerAsync come from the host. The host's task-document index (TaskDocuments) is area publication-caches': until then every terminal task's documents are scanned. Tests: session.group-commit.*, session.*; waits on area publication-caches v1.5.0 (work list area publication-caches, e5c6182ba): retiring a terminal task's documents takes them from the host's index (TaskDocuments, upstream host.taskDocuments) and scans only for a task the Session does not know; CreatedTaskIds feeds that index; with it the file is v1.5.0's. Tests: harness.tasks.task-phases.commits-results-with-entries-atomically-keeps-memos-until-terminal-and-retires-task-documents (no document scan), session.*"
+      "note": "Transaction (ITx): table reads/writes with ReadAfterWrite, documents through the Chord tracker (DraftObject), fork copies, checkpoints, migrations, task records (CreateTaskAsync, writing abandonOnRestart before state when TaskOptions.AbandonOnRestart is true; internal SetTask; execution is P7), submissions. A lock guards its state because Tx operations may run concurrently in .NET. Tests: session.tables.*, session.documents.*, session.checkpoints-migrations.*, session.forks.*, harness.cancellation-barrier.*, types.task-record-abort-reason-and-abandon-on-restart. Record key order is upstream's per path: an entry is { ...draft, id, conversationId, head, byTaskId } (EntryRecord/EntryDraft KeyOrder), a submission { ...create, id } with later fields appended, a task's startedAt before memos; checked against upstream-written sessions by compat.*. v1.5.0 (work list area telemetry): a created task stores its trace (the option's carrier, none for root, else the carrier the commit span injects) and links; a run's generation takes its first submission's carrier as its trace and links the others'; a settled transaction drops its commit context (2ec55d808). Tests: harness.telemetry.inherits-omitted-or-undefined-task-traces-and-stores-no-carrier-for-an-explicit-root; waits on the file's other areas v1.5.0 (work list area deferred-commits, 6c2fd73b0): CommitOptions.Persistence (CommitPersistence.Immediate, Deferred(withinMs)); a held commit's document writes become HeldDocument entries (pending ops after a base) that a later own commit, a reading commit (appended at the end of its writes) or the window's store takes (Transaction.Holdable, AdoptHeld, TakeHeld, StoreHeld). Tests: session.deferred-commits.*; waits on the file's other areas v1.5.0 (work list area vocabulary, 5f312dac4): a document publication is a DocumentValueChange, or a DocumentRetireChange for a retirement (was a null value), which carries no held operations; waits on the file's other areas v1.5.0 (work list area admission, fb524dd2e and cc9c52310): a continue submission record has no entry and is never queued; the internal Context, HasTableWrite and OwnedBy(tx, host) let SubmitAsync(tx, draft) admit inside the caller's commit, and ReadAfterWriteException names Tx.<Method>(). Tests: harness.submit-in-commit.*, harness.continue.*, storage.memory.conformance.stores-continue-submissions-which-have-no-entry-and-are-never-queued; waits on the file's other areas v1.5.0 (work list area group-commit, e5c6182ba): reads go through the line's GatedStorage; a retirement touches its address, retiring a terminal task's documents touches the task's scope; WriteKeys and CreatedTaskIds (upstream writeKeys, createdTaskIds); LatestEntryIdAsync (tx.latestEntryId) and LatestHeadMarkerAsync come from the host. The host's task-document index (TaskDocuments) is area publication-caches': until then every terminal task's documents are scanned. Tests: session.group-commit.*, session.*; waits on area publication-caches v1.5.0 (work list area publication-caches, e5c6182ba): retiring a terminal task's documents takes them from the host's index (TaskDocuments, upstream host.taskDocuments) and scans only for a task the Session does not know; CreatedTaskIds feeds that index; with it the file is v1.5.0's. Tests: harness.tasks.task-phases.commits-results-with-entries-atomically-keeps-memos-until-terminal-and-retires-task-documents (no document scan), session.*",
+      "currentImplementation": {
+        "mapping": "compatibility/gap-status-2026-11-08.json",
+        "upstream": "packages/durable/src/session/transaction.ts",
+        "sourceStatus": "source-implemented",
+        "runtimeStatus": "pending-integrated-validation",
+        "sourcePaths": [
+          "src/PiSharp.Durable/Session/Transaction.cs"
+        ],
+        "note": "Additive agent/checkpoint fields need no SQL schema bump; older binaries do not enforce the new fields. External ITx implementations retain a default unsupported lookup until they implement it."
+      },
+      "historicalPisharp": "src/PiSharp.Durable/Session/Transaction.cs"
     },
     {
       "upstream": "packages/durable/src/session/writer.ts",
@@ -765,7 +835,19 @@
       "upstreamChange": "modified",
       "previousBlobSha1": "c524246ef15d85ca8e34744496cfce4267209127",
       "changedLines": 281,
-      "note": "SqliteStorage: upstream queries, orderings and JSON columns; one SQL transaction per commit; next_id TEXT. Batch validation, addressing and paging rules are shared with MemoryStorage in src/PiSharp.Durable/Storage/StorageRules.cs. Tests: storage.sqlite.* P13: compat.*.sqlite.* open, read, resume and rewrite SQLite sessions the pinned upstream wrote (Fixtures/upstream-sessions); PiSharp's rows and JSON columns are upstream's text, and upstream reads PiSharp's (compat.reverse.*). v1.2.0: unknown conversations, malformed cursors and history a document does not keep throw StorageRequestException; rejected document copies throw plain exceptions; busy statements are retried by the connection's busy timeout (SqliteConnectionDatabase, 5 s by default), the storage's own transient retry. v1.5.0 (work list area storage-batches): CommitAsync(batches, receive, context) runs the call in one SQL transaction: each batch's checks read the state the earlier batches left, a batch a check refuses ends the call with the earlier ones committed, and a driver failure (WatchedExecutor watches ExecAsync, RunAsync, RunCountedAsync, GetAsync and AllAsync, upstream watchCalls) rejects the whole call; document copies resolve before the writes, so no savepoint is needed. The table prefix rendering is area sqlite's. Tests: storage.sqlite.batches.*, storage.sqlite.conformance.*, storage.sqlite.reopen.conformance.*"
+      "note": "SqliteStorage: upstream queries, orderings and JSON columns; one SQL transaction per commit; next_id TEXT. Batch validation, addressing and paging rules are shared with MemoryStorage in src/PiSharp.Durable/Storage/StorageRules.cs. Tests: storage.sqlite.* P13: compat.*.sqlite.* open, read, resume and rewrite SQLite sessions the pinned upstream wrote (Fixtures/upstream-sessions); PiSharp's rows and JSON columns are upstream's text, and upstream reads PiSharp's (compat.reverse.*). v1.2.0: unknown conversations, malformed cursors and history a document does not keep throw StorageRequestException; rejected document copies throw plain exceptions; busy statements are retried by the connection's busy timeout (SqliteConnectionDatabase, 5 s by default), the storage's own transient retry. v1.5.0 (work list area storage-batches): CommitAsync(batches, receive, context) runs the call in one SQL transaction: each batch's checks read the state the earlier batches left, a batch a check refuses ends the call with the earlier ones committed, and a driver failure (WatchedExecutor watches ExecAsync, RunAsync, RunCountedAsync, GetAsync and AllAsync, upstream watchCalls) rejects the whole call; document copies resolve before the writes, so no savepoint is needed. The table prefix rendering is area sqlite's. Tests: storage.sqlite.batches.*, storage.sqlite.conformance.*, storage.sqlite.reopen.conformance.*",
+      "currentImplementation": {
+        "mapping": "compatibility/gap-status-2026-11-08.json",
+        "upstream": "packages/durable/src/storage/sqlite/storage.ts",
+        "sourceStatus": "source-implemented",
+        "runtimeStatus": "pending-integrated-validation",
+        "sourcePaths": [
+          "src/PiSharp.Durable.Sqlite/Storage.cs",
+          "src/PiSharp.Durable.Sqlite/Commit.cs"
+        ],
+        "note": "No schema change. Final integrated conformance and statement-count/latency comparison remain required; source shape does not prove a speedup."
+      },
+      "historicalPisharp": "src/PiSharp.Durable.Sqlite/Storage.cs"
     },
     {
       "upstream": "packages/durable/src/storage/store/commit.ts",
@@ -815,7 +897,18 @@
       "phase": "sync-1.5.0",
       "status": "ported",
       "upstreamChange": "added",
-      "note": "v1.5.0 (work list area store-storage): StoreStorage.OpenAsync(store, owner, context) claims the owner's tables and document namespaces (a second claim is refused invalid/args), prepares the tables and raises the allocator above every id they hold; CommitAsync is one CommitSeriesAsync per call; Publishing runs in the attached host's batch (Batch.Within) or plainly; reads are guarded, request errors told after the read; CloseAsync waits for its calls underway and releases its claims, the store staying open. The Chord surface it needs beyond the adapter API is public and narrow, not InternalsVisibleTo: ChordStore.Claims (Documents, Release) and ChordStore.Batch (Running, Within). PiSharp-only (Context.cs): the store's context is DurableContext's conversion, ChordContext.Background until area telemetry gives DurableContext a span; cancellation later (decision 0013). Tests: storage.store.conformance.*, storage.store.reopen.conformance.*, storage.store.claims.*, storage.store.semantics.*, storage.store.commits.*, storage.store.commit.*, storage.store.gc.*, harness.*.store.*"
+      "note": "v1.5.0 (work list area store-storage): StoreStorage.OpenAsync(store, owner, context) claims the owner's tables and document namespaces (a second claim is refused invalid/args), prepares the tables and raises the allocator above every id they hold; CommitAsync is one CommitSeriesAsync per call; Publishing runs in the attached host's batch (Batch.Within) or plainly; reads are guarded, request errors told after the read; CloseAsync waits for its calls underway and releases its claims, the store staying open. The Chord surface it needs beyond the adapter API is public and narrow, not InternalsVisibleTo: ChordStore.Claims (Documents, Release) and ChordStore.Batch (Running, Within). PiSharp-only (Context.cs): the store's context is DurableContext's conversion, ChordContext.Background until area telemetry gives DurableContext a span; cancellation later (decision 0013). Tests: storage.store.conformance.*, storage.store.reopen.conformance.*, storage.store.claims.*, storage.store.semantics.*, storage.store.commits.*, storage.store.commit.*, storage.store.gc.*, harness.*.store.*",
+      "currentImplementation": {
+        "mapping": "compatibility/gap-status-2026-11-08.json",
+        "upstream": "packages/durable/src/storage/store/storage.ts",
+        "sourceStatus": "source-implemented",
+        "runtimeStatus": "pending-integrated-validation",
+        "sourcePaths": [
+          "src/PiSharp.Durable.Store/Storage.cs"
+        ],
+        "note": "Real-host examples and integration tests now exist; final execution and package-only consumption remain pending."
+      },
+      "historicalPisharp": "src/PiSharp.Durable.Store/Storage.cs"
     },
     {
       "upstream": "packages/durable/src/storage/store/tables.ts",
@@ -950,7 +1043,18 @@
       "upstreamChange": "modified",
       "previousBlobSha1": "ca600ae5ed2d1268de32327dc061106d7ddbd747",
       "changedLines": 19,
-      "note": "ToolSearch.CreateTool and CreateExtension: tool_search (callers model, replay safe, fixed description) ranks Agent.Deferred by name, name with spaces, description and schema text (SearchText) with Search.RankDocuments and loads the matches through control.addTools; the extension is tool-search. Tests: tool-search.*, compat.deferred-tool-search.* (run on SQLite and JSONL: records byte for byte, events and observed) v1.5.0 (work list area tools-schema): parameters are the JSON pi-schema's obj({ query: str(...), limit: opt(num(...)) }, { open: true }) builds; the search text and ranking are area tool-search's. Tests: tool-search.declaration, compat.deferred-tool-search.*.written (authored key order)"
+      "note": "ToolSearch.CreateTool and CreateExtension: tool_search (callers model, replay safe, fixed description) ranks Agent.Deferred by name, name with spaces, description and schema text (SearchText) with Search.RankDocuments and loads the matches through control.addTools; the extension is tool-search. Tests: tool-search.*, compat.deferred-tool-search.* (run on SQLite and JSONL: records byte for byte, events and observed) v1.5.0 (work list area tools-schema): parameters are the JSON pi-schema's obj({ query: str(...), limit: opt(num(...)) }, { open: true }) builds; the search text and ranking are area tool-search's. Tests: tool-search.declaration, compat.deferred-tool-search.*.written (authored key order)",
+      "currentImplementation": {
+        "mapping": "compatibility/gap-status-2026-11-08.json",
+        "upstream": "packages/durable/src/tool-search/tool-search.ts",
+        "sourceStatus": "source-implemented",
+        "runtimeStatus": "pending-integrated-validation",
+        "sourcePaths": [
+          "src/PiSharp.Durable.Tools/ToolSearch/ToolSearch.cs"
+        ],
+        "note": "Source and authored tests are present; final integrated validation is pending."
+      },
+      "historicalPisharp": "src/PiSharp.Durable.Tools/ToolSearch/ToolSearch.cs"
     },
     {
       "upstream": "packages/durable/src/tools/bash.ts",
@@ -1088,7 +1192,19 @@
       "upstreamChange": "modified",
       "previousBlobSha1": "804e49ef19de37375d5b43873ee908f03c1cc2e2",
       "changedLines": 453,
-      "note": "Records and storage contract, split across Types.cs (conversation, entry, submission and task records; TaskOptions.AbandonOnRestart; TaskRecord.AbortReason and AbandonOnRestart, written only when set, abortReason appended by the mark that sets it), TypesDocuments.cs (document semantics, records, content), TypesStorage.cs (scans, cursors, writes, IStorage and its failure contract), TypesSession.cs (EntryDraft/EntryHead, TypedEntry/TypedEntryDraft, ICommitChange/CommitPublication/DocumentCommitChange, WatchEnd with session_failed, SessionEnd, IWatchHandle, IDocumentReader/IDocumentObserver, ISession with Closed, ITx), TypesTasks.cs (ITaskRuntime with AbortOwnedAsync and OwnedTasksAsync, IHookRunner) and Ids.cs; JSON via ToJson/FromJson in upstream's key order (EntryRecord, SubmissionRecord and TaskRecord keep the order they were created, decoded or marked with, KeyOrder), pinned against upstream-written sessions by compat.*. Intentional mapping: TypeScript's phantom type parameters are erased, as documents are JsonObjectValue-typed (Documents.cs row): TaskId<Result>, TaskRecord<Input, Checkpoint, Result> and SettledTask<Result> are TaskId and TaskRecord over JsonValue, so a task's result type, typed input and exhaustive phase map are not checked at compile time (types.test.ts row). The document definition and semantics types (CommonDocDefinition, DocFamilyDefinition, DocumentSemantics and its conversation variants) are Documents.cs's scope-typed tokens, DocumentWatch is IWatchHandle<JsonObjectValue?> and TableCommitChange is ICommitChange; ownedTasks returns the immutable committed records instead of copies. Tests: types.*, storage.*, session.*, harness.*, compat.* v1.5.0 (work list area sleep): DurableTaskStatus.Sleeping and SleepingTaskState {status, checkpoint, until}; NextTaskState.Sleeping; ITaskRuntime.SleepUntilAsync and SetTimer replace SleepAsync (f75b3240a) v1.5.0 (work list area reports): ReportTask, HostCallback, ReportInfo (one record tagged by Kind, with typed ReportReason), Report and ReportFrom in TypesReports.cs; ITaskRuntime.Report(error, from) (a30c2a81d, 440a5fcdb, 5ba1cbaf3, 91b33cab3, 5f312dac4). task_interrupted is area restarts', the telemetry callback area telemetry's. Tests: harness.reports.* v1.5.0 (work list area telemetry): SubmissionRecord.Trace, TaskRecord.Trace and Links, TaskOptions.Trace (TaskTrace, upstream's TelemetryCarrier | \"root\") and Links, in upstream's key order and absent without propagation (2ec55d808); HostCallback.Telemetry (TypesReports.cs). Tests: harness.telemetry.*; waits on the file's other areas v1.5.0 (work list area deferred-commits, 6c2fd73b0): CommitOptions and CommitPersistence (TypesSession.cs), TaskRuntime commit options (TypesTasks.cs). Tests: session.deferred-commits.*; waits on the file's other areas v1.5.0 (work list area observers, 8b0caefc2): Observer<T> (advance(call, context), an Action or a Task-returning delegate, and end(end)) and Observation<T> (Value, Detach) in TypesSession.cs; ISession.ObserveDocAsync. Tests: session.observers.*; waits on the file's other areas v1.5.0 (work list area vocabulary, 5f312dac4): ISession.ObserveCommits(CommitObserver) returns a CommitObservation (Detach), replacing SubscribeCommits (no alias); SessionEnd is tagged by Kind (SessionEnd.Closed, SessionEnd.Failed(error)); DocumentCommitChange is DocumentValueChange or DocumentRetireChange (Kind change or retire), in TypesSession.cs. Stored formats are unchanged. Tests: session.observers.observe-commits.*; waits on the file's other areas v1.5.0 (work list area admission, fb524dd2e): SubmissionType.Continue; SubmissionRecord's union is its Type discriminator with SubmissionShape.Validate's table (a continue: placed with no other field, done with an answer, unanswered with a reason and an optional detail; never queued, never an entry), so code that narrows by status alone must check Type. Stored formats are unchanged (the type is a stored string; no storage schema constrains it). Tests: harness.continue.*, storage.memory.conformance.stores-continue-submissions-which-have-no-entry-and-are-never-queued; waits on the file's other areas v1.5.0 (work list area run-end, 65fba65b2): ITaskRuntime inherits IHookApi's EntryAsync and EntriesAsync (TypesTasks.cs), upstream TaskRuntime.entries(). Tests: harness.hook-reads.*; waits on the file's other areas v1.5.0 (work list area publication-caches, 8b0caefc2, 5f312dac4 and e5c6182ba): ISession.ObserveCommits documents the C# publication order and ITx that its results are shared with the read caches and context ranges (records are immutable, so upstream's freeze has no counterpart). Stored formats are unchanged. Tests: session.adoption.*; waits on the file's other areas v1.5.0 (work list area registry-reader, the last of the file's areas): no shape left to port; ISession.CommitAsync's doc gains upstream's group-commit contract and TaskOptions.ConversationId's doc upstream's wording. Types.cs and TypesSession.cs are re-pinned to v1.5.0; TypesDocuments.cs, TypesStorage.cs, TypesTasks.cs, Ids.cs, Tasks.cs and Entries.cs, which cite part of types.ts with other upstream files, keep their citations for closeout's citations audit. Tests: types.*, storage.*, session.*, harness.*"
+      "note": "Records and storage contract, split across Types.cs (conversation, entry, submission and task records; TaskOptions.AbandonOnRestart; TaskRecord.AbortReason and AbandonOnRestart, written only when set, abortReason appended by the mark that sets it), TypesDocuments.cs (document semantics, records, content), TypesStorage.cs (scans, cursors, writes, IStorage and its failure contract), TypesSession.cs (EntryDraft/EntryHead, TypedEntry/TypedEntryDraft, ICommitChange/CommitPublication/DocumentCommitChange, WatchEnd with session_failed, SessionEnd, IWatchHandle, IDocumentReader/IDocumentObserver, ISession with Closed, ITx), TypesTasks.cs (ITaskRuntime with AbortOwnedAsync and OwnedTasksAsync, IHookRunner) and Ids.cs; JSON via ToJson/FromJson in upstream's key order (EntryRecord, SubmissionRecord and TaskRecord keep the order they were created, decoded or marked with, KeyOrder), pinned against upstream-written sessions by compat.*. Intentional mapping: TypeScript's phantom type parameters are erased, as documents are JsonObjectValue-typed (Documents.cs row): TaskId<Result>, TaskRecord<Input, Checkpoint, Result> and SettledTask<Result> are TaskId and TaskRecord over JsonValue, so a task's result type, typed input and exhaustive phase map are not checked at compile time (types.test.ts row). The document definition and semantics types (CommonDocDefinition, DocFamilyDefinition, DocumentSemantics and its conversation variants) are Documents.cs's scope-typed tokens, DocumentWatch is IWatchHandle<JsonObjectValue?> and TableCommitChange is ICommitChange; ownedTasks returns the immutable committed records instead of copies. Tests: types.*, storage.*, session.*, harness.*, compat.* v1.5.0 (work list area sleep): DurableTaskStatus.Sleeping and SleepingTaskState {status, checkpoint, until}; NextTaskState.Sleeping; ITaskRuntime.SleepUntilAsync and SetTimer replace SleepAsync (f75b3240a) v1.5.0 (work list area reports): ReportTask, HostCallback, ReportInfo (one record tagged by Kind, with typed ReportReason), Report and ReportFrom in TypesReports.cs; ITaskRuntime.Report(error, from) (a30c2a81d, 440a5fcdb, 5ba1cbaf3, 91b33cab3, 5f312dac4). task_interrupted is area restarts', the telemetry callback area telemetry's. Tests: harness.reports.* v1.5.0 (work list area telemetry): SubmissionRecord.Trace, TaskRecord.Trace and Links, TaskOptions.Trace (TaskTrace, upstream's TelemetryCarrier | \"root\") and Links, in upstream's key order and absent without propagation (2ec55d808); HostCallback.Telemetry (TypesReports.cs). Tests: harness.telemetry.*; waits on the file's other areas v1.5.0 (work list area deferred-commits, 6c2fd73b0): CommitOptions and CommitPersistence (TypesSession.cs), TaskRuntime commit options (TypesTasks.cs). Tests: session.deferred-commits.*; waits on the file's other areas v1.5.0 (work list area observers, 8b0caefc2): Observer<T> (advance(call, context), an Action or a Task-returning delegate, and end(end)) and Observation<T> (Value, Detach) in TypesSession.cs; ISession.ObserveDocAsync. Tests: session.observers.*; waits on the file's other areas v1.5.0 (work list area vocabulary, 5f312dac4): ISession.ObserveCommits(CommitObserver) returns a CommitObservation (Detach), replacing SubscribeCommits (no alias); SessionEnd is tagged by Kind (SessionEnd.Closed, SessionEnd.Failed(error)); DocumentCommitChange is DocumentValueChange or DocumentRetireChange (Kind change or retire), in TypesSession.cs. Stored formats are unchanged. Tests: session.observers.observe-commits.*; waits on the file's other areas v1.5.0 (work list area admission, fb524dd2e): SubmissionType.Continue; SubmissionRecord's union is its Type discriminator with SubmissionShape.Validate's table (a continue: placed with no other field, done with an answer, unanswered with a reason and an optional detail; never queued, never an entry), so code that narrows by status alone must check Type. Stored formats are unchanged (the type is a stored string; no storage schema constrains it). Tests: harness.continue.*, storage.memory.conformance.stores-continue-submissions-which-have-no-entry-and-are-never-queued; waits on the file's other areas v1.5.0 (work list area run-end, 65fba65b2): ITaskRuntime inherits IHookApi's EntryAsync and EntriesAsync (TypesTasks.cs), upstream TaskRuntime.entries(). Tests: harness.hook-reads.*; waits on the file's other areas v1.5.0 (work list area publication-caches, 8b0caefc2, 5f312dac4 and e5c6182ba): ISession.ObserveCommits documents the C# publication order and ITx that its results are shared with the read caches and context ranges (records are immutable, so upstream's freeze has no counterpart). Stored formats are unchanged. Tests: session.adoption.*; waits on the file's other areas v1.5.0 (work list area registry-reader, the last of the file's areas): no shape left to port; ISession.CommitAsync's doc gains upstream's group-commit contract and TaskOptions.ConversationId's doc upstream's wording. Types.cs and TypesSession.cs are re-pinned to v1.5.0; TypesDocuments.cs, TypesStorage.cs, TypesTasks.cs, Ids.cs, Tasks.cs and Entries.cs, which cite part of types.ts with other upstream files, keep their citations for closeout's citations audit. Tests: types.*, storage.*, session.*, harness.*",
+      "currentImplementation": {
+        "mapping": "compatibility/gap-status-2026-11-08.json",
+        "upstream": "packages/durable/src/types.ts",
+        "sourceStatus": "source-implemented",
+        "runtimeStatus": "pending-integrated-validation",
+        "sourcePaths": [
+          "src/PiSharp.Durable/Types.cs",
+          "src/PiSharp.Durable/TypesSession.cs"
+        ],
+        "note": "Additive agent/checkpoint fields need no SQL schema bump; older binaries do not enforce the new fields. External ITx implementations retain a default unsupported lookup until they implement it."
+      },
+      "historicalPisharp": "src/PiSharp.Durable/Types.cs"
     },
     {
       "upstream": "packages/chord/src/context/index.ts",
@@ -1106,14 +1222,25 @@
       "upstream": "packages/chord/src/delta/apply-immutable-trusted.ts",
       "blobSha1": "cde0300e7a865f91716939a9f6319bc37b5d3620",
       "lines": 125,
-      "pisharp": "src/PiSharp.Durable/Chord/Delta/ApplyImmutableTrusted.cs",
+      "pisharp": "src/PiSharp.Durable/Chord/Delta/Apply.cs",
       "phase": "P1",
       "status": "needs-sync",
       "upstreamChange": "modified",
       "previousBlobSha1": "7944bfae1bb9d7365dcb7c968d65f3f6c065861f",
       "changedLines": 9,
       "note": "Internal option of DeltaApply (DeltaApplyTrusted): skips the path-safety scan; immutable values make it otherwise the same applier. Tests: chord.apply-immutable-trusted.*",
-      "portedBlobSha1": "7944bfae1bb9d7365dcb7c968d65f3f6c065861f"
+      "portedBlobSha1": "7944bfae1bb9d7365dcb7c968d65f3f6c065861f",
+      "currentImplementation": {
+        "mapping": "compatibility/gap-status-2026-11-08.json",
+        "upstream": "packages/chord/src/delta/apply-immutable-trusted.ts",
+        "sourceStatus": "source-implemented",
+        "runtimeStatus": "pending-integrated-validation",
+        "sourcePaths": [
+          "src/PiSharp.Durable/Chord/Delta/Apply.cs"
+        ],
+        "note": "Trusted immutable application is a native equivalent; CLR immutable container copying has no upstream JavaScript container optimization to port."
+      },
+      "historicalPisharp": "src/PiSharp.Durable/Chord/Delta/ApplyImmutableTrusted.cs"
     },
     {
       "upstream": "packages/chord/src/delta/diff.ts",
@@ -1138,7 +1265,18 @@
       "previousBlobSha1": "388c88514399317e95d9488f02f6f8353a4d7a36",
       "changedLines": 39,
       "note": "Ops, validation, overlap, apply/applyImmutable(Batches) and codec. Tests: chord.delta.*, chord.apply-immutable.* P13: compat.ops.* replay the upstream-captured ops corpus, and upstream replays PiSharp's operations (compat.reverse.*). v1.2.0: appendCopy (Apply.cs) builds an append to an array not yet copied in one copy (chord.apply-immutable.appends-to-an-array-not-yet-copied-in-one-copy-sharing-everything-else). v1.5.0: appendText (DraftObject.AppendText) and PendingOps (Pending.cs) are exported; ownedSlice has no C# counterpart, as a .NET range copies. Needs-sync for phase 6: d0aa218cb's container copies (row chord.delta-container-copies, no-op), the codec's batch-concatenation comment and Decoder.decode's typing.",
-      "portedBlobSha1": "388c88514399317e95d9488f02f6f8353a4d7a36"
+      "portedBlobSha1": "388c88514399317e95d9488f02f6f8353a4d7a36",
+      "currentImplementation": {
+        "mapping": "compatibility/gap-status-2026-11-08.json",
+        "upstream": "packages/chord/src/delta/index.ts",
+        "sourceStatus": "source-implemented",
+        "runtimeStatus": "pending-integrated-validation",
+        "sourcePaths": [
+          "src/PiSharp.Durable/Chord/Delta/Ops.cs"
+        ],
+        "note": "Native immutable operations, appendText and pending operations exist; CLR range copying and decoder types are intentional language mappings."
+      },
+      "historicalPisharp": "src/PiSharp.Durable/Chord/Delta/Ops.cs"
     },
     {
       "upstream": "packages/chord/src/delta/pending.ts",
@@ -1163,14 +1301,26 @@
       "upstream": "packages/chord/src/delta/tracker.ts",
       "blobSha1": "731cc49a8811bca36671a2dc46a0a9266aa36e5e",
       "lines": 2319,
-      "pisharp": "src/PiSharp.Durable/Chord/Delta/Draft.cs",
+      "pisharp": "src/PiSharp.Durable/Chord/Delta/Tracker.cs",
       "phase": "P1",
       "status": "needs-sync",
       "note": "An explicit copy-on-write draft API replaces the Proxy tracker (decision 0005): Draft.cs (DraftObject/DraftArray) and Tracker.cs (Tracker, Change, Prepared, emission). Upstream's asserted op sequences are reproduced exactly. Tests: chord.tracker.*, chord.fuzz.tracker-ops-replay-to-value P13: compat.ops.* make the seeded edits of an upstream-captured ops corpus (Fixtures/upstream-sessions/ops-corpus.json) and must emit upstream's exact operations. v1.2.0: an array draft stays a piece table while elements are only inserted or removed (DraftArray.Pieces; a short list instead of the treap, flattened into entries past 64 pieces or when an element moves), and emission plans it from the pieces alone (orderedArrayPlan, DraftEmitter.EmitOrderedArrayPlan); a flattened draft is planned by the element walk (elementArrayPlan). chord.tracker.native.piece-table-and-flattened-drafts-emit-the-same-operations checks both plans emit the same operations; benchmarks: document-append (docs/durable-benchmarks.md). v1.5.0 (area chord-append-text): DraftObject.AppendText (upstream appendText) records an append op per key without the prepare-time string comparison, and a Set or Delete of the key drops it (DraftObject.Appends, DraftEmitter.EmitObject); tests: chord.delta-append-text.*. Needs-sync for phase 6: a92283056 (the open change held without a WeakRef); ownedSlice needs nothing (row chord.delta-owned-slice).",
       "upstreamChange": "modified",
       "previousBlobSha1": "8e01705fa45212a3e680fba2e49f7dac20410096",
       "changedLines": 156,
-      "portedBlobSha1": "8e01705fa45212a3e680fba2e49f7dac20410096"
+      "portedBlobSha1": "8e01705fa45212a3e680fba2e49f7dac20410096",
+      "currentImplementation": {
+        "mapping": "compatibility/gap-status-2026-11-08.json",
+        "upstream": "packages/chord/src/delta/tracker.ts",
+        "sourceStatus": "source-implemented",
+        "runtimeStatus": "pending-integrated-validation",
+        "sourcePaths": [
+          "src/PiSharp.Durable/Chord/Delta/Tracker.cs",
+          "src/PiSharp.Durable/Chord/Delta/Draft.cs"
+        ],
+        "note": "Explicit CLR drafts replace revoked JS proxies; cleanup visits allocated draft nodes. Immutable range/container copies and microtask timing have native dispositions."
+      },
+      "historicalPisharp": "src/PiSharp.Durable/Chord/Delta/Draft.cs"
     },
     {
       "upstream": "packages/chord/src/json.ts",
@@ -1238,11 +1388,23 @@
       "upstream": "packages/chord/src/sqlite/node.ts",
       "blobSha1": "269249027a212970076e9cc30071ec281bb71ec6",
       "lines": 219,
-      "pisharp": "src/PiSharp.Durable.Sqlite/ConnectionDatabase.cs",
+      "pisharp": "src/PiSharp.Durable.Sqlite/Storage.cs",
       "phase": "sync-1.5.0",
       "status": "in-progress",
       "upstreamChange": "added",
-      "note": "v1.5.0 (work list area sqlite): SqliteConnectionDatabase is the Node driver: connection defaults (busy_timeout 5000, wal_autocheckpoint 1000, synchronous=NORMAL), RunCountedAsync, the transaction outcome (slice 6b D4) and the serial queue are v1.5.0, tested by chord.sqlite.node.* and storage.sqlite.facade.*. Still v1.2.0: its statement cache keeps every SQL text it prepared, where v1.5.0 keeps the 256 most recently used (db14038bd, applicability row chord.sqlite-statement-cache, phase 6), so the row and the ConnectionDatabase.cs citation wait on that row"
+      "note": "v1.5.0 (work list area sqlite): SqliteConnectionDatabase is the Node driver: connection defaults (busy_timeout 5000, wal_autocheckpoint 1000, synchronous=NORMAL), RunCountedAsync, the transaction outcome (slice 6b D4) and the serial queue are v1.5.0, tested by chord.sqlite.node.* and storage.sqlite.facade.*. Still v1.2.0: its statement cache keeps every SQL text it prepared, where v1.5.0 keeps the 256 most recently used (db14038bd, applicability row chord.sqlite-statement-cache, phase 6), so the row and the ConnectionDatabase.cs citation wait on that row",
+      "currentImplementation": {
+        "mapping": "compatibility/gap-status-2026-11-08.json",
+        "upstream": "packages/chord/src/sqlite/node.ts",
+        "sourceStatus": "source-implemented",
+        "runtimeStatus": "pending-integrated-validation",
+        "sourcePaths": [
+          "src/PiSharp.Durable.Sqlite/Storage.cs",
+          "src/PiSharp.Durable.Sqlite/ConnectionDatabase.cs"
+        ],
+        "note": "Source and authored tests are present; final integrated validation is pending."
+      },
+      "historicalPisharp": "src/PiSharp.Durable.Sqlite/ConnectionDatabase.cs"
     },
     {
       "upstream": "packages/chord/src/sqlite/schema.ts",
@@ -1267,13 +1429,25 @@
       "upstream": "packages/chord/src/types.ts",
       "blobSha1": "3ca754aaae575938cc61ab9f505420ae605b7647",
       "lines": 89,
-      "pisharp": "src/PiSharp.Durable/Chord/ReplicatedStateTypes.cs",
+      "pisharp": "src/PiSharp.Chord/Legacy/Runtime/Contracts.cs",
       "phase": "P1",
       "status": "excluded",
       "upstreamChange": "modified",
       "previousBlobSha1": "cb04296a12b9c57a1577426adf316328619e2b4d",
       "changedLines": 68,
-      "note": "v1.2.0 types.ts holds only the host runtime's types (Ctx, Readable, StateEvent, handles and shapes), which decision 0005 excludes. The subset PiSharp ported from the v1.1.0 file moved: the replicated state types to state.ts (ported in Chord/ReplicatedStateTypes.cs, the state.ts row), JsonValue to json.ts (Chord/JsonValue.cs) and Context/ContextKey to context/index.ts (Chord/DurableContext.cs)."
+      "note": "v1.2.0 types.ts holds only the host runtime's types (Ctx, Readable, StateEvent, handles and shapes), which decision 0005 excludes. The subset PiSharp ported from the v1.1.0 file moved: the replicated state types to state.ts (ported in Chord/ReplicatedStateTypes.cs, the state.ts row), JsonValue to json.ts (Chord/JsonValue.cs) and Context/ContextKey to context/index.ts (Chord/DurableContext.cs).",
+      "currentImplementation": {
+        "mapping": "compatibility/gap-status-2026-11-08.json",
+        "upstream": "packages/chord/src/types.ts",
+        "sourceStatus": "source-implemented",
+        "runtimeStatus": "pending-integrated-validation",
+        "sourcePaths": [
+          "src/PiSharp.Chord/Legacy/Runtime/Contracts.cs",
+          "src/PiSharp.Chord/Legacy/Runtime/Context.cs"
+        ],
+        "note": "The former release exclusion of the legacy host types is historical. A distinct native legacy host/runtime now exists; CLR declaration and lifetime mappings remain explicit."
+      },
+      "historicalPisharp": "src/PiSharp.Durable/Chord/ReplicatedStateTypes.cs"
     },
     {
       "upstream": "packages/chord/src/watch.ts",
@@ -1898,28 +2072,61 @@
       "upstream": "packages/durable/test/examples/35-durable-on-the-store.ts",
       "blobSha1": "958a9d1b42568c2d3462885bfef40c366d94f3c9",
       "lines": 108,
-      "pisharp": "samples/Durable.Examples/ExamplesDurableOnTheStore.cs",
+      "pisharp": "samples/Durable.Chord.Examples/Example35.cs",
       "phase": "sync-1.5.0",
       "status": "planned",
-      "upstreamChange": "added"
+      "upstreamChange": "added",
+      "currentImplementation": {
+        "mapping": "compatibility/gap-status-2026-11-08.json",
+        "upstream": "packages/durable/test/examples/35-durable-on-the-store.ts",
+        "sourceStatus": "source-implemented",
+        "runtimeStatus": "pending-integrated-validation",
+        "sourcePaths": [
+          "samples/Durable.Chord.Examples/Example35.cs"
+        ],
+        "note": "Real-host examples and integration tests now exist; final execution and package-only consumption remain pending."
+      },
+      "historicalPisharp": "samples/Durable.Examples/ExamplesDurableOnTheStore.cs"
     },
     {
       "upstream": "packages/durable/test/examples/36-durable-views.ts",
       "blobSha1": "2f2ace4889ad433d013697ca7f9513111849652e",
       "lines": 91,
-      "pisharp": "samples/Durable.Examples/ExamplesDurableViews.cs",
+      "pisharp": "samples/Durable.Chord.Examples/Example36.cs",
       "phase": "sync-1.5.0",
       "status": "planned",
-      "upstreamChange": "added"
+      "upstreamChange": "added",
+      "currentImplementation": {
+        "mapping": "compatibility/gap-status-2026-11-08.json",
+        "upstream": "packages/durable/test/examples/36-durable-views.ts",
+        "sourceStatus": "source-implemented",
+        "runtimeStatus": "pending-integrated-validation",
+        "sourcePaths": [
+          "samples/Durable.Chord.Examples/Example36.cs"
+        ],
+        "note": "Real-host examples and integration tests now exist; final execution and package-only consumption remain pending."
+      },
+      "historicalPisharp": "samples/Durable.Examples/ExamplesDurableViews.cs"
     },
     {
       "upstream": "packages/durable/test/examples/37-harness-registry.ts",
       "blobSha1": "404a61a0d7a452b5c99c5b7de7c42787d2544cae",
       "lines": 172,
-      "pisharp": "samples/Durable.Examples/ExamplesHarnessRegistry.cs",
+      "pisharp": "samples/Durable.Chord.Examples/Example37.cs",
       "phase": "sync-1.5.0",
       "status": "planned",
-      "upstreamChange": "added"
+      "upstreamChange": "added",
+      "currentImplementation": {
+        "mapping": "compatibility/gap-status-2026-11-08.json",
+        "upstream": "packages/durable/test/examples/37-harness-registry.ts",
+        "sourceStatus": "source-implemented",
+        "runtimeStatus": "pending-integrated-validation",
+        "sourcePaths": [
+          "samples/Durable.Chord.Examples/Example37.cs"
+        ],
+        "note": "Real-host examples and integration tests now exist; final execution and package-only consumption remain pending."
+      },
+      "historicalPisharp": "samples/Durable.Examples/ExamplesHarnessRegistry.cs"
     },
     {
       "upstream": "packages/durable/test/fixtures/delete-buffer.ts",
@@ -2311,7 +2518,19 @@
       "phase": "sync-1.5.0",
       "status": "in-progress",
       "upstreamChange": "added",
-      "note": "v1.5.0 (work list area registry-reader, 6eb99ad65): 3 of 3 cases run against a hand-built registry: Chord v2's own RegistryRecord, Batch and WritableSource (through the test-only InternalsVisibleTo), wired as the host's load does (one commit serves the provider and enters each plugin object's writable contribution, then composes once). harness.registry-reader.registry-reader.* (2) keep every assertion; harness.registry-reader.durable-s-views-from-other-objects-slice-8-5-s1.* (1) keeps Durable's (the view sees app.first, the Session's close fails both followers with \"session closed\" (S1), the next Harness's view lacks app.first and sees app.second). Plus harness.registry-reader.contract.* (3, authored). In progress until phase 6 (createHost): the host calls themselves (createHost, load, serve, local objects, self.writable, self.contribute, self.open, self.follow, self.retryOn, self.derive, host.registry, host.get, host.hold, host.close) and, in the S1 case, that durable.close rejects with \"session closed\", that the viewer's state is failed with a transient cause and then live, and durable.retry() opening the next Harness"
+      "note": "v1.5.0 (work list area registry-reader, 6eb99ad65): 3 of 3 cases run against a hand-built registry: Chord v2's own RegistryRecord, Batch and WritableSource (through the test-only InternalsVisibleTo), wired as the host's load does (one commit serves the provider and enters each plugin object's writable contribution, then composes once). harness.registry-reader.registry-reader.* (2) keep every assertion; harness.registry-reader.durable-s-views-from-other-objects-slice-8-5-s1.* (1) keeps Durable's (the view sees app.first, the Session's close fails both followers with \"session closed\" (S1), the next Harness's view lacks app.first and sees app.second). Plus harness.registry-reader.contract.* (3, authored). In progress until phase 6 (createHost): the host calls themselves (createHost, load, serve, local objects, self.writable, self.contribute, self.open, self.follow, self.retryOn, self.derive, host.registry, host.get, host.hold, host.close) and, in the S1 case, that durable.close rejects with \"session closed\", that the viewer's state is failed with a transient cause and then live, and durable.retry() opening the next Harness",
+      "currentImplementation": {
+        "mapping": "compatibility/gap-status-2026-11-08.json",
+        "upstream": "packages/durable/test/harness-registry-reader.test.ts",
+        "sourceStatus": "source-implemented",
+        "runtimeStatus": "pending-integrated-validation",
+        "sourcePaths": [
+          "tests/PiSharp.Durable.Tests/HarnessRegistryReaderCases.cs",
+          "tests/PiSharp.Chord.Durable.Integration.Tests"
+        ],
+        "note": "Real-host examples and integration tests now exist; final execution and package-only consumption remain pending."
+      },
+      "historicalPisharp": "tests/PiSharp.Durable.Tests/HarnessRegistryReaderCases.cs"
     },
     {
       "upstream": "packages/durable/test/harness-registry.test.ts",
@@ -3025,7 +3244,19 @@
       "phase": "sync-1.5.0",
       "status": "in-progress",
       "upstreamChange": "added",
-      "note": "v1.5.0 (work list area store-storage): 18 of its 20 cases and both conformance runs: storage.store.conformance.* (:memory:) and storage.store.reopen.conformance.* (ReopeningStoreStorage), storage.store.claims.*, storage.store.semantics.*, storage.store.archives.*, storage.store.heads.*, storage.store.reads.*, storage.store.commits.*, storage.store.review.*, storage.store.gc.*. Hand-built, as Chord's host (createHost) is phase 6: the archive case's Chord data is another owner's StoreStorage document (app.memo) instead of a Chord object's state; the publishing case attaches a hand-built Batch (through InternalsVisibleTo) and calls Publishing itself, as upstream's are (a Session publishing through it is storage.store.commit.publishes-each-commit-of-a-call-in-a-host-batch-of-its-own-after-the-calls-one-transaction, since area publication-caches); the statement count is the counted backend's (CountedStore in StoreStorageCommitCases.cs), as DurableContext carries no telemetry span until area telemetry. Not ported: the two cases of \"Durable's views as Chord sources on the store\" (createHost, defineFacet, self.open, self.follow, self.derive). In progress until phase 6's host runs those and the hand-built cases as upstream does"
+      "note": "v1.5.0 (work list area store-storage): 18 of its 20 cases and both conformance runs: storage.store.conformance.* (:memory:) and storage.store.reopen.conformance.* (ReopeningStoreStorage), storage.store.claims.*, storage.store.semantics.*, storage.store.archives.*, storage.store.heads.*, storage.store.reads.*, storage.store.commits.*, storage.store.review.*, storage.store.gc.*. Hand-built, as Chord's host (createHost) is phase 6: the archive case's Chord data is another owner's StoreStorage document (app.memo) instead of a Chord object's state; the publishing case attaches a hand-built Batch (through InternalsVisibleTo) and calls Publishing itself, as upstream's are (a Session publishing through it is storage.store.commit.publishes-each-commit-of-a-call-in-a-host-batch-of-its-own-after-the-calls-one-transaction, since area publication-caches); the statement count is the counted backend's (CountedStore in StoreStorageCommitCases.cs), as DurableContext carries no telemetry span until area telemetry. Not ported: the two cases of \"Durable's views as Chord sources on the store\" (createHost, defineFacet, self.open, self.follow, self.derive). In progress until phase 6's host runs those and the hand-built cases as upstream does",
+      "currentImplementation": {
+        "mapping": "compatibility/gap-status-2026-11-08.json",
+        "upstream": "packages/durable/test/store-storage.test.ts",
+        "sourceStatus": "source-implemented",
+        "runtimeStatus": "pending-integrated-validation",
+        "sourcePaths": [
+          "tests/PiSharp.Durable.Tests/StoreStorageCases.cs",
+          "tests/PiSharp.Chord.Durable.Integration.Tests"
+        ],
+        "note": "Real-host examples and integration tests now exist; final execution and package-only consumption remain pending."
+      },
+      "historicalPisharp": "tests/PiSharp.Durable.Tests/StoreStorageCases.cs"
     },
     {
       "upstream": "packages/durable/test/system-order-cache-e2e.test.ts",

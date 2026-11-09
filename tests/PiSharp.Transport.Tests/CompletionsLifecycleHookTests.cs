@@ -33,8 +33,9 @@ internal static class CompletionsLifecycleHookTests
         var (events, data, total, depth, framing) = options;
         // openai-completions.ts:558 reads every chunk the SDK stream yields (for await over the OpenAI Stream): no event count and no
         // 64 KiB event bound; one event keeps the per-content budget and the stream the total budget.
+        // docs/compatibility/json-fidelity-and-bounds.md specifies the shared 1000-level default (formerly 32/64).
         Check(events == int.MaxValue && data == PiSharp.AI.PiRequestBudget.StreamCharacters && total == PiSharp.AI.PiRequestBudget.StreamTotalCharacters &&
-            depth == 32 && framing is null, "Existing positional options changed.");
+            depth == PiSharp.Contracts.JsonData.MaximumDepth && framing is null, "Existing positional options changed.");
         using var client = new HttpClient(new FakeHttpHandler((_, _) => throw new InvalidOperationException("Legacy control never sends.")));
         _ = new CompletionsHttpSseTransport(client, (_, _) => new(HttpMethod.Post, Endpoint), new());
         using var request = new CompletionsKeyAuthRequestFactory(Endpoint, Model).Create(Request(), Key);
@@ -120,15 +121,24 @@ internal static class CompletionsLifecycleHookTests
                 opaque.GetProperty("text").GetString() == "\u03c0\U0001f600" && opaque.GetProperty("null").ValueKind == JsonValueKind.Null && !opaque.TryGetProperty("missing", out _), "Actual production ECMAScript payload serialization changed.");
             Check(before == numeric.ToString(), "Serialized payload replaced original numeric tokens.");
         }
+        // JSON-fidelity-and-bounds.md and pinned v1.5.0 JSON.stringify retain a lone string-value surrogate as its escape.
+        var lone = JsonData.Parse("{\"text\":\"\\uD800\"}"); var loneOriginal = lone.ToString();
+        using (var fixture = new Fixture(new ProbeStream(Wire(Finish)), new() { OnPayload = (_, _, _) => ValueTask.FromResult<JsonData?>(lone) }))
+        {
+            var result = await new ChatClient(fixture.Transport).CompleteAsync(Request());
+            Check(result.Failure is null && fixture.Handler.SendCalls == 1 && fixture.Content.AcquireCalls == 1, "Valid escaped string surrogate did not send exactly once.");
+            Check(new UTF8Encoding(false, true).GetString(fixture.SentBytes!) == "{\"text\":\"\\ud800\"}", "Lone surrogate wire escape changed.");
+            Check(lone.ToString() == loneOriginal, "Lone surrogate callback-owned value was mutated.");
+        }
         using var permissive = JsonDocument.Parse("{ /* retained */ \"opaque\":1, }", new JsonDocumentOptions { CommentHandling = JsonCommentHandling.Skip, AllowTrailingCommas = true });
         var bad = new[] { JsonData.FromElement(permissive.RootElement), JsonData.Null, JsonData.Parse("{\"n\":1e999}"),
-            JsonData.Parse("{\"text\":\"\\uD800\"}"), JsonData.Parse("{\"opaque\":\"" + new string('x', limit - 12) + "\"}"), JsonData.Parse("{\"a\":{\"b\":{\"c\":{\"d\":{}}}}}") };
+            JsonData.Parse("{\"opaque\":\"" + new string('x', limit - 12) + "\"}"), JsonData.Parse("{\"a\":{\"b\":{\"c\":{\"d\":{}}}}}") };
         foreach (var replacement in bad)
         {
             using var fixture = new Fixture(new ProbeStream(Wire(Finish)), new() { OnPayload = (_, _, _) => ValueTask.FromResult<JsonData?>(replacement) },
                 requestOptions: new(MaximumPayloadBytes: limit, MaximumPayloadDepth: 4));
             var result = await new ChatClient(fixture.Transport).CompleteAsync(Request());
-            Check(result.Failure is not null && fixture.Handler.SendCalls == 0 && fixture.Content.AcquireCalls == 0, "Malformed/nonfinite/Unicode/depth/over-budget replacement gained effects.");
+            Check(result.Failure is not null && fixture.Handler.SendCalls == 0 && fixture.Content.AcquireCalls == 0, "Malformed/nonfinite/depth/over-budget replacement gained effects.");
         }
         using (var fixture = new Fixture(new ProbeStream(Wire(Finish)), new() { OnPayload = (_, _, _) =>
             ValueTask.FromResult<JsonData?>(JsonData.Parse("{\"x\":1,\"\\u0078\":2}")) }))

@@ -1,0 +1,246 @@
+{
+  "store": {
+    "dump": {
+      "profile": {
+        "name": "ada",
+        "nick": "x",
+        "age": 36,
+        "count": 3,
+        "score": 1,
+        "ratio": 0.5,
+        "active": true,
+        "verified": false,
+        "role": "admin",
+        "level": 1,
+        "kind": "person",
+        "one": 1,
+        "yes": true,
+        "tags": [
+          "a",
+          "b",
+          "c"
+        ],
+        "points": [],
+        "extra": {
+          "a": 10,
+          "b": 6,
+          "c": 9
+        },
+        "nothing": null,
+        "choice": {
+          "deep": [
+            {
+              "x": 3
+            }
+          ]
+        },
+        "nested": {
+          "inner": {
+            "v": "third one"
+          }
+        }
+      },
+      "notes": {
+        "a": {
+          "body": "first note"
+        },
+        "b": {
+          "body": "second"
+        }
+      },
+      "rows": [
+        {
+          "id": "a",
+          "n": 0,
+          "flag": false,
+          "label": "first note",
+          "data": {
+            "a": 10,
+            "b": [
+              "a"
+            ]
+          },
+          "maybe": {
+            "n": 1.5
+          }
+        },
+        {
+          "id": "b",
+          "n": 0,
+          "flag": false,
+          "label": "second",
+          "data": {
+            "a": 6,
+            "b": [
+              "b"
+            ]
+          }
+        },
+        {
+          "id": "c",
+          "n": 0,
+          "flag": false,
+          "label": "third one",
+          "data": {
+            "a": 9,
+            "b": [
+              "c"
+            ]
+          }
+        }
+      ],
+      "edits": [
+        {
+          "id": "a",
+          "path": "/notes/a.md",
+          "at": 10
+        },
+        {
+          "id": "b",
+          "path": "/notes/b.md",
+          "at": 6
+        },
+        {
+          "id": "c",
+          "path": "/notes/c.md",
+          "at": 9
+        }
+      ],
+      "runs": 0
+    },
+    "finished": [
+      {
+        "count": 2
+      },
+      {
+        "count": 2
+      },
+      {
+        "count": 2
+      }
+    ],
+    "note": "second"
+  },
+  "archive": {
+    "dump": {
+      "profile": {
+        "name": "ada",
+        "nick": "x",
+        "age": 36,
+        "count": 3,
+        "score": 1,
+        "ratio": 0.5,
+        "active": true,
+        "verified": false,
+        "role": "admin",
+        "level": 1,
+        "kind": "person",
+        "one": 1,
+        "yes": true,
+        "tags": [
+          "a",
+          "b",
+          "c"
+        ],
+        "points": [],
+        "extra": {
+          "a": 10,
+          "b": 6,
+          "c": 9
+        },
+        "nothing": null,
+        "choice": {
+          "deep": [
+            {
+              "x": 3
+            }
+          ]
+        },
+        "nested": {
+          "inner": {
+            "v": "third one"
+          }
+        }
+      },
+      "notes": {
+        "a": {
+          "body": "first note"
+        },
+        "b": {
+          "body": "second"
+        }
+      },
+      "rows": [
+        {
+          "id": "a",
+          "n": 0,
+          "flag": false,
+          "label": "first note",
+          "data": {
+            "a": 10,
+            "b": [
+              "a"
+            ]
+          },
+          "maybe": {
+            "n": 1.5
+          }
+        },
+        {
+          "id": "b",
+          "n": 0,
+          "flag": false,
+          "label": "second",
+          "data": {
+            "a": 6,
+            "b": [
+              "b"
+            ]
+          }
+        },
+        {
+          "id": "c",
+          "n": 0,
+          "flag": false,
+          "label": "third one",
+          "data": {
+            "a": 9,
+            "b": [
+              "c"
+            ]
+          }
+        }
+      ],
+      "edits": [
+        {
+          "id": "a",
+          "path": "/notes/a.md",
+          "at": 10
+        },
+        {
+          "id": "b",
+          "path": "/notes/b.md",
+          "at": 6
+        },
+        {
+          "id": "c",
+          "path": "/notes/c.md",
+          "at": 9
+        }
+      ],
+      "runs": 0
+    },
+    "finished": [
+      {
+        "count": 2
+      },
+      {
+        "count": 2
+      },
+      {
+        "count": 2
+      }
+    ],
+    "note": "second"
+  }
+}

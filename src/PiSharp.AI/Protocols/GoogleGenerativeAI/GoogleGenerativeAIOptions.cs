@@ -7,6 +7,8 @@ namespace PiSharp.AI.Protocols.GoogleGenerativeAI;
 /// <summary>Direct stream options. Credentials and environment are supplied by the caller.</summary>
 public sealed record GoogleGenerativeAIOptions(JsonData ModelMetadata, string? ApiKey = null)
 {
+    /// <summary>Optional per-level token budgets used by simple native bindings.</summary>
+    public JsonData? ThinkingBudgets { get; init; }
     public double? Temperature { get; init; }
     public double? MaxTokens { get; init; }
     public string? ToolChoice { get; init; }

@@ -18,23 +18,23 @@
       "pisharp.agent": {
         "type": "Project",
         "dependencies": {
-          "PiSharp.AI": "[1.1.0.6, )",
-          "PiSharp.Contracts": "[1.1.0.6, )"
+          "PiSharp.AI": "[1.5.0, )",
+          "PiSharp.Contracts": "[1.5.0, )"
         }
       },
       "pisharp.ai": {
         "type": "Project",
         "dependencies": {
-          "PiSharp.Contracts": "[1.1.0.6, )",
-          "PiSharp.Telemetry": "[1.1.0.6, )"
+          "PiSharp.Contracts": "[1.5.0, )",
+          "PiSharp.Telemetry": "[1.5.0, )"
         }
       },
       "pisharp.codemode": {
         "type": "Project",
         "dependencies": {
           "Jint": "[4.16.3, 4.16.3]",
-          "PiSharp.Contracts": "[1.1.0.6, )",
-          "PiSharp.Extensions.Abstractions": "[1.1.0.6, )"
+          "PiSharp.Contracts": "[1.5.0, )",
+          "PiSharp.Extensions.Abstractions": "[1.5.0, )"
         }
       },
       "pisharp.contracts": {
@@ -43,14 +43,14 @@
       "pisharp.durable": {
         "type": "Project",
         "dependencies": {
-          "PiSharp.AI": "[1.1.0.6, )",
-          "PiSharp.Contracts": "[1.1.0.6, )"
+          "PiSharp.AI": "[1.5.0, )",
+          "PiSharp.Contracts": "[1.5.0, )"
         }
       },
       "pisharp.extensions.abstractions": {
         "type": "Project",
         "dependencies": {
-          "PiSharp.Contracts": "[1.1.0.6, )"
+          "PiSharp.Contracts": "[1.5.0, )"
         }
       },
       "pisharp.telemetry": {
@@ -59,8 +59,8 @@
       "pisharp.tools": {
         "type": "Project",
         "dependencies": {
-          "PiSharp.Agent": "[1.1.0.6, )",
-          "PiSharp.Contracts": "[1.1.0.6, )"
+          "PiSharp.Agent": "[1.5.0, )",
+          "PiSharp.Contracts": "[1.5.0, )"
         }
       }
     }

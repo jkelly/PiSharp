@@ -80,9 +80,13 @@ internal static class ResponsesKeyAuthRequestFactoryTests
             using var payload = JsonDocument.Parse(await largest.Content!.ReadAsStringAsync());
             Equal("2147483647", payload.RootElement.GetProperty("max_output_tokens").GetRawText());
         }
-        Equal(ResponsesKeyAuthRequestFailure.UnsupportedOptions, Failure(() => Factory(new(MaxOutputTokens: 16))).Failure);
-        foreach (var value in new[] { 0, -1 })
-            Equal(ResponsesKeyAuthRequestFailure.UnsupportedOptions, Failure(() => Factory(new(MaxOutputTokens: value))).Failure);
+        // Disabled capability omits the field, independently of a supplied named cap; supported profiles above retain the floor/cap.
+        foreach (var value in new int?[] { null, 0, -1, 16 })
+        {
+            using var disabled = Factory(new(SupportsMaxOutputTokens: false, MaxOutputTokens: value)).Create(Request(), Key);
+            using var body = JsonDocument.Parse(await disabled.Content!.ReadAsStringAsync());
+            Check(!body.RootElement.TryGetProperty("max_output_tokens", out _), "Disabled max-output capability serialized the field.");
+        }
         Equal(ResponsesKeyAuthRequestFailure.ResourceLimit, Failure(() => Factory(new(SupportsMaxOutputTokens: true, MaxOutputTokens: 101, MaximumOutputTokens: 100))).Failure);
         Equal(ResponsesKeyAuthRequestFailure.InvalidConfiguration, Failure(() => Factory(new(MaximumOutputTokens: 15))).Failure);
     }
@@ -147,7 +151,10 @@ internal static class ResponsesKeyAuthRequestFactoryTests
             ("\u2028\uE000\\\r\n", "\u2028\uE000\\\r\n")
         })
         {
-            using var request = Factory(new(SessionId: session)).Create(Request(), Key);
+            // Body cache-key fidelity is independent from printable-ASCII header admission: explicitly delete both generated headers.
+            using var request = Factory(new ResponsesKeyAuthRequestOptions(SessionId: session)
+                { Headers = JsonData.Parse("""{"session-id":null,"x-client-request-id":null}""") }).Create(Request(), Key);
+            Check(!request.Headers.Contains("session-id") && !request.Headers.Contains("x-client-request-id"), "Body-only cache-key control kept affinity headers.");
             using var payload = JsonDocument.Parse(await request.Content!.ReadAsStringAsync());
             Equal(expected, payload.RootElement.GetProperty("prompt_cache_key").GetString());
         }
@@ -169,7 +176,12 @@ internal static class ResponsesKeyAuthRequestFactoryTests
             new(MaximumSessionIdCharacters: 0), new(MaximumTemperatureMagnitude: 0),
             new(MaximumTemperatureMagnitude: double.NaN), new(MaximumTemperatureMagnitude: double.PositiveInfinity)
         }) Equal(ResponsesKeyAuthRequestFailure.InvalidConfiguration, Failure(() => Factory(options)).Failure);
-        var configured = new ResponsesKeyAuthRequestOptions(SessionId: supplementary, MaximumSessionIdCharacters: 2, Temperature: 0);
+        foreach (var invalidHeaderSession in new[] { supplementary, "control\r\n" })
+            Equal(ResponsesKeyAuthRequestFailure.InvalidConfiguration, Failure(() => Factory(new(SessionId: invalidHeaderSession)).Create(Request(), Key)).Failure);
+        using (var ascii = Factory(new(SessionId: "ascii-session")).Create(Request(), Key))
+            Check(ascii.Headers.GetValues("session-id").Single() == "ascii-session" && !ascii.Headers.Contains("session_id"), "Default printable affinity header changed.");
+        var configured = new ResponsesKeyAuthRequestOptions(SessionId: supplementary, MaximumSessionIdCharacters: 2, Temperature: 0)
+        { Headers = JsonData.Parse("""{"session-id":null,"x-client-request-id":null}""") };
         using var baseline = Factory(configured).Create(Request(), Key);
         var bytes = (await baseline.Content!.ReadAsByteArrayAsync()).Length;
         using var exact = Factory(configured with { MaximumPayloadBytes = bytes }).Create(Request(), Key);
@@ -277,7 +289,7 @@ internal static class ResponsesKeyAuthRequestFactoryTests
             new(MaximumModelCharacters: Model.Id.Length - 1), new(MaximumEndpointCharacters: Endpoint.AbsoluteUri.Length - 1),
             new(MaximumPayloadDepth: 4)
         }) Equal(ResponsesKeyAuthRequestFailure.ResourceLimit, Failure(() => Factory(options).Create(chat, Key)).Failure);
-        foreach (var options in new ResponsesKeyAuthRequestOptions[] { new(MaximumKeyCharacters: 0), new(MaximumPayloadBytes: 0), new(MaximumPayloadDepth: 65) })
+        foreach (var options in new ResponsesKeyAuthRequestOptions[] { new(MaximumKeyCharacters: 0), new(MaximumPayloadBytes: 0), new(MaximumPayloadDepth: PiSharp.Contracts.JsonData.MaximumDepth + 1) })
             Equal(ResponsesKeyAuthRequestFailure.InvalidConfiguration, Failure(() => Factory(options)).Failure);
         Equal(ResponsesKeyAuthRequestFailure.InvalidConfiguration, Failure(() => new ResponsesKeyAuthRequestFactory(Endpoint, Model, new(false, MaximumMessages: 0))).Failure);
         using var cancellation = new CancellationTokenSource(); cancellation.Cancel();
@@ -359,6 +371,11 @@ internal static class ResponsesKeyAuthRequestFactoryTests
         // Pinned transcript.ts getCurrentTools/resolveTranscriptTools and convertResponsesTools:
         // removals precede additions, replacements retain position, removal/readd moves to the end.
         var history = ImmutableArray<TranscriptEntry>.Empty;
+        // Keep strict:false expectations in an explicitly supported profile; default capability is false and omits the field.
+        var declaredOptions = new ResponsesToolDeclarationProjectionOptions(SupportsStrictMode: true);
+        var declaredFactory = new ResponsesKeyAuthRequestFactory(Endpoint, Model, new(false, ToolDeclarations: declaredOptions));
+        var ordinaryDefault = new ChatRequest(Model, [SystemDelta("""{"toolsAdded":[{"name":"default","description":"default","parameters":{"type":"object"}}]}""")]);
+        Check(!new ResponsesToolDeclarationProjector().Project(ordinaryDefault).Value[0].TryGetProperty("strict", out _), "Default unsupported strict field was emitted.");
         var cases = new (string Delta, string Expected)[]
         {
             ("""{"toolsRemoved":[{"name":"undeclared"}],"toolsAdded":[{"name":"a","description":"first","parameters":{"type":"object"}},{"name":"b","description":"second","parameters":{"type":"object"}}]}""",
@@ -378,9 +395,9 @@ internal static class ResponsesKeyAuthRequestFactoryTests
             history = history.Add(SystemDelta(delta));
             var originals = history.Select(message => message.WireBody.ToString()).ToArray();
             var chat = new ChatRequest(Model, history.Add(Request().Messages[0]));
-            var tools = new ResponsesToolDeclarationProjector().Project(chat);
+            var tools = new ResponsesToolDeclarationProjector(declaredOptions).Project(chat);
             Check(Same(JsonData.Parse(expected).Value, tools.Value), "Active tool replay differs from authored source-linked expectation.");
-            using var request = Factory().Create(chat, Key);
+            using var request = declaredFactory.Create(chat, Key);
             using var payload = JsonDocument.Parse(await request.Content!.ReadAsStringAsync());
             if (tools.Value.GetArrayLength() == 0) Check(!payload.RootElement.TryGetProperty("tools", out _), "Empty active tools were not omitted.");
             else Check(Same(JsonData.Parse(expected).Value, payload.RootElement.GetProperty("tools")), "Request omitted or rewrote active tool declarations.");
@@ -393,9 +410,9 @@ internal static class ResponsesKeyAuthRequestFactoryTests
         var strictChat = new ChatRequest(Model, [SystemDelta("""{"toolsAdded":[{"name":"strict-tool","description":"strict","parameters":{"type":"object","properties":{"optional":{"type":"string"},"mandatory":{"type":"integer"},"nullable":{"type":["string","null"]}},"required":["mandatory"]},"constrainedSampling":{"type":"json_schema","strict":"require"}}]}""")]);
         const string strictExpected = """[{"type":"function","name":"strict-tool","description":"strict","parameters":{"type":"object","properties":{"optional":{"anyOf":[{"type":"string"},{"type":"null"}]},"mandatory":{"type":"integer"},"nullable":{"type":["string","null"]}},"required":["optional","mandatory","nullable"],"additionalProperties":false},"strict":true}]""";
         var strictOriginal = strictChat.Messages[0].WireBody.ToString();
-        Check(Same(JsonData.Parse(strictExpected).Value, new ResponsesToolDeclarationProjector().Project(strictChat).Value), "Strict sampling conversion differs.");
+        Check(Same(JsonData.Parse(strictExpected).Value, new ResponsesToolDeclarationProjector(declaredOptions).Project(strictChat).Value), "Strict sampling conversion differs.");
         Equal(strictOriginal, strictChat.Messages[0].WireBody.ToString());
-        using (var strictRequest = Factory().Create(strictChat, Key))
+        using (var strictRequest = declaredFactory.Create(strictChat, Key))
         {
             using var payload = JsonDocument.Parse(await strictRequest.Content!.ReadAsStringAsync());
             Check(Same(JsonData.Parse(strictExpected).Value, payload.RootElement.GetProperty("tools")), "Strict tools did not enter the payload.");
@@ -403,7 +420,7 @@ internal static class ResponsesKeyAuthRequestFactoryTests
         Equal(ResponsesProjectionFailure.UnsupportedContent, Throws<ResponsesProjectionException>(() =>
             new ResponsesToolDeclarationProjector(new(SupportsStrictMode: false)).Project(strictChat)).Failure);
         var ordinary = new ChatRequest(Model, [SystemDelta("""{"toolsAdded":[{"name":"a","description":"plain","parameters":{"type":"object","x-number":1.0,"x-null":null}}]}""")]);
-        foreach (var options in new ResponsesToolDeclarationProjectionOptions[] { new(SupportsStrictMode: false), new(Strict: null) })
+        foreach (var options in new ResponsesToolDeclarationProjectionOptions[] { new(SupportsStrictMode: false), new(SupportsStrictMode: true, Strict: null) })
         {
             var projected = new ResponsesToolDeclarationProjector(options).Project(ordinary).Value[0];
             Equal("1.0", projected.GetProperty("parameters").GetProperty("x-number").GetRawText());
@@ -415,11 +432,16 @@ internal static class ResponsesKeyAuthRequestFactoryTests
             Check(Same(projected, payload.RootElement.GetProperty("tools")[0]), "Factory ignored declared strict-mode capability.");
         }
         var fallback = new ChatRequest(Model, [SystemDelta("""{"toolsAdded":[{"name":"fallback","description":"prefer","parameters":{"type":"object","$ref":"#/private"},"constrainedSampling":{"type":"json_schema","strict":"prefer"}}]}""")]);
-        Check(!new ResponsesToolDeclarationProjector().Project(fallback).Value[0].GetProperty("strict").GetBoolean(), "Prefer failed to fall back for unsupported strict schema.");
+        Check(!new ResponsesToolDeclarationProjector(declaredOptions).Project(fallback).Value[0].GetProperty("strict").GetBoolean(), "Prefer failed to fall back for unsupported strict schema.");
+        // Pinned convertResponsesTools ignores a grammar hint when custom grammar support is disabled; it remains a function.
+        var ignoredGrammar = new ChatRequest(Model, [SystemDelta("""{"toolsAdded":[{"name":"private","description":"grammar","parameters":{"type":"object"},"constrainedSampling":{"type":"grammar","variants":{"openai_regex":".*"}}}]}""")]);
+        var grammarOriginal = ignoredGrammar.Messages[0].WireBody.ToString();
+        var grammarTools = new ResponsesToolDeclarationProjector().Project(ignoredGrammar);
+        Check(Same(JsonData.Parse("""[{"type":"function","name":"private","description":"grammar","parameters":{"type":"object"}}]""").Value, grammarTools.Value), "Disabled grammar capability changed function fallback.");
+        Equal(grammarOriginal, ignoredGrammar.Messages[0].WireBody.ToString());
         foreach (var delta in new[]
         {
             """{"toolsAdded":[{"type":"custom","name":"private","description":"grammar","parameters":{}}]}""",
-            """{"toolsAdded":[{"name":"private","description":"grammar","parameters":{"type":"object"},"constrainedSampling":{"type":"grammar","variants":{"openai_regex":".*"}}}]}""",
             """{"toolsAdded":[{"name":"private","description":"required","parameters":{"type":"object","$ref":"#/private"},"constrainedSampling":{"type":"json_schema","strict":"require"}}]}""",
             """{"toolsAdded":[{"name":"private","description":"unsupported sampling","parameters":{},"constrainedSampling":{"type":"future"}}]}""",
             """{"toolsRemoved":["private"]}"""
@@ -431,7 +453,16 @@ internal static class ResponsesKeyAuthRequestFactoryTests
         }
         Throws<JsonException>(() => JsonData.Parse("""{"name":"a","\u006eame":"b"}"""));
         var unicode = new ChatRequest(Model, [SystemDelta("""{"toolsAdded":[{"name":"a","description":"\uD800","parameters":{}}]}""")]);
-        Equal(ResponsesProjectionFailure.UnsupportedUnicode, Throws<ResponsesProjectionException>(() => Factory().Create(unicode, Key)).Failure);
+        var unicodeOriginal = unicode.Messages[0].WireBody.ToString();
+        using (var unicodeRequest = Factory().Create(unicode, Key))
+        {
+            // A valid JSON string code unit must survive as its escape, not silently become U+FFFD (pinned convertResponsesTools/JSON.stringify).
+            var bytes = await unicodeRequest.Content!.ReadAsByteArrayAsync();
+            Equal("{\"model\":\"synthetic-key-model\",\"input\":[],\"stream\":true,\"store\":false,\"tools\":[{\"type\":\"function\",\"name\":\"a\",\"description\":\"\\ud800\",\"parameters\":{}}]}", new UTF8Encoding(false, true).GetString(bytes));
+            using var parsed = JsonDocument.Parse(bytes);
+            Equal("\uD800", JsonUtf16.GetString(parsed.RootElement.GetProperty("tools")[0].GetProperty("description")));
+        }
+        Equal(unicodeOriginal, unicode.Messages[0].WireBody.ToString());
         await SchemaNumbersAndDecodedDuplicates();
     }
 
@@ -444,7 +475,7 @@ internal static class ResponsesKeyAuthRequestFactoryTests
         var chat = new ChatRequest(Model, history); var original = history[0].WireBody.ToString();
         foreach (var strict in new[] { false, true })
         {
-            var options = new ResponsesToolDeclarationProjectionOptions(Strict: strict);
+            var options = new ResponsesToolDeclarationProjectionOptions(SupportsStrictMode: true, Strict: strict);
             var standalone = new ResponsesToolDeclarationProjector(options).Project(chat);
             Equal(0, new ResponsesTranscriptProjector(new(false, ToolDeclarations: options)).Project(chat).Value.GetArrayLength());
             using var request = new ResponsesKeyAuthRequestFactory(Endpoint, Model, new(false, ToolDeclarations: options)).Create(chat, Key);

@@ -27,7 +27,7 @@ The agent folder is `~/.pi/agent`. Set `PI_CODING_AGENT_DIR` to move it. Every p
 | `bin/` | `rg` and `fd`, if PiSharp downloaded them. Also first on `PATH` for `bash`. |
 | `crashes.json` | The last crash of interactive mode, so the next start can point you to `/bug`. |
 | `pi-debug.log` | Written by the hidden `/debug` command. |
-| `pisharp/pi-runtime/<version>/` | Pi's own npm packages, installed on first use of a TypeScript extension. `PISHARP_PI_RUNTIME_DIR` moves it. See [Node bridge](/docs/extensions/node-bridge/). |
+| `pisharp/pi-runtime/<version-policy>/` | Pi's own npm packages, installed on first use of a TypeScript extension. `PISHARP_PI_RUNTIME_DIR` selects its parent. See [Node bridge](/docs/extensions/node-bridge/). |
 | `experimental/durable-sessions/` | Sessions of `pisharp durable`. See [Pi Durable](/docs/guides/durable/). |
 
 ## The project `.pi` folder

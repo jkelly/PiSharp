@@ -7,8 +7,9 @@ using System.Text.Json;
 using System.Threading.Channels;
 using PiSharp.Agent.Tools;
 using PiSharp.Tools.Processes;
+#pragma warning disable PISHARP_EXEC001 // Exercise the explicit native exec capture contract.
 
-internal static class NativeProcessRunnerTests
+internal static partial class NativeProcessRunnerTests
 {
     private const string ChildSwitch = "--native-process-test-child";
     private static readonly Encoding Utf8 = new UTF8Encoding(false, false);
@@ -23,7 +24,11 @@ internal static class NativeProcessRunnerTests
         ("native process source tail metadata raw spill hashes and structured both ends", TailAndStructuredSpill),
         ("native process total byte budget and sanitized output callback IO failures", BudgetAndOutputFaults),
         ("native process suspended running and drain cancellation timeout awaited cleanup", CancellationTimeoutAndAwaitedCleanup),
-        ("native process contained descendants and rearmed postexit idle drainage", DescendantsAndPostExitDrain)
+        ("native process contained descendants and rearmed postexit idle drainage", DescendantsAndPostExitDrain),
+        ("native process combined capture bounds preserve large pipes and UTF8", CombinedCapture),
+        ("native process explicit maxBuffer exceeds structured and raw limits with joined cleanup", ExplicitCapture),
+        ("native process background writer timeout records prior shell exit", BackgroundWriterTimeout),
+        .. OwnedChildCases()
     ];
 
     // Root's existing test Main calls this with args[1..] before normal test/report dispatch.
@@ -50,6 +55,11 @@ internal static class NativeProcessRunnerTests
             case "emit-file":
                 await using (var input = new FileStream(args[1], FileMode.Open, FileAccess.Read, FileShare.Read))
                     await input.CopyToAsync(Console.OpenStandardOutput());
+                return 0;
+            case "emit-pipes":
+                await Task.WhenAll(Emit(Console.OpenStandardOutput(), int.Parse(args[1]), (byte)'o'),
+                    Emit(Console.OpenStandardError(), int.Parse(args[2]), (byte)'e'));
+                if (args.Length > 3) await Task.Delay(Timeout.Infinite);
                 return 0;
             case "touch":
                 await File.WriteAllTextAsync(args[1], "child code ran", Utf8);
@@ -92,6 +102,103 @@ internal static class NativeProcessRunnerTests
                 }
                 return 0;
             default: return 2;
+        }
+        static async Task Emit(Stream stream, int count, byte value)
+        {
+            var chunk = new byte[8192]; Array.Fill(chunk, value);
+            while (count > 0) { var length = Math.Min(count, chunk.Length); await stream.WriteAsync(chunk.AsMemory(0, length)); count -= length; }
+            await stream.FlushAsync();
+        }
+    }
+
+    private static Task CombinedCapture()
+    {
+        var original = new ProcessRunResult(ProcessRunStatus.Exited, 0, null, false, true, true,
+            new("", ToolOutputTruncator.Tail(""), 0, 0, null), new("", false), 0, []);
+        var large = new byte[1024 * 1024 + 17]; Array.Fill(large, (byte)'x');
+        using (var capture = new SeparatedProcessCapture(8, 2L * large.Length))
+        {
+            Parallel.Invoke(() => capture.Append(false, large), () => capture.Append(true, large));
+            var result = capture.Result(original);
+            Equal(large.Length, result.StandardOutput.Content.Length); Equal(large.Length, result.StandardError.Content.Length);
+            Check(!result.CaptureLimitReached && !result.StandardOutput.Truncated && !result.StandardError.Truncated,
+                "Exact combined boundary or ordinary per-pipe cap truncated explicit output.");
+            capture.Append(true, [120]); result = capture.Result(original);
+            Check(result.CaptureLimitReached && result.StandardOutput.Content.Length + result.StandardError.Content.Length == 2 * large.Length,
+                "Exceeding the combined limit did not stop capture at its exact byte count.");
+        }
+        using (var capture = new SeparatedProcessCapture(8, 8))
+        {
+            capture.Append(false, Utf8.GetBytes("a€🙂").AsSpan(0, 6));
+            capture.Append(false, Utf8.GetBytes("a€🙂").AsSpan(6));
+            Equal("a€🙂", capture.Result(original).StandardOutput.Content);
+            Check(!capture.LimitReached, "A complete split character at the exact bound was truncated.");
+        }
+        using (var capture = new SeparatedProcessCapture(8, 5))
+        {
+            capture.Append(true, Utf8.GetBytes("a€🙂"));
+            Equal("a€", capture.Result(original).StandardError.Content);
+            Check(capture.LimitReached, "Crossing a UTF8 boundary did not truncate.");
+        }
+        using (var capture = new SeparatedProcessCapture(8, 0))
+        {
+            capture.Append(false, []); Check(!capture.LimitReached, "Empty output exceeded zero.");
+            capture.Append(false, [120]); Equal("", capture.Result(original).StandardOutput.Content);
+            Check(capture.LimitReached, "Nonempty output did not exceed zero.");
+        }
+        using (var capture = new SeparatedProcessCapture(8))
+        {
+            capture.Append(false, large); capture.Append(true, [101]); var result = capture.Result(original);
+            Equal(8, result.StandardOutput.Content.Length); Equal("e", result.StandardError.Content);
+            Check(result.StandardOutput.Truncated && !result.StandardError.Truncated && !capture.LimitReached,
+                "Ordinary per-pipe truncation changed into combined process termination.");
+        }
+        Throws<ArgumentOutOfRangeException>(() => new SeparatedProcessCapture(8, -1));
+        Throws<ArgumentOutOfRangeException>(() => new SeparatedProcessCapture(8, 0x40000000L));
+        return Task.CompletedTask;
+    }
+
+    private static async Task ExplicitCapture()
+    {
+        Windows(); using var temp = new Scratch();
+        const int length = 1024 * 1024 + 17;
+        // Deliberately small independent raw and structured budgets: an explicit capture supersedes both.
+        var runner = new NativeProcessRunner(new(MaximumRawBytes: 4096));
+        foreach (var (stdout, stderr) in new[] { (length, 0), (0, length), (length, length) })
+        {
+            var request = ChildRequest(temp, "emit-pipes", stdout.ToString(), stderr.ToString()) with
+                { CaptureLimitBytes = stdout + stderr };
+            var result = await Run(request);
+            Settled(result.Process); Equal(ProcessRunStatus.Exited, result.Process.Status);
+            Equal(stdout, result.StandardOutput.Content.Length); Equal(stderr, result.StandardError.Content.Length);
+            Check(!result.CaptureLimitReached && !result.StandardOutput.Truncated && !result.StandardError.Truncated,
+                "Large explicit output was truncated.");
+            Equal(stdout + stderr, result.Process.Output.RawBytes);
+            Check(result.Process.StructuredOutput.Truncated, "The ordinary structured receipt lost its separate bound.");
+        }
+        var limited = await Run(ChildRequest(temp, "emit-pipes", length.ToString(), length.ToString(), "wait") with
+            { CaptureLimitBytes = length });
+        Settled(limited.Process);
+        Check(limited.CaptureLimitReached && limited.StandardOutput.Content.Length + limited.StandardError.Content.Length == length,
+            "Concurrent pipes exceeded their shared capture budget.");
+        Equal(length, limited.Process.Output.RawBytes);
+        Check(limited.Process.ExitCode != 0, "A stopped live writer reported natural success.");
+        using var control = new Control(); using var canceled = new CancellationTokenSource();
+        var running = runner.RunSeparatedAsync(ChildRequest(temp, "block", control.Name) with
+            { CaptureLimitBytes = 2L * length }, canceled.Token).AsTask();
+        try
+        {
+            await control.ReadyAsync(); canceled.Cancel();
+            var result = await running;
+            Settled(result.Process); Equal(ProcessRunStatus.Canceled, result.Process.Status);
+            Check(!result.CaptureLimitReached, "Cancellation became a capture overflow.");
+        }
+        finally { canceled.Cancel(); await running; }
+
+        async Task<SeparatedProcessRunResult> Run(ProcessRequest request)
+        {
+            using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+            return await runner.RunSeparatedAsync(request, timeout.Token);
         }
     }
 
@@ -300,6 +407,33 @@ internal static class NativeProcessRunnerTests
         Has(lifecycle, ProcessDiagnostic.LifecycleCallbackFailed); Equal(ProcessRunStatus.Failed, lifecycle.Status); Check(lifecycle.CleanupConfirmed, "Lifecycle failure leaked process ownership.");
     }
 
+    private static async Task BackgroundWriterTimeout()
+    {
+        Windows(); using var temp = new Scratch();
+        using var root = new Control(); using var branch = new Control(); using var leaf = new Control();
+        using var cancel = new CancellationTokenSource();
+        var clock = new ManualClock(); var late = NewGate<bool>();
+        var run = new TestRunner(timeProvider: clock).RunAsync(ChildRequest(temp, "tree", root.Name, branch.Name, leaf.Name) with { TimeoutSeconds = 1 },
+            snapshot => { if (snapshot.Content.Contains("late-output", StringComparison.Ordinal)) late.TrySetResult(true); return ValueTask.CompletedTask; }, cancel.Token).AsTask();
+        try
+        {
+            var ids = await Task.WhenAll(root.ReadyAsync(), branch.ReadyAsync(), leaf.ReadyAsync());
+            // The one-second command timer is registered before the post-exit idle timer. A >=100ms barrier can
+            // consume that earlier notification and advance the clock before the shell exit is observed.
+            await root.SendAsync("EXIT"); await clock.WaitForDeadlineAsync(TimeSpan.FromMilliseconds(100).Ticks, exact: true);
+            clock.Advance(TimeSpan.FromMilliseconds(80)); await leaf.SendAsync("WRITE"); Equal("WROTE", await leaf.ReceiveAsync());
+            await late.Task.WaitAsync(TimeSpan.FromSeconds(5)); await clock.WaitForDeadlineAsync(TimeSpan.FromMilliseconds(180).Ticks, exact: true);
+            clock.Advance(TimeSpan.FromMilliseconds(920));
+            var result = await run;
+            Equal(ProcessRunStatus.TimedOut, result.Status); Settled(result);
+            Equal<int?>(0, result.ShellExitBeforeTimeout?.ExitCode);
+            Equal<double?>(0, result.ShellExitBeforeTimeout?.AfterSeconds);
+            Check(result.Output.Content.Contains("late-output", StringComparison.Ordinal), "background output disappeared");
+            foreach (var id in ids) Dead(id);
+        }
+        finally { cancel.Cancel(); await run; }
+    }
+
     private static async Task DescendantsAndPostExitDrain()
     {
         Windows(); using var temp = new Scratch();
@@ -475,9 +609,16 @@ internal static class NativeProcessRunnerTests
             lock (_gate) { _ticks += duration.Ticks; ready = _timers.Where(timer => !timer.Closed && timer.Due <= _ticks).ToList(); foreach (var timer in ready) timer.Due = long.MaxValue; }
             foreach (var timer in ready) timer.Callback(timer.State);
         }
-        public async Task WaitForDeadlineAsync(long deadline)
+        public async Task WaitForDeadlineAsync(long deadline, bool exact = false)
         {
-            try { while (await TimerScheduled.Reader.ReadAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(5)) < deadline) { } }
+            try
+            {
+                while (true)
+                {
+                    var scheduled = await TimerScheduled.Reader.ReadAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(5));
+                    if (exact ? scheduled == deadline : scheduled >= deadline) return;
+                }
+            }
             catch (TimeoutException) { throw new InvalidOperationException("Postexit idle timer did not schedule the expected controlled deadline."); }
         }
         private sealed class ClockTimer(ManualClock owner, TimerCallback callback, object? state) : ITimer

@@ -49,11 +49,13 @@ internal static partial class Program
         Check(events[^1] is StreamDone, "done");
         var request = http.All.Single();
         Equal("https://chatgpt.com/backend-api/codex/responses", request.Url, "url");
+        // R6: the reviewed gpt-5.6-sol catalog opts into mid-conversation additional tools. v1.5.0
+        // openai-responses-shared.ts declares even initial tools inline; Codex still keeps prompt text in instructions.
+        // Authored expected bodies below intentionally replace the former top-level-only projection; frozen captures are untouched.
         JsonEqual("""
             {"model":"gpt-5.6-sol","store":false,"stream":true,"instructions":"Be brief.",
-             "input":[{"role":"user","content":[{"type":"input_text","text":"Hi"}]}],
+             "input":[{"type":"additional_tools","role":"developer","tools":[{"type":"function","name":"read","description":"Read a file","parameters":{"type":"object","properties":{"path":{"type":"string"}},"required":["path"]},"strict":null}]},{"role":"user","content":[{"type":"input_text","text":"Hi"}]}],
              "text":{"verbosity":"low"},"include":["reasoning.encrypted_content"],"prompt_cache_key":"sess-1","tool_choice":"auto","parallel_tool_calls":true,
-             "tools":[{"type":"function","name":"read","description":"Read a file","parameters":{"type":"object","properties":{"path":{"type":"string"}},"required":["path"]},"strict":null}],
              "reasoning":{"effort":"high","summary":"auto"}}
             """, request.Body, "codex body");
         Check(request.Header("authorization") == "Bearer " + CodexToken && request.Header("chatgpt-account-id") == "acct-123" &&
@@ -67,7 +69,7 @@ internal static partial class Program
         // Off: reasoning effort none; no session: no cache key; a "required" tool choice and service tier travel as given.
         var off = Codex(new() { ToolChoice = "required", ServiceTier = "flex", TextVerbosity = "high", Temperature = 0.2 });
         Check(off.Transport.BuildBody(new(off.Model, CodexTranscript(), 3) { ThinkingLevel = "off" }).ToJsonString() ==
-            JsonDocument.Parse("""{"model":"gpt-5.6-sol","store":false,"stream":true,"instructions":"Be brief.","input":[{"role":"user","content":[{"type":"input_text","text":"Hi"}]}],"text":{"verbosity":"high"},"include":["reasoning.encrypted_content"],"tool_choice":"required","parallel_tool_calls":true,"temperature":0.2,"service_tier":"flex","tools":[{"type":"function","name":"read","description":"Read a file","parameters":{"type":"object","properties":{"path":{"type":"string"}},"required":["path"]},"strict":null}],"reasoning":{"effort":"none"}}""").RootElement.GetRawText(),
+            JsonDocument.Parse("""{"model":"gpt-5.6-sol","store":false,"stream":true,"instructions":"Be brief.","input":[{"type":"additional_tools","role":"developer","tools":[{"type":"function","name":"read","description":"Read a file","parameters":{"type":"object","properties":{"path":{"type":"string"}},"required":["path"]},"strict":null}]},{"role":"user","content":[{"type":"input_text","text":"Hi"}]}],"text":{"verbosity":"high"},"include":["reasoning.encrypted_content"],"tool_choice":"required","parallel_tool_calls":true,"temperature":0.2,"service_tier":"flex","reasoning":{"effort":"none"}}""").RootElement.GetRawText(),
             "off body");
         // minimal clamps through the thinkingLevelMap (minimal -> low); a missing system prompt uses the default instructions.
         var spark = Codex(id: "gpt-5.6-luna");

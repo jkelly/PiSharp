@@ -12,7 +12,7 @@ using PiSharp.Extensions.Runtime.Mcp;
 using PiSharp.Extensions.Runtime.Mcp.Transport;
 
 // Only supplied in-memory streams/exchanges. No HTTP client, process, credential or package acquisition.
-internal static class McpTransportTests
+internal static partial class McpTransportTests
 {
     internal const string Prefix = "mcp-transport.";
     internal static IEnumerable<(string Name, Func<Task> Run)> Cases() =>
@@ -34,6 +34,8 @@ internal static class McpTransportTests
         (Prefix + "stdio-frame-limit-and-partial-eof", Framing),
         (Prefix + "http-json-batch-session-protocol-and-delete", HttpJson),
         (Prefix + "http-sse-eof-filter-and-get-resumption-no-post-replay", HttpSse),
+        (Prefix + "http-sse-all-line-endings-and-byte-boundaries", HttpSseLineEndings),
+        (Prefix + "http-sse-cr-framing-retains-byte-bounds", HttpSseCrBounds),
         (Prefix + "http-get-after-initialized-and-405", HttpGet),
         (Prefix + "http-rejections-and-configured-body-bounds", HttpBounds),
         (Prefix + "http-cancel-joins-held-send-and-held-delete", HttpHeld),

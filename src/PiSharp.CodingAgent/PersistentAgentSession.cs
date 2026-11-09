@@ -1245,6 +1245,7 @@ public sealed partial class PersistentAgentSession : IAsyncDisposable
             await DrainLoadoutDiagnosticsAsync(cancellation.Token).ConfigureAwait(false);
             if (_registry is not null && !inputs.IsDefault)
                 ValidateLoadout(_context.LlmMessages.AddRange(inputs), cancellation.Token);
+            if (!inputs.IsDefault) await RecordLiveThinkingAsync(cancellation.Token).ConfigureAwait(false);
             settledResult = await RunUntilSettlementAsync(start, idle, cancellation.Token, operation).ConfigureAwait(false);
             status = cancellation.IsCancellationRequested ? "cancelled" :
                 settledResult.Reason == AgentLoopStopReason.Completed ? "completed" :

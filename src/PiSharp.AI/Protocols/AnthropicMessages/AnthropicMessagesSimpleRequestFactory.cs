@@ -1,6 +1,7 @@
 // Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/ai/src/api/anthropic-messages.ts (streamSimple,
 // mapThinkingLevelToEffort, compat.supportsMidConvoEffort) and packages/ai/src/api/simple-options.ts.
 using System.Text.Json;
+using PiSharp.AI.Protocols.ProviderShared;
 using PiSharp.Contracts;
 
 namespace PiSharp.AI.Protocols.AnthropicMessages;
@@ -15,7 +16,7 @@ public sealed class AnthropicMessagesSimpleRequestFactory : IChatTransport
     private readonly ModelDescriptor _model;
     private readonly AnthropicMessagesSimpleOptions _options;
     private readonly int _contextWindow, _modelMaxTokens;
-    private readonly bool _reasoning, _adaptive, _supportsOff, _midEffort;
+    private readonly bool _reasoning, _adaptive, _supportsOff, _midEffort, _supportsTemperature;
     private readonly JsonElement _levelMap;
 
     public AnthropicMessagesSimpleRequestFactory(HttpClient client, Uri baseUri, ModelDescriptor model,
@@ -32,17 +33,18 @@ public sealed class AnthropicMessagesSimpleRequestFactory : IChatTransport
         try
         {
             var metadata = options.ModelMetadata.Value;
-            if (metadata.GetProperty("id").GetString() != model.Id || metadata.GetProperty("api").GetString() != model.Api ||
-                metadata.GetProperty("provider").GetString() != model.Provider) throw Fail(AnthropicMessagesSimpleFailure.InvalidConfiguration);
-            _contextWindow = metadata.GetProperty("contextWindow").GetInt32();
-            _modelMaxTokens = metadata.GetProperty("maxTokens").GetInt32();
-            _reasoning = metadata.GetProperty("reasoning").GetBoolean();
+            if (metadata.GetUtf16Property("id").GetString() != model.Id || metadata.GetUtf16Property("api").GetString() != model.Api ||
+                metadata.GetUtf16Property("provider").GetString() != model.Provider) throw Fail(AnthropicMessagesSimpleFailure.InvalidConfiguration);
+            _contextWindow = metadata.GetUtf16Property("contextWindow").GetInt32();
+            _modelMaxTokens = metadata.GetUtf16Property("maxTokens").GetInt32();
+            _reasoning = metadata.GetUtf16Property("reasoning").GetBoolean();
             if (_modelMaxTokens <= 0) throw Fail(AnthropicMessagesSimpleFailure.InvalidConfiguration);
-            _adaptive = metadata.TryGetProperty("compat", out var compat) && compat.ValueKind != JsonValueKind.Null &&
-                compat.TryGetProperty("forceAdaptiveThinking", out var adaptive) && adaptive.GetBoolean();
+            _adaptive = metadata.TryGetUtf16Property("compat", out var compat) && compat.ValueKind != JsonValueKind.Null &&
+                compat.TryGetUtf16Property("forceAdaptiveThinking", out var adaptive) && adaptive.GetBoolean();
             // Managed per-turn effort: buildParams then always sends adaptive thinking with effort markers.
-            _midEffort = compat.ValueKind == JsonValueKind.Object && compat.TryGetProperty("supportsMidConvoEffort", out var midEffort) && midEffort.GetBoolean();
-            if (metadata.TryGetProperty("thinkingLevelMap", out var map) && map.ValueKind != JsonValueKind.Null)
+            _midEffort = compat.ValueKind == JsonValueKind.Object && compat.TryGetUtf16Property("supportsMidConvoEffort", out var midEffort) && midEffort.GetBoolean();
+            _supportsTemperature = !(compat.ValueKind == JsonValueKind.Object && compat.TryGetUtf16Property("supportsTemperature", out var temperature) && temperature.ValueKind == JsonValueKind.False);
+            if (metadata.TryGetUtf16Property("thinkingLevelMap", out var map) && map.ValueKind != JsonValueKind.Null)
             {
                 if (map.ValueKind != JsonValueKind.Object) throw Fail(AnthropicMessagesSimpleFailure.InvalidConfiguration);
                 foreach (var entry in map.EnumerateObject())
@@ -50,7 +52,7 @@ public sealed class AnthropicMessagesSimpleRequestFactory : IChatTransport
                         !Efforts.Contains(entry.Value.GetString()!, StringComparer.Ordinal))) throw Fail(AnthropicMessagesSimpleFailure.InvalidConfiguration);
                 _levelMap = map;
             }
-            _supportsOff = !(_levelMap.ValueKind == JsonValueKind.Object && _levelMap.TryGetProperty("off", out var off) && off.ValueKind == JsonValueKind.Null);
+            _supportsOff = !(_levelMap.ValueKind == JsonValueKind.Object && _levelMap.TryGetUtf16Property("off", out var off) && off.ValueKind == JsonValueKind.Null);
             if (options.ThinkingBudgets is { } budgets)
             {
                 if (budgets.Value.ValueKind != JsonValueKind.Object || budgets.ToString().Length > 4096)
@@ -72,17 +74,17 @@ public sealed class AnthropicMessagesSimpleRequestFactory : IChatTransport
         if (request is null || request.Model != _model || request.Messages.IsDefault) throw Fail(AnthropicMessagesSimpleFailure.InvalidTranscript);
         var estimate = AnthropicMessagesSimpleContextEstimator.Estimate(request.Messages, _options, cancellationToken);
         // simple-options.ts clampMaxTokensToContext in JavaScript numbers: a fractional estimate leaves a fractional cap.
-        double Clamp(double maximum) => _contextWindow <= 0 ? Math.Max(1, maximum) : Math.Min(maximum, Math.Max(1, _contextWindow - estimate.Tokens - 4096));
+        double Clamp(double maximum) => SimpleOutputBudget.ClampToContext(_contextWindow, estimate.Tokens, maximum);
         var maximum = Clamp(_options.MaxTokens ?? _modelMaxTokens);
         if (_options.Reasoning is not { } level) return new(estimate, maximum, false, 0, null);
         if (_adaptive)
         {
-            var effort = _levelMap.ValueKind == JsonValueKind.Object && _levelMap.TryGetProperty(level, out var mapped) && mapped.ValueKind == JsonValueKind.String
+            var effort = _levelMap.ValueKind == JsonValueKind.Object && _levelMap.TryGetUtf16Property(level, out var mapped) && mapped.ValueKind == JsonValueKind.String
                 ? mapped.GetString()! : level switch { "minimal" or "low" => "low", "medium" => "medium", _ => "high" };
             return new(estimate, maximum, true, 0, effort);
         }
         var budgetLevel = level is "xhigh" or "max" ? "high" : level;
-        double budget = _options.ThinkingBudgets is { } custom && custom.Value.TryGetProperty(budgetLevel, out var value) ? JsonNumber.Read(value) :
+        double budget = _options.ThinkingBudgets is { } custom && custom.Value.TryGetUtf16Property(budgetLevel, out var value) ? JsonNumber.Read(value) :
             budgetLevel switch { "minimal" => 1024, "low" => 2048, "medium" => 8192, _ => 16384 };
         // buildBaseOptions always supplies a context-clamped cap, even for omitted maxTokens.
         maximum = Math.Min(maximum + budget, _modelMaxTokens);
@@ -118,12 +120,13 @@ public sealed class AnthropicMessagesSimpleRequestFactory : IChatTransport
         return Bind(Resolve(request, cancellationToken)).Prepare(request, explicitApiKey, cancellationToken);
     }
     private AnthropicMessagesKeyAuthRequestFactory Bind(AnthropicMessagesSimpleResolution resolved) => new(_baseUri, _model,
-        _options.ProjectionOptions with
+        AnthropicCatalogCompatibility.Apply(_options.ProjectionOptions, _options.ModelMetadata) with
         {
             // The wire max_tokens is the exact JavaScript number (KeyAuthOptions.MaxTokens); the projection only needs a positive cap.
             MaximumTokens = (int)Math.Clamp(Math.Ceiling(resolved.MaxTokens), 1, int.MaxValue), ModelReasoning = _reasoning, ThinkingEnabled = resolved.ThinkingEnabled,
             ForceAdaptiveThinking = _adaptive, SupportsThinkingOff = _supportsOff, ThinkingBudgetTokens = resolved.ThinkingBudgetTokens,
             SupportsMidConversationEffort = _midEffort,
+            SupportsTemperature = _options.ProjectionOptions.SupportsTemperature && _supportsTemperature,
             Effort = resolved.Effort, ToolChoice = _options.ToolChoice ?? _options.ProjectionOptions.ToolChoice
         }, _options.KeyAuthOptions with { MaxTokens = resolved.MaxTokens });
     private void AdmitKey(string? key)

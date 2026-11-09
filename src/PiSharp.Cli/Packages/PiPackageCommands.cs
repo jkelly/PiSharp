@@ -407,8 +407,8 @@ Options:
                     if (target.Type is "all" or "extensions")
                     {
                         var updateSource = target.Type == "extensions" ? target.Source : null;
-                        await manager.UpdateAsync(updateSource, token).ConfigureAwait(false);
-                        await console.Log(console.Green(updateSource is not null ? $"Updated {updateSource}" : "Updated packages")).ConfigureAwait(false);
+                        var summary = await manager.UpdateAsync(updateSource, token).ConfigureAwait(false);
+                        foreach (var line in summary.Lines()) await console.Log(line).ConfigureAwait(false);
                     }
                     if (target.Type is "all" or "self")
                     {

@@ -469,7 +469,10 @@ public sealed class ResponsesTextToolTransport : IChatTransport
                     // openai-responses-shared.ts: calculateCost runs on response.completed with or without usage, so a usage-less
                     // completion still records its zero catalog cost (totalFromProvider false).
                     _usage = response.TryGetProperty("usage", out var usage) ? Usage(Object(usage)) : _usage with { Cost = Binary64Cost(0, 0, 0, 0, 0) };
-                    ApplyServiceTier(OptionalStringOrNull(response, "service_tier") ?? _options.ServiceTier);
+                    // A response echo remains authoritative; absent/null echo uses the same effective per-request
+                    // tier the factory sent, then the configured immutable fallback. Unknown request names map to no override.
+                    ApplyServiceTier(OptionalStringOrNull(response, "service_tier") ??
+                        ServiceTiers.OpenAI(_request.ServiceTier, _request.Model.Provider) ?? _options.ServiceTier);
                     foreach (var finished in _content.Where(s => s.Kind == "reasoning" && s.Ended && !s.ThinkingEnded))
                         EndThinking(finished, Emit);
                     _completed = true;

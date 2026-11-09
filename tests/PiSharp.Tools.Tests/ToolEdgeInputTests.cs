@@ -13,7 +13,7 @@ internal static class ToolEdgeInputTests
     [
         ("edge read offset and limit follow the source number arithmetic", ReadNumbers),
         ("edge empty paths reach the file system as the source tools do", EmptyPaths),
-        ("edge pi ls limits follow the source number arithmetic", LsNumbers),
+        ("edge pi ls limits normalize floor and minimum one", LsNumbers),
         ("edge NUL bytes give Node's argument errors", NulBytes),
         ("edge user shell failures give the source's errors", UserShellFailures),
         ("edge model bash without a shell stays registered and fails each command with getShellConfig's error", ModelBashWithoutShell),
@@ -66,10 +66,13 @@ internal static class ToolEdgeInputTests
         var invoker = new LsTool(temp.Root, temp.Root, pi: true).CreateInvoker(new Allow());
         foreach (var (input, expected) in new[]
         {
-            ("""{"path":"","limit":0}""", "(empty directory)"),
-            ("""{"path":".","limit":-2}""", "(empty directory)"),
-            ("""{"path":".","limit":1.5}""", "dir/\ne.txt\n\n[1.5 entries limit reached. Use limit=3 for more]"),
-            ("""{"path":".","limit":2.5}""", "dir/\ne.txt\nlines.txt"),
+            // Current upstream ls.ts floors finite limits and clamps them to one (C16).
+            // Keep empty-path resolution, directory suffixes, ordering and exact-limit behavior exercised.
+            ("""{"path":"","limit":0}""", "dir/\n\n[1 entries limit reached. Use limit=2 for more]"),
+            ("""{"path":".","limit":-2}""", "dir/\n\n[1 entries limit reached. Use limit=2 for more]"),
+            ("""{"path":".","limit":1.5}""", "dir/\n\n[1 entries limit reached. Use limit=2 for more]"),
+            ("""{"path":".","limit":2.5}""", "dir/\ne.txt\n\n[2 entries limit reached. Use limit=4 for more]"),
+            ("""{"path":".","limit":3}""", "dir/\ne.txt\nlines.txt"),
         })
             Equal(expected, Text(await invoker.ExecuteAsync(Invocation("ls", input), default)), input);
     }

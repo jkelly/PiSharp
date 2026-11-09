@@ -159,6 +159,7 @@ internal sealed class LazyModelTransport(RegistryModel entry, ModelDescriptor mo
                 connection = await selection.ConnectResolvedAnthropicAsync(authentication, handler, token, reresolve).ConfigureAwait(false);
             }
             else connection = selection.ConnectRoute(runtime);
+            connection.ThinkingBudgets = runtime.ThinkingBudgets;
             return connection;
         }
         finally { gate.Release(); }

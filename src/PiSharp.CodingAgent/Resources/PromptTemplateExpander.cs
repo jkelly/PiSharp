@@ -15,22 +15,29 @@ public static class PromptTemplateExpander
     {
         ArgumentNullException.ThrowIfNull(argsString);
         var args = ImmutableArray.CreateBuilder<string>();
-        // Pi 1.5.0 parseCommandArgs hasToken: a started token is kept even when empty, so "" and '' stay positional arguments.
-        var current = new StringBuilder(); char? quote = null; var hasToken = false;
-        foreach (var value in argsString)
+        // Upstream 96667f34: quotes open only at token start; unmatched quotes are re-read literally.
+        var current = new StringBuilder(); char? quote = null; var hasToken = false; var quoteStart = 0;
+        for (var i = 0; i < argsString.Length; i++)
         {
+            var value = argsString[i];
             if (quote is not null)
             {
-                if (value == quote) quote = null;
+                if (value == '\\' && i + 1 < argsString.Length && argsString[i + 1] == quote)
+                { current.Append(quote.Value); i++; }
+                else if (value == quote) quote = null;
                 else current.Append(value);
             }
-            else if (value is '\'' or '"') { quote = value; hasToken = true; }
+            else if ((value is '\'' or '"') && !hasToken) { quote = value; quoteStart = i; hasToken = true; }
             else if (PromptTemplateParser.IsEcmaWhitespace(value))
             {
                 if (!hasToken) continue;
                 args.Add(current.ToString()); current.Clear(); hasToken = false;
             }
             else { current.Append(value); hasToken = true; }
+            if (quote is not null && i == argsString.Length - 1)
+            {
+                quote = null; current.Clear(); current.Append(argsString[quoteStart]); i = quoteStart;
+            }
         }
         if (hasToken) args.Add(current.ToString());
         return args.ToImmutable();

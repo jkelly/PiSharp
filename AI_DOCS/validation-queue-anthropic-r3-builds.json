@@ -1,0 +1,34 @@
+[
+  {
+    "options": {
+      "LockTimeoutSeconds": 30,
+      "TestTimeoutSeconds": 600,
+      "Label": "Compatibility-r3-build",
+      "Project": "tests/PiSharp.Compatibility.Tests",
+      "BuildTimeoutSeconds": 240,
+      "BuildOnly": true,
+      "Configuration": "Debug",
+      "BuildArguments": [
+        "--no-restore",
+        "-p:RunAnalyzers=false"
+      ]
+    },
+    "environment": {}
+  },
+  {
+    "environment": {},
+    "options": {
+      "TestTimeoutSeconds": 600,
+      "BuildOnly": true,
+      "BuildTimeoutSeconds": 240,
+      "BuildArguments": [
+        "--no-restore",
+        "-p:RunAnalyzers=false"
+      ],
+      "LockTimeoutSeconds": 30,
+      "Configuration": "Debug",
+      "Project": "tests/PiSharp.AnthropicThreads.Tests",
+      "Label": "Threads-r3-build"
+    }
+  }
+]

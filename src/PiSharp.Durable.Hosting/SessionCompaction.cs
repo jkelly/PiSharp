@@ -111,4 +111,6 @@ internal sealed class SessionHarnessSettings(HarnessSettings? inner, Func<Sessio
     public override QueueMode? FollowUpMode => inner?.FollowUpMode;
     public override double? ContextRetentionMs => inner?.ContextRetentionMs;
     public override double? DocumentRetentionMs => inner?.DocumentRetentionMs;
+    public override AfterFailedRun? AfterFailedRun => inner?.AfterFailedRun;
+    public override double? RestartLimit => inner?.RestartLimit;
 }

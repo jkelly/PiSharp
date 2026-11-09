@@ -12,7 +12,7 @@ public sealed partial class PersistentAgentSession
     /// Source createAgentSession for an existing session: <c>options.thinkingLevel</c> (the CLI's --thinking, clamped to the model)
     /// becomes agent.state.thinkingLevel in memory and the session file is not written (sdk.ts appends a thinking_level_change only
     /// to a session that has none). The branch's recorded level is tolerated, as after tree navigation, until a change names the
-    /// session's; responses record the level they ran with. Requires the idle session, like <see cref="ConfigureAsync"/>.
+    /// session's; the next prompt records the effective level on its branch before execution. Requires the idle session, like <see cref="ConfigureAsync"/>.
     /// </summary>
     public async Task ApplyInitialThinkingLevelAsync(string level, CancellationToken cancellationToken = default)
     {

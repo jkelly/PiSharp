@@ -206,7 +206,7 @@ internal sealed class Transaction : ITx
     public Task<Page<TaskRecord>> ScanTasksAsync(TaskQuery query, int limit, JsonObjectValue? cursor = null) =>
         Read("scanTasks", () => host.Storage.ScanTasksAsync(query, limit, cursor, context));
 
-    /// <summary>Internal: the committed submission record.</summary>
+    /// <summary>The committed submission record; the ordinary table-read and transaction-lifetime rules apply.</summary>
     public Task<SubmissionRecord?> GetSubmissionAsync(SubmissionId id) => Read("submission", () => host.Storage.GetSubmissionAsync(id, context));
 
     public Task<SubmissionRecord?> GetSubmissionByRequestAsync(ConversationId conversationId, string requestId) =>

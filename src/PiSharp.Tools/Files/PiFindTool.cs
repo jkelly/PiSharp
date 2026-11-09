@@ -78,30 +78,30 @@ public sealed class PiFindTool : IToolArgumentSchemaAdapter
 
     private async Task<ToolResult> SearchAsync(Input input, string searchPath, CancellationToken token)
     {
-        var effectiveLimit = input.Limit ?? DefaultLimit;
+        var effectiveLimit = NormalizeLimit(input.Limit, DefaultLimit);
         var fd = await _fd(token).ConfigureAwait(false) ?? throw new PiSearchException("fd is not available and could not be downloaded");
         var args = Arguments(input, searchPath);
         // Source spawn(fd, args): Node rejects an argument with a NUL byte.
         if (NodeArgumentErrors.SpawnArguments(args) is { } spawnError) throw new PiSearchException(spawnError);
         var lines = new List<string>();
         PiSearchProcess.Outcome outcome;
-        try { outcome = await PiSearchProcess.RunAsync(fd, args, _paths.WorkingDirectory, _environment, line => { lines.Add(line); return false; }, token).ConfigureAwait(false); }
+        try { outcome = await PiSearchProcess.RunAsync(fd, args, _paths.WorkingDirectory, _environment, line => { if (!string.IsNullOrWhiteSpace(line)) lines.Add(line); return lines.Count > effectiveLimit; }, token).ConfigureAwait(false); }
         catch (IOException error) { throw new PiSearchException($"Failed to run fd: {error.Message}"); }
         var output = string.Join('\n', lines);
         if (outcome.ExitCode != 0 && output.Length == 0)
             throw new PiSearchException(outcome.StandardError.Trim() is { Length: > 0 } message ? message : $"fd exited with code {outcome.ExitCode}");
         if (output.Length == 0) return PiGrepTool.Result("No files found matching pattern", null);
         var relativized = new List<string>();
-        foreach (var raw in lines)
+        foreach (var raw in lines.Take((int)effectiveLimit))
         {
             var line = raw.TrimEnd('\r').Trim();
             if (line.Length != 0) relativized.Add(Relativize(line, searchPath));
         }
         var truncation = ToolOutputTruncator.Head(string.Join('\n', relativized), new(int.MaxValue));
         var details = new Dictionary<string, object?>(); var notices = new List<string>();
-        if (relativized.Count >= effectiveLimit)
+        if (lines.Count > effectiveLimit)
         {
-            notices.Add($"{PiGrepTool.JsNumber(effectiveLimit)} results limit reached. Use limit={PiGrepTool.JsNumber(effectiveLimit * 2)} for more, or refine pattern");
+            notices.Add($"{PiGrepTool.JsNumber(effectiveLimit)} results limit reached. Use limit={PiGrepTool.JsNumber(effectiveLimit * 2d)} for more, or refine pattern");
             details["resultLimitReached"] = effectiveLimit;
         }
         if (truncation.Truncated) { notices.Add("50.0KB limit reached"); details["truncation"] = PiGrepTool.TruncationDetails(truncation); }
@@ -111,7 +111,7 @@ public sealed class PiFindTool : IToolArgumentSchemaAdapter
     /// <summary>find.ts's fd arguments for this input and search path.</summary>
     private static List<string> Arguments(Input input, string searchPath)
     {
-        var effectiveLimit = input.Limit ?? DefaultLimit;
+        var effectiveLimit = NormalizeLimit(input.Limit, DefaultLimit);
         var args = new List<string> { "--glob", "--color=never", "--hidden" };
         // fd normally ignores .gitignore outside git repos, so keep --no-require-git there; inside repos use fd's git-aware default.
         var insideGitRepo = false;
@@ -123,7 +123,7 @@ public sealed class PiFindTool : IToolArgumentSchemaAdapter
             current = parent;
         }
         if (!insideGitRepo) args.Add("--no-require-git");
-        args.Add("--max-results"); args.Add(PiGrepTool.JsNumber(effectiveLimit));
+        args.Add("--max-results"); args.Add(PiGrepTool.JsNumber(effectiveLimit + 1));
         // fd --glob matches the basename unless --full-path is set; a path-containing pattern needs a leading '**/'.
         var effectivePattern = input.Pattern;
         if (input.Pattern.Contains('/'))
@@ -137,6 +137,8 @@ public sealed class PiFindTool : IToolArgumentSchemaAdapter
         args.Add("--"); args.Add(effectivePattern); args.Add(searchPath);
         return args;
     }
+
+    internal static int NormalizeLimit(double? value, double fallback) => (int)Math.Clamp(Math.Floor(value ?? fallback), 1, int.MaxValue - 1);
 
     /// <summary>find.ts relativizeFindResultPath.</summary>
     internal static string Relativize(string resultPath, string searchPath)

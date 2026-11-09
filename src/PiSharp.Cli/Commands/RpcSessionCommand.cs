@@ -157,8 +157,6 @@ public static class RpcSessionCommand
         InputObservation? observedInput = null; OutputObservation? observedOutput = null; OfflineGate? gate = null;
         SessionStorageBackend? backend = null; Exception? operationFailure = null;
         var cleanupFailures = new List<Exception>();
-        using var lifecycleStop = new CancellationTokenSource();
-        using var lifecycleRun = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, lifecycleStop.Token);
         try
         {
             var parsed = Parse(args);
@@ -408,7 +406,7 @@ public static class RpcSessionCommand
                     ? reloadCompaction(CancellationToken.None).GetAwaiter().GetResult() : settings, model),
                 // agent-session-runtime.ts switchSession: SessionManager.open(sessionPath) for the Pi entry.
                 prepareSessionPath: pi is null ? null : (path, token) => PrepareSessionPathAsync(path, backend, profile.Workspace, token));
-            profile.ConfigureLifecycleModeStop(lifecycleStop.CancelAsync);
+            profile.ConfigureLifecycleModeStop(() => { dispatcher.RequestShutdownWhenIdle(); return null; });
             if (pi?.Extensions is { } compactingExtensions)
             {
                 var compactor = dispatcher;
@@ -423,7 +421,7 @@ public static class RpcSessionCommand
             pi?.Interactive?.Host.Publish(() => publishedProfile.Sessions?.Current.Session ?? publishedSession, publishedProfile);
             // The dispatcher took ownership of the idle session: background MCP servers may publish their tools from now on.
             if (mcpHost is not null && mcpAdmission is not null) mcpHost.HostStarted(mcpAdmission);
-            await dispatcher.RunAsync(reader, lifecycleRun.Token).ConfigureAwait(false);
+            await dispatcher.RunAsync(reader, cancellationToken).ConfigureAwait(false);
         }
         catch (Exception error) { operationFailure = error; }
         // A run/subscriber failure may poison session authority even when resource

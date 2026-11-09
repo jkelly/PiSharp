@@ -42,6 +42,29 @@ public static class MaintainedCatalogOverlay
                 if (metadata["name"] is JsonValue name) target["name"] = name.DeepClone();
                 foreach (var property in new[] { "contextWindow", "maxTokens" })
                     if (Number(metadata[property]) is > 0) target[property] = metadata[property]!.DeepClone();
+                // Reviewed Anthropic capability corrections are merged, never a replacement of route compatibility.
+                if (Text(target, "api") == "anthropic-messages")
+                {
+                    if (metadata["compat"] is JsonObject corrections)
+                    {
+                        var compat = target["compat"] as JsonObject ?? new JsonObject();
+                        foreach (var property in new[] { "supportsMidConvoEffort", "supportsTemperature" })
+                            if (corrections.TryGetPropertyValue(property, out var value))
+                            {
+                                if (value is not JsonValue flag || !flag.TryGetValue<bool>(out _))
+                                    throw new FormatException("Anthropic compatibility correction must be boolean");
+                                compat[property] = value.DeepClone();
+                            }
+                        target["compat"] = compat;
+                    }
+                    if (metadata["thinkingLevelMap"] is JsonObject thinking && thinking.ContainsKey("off"))
+                    {
+                        if (thinking["off"] is not null) throw new FormatException("only disabling thinking off is supported");
+                        var levels = target["thinkingLevelMap"] as JsonObject ?? new JsonObject();
+                        levels["off"] = null;
+                        target["thinkingLevelMap"] = levels;
+                    }
+                }
                 if (!existing)
                 {
                     if (target["reasoning"] is null) target["reasoning"] = false;

@@ -155,7 +155,7 @@ internal static class Compaction
             await FailNoModelAsync(runtime, reference, context).ConfigureAwait(false);
             return;
         }
-        var policy = PolicyFor(settings, reference);
+        var policy = PolicyFor(settings, reference, agent.Compaction);
         var view = await runtime.ContextAsync(conversationId, context).ConfigureAwait(false);
         if (SelectCut(view, policy.KeepRecentTokens) is not { } cut)
         {
@@ -340,15 +340,19 @@ internal static class Compaction
         return id;
     }
 
-    /// <summary>The compaction policy for <paramref name="model"/>: its <c>ModelOverrides</c> entry over the harness-wide policy, field by
-    /// field (upstream <c>compactionPolicy</c>).</summary>
-    public static CompactionPolicy PolicyFor(Settings settings, ModelRef model)
+    /// <summary>Resolves the conversation model override, harness model override, conversation fields, and harness defaults, in that
+    /// order. A conversation's explicit disabled setting also wins over the harness model override.</summary>
+    public static CompactionPolicy PolicyFor(Settings settings, ModelRef model, CompactionSettings? conversation = null)
     {
         var policy = settings.Compaction;
-        CompactionOverride? entry = null;
-        policy.ModelOverrides?.TryGetValue($"{model.Provider}/{model.ModelId}", out entry);
-        return new CompactionPolicy(entry?.Enabled ?? policy.Enabled, entry?.ReserveTokens ?? policy.ReserveTokens,
-            entry?.KeepRecentTokens ?? policy.KeepRecentTokens, entry?.BackgroundTokens ?? policy.BackgroundTokens);
+        CompactionOverride? host = null, local = null;
+        var key = $"{model.Provider}/{model.ModelId}";
+        policy.ModelOverrides?.TryGetValue(key, out host);
+        conversation?.ModelOverrides?.TryGetValue(key, out local);
+        return new CompactionPolicy(local?.Enabled ?? (conversation?.Enabled == false ? false : host?.Enabled ?? conversation?.Enabled ?? policy.Enabled),
+            local?.ReserveTokens ?? host?.ReserveTokens ?? conversation?.ReserveTokens ?? policy.ReserveTokens,
+            local?.KeepRecentTokens ?? host?.KeepRecentTokens ?? conversation?.KeepRecentTokens ?? policy.KeepRecentTokens,
+            local?.BackgroundTokens ?? host?.BackgroundTokens ?? conversation?.BackgroundTokens ?? policy.BackgroundTokens);
     }
 
     /// <summary>

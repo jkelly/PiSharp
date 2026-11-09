@@ -6,11 +6,10 @@ using static PiSharp.Chord.Contracts.Schemas;
 // Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/chord/test/next/schema/declarations.ts, the declarations of the schema
 // switch's proofs (TypeBox to pi-schema): one of every schema helper and option in a contract. Ported here: the `everything` schema and
 // the contracts Everything, Account and Owner, with the host kind Account's address names; area cv2-documents-core added the persisted
-// documents Profile, Notes and ImportState (StateDefinition.Define). The rest needs layers later areas bring: the tables Rows and EditsV1
-// to EditsV3 with their json(...) columns (defineTable, evolveTable, json; the store-tables area) and the persisted job ImportJob
-// (defineJob, whose state is ImportState; jobs, phase 6). A schema is a JsonNode with one parent, so `everything` is a function that makes
+// documents Profile, Notes and ImportState (StateDefinition.Define). FullDeclarations.cs completes Rows, EditsV1 to EditsV3 and ImportJob
+// for the genuine v1.5.0 schema-switch compatibility corpus. A schema is a JsonNode with one parent, so `everything` is a function that makes
 // it afresh.
-internal static class SchemaDeclarations
+internal static partial class SchemaDeclarations
 {
     /// <summary>A schema with every helper and option a declaration can use (upstream <c>everything</c>).</summary>
     internal static JsonObject EverythingSchema() => Obj(

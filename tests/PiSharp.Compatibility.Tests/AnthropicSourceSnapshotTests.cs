@@ -59,6 +59,50 @@ internal static class AnthropicSourceSnapshotTests
         Check(ended.GetProperty("toolCall").GetProperty("arguments").GetProperty("name").GetString() == "hello", "Nested finalized tool");
         Check(!ended.GetProperty("toolCall").TryGetProperty("index", out _) && !ended.GetProperty("toolCall").TryGetProperty("partialJson", out _), "Final source tool strips scratch");
         Check(((ToolCallStarted)captured[1]).ToolCall.Arguments.Value.GetProperty("initial").GetBoolean(), "Native start payload never replaced by preview");
+        await CapturedUtf16ArgumentsAndDiagnostics();
+    }
+
+    private static async Task CapturedUtf16ArgumentsAndDiagnostics()
+    {
+        var tool = Tool.Replace("{\"initial\":true}", "{\"\\udc00\":\"\\ud800\"}", StringComparison.Ordinal);
+        var delta = Delta(8, "input_json_delta", "partial_json", "{\"\\udc00\":\"\\ud801\"}");
+        const string transformations = "{\"type\":\"message_delta\",\"delta\":{},\"input_transformations\":[{\"type\":{\"\\udc00\":\"\\ud800\"},\"path\":\"\\ud801\",\"reason\":\"\\ud802\"}]}";
+        var rates = new AnthropicTokenRates(3, 15, .3m, 3.75m);
+        var clock = new FixedCaptureClock();
+        foreach (var complete in new[] { false, true })
+        {
+            var input = complete ? new[] { Start, tool, delta, BlockStop(8), transformations, End, Stop } : new[] { Start, tool, delta };
+            var captured = await Collect(input, true, rates, clock);
+            var native = await Collect(input, false, rates, clock);
+            Check(native.Count == captured.Count, "UTF16 capture changed frame count; complete=" + complete + "; native=" + string.Join(",", native.Select(frame => frame.GetType().Name)) +
+                "; captured=" + string.Join(",", captured.Select(frame => frame.GetType().Name)) + "; terminal=" + PiWireJson.WriteMessage(((StreamTerminalEvent)captured[^1]).Message));
+            Equivalent(native, captured);
+            Check(captured.All(frame => frame.SourceEmissionSnapshot is not null), "UTF16 capture path dropped an owned source frame");
+            var started = Snapshot(captured.OfType<ToolCallStarted>().Single()).GetProperty("partial").GetProperty("content")[0].GetProperty("arguments").EnumerateObject().Single();
+            Check(JsonUtf16.GetName(started) == "\uDC00" && JsonUtf16.GetString(started.Value) == "\uD800", "Captured initial argument key/value changed");
+            var preview = Snapshot(captured.OfType<ToolCallDelta>().Single()).GetProperty("partial").GetProperty("content")[0].GetProperty("arguments").EnumerateObject().Single();
+            Check(JsonUtf16.GetName(preview) == "\uDC00" && JsonUtf16.GetString(preview.Value) == "\uD801", "Captured argument preview key/value changed");
+            // Both snapshots are owned immutable JSON; a later preview cannot rewrite the retained start.
+            Check(JsonUtf16.GetString(started.Value) == "\uD800", "Captured later frame mutated an earlier argument snapshot");
+            var terminal = (StreamTerminalEvent)captured[^1];
+            Check(complete ? terminal is StreamDone : terminal is StreamError, "UTF16 snapshot changed terminal kind");
+            var sourceMessage = Snapshot(terminal).GetProperty(complete ? "message" : "error");
+            var nativeMessage = PiWireJson.WriteMessage(((StreamTerminalEvent)native[^1]).Message).Value;
+            Check(JsonUtf16.DeepEquals(nativeMessage.GetProperty("content"), sourceMessage.GetProperty("content")), "Captured terminal content differs from native owned content");
+            Check(JsonUtf16.DeepEquals(nativeMessage.GetProperty("usage").GetProperty("cost"), sourceMessage.GetProperty("usage").GetProperty("cost")), "UTF16 snapshot rewriting changed committed cost");
+            if (!complete)
+            {
+                Check(!sourceMessage.TryGetProperty("anthropicFailure", out _) && terminal.Message.ExtraProperties!.TryGet("anthropicFailure", out var failure) && failure!.Value.GetString() == "UnexpectedEof",
+                    "Captured failed frame lost native classification or source omission");
+            }
+            else
+            {
+                Check(terminal.Message.ExtraProperties!.TryGet("diagnostics", out var diagnostics), "UTF16 transformation diagnostic missing");
+                var entry = diagnostics!.Value[0].GetProperty("details").GetProperty("transformations")[0];
+                Check(JsonUtf16.DeepEquals(JsonData.Parse("{\"\\udc00\":\"\\ud800\"}").Value, entry.GetProperty("type")) &&
+                    JsonUtf16.GetString(entry.GetProperty("path")) == "\uD801" && JsonUtf16.GetString(entry.GetProperty("reason")) == "\uD802", "UTF16 diagnostic key/value copy changed provider data");
+            }
+        }
     }
 
     internal static async Task NonObjectPreviewIsObservedAndFinal()
@@ -168,9 +212,12 @@ internal static class AnthropicSourceSnapshotTests
         }
     }
 
-    private static async Task<List<StreamEvent>> Collect(string[] input, bool capture, AnthropicTokenRates? rates = null)
+    private sealed class FixedCaptureClock : TimeProvider
+    { public override DateTimeOffset GetUtcNow() => DateTimeOffset.FromUnixTimeMilliseconds(1234); }
+
+    private static async Task<List<StreamEvent>> Collect(string[] input, bool capture, AnthropicTokenRates? rates = null, TimeProvider? clock = null)
     {
-        var transport = new AnthropicMessagesTransport((_, token) => Source(input, token), new(Rates: rates) { CaptureSourceEmissionSnapshots = capture });
+        var transport = new AnthropicMessagesTransport((_, token) => Source(input, token), new(Rates: rates) { CaptureSourceEmissionSnapshots = capture, Clock = clock ?? TimeProvider.System });
         var result = new List<StreamEvent>();
         await foreach (var frame in transport.StreamAsync(new(new("fixture", "anthropic-messages", "anthropic"), [], 123))) result.Add(frame);
         return result;

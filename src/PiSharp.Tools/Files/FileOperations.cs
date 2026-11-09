@@ -38,7 +38,14 @@ public interface IFileOperations
 }
 
 /// <summary>Framework file I/O with bounded reads and an existing-segment symlink/junction resolution profile.</summary>
-public sealed class LocalFileOperations : IDirectoryFileOperations
+/// <summary>Optional streaming seam. Returns an owned readable, seekable stream positioned at zero.
+/// The caller disposes the stream. Legacy adapters need implement only IFileOperations.</summary>
+public interface IStreamingFileOperations
+{
+    ValueTask<Stream> OpenReadAsync(string absolutePath, CancellationToken cancellationToken);
+}
+
+public sealed class LocalFileOperations : IDirectoryFileOperations, IStreamingFileOperations
 {
     public ValueTask<bool> IsDirectoryAsync(string absolutePath, CancellationToken cancellationToken)
     {
@@ -112,6 +119,13 @@ public sealed class LocalFileOperations : IDirectoryFileOperations
                 throw new DirectoryNotFoundException("A parent path is not a directory.");
         }
         return Path.GetFullPath(current);
+    }
+
+    public ValueTask<Stream> OpenReadAsync(string absolutePath, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        return ValueTask.FromResult<Stream>(new FileStream(absolutePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite,
+            81920, FileOptions.Asynchronous | FileOptions.SequentialScan));
     }
 
     public async ValueTask<ReadOnlyMemory<byte>> ReadAsync(string absolutePath, int maximumBytes, CancellationToken cancellationToken)

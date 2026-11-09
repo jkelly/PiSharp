@@ -24,13 +24,13 @@ internal static class AnthropicMessagesSimpleContextEstimator
                 characters += entry.WireBody.ToString().Length;
                 if (characters > options.MaximumContextCharacters) throw Fail(AnthropicMessagesSimpleFailure.ResourceLimit);
                 var message = entry.WireBody.Value;
-                if (message.GetProperty("role").GetString() != entry.Role) throw Fail(AnthropicMessagesSimpleFailure.InvalidTranscript);
-                var timestamp = message.GetProperty("timestamp").GetInt64();
+                if (message.GetUtf16Property("role").GetString() != entry.Role) throw Fail(AnthropicMessagesSimpleFailure.InvalidTranscript);
+                var timestamp = message.GetUtf16Property("timestamp").GetInt64();
                 if (entry.Role == "assistant")
                 {
-                    var usage = message.GetProperty("usage"); var total = Counter(usage, "totalTokens");
+                    var usage = message.GetUtf16Property("usage"); var total = Counter(usage, "totalTokens");
                     if (total == 0) total = Counter(usage, "input") + Counter(usage, "output") + Counter(usage, "cacheRead") + Counter(usage, "cacheWrite");
-                    if (timestamp >= latestPrefix && message.GetProperty("stopReason").GetString() is not ("aborted" or "error") && total > 0)
+                    if (timestamp >= latestPrefix && message.GetUtf16Property("stopReason").GetString() is not ("aborted" or "error") && total > 0)
                     { last = i; usageTokens = total; }
                 }
                 latestPrefix = Math.Max(latestPrefix, timestamp);
@@ -49,38 +49,38 @@ internal static class AnthropicMessagesSimpleContextEstimator
 
     private static int MessageTokens(JsonElement message, AnthropicMessagesSimpleOptions options)
     {
-        var role = message.GetProperty("role").GetString(); var content = message.GetProperty("content");
+        var role = message.GetUtf16Property("role").GetString(); var content = message.GetUtf16Property("content");
         if (role == "system")
         {
-            var parts = new List<string> { content.ValueKind == JsonValueKind.String ? content.GetString()! :
-                string.Join("\n", content.EnumerateArray().Where(block => block.GetProperty("type").GetString() == "text")
-                    .Select(block => block.GetProperty("text").GetString()!)) };
-            if (message.TryGetProperty("sections", out var sections) && sections.ValueKind != JsonValueKind.Null)
+            var parts = new List<string> { content.ValueKind == JsonValueKind.String ? JsonUtf16.GetString(content) :
+                string.Join("\n", content.EnumerateArray().Where(block => block.GetUtf16Property("type").GetString() == "text")
+                    .Select(block => JsonUtf16.GetString(block.GetUtf16Property("text")))) };
+            if (message.TryGetUtf16Property("sections", out var sections) && sections.ValueKind != JsonValueKind.Null)
             {
                 // Object.values follows ECMAScript integer-key ordering.
                 using var ordered = JsonDocument.Parse(JsonText(sections, options), PiSharp.Contracts.JsonData.DocumentOptions);
                 foreach (var section in ordered.RootElement.EnumerateObject())
-                    if (section.Value.ValueKind != JsonValueKind.Null) parts.Add(section.Value.GetString()!);
+                    if (section.Value.ValueKind != JsonValueKind.Null) parts.Add(JsonUtf16.GetString(section.Value));
             }
             var tokens = TextTokens(string.Join("\n\n", parts.Where(part => part.Length > 0)));
             foreach (var name in new[] { "toolsAdded", "toolsRemoved" })
-                if (message.TryGetProperty(name, out var tools) && tools.ValueKind != JsonValueKind.Null && tools.GetArrayLength() > 0)
+                if (message.TryGetUtf16Property(name, out var tools) && tools.ValueKind != JsonValueKind.Null && tools.GetArrayLength() > 0)
                     tokens = checked(tokens + TextTokens(JsonText(tools, options)));
             return tokens;
         }
         long characters = 0;
         if (role is "user" or "toolResult")
         {
-            if (content.ValueKind == JsonValueKind.String) return TextTokens(content.GetString()!);
-            foreach (var block in content.EnumerateArray()) characters += block.GetProperty("type").GetString() switch
-            { "text" => block.GetProperty("text").GetString()!.Length, "image" => 4800, _ => throw Fail(AnthropicMessagesSimpleFailure.InvalidTranscript) };
+            if (content.ValueKind == JsonValueKind.String) return TextTokens(JsonUtf16.GetString(content));
+            foreach (var block in content.EnumerateArray()) characters += block.GetUtf16Property("type").GetString() switch
+            { "text" => JsonUtf16.GetString(block.GetUtf16Property("text")).Length, "image" => 4800, _ => throw Fail(AnthropicMessagesSimpleFailure.InvalidTranscript) };
         }
         else if (role == "assistant")
-            foreach (var block in content.EnumerateArray()) characters += block.GetProperty("type").GetString() switch
+            foreach (var block in content.EnumerateArray()) characters += block.GetUtf16Property("type").GetString() switch
             {
-                "text" => block.GetProperty("text").GetString()!.Length,
-                "thinking" => block.GetProperty("thinking").GetString()!.Length,
-                "toolCall" => block.GetProperty("name").GetString()!.Length + JsonText(block.GetProperty("arguments"), options).Length,
+                "text" => JsonUtf16.GetString(block.GetUtf16Property("text")).Length,
+                "thinking" => JsonUtf16.GetString(block.GetUtf16Property("thinking")).Length,
+                "toolCall" => JsonUtf16.GetString(block.GetUtf16Property("name")).Length + JsonText(block.GetUtf16Property("arguments"), options).Length,
                 _ => throw Fail(AnthropicMessagesSimpleFailure.InvalidTranscript)
             };
         else throw Fail(AnthropicMessagesSimpleFailure.InvalidTranscript);
@@ -88,7 +88,7 @@ internal static class AnthropicMessagesSimpleContextEstimator
     }
     private static double Counter(JsonElement usage, string name)
     {
-        var count = JsonNumber.Read(usage.GetProperty(name));
+        var count = JsonNumber.Read(usage.GetUtf16Property(name));
         if (!double.IsFinite(count) || count < 0) throw Fail(AnthropicMessagesSimpleFailure.InvalidTranscript);
         return count;
     }

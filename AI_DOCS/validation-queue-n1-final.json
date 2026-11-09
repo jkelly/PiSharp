@@ -1,0 +1,14 @@
+{
+  "options": {
+    "Project": "tests/PiSharp.Chord.Hosting.Tests",
+    "Label": "N1-hosting-final",
+    "BuildTimeoutSeconds": 300,
+    "TestTimeoutSeconds": 600,
+    "LockTimeoutSeconds": 30,
+    "Configuration": "Debug",
+    "BuildArguments": [
+      "-p:RunAnalyzers=false"
+    ]
+  },
+  "environment": {}
+}

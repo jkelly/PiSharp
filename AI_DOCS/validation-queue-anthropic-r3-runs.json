@@ -1,0 +1,26 @@
+[
+  {
+    "options": {
+      "TestTimeoutSeconds": 600,
+      "LockTimeoutSeconds": 30,
+      "Label": "Compatibility-r3",
+      "Project": "tests/PiSharp.Compatibility.Tests",
+      "Configuration": "Debug",
+      "SkipBuild": true,
+      "BuildTimeoutSeconds": 240
+    },
+    "environment": {}
+  },
+  {
+    "environment": {},
+    "options": {
+      "TestTimeoutSeconds": 600,
+      "SkipBuild": true,
+      "LockTimeoutSeconds": 30,
+      "Label": "Threads-r3",
+      "Project": "tests/PiSharp.AnthropicThreads.Tests",
+      "Configuration": "Debug",
+      "BuildTimeoutSeconds": 240
+    }
+  }
+]

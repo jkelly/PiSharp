@@ -21,13 +21,16 @@ public sealed record ResponsesKeyAuthRequestOptions(
     string? CacheRetention = null, bool SupportsLongCacheRetention = true,
     bool SupportsExplicitPromptCacheMode = false, ProviderEnvironmentSnapshot? Environment = null)
 {
+    /// <summary>Null inherits model compatibility; auto and enabled send the cache key while caching is active; disabled omits it.
+    /// Explicit options take precedence over model compatibility. Sampling parameters still merge last.</summary>
+    public string? PromptCacheKeyMode { get; init; }
     public JsonData? ModelHeaders { get; init; }
     public JsonData? Headers { get; init; }
     public JsonData? ModelSamplingParams { get; init; }
     /// <summary>Source model samplingParamsByThinkingLevel; the effective level's entry merges between model and request parameters.</summary>
     public JsonData? ModelSamplingParamsByThinkingLevel { get; init; }
     public JsonData? SamplingParams { get; init; }
-    /// <summary>compat.sessionAffinityFormat (types.ts SessionAffinityFormat): "openai" adds session_id, "openai-nosession" only
+    /// <summary>compat.sessionAffinityFormat (types.ts SessionAffinityFormat): "openai" adds session-id, "openai-nosession" only
     /// x-client-request-id (as OpenCode's Responses models declare), "openrouter" x-session-id.</summary>
     public string SessionAffinityFormat { get; init; } = "openai";
     public int MaximumHeaders { get; init; } = 128;
@@ -128,6 +131,7 @@ public sealed class ResponsesKeyAuthRequestFactory
             expectedModel.Provider.Length > _options.MaximumModelCharacters)
             throw Failure(ResponsesKeyAuthRequestFailure.ResourceLimit);
         if (_options.CacheRetention is not (null or "none" or "short" or "long") ||
+            _options.PromptCacheKeyMode is not (null or "auto" or "enabled" or "disabled") ||
             !ResponsesServiceTier.Supported(_options.ServiceTier) || _options.PayloadOverrides is not null)
             throw Failure(ResponsesKeyAuthRequestFailure.UnsupportedOptions);
         if (_options.Temperature is { } temperature && !double.IsFinite(temperature))
@@ -171,7 +175,7 @@ public sealed class ResponsesKeyAuthRequestFactory
         _model = expectedModel;
         _modelJson = JsonSerializer.Serialize(expectedModel.Id);
         _suffix = ",\"stream\":true" +
-            (session is not null ? ",\"prompt_cache_key\":" + JsonSerializer.Serialize(session) : "") + CacheFields() + ",\"store\":false" +
+            (session is not null && _options.PromptCacheKeyMode != "disabled" ? ",\"prompt_cache_key\":" + JsonSerializer.Serialize(session) : "") + CacheFields() + ",\"store\":false" +
             (_options.SupportsMaxOutputTokens && _options.MaxOutputTokens is { } count && count != 0
                 ? ",\"max_output_tokens\":" + Math.Max(count, 16).ToString(CultureInfo.InvariantCulture) : "") +
             (_options.Temperature is { } value ? ",\"temperature\":" + (value == 0 ? "0" : JsonSerializer.Serialize(value)) : "") +
@@ -311,7 +315,7 @@ public sealed class ResponsesKeyAuthRequestFactory
             if (_options.SessionAffinityFormat == "openrouter") headers["x-session-id"] = session;
             else
             {
-                if (_options.SessionAffinityFormat == "openai") headers["session_id"] = session;
+                if (_options.SessionAffinityFormat == "openai") headers["session-id"] = session;
                 headers["x-client-request-id"] = session;
             }
         }

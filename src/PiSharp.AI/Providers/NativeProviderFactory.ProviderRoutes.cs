@@ -28,6 +28,8 @@ public sealed record ProviderRouteOptions(Func<CancellationToken, ValueTask<Prov
 {
     /// <summary>The output cap (maxTokens).</summary>
     public int MaxTokens { get; init; } = 1024;
+    /// <summary>Optional per-level token budgets for token-based reasoning providers.</summary>
+    public JsonData? ThinkingBudgets { get; init; }
     /// <summary>A summary route: no prompt caching and thinking off.</summary>
     public bool Summary { get; init; }
     /// <summary>With <see cref="Summary"/>: the summary keeps the main route's thinking binding and follows each request's level
@@ -190,7 +192,7 @@ public static partial class NativeProviderFactory
                     ToolDeclarations: new(MaximumMessages: options.MaximumMessages, MaximumEntryCharacters: options.MaximumEntryCharacters,
                         MaximumInputCharacters: budget, MaximumOutputCharacters: budget, MaximumOutputBytes: budget)) { ModelSupportsImages = images };
                 var request = new CompletionsKeyAuthRequestOptions(MaxTokens: maximum, CacheRetention: summary ? CompletionsCacheRetention.None : CompletionsCacheRetention.Short,
-                    MaximumPayloadBytes: options.MaximumPayloadBytes, SessionId: sessionId) { ModelMetadata = metadata };
+                    MaximumPayloadBytes: options.MaximumPayloadBytes, SessionId: sessionId) { ModelMetadata = metadata, ThinkingBudgets = options.ThinkingBudgets };
                 return BindCompletions(model, endpoint, key, projection, request with { ModelHeaders = modelHeaders }, handler, plain ? null : metadata);
             }
             case "openai-responses":
@@ -207,7 +209,7 @@ public static partial class NativeProviderFactory
                 return BindRouteAnthropic(model, new Uri(baseUrl), key, RouteAnthropicProjection(raw, new(MaximumTokens: maximum, ModelReasoning: reasoning,
                     ModelSupportsImages: images, ThinkingEnabled: false, MaximumMessages: options.MaximumMessages, MaximumEntryCharacters: options.MaximumEntryCharacters,
                     MaximumInputCharacters: budget, MaximumOutputCharacters: budget, MaximumOutputBytes: budget,
-                    CacheRetention: summary ? AnthropicCacheRetention.None : AnthropicCacheRetention.Short), plain),
+                    CacheRetention: summary ? AnthropicCacheRetention.None : AnthropicCacheRetention.Short) { ThinkingBudgets = options.ThinkingBudgets }, plain),
                     new(MaxTokens: maximum, MaximumPayloadBytes: options.MaximumPayloadBytes, ModelHeaders: modelHeaders, SessionId: sessionId)
                     { BearerAuthorization = model.Provider == "github-copilot" },
                     handler, plain ? null : metadata);
@@ -223,6 +225,10 @@ public static partial class NativeProviderFactory
         {
             SupportsMidConversationEffort = value.TryGetProperty("compat", out var compat) && compat.ValueKind == JsonValueKind.Object &&
                 compat.TryGetProperty("supportsMidConvoEffort", out var mid) && mid.ValueKind == JsonValueKind.True,
+            SupportsTemperature = projection.SupportsTemperature && !(compat.ValueKind == JsonValueKind.Object &&
+                compat.TryGetProperty("supportsTemperature", out var temperature) && temperature.ValueKind == JsonValueKind.False),
+            SupportsMessageThreads = projection.SupportsMessageThreads ?? (compat.ValueKind == JsonValueKind.Object &&
+                compat.TryGetProperty("supportsMessageThreads", out var threads) && threads.ValueKind is JsonValueKind.True or JsonValueKind.False ? threads.GetBoolean() : null),
             SupportsThinkingOff = supportsOff, ModelReasoning = projection.ModelReasoning && (supportsOff || !summary),
             AllowedFallbackModels = AnthropicFallbackModels(value)
         };
@@ -244,7 +250,7 @@ public static partial class NativeProviderFactory
                 : new ResponsesHttpSseTransport(client, new ResponsesKeyAuthRequestFactory(endpoint, model, projectionOptions,
                     effectiveRequestOptions with { ReasoningEffort = level == "off" ? null : level,
                         ReasoningSummary = level == "off" ? null : effectiveRequestOptions.ReasoningSummary,
-                        ThinkingLevelMap = effectiveRequestOptions.ThinkingLevelMap }), key, responsesOptions: responsesOptions)));
+                        ThinkingLevelMap = profile?.Map }), key, responsesOptions: responsesOptions)));
     }
 
     /// <summary>CreateAnthropic without the Anthropic identity/endpoint restriction.</summary>

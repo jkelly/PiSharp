@@ -126,6 +126,7 @@ public sealed record OverlayOptions
     public bool NonCapturing { get; init; }
 }
 public sealed record OverlayBounds(int Row, int Col, int Width, int Height);
+public sealed record OverlaySnapshot(bool Hidden, bool Focused, OverlayBounds? Bounds);
 public interface IOverlayHandle
 {
     void Hide();
@@ -136,6 +137,11 @@ public interface IOverlayHandle
     void Unfocus(IComponent? target = null, bool hasTarget = false);
     bool IsFocused { get; }
     OverlayBounds? GetBounds();
+    /// <summary>Captures last-rendered state without evaluating a user visibility callback.</summary>
+    OverlaySnapshot CaptureSnapshot()
+    {
+        return new OverlaySnapshot(IsHidden, IsFocused, GetBounds());
+    }
 }
 
 public enum TuiMode { Regular, Fullscreen }
@@ -222,6 +228,7 @@ public abstract partial class TuiBase : Container, ITui
         public bool Hidden;
         public int FocusOrder;
         public OverlayBounds? Bounds;
+        public OverlayBounds? LastRenderedBounds;
     }
     private sealed record FocusRestore(string Status, OverlayEntry? Overlay = null, IComponent? BlockedBy = null, bool ResumeRestoreOverlay = true, IComponent? ResumeTarget = null)
     {
@@ -400,6 +407,12 @@ public abstract partial class TuiBase : Container, ITui
         }
         public bool IsFocused => tui.focusedComponent == entry.Component;
         public OverlayBounds? GetBounds() => !tui.overlayStack.Contains(entry) || !tui.IsOverlayVisible(entry) ? null : entry.Bounds;
+        public OverlaySnapshot CaptureSnapshot()
+        {
+            if (!tui.overlayStack.Contains(entry)) return new OverlaySnapshot(true, false, null);
+            OverlayBounds? bounds = entry.Hidden ? null : entry.LastRenderedBounds;
+            return new OverlaySnapshot(entry.Hidden, IsFocused, bounds);
+        }
     }
 
     public void HideOverlay()
@@ -717,6 +730,9 @@ public abstract partial class TuiBase : Container, ITui
                 var line = TextUtils.VisibleWidth(overlayLines[i]) > w ? TextUtils.SliceByColumn(overlayLines[i], 0, w, true) : overlayLines[i];
                 result[index] = CompositeLine(result[index], line, col, w, termWidth);
             }
+        // Remote snapshot reads can arrive while a component render/visibility callback is in flight. Keep the previous
+        // completed layout stable until this composition commits, rather than exposing the temporary Bounds=null above.
+        foreach (var entry in overlayStack) entry.LastRenderedBounds = entry.Bounds;
         return result;
     }
 

@@ -140,7 +140,9 @@ internal sealed class TextState(ChatRequest request, MistralTextOptions options)
                 characters += fragment.Length; Limit(characters, options.MaximumContentCharacters);
                 // mistral-conversations.ts: block.arguments = open.arguments.append(argsDelta), each delta read once.
                 var previous = (ToolCallContent)blocks[saved.Index];
-                blocks[saved.Index] = previous with { Arguments = saved.Arguments.Append(fragment) };
+                var arguments = saved.Arguments.Append(fragment);
+                if (!ReferenceEquals(arguments, previous.Arguments)) ValidateArguments(arguments);
+                blocks[saved.Index] = previous with { Arguments = arguments };
                 frames.Add(Snapshot(new ToolCallDelta(saved.Index, fragment)));
             }
         return frames.ToImmutable();
@@ -185,15 +187,13 @@ internal sealed class TextState(ChatRequest request, MistralTextOptions options)
         {
             // Object.assign(block, open.arguments.finish()): malformed arguments end as {} with argumentsError.
             blocks[item.Index] = item.Arguments.Finish().AssignTo((ToolCallContent)blocks[item.Index]);
+            ValidateArguments(((ToolCallContent)blocks[item.Index]).Arguments);
             frames.Add(Snapshot(new ToolCallEnded(item.Index, (ToolCallContent)blocks[item.Index])));
         }
         return frames.ToImmutable();
     }
     private StreamEvent Snapshot(StreamEvent frame)
     {
-        // Tool JSON can fail structural admission when nested in a message. Preserve
-        // that eager validation and its original failure boundary for arbitrary payloads.
-        if (tools.Count > 0) return frame with { SourceEmissionSnapshot = PiWireJson.WriteMessage(Message(Reason)) };
         var header = MessageHeader(Reason); var fragments = text.ToArray();
         // At most six JSON characters per UTF-16 unit. Reserve an additional copy for
         // the frame's reducer growth, plus per-block and fixed envelope/usage overhead.
@@ -201,6 +201,23 @@ internal sealed class TextState(ChatRequest request, MistralTextOptions options)
             (long)request.Model.Api.Length + request.Model.Provider.Length + request.Model.Id.Length +
             (long)(responseId?.Length ?? 0) + (rawStop?.Length ?? 0) + (ProviderError?.Length ?? 0));
         return frame.WithDeferredSourceEmission(() => PiWireJson.WriteMessage(Materialize(header, fragments)), upperBound);
+    }
+
+    // Arguments are already owned and validated. Only nesting them in the message adds
+    // a new restriction. Check that restriction when their immutable value changes,
+    // before publishing the chunk, rather than serializing every historical message.
+    private static void ValidateArguments(JsonData arguments)
+    {
+        var pending = new Stack<(JsonElement Value, int Depth)>();
+        pending.Push((arguments.Value, 3)); // message -> content array -> block -> arguments
+        while (pending.TryPop(out var item))
+        {
+            if (item.Value.ValueKind is not (JsonValueKind.Object or JsonValueKind.Array)) continue;
+            if (item.Depth >= JsonData.MaximumDepth) throw new JsonException("Maximum JSON depth exceeded.");
+            if (item.Value.ValueKind == JsonValueKind.Object)
+                foreach (var property in item.Value.EnumerateObject()) pending.Push((property.Value, item.Depth + 1));
+            else foreach (var value in item.Value.EnumerateArray()) pending.Push((value, item.Depth + 1));
+        }
     }
 
     private sealed class TextFragments(string fragment, TextFragments? previous)

@@ -169,7 +169,7 @@ internal sealed partial class InteractiveMode
         ui.ClearOnShrink = settings.ClearOnShrink;
         headerContainer = new Container();
         loadedResourcesContainer = new Container();
-        chatContainer = new Container();
+        chatContainer = new ToolExecutionContainer();
         documentContainer = new Container();
         documentContainer.AddChild(headerContainer);
         documentContainer.AddChild(loadedResourcesContainer);
@@ -727,6 +727,7 @@ internal sealed partial class InteractiveMode
             isInitialized = false;
         }
         Themes.StopThemeWatcher();
+        ((ToolExecutionContainer)chatContainer).DisposeToolViews();
     }
 
     /// <summary>The resume command printed after an interactive quit (formatResumeCommand).</summary>

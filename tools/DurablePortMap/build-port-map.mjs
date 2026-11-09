@@ -155,6 +155,14 @@ for (const section of sections) {
       if (old.portedBlobSha1 && old.status === 'needs-sync') row.portedBlobSha1 = old.portedBlobSha1;
       if (old.status === 'ported' && blob && old.blobSha1 !== blob) [row.status, row.portedBlobSha1] = ['needs-sync', old.blobSha1];
     }
+    // Current gap work is independent of the release-baseline status and immutable upstream blobs. In particular, a
+    // release-planned example can now have source without a passing integrated run. Preserve that mapping without
+    // relabelling it as ported, and do not regenerate its former planned path over the actual source location.
+    if (old?.currentImplementation) {
+      row.currentImplementation = old.currentImplementation;
+      if ('historicalPisharp' in old) row.historicalPisharp = old.historicalPisharp;
+      if (old.pisharp) row.pisharp = old.pisharp;
+    }
     if (!blob) {
       if (['ported', 'needs-sync', 'in-progress'].includes(row.status)) row.status = 'removed-upstream';
     } else if (row.upstreamChange === 'added' && (!old || old.status === 'planned')) row.phase = row.phase && SYNC_PHASE;
@@ -182,6 +190,7 @@ const text = JSON.stringify({
   schemaVersion: 2, upstreamCommit: UPSTREAM_COMMIT, upstreamVersion: UPSTREAM_VERSION, previousCommit: PREVIOUS_COMMIT,
   previousVersion: PREVIOUS_VERSION, decision: 'docs/decisions/0005-pi-durable-experimental.md',
   worklist: WORKLIST,
+  ...(recorded.currentImplementation ? { currentImplementation: recorded.currentImplementation } : {}),
   statusMeaning: { planned: 'Not started.', 'in-progress': 'Being ported.',
     ported: 'Ported from the blob in blobSha1, with the listed upstream tests passing.',
     'needs-sync': 'Ported from an earlier upstream blob (portedBlobSha1); the pinned blob differs and the C# has not caught up yet.',
@@ -196,8 +205,8 @@ if (args.includes('--check')) {
 } else writeFileSync(OUT, text);
 const statuses = {};
 for (const row of rows) statuses[row.status] = (statuses[row.status] ?? 0) + 1;
-console.log(`${rows.length} files; ${JSON.stringify(statuses)}; upstream ${JSON.stringify({ unchanged: count(row => !row.upstreamChange && !row.removedIn),
+console.log(`${rows.length} files${recorded.currentImplementation ? ' (release-baseline statuses)' : ''}; ${JSON.stringify(statuses)}; upstream ${JSON.stringify({ unchanged: count(row => !row.upstreamChange && !row.removedIn),
   modified: count(row => row.upstreamChange === 'modified'), renamed: count(row => row.upstreamChange === 'renamed'),
   added: count(row => row.upstreamChange === 'added'), removed: count(row => row.upstreamChange === 'removed'),
   removedEarlier: count(row => row.removedIn) })}; ${
-  rows.filter(row => ['planned', 'needs-sync'].includes(row.status)).reduce((sum, row) => sum + (row.changedLines ?? row.lines), 0)} lines to sync`);
+  rows.filter(row => ['planned', 'needs-sync'].includes(row.status)).reduce((sum, row) => sum + (row.changedLines ?? row.lines), 0)} ${recorded.currentImplementation ? `historical-baseline lines marked pending; ${rows.filter(row=>row.currentImplementation).length} current source mappings (integrated runtime validation pending)` : 'lines to sync'}`);

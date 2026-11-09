@@ -177,6 +177,8 @@ public sealed record AgentChange
     /// <see cref="ArgumentOutOfRangeException"/> (upstream <c>RangeError</c>) unless it is an integer 1 or more, within JavaScript's safe
     /// integers, or <see cref="Patch{T}.Clear"/>.</summary>
     public Patch<long>? MaxTurns { get; init; }
+    /// <summary>Replaces this conversation's compaction settings as a whole; Clear restores harness inheritance.</summary>
+    public Patch<CompactionSettings>? Compaction { get; init; }
     /// <summary>PiSharp-only (decision 0007): the service tier of the conversation's requests (auto, normal, economy, priority, fast,
     /// ultrafast). A child conversation starts with its owner's.</summary>
     public Patch<string>? ServiceTier { get; init; }
@@ -209,6 +211,8 @@ public sealed record Agent
     /// <c>unanswered</c> with <c>turn_limit</c>. An integer, 1 or more; null, no limit. Task-owned children and forks inherit it.
     /// </summary>
     public long? MaxTurns { get; init; }
+    /// <summary>This conversation's stored compaction settings; null inherits the harness policy.</summary>
+    public CompactionSettings? Compaction { get; init; }
     /// <summary>PiSharp-only (decision 0007): the service tier; null when unset.</summary>
     public string? ServiceTier { get; init; }
 }
@@ -652,6 +656,10 @@ public sealed record ConversationStreamOptions
     public string? Transport { get; init; }
     /// <summary>HTTP request timeout.</summary>
     public double? TimeoutMs { get; init; }
+    /// <summary>WebSocket connection/open handshake timeout in milliseconds; stream idleness uses TimeoutMs.</summary>
+    public double? WebsocketConnectTimeoutMs { get; init; }
+    /// <summary>Custom token budgets by thinking level, for token-based providers.</summary>
+    public JsonObjectValue? ThinkingBudgets { get; init; }
     /// <summary>Provider/SDK retries inside one request attempt.</summary>
     public int? MaxRetries { get; init; }
     /// <summary>Longest server-requested retry delay to wait for.</summary>
@@ -722,7 +730,9 @@ public sealed record RetrySettings
     public double? MaxAgentDelayMs { get; init; }
 }
 
-/// <summary>Harness-wide host overrides of <see cref="CompactionPolicy"/> (upstream <c>CompactionSettings</c>).</summary>
+/// <summary>Overrides of <see cref="CompactionPolicy"/> for a harness or one conversation. Conversation model overrides win over
+/// harness model overrides, then conversation fields, then harness defaults. A conversation's Enabled=false also beats a harness
+/// model override; its own model override may explicitly enable compaction again.</summary>
 public sealed record CompactionSettings
 {
     /// <summary>Threshold and overflow compaction.</summary>

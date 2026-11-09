@@ -26,6 +26,8 @@ internal static partial class Changelog
 
     [GeneratedRegex(@"##\s+\[?([0-9]+)\.([0-9]+)\.([0-9]+)(?:\.([0-9]+))?\]?")]
     private static partial Regex VersionHeader();
+    [GeneratedRegex(@"^v?([0-9]+)\.([0-9]+)\.([0-9]+)(?:\.([0-9]+))?")]
+    private static partial Regex SeenVersion();
 
     private static string EntryVersion(ChangelogEntry entry) =>
         entry.Revision > 0 ? $"{entry.Major}.{entry.Minor}.{entry.Patch}.{entry.Revision}" : $"{entry.Major}.{entry.Minor}.{entry.Patch}";
@@ -143,22 +145,15 @@ internal static partial class Changelog
         return v1.Revision.CompareTo(v2.Revision);
     }
 
-    /// <summary>Entries newer than <paramref name="lastVersion"/> (missing or non-numeric parts count as 0).</summary>
+    /// <summary>Entries newer than the leading release version in <paramref name="lastVersion"/>. Prerelease/build suffixes
+    /// do not repeat that release's notes; a value without major.minor.patch yields no entries.</summary>
     public static List<ChangelogEntry> GetNewEntries(IEnumerable<ChangelogEntry> entries, string lastVersion)
     {
-        var parts = lastVersion.Split('.').Select(JsNumberToInt).ToArray();
-        var last = new ChangelogEntry(parts.Length > 0 ? parts[0] : 0, parts.Length > 1 ? parts[1] : 0, parts.Length > 2 ? parts[2] : 0, "",
-            parts.Length > 3 ? parts[3] : 0);
+        var match = SeenVersion().Match(PiSharp.Tui.Pi.TextUtils.JsTrim(lastVersion));
+        if (!match.Success) return [];
+        var last = new ChangelogEntry(ParseInt(match.Groups[1].Value), ParseInt(match.Groups[2].Value), ParseInt(match.Groups[3].Value), "",
+            match.Groups[4].Success ? ParseInt(match.Groups[4].Value) : 0);
         return [.. entries.Where(entry => CompareVersions(entry, last) > 0)];
-    }
-
-    /// <summary><c>Number(part) || 0</c> for the integer parts of a version.</summary>
-    private static int JsNumberToInt(string part)
-    {
-        var trimmed = PiSharp.Tui.Pi.TextUtils.JsTrim(part);
-        if (trimmed.Length == 0) return 0;
-        return double.TryParse(trimmed, NumberStyles.Float, CultureInfo.InvariantCulture, out var value) && !double.IsNaN(value) && !double.IsInfinity(value)
-            ? (int)Math.Clamp(Math.Truncate(value), int.MinValue, int.MaxValue) : 0;
     }
 
     /// <summary>Source <c>getChangelogPath</c>: <c>CHANGELOG.md</c> in the package directory, which is <c>PI_PACKAGE_DIR</c>

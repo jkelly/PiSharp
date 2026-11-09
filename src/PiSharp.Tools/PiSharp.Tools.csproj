@@ -4,6 +4,7 @@
     <NoWarn>$(NoWarn);PISHARP_EXEC001</NoWarn>
   </PropertyGroup>
   <ItemGroup>
+    <InternalsVisibleTo Include="PiSharp.Tools.Tests" />
     <!-- The SkiaSharp image codec shares the RGBA raster, Lanczos3 resampling and EXIF orientation. -->
     <InternalsVisibleTo Include="PiSharp.Tools.Skia" />
     <!-- Branch feature/pi-durable (decision 0005): the durable execution environment reuses the Windows job-object process lifetime and

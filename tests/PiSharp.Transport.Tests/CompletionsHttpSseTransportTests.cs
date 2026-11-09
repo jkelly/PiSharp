@@ -129,7 +129,7 @@ internal static class CompletionsHttpSseTransportTests
             (Sse(" [DONE] "), "SourceFailed"), (Sse("[DONE]trailing"), "SourceFailed"),
             (Sse("{private-invalid"), "SourceFailed"), (Sse("[]"), "SourceFailed"),
             (Sse("""{"choices":[],"id":"a","\u0069d":"b"}"""), "SourceFailed"),
-            (Sse("""{"choices":[],"opaque":"\ud800"}"""), "SourceFailed"),
+            (Sse("""{"choices":[],"opaque":"\ud800"}"""), "UnexpectedEof"),
             ("event: error\ndata: {\"private-message\":\"secret\"}\n\n" + Sse(Finish), "SourceFailed"),
             (Sse("""{"error":{"message":"private-message"}}""", Finish), "SourceFailed"),
             (Sse("""{"choices":[],"opaque":1e400}""", Finish), "MalformedStream")
@@ -141,6 +141,19 @@ internal static class CompletionsHttpSseTransportTests
             if (wire.Contains("error", StringComparison.Ordinal)) Check(result.Message.ExtraProperties!.Values["errorMessage"].Value.GetString() is "{\"private-message\":\"secret\"}" or "private-message", "SDK stream error message differs.");
             else Check(!result.Failure!.Message.Contains("private", StringComparison.Ordinal), "SSE failure leaked rejected payload.");
             Check(fixture.Response.Disposed, "Rejected frame retained its response.");
+        }
+        // Valid escaped UTF-16 values survive the HTTP/DTO boundary. A real finish is still mandatory (the EOF vector above).
+        JsonData? observedSurrogate = null;
+        var fidelityHooks = new CompletionsLifecycleHooks { OnProviderStreamEvent = (dto, _, _) =>
+        { if (dto.Value.TryGetProperty("opaque", out _)) observedSurrogate = dto; return ValueTask.CompletedTask; } };
+        using (var preserved = new Fixture(new ProbeStream(Encoding.UTF8.GetBytes(Sse("""{"choices":[],"opaque":"\ud800"}""", Finish))),
+            new() { Hooks = fidelityHooks }))
+        {
+            var result = await new ChatClient(preserved.Transport).CompleteAsync(Request());
+            Check(result.Failure is null && result.Message.StopReason == StopReason.Stop && preserved.Handler.SendCalls == 1, "Valid escaped DTO value failed a true finish or duplicated HTTP.");
+            Check(observedSurrogate is not null && observedSurrogate.Value.GetProperty("opaque").GetRawText() == "\"\\ud800\"" &&
+                JsonUtf16.GetString(observedSurrogate.Value.GetProperty("opaque")) == "\uD800", "HTTP DTO surrogate code unit was lost or replaced.");
+            Check(preserved.Response.Disposed, "Fidelity control retained response ownership.");
         }
         using (var fixture = new Fixture(new ProbeStream([.. Encoding.UTF8.GetBytes("data: "), 0xff, .. Encoding.UTF8.GetBytes("\n\n")])))
             Failed(await new ChatClient(fixture.Transport).CompleteAsync(Request()), "SourceFailed");
@@ -178,7 +191,7 @@ internal static class CompletionsHttpSseTransportTests
         HttpRequestMessage Factory(ChatRequest request, CancellationToken token) { factoryCalls++; return new CompletionsKeyAuthRequestFactory(Endpoint, Model, options: new(MaximumPayloadBytes: 32)).Create(request, Key, token); }
         var transport = new CompletionsHttpSseTransport(client, Factory);
         Failed(await new ChatClient(transport).CompleteAsync(Request()), "SourceFailed"); Equal(1, factoryCalls); Equal(0, handler.SendCalls);
-        foreach (var options in new CompletionsHttpSseOptions[] { new(MaximumDataEvents: 0), new(MaximumDataCharacters: 0), new(MaximumTotalDataCharacters: 0), new(MaximumJsonDepth: 65),
+        foreach (var options in new CompletionsHttpSseOptions[] { new(MaximumDataEvents: 0), new(MaximumDataCharacters: 0), new(MaximumTotalDataCharacters: 0), new(MaximumJsonDepth: PiSharp.Contracts.JsonData.MaximumDepth + 1),
             new(Framing: new(RejectInvalidUtf8: false)), new(Framing: new(RejectInvalidUtf8: true, EofBehavior: SseEofBehavior.DiscardPendingEvent)) })
             Throws<ArgumentException>(() => new CompletionsHttpSseTransport(client, Factory, options));
         using var cancelled = new CancellationTokenSource(); cancelled.Cancel();

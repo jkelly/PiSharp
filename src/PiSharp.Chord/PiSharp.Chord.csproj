@@ -1,17 +1,20 @@
 <Project Sdk="Microsoft.NET.Sdk">
-  <!-- Decision 0013 (Pi 1.5.0 sync, phase 4): a port of Chord v2, Pi's experimental @earendil-works/chord/next (packages/chord/src/next).
-       Phase 4 ports the layers pi-durable needs (contracts, data, state, the store, documents and registries); phase 6 the rest. It
-       references PiSharp.Contracts (pi-schema is PiSharp.Contracts.Schema) and no PiSharp.Durable project: the code joining Chord v2 with
-       Durable goes in PiSharp.Durable.Store. Experimental: the assembly is [Experimental("PISHARP_CHORD001")]. Not packed in 1.5.0:
-       it reads PiSharp.Contracts' pi-schema internals, which need a public experimental API first, and the rest of Chord is phase 6. -->
+  <!-- Chord local package admission includes the experimental next runtime (host, jobs, state, store, registries and links)
+       and the separately versioned legacy protocol-4 runtime. Runtime and distribution acceptance remain independently recorded. It
+       references Contracts, Telemetry and Tools for shared native child containment (Tools brings Agent/AI transitively), and no Durable project: the code joining Chord v2 with
+       Durable goes in PiSharp.Durable.Store. Experimental: the assembly is [Experimental("PISHARP_CHORD001")].
+       Package admission deliberately retains exact-version friend access to Contracts' schema implementation; these implementation
+       types are not part of the public Chord API. See docs/contracts/gap-package-admission.md. Publication requires separate approval. -->
   <PropertyGroup>
-    <IsPackable>false</IsPackable>
+    <IsPackable>true</IsPackable>
     <!-- Chord's context carries a pi-telemetry span (PiSharp.Telemetry, [Experimental("PISHARP_TELEMETRY001")]), as upstream's does. -->
     <NoWarn>$(NoWarn);PISHARP_TELEMETRY001</NoWarn>
   </PropertyGroup>
   <ItemGroup>
     <!-- Upstream's tests import each layer's internal.ts; the suite reaches the same surface. -->
     <InternalsVisibleTo Include="PiSharp.Chord.Tests" />
+    <!-- Native plugin generations wrap an evaluated facet's setup in their own immutable declaration identity. -->
+    <InternalsVisibleTo Include="PiSharp.Chord.Hosting" />
     <!-- The StoreStorage cases (area store-storage) attach a hand-built host's batch, as upstream's attach their createHost (phase 6). -->
     <InternalsVisibleTo Include="PiSharp.Durable.Tests" />
   </ItemGroup>
@@ -19,5 +22,7 @@
     <ProjectReference Include="../PiSharp.Contracts/PiSharp.Contracts.csproj" />
     <!-- Upstream's chord depends on @earendil-works/pi-telemetry: its Context carries a telemetry span. -->
     <ProjectReference Include="../PiSharp.Telemetry/PiSharp.Telemetry.csproj" />
+    <!-- Legacy native host-manager workers reuse the audited process-tree admission/cleanup implementation. -->
+    <ProjectReference Include="../PiSharp.Tools/PiSharp.Tools.csproj" />
   </ItemGroup>
 </Project>

@@ -1,4 +1,5 @@
 // Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/schema/src/resolver.ts
+// Relative identifier correction: Pi 7d073328e44337d3292a7db9b0f0308f679c5e97.
 //
 // Reference resolution of one compile: schema resources, anchors and JSON Pointers over the root schema and the registered documents.
 #nullable enable
@@ -10,8 +11,8 @@ namespace PiSharp.Contracts.Schema;
 internal readonly record struct ResolvedSchema(object? Node, string Base);
 
 /// <summary>
-/// Resolves references in the root schema and the registered documents. The schema is indexed on the first reference, so a schema
-/// without references is never walked for identifiers. Every member runs under the compile's lock.
+/// Resolves references in the root schema and the registered documents. The schema is indexed on the first reference or identifier,
+/// so a schema with neither is never walked for identifiers. Every member runs under the compile's lock.
 /// </summary>
 internal sealed class SchemaResolver
 {
@@ -44,12 +45,12 @@ internal sealed class SchemaResolver
         _root = root;
         _schemas = options.Schemas;
         _rejectUnresolved = options.RejectUnresolvedRefs;
-        RootBase = root is JsObject o ? BaseFor(o, DefaultBase) : DefaultBase;
     }
 
     public bool Draft7 { get; }
 
-    public string RootBase { get; }
+    /// <summary>The starting base; the root's own identifier is applied by <see cref="BaseFor"/>.</summary>
+    public string RootBase => DefaultBase;
 
     /// <summary>Schema object to the base URI it was indexed under.</summary>
     public Dictionary<JsObject, string> BaseOf { get; } = new(ReferenceEqualityComparer.Instance);
@@ -67,6 +68,13 @@ internal sealed class SchemaResolver
         {
             if (BaseOf.TryGetValue(node, out var indexed)) return indexed;
             if (node.GetOwn("$id") is not string id) return @base;
+            // The caller may already carry this node's base (reference targets and annotation
+            // probes do). Index from the original document base before applying an identifier.
+            if (!_indexed)
+            {
+                EnsureIndexed();
+                if (BaseOf.TryGetValue(node, out indexed)) return indexed;
+            }
             if (Draft7 && (node.GetOwn("$ref") is string || id.StartsWith('#'))) return @base;
             return DocumentOf(ResolveUri(id, @base));
         }

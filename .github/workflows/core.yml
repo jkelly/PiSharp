@@ -1,0 +1,86 @@
+name: Core validation
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+  workflow_call:
+    inputs:
+      source_sha:
+        type: string
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  core:
+    name: Core console (${{ matrix.suite }}, Windows)
+    runs-on: windows-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        suite: [Compatibility, Agent, Transport, Sessions, Tools, CodingAgent, Rpc, Extensions.ContractTests, ExtensionHost, Tui]
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.source_sha || github.sha }}
+      - uses: actions/setup-dotnet@v5
+        with:
+          global-json-file: global.json
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install native search prerequisite
+        shell: pwsh
+        run: choco install ripgrep --yes --no-progress
+      - name: Run console suite with native fixture prerequisites
+        shell: pwsh
+        run: ./tools/ci/run-core-suite.ps1 -Suite '${{ matrix.suite }}' -ReportDirectory '${{ runner.temp }}/core'
+      - name: Record actual cases and checkout provenance
+        if: always()
+        shell: pwsh
+        run: |
+          $suite = if ('${{ matrix.suite }}' -eq 'Extensions.ContractTests') { 'PiSharp.Extensions.ContractTests' } else { 'PiSharp.${{ matrix.suite }}.Tests' }
+          node tools/ci/write-validation-manifest.mjs --output '${{ runner.temp }}/core/manifest.json' --execution '${{ runner.temp }}/core/execution.json' --report "$suite=${{ runner.temp }}/core/$suite.json" --console "$suite=${{ runner.temp }}/core/console.log" --prerequisite "dotnet-sdk=$(dotnet --version)" --prerequisite 'Windows native process and ConPTY support' --prerequisite 'native extension fixtures published for CodingAgent/Extensions.ContractTests by runner' --reject-skips
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: core-${{ matrix.suite }}
+          path: ${{ runner.temp }}/core
+          if-no-files-found: error
+
+  applicability:
+    name: Offline and frozen-source applicability
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.source_sha || github.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Offline applicability and worklist structure
+        run: |
+          node --test tools/CompatibilityReport/sync-applicability.test.mjs tools/ci/validation-manifest.test.mjs
+          node tools/DurablePortMap/check-worklist.mjs --offline
+      - name: Fetch immutable upstream objects
+        shell: bash
+        run: |
+          git init "$RUNNER_TEMP/pi"
+          git -C "$RUNNER_TEMP/pi" fetch --depth 1 https://github.com/earendil-works/pi 7d073328e44337d3292a7db9b0f0308f679c5e97 f9a26365568127461c47a07a37dcb42c140a3ac5 06a466935536f8c9bcacb2d5efc0fc021be1bdff
+          git -C "$RUNNER_TEMP/pi" checkout --detach 7d073328e44337d3292a7db9b0f0308f679c5e97
+          test "$(git -C "$RUNNER_TEMP/pi" rev-parse HEAD)" = 7d073328e44337d3292a7db9b0f0308f679c5e97
+          git -C "$RUNNER_TEMP/pi" tag v1.5.0 f9a26365568127461c47a07a37dcb42c140a3ac5
+          git -C "$RUNNER_TEMP/pi" tag v1.2.0 06a466935536f8c9bcacb2d5efc0fc021be1bdff
+      - name: Required exact-object source checks (no skipped upstream check)
+        env:
+          PI_REQUIRE_UPSTREAM: '1'
+          PI_UPSTREAM_V1_5_0: ${{ runner.temp }}/pi
+        run: |
+          node --test tools/CompatibilityReport/sync-applicability.test.mjs
+          node tools/DurablePortMap/check-worklist.mjs --upstream "$RUNNER_TEMP/pi"
+          node tools/DurablePortMap/build-port-map.mjs --upstream "$RUNNER_TEMP/pi" --check

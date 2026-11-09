@@ -3,11 +3,11 @@ using System.Text;
 
 namespace PiSharp.Tools.Processes;
 
-/// <summary>Retains the original joined process receipt and each original pipe's independently bounded bytes.</summary>
+/// <summary>Retains the original joined process receipt and each original pipe's captured bytes.</summary>
 public sealed record SeparatedProcessRunResult(ProcessRunResult Process,
     ProcessStructuredOutput StandardOutput, ProcessStructuredOutput StandardError)
 {
-    /// <summary>The request's <see cref="ProcessRequest.CaptureLimitBytes"/> was reached: the runner stopped the process, and each
+    /// <summary>The request's <see cref="ProcessRequest.CaptureLimitBytes"/> was exceeded: the runner stopped the process, and each
     /// pipe keeps only its complete UTF-8 characters within the limit.</summary>
     [Experimental("PISHARP_EXEC001")] public bool CaptureLimitReached { get; init; }
 }
@@ -21,6 +21,8 @@ public interface ISeparatedProcessRunner : IProcessRunner
 // shared by both pumps, so its appends are serialized.
 public sealed class SeparatedProcessCapture : IDisposable
 {
+    // Same byte bound as native pi.exec, below both MemoryStream's and the runtime's string limit.
+    internal const long MaximumCombinedBytes = 0x3FFFFFDF;
     private readonly int _maximumBytes;
     private readonly long? _combinedLimit;
     private readonly object _gate = new();
@@ -32,23 +34,30 @@ public sealed class SeparatedProcessCapture : IDisposable
         if (maximumBytes is < 1 or > 1024 * 1024) throw new ArgumentOutOfRangeException(nameof(maximumBytes));
         _maximumBytes = maximumBytes;
     }
-    /// <summary>A capture that is also bounded by both pipes together (source execCommand maxBuffer). Reaching that limit, or either
-    /// pipe's own bound, sets <see cref="LimitReached"/> so the runner stops the process.</summary>
+    /// <summary>A capture bounded by both pipes together (source execCommand maxBuffer). The explicit combined limit replaces
+    /// the ordinary per-pipe bound; exceeding it sets <see cref="LimitReached"/> so the runner stops the process.
+    /// Buffers grow only as bytes arrive. <paramref name="maximumBytes"/> retains its ordinary-bound validation.</summary>
     [Experimental("PISHARP_EXEC001")]
     public SeparatedProcessCapture(int maximumBytes, long combinedLimit) : this(maximumBytes)
     {
         ArgumentOutOfRangeException.ThrowIfNegative(combinedLimit);
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(combinedLimit, MaximumCombinedBytes);
         _combinedLimit = combinedLimit;
+        _maximumBytes = (int)combinedLimit;
     }
     [Experimental("PISHARP_EXEC001")] public bool LimitReached { get; private set; }
-    public void Append(bool standardError, ReadOnlySpan<byte> bytes)
+    public void Append(bool standardError, ReadOnlySpan<byte> bytes) => AppendAdmitted(standardError, bytes);
+
+    // Return only the prefix admitted to an explicit capture. Pumps still drain both pipes, but must not send over-limit
+    // bytes to the separate raw-output accumulator, where they could turn normal maxBuffer termination into an I/O failure.
+    internal int AppendAdmitted(bool standardError, ReadOnlySpan<byte> bytes)
     {
-        if (_combinedLimit is null) { AppendCore(standardError, bytes); return; }
-        lock (_gate) AppendCore(standardError, bytes);
+        if (_combinedLimit is null) { AppendCore(standardError, bytes); return bytes.Length; }
+        lock (_gate) return AppendCore(standardError, bytes);
     }
-    private void AppendCore(bool standardError, ReadOnlySpan<byte> bytes)
+    private int AppendCore(bool standardError, ReadOnlySpan<byte> bytes)
     {
-        if (LimitReached) return;
+        if (LimitReached) return 0;
         // The pipes share the combined limit; the read that crosses it keeps only the bytes within it.
         if (_combinedLimit is { } limit && _stdout.Length + _stderr.Length + bytes.Length > limit)
         { bytes = bytes[..(int)(limit - _stdout.Length - _stderr.Length)]; LimitReached = true; }
@@ -60,7 +69,10 @@ public sealed class SeparatedProcessCapture : IDisposable
             if (standardError) _stderrTruncated = true; else _stdoutTruncated = true;
             if (_combinedLimit is not null) LimitReached = true;
         }
+        return count;
     }
+    internal ProcessRunnerOptions OutputOptions(ProcessRunnerOptions options) => _combinedLimit is { } limit
+        ? options with { MaximumRawBytes = Math.Max(options.MaximumRawBytes, (int)limit) } : options;
     public SeparatedProcessRunResult Result(ProcessRunResult original) => new(original,
         new(Decode(_stdout), _stdoutTruncated || LimitReached), new(Decode(_stderr), _stderrTruncated || LimitReached))
     { CaptureLimitReached = LimitReached };

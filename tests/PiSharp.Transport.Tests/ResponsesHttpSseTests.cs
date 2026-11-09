@@ -75,21 +75,39 @@ internal static class ResponsesHttpSseTests
             Sse("[]"),
             Sse("""{"type":"response.created","response":{"id":"private-id","id":"duplicate"}}"""),
             Sse("""{"type":"response.created","response":{"id":"\uD800"}}"""),
-            Sse(ToolStart, ToolEnd("{\"private-argument\":"), Completed),
             Sse(ToolStart, ToolEnd(FinalArguments), "[DONE]", Completed),
             Sse(ToolStart, ToolEnd(FinalArguments)),
             Sse(" [DONE] ")
         })
         {
             using var fixture = new Fixture(new ProbeStream(Bytes(sse)));
-            var result = await new ChatClient(fixture.Transport, capacity: 1).CompleteAsync(Request());
-            Failure(result, ChatFailureKind.MalformedStream);
+            var result = await new ChatClient(fixture.Observed, capacity: 1).CompleteAsync(Request());
+            Failure(result, ChatFailureKind.Provider);
+            ResponsesRawContractAssertions.Error(fixture.Frames, typeof(StreamProtocolException));
             Check(!result.Failure!.Message.Contains("private", StringComparison.Ordinal), "JSON failure leaked source data.");
             Check(fixture.Requests.Single().DisposedAfterResponse && fixture.ResponseContent.Disposed,
                 "Rejected JSON/termination retained HTTP ownership.");
         }
         using (var fixture = new Fixture(new ProbeStream([.. Bytes("data: "), 0xff, .. Bytes("\n\n")])))
-            Failure(await new ChatClient(fixture.Transport).CompleteAsync(Request()), ChatFailureKind.MalformedStream);
+        {
+            Failure(await new ChatClient(fixture.Observed).CompleteAsync(Request()), ChatFailureKind.Provider);
+            ResponsesRawContractAssertions.Error(fixture.Frames, typeof(StreamProtocolException));
+            Check(fixture.ResponseContent.Disposed && fixture.Requests.Single().DisposedAfterResponse, "Invalid UTF8 escaped owned cleanup.");
+        }
+        // Pinned parseToolCallArguments finishes malformed argument text with {} plus argumentsError; this is transport output,
+        // not evidence of execution. Agent.Tests/Sync150Cases and CompletionsHttpTurnTests cover rejection before tool execution.
+        using (var repaired = new Fixture(new ProbeStream(Bytes(Sse(ToolStart, ToolEnd("{\"private-argument\":"), Completed)))))
+        {
+            var result = await new ChatClient(repaired.Observed).CompleteAsync(Request());
+            Check(result.Failure is null && result.Message.StopReason == StopReason.ToolUse, "Malformed argument text failed transport finalization.");
+            var tool = (ToolCallContent)result.Message.Content.Single();
+            Check(tool.Arguments.ToString() == "{}" && tool.ExtraProperties!.Values["argumentsError"].Value.GetString() ==
+                "Unexpected end of JSON input\n\nReceived arguments:\n{\"private-argument\":", "Malformed argument marker or empty object changed.");
+            Check(repaired.Frames.OfType<ToolCallEnded>().Count() == 1 && repaired.Frames.OfType<StreamDone>().Count() == 1 &&
+                repaired.ResponseContent.Disposed && repaired.Requests.Single().DisposedAfterResponse, "Tool argument finalization duplicated ends or skipped cleanup.");
+        }
+        using (var loneId = new Fixture(new ProbeStream(Bytes(Sse("""{"type":"response.created","response":{"id":"\uD800"}}""", Completed)))))
+            Check((await new ChatClient(loneId.Observed).CompleteAsync(Request())).Failure is null, "Valid escaped response metadata failed a real completion.");
 
         // EOF and an exact sentinel are both supported source ends after a validated completion DTO.
         foreach (var suffix in new[] { Array.Empty<string>(), new[] { "[DONE]", "{ignored-after-sentinel" } })
@@ -102,8 +120,10 @@ internal static class ResponsesHttpSseTests
 
         using (var fixture = new Fixture(new ProbeStream(Bytes("private-error-body")), status: HttpStatusCode.TooManyRequests))
         {
-            Failure(await new ChatClient(fixture.Transport).CompleteAsync(Request()), ChatFailureKind.Provider);
-            Equal(0, fixture.ResponseContent.AcquireCalls);
+            Failure(await new ChatClient(fixture.Observed).CompleteAsync(Request()), ChatFailureKind.Provider);
+            var rejected = ResponsesRawContractAssertions.Error(fixture.Frames, typeof(HttpRequestException));
+            Check(rejected.NativeSourceException is HttpRequestException { StatusCode: HttpStatusCode.TooManyRequests } && fixture.Frames.OfType<StreamStarted>().Count() == 0, "Status rejection lost original status or emitted Start.");
+            Equal(1, fixture.ResponseContent.AcquireCalls);
             Equal(0, fixture.ResponseContent.SerializeCalls);
             Check(fixture.Requests.Single().DisposedAfterResponse, "HTTP rejection retained its owned request.");
             Equal(1, fixture.Handler.SendCalls);
@@ -127,8 +147,9 @@ internal static class ResponsesHttpSseTests
         })
         {
             using var fixture = new Fixture(new ProbeStream(Bytes(Sse(Created, Completed, "[DONE]"))), options);
-            Failure(await new ChatClient(fixture.Transport).CompleteAsync(Request()), ChatFailureKind.ResourceLimit);
-            Check(fixture.Requests.Single().DisposedAfterResponse, "Admission failure retained its request.");
+            Failure(await new ChatClient(fixture.Observed).CompleteAsync(Request()), ChatFailureKind.Provider);
+            ResponsesRawContractAssertions.Error(fixture.Frames, typeof(StreamLimitException));
+            Check(fixture.Requests.Single().DisposedAfterResponse && fixture.ResponseContent.Disposed, "Admission failure retained owned HTTP work.");
         }
         using var handler = new FakeHttpHandler((_, _) => throw new InvalidOperationException("Unexpected send."));
         using var client = new HttpClient(handler);
@@ -137,7 +158,7 @@ internal static class ResponsesHttpSseTests
         foreach (var options in new ResponsesHttpSseOptions[]
         {
             new(MaximumDataEvents: 0), new(MaximumDataCharacters: 0), new(MaximumTotalDataCharacters: 0),
-            new(MaximumJsonDepth: 65), new(Framing: new(RejectInvalidUtf8: false))
+            new(MaximumJsonDepth: PiSharp.Contracts.JsonData.MaximumDepth + 1), new(Framing: new(RejectInvalidUtf8: false))
         })
             Throws<ArgumentException>(() => new ResponsesHttpSseTransport(client, Factory, options));
         Equal(0, factoryCalls);
@@ -181,7 +202,7 @@ internal static class ResponsesHttpSseTests
         using var fixture = new Fixture(body);
         var reader = fixture.Transport.StreamAsync(Request()).GetAsyncEnumerator();
         Check(await reader.MoveNextAsync() && reader.Current is StreamStarted, "Missing authored start.");
-        Equal(0, fixture.FactoryCalls);
+        Equal(1, fixture.FactoryCalls); Equal(1, fixture.Handler.SendCalls); Equal(0, fixture.ResponseContent.AcquireCalls);
         Check(await reader.MoveNextAsync() && reader.Current is ToolCallStarted, "Missing mapped tool start.");
         var cleanup = reader.DisposeAsync().AsTask();
         try
@@ -201,39 +222,70 @@ internal static class ResponsesHttpSseTests
 
     public static async Task FactorySendAndSourceFaults()
     {
-        using var handler = new FakeHttpHandler((_, _) => throw new HttpRequestException("private-send-error"));
+        var sendOriginal = new HttpRequestException("private-send-error");
+        using var handler = new FakeHttpHandler((_, _) => throw sendOriginal);
         using var client = new HttpClient(handler);
-        var throwingFactory = new ResponsesHttpSseTransport(client, _ => throw new InvalidOperationException("private-factory-error"));
-        var factoryFailure = await new ChatClient(throwingFactory).CompleteAsync(Request());
+        // Pinned wrapper preserves caller/source exception identity and display text; malformed DTO checks above remain sanitized.
+        var factoryOriginal = new InvalidOperationException("private-factory-error");
+        var throwingFactory = new ResponsesHttpSseTransport(client, _ => throw factoryOriginal);
+        var factoryFrames = new List<StreamEvent>();
+        var factoryFailure = await new ChatClient(new ResponsesRawFrameObserver(throwingFactory, factoryFrames)).CompleteAsync(Request());
         Failure(factoryFailure, ChatFailureKind.Provider);
-        Check(!factoryFailure.Failure!.Message.Contains("private", StringComparison.Ordinal), "Factory fault leaked data.");
+        var factoryError = ResponsesRawContractAssertions.Error(factoryFrames, typeof(InvalidOperationException));
+        Check(ReferenceEquals(factoryOriginal, factoryError.NativeSourceException) && factoryFailure.Failure!.Message == factoryOriginal.Message &&
+            factoryFrames.OfType<StreamStarted>().Count() == 0, "Factory original exception/display or pre-Start ordering changed.");
         var nullFactory = new ResponsesHttpSseTransport(client, _ => null!);
-        Failure(await new ChatClient(nullFactory).CompleteAsync(Request()), ChatFailureKind.MalformedStream);
+        var nullFrames = new List<StreamEvent>();
+        Failure(await new ChatClient(new ResponsesRawFrameObserver(nullFactory, nullFrames)).CompleteAsync(Request()), ChatFailureKind.Provider);
+        ResponsesRawContractAssertions.Error(nullFrames, typeof(StreamProtocolException));
+        Equal(0, nullFrames.OfType<StreamStarted>().Count());
         Equal(0, handler.SendCalls);
         var requestContent = new OwnedRequestContent(() => true);
         var sendFailure = new ResponsesHttpSseTransport(client, _ => new(HttpMethod.Post, "https://synthetic.invalid/responses") { Content = requestContent });
-        Failure(await new ChatClient(sendFailure).CompleteAsync(Request()), ChatFailureKind.Provider);
+        var sendFrames = new List<StreamEvent>();
+        var sendResult = await new ChatClient(new ResponsesRawFrameObserver(sendFailure, sendFrames)).CompleteAsync(Request());
+        Failure(sendResult, ChatFailureKind.Provider);
+        var sendError = ResponsesRawContractAssertions.Error(sendFrames, typeof(HttpRequestException));
+        Check(ReferenceEquals(sendOriginal, sendError.NativeSourceException) && sendError.NativeSourceTask?.IsFaulted == true && sendFrames.OfType<StreamStarted>().Count() == 0,
+            "Original HTTP send failure/task or acquisition ordering changed.");
         Check(requestContent.Disposed && !handler.Disposed, "Send fault retained the owned request or disposed the client.");
         Equal(1, handler.SendCalls);
 
         var body = new HttpCleanupGateStream([]) { FailRead = true };
         using (var fixture = new Fixture(body))
         {
-            var run = new ChatClient(fixture.Transport).CompleteAsync(Request());
+            var run = new ChatClient(fixture.Observed).CompleteAsync(Request());
             try
             {
                 await body.CleanupEntered.Task;
                 Check(!run.IsCompleted && !fixture.Requests.Single().Disposed, "Read fault escaped before cleanup.");
                 body.ReleaseCleanup.TrySetResult();
                 Failure(await run, ChatFailureKind.Provider);
-                Check(fixture.Requests.Single().DisposedAfterResponse, "Read fault retained its request.");
+                var readError = ResponsesRawContractAssertions.Error(fixture.Frames, typeof(IOException));
+                Check(readError.NativeSourceTask?.IsFaulted == true, "Original read task was lost.");
+                Check(fixture.Requests.Single().DisposedAfterResponse && fixture.ResponseContent.Disposed, "Read fault retained owned HTTP work.");
             }
             finally { body.ReleaseCleanup.TrySetResult(); try { await run; } catch { } }
         }
-        using (var fixture = new Fixture(new HttpCleanupFailureStream()))
+        foreach (var asynchronous in new[] { false, true })
         {
-            Failure(await new ChatClient(fixture.Transport).CompleteAsync(Request()), ChatFailureKind.Provider);
-            Check(fixture.Requests.Single().DisposedAfterResponse, "Body cleanup fault skipped owned request disposal.");
+            var original = new IOException(asynchronous ? "inert asynchronous cleanup failure" : "inert synchronous cleanup failure");
+            var cleanupBody = new CleanupFailureStream(original, asynchronous);
+            using var fixture = new Fixture(cleanupBody);
+            var result = await new ChatClient(fixture.Observed).CompleteAsync(Request());
+            Failure(result, ChatFailureKind.Provider);
+            Check(fixture.Frames.OfType<StreamDone>().Count() == 0 && fixture.Frames.OfType<StreamTerminalEvent>().Count() == 1 && fixture.Frames.Last() is StreamError,
+                "Cleanup failure produced executable success or duplicate terminals.");
+            var cleanup = (StreamError)fixture.Frames.Last();
+            Check(cleanup.NativeCleanupExceptions?.Count == 1 && ReferenceEquals(cleanup.NativeCleanupExceptions[0], original) && cleanup.NativeSourceException is null,
+                "Original cleanup exception was replaced or mislabeled as a source failure.");
+            // A synchronously throwing ValueTask method never returned a task; the raw contract must not fabricate one.
+            if (asynchronous)
+                Check(cleanup.NativeCleanupTasks?.Count == 1 && cleanup.NativeCleanupTasks[0].IsFaulted &&
+                    ReferenceEquals(cleanup.NativeCleanupTasks[0].Exception!.InnerExceptions.Single(), original), "Original faulted asynchronous cleanup task was lost.");
+            else Check(cleanup.NativeCleanupTasks is null or { Count: 0 }, "Synchronous cleanup fabricated an original task.");
+            Check(result.Failure!.Message == original.Message && cleanupBody.Attempts == 1 && fixture.Requests.Single().DisposedAfterResponse,
+                "Body cleanup error text, invocation count or owned request disposal changed.");
         }
 
         // One adapter may be enumerated repeatedly; the factory must supply a fresh owned request each time.
@@ -255,6 +307,18 @@ internal static class ResponsesHttpSseTests
             "Repeated enumeration reused or retained factory requests.");
     }
 
+    private sealed class CleanupFailureStream(Exception original, bool asynchronous) : ProbeStream([])
+    {
+        internal int Attempts;
+        public override ValueTask DisposeAsync()
+        {
+            Attempts++;
+            if (!asynchronous) throw original;
+            return new ValueTask(FailAsync());
+        }
+        private async Task FailAsync() { await Task.Yield(); throw original; }
+    }
+
     private sealed class Fixture : IDisposable
     {
         public readonly StreamProbeContent ResponseContent;
@@ -262,6 +326,8 @@ internal static class ResponsesHttpSseTests
         public readonly HttpClient Client;
         public readonly ResponsesHttpSseTransport Transport;
         public readonly List<OwnedRequestContent> Requests = [];
+        public readonly List<StreamEvent> Frames = [];
+        public IChatTransport Observed => new ResponsesRawFrameObserver(Transport, Frames);
         public int FactoryCalls;
         public ChatRequest? LastChatRequest;
 

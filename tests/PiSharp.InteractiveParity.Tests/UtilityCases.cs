@@ -970,8 +970,8 @@ internal static class UtilityCases
             Equal("## [1.1.0] - 2026-05-01\n\n### Added\n- one", entries[0].Content, "first content");
             Equal("## [0.99.1.1]\n- three", entries[2].Content, "last content trimmed");
             Seq(["1.1.0"], Changelog.GetNewEntries(entries, "1.0.4").Select(e => $"{e.Major}.{e.Minor}.{e.Patch}"), "newer than 1.0.4");
-            Equal(3, Changelog.GetNewEntries(entries, "0.1").Count, "missing patch counts as 0");
-            Equal(3, Changelog.GetNewEntries(entries, "garbage").Count, "non-numeric counts as 0");
+            Equal(0, Changelog.GetNewEntries(entries, "0.1").Count, "missing patch has no release to compare");
+            Equal(0, Changelog.GetNewEntries(entries, "garbage").Count, "non-numeric has no release to compare");
             Equal(0, Changelog.ParseChangelog(Path.Combine(dir.Path, "missing.md")).Count, "missing file");
         }));
         yield return ("util.changelog.path", Sync(() =>

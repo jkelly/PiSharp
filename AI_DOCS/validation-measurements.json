@@ -1,0 +1,86 @@
+{
+  "schemaVersion": 1,
+  "result": "valid-measurements-with-recorded-restore-delta",
+  "kind": "latency-injected-sql-executor-benchmark",
+  "workload": {
+    "batches": 256,
+    "delayBeforeEachExecutorCallMs": 1,
+    "transactionBoundaryCallsCounted": false,
+    "validation": "Each workload asserts256 stored batches; candidate asserts no more than8 executor calls."
+  },
+  "interpretation": "Elapsed times include injected Task.Delay(1), Windows timer scheduling and facade work. These are not raw SQLite throughput or a general speedup claim. MaxParameters includes warmup. No synthetic test cases or passing-suite result are created.",
+  "runs": [
+    {
+      "label": "I18-baseline-benchmark",
+      "kind": "measured-workload-not-console-test-cases",
+      "measurement": {
+        "Mode": "I12-baseline",
+        "Batches": 256,
+        "Calls": 770,
+        "ElapsedMs": 12040,
+        "MaxParameters": 5
+      },
+      "workloadExitCode": 0,
+      "receipt": "E:\\AI\\PiSharp\\gap-implementation\\artifacts\\gap-validation\\I18-baseline-benchmark-3456e988023b4696a001dad5d2aef7ce\\receipt.json",
+      "receiptRecordedResult": "failed",
+      "stdout": "E:\\AI\\PiSharp\\gap-implementation\\artifacts\\gap-validation\\I18-baseline-benchmark-3456e988023b4696a001dad5d2aef7ce\\tests.stdout.log",
+      "stdoutSha256": "9f2779a44ca6353087880222ebfffec2c9123d318fe50eb745b7315091d59555",
+      "source": {
+        "head": "14dd34b369fba6d236684da6dfc8a39a03263321",
+        "dirty": true,
+        "beforeSha256": "a6c54a673b1c23c50d757a8a04b80fd891364bda641c769f772ee0f05d7ff335",
+        "manifest": "E:\\AI\\PiSharp\\gap-implementation\\artifacts\\gap-validation\\I18-baseline-benchmark-3456e988023b4696a001dad5d2aef7ce\\source-before.json",
+        "afterSha256": "6714f8b4e7859eabe4de7d8dbe158cfb2e6fe4434361b3e979de74e698347fa5",
+        "changedDuringRun": true
+      },
+      "sourceChanges": [
+        "artifacts/gap-validation/I18-baseline/packages.lock.json"
+      ],
+      "sourceQualification": "all preexisting input hashes identical; baseline only added its exact-pinned dependency lock during first restore",
+      "platform": {
+        "os": "Microsoft Windows 10.0.26300",
+        "architecture": "X64"
+      },
+      "sdk": {
+        "path": "E:/AI/PiSharp/PiSharp/artifacts/sample-tools/dotnet/dotnet.exe",
+        "launcherSha256": "21a46f1e5235cf4e844b9de5429f0e198b9c97a41f0503a66442f1d639ca3ee6",
+        "configuredVersion": "10.0.401"
+      }
+    },
+    {
+      "label": "I18-candidate-benchmark",
+      "kind": "measured-workload-not-console-test-cases",
+      "measurement": {
+        "Mode": "I18-candidate",
+        "Batches": 256,
+        "Calls": 5,
+        "ElapsedMs": 78,
+        "MaxParameters": 2
+      },
+      "workloadExitCode": 0,
+      "receipt": "E:\\AI\\PiSharp\\gap-implementation\\artifacts\\gap-validation\\I18-candidate-benchmark-2b26941db9dc42298309e69689232a43\\receipt.json",
+      "receiptRecordedResult": "failed",
+      "stdout": "E:\\AI\\PiSharp\\gap-implementation\\artifacts\\gap-validation\\I18-candidate-benchmark-2b26941db9dc42298309e69689232a43\\tests.stdout.log",
+      "stdoutSha256": "67caf79009c7223eafbfd59d7137cf3b8982ae5ebb15e583a1f82b9a36c1d595",
+      "source": {
+        "head": "14dd34b369fba6d236684da6dfc8a39a03263321",
+        "dirty": true,
+        "beforeSha256": "0506f8828518c326d25f9df226abf602b1b3f68d9a762c762990f84e4b5aaeca",
+        "manifest": "E:\\AI\\PiSharp\\gap-implementation\\artifacts\\gap-validation\\I18-candidate-benchmark-2b26941db9dc42298309e69689232a43\\source-before.json",
+        "afterSha256": "0506f8828518c326d25f9df226abf602b1b3f68d9a762c762990f84e4b5aaeca",
+        "changedDuringRun": false
+      },
+      "sourceChanges": [],
+      "sourceQualification": "identical before/after manifests",
+      "platform": {
+        "os": "Microsoft Windows 10.0.26300",
+        "architecture": "X64"
+      },
+      "sdk": {
+        "path": "E:/AI/PiSharp/PiSharp/artifacts/sample-tools/dotnet/dotnet.exe",
+        "launcherSha256": "21a46f1e5235cf4e844b9de5429f0e198b9c97a41f0503a66442f1d639ca3ee6",
+        "configuredVersion": "10.0.401"
+      }
+    }
+  ]
+}

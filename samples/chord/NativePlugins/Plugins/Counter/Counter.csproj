@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><NoWarn>$(NoWarn);PISHARP_CHORD001;PISHARP_SCHEMA001;PISHARP_TELEMETRY001</NoWarn></PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../../../../src/PiSharp.Chord.Hosting/PiSharp.Chord.Hosting.csproj" />
+    <ProjectReference Include="../../Shared/Shared.csproj" />
+    <ProjectReference Include="Private/Private.csproj" />
+    <Compile Remove="Private/**/*.cs" />
+  </ItemGroup>
+</Project>

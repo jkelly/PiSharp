@@ -78,7 +78,8 @@
         "type": "Project",
         "dependencies": {
           "PiSharp.Contracts": "[1.5.0, )",
-          "PiSharp.Telemetry": "[1.5.0, )"
+          "PiSharp.Telemetry": "[1.5.0, )",
+          "PiSharp.Tools": "[1.5.0, )"
         }
       },
       "pisharp.codemode": {

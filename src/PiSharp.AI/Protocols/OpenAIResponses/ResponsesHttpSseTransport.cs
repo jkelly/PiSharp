@@ -87,8 +87,11 @@ public sealed class ResponsesHttpSseTransport : IChatTransport
         try
         {
             cancellationToken.ThrowIfCancellationRequested();
+            // A missing request tier is not an override of a conflicting mapper fallback. Only an explicit,
+            // recognized per-request tier whose wire value matches this bound request can reconcile the split.
+            var explicitTier = request.ServiceTier is not null ? ServiceTiers.OpenAI(request.ServiceTier, request.Model.Provider) : null;
             if (ownedRequest.Options.TryGetValue(ResponsesKeyAuthRequestFactory.RequestedServiceTierKey, out var tier) &&
-                tier.RequestedTier != _requestedServiceTier && tier.RequestedTier != ServiceTiers.OpenAI(request.ServiceTier, request.Model.Provider))
+                tier.RequestedTier != _requestedServiceTier && !(explicitTier is not null && tier.RequestedTier == explicitTier))
                 throw new ResponsesKeyAuthRequestException(ResponsesKeyAuthRequestFailure.InvalidConfiguration);
             var factory = _factory;
             if (factory is not null && factory.Policy.OnPayload is { } payloadHook)

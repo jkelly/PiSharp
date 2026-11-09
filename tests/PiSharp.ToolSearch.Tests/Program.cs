@@ -13,6 +13,7 @@ internal static partial class Program
 
     private static async Task<int> Main(string[] args)
     {
+        if (args is ["--unicode-profile"]) { Console.WriteLine(JsonSerializer.Serialize(UnicodeProfile())); return 0; }
         if (args.Length != 0 && (args.Length != 2 || args[0] != "--report")) throw new ArgumentException("Use [--report <fresh path>].");
         var cases = new List<(string Id, Func<Task> Run)>
         {
@@ -35,6 +36,8 @@ internal static partial class Program
             ("calls.grant-rule-exact-name-target-and-admitted-scope", CallGrantRule)
         };
         cases.AddRange(Sync150Cases());
+        cases.Add(("refs.search.reachable-local-graph", Sync(ReferencedSearchMetadata)));
+        cases.Add(("unicode.profile-normal-invariant-and-fallback", UnicodeProfiles));
         var results = new List<object>(); var failures = 0;
         foreach (var test in cases)
         {

@@ -1,0 +1,18 @@
+{
+  "options": {
+    "Project": "artifacts/transport-baseline/source/tests/PiSharp.Compatibility.Tests/PiSharp.Compatibility.Tests.csproj",
+    "Label": "Compatibility-baseline-14dd34",
+    "BuildTimeoutSeconds": 240,
+    "TestTimeoutSeconds": 480,
+    "LockTimeoutSeconds": 30,
+    "Configuration": "Debug",
+    "TestArgs": [
+      "--repo",
+      "E:/AI/PiSharp/gap-implementation/artifacts/transport-baseline/source"
+    ],
+    "BuildArguments": [
+      "-p:RunAnalyzers=false"
+    ]
+  },
+  "environment": {}
+}

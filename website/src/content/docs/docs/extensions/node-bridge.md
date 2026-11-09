@@ -17,18 +17,20 @@ Project extensions load only when you trust the project. `--no-extensions` turns
 
 ## What you need
 
-- **Node.js 22.13 or later**, on your `PATH` or named by `PISHARP_NODE`. Pi itself asks for Node 22.19.
+- **Node.js 22.19 or later**, on your `PATH` or named by `PISHARP_NODE`, for the installed Pi 1.5.0 packages.
 - **npm**, the first time an extension loads (see below).
 
 PiSharp starts Node only when an extension needs it. Without extensions, or with only [C# extensions](/docs/extensions/build-an-extension/), Node isn't needed.
 
 ## Pi's own packages
 
-The first time a TypeScript extension loads, PiSharp installs Pi 1.2.0's npm packages (`@earendil-works/pi-coding-agent`, `pi-ai`, `pi-tui` and `pi-agent-core`, with `typebox` and `jiti`) into `~/.pi/agent/pisharp/pi-runtime/1.2.0`, using your npm. Every `@earendil-works` package is pinned to exactly 1.2.0. `undici`, which `pi-coding-agent` uses for HTTP, is overridden to exactly 8.12.3, the version Pi 1.5.0 moved to for security advisories (Pi 1.2.0 pins 8.10.2). The runtime stays on Pi 1.2.0's packages because Pi 1.5.0's `pi-agent-core` attributes agent requests to Pi by default, which PiSharp doesn't do. A runtime installed by an earlier PiSharp, whose `package.json` lacks the override, is installed again on next use. Every package's integrity is checked against the npm registry before it's used. Extensions then load through Pi's own `jiti` setup, so imports such as `@earendil-works/pi-coding-agent` resolve to the real code.
+The first time a TypeScript extension loads, PiSharp installs Pi 1.5.0's npm packages (`@earendil-works/pi-coding-agent`, `pi-ai`, `pi-tui` and `pi-agent-core`, with `typebox` 1.3.27 and `jiti` 2.7.0) into `~/.pi/agent/pisharp/pi-runtime/1.5.0-no-default-attribution-v1`, using your npm. The Pi packages are pinned to exactly 1.5.0 and `undici` to 8.12.3. Every package's lockfile integrity is checked against the npm registry before installation is admitted. Extensions load through Pi's own `jiti` setup and share the installed packages' module identities. PiSharp clears the installed agent-core's default Pi attribution before extensions load; an extension's explicit request identity remains effective.
 
-`PISHARP_PI_RUNTIME_DIR` moves this folder.
+`PISHARP_PI_RUNTIME_DIR` selects the parent of the version and policy folder. Existing caches, including Pi 1.2.0 caches and earlier configured runtime directories, remain untouched for rollback. An unverified existing target is preserved and causes an explicit fallback.
 
-If the install can't run (offline, no npm, or a failed install), extensions still load against PiSharp's built-in copies of those modules, and PiSharp warns that they aren't running against the Pi 1.2.0 packages. The built-in copies don't support `.tsx` files or built-in tool factories with custom `operations`.
+The Node child defaults `PI_TELEMETRY` to `0` so the installed SDK also defaults to no Pi attribution. An explicit environment value remains effective; the parent process environment is unchanged.
+
+If the install can't run (offline, no npm, or a failed install), extensions still load against PiSharp's built-in copies of those modules, and PiSharp warns that they aren't running against the Pi 1.5.0 packages. The built-in copies don't support `.tsx` files or built-in tool factories with custom `operations`.
 
 ## What works
 
@@ -38,7 +40,7 @@ Pi 1.5.0's additions work too. Tool, message and entry renderers get `keyText()`
 
 Dialogs and inline custom components stack in the editor slot, as in Pi 1.4.0. A `select`, `confirm`, `input` or `editor` dialog, or an inline `ctx.ui.custom()` component, hides the one that is showing. When it closes, the one below shows again. Every dialog still settles when it is answered, times out or is aborted, and the blocked program status follows the dialog that is showing. If an extension calls `ctx.ui.setEditorComponent()` while a dialog is open, the dialog keeps its place and focus. The new editor shows when the last dialog closes.
 
-`ctx.ui.custom(factory, { overlay: true, overlayOptions })` opens the component as an overlay on top of the screen, as in Pi 1.3.0. Its `done()` hides the overlay it opened, even when another overlay opened above it. The overlay options are `width`, `minWidth`, `maxHeight`, `anchor`, `offsetX`, `offsetY`, `row`, `col`, `margin` and `nonCapturing`. Without `overlayOptions` the overlay takes the component's `width`. A function `overlayOptions` is called once, when the overlay opens. Two parts don't cross the bridge: the `visible` callback and `onHandle`, the handle Pi passes back for showing and hiding the overlay.
+`ctx.ui.custom(factory, { overlay: true, overlayOptions, onHandle })` opens the component as an overlay on top of the screen, as in Pi 1.3.0. Its `done()` hides the overlay it opened, even when another overlay opened above it. The overlay options are `width`, `minWidth`, `maxHeight`, `anchor`, `offsetX`, `offsetY`, `row`, `col`, `margin`, `nonCapturing` and `visible`. Without `overlayOptions` the overlay takes the component's `width`. A function `overlayOptions` is called once after the component factory settles. The `visible(columns, rows)` callback remains in Node and is evaluated with current terminal dimensions. `onHandle` receives `hide`, `setHidden`, `isHidden`, `focus`, `unfocus`, `isFocused` and `getBounds`. Mutations settle on the next UI turn; getters use the latest UI snapshot and reflect the handle's pending mutations. Parameterless `unfocus()` is supported. A handle becomes inert after its component closes or the extension runtime is invalidated.
 
 A component's `capturesViewportInput` (Pi 1.5.0) reaches the full-screen viewport, so a custom component or an extension editor with a menu open gets the scroll keys. PiSharp reads the value after each render and each key. The key hints keep the terminal UI's keybindings after `/reload`.
 

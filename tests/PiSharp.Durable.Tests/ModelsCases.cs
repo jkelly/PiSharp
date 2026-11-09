@@ -71,7 +71,7 @@ internal static partial class Program
             Check(models.GetModel("openai", "no-such-model") is null, "unknown model");
             Check(models.GetModel("no-such-provider", "gpt-4.1") is null, "unknown provider");
             Check(models.GetModels("openai").All(model => model.Provider == "openai" && model.Api == "openai-responses"), "openai chat models");
-            Equal(42, models.Providers.Count, "every built-in provider registers");
+            Equal(43, models.Providers.Count, "every built-in provider registers");
         }),
         // pi-ai 1.2.0 Model.inputLimits (work list area e): the read tool's image limits come from images.resize.
         Case("models.catalog.input-limits-come-from-the-catalog-entry", () =>
@@ -107,7 +107,7 @@ internal static partial class Program
         }),
         Case("models.catalog.every-embedded-shard-matches-its-pinned-hash", () =>
         {
-            Equal(42, DurableBuiltinCatalog.Providers.Length, "shards");
+            Equal(43, DurableBuiltinCatalog.Providers.Length, "frozen and reviewed providers");
             foreach (var provider in DurableBuiltinCatalog.Providers)
                 Equal(provider, DurableBuiltinCatalog.Get(provider)!.Provider, "shard " + provider);
             // The shards are PiSharp.Cli's pinned copies, linked rather than copied.

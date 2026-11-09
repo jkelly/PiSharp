@@ -121,15 +121,15 @@ internal static partial class Program
         Equal($"User packages:\n  npm:fixture-pkg@1.0.0\n    {Path.Combine(userRoot, "node_modules", "fixture-pkg")}\n", stdout, "list");
 
         (code, stdout, _) = await RunPackages(sandbox, processes, "update", "--extensions");
-        Equal(0, code, "pinned update"); Equal("Updated packages\n", stdout, "pinned versions are not updated"); Equal("1.0.0", Version(userRoot, "fixture-pkg"), "still pinned");
+        Equal(0, code, "pinned update"); Equal("Unchanged npm:fixture-pkg@1.0.0 [user] (1.0.0)\n", stdout, "pinned versions are not updated"); Equal("1.0.0", Version(userRoot, "fixture-pkg"), "still pinned");
 
         sandbox.Write(settingsPath, Jstr(new { packages = new[] { "npm:fixture-pkg@^1.0.0" } }));
         (code, stdout, stderr) = await RunPackages(sandbox, processes, "update", "--extensions");
         Equal(0, code, "range update; " + stderr);
-        Check(stdout.StartsWith("Updating npm:fixture-pkg@^1.0.0...\n", StringComparison.Ordinal) && stdout.EndsWith("Updated packages\n", StringComparison.Ordinal), "range update output: " + stdout);
+        Check(stdout.StartsWith("Updating npm:fixture-pkg@^1.0.0...\n", StringComparison.Ordinal) && stdout.EndsWith("Updated npm:fixture-pkg@^1.0.0 [user] (1.0.0 -> 1.1.0)\n", StringComparison.Ordinal), "range update output: " + stdout);
         Equal("1.1.0", Version(userRoot, "fixture-pkg"), "updated within the range");
         (code, stdout, _) = await RunPackages(sandbox, processes, "update", "npm:fixture-pkg");
-        Equal(0, code, "targeted update"); Equal("Updated npm:fixture-pkg\n", stdout, "already current");
+        Equal(0, code, "targeted update"); Equal("Unchanged npm:fixture-pkg@^1.0.0 [user] (1.1.0)\n", stdout, "already current");
 
         var run = await sandbox.Run("-p", "--provider", "anthropic", "--model", "claude-sonnet-4-5", "hi");
         Equal(0, run.Code, "session; " + run.Err);
@@ -208,11 +208,11 @@ internal static partial class Program
         var v2 = await Commit("prompts/second.md", "Second");
         (code, stdout, stderr) = await RunPackages(sandbox, processes, "update", "--extensions");
         Equal(0, code, "update; " + stderr);
-        Check(stdout.StartsWith($"Updating {source}...\n", StringComparison.Ordinal) && stdout.EndsWith("Updated packages\n", StringComparison.Ordinal), "update output: " + stdout);
+        Check(stdout.StartsWith($"Updating {source}...\n", StringComparison.Ordinal) && stdout.EndsWith($"Updated {source} [user] ({v1.Trim()} -> {v2.Trim()})\n", StringComparison.Ordinal), "update output: " + stdout);
         Check(File.Exists(Path.Combine(target, "prompts", "second.md")), "new commit pulled");
         Equal(v2, await Git(target, "rev-parse", "HEAD"), "at the remote head");
         (code, stdout, _) = await RunPackages(sandbox, processes, "update", source);
-        Equal(0, code, "targeted update"); Check(stdout.EndsWith($"Updated {source}\n", StringComparison.Ordinal), "targeted update output");
+        Equal(0, code, "targeted update"); Check(stdout.EndsWith($"Unchanged {source} [user] ({v2.Trim()})\n", StringComparison.Ordinal), "targeted update output");
 
         var run = await sandbox.Run("-p", "--provider", "anthropic", "--model", "claude-sonnet-4-5", "hi");
         Equal(0, run.Code, "session; " + run.Err);

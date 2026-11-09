@@ -108,6 +108,7 @@ internal sealed class LiveProviderRoute
                 return NativeProviderFactory.CreateBedrock(model, definition.Raw, new BedrockConverseOptions
                 {
                     MaxTokens = maximum, CacheRetention = summary ? "none" : null,
+                    ThinkingBudgets = runtime.ThinkingBudgets is { } budgets ? budgets.Value.EnumerateObject().ToImmutableDictionary(p => p.Name, p => p.Value.GetInt32()) : null,
                     Auth = async token => { var auth = await CurrentAsync(token).ConfigureAwait(false); return (auth.ApiKey, auth.Environment); }
                 }, new AwsEnvironment(environment.Get, runtime.HomeDirectory ?? Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
                     credentialHttp.Value, runtime.Time) { RunCredentialProcess = AwsCredentialProcess.RunAsync }, handler, plain && Levels(definition).Contains("off") ? "off" : null);
@@ -136,7 +137,7 @@ internal sealed class LiveProviderRoute
                     if (location is null) throw new InvalidOperationException("Vertex AI requires a location. Set GOOGLE_CLOUD_LOCATION or pass location in options.");
                     var access = await adc.AccessTokenAsync(auth.Environment?.GetValueOrDefault("GOOGLE_APPLICATION_CREDENTIALS"), token).ConfigureAwait(false);
                     return new(PiSharp.AI.Protocols.GoogleVertex.GoogleVertexEndpoints.Adc(model.Id, project, location, definition.BaseUrl), access, false, project, location);
-                }, maximum, plain, handler);
+                }, maximum, plain, handler, runtime.ThinkingBudgets);
             }
             default:
                 return NativeProviderFactory.CreateProviderRoute(model, definition.Raw, new ProviderRouteOptions(async token =>
@@ -145,7 +146,7 @@ internal sealed class LiveProviderRoute
                     var baseUrl = ProviderHeaderPolicies.ResolveCloudflareBaseUrl(auth.BaseUrl ?? definition.BaseUrl, auth.Environment);
                     return new ProviderRequestAuth(auth.ApiKey, baseUrl, auth.Headers);
                 })
-                { MaxTokens = maximum, Summary = summary, SummaryThinking = thinking, MaximumMessages = PiRequestBudget.RequestMessages }, handler);
+                { MaxTokens = maximum, ThinkingBudgets = runtime.ThinkingBudgets, Summary = summary, SummaryThinking = thinking, MaximumMessages = PiRequestBudget.RequestMessages }, handler);
         }
     }
 

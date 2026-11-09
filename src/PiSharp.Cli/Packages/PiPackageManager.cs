@@ -259,7 +259,7 @@ internal sealed class PiPackageManager
 
     /// <summary>Source update: every configured package, or those matching <paramref name="source"/>'s identity (an unknown source fails
     /// with a suggestion). Pinned npm versions stay; git sources are fetched and reset; nothing happens offline.</summary>
-    internal async Task UpdateAsync(string? source = null, CancellationToken cancellationToken = default)
+    internal async Task<PiPackageUpdateSummary> UpdateAsync(string? source = null, CancellationToken cancellationToken = default)
     {
         var identity = source is null ? null : GetPackageIdentity(source);
         var matched = false;
@@ -273,12 +273,13 @@ internal sealed class PiPackageManager
             }
         if (source is not null && !matched)
             throw new PiPackageException(BuildNoMatchingPackageMessage(source, [.. Packages("user"), .. Packages("project")]));
-        await UpdateConfiguredSources(updateSources, cancellationToken).ConfigureAwait(false);
+        return await UpdateConfiguredSources(updateSources, cancellationToken).ConfigureAwait(false);
     }
 
-    private async Task UpdateConfiguredSources(List<(string Source, string Scope)> sources, CancellationToken cancellationToken)
+    private async Task<PiPackageUpdateSummary> UpdateConfiguredSources(List<(string Source, string Scope)> sources, CancellationToken cancellationToken)
     {
-        if (OfflineModeEnabled || sources.Count == 0) return;
+        if (OfflineModeEnabled) return new([.. sources.Select(entry => new PiPackageUpdateResult(entry.Source, entry.Scope, PiPackageUpdateStatus.Offline))]);
+        var results = new System.Collections.Concurrent.ConcurrentBag<PiPackageUpdateResult>();
         var npmCandidates = new List<(string Source, string Scope, PiNpmSource Parsed)>();
         var gitCandidates = new List<(string Source, string Scope, PiGitSource Parsed)>();
         foreach (var (source, scope) in sources)
@@ -287,7 +288,12 @@ internal sealed class PiPackageManager
             switch (PiPackageSource.Parse(source))
             {
                 case PiNpmSource npm when !npm.Pinned: npmCandidates.Add((source, scope, npm)); break;
+                case PiNpmSource npm:
+                    var version = GetInstalledNpmVersion(GetManagedNpmInstallPath(npm, scope));
+                    results.Add(new(source, scope, PiPackageUpdateStatus.Unchanged, version, version));
+                    break;
                 case PiGitSource git: gitCandidates.Add((source, scope, git)); break;
+                default: results.Add(new(source, scope, PiPackageUpdateStatus.Unchanged)); break;
             }
         }
         var checks = await RunWithConcurrency(npmCandidates.Select(entry => (Func<Task<NpmUpdateCheck>>)(() => ShouldUpdateNpmSource(entry.Parsed, entry.Scope, cancellationToken))).ToList(),
@@ -295,24 +301,43 @@ internal sealed class PiPackageManager
         var userUpdates = new List<NpmUpdateTarget>(); var projectUpdates = new List<NpmUpdateTarget>();
         for (var index = 0; index < npmCandidates.Count; index++)
         {
-            if (!checks[index].ShouldUpdate) continue;
+            if (!checks[index].ShouldUpdate)
+            {
+                results.Add(new(npmCandidates[index].Source, npmCandidates[index].Scope, PiPackageUpdateStatus.Unchanged,
+                    checks[index].InstalledVersion, checks[index].InstalledVersion));
+                continue;
+            }
             (npmCandidates[index].Scope == "user" ? userUpdates : projectUpdates).Add(new(npmCandidates[index].Source, npmCandidates[index].Parsed,
-                checks[index].InstalledVersion, checks[index].TargetVersion));
+                checks[index].InstalledVersion, checks[index].TargetVersion, checks[index].Warning));
         }
         var tasks = new List<Task>();
-        if (userUpdates.Count > 0) tasks.Add(UpdateNpmBatch(userUpdates, "user", cancellationToken));
-        if (projectUpdates.Count > 0) tasks.Add(UpdateNpmBatch(projectUpdates, "project", cancellationToken));
+        if (userUpdates.Count > 0) tasks.Add(UpdateNpmBatch(userUpdates, "user", results, cancellationToken));
+        if (projectUpdates.Count > 0) tasks.Add(UpdateNpmBatch(projectUpdates, "project", results, cancellationToken));
         if (gitCandidates.Count > 0)
             tasks.Add(RunWithConcurrency(gitCandidates.Select(entry => (Func<Task<bool>>)(async () =>
             {
+                var path = GetGitInstallPath(entry.Parsed, entry.Scope);
+                var existed = Directory.Exists(path);
+                var before = await ReadGitHead(path, cancellationToken).ConfigureAwait(false);
                 await WithProgress("update", entry.Source, $"Updating {entry.Source}...", () => UpdateGit(entry.Parsed, entry.Scope, cancellationToken)).ConfigureAwait(false);
+                var after = await ReadGitHead(path, cancellationToken).ConfigureAwait(false);
+                var warning = after is null ? "Could not determine the installed commit." : existed && before is null ? "Could not determine the previous commit." : File.Exists(GetGitUpdateMarkerPath(path)) ? "Dependencies were installed but checkout cleanup is incomplete." : null;
+                results.Add(new(entry.Source, entry.Scope, warning is not null ? PiPackageUpdateStatus.Warning : before == after ? PiPackageUpdateStatus.Unchanged : PiPackageUpdateStatus.Changed, before, after, warning));
                 return true;
             })).ToList(), GitUpdateConcurrency));
         await Task.WhenAll(tasks).ConfigureAwait(false);
+        return new([.. sources.Select(entry => results.First(result => result.Source == entry.Source && result.Scope == entry.Scope))]);
     }
 
-    private sealed record NpmUpdateCheck(bool ShouldUpdate, string? InstalledVersion = null, string? TargetVersion = null);
-    private sealed record NpmUpdateTarget(string Source, PiNpmSource Parsed, string? InstalledVersion, string? TargetVersion);
+    private async Task<string?> ReadGitHead(string path, CancellationToken token)
+    {
+        if (!Directory.Exists(path)) return null;
+        try { return PiArgs.JsTrim(await Capture("git", ["rev-parse", "HEAD"], path, token).ConfigureAwait(false)); }
+        catch (Exception error) when (error is not OperationCanceledException) { return null; }
+    }
+
+    private sealed record NpmUpdateCheck(bool ShouldUpdate, string? InstalledVersion = null, string? TargetVersion = null, string? Warning = null);
+    private sealed record NpmUpdateTarget(string Source, PiNpmSource Parsed, string? InstalledVersion, string? TargetVersion, string? Warning = null);
 
     private async Task<NpmUpdateCheck> ShouldUpdateNpmSource(PiNpmSource source, string scope, CancellationToken cancellationToken)
     {
@@ -325,10 +350,10 @@ internal sealed class PiPackageManager
             return new(PiSemver.Gt(target, installedVersion), installedVersion, target);
         }
         // Preserve the update when the version lookup fails.
-        catch (Exception error) when (error is not OperationCanceledException) { return new(true, installedVersion); }
+        catch (Exception error) when (error is not OperationCanceledException) { return new(true, installedVersion, Warning: "Registry version lookup failed; installed version was checked after updating."); }
     }
 
-    private async Task UpdateNpmBatch(List<NpmUpdateTarget> sources, string scope, CancellationToken cancellationToken)
+    private async Task UpdateNpmBatch(List<NpmUpdateTarget> sources, string scope, System.Collections.Concurrent.ConcurrentBag<PiPackageUpdateResult> results, CancellationToken cancellationToken)
     {
         if (sources.Count == 0) return;
         var label = sources.Count == 1 ? sources[0].Source : $"{scope} npm packages";
@@ -341,6 +366,15 @@ internal sealed class PiPackageManager
             await RunNpmCommand(GetNpmInstallArgs(specs, installRoot), null, cancellationToken).ConfigureAwait(false);
         }).ConfigureAwait(false);
         ReportUnchangedNpmUpdates(sources, scope);
+        foreach (var entry in sources)
+        {
+            var after = GetInstalledNpmVersion(GetManagedNpmInstallPath(entry.Parsed, scope));
+            var warning = after is null ? "Could not determine the installed version." : entry.Warning;
+            if (after == entry.InstalledVersion && entry.TargetVersion is not null && after != entry.TargetVersion)
+                warning = $"Registry reports {entry.TargetVersion}, but npm left the installed version unchanged.";
+            results.Add(new(entry.Source, scope, warning is not null ? PiPackageUpdateStatus.Warning : after == entry.InstalledVersion ? PiPackageUpdateStatus.Unchanged : PiPackageUpdateStatus.Changed,
+                entry.InstalledVersion, after, warning));
+        }
     }
 
     /// <summary>Source reportUnchangedNpmUpdates: npm can resolve stale registry metadata shortly after a publish and install the old

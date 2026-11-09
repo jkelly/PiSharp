@@ -1,0 +1,758 @@
+{
+  "schemaVersion": 2,
+  "groups": {
+    "core": [
+      "PiSharp.Schema.Tests",
+      "PiSharp.AnthropicThreads.Tests",
+      "PiSharp.OpenAICompatibilityGap.Tests",
+      "PiSharp.SimpleOutputBudget.Tests",
+      "PiSharp.ResponsesTranscriptTools.Tests",
+      "PiSharp.ClassifierConfig.Tests",
+      "PiSharp.Models.Tests",
+      "PiSharp.CliSync.Tests",
+      "PiSharp.Tui.NativeModifiers.Tests",
+      "PiSharp.Evals.Tests"
+    ],
+    "chord": [
+      "PiSharp.Chord.Tests",
+      "PiSharp.Chord.Hosting.Tests",
+      "PiSharp.Chord.Legacy.Cluster.Tests",
+      "PiSharp.Chord.Durable.Integration.Tests",
+      "PiSharp.Durable150.Capture.Tests"
+    ],
+    "env": [
+      "PiSharp.Env.Connection.Tests",
+      "PiSharp.Env.Daemon.Tests",
+      "PiSharp.Env.Adapter.Tests",
+      "PiSharp.Env.Watch.Tests",
+      "PiSharp.Env.Process.Tests",
+      "PiSharp.Env.Terminal.Tests",
+      "PiSharp.Env.Ssh.Tests"
+    ],
+    "runtime-installer": [
+      "PiSharp.ExtensionParity.Tests"
+    ]
+  },
+  "buildTimeoutSeconds": 600,
+  "testTimeoutSeconds": 600,
+  "policies": {
+    "PiSharp.Schema.Tests": {
+      "format": "json",
+      "minimumCases": 1,
+      "requireDeclaredCount": true,
+      "expectedCaseIds": {
+        "all": [
+          "sync150.conformance-draft2020-12",
+          "sync150.conformance-draft7",
+          "sync150.errors-at-the-field",
+          "sync150.errors-tagged-union-branch",
+          "sync150.errors-pointer-escaping-and-refs",
+          "sync150.errors-messages",
+          "sync150.values-own-properties-and-bytes",
+          "sync150.string-lengths-in-code-points",
+          "sync150.options-formats-documents-draft7",
+          "sync150.malformed-schemas-throw",
+          "sync150.unresolved-refs-throw-or-reject",
+          "sync150.formats-standard",
+          "sync150.coerce-copy-on-write-and-parse",
+          "sync150.coerce-pass1-optional-nulls",
+          "sync150.coerce-pass2-conversion-rules",
+          "sync150.coerce-pass3-primitives-and-conflicts",
+          "sync150.coerce-recursive-schemas",
+          "sync150.coerce-member-keywords",
+          "sync150.public-api-json-nodes",
+          "sync150.tool-arguments-message-and-paths",
+          "sync150.tool-arguments-coerced-for-every-origin",
+          "sync150.tool-arguments-dangling-ref-rejects-in-place",
+          "sync150.tool-arguments-uncompilable-schema",
+          "gap.C01.relative-root-local-refs",
+          "gap.C01.relative-root-annotations",
+          "gap.C01.nested-resource-errors",
+          "gap.C01.dynamic-root-coercion",
+          "gap.C01.relative-root-tool-arguments",
+          "gap.F09.strict-validate-result",
+          "gap.F09.json-equality",
+          "gap.F09.recursive-and-typed-schema",
+          "gap.schema.public-json-surrogate-boundary",
+          "gap.contracts.source-generated-typed-schema",
+          "gap.contracts.aot-json-boundaries"
+        ]
+      }
+    },
+    "PiSharp.Models.Tests": {
+      "format": "json",
+      "minimumCases": 1,
+      "requireDeclaredCount": true,
+      "allowedSkips": {
+        "Linux": [
+          {
+            "id": "config-value.windows-default-shell-fallback",
+            "reason": "requires-windows-cmd-exe"
+          }
+        ],
+        "Darwin": [
+          {
+            "id": "config-value.windows-default-shell-fallback",
+            "reason": "requires-windows-cmd-exe"
+          }
+        ]
+      }
+    },
+    "PiSharp.CliSync.Tests": {
+      "format": "json",
+      "minimumCases": 1,
+      "expectedCaseIds": {
+        "Windows": [
+          "tools.read-image-pi-budget-end-to-end",
+          "live.image-pi-budget-every-family",
+          "cli.tools.parse-patterns-modifiers-and-no-mcp",
+          "cli.tools.exact-upstream-errors-through-commands",
+          "cli.provider-requires-model-exact-error",
+          "cli.tools.resolve-modifiers-from-available-defaults",
+          "selection.patterns-are-anchored-star-globs",
+          "selection.allowlist-keeps-unnamed-mcp-tools",
+          "selection.modifiers-change-the-default-selection",
+          "selection.initial-patterns-and-tool-search-gate",
+          "selection.registry-drops-unnamed-direct-mcp-activation",
+          "selection.initial-tools-settings-and-sdk-names-ignore-unregistered",
+          "selection.allowlisted-mcp-tool-activates-when-it-registers",
+          "selection.explicit-activation-ignores-unknown-and-capped-names",
+          "reload.default-tools-additions-only",
+          "reload.modifiers-allowlists-and-patterns",
+          "reload.planner-host-selector",
+          "reload.pending-tools-activate-on-late-registration",
+          "open.restored-unregistered-tools-pending-until-registration",
+          "open.restored-disabled-and-excluded-tools-stay-off",
+          "tree.navigation-restores-branch-tools-pending-until-registration",
+          "restore.changed-declaration-uses-current-binding",
+          "restore.hidden-tool-skipped-and-pending",
+          "tree.navigation-without-system-message-keeps-current-tools",
+          "open.restored-loadout-recorded-at-the-first-prompt",
+          "loadout.tool-change-records-match-declare-tool-changes",
+          "selection.idle-selection-and-catalog-recorded-at-the-next-prompt",
+          "prompt.in-memory-loadout-prompt-before-the-next-prompt",
+          "prompt.hidden-tools-byte-exact-sections",
+          "prompt.skills-hint-reader-fallback-and-indirect",
+          "prompt.unhidden-docs-line-and-options",
+          "prompt.registry-passes-prepared-hidden-declarations",
+          "prompt.mcp-servers-section-first-prompt-append-and-removal",
+          "keybindings.home-end-editor-only-defaults",
+          "osc7501.format-byte-sequences",
+          "osc7501.query-and-reply-detection",
+          "osc7501.channel-override-negotiation-and-restart",
+          "osc7501.reporter-run-dialog-and-compaction-lifecycle",
+          "osc7501.terminal-view-start-report-and-stop",
+          "auth.anthropic.login-copy-code-stores-auth-json-and-refreshes",
+          "auth.anthropic.login-browser-pasted-redirect-and-state-mismatch",
+          "auth.logout-selects-and-removes-stored-credentials",
+          "auth.lock-access-denied-retried-briefly-on-windows-other-errors-fail-fast",
+          "auth.anthropic.live-route-stored-oauth-refreshes-mid-session-and-logout-falls-back",
+          "auth.anthropic.live-route-stored-key-env-precedence-and-federation",
+          "provider.anthropic.live-route-managed-effort-levels-markers-and-recorded-effort",
+          "summary.compaction-and-branch-requests-match-upstream-per-family",
+          "provider.opencode.live-main-requests-carry-x-opencode-session",
+          "provider.azure.live-route-responses-completions-and-endpoint-errors",
+          "live.long-session-2000-messages-10000-records-opens-and-sends-whole-transcript",
+          "mcp.session.global-config-direct-background-failure-report-and-no-mcp",
+          "mcp.session.oauth-server-sends-stored-mcp-auth-token",
+          "mcp.session.windows-command-resolution-and-cmd-escaping",
+          "wire.agent-settled.json-mode-record-with-aborted",
+          "wire.agent-settled.native-extension-observation-and-reported-failure",
+          "wire.rpc-bash.interactive-bang-commands-abort-and-bounded-deltas",
+          "sync150.prompt-template-empty-quoted-arguments",
+          "sync150.resume-keeps-branch-tools-with-default-selection",
+          "sync150.resume-cli-keeps-tools-enabled-in-the-session",
+          "sync150.resume-activates-unmentioned-extension-tools-over-the-whole-branch",
+          "sync150.active-tools-keep-their-order",
+          "sync150.kimi-coding-live-route-speaks-chat-completions",
+          "sync150.opencode-go-google-route-carries-x-opencode-session",
+          "sync150.minimax-m3.1-flash-sends-output-config-effort",
+          "sync150.claude-opus-5-off-sends-disabled-thinking-live",
+          "sync150.openrouter-anthropic-latest-alias-speaks-messages",
+          "sync150.native-sdk-pack-pins-siblings-exactly",
+          "sync150.native-sdk-validator-accepts-only-exact-sibling-pins"
+        ],
+        "Linux": [
+          "tools.read-image-pi-budget-end-to-end",
+          "live.image-pi-budget-every-family",
+          "cli.tools.parse-patterns-modifiers-and-no-mcp",
+          "cli.tools.exact-upstream-errors-through-commands",
+          "cli.provider-requires-model-exact-error",
+          "cli.tools.resolve-modifiers-from-available-defaults",
+          "selection.patterns-are-anchored-star-globs",
+          "selection.allowlist-keeps-unnamed-mcp-tools",
+          "selection.modifiers-change-the-default-selection",
+          "selection.initial-patterns-and-tool-search-gate",
+          "selection.registry-drops-unnamed-direct-mcp-activation",
+          "selection.initial-tools-settings-and-sdk-names-ignore-unregistered",
+          "selection.allowlisted-mcp-tool-activates-when-it-registers",
+          "selection.explicit-activation-ignores-unknown-and-capped-names",
+          "reload.default-tools-additions-only",
+          "reload.modifiers-allowlists-and-patterns",
+          "reload.planner-host-selector",
+          "reload.pending-tools-activate-on-late-registration",
+          "open.restored-unregistered-tools-pending-until-registration",
+          "open.restored-disabled-and-excluded-tools-stay-off",
+          "tree.navigation-restores-branch-tools-pending-until-registration",
+          "restore.changed-declaration-uses-current-binding",
+          "restore.hidden-tool-skipped-and-pending",
+          "tree.navigation-without-system-message-keeps-current-tools",
+          "open.restored-loadout-recorded-at-the-first-prompt",
+          "loadout.tool-change-records-match-declare-tool-changes",
+          "selection.idle-selection-and-catalog-recorded-at-the-next-prompt",
+          "prompt.in-memory-loadout-prompt-before-the-next-prompt",
+          "prompt.hidden-tools-byte-exact-sections",
+          "prompt.skills-hint-reader-fallback-and-indirect",
+          "prompt.unhidden-docs-line-and-options",
+          "prompt.registry-passes-prepared-hidden-declarations",
+          "prompt.mcp-servers-section-first-prompt-append-and-removal",
+          "keybindings.home-end-editor-only-defaults",
+          "osc7501.format-byte-sequences",
+          "osc7501.query-and-reply-detection",
+          "osc7501.channel-override-negotiation-and-restart",
+          "osc7501.reporter-run-dialog-and-compaction-lifecycle",
+          "osc7501.terminal-view-start-report-and-stop",
+          "auth.anthropic.login-copy-code-stores-auth-json-and-refreshes",
+          "auth.anthropic.login-browser-pasted-redirect-and-state-mismatch",
+          "auth.logout-selects-and-removes-stored-credentials",
+          "auth.lock-access-denied-retried-briefly-on-windows-other-errors-fail-fast",
+          "auth.anthropic.live-route-stored-oauth-refreshes-mid-session-and-logout-falls-back",
+          "auth.anthropic.live-route-stored-key-env-precedence-and-federation",
+          "provider.anthropic.live-route-managed-effort-levels-markers-and-recorded-effort",
+          "summary.compaction-and-branch-requests-match-upstream-per-family",
+          "provider.opencode.live-main-requests-carry-x-opencode-session",
+          "provider.azure.live-route-responses-completions-and-endpoint-errors",
+          "live.long-session-2000-messages-10000-records-opens-and-sends-whole-transcript",
+          "mcp.session.global-config-direct-background-failure-report-and-no-mcp",
+          "mcp.session.oauth-server-sends-stored-mcp-auth-token",
+          "wire.agent-settled.json-mode-record-with-aborted",
+          "wire.agent-settled.native-extension-observation-and-reported-failure",
+          "wire.rpc-bash.interactive-bang-commands-abort-and-bounded-deltas",
+          "sync150.prompt-template-empty-quoted-arguments",
+          "sync150.resume-keeps-branch-tools-with-default-selection",
+          "sync150.resume-cli-keeps-tools-enabled-in-the-session",
+          "sync150.resume-activates-unmentioned-extension-tools-over-the-whole-branch",
+          "sync150.active-tools-keep-their-order",
+          "sync150.kimi-coding-live-route-speaks-chat-completions",
+          "sync150.opencode-go-google-route-carries-x-opencode-session",
+          "sync150.minimax-m3.1-flash-sends-output-config-effort",
+          "sync150.claude-opus-5-off-sends-disabled-thinking-live",
+          "sync150.openrouter-anthropic-latest-alias-speaks-messages",
+          "sync150.native-sdk-pack-pins-siblings-exactly",
+          "sync150.native-sdk-validator-accepts-only-exact-sibling-pins"
+        ],
+        "Darwin": [
+          "tools.read-image-pi-budget-end-to-end",
+          "live.image-pi-budget-every-family",
+          "cli.tools.parse-patterns-modifiers-and-no-mcp",
+          "cli.tools.exact-upstream-errors-through-commands",
+          "cli.provider-requires-model-exact-error",
+          "cli.tools.resolve-modifiers-from-available-defaults",
+          "selection.patterns-are-anchored-star-globs",
+          "selection.allowlist-keeps-unnamed-mcp-tools",
+          "selection.modifiers-change-the-default-selection",
+          "selection.initial-patterns-and-tool-search-gate",
+          "selection.registry-drops-unnamed-direct-mcp-activation",
+          "selection.initial-tools-settings-and-sdk-names-ignore-unregistered",
+          "selection.allowlisted-mcp-tool-activates-when-it-registers",
+          "selection.explicit-activation-ignores-unknown-and-capped-names",
+          "reload.default-tools-additions-only",
+          "reload.modifiers-allowlists-and-patterns",
+          "reload.planner-host-selector",
+          "reload.pending-tools-activate-on-late-registration",
+          "open.restored-unregistered-tools-pending-until-registration",
+          "open.restored-disabled-and-excluded-tools-stay-off",
+          "tree.navigation-restores-branch-tools-pending-until-registration",
+          "restore.changed-declaration-uses-current-binding",
+          "restore.hidden-tool-skipped-and-pending",
+          "tree.navigation-without-system-message-keeps-current-tools",
+          "open.restored-loadout-recorded-at-the-first-prompt",
+          "loadout.tool-change-records-match-declare-tool-changes",
+          "selection.idle-selection-and-catalog-recorded-at-the-next-prompt",
+          "prompt.in-memory-loadout-prompt-before-the-next-prompt",
+          "prompt.hidden-tools-byte-exact-sections",
+          "prompt.skills-hint-reader-fallback-and-indirect",
+          "prompt.unhidden-docs-line-and-options",
+          "prompt.registry-passes-prepared-hidden-declarations",
+          "prompt.mcp-servers-section-first-prompt-append-and-removal",
+          "keybindings.home-end-editor-only-defaults",
+          "osc7501.format-byte-sequences",
+          "osc7501.query-and-reply-detection",
+          "osc7501.channel-override-negotiation-and-restart",
+          "osc7501.reporter-run-dialog-and-compaction-lifecycle",
+          "osc7501.terminal-view-start-report-and-stop",
+          "auth.anthropic.login-copy-code-stores-auth-json-and-refreshes",
+          "auth.anthropic.login-browser-pasted-redirect-and-state-mismatch",
+          "auth.logout-selects-and-removes-stored-credentials",
+          "auth.lock-access-denied-retried-briefly-on-windows-other-errors-fail-fast",
+          "auth.anthropic.live-route-stored-oauth-refreshes-mid-session-and-logout-falls-back",
+          "auth.anthropic.live-route-stored-key-env-precedence-and-federation",
+          "provider.anthropic.live-route-managed-effort-levels-markers-and-recorded-effort",
+          "summary.compaction-and-branch-requests-match-upstream-per-family",
+          "provider.opencode.live-main-requests-carry-x-opencode-session",
+          "provider.azure.live-route-responses-completions-and-endpoint-errors",
+          "live.long-session-2000-messages-10000-records-opens-and-sends-whole-transcript",
+          "mcp.session.global-config-direct-background-failure-report-and-no-mcp",
+          "mcp.session.oauth-server-sends-stored-mcp-auth-token",
+          "wire.agent-settled.json-mode-record-with-aborted",
+          "wire.agent-settled.native-extension-observation-and-reported-failure",
+          "wire.rpc-bash.interactive-bang-commands-abort-and-bounded-deltas",
+          "sync150.prompt-template-empty-quoted-arguments",
+          "sync150.resume-keeps-branch-tools-with-default-selection",
+          "sync150.resume-cli-keeps-tools-enabled-in-the-session",
+          "sync150.resume-activates-unmentioned-extension-tools-over-the-whole-branch",
+          "sync150.active-tools-keep-their-order",
+          "sync150.kimi-coding-live-route-speaks-chat-completions",
+          "sync150.opencode-go-google-route-carries-x-opencode-session",
+          "sync150.minimax-m3.1-flash-sends-output-config-effort",
+          "sync150.claude-opus-5-off-sends-disabled-thinking-live",
+          "sync150.openrouter-anthropic-latest-alias-speaks-messages",
+          "sync150.native-sdk-pack-pins-siblings-exactly",
+          "sync150.native-sdk-validator-accepts-only-exact-sibling-pins"
+        ]
+      },
+      "platformPolicy": "The MCP stdio implementation is Windows-only; the explicitly named Windows command escaping case is not registered on Linux/macOS. Every remaining ID is mandatory."
+    },
+    "PiSharp.Chord.Tests": {
+      "format": "json",
+      "minimumCases": 1,
+      "requireDeclaredCount": true
+    },
+    "PiSharp.Chord.Hosting.Tests": {
+      "format": "json",
+      "minimumCases": 1,
+      "requireDeclaredCount": true,
+      "expectedCaseIds": {
+        "all": [
+          "plugins.discovery-validates-and-orders",
+          "plugins.build-load-reload-failure-and-collectible-context",
+          "http.routes-wraps-origin-and-anonymous-webhook",
+          "http.streaming-ranges-files-and-signed-cookies",
+          "http.real-loopback-listener-and-websocket",
+          "http.close-drains-then-seals-active-request",
+          "workers.real-process-route-stop-restart",
+          "workers.address-lock-waits-and-cancels",
+          "plugins.rollout-continues-failures-and-stops-explicitly",
+          "plugins.new-failed-plugin-retains-dirty-mark",
+          "plugins.builder-natural-exit-joins-descendant-pipes",
+          "http.listener-failed-start-disposes-services",
+          "workers.startup-shutdown-closes-connected-host",
+          "processes.natural-and-crashed-leader-kill-descendants"
+        ]
+      }
+    },
+    "PiSharp.OpenAICompatibilityGap.Tests": {
+      "format": "summary",
+      "minimumCases": 0,
+      "completionPattern": "PASS OpenAI compatibility gap matrix: [1-9][0-9]* assertions; offline authored expectations\\.",
+      "limitation": "Suite emits only its completion summary; individual assertions are not reported or invented."
+    },
+    "PiSharp.SimpleOutputBudget.Tests": {
+      "format": "summary",
+      "minimumCases": 0,
+      "completionPattern": "PASS: [1-9][0-9]* authored cross-provider output-budget cases; no network requests\\.",
+      "limitation": "Suite emits only its completion summary; individual assertions are not reported or invented."
+    },
+    "PiSharp.ResponsesTranscriptTools.Tests": {
+      "format": "summary",
+      "minimumCases": 0,
+      "completionPattern": "PASS Responses/Codex/Azure transcript tool matrix: [1-9][0-9]* assertions \\(authored v1\\.5\\.0 target\\)\\.",
+      "limitation": "Suite emits only its completion summary; individual assertions are not reported or invented."
+    },
+    "PiSharp.ClassifierConfig.Tests": {
+      "format": "summary",
+      "minimumCases": 0,
+      "completionPattern": "PASS: classifier provider configuration, loopback requests, reload snapshots, auth ownership, chat-only overrides, extension providers",
+      "limitation": "Suite emits only its completion summary; individual assertions are not reported or invented."
+    },
+    "PiSharp.Env.Adapter.Tests": {
+      "format": "summary",
+      "minimumCases": 0,
+      "completionPattern": "PASS remote adapters: paths, chunked transfers, lines, listing, errors, exec, cancellation and session fencing",
+      "limitation": "Suite emits only its completion summary; individual assertions are not reported or invented."
+    },
+    "PiSharp.AnthropicThreads.Tests": {
+      "format": "lines",
+      "minimumCases": 2,
+      "completionPattern": "PASS Anthropic continuation: normalization, OAuth tool roundtrip, mutation, fixed settings, hooks, retries, scope, warm isolation, cancellation, bounds, cleanup and concurrency"
+    },
+    "PiSharp.Tui.NativeModifiers.Tests": {
+      "format": "lines",
+      "minimumCases": 1,
+      "completionPattern": "[0-9]+/[1-9][0-9]* passed; offline host=.+; physical macOS qualification NOT performed\\.",
+      "expectedCaseIds": {
+        "all": [
+          "macOS session flags mask only physical Shift",
+          "non-macOS never invokes CoreGraphics",
+          "unavailable native library/symbol/image falls back",
+          "unexpected cancellation and errors propagate",
+          "actual host pipeline preserves Enter and Alt distinctions",
+          "stop cancels queued input without querying modifiers"
+        ]
+      }
+    },
+    "PiSharp.Evals.Tests": {
+      "format": "lines",
+      "minimumCases": 1,
+      "completionPattern": "[1-9][0-9]* assertions; 0 failed cases\\.",
+      "expectedCaseIds": {
+        "all": [
+          "plan.validation-order",
+          "comparison.paired-values-and-nulls",
+          "comparison.invalid-arms-block",
+          "comparison.digest-and-determinism",
+          "harness.failed-arm-continues-and-preflight",
+          "fixture.offline-repeatable",
+          "runtime.json-transcript",
+          "staging.container-recorder-isolation",
+          "staging.failure-continuation-and-mutation",
+          "staging.live-opt-in-and-paths",
+          "executor.real-offline-child",
+          "staging.real-fake-executable",
+          "cli.negative-input-exit"
+        ]
+      }
+    },
+    "PiSharp.Chord.Legacy.Cluster.Tests": {
+      "format": "lines",
+      "minimumCases": 1,
+      "completionPattern": "0 failures; legacy cluster/manager tests; authored native evidence, source [a-f0-9]{40}",
+      "expectedCaseIds": {
+        "Windows": [
+          "retention.actual-remote-linger-reacquire-and-lru",
+          "retention.actual-upstream-reconnect-reholds-again",
+          "cluster.actual-host-routes-and-reloads-existing-reference",
+          "cluster.parent-first-fifo-commit-and-prefix",
+          "cluster.vote-failure-rolls-every-host-back",
+          "cluster.vote-timeout-aborts-loading-child-and-can-retry",
+          "cluster.late-child-fenced-and-reconciled",
+          "cluster.ahead-child-refused-and-client-not-participant",
+          "cluster.discovery-reauthorizes-and-admits-expired-request",
+          "cluster.reconnect-replaces-parent-with-isolated-close",
+          "cluster.catchup-merges-modules-and-removal-tombstones",
+          "cluster.invalidates-or-restamps-only-matching-peer",
+          "manager.concurrent-start-stop-replace-real-child",
+          "manager.kernel-lock-and-replace",
+          "manager.does-not-inherit-parent-lock",
+          "manager.fatal-and-readiness-timeout-cleanup",
+          "manager.busy-to-idle-clock-and-policy",
+          "manager.grace-kills-descendants",
+          "manager.graceful-exit-kills-descendants-windows",
+          "retention.shared-bindings-lru-and-reacquire",
+          "retention.unhydrated-release-and-released-reference-gc",
+          "retention.collectible-assembly-shared-identity-and-alias",
+          "retention.actual-host-pins-module-until-root-retires",
+          "manager.admission-cleans-natural-exit-before-ready",
+          "retention.old-resource-close-loads-private-dependency-before-unload"
+        ],
+        "Linux": [
+          "retention.actual-remote-linger-reacquire-and-lru",
+          "retention.actual-upstream-reconnect-reholds-again",
+          "cluster.actual-host-routes-and-reloads-existing-reference",
+          "cluster.parent-first-fifo-commit-and-prefix",
+          "cluster.vote-failure-rolls-every-host-back",
+          "cluster.vote-timeout-aborts-loading-child-and-can-retry",
+          "cluster.late-child-fenced-and-reconciled",
+          "cluster.ahead-child-refused-and-client-not-participant",
+          "cluster.discovery-reauthorizes-and-admits-expired-request",
+          "cluster.reconnect-replaces-parent-with-isolated-close",
+          "cluster.catchup-merges-modules-and-removal-tombstones",
+          "cluster.invalidates-or-restamps-only-matching-peer",
+          "manager.concurrent-start-stop-replace-real-child",
+          "manager.kernel-lock-and-replace",
+          "manager.does-not-inherit-parent-lock",
+          "manager.fatal-and-readiness-timeout-cleanup",
+          "manager.busy-to-idle-clock-and-policy",
+          "manager.grace-kills-descendants",
+          "manager.graceful-exit-kills-descendants-windows",
+          "retention.shared-bindings-lru-and-reacquire",
+          "retention.unhydrated-release-and-released-reference-gc",
+          "retention.collectible-assembly-shared-identity-and-alias",
+          "retention.actual-host-pins-module-until-root-retires",
+          "manager.admission-cleans-natural-exit-before-ready",
+          "retention.old-resource-close-loads-private-dependency-before-unload"
+        ],
+        "Darwin": [
+          "retention.actual-remote-linger-reacquire-and-lru",
+          "retention.actual-upstream-reconnect-reholds-again",
+          "cluster.actual-host-routes-and-reloads-existing-reference",
+          "cluster.parent-first-fifo-commit-and-prefix",
+          "cluster.vote-failure-rolls-every-host-back",
+          "cluster.vote-timeout-aborts-loading-child-and-can-retry",
+          "cluster.late-child-fenced-and-reconciled",
+          "cluster.ahead-child-refused-and-client-not-participant",
+          "cluster.discovery-reauthorizes-and-admits-expired-request",
+          "cluster.reconnect-replaces-parent-with-isolated-close",
+          "cluster.catchup-merges-modules-and-removal-tombstones",
+          "cluster.invalidates-or-restamps-only-matching-peer",
+          "manager.concurrent-start-stop-replace-real-child",
+          "manager.kernel-lock-and-replace",
+          "manager.does-not-inherit-parent-lock",
+          "manager.fatal-and-readiness-timeout-cleanup",
+          "manager.busy-to-idle-clock-and-policy",
+          "manager.grace-kills-descendants",
+          "manager.graceful-exit-kills-descendants-windows",
+          "retention.shared-bindings-lru-and-reacquire",
+          "retention.unhydrated-release-and-released-reference-gc",
+          "retention.collectible-assembly-shared-identity-and-alias",
+          "retention.actual-host-pins-module-until-root-retires",
+          "manager.admission-cleans-natural-exit-before-ready",
+          "retention.old-resource-close-loads-private-dependency-before-unload"
+        ]
+      },
+      "allowedSkips": {
+        "Linux": [
+          {
+            "line": "SKIP graceful Job Object descendant test: Windows only.",
+            "suppressesPassId": "manager.graceful-exit-kills-descendants-windows",
+            "reason": "Windows Job Object descendant cleanup is only available on Windows; native Unix process ownership cases remain required."
+          }
+        ],
+        "Darwin": [
+          {
+            "line": "SKIP graceful Job Object descendant test: Windows only.",
+            "suppressesPassId": "manager.graceful-exit-kills-descendants-windows",
+            "reason": "Windows Job Object descendant cleanup is only available on Windows; native Unix process ownership cases remain required."
+          }
+        ]
+      }
+    },
+    "PiSharp.Chord.Durable.Integration.Tests": {
+      "format": "lines",
+      "minimumCases": 1,
+      "completionPattern": "[0-9]+/[1-9][0-9]* real-host Durable integration cases passed\\.",
+      "expectedCaseIds": {
+        "all": [
+          "real-host.example35.shared-sequence-archive-reopen-and-store-ownership",
+          "real-host.example36.follows-live-durable-views-and-detaches",
+          "real-host.example37.session-failure-retry-reopens-native-and-rebinds-follower",
+          "real-host.store-publication.adopts-two-durable-views-in-one-batch",
+          "real-host.registry-reader.reload-wakes-blocked-task-and-removal-is-visible",
+          "real-host.storage-failure.closes-once-and-detaches-owned-harness",
+          "real-host.follow.close-during-real-durable-attachment-detaches-late-result"
+        ]
+      }
+    },
+    "PiSharp.Durable150.Capture.Tests": {
+      "format": "lines",
+      "minimumCases": 1,
+      "completionPattern": "PASS_UPSTREAM_CAPTURE: [1-9][0-9]*; FAIL: 0; SKIP: 0",
+      "expectedCaseIds": {
+        "all": [
+          "capture150.manifest-and-raw-file-integrity",
+          "capture150.first.sqlite.sleeping.read",
+          "capture150.first.sqlite.early-reopen.read",
+          "capture150.first.sqlite.due-reopen.read",
+          "capture150.first.sqlite.process-exit.read",
+          "capture150.first.sqlite.restart-opened.read",
+          "capture150.first.sqlite.restart-completed.read",
+          "capture150.first.sqlite.commit-observers.read",
+          "capture150.first.sqlite.compaction.read",
+          "capture150.first.jsonl.sleeping.read",
+          "capture150.first.jsonl.early-reopen.read",
+          "capture150.first.jsonl.due-reopen.read",
+          "capture150.first.jsonl.process-exit.read",
+          "capture150.first.jsonl.restart-opened.read",
+          "capture150.first.jsonl.restart-completed.read",
+          "capture150.first.jsonl.commit-observers.read",
+          "capture150.first.jsonl.compaction.read",
+          "capture150.second.sqlite.sleeping.read",
+          "capture150.second.sqlite.early-reopen.read",
+          "capture150.second.sqlite.due-reopen.read",
+          "capture150.second.sqlite.process-exit.read",
+          "capture150.second.sqlite.restart-opened.read",
+          "capture150.second.sqlite.restart-completed.read",
+          "capture150.second.sqlite.commit-observers.read",
+          "capture150.second.sqlite.compaction.read",
+          "capture150.second.jsonl.sleeping.read",
+          "capture150.second.jsonl.early-reopen.read",
+          "capture150.second.jsonl.due-reopen.read",
+          "capture150.second.jsonl.process-exit.read",
+          "capture150.second.jsonl.restart-opened.read",
+          "capture150.second.jsonl.restart-completed.read",
+          "capture150.second.jsonl.commit-observers.read",
+          "capture150.second.jsonl.compaction.read",
+          "capture150.sqlite.two-independent-runs",
+          "capture150.jsonl.two-independent-runs"
+        ]
+      }
+    },
+    "PiSharp.Env.Connection.Tests": {
+      "format": "lines",
+      "minimumCases": 1,
+      "completionPattern": "Passed [1-9][0-9]* offline pi-env connection cases\\.",
+      "expectedCaseIds": {
+        "all": [
+          "fragmented-binary-frame-and-eof",
+          "invalid-frame-bounds-json-and-truncation",
+          "lazy-sync-events-and-session-isolation",
+          "abort-start-does-not-cancel-shared-factory",
+          "sent-abort-has-local-deadline",
+          "cancel-returns-daemon-error-before-grace",
+          "startup-timeout-and-sanitized-stderr",
+          "corrupt-ready-session-fails-and-restarts",
+          "artifact-hello-validation-is-enforced",
+          "disposal-joins-original-factory-cleanup"
+        ]
+      }
+    },
+    "PiSharp.Env.Daemon.Tests": {
+      "format": "lines",
+      "minimumCases": 1,
+      "completionPattern": "PASS: [1-9][0-9]* daemon integration tests",
+      "expectedCaseIds": {
+        "all": [
+          "framed filesystem and descriptor identity",
+          "malformed JSON stays synchronized",
+          "hello validation and handle limits",
+          "cancel registered before worker starts",
+          "disconnect releases resources and kept handles",
+          "partial frame terminates session",
+          "startup token, heartbeat and silence shutdown",
+          "pipelined chunks retain arrival order",
+          "bounded disconnect and late ownership cleanup",
+          "raw FIFO daemon exits after EOF and SIGTERM"
+        ],
+        "Windows": [
+          "framed filesystem and descriptor identity",
+          "malformed JSON stays synchronized",
+          "hello validation and handle limits",
+          "cancel registered before worker starts",
+          "disconnect releases resources and kept handles",
+          "partial frame terminates session",
+          "startup token, heartbeat and silence shutdown",
+          "pipelined chunks retain arrival order",
+          "bounded disconnect and late ownership cleanup",
+          "raw FIFO daemon exits after EOF and SIGTERM"
+        ]
+      },
+      "allowedSkips": {
+        "Windows": [
+          {
+            "line": "SKIP Unix raw FIFO EOF/SIGTERM regression on Windows",
+            "suppressesPassId": "raw FIFO daemon exits after EOF and SIGTERM",
+            "reason": "Raw FIFO and SIGTERM are Unix-only. The Windows lane runs protocol tests; Linux/macOS must execute this FIFO regression."
+          }
+        ]
+      }
+    },
+    "PiSharp.Env.Watch.Tests": {
+      "format": "lines",
+      "minimumCases": 1,
+      "completionPattern": "PASS all 5 remote watch cases",
+      "expectedCaseIds": {
+        "all": [
+          "polling coverage, observer isolation, exclusions and joined stop",
+          "initial failure and caller cancellation",
+          "fresh recovery snapshots targets and reports overflow",
+          "terminal watch errors and invalid event order",
+          "oversized changes degrade to overflow"
+        ]
+      }
+    },
+    "PiSharp.Env.Process.Tests": {
+      "format": "lines",
+      "minimumCases": 1,
+      "completionPattern": "PASS [1-9][0-9]* native Env process cases",
+      "expectedCaseIds": {
+        "all": [
+          "piped-binary-large-write-and-eof",
+          "exec-decode-stream-boundaries-and-spill-raw-bytes",
+          "window-counts-tail-and-spill-complete",
+          "timeout-abort-and-kill-have-distinct-results",
+          "wrapper-exit-kills-descendant",
+          "process-close-and-connection-loss-kill-owned-tree",
+          "parallel-runs-keep-request-and-stream-isolation",
+          "blocked-stdin-write-remains-cancellable",
+          "callback-failure-cancels-owned-process",
+          "validation-and-old-daemon-feature-gate"
+        ]
+      }
+    },
+    "PiSharp.Env.Terminal.Tests": {
+      "format": "lines",
+      "minimumCases": 1,
+      "completionPattern": "Passed [1-9][0-9]* pi-env terminal cases \\(.+\\)\\.",
+      "expectedCaseIds": {
+        "Windows": [
+          "client-started-event-and-raw-bytes",
+          "client-input-order-resize-and-foreground",
+          "client-splits-large-writes",
+          "client-prestart-error-and-close-abort",
+          "client-old-terminal-never-reconnects",
+          "daemon-rejects-invalid-sizes-and-unknown-handles",
+          "windows-terminal-is-explicitly-unsupported"
+        ],
+        "Linux": [
+          "client-started-event-and-raw-bytes",
+          "client-input-order-resize-and-foreground",
+          "client-splits-large-writes",
+          "client-prestart-error-and-close-abort",
+          "client-old-terminal-never-reconnects",
+          "daemon-rejects-invalid-sizes-and-unknown-handles",
+          "native-terminal-input-resize-environment-and-exit",
+          "native-terminal-binary-output",
+          "native-terminal-drains-output-through-slow-consumer",
+          "native-terminal-foreground-job-and-close",
+          "native-terminal-ordered-input-and-missing-executable",
+          "native-terminal-default-login-shell-and-env-clear",
+          "native-terminal-kill-versus-later-abort",
+          "native-terminal-disconnect-kills-session-leader"
+        ],
+        "Darwin": [
+          "client-started-event-and-raw-bytes",
+          "client-input-order-resize-and-foreground",
+          "client-splits-large-writes",
+          "client-prestart-error-and-close-abort",
+          "client-old-terminal-never-reconnects",
+          "daemon-rejects-invalid-sizes-and-unknown-handles",
+          "native-terminal-input-resize-environment-and-exit",
+          "native-terminal-binary-output",
+          "native-terminal-drains-output-through-slow-consumer",
+          "native-terminal-foreground-job-and-close",
+          "native-terminal-ordered-input-and-missing-executable",
+          "native-terminal-default-login-shell-and-env-clear",
+          "native-terminal-kill-versus-later-abort",
+          "native-terminal-disconnect-kills-session-leader"
+        ]
+      },
+      "platformPolicy": "Windows requires an actual ENOTSUP assertion plus protocol cases; Linux/macOS require every native PTY case plus protocol cases."
+    },
+    "PiSharp.Env.Ssh.Tests": {
+      "format": "lines",
+      "minimumCases": 1,
+      "completionPattern": "Passed [1-9][0-9]* offline SSH cases\\.",
+      "expectedCaseIds": {
+        "all": [
+          "structured-options-and-quoting",
+          "manifest-corruption-and-atomic-cache",
+          "detect-posix-windows-and-android",
+          "verify-upload-cache-and-reject-nohash",
+          "windows-encoded-upload",
+          "trust-and-sanitized-timeout-errors",
+          "host-key-management",
+          "lazy-bootstrap-handshake-reconnect",
+          "verified-artifact-hello-version-mismatch"
+        ]
+      }
+    },
+    "PiSharp.ExtensionParity.Tests": {
+      "format": "json",
+      "minimumCases": 1,
+      "requireDeclaredCount": true,
+      "expectedCaseIds": {
+        "all": [
+          "runtime.pi-packages-installed-with-verified-provenance"
+        ]
+      },
+      "requiredEnvironment": {
+        "EXTPARITY_FILTER": "runtime.pi-packages-installed-with-verified-provenance",
+        "PISHARP_TEST_INSTALL_PI_RUNTIME": "1"
+      },
+      "freshDirectoryEnvironment": "PISHARP_PI_RUNTIME_DIR",
+      "timeoutSeconds": 600,
+      "evidenceKind": "production-runtime-install-and-registry-integrity-verification",
+      "limitation": "Dedicated PiNodeRuntime.EnsureAsync installer path, using a fresh cache and public registry integrity checks. This is separate from the npm ci runtime fixture and ABI coverage."
+    }
+  }
+}

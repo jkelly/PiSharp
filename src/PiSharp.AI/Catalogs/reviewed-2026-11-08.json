@@ -1,0 +1,879 @@
+{
+  "schemaVersion": 1,
+  "provenance": {
+    "commit": "7d073328e44337d3292a7db9b0f0308f679c5e97",
+    "sources": [
+      {
+        "path": "packages/ai/catalog/providers/qwen-token-plan.ts",
+        "sha256": "17937a20a958ce9116bdb89281f84a0c613fc22fbf64b2babd7331caa68e8eb7"
+      },
+      {
+        "path": "packages/ai/catalog/providers/qwen-token-plan-individual.ts",
+        "sha256": "ea722d8b1fbb4802a00e4380f8a08f3d5833e762129db9ed1f21f863c7c7b085"
+      },
+      {
+        "path": "packages/ai/catalog/providers/qwen-token-plan-individual-cn.ts",
+        "sha256": "16155111f37002c22a6558b6ed878ee551171de4f4764563128cac0b5dd1fe3e"
+      },
+      {
+        "path": "packages/ai/catalog/providers/github-copilot.ts",
+        "sha256": "8ec4e3ed3a01cf0691ef815c44a95d7aa8e3263302f631b446d4e025e24961f5"
+      },
+      {
+        "path": "packages/coding-agent/src/core/model-resolver.ts",
+        "sha256": "6c3344890d79a0122ed7c84774c8d41178b4b5bec00f40759b8c30a1eb0c534e"
+      }
+    ],
+    "qwenMetadataBaseline": {
+      "path": "src/PiSharp.Cli/Models/qwen-token-plan-cn.json",
+      "sha256": "80824536f0c3cd83ab27424df2d664738cbe3f971b4e568a625432288fa53229",
+      "note": "Existing verified CN metadata; upstream reviewed allowlist/provider identity and endpoint only. No fresh models.dev retrieval."
+    }
+  },
+  "corrections": {
+    "anthropic": {
+      "claude-sonnet-5": {
+        "metadata": {
+          "id": "claude-sonnet-5",
+          "provider": "anthropic",
+          "type": "chat",
+          "compat": {
+            "supportsTemperature": false
+          }
+        },
+        "prices": [],
+        "provenance": {
+          "commit": "7d073328e44337d3292a7db9b0f0308f679c5e97",
+          "sources": [
+            {
+              "path": "packages/ai/catalog/families/anthropic.ts",
+              "sha256": "cfde18015edc75e2aac07ce7f59b74fd959ab9d0afa0ed44870a36d2ee5ec7ed"
+            }
+          ]
+        }
+      }
+    },
+    "azure": {
+      "gpt-6-astra": {
+        "metadata": {
+          "id": "gpt-6-astra",
+          "provider": "azure",
+          "type": "chat",
+          "contextWindow": 1050000
+        },
+        "prices": [],
+        "provenance": {
+          "commit": "7d073328e44337d3292a7db9b0f0308f679c5e97",
+          "sources": [
+            {
+              "path": "packages/ai/catalog/providers/azure.ts",
+              "sha256": "70b3539f69e900acdefce3f771b59437495209b1c38204191b680604458feeb0"
+            }
+          ]
+        }
+      },
+      "gpt-6-luna": {
+        "metadata": {
+          "id": "gpt-6-luna",
+          "provider": "azure",
+          "type": "chat",
+          "contextWindow": 1050000
+        },
+        "prices": [],
+        "provenance": {
+          "commit": "7d073328e44337d3292a7db9b0f0308f679c5e97",
+          "sources": [
+            {
+              "path": "packages/ai/catalog/providers/azure.ts",
+              "sha256": "70b3539f69e900acdefce3f771b59437495209b1c38204191b680604458feeb0"
+            }
+          ]
+        }
+      },
+      "gpt-6-sol": {
+        "metadata": {
+          "id": "gpt-6-sol",
+          "provider": "azure",
+          "type": "chat",
+          "contextWindow": 1050000
+        },
+        "prices": [],
+        "provenance": {
+          "commit": "7d073328e44337d3292a7db9b0f0308f679c5e97",
+          "sources": [
+            {
+              "path": "packages/ai/catalog/providers/azure.ts",
+              "sha256": "70b3539f69e900acdefce3f771b59437495209b1c38204191b680604458feeb0"
+            }
+          ]
+        }
+      },
+      "gpt-6.1-sol": {
+        "metadata": {
+          "id": "gpt-6.1-sol",
+          "provider": "azure",
+          "type": "chat",
+          "contextWindow": 1050000
+        },
+        "prices": [],
+        "provenance": {
+          "commit": "7d073328e44337d3292a7db9b0f0308f679c5e97",
+          "sources": [
+            {
+              "path": "packages/ai/catalog/providers/azure.ts",
+              "sha256": "70b3539f69e900acdefce3f771b59437495209b1c38204191b680604458feeb0"
+            }
+          ]
+        }
+      },
+      "gpt-6.1-terra": {
+        "metadata": {
+          "id": "gpt-6.1-terra",
+          "provider": "azure",
+          "type": "chat",
+          "contextWindow": 1050000
+        },
+        "prices": [],
+        "provenance": {
+          "commit": "7d073328e44337d3292a7db9b0f0308f679c5e97",
+          "sources": [
+            {
+              "path": "packages/ai/catalog/providers/azure.ts",
+              "sha256": "70b3539f69e900acdefce3f771b59437495209b1c38204191b680604458feeb0"
+            }
+          ]
+        }
+      }
+    },
+    "cloudflare-ai-gateway": {
+      "claude-sonnet-5": {
+        "metadata": {
+          "id": "claude-sonnet-5",
+          "provider": "cloudflare-ai-gateway",
+          "type": "chat",
+          "compat": {
+            "supportsTemperature": false
+          }
+        },
+        "prices": [],
+        "provenance": {
+          "commit": "7d073328e44337d3292a7db9b0f0308f679c5e97",
+          "sources": [
+            {
+              "path": "packages/ai/catalog/families/anthropic.ts",
+              "sha256": "cfde18015edc75e2aac07ce7f59b74fd959ab9d0afa0ed44870a36d2ee5ec7ed"
+            }
+          ]
+        }
+      }
+    },
+    "github-copilot": {
+      "claude-sonnet-5": {
+        "metadata": {
+          "id": "claude-sonnet-5",
+          "provider": "github-copilot",
+          "type": "chat",
+          "compat": {
+            "supportsTemperature": false
+          }
+        },
+        "prices": [],
+        "provenance": {
+          "commit": "7d073328e44337d3292a7db9b0f0308f679c5e97",
+          "sources": [
+            {
+              "path": "packages/ai/catalog/families/anthropic.ts",
+              "sha256": "cfde18015edc75e2aac07ce7f59b74fd959ab9d0afa0ed44870a36d2ee5ec7ed"
+            }
+          ]
+        }
+      }
+    },
+    "opencode-go": {
+      "claude-haiku-5-5": {
+        "metadata": {
+          "id": "claude-haiku-5-5",
+          "provider": "opencode-go",
+          "type": "chat",
+          "compat": {
+            "supportsMidConvoEffort": true
+          }
+        },
+        "prices": [],
+        "provenance": {
+          "commit": "7d073328e44337d3292a7db9b0f0308f679c5e97",
+          "sources": [
+            {
+              "path": "packages/ai/catalog/providers/opencode.ts",
+              "sha256": "a4346e62b9e8545e501bc293e9ac260f4c6661b2879dac60b5a5762239a25291"
+            },
+            {
+              "path": "packages/ai/catalog/families/anthropic.ts",
+              "sha256": "cfde18015edc75e2aac07ce7f59b74fd959ab9d0afa0ed44870a36d2ee5ec7ed"
+            }
+          ]
+        }
+      }
+    },
+    "opencode": {
+      "claude-fable-5-1": {
+        "metadata": {
+          "id": "claude-fable-5-1",
+          "provider": "opencode",
+          "type": "chat",
+          "thinkingLevelMap": {
+            "off": null
+          },
+          "compat": {
+            "supportsMidConvoEffort": true
+          }
+        },
+        "prices": [],
+        "provenance": {
+          "commit": "7d073328e44337d3292a7db9b0f0308f679c5e97",
+          "sources": [
+            {
+              "path": "packages/ai/catalog/providers/opencode.ts",
+              "sha256": "a4346e62b9e8545e501bc293e9ac260f4c6661b2879dac60b5a5762239a25291"
+            },
+            {
+              "path": "packages/ai/catalog/families/anthropic.ts",
+              "sha256": "cfde18015edc75e2aac07ce7f59b74fd959ab9d0afa0ed44870a36d2ee5ec7ed"
+            }
+          ]
+        }
+      },
+      "claude-haiku-5-5": {
+        "metadata": {
+          "id": "claude-haiku-5-5",
+          "provider": "opencode",
+          "type": "chat",
+          "compat": {
+            "supportsMidConvoEffort": true
+          }
+        },
+        "prices": [],
+        "provenance": {
+          "commit": "7d073328e44337d3292a7db9b0f0308f679c5e97",
+          "sources": [
+            {
+              "path": "packages/ai/catalog/providers/opencode.ts",
+              "sha256": "a4346e62b9e8545e501bc293e9ac260f4c6661b2879dac60b5a5762239a25291"
+            },
+            {
+              "path": "packages/ai/catalog/families/anthropic.ts",
+              "sha256": "cfde18015edc75e2aac07ce7f59b74fd959ab9d0afa0ed44870a36d2ee5ec7ed"
+            }
+          ]
+        }
+      },
+      "claude-opus-5": {
+        "metadata": {
+          "id": "claude-opus-5",
+          "provider": "opencode",
+          "type": "chat",
+          "compat": {
+            "supportsMidConvoEffort": true
+          }
+        },
+        "prices": [],
+        "provenance": {
+          "commit": "7d073328e44337d3292a7db9b0f0308f679c5e97",
+          "sources": [
+            {
+              "path": "packages/ai/catalog/providers/opencode.ts",
+              "sha256": "a4346e62b9e8545e501bc293e9ac260f4c6661b2879dac60b5a5762239a25291"
+            },
+            {
+              "path": "packages/ai/catalog/families/anthropic.ts",
+              "sha256": "cfde18015edc75e2aac07ce7f59b74fd959ab9d0afa0ed44870a36d2ee5ec7ed"
+            }
+          ]
+        }
+      },
+      "claude-opus-5-5": {
+        "metadata": {
+          "id": "claude-opus-5-5",
+          "provider": "opencode",
+          "type": "chat",
+          "thinkingLevelMap": {
+            "off": null
+          },
+          "compat": {
+            "supportsMidConvoEffort": true
+          }
+        },
+        "prices": [],
+        "provenance": {
+          "commit": "7d073328e44337d3292a7db9b0f0308f679c5e97",
+          "sources": [
+            {
+              "path": "packages/ai/catalog/providers/opencode.ts",
+              "sha256": "a4346e62b9e8545e501bc293e9ac260f4c6661b2879dac60b5a5762239a25291"
+            },
+            {
+              "path": "packages/ai/catalog/families/anthropic.ts",
+              "sha256": "cfde18015edc75e2aac07ce7f59b74fd959ab9d0afa0ed44870a36d2ee5ec7ed"
+            }
+          ]
+        }
+      },
+      "claude-sonnet-5": {
+        "metadata": {
+          "id": "claude-sonnet-5",
+          "provider": "opencode",
+          "type": "chat",
+          "compat": {
+            "supportsTemperature": false
+          }
+        },
+        "prices": [],
+        "provenance": {
+          "commit": "7d073328e44337d3292a7db9b0f0308f679c5e97",
+          "sources": [
+            {
+              "path": "packages/ai/catalog/families/anthropic.ts",
+              "sha256": "cfde18015edc75e2aac07ce7f59b74fd959ab9d0afa0ed44870a36d2ee5ec7ed"
+            }
+          ]
+        }
+      },
+      "claude-sonnet-5-5": {
+        "metadata": {
+          "id": "claude-sonnet-5-5",
+          "provider": "opencode",
+          "type": "chat",
+          "thinkingLevelMap": {
+            "off": null
+          },
+          "compat": {
+            "supportsMidConvoEffort": true
+          }
+        },
+        "prices": [],
+        "provenance": {
+          "commit": "7d073328e44337d3292a7db9b0f0308f679c5e97",
+          "sources": [
+            {
+              "path": "packages/ai/catalog/providers/opencode.ts",
+              "sha256": "a4346e62b9e8545e501bc293e9ac260f4c6661b2879dac60b5a5762239a25291"
+            },
+            {
+              "path": "packages/ai/catalog/families/anthropic.ts",
+              "sha256": "cfde18015edc75e2aac07ce7f59b74fd959ab9d0afa0ed44870a36d2ee5ec7ed"
+            }
+          ]
+        }
+      }
+    },
+    "openrouter": {
+      "anthropic/claude-sonnet-5": {
+        "metadata": {
+          "id": "anthropic/claude-sonnet-5",
+          "provider": "openrouter",
+          "type": "chat",
+          "compat": {
+            "supportsTemperature": false
+          }
+        },
+        "prices": [],
+        "provenance": {
+          "commit": "7d073328e44337d3292a7db9b0f0308f679c5e97",
+          "sources": [
+            {
+              "path": "packages/ai/catalog/families/anthropic.ts",
+              "sha256": "cfde18015edc75e2aac07ce7f59b74fd959ab9d0afa0ed44870a36d2ee5ec7ed"
+            }
+          ]
+        }
+      }
+    },
+    "vercel-ai-gateway": {
+      "anthropic/claude-sonnet-5": {
+        "metadata": {
+          "id": "anthropic/claude-sonnet-5",
+          "provider": "vercel-ai-gateway",
+          "type": "chat",
+          "compat": {
+            "supportsTemperature": false
+          }
+        },
+        "prices": [],
+        "provenance": {
+          "commit": "7d073328e44337d3292a7db9b0f0308f679c5e97",
+          "sources": [
+            {
+              "path": "packages/ai/catalog/families/anthropic.ts",
+              "sha256": "cfde18015edc75e2aac07ce7f59b74fd959ab9d0afa0ed44870a36d2ee5ec7ed"
+            }
+          ]
+        }
+      },
+      "anthropic/claude-sonnet-5-batch": {
+        "metadata": {
+          "id": "anthropic/claude-sonnet-5-batch",
+          "provider": "vercel-ai-gateway",
+          "type": "chat",
+          "compat": {
+            "supportsTemperature": false
+          }
+        },
+        "prices": [],
+        "provenance": {
+          "commit": "7d073328e44337d3292a7db9b0f0308f679c5e97",
+          "sources": [
+            {
+              "path": "packages/ai/catalog/families/anthropic.ts",
+              "sha256": "cfde18015edc75e2aac07ce7f59b74fd959ab9d0afa0ed44870a36d2ee5ec7ed"
+            }
+          ]
+        }
+      }
+    }
+  },
+  "additions": {
+    "qwen-token-plan-individual-cn": [
+      {
+        "id": "deepseek-v4-flash-0731",
+        "name": "DeepSeek V4 Flash 0731",
+        "api": "openai-completions",
+        "provider": "qwen-token-plan-individual-cn",
+        "baseUrl": "https://token-plan.cn-beijing.maas.aliyuncs.com/compatible-mode/v1",
+        "reasoning": true,
+        "input": [
+          "text"
+        ],
+        "cost": {
+          "input": 0,
+          "output": 0,
+          "cacheRead": 0,
+          "cacheWrite": 0
+        },
+        "contextWindow": 1000000,
+        "maxTokens": 384000,
+        "compat": {
+          "supportsStrictMode": true,
+          "thinkingFormat": "qwen",
+          "supportsDeveloperRole": false,
+          "supportsStore": false,
+          "supportsReasoningEffort": true
+        },
+        "thinkingLevelMap": {
+          "off": null,
+          "minimal": null,
+          "low": null,
+          "medium": null,
+          "high": "high",
+          "xhigh": null,
+          "max": "max"
+        },
+        "type": "chat"
+      },
+      {
+        "id": "deepseek-v4-pro",
+        "name": "DeepSeek V4 Pro",
+        "api": "openai-completions",
+        "provider": "qwen-token-plan-individual-cn",
+        "baseUrl": "https://token-plan.cn-beijing.maas.aliyuncs.com/compatible-mode/v1",
+        "reasoning": true,
+        "input": [
+          "text"
+        ],
+        "cost": {
+          "input": 0,
+          "output": 0,
+          "cacheRead": 0,
+          "cacheWrite": 0
+        },
+        "contextWindow": 1000000,
+        "maxTokens": 384000,
+        "compat": {
+          "supportsStrictMode": true,
+          "thinkingFormat": "qwen",
+          "supportsDeveloperRole": false,
+          "supportsStore": false,
+          "supportsReasoningEffort": true
+        },
+        "thinkingLevelMap": {
+          "off": null,
+          "minimal": null,
+          "low": null,
+          "medium": null,
+          "high": "high",
+          "xhigh": null,
+          "max": "max"
+        },
+        "type": "chat"
+      },
+      {
+        "id": "deepseek-v4-pro-0813",
+        "name": "DeepSeek V4 Pro 0813",
+        "api": "openai-completions",
+        "provider": "qwen-token-plan-individual-cn",
+        "baseUrl": "https://token-plan.cn-beijing.maas.aliyuncs.com/compatible-mode/v1",
+        "reasoning": true,
+        "input": [
+          "text"
+        ],
+        "cost": {
+          "input": 0,
+          "output": 0,
+          "cacheRead": 0,
+          "cacheWrite": 0
+        },
+        "contextWindow": 1000000,
+        "maxTokens": 384000,
+        "compat": {
+          "supportsStrictMode": true,
+          "thinkingFormat": "qwen",
+          "supportsDeveloperRole": false,
+          "supportsStore": false,
+          "supportsReasoningEffort": true
+        },
+        "thinkingLevelMap": {
+          "off": null,
+          "minimal": null,
+          "low": null,
+          "medium": null,
+          "high": "high",
+          "xhigh": null,
+          "max": "max"
+        },
+        "type": "chat"
+      },
+      {
+        "id": "glm-5.2",
+        "name": "GLM-5.2",
+        "api": "openai-completions",
+        "provider": "qwen-token-plan-individual-cn",
+        "baseUrl": "https://token-plan.cn-beijing.maas.aliyuncs.com/compatible-mode/v1",
+        "reasoning": true,
+        "input": [
+          "text"
+        ],
+        "cost": {
+          "input": 0,
+          "output": 0,
+          "cacheRead": 0,
+          "cacheWrite": 0
+        },
+        "contextWindow": 1000000,
+        "maxTokens": 131072,
+        "compat": {
+          "supportsStrictMode": true,
+          "thinkingFormat": "qwen",
+          "supportsDeveloperRole": false,
+          "supportsStore": false,
+          "supportsReasoningEffort": true
+        },
+        "thinkingLevelMap": {
+          "off": null,
+          "minimal": null,
+          "low": null,
+          "medium": null,
+          "high": "high",
+          "xhigh": null,
+          "max": "max"
+        },
+        "type": "chat"
+      },
+      {
+        "id": "glm-5.3",
+        "name": "GLM-5.3",
+        "api": "openai-completions",
+        "provider": "qwen-token-plan-individual-cn",
+        "baseUrl": "https://token-plan.cn-beijing.maas.aliyuncs.com/compatible-mode/v1",
+        "reasoning": true,
+        "input": [
+          "text"
+        ],
+        "cost": {
+          "input": 0,
+          "output": 0,
+          "cacheRead": 0,
+          "cacheWrite": 0
+        },
+        "contextWindow": 1000000,
+        "maxTokens": 131072,
+        "compat": {
+          "supportsStrictMode": true,
+          "thinkingFormat": "qwen",
+          "supportsDeveloperRole": false,
+          "supportsStore": false,
+          "supportsReasoningEffort": true
+        },
+        "thinkingLevelMap": {
+          "off": null,
+          "minimal": null,
+          "low": "low",
+          "medium": null,
+          "high": "high",
+          "xhigh": null,
+          "max": "max"
+        },
+        "type": "chat"
+      },
+      {
+        "id": "qwen3.6-flash",
+        "name": "Qwen3.6 Flash",
+        "api": "openai-completions",
+        "provider": "qwen-token-plan-individual-cn",
+        "baseUrl": "https://token-plan.cn-beijing.maas.aliyuncs.com/compatible-mode/v1",
+        "reasoning": true,
+        "input": [
+          "text",
+          "image"
+        ],
+        "cost": {
+          "input": 0,
+          "output": 0,
+          "cacheRead": 0,
+          "cacheWrite": 0
+        },
+        "contextWindow": 1000000,
+        "maxTokens": 65536,
+        "compat": {
+          "supportsStrictMode": true,
+          "thinkingFormat": "qwen",
+          "supportsDeveloperRole": false,
+          "supportsStore": false,
+          "supportsReasoningEffort": false
+        },
+        "inputLimits": {
+          "images": {
+            "resize": {
+              "maxWidth": 2000,
+              "maxHeight": 2000,
+              "maxBytes": 4718592,
+              "jpegQuality": 80
+            }
+          }
+        },
+        "type": "chat"
+      },
+      {
+        "id": "qwen3.7-max",
+        "name": "Qwen3.7 Max",
+        "api": "openai-completions",
+        "provider": "qwen-token-plan-individual-cn",
+        "baseUrl": "https://token-plan.cn-beijing.maas.aliyuncs.com/compatible-mode/v1",
+        "reasoning": true,
+        "input": [
+          "text"
+        ],
+        "cost": {
+          "input": 0,
+          "output": 0,
+          "cacheRead": 0,
+          "cacheWrite": 0
+        },
+        "contextWindow": 1000000,
+        "maxTokens": 131072,
+        "compat": {
+          "supportsStrictMode": true,
+          "thinkingFormat": "qwen",
+          "supportsDeveloperRole": false,
+          "supportsStore": false,
+          "supportsReasoningEffort": false
+        },
+        "type": "chat"
+      },
+      {
+        "id": "qwen3.7-plus",
+        "name": "Qwen3.7 Plus",
+        "api": "openai-completions",
+        "provider": "qwen-token-plan-individual-cn",
+        "baseUrl": "https://token-plan.cn-beijing.maas.aliyuncs.com/compatible-mode/v1",
+        "reasoning": true,
+        "input": [
+          "text",
+          "image"
+        ],
+        "cost": {
+          "input": 0,
+          "output": 0,
+          "cacheRead": 0,
+          "cacheWrite": 0
+        },
+        "contextWindow": 1000000,
+        "maxTokens": 65536,
+        "compat": {
+          "supportsStrictMode": true,
+          "thinkingFormat": "qwen",
+          "supportsDeveloperRole": false,
+          "supportsStore": false,
+          "supportsReasoningEffort": false
+        },
+        "inputLimits": {
+          "images": {
+            "resize": {
+              "maxWidth": 2000,
+              "maxHeight": 2000,
+              "maxBytes": 4718592,
+              "jpegQuality": 80
+            }
+          }
+        },
+        "type": "chat"
+      },
+      {
+        "id": "qwen3.8-flash",
+        "name": "Qwen3.8 Flash",
+        "api": "openai-completions",
+        "provider": "qwen-token-plan-individual-cn",
+        "baseUrl": "https://token-plan.cn-beijing.maas.aliyuncs.com/compatible-mode/v1",
+        "reasoning": true,
+        "input": [
+          "text",
+          "image"
+        ],
+        "cost": {
+          "input": 0,
+          "output": 0,
+          "cacheRead": 0,
+          "cacheWrite": 0
+        },
+        "contextWindow": 1000000,
+        "maxTokens": 131072,
+        "compat": {
+          "supportsStrictMode": true,
+          "thinkingFormat": "qwen",
+          "supportsDeveloperRole": false,
+          "supportsStore": false,
+          "supportsReasoningEffort": true
+        },
+        "thinkingLevelMap": {
+          "off": null,
+          "minimal": null,
+          "low": "low",
+          "medium": "medium",
+          "high": null,
+          "xhigh": "xhigh",
+          "max": null
+        },
+        "inputLimits": {
+          "images": {
+            "resize": {
+              "maxWidth": 2000,
+              "maxHeight": 2000,
+              "maxBytes": 4718592,
+              "jpegQuality": 80
+            }
+          }
+        },
+        "type": "chat"
+      },
+      {
+        "id": "qwen3.8-max",
+        "name": "Qwen3.8 Max",
+        "api": "openai-completions",
+        "provider": "qwen-token-plan-individual-cn",
+        "baseUrl": "https://token-plan.cn-beijing.maas.aliyuncs.com/compatible-mode/v1",
+        "reasoning": true,
+        "input": [
+          "text",
+          "image"
+        ],
+        "cost": {
+          "input": 0,
+          "output": 0,
+          "cacheRead": 0,
+          "cacheWrite": 0
+        },
+        "contextWindow": 1000000,
+        "maxTokens": 131072,
+        "compat": {
+          "supportsStrictMode": true,
+          "thinkingFormat": "qwen",
+          "supportsDeveloperRole": false,
+          "supportsStore": false,
+          "supportsReasoningEffort": true
+        },
+        "thinkingLevelMap": {
+          "off": null,
+          "minimal": null,
+          "low": "low",
+          "medium": "medium",
+          "high": null,
+          "xhigh": "xhigh",
+          "max": null
+        },
+        "inputLimits": {
+          "images": {
+            "resize": {
+              "maxWidth": 2000,
+              "maxHeight": 2000,
+              "maxBytes": 4718592,
+              "jpegQuality": 80
+            }
+          }
+        },
+        "type": "chat"
+      }
+    ],
+    "qwen-token-plan-individual": [
+      {
+        "id": "glm-5.3",
+        "name": "GLM-5.3",
+        "api": "openai-completions",
+        "provider": "qwen-token-plan-individual",
+        "baseUrl": "https://token-plan.ap-southeast-1.maas.aliyuncs.com/compatible-mode/v1",
+        "reasoning": true,
+        "input": [
+          "text"
+        ],
+        "cost": {
+          "input": 0,
+          "output": 0,
+          "cacheRead": 0,
+          "cacheWrite": 0
+        },
+        "contextWindow": 1000000,
+        "maxTokens": 131072,
+        "compat": {
+          "supportsStrictMode": true,
+          "thinkingFormat": "qwen",
+          "supportsDeveloperRole": false,
+          "supportsStore": false,
+          "supportsReasoningEffort": true
+        },
+        "thinkingLevelMap": {
+          "off": null,
+          "minimal": null,
+          "low": "low",
+          "medium": null,
+          "high": "high",
+          "xhigh": null,
+          "max": "max"
+        },
+        "type": "chat"
+      }
+    ],
+    "github-copilot": [
+      {
+        "type": "classifier",
+        "id": "microsoft-decision-1",
+        "name": "Microsoft-Decision-1",
+        "api": "typesafe-system-one",
+        "provider": "github-copilot",
+        "baseUrl": "https://api.individual.githubcopilot.com",
+        "input": [
+          "text"
+        ],
+        "cost": {
+          "input": 0.042,
+          "output": 0,
+          "cacheRead": 0,
+          "cacheWrite": 0
+        },
+        "contextWindow": 32768,
+        "headers": {
+          "User-Agent": "GitHubCopilotChat/0.35.0",
+          "Editor-Version": "vscode/1.107.0",
+          "Editor-Plugin-Version": "copilot-chat/0.35.0",
+          "Copilot-Integration-Id": "vscode-chat"
+        }
+      }
+    ]
+  }
+}

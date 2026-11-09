@@ -175,7 +175,8 @@ static class AnthropicMessagesTests
             ("{\"secret\":\"unfinished", "{}", "Unterminated string in JSON at position 21 (line 1 column 22)"), ("{\"n\":1,\"n\":2}", "{\"n\":2}", null),
             ("[]", "{}", "Tool arguments must be a JSON object"), ("null", "{}", "Tool arguments must be a JSON object"),
             ("{\"n\":1,}", "{}", "Expected double-quoted property name in JSON at position 7 (line 1 column 8)"),
-            ("{\"x\":\"\\uD800\"}", "{\"x\":\"\\ud800\"}", null), ("{\"x\":\"C:\\q\"}", "{\"x\":\"C:\\\\q\"}", null)
+            ("{\"x\":\"\\uD800\"}", "{\"x\":\"\\ud800\"}", null), ("{\"x\":\"C:\\q\"}", "{\"x\":\"C:\\\\q\"}", null),
+            ("{\"\\uDC00\":\"value\"}", "{\"\\udc00\":\"value\"}", null)
         })
         {
             var events = await Collect([Start, ToolStart, Delta(99, "input_json_delta", raw), BlockStop(99), End, Stop]);
@@ -265,11 +266,31 @@ static class AnthropicMessagesTests
         var exact = Terminal(await Collect([Start, End, Stop], new(MaximumEvents: 3, MaximumEventCharacters: Start.Length, MaximumInputCharacters: Start.Length + End.Length + Stop.Length)));
         Assert(exact is StreamDone, "Exact raw DTO bounds rejected.");
         // The SDK's JSON.parse keeps a lone surrogate of a string value: such a ping is ignored like any other.
-        Failure(Terminal(await Collect(["{\"type\":\"ping\",\"opaque\":\"\\uD800\"}"])), AnthropicMessagesFailure.UnexpectedEof);
+        var valuePing = Terminal(await Collect(["{\"type\":\"ping\",\"opaque\":\"\\uD800\"}"]));
+        Assert(Property(valuePing.Message.ExtraProperties, "anthropicFailure") == "\"UnexpectedEof\"", "Ignored escaped-value ping: " + PiWireJson.WriteMessage(valuePing.Message));
         Failure(Terminal(await Collect(["[]"])), AnthropicMessagesFailure.MalformedStream);
-        // JsonData itself rejects this decoded property name while the source factory
-        // constructs its owned DTO. No malformed DTO reaches the mapper's Process boundary.
-        Failure(Terminal(await Collect(["{\"type\":\"ping\",\"\\uDC00\":null}"])), AnthropicMessagesFailure.SourceFailed);
+        // Generic object names retain escaped UTF-16 code units, just like JSON.parse. A lone ping
+        // has no completed message, while the same ignored key before a normal response is accepted.
+        const string opaqueName = "{\"type\":\"ping\",\"\\uDC00\":null}";
+        var namePing = Terminal(await Collect([opaqueName]));
+        Assert(Property(namePing.Message.ExtraProperties, "anthropicFailure") == "\"UnexpectedEof\"", "Ignored escaped-name ping: " + PiWireJson.WriteMessage(namePing.Message));
+        Assert(Terminal(await Collect([opaqueName, Start, End, Stop])) is StreamDone, "Unknown escaped-surrogate name rejected a completed DTO stream.");
+        const string nameBeforeType = "{\"\\uDC00\":null,\"type\":\"ping\"}";
+        Assert(Terminal(await Collect([nameBeforeType, Start, End, Stop])) is StreamDone, "Unknown escaped-surrogate name before type rejected a completed DTO stream.");
+        var loneId = Terminal(await Collect([Start.Replace("\"id\":\"message\"", "\"id\":\"\\ud800\"", StringComparison.Ordinal), End, Stop]));
+        Assert(loneId is StreamDone && loneId.Message.ExtraProperties!.TryGet("responseId", out var responseId) && JsonUtf16.GetString(responseId!.Value) == "\uD800",
+            "Completed DTO response ID lost an accepted UTF16 code unit.");
+        foreach (var invalid in new[] { "{\"\\udc00\":null}", "{\"type\":1,\"\\udc00\":null}" })
+            Failure(Terminal(await Collect([invalid])), AnthropicMessagesFailure.MalformedStream);
+        Failure(Terminal(await Collect([Start, "{\"type\":\"message_delta\",\"delta\":{\"stop_reason\":\"unsupported\"},\"\\udc00\":null}"])), AnthropicMessagesFailure.MalformedStream);
+        Failure(Terminal(await Collect([Start, "{\"type\":\"message_delta\",\"delta\":{},\"usage\":{\"input_tokens\":\"bad\",\"\\udc00\":null}}"])), AnthropicMessagesFailure.MalformedStream);
+        // Decoded duplicate names remain invalid owned DTOs, regardless of escape casing.
+        Failure(Terminal(await Collect(["{\"type\":\"ping\",\"\\udc00\":0,\"\\uDC00\":1}"])), AnthropicMessagesFailure.SourceFailed);
+        var initialTool = ToolStart.Replace("\"input\":{\"seed\":true}", "\"input\":{\"\\uDC00\":\"seed\"}", StringComparison.Ordinal);
+        var namedArguments = await Collect([Start, initialTool, Delta(99, "input_json_delta", "{\"\\uDC00\":\"value\"}"), BlockStop(99), End, Stop]);
+        Equal("\uDC00", JsonUtf16.GetName(namedArguments.OfType<ToolCallStarted>().Single().ToolCall.Arguments.Value.EnumerateObject().Single()));
+        Assert(Terminal(namedArguments) is StreamDone && JsonUtf16.DeepEquals(JsonData.Parse("{\"\\udc00\":\"value\"}").Value,
+            ((ToolCallContent)Terminal(namedArguments).Message.Content.Single()).Arguments.Value), "Escaped-surrogate tool argument name did not roundtrip.");
         foreach (var raw in new[] { "{\"type\":\"ping\",}", "{\"type\":\"ping\",\"opaque\":{\"n\":1,}}", "{\"type\":\"ping\",/*private*/\"opaque\":1}" })
         {
             using var document = JsonDocument.Parse(raw, new JsonDocumentOptions { AllowTrailingCommas = true, CommentHandling = JsonCommentHandling.Skip });

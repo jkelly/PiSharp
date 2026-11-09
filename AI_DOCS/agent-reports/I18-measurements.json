@@ -1,0 +1,52 @@
+{
+  "kind": "observed-benchmark-measurements",
+  "caseCount": null,
+  "method": {
+    "samplesPerVariant": 1,
+    "configuration": "Debug",
+    "batches": 256,
+    "entryWritesPerBatch": 1,
+    "storage": ":memory:",
+    "artificialDelay": "await Task.Delay(1) before each executor SQL call",
+    "callCounterExcludes": [
+      "driver BEGIN",
+      "driver COMMIT",
+      "root warmup"
+    ],
+    "elapsedExcludes": [
+      "root warmup",
+      "close"
+    ],
+    "maxParametersIncludesWarmup": true
+  },
+  "interpretation": "770 to 5 executor calls; wall times reflect synthetic per-statement waiting, not raw SQLite throughput. Generic suite evidence gate rejected measurement-only output; separate benchmark evidence classification requested.",
+  "baselineAssemblySha256": "df12f8f3186f4c4b21594efb3249d9e870c1e9bc587f2ec619446c0d26008bbc",
+  "runs": [
+    {
+      "artifact": "artifacts/gap-validation/I18-baseline-benchmark-3456e988023b4696a001dad5d2aef7ce",
+      "processExitCode": 0,
+      "genericSuiteReceiptResult": "failed",
+      "sourceChangedDuringRun": true,
+      "measurement": {
+        "Mode": "I12-baseline",
+        "Batches": 256,
+        "Calls": 770,
+        "ElapsedMs": 12040,
+        "MaxParameters": 5
+      }
+    },
+    {
+      "artifact": "artifacts/gap-validation/I18-candidate-benchmark-2b26941db9dc42298309e69689232a43",
+      "processExitCode": 0,
+      "genericSuiteReceiptResult": "failed",
+      "sourceChangedDuringRun": false,
+      "measurement": {
+        "Mode": "I18-candidate",
+        "Batches": 256,
+        "Calls": 5,
+        "ElapsedMs": 78,
+        "MaxParameters": 2
+      }
+    }
+  ]
+}

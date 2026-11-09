@@ -190,20 +190,37 @@ internal static class ResponsesReasoningTests
         {
             new[] { Start, Delta, Completed() },
             new[] { Start, """{"type":"response.reasoning_text.delta","output_index":3,"item_id":"wrong","delta":"x"}""" },
-            new[] { Start, Done("""{"type":"reasoning","id":"rs_1","summary":false}""") },
-            new[] { Start, Done(), Delta, Completed() }
+            new[] { Start, Done("""{"type":"reasoning","id":"rs_1","summary":false}""") }
         })
         {
             using var fixture = new Fixture(Wire(events));
             var result = await fixture.Complete();
-            Check(result.Failure?.Kind == ChatFailureKind.MalformedStream, "Malformed reasoning accepted");
+            // Native strict unfinished-content/malformed-shape policy remains rejection; pinned v1.5 wrapper reports its error frame.
+            ResponsesRawContractAssertions.Error(fixture.Frames, typeof(StreamProtocolException));
+            Check(result.Failure?.Kind == ChatFailureKind.Provider && fixture.Frames.OfType<StreamStarted>().Count() == 1, "Malformed reasoning gained executable success");
+        }
+        // Pinned shared.ts removes a finished slot: a late delta for that slot is ignored, never appended to authoritative text/signature.
+        using (var late = new Fixture(Wire(Start, Done(), Delta, Completed())))
+        {
+            var result = await late.Complete();
+            Check(result.Failure is null && result.Message.StopReason == StopReason.Stop, "Ignored post-done delta failed a completed response");
+            var thinking = (ThinkingContent)result.Message.Content.Single();
+            Check(thinking.Thinking == "authoritative", "Late delta changed authoritative thinking");
+            Same(Item, JsonData.Parse(thinking.ExtraProperties!.Values["thinkingSignature"].Value.GetString()!).Value);
+            Check(late.Frames.OfType<ThinkingEnded>().Count() == 1 && !late.Frames.OfType<ThinkingDelta>().Any(frame => frame.Delta == "partial"), "Late delta was appended or thinking ended twice");
         }
         using (var limited = new Fixture(Wire(Start, Done(Item.Replace("authoritative", new string('x', 1000))), Completed()), new(MaximumContentCharacters: 512)))
-            Check((await limited.Complete()).Failure?.Kind == ChatFailureKind.ResourceLimit, "Reasoning end escaped content bound");
+        {
+            Check((await limited.Complete()).Failure?.Kind == ChatFailureKind.Provider, "Reasoning end escaped content bound");
+            ResponsesRawContractAssertions.Error(limited.Frames, typeof(StreamLimitException));
+        }
         var largeSignature = JsonNode.Parse(Item)!.AsObject();
         largeSignature["encrypted_content"] = new string('s', 1000);
         using (var limited = new Fixture(Wire(Start, Done(largeSignature.ToJsonString()), Completed()), new(MaximumContentCharacters: 512)))
-            Check((await limited.Complete()).Failure?.Kind == ChatFailureKind.ResourceLimit, "Reasoning signature escaped content bound");
+        {
+            Check((await limited.Complete()).Failure?.Kind == ChatFailureKind.Provider, "Reasoning signature escaped content bound");
+            ResponsesRawContractAssertions.Error(limited.Frames, typeof(StreamLimitException));
+        }
         foreach (var cancelAtCleanup in new[] { false, true })
         {
             var body = new HttpCleanupGateStream(Wire(Start, Delta, Done(), Completed()));
@@ -252,15 +269,17 @@ internal static class ResponsesReasoningTests
                     cleaned = true;
                 }
             }
-            var client = new ChatClient(new ResponsesTextToolTransport((_, _) => Source()), capacity: 1);
+            var frames = new List<StreamEvent>();
+            var client = new ChatClient(new ResponsesRawFrameObserver(new ResponsesTextToolTransport((_, _) => Source()), frames), capacity: 1);
             var task = client.CompleteAsync(Request());
             try
             {
                 await cleanupEntered.Task.WaitAsync(Deadline);
-                Check(!task.IsCompleted && !cleaned, "Signature failure bypassed original cleanup");
+                Check(!task.IsCompleted && !cleaned && !frames.OfType<StreamTerminalEvent>().Any(), "Signature failure bypassed original cleanup");
                 cleanupRelease.TrySetResult();
                 var result = await task;
-                Check(cleaned && result.Failure?.Kind == ChatFailureKind.ResourceLimit, "Pending signature limit misclassified: " + ending);
+                Check(cleaned && result.Failure?.Kind == ChatFailureKind.Provider, "Pending signature limit gained success: " + ending);
+                ResponsesRawContractAssertions.Error(frames, typeof(StreamLimitException));
                 Check(result.Message.StopReason == StopReason.Error, "Oversized signature succeeded");
                 Check(result.Failure!.Message == "Responses text/tool stream exceeds configured limits.", "Signature limit diagnostic changed or exposed data");
             }
@@ -293,7 +312,8 @@ internal static class ResponsesReasoningTests
                 }
                 finally { disposed = true; }
             }
-            var client = new ChatClient(new ResponsesTextToolTransport((_, token) => Source(token)), capacity: 1);
+            var frames = new List<StreamEvent>();
+            var client = new ChatClient(new ResponsesRawFrameObserver(new ResponsesTextToolTransport((_, token) => Source(token)), frames), capacity: 1);
             var task = client.CompleteAsync(Request(), cancellation.Token);
             try
             {
@@ -303,8 +323,9 @@ internal static class ResponsesReasoningTests
                 else release.TrySetResult();
                 var result = await task;
                 Check(disposed, "Preterminal failure escaped source cleanup");
-                Check(result.Failure?.Kind == (failure == "cancel" ? ChatFailureKind.Cancelled :
-                    failure == "read" ? ChatFailureKind.Provider : ChatFailureKind.MalformedStream), "Failure classification changed");
+                Check(result.Failure?.Kind == (failure == "cancel" ? ChatFailureKind.Cancelled : ChatFailureKind.Provider), "Failure gained success");
+                ResponsesRawContractAssertions.Error(frames, failure == "cancel" ? typeof(OperationCanceledException) :
+                    failure == "read" ? typeof(IOException) : typeof(StreamProtocolException), failure == "cancel" ? StopReason.Aborted : StopReason.Error);
                 Check(result.Message.StopReason == (failure == "cancel" ? StopReason.Aborted : StopReason.Error), "Failure became success");
                 var thinking = (ThinkingContent)result.Message.Content.Single();
                 Check(thinking.Thinking == "authoritative", "Done-state text lost");
@@ -362,6 +383,7 @@ internal static class ResponsesReasoningTests
         internal readonly Handler Handler;
         private readonly HttpClient _client;
         internal readonly ResponsesHttpSseTransport Transport;
+        internal readonly List<StreamEvent> Frames = [];
         internal Fixture(byte[] wire, ResponsesTextToolOptions? options = null) : this(new MemoryStream(wire), options) { }
         internal Fixture(Stream body, ResponsesTextToolOptions? options = null)
         {
@@ -376,7 +398,7 @@ internal static class ResponsesReasoningTests
             var factory = Factory(new(ReasoningEffort: "high"));
             Transport = new(_client, request => factory.Create(request, Key), responsesOptions: options);
         }
-        internal Task<ChatResult> Complete(CancellationToken token = default) => new ChatClient(Transport, capacity: 1).CompleteAsync(Request(), token);
+        internal Task<ChatResult> Complete(CancellationToken token = default) => new ChatClient(new ResponsesRawFrameObserver(Transport, Frames), capacity: 1).CompleteAsync(Request(), token);
         public void Dispose() => _client.Dispose();
     }
     internal sealed class Handler(Func<HttpRequestMessage, Task<HttpResponseMessage>> send) : HttpMessageHandler

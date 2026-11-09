@@ -29,6 +29,7 @@ internal static partial class Program
         cases.AddRange(DeclarationDifferentialCases());
         cases.AddRange(Sync120Cases());
         cases.AddRange(Sync150Cases());
+        cases.AddRange(SchemaReferenceCases());
         cases.AddRange(DeterministicCases());
         cases.AddRange(SandboxCases());
         cases.AddRange(LimitCases());

@@ -8,6 +8,7 @@ internal static class PromptTemplateTests
         (Prefix + "quoted adjacent and unmatched arguments", Quotes),
         (Prefix + "ECMAScript whitespace differs from CLR whitespace", Whitespace),
         (Prefix + "empty quotes and literal backslashes match pinned parser", EmptyAndBackslash),
+        (Prefix + "Unicode slices keep scalar boundaries within UTF16 budgets", UnicodeSlices),
         (Prefix + "positional wildcards and unsupported patterns", Simple),
         (Prefix + "defaults and replacement values are not recursive", Defaults),
         (Prefix + "slices zero start zero length and missing arguments", Slices),
@@ -22,8 +23,11 @@ internal static class PromptTemplateTests
     private static Task Quotes()
     {
         Args(["first arg", "second", "third arg"], "\"first arg\" second 'third arg'");
-        Args(["prequotedpost", "tail"], "pre'quoted'post tail");
-        Args(["unfinished text"], "'unfinished text");
+        Args(["pre'quoted'post", "tail"], "pre'quoted'post tail");
+        Args(["'unfinished", "text"], "'unfinished text");
+        Args(["doesn't", "work"], "doesn't work");
+        Args(["\"", "tail"], "\" tail");
+        Args(["'"], "'");
         Args(["a'b", "c\"d"], "\"a'b\" 'c\"d'");
         return Task.CompletedTask;
     }
@@ -41,7 +45,8 @@ internal static class PromptTemplateTests
         // Pi 1.5.0 parseCommandArgs keeps empty quoted arguments in their position.
         Args(["", ""], "'' \"\"   ");
         Args(["", " "], "\"\" \" \"");
-        Args(["quoted \\text\\"], "\"quoted \\\"text\\\"\"");
+        Args(["quoted \"text\""], "\"quoted \\\"text\\\"\"");
+        Args(["it's fine", "after"], "'it\\'s fine' after");
         Args(["a\\", "b"], "a\\ b");
         Equal("Price: \\", PromptTemplateExpander.SubstituteArgs("Price: \\$100", []));
         return Task.CompletedTask;
@@ -53,6 +58,23 @@ internal static class PromptTemplateTests
         Equal("a.5 aS $arguments $ARGS $$ $A", PromptTemplateExpander.SubstituteArgs("$1.5 $ARGUMENTSS $arguments $ARGS $$ $A", ["a"]));
         Equal("$a", PromptTemplateExpander.SubstituteArgs("$$1", ["a"]));
         Equal("a  c", PromptTemplateExpander.SubstituteArgs("$@", ["a", "", "c"]));
+        return Task.CompletedTask;
+    }
+
+    private static Task UnicodeSlices()
+    {
+        const string text = "A😀B𝄞C";
+        for (var count = 0; count <= text.Length + 1; count++)
+        {
+            var head = PiSharp.Contracts.UnicodeText.SliceHead(text, count);
+            var tail = PiSharp.Contracts.UnicodeText.SliceTail(text, count);
+            if (head.Length > count || tail.Length > count) throw new InvalidOperationException("Slice exceeded UTF-16 budget.");
+            _ = new System.Text.UTF8Encoding(false, true).GetBytes(head + "|" + tail);
+        }
+        Equal("A", PiSharp.Contracts.UnicodeText.SliceHead(text, 2));
+        Equal("C", PiSharp.Contracts.UnicodeText.SliceTail(text, 2));
+        Equal("", PiSharp.Contracts.UnicodeText.SliceHead("😀", 1));
+        Equal("", PiSharp.Contracts.UnicodeText.SliceTail("😀", 1));
         return Task.CompletedTask;
     }
 

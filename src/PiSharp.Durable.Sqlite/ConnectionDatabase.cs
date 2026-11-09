@@ -1,10 +1,9 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/src/storage/sqlite/node.ts
+// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/chord/src/sqlite/node.ts
 //
 // Upstream adapts node:sqlite's DatabaseSync; this port adapts a Microsoft.Data.Sqlite connection (decision 0005) with the same serial
 // operation queue, statement cache, transaction handles and pragmas. In Pi v1.5.0 the driver moved to packages/chord/src/sqlite/node.ts
 // (f9a26365568127461c47a07a37dcb42c140a3ac5), and Durable's node.ts re-exports it and keeps openNodeSqliteStorage (SqliteStorage.OpenAsync
-// over a path). RunCountedAsync follows v1.5.0; the citation stays on v1.2.0 until the statement cache keeps only the 256 most recently
-// used statements, as v1.5.0's does (row chord.sqlite-statement-cache, phase 6). Differences, each forced by the binding:
+// over a path). The cache retains the 256 most recently used statements. Differences, each forced by the binding:
 // - Microsoft.Data.Sqlite binds parameters by name, so each unnamed "?" outside literals and comments is numbered ("?1", "?2", ...) when a
 //   statement is prepared; callers still pass positional values.
 // - Connections are opened with Pooling=False so that closing releases the file (Windows keeps pooled files open and locked).
@@ -159,21 +158,50 @@ public abstract class SqliteConnectionExecutor : ISqliteExecutor
     /// <summary>Prepared commands by SQL text, for one connection.</summary>
     internal sealed class StatementCache
     {
-        private readonly Dictionary<string, SqliteCommand> commands = new(StringComparer.Ordinal);
+        internal const int Capacity = 256;
+        private readonly Dictionary<string, (SqliteCommand Command, LinkedListNode<string> Recency)> commands = new(StringComparer.Ordinal);
+        private readonly LinkedList<string> recency = new();
+        public long TotalPrepares { get; private set; }
+        public long DisposedCount { get; private set; }
         private readonly Dictionary<string, int> prepares = new(StringComparer.Ordinal);
 
-        /// <summary>How many times each SQL text was prepared; a test checks no statement is prepared twice.</summary>
+        /// <summary>Prepare counts for resident SQL only; evicted texts are removed to bound instrumentation too.</summary>
         public IReadOnlyDictionary<string, int> PrepareCounts => prepares;
 
         public SqliteCommand Bind(SqliteConnection connection, string sql, object?[] parameters)
         {
-            if (!commands.TryGetValue(sql, out var command))
+            SqliteCommand command;
+            if (commands.TryGetValue(sql, out var cached))
+            {
+                command = cached.Command;
+                recency.Remove(cached.Recency);
+                recency.AddLast(cached.Recency);
+            }
+            else
             {
                 command = connection.CreateCommand();
-                command.CommandText = NumberParameters(sql);
-                command.Prepare();
-                prepares[sql] = prepares.GetValueOrDefault(sql) + 1;
-                commands[sql] = command;
+                try
+                {
+                    command.CommandText = NumberParameters(sql);
+                    command.Prepare();
+                }
+                catch
+                {
+                    command.Dispose();
+                    throw;
+                }
+                TotalPrepares++;
+                commands.Add(sql, (command, recency.AddLast(sql)));
+                prepares.Add(sql, 1);
+                if (commands.Count > Capacity)
+                {
+                    var oldest = recency.First!;
+                    commands[oldest.Value].Command.Dispose();
+                    DisposedCount++;
+                    commands.Remove(oldest.Value);
+                    prepares.Remove(oldest.Value);
+                    recency.RemoveFirst();
+                }
             }
             command.Parameters.Clear();
             for (var index = 0; index < parameters.Length; index++)
@@ -183,8 +211,14 @@ public abstract class SqliteConnectionExecutor : ISqliteExecutor
 
         public void Clear()
         {
-            foreach (var command in commands.Values) command.Dispose();
+            foreach (var cached in commands.Values)
+            {
+                cached.Command.Dispose();
+                DisposedCount++;
+            }
             commands.Clear();
+            recency.Clear();
+            prepares.Clear();
         }
 
         private static object Value(object? value, int index) => value switch
@@ -300,8 +334,10 @@ public sealed class SqliteConnectionDatabase : SqliteConnectionExecutor, ISqlite
     /// <summary>Adapts an open connection, which the database then owns. Open file connections with <c>Pooling=False</c>.</summary>
     public SqliteConnectionDatabase(SqliteConnection connection) : base(Checked(connection), new StatementCache()) { }
 
-    /// <summary>How many times each SQL text was prepared on this connection.</summary>
+    /// <summary>Prepare counts for resident statements only, bounded by the cache capacity.</summary>
     internal IReadOnlyDictionary<string, int> PrepareCounts => Statements.PrepareCounts;
+    internal long TotalPrepares => Statements.TotalPrepares;
+    internal long DisposedStatementCount => Statements.DisposedCount;
 
     /// <summary>The SQLite library version of the connection.</summary>
     public Version SqliteVersion => ParseVersion(Connection.ServerVersion);

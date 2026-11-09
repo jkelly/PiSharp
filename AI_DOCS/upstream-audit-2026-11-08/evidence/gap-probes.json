@@ -1,0 +1,76 @@
+{
+  "productCommit": "14dd34b369fba6d236684da6dfc8a39a03263321",
+  "observations": [
+    {
+      "id": "schema-no-id-control",
+      "expected": true,
+      "actual": true,
+      "exception": null
+    },
+    {
+      "id": "schema-relative-id",
+      "expected": true,
+      "actual": null,
+      "exception": "JsonSchemaException: Unresolved $ref #/$defs/value (no schema registered for https://json-schema.invalid/schemas/schemas/tool.json)"
+    },
+    {
+      "id": "prompt-apostrophe",
+      "expected": [
+        "doesn\u0027t",
+        "work"
+      ],
+      "actual": [
+        "doesnt work"
+      ],
+      "exception": null
+    },
+    {
+      "id": "prompt-unmatched-quote",
+      "expected": [
+        "one",
+        "\u0022two"
+      ],
+      "actual": [
+        "one",
+        "two"
+      ],
+      "exception": null
+    },
+    {
+      "id": "prompt-quoted-control",
+      "expected": [
+        "two words",
+        "next"
+      ],
+      "actual": [
+        "two words",
+        "next"
+      ],
+      "exception": null
+    },
+    {
+      "id": "tool-search-direct-control",
+      "expected": true,
+      "actual": true,
+      "exception": null
+    },
+    {
+      "id": "tool-search-ref",
+      "expected": true,
+      "actual": false,
+      "exception": null
+    },
+    {
+      "id": "edit-mixed-line-endings",
+      "expected": "first\r\nSECOND\nthird\r",
+      "actual": "first\r\nSECOND\r\nthird\r\n",
+      "exception": null
+    },
+    {
+      "id": "anthropic-nonstrict-defs",
+      "expected": true,
+      "actual": false,
+      "exception": null
+    }
+  ]
+}

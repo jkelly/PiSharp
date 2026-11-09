@@ -6,7 +6,7 @@ using PiSharp.Cli.Models;
 
 namespace PiSharp.Cli.Pi;
 
-/// <summary><c>pisharp auth print-api-key|print-bearer-token|check</c>.</summary>
+/// <summary><c>pisharp auth login|logout|print-api-key|print-bearer-token|check</c>.</summary>
 internal static partial class PiAuthCommand
 {
     private sealed class AuthCommandError(string message) : Exception(message);
@@ -23,16 +23,20 @@ internal static partial class PiAuthCommand
     internal static string HelpText => $"""
         Usage:
           {PiConfig.DisplayName} auth print-api-key [--provider <provider>] [--model <model>]
+          {PiConfig.DisplayName} auth login <provider> [--api-key] [--no-browser]
+          {PiConfig.DisplayName} auth logout <provider>
           {PiConfig.DisplayName} auth print-bearer-token [--provider <provider>] [--model <model>] [--min-expiry <duration>]
           {PiConfig.DisplayName} auth check [--provider <provider>] [--model <model>] [--json] [--credentials] [--no-refresh]
 
-        Auth commands require at least one of --provider or --model. Checks refresh expired OAuth credentials by default; --no-refresh prevents this. --credentials emits the credential, or includes it in JSON output.
+        Login and logout accept a provider id or name. Login uses account sign-in when available; --api-key saves an API key, and --no-browser selects another account sign-in method without opening a browser. Logout removes stored credentials only.
+        Credential printing and check require at least one of --provider or --model. Checks refresh expired OAuth credentials by default; --no-refresh prevents this. --credentials emits the credential, or includes it in JSON output.
         """.Replace("\r\n", "\n");
 
     [GeneratedRegex(@"^(\d+)(ms|s|m|h)$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex Duration();
 
-    internal static async Task<int> RunAsync(string[] args, PiHost host, CancellationToken token)
+    internal static async Task<int> RunAsync(string[] args, PiHost host, CancellationToken token,
+        PiSharp.Cli.Authentication.ProviderLoginHost? loginHost = null)
     {
         var err = host.Stderr;
         async Task<int> Fail(string message, int code)
@@ -46,13 +50,14 @@ internal static partial class PiAuthCommand
             await PiCommand.Line(host.Stdout, HelpText).ConfigureAwait(false);
             return 0;
         }
+        if (args[1] is "login" or "logout") return await RunLoginLogoutAsync(args, host, loginHost, token).ConfigureAwait(false);
         Kind kind; var commandArgs = new List<string>(); bool json = false, credentials = false, noRefresh = false; long? minExpiry = null;
         try
         {
             kind = args[1] switch
             {
                 "check" => Kind.Check, "print-api-key" => Kind.ApiKey, "print-bearer-token" => Kind.BearerToken,
-                _ => throw new AuthCommandError($"Unknown auth command \"{args[1]}\". Use \"{PiConfig.DisplayName} auth print-api-key\", \"{PiConfig.DisplayName} auth print-bearer-token\", or \"{PiConfig.DisplayName} auth check\".")
+                _ => throw new AuthCommandError($"Unknown auth command \"{args[1]}\". Use \"{PiConfig.DisplayName} auth login\", \"{PiConfig.DisplayName} auth logout\", \"{PiConfig.DisplayName} auth print-api-key\", \"{PiConfig.DisplayName} auth print-bearer-token\", or \"{PiConfig.DisplayName} auth check\".")
             };
             for (var index = 2; index < args.Length; index++)
             {

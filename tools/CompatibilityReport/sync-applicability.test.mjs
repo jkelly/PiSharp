@@ -8,12 +8,20 @@ import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { buildStatus, validateStatus, attachCurrentMappings, statusPath } from './gap-status-mapping.mjs';
 
 const repo = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const json = path => JSON.parse(readFileSync(resolve(repo, path), 'utf8'));
 const TABLE = 'compatibility/sync-1.5.0-applicability.json', VERSIONS = ['1.3.0', '1.4.0', '1.5.0'];
 const table = json(TABLE), rowById = new Map(table.rows.map(row => [row.id, row]));
 const PHASES = { ai: 2, schema: 2, schemas: 2, 'coding-agent-core': 2, 'coding-agent-cli': 2, tui: 2, codemode: 2, mcp: 2, tools: 2, 'node-bridge': 2, docs: 2, telemetry: 3, durable: 4, env: 5, chord: 6, evals: 7 };
+
+test('current source mapping preserves historical evidence and separates runtime acceptance', () => {
+  const current=json(statusPath);
+  validateStatus(current);
+  assert.deepEqual(current,buildStatus());
+  for(const [path,expected] of Object.entries(attachCurrentMappings(current))) assert.deepEqual(json(path),expected,path);
+});
 
 // Top-level bullets under each ### section of ## [1.3.0] to ## [1.5.0], numbered per section: <package>@<version>/<section>#<n>.
 export function changelogBullets(pkg, text) {
@@ -71,7 +79,12 @@ test('statuses, phases, releases and PiSharp paths', () => {
       // literally or as an interpolated $"<prefix>.{name}" with "<name>" in the same file.
       assert(row.evidence.commits.length > 0 && row.evidence.commits.every(sha => /^[0-9a-f]{7,40}$/.test(sha)), row.id + ' commits');
       assert(row.evidence.tests.length > 0, row.id + ' needs tests');
-      for (const entry of row.evidence.tests) {
+      for (const historicalEntry of row.evidence.tests) {
+        // A renamed current authored test must not erase historical release evidence or imply that the new test passed.
+        // The dated current mapping records such replacements with an explicit pending runtime status.
+        const replacement = row.currentImplementation?.testReplacements?.[historicalEntry];
+        if (replacement) assert.equal(row.currentImplementation.runtimeStatus, 'pending-integrated-validation', row.id + ' replacement is source evidence only');
+        const entry = replacement ?? historicalEntry;
         const [path, caseId] = entry.split(/: (.*)/s), cut = caseId.lastIndexOf('.') + 1;
         assert(existsSync(resolve(repo, path)), row.id + ' names a missing test file ' + path);
         const text = readFileSync(resolve(repo, path), 'utf8');
@@ -95,6 +108,7 @@ test('statuses, phases, releases and PiSharp paths', () => {
 });
 
 const upstream = process.env.PI_UPSTREAM_V1_5_0;
+if (process.env.PI_REQUIRE_UPSTREAM === '1' && !upstream) throw new Error('PI_REQUIRE_UPSTREAM requires PI_UPSTREAM_V1_5_0; refusing a skipped source check');
 test('bullets and upstream paths match the changelogs and tree at v1.5.0', { skip: upstream ? false : 'set PI_UPSTREAM_V1_5_0 to a Pi checkout with v1.2.0 and v1.5.0' }, () => {
   const git = (...args) => execFileSync('git', ['-C', upstream, ...args], { maxBuffer: 1 << 28 }).toString();
   assert.equal(git('rev-parse', 'v1.5.0^{commit}').trim(), table.to.commit);

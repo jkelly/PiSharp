@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <NoWarn>$(NoWarn);PISHARP_CHORD001;PISHARP_DURABLE001;PISHARP_SCHEMA001;PISHARP_TELEMETRY001</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../samples/Durable.Chord.Examples/Durable.Chord.Examples.csproj" />
+  </ItemGroup>
+</Project>

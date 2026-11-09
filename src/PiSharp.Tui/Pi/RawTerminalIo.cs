@@ -131,6 +131,10 @@ internal sealed class WindowsRawTerminalIo : IRawTerminalIo
 [System.Runtime.Versioning.UnsupportedOSPlatform("windows")]
 internal sealed class PosixRawTerminalIo : IRawTerminalIo
 {
+    private const int CombinedSessionState = 0;
+    private const ulong ShiftMask = 1UL << 17;
+    private readonly bool isMacOS;
+    private readonly Func<int, ulong> modifierFlags;
     private readonly byte[] original = new byte[256];
     private bool raw;
     private Thread? reader;
@@ -139,6 +143,17 @@ internal sealed class PosixRawTerminalIo : IRawTerminalIo
     private PosixSignalRegistration? winch, cont;
     private readonly object writeGate = new();
 
+    public PosixRawTerminalIo() : this(OperatingSystem.IsMacOS(), CGEventSourceFlagsState) { }
+
+    // Keep the platform and native call injectable without opening a tty in offline tests.
+    internal PosixRawTerminalIo(bool isMacOS, Func<int, ulong> modifierFlags)
+    {
+        this.isMacOS = isMacOS;
+        this.modifierFlags = modifierFlags;
+    }
+
+    [DllImport("/System/Library/Frameworks/CoreGraphics.framework/CoreGraphics", CallingConvention = CallingConvention.Cdecl)]
+    private static extern ulong CGEventSourceFlagsState(int stateId);
     [DllImport("libc", SetLastError = true)] private static extern int tcgetattr(int fd, byte[] termios);
     [DllImport("libc", SetLastError = true)] private static extern int tcsetattr(int fd, int actions, byte[] termios);
     [DllImport("libc")] private static extern void cfmakeraw(byte[] termios);
@@ -262,6 +277,19 @@ internal sealed class PosixRawTerminalIo : IRawTerminalIo
         cont = PosixSignalRegistration.Create(PosixSignal.SIGCONT, _ => onResize());
     }
     public void StopWatchingResize() { winch?.Dispose(); winch = null; cont?.Dispose(); cont = null; }
-    public bool IsShiftPressed() => false;
+    public bool IsShiftPressed()
+    {
+        if (!isMacOS) return false;
+        try
+        {
+            // Match Pi's macOS helper: current login-session state, not flags from the input bytes.
+            return (modifierFlags(CombinedSessionState) & ShiftMask) != 0;
+        }
+        catch (Exception error) when (error is DllNotFoundException or EntryPointNotFoundException or BadImageFormatException)
+        {
+            // Headless/unsupported hosts retain ordinary Enter and Alt+Enter behavior.
+            return false;
+        }
+    }
     private sealed class Callback(Action dispose) : IDisposable { public void Dispose() => dispose(); }
 }

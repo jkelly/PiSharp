@@ -74,7 +74,7 @@ Run the release workflow by hand from the Actions tab to build and check a versi
 | Input | Default | Effect |
 | --- | --- | --- |
 | `version` | `1.5.0` | The version to build and validate. |
-| `skip_tests` | `false` | Skip the offline test suites. Only a dry run can skip them. |
+| `skip_tests` | `false` | Skip the 22 release-list suites in a dry run. Core and Durable validation still run. |
 
 A dry run runs only the build job. The publish and GitHub release jobs run only for a pushed tag.
 
@@ -91,7 +91,7 @@ git push origin v1.5.0
 
 ## The release workflow
 
-`release.yml` has three jobs.
+`release.yml` has three packaging/publication jobs plus two reusable validation gates. The core and Durable workflows receive the exact release `github.sha`. Both must succeed before NuGet publication and the GitHub release can run. Durable's gate includes the three-OS suites, zero-retention reruns, SQL Server, hosting/server checks and the four SQLite publish RIDs. Separate web/browser suites are optional and do not gate this core release path.
 
 ### Build
 
@@ -129,10 +129,10 @@ After the publish job succeeds, the release job creates the GitHub release for t
 
 It writes provenance files to `artifacts/release-inputs/`, recording the commit, version, Pi baseline and SDK. Then it packs:
 
-- The 23 libraries, with `tools/release/PiSharp.NativeSdk.targets`. The targets file sets the package id, version, description, license, readme and notices, embeds the provenance, and fails without a version, a commit, the provenance file or `net10.0`. Each package is checked by `Assert-PiSharpNativeSdkPackage`: its members, its dependencies (PiSharp siblings at exactly the release version, `[<version>]`, so a consumer can't mix packages from different releases, as Pi pins its own packages from 1.3.0; third-party packages at their pinned versions) and its assembly. The targets file is what makes `dotnet pack` write `[<version>]` for project references; NuGet would otherwise write the release version as a minimum.
+- The current 28-library admission list, with `tools/release/PiSharp.NativeSdk.targets`. The targets file sets the package id, version, description, license, readme and notices, embeds the provenance, and fails without a version, a commit, the provenance file or `net10.0`. Each package is checked by `Assert-PiSharpNativeSdkPackage`: its members, its dependencies (PiSharp siblings at exactly the release version, `[<version>]`, so a consumer can't mix packages from different releases, as Pi pins its own packages from 1.3.0; third-party packages at their pinned versions) and its assembly. The targets file is what makes `dotnet pack` write `[<version>]` for project references; NuGet would otherwise write the release version as a minimum.
 - The CLI, as the `PiSharp.Cli` tool with the command `pisharp`, with `tools/packaging/PiSharp.Distribution.targets`, checked by `tools/packaging/validate-distribution.ps1`.
 
-The reports go to `artifacts/validation/`. The script fails unless it ends with exactly 24 packages.
+The reports go to `artifacts/validation/`. The unreleased gap-admission preparation extends the list to 28 libraries and the CLI tool (29 packages). The script checks its exact library-list count. The published 1.5.0 release contained 24 packages; its release notes remain historical. Chord, Chord.Hosting, Durable.Store, Env.Protocol and Env additionally require the package-only external consumer gate documented in `docs/contracts/gap-package-admission.md`. The Env daemon is a separately verified native artifact, never a library package.
 
 ## After the release
 

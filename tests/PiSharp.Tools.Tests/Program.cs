@@ -23,7 +23,7 @@ internal static class Program
             .Concat(GrepContextHostAdapterTests.Cases())
             .Concat(UnixProcessRunnerTests.Cases())
             .Concat(ToolParityTests.Cases()).Concat(SkiaCodecTests.Cases()).Concat(ToolValidationTests.Cases()).Concat(ToolEdgeInputTests.Cases())
-            .Concat(GrepToolTests.Sync150Cases()).Concat(Sync150Tests.Cases()).Concat(Sync150SchemaCases.Cases())
+            .Concat(GapFileToolsTests.Cases()).Concat(GrepToolTests.Sync150Cases()).Concat(Sync150Tests.Cases()).Concat(Sync150SchemaCases.Cases())
             .Where(test => filter is null || test.Name.Contains(filter, StringComparison.OrdinalIgnoreCase)).ToArray();
         if (tests.Length == 0) { Console.Error.WriteLine("No matching tool test cases."); return 2; }
         foreach (var test in tests)
@@ -36,6 +36,7 @@ internal static class Program
                     test.Run.Method.DeclaringType == typeof(FdFindExecutorTests) || test.Run.Method.DeclaringType == typeof(GrepToolTests) ||
                     test.Run.Method.DeclaringType == typeof(GrepContextHostAdapterTests) ||
                     test.Name.StartsWith("Unix ", StringComparison.Ordinal) ||
+                    test.Name.StartsWith("owned child ", StringComparison.Ordinal) ||
                     test.Name == "Bash abort timeout spawn capture cleanup and foreign failures retain bounded known output") await test.Run();
                 else await test.Run().WaitAsync(TimeSpan.FromSeconds(20));
                 Console.WriteLine("PASS " + test.Name);

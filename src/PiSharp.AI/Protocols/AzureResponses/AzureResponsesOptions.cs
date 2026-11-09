@@ -16,6 +16,9 @@ public sealed record AzureResponsesOptions(JsonData ModelMetadata, ResponsesTran
     public JsonData? Headers { get; init; }
     public double? MaxTokens { get; init; }
     public double? Temperature { get; init; }
+    /// <summary>Null inherits model compatibility; auto and enabled send the cache key; disabled omits it.
+    /// Explicit options take precedence; sampling parameters still merge last.</summary>
+    public string? PromptCacheKeyMode { get; init; }
     public string? SessionId { get; init; }
     public string? ReasoningEffort { get; init; }
     public string? ReasoningSummary { get; init; }

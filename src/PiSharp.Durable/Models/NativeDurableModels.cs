@@ -79,6 +79,9 @@ public sealed record NativeDurableModelsOptions
     /// only).
     /// </summary>
     public ModelOperationsRegistry? ModelOperations { get; init; }
+
+    /// <summary>Default identity for every request. Request identity overrides individual fields; null adds no attribution.</summary>
+    public ClientIdentity? Identity { get; init; }
 }
 
 /// <summary>
@@ -113,6 +116,8 @@ public sealed class NativeDurableModels : IDurableModels, IDisposable
     private readonly TimeProvider time;
     private readonly ModelCache models = new();
     private readonly Lazy<ModelOperationsRegistry> operations;
+    private readonly ClientIdentity? identity;
+    private readonly HttpMessageInvoker operationHttp;
     private int disposed;
 
     /// <summary>Creates the collection.</summary>
@@ -123,7 +128,7 @@ public sealed class NativeDurableModels : IDurableModels, IDisposable
         foreach (var id in options.Providers ?? DurableBuiltinCatalog.Providers)
         {
             ArgumentNullException.ThrowIfNull(id);
-            if (!DurableBuiltinCatalog.ShardHashes.ContainsKey(id)) throw new ArgumentException($"Unknown built-in provider: {id}", nameof(options));
+            if (!DurableBuiltinCatalog.Providers.Contains(id, StringComparer.Ordinal)) throw new ArgumentException($"Unknown built-in provider: {id}", nameof(options));
             builder[id] = null; // Loaded on first use.
         }
         foreach (var catalog in options.Catalogs ?? [])
@@ -135,9 +140,11 @@ public sealed class NativeDurableModels : IDurableModels, IDisposable
         environment = options.Environment ?? (_ => null);
         resolveApiKey = options.ResolveApiKey;
         hostTransport = options.HostTransport;
+        identity = options.Identity;
         // Disposing the wrapper disposes the inner handler; a caller-owned handler's wrapper is never disposed.
         handler = new PayloadHandler(options.HttpHandler ?? new SocketsHttpHandler { AllowAutoRedirect = false });
         ownsHandler = options.HttpHandler is null;
+        operationHttp = new HttpMessageInvoker(handler, disposeHandler: false);
         time = options.TimeProvider ?? TimeProvider.System;
         var host = options.ModelOperations;
         operations = new(() => host ?? ModelOperationsRegistry.CreateBuiltin(
@@ -260,7 +267,11 @@ public sealed class NativeDurableModels : IDurableModels, IDisposable
         {
             return DurableModelOperations.ClassifierError(model, error.Message, cancellationToken.IsCancellationRequested);
         }
-        var request = options?.Telemetry is { } telemetry ? new ClassifierOptions { Telemetry = telemetry } : null;
+        var request = new ClassifierOptions
+        {
+            Telemetry = options?.Telemetry, Identity = ClientIdentities.Merge(identity, options?.Identity),
+            Http = operationHttp, TimeProvider = time,
+        };
         var result = await operations.Value.ClassifyAsync(classifier, parsed, request, cancellationToken).ConfigureAwait(false);
         return (JsonObjectValue)Chord.JsonValue.FromData(ModelOperationJson.WriteClassifierResult(result));
     }
@@ -286,7 +297,11 @@ public sealed class NativeDurableModels : IDurableModels, IDisposable
         {
             return DurableModelOperations.ImagesError(model, error.Message, cancellationToken.IsCancellationRequested);
         }
-        var request = options?.Telemetry is { } telemetry ? new ImagesOptions { Telemetry = telemetry } : null;
+        var request = new ImagesOptions
+        {
+            Telemetry = options?.Telemetry, Identity = ClientIdentities.Merge(identity, options?.Identity),
+            Http = operationHttp, TimeProvider = time,
+        };
         var result = await operations.Value.GenerateImagesAsync(image, parsed, request, cancellationToken).ConfigureAwait(false);
         return (JsonObjectValue)Chord.JsonValue.FromData(ModelOperationJson.WriteAssistantImages(result));
     }
@@ -297,6 +312,7 @@ public sealed class NativeDurableModels : IDurableModels, IDisposable
     {
         ArgumentNullException.ThrowIfNull(model);
         ObjectDisposedException.ThrowIf(Volatile.Read(ref disposed) != 0, this);
+        if (identity is not null) options = (options ?? new DurableStreamOptions()) with { Identity = ClientIdentities.Merge(identity, options?.Identity) };
         var stream = StreamAsync(model, messages, options, cancellationToken);
         return options?.Telemetry is { } telemetry ? ObserveAsync(stream, model, telemetry, options.Reasoning, poll: false) : stream;
     }
@@ -431,7 +447,7 @@ public sealed class NativeDurableModels : IDurableModels, IDisposable
         try
         {
             var level = ThinkingLevels.Clamp(provider.GetSupportedThinkingLevels(descriptor), options?.Reasoning ?? "off");
-            var thinkingCap = Clamp(NativeModelRoutes.ThinkingCap(raw, model.Api, level, maximum));
+            var thinkingCap = Clamp(NativeModelRoutes.ThinkingCap(raw, model.Api, level, maximum, options?.ThinkingBudgets));
             if (thinkingCap != maximum)
             {
                 provider.Dispose();
@@ -454,6 +470,7 @@ public sealed class NativeDurableModels : IDurableModels, IDisposable
     internal static NativeRouteSettings Settings(DurableStreamOptions? options, int maximum) => new()
     {
         MaxTokens = maximum,
+        ThinkingBudgets = options?.ThinkingBudgets?.ToData(),
         CacheRetention = options?.CacheRetention is "none" or "long" ? options.CacheRetention : "short",
         Headers = options?.Headers,
         UserId = options?.Metadata is { } metadata && metadata.TryGetValue("user_id", out var user) && user is JsonStringValue text ? text.Value : null,
@@ -576,6 +593,7 @@ public sealed class NativeDurableModels : IDurableModels, IDisposable
     public void Dispose()
     {
         if (Interlocked.Exchange(ref disposed, 1) != 0) return;
+        operationHttp.Dispose();
         if (ownsHandler) handler.Dispose();
     }
 
@@ -587,6 +605,14 @@ public sealed class NativeDurableModels : IDurableModels, IDisposable
         public IReadOnlyList<DurableModel> Of(FrozenModelCatalog catalog) => cache.GetValue(catalog, owned =>
             [.. owned.Models.Where(model => model.Type == CatalogModelType.Chat).Select(FromCatalog)]);
     }
+
+    /// <summary>Wraps a host route's provider handler so the current request's payload callback runs at its HTTP boundary.
+    /// The host owns the returned handler and its inner handler. No callback is stored on the handler.</summary>
+    public static HttpMessageHandler WrapProviderHandler(HttpMessageHandler? inner) => PayloadHandler.Wrap(inner);
+
+    /// <summary>Whether the current async request has a provider payload callback. Host routes may use this to select HTTP
+    /// instead of a WebSocket transport, whose frames do not pass through an HTTP handler.</summary>
+    public static bool HasActiveProviderPayloadHook => PayloadHandler.HasActiveHook;
 
     /// <summary>The <see cref="DurableStreamOptions.OnPayload"/> of the request whose HTTP sends run in this scope, and its model.</summary>
     internal sealed record PayloadScope(Func<Chord.JsonValue, DurableModel, CancellationToken, Task<Chord.JsonValue?>> OnPayload, DurableModel Model);
@@ -600,6 +626,7 @@ public sealed class NativeDurableModels : IDurableModels, IDisposable
     internal sealed class PayloadHandler(HttpMessageHandler inner) : DelegatingHandler(inner)
     {
         private static readonly AsyncLocal<PayloadScope?> Current = new();
+        internal static bool HasActiveHook => Current.Value is not null;
         private static readonly HttpRequestOptionsKey<bool> Applied = new("PiSharp.Durable.PayloadApplied");
 
         /// <summary><paramref name="inner"/> (null: a handler of its own that follows no redirects) with the request scope's payload
@@ -624,14 +651,19 @@ public sealed class NativeDurableModels : IDurableModels, IDisposable
                 request.Options.Set(Applied, true);
                 // The callback and the send run outside the scope: a request the callback makes is not this request's payload.
                 Current.Value = null;
-                var text = await content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+                var compressed = content.Headers.ContentEncoding.Any(value => value.Equals("zstd", StringComparison.OrdinalIgnoreCase));
+                var text = compressed
+                    ? Encoding.UTF8.GetString(PiSharp.AI.Compression.ZstdDecoder.Decompress(await content.ReadAsByteArrayAsync(cancellationToken).ConfigureAwait(false)))
+                    : await content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
                 Chord.JsonValue? payload = null;
                 try { payload = Chord.JsonValue.Parse(text); }
                 catch (FormatException) { }
                 if (payload is not null && await scope.OnPayload(payload, scope.Model, cancellationToken).ConfigureAwait(false) is { } replaced &&
                     !ReferenceEquals(replaced, payload))
                 {
-                    var body = new StringContent(replaced.ToJson(), Encoding.UTF8);
+                    HttpContent body = compressed
+                        ? new ByteArrayContent(PiSharp.AI.Compression.Zstd.Compress(Encoding.UTF8.GetBytes(replaced.ToJson())))
+                        : new StringContent(replaced.ToJson(), Encoding.UTF8);
                     foreach (var header in content.Headers)
                         if (!header.Key.Equals("Content-Length", StringComparison.OrdinalIgnoreCase) && !header.Key.Equals("Content-Type", StringComparison.OrdinalIgnoreCase))
                             body.Headers.TryAddWithoutValidation(header.Key, header.Value);

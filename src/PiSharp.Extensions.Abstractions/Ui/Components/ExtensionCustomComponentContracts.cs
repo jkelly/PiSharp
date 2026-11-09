@@ -18,7 +18,30 @@ public sealed record ExtensionCustomComponentBlocked(string Kind, string Message
 /// overlayOptions object as JSON (width, minWidth, maxHeight, anchor, offsetX, offsetY, row, col, margin, nonCapturing); null uses the
 /// overlay defaults.</summary>
 [Experimental("PISHARP_EXTUI001")]
-public sealed record ExtensionCustomComponentOverlay(JsonElement? Options = null);
+public sealed record ExtensionCustomComponentOverlay(JsonElement? Options = null)
+{
+    /// <summary>Evaluated with current terminal dimensions. The transport owns its deadline.</summary>
+    public Func<int, int, CancellationToken, Task<bool>>? Visible { get; init; }
+    /// <summary>Called after the overlay is mounted and outside the UI loop's mounting callback.</summary>
+    public Func<ExtensionCustomComponentOverlayHandle, CancellationToken, Task>? OnHandle { get; init; }
+}
+
+/// <summary>Last UI-owned state. Bounds are from the last completed render, without invoking visibility callbacks.</summary>
+[Experimental("PISHARP_EXTUI001")]
+public sealed record ExtensionCustomComponentOverlayState(bool Hidden, bool Focused, int? Row = null, int? Col = null,
+    int? Width = null, int? Height = null, long Sequence = 0);
+
+/// <summary>Thread-safe transport handle: mutations enqueue UI work; reads never enter the UI loop.</summary>
+[Experimental("PISHARP_EXTUI001")]
+public sealed class ExtensionCustomComponentOverlayHandle(Action<string, bool?, long> enqueue)
+{
+    private ExtensionCustomComponentOverlayState state = new(false, false);
+    private int active = 1;
+    public ExtensionCustomComponentOverlayState State => Volatile.Read(ref active) == 0 ? new(true, false) : Volatile.Read(ref state);
+    public void Update(ExtensionCustomComponentOverlayState value) { if (Volatile.Read(ref active) != 0) Volatile.Write(ref state, value); }
+    public void Send(string operation, bool? hidden = null, long sequence = 0) { if (Volatile.Read(ref active) != 0) enqueue(operation, hidden, sequence); }
+    public void Retire() { Interlocked.Exchange(ref active, 0); Volatile.Write(ref state, new(true, false)); }
+}
 
 /// <summary>Actual worker callbacks supplied by the admitted native transport owner. Source objects,
 /// constructors, theme, keybindings and render state remain in their original realm.</summary>

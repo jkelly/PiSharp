@@ -357,7 +357,7 @@ internal sealed class SchemaCompiler
     }
 
     /// <summary><paramref name="node"/> without <c>unevaluatedProperties</c> and <c>unevaluatedItems</c> (one copy per node).</summary>
-    public JsObject WithoutUnevaluated(JsObject node)
+    public JsObject WithoutUnevaluated(JsObject node, string @base)
     {
         lock (Sync)
         {
@@ -367,6 +367,10 @@ internal sealed class SchemaCompiler
             {
                 if (k is not ("unevaluatedProperties" or "unevaluatedItems")) rest.Set(k, node.GetOwn(k));
             }
+
+            // This is the same schema resource with fewer assertions. Preserve its resolved
+            // base, rather than applying a relative $id again to this synthetic node.
+            R.BaseOf[rest] = R.BaseFor(node, @base);
 
             return _withoutUnevaluated[node] = rest;
         }

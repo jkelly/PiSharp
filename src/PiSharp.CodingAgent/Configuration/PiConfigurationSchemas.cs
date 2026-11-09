@@ -1,5 +1,6 @@
 // Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/schemas/{models,settings,keybindings,theme}.schema.json
-// (embedded byte-for-byte under Schemas/) and packages/coding-agent/scripts/generate-schemas.ts.
+// (models.schema.json has reviewed native compatibility extensions; the other schemas retain upstream bytes)
+// and packages/coding-agent/scripts/generate-schemas.ts. See docs/models-schema-derivative.md.
 using System.Text;
 using PiSharp.Agent;
 
@@ -7,7 +8,7 @@ namespace PiSharp.CodingAgent.Configuration;
 
 /// <summary>
 /// Pi's published configuration schemas (<c>https://pi.dev/schemas/*.schema.json</c>), generated from the TypeBox schemas that validate
-/// models.json, settings.json, keybindings.json and theme files. PiSharp embeds them and validates with them, so the checks and their
+/// models.json, settings.json, keybindings.json and theme files. PiSharp embeds them with reviewed models-schema extensions, so the checks and their
 /// messages are the TypeBox ones.
 /// </summary>
 public static class PiConfigurationSchemas
@@ -22,7 +23,7 @@ public static class PiConfigurationSchemas
     /// <summary>The published URL of a schema file (its <c>$id</c>).</summary>
     public static string Url(string fileName) => BaseUrl + "/" + fileName;
 
-    /// <summary>The embedded published schema file, exactly as upstream ships it.</summary>
+    /// <summary>The embedded schema file. The models schema includes reviewed native extensions; see the derivative provenance record.</summary>
     public static byte[] ReadBytes(string fileName)
     {
         if (!FileNames.Contains(fileName, StringComparer.Ordinal)) throw new ArgumentException("Unknown configuration schema " + fileName, nameof(fileName));

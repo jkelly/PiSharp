@@ -16,6 +16,7 @@ public static class AnthropicResolvedProviderFactory
         JsonData? modelMetadata = null)
     {
         ArgumentNullException.ThrowIfNull(authentication);
+        projectionOptions = AnthropicCatalogCompatibility.Apply(projectionOptions, modelMetadata);
         // Existing fixed endpoint/model/key admission remains authoritative and unchanged. Federation has no key.
         Validate(model, endpoint, authentication.Kind == AuthenticationKind.WorkloadIdentityFederation ? null : authentication.Authentication.Secret,
             "anthropic", "anthropic-messages");

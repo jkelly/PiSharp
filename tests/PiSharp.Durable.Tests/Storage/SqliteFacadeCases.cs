@@ -7,8 +7,8 @@
 // settings, runCounted (with helpers.ts's runChanges), and the outcome of a transaction (slice 6b D4). Adapted there: upstream makes
 // BEGIN IMMEDIATE, COMMIT or ROLLBACK throw by replacing DatabaseSync.exec; here BEGIN IMMEDIATE fails inside a transaction the
 // connection already began, COMMIT on a deferred foreign key violation, and ROLLBACK after the callback committed. Not ported: upstream's
-// re-export identity case (the C# types are the same types, with no re-export) and the 256-statement cache case (row
-// chord.sqlite-statement-cache, phase 6). The authored chord.sqlite.node.counts-no-rows-that-triggers-change pins that trigger writes do
+// re-export identity case (the C# types are the same types, with no re-export). The cache case verifies bounded
+// resident instrumentation and explicit disposal required by the .NET binding. The authored chord.sqlite.node.counts-no-rows-that-triggers-change pins that trigger writes do
 // not count. The storage commits go through v1.5.0's commitWrites (CommitWritesAsync, area storage-batches).
 using Microsoft.Data.Sqlite;
 using PiSharp.Durable;
@@ -37,7 +37,54 @@ internal static partial class Program
             var repeated = connection.PrepareCounts.Where(pair => pair.Value > 1).Select(pair => pair.Key).ToArray();
             Check(repeated.Length == 0, "statements prepared more than once: " + string.Join(" | ", repeated));
             Check(connection.PrepareCounts.Count > 0, "statements were prepared");
+            Equal((long)connection.PrepareCounts.Count, connection.TotalPrepares, "no statement re-prepared");
             await storage.CloseAsync(SqliteContext);
+        });
+
+        yield return Case("chord.sqlite.node.disposes-evicted-and-cleared-command-resources", () =>
+        {
+            using var connection = new SqliteConnection("Data Source=:memory:");
+            connection.Open();
+            var cache = new SqliteConnectionExecutor.StatementCache();
+            var oldest = cache.Bind(connection, "SELECT 0", []);
+            var oldestHandle = PreparedHandle(oldest);
+            for (var index = 1; index <= 256; index++) cache.Bind(connection, $"SELECT {index}", []);
+            Check(oldestHandle.IsClosed, "eviction finalized the native prepared statement");
+            var survivor = cache.Bind(connection, "SELECT 256", []);
+            var survivorHandle = PreparedHandle(survivor);
+            Check(!survivorHandle.IsClosed, "resident native statement remains open");
+            cache.Clear();
+            Check(survivorHandle.IsClosed, "clear finalized the resident native statement");
+
+            // Pinned Microsoft.Data.Sqlite 10.0.12 Dispose finalizes these handles but retains Connection.
+            // Inspect the actual native SafeHandle, rather than assuming disposal clears that property.
+            static SQLitePCL.sqlite3_stmt PreparedHandle(SqliteCommand command) =>
+                ((IEnumerable<(SQLitePCL.sqlite3_stmt Statement, int ParamCount)>)typeof(SqliteCommand)
+                    .GetField("_preparedStatements", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!
+                    .GetValue(command)!).Single().Statement;
+        });
+
+        yield return Case("chord.sqlite.node.bounds-statements-with-lru-promotion-disposal-and-reprepare", async () =>
+        {
+            var database = await SqliteConnectionDatabase.OpenAsync(":memory:");
+            for (var index = 0; index < 256; index++) await database.GetAsync($"SELECT {index} AS value");
+            Equal(256, database.PrepareCounts.Count, "resident statements at capacity");
+            await database.TransactionAsync(async tx => { await tx.GetAsync("SELECT 0 AS value"); });
+            await database.GetAsync("SELECT 256 AS value");
+            Check(database.PrepareCounts.ContainsKey("SELECT 0 AS value"), "transaction hit promoted oldest");
+            Check(!database.PrepareCounts.ContainsKey("SELECT 1 AS value"), "least recently used evicted");
+            Equal(1L, database.DisposedStatementCount, "eviction disposed command");
+            var prepares = database.TotalPrepares;
+            Equal(1L, (await database.GetAsync("SELECT 1 AS value"))!.GetInt64("value"), "evicted statement works again");
+            Equal(prepares + 1, database.TotalPrepares, "evicted statement re-prepared");
+            for (var index = 257; index < 1024; index++) await database.GetAsync($"SELECT {index} AS value");
+            Equal(256, database.PrepareCounts.Count, "instrumentation stays bounded after churn");
+            Equal(database.TotalPrepares - 256, database.DisposedStatementCount, "all evictions disposed");
+            await database.CloseAsync();
+            Equal(0, database.PrepareCounts.Count, "close clears instrumentation");
+            Equal(database.TotalPrepares, database.DisposedStatementCount, "close disposes survivors");
+            await database.CloseAsync();
+            Equal(database.TotalPrepares, database.DisposedStatementCount, "repeat close does not dispose twice");
         });
 
         yield return Case("storage.sqlite.facade.commits-work-done-through-the-transaction-handle-and-closes-idempotently", async () =>

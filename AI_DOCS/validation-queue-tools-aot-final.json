@@ -1,0 +1,29 @@
+[
+  {
+    "options": {
+      "Project": "tests/PiSharp.Tools.Tests",
+      "Label": "Tools-full-stable6",
+      "BuildTimeoutSeconds": 240,
+      "TestTimeoutSeconds": 600,
+      "LockTimeoutSeconds": 30,
+      "Configuration": "Debug",
+      "BuildArguments": [
+        "-p:RunAnalyzers=false"
+      ]
+    },
+    "environment": {}
+  },
+  {
+    "options": {
+      "Project": "artifacts/gap-validation/NativeEnvDriverR3/NativeEnvDriverR3.proj",
+      "Label": "NativeAOT-stable6",
+      "BuildTimeoutSeconds": 1200,
+      "TestTimeoutSeconds": 300,
+      "LockTimeoutSeconds": 30,
+      "Configuration": "Debug",
+      "BuildOnly": true,
+      "BuildArguments": []
+    },
+    "environment": {}
+  }
+]

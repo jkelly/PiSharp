@@ -61,8 +61,8 @@ internal static class DurableBuiltinCatalog
 
     private static readonly ConcurrentDictionary<string, FrozenModelCatalog> Loaded = new(StringComparer.Ordinal);
 
-    /// <summary>The built-in providers that have a catalog shard, in ordinal order.</summary>
-    internal static ImmutableArray<string> Providers { get; } = [.. ShardHashes.Keys.Order(StringComparer.Ordinal)];
+    /// <summary>The built-in providers with a frozen shard or reviewed addition, in ordinal order.</summary>
+    internal static ImmutableArray<string> Providers { get; } = [.. ShardHashes.Keys.Concat(ReviewedModelCatalog.AdditionalProviders).Distinct().Order(StringComparer.Ordinal)];
 
     /// <summary>The verified shard bytes of a built-in provider.</summary>
     internal static byte[] ReadShard(string provider)
@@ -79,7 +79,8 @@ internal static class DurableBuiltinCatalog
         return bytes;
     }
 
-    /// <summary>The parsed, hash-verified catalog of a built-in provider (cached per process); null for a provider without a shard.</summary>
+    /// <summary>The hash-verified baseline plus explicit reviewed changes (cached per process); null for an unknown provider.</summary>
     internal static FrozenModelCatalog? Get(string provider) =>
-        ShardHashes.ContainsKey(provider) ? Loaded.GetOrAdd(provider, id => FrozenModelCatalog.ReadProviderJson(id, ReadShard(id))) : null;
+        ShardHashes.ContainsKey(provider) || ReviewedModelCatalog.AdditionalProviders.Contains(provider)
+            ? Loaded.GetOrAdd(provider, id => ReviewedModelCatalog.Apply(id, ShardHashes.ContainsKey(id) ? FrozenModelCatalog.ReadProviderJson(id, ReadShard(id)) : null)!) : null;
 }

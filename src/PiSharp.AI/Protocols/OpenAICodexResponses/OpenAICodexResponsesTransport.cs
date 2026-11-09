@@ -88,7 +88,7 @@ public sealed partial class OpenAICodexResponsesTransport : IChatTransport, IThi
     private readonly ImmutableArray<string> _levels;
     private readonly string? _defaultLevel;
     private readonly ResponsesTokenRates _rates;
-    private readonly bool _grammar, _strictMode, _midConversation, _developerRole;
+    private readonly bool _grammar, _strictMode, _midConversation, _developerRole, _additionalTools, _toolSearch;
 
     public OpenAICodexResponsesTransport(HttpClient client, ModelDescriptor model, JsonData modelMetadata, OpenAICodexResponsesOptions options,
         Func<CancellationToken, ValueTask<string>> accessToken, string? defaultThinkingLevel = null)
@@ -105,6 +105,7 @@ public sealed partial class OpenAICodexResponsesTransport : IChatTransport, IThi
         bool Compat(string name, bool fallback) => _metadata.TryGetProperty("compat", out var compat) && compat.ValueKind == JsonValueKind.Object &&
             compat.TryGetProperty(name, out var flag) && flag.ValueKind is JsonValueKind.True or JsonValueKind.False ? flag.GetBoolean() : fallback;
         _grammar = Compat("supportsOpenAIGrammarTools", false); _strictMode = Compat("supportsStrictMode", true);
+        _additionalTools = Compat("supportsAdditionalTools", false); _toolSearch = Compat("supportsToolSearch", false);
         _midConversation = Compat("supportsMidConvoSystemMessages", false); _developerRole = Compat("supportsDeveloperRole", true);
     }
 
@@ -159,6 +160,7 @@ public sealed partial class OpenAICodexResponsesTransport : IChatTransport, IThi
                 MaximumEntryCharacters: _options.MaximumEntryCharacters, MaximumInputCharacters: Budget,
                 MaximumOutputCharacters: Budget, MaximumOutputBytes: Budget) { SupportsOpenAIGrammarTools = _grammar })
         {
+            SupportsAdditionalTools = _additionalTools, SupportsToolSearch = _toolSearch,
             ModelSupportsImages = _metadata.TryGetProperty("input", out var inputs) && inputs.ValueKind == JsonValueKind.Array &&
                 inputs.EnumerateArray().Any(item => item.ValueKind == JsonValueKind.String && item.GetString() == "image")
         };
@@ -273,7 +275,7 @@ public sealed partial class OpenAICodexResponsesTransport : IChatTransport, IThi
         internal bool? EndTurn;
         internal readonly List<JsonObject> Diagnostics = [];
         internal WebSocketLease? Lease;
-        internal bool WebSocketStarted, UseCachedContext, RetriedMissingContinuation;
+        internal bool WebSocketStarted, UseCachedContext, RetriedMissingContinuation, DisableContinuation;
         internal JsonObject? FullBody;
         internal string? CacheSessionId, ConfiguredTransport;
         internal int RequestBytes;
@@ -284,7 +286,7 @@ public sealed partial class OpenAICodexResponsesTransport : IChatTransport, IThi
 
     private async IAsyncEnumerable<StreamEvent> StreamCore(ChatRequest request, [EnumeratorCancellation] CancellationToken token)
     {
-        var invocation = new Invocation();
+        var invocation = new Invocation { DisableContinuation = request.DisableContinuation };
         var inner = new ResponsesTextToolTransport((chat, cancellation, context) => PrepareAsync(chat, invocation, cancellation),
             new ResponsesTextToolOptions(MaximumEvents: int.MaxValue, MaximumEventCharacters: 16 * 1_048_576, MaximumInputCharacters: 64 * 1_048_576,
                 MaximumContentSlots: int.MaxValue, MaximumContentCharacters: 16 * 1_048_576, MaximumJsonDepth: JsonData.MaximumDepth, Rates: _rates)
@@ -353,9 +355,9 @@ public sealed partial class OpenAICodexResponsesTransport : IChatTransport, IThi
         var accountId = ExtractAccountId(token0);
         var headers = BuildHeaders(token0, request.SessionId, request.Identity);
         var body = BuildBody(request);
-        if (_options.OnPayload is { } hook && await hook(JsonData.Parse(body.ToJsonString(BodyJson)), _model, token).ConfigureAwait(false) is { } replaced)
+        if (_options.OnPayload is { } hook && await hook(JsonData.Parse(JsonUtf16.ToJsonString(body, BodyJson.Encoder)), _model, token).ConfigureAwait(false) is { } replaced)
             body = JsonNode.Parse(replaced.ToString(), documentOptions: JsonData.DocumentOptions) as JsonObject ?? throw new InvalidOperationException("Codex payload must be an object.");
-        var bodyJson = body.ToJsonString(BodyJson);
+        var bodyJson = JsonUtf16.ToJsonString(body, BodyJson.Encoder);
         var transport = _options.Transport?.Invoke() is { Length: > 0 } configured ? configured : "auto";
         var cacheSessionId = _options.CacheRetention == "none" ? null : _options.SessionId ?? request.SessionId;
         invocation.CacheSessionId = cacheSessionId; invocation.ConfiguredTransport = transport;

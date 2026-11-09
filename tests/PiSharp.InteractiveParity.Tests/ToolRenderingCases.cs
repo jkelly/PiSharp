@@ -143,6 +143,7 @@ internal static partial class ToolRenderingCases
 
     public static IEnumerable<(string Id, Func<Task> Run)> All()
     {
+        foreach (var test in GapDisposalTests()) yield return test;
         foreach (var test in ToolExecutionComponentTests()) yield return test;
         foreach (var test in BashExecutionTests()) yield return test;
         foreach (var test in CodemodeRendererTests()) yield return test;

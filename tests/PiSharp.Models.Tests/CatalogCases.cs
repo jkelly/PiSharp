@@ -76,12 +76,12 @@ internal static partial class Program
         Names(["amazon-bedrock", "ant-ling", "anthropic", "azure", "baseten", "cerebras", "cloudflare-ai-gateway", "cloudflare-workers-ai", "deepseek",
             "fireworks", "github-copilot", "google", "google-vertex", "groq", "huggingface", "kimi-coding", "meta", "minimax", "minimax-cn", "mistral",
             "moonshotai", "moonshotai-cn", "nvidia", "openai", "openai-codex", "opencode", "opencode-go", "openrouter", "qwen-token-plan",
-            "qwen-token-plan-cn", "qwen-token-plan-individual", "radius", "together", "typesafe", "vercel-ai-gateway", "xai", "xiaomi",
+            "qwen-token-plan-cn", "qwen-token-plan-individual", "qwen-token-plan-individual-cn", "radius", "together", "typesafe", "vercel-ai-gateway", "xai", "xiaomi",
             "xiaomi-token-plan-ams", "xiaomi-token-plan-cn", "xiaomi-token-plan-sgp", "zai", "zai-coding-cn"],
             BuiltinProviders.All.Select(provider => provider.Id), "builtinProviders() order");
         foreach (var provider in BuiltinProviders.All)
         {
-            var catalog = BuiltinModelCatalog.Get(provider.Id);
+            var catalog = ReviewedModelCatalog.Apply(provider.Id, BuiltinModelCatalog.Has(provider.Id) ? BuiltinModelCatalog.Get(provider.Id) : null)!;
             foreach (var api in catalog.DeclaredApis) Check(provider.Apis.Contains(api), $"{provider.Id} lacks API {api}");
             if (provider.BaseUrl is { } baseUrl && provider.Id is not ("fireworks" or "openrouter" or "vercel-ai-gateway"))
                 Check(catalog.Models.All(model => model.BaseUrl == baseUrl), provider.Id + " base URL");

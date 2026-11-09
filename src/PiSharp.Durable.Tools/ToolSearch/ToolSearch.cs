@@ -5,6 +5,7 @@
 // - The arguments are validated against the schema before execute, so `query` is a string and `limit`, when present, a number; JavaScript's
 //   `trim()` and `Number.isInteger` are Js.Trim and a finite, whole check. A limit past int.MaxValue ranks as int.MaxValue, which no
 //   document list reaches.
+using PiSharp.Contracts;
 using PiSharp.Durable.Chord;
 using PiSharp.Durable.Internal.PiAi.Validation;
 
@@ -83,29 +84,40 @@ public static class ToolSearch
     }
 
     /// <summary>Schema descriptions and property names, recursively.</summary>
-    private static void SchemaText(JsonValue? schema, List<string> parts)
+    private static void SchemaText(JsonValue? schema, JsonValue root, List<string> parts, HashSet<JsonValue> seen, int depth, bool referenced = false)
     {
-        if (schema is not JsonObjectValue value) return;
+        if (depth > 64 || schema is not JsonObjectValue value) return;
+        if (referenced && !seen.Add(schema)) return;
+        static bool Lookup(JsonValue current, string name, out JsonValue property)
+        {
+            if (current is JsonObjectValue obj && obj.TryGetValue(name, out var found)) { property = found; return true; }
+            property = null!;
+            return false;
+        }
+        if (value.TryGetValue("$ref", out var reference) && reference is JsonStringValue refText &&
+            LocalSchemaReferences.TryResolve(refText.Value, root, Lookup, node => node is JsonObjectValue or JsonBooleanValue, out var target))
+            SchemaText(target, root, parts, seen, depth + 1, referenced: true);
         if (value.TryGetValue("description", out var description) && description is JsonStringValue text) parts.Add(text.Value);
         if (value.TryGetValue("properties", out var properties) && properties is JsonObjectValue named)
         {
             foreach (var (name, property) in named)
             {
                 parts.Add(name);
-                SchemaText(property, parts);
+                SchemaText(property, root, parts, seen, depth + 1);
             }
         }
-        SchemaText(value.TryGetValue("items", out var items) ? items : null, parts);
+        SchemaText(value.TryGetValue("items", out var items) ? items : null, root, parts, seen, depth + 1);
         foreach (var key in new[] { "anyOf", "oneOf", "allOf" })
             if (value.TryGetValue(key, out var variants) && variants is JsonArrayValue list)
-                foreach (var variant in list) SchemaText(variant, parts);
+                foreach (var variant in list) SchemaText(variant, root, parts, seen, depth + 1);
     }
 
     /// <summary>Search text of a tool: its description and its parameters' names and descriptions; the ranker reads the name.</summary>
     internal static string SearchText(ToolRegistration tool)
     {
         var parts = new List<string> { tool.Description };
-        SchemaText(tool.Parameters, parts);
+        var seen = new HashSet<JsonValue>(ReferenceEqualityComparer.Instance) { tool.Parameters };
+        SchemaText(tool.Parameters, tool.Parameters, parts, seen, 0);
         return string.Join(" ", parts.Where(part => Js.Trim(part).Length != 0));
     }
 }

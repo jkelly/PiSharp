@@ -36,6 +36,8 @@ var tests = new List<(string Name, Func<Task> Run)>
     ("source.wire.original-starts-owned-partials-and-nested-metadata", PiWireSourceEventTests.ReadOriginalShapesAndOwnership),
     ("source.wire.reject-ambiguous-and-native-only-events", PiWireSourceEventTests.RefuseAmbiguousOrInventedSourceFrames),
     ("source.wire.compact-native-boundary-remains-separate", PiWireSourceEventTests.CompactNativeBoundaryRemainsSeparate),
+    ("source.wire.utf16-metadata-public-roundtrips", PiWireJsonFidelityTests.PublicWriterReaderRoundtrips),
+    ("source.wire.utf16-metadata-strict-invalid-controls", PiWireJsonFidelityTests.StrictInvalidControls),
     ("native.reducer.thinking-checkpoint-contract", ThinkingCheckpointTests.Contract),
     ("native.stream.thinking-checkpoint-cancel-cleanup", ThinkingCheckpointTests.CancellationAndCleanup),
     ("native.reducer.thinking-checkpoint-bounds-kinds", ThinkingCheckpointTests.BoundsAndKinds),

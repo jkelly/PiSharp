@@ -190,13 +190,13 @@ public sealed partial class OpenAICodexResponsesTransport
             try
             {
                 lease = await AcquireAsync(url, headers, cacheSessionId, accountId, cancellation).ConfigureAwait(false);
-                invocation.UseCachedContext = transport is "websocket-cached" or "auto";
+                invocation.UseCachedContext = !invocation.DisableContinuation && (transport is "websocket-cached" or "auto");
                 invocation.FullBody = body;
                 var requestBody = invocation.UseCachedContext && lease.Entry is { } entry ? CachedRequestBody(entry, body) : body;
                 RecordRequest(cacheSessionId, lease.Reused, invocation.UseCachedContext, requestBody);
                 var frame = new JsonObject { ["type"] = "response.create" };
                 foreach (var (name, value) in requestBody) frame[name] = value?.DeepClone();
-                await lease.Socket.SendAsync(Encoding.UTF8.GetBytes(frame.ToJsonString(BodyJson)), WebSocketMessageType.Text, true, cancellation).ConfigureAwait(false);
+                await lease.Socket.SendAsync(Encoding.UTF8.GetBytes(JsonUtf16.ToJsonString(frame, BodyJson.Encoder)), WebSocketMessageType.Text, true, cancellation).ConfigureAwait(false);
                 var events = MapWebSocketEventsAsync(lease.Socket, invocation, cancellation).GetAsyncEnumerator(cancellation);
                 bool first;
                 try { first = await events.MoveNextAsync().ConfigureAwait(false); }
@@ -322,7 +322,7 @@ public sealed partial class OpenAICodexResponsesTransport
         static string WithoutInput(JsonObject value)
         {
             var copy = (JsonObject)value.DeepClone(); copy.Remove("input"); copy.Remove("previous_response_id");
-            return copy.ToJsonString(BodyJson);
+            return JsonUtf16.ToJsonString(copy, BodyJson.Encoder);
         }
         if (WithoutInput(body) != WithoutInput(continuation.LastRequestBody)) return null;
         var current = body["input"] as JsonArray ?? [];
@@ -330,7 +330,7 @@ public sealed partial class OpenAICodexResponsesTransport
             .. continuation.LastResponseItems.Select(item => item?.DeepClone())]);
         if (current.Count < baseline.Count) return null;
         var prefix = new JsonArray([.. current.Take(baseline.Count).Select(item => item?.DeepClone())]);
-        if (prefix.ToJsonString(BodyJson) != baseline.ToJsonString(BodyJson)) return null;
+        if (JsonUtf16.ToJsonString(prefix, BodyJson.Encoder) != JsonUtf16.ToJsonString(baseline, BodyJson.Encoder)) return null;
         return new JsonArray([.. current.Skip(baseline.Count).Select(item => item?.DeepClone())]);
     }
 

@@ -3,6 +3,7 @@
 using System.Collections.Immutable;
 using System.Text.Json;
 using PiSharp.AI.Protocols.GoogleGenerativeAI;
+using PiSharp.AI.Protocols.ProviderShared;
 using PiSharp.Contracts;
 
 namespace PiSharp.AI.Protocols.AzureResponses;
@@ -79,7 +80,7 @@ public sealed class AzureResponsesSimpleTransport : IChatTransport
         catch (GoogleGenerativeAIException error)
         { throw new AzureResponsesException(error.Failure == GoogleFailure.ResourceLimit ? AzureResponsesFailure.ResourceLimit : AzureResponsesFailure.UnsupportedOptions); }
         var maximum = options.DirectOptions.MaxTokens ?? modelMaxTokens;
-        var capped = contextWindow <= 0 ? Math.Max(1, maximum) : Math.Min(maximum, Math.Max(1, contextWindow - estimate.Tokens - 4096));
+        var capped = SimpleOutputBudget.ClampToContext(contextWindow, estimate.Tokens, maximum);
         if (!double.IsFinite(capped)) throw new AzureResponsesException(AzureResponsesFailure.UnsupportedOptions);
         var clamped = options.Reasoning is { } selected ? ClampThinkingLevel(selected) : null;
         cancellationToken.ThrowIfCancellationRequested();

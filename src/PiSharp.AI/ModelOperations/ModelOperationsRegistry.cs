@@ -26,7 +26,7 @@ public sealed class ModelOperationsException(ModelOperationsErrorCode code, stri
 public sealed record ProviderAuthRequest(string Provider, string? ApiKey = null, ImmutableDictionary<string, string>? Env = null)
 {
     /// <summary>An availability check (models.ts <c>checkProviderAuth</c>): a stored OAuth credential counts as configured
-    /// without being refreshed, and only <see cref="ProviderAuthResult.IsOAuth"/> and non-null matter.</summary>
+    /// without being refreshed; provider filters may also use <see cref="ProviderAuthResult.AvailableModelIds"/>.</summary>
     public bool Check { get; init; }
 }
 
@@ -39,6 +39,9 @@ public sealed record ProviderAuthResult(string? ApiKey)
     public string? BaseUrl { get; init; }
     /// <summary>True when the credential is an OAuth token: OpenAI then lists no Decisions models.</summary>
     public bool IsOAuth { get; init; }
+    /// <summary>Model ids allowed by a subscription credential, when supplied by the provider. Null means unrestricted;
+    /// an empty set allows none. GitHub Copilot applies this to chat and classifier models alike.</summary>
+    public ImmutableHashSet<string>? AvailableModelIds { get; init; }
     public override string ToString() => "ProviderAuthResult [redacted]";
 }
 
@@ -108,7 +111,7 @@ public static class ModelOperationApis
 public static class BuiltinModelOperationProviders
 {
     public static ImmutableArray<string> ProviderIds { get; } =
-        ["openai", "openrouter", "typesafe", "cloudflare-workers-ai", "opencode", "vercel-ai-gateway"];
+        ["openai", "openrouter", "typesafe", "cloudflare-workers-ai", "opencode", "vercel-ai-gateway", "github-copilot"];
 
     /// <summary>The provider definition with <paramref name="models"/>. A provider without classifier or image APIs lists
     /// its models only.</summary>
@@ -132,6 +135,12 @@ public static class BuiltinModelOperationProviders
                 Images = ImmutableDictionary<string, IImagesApi>.Empty.WithComparers(StringComparer.Ordinal).Add(OpenRouterImages.ApiId, OpenRouterImages.Instance)
             },
             "typesafe" => new ModelOperationsProvider("typesafe", "TypeSafe") { Models = list, Classifiers = One(TypeSafeSystemOneClassifier.Instance) },
+            "github-copilot" => new ModelOperationsProvider("github-copilot", "GitHub Copilot")
+            {
+                Models = list, Classifiers = One(CopilotSystemOneClassifier.Instance),
+                FilterAllModels = (all, auth) => auth.IsOAuth && auth.AvailableModelIds is { } allowed
+                    ? [.. all.Where(model => allowed.Contains(model.Id))] : all
+            },
             "cloudflare-workers-ai" => new ModelOperationsProvider("cloudflare-workers-ai", "Cloudflare Workers AI")
             {
                 Models = list, Classifiers = One(CloudflareWorkersAISystemOneClassifier.Instance),

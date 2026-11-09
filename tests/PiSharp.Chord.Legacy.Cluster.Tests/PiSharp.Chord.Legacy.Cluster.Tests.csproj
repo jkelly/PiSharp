@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <NoWarn>$(NoWarn);PISHARP_CHORD001;PISHARP_SCHEMA001;PISHARP_TELEMETRY001</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../src/PiSharp.Chord/PiSharp.Chord.csproj" />
+    <ProjectReference Include="../PiSharp.Chord.Legacy.LoaderDependency/PiSharp.Chord.Legacy.LoaderDependency.csproj" />
+  </ItemGroup>
+</Project>

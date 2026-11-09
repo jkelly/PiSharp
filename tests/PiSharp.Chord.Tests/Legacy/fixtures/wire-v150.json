@@ -1,0 +1,519 @@
+{
+  "sourceCommit": "f9a26365568127461c47a07a37dcb42c140a3ac5",
+  "sourcePath": "packages/chord/src/wire.ts",
+  "sourceSha256": "1796c1cef0ede947ce770af983ccd7df99b82ef726ec49fef8eed8511301d73b",
+  "node": "v24.22.0",
+  "protocol": 4,
+  "fixtures": [
+    {
+      "id": "wire-0",
+      "frame": {
+        "t": "hello",
+        "protocol": 4,
+        "name": "server",
+        "kind": "host",
+        "codeVersion": 1,
+        "acks": true
+      },
+      "valid": true
+    },
+    {
+      "id": "wire-1",
+      "frame": {
+        "t": "hello",
+        "name": "client",
+        "kind": "client",
+        "codeVersion": 0
+      },
+      "valid": true
+    },
+    {
+      "id": "wire-2",
+      "frame": {
+        "t": "ack",
+        "n": 1
+      },
+      "valid": true
+    },
+    {
+      "id": "wire-3",
+      "frame": {
+        "t": "hold",
+        "id": 1,
+        "at": "server",
+        "token": {
+          "name": "test",
+          "scope": "remote",
+          "version": 1,
+          "input": {
+            "type": "object"
+          },
+          "host": {
+            "name": "server"
+          },
+          "variants": {
+            "main": {
+              "x": {
+                "kind": "state",
+                "schema": {
+                  "type": "number"
+                }
+              },
+              "ping": {
+                "kind": "method"
+              }
+            }
+          }
+        },
+        "input": {},
+        "state": false,
+        "again": true,
+        "origin": "o"
+      },
+      "valid": true
+    },
+    {
+      "id": "wire-4",
+      "frame": {
+        "t": "release",
+        "id": 1
+      },
+      "valid": true
+    },
+    {
+      "id": "wire-5",
+      "frame": {
+        "t": "shape",
+        "id": 1,
+        "variant": "main",
+        "members": [
+          "x",
+          "ping"
+        ],
+        "contract": "x",
+        "state": [
+          "x"
+        ]
+      },
+      "valid": true
+    },
+    {
+      "id": "wire-6",
+      "frame": {
+        "t": "gone",
+        "id": 1,
+        "error": {
+          "code": "gone",
+          "message": "gone: removed"
+        }
+      },
+      "valid": true
+    },
+    {
+      "id": "wire-7",
+      "frame": {
+        "t": "call",
+        "id": 2,
+        "hold": 1,
+        "member": "ping"
+      },
+      "valid": true
+    },
+    {
+      "id": "wire-8",
+      "frame": {
+        "t": "call",
+        "id": 3,
+        "hold": 1,
+        "member": "ping",
+        "args": null,
+        "root": {
+          "rootId": "r",
+          "codeVersion": 1
+        }
+      },
+      "valid": true
+    },
+    {
+      "id": "wire-9",
+      "frame": {
+        "t": "result",
+        "id": 2
+      },
+      "valid": true
+    },
+    {
+      "id": "wire-10",
+      "frame": {
+        "t": "result",
+        "id": 3,
+        "value": null
+      },
+      "valid": true
+    },
+    {
+      "id": "wire-11",
+      "frame": {
+        "t": "cancel",
+        "id": 2
+      },
+      "valid": true
+    },
+    {
+      "id": "wire-12",
+      "frame": {
+        "t": "sub",
+        "hold": 1
+      },
+      "valid": true
+    },
+    {
+      "id": "wire-13",
+      "frame": {
+        "t": "unsub",
+        "hold": 1
+      },
+      "valid": true
+    },
+    {
+      "id": "wire-14",
+      "frame": {
+        "t": "resync",
+        "hold": 1,
+        "m": "x"
+      },
+      "valid": true
+    },
+    {
+      "id": "wire-15",
+      "frame": {
+        "t": "state",
+        "hold": 1,
+        "m": "x",
+        "as": "snap",
+        "value": 1
+      },
+      "valid": true
+    },
+    {
+      "id": "wire-16",
+      "frame": {
+        "t": "state",
+        "hold": 1,
+        "m": "x",
+        "as": "reset"
+      },
+      "valid": true
+    },
+    {
+      "id": "wire-17",
+      "frame": {
+        "t": "state",
+        "hold": 1,
+        "m": "x",
+        "as": "ops",
+        "ops": [
+          [
+            "r",
+            null
+          ]
+        ]
+      },
+      "valid": true
+    },
+    {
+      "id": "wire-18",
+      "frame": {
+        "t": "state",
+        "hold": 1,
+        "m": "x",
+        "as": "error",
+        "error": {
+          "code": "unavailable",
+          "message": "failed",
+          "reason": "offline"
+        }
+      },
+      "valid": true
+    },
+    {
+      "id": "wire-19",
+      "frame": {
+        "t": "ping",
+        "n": -1
+      },
+      "valid": true
+    },
+    {
+      "id": "wire-20",
+      "frame": {
+        "t": "pong",
+        "n": 0
+      },
+      "valid": true
+    },
+    {
+      "id": "wire-21",
+      "frame": {
+        "t": "bye"
+      },
+      "valid": true
+    },
+    {
+      "id": "wire-22",
+      "frame": {
+        "t": "root_end",
+        "rootId": "r"
+      },
+      "valid": true
+    },
+    {
+      "id": "wire-23",
+      "frame": {
+        "t": "invalidate",
+        "pattern": {
+          "kind": "user"
+        }
+      },
+      "valid": true
+    },
+    {
+      "id": "wire-24",
+      "frame": {
+        "t": "prepare",
+        "reload": 1,
+        "codeVersion": 2,
+        "plugins": [
+          "p"
+        ],
+        "options": {
+          "remove": [],
+          "gateDeadline": 0,
+          "retireDeadline": 2
+        }
+      },
+      "valid": true
+    },
+    {
+      "id": "wire-25",
+      "frame": {
+        "t": "vote",
+        "reload": 1,
+        "report": {
+          "codeVersion": 2,
+          "previous": 1,
+          "changed": [
+            "p"
+          ],
+          "removed": [],
+          "prepared": [
+            "x"
+          ],
+          "gated": []
+        }
+      },
+      "valid": true
+    },
+    {
+      "id": "wire-26",
+      "frame": {
+        "t": "commit",
+        "reload": 1
+      },
+      "valid": true
+    },
+    {
+      "id": "wire-27",
+      "frame": {
+        "t": "retire",
+        "codeVersion": 1
+      },
+      "valid": true
+    },
+    {
+      "id": "wire-28",
+      "frame": {
+        "t": "abort",
+        "reload": 1
+      },
+      "valid": true
+    },
+    {
+      "id": "wire-29",
+      "frame": {
+        "t": "ack",
+        "n": 0
+      },
+      "valid": false
+    },
+    {
+      "id": "wire-30",
+      "frame": {
+        "t": "ack",
+        "n": -1
+      },
+      "valid": false
+    },
+    {
+      "id": "wire-31",
+      "frame": {
+        "t": "ack",
+        "n": 1.5
+      },
+      "valid": false
+    },
+    {
+      "id": "wire-32",
+      "frame": {
+        "t": "ack",
+        "n": "1"
+      },
+      "valid": false
+    },
+    {
+      "id": "wire-33",
+      "frame": {
+        "t": "ack",
+        "n": null
+      },
+      "valid": false
+    },
+    {
+      "id": "wire-34",
+      "frame": {
+        "t": "hello",
+        "name": "",
+        "kind": "host",
+        "codeVersion": 1
+      },
+      "valid": false
+    },
+    {
+      "id": "wire-35",
+      "frame": {
+        "t": "hold",
+        "id": 1,
+        "at": "server",
+        "token": {
+          "name": "test",
+          "scope": "remote",
+          "version": 1,
+          "input": {
+            "type": "object"
+          },
+          "host": {
+            "name": "server"
+          },
+          "variants": {
+            "main": {
+              "x": {
+                "kind": "state",
+                "schema": {
+                  "type": "number"
+                }
+              },
+              "ping": {
+                "kind": "method"
+              }
+            }
+          }
+        },
+        "input": {},
+        "state": true
+      },
+      "valid": false
+    },
+    {
+      "id": "wire-36",
+      "frame": {
+        "t": "hold",
+        "id": 1,
+        "at": "server",
+        "token": {
+          "name": "test",
+          "scope": "remote",
+          "version": 1,
+          "input": {
+            "type": "object"
+          },
+          "host": {
+            "name": "server"
+          },
+          "variants": {
+            "main": {
+              "x": {
+                "kind": "state",
+                "schema": {
+                  "type": "number"
+                }
+              },
+              "ping": {
+                "kind": "method"
+              }
+            }
+          }
+        },
+        "input": {},
+        "again": false
+      },
+      "valid": false
+    },
+    {
+      "id": "wire-37",
+      "frame": {
+        "t": "state",
+        "hold": 1,
+        "m": "x",
+        "as": "invalid"
+      },
+      "valid": false
+    },
+    {
+      "id": "wire-38",
+      "frame": {
+        "t": "state",
+        "hold": 1,
+        "m": "x",
+        "as": "ops",
+        "ops": [
+          1
+        ]
+      },
+      "valid": false
+    },
+    {
+      "id": "wire-39",
+      "frame": {
+        "t": "gone",
+        "id": 1,
+        "error": {
+          "code": "fake",
+          "message": "bad"
+        }
+      },
+      "valid": false
+    },
+    {
+      "id": "wire-40",
+      "frame": {
+        "t": "bound",
+        "entries": []
+      },
+      "valid": false
+    },
+    {
+      "id": "wire-41",
+      "frame": {
+        "t": "shape",
+        "id": 1,
+        "members": [],
+        "contract": "x",
+        "state": [],
+        "future": {
+          "a": true
+        }
+      },
+      "valid": true
+    }
+  ]
+}

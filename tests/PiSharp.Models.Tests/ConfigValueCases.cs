@@ -56,7 +56,7 @@ internal static partial class Program
     // shell is bash (Git Bash on Windows), so the upstream command texts run unchanged.
     private static void ConfigShellCommands()
     {
-        if (OperatingSystem.IsWindows() && !HasBash()) return; // The default-shell fallback case covers hosts without bash.
+        if (!HasBash()) throw new InvalidOperationException("This shell-command regression requires Bash. Install Git Bash on Windows or provide Bash on PATH before running PiSharp.Models.Tests.");
         var resolver = new ConfigValueResolver(Env());
         var tag = Guid.NewGuid().ToString("N");
         Equal("spaced-key", resolver.Resolve("!echo '  spaced-key  ' # " + tag), "trimmed stdout");
@@ -71,7 +71,7 @@ internal static partial class Program
     // Upstream "caches successful and failed commands until explicitly cleared" and "uncached resolution executes a command on every call".
     private static Task ConfigShellCaching() => WithTemp("config-cache", root =>
     {
-        if (OperatingSystem.IsWindows() && !HasBash()) return Task.CompletedTask;
+        if (!HasBash()) throw new InvalidOperationException("This shell-caching regression requires Bash. Install Git Bash on Windows or provide Bash on PATH before running PiSharp.Models.Tests.");
         var counter = Path.Combine(root, "counter"); File.WriteAllText(counter, "0");
         var escaped = counter.Replace('\\', '/').Replace("\"", "\\\"", StringComparison.Ordinal);
         var resolver = new ConfigValueResolver(Env());
@@ -92,7 +92,7 @@ internal static partial class Program
     // executeCommandUncached on Windows: without a configured (bash) shell the command falls back to execSync's default shell (cmd.exe).
     private static void ConfigDefaultShellFallback()
     {
-        if (!OperatingSystem.IsWindows()) return;
+        if (!OperatingSystem.IsWindows()) throw new PlatformNotSupportedException("The default-shell fallback regression requires Windows cmd.exe.");
         var host = new PiSharp.Tools.Processes.ShellHost(true, name => name == "ComSpec" ? Environment.GetEnvironmentVariable("ComSpec") : null,
             _ => false, Path.GetTempPath());
         Equal("fallback-value", ConfigValueResolver.RunShellCommand("echo fallback-value", host), "cmd fallback");

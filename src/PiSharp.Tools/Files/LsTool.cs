@@ -97,6 +97,7 @@ public sealed class LsTool
 
     private async ValueTask<ToolResult> ListAsync(string target, double limit, CancellationToken token)
     {
+        limit = PiFindTool.NormalizeLimit(limit, 500);
         try
         {
             if (!await _operations.ExistsAsync(target, token).ConfigureAwait(false))
@@ -125,7 +126,6 @@ public sealed class LsTool
             foreach (var entry in sorted)
             {
                 token.ThrowIfCancellationRequested();
-                if (results.Count >= limit) { entryLimitReached = true; break; }
                 try
                 {
                     var child = _paths.Absolute(await _operations.CanonicalizeAsync(Path.Combine(target, entry), token).ConfigureAwait(false));
@@ -134,6 +134,7 @@ public sealed class LsTool
                     // ls.ts stat()s every entry through its link wherever it points.
                     if (!_pi && (Path.IsPathRooted(relative) || relative == ".." || relative.StartsWith(".." + Path.DirectorySeparatorChar, StringComparison.Ordinal))) continue;
                     var directory = await _operations.IsDirectoryAsync(child, token).ConfigureAwait(false);
+                    if (results.Count >= limit) { entryLimitReached = true; break; }
                     results.Add(entry + (directory ? "/" : ""));
                 }
                 catch (Exception error) when (error is not OperationCanceledException) { /* Source skips failed child stats; native cancellation still joins. */ }

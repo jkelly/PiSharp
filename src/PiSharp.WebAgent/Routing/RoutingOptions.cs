@@ -11,6 +11,9 @@ public sealed class RoutingOptions
     /// never disposes it. Tests pass a fake, so no request leaves the process.</summary>
     public HttpMessageHandler? ProviderHandler { get; init; }
 
+    /// <summary>Offline tests may replace creation of the generation-owned default HTTP pool.</summary>
+    internal Func<HttpMessageHandler>? CreateDefaultProviderHandler { get; init; }
+
     /// <summary>The OpenAI Codex transport: <c>sse</c>, <c>websocket</c>, or null for <c>auto</c> (WebSocket first, then SSE).</summary>
     public string? CodexTransport { get; init; }
 

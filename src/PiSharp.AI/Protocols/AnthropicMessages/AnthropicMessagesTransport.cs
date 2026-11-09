@@ -141,7 +141,7 @@ public sealed partial class AnthropicMessagesTransport : IChatTransport
         };
     private static StreamProtocolException Protocol() => new("Invalid or unsupported Anthropic Messages stream.");
     private static StreamLimitException Limit() => new("Anthropic Messages stream exceeds configured limits.");
-    private static JsonData TextData(string value) => JsonData.Parse(JsonSerializer.Serialize(value));
+    private static JsonData TextData(string value) => AnthropicJsonProperties.StringData(value);
     private sealed class ProviderSignalException : Exception { }
     private sealed class Slot(int index, string kind, JsonFields properties, string signature = "")
     {
@@ -207,7 +207,7 @@ public sealed partial class AnthropicMessagesTransport : IChatTransport
                 var body = JsonData.Parse(raw).Value; Object(body);
                 foreach (var property in new[] { "toolsRemoved", "toolsAdded" })
                 {
-                    if (!body.TryGetProperty(property, out var tools)) continue;
+                    if (!body.TryGetUtf16Property(property, out var tools)) continue;
                     if (tools.ValueKind != JsonValueKind.Array) throw Protocol();
                     foreach (var tool in tools.EnumerateArray())
                     {
@@ -248,9 +248,9 @@ public sealed partial class AnthropicMessagesTransport : IChatTransport
             {
                 case "message_start":
                     if (_messageStarted || _slots.Count != 0) throw Protocol();
-                    var message = Object(value.GetProperty("message"));
-                    if (message.TryGetProperty("content", out var embedded) && (embedded.ValueKind != JsonValueKind.Array || embedded.GetArrayLength() != 0)) throw Protocol();
-                    if (message.TryGetProperty("role", out var role) && (role.ValueKind != JsonValueKind.String || role.GetString() != "assistant")) throw Protocol();
+                    var message = Object(value.GetUtf16Property("message"));
+                    if (message.TryGetUtf16Property("content", out var embedded) && (embedded.ValueKind != JsonValueKind.Array || embedded.GetArrayLength() != 0)) throw Protocol();
+                    if (message.TryGetUtf16Property("role", out var role) && (role.ValueKind != JsonValueKind.String || role.GetString() != "assistant")) throw Protocol();
                     _properties = _properties.Set("responseId", TextData(String(message, "id")));
                     var actualModel = OptionalString(message, "model");
                     if (!string.IsNullOrEmpty(actualModel) && actualModel != Start.Partial.Model)
@@ -261,10 +261,10 @@ public sealed partial class AnthropicMessagesTransport : IChatTransport
                                 if (fallback.Provider == Start.Partial.Provider && fallback.Model == actualModel)
                                 { _rates = fallback.Rates; break; }
                     }
-                    Transformations(message); ReadUsage(Object(message.GetProperty("usage")), initial: true); _messageStarted = true;
+                    Transformations(message); ReadUsage(Object(message.GetUtf16Property("usage")), initial: true); _messageStarted = true;
                     break;
                 case "content_block_start":
-                    RequireMessage(); var wireIndex = Index(value); var block = Object(value.GetProperty("content_block"));
+                    RequireMessage(); var wireIndex = Index(value); var block = Object(value.GetUtf16Property("content_block"));
                     if (_slots.ContainsKey(wireIndex) || _fallbackIndices.Contains(wireIndex)) throw Protocol();
                     var kind = String(block, "type");
                     if (kind == "fallback")
@@ -294,7 +294,7 @@ public sealed partial class AnthropicMessagesTransport : IChatTransport
                             Emit(new ThinkingStarted(index, new("[Reasoning redacted]", redactedProperties))); break;
                         case "tool_use":
                             var toolProperties = JsonFields.FromObjectExcept(block, "type", "id", "name", "input");
-                            var initialInput = block.TryGetProperty("input", out var input) && input.ValueKind != JsonValueKind.Null
+                            var initialInput = block.TryGetUtf16Property("input", out var input) && input.ValueKind != JsonValueKind.Null
                                 ? JsonData.FromElement(Object(input)) : JsonData.EmptyObject;
                             slot = new(index, kind, toolProperties);
                             // anthropic-messages.ts keeps content_block.id and .name as streamed, empty strings included (owner decision 13); a
@@ -304,7 +304,7 @@ public sealed partial class AnthropicMessagesTransport : IChatTransport
                     }
                     _slots.Add(wireIndex, slot); break;
                 case "content_block_delta":
-                    RequireMessage(); var active = Active(Index(value)); var delta = Object(value.GetProperty("delta"));
+                    RequireMessage(); var active = Active(Index(value)); var delta = Object(value.GetUtf16Property("delta"));
                     switch (String(delta, "type"))
                     {
                         case "text_delta":
@@ -340,26 +340,26 @@ public sealed partial class AnthropicMessagesTransport : IChatTransport
                     else throw Protocol();
                     ended.Ended = true; break;
                 case "message_delta":
-                    RequireMessage(); var messageDelta = Object(value.GetProperty("delta")); Transformations(value);
+                    RequireMessage(); var messageDelta = Object(value.GetUtf16Property("delta")); Transformations(value);
                     var stop = OptionalString(messageDelta, "stop_reason");
                     if (!string.IsNullOrEmpty(stop))
                     {
                         _properties = _properties.Set("rawStopReason", TextData(stop)); _reason = Stop(stop);
                         if (stop == "refusal")
                         {
-                            var explanation = messageDelta.TryGetProperty("stop_details", out var stopDetails) && stopDetails.ValueKind != JsonValueKind.Null
+                            var explanation = messageDelta.TryGetUtf16Property("stop_details", out var stopDetails) && stopDetails.ValueKind != JsonValueKind.Null
                                 ? OptionalString(Object(stopDetails), "explanation") : null;
                             _stopErrorMessage = string.IsNullOrEmpty(explanation) ? "The model refused to complete the request" : explanation;
                         }
                         else if (stop == "sensitive") _stopErrorMessage = "Provider stopped with: sensitive";
                     }
                     // calculateCost runs on every message_delta; only the usage fields it carries update the counts.
-                    ReadUsage(value.TryGetProperty("usage", out var usage) && usage.ValueKind != JsonValueKind.Null ? Object(usage) : NoUsage, initial: false);
+                    ReadUsage(value.TryGetUtf16Property("usage", out var usage) && usage.ValueKind != JsonValueKind.Null ? Object(usage) : NoUsage, initial: false);
                     break;
                 case "message_stop":
                     RequireMessage(); _messageStopped = true; break;
                 case "error":
-                    _ = Object(value.GetProperty("error")); throw new ProviderSignalException();
+                    _ = Object(value.GetUtf16Property("error")); throw new ProviderSignalException();
                 default: throw Protocol();
             }
             if (_options.CaptureSourceEmissionSnapshots)
@@ -396,19 +396,19 @@ public sealed partial class AnthropicMessagesTransport : IChatTransport
                     var projected = new System.Text.Json.Nodes.JsonObject();
                     if (item.ValueKind == JsonValueKind.Object)
                         foreach (var name in new[] { "type", "path", "reason" })
-                            if (item.TryGetProperty(name, out var field) && field.ValueKind != JsonValueKind.Null)
-                                projected[name] = System.Text.Json.Nodes.JsonNode.Parse(field.GetRawText(), documentOptions: PiSharp.Contracts.JsonData.DocumentOptions);
+                            if (item.TryGetUtf16Property(name, out var field) && field.ValueKind != JsonValueKind.Null)
+                                projected[name] = JsonUtf16.MutableNode(field.GetRawText());
                     transformations.Add(projected);
                 }
                 if (failure is null)
                 {
                     // Appended after any diagnostic recorded earlier in the request (the preferred strict tool fallback).
                     var diagnostics = properties.TryGet("diagnostics", out var earlier) && earlier is not null
-                        ? System.Text.Json.Nodes.JsonNode.Parse(earlier.ToString(), documentOptions: PiSharp.Contracts.JsonData.DocumentOptions)!.AsArray() : [];
+                        ? JsonUtf16.MutableNode(earlier)!.AsArray() : [];
                     diagnostics.Add(new System.Text.Json.Nodes.JsonObject { ["type"] = "anthropic_input_transformations",
                         ["timestamp"] = _options.Clock.GetUtcNow().ToUnixTimeMilliseconds(),
                         ["details"] = new System.Text.Json.Nodes.JsonObject { ["transformations"] = transformations } });
-                    properties = properties.Set("diagnostics", JsonData.Parse(diagnostics.ToJsonString()));
+                    properties = properties.Set("diagnostics", JsonData.Parse(JsonUtf16.ToJsonString(diagnostics, System.Text.Encodings.Web.JavaScriptEncoder.Default)));
                 }
             }
             var reason = failure is null ? _reason : failure == AnthropicMessagesFailure.Cancelled ? StopReason.Aborted : StopReason.Error;
@@ -428,10 +428,10 @@ public sealed partial class AnthropicMessagesTransport : IChatTransport
             var read = Count(usage, "cache_read_input_tokens", initial ? 0 : _usage.CacheRead);
             var write = Count(usage, "cache_creation_input_tokens", initial ? 0 : _usage.CacheWrite);
             if (initial) _cacheWrite1h = 0;
-            if (usage.TryGetProperty("cache_creation", out var cache) && cache.ValueKind != JsonValueKind.Null)
+            if (usage.TryGetUtf16Property("cache_creation", out var cache) && cache.ValueKind != JsonValueKind.Null)
                 _cacheWrite1h = Count(Object(cache), "ephemeral_1h_input_tokens", _cacheWrite1h);
-            if (!initial && usage.TryGetProperty("output_tokens_details", out var details) && details.ValueKind != JsonValueKind.Null &&
-                Object(details).TryGetProperty("thinking_tokens", out var thinking) && thinking.ValueKind != JsonValueKind.Null)
+            if (!initial && usage.TryGetUtf16Property("output_tokens_details", out var details) && details.ValueKind != JsonValueKind.Null &&
+                Object(details).TryGetUtf16Property("thinking_tokens", out var thinking) && thinking.ValueKind != JsonValueKind.Null)
                 _reasoning = Tokens(thinking);
             if (_cacheWrite1h > write || _reasoning > output) throw Protocol();
             var total = input + output + read + write;
@@ -451,20 +451,20 @@ public sealed partial class AnthropicMessagesTransport : IChatTransport
             {
                 binary64 = JsonData.Parse(Contracts.Compatibility.EcmaScriptJsonProjection.Project(JsonSerializer.Serialize(new
                 {
-                    input = cost.GetProperty("input").GetDouble(), output = cost.GetProperty("output").GetDouble(),
-                    cacheRead = cost.GetProperty("cacheRead").GetDouble(), cacheWrite = cost.GetProperty("cacheWrite").GetDouble(), total = billed
+                    input = cost.GetUtf16Property("input").GetDouble(), output = cost.GetUtf16Property("output").GetDouble(),
+                    cacheRead = cost.GetUtf16Property("cacheRead").GetDouble(), cacheWrite = cost.GetUtf16Property("cacheWrite").GetDouble(), total = billed
                 })));
                 cost = binary64.Value;
             }
-            _usage = new(input, output, read, write, total, new(cost.GetProperty("input").GetDecimal(), cost.GetProperty("output").GetDecimal(),
-                cost.GetProperty("cacheRead").GetDecimal(), cost.GetProperty("cacheWrite").GetDecimal(), cost.GetProperty("total").GetDecimal(),
+            _usage = new(input, output, read, write, total, new(cost.GetUtf16Property("input").GetDecimal(), cost.GetUtf16Property("output").GetDecimal(),
+                cost.GetUtf16Property("cacheRead").GetDecimal(), cost.GetUtf16Property("cacheWrite").GetDecimal(), cost.GetUtf16Property("total").GetDecimal(),
                 ProviderCost.TotalFromProvider(reported is not null), binary64), extras);
         }
         private void Transformations(JsonElement value)
         {
             // Upstream: `if (Array.isArray(transformations)) inputTransformations = transformations;` anything else is ignored and the
             // last array seen (message_start, then message_delta) is reported; entries are not validated here.
-            if (!value.TryGetProperty("input_transformations", out var transformations) || transformations.ValueKind != JsonValueKind.Array) return;
+            if (!value.TryGetUtf16Property("input_transformations", out var transformations) || transformations.ValueKind != JsonValueKind.Array) return;
             if (transformations.GetArrayLength() > _options.MaximumContentSlots) throw Limit();
             _transformations = transformations.Clone();
         }
@@ -478,7 +478,7 @@ public sealed partial class AnthropicMessagesTransport : IChatTransport
             {
                 if (++depth > _options.MaximumJsonDepth) throw Limit();
                 if (value.ValueKind == JsonValueKind.Object)
-                    foreach (var property in value.EnumerateObject()) { Unicode(property.Name); CheckJson(property.Value, depth); }
+                    foreach (var property in value.EnumerateObject()) { _ = JsonUtf16.GetName(property); CheckJson(property.Value, depth); }
                 else foreach (var item in value.EnumerateArray()) CheckJson(item, depth);
             }
             // A string value keeps a lone surrogate, as the SDK's JSON.parse does.
@@ -491,24 +491,24 @@ public sealed partial class AnthropicMessagesTransport : IChatTransport
             "refusal" or "sensitive" => StopReason.Error, _ => throw Protocol()
         };
         // anthropic-messages.ts keeps each count as the JavaScript number the stream reports (a fraction included).
-        private static double Count(JsonElement value, string name, double fallback) => value.TryGetProperty(name, out var count) &&
+        private static double Count(JsonElement value, string name, double fallback) => value.TryGetUtf16Property(name, out var count) &&
             count.ValueKind != JsonValueKind.Null ? Tokens(count) : fallback;
         private static double Tokens(JsonElement value)
         { var number = value.ValueKind == JsonValueKind.Number ? JsonNumber.Read(value) : double.NaN; return double.IsFinite(number) ? number : throw Protocol(); }
         private static long Number(JsonElement value)
         { if (value.ValueKind != JsonValueKind.Number || !value.TryGetInt64(out var number) || number < 0) throw Protocol(); return number; }
         private static int Index(JsonElement value)
-        { var number = Number(value.GetProperty("index")); return number <= int.MaxValue ? (int)number : throw Protocol(); }
+        { var number = Number(value.GetUtf16Property("index")); return number <= int.MaxValue ? (int)number : throw Protocol(); }
         private static JsonElement Object(JsonElement value) => value.ValueKind == JsonValueKind.Object ? value : throw Protocol();
         private static string String(JsonElement value, string name, bool allowEmpty = false)
         {
-            var item = value.GetProperty(name);
+            var item = value.GetUtf16Property(name);
             if (item.ValueKind != JsonValueKind.String) throw Protocol(); var text = JsonUtf16.GetString(item);
             if (!allowEmpty && text.Length == 0) throw Protocol(); return text;
         }
         private static string? OptionalString(JsonElement value, string name)
         {
-            if (!value.TryGetProperty(name, out var item) || item.ValueKind == JsonValueKind.Null) return null;
+            if (!value.TryGetUtf16Property(name, out var item) || item.ValueKind == JsonValueKind.Null) return null;
             return item.ValueKind == JsonValueKind.String ? JsonUtf16.GetString(item) : throw Protocol();
         }
         private static void Unicode(string value)

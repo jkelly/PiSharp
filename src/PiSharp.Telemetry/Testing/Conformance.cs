@@ -1,6 +1,9 @@
 // Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/telemetry/src/testing/conformance.ts, packages/telemetry/src/testing/types.ts.
+using System.Buffers;
+using System.Collections;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using System.Text.Json.Serialization;
 
 namespace PiSharp.Telemetry.Testing;
 
@@ -360,8 +363,12 @@ public static class TelemetryAdapterConformance
         throw new TelemetryConformanceException("Expected operation to reject");
     }
 
-    private static Dictionary<string, string> JsonRoundtrip(IReadOnlyDictionary<string, string> carrier) =>
-        JsonSerializer.Deserialize<Dictionary<string, string>>(JsonSerializer.Serialize(carrier))!;
+    private static Dictionary<string, string> JsonRoundtrip(IReadOnlyDictionary<string, string> carrier)
+    {
+        var json = CarrierJson(carrier);
+        return JsonNode.Parse(json.ToJsonString())!.AsObject()
+            .ToDictionary(pair => pair.Key, pair => pair.Value?.GetValue<string>()!, StringComparer.Ordinal);
+    }
 
     private static void Ok(bool condition, string message)
     {
@@ -382,9 +389,46 @@ public static class TelemetryAdapterConformance
     /// <summary>deepStrictEqual through the values' JSON forms, ignoring object key order.</summary>
     private static void DeepEqual(object? actual, object? expected, string what)
     {
-        var left = JsonSerializer.SerializeToNode(actual);
-        var right = JsonSerializer.SerializeToNode(expected);
+        var left = JsonForm(actual);
+        var right = JsonForm(expected);
         if (!JsonNode.DeepEquals(left, right))
             throw new TelemetryConformanceException($"Expected {what} {right?.ToJsonString() ?? "null"}, got {left?.ToJsonString() ?? "null"}.");
+    }
+
+    // These are the closed value forms used by this conformance suite. In
+    // particular, iterator implementations and object[] rows do not require
+    // reflection metadata for arbitrary CLR types when this library is AOTed.
+    private static JsonNode? JsonForm(object? value) => value switch
+    {
+        null => null,
+        JsonNode json => json.DeepClone(),
+        SpanAttributes attributes => Converted(attributes, new SpanAttributesJsonConverter()),
+        AttributeValue attribute => Converted(attribute, new AttributeValueJsonConverter()),
+        SpanStatus status => Converted(status, new SpanStatusJsonConverter()),
+        TelemetryMetricKind kind => Converted(kind, new MetricKindConverter()),
+        RecordedTelemetryEvent item => new JsonObject { ["name"] = item.Name, ["attributes"] = JsonForm(item.Attributes) },
+        RecordedTelemetryLink item => new JsonObject { ["context"] = CarrierJson(item.Context), ["attributes"] = JsonForm(item.Attributes) },
+        IReadOnlyDictionary<string, string> carrier => CarrierJson(carrier),
+        string text => JsonValue.Create(text),
+        bool boolean => JsonValue.Create(boolean),
+        int number => JsonValue.Create(number),
+        long number => JsonValue.Create(number),
+        double number => JsonValue.Create(number),
+        IEnumerable sequence => new JsonArray(sequence.Cast<object?>().Select(JsonForm).ToArray()),
+        _ => throw new TelemetryConformanceException($"Unknown conformance JSON value: {value.GetType().Name}")
+    };
+
+    private static JsonObject CarrierJson(IReadOnlyDictionary<string, string> carrier) =>
+        new(carrier.Select(pair => new KeyValuePair<string, JsonNode?>(pair.Key, JsonValue.Create(pair.Value))));
+
+    private static JsonNode? Converted<T>(T value, JsonConverter<T> converter)
+    {
+        var bytes = new ArrayBufferWriter<byte>();
+        using (var writer = new Utf8JsonWriter(bytes))
+        {
+            converter.Write(writer, value, JsonSerializerOptions.Default);
+            writer.Flush();
+        }
+        return JsonNode.Parse(bytes.WrittenSpan);
     }
 }

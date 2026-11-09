@@ -227,6 +227,20 @@ public sealed class ReadWriteTools
         byte[] owned;
         try
         {
+            if (_operations is IStreamingFileOperations streaming)
+            {
+                await using var stream = await streaming.OpenReadAsync(target, token).ConfigureAwait(false);
+                if (!stream.CanRead || !stream.CanSeek) throw new IOException("Streaming adapter must return a readable seekable stream.");
+                if (stream.Length > _options.MaximumReadBytes)
+                {
+                    var prefix = new byte[ImageMime.SniffBytes];
+                    var count = await stream.ReadAtLeastAsync(prefix, prefix.Length, throwOnEndOfStream: false, cancellationToken: token).ConfigureAwait(false);
+                    if (ImageMime.DetectSupportedImageMimeType(prefix.AsSpan(0, count)) is not null)
+                        throw new FileToolException(FileToolFailure.ResourceLimit);
+                    stream.Position = 0;
+                    return await ReadStreamingTextAsync(stream, input, token).ConfigureAwait(false);
+                }
+            }
             var supplied = await _operations.ReadAsync(target, _options.MaximumReadBytes, token).ConfigureAwait(false);
             token.ThrowIfCancellationRequested();
             if (supplied.Length > _options.MaximumReadBytes) throw new FileToolException(FileToolFailure.ResourceLimit);
@@ -289,6 +303,79 @@ public sealed class ReadWriteTools
         ToolResult result = new([new TextContent(output)], details);
         result = result with { StructuredContent = ToReadOutput(result.ContentValue) };
         // Source read: details is undefined (absent from the result) unless the output was truncated.
+        return details.Value.ValueKind == JsonValueKind.Null ? result.WithProperty("details", null) : result;
+    }
+
+    private async ValueTask<ToolResult> ReadStreamingTextAsync(Stream stream, Input input, CancellationToken token)
+    {
+        // Counting retains only a decoder buffer. A second pass selects text without ever materializing skipped lines.
+        using var reader = new StreamReader(stream, LenientUtf8, detectEncodingFromByteOrderMarks: false, bufferSize: 8192, leaveOpen: true);
+        var buffer = new char[8192]; long total = 1;
+        int read;
+        while ((read = await reader.ReadAsync(buffer.AsMemory(), token).ConfigureAwait(false)) != 0)
+            for (var i = 0; i < read; i++) if (buffer[i] == '\n') total++;
+        if (total > int.MaxValue) throw new FileToolException(FileToolFailure.ResourceLimit);
+        var start = input.Offset is { } offset && offset != 0 ? Math.Max(0, offset - 1) : 0;
+        if (start >= total) return ToolResult.Error(ToolFailureKind.InvalidArguments,
+            $"Offset {Js(input.Offset!.Value)} is beyond end of file ({total} lines total)");
+        var range = Slice((int)total, start, input.Limit is { } limit ? Math.Min(start + limit, total) : total);
+        stream.Position = 0; reader.DiscardBufferedData();
+        var selected = new StringBuilder(); var current = 0; long bytes = 0, firstBytes = 0;
+        var pendingHigh = false; var firstLine = true; char last = '\0';
+        void Count(char c)
+        {
+            if (pendingHigh)
+            {
+                pendingHigh = false;
+                if (char.IsLowSurrogate(c)) { bytes += 4; if (firstLine) firstBytes += 4; return; }
+                bytes += 3; if (firstLine) firstBytes += 3;
+            }
+            if (char.IsHighSurrogate(c)) { pendingHigh = true; return; }
+            var size = c < 0x80 ? 1 : c < 0x800 ? 2 : 3;
+            bytes += size; if (firstLine && c != '\n') firstBytes += size;
+        }
+        while (current < range.From + range.Count && (read = await reader.ReadAsync(buffer.AsMemory(), token).ConfigureAwait(false)) != 0)
+        {
+            for (var i = 0; i < read && current < range.From + range.Count; i++)
+            {
+                var c = buffer[i];
+                if (current >= range.From && !(c == '\n' && current == range.From + range.Count - 1))
+                {
+                    Count(c); last = c;
+                    if (selected.Length < 51202) selected.Append(c);
+                    if (c == '\n') firstLine = false;
+                }
+                if (c == '\n') current++;
+            }
+        }
+        if (pendingHigh) { bytes += 3; if (firstLine) firstBytes += 3; }
+        var truncation = ToolOutputTruncator.Head(selected.ToString());
+        var selectedLines = bytes == 0 ? 0 : range.Count - (last == '\n' ? 1 : 0);
+        truncation = truncation with { TotalLines = selectedLines, TotalBytes = (int)Math.Min(int.MaxValue, bytes) };
+        string output; var details = JsonData.Null;
+        if (truncation.FirstLineExceedsLimit)
+        {
+            if (start != Math.Floor(start))
+                return ToolResult.Error(ToolFailureKind.ExecutionError,
+                    "The \"string\" argument must be of type string or an instance of Buffer or ArrayBuffer. Received undefined");
+            output = $"[Line {Js(start + 1)} is {FormatSize((int)Math.Min(int.MaxValue, firstBytes))}, exceeds 50.0KB limit. Use bash: sed -n '{Js(start + 1)}p' {input.DisplayPath} | head -c 51200]";
+            details = TruncationDetails(truncation);
+        }
+        else if (truncation.Truncated)
+        {
+            var end = start + truncation.OutputLines;
+            var suffix = truncation.TruncatedBy == ToolOutputTruncationLimit.Bytes ? " (50.0KB limit)" : "";
+            output = truncation.Content + $"\n\n[Showing lines {Js(start + 1)}-{Js(end)} of {total}{suffix}. Use offset={Js(end + 1)} to continue.]";
+            details = TruncationDetails(truncation);
+        }
+        else if (input.Limit is { } userLimit && Math.Min(start + userLimit, total) < total)
+        {
+            var end = Math.Min(start + userLimit, total);
+            output = truncation.Content + $"\n\n[{Js(total - end)} more lines in file. Use offset={Js(end + 1)} to continue.]";
+        }
+        else output = truncation.Content;
+        ToolResult result = new([new TextContent(output)], details);
+        result = result with { StructuredContent = ToReadOutput(result.ContentValue) };
         return details.Value.ValueKind == JsonValueKind.Null ? result.WithProperty("details", null) : result;
     }
 

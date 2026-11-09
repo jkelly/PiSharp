@@ -61,6 +61,18 @@ public sealed class WebDurableModels : IDurableModels, IAsyncDisposable
     public Task CancelDeferredAsync(DurableModel model, DurableDeferredHandle handle, CancellationToken cancellationToken) =>
         native.CancelDeferredAsync(model, handle, cancellationToken);
 
+    /// <inheritdoc/>
+    public IAsyncEnumerable<StreamEvent> StreamDeferred(DurableModel model, DurableDeferredHandle handle, DurableRequestOptions? options,
+        CancellationToken cancellationToken) => native.StreamDeferred(model, handle, options, cancellationToken);
+
+    /// <inheritdoc/>
+    public Task<AssistantMessage> FetchDeferredAsync(DurableModel model, DurableDeferredHandle handle, DurableRequestOptions? options,
+        CancellationToken cancellationToken) => native.FetchDeferredAsync(model, handle, options, cancellationToken);
+
+    /// <inheritdoc/>
+    public Task CancelDeferredAsync(DurableModel model, DurableDeferredHandle handle, DurableRequestOptions? options,
+        CancellationToken cancellationToken) => native.CancelDeferredAsync(model, handle, options, cancellationToken);
+
     /// <summary>Releases the native adapter (the router and its routes are closed by their own owner).</summary>
     public ValueTask DisposeAsync()
     {

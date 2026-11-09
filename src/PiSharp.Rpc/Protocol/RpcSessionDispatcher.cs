@@ -295,6 +295,7 @@ public sealed partial class RpcSessionDispatcher : IAsyncDisposable
             _startupReady.TrySetException(_startupFailure);
             SignalFatal(RpcDispatchFailure.SessionRunFailed, error);
         }
+        finally { ScheduleIdleShutdownCheck(); }
     }
 
     /// <summary>Settles on shared shutdown, including actual run, coordinator, output and stream cleanup.</summary>
@@ -352,7 +353,7 @@ public sealed partial class RpcSessionDispatcher : IAsyncDisposable
             using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, _stopInputToken);
             inputToken = linked.Token;
             if (_sessionStartup is not null) _startupWork = StartLifecycleAsync(linked.Token);
-            await foreach (var admission in input.ReadAdmissionsAsync(linked.Token).ConfigureAwait(false))
+            await foreach (var admission in ReadAttachedInputAsync(input, linked.Token).ConfigureAwait(false))
             {
                 if (admission.Record is { } record && TryUiResponse(record)) continue;
                 if (_ui is not null)
@@ -481,6 +482,7 @@ public sealed partial class RpcSessionDispatcher : IAsyncDisposable
             if (originatingInput is not null && postSlot is not null)
                 await JoinPostOrigin("input-settled", _postInputSettlement, originatingInput, postSlot).ConfigureAwait(false);
             if (next is not null) _ = ObserveCommandAsync(HandleAsync(next.Record, next.ParseFailure, CancellationToken.None, next.Bytes, wasDeferred: true));
+            ScheduleIdleShutdownCheck();
         }
     }
 
@@ -1137,6 +1139,7 @@ public sealed partial class RpcSessionDispatcher : IAsyncDisposable
             // Processing/idle and agent_settled writer awaits finished and run ownership is released.
             // A reserved post-run slot remains part of actual dispatcher shutdown custody.
             await JoinPostOrigin("run-settled", _postRunSettlement, originating, postSlot).ConfigureAwait(false);
+            ScheduleIdleShutdownCheck();
         }
     }
     private bool StopRequested(RunState run) { lock (_gate) return _closed || run.AbortRequested; }
@@ -1475,6 +1478,9 @@ public sealed partial class RpcSessionDispatcher : IAsyncDisposable
         // Internal fatal closure may start inside a callback: wait our run first, before invoking native self-wait guards.
         if (run is not null) try { await run.Settled.Task.ConfigureAwait(false); } catch (Exception error) { failures.Add(error); }
         try { await pending.ConfigureAwait(false); await _session.WaitForIdleAsync().ConfigureAwait(false); } catch (Exception error) { failures.Add(error); }
+        Task? idleShutdownWait;
+        lock (_gate) idleShutdownWait = _idleShutdownWait;
+        if (idleShutdownWait is not null) await idleShutdownWait.ConfigureAwait(false);
         await JoinPostOriginShutdown(failures).ConfigureAwait(false);
         if (uiCleanup is not null) try { await uiCleanup.ConfigureAwait(false); } catch (Exception error) { failures.Add(error); }
         try { _subscription.Dispose(); } catch (Exception error) { failures.Add(error); }

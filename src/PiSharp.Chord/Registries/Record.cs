@@ -130,10 +130,10 @@ internal sealed class RegistryRecord
     /// <see cref="RegistriesInternal.CheckProvider"/> when its setup ran), replacing the provider a reload changed, inside a batch: the table
     /// composes again (lazily).
     /// </summary>
-    public void Serve(long version, IRegistryProvider served)
+    public void Serve(long version, IRegistryProvider served, object? callbackOwner = null)
     {
         ArgumentNullException.ThrowIfNull(served);
-        provider = new Provider(version, served);
+        provider = new Provider(version, served, callbackOwner);
         table = null;
         Invalidate();
     }
@@ -221,7 +221,12 @@ internal sealed class RegistryRecord
     public Delegate? ValueAdapter(long version) => provider?.Served.ValueAdapter(version);
 
     /// <summary>Maps the composition <paramref name="current"/> with <paramref name="adapter"/>, one of the provider's value adapters.</summary>
-    public object? MapValue(Delegate adapter, object? current) => provider!.Served.MapValue(adapter, current);
+    public object? MapValue(Delegate adapter, object? current)
+    {
+        using var lease = RetainCallback(adapter);
+        return provider!.Served.MapValue(adapter, current);
+    }
+    internal IDisposable? RetainCallback(Delegate callback) => batch.RetainCallback?.Invoke(callback, provider?.CallbackOwner);
 
     /// <summary>Runs an adapter of the provider as a pure compute, counted (<c>chord.registry.adapts</c>).</summary>
     public T Adapt<T>(Func<T> adapter)
@@ -287,6 +292,7 @@ internal sealed class RegistryRecord
             try
             {
                 batch.Count("chord.registry.composes");
+                using var lease = RetainCallback(served.Served.ComposeCallback);
                 value = batch.Compute(() => served.Served.Compose(built, context));
             }
             catch (Exception error)
@@ -339,7 +345,7 @@ internal sealed class RegistryRecord
     }
 
     /// <summary>The provider as served: the defining plugin's version, and its compose and adapters.</summary>
-    private sealed record Provider(long Version, IRegistryProvider Served);
+    private sealed record Provider(long Version, IRegistryProvider Served, object? CallbackOwner);
 
     /// <summary>A last good composition: its value and the contributions it was built from.</summary>
     private sealed record Good(object? Value, RegistryContribution[] From);

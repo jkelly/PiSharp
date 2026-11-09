@@ -38,11 +38,11 @@ internal static class LsToolTests
         using var temp = new Temp(); var files = new Fake(temp.Root) { Names = ["c", "a", "b"] };
         var tool = new LsTool(temp.Root, temp.Root, files);
         var fractional = await Invoke(tool, new { limit = 1.5 });
-        Equal("a\nb\n\n[1.5 entries limit reached. Use limit=3 for more]", Text(fractional));
-        Equal(1.5, fractional.Details.Value.GetProperty("entryLimitReached").GetDouble());
+        Equal("a\n\n[1 entries limit reached. Use limit=2 for more]", Text(fractional));
+        Equal(1d, fractional.Details.Value.GetProperty("entryLimitReached").GetDouble());
         var exact = await Invoke(tool, new { limit = 3 }); Equal("a\nb\nc", Text(exact)); Check(!exact.HasProperty("details"), "Exact count incorrectly marked reached.");
         foreach (var limit in new[] { 0d, -1d })
-        { var empty = await Invoke(tool, new { limit }); Equal("(empty directory)", Text(empty)); Check(!empty.HasProperty("details"), "Zero/negative output has limit details."); }
+        { var empty = await Invoke(tool, new { limit }); Equal("a\n\n[1 entries limit reached. Use limit=2 for more]", Text(empty)); Check(empty.HasProperty("details"), "Normalized limit should report additional entries."); }
         files.Names = []; Equal("(empty directory)", Text(await Invoke(tool, new { })));
         files.Names = Enumerable.Range(0, 501).Select(i => i.ToString("D4")).ToImmutableArray();
         var capped = await Invoke(tool, new { }); Equal(500d, capped.Details.Value.GetProperty("entryLimitReached").GetDouble());

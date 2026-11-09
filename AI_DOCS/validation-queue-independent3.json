@@ -1,0 +1,222 @@
+[
+  {
+    "options": {
+      "Project": "tests/PiSharp.Chord.Hosting.Tests",
+      "Label": "N1-hosting-runtime3",
+      "BuildTimeoutSeconds": 240,
+      "TestTimeoutSeconds": 480,
+      "LockTimeoutSeconds": 15,
+      "BuildArguments": [
+        "-p:RunAnalyzers=false"
+      ]
+    },
+    "environment": {},
+    "note": "owner reports source coherent; pending central execution"
+  },
+  {
+    "options": {
+      "Project": "tests/PiSharp.Chord.Legacy.Cluster.Tests",
+      "Label": "LG3-cluster-runtime3",
+      "BuildTimeoutSeconds": 240,
+      "TestTimeoutSeconds": 480,
+      "LockTimeoutSeconds": 15,
+      "BuildArguments": [
+        "-p:RunAnalyzers=false"
+      ]
+    },
+    "environment": {},
+    "note": "owner reports source coherent; pending central execution"
+  },
+  {
+    "options": {
+      "Project": "tests/PiSharp.Chord.Durable.Integration.Tests",
+      "Label": "X1-durable-chord-runtime3",
+      "BuildTimeoutSeconds": 240,
+      "TestTimeoutSeconds": 480,
+      "LockTimeoutSeconds": 15,
+      "BuildArguments": [
+        "-p:RunAnalyzers=false"
+      ]
+    },
+    "environment": {},
+    "note": "owner reports source coherent; pending central execution"
+  },
+  {
+    "options": {
+      "Project": "tests/PiSharp.Durable.Tests",
+      "Label": "DLT-tracker-runtime3",
+      "BuildTimeoutSeconds": 240,
+      "TestTimeoutSeconds": 480,
+      "LockTimeoutSeconds": 15,
+      "TestArgs": [
+        "--only",
+        "chord.tracker.,chord.delta,chord.fuzz.tracker"
+      ],
+      "BuildArguments": [
+        "-p:RunAnalyzers=false"
+      ]
+    },
+    "environment": {},
+    "note": "owner reports source coherent; pending central execution"
+  },
+  {
+    "options": {
+      "Project": "tests/PiSharp.Durable.Tests",
+      "Label": "TSQ-native-runtime3",
+      "BuildTimeoutSeconds": 240,
+      "TestTimeoutSeconds": 240,
+      "LockTimeoutSeconds": 15,
+      "TestArgs": [
+        "--only",
+        "telemetry-sqlite.native-host-binding"
+      ],
+      "BuildArguments": [
+        "-p:RunAnalyzers=false"
+      ]
+    },
+    "environment": {},
+    "note": "owner reports source coherent; pending central execution"
+  },
+  {
+    "options": {
+      "Project": "tests/PiSharp.Chord.Tests",
+      "Label": "CORPUS-runtime3",
+      "TestArgs": [
+        "--only",
+        "schema.corpus."
+      ],
+      "BuildArguments": [
+        "-p:RunAnalyzers=false"
+      ],
+      "BuildTimeoutSeconds": 180,
+      "TestTimeoutSeconds": 300,
+      "LockTimeoutSeconds": 30
+    },
+    "environment": {}
+  },
+  {
+    "options": {
+      "Project": "artifacts/gap-validation/NativeEnvDriver/NativeEnvDriver.proj",
+      "Label": "E08-native-aot",
+      "BuildOnly": true,
+      "BuildTimeoutSeconds": 1200,
+      "LockTimeoutSeconds": 30
+    },
+    "environment": {}
+  },
+  {
+    "options": {
+      "Project": "tests/PiSharp.ExtensionParity.Tests",
+      "Label": "I19-updates-runtime3",
+      "BuildTimeoutSeconds": 240,
+      "TestTimeoutSeconds": 240,
+      "LockTimeoutSeconds": 15,
+      "BuildArguments": [
+        "-p:RunAnalyzers=false"
+      ]
+    },
+    "environment": {
+      "EXTPARITY_FILTER": "package-update",
+      "PISHARP_TEST_PI150_NODE_MODULES": "E:\\AI\\PiSharp\\gap-implementation\\artifacts\\node-runtime-150\\node_modules"
+    },
+    "note": "owner reports source coherent; pending central execution"
+  },
+  {
+    "options": {
+      "Project": "tests/PiSharp.ExtensionParity.Tests",
+      "Label": "I19-package-cli-runtime3",
+      "BuildTimeoutSeconds": 240,
+      "TestTimeoutSeconds": 240,
+      "LockTimeoutSeconds": 15,
+      "BuildArguments": [
+        "-p:RunAnalyzers=false"
+      ]
+    },
+    "environment": {
+      "EXTPARITY_FILTER": "package.cli",
+      "PISHARP_TEST_PI150_NODE_MODULES": "E:\\AI\\PiSharp\\gap-implementation\\artifacts\\node-runtime-150\\node_modules"
+    },
+    "note": "owner reports source coherent; pending central execution"
+  },
+  {
+    "options": {
+      "Project": "tests/PiSharp.ExtensionParity.Tests",
+      "Label": "I10-extensions-runtime3",
+      "BuildTimeoutSeconds": 240,
+      "TestTimeoutSeconds": 240,
+      "LockTimeoutSeconds": 15,
+      "BuildArguments": [
+        "-p:RunAnalyzers=false"
+      ]
+    },
+    "environment": {
+      "EXTPARITY_FILTER": "gap.ctx-shutdown",
+      "PISHARP_TEST_PI150_NODE_MODULES": "E:\\AI\\PiSharp\\gap-implementation\\artifacts\\node-runtime-150\\node_modules"
+    },
+    "note": "owner reports source coherent; pending central execution"
+  },
+  {
+    "options": {
+      "Project": "tests/PiSharp.ExtensionParity.Tests",
+      "Label": "R8-runtime3",
+      "BuildArguments": [
+        "-p:RunAnalyzers=false"
+      ],
+      "BuildTimeoutSeconds": 180,
+      "TestTimeoutSeconds": 240,
+      "LockTimeoutSeconds": 30
+    },
+    "environment": {
+      "EXTPARITY_FILTER": "gap.runtime",
+      "PISHARP_TEST_PI150_NODE_MODULES": "E:\\AI\\PiSharp\\gap-implementation\\artifacts\\node-runtime-150\\node_modules"
+    }
+  },
+  {
+    "options": {
+      "Project": "tests/PiSharp.ExtensionParity.Tests",
+      "Label": "R8-overlay-node-runtime3",
+      "BuildArguments": [
+        "-p:RunAnalyzers=false"
+      ],
+      "BuildTimeoutSeconds": 180,
+      "TestTimeoutSeconds": 240,
+      "LockTimeoutSeconds": 30
+    },
+    "environment": {
+      "EXTPARITY_FILTER": "gap.overlay-node",
+      "PISHARP_TEST_PI150_NODE_MODULES": "E:\\AI\\PiSharp\\gap-implementation\\artifacts\\node-runtime-150\\node_modules"
+    }
+  },
+  {
+    "options": {
+      "Project": "tests/PiSharp.InteractiveParity.Tests",
+      "Label": "W24-interactive-runtime3",
+      "BuildTimeoutSeconds": 240,
+      "TestTimeoutSeconds": 240,
+      "LockTimeoutSeconds": 15,
+      "BuildArguments": [
+        "-p:RunAnalyzers=false"
+      ]
+    },
+    "environment": {
+      "INTERACTIVEPARITY_FILTER": "gap.changelog|gap.model-scope|gap.overlay-keeps|gap.tool-disposal"
+    },
+    "note": "owner reports source coherent; pending central execution"
+  },
+  {
+    "options": {
+      "Project": "tests/PiSharp.InteractiveParity.Tests",
+      "Label": "R8-overlay-runtime3",
+      "BuildTimeoutSeconds": 240,
+      "TestTimeoutSeconds": 240,
+      "LockTimeoutSeconds": 15,
+      "BuildArguments": [
+        "-p:RunAnalyzers=false"
+      ]
+    },
+    "environment": {
+      "INTERACTIVEPARITY_FILTER": "gap.overlay|sync150.overlay-custom|sync150.custom-overlay"
+    },
+    "note": "owner reports source coherent; pending central execution"
+  }
+]

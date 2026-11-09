@@ -4058,6 +4058,7 @@ public sealed class TerminalTextEditorPasteController
     }
 
     // Immutable official ICU78.3 data; provenance, full licensing and generator reside in word-data/icu78.
+    [System.CodeDom.Compiler.GeneratedCode("PiSharp.WordData", "ICU78.3")]
     private static class PinnedWordDictionaryData
     {
         internal const int CjkBytes = 2007296;
@@ -23094,6 +23095,7 @@ public sealed class TerminalTextEditorPasteController
     }
 
     // Exact official ICU78.3 data; full notices and input proof in word-data/icu78-sea.
+    [System.CodeDom.Compiler.GeneratedCode("PiSharp.WordData", "ICU78.3")]
     private static class PinnedWordSeaData
     {
         internal const int LaoBytes = 162624;

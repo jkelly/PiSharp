@@ -45,6 +45,9 @@ public sealed record AnthropicMessagesRequestOptions(
     int MaximumOutputCharacters = PiRequestBudget.RequestPayloadBytes, int MaximumOutputBytes = PiRequestBudget.RequestPayloadBytes,
     bool SupportsMidConversationToolChanges = false, bool SupportsMidConversationEffort = false)
 {
+    /// <summary>Optional per-level token budgets used by native thinking bindings.</summary>
+    public JsonData? ThinkingBudgets { get; init; }
+
     /// <summary>Upstream buildParams providerThinkingLevel: the effort a managed (compat.supportsMidConvoEffort) response records,
     /// none while thinking is disabled.</summary>
     public string? ProviderThinkingLevel => EffortMessages ? Effort ?? "high" : null;
@@ -56,6 +59,8 @@ public sealed record AnthropicMessagesRequestOptions(
     /// <summary>Pi 1.2.0 buildParams(disablePreferredStrictTools): strict "prefer" tools are sent non-strict (the one fallback
     /// request after Anthropic rejects the strict tool set); strict "require" tools stay strict.</summary>
     public bool DisablePreferredStrictTools { get; init; }
+    /// <summary>Null enables message threads only for Anthropic's direct API; gateways require explicit opt-in.</summary>
+    public bool? SupportsMessageThreads { get; init; }
 }
 
 /// <summary>A projected request body and whether any strict "prefer" tool was sent strict (Pi 1.2.0 buildParams hasPreferredStrictTools).</summary>
@@ -155,7 +160,7 @@ public sealed class AnthropicMessagesRequestProjector
                 }
                 else if (entry.Role == "user")
                 {
-                    CloseCalls(); var content = entry.Body.Value.TryGetProperty("content", out var supplied) ? supplied : default;
+                    CloseCalls(); var content = entry.Body.Value.TryGetUtf16Property("content", out var supplied) ? supplied : default;
                     if (content.ValueKind == JsonValueKind.String)
                     { var text = Text(content); if (Trim(text).Length > 0) AddMessage("user", JsonValue.Create(text)!); }
                     else
@@ -218,15 +223,15 @@ public sealed class AnthropicMessagesRequestProjector
                     var body = entry.Body.Value; var original = String(body, "toolCallId");
                     var id = _idMap.GetValueOrDefault(original, original);
                     if (!_pendingCalls.Any(call => call.Id == id) || !_answered.Add(id) && id.Length > 0) throw Fail(AnthropicRequestFailure.UnmatchedToolResult);
-                    var isError = body.GetProperty("isError");
+                    var isError = body.GetUtf16Property("isError");
                     if (isError.ValueKind is not (JsonValueKind.True or JsonValueKind.False)) throw Fail(AnthropicRequestFailure.InvalidTranscript);
-                    var content = body.TryGetProperty("content", out var supplied) ? supplied : default;
+                    var content = body.TryGetUtf16Property("content", out var supplied) ? supplied : default;
                     var blocks = ContentBlocks(content, user: false);
                     // splitErrorToolResultImages: Anthropic rejects error tool results that contain anything but text, so their images
                     // follow all tool results of the turn, after a caption naming the call (#10794).
                     if (isError.GetBoolean() && blocks.Any(IsImage))
                     {
-                        var name = body.TryGetProperty("toolName", out var toolName) && toolName.ValueKind == JsonValueKind.String ? Text(toolName) : null;
+                        var name = body.TryGetUtf16Property("toolName", out var toolName) && toolName.ValueKind == JsonValueKind.String ? Text(toolName) : null;
                         AddResult(id, ErrorResultText(blocks), true,
                             [TextBlock(ProviderShared.ProviderTranscript.ErrorToolImagesCaption(id, name)), .. blocks.Where(IsImage)]);
                     }
@@ -301,7 +306,7 @@ public sealed class AnthropicMessagesRequestProjector
                 characters += raw.Length; var owned = JsonData.Parse(raw); var body = owned.Value; CheckJson(body, 0);
                 if (body.ValueKind != JsonValueKind.Object || String(body, "role") != entry.Role) throw Fail(AnthropicRequestFailure.InvalidTranscript);
                 if (entry.Role is not ("system" or "user" or "assistant" or "toolResult")) throw Fail(AnthropicRequestFailure.UnsupportedContent);
-                if (body.TryGetProperty("content", out var content) && content.ValueKind == JsonValueKind.Array)
+                if (body.TryGetUtf16Property("content", out var content) && content.ValueKind == JsonValueKind.Array)
                 { if (content.GetArrayLength() > options.MaximumContentBlocks - blocks) throw Fail(AnthropicRequestFailure.ResourceLimit); blocks += content.GetArrayLength(); }
                 AssistantMessage? assistant = null;
                 if (entry.Role == "assistant")
@@ -312,15 +317,16 @@ public sealed class AnthropicMessagesRequestProjector
                 if (entry.Role == "system")
                 {
                     var text = ContentText(body); if (text.Length > 0) _systemText.Add(text);
-                    if (body.TryGetProperty("sections", out var sections))
+                    if (body.TryGetUtf16Property("sections", out var sections))
                         foreach (var property in Properties(sections))
                         {
-                            if (property.Value.ValueKind == JsonValueKind.Null) { _sections.Remove(property.Name); _sectionOrder.Remove(property.Name); }
-                            else { if (!_sections.ContainsKey(property.Name)) _sectionOrder.Add(property.Name); _sections[property.Name] = Text(property.Value); }
+                            var name = JsonUtf16.GetName(property);
+                            if (property.Value.ValueKind == JsonValueKind.Null) { _sections.Remove(name); _sectionOrder.Remove(name); }
+                            else { if (!_sections.ContainsKey(name)) _sectionOrder.Add(name); _sections[name] = Text(property.Value); }
                         }
                     foreach (var property in new[] { "toolsRemoved", "toolsAdded" })
                     {
-                        if (!body.TryGetProperty(property, out var values)) continue;
+                        if (!body.TryGetUtf16Property(property, out var values)) continue;
                         foreach (var declaration in Array(values))
                         {
                             token.ThrowIfCancellationRequested(); if (++declarations > options.MaximumDeclarations) throw Fail(AnthropicRequestFailure.ResourceLimit);
@@ -342,7 +348,7 @@ public sealed class AnthropicMessagesRequestProjector
         {
             if (!options.SupportsMidConversationSystemMessages || !options.SupportsMidConversationToolChanges ||
                 _entries.Count == 0 || _entries[0].Role != "system" ||
-                !_entries[0].Body.Value.TryGetProperty("toolsAdded", out var initial) || initial.GetArrayLength() == 0) return;
+                !_entries[0].Body.Value.TryGetUtf16Property("toolsAdded", out var initial) || initial.GetArrayLength() == 0) return;
             // inline-tools-2026-09-15: the request-level list stays the initial tools plus the placeholder. Every later
             // declaration, including a same-name redefinition, is defined by value in its own tool_addition block.
             _nativeDeclarations.AddRange(Array(initial));
@@ -351,9 +357,9 @@ public sealed class AnthropicMessagesRequestProjector
         }
         private void AddToolChanges(JsonElement body, JsonArray blocks)
         {
-            var added = body.TryGetProperty("toolsAdded", out var additions) ? Array(additions).ToArray() : [];
+            var added = body.TryGetUtf16Property("toolsAdded", out var additions) ? Array(additions).ToArray() : [];
             var redefined = added.Select(tool => String(tool, "name")).ToHashSet(StringComparer.Ordinal);
-            if (body.TryGetProperty("toolsRemoved", out var removals))
+            if (body.TryGetUtf16Property("toolsRemoved", out var removals))
                 foreach (var tool in Array(removals))
                 {
                     token.ThrowIfCancellationRequested(); var name = String(tool, "name");
@@ -406,22 +412,22 @@ public sealed class AnthropicMessagesRequestProjector
         {
             if (_entries.Count == 0 || _entries[0].Role != "system") return "";
             var body = _entries[0].Body.Value; var parts = new List<string>(); var content = ContentText(body); if (content.Length > 0) parts.Add(content);
-            if (body.TryGetProperty("sections", out var sections))
+            if (body.TryGetUtf16Property("sections", out var sections))
                 foreach (var property in Properties(sections)) if (property.Value.ValueKind != JsonValueKind.Null && Text(property.Value).Length > 0) parts.Add(Text(property.Value));
             return string.Join("\n\n", parts);
         }
         private string RenderUpdate(JsonElement body)
         {
             var parts = new List<string>(); var content = ContentText(body); if (content.Length > 0) parts.Add(content);
-            if (body.TryGetProperty("sections", out var sections))
+            if (body.TryGetUtf16Property("sections", out var sections))
                 foreach (var property in Properties(sections)) parts.Add(property.Value.ValueKind == JsonValueKind.Null
-                    ? "Removed system prompt section \"" + property.Name + "\"."
-                    : "Updated system prompt section \"" + property.Name + "\":\n\n" + Text(property.Value));
+                    ? "Removed system prompt section \"" + JsonUtf16.GetName(property) + "\"."
+                    : "Updated system prompt section \"" + JsonUtf16.GetName(property) + "\":\n\n" + Text(property.Value));
             return string.Join("\n\n", parts);
         }
         private static string ContentText(JsonElement body)
         {
-            if (!body.TryGetProperty("content", out var content) || content.ValueKind == JsonValueKind.Null) return "";
+            if (!body.TryGetUtf16Property("content", out var content) || content.ValueKind == JsonValueKind.Null) return "";
             if (content.ValueKind == JsonValueKind.String) return Text(content);
             return string.Join("\n", Array(content).Where(block => String(block, "type") == "text").Select(block => String(block, "text")));
         }
@@ -537,9 +543,9 @@ public sealed class AnthropicMessagesRequestProjector
         }
         private JsonObject ConvertTool(JsonElement declaration, string name)
         {
-            var parameters = declaration.GetProperty("parameters"); if (parameters.ValueKind != JsonValueKind.Object) throw Fail(AnthropicRequestFailure.UnsupportedContent);
+            var parameters = declaration.GetUtf16Property("parameters"); if (parameters.ValueKind != JsonValueKind.Object) throw Fail(AnthropicRequestFailure.UnsupportedContent);
             var schema = Node(parameters)!.AsObject(); var strict = false;
-            if (declaration.TryGetProperty("constrainedSampling", out var config) && config.ValueKind is not (JsonValueKind.False or JsonValueKind.Null))
+            if (declaration.TryGetUtf16Property("constrainedSampling", out var config) && config.ValueKind is not (JsonValueKind.False or JsonValueKind.Null))
             {
                 var kind = String(config, "type");
                 if (kind == "json_schema")
@@ -561,10 +567,15 @@ public sealed class AnthropicMessagesRequestProjector
                 throw Fail(AnthropicRequestFailure.UnsupportedContent);
             var input = strict ? schema.DeepClone().AsObject() : new JsonObject();
             input["type"] = "object"; input["properties"] = schema["properties"]?.DeepClone() ?? new JsonObject(); input["required"] = schema["required"]?.DeepClone() ?? new JsonArray();
+            // Local references in non-strict properties still resolve against the root schema, including
+            // preferred-strict fallbacks and inline tool additions that use this same conversion.
+            if (!strict)
+                foreach (var definitions in new[] { "$defs", "definitions" })
+                    if (schema.TryGetPropertyValue(definitions, out var value)) input[definitions] = value?.DeepClone();
             var tool = new JsonObject { ["name"] = name, ["description"] = String(declaration, "description"), ["input_schema"] = input };
             if (options.SupportsEagerToolInputStreaming) tool["eager_input_streaming"] = true;
             if (strict) tool["strict"] = true;
-            if (strict && declaration.GetProperty("constrainedSampling").GetProperty("strict").GetString() == "prefer") HasPreferredStrictTools = true;
+            if (strict && declaration.GetUtf16Property("constrainedSampling").GetUtf16Property("strict").GetString() == "prefer") HasPreferredStrictTools = true;
             return tool;
         }
         private JsonArray Betas()
@@ -682,7 +693,7 @@ public sealed class AnthropicMessagesRequestProjector
         return value.Value.ValueKind is JsonValueKind.True or JsonValueKind.False ? value.Value.GetBoolean() : throw Fail(AnthropicRequestFailure.UnsupportedContent);
     }
     private static string? OptionalString(JsonFields? properties, string name) => properties?.TryGet(name, out var value) == true && value!.Value.ValueKind != JsonValueKind.Null ? Text(value.Value) : null;
-    private static string String(JsonElement value, string name) => Text(value.GetProperty(name));
+    private static string String(JsonElement value, string name) => Text(value.GetUtf16Property(name));
     private static string Text(JsonElement value)
     {
         if (value.ValueKind != JsonValueKind.String) throw Fail(AnthropicRequestFailure.InvalidTranscript);

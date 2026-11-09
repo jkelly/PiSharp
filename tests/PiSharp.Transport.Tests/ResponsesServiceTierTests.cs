@@ -1,3 +1,5 @@
+// PiSharp-only per-request service-tier controls are deliberately exercised here.
+#pragma warning disable PISHARP_TIERS001
 using System.Net;
 using System.Runtime.CompilerServices;
 using System.Text;
@@ -20,9 +22,13 @@ internal static class ResponsesServiceTierTests
     private static void Check(bool value, string reason) { if (!value) throw new InvalidOperationException(reason); }
     private static async IAsyncEnumerable<JsonData> Source(string value, [EnumeratorCancellation] CancellationToken token)
     { token.ThrowIfCancellationRequested(); yield return JsonData.Parse(value); await Task.CompletedTask; }
-    private static Task<ChatResult> Run(string model, string? requested, string status, string? echo, string? usage = Usage, ResponsesTokenRates? rates = null) =>
-        new ChatClient(new ResponsesTextToolTransport((_, token) => Source(Terminal(status, echo, usage), token), new(Rates: rates ?? Rates, ServiceTier: requested)))
-            .CompleteAsync(Request(model));
+    private static Task<ChatResult> Run(string model, string? requested, string status, string? echo, string? usage = Usage, ResponsesTokenRates? rates = null,
+        List<StreamEvent>? frames = null)
+    {
+        IChatTransport transport = new ResponsesTextToolTransport((_, token) => Source(Terminal(status, echo, usage), token), new(Rates: rates ?? Rates, ServiceTier: requested));
+        if (frames is not null) transport = new ResponsesRawFrameObserver(transport, frames);
+        return new ChatClient(transport).CompleteAsync(Request(model));
+    }
     public static IEnumerable<(string Name, Func<Task> Run)> Cases()
     {
         yield return ("responses-tier.echo-precedence-model-rates-and-terminal-kinds", Matrix);
@@ -30,6 +36,7 @@ internal static class ResponsesServiceTierTests
         yield return ("responses-tier.fake-http-request-price-and-owned-cleanup", Http);
         yield return ("responses-tier.factory-bound-request-and-pricing", BoundComposition);
         yield return ("responses-tier.split-config-rejected-before-send", RejectSplit);
+        yield return ("responses-tier.explicit-request-override-wire-pricing-and-echo-authority", PerRequestTier);
     }
     private static void Price(ChatResult result, decimal factor)
     {
@@ -95,9 +102,17 @@ internal static class ResponsesServiceTierTests
             catch (ArgumentException) { rejected = true; }
             Check(rejected, "Unknown fallback tier admitted");
         }
+        // v1.5.0 wrapper emits an error frame; malformed tier shapes still require the retained original protocol cause and no success.
         foreach (var echo in new[] { "0", "true", "{}", "[]" })
-            Check((await Run("gpt-5.5", "flex", "completed", echo)).Failure?.Kind == ChatFailureKind.MalformedStream, "Malformed tier accepted");
-        Check((await Run("gpt-5.5", "priority", "completed", null, """{"input_tokens":1000000}""", new(decimal.MaxValue))).Failure?.Kind == ChatFailureKind.MalformedStream, "Cost overflow escaped existing protocol classification");
+        {
+            var frames = new List<StreamEvent>();
+            Check((await Run("gpt-5.5", "flex", "completed", echo, frames: frames)).Failure?.Kind == ChatFailureKind.Provider, "Malformed tier gained success");
+            ResponsesRawContractAssertions.Error(frames, typeof(StreamProtocolException));
+        }
+        var overflowFrames = new List<StreamEvent>();
+        var overflowUsage = Usage.Replace("\"input_tokens\":10", "\"input_tokens\":1000000", StringComparison.Ordinal);
+        Check((await Run("gpt-5.5", "priority", "completed", null, overflowUsage, new(decimal.MaxValue), overflowFrames)).Failure?.Kind == ChatFailureKind.Provider, "Cost overflow gained success");
+        ResponsesRawContractAssertions.Error(overflowFrames, typeof(StreamProtocolException));
     }
     private static async Task BoundComposition()
     {
@@ -139,10 +154,12 @@ internal static class ResponsesServiceTierTests
             using var http = new HttpClient(handler);
             var factory = new ResponsesKeyAuthRequestFactory(new("https://synthetic.invalid/v1/responses"), Request().Model, new(false), new(ServiceTier: requested));
             var transport = new ResponsesHttpSseTransport(http, request => { var value = factory.Create(request, "inert-key"); created = value; return value; }, responsesOptions: new(Rates: Rates, ServiceTier: fallback));
+            var frames = new List<StreamEvent>();
+            await foreach (var frame in transport.StreamAsync(Request())) frames.Add(frame);
+            var splitError = ResponsesRawContractAssertions.Error(frames, typeof(ResponsesKeyAuthRequestException));
+            Check(((ResponsesKeyAuthRequestException)splitError.NativeSourceException!).Failure == ResponsesKeyAuthRequestFailure.InvalidConfiguration &&
+                frames.OfType<StreamStarted>().Count() == 0 && sends == 0 && created is not null, "Legacy delegate split acquired HTTP or lost its exact cause");
             var rejected = false;
-            try { await foreach (var _ in transport.StreamAsync(Request())) { } }
-            catch (ResponsesKeyAuthRequestException error) when (error.Failure == ResponsesKeyAuthRequestFailure.InvalidConfiguration) { rejected = true; }
-            Check(rejected && sends == 0 && created is not null, "Legacy delegate split silently admitted");
             var disposed = false;
             try { _ = await created!.Content!.ReadAsByteArrayAsync(); }
             catch (ObjectDisposedException) { disposed = true; }
@@ -155,7 +172,8 @@ internal static class ResponsesServiceTierTests
                 Check(rejected && sends == 0, "Conflicting explicit bound override admitted");
             }
         }
-        using var matchingHttp = new HttpClient(new ResponsesReasoningTests.Handler(_ => throw new InvalidOperationException("Construction only")));
+        var matchingSends = 0;
+        using var matchingHttp = new HttpClient(new ResponsesReasoningTests.Handler(_ => { matchingSends++; throw new InvalidOperationException("Construction only"); }));
         var matching = new ResponsesKeyAuthRequestFactory(new("https://synthetic.invalid"), Request().Model, new(false), new(ServiceTier: "flex"));
         _ = new ResponsesHttpSseTransport(matchingHttp, matching, "inert-key", responsesOptions: new(ServiceTier: "flex"));
         using var cancellation = new CancellationTokenSource();
@@ -165,10 +183,61 @@ internal static class ResponsesServiceTierTests
             cancellation.Cancel();
             return message;
         });
-        var cancelled = false;
-        try { await foreach (var _ in cancelDuringFactory.StreamAsync(Request(), cancellation.Token)) { } }
-        catch (OperationCanceledException) { cancelled = true; }
-        Check(cancelled, "Binding validation changed post-factory cancellation precedence");
+        var canceledFrames = new List<StreamEvent>();
+        await foreach (var frame in cancelDuringFactory.StreamAsync(Request(), cancellation.Token)) canceledFrames.Add(frame);
+        var canceled = ResponsesRawContractAssertions.Error(canceledFrames, typeof(OperationCanceledException), StopReason.Aborted);
+        Check(((OperationCanceledException)canceled.NativeSourceException!).CancellationToken == cancellation.Token && matchingSends == 0 &&
+            canceledFrames.OfType<StreamStarted>().Count() == 0, "Binding validation changed post-factory cancellation precedence");
+    }
+    private static async Task PerRequestTier()
+    {
+        foreach (var configured in new string?[] { null, "flex" })
+        foreach (var asked in new string?[] { null, "auto", "normal", "economy", "priority", "fast", "ultrafast", "unknown" })
+        foreach (var echo in new string?[] { null, "null", "\"default\"", "\"flex\"" })
+        {
+            var expectedWire = ServiceTiers.OpenAI(asked, "openai") ?? configured;
+            var sends = 0;
+            using var handler = new ResponsesReasoningTests.Handler(async request =>
+            {
+                sends++;
+                var body = JsonData.Parse(await request.Content!.ReadAsStringAsync()).Value;
+                Check(body.TryGetProperty("service_tier", out var value) == (expectedWire is not null), "Effective request tier omission changed");
+                if (expectedWire is not null) Check(value.GetString() == expectedWire, "Effective request tier was not normalized consistently");
+                return new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent("data: " + Terminal("completed", echo) + "\n\n", Encoding.UTF8, "text/event-stream") };
+            });
+            using var http = new HttpClient(handler);
+            var options = new ResponsesKeyAuthRequestOptions(ServiceTier: configured);
+            var factory = new ResponsesKeyAuthRequestFactory(new("https://synthetic.invalid/v1/responses"), Request().Model, new(false), options);
+            var transport = new ResponsesHttpSseTransport(http, factory, "inert-key", responsesOptions: new(Rates: Rates));
+            var chat = Request() with { ServiceTier = asked };
+            var frames = new List<StreamEvent>();
+            var result = await new ChatClient(new ResponsesRawFrameObserver(transport, frames)).CompleteAsync(chat);
+            Check(result.Failure is null && frames.OfType<StreamDone>().Count() == 1 && frames.OfType<StreamError>().Count() == 0 && sends == 1, "Valid explicit request tier rejected");
+            var effectivePrice = echo is "\"default\"" ? "default" : echo is "\"flex\"" ? "flex" : expectedWire;
+            Price(result, effectivePrice == "flex" ? 0.5m : effectivePrice is "priority" or "fast" ? 2.5m : 1m);
+            Check(options.ServiceTier == configured && chat.ServiceTier == asked, "Tier binding mutated caller-owned options/request");
+        }
+        // Reuse one bound transport concurrently: request tiers must not leak into another request's immutable fallback.
+        var seen = new System.Collections.Concurrent.ConcurrentBag<string>();
+        using var sharedHandler = new ResponsesReasoningTests.Handler(async request =>
+        {
+            seen.Add(JsonData.Parse(await request.Content!.ReadAsStringAsync()).Value.GetProperty("service_tier").GetString()!);
+            return new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent("data: " + Terminal("completed", null) + "\n\n", Encoding.UTF8, "text/event-stream") };
+        });
+        using var sharedHttp = new HttpClient(sharedHandler);
+        var sharedOptions = new ResponsesKeyAuthRequestOptions(ServiceTier: "flex");
+        var sharedFactory = new ResponsesKeyAuthRequestFactory(new("https://synthetic.invalid/v1/responses"), Request().Model, new(false), sharedOptions);
+        var shared = new ResponsesHttpSseTransport(sharedHttp, sharedFactory, "inert-key", responsesOptions: new(Rates: Rates));
+        string?[] interleaved = ["priority", "normal", "economy", null, "auto", "priority", "normal"];
+        var results = await Task.WhenAll(interleaved.Select(asked => new ChatClient(shared).CompleteAsync(Request() with { ServiceTier = asked })));
+        for (var index = 0; index < results.Length; index++)
+        {
+            Check(results[index].Failure is null, "Interleaved explicit tier failed");
+            var wire = ServiceTiers.OpenAI(interleaved[index], "openai") ?? "flex";
+            Price(results[index], wire == "flex" ? 0.5m : wire == "priority" ? 2.5m : 1m);
+        }
+        Check(seen.OrderBy(value => value, StringComparer.Ordinal).SequenceEqual(interleaved.Select(asked => ServiceTiers.OpenAI(asked, "openai") ?? "flex").OrderBy(value => value, StringComparer.Ordinal)) &&
+            sharedOptions.ServiceTier == "flex", "Concurrent tier selection changed wire counts or the configured fallback");
     }
     private static async Task Http()
     {

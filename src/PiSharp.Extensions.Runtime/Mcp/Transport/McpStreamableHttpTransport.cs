@@ -181,7 +181,7 @@ public sealed class McpStreamableHttpTransport : IMcpWireTransport
     private static bool Retryable(Exception error) => error is HttpRequestException || error is McpHttpStatusException status && (status.StatusCode is 408 or 429 || status.StatusCode >= 500) || error is IOException and not (McpRuntimeProtocolException or McpHttpStatusException or McpRuntimeDisconnectedException);
     private async Task Sse(Stream body, McpWireCallbacks receiver, Cursor cursor, string? responseId, CancellationToken token, ResponseLease? ownedGet = null)
     {
-        var bytes = new byte[limits.ReadBufferBytes]; using var line = new MemoryStream(); var data = new StringBuilder(); string? eventName = null; var hasData = false; long dataBytes = 0; var firstLine = true;
+        var bytes = new byte[limits.ReadBufferBytes]; using var line = new MemoryStream(); var data = new StringBuilder(); string? eventName = null; var hasData = false; long dataBytes = 0; var firstLine = true; var skipLf = false;
         async Task Dispatch()
         {
             if (hasData && (eventName is null or "" or "message") && !string.IsNullOrWhiteSpace(data.ToString()))
@@ -195,7 +195,7 @@ public sealed class McpStreamableHttpTransport : IMcpWireTransport
         }
         async Task Line()
         {
-            var raw = McpWireJson.Utf8.GetString(line.GetBuffer(), 0, (int)line.Length); line.SetLength(0); if (raw.EndsWith('\r')) raw = raw[..^1];
+            var raw = McpWireJson.Utf8.GetString(line.GetBuffer(), 0, (int)line.Length); line.SetLength(0);
             if (firstLine) { firstLine = false; if (raw.StartsWith('\uFEFF')) raw = raw[1..]; }
             if (raw.Length == 0) { await Dispatch().ConfigureAwait(false); return; }
             if (raw[0] == ':') return;
@@ -213,7 +213,11 @@ public sealed class McpStreamableHttpTransport : IMcpWireTransport
             if (count == 0) { if (line.Length > 0) await Line().ConfigureAwait(false); await Dispatch().ConfigureAwait(false); return; }
             for (var index = 0; index < count; index++)
             {
-                if (bytes[index] == 10) await Line().ConfigureAwait(false);
+                var current = bytes[index];
+                // CR ends the line immediately, even on an open stream. A following LF belongs
+                // to that delimiter, including when it arrives in the next read.
+                if (skipLf) { skipLf = false; if (current == 10) continue; }
+                if (current is 10 or 13) { await Line().ConfigureAwait(false); skipLf = current == 13; }
                 else { if (line.Length >= limits.MaximumFrameBytes) throw new McpRuntimeProtocolException("MCP SSE line byte limit exceeded"); line.WriteByte(bytes[index]); }
             }
         }

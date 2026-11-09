@@ -18,13 +18,13 @@ public static partial class NativeProviderFactory
 {
     /// <summary>google-vertex through the Simple Vertex transport, with its endpoint and credential resolved before every request.</summary>
     public static NativeHttpModelProvider CreateGoogleVertexRoute(ModelDescriptor model, JsonData modelMetadata,
-        Func<CancellationToken, ValueTask<GoogleVertexRequestAuth>> auth, double? maxTokens = null, bool summary = false, HttpMessageHandler? handler = null)
+        Func<CancellationToken, ValueTask<GoogleVertexRequestAuth>> auth, double? maxTokens = null, bool summary = false, HttpMessageHandler? handler = null, JsonData? thinkingBudgets = null)
     {
         ArgumentNullException.ThrowIfNull(model); ArgumentNullException.ThrowIfNull(modelMetadata); ArgumentNullException.ThrowIfNull(auth);
         if (model.Provider != "google-vertex" || model.Api != "google-vertex") throw new ArgumentException("Unsupported native model or endpoint selection.");
         GoogleVertexSimpleTransport Transport(HttpClient client, GoogleVertexRequestAuth resolved, string? level) => new(client, model,
             new(new(resolved.Endpoint, resolved.Token, new GoogleGenerativeAIOptions(modelMetadata) { MaxTokens = maxTokens, MaximumPayloadBytes = MaximumGooglePayloadBytes }) { ApiKeyMode = resolved.ApiKeyMode },
-                resolved.Project, resolved.Location, level));
+                resolved.Project, resolved.Location, level) { ThinkingBudgets = thinkingBudgets });
         return Bind(model, handler, client =>
         {
             var levels = summary ? ImmutableArray.Create("off")

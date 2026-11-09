@@ -73,16 +73,15 @@ public sealed partial class AnthropicMessagesTransport
             // cache split committed with this exact usage, including failure terminals.
             var cacheWrite1h = usage.ExtraProperties is { } properties && properties.TryGet("cacheWrite1h", out var count)
                 ? count!.Value.GetInt64() : 0;
-            var node = JsonNode.Parse(sourceEvent.ToString(), documentOptions: PiSharp.Contracts.JsonData.DocumentOptions)!;
+            var node = JsonUtf16.MutableNode(sourceEvent)!;
             var written = node[messageField]!["usage"]!["cost"]!.AsObject();
-            var cost = JsonNode.Parse(
-                OriginalAnthropicUsageCostProjection.Create(_rates, usage, cacheWrite1h).ToString(), documentOptions: PiSharp.Contracts.JsonData.DocumentOptions)!.AsObject();
+            var cost = JsonUtf16.MutableNode(OriginalAnthropicUsageCostProjection.Create(_rates, usage, cacheWrite1h))!.AsObject();
             // openrouter-cost.ts: a billed total replaces the catalog one. totalFromProvider follows the five cost fields.
             if (written["totalFromProvider"] is JsonValue flag && flag.GetValueKind() == JsonValueKind.True) cost["total"] = written["total"]!.DeepClone();
             foreach (var item in written)
                 if (!cost.ContainsKey(item.Key)) cost[item.Key] = item.Value?.DeepClone();
             node[messageField]!["usage"]!["cost"] = cost;
-            return JsonData.Parse(node.ToJsonString());
+            return JsonData.Parse(JsonUtf16.ToJsonString(node, System.Text.Encodings.Web.JavaScriptEncoder.Default));
         }
     }
 }

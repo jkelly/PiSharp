@@ -462,6 +462,74 @@ internal static partial class Program
 
     private static IEnumerable<(string, Func<Task>)> StorageSqliteBatchesCases()
     {
+        foreach (var test in SqliteBulkChecks()) yield return test;
+        yield return Case("storage.sqlite.batches.commit-failure-rolls-back-all-batches-before-receipts", async () =>
+        {
+            var database = await SqliteConnectionDatabase.OpenAsync(":memory:");
+            var storage = await SqliteStorage.OpenAsync(database);
+            try
+            {
+                await CreateSqliteRoot(storage);
+                await database.ExecAsync("PRAGMA foreign_keys = ON");
+                await database.ExecAsync("CREATE TABLE fault_parent (id INTEGER PRIMARY KEY)");
+                await database.ExecAsync("CREATE TABLE fault_child (id INTEGER REFERENCES fault_parent(id) DEFERRABLE INITIALLY DEFERRED)");
+                await database.ExecAsync("CREATE TRIGGER fail_commit AFTER INSERT ON entries BEGIN INSERT INTO fault_child VALUES (999); END");
+                var before = (await database.GetAsync("SELECT next_id, next_seq FROM durable_metadata"))!.ToString();
+                var receipts = new List<int>();
+                IReadOnlyList<IReadOnlyList<StorageWrite>> batches =
+                    [[new EntryWrite(SqliteEntry(new EntryId(100), ConversationId.Root))],
+                     [new EntryWrite(SqliteEntry(new EntryId(101), ConversationId.Root))]];
+                await ThrowsAsync<SqliteException>(() => storage.CommitAsync(batches, (index, _) => receipts.Add(index), SqliteContext), "COMMIT constraint");
+                Equal(0, receipts.Count, "failed COMMIT has no receipts");
+                Equal(0L, (await database.GetAsync("SELECT count(*) AS n FROM entries"))!.GetInt64("n"), "entries rolled back");
+                Equal(0L, (await database.GetAsync("SELECT count(*) AS n FROM record_ids WHERE id >= 100"))!.GetInt64("n"), "claims rolled back");
+                Equal(before, (await database.GetAsync("SELECT next_id, next_seq FROM durable_metadata"))!.ToString(), "metadata rolled back");
+                await database.ExecAsync("DROP TRIGGER fail_commit");
+                var accepted = await storage.CommitAsync(batches, (index, _) =>
+                {
+                    Equal(2L, database.GetAsync("SELECT count(*) AS n FROM entries").GetAwaiter().GetResult()!.GetInt64("n"), "receipt observes committed batches");
+                    receipts.Add(index);
+                }, SqliteContext);
+                Equal(2, accepted.Stored, "recovery stores both batches");
+                Equal("0,1", string.Join(",", receipts), "ordered receipts");
+            }
+            finally { await storage.CloseAsync(SqliteContext); }
+        });
+
+        // Authored C# corruption matrix: valid JSON with invalid persisted shape, not malformed JSON syntax.
+        foreach (var fault in new[] { "record-shape", "copy-record-shape", "missing-base", "base-shape", "delta-shape", "version-boundary", "missing-revision" })
+        foreach (var later in new[] { false, true })
+            yield return SqliteCorruptStoredDataCase(fault, later);
+
+        yield return SqliteLaterCheckFailureCase(
+            "storage.sqlite.batches.rejects-later-check-faulted-io-task",
+            () => Task.FromException<SqliteRow?>(new IOException("disk I/O error")));
+        yield return SqliteLaterCheckFailureCase(
+            "storage.sqlite.batches.rejects-later-check-faulted-semantic-exception-type",
+            () => Task.FromException<SqliteRow?>(new InvalidOperationException("driver failure")));
+        yield return Case("storage.sqlite.batches.later-write-failure-rolls-back-before-receipts", async () =>
+        {
+            var database = await SqliteConnectionDatabase.OpenAsync(":memory:");
+            var fail = false;
+            var storage = await SqliteStorage.OpenAsync(new FailingSqliteDatabase(database,
+                sql => fail && sql.StartsWith("UPDATE durable_metadata", StringComparison.Ordinal)));
+            try
+            {
+                await CreateSqliteRoot(storage);
+                fail = true;
+                var receipts = new List<int>();
+                var before = (await database.GetAsync("SELECT next_id, next_seq FROM durable_metadata"))!.ToString();
+                IReadOnlyList<IReadOnlyList<StorageWrite>> batches =
+                    [[new EntryWrite(SqliteEntry(new EntryId(100), ConversationId.Root))],
+                     [new EntryWrite(SqliteEntry(new EntryId(101), ConversationId.Root))]];
+                Equal("rejected", await SqliteCommitOutcome(storage.CommitAsync(batches, (index, _) => receipts.Add(index), SqliteContext)), "write rejects");
+                Equal(0, receipts.Count, "no write-failure receipts");
+                Equal(0L, (await database.GetAsync("SELECT count(*) AS n FROM entries"))!.GetInt64("n"), "entries rolled back");
+                Equal(before, (await database.GetAsync("SELECT next_id, next_seq FROM durable_metadata"))!.ToString(), "metadata unchanged");
+            }
+            finally { await storage.CloseAsync(SqliteContext); }
+        });
+
         yield return SqliteLaterCheckFailureCase(
             "storage.sqlite.batches.rejects-the-whole-call-the-batches-before-it-included-when-a-later-batch-s-check-read-fails-with-a-undefined-rejection",
             () => Task.FromCanceled<SqliteRow?>(new CancellationToken(canceled: true)));
@@ -483,18 +551,82 @@ internal static partial class Program
             () => Task.FromCanceled<SqliteRow?>(new CancellationToken(canceled: true)));
     }
 
+    private static (string, Func<Task>) SqliteCorruptStoredDataCase(string fault, bool later) =>
+        Case($"storage.sqlite.batches.corrupt-{fault}-{(later ? "later" : "first")}-rejects-whole-transaction", async () =>
+    {
+        var database = await SqliteConnectionDatabase.OpenAsync(":memory:");
+        var storage = await SqliteStorage.OpenAsync(database);
+        try
+        {
+            await CreateSqliteRoot(storage);
+            var source = new DocumentCreate
+            {
+                Id = new DocumentId(2), Kind = "corrupt", Scope = DocumentScope.Conversation(ConversationId.Root),
+                History = DocumentHistory.Rewindable, Fork = DocumentFork.AsOf,
+            };
+            await storage.CommitWritesAsync([new DocumentCreateWrite(source, DocumentContent.Base(1, (JsonObjectValue)J("{\"n\":1}")))], SqliteContext);
+            await storage.CommitWritesAsync([new DocumentChangeWrite(source.Id, DocumentContent.Delta(1, Ops("[[\"s\",[\"n\"],2]]")))], SqliteContext);
+            switch (fault)
+            {
+                case "record-shape":
+                case "copy-record-shape":
+                    await database.RunAsync("UPDATE documents SET record = ? WHERE id = ?", "{}", source.Id.Value);
+                    break;
+                case "missing-base":
+                    await database.RunAsync("DELETE FROM document_revisions WHERE document_id = ? AND kind = 'base'", source.Id.Value);
+                    break;
+                case "base-shape":
+                    await database.RunAsync("UPDATE document_revisions SET content = ? WHERE document_id = ? AND kind = 'base'", "[]", source.Id.Value);
+                    break;
+                case "delta-shape":
+                    await database.RunAsync("UPDATE document_revisions SET content = ? WHERE document_id = ? AND kind = 'delta'", "{}", source.Id.Value);
+                    break;
+                case "version-boundary":
+                    await database.RunAsync("UPDATE document_revisions SET version = 2 WHERE document_id = ? AND kind = 'delta'", source.Id.Value);
+                    break;
+                case "missing-revision":
+                    await database.RunAsync("DELETE FROM document_revisions WHERE document_id = ?", source.Id.Value);
+                    break;
+            }
+            StorageWrite failing = fault == "record-shape"
+                ? new DocumentChangeWrite(source.Id, DocumentContent.Base(1, (JsonObjectValue)J("{}")))
+                : fault == "missing-revision"
+                    ? new DocumentChangeWrite(source.Id, DocumentContent.Delta(1, Ops("[[\"s\",[\"n\"],3]]")))
+                    : new DocumentCopyWrite(source with { Id = new DocumentId(3), Scope = DocumentScope.Conversation(new ConversationId(50)) }, new(source.Id, DocumentPoint.Current));
+            IReadOnlyList<StorageWrite> first = [new EntryWrite(SqliteEntry(new EntryId(100), ConversationId.Root))];
+            IReadOnlyList<IReadOnlyList<StorageWrite>> batches = later ? [first, [failing]] : [[failing], first];
+            var before = (await database.GetAsync("SELECT next_id, next_seq FROM durable_metadata"))!.ToString();
+            var receipts = new List<int>();
+            Equal("rejected", await SqliteCommitOutcome(storage.CommitAsync(batches, (index, _) => receipts.Add(index), SqliteContext)), "corruption rejects");
+            Equal(0, receipts.Count, "no receipts");
+            Equal<CommittedEntry?>(null, await storage.GetEntryAsync(new EntryId(100), SqliteContext), "earlier entry rolled back");
+            Equal<SqliteRow?>(null, await database.GetAsync("SELECT id FROM record_ids WHERE id = 100"), "ID claim rolled back");
+            Equal(before, (await database.GetAsync("SELECT next_id, next_seq FROM durable_metadata"))!.ToString(), "allocation metadata unchanged");
+            // A real semantic refusal still commits the accepted prefix, even in a store with unrelated corruption.
+            var accepted = await storage.CommitAsync([first, [new ConversationWrite(new(ConversationId.Root))]], (index, _) => receipts.Add(index), SqliteContext);
+            Equal(1, accepted.Stored, "semantic refusal keeps prefix");
+            Check(accepted.Refused is not null, "semantic refusal returned");
+            Equal("0", string.Join(",", receipts), "prefix receipt only");
+            Check(await storage.GetEntryAsync(new EntryId(100), SqliteContext) is not null, "prefix persisted");
+        }
+        finally { await storage.CloseAsync(SqliteContext); }
+    });
+
     /// <summary>The first batch passes its checks and is written; the second batch's check read fails with <paramref name="fail"/>.</summary>
     private static (string, Func<Task>) SqliteLaterCheckFailureCase(string id, Func<Task<SqliteRow?>> fail) => Case(id, async () =>
     {
         await using var temp = new SqliteTemp();
         var failCheck = false;
-        var reads = 0;
         var storage = temp.Track(await SqliteStorage.OpenAsync(new CheckReadFailingDatabase(await SqliteConnectionDatabase.OpenAsync(temp.NewPath()),
-            sql => failCheck && sql.Contains("record_type", StringComparison.Ordinal) && ++reads == 2 ? fail() : null)));
+            sql => failCheck && sql.StartsWith("SELECT record FROM documents WHERE id = ?", StringComparison.Ordinal) ? fail() : null)));
         await CreateSqliteRoot(storage);
-        EntryId[] ids = [await storage.MintIdAsync<EntryId>(), await storage.MintIdAsync<EntryId>()];
+        var source = new DocumentCreate { Id = new DocumentId(2), Kind = "copy", Scope = DocumentScope.Conversation(ConversationId.Root),
+            History = DocumentHistory.Rewindable, Fork = DocumentFork.AsOf };
+        await storage.CommitWritesAsync([new DocumentCreateWrite(source, DocumentContent.Base(1, (JsonObjectValue)J("{}")))], SqliteContext);
+        EntryId[] ids = [new EntryId(3)];
         IReadOnlyList<IReadOnlyList<StorageWrite>> batches =
-            [.. ids.Select(IReadOnlyList<StorageWrite> (id) => [new EntryWrite(new() { Id = id, ConversationId = ConversationId.Root, Kind = "note" })])];
+            [[new EntryWrite(SqliteEntry(ids[0], ConversationId.Root))],
+             [new DocumentCopyWrite(source with { Id = new DocumentId(4), Scope = DocumentScope.Conversation(new ConversationId(50)) }, new(source.Id, DocumentPoint.Current))]];
         failCheck = true;
         var receipts = new List<long>();
         var outcome = await SqliteCommitOutcome(storage.CommitAsync(batches, (index, _) => receipts.Add(index), SqliteContext));
@@ -705,7 +837,13 @@ internal static partial class Program
             public Task RunAsync(string sql, params object?[] parameters) => inner.RunAsync(sql, parameters);
             public Task<long> RunCountedAsync(string sql, params object?[] parameters) => inner.RunCountedAsync(sql, parameters);
             public Task<SqliteRow?> GetAsync(string sql, params object?[] parameters) => intercept(sql) ?? inner.GetAsync(sql, parameters);
-            public Task<IReadOnlyList<SqliteRow>> AllAsync(string sql, params object?[] parameters) => inner.AllAsync(sql, parameters);
+            public async Task<IReadOnlyList<SqliteRow>> AllAsync(string sql, params object?[] parameters)
+            {
+                var intercepted = intercept(sql);
+                if (intercepted is null) return await inner.AllAsync(sql, parameters);
+                var row = await intercepted;
+                return row is null ? [] : [row];
+            }
         }
     }
 

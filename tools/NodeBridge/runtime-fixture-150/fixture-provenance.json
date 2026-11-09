@@ -1,0 +1,22 @@
+{
+  "kind": "test-only-published-runtime-fixture",
+  "runtimeVersion": "1.5.0",
+  "runtimePolicy": "no-default-attribution-v1",
+  "manifestSource": "src/PiSharp.Cli/Extensions/Pi/PiNodeRuntime.cs:PackageJson",
+  "initialLockSource": "artifacts/node-runtime-150/package-lock.json",
+  "registry": "https://registry.npmjs.org",
+  "packageCount": 123,
+  "manifestSha256": "0036692a4e6f095abe996064c782dc479e48a68118f1a2c6999d298d7829844b",
+  "lockSha256": "a0f5134d61b7976c8afa1ebd90eb592ef69918f4d342483ba545b961ce73056d",
+  "validation": {
+    "date": "2026-11-08",
+    "node": "v24.22.0",
+    "npm": "11.19.1",
+    "command": "npm ci --ignore-scripts --no-audit --no-fund --fetch-retries=0",
+    "destination": "fresh artifacts/runtime-fixture-150-ci-* directory",
+    "exitCode": 0,
+    "installedPackages": 123,
+    "dependencyChangesFromInitialLock": 0,
+    "productionCacheAdmission": false
+  }
+}

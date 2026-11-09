@@ -35,12 +35,13 @@ internal static partial class Program
             try
             {
                 await test.Run().WaitAsync(TimeSpan.FromSeconds(120));
-                results.Add(new { test.Id, status = "PASS_AUTHORED_NATIVE_ONLY", ms = started.ElapsedMilliseconds });
+                results.Add(new { test.Id, status = test.Id.StartsWith("schema.corpus.", StringComparison.Ordinal) ? "PASS_UPSTREAM_CAPTURE" : "PASS_AUTHORED_NATIVE_ONLY", ms = started.ElapsedMilliseconds });
             }
             catch (Exception error) { failures++; results.Add(new { test.Id, status = "FAIL", failure = error.ToString() }); }
         }
-        var report = new { sourceSha = PiSharp.Chord.ChordNext.Commit, status = "AUTHORED NATIVE; NO UPSTREAM CAPTURE", cases = cases.Count, failures,
-            genuineSourceCasesCaptured = 0, results };
+        var capturedCases = cases.Count(test => test.Id.StartsWith("schema.corpus.", StringComparison.Ordinal));
+        var report = new { sourceSha = PiSharp.Chord.ChordNext.Commit, status = capturedCases == 0 ? "AUTHORED NATIVE; NO UPSTREAM CAPTURE" : "MIXED: SEE INDIVIDUAL CASE STATUS", cases = cases.Count, failures,
+            genuineSourceCasesCaptured = capturedCases, results };
         var json = JsonSerializer.Serialize(report, new JsonSerializerOptions { WriteIndented = true });
         if (reportPath is not null)
         {

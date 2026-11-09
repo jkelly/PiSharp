@@ -17,7 +17,7 @@ public sealed partial class NativeExtensionContextFacadeHost : IExtensionModelOp
     // built on first use.
     private static readonly Lazy<NativeExtensionModelOperations> DefaultModelOperations = new(() => new(
         NativeExtensionModelOperations.CreateDefaultRegistry(LiveSessionRuntime.Default.ReadEnvironment, LiveSessionRuntime.Default.AuthPath,
-            LiveSessionRuntime.Default.CreateAuthHttp, LiveSessionRuntime.Default.Time)));
+            LiveSessionRuntime.Default.CreateAuthHttp, LiveSessionRuntime.Default.Time, modelsPath: LiveSessionRuntime.Default.ModelsPath)));
     private NativeExtensionModelOperations? modelOperations;
 
     /// <summary>Binds this host's model registry once, before its first use. Only application composition binds it;

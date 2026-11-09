@@ -5,6 +5,9 @@
 // edit regions fold into one splice, reserved keys fold into the nearest safe ancestor, and more than 4,096 operations fold into r. An
 // array whose draft is still a piece table kept its base elements in order, so its plan comes from the pieces alone (orderedArrayPlan)
 // and an append to a long array costs no walk over it; a draft flattened into entries is planned by a walk over them (elementArrayPlan).
+// Open-context ownership follows Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (v1.5.0): one strong latest context,
+// weak older competitors, unregistered prepared replacements and one shared weak tracker reference. CLR draft cleanup
+// sweeps allocated draft nodes so retained handles release their data as well as refusing subsequent operations.
 using System.Collections.Immutable;
 
 namespace PiSharp.Durable.Chord.Delta;
@@ -16,10 +19,14 @@ namespace PiSharp.Durable.Chord.Delta;
 /// </summary>
 public sealed class Tracker
 {
-    private readonly HashSet<WeakReference<ChangeContext>> contexts = [];
+    // One sequential change needs no GC handle. Only an older, still-open competitor is weakly registered.
+    private ChangeContext? open;
+    private HashSet<WeakReference<ChangeContext>>? competitors;
+    private readonly object owner = new();
+    private readonly WeakReference<Tracker> self;
     private int pruneBudget = 256;
 
-    private Tracker(JsonValue initial) { Value = initial; }
+    private Tracker(JsonValue initial) { Value = initial; self = new(this); }
 
     /// <summary>Takes ownership of an object or array root in O(1); the root is never traversed or copied.</summary>
     public static Tracker Track(JsonValue initial)
@@ -34,12 +41,14 @@ public sealed class Tracker
     /// <summary>The number of adoptions so far.</summary>
     public long Revision { get; private set; }
 
-    /// <summary>Opens a draft over <see cref="Value"/>. Several changes may be open at once; adopting one makes the others stale.</summary>
+    /// <summary>Opens a draft over <see cref="Value"/>. Several changes may be open at once; adopting one makes the others stale.
+    /// The latest open draft is held strongly until settled, another change begins, or a prepared change is adopted.</summary>
     public Change BeginChange()
     {
-        var context = new ChangeContext(this, Revision, Value, replacement: false);
+        var context = new ChangeContext(owner, self, Revision, Value);
         context.Root = Draft.CreateRoot(context, Value);
-        Register(context);
+        if (open is not null) Demote(open);
+        open = context;
         return new Change(context);
     }
 
@@ -51,8 +60,8 @@ public sealed class Tracker
     public Prepared PrepareReplace(JsonValue value)
     {
         RequireContainer(value, nameof(value));
-        var context = new ChangeContext(this, Revision, Value, replacement: true) { Status = ChangeStatus.Prepared };
-        Register(context);
+        // Materialization releases this context before returning, so it never enters the open registry.
+        var context = new ChangeContext(owner, self, Revision, Value) { Status = ChangeStatus.Prepared };
         try
         {
             var noop = JsonValue.DeepEquals(Value, value);
@@ -75,7 +84,7 @@ public sealed class Tracker
     {
         ArgumentNullException.ThrowIfNull(prepared);
         var context = prepared.Context;
-        if (!ReferenceEquals(context.Owner, this)) throw new InvalidOperationException("Prepared change belongs to a different tracker");
+        if (!ReferenceEquals(context.Owner, owner)) throw new InvalidOperationException("Prepared change belongs to a different tracker");
         switch (context.Status)
         {
             case ChangeStatus.Consumed: throw new InvalidOperationException("Prepared change has already been used");
@@ -98,30 +107,41 @@ public sealed class Tracker
 
     internal void Release(ChangeContext context)
     {
-        if (context.RegistryRef is { } reference) contexts.Remove(reference);
+        if (ReferenceEquals(open, context)) open = null;
+        else if (context.RegistryRef is { } reference) competitors?.Remove(reference);
         context.RegistryRef = null;
     }
 
-    private void Register(ChangeContext context)
+    private void Demote(ChangeContext context)
     {
         context.RegistryRef = new WeakReference<ChangeContext>(context);
-        contexts.Add(context.RegistryRef);
+        (competitors ??= []).Add(context.RegistryRef);
         if (--pruneBudget > 0) return;
-        contexts.RemoveWhere(reference => !reference.TryGetTarget(out _));
-        pruneBudget = Math.Max(256, contexts.Count);
+        competitors.RemoveWhere(reference => !reference.TryGetTarget(out _));
+        pruneBudget = Math.Max(256, competitors.Count);
     }
 
     private void Invalidate(ChangeContext winner)
     {
-        foreach (var reference in contexts)
-        {
-            if (!reference.TryGetTarget(out var context) || ReferenceEquals(context, winner)) continue;
-            if (context.Status is ChangeStatus.Open or ChangeStatus.Prepared) context.Status = ChangeStatus.Stale;
-            context.RegistryRef = null;
-            context.Clear();
-        }
-        contexts.Clear();
+        var previousOpen = open;
+        var previousCompetitors = competitors;
+        open = null;
+        competitors = null;
         pruneBudget = 256;
+        if (previousOpen is not null) Stale(previousOpen, winner);
+        if (previousCompetitors is null) return;
+        foreach (var reference in previousCompetitors)
+        {
+            if (reference.TryGetTarget(out var context)) Stale(context, winner);
+        }
+    }
+
+    private static void Stale(ChangeContext context, ChangeContext winner)
+    {
+        if (ReferenceEquals(context, winner)) return;
+        if (context.Status is ChangeStatus.Open or ChangeStatus.Prepared) context.Status = ChangeStatus.Stale;
+        context.RegistryRef = null;
+        context.Clear();
     }
 
     private static void RequireContainer(JsonValue value, string name)
@@ -216,20 +236,30 @@ internal enum ChangeStatus { Open, Prepared, Consumed, Aborted, Stale }
 /// <summary>The shared state of one change: its status cell, its drafts and the drafts dirtied so far, in first-dirty order.</summary>
 internal sealed class ChangeContext
 {
-    internal ChangeContext(Tracker owner, long baseRevision, JsonValue baseValue, bool replacement)
+    private readonly WeakReference<Tracker> tracker;
+    private JsonValue? baseValue;
+    private Draft? nodes;
+    private List<Draft>? dirtyNodes;
+
+    internal ChangeContext(object owner, WeakReference<Tracker> tracker, long baseRevision, JsonValue baseValue)
     {
-        Owner = owner; BaseRevision = baseRevision; BaseValue = baseValue; Replacement = replacement;
+        Owner = owner; this.tracker = tracker; BaseRevision = baseRevision; this.baseValue = baseValue;
     }
 
-    internal Tracker Owner { get; }
+    internal object Owner { get; }
     internal long BaseRevision { get; }
-    internal JsonValue BaseValue { get; }
-    internal bool Replacement { get; }
+    internal JsonValue BaseValue => baseValue ?? throw new InvalidOperationException("Cannot use a settled overlay");
     internal ChangeStatus Status { get; set; }
     internal bool Released { get; private set; }
     internal Draft? Root { get; set; }
-    internal List<Draft> DirtyNodes { get; } = [];
+    internal List<Draft> DirtyNodes => dirtyNodes ??= [];
     internal WeakReference<ChangeContext>? RegistryRef { get; set; }
+
+    internal void Register(Draft node)
+    {
+        node.NextAllocated = nodes;
+        nodes = node;
+    }
 
     internal void AssertReadable()
     {
@@ -253,10 +283,20 @@ internal sealed class ChangeContext
     /// <summary>Revokes every draft and drops the overlay so held handles keep nothing alive but themselves.</summary>
     internal void Clear()
     {
-        Owner.Release(this);
+        if (Released) return;
+        if (tracker.TryGetTarget(out var owner)) owner.Release(this);
         Released = true;
+        // Explicit CLR drafts cannot revoke a proxy. Clear their data and links while preserving the shared status
+        // cell, including detached/read-only descendants that are absent from DirtyNodes or the live root tree.
+        while (nodes is { } node)
+        {
+            nodes = node.NextAllocated;
+            node.NextAllocated = null;
+            node.Release();
+        }
         Root = null;
-        DirtyNodes.Clear();
+        dirtyNodes = null;
+        baseValue = null;
     }
 }
 

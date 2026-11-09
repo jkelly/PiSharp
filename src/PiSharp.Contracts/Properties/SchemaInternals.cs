@@ -6,5 +6,7 @@ using System.Runtime.CompilerServices;
 [assembly: InternalsVisibleTo("PiSharp.Schema.Tests")]
 // Chord v2's schema tests (decision 0013, phase 4) check bytes() schemas against byte arrays, which only the JavaScript value model holds.
 [assembly: InternalsVisibleTo("PiSharp.Chord.Tests")]
-// Chord v2's data layer (decision 0013, phase 4) checks values with byte leaves, so it compiles on the JavaScript value model too.
+// Deliberate experimental package coupling: Chord's byte-bearing value checks use this implementation surface.
+// Chord/Contracts packages pin each other through exact sibling dependency versions. No internal schema types are exposed by
+// public Chord signatures. The contract and external package-consumer gate are in docs/contracts/gap-package-admission.md.
 [assembly: InternalsVisibleTo("PiSharp.Chord")]

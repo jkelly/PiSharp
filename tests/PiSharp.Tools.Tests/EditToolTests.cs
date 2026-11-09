@@ -128,8 +128,8 @@ internal static class EditToolTests
         foreach (var test in new[]
         {
             (Before: "\ufefffirst\r\nsecond\r\nthird\r\n", Old: "second\n", New: "SECOND\n", After: "\ufefffirst\r\nSECOND\r\nthird\r\n"),
-            (Before: "first\r\nsecond\nthird\r", Old: "second\n", New: "SECOND\n", After: "first\r\nSECOND\r\nthird\r\n"),
-            (Before: "first\nsecond\r\nthird\r", Old: "second\r\n", New: "SECOND\r\n", After: "first\nSECOND\nthird\n"),
+            (Before: "first\r\nsecond\nthird\r", Old: "second\n", New: "SECOND\n", After: "first\r\nSECOND\r\nthird\r"),
+            (Before: "first\nsecond\r\nthird\r", Old: "second\r\n", New: "SECOND\r\n", After: "first\nSECOND\nthird\r"),
             (Before: "\U0001f642 before\n\u6587 after\n", Old: "\U0001f642 before", New: "\U0001f680 changed", After: "\U0001f680 changed\n\u6587 after\n")
         })
         {

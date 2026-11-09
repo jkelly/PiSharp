@@ -9,11 +9,11 @@ using PiSharp.Cli.Pi;
 // cli/args.ts (--extension, --no-extensions, extension flags) and cli/config-selector.ts. Expectations are written from the pinned
 // sources by reading, never captured from an upstream run. Cases that run extension code need Node.js on PATH (22.13 or later for
 // TypeScript) and report SKIP_NO_NODE without it; package cases that install from npm need npm and use only local tarballs and a
-// local registry fixture. The only network use is the one-time npm install of the Pi 1.2.0 packages extensions run
+// local registry fixture. The only network use is the one-time npm install of the Pi 1.5.0 packages extensions run
 // against (PiNodeRuntime, verified against the public registry); without it the cases run on the compatibility modules. No real credentials, no real home or agent directory.
 internal static partial class Program
 {
-    private const string Upstream = "f9a26365568127461c47a07a37dcb42c140a3ac5"; // Report label: synced to Pi v1.5.0 (decision 0013); extensions still run on the Pi 1.2.0 npm packages (PiNodeRuntime.PiVersion, owner decision 2026-11-05).
+    private const string Upstream = "f9a26365568127461c47a07a37dcb42c140a3ac5"; // Report label: synced to Pi v1.5.0 (decision 0013); installed runtime is Pi 1.5.0 with neutral default attribution (upgrade 2026-11-08).
 
     private static async Task<int> Main(string[] args)
     {
@@ -47,6 +47,7 @@ internal static partial class Program
         cases.AddRange(Sync150BridgeCases());
         cases.AddRange(Sync150CliCases());
         cases.AddRange(Sync150RuntimeCases());
+        cases.AddRange(GapRuntimeCases());
         var filter = Environment.GetEnvironmentVariable("EXTPARITY_FILTER");
         if (!string.IsNullOrEmpty(filter)) cases = [.. cases.Where(test => test.Id.Contains(filter, StringComparison.Ordinal))];
         var results = new List<object>(); var failures = 0; var skipped = 0;
@@ -99,22 +100,27 @@ internal static partial class Program
         var parts = version.TrimStart('v').Split('.');
         if (int.Parse(parts[0]) < 22 || int.Parse(parts[0]) == 22 && int.Parse(parts[1]) < 13) throw new SkipException("NO_NODE", "Node.js " + version + " is older than 22.13.");
     }
-    /// <summary>The Pi 1.2.0 packages for every sandbox: installed with npm from the public registry once (the production installer,
-    /// verified against the registry's integrity hashes) into a machine-wide test folder. Null (and the compatibility modules) when
-    /// Node, npm or the registry is unavailable.</summary>
-    internal static readonly string SharedPiRuntimeDirectory = Path.Combine(Path.GetFullPath(Path.GetTempPath()), "pisharp-ext-parity-pi-runtime", PiSharp.Cli.Extensions.Pi.PiNodeRuntime.PiVersion);
+    /// <summary>Dedicated opt-in production installer qualification. Ordinary sandboxes use the separately reviewed local fixture
+    /// or explicitly select compatibility modules; construction never starts npm.</summary>
+    internal static readonly string SharedPiRuntimeRoot = Environment.GetEnvironmentVariable("PISHARP_PI_RUNTIME_DIR")
+        ?? Path.Combine(Path.GetFullPath(Path.GetTempPath()), "pisharp-ext-parity-pi-runtime");
+    internal static readonly string SharedPiRuntimeDirectory = PiSharp.Cli.Extensions.Pi.PiNodeRuntime.Directory(SharedPiRuntimeRoot,
+        name => name == "PISHARP_PI_RUNTIME_DIR" ? SharedPiRuntimeRoot : null);
     internal static readonly Lazy<Task<string?>> SharedPiRuntime = new(async () =>
     {
+        if (!PiCommand.IsTruthyEnvFlag(Environment.GetEnvironmentVariable("PISHARP_TEST_INSTALL_PI_RUNTIME"))) return null;
         if (NodeVersion.Value is null || NpmVersion.Value is null) return null;
         var (modules, fallback) = await PiSharp.Cli.Extensions.Pi.PiNodeRuntime.EnsureAsync(SharedPiRuntimeDirectory,
-            name => name == "PISHARP_PI_RUNTIME_DIR" ? SharedPiRuntimeDirectory : null, Console.Error, null, null, CancellationToken.None);
+            name => name == "PISHARP_PI_RUNTIME_DIR" ? SharedPiRuntimeRoot : null, Console.Error, null, null, CancellationToken.None);
         if (fallback is not null) Console.Error.WriteLine("ExtensionParity: " + fallback);
         return modules;
     });
     private static string RequirePiRuntime()
     {
+        RequireNode();
+        if (ReviewedPiRuntime.Value is { } fixture) return fixture;
         RequireNpm();
-        return SharedPiRuntime.Value.GetAwaiter().GetResult() ?? throw new SkipException("NO_PI_RUNTIME", "The Pi 1.2.0 packages could not be installed (no registry access).");
+        return SharedPiRuntime.Value.GetAwaiter().GetResult() ?? throw new SkipException("NO_PI_RUNTIME", "Provide the reviewed local fixture; production npm installation requires PISHARP_TEST_INSTALL_PI_RUNTIME=1.");
     }
     private static void RequireNpm() { RequireNode(); if (NpmVersion.Value is null) throw new SkipException("NO_NPM", "npm is not on PATH."); }
     private static void RequireGit() { if (GitVersion.Value is null) throw new SkipException("NO_GIT", "git is not on PATH."); }
@@ -149,8 +155,9 @@ internal static partial class Program
             Home = Path.Combine(Root, "home"); AgentDir = Path.Combine(Home, ".pi", "agent"); Cwd = Path.Combine(Root, "project");
             Directory.CreateDirectory(AgentDir); Directory.CreateDirectory(Cwd);
             Vars["ANTHROPIC_API_KEY"] = "sk-test-key";
-            // Extensions run against the real Pi 1.2.0 packages, installed once per machine for the suite (PiNodeRuntime).
-            if (SharedPiRuntime.Value.GetAwaiter().GetResult() is not null) Vars["PISHARP_PI_RUNTIME_DIR"] = SharedPiRuntimeDirectory;
+            // Reuse a production cache only when a dedicated test explicitly installed it already; never start installation here.
+            if (SharedPiRuntime.IsValueCreated && SharedPiRuntime.Value.IsCompletedSuccessfully && SharedPiRuntime.Value.Result is not null)
+                Vars["PISHARP_PI_RUNTIME_DIR"] = SharedPiRuntimeRoot;
             // The sandbox is a git repository, so the ancestor walk for .agents/skills stops at its root (collectAncestorAgentsSkillDirs).
             Directory.CreateDirectory(Path.Combine(Root, ".git"));
             File.WriteAllText(Path.Combine(Root, ".git", "HEAD"), "ref: refs/heads/main\n");
@@ -171,6 +178,8 @@ internal static partial class Program
             Func<string[], PiEntryOptions, CancellationToken, Task<int>>? runInteractive = null, Stream? rpcInput = null, Stream? rpcOutput = null) => new()
         {
             Cwd = Cwd, Home = Home, GetEnvironment = name => Vars.GetValueOrDefault(name), SetEnvironment = (name, value) => Vars[name] = value,
+            PiModules = Vars.ContainsKey("PISHARP_PI_RUNTIME_DIR") ? null : ReviewedPiRuntime.Value,
+            UseCompatibilityModules = !Vars.ContainsKey("PISHARP_PI_RUNTIME_DIR") && ReviewedPiRuntime.Value is null,
             Stdout = stdout, Stderr = stderr, Stdin = new StringReader(stdin ?? ""), StdinIsTty = stdin is null, StdoutIsTty = interactive,
             LiveRuntime = Runtime(), CreateMcpHost = McpHost ?? (agentDir => new PiSharp.Cli.Mcp.McpSessionHost(agentDir, Home, () => [])),
             RunInteractive = runInteractive, OpenRpcInput = rpcInput is null ? null : () => rpcInput, OpenRpcOutput = rpcOutput is null ? null : () => rpcOutput,

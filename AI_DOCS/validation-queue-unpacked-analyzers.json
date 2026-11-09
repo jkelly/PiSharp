@@ -1,0 +1,36 @@
+[
+  {
+    "options": {
+      "Project": "src/PiSharp.WebAgent/PiSharp.WebAgent.csproj",
+      "Label": "WebAgent-normal-Release",
+      "BuildOnly": true,
+      "BuildTimeoutSeconds": 300,
+      "TestTimeoutSeconds": 300,
+      "LockTimeoutSeconds": 30,
+      "Configuration": "Release",
+      "BuildArguments": [
+        "-p:RunAnalyzers=true",
+        "-p:RunAnalyzersDuringBuild=true",
+        "-p:ReportAnalyzer=true"
+      ]
+    },
+    "environment": {}
+  },
+  {
+    "options": {
+      "Project": "tools/PiSharp.Evals/PiSharp.Evals.csproj",
+      "Label": "Evals-normal-Release",
+      "BuildOnly": true,
+      "BuildTimeoutSeconds": 300,
+      "TestTimeoutSeconds": 300,
+      "LockTimeoutSeconds": 30,
+      "Configuration": "Release",
+      "BuildArguments": [
+        "-p:RunAnalyzers=true",
+        "-p:RunAnalyzersDuringBuild=true",
+        "-p:ReportAnalyzer=true"
+      ]
+    },
+    "environment": {}
+  }
+]

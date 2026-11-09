@@ -173,6 +173,11 @@ internal static class McpCommand
             Error($"MCP server \"{name}\" is defined in {entry.Source}, not in the project; omit --local.");
             return 1;
         }
+        if (entry.Config.AuthProvider is { } authProvider)
+        {
+            Error($"MCP server \"{name}\" uses provider authentication. Run {AppName} auth {command} {authProvider}.");
+            return 1;
+        }
         if (!McpConfigurationReader.UsesOAuth(entry.Config) || !entry.Config.Raw.Value.TryGetProperty("url", out var configuredUrl) ||
             !Uri.TryCreate(configuredUrl.GetString(), UriKind.Absolute, out var url))
         {
@@ -419,9 +424,12 @@ internal static class McpCommand
             {
                 var needsAuth = false;
                 for (Exception? current = failure; current is not null; current = current.InnerException)
-                    needsAuth |= current is PiSharp.Extensions.Mcp.Authentication.McpOAuthAuthorizationRequiredException;
+                    needsAuth |= current is PiSharp.Extensions.Mcp.Authentication.McpOAuthAuthorizationRequiredException ||
+                        entry.Config.AuthProvider is not null && current is PiSharp.Extensions.Mcp.Transport.McpHttpStatusException { StatusCode: 401 };
                 report["state"] = needsAuth ? "needs-auth" : "failed";
-                report["error"] = needsAuth ? McpProviderTokenAuthentication.SignInRequiredMessage(entry)
+                report["error"] = needsAuth ? entry.Config.AuthProvider is { } provider
+                    ? $"MCP server \"{entry.Name}\" requires sign-in. Run {AppName} auth login {provider}."
+                    : McpProviderTokenAuthentication.SignInRequiredMessage(entry)
                     : failure is AggregateException { InnerExceptions.Count: 1 } single ? single.InnerExceptions[0].Message : failure.Message;
             }
             finally { if (runtime is not null) try { await runtime.CloseAsync().ConfigureAwait(false); } catch (Exception) { } }
@@ -446,7 +454,11 @@ internal static class McpCommand
             log($"{name}: {shown} ({report["exposure"]!.GetValue<string>()}, {report["scope"]!.GetValue<string>()})");
             log($"  {report["transport"]!.GetValue<string>()}");
             if (report["override"] is { } overridden) log($"  project override: {overridden.GetValue<string>()}");
-            if (state == "needs-auth") log($"  sign in with: {AppName} mcp login {name}");
+            if (state == "needs-auth")
+            {
+                var authProvider = loaded.Servers.First(entry => entry.Name == name).Config.AuthProvider;
+                log(authProvider is null ? $"  sign in with: {AppName} mcp login {name}" : $"  sign in with: {AppName} auth login {authProvider}");
+            }
             if (tools.Count > 0)
                 log("  tools: " + string.Join(", ", tools.Select(tool => report["toolExposure"]?[tool] is { } toolExposure ? $"{tool} [{toolExposure.GetValue<string>()}]" : tool)));
             if (report["resources"] is not null) log("  offers resources");

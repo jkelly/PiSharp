@@ -24,18 +24,19 @@ internal static class AnthropicStrictToolsFallback
         request.Options.TryGetValue(RequestKey, out var fallback) ? fallback : null;
 
     /// <summary>The anthropic_strict_tools_fallback diagnostic, stamped with Date.now() when the fallback is chosen.</summary>
-    internal static JsonData Diagnostic(Exception rejection, TimeProvider clock) => JsonData.Parse(new JsonObject
+    internal static JsonData Diagnostic(Exception rejection, TimeProvider clock) => JsonData.Parse(JsonUtf16.ToJsonString(new JsonObject
     {
         ["type"] = "anthropic_strict_tools_fallback",
         ["timestamp"] = clock.GetUtcNow().ToUnixTimeMilliseconds(),
-        ["error"] = new JsonObject { ["message"] = rejection.Message },
+        ["error"] = new JsonObject { ["message"] = JsonUtf16.StringNode(rejection.Message) },
         ["details"] = new JsonObject { ["reason"] = "strict_tool_limits_exceeded" },
-    }.ToJsonString());
+    }, System.Text.Encodings.Web.JavaScriptEncoder.Default));
 }
 
 /// <summary>Diagnostics one invocation records before its response (upstream appends them to the output message when they occur).</summary>
 internal sealed class AnthropicRequestDiagnostics
 {
+    internal AnthropicThreadAttempt? Thread;
     private readonly List<JsonData> _items = [];
     internal IReadOnlyList<JsonData> Items { get { lock (_items) return [.. _items]; } }
     internal void Add(JsonData diagnostic) { lock (_items) _items.Add(diagnostic); }

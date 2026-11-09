@@ -1,0 +1,101 @@
+{
+  "sourceSha": "f9a26365568127461c47a07a37dcb42c140a3ac5",
+  "status": "AUTHORED NATIVE; NO UPSTREAM CAPTURE",
+  "cases": 23,
+  "failures": 0,
+  "genuineSourceCasesCaptured": 0,
+  "results": [
+    {
+      "Id": "sync150.conformance-draft2020-12",
+      "status": "PASS_AUTHORED_NATIVE_ONLY"
+    },
+    {
+      "Id": "sync150.conformance-draft7",
+      "status": "PASS_AUTHORED_NATIVE_ONLY"
+    },
+    {
+      "Id": "sync150.errors-at-the-field",
+      "status": "PASS_AUTHORED_NATIVE_ONLY"
+    },
+    {
+      "Id": "sync150.errors-tagged-union-branch",
+      "status": "PASS_AUTHORED_NATIVE_ONLY"
+    },
+    {
+      "Id": "sync150.errors-pointer-escaping-and-refs",
+      "status": "PASS_AUTHORED_NATIVE_ONLY"
+    },
+    {
+      "Id": "sync150.errors-messages",
+      "status": "PASS_AUTHORED_NATIVE_ONLY"
+    },
+    {
+      "Id": "sync150.values-own-properties-and-bytes",
+      "status": "PASS_AUTHORED_NATIVE_ONLY"
+    },
+    {
+      "Id": "sync150.string-lengths-in-code-points",
+      "status": "PASS_AUTHORED_NATIVE_ONLY"
+    },
+    {
+      "Id": "sync150.options-formats-documents-draft7",
+      "status": "PASS_AUTHORED_NATIVE_ONLY"
+    },
+    {
+      "Id": "sync150.malformed-schemas-throw",
+      "status": "PASS_AUTHORED_NATIVE_ONLY"
+    },
+    {
+      "Id": "sync150.unresolved-refs-throw-or-reject",
+      "status": "PASS_AUTHORED_NATIVE_ONLY"
+    },
+    {
+      "Id": "sync150.formats-standard",
+      "status": "PASS_AUTHORED_NATIVE_ONLY"
+    },
+    {
+      "Id": "sync150.coerce-copy-on-write-and-parse",
+      "status": "PASS_AUTHORED_NATIVE_ONLY"
+    },
+    {
+      "Id": "sync150.coerce-pass1-optional-nulls",
+      "status": "PASS_AUTHORED_NATIVE_ONLY"
+    },
+    {
+      "Id": "sync150.coerce-pass2-conversion-rules",
+      "status": "PASS_AUTHORED_NATIVE_ONLY"
+    },
+    {
+      "Id": "sync150.coerce-pass3-primitives-and-conflicts",
+      "status": "PASS_AUTHORED_NATIVE_ONLY"
+    },
+    {
+      "Id": "sync150.coerce-recursive-schemas",
+      "status": "PASS_AUTHORED_NATIVE_ONLY"
+    },
+    {
+      "Id": "sync150.coerce-member-keywords",
+      "status": "PASS_AUTHORED_NATIVE_ONLY"
+    },
+    {
+      "Id": "sync150.public-api-json-nodes",
+      "status": "PASS_AUTHORED_NATIVE_ONLY"
+    },
+    {
+      "Id": "sync150.tool-arguments-message-and-paths",
+      "status": "PASS_AUTHORED_NATIVE_ONLY"
+    },
+    {
+      "Id": "sync150.tool-arguments-coerced-for-every-origin",
+      "status": "PASS_AUTHORED_NATIVE_ONLY"
+    },
+    {
+      "Id": "sync150.tool-arguments-dangling-ref-rejects-in-place",
+      "status": "PASS_AUTHORED_NATIVE_ONLY"
+    },
+    {
+      "Id": "sync150.tool-arguments-uncompilable-schema",
+      "status": "PASS_AUTHORED_NATIVE_ONLY"
+    }
+  ]
+}

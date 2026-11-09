@@ -108,7 +108,7 @@ internal sealed class SchemaCoercer(SchemaCompiler c, object? schema)
         }
     }
 
-    private string BaseOf(object? node, string @base) => c.R.IndexedBaseOr(node, @base);
+    private string BaseOf(object? node, string @base) => node is JsObject o ? c.R.BaseFor(o, @base) : @base;
 
     // ---------------------------------------------------------------------------------------------------------------
     // Pass 1: optional nulls

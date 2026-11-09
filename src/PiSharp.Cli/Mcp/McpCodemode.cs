@@ -127,7 +127,8 @@ internal static class McpCodemode
     internal sealed class ModelRuntime(NativeExtensionModelOperations operations) : ICodemodeModelRuntime
     {
         public static ModelRuntime CreateDefault(Func<bool>? llamaProvider = null) => new(new(NativeExtensionModelOperations.CreateDefaultRegistry(
-            PiSharp.Cli.Commands.LiveSessionRuntime.Default.ReadEnvironment, PiSharp.Cli.Commands.LiveSessionRuntime.Default.AuthPath, llamaProvider: llamaProvider)));
+            PiSharp.Cli.Commands.LiveSessionRuntime.Default.ReadEnvironment, PiSharp.Cli.Commands.LiveSessionRuntime.Default.AuthPath,
+            llamaProvider: llamaProvider, modelsPath: PiSharp.Cli.Commands.LiveSessionRuntime.Default.ModelsPath)));
         public ImmutableArray<JsonData> GetModelsOfType(ModelType type, string? provider) => operations.GetModelsOfType(type, provider);
         public Task<ImmutableArray<JsonData>> GetAvailableOfTypeAsync(ModelType type, string? provider, CancellationToken cancellationToken) =>
             operations.GetAvailableOfTypeAsync(type, provider, cancellationToken);

@@ -129,10 +129,21 @@ internal static partial class Program
             }),
             Case("executor.token-budget-at-boundary-and-one-past", async () =>
             {
+                var previewHost = new FakeHost([Nested("fail")], (_, _) => new(null,
+                    Parse(JsonSerializer.Serialize(new { content = new[] { new { type = "text", text = new string('e', 496) + "😀tail" } } })), true));
+                var previewResult = await Execute("try { await tools.fail({text: 'x'.repeat(187) + '😀tail'}); } catch {}", previewHost);
+                var preview = previewResult.Value.GetProperty("details").GetProperty("calls")[0];
+                Equal("{\"text\":\"" + new string('x', 187) + "...", preview.GetProperty("args").GetString(), "scalar-safe args preview");
+                Equal(new string('e', 496) + "...", preview.GetProperty("error").GetString(), "scalar-safe error preview");
                 // 30 tokens = 120 characters of text output.
                 Equal("x".PadLeft(120, 'x'), ResultText(await Execute("// @options: {\"max_output_tokens\": 30}\ntext(\"x\".repeat(120))")), "exactly the budget");
                 var over = await Execute("// @options: {\"max_output_tokens\": 30}\ntext(\"x\".repeat(121))");
                 Check(ResultText(over).StartsWith("Warning: truncated output (original token count: 31)\nTotal output lines: 1\n\n" + new string('x', 60) + "…1 tokens truncated…" + new string('x', 60), StringComparison.Ordinal), ResultText(over));
+                var unicode = await Execute("// @options: {\"max_output_tokens\": 30}\ntext('x'.repeat(59) + '😀M😀' + 'y'.repeat(59))");
+                var unicodeText = ResultText(unicode);
+                Check(unicodeText.Contains(new string('x', 59) + "…1 tokens truncated…" + new string('y', 59), StringComparison.Ordinal), unicodeText);
+                _ = new System.Text.UTF8Encoding(false, true).GetBytes(unicodeText);
+                Equal(new string('x', 59) + "😀M😀" + new string('y', 59), File.ReadAllText(unicode.Value.GetProperty("details").GetProperty("fullOutputPath").GetString()!), "Unicode spill retains full output");
                 var result = await Execute($"// @options: {{\"max_output_tokens\": 30}}\nfor (let i = 0; i < 100; i++) text(\"row \" + i);\nimage(\"data:image/png;base64,{TinyPng}\");");
                 var path = result.Value.GetProperty("details").GetProperty("fullOutputPath").GetString()!;
                 var text = ResultText(result);

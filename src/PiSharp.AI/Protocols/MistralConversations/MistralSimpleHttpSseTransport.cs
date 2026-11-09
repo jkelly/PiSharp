@@ -2,6 +2,7 @@
 using System.Collections.Immutable;
 using System.Text.Json;
 using System.Text;
+using PiSharp.AI.Protocols.ProviderShared;
 using PiSharp.Contracts;
 using PiSharp.Contracts.Compatibility;
 
@@ -69,7 +70,7 @@ public sealed class MistralSimpleHttpSseTransport : IChatTransport, IThinkingLev
         if (request.Model != _model || request.Messages.IsDefault) throw Invalid();
         var estimate = Estimate(request.Messages);
         var maximum = _options.MaxTokens ?? _modelMaxTokens;
-        maximum = _contextWindow <= 0 ? Math.Max(1, maximum) : Math.Min(maximum, Math.Max(1, _contextWindow - estimate - 4096));
+        maximum = SimpleOutputBudget.ClampToContext(_contextWindow, estimate, maximum);
         return new(estimate, maximum);
     }
     public IAsyncEnumerable<StreamEvent> StreamAsync(ChatRequest request, CancellationToken cancellationToken = default)

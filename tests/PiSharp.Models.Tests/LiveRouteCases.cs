@@ -81,7 +81,7 @@ internal static partial class Program
 
     private static string? LiveModelFor(string provider)
     {
-        var chat = BuiltinModelCatalog.Get(provider).Models.Where(model => model.Type == CatalogModelType.Chat &&
+        var chat = ReviewedModelCatalog.Apply(provider, BuiltinModelCatalog.Has(provider) ? BuiltinModelCatalog.Get(provider) : null)!.Models.Where(model => model.Type == CatalogModelType.Chat &&
             LiveSessionSelection.SupportedApi(provider, model.DeclaredApi)).ToList();
         if (chat.Count == 0) return null;
         return chat.FirstOrDefault(model => model.Id == ModelResolver.DefaultModelFor(provider))?.Id ?? chat[0].Id;
@@ -122,7 +122,7 @@ internal static partial class Program
                 Check(last is StreamDone, $"{provider.Id} {api} stream did not complete: {last?.GetType().Name}");
             routed.Add($"{provider.Id}: {api} {request.Url}");
         }
-        Equal(35, routed.Count, "providers with a live route: " + string.Join("; ", routed));
+        Equal(36, routed.Count, "providers with a live route: " + string.Join("; ", routed));
         LiveRoutes.AddRange(routed);
     }
 

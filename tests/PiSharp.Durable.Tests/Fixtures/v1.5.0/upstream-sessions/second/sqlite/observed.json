@@ -1,0 +1,26 @@
+{
+  "sleeping": {
+    "status": "sleeping",
+    "checkpoint": {
+      "phase": "after",
+      "slept": 1000
+    },
+    "until": 1767225601000
+  },
+  "after": 1,
+  "completed": {
+    "status": "completed",
+    "result": 1767225601000
+  },
+  "restarts": 1,
+  "restarted": {
+    "status": "completed",
+    "result": "resumed-after-process-exit"
+  },
+  "compaction": {
+    "status": "completed",
+    "result": {
+      "submissionId": 22
+    }
+  }
+}

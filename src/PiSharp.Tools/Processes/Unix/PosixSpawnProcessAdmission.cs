@@ -24,7 +24,10 @@ public sealed class PosixSpawnProcessAdmission : IUnixProcessAdmission
     private const string AnchorScript = "trap '' HUP INT TERM; while :; do sleep 86400; done";
     private const string LaunchScript = "cd -- \"$0\" || exit 127; exec \"$@\"";
 
-    public ValueTask<IUnixProcessLease> LaunchAsync(ProcessRequest request, CancellationToken cancellationToken)
+    public ValueTask<IUnixProcessLease> LaunchAsync(ProcessRequest request, CancellationToken cancellationToken) =>
+        LaunchAsync(request, cancellationToken, keepStandardInputOpen: false);
+
+    internal ValueTask<IUnixProcessLease> LaunchAsync(ProcessRequest request, CancellationToken cancellationToken, bool keepStandardInputOpen, bool cancellablePipes = false)
     {
         ArgumentNullException.ThrowIfNull(request);
         if (!OperatingSystem.IsLinux() && !OperatingSystem.IsMacOS()) throw new PlatformNotSupportedException();
@@ -43,27 +46,36 @@ public sealed class PosixSpawnProcessAdmission : IUnixProcessAdmission
         var environment = request.Environment.Select(pair => pair.Key + "=" + pair.Value).ToArray();
         var anchor = Spawn(Shell, [Shell, "-c", AnchorScript], environment, processGroup: 0, stdout: -1, stderr: -1);
         int[] stdout = [-1, -1], stderr = [-1, -1], stdin = [-1, -1];
+        int command = -1;
+        Stream? outputStream = null, errorStream = null, liveInput = null;
+        Task input = Task.CompletedTask;
         try
         {
             Pipe(stdout); Pipe(stderr);
-            if (request.StandardInput is not null) Pipe(stdin);
-            int command;
+            if (keepStandardInputOpen || request.StandardInput is not null) Pipe(stdin);
             try
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 command = Spawn(Shell, [Shell, "-c", LaunchScript, request.WorkingDirectory, request.Executable, .. request.Arguments], environment,
                     processGroup: anchor, stdout: stdout[1], stderr: stderr[1], stdin: stdin[0]);
             }
             finally { Close(ref stdout[1]); Close(ref stderr[1]); Close(ref stdin[0]); } // The child holds its copies; EOF follows its exit.
             // The input is written off the caller's thread and the pipe closed (EOF); a child that exits early ends the write (EPIPE).
-            var input = request.StandardInput is { } bytes ? WriteInputAsync(Writer(ref stdin[1]), bytes) : Task.CompletedTask;
-            var lease = new Lease(anchor, command, Stream(ref stdout[0]), Stream(ref stderr[0]), input);
+            if (keepStandardInputOpen) liveInput = OwnedPipe(ref stdin[1], writer: true);
+            input = !keepStandardInputOpen && request.StandardInput is { } bytes ? WriteInputAsync(Writer(ref stdin[1]), bytes) : Task.CompletedTask;
+            outputStream = cancellablePipes ? OwnedPipe(ref stdout[0], writer: false) : Stream(ref stdout[0]);
+            errorStream = cancellablePipes ? OwnedPipe(ref stderr[0], writer: false) : Stream(ref stderr[0]);
+            var lease = new Lease(anchor, command, outputStream, errorStream, input, liveInput);
             return ValueTask.FromResult<IUnixProcessLease>(lease);
         }
         catch
         {
             Close(ref stdout[0]); Close(ref stdout[1]); Close(ref stderr[0]); Close(ref stderr[1]); Close(ref stdin[0]); Close(ref stdin[1]);
             _ = KillGroup(anchor);
+            if (command > 0) Reap(command);
             Reap(anchor);
+            input.GetAwaiter().GetResult();
+            outputStream?.Dispose(); errorStream?.Dispose(); liveInput?.Dispose();
             throw;
         }
     }
@@ -118,6 +130,11 @@ public sealed class PosixSpawnProcessAdmission : IUnixProcessAdmission
     {
         var handle = new SafeFileHandle((IntPtr)fd, ownsHandle: true); fd = -1;
         return new FileStream(handle, FileAccess.Read, bufferSize: 0, isAsync: false);
+    }
+    private static Stream OwnedPipe(ref int fd, bool writer)
+    {
+        var stream = new PosixOwnedPipeStream(fd, writer); fd = -1;
+        return stream;
     }
 
     private static FileStream Writer(ref int fd)
@@ -216,6 +233,9 @@ public sealed class PosixSpawnProcessAdmission : IUnixProcessAdmission
         }
     }
 
+    internal static Stream InteractiveInput(IUnixProcessLease lease) => ((Lease)lease).StandardInput
+        ?? throw new InvalidOperationException("Input is not redirected.");
+
     private sealed class Lease : IUnixProcessLease
     {
         private readonly int anchor;
@@ -227,11 +247,13 @@ public sealed class PosixSpawnProcessAdmission : IUnixProcessAdmission
         public int ProcessId { get; }
         public Stream StandardOutput { get; }
         public Stream StandardError { get; }
+        internal Stream? StandardInput { get; }
         public Task<int> Exit { get; }
 
-        internal Lease(int anchor, int command, Stream stdout, Stream stderr, Task input)
+        internal Lease(int anchor, int command, Stream stdout, Stream stderr, Task input, Stream? standardInput)
         {
             this.anchor = anchor; this.input = input; ProcessId = command; StandardOutput = stdout; StandardError = stderr;
+            StandardInput = standardInput;
             Exit = Task.Factory.StartNew(() => Reap(command), CancellationToken.None, TaskCreationOptions.LongRunning, TaskScheduler.Default);
             anchorExit = Task.Factory.StartNew(() => Reap(anchor), CancellationToken.None, TaskCreationOptions.LongRunning, TaskScheduler.Default);
         }
@@ -265,6 +287,7 @@ public sealed class PosixSpawnProcessAdmission : IUnixProcessAdmission
         {
             var failures = new List<Exception>();
             try { await StopGroupAsync().ConfigureAwait(false); } catch (Exception error) { failures.Add(error); }
+            try { if (StandardInput is not null) await StandardInput.DisposeAsync().ConfigureAwait(false); } catch (Exception error) { failures.Add(error); }
             try { await input.WaitAsync(TimeSpan.FromSeconds(5)).ConfigureAwait(false); } catch (Exception error) { failures.Add(error); }
             try { await StandardOutput.DisposeAsync().ConfigureAwait(false); } catch (Exception error) { failures.Add(error); }
             try { await StandardError.DisposeAsync().ConfigureAwait(false); } catch (Exception error) { failures.Add(error); }

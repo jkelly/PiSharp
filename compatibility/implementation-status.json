@@ -11119,5 +11119,9 @@
       "Full schemas/platforms and original package/phase criteria"
     ],
     "reviewGuide": "docs/contracts/native-nested-tool-broker.md"
+  },
+  "currentGapStatus": {
+    "mapping": "compatibility/gap-status-2026-11-08.json",
+    "scope": "The preceding milestones are historical evidence. Consult the dated mapping for current source implementation and separately pending integrated validation; original pins and observations are preserved."
   }
 }

@@ -1,0 +1,9 @@
+# Node custom overlay handles
+
+`ctx.ui.custom` keeps its factory, `overlayOptions` function, `visible(columns, rows)` predicate, and `onHandle` callback in Node. Options are resolved once after the component factory settles, matching upstream. Only a `dynamicVisible` flag crosses JSON; the predicate runs again on the UI's visibility checks with current dimensions, under a one-second host deadline. A failed/timed-out predicate hides the overlay for that check.
+
+Each handle belongs to one component and runtime generation. `component.overlay.ready` invokes `onHandle` once. `hide`, `setHidden`, `focus`, and `unfocus` publish ordered mutation notifications; the UI applies them on its own loop. Synchronous getters read the last UI snapshot without entering the UI loop or calling Node. This is deliberate transport admission semantics: physical changes settle on the next UI turn. The Node proxy reflects its own pending mutations immediately, then refreshes from UI snapshots. `getBounds` describes the last completed render, as in the native handle.
+
+No overlay operation synchronously waits for UI work. In particular, a visibility or render callback can use the handle while the UI is waiting for Node without forming a reverse-call deadlock. Snapshot capture does not evaluate `visible`. Queries and input/render share the component lifetime; stale handle methods are no-ops (getters return hidden/unfocused/no bounds), and no request is sent after disposal or runtime invalidation. `done` is idempotent, including synchronous factory completion and completion before an asynchronous factory settles. A throwing `onHandle` rejects the custom operation and closes its own overlay.
+
+Mutating another component through `unfocus(target)` is not supported by the JSON bridge; parameterless `unfocus()` restores native focus normally. Native component identities cannot cross this transport.

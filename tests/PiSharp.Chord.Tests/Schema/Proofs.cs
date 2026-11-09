@@ -1,15 +1,13 @@
 using System.Text.Json.Nodes;
 using PiSharp.Chord.Contracts;
+using PiSharp.Chord.Store;
 
 // Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/chord/test/next/schema/proofs.ts, the values the schema switch must keep
-// (recorded.json, made with the TypeBox helpers). Ported here: fingerprints()'s contracts and documents (the profile's fingerprint and
-// normal form, snapshotSchema of `everything`, and the notes' and importState's fingerprints; the documents from area cv2-documents-core).
-// The rest needs layers later areas bring: tables (TableDefinition fingerprints and records; the store-tables area), job (JobDefinition's
-// fingerprint; jobs, phase 6), and storedReads, which opens stored/store.db and imports stored/archive.jsonl into a host serving the owner
-// (owner.ts: createHost, defineFacet, the store engine and its archive; phase 6 and the store areas).
+// (recorded.json, made with the TypeBox helpers). Complete fingerprints() includes contracts, documents, tables and jobs.
+// CorpusCases.cs completes storedReads, migrating tables and resuming stored jobs through a real native host.
 internal static class SchemaProofs
 {
-    /// <summary>The fingerprints and normal forms of the declarations ported so far, in recorded.json's shape.</summary>
+    /// <summary>All fingerprints and normal forms of the declarations, in recorded.json's shape.</summary>
     internal static JsonObject Fingerprints() => new()
     {
         ["contracts"] = new JsonObject
@@ -28,6 +26,20 @@ internal static class SchemaProofs
             ["notes"] = SchemaDeclarations.Notes.Fingerprint,
             ["importState"] = SchemaDeclarations.ImportState.Fingerprint,
         },
+        ["tables"] = new JsonObject
+        {
+            ["rows"] = TableFingerprint(SchemaDeclarations.Rows),
+            ["editsV1"] = TableFingerprint(SchemaDeclarations.EditsV1),
+            ["editsV2"] = TableFingerprint(SchemaDeclarations.EditsV2),
+            ["editsV3"] = TableFingerprint(SchemaDeclarations.EditsV3),
+        },
+        ["job"] = SchemaDeclarations.ImportJob.Fingerprint,
+    };
+
+    private static JsonObject TableFingerprint(TableDefinition table) => new()
+    {
+        ["fingerprint"] = table.Fingerprint,
+        ["record"] = Entries(table.Record.Select(entry => (entry.Key, (JsonNode)entry.Value.ToJson()))),
     };
 
     /// <summary>A contract's params normal form and, per version, its fingerprint and each variant's state, keyed and method normal forms.</summary>

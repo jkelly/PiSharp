@@ -89,6 +89,10 @@ public sealed class RegistryEntry<C>
 
     /// <summary>The contributed value (adapted, for an older version).</summary>
     public required C Value { get; init; }
+
+    /// <summary>Optional immutable identity of the code owner that declared this contribution. Native plugin
+    /// integrations use it when callbacks are constructed by shared libraries; ordinary registries leave it null.</summary>
+    public object? CallbackOwner { get; init; }
 }
 
 /// <summary>A conflict <c>compose</c> resolved with its fallback (upstream <c>RegistryConflict</c>): reported as <c>registry_conflict</c>,
@@ -153,6 +157,7 @@ public sealed class RegistryProvider<C, V> : IRegistryProvider
     public RegistryAccepts<C, V>? Accepts { get; init; }
 
     bool IRegistryProvider.HasCompose => Compose is not null;
+    Delegate IRegistryProvider.ComposeCallback => Compose;
 
     Delegate? IRegistryProvider.ContributionAdapter(long version) => AdaptersOf(version)?.Contribution;
 
@@ -162,11 +167,11 @@ public sealed class RegistryProvider<C, V> : IRegistryProvider
 
     object? IRegistryProvider.MapValue(Delegate adapter, object? current) => ((Func<V, object?>)adapter)(RegistriesInternal.Cast<V>(current));
 
-    object IRegistryProvider.Entry(Contributor contributor, long version, object? value)
+    object IRegistryProvider.Entry(Contributor contributor, long version, object? value, object? callbackOwner)
     {
         if (!RegistriesInternal.TryCast<C>(value, out var typed))
             throw new InvalidCastException($"a contribution of {RegistriesInternal.TypeName(value)}, not of {typeof(C).Name}");
-        return new RegistryEntry<C> { Plugin = contributor.Plugin, Type = contributor.Type, Version = version, Value = typed };
+        return new RegistryEntry<C> { Plugin = contributor.Plugin, Type = contributor.Type, Version = version, Value = typed, CallbackOwner = callbackOwner };
     }
 
     bool IRegistryProvider.Made(object entry) => entry is RegistryEntry<C>;
@@ -207,6 +212,7 @@ public interface IRegistryValue<V> : INativeWatchable<V>
 /// </summary>
 internal interface IRegistryProvider
 {
+    Delegate ComposeCallback { get; }
     /// <summary>Whether it has a <c>compose</c> (checkProvider).</summary>
     bool HasCompose { get; }
 
@@ -224,7 +230,7 @@ internal interface IRegistryProvider
 
     /// <summary>A table entry of <paramref name="value"/>; throws an <see cref="InvalidCastException"/> when it is no contribution of its
     /// type (a token of another type: PiSharp-only, as JavaScript has no casts).</summary>
-    object Entry(Contributor contributor, long version, object? value);
+    object Entry(Contributor contributor, long version, object? value, object? callbackOwner);
 
     /// <summary>Whether <paramref name="entry"/> is one of its type (an entry made for another provider's type is made again).</summary>
     bool Made(object entry);

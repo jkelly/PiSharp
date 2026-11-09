@@ -46,7 +46,11 @@ public sealed record CacheWarmRequestOptions(string? CacheRetention = null, stri
 public sealed record CacheWarmRequest(CacheWarmModel Model, CacheWarmRequestOptions Options, object? Payload = null);
 
 /// <summary>The overrides every refresh applies to the stored options: <c>maxTokens: 1, maxRetries: 0</c>.</summary>
-public sealed record CacheWarmReplayOverrides(int MaxTokens, int MaxRetries);
+public sealed record CacheWarmReplayOverrides(int MaxTokens, int MaxRetries)
+{
+    /// <summary>Refreshes are independent requests and must not replace foreground continuation state.</summary>
+    public bool DisableContinuation { get; init; } = true;
+}
 
 /// <summary>Stands for <c>models.streamSimple(model, context, {...options, maxTokens: 1, maxRetries: 0, signal}).result()</c>.
 /// The token is the run's own abort signal, cancelled when the run is replaced or stopped.</summary>
@@ -92,13 +96,13 @@ public sealed record CacheWarmingStatus(string State, string? Reason = null, dou
 public sealed class CacheWarmer
 {
     /// <summary>Streaming warming never continues past this long after the real request that started it.</summary>
-    internal const double MaxWarmingAgeMs = 60 * 60_000;
+    internal const double MaxWarmingAgeMs = CacheWarmingPolicy.MaximumAgeMs;
     /// <summary>Idle warming uses a shorter horizon because continuation estimates become less reliable with age.</summary>
-    internal const double MaxIdleWarmingAgeMs = 30 * 60_000;
+    internal const double MaxIdleWarmingAgeMs = CacheWarmingPolicy.MaximumIdleAgeMs;
     /// <summary>A refresh is sent only when it is expected to save at least this many dollars.</summary>
-    public const double MinimumExpectedSavings = 0.05;
+    public const double MinimumExpectedSavings = CacheWarmingPolicy.MinimumExpectedSavings;
     /// <summary>Chance that a real request arrives before the cache entry expires while the agent sits idle.</summary>
-    internal const double IdleContinuationProbability = 0.15;
+    internal const double IdleContinuationProbability = CacheWarmingPolicy.IdleContinuationProbability;
 
     private sealed class ActiveRun(CacheWarmRequest request, Func<bool> isCurrent, double ttlMs, double delayMs, double startedAt)
     {
@@ -281,7 +285,7 @@ public sealed class CacheWarmer
         }
         try
         {
-            var message = await _replay(run.Request, new(1, 0), run.Controller.Token).ConfigureAwait(false);
+            var message = await _replay(run.Request, new(CacheWarmingPolicy.ReplayMaximumTokens, CacheWarmingPolicy.ReplayMaximumRetries), run.Controller.Token).ConfigureAwait(false);
             bool valid; lock (_gate) valid = ValidateRun(run);
             if (!valid) return;
             if (message.StopReason is not (StopReason.Error or StopReason.Aborted))
@@ -323,17 +327,9 @@ public sealed class CacheWarmer
 
     private CacheWarmingDecision Evaluate(ActiveRun run)
     {
-        var model = run.Request.Model;
-        var promptTokens = LastPromptTokens(_getBranch());
-        var cacheHitCost = model.Cost.Calculate(0, 0, promptTokens, 0).Total;
-        var cacheMissCost = model.Cost.CacheWrite > 0 ? model.Cost.Calculate(0, 0, 0, promptTokens).Total : model.Cost.Calculate(promptTokens, 0, 0, 0).Total;
-        var warmCost = model.Cost.Calculate(0, 1, promptTokens, 0).Total;
-        var missCost = Math.Max(0, cacheMissCost - cacheHitCost);
-        var continuationProbability = run.Phase == "idle" ? IdleContinuationProbability : 1;
-        var economicsAvailable = promptTokens > 0 && (cacheHitCost > 0 || cacheMissCost > 0);
-        var expectedSavings = continuationProbability * missCost - warmCost;
-        return new(run.Phase, warmCost, missCost, continuationProbability, expectedSavings, economicsAvailable,
-            expectedSavings >= MinimumExpectedSavings ? "warm" : "stop");
+        var decision = CacheWarmingPolicy.Evaluate(run.Request.Model.Cost, LastPromptTokens(_getBranch()), run.Phase);
+        return new(decision.Phase, decision.WarmCost, decision.MissCost, decision.ContinuationProbability,
+            decision.ExpectedSavings, decision.EconomicsAvailable, decision.Action);
     }
 
     /// <summary>Prompt size of the most recent real request on the branch, as reported by the provider.</summary>
@@ -355,8 +351,7 @@ public sealed class CacheWarmer
     /// <summary>Refresh at 90% of the TTL while preserving at least ten seconds of margin.</summary>
     public static double? GetCacheWarmingDelayMs(double ttlMs)
     {
-        if (ttlMs <= 10_000) return null;
-        return Math.Max(1, Math.Floor(Math.Min(ttlMs * 0.9, ttlMs - 10_000)));
+        return CacheWarmingPolicy.DelayMs(ttlMs);
     }
 
     /// <summary>Lifetime of the prompt cache entry a request writes, from the model's <c>promptCache</c> tier for the retention the
@@ -365,10 +360,8 @@ public sealed class CacheWarmer
     public static double? GetPromptCacheTtlMs(CacheWarmModel model, CacheWarmRequestOptions? options, Func<string, string?>? processEnvironment = null)
     {
         ArgumentNullException.ThrowIfNull(model);
-        var retention = options?.CacheRetention ?? (ProviderEnv("PI_CACHE_RETENTION", options?.Env, processEnvironment) == "long" ? "long" : "short");
-        if (retention == "none") return null;
-        var seconds = retention switch { "short" => model.PromptCacheShortSeconds, "long" => model.PromptCacheLongSeconds, _ => null };
-        return seconds is null ? null : seconds.Value * 1000;
+        return CacheWarmingPolicy.TtlMs(model.PromptCacheShortSeconds, model.PromptCacheLongSeconds,
+            options?.CacheRetention, options?.Env, processEnvironment);
     }
 
     /// <summary>Whether replaying the request with a one-token output cap leaves its cache entry untouched. Anthropic's
@@ -377,16 +370,7 @@ public sealed class CacheWarmer
     public static bool IsReplayable(CacheWarmModel model, CacheWarmRequestOptions? options)
     {
         ArgumentNullException.ThrowIfNull(model);
-        if (string.IsNullOrEmpty(options?.Reasoning) || model.Api != "anthropic-messages") return true;
-        return model.ForceAdaptiveThinking;
-    }
-
-    /// <summary>provider-env.ts <c>getProviderEnvValue</c>: a non-empty scoped value, else a non-empty process value.</summary>
-    private static string? ProviderEnv(string name, IReadOnlyDictionary<string, string?>? scoped, Func<string, string?>? process)
-    {
-        if (scoped is not null && scoped.TryGetValue(name, out var value) && !string.IsNullOrEmpty(value)) return value;
-        var fromProcess = (process ?? Environment.GetEnvironmentVariable)(name);
-        return string.IsNullOrEmpty(fromProcess) ? null : fromProcess;
+        return CacheWarmingPolicy.IsReplayable(model.Api, model.ForceAdaptiveThinking, options?.Reasoning);
     }
 
     private static string FormatDollars(double value) =>

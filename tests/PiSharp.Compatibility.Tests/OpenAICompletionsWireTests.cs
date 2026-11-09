@@ -234,9 +234,18 @@ internal static class OpenAICompletionsWireTests
         var exact = Terminal(await Collect([text, end], new(MaximumChunks: 2,
             MaximumChunkCharacters: Math.Max(text.Length, end.Length), MaximumInputCharacters: text.Length + end.Length)));
         Check(exact is StreamDone, "Exact raw admission budget rejected.");
-        foreach (var malformed in new[] { "[]", """{"choices":[{"delta":{"content":"\ud800"}}]}""",
+        foreach (var malformed in new[] { "[]",
             """{"choices":[],"opaque":1e999}""", """{"choices":[{"delta":{},"finish_reason":9}]}""" })
             Failed(Terminal(await Collect([malformed])), OpenAICompletionsWireFailure.MalformedStream);
+        // Pinned JSON.parse and docs/compatibility/json-fidelity-and-bounds.md retain escaped UTF-16 string values.
+        // The same DTO without a finish remains UnexpectedEof; preserving its text cannot authorize success by itself.
+        var lone = JsonData.Parse("""{"choices":[{"delta":{"content":"\ud800"}}]}"""); var loneOriginal = lone.ToString();
+        var lonePartial = await Collect(new OpenAICompletionsWireSource((_, _) => OwnedSequence([lone])));
+        Failed(Terminal(lonePartial), OpenAICompletionsWireFailure.UnexpectedEof);
+        var loneComplete = Terminal(await Collect(new OpenAICompletionsWireSource((_, _) => OwnedSequence([lone, JsonData.Parse(end)]))));
+        Check(loneComplete is StreamDone && loneComplete.Message.Content.Single() is TextContent { Text: "\uD800" }, "Escaped string-value surrogate was discarded.");
+        Equal("\"\\ud800\"", PiWireJson.WriteContent(loneComplete.Message.Content.Single()).Value.GetProperty("text").GetRawText());
+        Equal(loneOriginal, lone.ToString());
         foreach (var raw in new[] { """{"choices":[],}""", """{"choices":[],/*private*/"opaque":1}""" })
         {
             using var document = JsonDocument.Parse(raw, new JsonDocumentOptions { AllowTrailingCommas = true, CommentHandling = JsonCommentHandling.Skip });
@@ -441,5 +450,5 @@ internal static class OpenAICompletionsWireTests
     private static async Task ThrowsAsync<T>(Func<Task> action) where T : Exception
     { try { await action(); } catch (T) { return; } throw new InvalidOperationException("Expected failure."); }
     private static void Check(bool condition, string message) { if (!condition) throw new InvalidOperationException(message); }
-    private static void Equal<T>(T expected, T actual) => Check(EqualityComparer<T>.Default.Equals(expected, actual), "Completions values differ.");
+    private static void Equal<T>(T expected, T actual) => Check(EqualityComparer<T>.Default.Equals(expected, actual), $"Completions values differ: expected {expected}; actual {actual}.");
 }

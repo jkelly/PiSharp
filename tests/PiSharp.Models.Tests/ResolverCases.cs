@@ -196,9 +196,9 @@ internal static partial class Program
     private static void DefaultsExist()
     {
         Equal("gpt-6.1-sol", ModelResolver.DefaultModelFor("openai"), "openai"); Equal("gpt-6.1-sol", ModelResolver.DefaultModelFor("openai-codex"), "codex");
-        Equal("glm-5.3", ModelResolver.DefaultModelFor("zai"), "zai"); Equal("MiniMax-M2.7", ModelResolver.DefaultModelFor("minimax-cn"), "minimax-cn");
+        Equal("glm-5.3", ModelResolver.DefaultModelFor("zai"), "zai"); Equal("MiniMax-M3", ModelResolver.DefaultModelFor("minimax-cn"), "minimax-cn");
         Equal("gpt-oss-120b", ModelResolver.DefaultModelFor("cerebras"), "cerebras"); Equal("Ring-2.6-1T", ModelResolver.DefaultModelFor("ant-ling"), "ant-ling");
-        Equal("zai/glm-5.1", ModelResolver.DefaultModelFor("vercel-ai-gateway"), "gateway"); Equal("grok-4.7", ModelResolver.DefaultModelFor("xai"), "xai");
+        Equal("zai/glm-5.3", ModelResolver.DefaultModelFor("vercel-ai-gateway"), "gateway"); Equal("grok-4.7", ModelResolver.DefaultModelFor("xai"), "xai");
         Equal("qwen3.8-max", ModelResolver.DefaultModelFor("qwen-token-plan-individual"), "qwen individual");
         foreach (var provider in BuiltinModelCatalog.ShardHashes.Keys)
         {
@@ -219,8 +219,8 @@ internal static partial class Program
             (provider, id) => provider == "deepseek" && id == "deepseek-v4-flash" ? saved : null, provider => provider == "spark-two", () => [local]);
         Equal("spark-two/deepseek-v4-flash", unauthenticated.Model?.Reference, "unauthenticated saved default ignored");
         var defaults = ModelResolver.FindInitialModel([], false, null, null, null, null, (_, _) => null, NoAuth,
-            () => [M("groq", "zzz"), M("anthropic", "claude-opus-4-8"), M("groq", "openai/gpt-oss-120b")]);
-        Equal("anthropic/claude-opus-4-8", defaults.Model?.Reference, "provider defaults in declaration order");
+            () => [M("groq", "zzz"), M("anthropic", "claude-opus-5-5"), M("groq", "openai/gpt-oss-120b")]);
+        Equal("anthropic/claude-opus-5-5", defaults.Model?.Reference, "provider defaults in declaration order");
         var scoped = ModelResolver.FindInitialModel([new(AllModels[1], null)], false, null, null, "low",
             new Dictionary<string, string> { ["openai/gpt-4o"] = "high" }, (_, _) => null, NoAuth, () => []);
         Check(scoped.Model?.Reference == "openai/gpt-4o" && scoped.ThinkingLevel == "high", "scoped first with per-model level");

@@ -188,13 +188,18 @@ internal sealed partial class OfflineSessionProfile
     }
     internal void ForgetRuntimeView(AgentSessionAttachment attachment, ProfileRuntimeView view)
     {
+        var forgotten = false;
         lock (viewGate)
             if (runtimeViews.TryGetValue(attachment, out var actual) && ReferenceEquals(actual, view))
             {
                 ForgetEffectiveSettingsAttachment(attachment, view);
                 ForgetOriginalPromptAttachment(attachment);
                 runtimeViews.Remove(attachment);
+                forgotten = true;
             }
+        if (forgotten)
+            PiSharp.AI.Protocols.AnthropicMessages.AnthropicMessageThreadStore.Shared.Cleanup(
+                attachment.Session.Snapshot.Log.Header.Id);
     }
 
     /// <summary>Prepare one fresh built-in view and its SAME runtime lease. Caller owns

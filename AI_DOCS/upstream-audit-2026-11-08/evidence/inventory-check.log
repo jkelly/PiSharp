@@ -1,0 +1,12 @@
+✔ the table spans the previous and current target locks (1.3996ms)
+✔ every bullet maps to rows and every row agrees with the coverage map (4.3476ms)
+✔ statuses, phases, releases and PiSharp paths (121.6739ms)
+﹣ bullets and upstream paths match the changelogs and tree at v1.5.0 (0.0668ms) # set PI_UPSTREAM_V1_5_0 to a Pi checkout with v1.2.0 and v1.5.0
+ℹ tests 4
+ℹ suites 0
+ℹ pass 3
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 1
+ℹ todo 0
+ℹ duration_ms 192.623

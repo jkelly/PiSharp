@@ -116,9 +116,8 @@ internal static partial class BedrockConverseRequest
 
     private static double ClampToContext(BedrockModel model, IReadOnlyList<JsonObject> transcript, double maxTokens)
     {
-        if (model.ContextWindow <= 0) return Math.Max(1, maxTokens);
-        var available = model.ContextWindow - ProviderTranscript.EstimateContextTokens(transcript) - 4096;
-        return Math.Min(maxTokens, Math.Max(1, available));
+        var input = model.ContextWindow <= 0 ? 0 : ProviderTranscript.EstimateContextTokens(transcript);
+        return SimpleOutputBudget.ClampToContext(model.ContextWindow, input, maxTokens);
     }
 
     /// <summary>The ConverseStream body for one request. With <paramref name="disablePreferredStrictTools"/>, strict "prefer" tools are sent

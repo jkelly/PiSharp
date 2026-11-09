@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType><TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings><Nullable>enable</Nullable><TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <ManagePackageVersionsCentrally>false</ManagePackageVersionsCentrally>
+    <NoWarn Condition="'$(AdmitExperimental)' == 'true'">$(NoWarn);PISHARP_CHORD001;PISHARP_SCHEMA001;PISHARP_TELEMETRY001;PISHARP_DURABLE001;PISHARP_ENV001</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="PiSharp.Chord" Version="[@VERSION@]" />
+    <PackageReference Include="PiSharp.Chord.Hosting" Version="[@VERSION@]" />
+    <PackageReference Include="PiSharp.Durable.Store" Version="[@VERSION@]" />
+    <PackageReference Include="PiSharp.Env.Protocol" Version="[@VERSION@]" />
+    <PackageReference Include="PiSharp.Env" Version="[@VERSION@]" />
+  </ItemGroup>
+</Project>

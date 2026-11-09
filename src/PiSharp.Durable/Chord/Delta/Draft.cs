@@ -26,12 +26,15 @@ public abstract class Draft
     private protected Draft(ChangeContext context, Draft? parent, string? parentKey, ArrayEntry? parentEntry, bool placement)
     {
         Context = context; Parent = parent; ParentKey = parentKey; ParentEntry = parentEntry; Placement = placement;
+        context.Register(this);
     }
 
     internal ChangeContext Context { get; }
-    internal Draft? Parent { get; }
-    internal string? ParentKey { get; }
-    internal ArrayEntry? ParentEntry { get; }
+    // Intrusive ownership avoids a separate collection allocation for a single-node change.
+    internal Draft? NextAllocated { get; set; }
+    internal Draft? Parent { get; private set; }
+    internal string? ParentKey { get; private set; }
+    internal ArrayEntry? ParentEntry { get; private set; }
     /// <summary>Created over a value placed in this change: its edits fold into the placement's payload.</summary>
     internal bool Placement { get; }
     internal bool Dirty { get; private set; }
@@ -60,6 +63,17 @@ public abstract class Draft
     internal JsonValue Current() => current ??= Dirty || SubtreeDirty ? Materialize() : BaseValue;
 
     private protected abstract JsonValue Materialize();
+
+    internal void Release()
+    {
+        current = null;
+        Parent = null;
+        ParentKey = null;
+        ParentEntry = null;
+        ReleaseData();
+    }
+
+    private protected abstract void ReleaseData();
 
     private protected void MarkDirty()
     {
@@ -91,7 +105,8 @@ public abstract class Draft
 /// key moves to the end).</summary>
 public sealed class DraftObject : Draft
 {
-    private readonly JsonObjectValue baseValue;
+    private static readonly JsonObjectValue ReleasedBase = JsonValue.Object();
+    private JsonObjectValue baseValue;
     private Dictionary<string, Draft>? children;
 
     internal DraftObject(ChangeContext context, JsonObjectValue value, Draft? parent, string? key, ArrayEntry? entry, bool placement)
@@ -102,6 +117,16 @@ public sealed class DraftObject : Draft
 
     internal override JsonValue BaseValue => baseValue;
     internal JsonObjectValue Base => baseValue;
+
+    private protected override void ReleaseData()
+    {
+        baseValue = ReleasedBase;
+        children = null;
+        Writes = null;
+        Deletes = null;
+        Readded = null;
+        Appends = null;
+    }
     /// <summary>Written keys in first-write order (emission order).</summary>
     internal OrderedDictionary<string, JsonValue>? Writes { get; private set; }
     /// <summary>Deleted keys in deletion order.</summary>
@@ -327,10 +352,11 @@ public sealed class DraftObject : Draft
 /// </summary>
 public sealed class DraftArray : Draft
 {
+    private static readonly JsonArrayValue ReleasedBase = JsonValue.Array();
     // Past this many pieces a splice flattens the draft into entries, bounding the linear piece scans (upstream keeps a treap instead).
     private const int MaxPieces = 64;
 
-    private readonly JsonArrayValue baseValue;
+    private JsonArrayValue baseValue;
     private Dictionary<int, ArrayEntry>? touched; // entries by base index while no element has moved
     private List<ArrayPiece>? pieces; // the piece table once elements were inserted or removed, until an element moves
     private int pieceLength;
@@ -345,6 +371,17 @@ public sealed class DraftArray : Draft
 
     internal override JsonValue BaseValue => baseValue;
     internal JsonArrayValue Base => baseValue;
+
+    private protected override void ReleaseData()
+    {
+        baseValue = ReleasedBase;
+        touched = null;
+        pieces = null;
+        positions = null;
+        baseRanges = null;
+        Entries = null;
+        Overrides = null;
+    }
     /// <summary>Every entry in order, once an element moved (or the piece table grew past <see cref="MaxPieces"/>).</summary>
     internal List<ArrayEntry>? Entries { get; private set; }
     /// <summary>The piece table while elements were only inserted or removed: base ranges keep their base order.</summary>

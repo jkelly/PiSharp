@@ -21,11 +21,17 @@ public sealed record CompletionsKeyAuthRequestOptions(double? MaxTokens = null, 
     int MaximumHeaderCharacters = 8192, int MaximumTotalHeaderCharacters = 32_768, double MaximumTokenMagnitude = 1_000_000,
     double MaximumTemperatureMagnitude = 2)
 {
+    /// <summary>Null inherits model compatibility; otherwise explicitly overrides it. Effective default is false.</summary>
+    public bool? RequiresToolsWithToolHistory { get; init; }
+    /// <summary>Null inherits model compatibility; auto uses OpenAI or supported long retention, enabled allows compatible proxies,
+    /// disabled omits the cache key. Caching must be active. Sampling parameters still merge last.</summary>
+    public string? PromptCacheKeyMode { get; init; }
     /// <summary>Explicit provider mode; null detects OpenRouter from provider identity or endpoint.</summary>
     public CompletionsReasoningFormat? ReasoningFormat { get; init; }
     /// <summary>Owned source model mappings for off/minimal/low/medium/high/xhigh/max; string or null values.</summary>
     public JsonData? ThinkingLevelMap { get; init; }
-    /// <summary>Opt-in immutable Source model metadata, including existing FrozenCatalogModel.Raw. Model compatibility is authoritative.</summary>
+    /// <summary>Opt-in immutable Source model metadata, including existing FrozenCatalogModel.Raw. Model compatibility is authoritative
+    /// except for explicitly supplied RequiresToolsWithToolHistory, RequiresNonNullAssistantContent projection and PromptCacheKeyMode overrides.</summary>
     public JsonData? ModelMetadata { get; init; }
     /// <summary>Source per-request sampling fields; merged after model sampling defaults and named fields.</summary>
     public JsonData? SamplingParams { get; init; }
@@ -83,7 +89,7 @@ public sealed class CompletionsKeyAuthRequestFactory
             !double.IsFinite(_options.MaximumTokenMagnitude) || _options.MaximumTokenMagnitude <= 0 ||
             !double.IsFinite(_options.MaximumTemperatureMagnitude) || _options.MaximumTemperatureMagnitude <= 0 ||
             _options.MaxTokens is { } max && !double.IsFinite(max) || _options.Temperature is { } temperature && !double.IsFinite(temperature) ||
-            !Enum.IsDefined(_options.CacheRetention) || _options.MaxTokensField is not ("max_tokens" or "max_completion_tokens") ||
+            !Enum.IsDefined(_options.CacheRetention) || _options.PromptCacheKeyMode is not (null or "auto" or "enabled" or "disabled") || _options.MaxTokensField is not ("max_tokens" or "max_completion_tokens") ||
             _options.SessionAffinityFormat is not ("openai" or "openai-nosession" or "openrouter") ||
             _options.ReasoningFormat is { } format && !Enum.IsDefined(format)) throw Fail(CompletionsRequestFailure.InvalidConfiguration);
         if (_options.RequestModelId is { } requestModel && !Identity(requestModel)) throw Fail(CompletionsRequestFailure.InvalidConfiguration);
@@ -240,15 +246,17 @@ public sealed class CompletionsKeyAuthRequestFactory
         }
         JsonData Text(string text) => JsonData.Parse(JsonSerializer.Serialize(text, CompletionsJson.Output));
         Add("model", Text(_options.RequestModelId ?? _model.Id)); Add("messages", messages); Add("stream", JsonData.Parse("true"));
-        if (_cacheKey is not null && (_endpoint.AbsoluteUri.Contains("api.openai.com", StringComparison.Ordinal) && _options.CacheRetention != CompletionsCacheRetention.None ||
-            _options.CacheRetention == CompletionsCacheRetention.Long && _options.SupportsLongCacheRetention)) Add("prompt_cache_key", Text(_cacheKey));
+        if (_cacheKey is not null && _options.CacheRetention != CompletionsCacheRetention.None &&
+            (_options.PromptCacheKeyMode == "enabled" || (_options.PromptCacheKeyMode is null or "auto") &&
+                (_endpoint.AbsoluteUri.Contains("api.openai.com", StringComparison.Ordinal) ||
+                 _options.CacheRetention == CompletionsCacheRetention.Long && _options.SupportsLongCacheRetention))) Add("prompt_cache_key", Text(_cacheKey));
         if (_options.CacheRetention == CompletionsCacheRetention.Long && _options.SupportsLongCacheRetention) Add("prompt_cache_retention", Text("24h"));
         if (_options.SupportsUsageInStreaming) Add("stream_options", JsonData.Parse("{\"include_usage\":true}"));
         if (_options.SupportsStore) Add("store", JsonData.Parse("false"));
         // Direct stream truthiness omits zero, but retains finite negative/fractional supplied values.
         if (_options.MaxTokens is { } count && count != 0) Add(_options.MaxTokensField, Number(count, cancellationToken));
         if (_options.Temperature is { } temperature) Add("temperature", Number(temperature, cancellationToken));
-        if (tools.Value.GetArrayLength() != 0 || HasToolHistory(request)) Add("tools", tools);
+        if (tools.Value.GetArrayLength() != 0 || _options.RequiresToolsWithToolHistory == true && HasToolHistory(request)) Add("tools", tools);
         if (_zaiToolStream && tools.Value.GetArrayLength() != 0) Add("tool_stream", JsonData.Parse("true"));
         if (_priority is not null) Add("priority", _priority);
         if (_options.ServiceTier is { } serviceTier) Add("service_tier", Text(serviceTier));
@@ -427,8 +435,14 @@ public sealed class CompletionsKeyAuthRequestFactory
             var cacheFormat = Text("cacheControlFormat", provider == "openrouter" && id.StartsWith("anthropic/", StringComparison.Ordinal) ? "anthropic" : null);
             if (affinityFormat is not ("openai" or "openai-nosession" or "openrouter") || maxTokensField is not ("max_tokens" or "max_completion_tokens") || cacheFormat is not (null or "anthropic"))
                 throw Fail(CompletionsRequestFailure.InvalidConfiguration);
+            var cacheKeyMode = Text("promptCacheKeyMode", "auto");
+            if (cacheKeyMode is not ("auto" or "enabled" or "disabled")) throw Fail(CompletionsRequestFailure.InvalidConfiguration);
+            var requiresTools = Flag("requiresToolsWithToolHistory", false);
+            var requiresContent = Flag("requiresNonNullAssistantContent", false);
             var options = _options with
             {
+                PromptCacheKeyMode = _options.PromptCacheKeyMode ?? cacheKeyMode,
+                RequiresToolsWithToolHistory = _options.RequiresToolsWithToolHistory ?? requiresTools,
                 SupportsStore = Flag("supportsStore", !nonStandard), SupportsUsageInStreaming = Flag("supportsUsageInStreaming", true),
                 SupportsReasoningEffort = Flag("supportsReasoningEffort", !isGrok && !isZai && !isMoonshot && !isTogether && !isGateway && !isNvidia && !isAntLing),
                 MaxTokensField = maxTokensField, SendSessionAffinityHeaders = Flag("sendSessionAffinityHeaders", isOpenRouter), SessionAffinityFormat = affinityFormat,
@@ -438,6 +452,7 @@ public sealed class CompletionsKeyAuthRequestFactory
             };
             var projection = _projectionOptions with
             {
+                RequiresNonNullAssistantContent = _projectionOptions.RequiresNonNullAssistantContent ?? requiresContent,
                 Reasoning = reasoning.GetBoolean(), ModelSupportsImages = input.EnumerateArray().Any(item => item.GetString() == "image"),
                 SupportsDeveloperRole = Flag("supportsDeveloperRole", isOpenRouter && (id.StartsWith("anthropic/", StringComparison.Ordinal) || id.StartsWith("openai/", StringComparison.Ordinal)) || !nonStandard && !isOpenRouter),
               SupportsMidConversationSystemMessages = Flag("supportsMidConvoSystemMessages", false), RequiresToolResultName = Flag("requiresToolResultName", false),

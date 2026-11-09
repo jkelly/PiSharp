@@ -1,0 +1,257 @@
+[
+  {
+    "options": {
+      "Project": "tests/PiSharp.Durable.Tests",
+      "Label": "I17-durable-final1",
+      "BuildTimeoutSeconds": 240,
+      "TestTimeoutSeconds": 240,
+      "LockTimeoutSeconds": 15,
+      "TestArgs": [
+        "--only",
+        "gap.durable."
+      ]
+    },
+    "environment": {},
+    "note": "owner reports source coherent; pending central execution"
+  },
+  {
+    "options": {
+      "Project": "tests/PiSharp.DurableCli.Tests",
+      "Label": "I17-cli-final1",
+      "BuildTimeoutSeconds": 240,
+      "TestTimeoutSeconds": 240,
+      "LockTimeoutSeconds": 15,
+      "TestArgs": [
+        "--only",
+        "gap.durable-host."
+      ]
+    },
+    "environment": {},
+    "note": "owner reports source coherent; pending central execution"
+  },
+  {
+    "options": {
+      "Project": "tests/PiSharp.Durable.Hosting.Tests",
+      "Label": "I11-host-final1",
+      "BuildTimeoutSeconds": 240,
+      "TestTimeoutSeconds": 240,
+      "LockTimeoutSeconds": 15,
+      "TestArgs": [
+        "--only",
+        "settings-forwarding."
+      ]
+    },
+    "environment": {},
+    "note": "owner reports source coherent; pending central execution"
+  },
+  {
+    "options": {
+      "Project": "tests/PiSharp.CustomAgents.Tests",
+      "Label": "I11-team-final1",
+      "BuildTimeoutSeconds": 240,
+      "TestTimeoutSeconds": 240,
+      "LockTimeoutSeconds": 15,
+      "TestArgs": [
+        "--only",
+        "settings-forwarding."
+      ]
+    },
+    "environment": {},
+    "note": "owner reports source coherent; pending central execution"
+  },
+  {
+    "options": {
+      "Project": "tests/PiSharp.Rpc.Tests",
+      "Label": "I10-rpc-final1",
+      "BuildTimeoutSeconds": 240,
+      "TestTimeoutSeconds": 240,
+      "LockTimeoutSeconds": 15,
+      "TestArgs": [
+        "--filter",
+        "rpc.idle-shutdown"
+      ]
+    },
+    "environment": {},
+    "note": "owner reports source coherent; pending central execution"
+  },
+  {
+    "options": {
+      "Project": "tests/PiSharp.Extensions.ContractTests",
+      "Label": "I09-http-final1",
+      "BuildTimeoutSeconds": 240,
+      "TestTimeoutSeconds": 240,
+      "LockTimeoutSeconds": 15,
+      "TestArgs": [
+        "--filter",
+        "mcp-transport.http-"
+      ]
+    },
+    "environment": {},
+    "note": "owner reports source coherent; pending central execution"
+  },
+  {
+    "options": {
+      "Project": "tests/PiSharp.McpSync.Tests",
+      "Label": "I09-oauth-final1",
+      "BuildTimeoutSeconds": 240,
+      "TestTimeoutSeconds": 240,
+      "LockTimeoutSeconds": 15
+    },
+    "environment": {},
+    "note": "owner reports source coherent; pending central execution"
+  },
+  {
+    "options": {
+      "Project": "tests/PiSharp.WebAgent.Tests",
+      "Label": "I21-routing-final1",
+      "BuildTimeoutSeconds": 240,
+      "TestTimeoutSeconds": 240,
+      "LockTimeoutSeconds": 15,
+      "TestArgs": [
+        "--only",
+        "routing."
+      ]
+    },
+    "environment": {},
+    "note": "owner reports source coherent; pending central execution"
+  },
+  {
+    "options": {
+      "Project": "tests/PiSharp.Durable.Tests",
+      "Label": "I21-identity-final1",
+      "BuildTimeoutSeconds": 240,
+      "TestTimeoutSeconds": 240,
+      "LockTimeoutSeconds": 15,
+      "TestArgs": [
+        "--only",
+        "models.identity,models.payload"
+      ]
+    },
+    "environment": {},
+    "note": "owner reports source coherent; pending central execution"
+  },
+  {
+    "options": {
+      "Project": "tests/PiSharp.Chord.Tests",
+      "Label": "Chord-new-families-final1",
+      "TestArgs": [
+        "--only",
+        "host.runtime,host.reload,host.adapted,jobs.,link.,remote.,legacy.,telemetry-sqlite.,schema.corpus."
+      ],
+      "BuildTimeoutSeconds": 180,
+      "TestTimeoutSeconds": 360,
+      "LockTimeoutSeconds": 15
+    },
+    "environment": {}
+  },
+  {
+    "options": {
+      "Project": "artifacts/gap-validation/I18SqliteCases/I18SqliteCases.csproj",
+      "Label": "I18-real-cases-final1",
+      "BuildTimeoutSeconds": 240,
+      "TestTimeoutSeconds": 240,
+      "LockTimeoutSeconds": 15
+    },
+    "environment": {},
+    "note": "owner reports source coherent; pending central execution"
+  },
+  {
+    "options": {
+      "Project": "tests/PiSharp.MistralConversations.Tests",
+      "Label": "R5-retry-final1",
+      "BuildTimeoutSeconds": 240,
+      "TestTimeoutSeconds": 240,
+      "LockTimeoutSeconds": 15
+    },
+    "environment": {},
+    "note": "owner reports source coherent; pending central execution"
+  },
+  {
+    "options": {
+      "Project": "tests/PiSharp.Tui.NativeModifiers.Tests",
+      "Label": "R7-retry-final1",
+      "BuildTimeoutSeconds": 240,
+      "TestTimeoutSeconds": 240,
+      "LockTimeoutSeconds": 15
+    },
+    "environment": {},
+    "note": "owner reports source coherent; pending central execution"
+  },
+  {
+    "options": {
+      "Project": "tests/PiSharp.Models.Tests",
+      "Label": "I06-models-retry-final1",
+      "BuildTimeoutSeconds": 240,
+      "TestTimeoutSeconds": 240,
+      "LockTimeoutSeconds": 15
+    },
+    "environment": {},
+    "note": "owner reports source coherent; pending central execution"
+  },
+  {
+    "options": {
+      "Project": "tests/PiSharp.ToolSearch.Tests",
+      "Label": "I03-toolsearch-final1",
+      "BuildTimeoutSeconds": 240,
+      "TestTimeoutSeconds": 240,
+      "LockTimeoutSeconds": 15
+    },
+    "environment": {},
+    "note": "owner reports source coherent; pending central execution"
+  },
+  {
+    "options": {
+      "Project": "tests/PiSharp.Codemode.Tests",
+      "Label": "I03-codemode-refs-final1",
+      "BuildTimeoutSeconds": 240,
+      "TestTimeoutSeconds": 240,
+      "LockTimeoutSeconds": 15,
+      "TestArgs": [
+        "--only",
+        "refs."
+      ]
+    },
+    "environment": {},
+    "note": "owner reports source coherent; pending central execution"
+  },
+  {
+    "options": {
+      "Project": "tests/PiSharp.Codemode.Tests",
+      "Label": "I03-codemode-summary-final1",
+      "BuildTimeoutSeconds": 240,
+      "TestTimeoutSeconds": 240,
+      "LockTimeoutSeconds": 15,
+      "TestArgs": [
+        "--only",
+        "sync150.output-type-summaries"
+      ]
+    },
+    "environment": {},
+    "note": "owner reports source coherent; pending central execution"
+  },
+  {
+    "options": {
+      "Project": "tests/PiSharp.Durable.Tests",
+      "Label": "I03-durable-search-final1",
+      "BuildTimeoutSeconds": 240,
+      "TestTimeoutSeconds": 240,
+      "LockTimeoutSeconds": 15,
+      "TestArgs": [
+        "--only",
+        "tool-search.refs,tool-search.ranking-differential"
+      ]
+    },
+    "environment": {},
+    "note": "owner reports source coherent; pending central execution"
+  },
+  {
+    "options": {
+      "Project": "artifacts/gap-validation/NativeEnvDriver/NativeEnvDriver.proj",
+      "Label": "E08-native-aot",
+      "BuildOnly": true,
+      "BuildTimeoutSeconds": 1200,
+      "LockTimeoutSeconds": 15
+    },
+    "environment": {}
+  }
+]

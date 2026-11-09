@@ -1,0 +1,64 @@
+[
+  {
+    "environment": {},
+    "options": {
+      "TestTimeoutSeconds": 600,
+      "SkipBuild": true,
+      "LockTimeoutSeconds": 30,
+      "Label": "Compatibility-final",
+      "Project": "tests/PiSharp.Compatibility.Tests",
+      "Configuration": "Debug",
+      "BuildTimeoutSeconds": 240
+    }
+  },
+  {
+    "environment": {},
+    "options": {
+      "TestTimeoutSeconds": 600,
+      "SkipBuild": true,
+      "LockTimeoutSeconds": 30,
+      "Label": "Transport-final",
+      "Project": "tests/PiSharp.Transport.Tests",
+      "Configuration": "Debug",
+      "BuildTimeoutSeconds": 240
+    }
+  },
+  {
+    "environment": {},
+    "options": {
+      "TestTimeoutSeconds": 600,
+      "SkipBuild": true,
+      "LockTimeoutSeconds": 30,
+      "Label": "Threads-final",
+      "Project": "tests/PiSharp.AnthropicThreads.Tests",
+      "Configuration": "Debug",
+      "BuildTimeoutSeconds": 240
+    }
+  },
+  {
+    "environment": {
+      "INTERACTIVEPARITY_FILTER": "gap.overlay|sync150.overlay-custom|sync150.custom-overlay"
+    },
+    "options": {
+      "TestTimeoutSeconds": 600,
+      "SkipBuild": true,
+      "LockTimeoutSeconds": 30,
+      "Label": "Overlay-final",
+      "Project": "tests/PiSharp.InteractiveParity.Tests",
+      "Configuration": "Debug",
+      "BuildTimeoutSeconds": 240
+    }
+  },
+  {
+    "environment": {},
+    "options": {
+      "TestTimeoutSeconds": 600,
+      "SkipBuild": true,
+      "LockTimeoutSeconds": 30,
+      "Label": "ProviderOffline-final",
+      "Project": "tests/PiSharp.ProviderOfflineDifferential.Tests",
+      "Configuration": "Debug",
+      "BuildTimeoutSeconds": 240
+    }
+  }
+]

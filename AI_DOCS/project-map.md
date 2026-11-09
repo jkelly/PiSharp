@@ -1,3 +1,5 @@
+> Active 2026-11-08 implementation: see [context](gap-implementation-context.md), [execution plan](gap-execution-plan.md) and [audit contracts](upstream-audit-2026-11-08/contracts.md). Historical material below is preserved.
+
 # Project Map
 
 Planning snapshot: 2026-10-20. Request: plan the remaining PiSharp Durable features; no feature implementation in this turn.

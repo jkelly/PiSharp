@@ -2160,6 +2160,25 @@
       ],
       "change": "pi-ai gains ClientIdentity { userAgent: \"detailed\" | \"short\" | { custom }, attribution: { name, url, categories? } | null, version }, set per request (identity) or as the createModels({ identity }) default and merged field by field (mergeClientIdentity; withClientIdentity wraps a Models or MutableModels). Every chat API sends getIdentityHeaders() below model, provider and request headers: the detailed User-Agent pi/<version> (<platform>; <runtime>/<runtime version>; <arch>) replaces getPiUserAgent()'s pi (<platform> <release>; <arch>) (utils/pi-user-agent.ts is deleted), and with attribution OpenRouter gets HTTP-Referer, X-OpenRouter-Title and X-OpenRouter-Categories, NVIDIA NIM X-BILLING-INVOKE-ORIGIN (name with its first letter upper-cased) and OpenCode x-opencode-client. pi-ai itself sends no attribution by default; PI_ATTRIBUTION is { name: \"pi\", url: \"https://pi.dev\", categories: [\"cli-agent\"] } and the Codex originator stays pi.",
       "pisharp": [
+        "src/PiSharp.Durable/Harness/Models.cs",
+        "src/PiSharp.Durable/Models/NativeDurableModels.cs",
+        "src/PiSharp.WebAgent/Routing/AccountRouter.cs",
+        "src/PiSharp.WebAgent/Routing/WebDurableModels.cs"
+      ],
+      "release": "1.5.0",
+      "notes": "PiSharp has no identity type today: user agents are fixed per protocol (\"PiSharp\" at CompletionsKeyAuthRequestFactory.cs:167, AnthropicMessagesKeyAuthRequestFactory.cs:113 and AnthropicMessagesAuthenticatedRequestFactory.cs:63; \"pi/1.2.0\" at GoogleKeyAuthRequestFactory.cs:46, GoogleVertexRequestFactory.cs:42 and OpenAICodexResponsesTransport.cs:41; none on Responses or Azure), and the only attribution header is x-opencode-client: pisharp, sent with a session (NativeProviderFactory.ProviderRoutes.cs:100). Port ClientIdentity, FormatUserAgent, GetIdentityHeaders and the merge rules into PiSharp.AI as [Experimental] API, with the identity on ChatRequest and ModelRequestOptions. 0013 design point Identity: the version is the Pi version PiSharp tracks (1.5.0, worklist pin pi-version-identity) and the runtime field names .NET (dotnet/<version>, as BugReport.PiUserAgent does at BugReport.cs:84). Which attribution PiSharp sends is the owner's call (core.client-identity-attribution). Regenerate the Mistral source-inventory.json, which pins the deleted pi-user-agent.ts (worklist pin json-source-inventories). Bedrock, images, pi-messages and classifiers are ai.identity-more-requests.",
+      "evidence": {
+        "commits": [
+          "3b1e184d",
+          "cc075493"
+        ],
+        "tests": [
+          "tests/PiSharp.ProviderSync.Tests/Sync150Cases.cs: sync150.identity-user-agent-merge-and-attribution-headers",
+          "tests/PiSharp.ProviderSync.Tests/Sync150Cases.cs: sync150.identity-headers-on-chat-requests"
+        ]
+      },
+      "deferred": "Models-level createModels({identity}) / withClientIdentity is not ported; identity travels on ChatRequest.Identity and provider options. Callers that still build their own UA (RemoteModelCatalog, BugReport, PiToolsManager) belong to core.client-identity-attribution.",
+      "historicalPisharp": [
         "src/PiSharp.AI/Abstractions/IChatTransport.cs",
         "src/PiSharp.AI/ModelOperations/ModelRequestOptions.cs",
         "src/PiSharp.AI/Providers/NativeProviderFactory.ProviderRoutes.cs",
@@ -2174,19 +2193,13 @@
         "src/PiSharp.AI/Protocols/OpenAICodexResponses/OpenAICodexResponsesTransport.cs",
         "src/PiSharp.AI/Protocols/MistralConversations/source-inventory.json"
       ],
-      "release": "1.5.0",
-      "notes": "PiSharp has no identity type today: user agents are fixed per protocol (\"PiSharp\" at CompletionsKeyAuthRequestFactory.cs:167, AnthropicMessagesKeyAuthRequestFactory.cs:113 and AnthropicMessagesAuthenticatedRequestFactory.cs:63; \"pi/1.2.0\" at GoogleKeyAuthRequestFactory.cs:46, GoogleVertexRequestFactory.cs:42 and OpenAICodexResponsesTransport.cs:41; none on Responses or Azure), and the only attribution header is x-opencode-client: pisharp, sent with a session (NativeProviderFactory.ProviderRoutes.cs:100). Port ClientIdentity, FormatUserAgent, GetIdentityHeaders and the merge rules into PiSharp.AI as [Experimental] API, with the identity on ChatRequest and ModelRequestOptions. 0013 design point Identity: the version is the Pi version PiSharp tracks (1.5.0, worklist pin pi-version-identity) and the runtime field names .NET (dotnet/<version>, as BugReport.PiUserAgent does at BugReport.cs:84). Which attribution PiSharp sends is the owner's call (core.client-identity-attribution). Regenerate the Mistral source-inventory.json, which pins the deleted pi-user-agent.ts (worklist pin json-source-inventories). Bedrock, images, pi-messages and classifiers are ai.identity-more-requests.",
-      "evidence": {
-        "commits": [
-          "3b1e184d",
-          "cc075493"
-        ],
-        "tests": [
-          "tests/PiSharp.ProviderSync.Tests/Sync150Cases.cs: sync150.identity-user-agent-merge-and-attribution-headers",
-          "tests/PiSharp.ProviderSync.Tests/Sync150Cases.cs: sync150.identity-headers-on-chat-requests"
-        ]
-      },
-      "deferred": "Models-level createModels({identity}) / withClientIdentity is not ported; identity travels on ChatRequest.Identity and provider options. Callers that still build their own UA (RemoteModelCatalog, BugReport, PiToolsManager) belong to core.client-identity-attribution."
+      "currentImplementation": {
+        "mapping": "compatibility/gap-status-2026-11-08.json",
+        "id": "ai.client-identity",
+        "sourceStatus": "source-implemented",
+        "runtimeStatus": "pending-integrated-validation",
+        "note": "Owner-selected no-attribution default is retained. Unsupported deferred providers remain explicitly unsupported, not silently emulated."
+      }
     },
     {
       "id": "ai.identity-more-requests",
@@ -2268,13 +2281,10 @@
       ],
       "change": "resolveTranscriptTools() takes a TranscriptToolSupport (\"none\", \"additions\" or \"changes\") and returns foldedSystemMessages instead of anchorsAdditions. Responses models with mid-conversation system messages and additional_tools (\"changes\") send no top-level tools and declare every tool in additional_tools items starting at the head of the input; each later item follows an incremental-tools notice that restates tools still unavailable, and true removals are announced in the system update text. Tool search and Kimi tool messages (\"additions\") fold the top-level list up to the last removal or redeclaration and keep later additions anchored, so the cached prefix changes once per removal instead of on every later load.",
       "pisharp": [
-        "src/PiSharp.AI/Protocols/ProviderShared/ProviderTranscript.cs",
-        "src/PiSharp.AI/Protocols/OpenAICompletions/CompletionsTranscriptProjector.cs",
-        "src/PiSharp.AI/Protocols/OpenAICompletions/CompletionsToolDeclarationProjector.cs",
+        "src/PiSharp.AI/Protocols/OpenAIResponses/ResponsesTranscriptTools.cs",
         "src/PiSharp.AI/Protocols/OpenAIResponses/ResponsesTranscriptProjector.cs",
-        "src/PiSharp.AI/Protocols/OpenAIResponses/ResponsesToolDeclarationProjector.cs",
-        "src/PiSharp.AI/Protocols/OpenAICodexResponses/OpenAICodexResponsesTransport.cs",
-        "src/PiSharp.AI/Protocols/AzureResponses/AzureResponsesRequestFactory.cs"
+        "src/PiSharp.AI/Protocols/AzureResponses/AzureResponsesRequestFactory.cs",
+        "src/PiSharp.AI/Protocols/OpenAICodexResponses/OpenAICodexResponsesTransport.cs"
       ],
       "release": "1.5.0",
       "notes": "Completions: PiSharp anchors Kimi tool messages only while no tool was ever removed (CompletionsToolDeclarationProjector.CanAnchorAdditions, CompletionsToolDeclarationProjector.cs:161, used at CompletionsTranscriptProjector.cs:75-93); port the fold up to the last non-additive change. Responses, Codex and Azure: PiSharp never implemented additional_tools or tool search and always sends the current tool list (docs/compatibility/responses-tools-sdk-reference.md; Azure refuses those compat flags at AzureResponsesRequestFactory.cs:52). The \"changes\" and \"additions\" modes there are new request shapes for catalog models flagged supportsAdditionalTools or supportsToolSearch (openai.json, openai-codex.json, github-copilot.json), so they need their own wire tests.",
@@ -2286,7 +2296,23 @@
           "tests/PiSharp.ProviderSync.Tests/Sync150Cases.cs: sync150.completions-kimi-tool-additions-fold-to-the-last-removal"
         ]
       },
-      "deferred": "Responses/Codex/Azure additional_tools (\"changes\") and tool search (\"additions\") are request shapes PiSharp never implemented; AzureResponsesRequestFactory refuses those flags. Removal announcements belong to that mode."
+      "deferred": "Responses/Codex/Azure additional_tools (\"changes\") and tool search (\"additions\") are request shapes PiSharp never implemented; AzureResponsesRequestFactory refuses those flags. Removal announcements belong to that mode.",
+      "historicalPisharp": [
+        "src/PiSharp.AI/Protocols/ProviderShared/ProviderTranscript.cs",
+        "src/PiSharp.AI/Protocols/OpenAICompletions/CompletionsTranscriptProjector.cs",
+        "src/PiSharp.AI/Protocols/OpenAICompletions/CompletionsToolDeclarationProjector.cs",
+        "src/PiSharp.AI/Protocols/OpenAIResponses/ResponsesTranscriptProjector.cs",
+        "src/PiSharp.AI/Protocols/OpenAIResponses/ResponsesToolDeclarationProjector.cs",
+        "src/PiSharp.AI/Protocols/OpenAICodexResponses/OpenAICodexResponsesTransport.cs",
+        "src/PiSharp.AI/Protocols/AzureResponses/AzureResponsesRequestFactory.cs"
+      ],
+      "currentImplementation": {
+        "mapping": "compatibility/gap-status-2026-11-08.json",
+        "id": "ai.transcript-tool-support",
+        "sourceStatus": "source-implemented",
+        "runtimeStatus": "pending-integrated-validation",
+        "note": "Source and authored tests are present; final integrated validation is pending."
+      }
     },
     {
       "id": "ai.whitespace-tool-output",
@@ -2585,11 +2611,9 @@
       ],
       "change": "System One classifier models gain compat (SystemOneCompat: imageInput \"assets\" | \"images\" | \"state-image-urls\", sendImageOptInHeader); built-in catalog entries set it, and models without it detect it from provider, baseUrl and model id. A models.json provider-level compat now also applies to that provider's classifier models (model and modelOverrides entries still apply to chat models only), and extension classifier models accept compat.",
       "pisharp": [
-        "src/PiSharp.AI/ModelOperations/SystemOneClassifier.cs",
-        "src/PiSharp.ModelRuntime/Models/ModelProviderComposer.cs",
-        "src/PiSharp.ModelRuntime/Models/ModelsJsonConfig.cs",
         "src/PiSharp.CodingAgent/Schemas/models.schema.json",
-        "src/PiSharp.Extensions.Abstractions/Facade/Registration/ModelOperationProviderContracts.cs"
+        "src/PiSharp.ModelRuntime/Models/ModelResolver.cs",
+        "src/PiSharp.AI/ModelOperations/CopilotSystemOneClassifier.cs"
       ],
       "release": "1.5.0",
       "notes": "Lands with ai.classifier-image-input. The catalog compat values arrive with the shard refresh (model-catalog-shards). Check the TypeScript extension path (PiExtensionModels.cs) carries classifier compat across the Node bridge.",
@@ -2605,7 +2629,21 @@
           "tests/PiSharp.Classifiers.Tests/Sync150Cases.cs: sync150.catalog-compat-drives-the-image-form"
         ]
       },
-      "deferred": "The CLI classifier registry (NativeExtensionModelOperations.CreateDefaultRegistry) reads the built-in shards only, so models.json baseUrl/compat never reach classify calls. Pre-existing; documented under Differences from Pi."
+      "deferred": "The CLI classifier registry (NativeExtensionModelOperations.CreateDefaultRegistry) reads the built-in shards only, so models.json baseUrl/compat never reach classify calls. Pre-existing; documented under Differences from Pi.",
+      "historicalPisharp": [
+        "src/PiSharp.AI/ModelOperations/SystemOneClassifier.cs",
+        "src/PiSharp.ModelRuntime/Models/ModelProviderComposer.cs",
+        "src/PiSharp.ModelRuntime/Models/ModelsJsonConfig.cs",
+        "src/PiSharp.CodingAgent/Schemas/models.schema.json",
+        "src/PiSharp.Extensions.Abstractions/Facade/Registration/ModelOperationProviderContracts.cs"
+      ],
+      "currentImplementation": {
+        "mapping": "compatibility/gap-status-2026-11-08.json",
+        "id": "ai.system-one-compat",
+        "sourceStatus": "source-implemented",
+        "runtimeStatus": "pending-integrated-validation",
+        "note": "Source and authored tests are present; final integrated validation is pending."
+      }
     },
     {
       "id": "ai.workers-ai-classifier-models",
@@ -3065,15 +3103,8 @@
       ],
       "change": "Every provider and the pi-messages client now feed each tool-call argument delta once into a ToolCallArgumentsStream instead of re-parsing the accumulated JSON on each delta (f715a15c1). Stream state (partialJson, partialArgs, index, customInput, streamIndex, Bedrock's encrypted reasoning bytes) moves into per-stream maps and no longer sits on the content blocks, so it does not reach partial messages or failed-stream transcripts.",
       "pisharp": [
-        "src/PiSharp.AI/Protocols/PiMessages/PiMessagesEventMapper.cs",
-        "src/PiSharp.AI/Providers/OpenAICompletionsWireSource.cs",
-        "src/PiSharp.AI/Protocols/GoogleGenerativeAI/GoogleEventMapper.cs",
         "src/PiSharp.AI/Protocols/MistralConversations/TextState.cs",
-        "src/PiSharp.AI/Protocols/Bedrock/BedrockEventState.cs",
-        "src/PiSharp.AI/Protocols/AnthropicMessages/AnthropicMessagesTransport.SourceSnapshots.cs",
-        "src/PiSharp.AI/Protocols/OpenAIResponses/ResponsesTextToolTransport.cs",
-        "src/PiSharp.AI/ToolArguments/StreamingJson.cs",
-        "src/PiSharp.AI/Streaming/AssistantStreamReducer.cs"
+        "src/PiSharp.AI/Protocols/PiMessages/PiMessagesEventMapper.cs"
       ],
       "release": "1.5.0",
       "notes": "PiSharp re-parses the whole buffer per delta: PiMessagesEventMapper.cs:87-88, OpenAICompletionsWireSource.cs:454, GoogleEventMapper.cs:127-128, MistralConversations/TextState.cs:129-133, BedrockEventState.cs:181; AnthropicMessagesTransport.SourceSnapshots.cs:37-44 keeps partialJson and index on the block snapshot. Depends on group C's ai.streaming-json-parser (ai@1.5.0/Added#2), which brings StreamingJsonParser and ToolCallArgumentsStream. Add a large-argument test (hundreds of KB) per provider that bounds allocations. coding-agent Fixed#17 also maps to ai.grammar-input-delta, bridge.stream-proxy-incremental-args and cli.tool-args-render-per-frame.",
@@ -3093,7 +3124,25 @@
           "tests/PiSharp.ProviderApis.Tests/Program.cs: bedrock.tool-arguments-finalize-through-parse-streaming-json"
         ]
       },
-      "deferred": "Mistral still writes a full message snapshot per frame pi-messages Capture still deep-clones its partial failure-path partials in Anthropic and Completions are rebuilt rather than streamed"
+      "deferred": "Mistral still writes a full message snapshot per frame pi-messages Capture still deep-clones its partial failure-path partials in Anthropic and Completions are rebuilt rather than streamed",
+      "historicalPisharp": [
+        "src/PiSharp.AI/Protocols/PiMessages/PiMessagesEventMapper.cs",
+        "src/PiSharp.AI/Providers/OpenAICompletionsWireSource.cs",
+        "src/PiSharp.AI/Protocols/GoogleGenerativeAI/GoogleEventMapper.cs",
+        "src/PiSharp.AI/Protocols/MistralConversations/TextState.cs",
+        "src/PiSharp.AI/Protocols/Bedrock/BedrockEventState.cs",
+        "src/PiSharp.AI/Protocols/AnthropicMessages/AnthropicMessagesTransport.SourceSnapshots.cs",
+        "src/PiSharp.AI/Protocols/OpenAIResponses/ResponsesTextToolTransport.cs",
+        "src/PiSharp.AI/ToolArguments/StreamingJson.cs",
+        "src/PiSharp.AI/Streaming/AssistantStreamReducer.cs"
+      ],
+      "currentImplementation": {
+        "mapping": "compatibility/gap-status-2026-11-08.json",
+        "id": "ai.tool-call-args-incremental",
+        "sourceStatus": "source-implemented",
+        "runtimeStatus": "pending-integrated-validation",
+        "note": "Anthropic and Completions residuals have explicit source dispositions; full optional diagnostic captures may still materialize snapshots."
+      }
     },
     {
       "id": "ai.grammar-input-delta",
@@ -4190,10 +4239,9 @@
       ],
       "change": "pi.exec() accepts ExecOptions.maxBuffer, a byte limit on stdout and stderr combined (default the smaller of 256 MiB and the runtime string limit; an invalid value rejects before spawning). Output past the limit terminates the command, which returns truncated: true, killed: true and a nonzero code; ExecResult.truncated is now always present.",
       "pisharp": [
-        "src/PiSharp.Extensions.Abstractions/Facade/Execution/ExtensionExecContracts.cs",
-        "src/PiSharp.Cli/Extensions/Execution/NativeExtensionExecHost.cs",
-        "src/PiSharp.Cli/Extensions/Execution/NativeExtensionExecContextHost.cs",
-        "tools/NodeBridge/pi-host/runtime.mjs"
+        "src/PiSharp.Tools/Processes/NativeProcessRunner.cs",
+        "src/PiSharp.Tools/Processes/SeparatedProcessCapture.cs",
+        "src/PiSharp.Tools/Processes/Unix/UnixProcessRunner.cs"
       ],
       "release": "1.5.0",
       "notes": "ExtensionExecResult(Stdout, Stderr, Code, Killed) (ExtensionExecContracts.cs:17) has no Truncated and the options no MaxBuffer; the bridge's execCommand (runtime.mjs:38) is the 1.2.0 one. The same commit (c466a3595) carries D1's coding-agent@1.5.0/Fixed#7 (default cap) and Fixed#8 (SIGKILL escalation); port them together. An incomplete UTF-8 suffix at the cut is dropped, not replaced. New C# members carry [Experimental].",
@@ -4206,7 +4254,20 @@
           "tests/PiSharp.ExtensionParity.Tests/Sync150PackageCases.cs: sync150.native-exec-max-buffer-truncates-stops-and-spawn-errors"
         ]
       },
-      "deferred": "Native pi.exec still captures at most 1 MiB per pipe (the separated process runner's per-pipe bound), so native output stops and reads truncated at 1 MiB per pipe even when maxBuffer (default 256 MiB) is larger. The bridge honours maxBuffer in full."
+      "deferred": "Native pi.exec still captures at most 1 MiB per pipe (the separated process runner's per-pipe bound), so native output stops and reads truncated at 1 MiB per pipe even when maxBuffer (default 256 MiB) is larger. The bridge honours maxBuffer in full.",
+      "historicalPisharp": [
+        "src/PiSharp.Extensions.Abstractions/Facade/Execution/ExtensionExecContracts.cs",
+        "src/PiSharp.Cli/Extensions/Execution/NativeExtensionExecHost.cs",
+        "src/PiSharp.Cli/Extensions/Execution/NativeExtensionExecContextHost.cs",
+        "tools/NodeBridge/pi-host/runtime.mjs"
+      ],
+      "currentImplementation": {
+        "mapping": "compatibility/gap-status-2026-11-08.json",
+        "id": "core.exec-max-buffer",
+        "sourceStatus": "source-implemented",
+        "runtimeStatus": "pending-integrated-validation",
+        "note": "Source and authored tests are present; final integrated validation is pending."
+      }
     },
     {
       "id": "core.system-prompt-tightened",
@@ -4665,7 +4726,9 @@
       ],
       "change": "SessionManager._appendEntry remembers the previous leaf and, if _persist throws (ENOSPC, EBUSY, ETIMEDOUT), pops the entry from fileEntries, removes it from byId, restores the leaf and rethrows. An entry that was not written never becomes the parent of later entries, so a resumed session keeps its history, including the first system message that declares the tools.",
       "pisharp": [
-        "tools/NodeBridge/pi-host/virtual/coding-agent/core/session-manager.mjs"
+        "src/PiSharp.Sessions/Storage/SessionLogStore.cs",
+        "src/PiSharp.CodingAgent/PersistentAgentSession.cs",
+        "src/PiSharp.CodingAgent/PersistentAgentSession.Recovery.cs"
       ],
       "release": "1.5.0",
       "notes": "Native sessions already behave this way: SessionLogStore.AppendAsync builds the next snapshot aside (SessionLogStore.cs:196-200) and CommitBytesAsync publishes it only after write, flush and checkpoint succeed (SessionLogStore.cs:219). A failure poisons the store (SessionLogStore.cs:222), so later appends are refused (SessionLogStore.cs:174) instead of chaining to an unwritten parent. PersistentAgentSession records the fault (for example PersistentAgentSession.Activation.cs:178). That is stricter than upstream, which keeps writing after the failure, and the difference is pre-existing. The port is the bridge's fallback copy of SessionManager (session-manager.mjs:722-727, used when the Pi npm packages are not installed), which still keeps the entry in memory. 0013 lists session write failures under the core area. Move with core.fork-single-file-handle and the projectContextEntry export of core.branch-summary-context-edits, which touch the same module.",
@@ -4678,7 +4741,17 @@
           "tests/PiSharp.ExtensionParity.Tests/Sync150Cases.cs: sync150.bridge-session-manager-rolls-back-unwritten-entries-and-forks-through-one-fd"
         ]
       },
-      "deferred": "Only the Node bridge's fallback SessionManager copy follows v1.5.0. Native sessions already keep memory in line with the file (the snapshot is published only after a write succeeds), but after a write that may have reached the file the session faults and accepts no more writes, where upstream rolls the entry back and keeps writing. Whether native sessions follow upstream there is an owner decision (a possibly torn line stays in the file)."
+      "deferred": "Only the Node bridge's fallback SessionManager copy follows v1.5.0. Native sessions already keep memory in line with the file (the snapshot is published only after a write succeeds), but after a write that may have reached the file the session faults and accepts no more writes, where upstream rolls the entry back and keeps writing. Whether native sessions follow upstream there is an owner decision (a possibly torn line stays in the file).",
+      "historicalPisharp": [
+        "tools/NodeBridge/pi-host/virtual/coding-agent/core/session-manager.mjs"
+      ],
+      "currentImplementation": {
+        "mapping": "compatibility/gap-status-2026-11-08.json",
+        "id": "core.session-write-failure-rollback",
+        "sourceStatus": "implemented-with-retained-native-difference",
+        "runtimeStatus": "pending-integrated-validation",
+        "note": "Intentional native fail-stop after uncertain session writes is retained: later mutations fail rather than pretending a disk write rolled back. Incomplete-tail recovery and persistence ordering require final regression execution."
+      }
     },
     {
       "id": "core.branch-summary-thinking-level",
@@ -5050,9 +5123,10 @@
       ],
       "change": "ctx.ui.custom({ overlay: true }) keeps the handle of the overlay it opened, and its done() hides that overlay rather than the topmost one, so stacked overlays from different extensions close and resolve correctly.",
       "pisharp": [
-        "src/PiSharp.Cli/Interactive/Mode/InteractiveMode.ExtensionHost.cs:197",
-        "src/PiSharp.Cli/Extensions/Pi/PiExtensionHost.Requests.cs:793",
-        "tools/NodeBridge/pi-host/runtime.mjs"
+        "src/PiSharp.Cli/Extensions/Pi/PiNodeRuntime.cs",
+        "src/PiSharp.Cli/Interactive/Mode/InteractiveMode.ExtensionHost.cs",
+        "tools/NodeBridge/pi-host/runtime.mjs",
+        "tools/NodeBridge/installed-runtime-abi.mjs"
       ],
       "release": "1.5.0",
       "notes": "PiSharp has no overlay mode for extension custom components. The bridge sends overlay and overlayOptions (tools/NodeBridge/pi-host/runtime.mjs:566-567), but OpenComponentAsync ignores them (PiExtensionHost.Requests.cs:793-808). ShowExtensionCustomComponentAsync puts the component in the editor slot and refuses a second one (InteractiveMode.ExtensionHost.cs:211). Decision 0013 puts the gap in scope: port overlay mode (stacked overlays, overlayOptions), where done() hides the overlay its own handle opened.",
@@ -5065,7 +5139,19 @@
           "tests/PiSharp.InteractiveParity.Tests/Sync150CliCases.cs: sync150.custom-overlay-options-from-the-bridge"
         ]
       },
-      "deferred": "onHandle (the overlay handle Pi hands the extension for setHidden/focus/unfocus/getBounds) and overlayOptions.visible are functions in the Node realm. Forwarding them needs a remote handle object and a synchronous bridge call per render, which is new bridge protocol, not a small additive edit."
+      "deferred": "onHandle (the overlay handle Pi hands the extension for setHidden/focus/unfocus/getBounds) and overlayOptions.visible are functions in the Node realm. Forwarding them needs a remote handle object and a synchronous bridge call per render, which is new bridge protocol, not a small additive edit.",
+      "historicalPisharp": [
+        "src/PiSharp.Cli/Interactive/Mode/InteractiveMode.ExtensionHost.cs:197",
+        "src/PiSharp.Cli/Extensions/Pi/PiExtensionHost.Requests.cs:793",
+        "tools/NodeBridge/pi-host/runtime.mjs"
+      ],
+      "currentImplementation": {
+        "mapping": "compatibility/gap-status-2026-11-08.json",
+        "id": "cli.custom-overlay-own-handle",
+        "sourceStatus": "source-implemented",
+        "runtimeStatus": "pending-integrated-validation",
+        "note": "Native overlay handles and installed-runtime ABI have explicit mappings; arbitrary JS objects and general JS/Node IPC equivalence are not claimed."
+      }
     },
     {
       "id": "cli.concurrent-extension-dialogs",
@@ -6132,7 +6218,6 @@
       ],
       "change": "Some Apple Terminal setups send ESC+CR for Shift+Enter, which parsed as alt+enter and queued a follow-up. The native Shift fallback (Apple Terminal and Windows) now treats ESC+CR with Shift held like plain CR, as Shift+Enter (86dc686cf); terminal-setup.md documents it.",
       "pisharp": [
-        "src/PiSharp.Tui/Pi/Terminal.cs",
         "src/PiSharp.Tui/Pi/RawTerminalIo.cs"
       ],
       "release": "1.5.0",
@@ -6146,7 +6231,18 @@
           "tests/PiSharp.InteractiveParity.Tests/Sync150Cases.cs: sync150.native-shift-enter.esc-return"
         ]
       },
-      "deferred": "macOS: PiSharp cannot read the Shift state on macOS (RawTerminalIo.cs:265, no CoreGraphics query), so native Shift+Enter is not detected there. The Windows path is ported; the test fakes the Shift state."
+      "deferred": "macOS: PiSharp cannot read the Shift state on macOS (RawTerminalIo.cs:265, no CoreGraphics query), so native Shift+Enter is not detected there. The Windows path is ported; the test fakes the Shift state.",
+      "historicalPisharp": [
+        "src/PiSharp.Tui/Pi/Terminal.cs",
+        "src/PiSharp.Tui/Pi/RawTerminalIo.cs"
+      ],
+      "currentImplementation": {
+        "mapping": "compatibility/gap-status-2026-11-08.json",
+        "id": "tui.native-shift-enter-esc-return",
+        "sourceStatus": "implemented-with-retained-native-difference",
+        "runtimeStatus": "pending-integrated-validation",
+        "note": "Physical macOS modifier input requires a macOS host acceptance run; synthetic tests cannot qualify it."
+      }
     },
     {
       "id": "tui.regular-mode-strip-osc133",
@@ -7129,8 +7225,8 @@
       ],
       "change": "The tokenizer kept only ASCII letters and digits, so non-ASCII queries found nothing. tool_search and the durable search normalise text to NFC, treat \\p{L}\\p{M}\\p{N} as word characters and split text without spaces (such as Chinese or Thai) with Intl.Segmenter word granularity (79006f061).",
       "pisharp": [
-        "src/PiSharp.Extensions.Abstractions/Mcp/Discovery/ToolSearchRanker.cs",
-        "src/PiSharp.Durable/Search.cs"
+        "src/PiSharp.Extensions.Abstractions/Mcp/Discovery/UnicodeWordSegmenter.cs",
+        "src/PiSharp.Extensions.Abstractions/Mcp/Discovery/ToolSearchRanker.cs"
       ],
       "release": "1.5.0",
       "notes": "Owner design point: .NET has no Intl.Segmenter word granularity (ICU dictionary segmentation for CJK and Thai). PiSharp's WordSegmenter (src/PiSharp.Tui/Pi/TextSupport.cs:48-60) is UAX#29-like: CJK ideographs stand alone and Thai is not split. Choose ICU interop or accept that segmenter. The durable copy (Search.cs) moves with the phase 4 durable re-sync.",
@@ -7143,7 +7239,18 @@
           "tests/PiSharp.ToolSearch.Tests/Sync150Cases.cs: sync150.tool-search-unicode-words.rank"
         ]
       },
-      "deferred": "Residual differences from Intl.Segmenter: the system ICU version (Windows icu.dll, macOS libicucore, Linux libicuuc.so.N) can differ from V8's bundled ICU; without ICU a run stays one word (no CJK/Thai split); with invariant globalization NFC is a no-op; JS Final_Sigma lowercasing is not reproduced; root locale only. The durable copy moves with durable.tool-search-unicode (phase 4)."
+      "deferred": "Residual differences from Intl.Segmenter: the system ICU version (Windows icu.dll, macOS libicucore, Linux libicuuc.so.N) can differ from V8's bundled ICU; without ICU a run stays one word (no CJK/Thai split); with invariant globalization NFC is a no-op; JS Final_Sigma lowercasing is not reproduced; root locale only. The durable copy moves with durable.tool-search-unicode (phase 4).",
+      "historicalPisharp": [
+        "src/PiSharp.Extensions.Abstractions/Mcp/Discovery/ToolSearchRanker.cs",
+        "src/PiSharp.Durable/Search.cs"
+      ],
+      "currentImplementation": {
+        "mapping": "compatibility/gap-status-2026-11-08.json",
+        "id": "tools.tool-search-unicode-words",
+        "sourceStatus": "implemented-with-retained-native-difference",
+        "runtimeStatus": "pending-integrated-validation",
+        "note": "Culture/invariant/ICU profiles are tested separately; CLR sigma/NFC and word segmentation differences from V8 remain disclosed."
+      }
     },
     {
       "id": "tools.image-resize-smaller-encoding",
@@ -7287,11 +7394,10 @@
       ],
       "change": "Extensions' `@earendil-works/pi-ai` and `/compat` (and the `@mariozechner` aliases) resolve to a coding-agent view: pi-ai's compat entry plus TypeBox's Type, Static and TSchema from the coding agent's own TypeBox, and a StringEnum that stays a TypeBox TUnsafe, so extensions keep importing them from pi-ai. A new `@earendil-works/pi-ai/models` entry is mapped. The built-in tool factories are typed TypeBoxAgentTool (types only).",
       "pisharp": [
-        "tools/NodeBridge/pi-host/virtual/index.json",
-        "tools/NodeBridge/pi-host/loader-hooks.mjs",
-        "tools/NodeBridge/pi-host/virtual/pi-ai.mjs",
-        "tools/NodeBridge/pi-host/virtual/upstream-exports.json",
-        "tests/PiSharp.ExtensionParity.Tests/RuntimeCases.cs"
+        "src/PiSharp.Cli/Extensions/Pi/PiNodeRuntime.cs",
+        "src/PiSharp.Cli/Interactive/Mode/InteractiveMode.ExtensionHost.cs",
+        "tools/NodeBridge/pi-host/runtime.mjs",
+        "tools/NodeBridge/installed-runtime-abi.mjs"
       ],
       "release": "1.5.0",
       "notes": "The bridge maps both specifiers to virtual/pi-ai.mjs, which re-exports TypeBox the 1.2.0 way. With the real 1.5.0 packages installed, loader-hooks.mjs:29 maps `@earendil-works/pi-ai` to `@earendil-works/pi-ai/compat`, which no longer has Type, so that path needs the view too. Depends on the Pi 1.5.0 package re-pin of the bridge and on bridge.pi-schema-validation.",
@@ -7306,7 +7412,21 @@
           "tests/PiSharp.ExtensionParity.Tests/Sync150BridgeCases.cs: sync150.bridge-extensions-import-the-pi-ai-extension-view-and-pi-ai-models"
         ]
       },
-      "deferred": "Compatibility mode serves the ported view (virtual/pi-ai-extension-view.mjs) for pi-ai and pi-ai/compat. In installed mode pi-modules.mjs and loader-hooks.mjs use the coding agent's dist/core/extensions/pi-ai-extension-view.js when it exists, but the installed runtime stays at Pi 1.2.0 (PiNodeRuntime.PiVersion), which ships no view, so installed extensions keep 1.2.0's pi-ai until the runtime pin moves (see core.windows-path-casing / bridge.undici-gondolin-advisories)."
+      "deferred": "Compatibility mode serves the ported view (virtual/pi-ai-extension-view.mjs) for pi-ai and pi-ai/compat. In installed mode pi-modules.mjs and loader-hooks.mjs use the coding agent's dist/core/extensions/pi-ai-extension-view.js when it exists, but the installed runtime stays at Pi 1.2.0 (PiNodeRuntime.PiVersion), which ships no view, so installed extensions keep 1.2.0's pi-ai until the runtime pin moves (see core.windows-path-casing / bridge.undici-gondolin-advisories).",
+      "historicalPisharp": [
+        "tools/NodeBridge/pi-host/virtual/index.json",
+        "tools/NodeBridge/pi-host/loader-hooks.mjs",
+        "tools/NodeBridge/pi-host/virtual/pi-ai.mjs",
+        "tools/NodeBridge/pi-host/virtual/upstream-exports.json",
+        "tests/PiSharp.ExtensionParity.Tests/RuntimeCases.cs"
+      ],
+      "currentImplementation": {
+        "mapping": "compatibility/gap-status-2026-11-08.json",
+        "id": "bridge.pi-ai-extension-view",
+        "sourceStatus": "source-implemented",
+        "runtimeStatus": "pending-integrated-validation",
+        "note": "Native overlay handles and installed-runtime ABI have explicit mappings; arbitrary JS objects and general JS/Node IPC equivalence are not claimed."
+      }
     },
     {
       "id": "bridge.pi-schema-validation",
@@ -7420,7 +7540,10 @@
       ],
       "change": "pi-coding-agent's exact undici dependency moves from 8.10.2 to 8.12.3 (66c2fa3d7, with the release install lock). The Gondolin extension example's @earendil-works/gondolin moves from 0.12.0 to 0.14.0 (2685de7a1). Both are for security advisories.",
       "pisharp": [
-        "src/PiSharp.Cli/Extensions/Pi/PiNodeRuntime.cs"
+        "src/PiSharp.Cli/Extensions/Pi/PiNodeRuntime.cs",
+        "src/PiSharp.Cli/Interactive/Mode/InteractiveMode.ExtensionHost.cs",
+        "tools/NodeBridge/pi-host/runtime.mjs",
+        "tools/NodeBridge/installed-runtime-abi.mjs"
       ],
       "release": "1.5.0",
       "notes": "Native PiSharp does no HTTP through undici; it uses .NET HttpClient. undici reaches users only through the Node bridge's Pi runtime: PiNodeRuntime npm-installs @earendil-works/pi-coding-agent at PiVersion \"1.2.0\" (PiNodeRuntime.cs:19, :31). npm then resolves coding-agent's exact undici pin, so moving PiVersion to 1.5.0 brings 8.12.3. That move belongs to the node-bridge Pi 1.5.0 packages work in 0013; this row only records the pinned-dependency outcome (0013 Scope: pinned dependency versions are ported). Check undici 8.12.3 in the installed runtime's package-lock.json. The Gondolin example is not shipped by PiSharp (no Gondolin sample under samples/extensions), so that half needs nothing.",
@@ -7434,6 +7557,19 @@
           "tests/PiSharp.ExtensionParity.Tests/Sync150RuntimeCases.cs: sync150.pi-runtime-without-the-undici-override-is-reinstalled",
           "tests/PiSharp.ExtensionParity.Tests/RuntimeCases.cs: runtime.pi-packages-installed-with-verified-provenance"
         ]
+      },
+      "historicalPisharp": [
+        "src/PiSharp.Cli/Extensions/Pi/PiNodeRuntime.cs"
+      ],
+      "currentImplementation": {
+        "mapping": "compatibility/gap-status-2026-11-08.json",
+        "id": "bridge.undici-gondolin-advisories",
+        "sourceStatus": "source-implemented",
+        "runtimeStatus": "pending-integrated-validation",
+        "note": "The approved current Node runtime uses Pi 1.5.0 while retaining the undici 8.12.3 override. Historical Pi 1.2.0 release choice and test reference remain preserved; this replacement names the current authored test, not a passing execution.",
+        "testReplacements": {
+          "tests/PiSharp.ExtensionParity.Tests/Sync150RuntimeCases.cs: sync150.pi-runtime-manifest-pins-undici-and-keeps-pi-1.2.0": "tests/PiSharp.ExtensionParity.Tests/Sync150RuntimeCases.cs: sync150.pi-runtime-manifest-pins-undici-and-pi-1.5.0"
+        }
       }
     },
     {
@@ -8224,7 +8360,11 @@
       ],
       "change": "StoreStorage.open(store, owner, context) is Durable's Storage on Chord v2's store: a Session's records are declared tables of the store under owner, its documents live in the store's documents engine, its IDs come from the store's one allocator, and each commit() call is one store transaction (ChordStore.commitSeries) with one seq and outbox row per batch, published in the batch of the host the store serves. It passes the storage conformance suite, and close() leaves the store open.",
       "pisharp": [
-        "src/PiSharp.Durable/Storage/ (new)"
+        "src/PiSharp.Durable.Store/Storage.cs",
+        "src/PiSharp.Durable.Store/RegistryReader.cs",
+        "samples/Durable.Chord.Examples/Example35.cs",
+        "samples/Durable.Chord.Examples/Example36.cs",
+        "samples/Durable.Chord.Examples/Example37.cs"
       ],
       "release": "1.5.0",
       "notes": "Blocked on Chord v2's store (chord@1.5.0/Added#1 and Added#2, group F), which phase 4 ports with the parts of Chord v2 durable needs (decision 0013, Durable: src/PiSharp.Chord, with StoreStorage in the src/PiSharp.Durable.Store adapter). Depends on durable.storage-commit-batches.",
@@ -8250,7 +8390,17 @@
           "tests/PiSharp.Durable.Tests/StoreStorageCommitCases.cs: storage.store.commit.publishes-each-commit-of-a-call-in-a-host-batch-of-its-own-after-the-calls-one-transaction"
         ]
       },
-      "deferred": "Phase 6 (createHost, defineFacet, self.table/open/follow/derive) takes examples 35-durable-on-the-store and 36-durable-views, which would also need an upstream run for their expected output, and store-storage.test.ts's 2 view cases. store-storage-commit.test.ts's 1.5-id case cannot be ported (PiSharp ids are longs). Everything else is ported. StoreStorage passes the conformance suite (storage.store.conformance.* and storage.store.reopen.conformance.*, generated case ids), and the store pass runs 455 harness.<group>.store.* cases (19 groups). The publication case ('publishes each commit of a call in a host batch of its own') runs since area publication-caches on a hand-built Chord batch; createHost's own batch is phase 6's."
+      "deferred": "Phase 6 (createHost, defineFacet, self.table/open/follow/derive) takes examples 35-durable-on-the-store and 36-durable-views, which would also need an upstream run for their expected output, and store-storage.test.ts's 2 view cases. store-storage-commit.test.ts's 1.5-id case cannot be ported (PiSharp ids are longs). Everything else is ported. StoreStorage passes the conformance suite (storage.store.conformance.* and storage.store.reopen.conformance.*, generated case ids), and the store pass runs 455 harness.<group>.store.* cases (19 groups). The publication case ('publishes each commit of a call in a host batch of its own') runs since area publication-caches on a hand-built Chord batch; createHost's own batch is phase 6's.",
+      "historicalPisharp": [
+        "src/PiSharp.Durable/Storage/ (new)"
+      ],
+      "currentImplementation": {
+        "mapping": "compatibility/gap-status-2026-11-08.json",
+        "id": "durable.store-storage",
+        "sourceStatus": "source-implemented",
+        "runtimeStatus": "pending-integrated-validation",
+        "note": "Real-host examples and integration tests now exist; final execution and package-only consumption remain pending."
+      }
     },
     {
       "id": "durable.durable-sleep",
@@ -10062,11 +10212,10 @@
       ],
       "change": "HarnessOptions.identity (a pi-ai ClientIdentity) sets the User-Agent and provider attribution of every model request through the Harness, hooks and tools included; api.models in tools and hooks is a wrapper of the host's Models that adds the identity, not the same object.",
       "pisharp": [
-        "src/PiSharp.Durable/Harness/Harness.cs",
-        "src/PiSharp.Durable/Harness/Types.cs",
         "src/PiSharp.Durable/Harness/Models.cs",
         "src/PiSharp.Durable/Models/NativeDurableModels.cs",
-        "src/PiSharp.Cli/Durable/DurableModels.cs"
+        "src/PiSharp.WebAgent/Routing/AccountRouter.cs",
+        "src/PiSharp.WebAgent/Routing/WebDurableModels.cs"
       ],
       "release": "1.5.0",
       "notes": "Depends on ai@1.4.0/Added#1 and agent@1.4.0/Added#1 (group B: ClientIdentity in PiSharp.AI). 0013 design point 'Identity': PiSharp identifies as the Pi version it tracks (user agent pi/<version> (<platform>; <runtime>; <arch>)). NativeDurableModels and the CLI's DurableModels stream over PiSharp.AI transports, so the identity must reach them; the device host and the web agent (decisions 0008 and 0011) open Harnesses and should pass the same identity.",
@@ -10083,7 +10232,21 @@
           "tests/PiSharp.Durable.Tests/ModelsCases.cs: models.identity.a-request-identity-sets-the-user-agent"
         ]
       },
-      "deferred": "Upstream's DEFAULT_HARNESS_IDENTITY is { attribution: PI_ATTRIBUTION }; PiSharp's Harness.DefaultIdentity is empty and adds no attribution, by the owner's decision of 2026-11-05 (decision 0013, core.client-identity-attribution: no attribution). The user-agent part is ported: a Harness without an identity sends PiSharp.AI's default pi/1.5.0 (<platform>; dotnet/<runtime>; <arch>) user agent, and a HarnessOptions.Identity is merged over the default into every chat request. Left for a later sync: (1) IDurableModels' classify, generateImages and deferred fetch/cancel take no request options, so the Harness identity reaches chat requests only (upstream's withClientIdentity wraps every Models call; those calls send PiSharp.AI's default, which equals the Harness default today); (2) NativeDurableModels has no createModels identity option (upstream adc5fa9f8), so its citation stays on v1.2.0. The device host forwards DurableDeviceOptions.Identity, which no caller (CLI, web agent) sets, as PiSharp has no attribution to send."
+      "deferred": "Upstream's DEFAULT_HARNESS_IDENTITY is { attribution: PI_ATTRIBUTION }; PiSharp's Harness.DefaultIdentity is empty and adds no attribution, by the owner's decision of 2026-11-05 (decision 0013, core.client-identity-attribution: no attribution). The user-agent part is ported: a Harness without an identity sends PiSharp.AI's default pi/1.5.0 (<platform>; dotnet/<runtime>; <arch>) user agent, and a HarnessOptions.Identity is merged over the default into every chat request. Left for a later sync: (1) IDurableModels' classify, generateImages and deferred fetch/cancel take no request options, so the Harness identity reaches chat requests only (upstream's withClientIdentity wraps every Models call; those calls send PiSharp.AI's default, which equals the Harness default today); (2) NativeDurableModels has no createModels identity option (upstream adc5fa9f8), so its citation stays on v1.2.0. The device host forwards DurableDeviceOptions.Identity, which no caller (CLI, web agent) sets, as PiSharp has no attribution to send.",
+      "historicalPisharp": [
+        "src/PiSharp.Durable/Harness/Harness.cs",
+        "src/PiSharp.Durable/Harness/Types.cs",
+        "src/PiSharp.Durable/Harness/Models.cs",
+        "src/PiSharp.Durable/Models/NativeDurableModels.cs",
+        "src/PiSharp.Cli/Durable/DurableModels.cs"
+      ],
+      "currentImplementation": {
+        "mapping": "compatibility/gap-status-2026-11-08.json",
+        "id": "durable.harness-identity",
+        "sourceStatus": "source-implemented",
+        "runtimeStatus": "pending-integrated-validation",
+        "note": "Owner-selected no-attribution default is retained. Unsupported deferred providers remain explicitly unsupported, not silently emulated."
+      }
     },
     {
       "id": "durable.host-option-providers",
@@ -10662,12 +10825,10 @@
       ],
       "change": "GenerationHooks.beforeProviderRequest({ model, payload }, api) replaces the provider request body of a generation request, for that request only: the body is in the provider API's format, hooks chain in extension order each time pi-ai builds a body, a throw is reported and the chain continues, and compaction requests do not use it.",
       "pisharp": [
-        "src/PiSharp.Durable/Harness/Generation.cs",
-        "src/PiSharp.Durable/Harness/Types.cs",
         "src/PiSharp.Durable/Harness/Models.cs",
         "src/PiSharp.Durable/Models/NativeDurableModels.cs",
-        "src/PiSharp.Durable/Models/NativeModelRoutes.cs",
-        "src/PiSharp.Cli/Durable/DurableModels.cs"
+        "src/PiSharp.WebAgent/Routing/AccountRouter.cs",
+        "src/PiSharp.WebAgent/Routing/WebDurableModels.cs"
       ],
       "release": "1.5.0",
       "notes": "Upstream passes the chain as pi-ai's onPayload stream option. IDurableModels streams over PiSharp.AI's native transports (decision 0005 'Model adapter'), which must hand the provider body to a callback on every route, the CLI's live routes included; check what PiSharp.AI's payload hook already offers before adding a durable stream option. No PiSharp-only surface is affected.",
@@ -10683,7 +10844,22 @@
           "tests/PiSharp.Durable.Tests/ModelsCases.cs: models.payload.on-payload-replaces-the-json-request-body-and-null-keeps-it"
         ]
       },
-      "deferred": "One part waits: the web agent's account routes (src/PiSharp.WebAgent/Routing/AccountRouter.cs via WebDurableModels, outside the durable areas' files) build their transports on an unwrapped provider handler, so the hook reaches the web agent's native routes but not its account routes; wrapping that handler with NativeDurableModels.PayloadHandler.Wrap (internal today) is a follow-up. A throwing hook's report names its extension in ReportInfo since area reports (f4373fcf)."
+      "deferred": "One part waits: the web agent's account routes (src/PiSharp.WebAgent/Routing/AccountRouter.cs via WebDurableModels, outside the durable areas' files) build their transports on an unwrapped provider handler, so the hook reaches the web agent's native routes but not its account routes; wrapping that handler with NativeDurableModels.PayloadHandler.Wrap (internal today) is a follow-up. A throwing hook's report names its extension in ReportInfo since area reports (f4373fcf).",
+      "historicalPisharp": [
+        "src/PiSharp.Durable/Harness/Generation.cs",
+        "src/PiSharp.Durable/Harness/Types.cs",
+        "src/PiSharp.Durable/Harness/Models.cs",
+        "src/PiSharp.Durable/Models/NativeDurableModels.cs",
+        "src/PiSharp.Durable/Models/NativeModelRoutes.cs",
+        "src/PiSharp.Cli/Durable/DurableModels.cs"
+      ],
+      "currentImplementation": {
+        "mapping": "compatibility/gap-status-2026-11-08.json",
+        "id": "durable.before-provider-request",
+        "sourceStatus": "source-implemented",
+        "runtimeStatus": "pending-integrated-validation",
+        "note": "Owner-selected no-attribution default is retained. Unsupported deferred providers remain explicitly unsupported, not silently emulated."
+      }
     },
     {
       "id": "durable.thinking-level-recorded",
@@ -11159,8 +11335,11 @@
       ],
       "change": "registryReader(value, context) is a RegistryReader over a Chord v2 registry value whose composition is a registry snapshot: snapshot() reads the current composition and subscribe observes its compositions synchronously inside Chord's batch, so a Harness opened in a Chord object takes its extensions from a Chord registry.",
       "pisharp": [
-        "src/PiSharp.Durable/Harness/Registry.cs",
-        "src/PiSharp.Durable/Harness/ (new)"
+        "src/PiSharp.Durable.Store/Storage.cs",
+        "src/PiSharp.Durable.Store/RegistryReader.cs",
+        "samples/Durable.Chord.Examples/Example35.cs",
+        "samples/Durable.Chord.Examples/Example36.cs",
+        "samples/Durable.Chord.Examples/Example37.cs"
       ],
       "release": "1.5.0",
       "notes": "Blocked on Chord v2 registries (chord@1.5.0/Added#3, group F), which phase 4 ports with the parts of Chord v2 durable needs (decision 0013, Durable). PiSharp's IRegistryReader (Harness/Types.cs) and Registry.cs need no other change.",
@@ -11180,7 +11359,18 @@
           "tests/PiSharp.Durable.Tests/HarnessRegistryReaderCases.cs: harness.registry-reader.contract.its-disposer-detaches-the-listener-once-and-close-calls-none"
         ]
       },
-      "deferred": "Phase 6 (createHost) takes example 37 (37-harness-registry.ts as samples/Durable.Examples/ExamplesHarnessRegistry.cs, not ported: it is built on createHost, defineFacet, local objects, self.registry/open/contribute/follow/retryOn/derive and host.hold, which Durable.Examples cannot reach) and the host-built parts of harness-registry-reader.test.ts: in all three cases the host calls that build the registries (createHost, load, serve, local objects with self.writable and self.contribute, host.registry, host.get, host.close), and in the S1 case (a follower of a contributed Harness fails when that Harness's Session closes, and follows the next one) that durable.close rejects with \"session closed\", that the viewer's state is failed with a transient cause and then live, and that durable.retry() opens the next Harness (the case opens it and sets the writable). Every assertion of the other two cases, and the S1 case's assertions on Durable, pass on the hand-built registry."
+      "deferred": "Phase 6 (createHost) takes example 37 (37-harness-registry.ts as samples/Durable.Examples/ExamplesHarnessRegistry.cs, not ported: it is built on createHost, defineFacet, local objects, self.registry/open/contribute/follow/retryOn/derive and host.hold, which Durable.Examples cannot reach) and the host-built parts of harness-registry-reader.test.ts: in all three cases the host calls that build the registries (createHost, load, serve, local objects with self.writable and self.contribute, host.registry, host.get, host.close), and in the S1 case (a follower of a contributed Harness fails when that Harness's Session closes, and follows the next one) that durable.close rejects with \"session closed\", that the viewer's state is failed with a transient cause and then live, and that durable.retry() opens the next Harness (the case opens it and sets the writable). Every assertion of the other two cases, and the S1 case's assertions on Durable, pass on the hand-built registry.",
+      "historicalPisharp": [
+        "src/PiSharp.Durable/Harness/Registry.cs",
+        "src/PiSharp.Durable/Harness/ (new)"
+      ],
+      "currentImplementation": {
+        "mapping": "compatibility/gap-status-2026-11-08.json",
+        "id": "durable.registry-reader",
+        "sourceStatus": "source-implemented",
+        "runtimeStatus": "pending-integrated-validation",
+        "note": "Real-host examples and integration tests now exist; final execution and package-only consumption remain pending."
+      }
     },
     {
       "id": "durable.upstream-tests",
@@ -11238,11 +11428,30 @@
       ],
       "change": "`RemoteWatcher` implements Durable's v1.5.0 `FileWatcher`: `close(context)` is `stop(context)`, and it delivers tagged `FileChange`s (`{ kind: \"paths\", paths }`, `{ kind: \"overflow\" }`, `{ kind: \"failed\", error }`) instead of `WatchChange` objects; a failure stops it. The daemon's `watch` protocol is unchanged: the wire still says `{ overflow: true }` or `{ paths }`.",
       "pisharp": [
+        "src/PiSharp.Env/Connection.cs",
+        "src/PiSharp.Env/RemoteExecutionEnv.cs",
+        "src/PiSharp.Env/RemoteFileSystem.cs",
+        "src/PiSharp.Env/RemoteShell.cs",
+        "src/PiSharp.Env/RemoteWatch.cs",
+        "src/PiSharp.Env/RemoteTerminal.cs",
+        "src/PiSharp.Env/Ssh.cs",
+        "src/PiSharp.Env.Daemon/EnvDaemonSession.cs",
+        "src/PiSharp.Env.Daemon/Native/pisharp_env_native.c",
+        "src/PiSharp.Env.Protocol/FrameCodec.cs"
+      ],
+      "release": "1.5.0.x",
+      "notes": "PiSharp has the v1.2.0 shapes in Durable: IFileWatcher with CloseAsync and the WatchChange records (FileSystem.cs:126 and :154-160). The rename to stop and FileChange is Durable's change (group E, phase 4); this row follows it in the remote client, which PiSharp does not have yet (env.remote-execution-env).",
+      "historicalPisharp": [
         "src/PiSharp.Durable/Env/FileSystem.cs",
         "src/PiSharp.Env/ (new)"
       ],
-      "release": "1.5.0.x",
-      "notes": "PiSharp has the v1.2.0 shapes in Durable: IFileWatcher with CloseAsync and the WatchChange records (FileSystem.cs:126 and :154-160). The rename to stop and FileChange is Durable's change (group E, phase 4); this row follows it in the remote client, which PiSharp does not have yet (env.remote-execution-env)."
+      "currentImplementation": {
+        "mapping": "compatibility/gap-status-2026-11-08.json",
+        "id": "env.remote-watcher-stop",
+        "sourceStatus": "source-implemented",
+        "runtimeStatus": "pending-integrated-validation",
+        "note": "Native daemon artifact, real SSH and OS-specific process/PTY gates remain. Windows PTY is explicitly unsupported (ENOTSUP); Android and six-target NativeAOT support require actual artifact execution."
+      }
     },
     {
       "id": "env.daemon-helper-thread-spawn-error",
@@ -11258,10 +11467,29 @@
       ],
       "change": "When the daemon cannot start a helper thread for `exec` or `pty` (for example at a cgroup task limit), the request fails with `spawn_error` instead of hanging, and the command already started is killed and reaped (#11433).",
       "pisharp": [
-        "src/PiSharp.Env.Daemon/ (new)"
+        "src/PiSharp.Env/Connection.cs",
+        "src/PiSharp.Env/RemoteExecutionEnv.cs",
+        "src/PiSharp.Env/RemoteFileSystem.cs",
+        "src/PiSharp.Env/RemoteShell.cs",
+        "src/PiSharp.Env/RemoteWatch.cs",
+        "src/PiSharp.Env/RemoteTerminal.cs",
+        "src/PiSharp.Env/Ssh.cs",
+        "src/PiSharp.Env.Daemon/EnvDaemonSession.cs",
+        "src/PiSharp.Env.Daemon/Native/pisharp_env_native.c",
+        "src/PiSharp.Env.Protocol/FrameCodec.cs"
       ],
       "release": "1.5.0.x",
-      "notes": "Daemon side. It comes with the daemon either way the owner decides (env.daemon)."
+      "notes": "Daemon side. It comes with the daemon either way the owner decides (env.daemon).",
+      "historicalPisharp": [
+        "src/PiSharp.Env.Daemon/ (new)"
+      ],
+      "currentImplementation": {
+        "mapping": "compatibility/gap-status-2026-11-08.json",
+        "id": "env.daemon-helper-thread-spawn-error",
+        "sourceStatus": "source-implemented",
+        "runtimeStatus": "pending-integrated-validation",
+        "note": "Native daemon artifact, real SSH and OS-specific process/PTY gates remain. Windows PTY is explicitly unsupported (ENOTSUP); Android and six-target NativeAOT support require actual artifact execution."
+      }
     },
     {
       "id": "env.daemon-exit-signals",
@@ -11280,10 +11508,29 @@
       ],
       "change": "On Unix the daemon blocks `SIGTERM`, `SIGINT` and `SIGHUP` before it starts any thread and waits for them on a thread of its own, which kills every process group it started and exits, so `Connection.close()` (which ends stdin and sends `SIGTERM`) no longer leaves commands running. On Windows a job object kills each command's own process with the daemon but not the processes it started; the protocol doc now says so.",
       "pisharp": [
-        "src/PiSharp.Env.Daemon/ (new)"
+        "src/PiSharp.Env/Connection.cs",
+        "src/PiSharp.Env/RemoteExecutionEnv.cs",
+        "src/PiSharp.Env/RemoteFileSystem.cs",
+        "src/PiSharp.Env/RemoteShell.cs",
+        "src/PiSharp.Env/RemoteWatch.cs",
+        "src/PiSharp.Env/RemoteTerminal.cs",
+        "src/PiSharp.Env/Ssh.cs",
+        "src/PiSharp.Env.Daemon/EnvDaemonSession.cs",
+        "src/PiSharp.Env.Daemon/Native/pisharp_env_native.c",
+        "src/PiSharp.Env.Protocol/FrameCodec.cs"
       ],
       "release": "1.5.0.x",
-      "notes": "A C# daemon would register the same signals with PosixSignalRegistration. It comes with upstream's binaries if the owner runs them (env.daemon)."
+      "notes": "A C# daemon would register the same signals with PosixSignalRegistration. It comes with upstream's binaries if the owner runs them (env.daemon).",
+      "historicalPisharp": [
+        "src/PiSharp.Env.Daemon/ (new)"
+      ],
+      "currentImplementation": {
+        "mapping": "compatibility/gap-status-2026-11-08.json",
+        "id": "env.daemon-exit-signals",
+        "sourceStatus": "source-implemented",
+        "runtimeStatus": "pending-integrated-validation",
+        "note": "Native daemon artifact, real SSH and OS-specific process/PTY gates remain. Windows PTY is explicitly unsupported (ENOTSUP); Android and six-target NativeAOT support require actual artifact execution."
+      }
     },
     {
       "id": "env.connection-startup-stderr",
@@ -11297,10 +11544,29 @@
       ],
       "change": "Unlisted (#10716, 479d6e5e2): when the daemon exits or fails before `hello`, the startup error adds the last 20 lines (at most 2,000 characters) of its stderr, with terminal escapes and control characters removed, because a tool error can reach the model. A ready session fails as soon as the daemon exits, even while a process it started keeps a pipe open.",
       "pisharp": [
-        "src/PiSharp.Env/ (new)"
+        "src/PiSharp.Env/Connection.cs",
+        "src/PiSharp.Env/RemoteExecutionEnv.cs",
+        "src/PiSharp.Env/RemoteFileSystem.cs",
+        "src/PiSharp.Env/RemoteShell.cs",
+        "src/PiSharp.Env/RemoteWatch.cs",
+        "src/PiSharp.Env/RemoteTerminal.cs",
+        "src/PiSharp.Env/Ssh.cs",
+        "src/PiSharp.Env.Daemon/EnvDaemonSession.cs",
+        "src/PiSharp.Env.Daemon/Native/pisharp_env_native.c",
+        "src/PiSharp.Env.Protocol/FrameCodec.cs"
       ],
       "release": "1.5.0.x",
-      "notes": "In no changelog. Part of the client (env.remote-execution-env)."
+      "notes": "In no changelog. Part of the client (env.remote-execution-env).",
+      "historicalPisharp": [
+        "src/PiSharp.Env/ (new)"
+      ],
+      "currentImplementation": {
+        "mapping": "compatibility/gap-status-2026-11-08.json",
+        "id": "env.connection-startup-stderr",
+        "sourceStatus": "source-implemented",
+        "runtimeStatus": "pending-integrated-validation",
+        "note": "Native daemon artifact, real SSH and OS-specific process/PTY gates remain. Windows PTY is explicitly unsupported (ENOTSUP); Android and six-target NativeAOT support require actual artifact execution."
+      }
     },
     {
       "id": "env.daemon-watch-frame-overflow",
@@ -11313,10 +11579,29 @@
       ],
       "change": "Unlisted (#11605, 102d12871): a watch `change` event whose path list would not fit in a 16 MiB frame is sent as the existing `{ overflow: true }` event. Before, `write_frame` refused it and the daemon's only output writer stopped, so requests hung until the client's 30 s silence limit dropped the connection.",
       "pisharp": [
-        "src/PiSharp.Env.Daemon/ (new)"
+        "src/PiSharp.Env/Connection.cs",
+        "src/PiSharp.Env/RemoteExecutionEnv.cs",
+        "src/PiSharp.Env/RemoteFileSystem.cs",
+        "src/PiSharp.Env/RemoteShell.cs",
+        "src/PiSharp.Env/RemoteWatch.cs",
+        "src/PiSharp.Env/RemoteTerminal.cs",
+        "src/PiSharp.Env/Ssh.cs",
+        "src/PiSharp.Env.Daemon/EnvDaemonSession.cs",
+        "src/PiSharp.Env.Daemon/Native/pisharp_env_native.c",
+        "src/PiSharp.Env.Protocol/FrameCodec.cs"
       ],
       "release": "1.5.0.x",
-      "notes": "In no changelog. Daemon side (env.daemon)."
+      "notes": "In no changelog. Daemon side (env.daemon).",
+      "historicalPisharp": [
+        "src/PiSharp.Env.Daemon/ (new)"
+      ],
+      "currentImplementation": {
+        "mapping": "compatibility/gap-status-2026-11-08.json",
+        "id": "env.daemon-watch-frame-overflow",
+        "sourceStatus": "source-implemented",
+        "runtimeStatus": "pending-integrated-validation",
+        "note": "Native daemon artifact, real SSH and OS-specific process/PTY gates remain. Windows PTY is explicitly unsupported (ENOTSUP); Android and six-target NativeAOT support require actual artifact execution."
+      }
     },
     {
       "id": "env.remote-execution-env",
@@ -11336,13 +11621,32 @@
       ],
       "change": "`RemoteExecutionEnv` is a Durable `ExecutionEnv` whose file operations, commands, line scans, `listFiles` and watches run on a pi-env daemon through a `Connection`: frames over the daemon's stdin and stdout, pings every 5 s, a 30 s silence limit, and a new daemon at the next request after a loss (requests of the lost one fail with `lost: true`). Results match `NodeExecutionEnv` on that machine; only error messages differ. `LocalExecutionEnv` is the local environment plus `listFiles` through a daemon on the same machine, and `nodePlatform(info)` maps the daemon's platform names to Node's.",
       "pisharp": [
+        "src/PiSharp.Env/Connection.cs",
+        "src/PiSharp.Env/RemoteExecutionEnv.cs",
+        "src/PiSharp.Env/RemoteFileSystem.cs",
+        "src/PiSharp.Env/RemoteShell.cs",
+        "src/PiSharp.Env/RemoteWatch.cs",
+        "src/PiSharp.Env/RemoteTerminal.cs",
+        "src/PiSharp.Env/Ssh.cs",
+        "src/PiSharp.Env.Daemon/EnvDaemonSession.cs",
+        "src/PiSharp.Env.Daemon/Native/pisharp_env_native.c",
+        "src/PiSharp.Env.Protocol/FrameCodec.cs"
+      ],
+      "release": "1.5.0.x",
+      "notes": "PiSharp implements Durable's ExecutionEnv locally (IExecutionEnv, Shell.cs:150; LocalExecutionEnv.cs:43) and lists files in process with the daemon's semantics (LocalFileListing.cs:30), so local listing needs no daemon. The remote client is missing. It builds on Durable's v1.5.0 ExecutionEnv (phase 4), and pi-env depends on pi-durable and Chord. The coding agent does not use pi-env (not in coding-agent's v1.5.0 dependencies, no imports in its src), so nothing pulls it into phase 2.",
+      "historicalPisharp": [
         "src/PiSharp.Durable/Env/Shell.cs",
         "src/PiSharp.Durable.Tools/Env/LocalExecutionEnv.cs",
         "src/PiSharp.Durable/Env/Local/LocalFileListing.cs",
         "src/PiSharp.Env/ (new)"
       ],
-      "release": "1.5.0.x",
-      "notes": "PiSharp implements Durable's ExecutionEnv locally (IExecutionEnv, Shell.cs:150; LocalExecutionEnv.cs:43) and lists files in process with the daemon's semantics (LocalFileListing.cs:30), so local listing needs no daemon. The remote client is missing. It builds on Durable's v1.5.0 ExecutionEnv (phase 4), and pi-env depends on pi-durable and Chord. The coding agent does not use pi-env (not in coding-agent's v1.5.0 dependencies, no imports in its src), so nothing pulls it into phase 2."
+      "currentImplementation": {
+        "mapping": "compatibility/gap-status-2026-11-08.json",
+        "id": "env.remote-execution-env",
+        "sourceStatus": "source-implemented",
+        "runtimeStatus": "pending-integrated-validation",
+        "note": "Native daemon artifact, real SSH and OS-specific process/PTY gates remain. Windows PTY is explicitly unsupported (ENOTSUP); Android and six-target NativeAOT support require actual artifact execution."
+      }
     },
     {
       "id": "env.ssh-bootstrap",
@@ -11356,10 +11660,29 @@
       ],
       "change": "`connectSsh(target)` detects the remote system, deploys the daemon the package ships for it (named by its SHA-256 and verified before every start) and connects; `sshConnection` does the same lazily at the first operation. `ssh` runs with BatchMode, strict host-key checking against the application's own known-hosts file under a fixed alias, and no forwarding, shared connections or configured commands; `scanHostKey`, `acceptHostKey` and `forgetHostKey` manage trusted keys, and a changed key is never accepted without removing the old one. Windows targets are detected and deployed through PowerShell.",
       "pisharp": [
-        "src/PiSharp.Env/ (new)"
+        "src/PiSharp.Env/Connection.cs",
+        "src/PiSharp.Env/RemoteExecutionEnv.cs",
+        "src/PiSharp.Env/RemoteFileSystem.cs",
+        "src/PiSharp.Env/RemoteShell.cs",
+        "src/PiSharp.Env/RemoteWatch.cs",
+        "src/PiSharp.Env/RemoteTerminal.cs",
+        "src/PiSharp.Env/Ssh.cs",
+        "src/PiSharp.Env.Daemon/EnvDaemonSession.cs",
+        "src/PiSharp.Env.Daemon/Native/pisharp_env_native.c",
+        "src/PiSharp.Env.Protocol/FrameCodec.cs"
       ],
       "release": "1.5.0.x",
-      "notes": "Security-sensitive: the host-key flow puts a fingerprint in front of the owner to compare out of band. Which binaries get deployed follows env.daemon. The daemon's `--token` argument is a stdout sync marker, not a credential; check it against the rule that secrets never reach command lines."
+      "notes": "Security-sensitive: the host-key flow puts a fingerprint in front of the owner to compare out of band. Which binaries get deployed follows env.daemon. The daemon's `--token` argument is a stdout sync marker, not a credential; check it against the rule that secrets never reach command lines.",
+      "historicalPisharp": [
+        "src/PiSharp.Env/ (new)"
+      ],
+      "currentImplementation": {
+        "mapping": "compatibility/gap-status-2026-11-08.json",
+        "id": "env.ssh-bootstrap",
+        "sourceStatus": "source-implemented",
+        "runtimeStatus": "pending-integrated-validation",
+        "note": "Native daemon artifact, real SSH and OS-specific process/PTY gates remain. Windows PTY is explicitly unsupported (ENOTSUP); Android and six-target NativeAOT support require actual artifact execution."
+      }
     },
     {
       "id": "env.terminal",
@@ -11374,9 +11697,28 @@
       ],
       "change": "`openTerminal(connection, options)` runs a program, by default the login shell, in a daemon pseudo-terminal: raw output, input in arrival order, resizing (`SIGWINCH`), the exit code, and `foreground()` naming the process group in front when it is not the program's own. `localDaemon()` starts the daemon for this machine, for terminals without SSH. Unix only; Windows answers `ENOTSUP`.",
       "pisharp": [
+        "src/PiSharp.Env/Connection.cs",
+        "src/PiSharp.Env/RemoteExecutionEnv.cs",
+        "src/PiSharp.Env/RemoteFileSystem.cs",
+        "src/PiSharp.Env/RemoteShell.cs",
+        "src/PiSharp.Env/RemoteWatch.cs",
+        "src/PiSharp.Env/RemoteTerminal.cs",
+        "src/PiSharp.Env/Ssh.cs",
+        "src/PiSharp.Env.Daemon/EnvDaemonSession.cs",
+        "src/PiSharp.Env.Daemon/Native/pisharp_env_native.c",
+        "src/PiSharp.Env.Protocol/FrameCodec.cs"
+      ],
+      "release": "1.5.0.x",
+      "historicalPisharp": [
         "src/PiSharp.Env/ (new)"
       ],
-      "release": "1.5.0.x"
+      "currentImplementation": {
+        "mapping": "compatibility/gap-status-2026-11-08.json",
+        "id": "env.terminal",
+        "sourceStatus": "source-implemented",
+        "runtimeStatus": "pending-integrated-validation",
+        "note": "Native daemon artifact, real SSH and OS-specific process/PTY gates remain. Windows PTY is explicitly unsupported (ENOTSUP); Android and six-target NativeAOT support require actual artifact execution."
+      }
     },
     {
       "id": "env.daemon",
@@ -11390,10 +11732,29 @@
       ],
       "change": "`pi-env serve --token <hex>`, a Rust program, prints `PI-ENV <token>` and then speaks big-endian length-prefixed frames (request, result, error, event, cancel, ping; a JSON object plus a raw payload, at most 16 MiB) on stdin and stdout. File operations run on a worker pool and `exec`, `pty` and `watch` on threads of their own, with output windows, cancellation by request id, replies ahead of bulk output, native watching with polling on Windows and network file systems, and a kill of every process group on silence or end of input.",
       "pisharp": [
-        "src/PiSharp.Env.Daemon/ (new)"
+        "src/PiSharp.Env/Connection.cs",
+        "src/PiSharp.Env/RemoteExecutionEnv.cs",
+        "src/PiSharp.Env/RemoteFileSystem.cs",
+        "src/PiSharp.Env/RemoteShell.cs",
+        "src/PiSharp.Env/RemoteWatch.cs",
+        "src/PiSharp.Env/RemoteTerminal.cs",
+        "src/PiSharp.Env/Ssh.cs",
+        "src/PiSharp.Env.Daemon/EnvDaemonSession.cs",
+        "src/PiSharp.Env.Daemon/Native/pisharp_env_native.c",
+        "src/PiSharp.Env.Protocol/FrameCodec.cs"
       ],
       "release": "1.5.0.x",
-      "notes": "Decision 0013: port it or run upstream's binaries, settled when phase 5 starts. Porting means a C# NativeAOT daemon for Linux, macOS, Android (Termux) and Windows on x64 and arm64. Running means shipping upstream's per-platform binaries from the npm package's bin/ and verifying their SHA-256."
+      "notes": "Decision 0013: port it or run upstream's binaries, settled when phase 5 starts. Porting means a C# NativeAOT daemon for Linux, macOS, Android (Termux) and Windows on x64 and arm64. Running means shipping upstream's per-platform binaries from the npm package's bin/ and verifying their SHA-256.",
+      "historicalPisharp": [
+        "src/PiSharp.Env.Daemon/ (new)"
+      ],
+      "currentImplementation": {
+        "mapping": "compatibility/gap-status-2026-11-08.json",
+        "id": "env.daemon",
+        "sourceStatus": "source-implemented",
+        "runtimeStatus": "pending-integrated-validation",
+        "note": "Native daemon artifact, real SSH and OS-specific process/PTY gates remain. Windows PTY is explicitly unsupported (ENOTSUP); Android and six-target NativeAOT support require actual artifact execution."
+      }
     },
     {
       "id": "env.conformance-tests",
@@ -11413,12 +11774,31 @@
       ],
       "change": "The tests run Durable's env conformance suite against `RemoteExecutionEnv` over a daemon pipe, compare random operation sequences and Durable's tools against `NodeExecutionEnv` on the same machine, check that old daemons answer `not_supported`, and run the suite over a real SSH server when `PI_ENV_SSH_HOST` is set.",
       "pisharp": [
+        "src/PiSharp.Env/Connection.cs",
+        "src/PiSharp.Env/RemoteExecutionEnv.cs",
+        "src/PiSharp.Env/RemoteFileSystem.cs",
+        "src/PiSharp.Env/RemoteShell.cs",
+        "src/PiSharp.Env/RemoteWatch.cs",
+        "src/PiSharp.Env/RemoteTerminal.cs",
+        "src/PiSharp.Env/Ssh.cs",
+        "src/PiSharp.Env.Daemon/EnvDaemonSession.cs",
+        "src/PiSharp.Env.Daemon/Native/pisharp_env_native.c",
+        "src/PiSharp.Env.Protocol/FrameCodec.cs"
+      ],
+      "release": "1.5.0.x",
+      "notes": "PiSharp's port of Durable's env conformance kit (EnvConformance.cs) can be reused. Tests stay offline: the external SSH suite stays opt-in, behind its environment variable.",
+      "historicalPisharp": [
         "src/PiSharp.Durable/Testing/EnvConformance.cs",
         "tests/PiSharp.Durable.Tests/EnvListFilesCases.cs",
         "tests/PiSharp.Env.Tests/ (new)"
       ],
-      "release": "1.5.0.x",
-      "notes": "PiSharp's port of Durable's env conformance kit (EnvConformance.cs) can be reused. Tests stay offline: the external SSH suite stays opt-in, behind its environment variable."
+      "currentImplementation": {
+        "mapping": "compatibility/gap-status-2026-11-08.json",
+        "id": "env.conformance-tests",
+        "sourceStatus": "source-implemented",
+        "runtimeStatus": "pending-integrated-validation",
+        "note": "Native daemon artifact, real SSH and OS-specific process/PTY gates remain. Windows PTY is explicitly unsupported (ENOTSUP); Android and six-target NativeAOT support require actual artifact execution."
+      }
     },
     {
       "id": "chord.watch-handle",
@@ -11643,10 +12023,21 @@
       ],
       "change": "The tracker keeps its one open change in a plain field and registers a `WeakRef` only for a change opened while another is open (a competitor); before, every change got a `WeakRef` in a set. A draft dropped without `prepare()` or `abort()` now stays referenced by the tracker until its next `beginChange()` or `adopt()`.",
       "pisharp": [
-        "src/PiSharp.Durable/Chord/Delta/Tracker.cs"
+        "src/PiSharp.Durable/Chord/Delta/Tracker.cs",
+        "src/PiSharp.Durable/Chord/Delta/Draft.cs"
       ],
       "release": "1.5.0.x",
-      "notes": "PiSharp follows v1.2.0: every change registers a `WeakReference<ChangeContext>` in a HashSet (Tracker.cs:19 and :105-112). Upstream's motive is V8 promoting each change's overlay; in .NET each WeakReference is a GC handle allocated per change, so the same shape saves work here too. Staleness rules do not change; the test checks the open and competitor bookkeeping."
+      "notes": "PiSharp follows v1.2.0: every change registers a `WeakReference<ChangeContext>` in a HashSet (Tracker.cs:19 and :105-112). Upstream's motive is V8 promoting each change's overlay; in .NET each WeakReference is a GC handle allocated per change, so the same shape saves work here too. Staleness rules do not change; the test checks the open and competitor bookkeeping.",
+      "historicalPisharp": [
+        "src/PiSharp.Durable/Chord/Delta/Tracker.cs"
+      ],
+      "currentImplementation": {
+        "mapping": "compatibility/gap-status-2026-11-08.json",
+        "id": "chord.delta-tracker-open-change",
+        "sourceStatus": "source-implemented",
+        "runtimeStatus": "pending-integrated-validation",
+        "note": "Explicit CLR drafts replace revoked JS proxies; cleanup visits allocated draft nodes. Immutable range/container copies and microtask timing have native dispositions."
+      }
     },
     {
       "id": "chord.delta-container-copies",
@@ -11939,10 +12330,21 @@
       ],
       "change": "The Node SQLite driver keeps the 256 most recently used prepared statements per connection instead of every statement it ever prepared, so callers that generate SQL of unbounded shapes (a query builder) no longer grow memory without bound.",
       "pisharp": [
+        "src/PiSharp.Durable.Sqlite/Storage.cs",
         "src/PiSharp.Durable.Sqlite/ConnectionDatabase.cs"
       ],
       "release": "1.5.0.x",
-      "notes": "PiSharp's StatementCache (ConnectionDatabase.cs:140-163) keeps every prepared SqliteCommand in a Dictionary for the connection's life. An evicted command must be disposed; the PrepareCounts test hook stays."
+      "notes": "PiSharp's StatementCache (ConnectionDatabase.cs:140-163) keeps every prepared SqliteCommand in a Dictionary for the connection's life. An evicted command must be disposed; the PrepareCounts test hook stays.",
+      "historicalPisharp": [
+        "src/PiSharp.Durable.Sqlite/ConnectionDatabase.cs"
+      ],
+      "currentImplementation": {
+        "mapping": "compatibility/gap-status-2026-11-08.json",
+        "id": "chord.sqlite-statement-cache",
+        "sourceStatus": "source-implemented",
+        "runtimeStatus": "pending-integrated-validation",
+        "note": "Source and authored tests are present; final integrated validation is pending."
+      }
     },
     {
       "id": "chord.sqlite-cloudflare",
@@ -11980,11 +12382,22 @@
       ],
       "change": "`createSqliteTelemetry(db, { retentionMs, maxQueuedSpans })` records pi-telemetry spans and metrics over any `SqliteDatabase`: bounded queues of settled spans (10,000 by default), ten-second metric aggregates (count, sum, min and max per series), a one-second flush in one transaction with retention cleanup (seven days), and the `TelemetryStore` queries `findTraces`, `getTrace` and `findMetrics` over `telemetry_spans`, `telemetry_metrics` and `telemetry_schema`. A write failure stops recording for good.",
       "pisharp": [
+        "src/PiSharp.Chord/TelemetrySqlite/SqliteTelemetry.cs",
+        "src/PiSharp.Chord/TelemetrySqlite/SqliteTelemetryStore.cs"
+      ],
+      "release": "1.5.0.x",
+      "notes": "Depends on the telemetry area (phase 3: TelemetryContext, TelemetryStore, the trace shapes and renderTrace) and on chord.sqlite. It could ship with phase 3 if the owner wants stored traces in 1.5.0.",
+      "historicalPisharp": [
         "src/PiSharp.Durable.Sqlite/Database.cs",
         "src/PiSharp.Chord/ (new)"
       ],
-      "release": "1.5.0.x",
-      "notes": "Depends on the telemetry area (phase 3: TelemetryContext, TelemetryStore, the trace shapes and renderTrace) and on chord.sqlite. It could ship with phase 3 if the owner wants stored traces in 1.5.0."
+      "currentImplementation": {
+        "mapping": "compatibility/gap-status-2026-11-08.json",
+        "id": "chord.telemetry-sqlite",
+        "sourceStatus": "source-implemented",
+        "runtimeStatus": "pending-integrated-validation",
+        "note": "Opt-in recorder/query store; no automatic SQL capture or exporter is enabled."
+      }
     },
     {
       "id": "chord.contracts",
@@ -12009,10 +12422,24 @@
       ],
       "change": "Contracts are runtime values: `local` and `remote` types with a version, an input schema, and variants of state and methods (a remote object's `variant`, chosen by its factory and reserved as a member name); `method(args?, result?)` (no arguments: `ref.name(ctx?)`; no result: void; both left out of the description), `opaque`, and on remote types a required placement, `hostNamed(name)` or `hostFamily(prefix, field)`. Descriptions are hashed into fingerprints, `coverage` checks that a provider covers a consumer (equal placements, agreeing arguments) and `accepts` adapters serve old consumers. A reference is `Ref<C>`, a factory returns `ImplementationOf<C>`, and failures are `ChordError`s with the codes of the guide.",
       "pisharp": [
-        "src/PiSharp.Chord/ (new)"
+        "src/PiSharp.Chord/Legacy/Contracts.cs",
+        "src/PiSharp.Chord/Legacy/Runtime/Host.cs",
+        "src/PiSharp.Chord/Legacy/Runtime/Schema.cs",
+        "src/PiSharp.Chord/Legacy/Runtime/Reference.cs",
+        "src/PiSharp.Chord/Legacy/Runtime/Reload.cs"
       ],
       "release": "1.5.0.x",
-      "notes": "PiSharp has no Chord kernel: decision 0005 ported only what pi-durable imported. A fingerprint is hash64 of the description's canonical JSON, so a C# host can serve TypeScript peers (browsers, Node hosts) only if it reproduces both byte for byte; pin fingerprints of upstream's test contracts. The 1.3.0 renames (Ref, ImplementationOf, variant) are naming for a fresh port. TypeScript-only checks (PlacementFor, the hostFamily field) become generic constraints or run-time checks. The coding agent does not use Chord: coding-agent's v1.5.0 package.json does not list it (coding-agent@1.2.0 removed the dependency), its src imports nothing from it, and examples/tsconfig.json only repeats the root path map, so nothing pulls Chord into phase 2. Its consumers are pi-durable (phase 4) and pi-env."
+      "notes": "PiSharp has no Chord kernel: decision 0005 ported only what pi-durable imported. A fingerprint is hash64 of the description's canonical JSON, so a C# host can serve TypeScript peers (browsers, Node hosts) only if it reproduces both byte for byte; pin fingerprints of upstream's test contracts. The 1.3.0 renames (Ref, ImplementationOf, variant) are naming for a fresh port. TypeScript-only checks (PlacementFor, the hostFamily field) become generic constraints or run-time checks. The coding agent does not use Chord: coding-agent's v1.5.0 package.json does not list it (coding-agent@1.2.0 removed the dependency), its src imports nothing from it, and examples/tsconfig.json only repeats the root path map, so nothing pulls Chord into phase 2. Its consumers are pi-durable (phase 4) and pi-env.",
+      "historicalPisharp": [
+        "src/PiSharp.Chord/ (new)"
+      ],
+      "currentImplementation": {
+        "mapping": "compatibility/gap-status-2026-11-08.json",
+        "id": "chord.contracts",
+        "sourceStatus": "source-implemented",
+        "runtimeStatus": "pending-integrated-validation",
+        "note": "Separate legacy contract/runtime and protocol 4; native declarations/ALC replace TypeScript evaluation. Platform process/collection gates remain."
+      }
     },
     {
       "id": "chord.contract-schemas",
@@ -12032,10 +12459,24 @@
       ],
       "change": "Chord's schemas are JSON Schema checked by pi-schema instead of TypeBox: contracts, `self.state(...)` schemas and method signatures take pi-schema builders or any JSON Schema object, and validation, input defaults and stripping of unknown fields work on any schema by its shape. `format` is an annotation, never checked. An `invalid` error's message is `<path> <message>` in pi-schema's words and its `details` are pi-schema `ValidationError`s (`{ path, keyword, message }`); link frames, descriptions, fingerprints and identities stay the same for schemas with the same JSON.",
       "pisharp": [
-        "src/PiSharp.Chord/ (new)"
+        "src/PiSharp.Chord/Legacy/Contracts.cs",
+        "src/PiSharp.Chord/Legacy/Runtime/Host.cs",
+        "src/PiSharp.Chord/Legacy/Runtime/Schema.cs",
+        "src/PiSharp.Chord/Legacy/Runtime/Reference.cs",
+        "src/PiSharp.Chord/Legacy/Runtime/Reload.cs"
       ],
       "release": "1.5.0.x",
-      "notes": "Depends on the schema area's pi-schema port (phase 2) for validation, defaults and stripping. The TypeBox-to-pi-schema migration table is TypeScript API; a C# port starts on JSON Schema. Fingerprints come from the schema JSON (chord.contracts)."
+      "notes": "Depends on the schema area's pi-schema port (phase 2) for validation, defaults and stripping. The TypeBox-to-pi-schema migration table is TypeScript API; a C# port starts on JSON Schema. Fingerprints come from the schema JSON (chord.contracts).",
+      "historicalPisharp": [
+        "src/PiSharp.Chord/ (new)"
+      ],
+      "currentImplementation": {
+        "mapping": "compatibility/gap-status-2026-11-08.json",
+        "id": "chord.contract-schemas",
+        "sourceStatus": "source-implemented",
+        "runtimeStatus": "pending-integrated-validation",
+        "note": "Separate legacy contract/runtime and protocol 4; native declarations/ALC replace TypeScript evaluation. Platform process/collection gates remain."
+      }
     },
     {
       "id": "chord.objects-declarations",
@@ -12062,10 +12503,24 @@
       ],
       "change": "`host.serve(type, factory, options)` serves a type. `lifetime: \"referenced\"` (the default) creates an object at the first `get` of its address and disposes it after its last reference is released, plus `linger`; `lifetime: \"host\"` keeps the type's one object from facet load to host close, for local types whose input accepts `{}` and without `linger`, and only such objects may register. Factories declare by name: `self.state(name, schema, initial or { init }, { version, migrate })` cells with per-cell versions (`init(ctx)` runs before the object goes live), `self.resource(name, { version, deps, exclusive, open, close })`, `self.on(name, source, [select,] handler)`, and unnamed `self.derive` and `self.task`; a repeated name is `invalid/duplicate`.",
       "pisharp": [
-        "src/PiSharp.Chord/ (new)"
+        "src/PiSharp.Chord/Legacy/Contracts.cs",
+        "src/PiSharp.Chord/Legacy/Runtime/Host.cs",
+        "src/PiSharp.Chord/Legacy/Runtime/Schema.cs",
+        "src/PiSharp.Chord/Legacy/Runtime/Reference.cs",
+        "src/PiSharp.Chord/Legacy/Runtime/Reload.cs"
       ],
       "release": "1.5.0.x",
-      "notes": "TypeScript-only parts (ServeOptionsFor and the compile-time refusal of lifetime host, the EventOf, ValueOf, StateOptions and Lifetime types) become C# overloads or generic constraints over the same run-time refusals."
+      "notes": "TypeScript-only parts (ServeOptionsFor and the compile-time refusal of lifetime host, the EventOf, ValueOf, StateOptions and Lifetime types) become C# overloads or generic constraints over the same run-time refusals.",
+      "historicalPisharp": [
+        "src/PiSharp.Chord/ (new)"
+      ],
+      "currentImplementation": {
+        "mapping": "compatibility/gap-status-2026-11-08.json",
+        "id": "chord.objects-declarations",
+        "sourceStatus": "source-implemented",
+        "runtimeStatus": "pending-integrated-validation",
+        "note": "Separate legacy contract/runtime and protocol 4; native declarations/ALC replace TypeScript evaluation. Platform process/collection gates remain."
+      }
     },
     {
       "id": "chord.hosts-facets-principals",
@@ -12086,10 +12541,24 @@
       ],
       "change": "`createHost<P>({ name, self, principalKey, upstream, ... })` hosts objects for the app's principal type: `self` is the principal of the host's own code, `connect(link, { principal })` names what the parent's requests act as, and principals are recognized by `principalKey`; Chord invents none. `defineFacet` facets get a `FacetApi` (`serve`, `name`, `root`, `registry` and `signal`, which aborts once that run of the facet is no longer installed), `host.load` installs facets with host-lifetime objects live first (`awaitHostObjects`), and `host.root(fn)` runs code outside objects with a `ctx`.",
       "pisharp": [
-        "src/PiSharp.Chord/ (new)"
+        "src/PiSharp.Chord/Legacy/Contracts.cs",
+        "src/PiSharp.Chord/Legacy/Runtime/Host.cs",
+        "src/PiSharp.Chord/Legacy/Runtime/Schema.cs",
+        "src/PiSharp.Chord/Legacy/Runtime/Reference.cs",
+        "src/PiSharp.Chord/Legacy/Runtime/Reload.cs"
       ],
       "release": "1.5.0.x",
-      "notes": "The principal type parameter maps to C# generics; FacetApi.signal maps to a CancellationToken."
+      "notes": "The principal type parameter maps to C# generics; FacetApi.signal maps to a CancellationToken.",
+      "historicalPisharp": [
+        "src/PiSharp.Chord/ (new)"
+      ],
+      "currentImplementation": {
+        "mapping": "compatibility/gap-status-2026-11-08.json",
+        "id": "chord.hosts-facets-principals",
+        "sourceStatus": "source-implemented",
+        "runtimeStatus": "pending-integrated-validation",
+        "note": "Separate legacy contract/runtime and protocol 4; native declarations/ALC replace TypeScript evaluation. Platform process/collection gates remain."
+      }
     },
     {
       "id": "chord.references",
@@ -12116,10 +12585,30 @@
       ],
       "change": "An awaited reference has its state: `ctx.get` and `host.get` resolve once the reference is live and every state member of its variant has a first snapshot, and reject with the activation error, `aborted` or `unavailable/ready_timeout` after `readyTimeout` (60 s); `host.hold` is the synchronous form and `self.get` stays synchronous, its object going live only once its references are hydrated. State members are typed `T` (read early: `not_ready`; outside the variant: `not_in_variant`), a held remote reference stays subscribed (`state: false` makes a method-only reference), references to one object share one binding per host and key, kept hydrated after release by `HostOptions.linger`, and a remote call refuses a ctx from another host (`invalid/foreign_ctx`).",
       "pisharp": [
-        "src/PiSharp.Chord/ (new)"
+        "src/PiSharp.Chord/Legacy/Contracts.cs",
+        "src/PiSharp.Chord/Legacy/Runtime/Host.cs",
+        "src/PiSharp.Chord/Legacy/Runtime/Schema.cs",
+        "src/PiSharp.Chord/Legacy/Runtime/Reference.cs",
+        "src/PiSharp.Chord/Legacy/Runtime/Reload.cs",
+        "src/PiSharp.Chord/Legacy/Protocol/LegacyFrame.cs",
+        "src/PiSharp.Chord/Legacy/Protocol/LegacyCodec.cs",
+        "src/PiSharp.Chord/Legacy/Protocol/LegacyConnection.cs",
+        "src/PiSharp.Chord/Legacy/Protocol/LegacyPeerSession.cs",
+        "src/PiSharp.Chord/Legacy/Links/LegacyLinks.cs",
+        "src/PiSharp.Chord/Legacy/Links/LegacyNativeTransports.cs"
       ],
       "release": "1.5.0.x",
-      "notes": "Remote references are unions discriminated by variant in TypeScript; C# needs a variant switch over typed members."
+      "notes": "Remote references are unions discriminated by variant in TypeScript; C# needs a variant switch over typed members.",
+      "historicalPisharp": [
+        "src/PiSharp.Chord/ (new)"
+      ],
+      "currentImplementation": {
+        "mapping": "compatibility/gap-status-2026-11-08.json",
+        "id": "chord.references",
+        "sourceStatus": "source-implemented",
+        "runtimeStatus": "pending-integrated-validation",
+        "note": "Separate legacy contract/runtime and protocol 4; native declarations/ALC replace TypeScript evaluation. Platform process/collection gates remain. Protocol 4 is distinct from next. Native framed pipes are not Node child_process IPC; actual browser/Node interoperability and OS transport gates remain."
+      }
     },
     {
       "id": "chord.wire-protocol",
@@ -12143,10 +12632,25 @@
       ],
       "change": "Hosts exchange JSON frames, declared once as the schema that validates them. Links announce `PROTOCOL_VERSION` (4) in `hello`; peers of another version, or none, are refused: the link closes with `protocol-version <n>` and both sides report `onProtocolMismatch`. In protocol 4 a `hold` implies its variant's state (`state: false` until `sub`), the provider answers with a `shape` (with `variant`, without `codeVersion`) and snapshots, `state` frames are addressed by hold and member with `as: snap | reset | ops | error`, `resync` asks for a member again, `again` marks a re-hold after a link loss, `origin` names the client connection, remote tokens carry `host`, a hold's input is normalized, and void or argument-less calls omit `args` and `value`.",
       "pisharp": [
-        "src/PiSharp.Chord/ (new)"
+        "src/PiSharp.Chord/Legacy/Protocol/LegacyFrame.cs",
+        "src/PiSharp.Chord/Legacy/Protocol/LegacyCodec.cs",
+        "src/PiSharp.Chord/Legacy/Protocol/LegacyConnection.cs",
+        "src/PiSharp.Chord/Legacy/Protocol/LegacyPeerSession.cs",
+        "src/PiSharp.Chord/Legacy/Links/LegacyLinks.cs",
+        "src/PiSharp.Chord/Legacy/Links/LegacyNativeTransports.cs"
       ],
       "release": "1.5.0.x",
-      "notes": "The frame schema is the interop surface with TypeScript Chord peers (browser tabs, Node hosts). Test frames against upstream's link tests; authored expectations are never labelled as captures (0013)."
+      "notes": "The frame schema is the interop surface with TypeScript Chord peers (browser tabs, Node hosts). Test frames against upstream's link tests; authored expectations are never labelled as captures (0013).",
+      "historicalPisharp": [
+        "src/PiSharp.Chord/ (new)"
+      ],
+      "currentImplementation": {
+        "mapping": "compatibility/gap-status-2026-11-08.json",
+        "id": "chord.wire-protocol",
+        "sourceStatus": "source-implemented",
+        "runtimeStatus": "pending-integrated-validation",
+        "note": "Protocol 4 is distinct from next. Native framed pipes are not Node child_process IPC; actual browser/Node interoperability and OS transport gates remain."
+      }
     },
     {
       "id": "chord.links-transports",
@@ -12165,10 +12669,25 @@
       ],
       "change": "Links are `memoryLinkPair()`, `ipcLink` over a Node IPC channel, and `webSocketLink` with `acceptWebSockets` on a server; connections ping, and a dead link releases everything held through it. A failed IPC write (the `EPIPE` of a write to a peer that just exited) ends the link with `ipc send failed: EPIPE` instead of an unhandled error that crashes the process.",
       "pisharp": [
-        "src/PiSharp.Chord/ (new)"
+        "src/PiSharp.Chord/Legacy/Protocol/LegacyFrame.cs",
+        "src/PiSharp.Chord/Legacy/Protocol/LegacyCodec.cs",
+        "src/PiSharp.Chord/Legacy/Protocol/LegacyConnection.cs",
+        "src/PiSharp.Chord/Legacy/Protocol/LegacyPeerSession.cs",
+        "src/PiSharp.Chord/Legacy/Links/LegacyLinks.cs",
+        "src/PiSharp.Chord/Legacy/Links/LegacyNativeTransports.cs"
       ],
       "release": "1.5.0.x",
-      "notes": "Node IPC channels have no .NET counterpart: a C# ipcLink needs framing over a child's stdio or a pipe, and a link to a Node child host needs Node's IPC serialization. WebSockets map to System.Net.WebSockets. Standing rule: servers bind to 127.0.0.1."
+      "notes": "Node IPC channels have no .NET counterpart: a C# ipcLink needs framing over a child's stdio or a pipe, and a link to a Node child host needs Node's IPC serialization. WebSockets map to System.Net.WebSockets. Standing rule: servers bind to 127.0.0.1.",
+      "historicalPisharp": [
+        "src/PiSharp.Chord/ (new)"
+      ],
+      "currentImplementation": {
+        "mapping": "compatibility/gap-status-2026-11-08.json",
+        "id": "chord.links-transports",
+        "sourceStatus": "source-implemented",
+        "runtimeStatus": "pending-integrated-validation",
+        "note": "Protocol 4 is distinct from next. Native framed pipes are not Node child_process IPC; actual browser/Node interoperability and OS transport gates remain."
+      }
     },
     {
       "id": "chord.links-flow-control",
@@ -12190,10 +12709,25 @@
       ],
       "change": "Peers acknowledge what they processed (`ack` frames, announced with `acks` in `hello`). While a window of frames (`LinkOptions.window`, 256 KiB) is unacknowledged, state frames wait at the sender, coalesced per subscription; calls, results, control frames and the first unit of a new reference are never held back, units for reloads and re-holds are built lazily, and waiting ops are capped per link (`pendingCap`, four windows), beyond which the oldest streams become resets. `Link.send` returns the encoded size, so only links that report it are windowed, and `AcceptOptions.maxCalls` answers calls beyond the limit with `unavailable/too_many_calls`.",
       "pisharp": [
-        "src/PiSharp.Chord/ (new)"
+        "src/PiSharp.Chord/Legacy/Protocol/LegacyFrame.cs",
+        "src/PiSharp.Chord/Legacy/Protocol/LegacyCodec.cs",
+        "src/PiSharp.Chord/Legacy/Protocol/LegacyConnection.cs",
+        "src/PiSharp.Chord/Legacy/Protocol/LegacyPeerSession.cs",
+        "src/PiSharp.Chord/Legacy/Links/LegacyLinks.cs",
+        "src/PiSharp.Chord/Legacy/Links/LegacyNativeTransports.cs"
       ],
       "release": "1.5.0.x",
-      "notes": "Under load a result can arrive before the state change it caused; the port keeps that order rule, and the tests check it."
+      "notes": "Under load a result can arrive before the state change it caused; the port keeps that order rule, and the tests check it.",
+      "historicalPisharp": [
+        "src/PiSharp.Chord/ (new)"
+      ],
+      "currentImplementation": {
+        "mapping": "compatibility/gap-status-2026-11-08.json",
+        "id": "chord.links-flow-control",
+        "sourceStatus": "source-implemented",
+        "runtimeStatus": "pending-integrated-validation",
+        "note": "Protocol 4 is distinct from next. Native framed pipes are not Node child_process IPC; actual browser/Node interoperability and OS transport gates remain."
+      }
     },
     {
       "id": "chord.links-compression",
@@ -12211,10 +12745,25 @@
       ],
       "change": "Call arguments, results and state snapshots whose JSON exceeds `PACK_THRESHOLD` (64K characters) are deflated (raw deflate, level 1): over IPC as a base64 field, over WebSockets as a binary message. Relays forward the deflated bytes unread and only the host that uses the payload inflates it; `webSocketLink(socket, { compress, acceptPacked })` controls sending and accepting packed frames, and `inflateMessage` turns a packed message back into a text frame.",
       "pisharp": [
-        "src/PiSharp.Chord/ (new)"
+        "src/PiSharp.Chord/Legacy/Protocol/LegacyFrame.cs",
+        "src/PiSharp.Chord/Legacy/Protocol/LegacyCodec.cs",
+        "src/PiSharp.Chord/Legacy/Protocol/LegacyConnection.cs",
+        "src/PiSharp.Chord/Legacy/Protocol/LegacyPeerSession.cs",
+        "src/PiSharp.Chord/Legacy/Links/LegacyLinks.cs",
+        "src/PiSharp.Chord/Legacy/Links/LegacyNativeTransports.cs"
       ],
       "release": "1.5.0.x",
-      "notes": "System.IO.Compression.DeflateStream writes raw deflate, matching `zlib.deflateRawSync`. Servers should refuse packed frames from untrusted clients (acceptPacked false), which bounds decompression bombs."
+      "notes": "System.IO.Compression.DeflateStream writes raw deflate, matching `zlib.deflateRawSync`. Servers should refuse packed frames from untrusted clients (acceptPacked false), which bounds decompression bombs.",
+      "historicalPisharp": [
+        "src/PiSharp.Chord/ (new)"
+      ],
+      "currentImplementation": {
+        "mapping": "compatibility/gap-status-2026-11-08.json",
+        "id": "chord.links-compression",
+        "sourceStatus": "source-implemented",
+        "runtimeStatus": "pending-integrated-validation",
+        "note": "Protocol 4 is distinct from next. Native framed pipes are not Node child_process IPC; actual browser/Node interoperability and OS transport gates remain."
+      }
     },
     {
       "id": "chord.routes-relays",
@@ -12236,10 +12785,30 @@
       ],
       "change": "A server relays between its children and from clients to workers: `host.route(prefix, { authorize, resolve, principal })` reaches addressable hosts (a worker spawned on demand), a forwarded principal is accepted only from the parent link, a relay refuses a hold whose target disagrees with its contract's placement, and a client's hold carries an opaque `origin` (the accepting host's id for that connection) that relays forward, so a disconnect releases exactly that client's holds. A host a route resolves is admitted even when the reference that asked for it is released, its client disconnects or its principal is revoked meanwhile, and a link already closed when accepted or routed to is never kept as a connection.",
       "pisharp": [
-        "src/PiSharp.Chord/ (new)"
+        "src/PiSharp.Chord/Legacy/Protocol/LegacyFrame.cs",
+        "src/PiSharp.Chord/Legacy/Protocol/LegacyCodec.cs",
+        "src/PiSharp.Chord/Legacy/Protocol/LegacyConnection.cs",
+        "src/PiSharp.Chord/Legacy/Protocol/LegacyPeerSession.cs",
+        "src/PiSharp.Chord/Legacy/Links/LegacyLinks.cs",
+        "src/PiSharp.Chord/Legacy/Links/LegacyNativeTransports.cs",
+        "src/PiSharp.Chord/Legacy/Cluster/LegacyCluster.cs",
+        "src/PiSharp.Chord/Legacy/Cluster/LegacyNetwork.cs",
+        "src/PiSharp.Chord/Legacy/Manager/LegacyHostManager.cs",
+        "src/PiSharp.Chord/Legacy/Manager/LegacyProcessDriver.cs",
+        "src/PiSharp.Chord/Legacy/Manager/LegacyFacetAssemblyLoader.cs"
       ],
       "release": "1.5.0.x",
-      "notes": "The 1.5.0 fix stops a spawned worker's lifetime-host references to its parent from waiting into `unavailable/ready_timeout`; the 1.3.0 fix stops a dead route link from failing every later call with `unavailable` and leaking its ping timer. Both need tests."
+      "notes": "The 1.5.0 fix stops a spawned worker's lifetime-host references to its parent from waiting into `unavailable/ready_timeout`; the 1.3.0 fix stops a dead route link from failing every later call with `unavailable` and leaking its ping timer. Both need tests.",
+      "historicalPisharp": [
+        "src/PiSharp.Chord/ (new)"
+      ],
+      "currentImplementation": {
+        "mapping": "compatibility/gap-status-2026-11-08.json",
+        "id": "chord.routes-relays",
+        "sourceStatus": "source-implemented",
+        "runtimeStatus": "pending-integrated-validation",
+        "note": "Protocol 4 is distinct from next. Native framed pipes are not Node child_process IPC; actual browser/Node interoperability and OS transport gates remain. Native module loader/locks/process transport have documented adaptations; non-Windows orphan cleanup and Node lock/IPC interoperability remain unqualified."
+      }
     },
     {
       "id": "chord.reload",
@@ -12265,10 +12834,29 @@
       ],
       "change": "`host.reload(facets)` swaps code while it runs: work in flight finishes on its code version (`codeVersion`, formerly epoch), state is kept and a cell whose version rose migrates at a safe point, derivations are recomputed at the commit, and listeners on replaced state subscribe again. A reload starts an object's new tasks only after its aborted ones finished (at most `taskStopDeadline`, 5 s); a forced retirement of a code version first aborts the roots still on it (`superseded`, up to 1 s), relayed calls follow their root's signal, and a resource kept across a reload adopts the newest declaration's `close`.",
       "pisharp": [
-        "src/PiSharp.Chord/ (new)"
+        "src/PiSharp.Chord/Legacy/Contracts.cs",
+        "src/PiSharp.Chord/Legacy/Runtime/Host.cs",
+        "src/PiSharp.Chord/Legacy/Runtime/Schema.cs",
+        "src/PiSharp.Chord/Legacy/Runtime/Reference.cs",
+        "src/PiSharp.Chord/Legacy/Runtime/Reload.cs",
+        "src/PiSharp.Chord/Legacy/Cluster/LegacyCluster.cs",
+        "src/PiSharp.Chord/Legacy/Cluster/LegacyNetwork.cs",
+        "src/PiSharp.Chord/Legacy/Manager/LegacyHostManager.cs",
+        "src/PiSharp.Chord/Legacy/Manager/LegacyProcessDriver.cs",
+        "src/PiSharp.Chord/Legacy/Manager/LegacyFacetAssemblyLoader.cs"
       ],
       "release": "1.5.0.x",
-      "notes": "Hot reload of C# code means collectible AssemblyLoadContexts, one per code version; how facets are built and loaded is the owner's decision (chord.host-manager, chord.next-plugins). Retention is chord.kernel-retention."
+      "notes": "Hot reload of C# code means collectible AssemblyLoadContexts, one per code version; how facets are built and loaded is the owner's decision (chord.host-manager, chord.next-plugins). Retention is chord.kernel-retention.",
+      "historicalPisharp": [
+        "src/PiSharp.Chord/ (new)"
+      ],
+      "currentImplementation": {
+        "mapping": "compatibility/gap-status-2026-11-08.json",
+        "id": "chord.reload",
+        "sourceStatus": "source-implemented",
+        "runtimeStatus": "pending-integrated-validation",
+        "note": "Separate legacy contract/runtime and protocol 4; native declarations/ALC replace TypeScript evaluation. Platform process/collection gates remain. Native module loader/locks/process transport have documented adaptations; non-Windows orphan cleanup and Node lock/IPC interoperability remain unqualified."
+      }
     },
     {
       "id": "chord.cluster-reload",
@@ -12287,10 +12875,24 @@
       ],
       "change": "A parent coordinates a reload's prepare and commit across its child hosts. A child whose hello arrives while a cluster reload runs is synced or reconciled when the reload ends (one already behind is fenced at once, so its roots' calls up are admitted), the coordinator retires before it sends `prepare`, a child waits for its parent's `retire` (at most `retireDeadline`), and a child coming in step learns which code versions the parent retired.",
       "pisharp": [
-        "src/PiSharp.Chord/ (new)"
+        "src/PiSharp.Chord/Legacy/Cluster/LegacyCluster.cs",
+        "src/PiSharp.Chord/Legacy/Cluster/LegacyNetwork.cs",
+        "src/PiSharp.Chord/Legacy/Manager/LegacyHostManager.cs",
+        "src/PiSharp.Chord/Legacy/Manager/LegacyProcessDriver.cs",
+        "src/PiSharp.Chord/Legacy/Manager/LegacyFacetAssemblyLoader.cs"
       ],
       "release": "1.5.0.x",
-      "notes": "Before these fixes a late child stayed on the old code and failed every call `superseded`, and parents' old roots got `superseded` on children that retired early."
+      "notes": "Before these fixes a late child stayed on the old code and failed every call `superseded`, and parents' old roots got `superseded` on children that retired early.",
+      "historicalPisharp": [
+        "src/PiSharp.Chord/ (new)"
+      ],
+      "currentImplementation": {
+        "mapping": "compatibility/gap-status-2026-11-08.json",
+        "id": "chord.cluster-reload",
+        "sourceStatus": "source-implemented",
+        "runtimeStatus": "pending-integrated-validation",
+        "note": "Native module loader/locks/process transport have documented adaptations; non-Windows orphan cleanup and Node lock/IPC interoperability remain unqualified."
+      }
     },
     {
       "id": "chord.kernel-retention",
@@ -12312,10 +12914,29 @@
       ],
       "change": "Disposed objects leave the host at once (before, one per distinct guest, session or input stayed reachable until its address was used again); references no longer keep every code version's services, and with them old factory code, reachable; call, task and root contexts detach from long-lived signals when they close instead of staying linked through `AbortSignal.any`; and a resource kept across a reload stops holding the code of the run that first opened it.",
       "pisharp": [
-        "src/PiSharp.Chord/ (new)"
+        "src/PiSharp.Chord/Legacy/Contracts.cs",
+        "src/PiSharp.Chord/Legacy/Runtime/Host.cs",
+        "src/PiSharp.Chord/Legacy/Runtime/Schema.cs",
+        "src/PiSharp.Chord/Legacy/Runtime/Reference.cs",
+        "src/PiSharp.Chord/Legacy/Runtime/Reload.cs",
+        "src/PiSharp.Chord/Legacy/Cluster/LegacyCluster.cs",
+        "src/PiSharp.Chord/Legacy/Cluster/LegacyNetwork.cs",
+        "src/PiSharp.Chord/Legacy/Manager/LegacyHostManager.cs",
+        "src/PiSharp.Chord/Legacy/Manager/LegacyProcessDriver.cs",
+        "src/PiSharp.Chord/Legacy/Manager/LegacyFacetAssemblyLoader.cs"
       ],
       "release": "1.5.0.x",
-      "notes": "The .NET equivalents: old code versions as collectible AssemblyLoadContexts, which unload only when nothing references their types, and linked CancellationTokenSources that must be disposed when a context closes. Needs unload tests (a WeakReference to the load context)."
+      "notes": "The .NET equivalents: old code versions as collectible AssemblyLoadContexts, which unload only when nothing references their types, and linked CancellationTokenSources that must be disposed when a context closes. Needs unload tests (a WeakReference to the load context).",
+      "historicalPisharp": [
+        "src/PiSharp.Chord/ (new)"
+      ],
+      "currentImplementation": {
+        "mapping": "compatibility/gap-status-2026-11-08.json",
+        "id": "chord.kernel-retention",
+        "sourceStatus": "source-implemented",
+        "runtimeStatus": "pending-integrated-validation",
+        "note": "Separate legacy contract/runtime and protocol 4; native declarations/ALC replace TypeScript evaluation. Platform process/collection gates remain. Native module loader/locks/process transport have documented adaptations; non-Windows orphan cleanup and Node lock/IPC interoperability remain unqualified."
+      }
     },
     {
       "id": "chord.host-manager",
@@ -12337,10 +12958,24 @@
       ],
       "change": "`@earendil-works/chord/node`: `createHostManager` runs child host processes through a `Driver` (`forkDriver`, with `childControl` on the child side), `processLock()` keeps one process per lock through a socket, and `nodeLoader` imports facet modules. `nodeLoader` registers every facet's directory before importing any (one module copy per file), the lock socket moves to a private `/tmp/chord2-<uid>` when the temp path would exceed sun_path (104 bytes on macOS and the BSDs), `forkDriver` no longer passes its own `CHORD2_LOCK` to children, and control messages to a gone peer are dropped instead of raising `EPIPE`.",
       "pisharp": [
-        "src/PiSharp.Chord/ (new)"
+        "src/PiSharp.Chord/Legacy/Cluster/LegacyCluster.cs",
+        "src/PiSharp.Chord/Legacy/Cluster/LegacyNetwork.cs",
+        "src/PiSharp.Chord/Legacy/Manager/LegacyHostManager.cs",
+        "src/PiSharp.Chord/Legacy/Manager/LegacyProcessDriver.cs",
+        "src/PiSharp.Chord/Legacy/Manager/LegacyFacetAssemblyLoader.cs"
       ],
       "release": "1.5.0.x",
-      "notes": "Node-specific: forked Node processes with IPC and ESM facet modules. A C# port runs child hosts as its own processes over a pipe link and loads facets from assemblies; processLock maps to a Unix socket (same sun_path limit) or a named mutex. Owner decision when phase 6 starts."
+      "notes": "Node-specific: forked Node processes with IPC and ESM facet modules. A C# port runs child hosts as its own processes over a pipe link and loads facets from assemblies; processLock maps to a Unix socket (same sun_path limit) or a named mutex. Owner decision when phase 6 starts.",
+      "historicalPisharp": [
+        "src/PiSharp.Chord/ (new)"
+      ],
+      "currentImplementation": {
+        "mapping": "compatibility/gap-status-2026-11-08.json",
+        "id": "chord.host-manager",
+        "sourceStatus": "source-implemented",
+        "runtimeStatus": "pending-integrated-validation",
+        "note": "Native module loader/locks/process transport have documented adaptations; non-Windows orphan cleanup and Node lock/IPC interoperability remain unqualified."
+      }
     },
     {
       "id": "chord.registries-v1",
@@ -12358,9 +12993,23 @@
       ],
       "change": "`defineRegistry<V>(name, { conflict })` declares tables that `lifetime: \"host\"` objects fill with `self.register`; a registration from any other object is `invalid/not_host_lifetime` (was `not_eager`). Each code version has one complete table, a request keeps its version's table across a reload, order is first registration, and `conflict: \"error\"` fails a duplicate key or the reload.",
       "pisharp": [
+        "src/PiSharp.Chord/Legacy/Contracts.cs",
+        "src/PiSharp.Chord/Legacy/Runtime/Host.cs",
+        "src/PiSharp.Chord/Legacy/Runtime/Schema.cs",
+        "src/PiSharp.Chord/Legacy/Runtime/Reference.cs",
+        "src/PiSharp.Chord/Legacy/Runtime/Reload.cs"
+      ],
+      "release": "1.5.0.x",
+      "historicalPisharp": [
         "src/PiSharp.Chord/ (new)"
       ],
-      "release": "1.5.0.x"
+      "currentImplementation": {
+        "mapping": "compatibility/gap-status-2026-11-08.json",
+        "id": "chord.registries-v1",
+        "sourceStatus": "source-implemented",
+        "runtimeStatus": "pending-integrated-validation",
+        "note": "Separate legacy contract/runtime and protocol 4; native declarations/ALC replace TypeScript evaluation. Platform process/collection gates remain."
+      }
     },
     {
       "id": "chord.tests-docs",
@@ -12382,11 +13031,59 @@
       ],
       "change": "Chord's vitest suite (391 files at v1.5.0: v1 cases, `test/next` with the runnable examples 01-48 and hand-run benchmarks, `test/next-node`), the tutorial whose every example runs as `test/tutorial.test.ts`, the usage guide, the specification and the README.",
       "pisharp": [
+        "src/PiSharp.Chord/Legacy/Contracts.cs",
+        "src/PiSharp.Chord/Legacy/Runtime/Host.cs",
+        "src/PiSharp.Chord/Legacy/Runtime/Schema.cs",
+        "src/PiSharp.Chord/Legacy/Runtime/Reference.cs",
+        "src/PiSharp.Chord/Legacy/Runtime/Reload.cs",
+        "src/PiSharp.Chord/Legacy/Protocol/LegacyFrame.cs",
+        "src/PiSharp.Chord/Legacy/Protocol/LegacyCodec.cs",
+        "src/PiSharp.Chord/Legacy/Protocol/LegacyConnection.cs",
+        "src/PiSharp.Chord/Legacy/Protocol/LegacyPeerSession.cs",
+        "src/PiSharp.Chord/Legacy/Links/LegacyLinks.cs",
+        "src/PiSharp.Chord/Legacy/Links/LegacyNativeTransports.cs",
+        "src/PiSharp.Chord/Legacy/Cluster/LegacyCluster.cs",
+        "src/PiSharp.Chord/Legacy/Cluster/LegacyNetwork.cs",
+        "src/PiSharp.Chord/Legacy/Manager/LegacyHostManager.cs",
+        "src/PiSharp.Chord/Legacy/Manager/LegacyProcessDriver.cs",
+        "src/PiSharp.Chord/Legacy/Manager/LegacyFacetAssemblyLoader.cs",
+        "src/PiSharp.Chord/Host/Host.cs",
+        "src/PiSharp.Chord/Host/Object.cs",
+        "src/PiSharp.Chord/Host/Follow.cs",
+        "src/PiSharp.Chord/Host/Reload.cs",
+        "src/PiSharp.Chord/Jobs/Definition.cs",
+        "src/PiSharp.Chord/Jobs/Job.cs",
+        "src/PiSharp.Chord/Jobs/PersistedRuns.cs",
+        "src/PiSharp.Chord/Documents/Transaction.cs",
+        "src/PiSharp.Chord/Link/Message.cs",
+        "src/PiSharp.Chord/Link/Link.cs",
+        "src/PiSharp.Chord/Link/Transports.cs",
+        "src/PiSharp.Chord/Remote/HostLink.cs",
+        "src/PiSharp.Chord/Remote/Relay.cs",
+        "src/PiSharp.Chord/Host/RemoteIntegration.cs",
+        "src/PiSharp.Chord.Hosting/Plugins/PluginManager.cs",
+        "src/PiSharp.Chord.Hosting/Plugins/PluginRuntime.cs",
+        "src/PiSharp.Chord.Hosting/Http/ChordHttp.cs",
+        "src/PiSharp.Chord.Hosting/Workers/ProcessWorkers.cs",
+        "src/PiSharp.Durable.Store/Storage.cs",
+        "src/PiSharp.Durable.Store/RegistryReader.cs",
+        "samples/Durable.Chord.Examples/Example35.cs",
+        "samples/Durable.Chord.Examples/Example36.cs",
+        "samples/Durable.Chord.Examples/Example37.cs"
+      ],
+      "release": "1.5.0.x",
+      "notes": "Each row's cases port with it; tests stay faux and offline. Website pages describe the Chord port once it exists and claim parity only with evidence (0013). The v2 examples follow chord.next-entry-point's timing.",
+      "historicalPisharp": [
         "tests/PiSharp.Chord.Tests/ (new)",
         "website/src/content/docs/docs/embed/chord.md (new)"
       ],
-      "release": "1.5.0.x",
-      "notes": "Each row's cases port with it; tests stay faux and offline. Website pages describe the Chord port once it exists and claim parity only with evidence (0013). The v2 examples follow chord.next-entry-point's timing."
+      "currentImplementation": {
+        "mapping": "compatibility/gap-status-2026-11-08.json",
+        "id": "chord.tests-docs",
+        "sourceStatus": "source-implemented",
+        "runtimeStatus": "pending-integrated-validation",
+        "note": "Separate legacy contract/runtime and protocol 4; native declarations/ALC replace TypeScript evaluation. Platform process/collection gates remain. Protocol 4 is distinct from next. Native framed pipes are not Node child_process IPC; actual browser/Node interoperability and OS transport gates remain. Native module loader/locks/process transport have documented adaptations; non-Windows orphan cleanup and Node lock/IPC interoperability remain unqualified. CLR host/draft lifetime adaptations remain explicit; source completion is not a final integrated runtime pass. Next protocol and native transports are separate from legacy protocol 4; cross-runtime/platform interoperability needs explicit execution. Native C# plugins/shared assemblies, OS lock and worker transport replace TypeScript/npm runtime behavior. Arbitrary Node plugins/browser bundling are not claimed. Real-host examples and integration tests now exist; final execution and package-only consumption remain pending."
+      }
     },
     {
       "id": "chord.next-entry-point",
@@ -12406,7 +13103,24 @@
       ],
       "change": "Chord v2, the next object runtime in `src/next` (design in `docs/next/design.md`, decision log and slice plan beside it), is exported as `@earendil-works/chord/next` (experimental): every layer's API for apps (contracts, data, documents, hosts, jobs, links, state, the store), and, marked internal, the store's surface for adapters (`StoreOwnerTables`, `OwnerTable`, the documents engine's reads and writes, the commit step, `applyBatch`). Its API changes with every slice; plugins, HTTP and workers are not exported yet.",
       "pisharp": [
-        "src/PiSharp.Chord/ (new)"
+        "src/PiSharp.Chord/Host/Host.cs",
+        "src/PiSharp.Chord/Host/Object.cs",
+        "src/PiSharp.Chord/Host/Follow.cs",
+        "src/PiSharp.Chord/Host/Reload.cs",
+        "src/PiSharp.Chord/Jobs/Definition.cs",
+        "src/PiSharp.Chord/Jobs/Job.cs",
+        "src/PiSharp.Chord/Jobs/PersistedRuns.cs",
+        "src/PiSharp.Chord/Documents/Transaction.cs",
+        "src/PiSharp.Chord/Link/Message.cs",
+        "src/PiSharp.Chord/Link/Link.cs",
+        "src/PiSharp.Chord/Link/Transports.cs",
+        "src/PiSharp.Chord/Remote/HostLink.cs",
+        "src/PiSharp.Chord/Remote/Relay.cs",
+        "src/PiSharp.Chord/Host/RemoteIntegration.cs",
+        "src/PiSharp.Chord.Hosting/Plugins/PluginManager.cs",
+        "src/PiSharp.Chord.Hosting/Plugins/PluginRuntime.cs",
+        "src/PiSharp.Chord.Hosting/Http/ChordHttp.cs",
+        "src/PiSharp.Chord.Hosting/Workers/ProcessWorkers.cs"
       ],
       "release": "1.5.0",
       "pulledInBy": [
@@ -12433,7 +13147,17 @@
           "tests/PiSharp.Chord.Tests/Contracts/SchemaCases.cs: contracts.schema.bytes-checks-the-type-and-the-length-bounds"
         ]
       },
-      "deferred": "The entry point (src/PiSharp.Chord, PiSharp.Chord.ChordNext, experimental PISHARP_CHORD001, not packable) is ported, and so is every layer @earendil-works/chord/next exports up to the store, with their tests: contracts (with contract evolution and checkAccepts), data, documents, state, registries, and the store with its SQLite backend (areas cv2-*, store-storage and registry-reader). Left for phase 6: the host, jobs and link layers (hosts, jobs, links and relays) that next/index.ts also re-exports, and the support.ts helpers no ported test uses yet (NotesDoc, and the host, link, relay and raw-peer helpers built on createHost; ChordSupport.cs's header lists them)."
+      "deferred": "The entry point (src/PiSharp.Chord, PiSharp.Chord.ChordNext, experimental PISHARP_CHORD001, not packable) is ported, and so is every layer @earendil-works/chord/next exports up to the store, with their tests: contracts (with contract evolution and checkAccepts), data, documents, state, registries, and the store with its SQLite backend (areas cv2-*, store-storage and registry-reader). Left for phase 6: the host, jobs and link layers (hosts, jobs, links and relays) that next/index.ts also re-exports, and the support.ts helpers no ported test uses yet (NotesDoc, and the host, link, relay and raw-peer helpers built on createHost; ChordSupport.cs's header lists them).",
+      "historicalPisharp": [
+        "src/PiSharp.Chord/ (new)"
+      ],
+      "currentImplementation": {
+        "mapping": "compatibility/gap-status-2026-11-08.json",
+        "id": "chord.next-entry-point",
+        "sourceStatus": "source-implemented",
+        "runtimeStatus": "pending-integrated-validation",
+        "note": "CLR host/draft lifetime adaptations remain explicit; source completion is not a final integrated runtime pass. Next protocol and native transports are separate from legacy protocol 4; cross-runtime/platform interoperability needs explicit execution. Native C# plugins/shared assemblies, OS lock and worker transport replace TypeScript/npm runtime behavior. Arbitrary Node plugins/browser bundling are not claimed."
+      }
     },
     {
       "id": "chord.next-contracts-data",
@@ -12454,7 +13178,9 @@
       ],
       "change": "Layer 1: contracts (`local`, `remote`, `hostKind`, `method`, params, `evolve` and `accepts` history, fingerprints, snapshots) and data (argument checks, principals and principal keys, errors such as `broken`, failure causes, validators). Schemas are checked by pi-schema through helpers (`str`, `num`, `int`, `bool`, `nul`, `lit`, `oneOf`, `union`, `obj`, `arr`, `map`, `opt`, `bytes`, `unknown`) that keep the JSON contracts were fingerprinted with; `opt(...)` marks only an object field or table column, a schema with a non-enumerable key is refused at declaration, `format` is not checked, and a failed check's `details.path` is a JSON Pointer.",
       "pisharp": [
-        "src/PiSharp.Chord/ (new)"
+        "tests/PiSharp.Chord.Tests/Schema/FullDeclarations.cs",
+        "tests/PiSharp.Chord.Tests/Schema/Proofs.cs",
+        "tests/PiSharp.Chord.Tests/Schema/CorpusCases.cs"
       ],
       "release": "1.5.0",
       "pulledInBy": [
@@ -12486,7 +13212,17 @@
           "tests/PiSharp.Chord.Tests/Schema/SchemaSwitchCases.cs: schema.schema-switch.keeps-every-fingerprint-and-normal-form-of-contracts"
         ]
       },
-      "deferred": "Contracts (cv2-contracts, cv2-evolve) and data (cv2-data) are ported: every file of packages/chord/src/next/contracts and next/data, and every upstream case of test/next/contracts and test/next/data except the type-level ones. Left, in test/next/schema: (1) schema-switch.test.ts's fingerprint case compares the contracts and the documents with recorded.json. The tables' fingerprints and records are not compared yet, although defineTable landed with cv2-store-tables (a follow-up for phase 6's Chord work). The job's fingerprint waits for defineJob (phase 6). Its 'stored data' case (storedReads: a host reading stored/store.db and importing stored/archive.jsonl) needs createHost and defineFacet (phase 6); two PiSharp cases read stored/ through the store alone. (2) owner.ts waits for phase 6 (createHost, defineFacet). write-stored.ts is not ported: it rewrites the fixtures, which decision 0013 rules out."
+      "deferred": "Contracts (cv2-contracts, cv2-evolve) and data (cv2-data) are ported: every file of packages/chord/src/next/contracts and next/data, and every upstream case of test/next/contracts and test/next/data except the type-level ones. Left, in test/next/schema: (1) schema-switch.test.ts's fingerprint case compares the contracts and the documents with recorded.json. The tables' fingerprints and records are not compared yet, although defineTable landed with cv2-store-tables (a follow-up for phase 6's Chord work). The job's fingerprint waits for defineJob (phase 6). Its 'stored data' case (storedReads: a host reading stored/store.db and importing stored/archive.jsonl) needs createHost and defineFacet (phase 6); two PiSharp cases read stored/ through the store alone. (2) owner.ts waits for phase 6 (createHost, defineFacet). write-stored.ts is not ported: it rewrites the fixtures, which decision 0013 rules out.",
+      "historicalPisharp": [
+        "src/PiSharp.Chord/ (new)"
+      ],
+      "currentImplementation": {
+        "mapping": "compatibility/gap-status-2026-11-08.json",
+        "id": "chord.next-contracts-data",
+        "sourceStatus": "source-implemented",
+        "runtimeStatus": "pending-integrated-validation",
+        "note": "Full tables/jobs/real-host corpus source is present. Frozen recorded/schema/store artifacts remain original; comparison execution is pending."
+      }
     },
     {
       "id": "chord.next-documents-state",
@@ -12506,7 +13242,14 @@
       ],
       "change": "Documents: `defineState` (schema, version, `initial`, keyed, `persist` with `checkpointWhen`), the handles an object's attempts get, transactions over documents, tables and job runs (`self.tx`, drafts, retire), keyed watches and `at(key)`, retirement as a flag, and document histories `none`, `latest` and `rewindable` with reads at a point. State: JSON and native watchables, `self.derive` (lazy when unwatched, `mapShared`), `constant`, the batch, and `self.writable(initial)`, an in-process value an attempt sets (identity compared); native sources (writables, registry values, `ref.state`) are derive sources.",
       "pisharp": [
-        "src/PiSharp.Chord/ (new)"
+        "src/PiSharp.Chord/Host/Host.cs",
+        "src/PiSharp.Chord/Host/Object.cs",
+        "src/PiSharp.Chord/Host/Follow.cs",
+        "src/PiSharp.Chord/Host/Reload.cs",
+        "src/PiSharp.Chord/Jobs/Definition.cs",
+        "src/PiSharp.Chord/Jobs/Job.cs",
+        "src/PiSharp.Chord/Jobs/PersistedRuns.cs",
+        "src/PiSharp.Chord/Documents/Transaction.cs"
       ],
       "release": "1.5.0",
       "pulledInBy": [
@@ -12537,7 +13280,17 @@
           "tests/PiSharp.Chord.Tests/State/DeriveCases.cs: state.derive.the-pull-model-computes-a-diamonds-derives-once-each-per-batch"
         ]
       },
-      "deferred": "Transactions over job runs (Tx.start, the job-run slots) and Tracker's prepareReplace and appendText wait for chord.next-jobs (phase 6). Five of the 83 upstream cases of this area's six test files are not ported as written: four need createHost (phase 6) and one has no .NET counterpart. (1) slot.test.ts 'refuse persisting without a stable identity or a store, and a flipped persist' needs the host's P3 checks; its flipped-persist part runs as documents.slot.pisharp-persisted-singletons-a-flipped-persist-fails-the-activation-broken. (2) keyed-slot.test.ts 'at(key) is initial while absent: a state member, derive and on source' needs members and self.on; its derive-source part runs as documents.keyed-slot.pisharp-at-key-is-initial-while-absent-a-derive-source-retirement-arrives-with-the-flag. (3) transaction.test.ts 'a handler's commit held in the SQL past closeTimeout' needs a method handler's drain and closeTimeout. (4) transaction.test.ts 'revoke their drafts when they settle' cannot hold: a JsonObject draft cannot be revoked, so expect(() => kept.n).toThrow() has no counterpart; documents.transaction.pisharp-transactions-a-kept-draft-is-detached-and-a-settled-transaction-refuses-its-drafts checks that a kept draft is detached and a settled transaction refuses drafts. (5) transaction.test.ts 'settles an in-memory change within five microtask turns' counts JavaScript microtask turns, which have no .NET counterpart; not ported."
+      "deferred": "Transactions over job runs (Tx.start, the job-run slots) and Tracker's prepareReplace and appendText wait for chord.next-jobs (phase 6). Five of the 83 upstream cases of this area's six test files are not ported as written: four need createHost (phase 6) and one has no .NET counterpart. (1) slot.test.ts 'refuse persisting without a stable identity or a store, and a flipped persist' needs the host's P3 checks; its flipped-persist part runs as documents.slot.pisharp-persisted-singletons-a-flipped-persist-fails-the-activation-broken. (2) keyed-slot.test.ts 'at(key) is initial while absent: a state member, derive and on source' needs members and self.on; its derive-source part runs as documents.keyed-slot.pisharp-at-key-is-initial-while-absent-a-derive-source-retirement-arrives-with-the-flag. (3) transaction.test.ts 'a handler's commit held in the SQL past closeTimeout' needs a method handler's drain and closeTimeout. (4) transaction.test.ts 'revoke their drafts when they settle' cannot hold: a JsonObject draft cannot be revoked, so expect(() => kept.n).toThrow() has no counterpart; documents.transaction.pisharp-transactions-a-kept-draft-is-detached-and-a-settled-transaction-refuses-its-drafts checks that a kept draft is detached and a settled transaction refuses drafts. (5) transaction.test.ts 'settles an in-memory change within five microtask turns' counts JavaScript microtask turns, which have no .NET counterpart; not ported.",
+      "historicalPisharp": [
+        "src/PiSharp.Chord/ (new)"
+      ],
+      "currentImplementation": {
+        "mapping": "compatibility/gap-status-2026-11-08.json",
+        "id": "chord.next-documents-state",
+        "sourceStatus": "source-implemented",
+        "runtimeStatus": "pending-integrated-validation",
+        "note": "CLR host/draft lifetime adaptations remain explicit; source completion is not a final integrated runtime pass."
+      }
     },
     {
       "id": "chord.next-host-objects",
@@ -12558,10 +13311,23 @@
       ],
       "change": "Hosts, facets, objects, natives and references: activation with failure causes, backoff and parked attempts that wake on change, principals and variants, links to children, a parent and routes to addressable hosts (`host.route` returns a `RouteHandle` with `retry` and `suspend`, and a failed `resolve` fails its holders `waiting` with no backoff timer), revocation, cycle checks across hosts, presence and keep-alive counts. Slice 8 adds `self.retryOn(...sources)`, wake signals and root scopes (`host.root(fn, context, { principal })`, sealed when `fn` settles, `context` aborts or the host closes; anonymous with `principal: undefined`), and `self.follow` takes another runtime's synchronous observers as sources.",
       "pisharp": [
-        "src/PiSharp.Chord/ (new)"
+        "src/PiSharp.Chord/Host/Host.cs",
+        "src/PiSharp.Chord/Host/Object.cs",
+        "src/PiSharp.Chord/Host/Follow.cs",
+        "src/PiSharp.Chord/Host/Reload.cs"
       ],
       "release": "1.5.0.x",
-      "notes": "The largest v2 layer (8,815 lines). `self.follow` is how Chord follows Durable's views (durable@1.5.0/Added#3, group E)."
+      "notes": "The largest v2 layer (8,815 lines). `self.follow` is how Chord follows Durable's views (durable@1.5.0/Added#3, group E).",
+      "historicalPisharp": [
+        "src/PiSharp.Chord/ (new)"
+      ],
+      "currentImplementation": {
+        "mapping": "compatibility/gap-status-2026-11-08.json",
+        "id": "chord.next-host-objects",
+        "sourceStatus": "source-implemented",
+        "runtimeStatus": "pending-integrated-validation",
+        "note": "CLR host/draft lifetime adaptations remain explicit; source completion is not a final integrated runtime pass."
+      }
     },
     {
       "id": "chord.next-reload",
@@ -12582,10 +13348,23 @@
       ],
       "change": "`host.load` and `host.reload` work per plugin: a plugin whose setup, factory or declarations fail is left out at `load` (`{ failed }`) or kept on its old code at `reload` (`failed` in the report; `reload(facets, ctx, { failed })` for build and evaluation failures), a closure rule keeps a consumer old when its provider was kept old, and an abort after the commit rejects with `details.committed`. A reload stages, commits atomically or rolls back, swaps pure members, restarts natives, and carries holds, `accepts`, jobs and registries across.",
       "pisharp": [
-        "src/PiSharp.Chord/ (new)"
+        "src/PiSharp.Chord/Host/Host.cs",
+        "src/PiSharp.Chord/Host/Object.cs",
+        "src/PiSharp.Chord/Host/Follow.cs",
+        "src/PiSharp.Chord/Host/Reload.cs"
       ],
       "release": "1.5.0.x",
-      "notes": "Same code-loading question as chord.reload: collectible AssemblyLoadContexts per code version."
+      "notes": "Same code-loading question as chord.reload: collectible AssemblyLoadContexts per code version.",
+      "historicalPisharp": [
+        "src/PiSharp.Chord/ (new)"
+      ],
+      "currentImplementation": {
+        "mapping": "compatibility/gap-status-2026-11-08.json",
+        "id": "chord.next-reload",
+        "sourceStatus": "source-implemented",
+        "runtimeStatus": "pending-integrated-validation",
+        "note": "CLR host/draft lifetime adaptations remain explicit; source completion is not a final integrated runtime pass."
+      }
     },
     {
       "id": "chord.next-jobs",
@@ -12603,10 +13382,23 @@
       ],
       "change": "Routines (`self.on`, `self.onLive`, `sleep`) and jobs (`defineJob`, `self.job`): owned work a call starts that outlives the call, as intent (a transaction), run (any effect) and finish (a transaction on the current code), with dedupe, `busy` and `running`. Persisted jobs (`persist: { resume }`) resume after a restart, with a stored `abort(id, ctx)` and deferred state changes.",
       "pisharp": [
-        "src/PiSharp.Chord/ (new)"
+        "src/PiSharp.Chord/Jobs/Definition.cs",
+        "src/PiSharp.Chord/Jobs/Job.cs",
+        "src/PiSharp.Chord/Jobs/PersistedRuns.cs",
+        "src/PiSharp.Chord/Documents/Transaction.cs"
       ],
       "release": "1.5.0.x",
-      "notes": "Persisted jobs need chord.next-store."
+      "notes": "Persisted jobs need chord.next-store.",
+      "historicalPisharp": [
+        "src/PiSharp.Chord/ (new)"
+      ],
+      "currentImplementation": {
+        "mapping": "compatibility/gap-status-2026-11-08.json",
+        "id": "chord.next-jobs",
+        "sourceStatus": "source-implemented",
+        "runtimeStatus": "pending-integrated-validation",
+        "note": "Source and authored tests are present; final integrated validation is pending."
+      }
     },
     {
       "id": "chord.next-links-remote",
@@ -12627,10 +13419,25 @@
       ],
       "change": "Links: one `Message` type checked after every decode (skipped on trusted links), text and binary codecs, opaque parts with size limits and compression at the origin, the handshake and heartbeat, and IPC and WebSocket transports. Remote: a `HostLink` per link with a provider side per origin and one consumer side, holds, relayed holds and calls, replicas, and the ack-clocked window per origin with a call window; a link reads `origin` only on parent and route links (a protocol error on a child link) and drops a per-origin record once it is idle.",
       "pisharp": [
-        "src/PiSharp.Chord/ (new)"
+        "src/PiSharp.Chord/Link/Message.cs",
+        "src/PiSharp.Chord/Link/Link.cs",
+        "src/PiSharp.Chord/Link/Transports.cs",
+        "src/PiSharp.Chord/Remote/HostLink.cs",
+        "src/PiSharp.Chord/Remote/Relay.cs",
+        "src/PiSharp.Chord/Host/RemoteIntegration.cs"
       ],
       "release": "1.5.0.x",
-      "notes": "v2's protocol is not v1's (chord.wire-protocol); the two share no frames. Same transport questions as chord.links-transports."
+      "notes": "v2's protocol is not v1's (chord.wire-protocol); the two share no frames. Same transport questions as chord.links-transports.",
+      "historicalPisharp": [
+        "src/PiSharp.Chord/ (new)"
+      ],
+      "currentImplementation": {
+        "mapping": "compatibility/gap-status-2026-11-08.json",
+        "id": "chord.next-links-remote",
+        "sourceStatus": "source-implemented",
+        "runtimeStatus": "pending-integrated-validation",
+        "note": "Next protocol and native transports are separate from legacy protocol 4; cross-runtime/platform interoperability needs explicit execution."
+      }
     },
     {
       "id": "chord.next-store",
@@ -12651,8 +13458,15 @@
       ],
       "change": "One store per host over a backend (SQLite through chord/sqlite, or Durable Objects' storage): declared tables, queries compiled once to SQL, writes, one commit queue, an outbox, the documents engine, eager table migrations, export and import (archives that carry document revisions) and batch apply. 1.5.0 adds one id allocator for every id, claims per table and per document namespace, Durable's semantics for a refused commit (it rejects only that commit; an unknown outcome stops the store), and `ChordStore.commitSeries(commits, receive, ctx)`: several commits in one backend transaction, each at its own seq with its own outbox row and check, replacing `commitInBatch`.",
       "pisharp": [
-        "src/PiSharp.Durable.Sqlite/Database.cs",
-        "src/PiSharp.Chord/ (new)"
+        "src/PiSharp.Durable.Store/Storage.cs",
+        "src/PiSharp.Durable.Store/RegistryReader.cs",
+        "samples/Durable.Chord.Examples/Example35.cs",
+        "samples/Durable.Chord.Examples/Example36.cs",
+        "samples/Durable.Chord.Examples/Example37.cs",
+        "src/PiSharp.Chord/Host/Host.cs",
+        "src/PiSharp.Chord/Host/Object.cs",
+        "src/PiSharp.Chord/Host/Follow.cs",
+        "src/PiSharp.Chord/Host/Reload.cs"
       ],
       "release": "1.5.0",
       "pulledInBy": [
@@ -12722,7 +13536,18 @@
           "tests/PiSharp.Chord.Tests/Store/StoreCases.cs: store.store.a-commit-series-stops-the-store-when-a-receipt-throws"
         ]
       },
-      "deferred": "refusal.test.ts's \"Chord's owners\" case serves an object on a host (createHost, phase 6). The Durable Objects backend (chord/sqlite/cloudflare) is Cloudflare's, which is excluded. Everything else of the store is ported: the engine, tables and SQL; export and import (store.export, importStore, the archive format and its parts, JSONL; area cv2-store-archive); and the production ISqliteDatabase over PiSharp.Durable.Sqlite (PiSharp.Durable.Store's Database.cs, area store-storage)."
+      "deferred": "refusal.test.ts's \"Chord's owners\" case serves an object on a host (createHost, phase 6). The Durable Objects backend (chord/sqlite/cloudflare) is Cloudflare's, which is excluded. Everything else of the store is ported: the engine, tables and SQL; export and import (store.export, importStore, the archive format and its parts, JSONL; area cv2-store-archive); and the production ISqliteDatabase over PiSharp.Durable.Sqlite (PiSharp.Durable.Store's Database.cs, area store-storage).",
+      "historicalPisharp": [
+        "src/PiSharp.Durable.Sqlite/Database.cs",
+        "src/PiSharp.Chord/ (new)"
+      ],
+      "currentImplementation": {
+        "mapping": "compatibility/gap-status-2026-11-08.json",
+        "id": "chord.next-store",
+        "sourceStatus": "source-implemented",
+        "runtimeStatus": "pending-integrated-validation",
+        "note": "Real-host examples and integration tests now exist; final execution and package-only consumption remain pending. CLR host/draft lifetime adaptations remain explicit; source completion is not a final integrated runtime pass."
+      }
     },
     {
       "id": "chord.next-registries",
@@ -12740,7 +13565,15 @@
       ],
       "change": "`defineRegistry<C, V>(name, { version })` tokens shared by plugins, served by the defining plugin's facet with `host.serve(R, { compose, accepts })`. Facets (`self.contribute(R, value)`) and host-lifetime objects contribute plain values or watchables, kept in a table sorted by plugin name and composed lazily; readers use `self.registry(R)`, a declared dependency that fails `transient` with `unavailable/undeclared` when nobody serves it, or `host.registry(R, ctx)`, a `RegistryValue<V>` with `observe(observer, ctx)`. `accepts` adapts older contributions and readers; helpers `keyedEntries` and `orderedEntries`; `onError` kinds `registry_conflict`, `registry_failed`, `contribution_failed` and `contribution_refused`.",
       "pisharp": [
-        "src/PiSharp.Chord/ (new)"
+        "src/PiSharp.Durable.Store/Storage.cs",
+        "src/PiSharp.Durable.Store/RegistryReader.cs",
+        "samples/Durable.Chord.Examples/Example35.cs",
+        "samples/Durable.Chord.Examples/Example36.cs",
+        "samples/Durable.Chord.Examples/Example37.cs",
+        "src/PiSharp.Chord/Host/Host.cs",
+        "src/PiSharp.Chord/Host/Object.cs",
+        "src/PiSharp.Chord/Host/Follow.cs",
+        "src/PiSharp.Chord/Host/Reload.cs"
       ],
       "release": "1.5.0",
       "pulledInBy": [
@@ -12803,7 +13636,17 @@
           "tests/PiSharp.Chord.Tests/Registries/ValueCases.cs: registries.value.pisharp-a-version-is-read-as-one-type-a-composition-of-another-type-fails-it-contract-mismatch"
         ]
       },
-      "deferred": "Every file of packages/chord/src/next/registries is ported (src/PiSharp.Chord/Registries, namespace PiSharp.Chord.Registries), and 44 of the 47 upstream cases of test/next/registries run on a hand-built host (tests/PiSharp.Chord.Tests/Registries/RegistryHost.cs), plus 3 PiSharp cases. The row also names packages/chord/src/next/host, which is chord.next-host-objects' (phase 6, excluded in the work list), and what only createHost has waits for it: (1) registry.test.ts 'one per host' (a second serve leaves its plugin out at load) and 'are served only while the setup runs'; (2) the load-failure half of 'a provider without compose' (staging prefixes the refusal with 'plugin \"@app/a\": ' and leaves the plugin out; the refusal itself, checkProvider, is ported); (3) record.test.ts 'a followed contribution whose runtime ended its observer stays with its last value' (self.follow's source, host/follow.ts); (4) assertions on host state inside ported cases: a parked attempt's state and retryAt (the 'waiting for registry <name>: ' prefix), objects' reachability ({ kind: \"live\" }), failures(errors) (activation_failed), the publication promise host.registry waits for, and getEventListeners. packages/chord/docs/next/slice-8.md is design prose; the README's rules are summarised in Registries/Index.cs."
+      "deferred": "Every file of packages/chord/src/next/registries is ported (src/PiSharp.Chord/Registries, namespace PiSharp.Chord.Registries), and 44 of the 47 upstream cases of test/next/registries run on a hand-built host (tests/PiSharp.Chord.Tests/Registries/RegistryHost.cs), plus 3 PiSharp cases. The row also names packages/chord/src/next/host, which is chord.next-host-objects' (phase 6, excluded in the work list), and what only createHost has waits for it: (1) registry.test.ts 'one per host' (a second serve leaves its plugin out at load) and 'are served only while the setup runs'; (2) the load-failure half of 'a provider without compose' (staging prefixes the refusal with 'plugin \"@app/a\": ' and leaves the plugin out; the refusal itself, checkProvider, is ported); (3) record.test.ts 'a followed contribution whose runtime ended its observer stays with its last value' (self.follow's source, host/follow.ts); (4) assertions on host state inside ported cases: a parked attempt's state and retryAt (the 'waiting for registry <name>: ' prefix), objects' reachability ({ kind: \"live\" }), failures(errors) (activation_failed), the publication promise host.registry waits for, and getEventListeners. packages/chord/docs/next/slice-8.md is design prose; the README's rules are summarised in Registries/Index.cs.",
+      "historicalPisharp": [
+        "src/PiSharp.Chord/ (new)"
+      ],
+      "currentImplementation": {
+        "mapping": "compatibility/gap-status-2026-11-08.json",
+        "id": "chord.next-registries",
+        "sourceStatus": "source-implemented",
+        "runtimeStatus": "pending-integrated-validation",
+        "note": "Real-host examples and integration tests now exist; final execution and package-only consumption remain pending. CLR host/draft lifetime adaptations remain explicit; source completion is not a final integrated runtime pass."
+      }
     },
     {
       "id": "chord.next-plugins",
@@ -12822,10 +13665,23 @@
       ],
       "change": "The Node plugins component finds plugin directories, builds each facet with esbuild (an optional peer dependency) and evaluates it with `vm.Script`, maps plugin stack traces (`mapStack`), installs plugin dependencies, watches plugin and base code, and rolls reloads out across hosts (`RolloutStep` returns `{ hosts }`). Slice 10 adds one definition per facet kind (`kinds: { name: { platform, hostPackages } }`, modules given at `plugins.load(host, { kind, core, modules })`), `createPluginRuntime()` without esbuild for workers, `scripts(kind)`, and cross-plugin imports by plugin name (`@app/notes/contract`).",
       "pisharp": [
-        "src/PiSharp.Chord/ (new)"
+        "src/PiSharp.Chord.Hosting/Plugins/PluginManager.cs",
+        "src/PiSharp.Chord.Hosting/Plugins/PluginRuntime.cs",
+        "src/PiSharp.Chord.Hosting/Http/ChordHttp.cs",
+        "src/PiSharp.Chord.Hosting/Workers/ProcessWorkers.cs"
       ],
       "release": "1.5.0.x",
-      "notes": "Owner decision: this component builds and evaluates TypeScript. A C# port could compile C# plugins (Roslyn, collectible AssemblyLoadContexts) or run TypeScript plugins through the Node bridge; neither is upstream's code path. Installing plugin dependencies runs npm."
+      "notes": "Owner decision: this component builds and evaluates TypeScript. A C# port could compile C# plugins (Roslyn, collectible AssemblyLoadContexts) or run TypeScript plugins through the Node bridge; neither is upstream's code path. Installing plugin dependencies runs npm.",
+      "historicalPisharp": [
+        "src/PiSharp.Chord/ (new)"
+      ],
+      "currentImplementation": {
+        "mapping": "compatibility/gap-status-2026-11-08.json",
+        "id": "chord.next-plugins",
+        "sourceStatus": "source-implemented",
+        "runtimeStatus": "pending-integrated-validation",
+        "note": "Native C# plugins/shared assemblies, OS lock and worker transport replace TypeScript/npm runtime behavior. Arbitrary Node plugins/browser bundling are not claimed."
+      }
     },
     {
       "id": "chord.next-http",
@@ -12843,10 +13699,23 @@
       ],
       "change": "A Web-standard `fetch` handler built from what plugins contribute to the registry `Http` (routes, wraps, sockets, allowed hosts, relays, CSP sources), with authenticators from the registry `Authenticators`, responses as descriptions (`json`, `html`, `bytes` with ranges, `redirect`, `error`, `fileResponse`) and a security baseline on by default: provenance by socket and `Host`, foreign requests anonymous, `Origin` checks, default headers with a per-response CSP nonce, signed cookies and safe downloads. Chord's own Node listener is a host-lifetime object, `nodeRequest` mounts the handler on an app's own server, and the links endpoint and plugin sockets have a heartbeat and close when their contribution leaves.",
       "pisharp": [
-        "src/PiSharp.Chord/ (new)"
+        "src/PiSharp.Chord.Hosting/Plugins/PluginManager.cs",
+        "src/PiSharp.Chord.Hosting/Plugins/PluginRuntime.cs",
+        "src/PiSharp.Chord.Hosting/Http/ChordHttp.cs",
+        "src/PiSharp.Chord.Hosting/Workers/ProcessWorkers.cs"
       ],
       "release": "1.5.0.x",
-      "notes": "ASP.NET Core is the natural host (Kestrel plus a middleware for the handler). Standing rules: the listener binds to 127.0.0.1 by default, and secrets such as the cookie signing key never reach the browser or logs."
+      "notes": "ASP.NET Core is the natural host (Kestrel plus a middleware for the handler). Standing rules: the listener binds to 127.0.0.1 by default, and secrets such as the cookie signing key never reach the browser or logs.",
+      "historicalPisharp": [
+        "src/PiSharp.Chord/ (new)"
+      ],
+      "currentImplementation": {
+        "mapping": "compatibility/gap-status-2026-11-08.json",
+        "id": "chord.next-http",
+        "sourceStatus": "source-implemented",
+        "runtimeStatus": "pending-integrated-validation",
+        "note": "Native C# plugins/shared assemblies, OS lock and worker transport replace TypeScript/npm runtime behavior. Arbitrary Node plugins/browser bundling are not claimed."
+      }
     },
     {
       "id": "chord.next-workers",
@@ -12862,10 +13731,29 @@
       ],
       "change": "`createWorkers(server, kind, options)` runs a forked worker process per address of one host kind, started on demand by the route it owns, stopped when idle and never restarted by itself (a failure stays until `retry` or a rollout); `workerMain` is the worker's side, and the server builds and ships the worker's plugins.",
       "pisharp": [
-        "src/PiSharp.Chord/ (new)"
+        "src/PiSharp.Chord.Hosting/Plugins/PluginManager.cs",
+        "src/PiSharp.Chord.Hosting/Plugins/PluginRuntime.cs",
+        "src/PiSharp.Chord.Hosting/Http/ChordHttp.cs",
+        "src/PiSharp.Chord.Hosting/Workers/ProcessWorkers.cs",
+        "src/PiSharp.Chord/Link/Message.cs",
+        "src/PiSharp.Chord/Link/Link.cs",
+        "src/PiSharp.Chord/Link/Transports.cs",
+        "src/PiSharp.Chord/Remote/HostLink.cs",
+        "src/PiSharp.Chord/Remote/Relay.cs",
+        "src/PiSharp.Chord/Host/RemoteIntegration.cs"
       ],
       "release": "1.5.0.x",
-      "notes": "Forked Node processes with IPC upstream; the C# port uses child processes with a pipe link (chord.links-transports, chord.host-manager) and ships plugins as chord.next-plugins decides."
+      "notes": "Forked Node processes with IPC upstream; the C# port uses child processes with a pipe link (chord.links-transports, chord.host-manager) and ships plugins as chord.next-plugins decides.",
+      "historicalPisharp": [
+        "src/PiSharp.Chord/ (new)"
+      ],
+      "currentImplementation": {
+        "mapping": "compatibility/gap-status-2026-11-08.json",
+        "id": "chord.next-workers",
+        "sourceStatus": "source-implemented",
+        "runtimeStatus": "pending-integrated-validation",
+        "note": "Native C# plugins/shared assemblies, OS lock and worker transport replace TypeScript/npm runtime behavior. Arbitrary Node plugins/browser bundling are not claimed. Next protocol and native transports are separate from legacy protocol 4; cross-runtime/platform interoperability needs explicit execution."
+      }
     },
     {
       "id": "evals.harness",
@@ -12883,10 +13771,27 @@
       ],
       "change": "pi-evals (private) holds behavioral evals of the coding agent, built on vitest-evals. Host evals (`eval:host` smoke, `eval:audit` documentation audit) run against a configured runtime; documentation-lift evals (`*.docs.eval.ts`) run each case in fresh `without_docs` and `with_docs` Docker containers built from the packed workspace, pair the arms, and report the lift. In the range upstream added a prompt-template documentation eval and dropped the autoevals dependency.",
       "pisharp": [
-        "tools/Evals/ (new)"
+        "tools/PiSharp.Evals/Harness.cs",
+        "tools/PiSharp.Evals/Plan.cs",
+        "tools/PiSharp.Evals/Report.cs",
+        "tools/PiSharp.Evals/StagedRuntime.cs"
       ],
       "release": "1.5.0.x",
-      "notes": "Decision 0013 ports it as a repository tool, with no package. The evals call a real provider (`PI_PROVIDER`, `PI_MODEL`), so they stay out of the automated suite (standing rule: tests stay faux and offline) and run only on demand. The documentation-lift evals measure Pi's docs; for PiSharp they would measure PiSharp's docs and website. Phase 7 decides which suites apply."
+      "notes": "Decision 0013 ports it as a repository tool, with no package. The evals call a real provider (`PI_PROVIDER`, `PI_MODEL`), so they stay out of the automated suite (standing rule: tests stay faux and offline) and run only on demand. The documentation-lift evals measure Pi's docs; for PiSharp they would measure PiSharp's docs and website. Phase 7 decides which suites apply.",
+      "historicalPisharp": [
+        "tools/Evals/ (new)"
+      ],
+      "currentImplementation": {
+        "mapping": "compatibility/gap-status-2026-11-08.json",
+        "id": "evals.harness",
+        "sourceStatus": "source-implemented",
+        "runtimeStatus": "pending-integrated-validation",
+        "note": "Offline staged runner implemented; live executable/container providers remain explicit opt-in and were not exercised by MAP."
+      }
     }
-  ]
+  ],
+  "currentImplementation": {
+    "mapping": "compatibility/gap-status-2026-11-08.json",
+    "statusScope": "Release-baseline status/notes and immutable upstream pins are retained; currentImplementation points to the current source mapping. Source implementation is not runtime acceptance."
+  }
 }

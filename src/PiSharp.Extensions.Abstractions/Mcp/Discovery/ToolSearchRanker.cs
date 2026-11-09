@@ -121,27 +121,13 @@ public static partial class ToolSearch
         return builder.ToString();
     }
 
-    /// <summary>Schema descriptions and property names, recursively.</summary>
-    private static void SchemaText(JsonElement schema, List<string> parts, int depth)
-    {
-        if (schema.ValueKind != JsonValueKind.Object || depth > 64) return;
-        var fields = McpJson.Properties(schema).ToDictionary(property => property.Name, property => property.Value, StringComparer.Ordinal);
-        if (fields.TryGetValue("description", out var description) && description.ValueKind == JsonValueKind.String) parts.Add(description.GetString()!);
-        if (fields.TryGetValue("properties", out var properties) && properties.ValueKind == JsonValueKind.Object)
-            foreach (var property in McpJson.Properties(properties)) { parts.Add(property.Name); SchemaText(property.Value, parts, depth + 1); }
-        if (fields.TryGetValue("items", out var items)) SchemaText(items, parts, depth + 1);
-        foreach (var key in new[] { "anyOf", "oneOf", "allOf" })
-            if (fields.TryGetValue(key, out var variants) && variants.ValueKind == JsonValueKind.Array)
-                foreach (var variant in variants.EnumerateArray()) SchemaText(variant, parts, depth + 1);
-    }
-
     /// <summary>Search text of a tool: the description and the schema descriptions and property names, and separately the
     /// namespace name, description and instructions. The ranker reads the name from <see cref="ToolSearchDocument.Name"/>.</summary>
     public static ToolSearchDocument CreateDocument(string name, string description, JsonElement parameters, ToolNamespace? toolNamespace = null)
     {
         ArgumentNullException.ThrowIfNull(name); ArgumentNullException.ThrowIfNull(description);
         var parts = new List<string> { description };
-        SchemaText(parameters, parts, 0);
+        LocalSchemaReferences.AppendSearchText(parameters, parts);
         var namespaceText = toolNamespace is null ? ""
             : string.Join(' ', toolNamespace.Name, toolNamespace.Description ?? "", toolNamespace.Instructions ?? "");
         return new(name, string.Join(' ', parts.Where(part => McpJson.JsTrim(part).Length > 0))) { NamespaceText = namespaceText };

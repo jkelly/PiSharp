@@ -87,8 +87,9 @@ internal sealed class ModelRegistry
 
     // Built-in entries are immutable (every change goes through RegistryModel.With), so one projection per process is shared.
     private static readonly ConcurrentDictionary<string, IReadOnlyList<RegistryModel>> Builtins = new(StringComparer.Ordinal);
-    private static IReadOnlyList<RegistryModel> BuiltinModels(string provider) => !BuiltinModelCatalog.Has(provider) ? [] :
-        Builtins.GetOrAdd(provider, id => [.. BuiltinModelCatalog.Get(id).Models.Select(RegistryModel.FromCatalog)]);
+    private static IReadOnlyList<RegistryModel> BuiltinModels(string provider) =>
+        Builtins.GetOrAdd(provider, id => [.. (ReviewedModelCatalog.Apply(id, BuiltinModelCatalog.Has(id) ? BuiltinModelCatalog.Get(id) : null)?.Models ?? [])
+            .Select(RegistryModel.FromCatalog)]);
 
     /// <summary>The options this registry was created with.</summary>
     internal ModelRegistryOptions Options => options;
@@ -403,6 +404,10 @@ internal sealed class ModelRegistry
         BuiltinProviders.TryGet(provider, out var builtin) ? builtin.Name : provider;
 
     internal JsonObject? GetProviderConfig(string provider) => ProviderConfig(provider);
+
+    /// <summary>The current models.json layer alone, shared with the classifier/image registry. Extension providers are
+    /// composed separately there; this snapshot changes only when the model registry refreshes.</summary>
+    internal JsonObject? GetModelsJsonProviderConfig(string provider) => config.GetProvider(provider);
 
     /// <summary>The provider's configuration for request auth: models.json, with an extension's apiKey, headers and authHeader over it
     /// (provider-composer.ts configuredApiKey/configuredHeaders).</summary>

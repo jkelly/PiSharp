@@ -59,6 +59,8 @@ public sealed class AccountRouter : IAsyncDisposable
     private readonly ConcurrentQueue<Lazy<Task<Generation>>> retired = new();
     private readonly ConcurrentDictionary<string, string> variableStamps = new(StringComparer.Ordinal);
     private int disposed;
+    private readonly object lifecycle = new();
+    private Task? close;
     private long customVersion;
 
     /// <summary>A router over the accounts of <paramref name="accounts"/> and their secrets in <paramref name="vault"/>, and the custom
@@ -114,7 +116,8 @@ public sealed class AccountRouter : IAsyncDisposable
             log.LogWarning("Account {Account} could not be read for {Provider}/{Model}.", account?.Id ?? "(none)", model.Provider, model.Id);
             throw new AccountRouteException(AccountRouteErrors.Unavailable, Describe(AccountRouteErrors.Unavailable, providerName, customProvider));
         }
-        var route = generation.Route(row.Entry, model);
+        var isolated = streamOptions?.ThinkingBudgets is not null || streamOptions?.WebsocketConnectTimeoutMs is not null;
+        var route = generation.Route(row.Entry, model, isolated ? streamOptions : null);
         IChatTransport transport = route;
         if (streamOptions?.MaxTokens is not null || streamOptions?.CacheRetention == "none")
         {
@@ -122,6 +125,7 @@ public sealed class AccountRouter : IAsyncDisposable
                 : (int)Math.Clamp(model.MaxTokens, 1, int.MaxValue);
             transport = route.Summary(maximum, streamOptions?.Reasoning);
         }
+        if (isolated) transport = new OwnedRequestTransport(generation, route, transport);
         return new AccountTransport(this, generation, transport, providerName);
     }
 
@@ -170,8 +174,9 @@ public sealed class AccountRouter : IAsyncDisposable
         if (custom is null) return;
         var version = catalog.CustomVersion;
         if (Interlocked.Exchange(ref customVersion, version) == version) return;
-        foreach (var key in generations.Keys)
-            if (generations.TryRemove(key, out var old)) retired.Enqueue(old);
+        lock (lifecycle)
+            foreach (var key in generations.Keys)
+                if (generations.TryRemove(key, out var old)) retired.Enqueue(old);
     }
 
     /// <summary>Retires the generation <paramref name="key"/> when a variable that <paramref name="provider"/> references changed since the
@@ -185,17 +190,26 @@ public sealed class AccountRouter : IAsyncDisposable
         var previous = variableStamps.GetValueOrDefault(key);
         if (previous == stamp) return;
         variableStamps[key] = stamp;
-        if (previous is not null && generations.TryRemove(key, out var stale)) retired.Enqueue(stale);
+        lock (lifecycle)
+            if (previous is not null && generations.TryRemove(key, out var stale)) retired.Enqueue(stale);
     }
 
     private async Task<Generation> GenerationAsync(string key, Func<Task<Generation>> create, CancellationToken cancellationToken)
     {
-        var lazy = generations.GetOrAdd(key, _ => new Lazy<Task<Generation>>(create, LazyThreadSafetyMode.ExecutionAndPublication));
-        try { return await lazy.Value.WaitAsync(cancellationToken).ConfigureAwait(false); }
-        catch (Exception) when (lazy.Value.IsFaulted || lazy.Value.IsCanceled)
+        Lazy<Task<Generation>> lazy;
+        Task<Generation> creation;
+        lock (lifecycle)
+        {
+            ObjectDisposedException.ThrowIf(disposed != 0, this);
+            lazy = generations.GetOrAdd(key, _ => new Lazy<Task<Generation>>(create, LazyThreadSafetyMode.ExecutionAndPublication));
+            // Starting creation and admitting its owner are atomic with the close snapshot.
+            creation = lazy.Value;
+        }
+        try { return await creation.WaitAsync(cancellationToken).ConfigureAwait(false); }
+        catch (Exception) when (creation.IsFaulted || creation.IsCanceled)
         {
             // A failed generation is not kept: the next request tries again (the account may be fixed meanwhile).
-            generations.TryRemove(KeyValuePair.Create(key, lazy));
+            lock (lifecycle) generations.TryRemove(KeyValuePair.Create(key, lazy));
             throw;
         }
     }
@@ -213,10 +227,15 @@ public sealed class AccountRouter : IAsyncDisposable
             var variables = customProvider.Variables.ToHashSet(StringComparer.Ordinal);
             environment = name => variables.Contains(name) ? credentials.Environment(name) : own(name);
         }
-        var runtime = Runtime(environment, source, account.Provider, BaseUrl(account));
-        var registry = await runtime.CreateModelRegistryAsync(CancellationToken.None).ConfigureAwait(false);
-        log.LogDebug("Account {Account} ({Provider}) has a new route generation.", account.Id, account.Provider);
-        return new Generation(account.Id, account.Provider, account, source, runtime, registry, customProvider);
+        var handlers = new ProviderHandlerOwner(options);
+        try
+        {
+            var runtime = Runtime(environment, source, account.Provider, BaseUrl(account), handlers);
+            var registry = await runtime.CreateModelRegistryAsync(CancellationToken.None).ConfigureAwait(false);
+            log.LogDebug("Account {Account} ({Provider}) has a new route generation.", account.Id, account.Provider);
+            return new Generation(account.Id, account.Provider, account, source, runtime, registry, customProvider, handlers);
+        }
+        catch { handlers.Dispose(); throw; }
     }
 
     /// <summary>A custom provider's runtime without an account: the file's $VAR reference (from a host environment that shows only the
@@ -225,15 +244,20 @@ public sealed class AccountRouter : IAsyncDisposable
     {
         var source = new CustomKeyCredentialSource(provider.Id, provider.FileKey == CustomKeySource.Environment ? null : CustomProviderJson.PlaceholderKey);
         var variables = provider.Variables.ToHashSet(StringComparer.Ordinal);
-        var runtime = Runtime(name => variables.Contains(name) || AccountEnvironment.Configuration.Contains(name) ? credentials.Environment(name) : null,
-            source, provider.Id, null);
-        var registry = await runtime.CreateModelRegistryAsync(CancellationToken.None).ConfigureAwait(false);
-        log.LogDebug("Custom provider {Provider} has a new route generation.", provider.Id);
-        return new Generation(KeylessKey + provider.Id, provider.Id, null, null, runtime, registry, provider);
+        var handlers = new ProviderHandlerOwner(options);
+        try
+        {
+            var runtime = Runtime(name => variables.Contains(name) || AccountEnvironment.Configuration.Contains(name) ? credentials.Environment(name) : null,
+                source, provider.Id, null, handlers);
+            var registry = await runtime.CreateModelRegistryAsync(CancellationToken.None).ConfigureAwait(false);
+            log.LogDebug("Custom provider {Provider} has a new route generation.", provider.Id);
+            return new Generation(KeylessKey + provider.Id, provider.Id, null, null, runtime, registry, provider, handlers);
+        }
+        catch { handlers.Dispose(); throw; }
     }
 
-    private LiveRouteRuntime Runtime(Func<string, string?> environment, PiSharp.Cli.Authentication.IProviderCredentialSource source, string provider, string? baseUrl) =>
-        new(environment, () => options.ProviderHandler, credentials.CreateHttp, Time, ModelsPath: custom?.Current.RoutesPath)
+    private LiveRouteRuntime Runtime(Func<string, string?> environment, PiSharp.Cli.Authentication.IProviderCredentialSource source, string provider, string? baseUrl, ProviderHandlerOwner handlers) =>
+        new(environment, handlers.Get, credentials.CreateHttp, Time, ModelsPath: custom?.Current.RoutesPath)
         {
             Credentials = () => source,
             OAuthFlows = (id, context) => WebCredentialSource.SignInProviders.Contains(id)
@@ -242,7 +266,7 @@ public sealed class AccountRouter : IAsyncDisposable
             // A run whose request the capture hook must change or record (RunHttpContext.NeedsHttp: a patch, strict tools, a cache edit, an
             // API version, retries, a timeout, or raw payloads) goes over SSE: the hook cannot reach a WebSocket frame, and its options would
             // otherwise be dropped. Read per request, in the run's async flow.
-            Transport = () => Runs.RunHttpScope.Current is { NeedsHttp: true } ? "sse" : options.CodexTransport,
+            Transport = () => (Runs.RunHttpScope.Current is { NeedsHttp: true } || NativeDurableModels.HasActiveProviderPayloadHook) ? "sse" : options.CodexTransport,
             HomeDirectory = credentials.Home,
             CreateCatalogClient = () => new HttpClient(new OfflineCatalogHandler()),
             ConfigureRegistry = baseUrl is not null
@@ -259,7 +283,8 @@ public sealed class AccountRouter : IAsyncDisposable
     {
         if (change.Change is not (AccountChange.CredentialReplaced or AccountChange.Removed or AccountChange.StatusChanged)) return;
         // Requests already streaming keep their generation; it is closed with the router.
-        if (generations.TryRemove(change.AccountId, out var old)) retired.Enqueue(old);
+        lock (lifecycle)
+            if (generations.TryRemove(change.AccountId, out var old)) retired.Enqueue(old);
     }
 
     // ─── Errors ─────────────────────────────────────────────────────────────
@@ -380,27 +405,41 @@ public sealed class AccountRouter : IAsyncDisposable
     private static AssistantMessage WithError(AssistantMessage message, string text) => message with { ExtraProperties = ErrorFields(message, text) };
 
     /// <summary>Closes every route the router opened (the provider handler stays the caller's).</summary>
-    public async ValueTask DisposeAsync()
+    public ValueTask DisposeAsync()
     {
-        if (Interlocked.Exchange(ref disposed, 1) != 0) return;
-        accounts.Changed -= OnChanged;
-        var all = generations.Values.Concat(retired).ToList();
-        generations.Clear();
+        lock (lifecycle)
+        {
+            if (close is null)
+            {
+                Volatile.Write(ref disposed, 1);
+                accounts.Changed -= OnChanged;
+                var all = generations.Values.Concat(retired).ToArray();
+                generations.Clear(); retired.Clear();
+                close = CloseAsync(all);
+            }
+            return new(close);
+        }
+    }
+
+    private async Task CloseAsync(IEnumerable<Lazy<Task<Generation>>> all)
+    {
         foreach (var lazy in all)
         {
-            if (!lazy.IsValueCreated || !lazy.Value.IsCompletedSuccessfully) continue;
-            try { await lazy.Value.Result.DisposeAsync().ConfigureAwait(false); }
+            try { await (await lazy.Value.ConfigureAwait(false)).DisposeAsync().ConfigureAwait(false); }
             catch (Exception error) { log.LogDebug(error, "Closing a route generation failed."); }
         }
     }
 
-    // ─── Generations and transports ─────────────────────────────────────────
-
     /// <summary>One account's (or one key-less custom provider's) runtime, registry and model routes, as of one credential version.</summary>
     private sealed class Generation(string key, string provider, AccountInfo? account, WebCredentialSource? source, LiveRouteRuntime runtime,
-        ModelRegistry registry, CustomProviderInfo? customProvider) : IAsyncDisposable
+        ModelRegistry registry, CustomProviderInfo? customProvider, ProviderHandlerOwner handlers) : IAsyncDisposable
     {
         private readonly ConcurrentDictionary<(string Provider, string Id), LazyModelTransport> routes = new();
+        private readonly HashSet<LazyModelTransport> isolatedRoutes = [];
+        private readonly object gate = new();
+        private readonly TaskCompletionSource drained = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private int active;
+        private Task? close;
 
         /// <summary>The generation's key: the account id, or <c>custom:</c> and the provider id.</summary>
         public string Key { get; } = key;
@@ -417,13 +456,134 @@ public sealed class AccountRouter : IAsyncDisposable
 
         public int Failures => Source?.Failures ?? 0;
 
-        public LazyModelTransport Route(RegistryModel entry, DurableModel model) =>
-            routes.GetOrAdd((model.Provider, model.Id), _ => new LazyModelTransport(entry, model.Descriptor, () => registry, runtime));
-
-        public async ValueTask DisposeAsync()
+        public LazyModelTransport Route(RegistryModel entry, DurableModel model, DurableStreamOptions? requestOptions)
         {
-            foreach (var route in routes.Values) await route.DisposeAsync().ConfigureAwait(false);
-            routes.Clear();
+            lock (gate)
+            {
+                ObjectDisposedException.ThrowIf(close is not null, this);
+                if (requestOptions is null)
+                    return routes.GetOrAdd((model.Provider, model.Id), _ => new LazyModelTransport(entry, model.Descriptor, () => registry, runtime));
+                var requestRuntime = runtime with
+                {
+                    ThinkingBudgets = requestOptions.ThinkingBudgets?.ToData(),
+                    WebSocketConnectTimeout = requestOptions.WebsocketConnectTimeoutMs is { } timeout
+                        ? TimeSpan.FromMilliseconds(timeout) : runtime.WebSocketConnectTimeout,
+                };
+                var isolated = new LazyModelTransport(entry, model.Descriptor, () => registry, requestRuntime);
+                isolatedRoutes.Add(isolated);
+                return isolated;
+            }
+        }
+
+        public IDisposable BeginStream()
+        {
+            lock (gate)
+            {
+                ObjectDisposedException.ThrowIf(close is not null, this);
+                active++;
+                return new ActiveStream(this);
+            }
+        }
+
+        private sealed class ActiveStream(Generation owner) : IDisposable
+        {
+            private int disposed;
+            public void Dispose()
+            {
+                if (Interlocked.Exchange(ref disposed, 1) != 0) return;
+                lock (owner.gate)
+                    if (--owner.active == 0 && owner.close is not null) owner.drained.TrySetResult();
+            }
+        }
+
+        public async ValueTask ReleaseRouteAsync(LazyModelTransport route)
+        {
+            try { await route.DisposeAsync().ConfigureAwait(false); }
+            finally { lock (gate) isolatedRoutes.Remove(route); }
+        }
+
+        public ValueTask DisposeAsync()
+        {
+            lock (gate)
+            {
+                if (close is null)
+                {
+                    if (active == 0) drained.TrySetResult();
+                    close = CloseAsync();
+                }
+                return new(close);
+            }
+        }
+
+        private async Task CloseAsync()
+        {
+            await drained.Task.ConfigureAwait(false);
+            var failures = new List<Exception>();
+            foreach (var route in routes.Values.Concat(isolatedRoutes))
+                try { await route.DisposeAsync().ConfigureAwait(false); }
+                catch (Exception error) { failures.Add(error); }
+            routes.Clear(); isolatedRoutes.Clear();
+            try { handlers.Dispose(); }
+            catch (Exception error) { failures.Add(error); }
+            if (failures.Count != 0) throw new AggregateException(failures);
+        }
+    }
+
+    /// <summary>The per-request route keeps its thinking capabilities and is released when its stream settles.</summary>
+    private sealed class OwnedRequestTransport(Generation generation, LazyModelTransport owner, IChatTransport inner)
+        : IChatTransport, IThinkingLevelTransport
+    {
+        public ImmutableArray<string> GetSupportedThinkingLevels(ModelDescriptor model) =>
+            inner is IThinkingLevelTransport thinking ? thinking.GetSupportedThinkingLevels(model) : owner.GetSupportedThinkingLevels(model);
+
+        public async IAsyncEnumerable<StreamEvent> StreamAsync(ChatRequest request, [EnumeratorCancellation] CancellationToken cancellationToken = default)
+        {
+            try
+            {
+                await foreach (var item in inner.StreamAsync(request, cancellationToken).ConfigureAwait(false)) yield return item;
+            }
+            finally { await generation.ReleaseRouteAsync(owner).ConfigureAwait(false); }
+        }
+    }
+
+    /// <summary>One lazily created HTTP pool per generation. Wrappers are owned; an injected handler is borrowed.</summary>
+    private sealed class ProviderHandlerOwner(RoutingOptions options) : IDisposable
+    {
+        private readonly object gate = new();
+        private HttpMessageHandler? handler;
+        private bool disposed;
+
+        public HttpMessageHandler Get()
+        {
+            lock (gate)
+            {
+                ObjectDisposedException.ThrowIf(disposed, this);
+                return handler ??= NativeDurableModels.WrapProviderHandler(options.ProviderHandler is { } borrowed
+                    ? new BorrowedHandler(borrowed)
+                    : options.CreateDefaultProviderHandler?.Invoke() ?? new SocketsHttpHandler { AllowAutoRedirect = false });
+            }
+        }
+
+        public void Dispose()
+        {
+            lock (gate)
+            {
+                if (disposed) return;
+                disposed = true;
+                handler?.Dispose();
+            }
+        }
+
+        private sealed class BorrowedHandler(HttpMessageHandler inner) : HttpMessageHandler
+        {
+            private readonly HttpMessageInvoker invoker = new(inner, disposeHandler: false);
+            protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) =>
+                invoker.SendAsync(request, cancellationToken);
+            protected override void Dispose(bool disposing)
+            {
+                if (disposing) invoker.Dispose();
+                base.Dispose(disposing);
+            }
         }
     }
 
@@ -437,6 +597,7 @@ public sealed class AccountRouter : IAsyncDisposable
 
         public async IAsyncEnumerable<StreamEvent> StreamAsync(ChatRequest request, [EnumeratorCancellation] CancellationToken cancellationToken = default)
         {
+            using var active = generation.BeginStream();
             var failures = generation.Failures;
             var yielded = false;
             Exception? thrown = null;

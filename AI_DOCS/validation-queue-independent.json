@@ -1,0 +1,122 @@
+[
+  {
+    "options": {
+      "Project": "artifacts/gap-validation/I18SqliteCases/I18SqliteCases.csproj",
+      "Label": "I18-real-cases-r2",
+      "BuildTimeoutSeconds": 240,
+      "TestTimeoutSeconds": 240,
+      "LockTimeoutSeconds": 15
+    },
+    "environment": {},
+    "note": "owner reports source coherent; pending central execution"
+  },
+  {
+    "options": {
+      "Project": "tests/PiSharp.MistralConversations.Tests",
+      "Label": "R5-retry-r2",
+      "BuildTimeoutSeconds": 240,
+      "TestTimeoutSeconds": 240,
+      "LockTimeoutSeconds": 15
+    },
+    "environment": {},
+    "note": "owner reports source coherent; pending central execution"
+  },
+  {
+    "options": {
+      "Project": "tests/PiSharp.Tui.NativeModifiers.Tests",
+      "Label": "R7-retry-r2",
+      "BuildTimeoutSeconds": 240,
+      "TestTimeoutSeconds": 240,
+      "LockTimeoutSeconds": 15
+    },
+    "environment": {},
+    "note": "owner reports source coherent; pending central execution"
+  },
+  {
+    "options": {
+      "Project": "tests/PiSharp.Env.Connection.Tests",
+      "Label": "E01-retry-r2",
+      "BuildTimeoutSeconds": 240,
+      "TestTimeoutSeconds": 240,
+      "LockTimeoutSeconds": 15
+    },
+    "environment": {},
+    "note": "wait design_env source-ready after restart race fix"
+  },
+  {
+    "options": {
+      "Project": "tests/PiSharp.Env.Daemon.Tests",
+      "Label": "E02-retry-r2",
+      "BuildTimeoutSeconds": 240,
+      "TestTimeoutSeconds": 240,
+      "LockTimeoutSeconds": 15
+    },
+    "environment": {},
+    "note": "owner reports source coherent; pending central execution"
+  },
+  {
+    "options": {
+      "Project": "tests/PiSharp.Env.Adapter.Tests",
+      "Label": "E03-adapters-r2",
+      "BuildTimeoutSeconds": 240,
+      "TestTimeoutSeconds": 420,
+      "LockTimeoutSeconds": 15
+    },
+    "environment": {},
+    "note": "owner reports source coherent; pending central execution"
+  },
+  {
+    "options": {
+      "Project": "tests/PiSharp.Env.Watch.Tests",
+      "Label": "E04-watch-r2",
+      "BuildTimeoutSeconds": 240,
+      "TestTimeoutSeconds": 240,
+      "LockTimeoutSeconds": 15
+    },
+    "environment": {},
+    "note": "owner reports source coherent; pending central execution"
+  },
+  {
+    "options": {
+      "Project": "tests/PiSharp.Env.Process.Tests",
+      "Label": "E05-process-r2",
+      "BuildTimeoutSeconds": 240,
+      "TestTimeoutSeconds": 240,
+      "LockTimeoutSeconds": 15
+    },
+    "environment": {},
+    "note": "owner reports source coherent; pending central execution"
+  },
+  {
+    "options": {
+      "Project": "tests/PiSharp.Env.Terminal.Tests",
+      "Label": "E06-terminal-r2",
+      "BuildTimeoutSeconds": 240,
+      "TestTimeoutSeconds": 240,
+      "LockTimeoutSeconds": 15
+    },
+    "environment": {},
+    "note": "owner reports source coherent; pending central execution"
+  },
+  {
+    "options": {
+      "Project": "tests/PiSharp.Env.Ssh.Tests",
+      "Label": "E07-retry-r2",
+      "BuildTimeoutSeconds": 240,
+      "TestTimeoutSeconds": 240,
+      "LockTimeoutSeconds": 15
+    },
+    "environment": {},
+    "note": "owner reports source coherent; pending central execution"
+  },
+  {
+    "options": {
+      "Project": "artifacts/gap-validation/NativeEnvDriver/NativeEnvDriver.proj",
+      "Label": "E08-native-aot",
+      "BuildOnly": true,
+      "BuildTimeoutSeconds": 1200,
+      "LockTimeoutSeconds": 15
+    },
+    "environment": {}
+  }
+]

@@ -193,7 +193,12 @@ export class ExtensionRuntime {
   }
 
   assertActive() { if (this.staleMessage) throw new Error(this.staleMessage); }
-  invalidate(text = STALE_MESSAGE) { if (!this.staleMessage) { this.staleMessage = text; this.eventBus.clear(); } }
+  invalidate(text = STALE_MESSAGE) {
+    if (!this.staleMessage) {
+      this.staleMessage = text; this.eventBus.clear();
+      for (const id of this.components.keys()) this.disposeComponent(id, true);
+    }
+  }
 
   // ---------------------------------------------------------------------------------------------------------------- loading
 
@@ -583,16 +588,34 @@ export class ExtensionRuntime {
       setHeader: (factory) => bridge.notify('ui.publish', { ctx, op: 'setHeader', args: [factory ? { component: runtime.createComponent((tui, theme) => factory(tui, theme)) } : null] }),
       setTitle: (title) => bridge.notify('ui.publish', { ctx, op: 'setTitle', args: [title] }),
       custom: (factory, options) => runtime.withUIPrompt('custom', undefined, () => new Promise((resolve, reject) => {
-        let id;
-        const done = (result) => { bridge.notify('component.done', { id }); runtime.disposeComponent(id); resolve(result); };
+        let id, closed = false;
+        const done = (result) => {
+          if (closed) return;
+          closed = true;
+          if (id) { bridge.notify('component.done', { id }); runtime.disposeComponent(id); }
+          resolve(result);
+        };
         try { id = runtime.createComponent((tui, theme, keybindings) => factory(tui, theme, keybindings, done)); }
         catch (error) { reject(error); return; }
-        // Pi 1.3.0: without overlayOptions an overlay takes the component's width property, if it has one.
-        const width = runtime.components.get(id)?.component?.width;
-        const overlayOptions = (typeof options?.overlayOptions === 'function' ? options.overlayOptions() : options?.overlayOptions) ?? (width ? { width } : undefined);
-        // Pi 1.5.0: blocked reports program status while the inline component is visible (overlays ignore it).
-        bridge.call('ui.custom', { ctx, component: id, overlay: options?.overlay === true, overlayOptions: overlayOptions ?? null, blocked: options?.blocked ?? null })
-          .catch((error) => { runtime.disposeComponent(id); reject(error); });
+        const record = runtime.components.get(id);
+        record.onInvalidated = () => { if (!closed) { closed = true; bridge.notify('component.done', { id }); resolve(undefined); } };
+        const open = () => {
+          if (closed || runtime.staleMessage || !runtime.components.has(id)) { runtime.disposeComponent(id); return; }
+          // Upstream resolves the options factory once, after the component factory has settled. The visible closure stays in Node.
+          const width = record.component?.width;
+          const overlayOptions = (typeof options?.overlayOptions === 'function' ? options.overlayOptions() : options?.overlayOptions) ?? (width ? { width } : undefined);
+          record.visible = typeof overlayOptions?.visible === 'function' ? overlayOptions.visible : undefined;
+          record.onHandle = options?.onHandle;
+          bridge.call('ui.custom', { ctx, component: id, overlay: options?.overlay === true, overlayOptions: overlayOptions ?? null,
+            dynamicVisible: !!record.visible, blocked: options?.blocked ?? null }).then(() => done(undefined), (error) => {
+              if (closed) return;
+              closed = true; runtime.disposeComponent(id); reject(error);
+            });
+        };
+        if (record.pending) record.pending.then(() => {
+          try { open(); } catch (error) { closed = true; runtime.disposeComponent(id); reject(error); }
+        }, error => { if (!closed) { closed = true; reject(error); } runtime.disposeComponent(id); });
+        else { try { open(); } catch (error) { closed = true; runtime.disposeComponent(id); reject(error); } }
       })),
       pasteToEditor: (text) => bridge.notify('ui.publish', { ctx, op: 'pasteToEditor', args: [text] }),
       setEditorText: (text) => bridge.notify('ui.publish', { ctx, op: 'setEditorText', args: [text] }),
@@ -740,18 +763,31 @@ export class ExtensionRuntime {
   setEditorAutocomplete(id, token) { this.components.get(id)?.component?.setAutocompleteProvider?.(this.hostAutocomplete(token)); }
 
   createComponent(factory, onCreated) {
-    const id = `c${++this.nextComponent}`;
+    const id = `c${this.generation}-${++this.nextComponent}`;
     const runtime = this, bridge = this.bridge;
     const tui = {
-      requestRender: () => bridge.notify('component.invalidate', { id }),
-      get terminal() { const size = bridge.sync('ui.read', { op: 'terminalSize' }) ?? { columns: 80, rows: 24 }; return { columns: size.columns, rows: size.rows }; },
+      requestRender: () => { if (!runtime.staleMessage && runtime.components.has(id)) bridge.notify('component.invalidate', { id }); },
+      get terminal() {
+        const size = runtime.staleMessage || !runtime.components.has(id) ? { columns: 80, rows: 24 }
+          : bridge.sync('ui.read', { op: 'terminalSize' }) ?? { columns: 80, rows: 24 };
+        return { columns: size.columns, rows: size.rows };
+      },
       get columns() { return this.terminal.columns; }, get rows() { return this.terminal.rows; },
     };
     const keybindings = { matches: () => false, getKeys: () => [], get: () => undefined };
     const record = { id, component: undefined, pending: undefined };
     this.components.set(id, record);
-    const created = factory(tui, runtime.theme(), keybindings);
-    if (created && typeof created.then === 'function') record.pending = created.then(component => { record.component = component; onCreated?.(component, id); bridge.notify('component.invalidate', { id }); }, () => {});
+    let created;
+    try { created = factory(tui, runtime.theme(), keybindings); }
+    catch (error) { this.components.delete(id); throw error; }
+    if (created && typeof created.then === 'function') {
+      record.pending = created.then(component => {
+        if (!this.components.has(id)) { try { component?.dispose?.(); } catch {} return; }
+        record.component = component; onCreated?.(component, id); bridge.notify('component.invalidate', { id });
+      });
+      // Widgets need no consumer of their factory promise; custom() observes the same rejection separately.
+      record.pending.catch(() => {});
+    }
     else { record.component = created; if (created) onCreated?.(created, id); }
     return id;
   }
@@ -771,7 +807,48 @@ export class ExtensionRuntime {
     record.captures = captures;
     this.bridge.notify('component.captures', { id: record.id, value: captures });
   }
-  disposeComponent(id) { const record = this.components.get(id); if (!record) return; this.components.delete(id); try { record.component?.dispose?.(); } catch { /* ignore */ } }
+  disposeComponent(id, invalidated = false) {
+    const record = this.components.get(id); if (!record) return;
+    this.components.delete(id);
+    if (invalidated) record.onInvalidated?.();
+    try { record.component?.dispose?.(); } catch { /* ignore */ }
+  }
+
+  /** Handle reads only reach a host snapshot. Mutations are notifications, so a host render/visible callback cannot reverse-wait on itself. */
+  readyOverlay(id) {
+    const record = this.components.get(id);
+    if (!record || this.staleMessage || record.handle) return;
+    const active = () => !this.staleMessage && this.components.get(id) === record;
+    let sequence = 0, pending = {};
+    const read = () => {
+      if (!active()) return { hidden: true, focused: false };
+      const state = this.bridge.sync('component.overlay.read', { id }) ?? {};
+      if ((state.sequence ?? 0) >= sequence) pending = {};
+      return { ...state, ...pending };
+    };
+    const command = (operation, hidden) => {
+      if (!active()) return;
+      if (operation === 'hide' || operation === 'setHidden') {
+        pending.hidden = operation === 'hide' || hidden;
+        if (pending.hidden) { pending.focused = false; pending.width = null; }
+      } else if (operation === 'focus') pending.focused = true;
+      else if (operation === 'unfocus') pending.focused = false;
+      this.bridge.notify('component.overlay.command', { id, operation, hidden, sequence: ++sequence });
+    };
+    const handle = record.handle = {
+      hide: () => command('hide'), setHidden: hidden => command('setHidden', !!hidden),
+      isHidden: () => read().hidden === true, focus: () => command('focus'),
+      unfocus: () => command('unfocus'), isFocused: () => read().focused === true,
+      getBounds: () => { const state = read(); return state.width == null ? undefined : { row: state.row, col: state.col, width: state.width, height: state.height }; },
+    };
+    record.onHandle?.(handle);
+  }
+
+  overlayVisible(id, columns, rows) {
+    const record = this.components.get(id);
+    if (!record || this.staleMessage) return false;
+    return record.visible ? record.visible(columns, rows) === true : true;
+  }
 
   // ---------------------------------------------------------------------------------------------------------------- dispatch
 

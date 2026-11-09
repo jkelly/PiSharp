@@ -1,5 +1,6 @@
 using System.Collections.Immutable;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 
 namespace PiSharp.Contracts;
 
@@ -69,24 +70,26 @@ public sealed class ToolLoadoutPresentation
         return messages.Select(message =>
         {
             if (message.Role != "system") return message;
-            var fields = new Dictionary<string, JsonElement>();
+            var fields = JsonUtf16.MutableNode(message.WireBody.Value)!.AsObject();
             foreach (var property in message.WireBody.Value.EnumerateObject())
             {
-                if (property.Name is not ("toolsAdded" or "toolsRemoved")) { fields[property.Name] = property.Value; continue; }
+                if (property.Name is not ("toolsAdded" or "toolsRemoved")) continue;
                 var projected = property.Value.EnumerateArray()
                     .Where(tool => !HiddenDeclarations.Contains(tool.GetProperty("name").GetString()!))
                     .Select(tool => property.Name == "toolsAdded" ? Describe(tool) : tool).ToArray();
-                if (projected.Length > 0) fields[property.Name] = JsonSerializer.SerializeToElement(projected);
+                if (projected.Length > 0)
+                    fields[property.Name] = new JsonArray(projected.Select(JsonUtf16.MutableNode).ToArray());
+                else fields.Remove(property.Name);
             }
-            return new TranscriptEntry("system", JsonData.Parse(JsonSerializer.Serialize(fields)));
+            return new TranscriptEntry("system", JsonData.Parse(JsonUtf16.ToJsonString(fields)));
         }).ToImmutableArray();
     }
     /// <summary>The declaration with the description a prepareLoadout hook gave it (unchanged without one).</summary>
     public JsonElement Describe(JsonElement tool)
     {
         if (!descriptions.TryGetValue(tool.GetProperty("name").GetString()!, out var description)) return tool;
-        var fields = tool.EnumerateObject().ToDictionary(property => property.Name, property => property.Value, StringComparer.Ordinal);
-        fields["description"] = JsonSerializer.SerializeToElement(description);
-        return JsonSerializer.SerializeToElement(fields);
+        var fields = JsonUtf16.MutableNode(tool)!.AsObject();
+        fields["description"] = JsonUtf16.StringNode(description);
+        return JsonData.Parse(JsonUtf16.ToJsonString(fields)).Value;
     }
 }

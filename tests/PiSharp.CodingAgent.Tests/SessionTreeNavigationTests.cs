@@ -23,6 +23,8 @@ internal static class SessionTreeNavigationTests
         (Prefix + "veto caller cancellation owned abort and foreign failures retain original state", Cancellation),
         (Prefix + "held callback joins original work through owner close and rejects self-waits", CloseAndReentrancy),
         (Prefix + "next durable append uses selected parent and storage failure retains facts", DurableContinuation),
+        (Prefix + "prompt durably records clamped live thinking after navigation and reopens", ThinkingPersistence),
+        (Prefix + "thinking write failure and pre-cancel preserve branch before provider", ThinkingWriteFailure),
         (Prefix + "memory and lazy navigation never materialize files", VirtualStorage),
         (Prefix + "pending queues and active input reject selection publication", Admission),
         (Prefix + "steering and followup admission preserve queues durable state and revision", QueueAdmissionPreservation),
@@ -59,6 +61,43 @@ internal static class SessionTreeNavigationTests
         var afterBytes = await f.Bytes();
         Check(bytes.AsSpan().SequenceEqual(afterBytes), "No-summary navigation changed durable bytes.");
         Equal(0, f.Transport.Calls); Equal(0, f.Ids); Equal(1, Directory.GetFiles(f.Root).Length);
+    }
+
+    private static async Task ThinkingPersistence()
+    {
+        await using var f = await Fixture.Open(reasoning: true);
+        await f.Session.ConfigureAsync(new(ThinkingLevel: "max"));
+        await Select(f, "left-system");
+        Equal("high", f.Session.Snapshot.Context.ThinkingLevel);
+        await f.Session.PromptAsync(User("branch prompt"));
+        var recorded = f.Session.Snapshot.Log.Entries.Single(e => e.Kind == SessionEntryKind.ThinkingLevelChange && e.ParentId == "left-system");
+        Equal("high", recorded.WireBody.Value.GetProperty("thinkingLevel").GetString());
+        Equal("high", f.Transport.LastThinking);
+        var count = f.Session.Snapshot.Log.Entries.Count(e => e.Kind == SessionEntryKind.ThinkingLevelChange);
+        await f.Session.PromptAsync(User("same selection"));
+        Equal(count, f.Session.Snapshot.Log.Entries.Count(e => e.Kind == SessionEntryKind.ThinkingLevelChange));
+        await f.Owner.DisposeAsync();
+        await using var reopened = await PersistentAgentSession.OpenWithRegistryAsync(f.Path, f.Registry, () => 123,
+            () => Guid.NewGuid().ToString("N"), fallbackModel: B);
+        Equal("high", reopened.Snapshot.Context.ThinkingLevel);
+    }
+
+    private static async Task ThinkingWriteFailure()
+    {
+        foreach (var cancelled in new[] { false, true })
+        {
+            await using var f = await Fixture.Open(reasoning: true);
+            await f.Session.ApplyInitialThinkingLevelAsync("max");
+            await Select(f, "left-system");
+            var before = f.Session.Snapshot; var bytes = await f.Bytes();
+            using var cts = new CancellationTokenSource();
+            if (cancelled) cts.Cancel(); else f.Storage!.FailWrite = true;
+            await Throws<Exception>(() => f.Session.PromptAsync(User("rejected"), cts.Token));
+            Equal(0, f.Transport.Calls);
+            Check(ReferenceEquals(before.Log, f.Session.Snapshot.Log), "Failed thinking append published a checkpoint.");
+            Check((await f.Bytes()).SequenceEqual(bytes), "Rejected thinking append changed disk.");
+            Equal("high", f.Session.Snapshot.Context.ThinkingLevel);
+        }
     }
 
     private static async Task CurrentLeaf()
@@ -378,14 +417,15 @@ internal static class SessionTreeNavigationTests
         public readonly NoTransport Transport = new();
         public PersistentAgentSession Session = null!;
         public ReplaceableAgentSession Owner = null!;
+        public SessionRuntimeRegistry Registry = null!;
         public Exception? ExpectedCleanupFailure;
         public SessionStorageBackend? Backend;
         public ObservedStorage? Storage;
         public int Ids;
         public static async Task<Fixture> Open(string selected = "right-tail", SessionStorageMode? mode = null, bool setupOnly = false,
-            bool registerRead = true)
+            bool registerRead = true, bool reasoning = false)
         {
-            var f = new Fixture(); Directory.CreateDirectory(f.Root);
+            var f = new Fixture(); f.Transport.Reasoning = reasoning; Directory.CreateDirectory(f.Root);
             try
             {
                 f.Backend = mode is { } m ? new(f.Root, m) : null;
@@ -399,6 +439,7 @@ internal static class SessionTreeNavigationTests
                     ? [new(Declaration("read"), new Adapter("read")), new(Declaration("write"), new Adapter("write"))]
                     : [new(Declaration("write"), new Adapter("write"))];
                 var registry = new SessionRuntimeRegistry([new(A, f.Transport), new(B, f.Transport)], tools, new Policy());
+                f.Registry = registry;
                 f.Session = await PersistentAgentSession.OpenWithRegistryAsync(f.Path, registry, () => 123,
                     () => "navigation-append-" + ++f.Ids,
                     new(UseLatestLeaf: false, SelectedLeafId: setupOnly ? "base-model" : selected, SessionLogStoreOptions: options), A);
@@ -463,11 +504,14 @@ internal static class SessionTreeNavigationTests
     private static TranscriptEntry System(string tool) => new("system", JsonData.Parse(JsonSerializer.Serialize(new
         { role = "system", content = "", timestamp = 123, toolsAdded = new[] { Declaration(tool).Value } })));
     private static JsonData Declaration(string tool) => JsonData.Parse(JsonSerializer.Serialize(new { name = tool, description = tool, parameters = new { type = "object" } }));
-    internal sealed class NoTransport : IChatTransport
+    internal sealed class NoTransport : IChatTransport, IThinkingLevelTransport
     {
         public int Calls;
+        public bool Reasoning;
+        public string? LastThinking;
+        public ImmutableArray<string> GetSupportedThinkingLevels(ModelDescriptor model) => Reasoning ? ["off", "low", "high"] : ["off"];
         public async IAsyncEnumerable<StreamEvent> StreamAsync(ChatRequest request, [EnumeratorCancellation] CancellationToken token = default)
-        { Calls++; await Task.FromException(new InvalidOperationException("Navigation must not invoke a provider.")); yield break; }
+        { Calls++; LastThinking = request.ThinkingLevel; await Task.FromException(new InvalidOperationException("Navigation must not invoke a provider.")); yield break; }
     }
     private sealed class Policy : IToolActionPolicy
     { public ValueTask<ToolActionAuthorization> AuthorizeAsync(ToolInvocation invocation, PreparedToolAction action, CancellationToken token) => throw new InvalidOperationException("Navigation cannot authorize tools."); }

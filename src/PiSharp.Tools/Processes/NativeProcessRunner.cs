@@ -23,8 +23,8 @@ public sealed record ProcessRequest(string Executable, ImmutableArray<string> Ar
     /// <summary>Bytes written to the child's standard input before it is closed (source commandTransport "stdin"). Null
     /// gives the child an empty standard input.</summary>
     public byte[]? StandardInput { get; init; }
-    /// <summary>Separated runs only: stop the process once stdout and stderr together reach this many bytes, keeping the bytes
-    /// within it (source execCommand maxBuffer). Null leaves only the per-pipe structured bound.</summary>
+    /// <summary>Separated runs only: stop the process when stdout and stderr together exceed this many bytes, keeping the bytes
+    /// within it (source execCommand maxBuffer). Replaces the per-pipe and raw-output limits for this capture; null keeps them.</summary>
     [System.Diagnostics.CodeAnalysis.Experimental("PISHARP_EXEC001")] public long? CaptureLimitBytes { get; init; }
 }
 
@@ -36,6 +36,7 @@ public sealed record ProcessRunnerOptions(int MaximumRawBytes = 64 * 1024 * 1024
 public sealed record ProcessOutputSnapshot(string Content, ToolOutputTruncationResult Truncation,
     int RawBytes, int LastLineBytes, string? FullOutputPath);
 public sealed record ProcessStructuredOutput(string Content, bool Truncated);
+public sealed record ProcessShellExit(int ExitCode, double AfterSeconds);
 public sealed record ProcessRunResult(ProcessRunStatus Status, int? ExitCode, int? ProcessId,
     bool ProcessStarted, bool CleanupConfirmed, bool CapturedOutputComplete,
     ProcessOutputSnapshot Output, ProcessStructuredOutput StructuredOutput,
@@ -43,6 +44,8 @@ public sealed record ProcessRunResult(ProcessRunStatus Status, int? ExitCode, in
 {
     /// <summary>The Win32 error when CreateProcess refused the executable (the launch never started).</summary>
     public int? LaunchError { get; init; }
+    /// <summary>The shell already exited before the timeout, while inherited output pipes were still active.</summary>
+    public ProcessShellExit? ShellExitBeforeTimeout { get; init; }
 }
 
 public delegate ValueTask ProcessOutputCallback(ProcessOutputSnapshot snapshot);
@@ -161,14 +164,15 @@ public sealed class NativeProcessRunner : ISeparatedProcessRunner
         var diagnostics = new List<ProcessDiagnostic>();
         var diagnosticGate = new object();
         var stop = new TaskCompletionSource<ProcessRunStatus>(TaskCreationOptions.RunContinuationsAsynchronously);
-        var output = new ShellOutputAccumulator(request.SpillPath, _options, _storage);
+        var output = new ShellOutputAccumulator(request.SpillPath, capture?.OutputOptions(_options) ?? _options, _storage);
         var captureComplete = true;
+        long shellExitedAt = -1, shellExitAtTimeout = -1;
         // Acquire the trusted timer before creating an OS process. It stays disarmed during launch.
         ITimer? timer;
         try
         {
             timer = request.TimeoutSeconds is not null
-                ? _clock.CreateTimer(_ => stop.TrySetResult(ProcessRunStatus.TimedOut), null,
+                ? _clock.CreateTimer(_ => { Interlocked.Exchange(ref shellExitAtTimeout, Interlocked.Read(ref shellExitedAt)); stop.TrySetResult(ProcessRunStatus.TimedOut); }, null,
                     Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan)
                 : null;
         }
@@ -267,7 +271,9 @@ public sealed class NativeProcessRunner : ISeparatedProcessRunner
             new(outcome, code, pid, started, cleaned, captureComplete,
                 output.Snapshot(), output.Structured(),
                 Math.Floor(_clock.GetElapsedTime(began).TotalSeconds * 10 + 0.5) / 10,
-                diagnostics.ToImmutableArray());
+                diagnostics.ToImmutableArray())
+            { ShellExitBeforeTimeout = outcome == ProcessRunStatus.TimedOut && code is { } shellCode && shellExitAtTimeout >= 0
+                ? new(shellCode, Math.Round(_clock.GetElapsedTime(began, shellExitAtTimeout).TotalSeconds, 1, MidpointRounding.AwayFromZero)) : null };
         ValueTask ObserveAsync(ProcessLifecycleStage stage) => _lifecycle is null ? ValueTask.CompletedTask :
             _lifecycle(new(stage, lifetime.ProcessId, lifetime.Started, cleanupConfirmed));
 
@@ -281,11 +287,13 @@ public sealed class NativeProcessRunner : ISeparatedProcessRunner
                     var count = await stream.ReadAsync(bytes, reads.Token).ConfigureAwait(false);
                     if (count == 0) break;
                     if (count != bytes.Length) Array.Resize(ref bytes, count);
-                    capture?.Append(standardError, bytes);
+                    var admitted = capture?.AppendAdmitted(standardError, bytes) ?? bytes.Length;
                     // A reached capture limit stops the process; the status still follows its actual exit.
                     if (capture is { LimitReached: true }) stop.TrySetResult(ProcessRunStatus.Exited);
                     Interlocked.Exchange(ref lastActivity, _clock.GetTimestamp());
                     activity.Writer.TryWrite(0);
+                    if (admitted == 0) continue;
+                    if (admitted != bytes.Length) Array.Resize(ref bytes, admitted);
                     await chunks.Writer.WriteAsync(bytes, reads.Token).ConfigureAwait(false);
                 }
             }
@@ -326,6 +334,7 @@ public sealed class NativeProcessRunner : ISeparatedProcessRunner
         async Task WaitForDrainAsync()
         {
             await lifetime.Exit.ConfigureAwait(false);
+            Interlocked.Exchange(ref shellExitedAt, _clock.GetTimestamp());
             Interlocked.Exchange(ref lastActivity, _clock.GetTimestamp());
             while (!pumps.IsCompleted)
             {

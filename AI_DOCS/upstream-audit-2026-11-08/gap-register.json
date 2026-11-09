@@ -1,0 +1,442 @@
+{
+  "schemaVersion": 1,
+  "productCommit": "14dd34b369fba6d236684da6dfc8a39a03263321",
+  "upstreamCandidate": "7d073328e44337d3292a7db9b0f0308f679c5e97",
+  "findings": [
+    {
+      "id": "C01",
+      "priorityAndEvidence": "P1, reproduced",
+      "finding": "Relative root schema $id: schemas/tool.json is applied twice. Valid local references fail, including tool argument validation.",
+      "workPackages": [
+        "W02"
+      ],
+      "primaryEvidence": {
+        "path": "src/PiSharp.Contracts/Schema/SchemaResolver.cs",
+        "line": 46,
+        "url": "https://github.com/jkelly/PiSharp/blob/14dd34b369fba6d236684da6dfc8a39a03263321/src/PiSharp.Contracts/Schema/SchemaResolver.cs#L46"
+      },
+      "sources": [
+        "https://github.com/earendil-works/pi/commit/2bd2c2d0a6a13e9a2d760073bd6e67b662964a60"
+      ]
+    },
+    {
+      "id": "C02",
+      "priorityAndEvidence": "P1, reproduced",
+      "finding": "Non-strict Anthropic tool projection drops root $defs/definitions, leaving dangling references. Strict-prefer fallback and inline tool additions share the path.",
+      "workPackages": [
+        "W03"
+      ],
+      "primaryEvidence": {
+        "path": "src/PiSharp.AI/Protocols/AnthropicMessages/AnthropicMessagesRequestProjector.cs",
+        "line": 562,
+        "url": "https://github.com/jkelly/PiSharp/blob/14dd34b369fba6d236684da6dfc8a39a03263321/src/PiSharp.AI/Protocols/AnthropicMessages/AnthropicMessagesRequestProjector.cs#L562"
+      },
+      "sources": [
+        "https://github.com/earendil-works/pi/commit/4a6a58eb5978ebc46df5a2590e65959d7fe1cbf5"
+      ]
+    },
+    {
+      "id": "C03",
+      "priorityAndEvidence": "P2; reproduced; corrupt-data trigger",
+      "finding": "A corrupted/incompatible stored record shape (valid JSON {}) becomes a semantic refusal; prior batch commits and receives a receipt. SQLite syntax checks prevent ordinary malformed-JSON insertion. C# storage-contract evidence, not exact upstream fixture equivalence.",
+      "workPackages": [
+        "W12"
+      ],
+      "primaryEvidence": {
+        "path": "src/PiSharp.Durable.Sqlite/Storage.cs",
+        "line": 99,
+        "url": "https://github.com/jkelly/PiSharp/blob/14dd34b369fba6d236684da6dfc8a39a03263321/src/PiSharp.Durable.Sqlite/Storage.cs#L99"
+      },
+      "sources": [
+        "https://github.com/earendil-works/pi/commit/fabf916fcf63a886c0974370d6b4dc34e4167e5b"
+      ]
+    },
+    {
+      "id": "C04",
+      "priorityAndEvidence": "P2, source",
+      "finding": "Hosted-session and agent-team settings wrappers drop AfterFailedRun and RestartLimit. Explicit Withdraw/Continue or limits 1/infinity become Keep/5.",
+      "workPackages": [
+        "W11"
+      ],
+      "primaryEvidence": {
+        "path": "src/PiSharp.Durable.Hosting/SessionCompaction.cs",
+        "line": 100,
+        "url": "https://github.com/jkelly/PiSharp/blob/14dd34b369fba6d236684da6dfc8a39a03263321/src/PiSharp.Durable.Hosting/SessionCompaction.cs#L100"
+      },
+      "sources": []
+    },
+    {
+      "id": "C05",
+      "priorityAndEvidence": "P1, reproduced",
+      "finding": "Editing one word normalizes untouched mixed CRLF/LF/lone-CR endings across the file. Existing tests explicitly expect the old behavior.",
+      "workPackages": [
+        "W07"
+      ],
+      "primaryEvidence": {
+        "path": "src/PiSharp.Tools/Files/EditPlan.cs",
+        "line": 47,
+        "url": "https://github.com/jkelly/PiSharp/blob/14dd34b369fba6d236684da6dfc8a39a03263321/src/PiSharp.Tools/Files/EditPlan.cs#L47"
+      },
+      "sources": [
+        "https://github.com/earendil-works/pi/commit/d448c51e2b895bf5dee92b69e33a0554648ee5f5"
+      ]
+    },
+    {
+      "id": "C06",
+      "priorityAndEvidence": "P1, source",
+      "finding": "Grep context reads each entire matched file without an input cap, retaining byte, decoded and line copies before output truncation. Small requested output can exhaust memory. UTF-16 context is decoded as UTF-8.",
+      "workPackages": [
+        "W07"
+      ],
+      "primaryEvidence": {
+        "path": "src/PiSharp.Tools/Files/PiGrepTool.cs",
+        "line": 114,
+        "url": "https://github.com/jkelly/PiSharp/blob/14dd34b369fba6d236684da6dfc8a39a03263321/src/PiSharp.Tools/Files/PiGrepTool.cs#L114"
+      },
+      "sources": [
+        "https://github.com/earendil-works/pi/commit/8da141c2ad8f9e9b5e9d3e42d78c4ed90c4fe125"
+      ]
+    },
+    {
+      "id": "C07",
+      "priorityAndEvidence": "P1 validation/fix lane, source",
+      "finding": "RPC discards the background catalogue-refresh task. It can rotate OAuth credentials, but process shutdown has no identified ownership/join for that task. Token-loss consequence requires the fake-refresh lifecycle test before a fix is accepted.",
+      "workPackages": [
+        "W10"
+      ],
+      "primaryEvidence": {
+        "path": "src/PiSharp.Cli/Pi/PiCommand.cs",
+        "line": 578,
+        "url": "https://github.com/jkelly/PiSharp/blob/14dd34b369fba6d236684da6dfc8a39a03263321/src/PiSharp.Cli/Pi/PiCommand.cs#L578"
+      },
+      "sources": [
+        "https://github.com/earendil-works/pi/commit/b2cb629237496524e745ff668ec5bd5d47130164"
+      ]
+    },
+    {
+      "id": "C08",
+      "priorityAndEvidence": "P2, reproduced",
+      "finding": "Prompt arguments lose apostrophes, combine words, discard unmatched quotes and lack escaped-quote handling. doesn't work becomes one argument doesnt work.",
+      "workPackages": [
+        "W08"
+      ],
+      "primaryEvidence": {
+        "path": "src/PiSharp.CodingAgent/Resources/PromptTemplateExpander.cs",
+        "line": 19,
+        "url": "https://github.com/jkelly/PiSharp/blob/14dd34b369fba6d236684da6dfc8a39a03263321/src/PiSharp.CodingAgent/Resources/PromptTemplateExpander.cs#L19"
+      },
+      "sources": [
+        "https://github.com/earendil-works/pi/commit/96667f342a8da98ec7969caee7f920ace104436f"
+      ]
+    },
+    {
+      "id": "C09",
+      "priorityAndEvidence": "P2, reproduced search / source summaries",
+      "finding": "Tool search omits descriptions/property names behind local references; deferred tools are not discovered. Codemode output summaries also omit referenced fields.",
+      "workPackages": [
+        "W03"
+      ],
+      "primaryEvidence": {
+        "path": "src/PiSharp.Extensions.Abstractions/Mcp/Discovery/ToolSearchRanker.cs",
+        "line": 125,
+        "url": "https://github.com/jkelly/PiSharp/blob/14dd34b369fba6d236684da6dfc8a39a03263321/src/PiSharp.Extensions.Abstractions/Mcp/Discovery/ToolSearchRanker.cs#L125"
+      },
+      "sources": [
+        "https://github.com/earendil-works/pi/commit/6d3e342b25db295bb266e28bdb1ebf09bdbae58d"
+      ]
+    },
+    {
+      "id": "C10",
+      "priorityAndEvidence": "P2, source",
+      "finding": "MCP SSE parser recognizes LF and CRLF, not CR-only framing; a valid open response can wait without dispatching.",
+      "workPackages": [
+        "W09"
+      ],
+      "primaryEvidence": {
+        "path": "src/PiSharp.Extensions.Runtime/Mcp/Transport/McpStreamableHttpTransport.cs",
+        "line": 199,
+        "url": "https://github.com/jkelly/PiSharp/blob/14dd34b369fba6d236684da6dfc8a39a03263321/src/PiSharp.Extensions.Runtime/Mcp/Transport/McpStreamableHttpTransport.cs#L199"
+      },
+      "sources": [
+        "https://github.com/earendil-works/pi/commit/b64e6badd6ddefda17fc7f6286c013467186d8a1"
+      ]
+    },
+    {
+      "id": "C11",
+      "priorityAndEvidence": "P2, source",
+      "finding": "If the old MCP callback port is occupied, sign-in clears registered client/tokens before attempting refresh with the original redirect URI. This can force needless re-registration/browser sign-in.",
+      "workPackages": [
+        "W09"
+      ],
+      "primaryEvidence": {
+        "path": "src/PiSharp.Cli/Mcp/Authentication/McpSignIn.cs",
+        "line": 130,
+        "url": "https://github.com/jkelly/PiSharp/blob/14dd34b369fba6d236684da6dfc8a39a03263321/src/PiSharp.Cli/Mcp/Authentication/McpSignIn.cs#L130"
+      },
+      "sources": [
+        "https://github.com/earendil-works/pi/commit/797e122cb1181931e6ec1fe2369c7c17dbf1fc9e"
+      ]
+    },
+    {
+      "id": "C12",
+      "priorityAndEvidence": "P2, source",
+      "finding": "Extension ctx.shutdown() while RPC is idle only sets a flag; no input/run settlement occurs to consume it, so another command is needed.",
+      "workPackages": [
+        "W10"
+      ],
+      "primaryEvidence": {
+        "path": "src/PiSharp.Cli/Commands/OfflineSessionProfile.LifecycleHandoffs.cs",
+        "line": 58,
+        "url": "https://github.com/jkelly/PiSharp/blob/14dd34b369fba6d236684da6dfc8a39a03263321/src/PiSharp.Cli/Commands/OfflineSessionProfile.LifecycleHandoffs.cs#L58"
+      },
+      "sources": [
+        "https://github.com/earendil-works/pi/commit/1708b47889664ec9838f6734ff57df58b079a50a"
+      ]
+    },
+    {
+      "id": "C13",
+      "priorityAndEvidence": "P2, source",
+      "finding": "Tree navigation keeps live thinking level but the next prompt does not record it on the new branch; reopening can restore an old level.",
+      "workPackages": [
+        "W08"
+      ],
+      "primaryEvidence": {
+        "path": "src/PiSharp.CodingAgent/PersistentAgentSession.Navigation.cs",
+        "line": 117,
+        "url": "https://github.com/jkelly/PiSharp/blob/14dd34b369fba6d236684da6dfc8a39a03263321/src/PiSharp.CodingAgent/PersistentAgentSession.Navigation.cs#L117"
+      },
+      "sources": [
+        "https://github.com/earendil-works/pi/commit/7860ff52892c1a9f0b017be78fc75dd30b5d5c98"
+      ]
+    },
+    {
+      "id": "C14",
+      "priorityAndEvidence": "P2, source",
+      "finding": "UTF-16 slicing can split non-BMP characters at grep, summary or codemode truncation boundaries.",
+      "workPackages": [
+        "W08"
+      ],
+      "primaryEvidence": {
+        "path": "src/PiSharp.Sessions/Compaction/SessionSummaryRequestBuilder.cs",
+        "line": 71,
+        "url": "https://github.com/jkelly/PiSharp/blob/14dd34b369fba6d236684da6dfc8a39a03263321/src/PiSharp.Sessions/Compaction/SessionSummaryRequestBuilder.cs#L71"
+      },
+      "sources": [
+        "https://github.com/earendil-works/pi/commit/9e870f6f002ca6c21ce010fdb99122afe3738b28"
+      ]
+    },
+    {
+      "id": "C15",
+      "priorityAndEvidence": "P2, source",
+      "finding": "Grep globs are evaluated from startup cwd instead of the supplied search directory; relative and leading-./ patterns can miss files.",
+      "workPackages": [
+        "W07"
+      ],
+      "primaryEvidence": {
+        "path": "src/PiSharp.Tools/Files/PiGrepTool.cs",
+        "line": 134,
+        "url": "https://github.com/jkelly/PiSharp/blob/14dd34b369fba6d236684da6dfc8a39a03263321/src/PiSharp.Tools/Files/PiGrepTool.cs#L134"
+      },
+      "sources": [
+        "https://github.com/earendil-works/pi/commit/6bf2ab9bbb64fd14793e506a5404078441219b95"
+      ]
+    },
+    {
+      "id": "C16",
+      "priorityAndEvidence": "P2, source",
+      "finding": "Zero find limit means unlimited to fd; zero/negative ls can report empty; exact result counts incorrectly report truncation.",
+      "workPackages": [
+        "W07"
+      ],
+      "primaryEvidence": {
+        "path": "src/PiSharp.Tools/Files/PiFindTool.cs",
+        "line": 80,
+        "url": "https://github.com/jkelly/PiSharp/blob/14dd34b369fba6d236684da6dfc8a39a03263321/src/PiSharp.Tools/Files/PiFindTool.cs#L80"
+      },
+      "sources": [
+        "https://github.com/earendil-works/pi/commit/676af1d777ef6f04b6bc8daf4cf3b9b1799cff4d"
+      ]
+    },
+    {
+      "id": "C17",
+      "priorityAndEvidence": "P2, source",
+      "finding": "Removing all tools after prior tool use still sends tools: []; newer vLLM rejects it. No compatibility override exists for old gateways needing the field.",
+      "workPackages": [
+        "W04"
+      ],
+      "primaryEvidence": {
+        "path": "src/PiSharp.AI/Protocols/OpenAICompletions/CompletionsKeyAuthRequestFactory.cs",
+        "line": 251,
+        "url": "https://github.com/jkelly/PiSharp/blob/14dd34b369fba6d236684da6dfc8a39a03263321/src/PiSharp.AI/Protocols/OpenAICompletions/CompletionsKeyAuthRequestFactory.cs#L251"
+      },
+      "sources": [
+        "https://github.com/earendil-works/pi/commit/7a6bd5a97cb64766c9ebbf30e9c0ad7c88a00c47"
+      ]
+    },
+    {
+      "id": "C18",
+      "priorityAndEvidence": "P2, source",
+      "finding": "Fixed 4,096-token output margin fails to accommodate input token-count differences, especially OpenRouter, causing premature context errors/compaction. Formula is duplicated across simple providers.",
+      "workPackages": [
+        "W05"
+      ],
+      "primaryEvidence": {
+        "path": "src/PiSharp.AI/Protocols/OpenAICompletions/CompletionsSimpleRequestFactory.cs",
+        "line": 103,
+        "url": "https://github.com/jkelly/PiSharp/blob/14dd34b369fba6d236684da6dfc8a39a03263321/src/PiSharp.AI/Protocols/OpenAICompletions/CompletionsSimpleRequestFactory.cs#L103"
+      },
+      "sources": [
+        "https://github.com/earendil-works/pi/commit/0a4fad5489f303fe023e3948d473731d7b2f8acb"
+      ]
+    },
+    {
+      "id": "C19",
+      "priorityAndEvidence": "P2, source metadata",
+      "finding": "Azure's five GPT-6 variants retain 272K rather than upstream-corrected 1.05M context; OpenCode Claude rows lack per-message effort; Sonnet 5 rows lack temperature exclusion. Runtime capabilities largely exist but catalogue does not select them.",
+      "workPackages": [
+        "W06"
+      ],
+      "primaryEvidence": {
+        "path": "src/PiSharp.Cli/Models/azure.json",
+        "line": 1,
+        "url": "https://github.com/jkelly/PiSharp/blob/14dd34b369fba6d236684da6dfc8a39a03263321/src/PiSharp.Cli/Models/azure.json#L1"
+      },
+      "sources": [
+        "https://github.com/earendil-works/pi/commit/b317575fd109a39b16f35161c4090ac2ecaa83f7",
+        "https://github.com/earendil-works/pi/commit/9ee7586a95f5e653ae279c3b8f20938faf3639a1",
+        "https://github.com/earendil-works/pi/commit/4b97777378a7c2190bfecea0581fb525dfdb5427"
+      ]
+    },
+    {
+      "id": "C20",
+      "priorityAndEvidence": "P2, source",
+      "finding": "Responses session-affinity header is session_id; reverse proxies may drop underscore headers.",
+      "workPackages": [
+        "W04"
+      ],
+      "primaryEvidence": {
+        "path": "src/PiSharp.AI/Protocols/OpenAIResponses/ResponsesKeyAuthRequestFactory.cs",
+        "line": 314,
+        "url": "https://github.com/jkelly/PiSharp/blob/14dd34b369fba6d236684da6dfc8a39a03263321/src/PiSharp.AI/Protocols/OpenAIResponses/ResponsesKeyAuthRequestFactory.cs#L314"
+      },
+      "sources": [
+        "https://github.com/earendil-works/pi/commit/c5d3978350c7d32db5d8eb28400d4fa851624703"
+      ]
+    },
+    {
+      "id": "C21",
+      "priorityAndEvidence": "P2, source",
+      "finding": "The specific new “stream ... was cut short after the reply had begun” failure is absent from both retry classifiers.",
+      "workPackages": [
+        "W04"
+      ],
+      "primaryEvidence": {
+        "path": "src/PiSharp.CodingAgent/Configuration/AgentRetryPolicy.cs",
+        "line": 45,
+        "url": "https://github.com/jkelly/PiSharp/blob/14dd34b369fba6d236684da6dfc8a39a03263321/src/PiSharp.CodingAgent/Configuration/AgentRetryPolicy.cs#L45"
+      },
+      "sources": [
+        "https://github.com/earendil-works/pi/commit/5663440468b1a465a445756db69a863c0d8e8372"
+      ]
+    },
+    {
+      "id": "C22",
+      "priorityAndEvidence": "P3, source",
+      "finding": "Package update prints success even when offline/nothing changed; no version/commit result summary.",
+      "workPackages": [
+        "W26"
+      ],
+      "primaryEvidence": {
+        "path": "src/PiSharp.Cli/Packages/PiPackageManager.cs",
+        "line": 281,
+        "url": "https://github.com/jkelly/PiSharp/blob/14dd34b369fba6d236684da6dfc8a39a03263321/src/PiSharp.Cli/Packages/PiPackageManager.cs#L281"
+      },
+      "sources": [
+        "https://github.com/earendil-works/pi/commit/342514bdf87b9fcc094b49820e2d636ec95b0a8f",
+        "https://github.com/earendil-works/pi/commit/806cdd68e312f8cb80efe367c661bea0bd3ee537"
+      ]
+    },
+    {
+      "id": "C23",
+      "priorityAndEvidence": "P2, source, disclosed baseline gap",
+      "finding": "SQLite prepared-command cache retains every distinct SQL text until close; varying SQL on long-lived connections can grow without a bound.",
+      "workPackages": [
+        "W12"
+      ],
+      "primaryEvidence": {
+        "path": "src/PiSharp.Durable.Sqlite/ConnectionDatabase.cs",
+        "line": 162,
+        "url": "https://github.com/jkelly/PiSharp/blob/14dd34b369fba6d236684da6dfc8a39a03263321/src/PiSharp.Durable.Sqlite/ConnectionDatabase.cs#L162"
+      },
+      "sources": []
+    }
+  ],
+  "capabilityPackages": {
+    "F01": [
+      "W13"
+    ],
+    "F02": [
+      "W13"
+    ],
+    "F03": [
+      "W13"
+    ],
+    "F04": [
+      "W14"
+    ],
+    "F05": [
+      "W04"
+    ],
+    "F06": [
+      "W07"
+    ],
+    "F07": [
+      "W26"
+    ],
+    "F08": [
+      "W23"
+    ],
+    "F09": [
+      "W24"
+    ]
+  },
+  "baselinePackages": {
+    "B01": [
+      "W16"
+    ],
+    "B02": [
+      "W17"
+    ],
+    "B03": [
+      "W18"
+    ],
+    "B04": [
+      "W19"
+    ],
+    "B05": [
+      "W20",
+      "W21"
+    ],
+    "B06": [
+      "W22"
+    ]
+  },
+  "verificationPackages": {
+    "V01": [
+      "W15"
+    ],
+    "V02": [
+      "W15"
+    ],
+    "V03": [
+      "W15"
+    ],
+    "V04": [
+      "W25"
+    ],
+    "V05": [
+      "W01",
+      "W15"
+    ]
+  }
+}

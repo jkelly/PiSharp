@@ -6,6 +6,7 @@
     <NoWarn>$(NoWarn);PISHARP_TIERS001;PISHARP_IDENTITY001;PISHARP_AI001;PISHARP_TELEMETRY001</NoWarn>
   </PropertyGroup>
   <ItemGroup>
+    <EmbeddedResource Include="Catalogs/reviewed-2026-11-08.json" />
     <ProjectReference Include="../PiSharp.Contracts/PiSharp.Contracts.csproj" />
     <!-- pi-ai depends on pi-telemetry: the request option's span type and the pi.ai.request / pi.ai.poll schema. -->
     <ProjectReference Include="../PiSharp.Telemetry/PiSharp.Telemetry.csproj" />

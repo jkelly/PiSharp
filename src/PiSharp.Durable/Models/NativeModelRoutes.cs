@@ -30,6 +30,8 @@ internal sealed record NativeRouteSettings
     public string? UserId { get; init; }
     /// <summary>Provider retries (google-generative-ai only).</summary>
     public int? MaxRetries { get; init; }
+    /// <summary>Explicit per-level token budgets passed to native provider bindings.</summary>
+    public JsonData? ThinkingBudgets { get; init; }
     /// <summary>Longest server-requested retry delay (google-generative-ai only).</summary>
     public double? MaxRetryDelayMs { get; init; }
 }
@@ -56,9 +58,11 @@ internal static class NativeModelRoutes
     /// anthropic-messages streamSimple budget thinking (adjustMaxTokensForThinking): a reasoning level without
     /// <c>compat.forceAdaptiveThinking</c> raises the cap by the level's budget, up to the model's cap. Other APIs keep the cap.
     /// </summary>
-    internal static int ThinkingCap(JsonElement raw, string api, string level, int maximum)
+    internal static int ThinkingCap(JsonElement raw, string api, string level, int maximum, Chord.JsonObjectValue? budgets = null)
     {
         if (api != "anthropic-messages" || level == "off" || !AnthropicBudgets.TryGetValue(level, out var budget)) return maximum;
+        if (budgets is not null && budgets.TryGetValue(level is "xhigh" or "max" ? "high" : level, out var custom) && custom is Chord.JsonNumberValue number)
+            budget = number.Value;
         if (raw.TryGetProperty("compat", out var compat) && compat.ValueKind == JsonValueKind.Object &&
             compat.TryGetProperty("forceAdaptiveThinking", out var adaptive) && adaptive.ValueKind == JsonValueKind.True) return maximum;
         if (!raw.TryGetProperty("maxTokens", out var cap) || !cap.TryGetDouble(out var ceiling) || ceiling <= 0) return maximum;
@@ -90,7 +94,7 @@ internal static class NativeModelRoutes
                     new CompletionsKeyAuthRequestOptions(MaxTokens: maximum, CacheRetention: retention switch
                     {
                         "none" => CompletionsCacheRetention.None, "long" => CompletionsCacheRetention.Long, _ => CompletionsCacheRetention.Short
-                    }, ModelHeaders: modelHeaders, Headers: headers), metadata, handler);
+                    }, ModelHeaders: modelHeaders, Headers: headers) { ThinkingBudgets = settings.ThinkingBudgets }, metadata, handler);
             case "openai-responses":
                 return NativeProviderFactory.CreateCatalogResponses(model, baseUrl, key,
                     new ResponsesTranscriptProjectionOptions(Reasoning: reasoning, ToolDeclarations: new()) { ModelSupportsImages = images },
@@ -102,7 +106,7 @@ internal static class NativeModelRoutes
                     ModelSupportsImages: images, ThinkingEnabled: false, UserId: settings.UserId, CacheRetention: retention switch
                     {
                         "none" => AnthropicCacheRetention.None, "long" => AnthropicCacheRetention.Long, _ => AnthropicCacheRetention.Short
-                    }));
+                    }) { ThinkingBudgets = settings.ThinkingBudgets });
                 var request = new AnthropicMessagesKeyAuthRequestOptions(MaxTokens: maximum, ModelHeaders: modelHeaders, Headers: headers);
                 // The fixed Anthropic factory owns provider "anthropic"; every other anthropic-messages provider binds by catalog.
                 return model.Provider == "anthropic"
@@ -112,7 +116,7 @@ internal static class NativeModelRoutes
             case "google-generative-ai":
                 return NativeProviderFactory.CreateCatalogGoogle(model, key, metadata, new GoogleGenerativeAIOptions(metadata)
                 {
-                    MaxTokens = maximum, Headers = headers, MaxRetries = Math.Clamp(settings.MaxRetries ?? 0, 0, 32),
+                    MaxTokens = maximum, Headers = headers, ThinkingBudgets = settings.ThinkingBudgets, MaxRetries = Math.Clamp(settings.MaxRetries ?? 0, 0, 32),
                     MaxRetryDelayMilliseconds = settings.MaxRetryDelayMs is { } delay ? (int)Math.Clamp(delay, 0, int.MaxValue) : 60_000,
                 }, handler);
             case "pi-messages":

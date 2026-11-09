@@ -1,5 +1,6 @@
 // Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/schema/src/validator.ts, packages/schema/src/types.ts, packages/schema/src/index.ts,
 // packages/schema/src/formats/index.ts
+// Strict validation result and equality exports: Pi 7d073328e44337d3292a7db9b0f0308f679c5e97.
 //
 // JSON Schema validation (drafts 2020-12 and 7), ported from pi-schema: Compile builds a schema into plain closures once. Values are
 // read as JavaScript reads JSON (numbers are doubles, object keys keep JavaScript's order), so verdicts, error messages and coerced
@@ -57,6 +58,27 @@ public sealed class JsonSchemaCompileOptions
 /// <summary>One failure of a value: where it is (a JSON Pointer, "" for the value itself), the failing keyword and a message.</summary>
 [Experimental("PISHARP_SCHEMA001")]
 public sealed record JsonSchemaValidationError(string Path, string Keyword, string Message);
+
+/// <summary>A strict validation result: the original value on success, or its errors on failure. No coercion is performed.</summary>
+[Experimental("PISHARP_SCHEMA001")]
+public sealed class JsonSchemaValidationResult<T>
+{
+    internal JsonSchemaValidationResult(bool ok, T? value, IReadOnlyList<JsonSchemaValidationError> errors)
+    {
+        Ok = ok;
+        Value = value;
+        Errors = errors;
+    }
+
+    /// <summary>Whether the value satisfies the schema. Check this before reading <see cref="Value"/>.</summary>
+    public bool Ok { get; }
+
+    /// <summary>The original value on success; <c>default</c> on failure. A successful JSON null also has a null value.</summary>
+    public T? Value { get; }
+
+    /// <summary>The validation failures; empty on success.</summary>
+    public IReadOnlyList<JsonSchemaValidationError> Errors { get; }
+}
 
 /// <summary>The result of <see cref="CoercingJsonSchemaValidator.Parse"/>: the coerced value when it is valid, else the errors of the coerced value.</summary>
 [Experimental("PISHARP_SCHEMA001")]
@@ -129,6 +151,22 @@ public class JsonSchemaValidator
 
     /// <summary>Why <paramref name="value"/> is invalid: one error per failing keyword, empty when it is valid.</summary>
     public IReadOnlyList<JsonSchemaValidationError> Errors(JsonNode? value) => Inner.Errors(Js.FromNode(value));
+
+    /// <summary>
+    /// Checks <paramref name="value"/> without coercion, cloning, inserting defaults or removing properties.
+    /// A successful result contains the same node instance, including when this is a coercing validator.
+    /// </summary>
+    public JsonSchemaValidationResult<JsonNode> Validate(JsonNode? value)
+    {
+        var errors = Inner.Errors(Js.FromNode(value));
+        return new(errors.Count == 0, errors.Count == 0 ? value : null, errors);
+    }
+
+    /// <summary>
+    /// Compares JSON values structurally using the validator's value model: object key order is ignored,
+    /// array order is significant, and numbers are compared as IEEE 754 doubles.
+    /// </summary>
+    public static bool Equal(JsonNode? left, JsonNode? right) => SchemaChecks.DeepEqual(Js.FromNode(left), Js.FromNode(right));
 }
 
 /// <summary>A validator compiled with <see cref="JsonSchemaCompileOptions.Coerce"/>: it also coerces loosely typed input towards the schema.</summary>

@@ -1,0 +1,44 @@
+[
+  {
+    "options": {
+      "Project": "tests/PiSharp.ProviderSync.Tests",
+      "Label": "ProviderSync-regression-final",
+      "BuildTimeoutSeconds": 240,
+      "TestTimeoutSeconds": 480,
+      "LockTimeoutSeconds": 30,
+      "Configuration": "Debug",
+      "BuildArguments": [
+        "-p:RunAnalyzers=false"
+      ]
+    },
+    "environment": {}
+  },
+  {
+    "options": {
+      "Project": "tests/PiSharp.AnthropicSimple.Tests",
+      "Label": "AnthropicSimple-regression-final",
+      "BuildTimeoutSeconds": 240,
+      "TestTimeoutSeconds": 480,
+      "LockTimeoutSeconds": 30,
+      "Configuration": "Debug",
+      "BuildArguments": [
+        "-p:RunAnalyzers=false"
+      ]
+    },
+    "environment": {}
+  },
+  {
+    "options": {
+      "Project": "tests/PiSharp.ProviderOfflineDifferential.Tests",
+      "Label": "ProviderOffline-regression-final",
+      "BuildTimeoutSeconds": 240,
+      "TestTimeoutSeconds": 480,
+      "LockTimeoutSeconds": 30,
+      "Configuration": "Debug",
+      "BuildArguments": [
+        "-p:RunAnalyzers=false"
+      ]
+    },
+    "environment": {}
+  }
+]

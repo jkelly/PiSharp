@@ -58,7 +58,7 @@ public static class CodemodeExecutor
         public double? Cost { get; set; }
     }
 
-    private static string TruncateText(string text, int max) => text.Length > max ? text[..(max - 3)] + "..." : text;
+    private static string TruncateText(string text, int max) => text.Length > max ? UnicodeText.SliceHead(text, max - 3) + "..." : text;
 
     private static string PreviewArgs(JsonData? args) => args is null ? "" : TruncateText(Js.Stringify(args.Value), ArgsPreviewChars);
 
@@ -391,7 +391,7 @@ public static class CodemodeExecutor
         if (texts.Count == 0 || combined.Length <= budget) return (items, null);
         var headChars = (int)(budget / 2); var tailChars = (int)(budget - headChars);
         var removed = combined.Length - headChars - tailChars;
-        var head = combined[..headChars]; var tail = tailChars > 0 ? combined[^tailChars..] : "";
+        var head = UnicodeText.SliceHead(combined, headChars); var tail = UnicodeText.SliceTail(combined, tailChars);
         var text = $"Warning: truncated output (original token count: {Ceiling(combined.Length)})\nTotal output lines: {combined.Split('\n').Length}\n\n{head}…{Ceiling(removed)} tokens truncated…{tail}";
         string? path = null;
         try

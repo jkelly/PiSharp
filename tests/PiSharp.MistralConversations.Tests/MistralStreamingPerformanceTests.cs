@@ -9,6 +9,7 @@ internal static class MistralStreamingPerformanceTests
 {
     public static IEnumerable<(string Name, Func<Task> Run)> Cases()
     {
+        foreach (var item in IncrementalSnapshotTests.Cases()) yield return item;
         yield return ("mistral lazy emission snapshots retain each historical value", Snapshots);
         yield return ("mistral deferred and materialized reducer admission agree at limits", Admission);
         yield return ("mistral compact progress allocation budget", Allocations);
@@ -20,7 +21,7 @@ internal static class MistralStreamingPerformanceTests
         var chunk = "data: " + JsonSerializer.Serialize(new { choices = new[] { new { delta = new { content = text } } } }) + "\n\n";
         return string.Concat(Enumerable.Repeat(chunk, count)) + "data: {\"choices\":[{\"delta\":{},\"finish_reason\":\"stop\"}]}\n\ndata: [DONE]\n\n";
     }
-    private static async Task<List<StreamEvent>> Read(string wire, bool reduce = false, ChatRequest? request = null,
+    internal static async Task<List<StreamEvent>> Read(string wire, bool reduce = false, ChatRequest? request = null,
         int? readSize = null, int? frameLimit = null)
     {
         using var client = new HttpClient(new Handler(wire, readSize));

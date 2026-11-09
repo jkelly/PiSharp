@@ -23,6 +23,7 @@ internal static partial class Program
         cases.AddRange(PackageCases);
         cases.AddRange(ConformanceCases);
         cases.AddRange(AiCases);
+        cases.AddRange(AotJsonCases);
         var results = new List<object>(); var failures = 0;
         foreach (var test in cases)
         {

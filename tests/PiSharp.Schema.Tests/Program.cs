@@ -14,13 +14,14 @@ internal static partial class Program
         if (args.Length != 0 && (args.Length != 2 || args[0] != "--report")) throw new ArgumentException("Use [--report <fresh path>].");
         var cases = new List<(string Id, Func<Task> Run)>();
         cases.AddRange(Sync150Cases);
+        cases.AddRange(GapCases);
         var results = new List<object>(); var failures = 0;
         foreach (var test in cases)
         {
             try { await test.Run().WaitAsync(TimeSpan.FromSeconds(300)); results.Add(new { test.Id, status = "PASS_AUTHORED_NATIVE_ONLY" }); }
             catch (Exception error) { failures++; results.Add(new { test.Id, status = "FAIL", failure = error.ToString() }); }
         }
-        var report = new { sourceSha = Upstream, status = "AUTHORED NATIVE; NO UPSTREAM CAPTURE", cases = cases.Count, failures,
+        var report = new { sourceSha = Upstream, gapRegressionSourceSha = GapRegressionUpstream, status = "AUTHORED NATIVE; NO UPSTREAM CAPTURE", cases = cases.Count, failures,
             genuineSourceCasesCaptured = 0, results };
         var json = JsonSerializer.Serialize(report, new JsonSerializerOptions { WriteIndented = true });
         if (args.Length == 2)

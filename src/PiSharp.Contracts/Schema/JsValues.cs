@@ -644,7 +644,7 @@ internal static class Js
                 {
                     return el.ValueKind switch
                     {
-                        JsonValueKind.String => el.GetString(),
+                        JsonValueKind.String => PiSharp.Contracts.JsonUtf16.GetString(el),
                         JsonValueKind.Number => double.Parse(el.GetRawText(), NumberStyles.Float, CultureInfo.InvariantCulture),
                         JsonValueKind.True => true,
                         JsonValueKind.False => false,

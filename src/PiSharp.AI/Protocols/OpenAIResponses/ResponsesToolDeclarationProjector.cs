@@ -36,7 +36,9 @@ public sealed class ResponsesToolDeclarationProjector
             throw new ArgumentOutOfRangeException(nameof(options), "Invalid Responses tool declaration limits.");
     }
 
-    public JsonData Project(ChatRequest request, CancellationToken cancellationToken = default)
+    public JsonData Project(ChatRequest request, CancellationToken cancellationToken = default) => Project(request, int.MaxValue, cancellationToken);
+
+    internal JsonData Project(ChatRequest request, int foldedSystems, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
         cancellationToken.ThrowIfCancellationRequested();
@@ -46,7 +48,7 @@ public sealed class ResponsesToolDeclarationProjector
             if (request.Messages.Length > _options.MaximumMessages) throw Failure(ResponsesProjectionFailure.ResourceLimit);
             var active = new Dictionary<string, JsonObject>(StringComparer.Ordinal);
             var order = new List<string>();
-            long inputCharacters = 0; var declarations = 0;
+            long inputCharacters = 0; var declarations = 0; var systemIndex = 0;
             foreach (var message in request.Messages)
             {
                 cancellationToken.ThrowIfCancellationRequested();
@@ -60,12 +62,13 @@ public sealed class ResponsesToolDeclarationProjector
                     role.ValueKind != JsonValueKind.String || Text(role) != message.Role)
                     throw Failure(ResponsesProjectionFailure.InvalidTranscript);
                 if (message.Role != "system") continue;
+                var folded = systemIndex++ < foldedSystems;
                 if (body.TryGetProperty("toolsRemoved", out var removed))
                     foreach (var reference in Array(removed))
                     {
                         if (++declarations > _options.MaximumDeclarations) throw Failure(ResponsesProjectionFailure.ResourceLimit);
                         var name = Name(reference);
-                        if (active.Remove(name)) order.Remove(name);
+                        if (folded && active.Remove(name)) order.Remove(name);
                     }
                 if (body.TryGetProperty("toolsAdded", out var added))
                     foreach (var declaration in Array(added))
@@ -74,6 +77,7 @@ public sealed class ResponsesToolDeclarationProjector
                         if (++declarations > _options.MaximumDeclarations) throw Failure(ResponsesProjectionFailure.ResourceLimit);
                         var name = Name(declaration);
                         var projected = Convert(declaration, cancellationToken);
+                        if (!folded) continue;
                         if (!active.ContainsKey(name))
                         {
                             if (active.Count >= _options.MaximumActiveTools) throw Failure(ResponsesProjectionFailure.ResourceLimit);
@@ -86,7 +90,7 @@ public sealed class ResponsesToolDeclarationProjector
             foreach (var name in order)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                var item = active[name]; var raw = item.ToJsonString(OutputJson);
+                var item = active[name]; var raw = JsonUtf16.ToJsonString(item, OutputJson.Encoder);
                 var separator = output.Count == 0 ? 0 : 1;
                 characters += raw.Length + separator; bytes += Encoding.UTF8.GetByteCount(raw) + separator;
                 if (characters > _options.MaximumOutputCharacters || bytes > _options.MaximumOutputBytes)
@@ -96,10 +100,25 @@ public sealed class ResponsesToolDeclarationProjector
                 output.Add(item);
             }
             cancellationToken.ThrowIfCancellationRequested();
-            return JsonData.Parse(output.ToJsonString(OutputJson));
+            return JsonData.Parse(JsonUtf16.ToJsonString(output, OutputJson.Encoder));
         }
         catch (Exception error) when (error is JsonException or InvalidOperationException or KeyNotFoundException or FormatException or OverflowException)
         { throw Failure(ResponsesProjectionFailure.UnsupportedContent); }
+    }
+
+    internal JsonArray ProjectAdded(JsonElement added, bool searchResult, CancellationToken token)
+    {
+        var result = new JsonArray();
+        foreach (var declaration in Array(added))
+        {
+            token.ThrowIfCancellationRequested();
+            if (result.Count >= _options.MaximumDeclarations || result.Count >= _options.MaximumActiveTools)
+                throw Failure(ResponsesProjectionFailure.ResourceLimit);
+            var tool = Convert(declaration, token);
+            if (searchResult) tool["defer_loading"] = true;
+            result.Add(tool);
+        }
+        return result;
     }
 
     private JsonObject Convert(JsonElement declaration, CancellationToken token)
@@ -114,8 +133,8 @@ public sealed class ResponsesToolDeclarationProjector
         JsonObject? strictParameters = null;
         // Pi abe508 openai-responses-shared.ts convertResponsesTools: a supported grammar makes a custom tool.
         if (ResponsesGrammar.Resolve(declaration, _options.SupportsOpenAIGrammarTools) is { } grammar)
-            return new JsonObject { ["type"] = "custom", ["name"] = name, ["description"] = description, ["format"] = new JsonObject
-                { ["type"] = "grammar", ["syntax"] = grammar.Syntax, ["definition"] = grammar.Definition } };
+            return new JsonObject { ["type"] = "custom", ["name"] = JsonUtf16.StringNode(name), ["description"] = JsonUtf16.StringNode(description), ["format"] = new JsonObject
+                { ["type"] = "grammar", ["syntax"] = grammar.Syntax, ["definition"] = JsonUtf16.StringNode(grammar.Definition) } };
         if (declaration.TryGetProperty("constrainedSampling", out var sampling) && sampling.ValueKind != JsonValueKind.False)
         {
             // Pi d866 constrained-sampling.ts: grammar is ignored when custom grammar tools are unsupported.
@@ -146,15 +165,15 @@ public sealed class ResponsesToolDeclarationProjector
             try { strictParameters = MakeStrict(parameters, token); }
             catch (StrictSchemaException) { throw Failure(ResponsesProjectionFailure.UnsupportedContent); }
         }
-        var result = new JsonObject { ["type"] = "function", ["name"] = name, ["description"] = description,
-            ["parameters"] = strictParameters ?? JsonNode.Parse(parameters.GetRawText(), documentOptions: PiSharp.Contracts.JsonData.DocumentOptions) };
+        var result = new JsonObject { ["type"] = "function", ["name"] = JsonUtf16.StringNode(name), ["description"] = JsonUtf16.StringNode(description),
+            ["parameters"] = strictParameters ?? JsonUtf16.MutableNode(parameters) };
         if (_options.SupportsStrictMode) result["strict"] = strict is null ? null : JsonValue.Create(strict.Value);
         return result;
     }
 
     private static JsonObject MakeStrict(JsonElement parameters, CancellationToken token)
     {
-        var root = JsonNode.Parse(parameters.GetRawText(), documentOptions: PiSharp.Contracts.JsonData.DocumentOptions)!.AsObject();
+        var root = JsonUtf16.MutableNode(parameters)!.AsObject();
         MakeNodeStrict(root, token);
         if (!IsType(root, "object")) throw new StrictSchemaException();
         return root;

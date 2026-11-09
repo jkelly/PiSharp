@@ -50,7 +50,7 @@ internal static class PiAiRetry
         "websocket.?closed", "websocket.?error",
         // Premature stream endings from SDKs and transports, including Codex CLI proxies' mid-stream disconnect (#11057).
         "ended without", "stream ended before message_stop", "stream ended before a terminal response event",
-        "http2 request did not get a response", "stream disconnected before completion", "pending stream has been canceled",
+        "http2 request did not get a response", "stream disconnected before completion", "cut short after the reply had begun", "pending stream has been canceled",
         // Provider-requested retry delay cap failures.
         "retry delay",
         // Explicit retry guidance emitted mid-stream.

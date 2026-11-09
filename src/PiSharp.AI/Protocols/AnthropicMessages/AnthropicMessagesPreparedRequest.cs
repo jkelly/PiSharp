@@ -43,10 +43,13 @@ public sealed class AnthropicMessagesPreparedRequest
         using var buffer = new MemoryStream();
         using (var writer = new Utf8JsonWriter(buffer))
         {
+            if (!WriteUtf16Root(writer, payload, raw, [], false, token))
+            {
             writer.WriteStartObject();
             foreach (var property in payload.Value.EnumerateObject())
-            { token.ThrowIfCancellationRequested(); writer.WritePropertyName(property.Name); writer.WriteRawValue(raw(property), skipInputValidation: true); }
+            { token.ThrowIfCancellationRequested(); writer.WritePropertyName(JsonUtf16.GetName(property)); writer.WriteRawValue(raw(property), skipInputValidation: true); }
             writer.WriteEndObject();
+            }
         }
         return JsonData.Parse(Encoding.UTF8.GetString(buffer.ToArray()));
     }
@@ -57,24 +60,18 @@ public sealed class AnthropicMessagesPreparedRequest
         if (payload.Value.ValueKind != JsonValueKind.Object) throw Invalid();
         if (Encoding.UTF8.GetByteCount(payload.ToString()) > _limits.MaximumPayloadBytes) throw Limit();
         Check(payload.Value, 0, token);
-        if (payload.Value.TryGetProperty("max_tokens", out var maximum) &&
+        if (payload.Value.TryGetUtf16Property("max_tokens", out var maximum) &&
             (maximum.ValueKind != JsonValueKind.Number || !maximum.TryGetDouble(out var number) || !double.IsFinite(number) || Math.Abs(number) > _limits.MaximumTokenMagnitude)) throw Invalid();
-        if (payload.Value.TryGetProperty("betas", out var betas) &&
+        if (payload.Value.TryGetUtf16Property("betas", out var betas) &&
             (betas.ValueKind != JsonValueKind.Array || betas.EnumerateArray().Any(value => value.ValueKind != JsonValueKind.String ||
                 value.GetString()!.Any(character => character < ' ' || character > '~')))) throw Invalid();
         if (!forceStream) return payload;
         // Pi spreads replacement then forces stream:true. Preserve all other raw JSON values.
-        using var buffer = new MemoryStream();
-        using (var writer = new Utf8JsonWriter(buffer))
-        {
-            writer.WriteStartObject();
-            foreach (var property in payload.Value.EnumerateObject())
-            { token.ThrowIfCancellationRequested(); if (property.Name != "stream") property.WriteTo(writer); else writer.WriteBoolean("stream", true); }
-            if (!payload.Value.TryGetProperty("stream", out _)) writer.WriteBoolean("stream", true);
-            writer.WriteEndObject();
-        }
-        if (buffer.Length > _limits.MaximumPayloadBytes) throw Limit();
-        return JsonData.Parse(Encoding.UTF8.GetString(buffer.ToArray()));
+        var root = JsonUtf16.MutableNode(payload)!.AsObject();
+        root["stream"] = true;
+        var json = JsonUtf16.ToJsonString(root);
+        if (Encoding.UTF8.GetByteCount(json) > _limits.MaximumPayloadBytes) throw Limit();
+        return JsonData.Parse(json);
     }
 
     private void Check(JsonElement value, int depth, CancellationToken token)
@@ -84,17 +81,31 @@ public sealed class AnthropicMessagesPreparedRequest
         {
             if (++depth > _limits.MaximumPayloadDepth) throw Limit();
             if (value.ValueKind == JsonValueKind.Object)
-                foreach (var property in value.EnumerateObject()) { Unicode(property.Name); Check(property.Value, depth, token); }
+                foreach (var property in value.EnumerateObject()) { _ = JsonUtf16.GetName(property); Check(property.Value, depth, token); }
             else foreach (var item in value.EnumerateArray()) Check(item, depth, token);
         }
-        else if (value.ValueKind == JsonValueKind.String) Unicode(value.GetString()!);
+        else if (value.ValueKind == JsonValueKind.String) _ = JsonUtf16.GetString(value);
         else if (value.ValueKind == JsonValueKind.Number && (!value.TryGetDouble(out var number) || !double.IsFinite(number))) throw Invalid();
     }
-    private static void Unicode(string value)
+    // Ordinary factory roots have ASCII field names and keep their original streaming encoder.
+    // A payload hook may add an arbitrary JSON name: write that rare root with JSON.stringify
+    // escaping so Utf8JsonWriter cannot replace a lone surrogate of the name with U+FFFD.
+    internal static bool WriteUtf16Root(Utf8JsonWriter writer, JsonData payload, Func<JsonProperty, string> raw,
+        IReadOnlyList<(string Name, string Value)> extras, bool omitBetas, CancellationToken token)
     {
-        for (var i = 0; i < value.Length; i++)
-            if (char.IsHighSurrogate(value[i])) { if (++i >= value.Length || !char.IsLowSurrogate(value[i])) throw Invalid(); }
-            else if (char.IsLowSurrogate(value[i])) throw Invalid();
+        if (!payload.Value.EnumerateObject().Any(property => !JsonUtf16.IsWellFormed(JsonUtf16.GetName(property)))) return false;
+        var text = new StringBuilder("{"); var count = 0;
+        foreach (var property in payload.Value.EnumerateObject())
+        {
+            token.ThrowIfCancellationRequested(); var name = JsonUtf16.GetName(property);
+            if (omitBetas && name == "betas") continue;
+            if (count++ > 0) text.Append(',');
+            JsonUtf16.Quote(text, name); text.Append(':').Append(raw(property));
+        }
+        foreach (var (name, value) in extras)
+        { if (count++ > 0) text.Append(','); JsonUtf16.Quote(text, name); text.Append(':'); JsonUtf16.Quote(text, value); }
+        writer.WriteRawValue(text.Append('}').ToString(), skipInputValidation: true);
+        return true;
     }
     private static AnthropicMessagesKeyAuthRequestException Invalid() => new(AnthropicMessagesKeyAuthRequestFailure.InvalidRequest);
     private static AnthropicMessagesKeyAuthRequestException Limit() => new(AnthropicMessagesKeyAuthRequestFailure.ResourceLimit);

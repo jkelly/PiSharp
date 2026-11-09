@@ -1,0 +1,84 @@
+[
+  {
+    "environment": {},
+    "options": {
+      "TestTimeoutSeconds": 600,
+      "BuildOnly": true,
+      "BuildTimeoutSeconds": 240,
+      "BuildArguments": [
+        "--no-restore",
+        "-p:RunAnalyzers=false"
+      ],
+      "LockTimeoutSeconds": 30,
+      "Configuration": "Debug",
+      "Project": "tests/PiSharp.Compatibility.Tests",
+      "Label": "Compatibility-final-build"
+    }
+  },
+  {
+    "environment": {},
+    "options": {
+      "TestTimeoutSeconds": 600,
+      "BuildOnly": true,
+      "BuildTimeoutSeconds": 240,
+      "BuildArguments": [
+        "--no-restore",
+        "-p:RunAnalyzers=false"
+      ],
+      "LockTimeoutSeconds": 30,
+      "Configuration": "Debug",
+      "Project": "tests/PiSharp.Transport.Tests",
+      "Label": "Transport-final-build"
+    }
+  },
+  {
+    "environment": {},
+    "options": {
+      "TestTimeoutSeconds": 600,
+      "BuildOnly": true,
+      "BuildTimeoutSeconds": 240,
+      "BuildArguments": [
+        "--no-restore",
+        "-p:RunAnalyzers=false"
+      ],
+      "LockTimeoutSeconds": 30,
+      "Configuration": "Debug",
+      "Project": "tests/PiSharp.AnthropicThreads.Tests",
+      "Label": "Threads-final-build"
+    }
+  },
+  {
+    "environment": {
+      "INTERACTIVEPARITY_FILTER": "gap.overlay|sync150.overlay-custom|sync150.custom-overlay"
+    },
+    "options": {
+      "TestTimeoutSeconds": 600,
+      "BuildOnly": true,
+      "BuildTimeoutSeconds": 240,
+      "BuildArguments": [
+        "--no-restore",
+        "-p:RunAnalyzers=false"
+      ],
+      "LockTimeoutSeconds": 30,
+      "Configuration": "Debug",
+      "Project": "tests/PiSharp.InteractiveParity.Tests",
+      "Label": "Overlay-final-build"
+    }
+  },
+  {
+    "environment": {},
+    "options": {
+      "TestTimeoutSeconds": 600,
+      "BuildOnly": true,
+      "BuildTimeoutSeconds": 240,
+      "BuildArguments": [
+        "--no-restore",
+        "-p:RunAnalyzers=false"
+      ],
+      "LockTimeoutSeconds": 30,
+      "Configuration": "Debug",
+      "Project": "tests/PiSharp.ProviderOfflineDifferential.Tests",
+      "Label": "ProviderOffline-final-build"
+    }
+  }
+]

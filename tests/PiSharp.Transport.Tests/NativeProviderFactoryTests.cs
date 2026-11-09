@@ -85,15 +85,14 @@ internal static class NativeProviderFactoryTests
         using var handler = new CaptureHandler(cancelOnSend: cancellation);
         var model = Model("responses");
         using var provider = Create("responses", model, handler);
-        try
-        {
-            await foreach (var _ in provider.Transport.StreamAsync(new(model, []), cancellation.Token)) { }
-            throw new InvalidOperationException("Cancellation did not interrupt Responses send.");
-        }
-        catch (OperationCanceledException)
-        {
-            Check(handler.Calls == 1 && handler.SendCancelled, "Caller cancellation did not reach the injected handler.");
-        }
+        // Frozen v1.5.0 openai-responses.ts:221-230,251-267: send occurs before Start; cancellation settles as one aborted frame.
+        var frames = new List<StreamEvent>();
+        await foreach (var frame in provider.Transport.StreamAsync(new(model, []), cancellation.Token)) frames.Add(frame);
+        var aborted = ResponsesRawContractAssertions.Error(frames, typeof(OperationCanceledException), StopReason.Aborted);
+        Check(handler.Calls == 1 && handler.SendCancelled && frames.OfType<StreamStarted>().Count() == 0, "Caller cancellation failed to stop acquisition before Start.");
+        Check(((OperationCanceledException)aborted.NativeSourceException!).CancellationToken.IsCancellationRequested && aborted.NativeSourceTask?.IsCanceled == true,
+            "Original canceled send exception/task was lost.");
+        Check(aborted.Message.Content.IsEmpty && aborted.Message.Model == model.Id && aborted.Message.Api == model.Api && aborted.Message.Provider == model.Provider && aborted.Message.Timestamp == 0 && !handler.Disposed, "Canceled send fabricated content or disposed borrowed handler.");
     }
 
     private static ModelDescriptor Model(string route) => new("offline-model",

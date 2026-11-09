@@ -1,0 +1,212 @@
+{
+  "schemaVersion": 1,
+  "chordPostRunFriendOnly": {
+    "receipt": "artifacts/gap-validation/Chord-full-stable9-82826a7a4b014cefa3835fa7f3161ef9/receipt.json",
+    "file": "src/PiSharp.Chord/PiSharp.Chord.csproj",
+    "currentSha256": "2ea219a0ca4fc4dbca8fa1ac75366be8650972dd2e6b1ff42a3c10eb16ad1012",
+    "removedExactly": "    <!-- Native plugin generations wrap an evaluated facet's setup in their own immutable declaration identity. -->\n    <InternalsVisibleTo Include=\"PiSharp.Chord.Hosting\" />\n",
+    "inverseSha256": "d8c37188bd73b57544ad5af721c9ac399e188ebe96adc6351495428c92ea51d6",
+    "originalSha256": "d8c37188bd73b57544ad5af721c9ac399e188ebe96adc6351495428c92ea51d6",
+    "interpretation": "Only the exact comment plus Hosting friend declaration is removed to reproduce tested bytes; no runtime algorithm or dependency changes."
+  },
+  "hostingSettingsRunDelta": {
+    "receipt": "artifacts\\gap-validation\\I11-host-stable9-83a5cf54d3e84d98862526e557ce8cdf\\receipt.json",
+    "addedOrModified": [
+      {
+        "path": "src/PiSharp.Codemode/packages.lock.json",
+        "before": "abd03a26b0e31d123c3ef6487076c68202a60f1206810517db85ca526d0e51eb",
+        "after": "2e46fb0bfa59b9e930bb92dae5d10bdf98c53c217cde41f66870e9e6011ddf26"
+      },
+      {
+        "path": "src/PiSharp.Durable.Tools/packages.lock.json",
+        "before": "ebb163cc02c08203fd515c289b754b5f7e5ee57d0536ddd708d9a2ca6c60fbb9",
+        "after": "94f895389ce83150ad98ac23644ad23094d0de3faa07266047e7932c80d69320"
+      },
+      {
+        "path": "src/PiSharp.Durable/packages.lock.json",
+        "before": "701b81f99ee5b1cf10b428da31518c72df8fb228f999dd39d8befc1dd98a688d",
+        "after": "c5ea52a17483add9a64e2fca8a676df17de585b7acf66f00766ee0a1fafd4aab"
+      },
+      {
+        "path": "src/PiSharp.Extensions.Abstractions/packages.lock.json",
+        "before": "44664b3f02c1448b46e8566926fafc821ae14b353d607e075db9c83ac5515d2e",
+        "after": "ac1f086ad1c86b7a3b1cb41762240ee0842e2242796732c4c73d6811bcf2e181"
+      }
+    ],
+    "removed": [],
+    "interpretation": "Exactly four NuGet lock files changed during target restore; no production or test source changes. Actual settings-forwarding2cases passed; original source-change classification retained."
+  },
+  "NativeAOT-release-final": {
+    "receipt": "E:\\AI\\PiSharp\\gap-implementation\\artifacts\\gap-validation\\NativeAOT-release-final-d7bc09f1dd10420cb432aae5324ab090\\receipt.json",
+    "changes": [
+      {
+        "path": "src/PiSharp.Agent/packages.lock.json",
+        "before": "c5ea52a17483add9a64e2fca8a676df17de585b7acf66f00766ee0a1fafd4aab",
+        "after": "701b81f99ee5b1cf10b428da31518c72df8fb228f999dd39d8befc1dd98a688d"
+      },
+      {
+        "path": "src/PiSharp.AI/packages.lock.json",
+        "before": "f135623dc8e06ee81b2539158933878338de34e83c62c2e63bfa88487a9f4724",
+        "after": "10888fada8d5f3e7bf9b07e42cfbd1c17033df0112c068a9ddc181e6aed421b6"
+      },
+      {
+        "path": "src/PiSharp.Codemode/packages.lock.json",
+        "before": "2e46fb0bfa59b9e930bb92dae5d10bdf98c53c217cde41f66870e9e6011ddf26",
+        "after": "abd03a26b0e31d123c3ef6487076c68202a60f1206810517db85ca526d0e51eb"
+      },
+      {
+        "path": "src/PiSharp.Contracts/packages.lock.json",
+        "before": "a4364d81a6de2707d66fbced18fbbc926c882ab96e1d1aebbb17e871285b9d75",
+        "after": "cd97f644c24bb2cd8c96d92c519036a65133ab22cafc294d07b527626ad20e84"
+      },
+      {
+        "path": "src/PiSharp.Durable.Tools/packages.lock.json",
+        "before": "94f895389ce83150ad98ac23644ad23094d0de3faa07266047e7932c80d69320",
+        "after": "ebb163cc02c08203fd515c289b754b5f7e5ee57d0536ddd708d9a2ca6c60fbb9"
+      },
+      {
+        "path": "src/PiSharp.Durable/packages.lock.json",
+        "before": "c5ea52a17483add9a64e2fca8a676df17de585b7acf66f00766ee0a1fafd4aab",
+        "after": "701b81f99ee5b1cf10b428da31518c72df8fb228f999dd39d8befc1dd98a688d"
+      },
+      {
+        "path": "src/PiSharp.Env.Protocol/packages.lock.json",
+        "before": "a4364d81a6de2707d66fbced18fbbc926c882ab96e1d1aebbb17e871285b9d75",
+        "after": "cd97f644c24bb2cd8c96d92c519036a65133ab22cafc294d07b527626ad20e84"
+      },
+      {
+        "path": "src/PiSharp.Extensions.Abstractions/packages.lock.json",
+        "before": "ac1f086ad1c86b7a3b1cb41762240ee0842e2242796732c4c73d6811bcf2e181",
+        "after": "44664b3f02c1448b46e8566926fafc821ae14b353d607e075db9c83ac5515d2e"
+      },
+      {
+        "path": "src/PiSharp.Telemetry/packages.lock.json",
+        "before": "a4364d81a6de2707d66fbced18fbbc926c882ab96e1d1aebbb17e871285b9d75",
+        "after": "cd97f644c24bb2cd8c96d92c519036a65133ab22cafc294d07b527626ad20e84"
+      },
+      {
+        "path": "src/PiSharp.Tools/packages.lock.json",
+        "before": "fc5425bd4d025cb664c597db884a210b51ff5403d37adeb5dacd2f55fcc007b6",
+        "after": "a96669481cac55ebbcec4b4719dee3208e7d893cca46cf21badb05f28b6da403"
+      }
+    ],
+    "removed": [],
+    "locksOnly": true
+  },
+  "N1-hosting-final": {
+    "receipt": "E:\\AI\\PiSharp\\gap-implementation\\artifacts\\gap-validation\\N1-hosting-final-d2cadb7125d44a72a940241579dfc5b6\\receipt.json",
+    "changes": [
+      {
+        "path": "src/PiSharp.Agent/packages.lock.json",
+        "before": "701b81f99ee5b1cf10b428da31518c72df8fb228f999dd39d8befc1dd98a688d",
+        "after": "c5ea52a17483add9a64e2fca8a676df17de585b7acf66f00766ee0a1fafd4aab"
+      },
+      {
+        "path": "src/PiSharp.AI/packages.lock.json",
+        "before": "10888fada8d5f3e7bf9b07e42cfbd1c17033df0112c068a9ddc181e6aed421b6",
+        "after": "f135623dc8e06ee81b2539158933878338de34e83c62c2e63bfa88487a9f4724"
+      },
+      {
+        "path": "src/PiSharp.AI/Protocols/AnthropicMessages/AnthropicMessagesAuthenticatedRequestFactory.cs",
+        "before": "f7eb3500e25ab046c2a942abb43652aaa9d30d0a18101fd87590773e70fa52d4",
+        "after": "e365472ae8584f801b703289036185c8ba34d1b38de26d02b4e6aa0e6b123579"
+      },
+      {
+        "path": "src/PiSharp.AI/Protocols/AnthropicMessages/AnthropicMessagesKeyAuthRequestFactory.cs",
+        "before": "3ead79a8c04471a3f6ea9ae3c8f891f90af765928e3b1247ba39e803391fec76",
+        "after": "57bf5a84f46492b94dcb1b6e3109cc3bf86a2fea68334dc4428f1f5967dd7022"
+      },
+      {
+        "path": "src/PiSharp.AI/Protocols/AnthropicMessages/AnthropicMessagesPreparedRequest.cs",
+        "before": "62e2afbe660a2b36ba132381da6c33372d2a65f785660cc860600910e9e9e33e",
+        "after": "f62ecc28cba7584809bceffc436dce3fd59f0a732c7b5e8c8e540550c7638aff"
+      },
+      {
+        "path": "src/PiSharp.AI/Protocols/AnthropicMessages/AnthropicMessagesRequestProjector.cs",
+        "before": "2572e92be21cd5e4e8b9dc7ba378aa426ccdbd23a07dc2e75199ab9c56b9b712",
+        "after": "4c45bad7ccff61e85012bf10c84028ba8394961eca6db1d85e7519dea3793e72"
+      },
+      {
+        "path": "src/PiSharp.AI/Protocols/AnthropicMessages/AnthropicMessageThreads.cs",
+        "before": "a89f42f9bd70c1ca9081eed593e5dd19b907b1f8fdfbfbcba3e65a815cfe810a",
+        "after": "0564ceb168175860addfbe63221a05d41fb8abfc67a8c35fa41d747cf0994848"
+      },
+      {
+        "path": "src/PiSharp.Contracts/packages.lock.json",
+        "before": "cd97f644c24bb2cd8c96d92c519036a65133ab22cafc294d07b527626ad20e84",
+        "after": "a4364d81a6de2707d66fbced18fbbc926c882ab96e1d1aebbb17e871285b9d75"
+      },
+      {
+        "path": "src/PiSharp.Telemetry/packages.lock.json",
+        "before": "cd97f644c24bb2cd8c96d92c519036a65133ab22cafc294d07b527626ad20e84",
+        "after": "a4364d81a6de2707d66fbced18fbbc926c882ab96e1d1aebbb17e871285b9d75"
+      },
+      {
+        "path": "src/PiSharp.Tools/packages.lock.json",
+        "before": "a96669481cac55ebbcec4b4719dee3208e7d893cca46cf21badb05f28b6da403",
+        "after": "fc5425bd4d025cb664c597db884a210b51ff5403d37adeb5dacd2f55fcc007b6"
+      }
+    ],
+    "removed": [],
+    "locksOnly": false
+  },
+  "I17-existing-compaction-stable9": {
+    "receipt": "E:\\AI\\PiSharp\\gap-implementation\\artifacts\\gap-validation\\I17-existing-compaction-stable9-e6aa5fb685624437a93f8c471b467ae1\\receipt.json",
+    "changes": [
+      {
+        "path": "benchmarks/PiSharp.Durable.Benchmarks/packages.lock.json",
+        "before": "efdb5cdad14f6cf545c01832002a1a44b58404beb7c9f4c9f3bb5ce06ce3ec32",
+        "after": "da1cee9096fb97b1132c118226b8c22638eff01e31191871529cb8f4d6ad8010"
+      },
+      {
+        "path": "src/PiSharp.Chord/PiSharp.Chord.csproj",
+        "before": "d8c37188bd73b57544ad5af721c9ac399e188ebe96adc6351495428c92ea51d6",
+        "after": "2ea219a0ca4fc4dbca8fa1ac75366be8650972dd2e6b1ff42a3c10eb16ad1012"
+      },
+      {
+        "path": "src/PiSharp.Durable.Store/packages.lock.json",
+        "before": "6ffdb8ad9ecd6f177c9b7409ed311f628c4d67f3f611158bf3dac76784ed0f02",
+        "after": "718c3649239c2be0b113035b6f9e49599fe4a6f7d0c1c427348ef20b1fe7ef62"
+      },
+      {
+        "path": "tests/PiSharp.Durable.Tests/packages.lock.json",
+        "before": "c0352423bafc91c7ad170e4998348cb59bd17961d535d557f891a300c1d04bea",
+        "after": "ad1e965a2b72ba1b85d18382f7e26cdb8faedb9541ce9c0093e60f87d79d8096"
+      }
+    ],
+    "removed": [],
+    "locksOnly": false
+  },
+  "runtime-installer-local": {
+    "receipt": "E:\\AI\\PiSharp\\gap-implementation\\artifacts\\gap-validation\\runtime-installer-local-333e21e351be480abb18775e1299e916\\receipt.json",
+    "changes": [
+      {
+        "path": "src/PiSharp.AI/Protocols/AzureResponses/AzureResponsesRequestFactory.cs",
+        "before": "c202a9ee07a2f381c9f8a02ffd143393bff0237a7cbae1283f7c599ce5f1b0e0",
+        "after": "b589b54826117a98ce904e77c53c086f4771deed73405764f7dfa37966fd2c28"
+      },
+      {
+        "path": "src/PiSharp.AI/Protocols/OpenAICodexResponses/OpenAICodexResponsesTransport.cs",
+        "before": "622f966888f17c877d742cac2536c739437ddf44c8893f0ca8e3ba29569d2bdf",
+        "after": "0ae6550840b54efc0fbf9790d94184b05dbda9833dd110cfc2077569c143bbd9"
+      },
+      {
+        "path": "src/PiSharp.AI/Protocols/OpenAICodexResponses/OpenAICodexResponsesTransport.WebSocket.cs",
+        "before": "951626cae2ccc4a4b7ec003e8c9a87dcd0d0e1e6f9c83da784d1e6b4bdcc8ba8",
+        "after": "35cd4c307848ad2ad876a2fce5437a319245ed85aa2d3df81a236a8285020243"
+      },
+      {
+        "path": "src/PiSharp.AI/Protocols/OpenAIResponses/ResponsesToolDeclarationProjector.cs",
+        "before": "de17d89c4b431944f10a079bf44aa0ae340530210e5acafe01d94afcc940580e",
+        "after": "6d1aabfe546bde764136f9710dbf08b0e8c9cc9632e48a82677a64d6206bd837"
+      },
+      {
+        "path": "src/PiSharp.AI/Protocols/OpenAIResponses/ResponsesTranscriptProjector.cs",
+        "before": "650d9db6fd925307628befbf2634235786224bca65c882fe1808670b8057c9f9",
+        "after": "f2cd474f903fff8f6990c4b2af318b548baf4973f723b5c1d32d4d6563037e65"
+      }
+    ],
+    "removed": [],
+    "locksOnly": false
+  }
+}

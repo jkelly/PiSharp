@@ -156,7 +156,43 @@ public static class Agents
             throw new ArgumentOutOfRangeException(nameof(change), maxTurns,
                 $"maxTurns must be an integer 1 or more, got {maxTurns.ToString(System.Globalization.CultureInfo.InvariantCulture)}");
         Set("maxTurns", change.MaxTurns, turns => JsonValue.Number(turns));
+        Set("compaction", change.Compaction, CompactionJson);
         Set("serviceTier", change.ServiceTier, text => text);
+    }
+
+    private static JsonObjectValue CompactionFields(bool? enabled, double? reserve, double? keep, double? background)
+    {
+        foreach (var (name, value) in new[] { ("reserveTokens", reserve), ("keepRecentTokens", keep), ("backgroundTokens", background) })
+            if (value is { } count && (!double.IsFinite(count) || count < 0 || count > MaxSafeInteger || Math.Floor(count) != count))
+                throw new ArgumentOutOfRangeException(nameof(value), count, $"compaction.{name} must be an integer 0 or more");
+        return new Internal.RecordJson.Writer().Add("enabled", enabled is { } flag ? JsonValue.Boolean(flag) : null).Number("reserveTokens", reserve)
+            .Number("keepRecentTokens", keep).Number("backgroundTokens", background).Build();
+    }
+
+    private static JsonObjectValue CompactionJson(CompactionSettings settings)
+    {
+        var fields = CompactionFields(settings.Enabled, settings.ReserveTokens, settings.KeepRecentTokens, settings.BackgroundTokens);
+        return settings.ModelOverrides is not { } overrides ? fields : fields.SetItem("modelOverrides", JsonValue.Object(overrides.Select(pair =>
+            KeyValuePair.Create(pair.Key, (JsonValue)CompactionFields(pair.Value.Enabled, pair.Value.ReserveTokens,
+                pair.Value.KeepRecentTokens, pair.Value.BackgroundTokens)))));
+    }
+
+    private static CompactionSettings? ReadCompaction(JsonValue? value)
+    {
+        if (value is not JsonObjectValue data) return null;
+        double? Number(JsonObjectValue source, string key) => Field(source, key) is JsonNumberValue number ? number.Value : null;
+        bool? Enabled(JsonObjectValue source) => Field(source, "enabled") is JsonBooleanValue flag ? flag.Value : null;
+        return new CompactionSettings
+        {
+            Enabled = Enabled(data), ReserveTokens = Number(data, "reserveTokens"), KeepRecentTokens = Number(data, "keepRecentTokens"),
+            BackgroundTokens = Number(data, "backgroundTokens"),
+            ModelOverrides = Field(data, "modelOverrides") is JsonObjectValue overrides ? overrides.ToDictionary(pair => pair.Key, pair =>
+            {
+                var entry = (JsonObjectValue)pair.Value;
+                return new CompactionOverride { Enabled = Enabled(entry), ReserveTokens = Number(entry, "reserveTokens"),
+                    KeepRecentTokens = Number(entry, "keepRecentTokens"), BackgroundTokens = Number(entry, "backgroundTokens") };
+            }, StringComparer.Ordinal) : null,
+        };
     }
 
     /// <summary>JavaScript's <c>Number.MAX_SAFE_INTEGER</c>: <c>Number.isSafeInteger</c> bounds a turn limit.</summary>
@@ -275,6 +311,7 @@ public static class Agents
             Cwd = (Field(state, "cwd") as JsonStringValue)?.Value,
             MaxTurns = Field(state, "maxTurns") is JsonNumberValue maxTurns ? (long)maxTurns.Value : null,
             ServiceTier = (Field(state, "serviceTier") as JsonStringValue)?.Value,
+            Compaction = ReadCompaction(Field(state, "compaction")),
         };
     }
 

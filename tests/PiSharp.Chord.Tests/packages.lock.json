@@ -52,11 +52,26 @@
           "SQLitePCLRaw.core": "2.1.12"
         }
       },
-      "pisharp.chord": {
+      "pisharp.agent": {
+        "type": "Project",
+        "dependencies": {
+          "PiSharp.AI": "[1.5.0, )",
+          "PiSharp.Contracts": "[1.5.0, )"
+        }
+      },
+      "pisharp.ai": {
         "type": "Project",
         "dependencies": {
           "PiSharp.Contracts": "[1.5.0, )",
           "PiSharp.Telemetry": "[1.5.0, )"
+        }
+      },
+      "pisharp.chord": {
+        "type": "Project",
+        "dependencies": {
+          "PiSharp.Contracts": "[1.5.0, )",
+          "PiSharp.Telemetry": "[1.5.0, )",
+          "PiSharp.Tools": "[1.5.0, )"
         }
       },
       "pisharp.contracts": {
@@ -64,6 +79,13 @@
       },
       "pisharp.telemetry": {
         "type": "Project"
+      },
+      "pisharp.tools": {
+        "type": "Project",
+        "dependencies": {
+          "PiSharp.Agent": "[1.5.0, )",
+          "PiSharp.Contracts": "[1.5.0, )"
+        }
       }
     }
   }

@@ -2,6 +2,7 @@
 // carriers, snapshots and serializable schemas). Number and string formatting follow PiSharp.Contracts/Schema/JsValues.cs (Js).
 using System.Collections.Immutable;
 using System.Globalization;
+using System.Runtime.CompilerServices;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -174,12 +175,34 @@ internal sealed class AttributeValueJsonConverter : JsonConverter<AttributeValue
 /// <summary>An object of attribute values in insertion order; undefined (null) values are left out, as JSON.stringify leaves them out.</summary>
 internal sealed class SpanAttributesJsonConverter : JsonConverter<SpanAttributes>
 {
+    private static readonly ConditionalWeakTable<JsonSerializerOptions, JsonConverter<AttributeValue>> Converters = new();
+    // AttributeValue has one known built-in converter. Resolve explicit caller
+    // overrides (including factories) without the reflection resolver fallback
+    // in JsonSerializerOptions.GetConverter(Type).
+    private static JsonConverter<AttributeValue> Values(JsonSerializerOptions options) => options.IsReadOnly
+        ? Converters.GetValue(options, ResolveValues) : ResolveValues(options);
+
+    private static JsonConverter<AttributeValue> ResolveValues(JsonSerializerOptions options)
+    {
+        foreach (var candidate in options.Converters)
+        {
+            if (!candidate.CanConvert(typeof(AttributeValue))) continue;
+            var converter = candidate is JsonConverterFactory factory
+                ? factory.CreateConverter(typeof(AttributeValue), options) : candidate;
+            return converter as JsonConverter<AttributeValue>
+                ?? throw new InvalidOperationException("The attribute-value converter must handle AttributeValue.");
+        }
+        if (options.TypeInfoResolver is not null && options.TryGetTypeInfo(typeof(AttributeValue), out var metadata))
+            return (JsonConverter<AttributeValue>)metadata.Converter;
+        return new AttributeValueJsonConverter();
+    }
+
     public override SpanAttributes? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
     {
         if (reader.TokenType == JsonTokenType.Null) return null;
         if (reader.TokenType != JsonTokenType.StartObject) throw new JsonException("Attributes are a JSON object.");
         var attributes = new SpanAttributes();
-        var values = (JsonConverter<AttributeValue>)options.GetConverter(typeof(AttributeValue));
+        var values = Values(options);
         while (reader.Read() && reader.TokenType != JsonTokenType.EndObject)
         {
             var name = reader.GetString()!;
@@ -191,12 +214,13 @@ internal sealed class SpanAttributesJsonConverter : JsonConverter<SpanAttributes
 
     public override void Write(Utf8JsonWriter writer, SpanAttributes value, JsonSerializerOptions options)
     {
+        var values = Values(options);
         writer.WriteStartObject();
         foreach (var (name, attribute) in value)
         {
             if (attribute is null) continue;
             writer.WritePropertyName(name);
-            JsonSerializer.Serialize(writer, attribute, options);
+            values.Write(writer, attribute, options);
         }
         writer.WriteEndObject();
     }

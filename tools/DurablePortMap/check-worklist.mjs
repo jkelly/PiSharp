@@ -24,7 +24,9 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const args = process.argv.slice(2);
 const option = name => (args.includes(name) ? args[args.indexOf(name) + 1] : undefined);
 const upstream = option('--upstream');
-if (!upstream) throw new Error('--upstream <Pi git repository> is required');
+const offline = args.includes('--offline');
+if (offline && upstream) throw new Error('Choose --offline or --upstream, not both');
+if (!offline && !upstream) throw new Error('--upstream <Pi git repository> is required');
 const worklistPath = option('--worklist') ?? 'compatibility/durable-sync-1.5.0-worklist.json';
 const readJson = path => JSON.parse(readFileSync(resolve(root, path), 'utf8'));
 const worklist = readJson(worklistPath);
@@ -32,7 +34,7 @@ const table = readJson('compatibility/sync-1.5.0-applicability.json');
 const portMap = readJson(worklist.portMap);
 const FROM = worklist.from?.commit, TO = worklist.to?.commit;
 const git = (...command) => execFileSync('git', ['-C', upstream, ...command], { encoding: 'utf8', maxBuffer: 1 << 30 });
-for (const commit of [FROM, TO])
+for (const commit of offline ? [] : [FROM, TO])
   try { execFileSync('git', ['-C', upstream, 'cat-file', '-e', `${commit}^{commit}`], { stdio: 'ignore' }); } catch { throw new Error(`${upstream} does not contain commit ${commit}; fetch it`); }
 
 const errors = [];
@@ -84,6 +86,9 @@ const position = new Map(areas.map((area, index) => [area.id, index]));
 
 // ---------------------------------------------------------------- coverage
 // git's view of the range, per package (across both, a file that moved from durable to chord would be one rename).
+const phase4 = (table.rows ?? []).filter(row => row.phase === 4);
+const expected = new Map(), chordNamed = new Set(), chordInAreas = [];
+if (!offline) {
 const range = new Map(); // path -> { change, renamedFrom?, lines }
 for (const pkg of ['packages/durable', 'packages/chord']) {
   for (const line of git('diff', '--name-status', '-M', FROM, TO, '--', pkg).trim().split('\n').filter(Boolean)) {
@@ -109,16 +114,13 @@ for (const row of portMap.files ?? []) {
     range.delete(row.renamedFrom);
   }
 }
-const phase4 = (table.rows ?? []).filter(row => row.phase === 4);
 const tree = commit => new Set(git('ls-tree', '-r', '--name-only', commit, '--', 'packages/chord').trim().split('\n').filter(Boolean));
 const chordFiles = [...new Set([...tree(FROM), ...tree(TO)])];
-const chordNamed = new Set();
 for (const row of phase4) for (const path of row.upstream ?? []) if (path.startsWith(C)) {
   const matches = chordFiles.filter(file => file === path || file.startsWith(path.endsWith('/') ? path : path + '/'));
   if (!matches.length) fail(`row ${row.id}: names ${path}, which neither commit has`);
   for (const file of matches) chordNamed.add(file);
 }
-const expected = new Map();
 for (const [path, info] of range) if (path.startsWith(D) || path.startsWith(C)) expected.set(path, info);
 for (const path of chordNamed) if (!expected.has(path)) expected.set(path, { change: 'unchanged', lines: 0 });
 
@@ -141,7 +143,6 @@ for (const area of areas) for (const entry of area.upstream ?? []) {
       fail(`excluded entry ${index + 1}: ${path} changed but no phase 4 row names it; its reason must start with "phase 6"`);
   }
 });
-const chordInAreas = [];
 for (const [path] of expected) {
   const places = seen.get(path) ?? [];
   if (places.length !== 1) fail(`${path}: in ${places.length ? places.join(', ') : 'no area and no excluded entry'}; expected exactly one`);
@@ -150,6 +151,8 @@ for (const [path] of expected) {
 for (const row of portMap.files ?? [])
   if (['needs-sync', 'planned'].includes(row.status) && !seen.has(row.upstream))
     fail(`port map: ${row.status} row ${row.upstream} is in no area and no excluded entry`);
+
+} // upstream-only coverage; offline still checks shape, rows, waves and local files
 
 // ---------------------------------------------------------------- rows
 const rowIds = new Set(phase4.map(row => row.id));
@@ -209,7 +212,7 @@ for (const area of areas) {
 const covered = [...expected.keys()];
 const excludedCount = (worklist.excluded ?? []).reduce((total, group) => total + (group.paths?.length ?? 0), 0);
 console.log(`durable-sync work list ${worklistPath}: ${areas.length} areas in ${waves.length} waves, ${phase4.length} phase 4 rows`);
-console.log(`coverage: ${covered.filter(path => path.startsWith(D)).length} durable files and ${covered.filter(path => path.startsWith(C)).length} chord files (${chordNamed.size} named by phase 4 rows); ${excludedCount} excluded`);
+console.log(offline ? 'coverage: NOT RUN (explicit offline structural validation)' : `coverage: ${covered.filter(path => path.startsWith(D)).length} durable files and ${covered.filter(path => path.startsWith(C)).length} chord files (${chordNamed.size} named by phase 4 rows); ${excludedCount} excluded`);
 if (chordInAreas.length) console.log(`chord files no phase 4 row names, placed in areas: ${chordInAreas.join('; ')}`);
 if (errors.length) {
   for (const error of errors) console.error('FAIL ' + error);

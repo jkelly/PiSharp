@@ -38,9 +38,13 @@ internal interface IDelivered
 /// <see cref="Running"/> and <see cref="Within"/>; the rest is the host's.</summary>
 public sealed class Batch
 {
+    // Installed by a real host. Standalone state/store users retain the original caller-owned behavior.
+    internal Func<bool>? IsOwnerThread { get; set; }
+    internal Action<Action>? InvokeOwner { get; set; }
+    internal Func<Delegate, object?, IDisposable?>? RetainCallback { get; set; }
     private static readonly Action<Action> ThreadPoolSchedule = static work => ThreadPool.UnsafeQueueUserWorkItem(static run => run(), work, preferLocal: false);
 
-    private readonly Action<BatchError> report;
+    private Action<BatchError> report;
     private readonly ITelemetryMetrics? metrics;
     // Set while adopting, delivering or computing a derive; one flag per host.
     private bool running;
@@ -64,13 +68,16 @@ public sealed class Batch
     {
         ArgumentNullException.ThrowIfNull(report);
         this.report = report;
-        ReportListener = error => report(new BatchError(BatchErrorKind.ListenerError, error));
+        ReportListener = error => this.report(new BatchError(BatchErrorKind.ListenerError, error));
         this.metrics = metrics;
         Schedule = schedule ?? ThreadPoolSchedule;
     }
 
     /// <summary>Reports a throwing watch listener's error (to the host's <c>onError</c>); what watches get as their <c>report</c>.</summary>
     internal Action<Exception> ReportListener { get; }
+
+    // Ended values may retain their last frame, but must not retain their closed host through diagnostics.
+    internal void ReleaseOwner() { report = static _ => { }; RetainCallback = null; }
 
     /// <summary>The host's scheduler: the watches made on this batch deliver through it, and <see cref="Soon"/> commits through it.</summary>
     internal Action<Action> Schedule { get; }
@@ -98,6 +105,12 @@ public sealed class Batch
     /// nests.</summary>
     internal T Compute<T>(Func<T> work)
     {
+        if (IsOwnerThread is { } owns && !owns())
+        {
+            T result = default!;
+            InvokeOwner!(() => result = Compute(work));
+            return result;
+        }
         var wasRunning = running;
         var wasComputing = computing;
         running = true;
@@ -116,6 +129,12 @@ public sealed class Batch
     /// <summary>Runs <paramref name="work"/> with reentrant calls refused; nests (a derive compute inside a commit).</summary>
     internal T Run<T>(Func<T> work)
     {
+        if (IsOwnerThread is { } owns && !owns())
+        {
+            T result = default!;
+            InvokeOwner!(() => result = Run(work));
+            return result;
+        }
         var outer = running;
         running = true;
         try
@@ -135,6 +154,7 @@ public sealed class Batch
     /// </summary>
     internal void Commit(Action adopt, ChordContext context)
     {
+        if (IsOwnerThread is { } owns && !owns()) { InvokeOwner!(() => Commit(adopt, context)); return; }
         ArgumentNullException.ThrowIfNull(adopt);
         ArgumentNullException.ThrowIfNull(context);
         Run(() =>
@@ -190,6 +210,7 @@ public sealed class Batch
     /// </summary>
     public void Within(Action adopt, ChordContext context)
     {
+        if (IsOwnerThread is { } owns && !owns()) { InvokeOwner!(() => Within(adopt, context)); return; }
         if (sending) later.Add(adopt);
         else if (running) adopt();
         else Commit(adopt, context);
@@ -201,6 +222,7 @@ public sealed class Batch
     /// </summary>
     internal void Soon(Action adopt, ChordContext context)
     {
+        if (IsOwnerThread is { } owns && !owns()) { InvokeOwner!(() => Soon(adopt, context)); return; }
         if (soon is not null)
         {
             soon.Add(adopt);

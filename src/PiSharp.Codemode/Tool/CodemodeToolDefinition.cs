@@ -157,8 +157,9 @@ public static class CodemodeToolDefinition
     /// <summary>The field names of an object schema, <c>{ output, exit_code, full_output_path? }</c>, with the fields of object-typed
     /// fields <paramref name="depth"/> levels deep: <c>{ content, structuredContent?: { results } }</c>, and the value of <c>const</c>
     /// fields: <c>{ action: "start", id }</c>. Null for other schemas.</summary>
-    private static string? DescribeFields(JsonElement schema, int depth)
+    private static string? DescribeFields(JsonElement schema, JsonElement root, int depth)
     {
+        schema = LocalSchemaReferences.Follow(schema, root);
         if (schema.ValueKind != JsonValueKind.Object) return null;
         if (Member(schema, "type") is not { ValueKind: JsonValueKind.String } type || type.GetString() != "object" ||
             Member(schema, "properties") is not { ValueKind: JsonValueKind.Object } properties) return null;
@@ -166,20 +167,22 @@ public static class CodemodeToolDefinition
             ? list.EnumerateArray().Where(item => item.ValueKind == JsonValueKind.String).Select(item => item.GetString()!).ToHashSet(StringComparer.Ordinal) : [];
         var fields = ModelOperationJson.ObjectEntries(properties).Select(field =>
         {
-            var nested = field.Value.ValueKind == JsonValueKind.Object && Member(field.Value, "const") is { } constant ? Js.Stringify(constant)
-                : depth > 0 ? DescribeFields(field.Value, depth - 1) : null;
+            var resolved = LocalSchemaReferences.Follow(field.Value, root);
+            var nested = resolved.ValueKind == JsonValueKind.Object && Member(resolved, "const") is { } constant ? Js.Stringify(constant)
+                : depth > 0 ? DescribeFields(resolved, root, depth - 1) : null;
             return $"{field.Key}{(required.Contains(field.Key) ? "" : "?")}{(nested is null ? "" : ": " + nested)}";
         });
         return $"{{ {string.Join(", ", fields)} }}";
     }
 
     /// <summary>The field names of each variant of an <c>anyOf</c>/<c>oneOf</c> whose variants are all objects, joined by <c>|</c>.</summary>
-    private static string? DescribeUnionFields(JsonElement schema)
+    private static string? DescribeUnionFields(JsonElement schema, JsonElement root)
     {
+        schema = LocalSchemaReferences.Follow(schema, root);
         if (schema.ValueKind != JsonValueKind.Object) return null;
         var variants = Member(schema, "anyOf") is { ValueKind: not JsonValueKind.Null } anyOf ? anyOf : Member(schema, "oneOf");
         if (variants is not { ValueKind: JsonValueKind.Array } array || array.GetArrayLength() == 0) return null;
-        var described = array.EnumerateArray().Select(variant => DescribeFields(variant, 0)).ToList();
+        var described = array.EnumerateArray().Select(variant => DescribeFields(variant, root, 0)).ToList();
         return described.All(fields => fields is not null) ? string.Join(" | ", described) : null;
     }
 
@@ -191,7 +194,7 @@ public static class CodemodeToolDefinition
     {
         var type = CodemodeDeclarations.RenderToolOutputType(schema?.Value);
         if (type == "string") return "a string";
-        var fields = schema is null ? null : DescribeFields(schema.Value, 1) ?? DescribeUnionFields(schema.Value);
+        var fields = schema is null ? null : DescribeFields(schema.Value, schema.Value, 1) ?? DescribeUnionFields(schema.Value, schema.Value);
         if (fields is not null) return $"`{fields}`";
         if (!type.Contains('\n', StringComparison.Ordinal)) return $"`{type}`";
         return $"a value; `await describeTool({Js.Stringify(name)})` shows its type";

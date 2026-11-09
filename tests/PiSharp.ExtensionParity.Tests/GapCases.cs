@@ -13,6 +13,8 @@ internal static partial class Program
         ("gap.get-commands-lists-templates-and-skills", GetCommandsCatalog),
         ("gap.ctx-compact-runs-the-session-compaction", ContextCompact),
         ("gap.ctx-shutdown-stops-rpc-after-the-command", ContextShutdown),
+        ("gap.ctx-shutdown-wakes-idle-rpc-timer", () => ContextIdleShutdown(timer: true)),
+        ("gap.ctx-shutdown-at-session-start", () => ContextIdleShutdown(timer: false)),
         ("gap.prompt-snippet-and-guidelines-in-the-system-prompt", PromptSnippet),
         ("gap.extension-tools-run-in-parallel-unless-sequential", ExecutionMode),
         ("gap.output-schema-reaches-codemode-declarations", OutputSchema),
@@ -187,14 +189,34 @@ internal static partial class Program
         var extension = sandbox.Write(Path.Combine(sandbox.Cwd, "bye.ts"), Probe + """
             export default function (pi: any) {
               pi.on("session_shutdown", async (event: any) => log("shutdown", event.reason));
-              pi.registerCommand("bye", { description: "Quit", handler: async (_args: string, ctx: any) => { ctx.shutdown(); log("requested"); } });
+              pi.registerCommand("bye", { description: "Quit", handler: async (_args: string, ctx: any) => {
+                ctx.shutdown(); ctx.shutdown(); await new Promise(resolve => setTimeout(resolve, 80)); log("requested");
+              } });
             }
             """);
         // The input never ends: only the shutdown request stops the run.
         var (code, records, stderr) = await RunRpc(sandbox, [.. Model, "-e", extension], ["""{"id":"bye","type":"prompt","message":"/bye"}"""], null, TimeSpan.FromSeconds(60));
         Equal(0, code, "exit; " + stderr);
-        Check(records.Any(record => IsResponse(record, "bye")), "the command was answered first");
+        Check(records.Any(record => IsResponse(record, "bye") && record["success"]?.GetValue<bool>() == true), "the command was answered successfully first");
         Names(["[\"requested\"]", "[\"shutdown\",\"quit\"]"], LogLines(sandbox), "shutdown after the command");
+    }
+
+    private static async Task ContextIdleShutdown(bool timer)
+    {
+        using var sandbox = NodeSandbox("idle-shutdown-" + timer);
+        var extension = sandbox.Write(Path.Combine(sandbox.Cwd, "idle.ts"), Probe + $$"""
+            export default function (pi: any) {
+              pi.on("session_shutdown", async () => log("shutdown"));
+              pi.on("session_start", async (_event: any, ctx: any) => {
+                {{(timer ? "setTimeout(() => { log('timer'); ctx.shutdown(); ctx.shutdown(); }, 80);" : "ctx.shutdown(); log('startup');")}}
+              });
+            }
+            """);
+        // Input has no commands and never reaches EOF; only the real context request can finish.
+        var (code, records, stderr) = await RunRpc(sandbox, [.. Model, "-e", extension], [], null, TimeSpan.FromSeconds(25));
+        Equal(0, code, "exit; " + stderr);
+        Check(records.All(record => record["type"]?.GetValue<string>() != "response"), "No command should be needed to wake idle RPC.");
+        Names([timer ? "[\"timer\"]" : "[\"startup\"]", "[\"shutdown\"]"], LogLines(sandbox), "one shutdown notification");
     }
 
     // agent-session.ts _rebuildSystemPrompt: an extension tool's promptSnippet lists it under the tools, and its promptGuidelines join the rules.

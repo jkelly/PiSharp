@@ -285,7 +285,7 @@ internal static class GenerationPhases
         var desired = await HarnessPrompt.RenderSectionsAsync(agent.Sections, input, shown,
             (error, section) => runtime.Report(error, ReportFrom.FromExtension(Agents.SectionExtension(agent, section.Key))), context).ConfigureAwait(false);
         var entries = HarnessPrompt.PlanSystemEntries(view, desired, agent.Tools, runtime.Now());
-        var threshold = compacted is null ? ThresholdCompaction(view, entries, resolved.ContextWindow, Compaction.PolicyFor(settings, model)) : null;
+        var threshold = compacted is null ? ThresholdCompaction(view, entries, resolved.ContextWindow, Compaction.PolicyFor(settings, model, agent.Compaction)) : null;
         if (threshold == "blocking")
         {
             // Compact first and prepare again; the transcript is unchanged until the compaction appends.
@@ -1020,7 +1020,7 @@ internal static class GenerationPhases
         // The retry and compaction policies govern the next attempt, so they are read now rather than pinned at preparation.
         var settings = runtime.Settings;
         var overflow = stopReason == "error" && PiAiOverflow.IsContextOverflow(message);
-        var policy = Compaction.PolicyFor(settings, reference);
+        var policy = Compaction.PolicyFor(settings, reference, (await runtime.AgentAsync(context).ConfigureAwait(false)).Compaction);
         if (overflow && compacted is null && policy.Enabled)
         {
             var view = await runtime.ContextAsync(conversationId, context, cutoff).ConfigureAwait(false);
@@ -1422,6 +1422,8 @@ internal static class GenerationPhases
     internal static JsonObjectValue StreamOptionsJson(ConversationStreamOptions options) => new RecordJson.Writer()
         .Add("transport", options.Transport)
         .Number("timeoutMs", options.TimeoutMs)
+        .Number("websocketConnectTimeoutMs", options.WebsocketConnectTimeoutMs)
+        .Add("thinkingBudgets", options.ThinkingBudgets)
         .Number("maxRetries", options.MaxRetries)
         .Number("maxRetryDelayMs", options.MaxRetryDelayMs)
         .Add("headers", options.Headers is { } headers
@@ -1436,6 +1438,8 @@ internal static class GenerationPhases
     {
         Transport = OptionalString(pinned, "transport"),
         TimeoutMs = OptionalNumber(pinned, "timeoutMs"),
+        WebsocketConnectTimeoutMs = OptionalNumber(pinned, "websocketConnectTimeoutMs"),
+        ThinkingBudgets = pinned.TryGetValue("thinkingBudgets", out var budgets) && budgets is JsonObjectValue thinking ? thinking : null,
         MaxRetries = OptionalNumber(pinned, "maxRetries") is { } retries ? (int)retries : null,
         MaxRetryDelayMs = OptionalNumber(pinned, "maxRetryDelayMs"),
         Headers = pinned.TryGetValue("headers", out var headers) && headers is JsonObjectValue values

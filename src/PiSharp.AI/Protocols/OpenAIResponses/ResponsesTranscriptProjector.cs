@@ -17,6 +17,11 @@ public sealed record ResponsesTranscriptProjectionOptions(
     ResponsesToolDeclarationProjectionOptions? ToolDeclarations = null,
     bool SynthesizeMissingToolResults = false)
 {
+    /// <summary>With mid-conversation system messages, declare all tools inline as additional_tools and announce removals.</summary>
+    public bool SupportsAdditionalTools { get; init; }
+    /// <summary>When inline replacement is unavailable, anchor additive tool loads using client tool-search items.</summary>
+    public bool SupportsToolSearch { get; init; }
+
     /// <summary>
     /// Null keeps the text-only profile (image blocks are unsupported content). True projects user and tool-result images as
     /// <c>input_image</c> data URLs; false downgrades them to Pi's non-vision placeholders
@@ -96,16 +101,22 @@ public sealed class ResponsesTranscriptProjector
     // The request factory uses both projections with this profile before allocating its request.
     internal JsonData ProjectInput(ChatRequest request, CancellationToken cancellationToken)
     {
-        try { return new Projection(request, _options, _allowed, cancellationToken).Run(); }
+        try { return new Projection(request, _options, _allowed, _tools, cancellationToken).Run(); }
         catch (Exception error) when (error is JsonException or InvalidOperationException or KeyNotFoundException or FormatException or OverflowException)
         { throw Failure(ResponsesProjectionFailure.InvalidTranscript); }
     }
-    internal JsonData ProjectTools(ChatRequest request, CancellationToken cancellationToken) => _tools.Project(request, cancellationToken);
+    internal JsonData ProjectTools(ChatRequest request, CancellationToken cancellationToken)
+    {
+        // Validate complete declarations before resolving the selected prefix, including declarations now carried inline.
+        var all = _tools.Project(request, cancellationToken);
+        var folded = ResponsesTranscriptTools.FoldedSystems(request, _options, cancellationToken);
+        return folded == int.MaxValue ? all : _tools.Project(request, folded, cancellationToken);
+    }
 
     private static ResponsesProjectionException Failure(ResponsesProjectionFailure failure) => new(failure);
     private sealed record Entry(string Role, JsonData Body, AssistantMessage? Assistant = null);
     private sealed class Projection(ChatRequest request, ResponsesTranscriptProjectionOptions options,
-        ImmutableHashSet<string> allowed, CancellationToken token)
+        ImmutableHashSet<string> allowed, ResponsesToolDeclarationProjector tools, CancellationToken token)
     {
         private readonly JsonArray _output = [];
         private int _outputCharacters = 2;
@@ -152,20 +163,66 @@ public sealed class ResponsesTranscriptProjector
             }
             // Pi abe508 openai-responses.ts: grammar input properties come from every tool the transcript declared.
             _grammarInputs = ResponsesGrammar.InputProperties(request, options.ToolDeclarations?.SupportsOpenAIGrammarTools == true, token);
+            var foldedSystems = ResponsesTranscriptTools.FoldedSystems(request, options, token);
             if (!options.SupportsMidConversationSystemMessages) entries = FoldSystems(entries);
             entries = Transform(entries);
             entries = PairAndOrder(entries);
-            var messageIndex = 0; var sourceIndex = 0;
+            var messageIndex = 0; var sourceIndex = 0; var systemIndex = 0;
+            var declaredAdditional = false; var unavailable = new List<string>();
+            var instructionRole = options.Reasoning && options.SupportsDeveloperRole ? "developer" : "system";
             foreach (var entry in entries)
             {
                 token.ThrowIfCancellationRequested();
                 var leadingSystem = sourceIndex++ == 0 && entry.Role == "system";
                 if (entry.Role == "system")
                 {
+                    var anchors = systemIndex++ >= foldedSystems;
+                    var body = entry.Body.Value;
+                    var addedNames = new HashSet<string>(StringComparer.Ordinal);
+                    if (anchors && body.TryGetProperty("toolsAdded", out var added))
+                    {
+                        foreach (var declaration in added.EnumerateArray())
+                        {
+                            var name = String(declaration, "name"); addedNames.Add(name); unavailable.Remove(name);
+                        }
+                        if (added.GetArrayLength() > 0)
+                        {
+                            if (options.SupportsAdditionalTools)
+                            {
+                                if (declaredAdditional)
+                                {
+                                    var notice = "This is an incremental tools update. Previously declared tools remain available unless explicitly marked unavailable. A tool declared again here is available again, and its latest definition replaces the earlier one.";
+                                    if (unavailable.Count > 0) notice += "\nStill unavailable: " + string.Join(", ", unavailable) + ".";
+                                    Add(new JsonObject { ["role"] = instructionRole, ["content"] = notice });
+                                }
+                                declaredAdditional = true;
+                                Add(new JsonObject { ["type"] = "additional_tools", ["role"] = "developer", ["tools"] = tools.ProjectAdded(added, false, token) });
+                            }
+                            else if (options.SupportsToolSearch)
+                            {
+                                var names = added.EnumerateArray().Select(item => String(item, "name")).ToArray();
+                                var callId = "pi_tool_load_" + ShortHash($"system:{messageIndex}:" + string.Join(",", names));
+                                Add(new JsonObject { ["type"] = "tool_search_call", ["call_id"] = callId, ["execution"] = "client", ["status"] = "completed",
+                                    ["arguments"] = new JsonObject { ["query"] = string.Join(" ", names), ["limit"] = names.Length } });
+                                Add(new JsonObject { ["type"] = "tool_search_output", ["call_id"] = callId, ["execution"] = "client", ["status"] = "completed",
+                                    ["tools"] = tools.ProjectAdded(added, true, token) });
+                            }
+                        }
+                    }
                     if (!leadingSystem || options.IncludeInitialSystemPrompt)
                     {
-                        var text = RenderSystem(entry.Body.Value, leadingSystem);
-                        if (text.Length > 0) Add(new JsonObject { ["role"] = options.Reasoning && options.SupportsDeveloperRole ? "developer" : "system", ["content"] = text });
+                        var text = RenderSystem(body, leadingSystem);
+                        if (anchors && body.TryGetProperty("toolsRemoved", out var removed))
+                        {
+                            var names = removed.EnumerateArray().Select(item => String(item, "name")).Where(name => !addedNames.Contains(name)).ToArray();
+                            if (names.Length > 0)
+                            {
+                                var notice = "The following tools are no longer available. Do not call them:\n" + string.Join("\n", names.Select(name => "- " + name));
+                                text = text.Length == 0 ? notice : text + "\n\n" + notice;
+                                foreach (var name in names) if (!unavailable.Contains(name)) unavailable.Add(name);
+                            }
+                        }
+                        if (text.Length > 0) Add(new JsonObject { ["role"] = instructionRole, ["content"] = text });
                     }
                 }
                 else if (entry.Role == "user")
@@ -201,7 +258,7 @@ public sealed class ResponsesTranscriptProjector
             }
             if (options.ConfigurationUpdateEffort is { } effort) Add(ConfigurationUpdate(effort));
             token.ThrowIfCancellationRequested();
-            return JsonData.Parse(_output.ToJsonString(OutputJson));
+            return JsonData.Parse(JsonUtf16.ToJsonString(_output, OutputJson.Encoder));
         }
 
         private List<Entry> Transform(List<Entry> entries)
@@ -479,7 +536,7 @@ public sealed class ResponsesTranscriptProjector
             new() { ["type"] = "configuration_update", ["reasoning"] = new JsonObject { ["effort"] = effort } };
         private void Add(JsonNode item)
         {
-            token.ThrowIfCancellationRequested(); var serialized = item.ToJsonString(OutputJson);
+            token.ThrowIfCancellationRequested(); var serialized = JsonUtf16.ToJsonString(item, OutputJson.Encoder);
             var size = serialized.Length + (_output.Count == 0 ? 0 : 1);
             if (_output.Count >= options.MaximumOutputItems || size > options.MaximumOutputCharacters - _outputCharacters)
                 throw Failure(ResponsesProjectionFailure.ResourceLimit);

@@ -53,20 +53,23 @@ internal sealed partial class OfflineSessionProfile
         }
     }
     private bool piShutdownRequested;
-    /// <summary>Pi ctx.shutdown(): the mode's shutdown handler. RPC mode records the request and stops after the current command or
-    /// run settles (rpc-mode.ts checkShutdownRequested); without a mode stop (print mode) it does nothing, as upstream's default.</summary>
+    /// <summary>Pi ctx.shutdown(): forward one stop intent immediately so an idle input read wakes.
+    /// The mode owns deferring the actual stop until command responses and runs settle.</summary>
     internal void RequestPiShutdown()
     {
-        lock (lifecycleGate) if (lifecycleModeStop is not null && !lifecycleClosing) piShutdownRequested = true;
+        lock (lifecycleGate)
+        {
+            if (lifecycleModeStop is null || lifecycleClosing || piShutdownRequested) return;
+            piShutdownRequested = true; LifecycleShutdownRequested = true;
+            // Publish any original before profile close can snapshot its owned tasks.
+            if (lifecycleModeStop() is { } original)
+                lifecycleOriginals.TryAdd(original, ("mode-stop-intent", null, null));
+        }
     }
 
     /// <summary>Invoked only after the host's actual input/run and writer originals settle, outside their gates.</summary>
     internal async Task DrainLifecycleHandoffsAsync(PersistentAgentSession originating)
     {
-        Func<Task?>? piStop = null;
-        lock (lifecycleGate)
-            if (piShutdownRequested && !LifecycleShutdownRequested && !lifecycleClosing) { piShutdownRequested = false; LifecycleShutdownRequested = true; piStop = lifecycleModeStop; }
-        if (piStop?.Invoke() is { } stopping) await stopping.ConfigureAwait(false);
         NativeLifecycleOrigin[] pending;
         lock (lifecycleGate)
         {
@@ -164,7 +167,13 @@ internal sealed partial class OfflineSessionProfile
             {
                 lock (lifecycleGate)
                 {
-                    if (lifecycleOriginals.TryGetValue(original, out var captured)) failures.Add((Exception?)captured.Aggregate ?? captured.Direct ?? error);
+                    if (lifecycleOriginals.TryGetValue(original, out var captured))
+                    {
+                        var aggregate = captured.Aggregate ?? (original.IsFaulted ? original.Exception : null);
+                        var direct = captured.Direct ?? error;
+                        lifecycleOriginals[original] = (captured.Phase, aggregate, direct);
+                        failures.Add((Exception?)aggregate ?? direct);
+                    }
                     else
                     {
                         var origin = lifecycleRequests.First(item => ReferenceEquals(item.Original, original));

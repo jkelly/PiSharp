@@ -4,9 +4,9 @@ using System.Runtime.InteropServices;
 
 namespace PiSharp.Cli;
 
-/// <summary>Termination signals of the non-interactive hosts (RPC, print and JSON). A signal cancels the host's work so it shuts
-/// down gracefully (session_shutdown, owned process cleanup) instead of being killed, and the process then exits with
-/// 128 + the signal number as Pi does: 143 for SIGTERM, 129 for SIGHUP.</summary>
+/// <summary>Termination signals of the non-interactive hosts (RPC, print and JSON). The first signal cancels the host's work so it
+/// joins session shutdown, owned processes and credential writes before exiting 143 for SIGTERM or 129 for SIGHUP.
+/// A repeated signal explicitly forces exit, bypassing unfinished cleanup.</summary>
 internal sealed class ShutdownSignals : IDisposable
 {
     private static readonly Lazy<ShutdownSignals> ProcessSignals = new(() => new(register: true));
@@ -16,9 +16,12 @@ internal sealed class ShutdownSignals : IDisposable
     private readonly CancellationTokenSource _shutdown = new();
     private readonly List<PosixSignalRegistration> _registrations = [];
     private int _received;
+    private int _signalCount;
+    private readonly Action<int> _forceExit;
 
-    internal ShutdownSignals(bool register)
+    internal ShutdownSignals(bool register, Action<int>? forceExit = null)
     {
+        _forceExit = forceExit ?? (register ? Environment.Exit : _ => { });
         if (!register) return;
         Add(PosixSignal.SIGTERM);
         if (!OperatingSystem.IsWindows()) Add(PosixSignal.SIGHUP);
@@ -33,9 +36,16 @@ internal sealed class ShutdownSignals : IDisposable
     /// <summary>The host's own exit code, unless a signal ended it.</summary>
     internal int Exit(int result) => ExitCode ?? result;
 
-    /// <summary>Delivers one signal: the first one is recorded and the host's work is cancelled.</summary>
+    /// <summary>The first signal records graceful cancellation; a repeated signal invokes the force-exit policy.</summary>
     internal void Signal(PosixSignal signal)
     {
+        if (Interlocked.Increment(ref _signalCount) > 1)
+        {
+            // The first signal is graceful even if EOF/ctx.shutdown already started cleanup.
+            // A subsequent signal is the user's explicit escape from stuck cleanup.
+            _forceExit(signal == PosixSignal.SIGHUP ? 129 : 143);
+            return;
+        }
         Interlocked.CompareExchange(ref _received, (int)signal, 0);
         try { _shutdown.Cancel(); } catch (ObjectDisposedException) { } catch (AggregateException) { }
     }

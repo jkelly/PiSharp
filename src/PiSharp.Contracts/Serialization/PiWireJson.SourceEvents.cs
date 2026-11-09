@@ -18,7 +18,7 @@ public static partial class PiWireJson
         {
             var content = SourceSlot<ThinkingContent>(partial, thinking.ContentIndex);
             if (content.ExtraProperties is not { } capturedProperties || !capturedProperties.TryGet("thinkingSignature", out var captured) ||
-                !JsonNode.DeepEquals(JsonNode.Parse(signature!.ToString(), documentOptions: PiSharp.Contracts.JsonData.DocumentOptions), JsonNode.Parse(captured!.ToString(), documentOptions: PiSharp.Contracts.JsonData.DocumentOptions)))
+                !JsonUtf16.DeepEquals(signature!.Value, captured!.Value))
                 throw new JsonException("Thinking signature differs from the actual source partial.");
             properties = signatureProperties.Remove("thinkingSignature");
         }
@@ -93,13 +93,16 @@ public static partial class PiWireJson
             _ => throw new JsonException("Not a Pi v0.99.1 source event.")
         };
         foreach (var field in fields)
-            if (!value.TryGetProperty(field, out _)) throw new JsonException("Required source event field absent: " + field);
+            if (!TryWireProperty(value, field, out _)) throw new JsonException("Required source event field absent: " + field);
         foreach (var property in value.EnumerateObject())
-            if (SourceReservedFields.Contains(property.Name) && !fields.Contains(property.Name, StringComparer.Ordinal))
-                throw new JsonException("Unexpected source event shape field: " + property.Name);
-        var snapshot = kind is "done" or "error" ? null : ReadMessage(value.GetProperty("partial"));
+        {
+            var name = JsonUtf16.GetName(property);
+            if (SourceReservedFields.Contains(name) && !fields.Contains(name, StringComparer.Ordinal))
+                throw new JsonException("Unexpected source event shape field: " + name);
+        }
+        var snapshot = kind is "done" or "error" ? null : ReadMessage(GetWireProperty(value, "partial"));
         var extras = JsonFields.FromObjectExcept(value, fields);
-        int Index() => value.GetProperty("contentIndex").GetInt32();
+        int Index() => GetWireProperty(value, "contentIndex").GetInt32();
         StreamEvent result = kind switch
         {
             "start" => new StreamStarted(snapshot!, extras),
@@ -111,10 +114,10 @@ public static partial class PiWireJson
             "thinking_end" => new ThinkingEnded(Index(), String(value, "content"), SourceThinkingEndProperties(snapshot, Index(), extras)),
             "toolcall_start" => new ToolCallStarted(Index(), SourceSlot<ToolCallContent>(snapshot, Index()), extras),
             "toolcall_delta" => new ToolCallDelta(Index(), String(value, "delta"), extras),
-            "toolcall_end" => new ToolCallEnded(Index(), ReadContent(value.GetProperty("toolCall")) as ToolCallContent
+            "toolcall_end" => new ToolCallEnded(Index(), ReadContent(GetWireProperty(value, "toolCall")) as ToolCallContent
                 ?? throw new JsonException("Source toolcall_end requires a toolCall."), extras),
-            "done" => new StreamDone(ReadStopReason(String(value, "reason")), ReadMessage(value.GetProperty("message")), extras),
-            "error" => new StreamError(ReadStopReason(String(value, "reason")), ReadMessage(value.GetProperty("error")), extras),
+            "done" => new StreamDone(ReadStopReason(String(value, "reason")), ReadMessage(GetWireProperty(value, "message")), extras),
+            "error" => new StreamError(ReadStopReason(String(value, "reason")), ReadMessage(GetWireProperty(value, "error")), extras),
             _ => throw new JsonException("Unknown source event.")
         };
         // Apply the same index/kind/payload/terminal consistency rules in both directions.
@@ -138,8 +141,20 @@ public static partial class PiWireJson
     }
 
     private static void SameContent(AssistantContent left, AssistantContent right)
-    { if (!JsonNode.DeepEquals(ContentNode(left), ContentNode(right))) throw new JsonException("Event payload differs from the actual source partial."); }
+    { if (!SameContentValue(left, right)) throw new JsonException("Event payload differs from the actual source partial."); }
+
+    private static bool SameContentValue(AssistantContent left, AssistantContent right)
+    {
+        // Compare the typed identities first: their existing node writer may normalize a malformed
+        // string, which must not make distinct tool identities compare equal at this boundary.
+        if (left is TextContent firstText && right is TextContent secondText && firstText.Text != secondText.Text) return false;
+        if (left is ThinkingContent firstThinking && right is ThinkingContent secondThinking && firstThinking.Thinking != secondThinking.Thinking) return false;
+        if (left is ToolCallContent first && right is ToolCallContent second && (first.Id != second.Id || first.Name != second.Name)) return false;
+        return JsonUtf16.DeepEquals(Own(ContentNode(left)).Value, Own(ContentNode(right)).Value);
+    }
 
     private static bool SameMessage(AssistantMessage left, AssistantMessage right)
-        => JsonNode.DeepEquals(MessageNode(left), MessageNode(right));
+        => left.Api == right.Api && left.Provider == right.Provider && left.Model == right.Model &&
+            left.Content.Length == right.Content.Length && left.Content.Zip(right.Content).All(pair => SameContentValue(pair.First, pair.Second)) &&
+            JsonUtf16.DeepEquals(Own(MessageNode(left)).Value, Own(MessageNode(right)).Value);
 }

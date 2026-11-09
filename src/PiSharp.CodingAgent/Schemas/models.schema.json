@@ -552,6 +552,14 @@
           "type": "boolean",
           "description": "Whether a user message after tool results requires an assistant message in between. Default: auto-detected from URL."
         },
+        "requiresNonNullAssistantContent": {
+          "type": "boolean",
+          "description": "Whether replayed assistant messages without text send empty string content instead of null. Default: false."
+        },
+        "requiresToolsWithToolHistory": {
+          "type": "boolean",
+          "description": "Whether requests without active tools send an empty tools array when history contains tool calls or results. Default: false."
+        },
         "requiresThinkingAsText": {
           "type": "boolean",
           "description": "Whether thinking blocks must be converted to text blocks with <thinking> delimiters. Default: auto-detected from URL."
@@ -1016,6 +1024,11 @@
         "supportsLongCacheRetention": {
           "type": "boolean",
           "description": "Whether the provider supports long prompt cache retention. Defaults are API-specific or auto-detected."
+        },
+        "promptCacheKeyMode": {
+          "type": "string",
+          "enum": ["auto", "enabled", "disabled"],
+          "description": "Controls prompt_cache_key. Auto uses the API-specific default, enabled sends it while caching is active, disabled omits it. Default: auto."
         },
         "vllmPriority": {
           "type": "number",

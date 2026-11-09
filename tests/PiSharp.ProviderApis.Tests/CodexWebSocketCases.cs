@@ -18,6 +18,7 @@ internal static partial class Program
     [
         ("codex-ws.handshake-headers-and-response-create-frame", CodexWebSocketHandshake),
         ("codex-ws.session-connection-reuse-and-previous-response-id-delta", CodexWebSocketContinuation),
+        ("codex-ws.disable-continuation-sends-full-context", CodexWebSocketDisableContinuation),
         ("codex-ws.sse-fallback-before-the-first-event-and-for-the-session", CodexWebSocketFallback),
         ("codex-ws.failures-after-start-retries-and-codex-errors", CodexWebSocketFailures),
         ("codex-ws.connect-and-idle-timeouts-and-connection-age-limit", CodexWebSocketTimeouts),
@@ -269,6 +270,28 @@ internal static partial class Program
             Check(await server.WaitAsync(() => server.Closes.Contains("1000 connection_age_limit")), "closed with connection_age_limit");
             OpenAICodexWebSockets.CloseSessions(session);
             Check(await server.WaitAsync(() => server.Closes.Contains("1000 debug_close")), "session cleanup closes with debug_close");
+        }
+        finally { OpenAICodexWebSockets.CloseSessions(session); OpenAICodexWebSockets.ResetDebugStats(session); }
+    }
+
+    private static async Task CodexWebSocketDisableContinuation()
+    {
+        await using var server = new CodexServer();
+        server.OnFrame = (connection, _) => connection.SendAllAsync(CodexCompleted);
+        const string session = "sess-ws-disabled-continuation";
+        var (transport, model, _) = CodexOver(server, "websocket-cached", session);
+        try
+        {
+            var first = (StreamDone)(await Collect(transport, Hi(model)))[^1];
+            var next = new ChatRequest(model, [Entry("""{"role":"user","content":"Hi","timestamp":2}"""),
+                new TranscriptEntry("assistant", PiWireJson.WriteMessage(first.Message)), Entry("""{"role":"user","content":"More","timestamp":4}""")], 5)
+                { DisableContinuation = true };
+            Check((await Collect(transport, next))[^1] is StreamDone, "full replay completes");
+            Equal(2, server.Frames.Count, "one request per call");
+            var body = JsonNode.Parse(server.Frames[1].Text)!;
+            Check(body["previous_response_id"] is null && body["input"]!.AsArray().Count == 3, "disabled continuation includes full replay");
+            Check(server.Upgrades.Count == 1 && server.Posts.IsEmpty, "connection reuse without cached context");
+            Check(OpenAICodexWebSockets.GetDebugStats(session) is { DeltaRequests: 0, FullContextRequests: 2 }, "full-context accounting");
         }
         finally { OpenAICodexWebSockets.CloseSessions(session); OpenAICodexWebSockets.ResetDebugStats(session); }
     }

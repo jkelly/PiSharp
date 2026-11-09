@@ -58,12 +58,17 @@ static class ResponsesTextToolTests
             }
             else
             {
-                Assert(failure is not null && progress.All(value => value is not StreamTerminalEvent), "Failed source trace authorized a terminal.");
+                // Authored wrapper reconciliation: frozen v1.5.0 api/openai-responses.ts:251-267 catches helper failures,
+                // preserves the original exception for native diagnostics and emits one error frame after cleanup.
+                Assert(failure is null, "Raw wrapper threw instead of reporting its error frame.");
+                var rejected = ErrorFrame(progress, typeof(StreamProtocolException));
+                Assert(!rejected.Message.Content.OfType<ToolCallContent>().Any(call => call.ExtraProperties?.TryGet("argumentsError", out _) == true), "Failure fabricated an authoritative tool final.");
                 var result = await new ChatClient(new ResponsesTextToolTransport((request, token) => Sequence(item.GetProperty("events").EnumerateArray().Select(JsonData.FromElement).ToArray())), capacity: 1).CompleteAsync(Request());
-                Equal(ChatFailureKind.MalformedStream, result.Failure!.Kind); Equal(StopReason.Error, result.Message.StopReason);
+                Equal(ChatFailureKind.Provider, result.Failure!.Kind); Equal(StopReason.Error, result.Message.StopReason);
+                Assert(result.Message.ExtraProperties?.TryGet("errorMessage", out var reason) == true && reason!.Value.GetString()!.Contains("Responses stream", StringComparison.Ordinal), "Canonical error lost the wrapper's protocol failure.");
             }
             results.Add(new JsonObject { ["caseId"] = id, ["overlappingOperations"] = overlappingEvents.Length,
-                ["status"] = index == 0 ? "completed-final-matched" : "failure-no-success-terminal",
+                ["status"] = index == 0 ? "completed-final-matched" : "authored-wrapper-error-terminal-no-success",
                 ["nativeEvents"] = new JsonArray(progress.Select(value => JsonNode.Parse(PiWireJson.WriteEvent(value).ToString())).ToArray()),
                 ["nativeFailure"] = failure?.Message });
         }
@@ -131,6 +136,8 @@ static class ResponsesTextToolTests
 
     public static async Task MalformedAndUnsupported()
     {
+        // Frozen v1.5.0 openai-responses.ts:221-230 acquires before Start; :251-267 reports helper faults as error frames.
+        // Keep every malformed/private DTO vector. Only the wrapper settlement changes; none may produce executable success.
         foreach (var invalid in new[]
         {
             "{}", "[]", "{\"type\":\"private-event\"}",
@@ -144,14 +151,21 @@ static class ResponsesTextToolTests
             """{"type":"response.completed","response":{"status":"completed","output":[{"type":"reasoning"}]}}"""
         })
         {
-            var result = await Complete(TextStart, invalid);
-            Equal(ChatFailureKind.MalformedStream, result.Failure!.Kind);
-            Assert(!result.Failure.Message.Contains("private", StringComparison.Ordinal), "Protocol diagnostic leaks DTO.");
+            var source = new Probe([JsonData.Parse(TextStart), JsonData.Parse(invalid)]);
+            var frames = await Raw(source);
+            var rejected = ErrorFrame(frames, typeof(StreamProtocolException));
+            Equal(1, source.Disposals);
+            Assert(!ErrorText(rejected).Contains("private", StringComparison.Ordinal), "Protocol error exposed private malformed DTO fields.");
         }
-        Equal(ChatFailureKind.MalformedStream, (await Complete(TextStart, TextStart)).Failure!.Kind);
-        Equal(ChatFailureKind.MalformedStream, (await Complete(Completed, Completed)).Failure!.Kind);
+        ErrorFrame(await Raw(new Probe([JsonData.Parse(TextStart), JsonData.Parse(TextStart)])), typeof(StreamProtocolException));
+        ErrorFrame(await Raw(new Probe([JsonData.Parse(Completed), JsonData.Parse(Completed)])), typeof(StreamProtocolException));
         var bookkeeping = """{"type":"response.in_progress","response":{"output":[]}}""";
         Assert((await Complete(bookkeeping, Completed)).Failure is null, "Documented empty lifecycle bookkeeping rejected.");
+        // An explicit, well-formed provider error is different from malformed DTO diagnostics and keeps the provider's display text.
+        var provider = await Raw(new Probe([JsonData.Parse("""{"type":"error","code":"busy","message":"provider display text"}""")]));
+        var providerError = ErrorFrame(provider);
+        Equal("Error Code busy: provider display text", ErrorText(providerError));
+        Assert(providerError.NativeSourceException is null, "Provider error was replaced by an invented helper exception.");
     }
 
     public static async Task Limits()
@@ -168,8 +182,11 @@ static class ResponsesTextToolTests
         };
         foreach (var (options, events) in configurations)
         {
-            var source = new Probe(events); var result = await new ChatClient(new ResponsesTextToolTransport((request, token) => source, options)).CompleteAsync(Request());
-            Equal(ChatFailureKind.ResourceLimit, result.Failure!.Kind); Equal(1, source.Disposals);
+            var source = new Probe(events);
+            var frames = await Raw(source, options);
+            var rejected = ErrorFrame(frames, typeof(StreamLimitException));
+            Assert(!ErrorText(rejected).Contains("private", StringComparison.Ordinal), "Budget failure exposed DTO fields.");
+            Equal(1, source.Disposals);
         }
         Assert((await new ChatClient(new ResponsesTextToolTransport((request, token) => Sequence([sample]),
             new(MaximumEvents: 1, MaximumEventCharacters: sample.ToString().Length, MaximumInputCharacters: sample.ToString().Length))).CompleteAsync(Request())).Failure is null, "Exact raw admission boundary rejected.");
@@ -186,7 +203,8 @@ static class ResponsesTextToolTests
         var expected = Request();
         var transport = new ResponsesTextToolTransport((request, token) => { Assert(ReferenceEquals(expected, request), "Request was replaced."); factories++; return source; });
         var reader = transport.StreamAsync(expected).GetAsyncEnumerator();
-        Assert(await reader.MoveNextAsync() && reader.Current is StreamStarted, "Missing authored start."); Equal(0, factories);
+        Assert(await reader.MoveNextAsync() && reader.Current is StreamStarted, "Missing authored start.");
+        Equal(1, factories); Equal(0, source.Pulls); // v1.5.0 create/accept/onResponse precedes Start, DTO pull follows demand.
         Assert(await reader.MoveNextAsync() && reader.Current is TextStarted, "Missing text start."); Equal(1, factories); Equal(1, source.Pulls);
         var disposal = reader.DisposeAsync().AsTask(); await source.DisposalEntered.Task;
         Assert(!disposal.IsCompleted, "Enumerator disposal failed to await owned cleanup."); Equal(1, source.Pulls);
@@ -195,16 +213,27 @@ static class ResponsesTextToolTests
 
     public static async Task Cancellation()
     {
+        // Frozen v1.5.0 openai-responses.ts catch emits aborted/error rather than throwing past the raw stream wrapper.
         using var before = new CancellationTokenSource(); before.Cancel(); var factories = 0;
         var transport = new ResponsesTextToolTransport((request, token) => { factories++; return Sequence([]); });
-        await Throws<OperationCanceledException>(async () => { await foreach (var _ in transport.StreamAsync(Request(), before.Token)) { } }); Equal(0, factories);
+        var canceled = new List<StreamEvent>();
+        await foreach (var frame in transport.StreamAsync(Request(), before.Token)) canceled.Add(frame);
+        var preCanceled = ErrorFrame(canceled, typeof(OperationCanceledException), StopReason.Aborted);
+        Equal(0, factories); Equal(0, canceled.OfType<StreamStarted>().Count());
+        Equal(before.Token, ((OperationCanceledException)preCanceled.NativeSourceException!).CancellationToken);
         using var during = new CancellationTokenSource();
         var source = new Probe([]) { HoldRead = true, HoldDisposal = true }; CancellationToken factoryToken = default;
         var reader = new ResponsesTextToolTransport((request, token) => { factoryToken = token; return source; }).StreamAsync(Request(), during.Token).GetAsyncEnumerator();
-        await reader.MoveNextAsync(); var pull = reader.MoveNextAsync().AsTask(); await source.ReadEntered.Task;
+        Assert(await reader.MoveNextAsync() && reader.Current is StreamStarted, "Accepted source did not start.");
+        var pull = reader.MoveNextAsync().AsTask(); await source.ReadEntered.Task;
         Equal(during.Token, factoryToken); Equal(during.Token, source.Token); during.Cancel(); await source.DisposalEntered.Task;
         Assert(!pull.IsCompleted, "Cancellation did not await source cleanup."); source.DisposalRelease.SetResult();
-        await Throws<OperationCanceledException>(async () => { await pull; }); await reader.DisposeAsync(); Equal(1, source.Disposals);
+        Assert(await pull, "Cancellation omitted its error terminal.");
+        var aborted = ErrorFrame([reader.Current], typeof(OperationCanceledException), StopReason.Aborted);
+        Equal(during.Token, ((OperationCanceledException)aborted.NativeSourceException!).CancellationToken);
+        Assert(aborted.NativeSourceTask?.IsCanceled == true, "Original canceled source task was lost.");
+        Assert(!await reader.MoveNextAsync(), "Cancellation produced a second terminal.");
+        await reader.DisposeAsync(); Equal(1, source.Disposals);
     }
 
     public static async Task CleanupBeforeTerminalAndFault()
@@ -216,14 +245,29 @@ static class ResponsesTextToolTests
             Assert(!terminal.IsCompleted, "Done escaped before asynchronous source cleanup."); source.DisposalRelease.SetResult();
             Assert(await terminal && reader.Current is StreamDone, "Terminal missing after cleanup."); Equal(1, source.Disposals);
         }
-        var faulting = new Probe([]) { ReadFailure = new InvalidOperationException("private-source-failure"), HoldDisposal = true };
-        var completion = new ChatClient(new ResponsesTextToolTransport((request, token) => faulting)).CompleteAsync(Request());
+        // Caller-owned source faults remain observable exactly (upstream catch formatProviderError); malformed DTOs above stay sanitized.
+        var original = new InvalidOperationException("private-source-failure");
+        var faulting = new Probe([]) { ReadFailure = original, HoldDisposal = true };
+        var completion = Raw(faulting);
         await faulting.DisposalEntered.Task; Assert(!completion.IsCompleted, "Source fault skipped cleanup."); faulting.DisposalRelease.SetResult();
-        var failed = await completion; Equal(ChatFailureKind.Provider, failed.Failure!.Kind); Equal(1, faulting.Disposals);
-        Assert(!failed.Failure.Message.Contains("private", StringComparison.Ordinal), "Source fault leaked.");
-        var cleanupFault = new Probe([JsonData.Parse(Completed)]) { DisposalFailure = new InvalidOperationException("private-cleanup-failure") };
-        var cleanupResult = await new ChatClient(new ResponsesTextToolTransport((request, token) => cleanupFault)).CompleteAsync(Request());
-        Equal(ChatFailureKind.Provider, cleanupResult.Failure!.Kind); Equal(StopReason.Error, cleanupResult.Message.StopReason); Equal(1, cleanupFault.Disposals);
+        var failed = ErrorFrame(await completion, typeof(InvalidOperationException)); Equal(1, faulting.Disposals);
+        Assert(ReferenceEquals(original, failed.NativeSourceException), "Original source exception identity was lost.");
+        Assert(failed.NativeSourceTask?.IsFaulted == true && failed.NativeSourceTask.Exception?.InnerExceptions.Single() == original, "Original faulted source task was lost.");
+        Equal(original.Message, ErrorText(failed));
+        var cleanupOriginal = new InvalidOperationException("private-cleanup-failure");
+        var cleanupFault = new Probe([JsonData.Parse(Completed)]) { DisposalFailure = cleanupOriginal };
+        var cleanupError = ErrorFrame(await Raw(cleanupFault)); Equal(1, cleanupFault.Disposals);
+        Assert(cleanupError.NativeCleanupExceptions?.Single() == cleanupOriginal, "Original cleanup exception was lost.");
+        Assert(cleanupError.NativeCleanupTasks?.Single().IsFaulted == true, "Original faulted cleanup task was lost.");
+        Equal(cleanupOriginal.Message, ErrorText(cleanupError));
+        // Acquisition failure occurs before Start and still yields exactly one error terminal, with no DTO pull/disposal effects.
+        var acquisition = new InvalidOperationException("caller-acquisition-failure");
+        var acquisitionFrames = new List<StreamEvent>();
+        await foreach (var frame in new ResponsesTextToolTransport((_, _) => throw acquisition).StreamAsync(Request())) acquisitionFrames.Add(frame);
+        var acquisitionError = ErrorFrame(acquisitionFrames, typeof(InvalidOperationException));
+        Equal(0, acquisitionFrames.OfType<StreamStarted>().Count());
+        Assert(ReferenceEquals(acquisition, acquisitionError.NativeSourceException), "Original acquisition failure was lost.");
+        Equal(acquisition.Message, ErrorText(acquisitionError));
     }
 
     public static async Task AuthoritativeCheckpointAndEnds()
@@ -265,12 +309,33 @@ static class ResponsesTextToolTests
         var source = new Probe([JsonData.Parse(created), JsonData.Parse(start)]);
         var adapter = new ResponsesTextToolTransport((request, token) => source, new(MaximumContentCharacters: 100));
         var progress = new List<StreamEvent>();
-        await Throws<StreamProtocolException>(async () => { await foreach (var value in adapter.StreamAsync(Request())) progress.Add(value); });
+        await foreach (var value in adapter.StreamAsync(Request())) progress.Add(value);
+        ErrorFrame(progress, typeof(StreamProtocolException));
         Assert(progress.OfType<TextStarted>().Count() == 1, "Pending slot/metadata was incorrectly charged to the reducer payload budget.");
         var completed = JsonSerializer.Serialize(new { type = "response.completed", response = new { id = longId, status = "completed", output = Array.Empty<object>() } });
-        var result = await new ChatClient(new ResponsesTextToolTransport((request, token) => Sequence([JsonData.Parse(completed)]),
-            new(MaximumContentCharacters: 100))).CompleteAsync(Request());
-        Equal(ChatFailureKind.ResourceLimit, result.Failure!.Kind);
+        var completedFrames = await Raw(new Probe([JsonData.Parse(completed)]), new(MaximumContentCharacters: 100));
+        ErrorFrame(completedFrames, typeof(StreamLimitException));
+    }
+
+    private static async Task<List<StreamEvent>> Raw(Probe source, ResponsesTextToolOptions? options = null)
+    {
+        var frames = new List<StreamEvent>();
+        await foreach (var frame in new ResponsesTextToolTransport((_, _) => source, options).StreamAsync(Request())) frames.Add(frame);
+        return frames;
+    }
+    private static StreamError ErrorFrame(IEnumerable<StreamEvent> frames, Type? originalType = null, StopReason reason = StopReason.Error)
+    {
+        var all = frames.ToArray();
+        Equal(0, all.OfType<StreamDone>().Count()); Equal(1, all.OfType<StreamTerminalEvent>().Count());
+        var terminal = all.Last() as StreamError ?? throw new Exception("Expected a final error frame.");
+        Equal(reason, terminal.Reason); Equal(reason, terminal.Message.StopReason);
+        if (originalType is not null) Assert(terminal.NativeSourceException is { } original && originalType.IsInstanceOfType(original), "Original helper exception type changed: " + terminal.NativeSourceException?.GetType().Name);
+        return terminal;
+    }
+    private static string ErrorText(StreamError error)
+    {
+        Assert(error.Message.ExtraProperties?.TryGet("errorMessage", out _) == true, "Error frame omitted display text.");
+        return error.Message.ExtraProperties!.Values["errorMessage"].Value.GetString()!;
     }
 
     private static Task<ChatResult> Complete(params string[] json) => new ChatClient(new ResponsesTextToolTransport((request, token) => Sequence(json.Select(JsonData.Parse).ToArray()))).CompleteAsync(Request());

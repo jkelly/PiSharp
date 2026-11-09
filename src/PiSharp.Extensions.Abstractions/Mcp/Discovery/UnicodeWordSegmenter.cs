@@ -24,18 +24,20 @@ internal static class UnicodeWordSegmenter
     [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
     private delegate void CloseIterator(nint iterator);
 
-    private sealed record Icu(OpenIterator Open, Step First, Step Next, Step RuleStatus, CloseIterator Close);
+    private sealed record Icu(OpenIterator Open, Step First, Step Next, Step RuleStatus, CloseIterator Close, string Backend);
 
     private static readonly Lazy<Icu?> Library = new(Load, LazyThreadSafetyMode.ExecutionAndPublication);
 
     /// <summary>Whether ICU was found, so text without spaces is split as upstream splits it.</summary>
     internal static bool IsAvailable => Library.Value is not null;
+    internal static string Backend => Library.Value?.Backend ?? "space-split fallback (system ICU unavailable)";
+    internal static IEnumerable<string> FallbackSegments(string text) => text.Split(' ');
 
     /// <summary>The word-like segments of the text (letters, marks and digits; no spaces), or its space-separated runs without ICU.</summary>
     internal static IEnumerable<string> WordLikeSegments(string text)
     {
         if (text.Length == 0) return [];
-        if (Library.Value is not { } icu || Segment(icu, text) is not { } words) return text.Split(' ');
+        if (Library.Value is not { } icu || Segment(icu, text) is not { } words) return FallbackSegments(text);
         return words;
     }
 
@@ -68,7 +70,7 @@ internal static class UnicodeWordSegmenter
             {
                 if (!NativeLibrary.TryLoad(path, out var handle)) continue;
                 var exportSuffix = suffix is null || NativeLibrary.TryGetExport(handle, "ubrk_open", out _) ? "" : suffix;
-                if (Bind(handle, exportSuffix) is { } icu) return icu;
+                if (Bind(handle, exportSuffix, path) is { } icu) return icu;
             }
         }
         catch (Exception error) when (error is DllNotFoundException or EntryPointNotFoundException or BadImageFormatException or MarshalDirectiveException)
@@ -92,12 +94,12 @@ internal static class UnicodeWordSegmenter
             for (var version = 99; version >= 50; version--) yield return ($"libicuuc.so.{version}", "_" + version);
     }
 
-    private static Icu? Bind(nint handle, string suffix)
+    private static Icu? Bind(nint handle, string suffix, string path)
     {
         T? Export<T>(string name) where T : Delegate =>
             NativeLibrary.TryGetExport(handle, name + suffix, out var address) ? Marshal.GetDelegateForFunctionPointer<T>(address) : null;
         return Export<OpenIterator>("ubrk_open") is { } open && Export<Step>("ubrk_first") is { } first && Export<Step>("ubrk_next") is { } next &&
             Export<Step>("ubrk_getRuleStatus") is { } ruleStatus && Export<CloseIterator>("ubrk_close") is { } close
-            ? new(open, first, next, ruleStatus, close) : null;
+            ? new(open, first, next, ruleStatus, close, "system ICU: " + path + "; symbol suffix: " + (suffix.Length == 0 ? "none" : suffix)) : null;
     }
 }

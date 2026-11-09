@@ -27,7 +27,7 @@ public static partial class NativeProviderFactory
                 : new ResponsesHttpSseTransport(client, new ResponsesKeyAuthRequestFactory(endpoint, model, projectionOptions,
                     effectiveRequestOptions with { ReasoningEffort = level == "off" ? null : level,
                         ReasoningSummary = level == "off" ? null : effectiveRequestOptions.ReasoningSummary,
-                        ThinkingLevelMap = effectiveRequestOptions.ThinkingLevelMap }), explicitApiKey, responsesOptions: responsesOptions)));
+                        ThinkingLevelMap = profile?.Map }), explicitApiKey, responsesOptions: responsesOptions)));
     }
 
     /// <summary>OpenAI or OpenRouter Completions, selected by the exact provider identity and endpoint.</summary>
@@ -77,6 +77,7 @@ public static partial class NativeProviderFactory
         HttpMessageHandler? handler = null, JsonData? modelMetadata = null, AnthropicMessagesHooks? hooks = null)
     {
         Validate(model, endpoint, explicitApiKey, "anthropic", "anthropic-messages");
+        projectionOptions = AnthropicCatalogCompatibility.Apply(projectionOptions, modelMetadata);
         var factory = new AnthropicMessagesKeyAuthRequestFactory(endpoint, model, projectionOptions, requestOptions);
         var maximum = requestOptions?.MaxTokens ?? projectionOptions.MaximumTokens;
         if (modelMetadata is not null && (maximum != Math.Truncate(maximum) || maximum is <= 0 or > int.MaxValue))
@@ -108,7 +109,7 @@ public static partial class NativeProviderFactory
         MaximumTokens = profile is null ? projection.MaximumTokens : (int)maximum, ThinkingEnabled = level != "off", ForceAdaptiveThinking = profile?.Adaptive ?? false,
         SupportsThinkingOff = profile?.SupportsOff ?? projection.SupportsThinkingOff,
         Effort = level != "off" && profile?.Adaptive == true ? profile.AnthropicEffort(level) : null,
-        ThinkingBudgetTokens = level == "off" || profile?.Adaptive == true ? 0 : NativeThinkingProfile.AnthropicBudget(level, (int)maximum)
+        ThinkingBudgetTokens = level == "off" || profile?.Adaptive == true ? 0 : NativeThinkingProfile.AnthropicBudget(level, (int)maximum, projection.ThinkingBudgets)
     };
 
     /// <summary>Managed effort responses record the exact effort their request carried (upstream stream()).</summary>

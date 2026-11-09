@@ -10,7 +10,7 @@ namespace PiSharp.Cli.Interactive.Mode.Components;
 
 internal sealed record ToolExecutionOptions(bool? ShowImages = null, int? ImageWidthCells = null, int? OutputPad = null);
 
-internal sealed class ToolExecutionComponent : Container
+internal sealed class ToolExecutionComponent : Container, IDisposableComponent
 {
     private const int FallbackPreviewLines = 10;
 
@@ -46,6 +46,7 @@ internal sealed class ToolExecutionComponent : Container
     /// <summary>The {content, details} object handed to renderResult for the current result.</summary>
     private JsonObject? resultForRenderer;
     private bool hideComponent;
+    private bool disposed;
 
     public ToolExecutionComponent(string toolName, string toolCallId, JsonNode? args, ToolExecutionOptions? options, ToolRenderers? toolDefinition,
         ITui ui, string cwd)
@@ -137,6 +138,7 @@ internal sealed class ToolExecutionComponent : Container
     /// runs its renderer once per frame, not once per delta (#9265).</summary>
     public void UpdateArgs(JsonNode? args)
     {
+        if (disposed) return;
         this.args = args;
         argsPending = true;
         ui.RequestRender();
@@ -162,6 +164,7 @@ internal sealed class ToolExecutionComponent : Container
     /// </summary>
     public void UpdateResult(JsonObject result, bool isPartial = false)
     {
+        if (disposed) return;
         this.result = result;
         resultForRenderer = new JsonObject
         {
@@ -198,12 +201,14 @@ internal sealed class ToolExecutionComponent : Container
 
     public override void Invalidate()
     {
+        if (disposed) return;
         base.Invalidate();
         UpdateDisplay();
     }
 
     public override List<string> Render(int width)
     {
+        if (disposed) return [];
         if (argsPending) UpdateDisplay();
         if (hideComponent) return [];
 
@@ -239,6 +244,9 @@ internal sealed class ToolExecutionComponent : Container
 
     private void UpdateDisplay()
     {
+        if (disposed) return;
+        var previousCall = callRendererComponent;
+        var previousResult = resultRendererComponent;
         argsPending = false;
         Func<string, string> bgFn = isPartial
             ? text => theme.Bg("toolPendingBg", text)
@@ -368,6 +376,36 @@ internal sealed class ToolExecutionComponent : Container
         }
 
         if (HasRendererDefinition() && !hasContent && imageComponents.Count == 0) hideComponent = true;
+        DisposeRemoved(previousCall, previousResult);
+    }
+
+    // A renderer may reuse its prior component, or transfer the same component between the call and result slots.
+    // Retire old views only after both replacements are known, and dispose shared views once.
+    private void DisposeRemoved(IComponent? first, IComponent? second)
+    {
+        List<Exception>? errors = null;
+        foreach (var component in new[] { first, second }.Distinct(ReferenceEqualityComparer.Instance))
+        {
+            if (component is null || ReferenceEquals(component, callRendererComponent) || ReferenceEquals(component, resultRendererComponent)) continue;
+            try
+            {
+                if (component is IDisposableComponent view) view.Dispose();
+                else if (component is IDisposable resource) resource.Dispose();
+            }
+            catch (Exception error) { (errors ??= []).Add(error); }
+        }
+        if (errors is not null) throw new AggregateException("Tool renderer disposal failed.", errors);
+    }
+
+    public void Dispose()
+    {
+        if (disposed) return;
+        disposed = true;
+        var call = callRendererComponent; var resultView = resultRendererComponent;
+        callRendererComponent = null; resultRendererComponent = null;
+        args = null; result = null; resultForRenderer = null;
+        Children.Clear(); rendererState.Clear(); imageComponents.Clear(); imageSources.Clear(); imageSpacers.Clear();
+        DisposeRemoved(call, resultView);
     }
 
     private string GetTextOutput() => RenderUtils.GetTextOutput(result, showImages);
