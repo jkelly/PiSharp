@@ -85,7 +85,7 @@ internal static partial class Program
         {
             // main.ts createRuntime runs buildSessionOptions and sdk.ts findInitialModel for every session: one without messages
             // (new_session, a missing file) takes the scoped pick, else the saved default, else the first available model, not
-            // the model set_model chose (rpc set_model does not persist it). Pi 1.1.0 run with node: claude-opus-4-8 without a scope
+            // the model set_model chose (rpc set_model does not persist it). The reviewed default is claude-opus-5-5 without a scope
             // or default, claude-haiku-4-5 with --models claude-haiku-4-5,claude-sonnet-4-5 or the default claude-haiku-4-5.
             async Task Expect(string expected, string[] extra, string? settings = null)
             {
@@ -103,7 +103,7 @@ internal static partial class Program
                 Equal(expected, responses[2]["data"]!["model"]!["id"]!.GetValue<string>(), "new_session model " + string.Join(' ', extra));
                 Equal(expected, responses[5]["data"]!["model"]!["id"]!.GetValue<string>(), "missing file model " + string.Join(' ', extra));
             }
-            await Expect("claude-opus-4-8", []);
+            await Expect("claude-opus-5-5", []); // Reviewed default from upstream 7d073328; scoped and explicit models still win below.
             await Expect("claude-haiku-4-5", ["--models", "claude-haiku-4-5,claude-sonnet-4-5"]);
             await Expect("claude-haiku-4-5", [], """{"defaultProvider":"anthropic","defaultModel":"claude-haiku-4-5"}""");
             // --model is every session's model (buildSessionOptions options.model).

@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Text.Json;
 using System.Text.Json.Nodes;
 using PiSharp.Cli.Mcp;
 using PiSharp.Extensions.Mcp.Configuration;
@@ -87,7 +88,8 @@ internal static partial class Program
     // setEnabled and setExposure save to the mcp.json that defines the server and apply at once; reconnect connects again.
     private static Task ManagerActions() => WithRoot("manager-actions", """{"other":1,"mcpServers":{"docs":{"command":"docs-server","exposure":"direct"}}}""", async fixture =>
     {
-        var provider = new Endpoint();
+        var replies = Enumerable.Range(0, 5).Select(index => "manager-reply-" + index).ToArray();
+        var provider = new Endpoint(replies.Select(id => (Func<HttpResponseMessage>)(() => Text("ok", id))).ToArray());
         var global = Path.Combine(fixture.Agent, "mcp.json");
         await using (var rpc = new Rpc(Args(fixture.Root, "new-memory"), provider, fixture.Host()))
         {
@@ -111,9 +113,21 @@ internal static partial class Program
             Equal(0, await rpc.Finish(), "exit code; " + rpc.Error);
         }
         var requests = provider.Snapshot();
-        bool Declares(int index) => ToolNames(requests[index]).Contains("mcp__docs__search");
-        Check(Declares(0) && !Declares(1) && Declares(2) && Declares(3), "disable withdraws, enable and reconnect declare: " + string.Join(" | ", requests.Select(request => string.Join(",", ToolNames(request)))));
-        Check(!Declares(4) && ToolNames(requests[4]).Contains("tool_search"), "deferred: not declared, tool_search activated: " + string.Join(",", ToolNames(requests[4])));
+        var tools = EffectiveToolNames(requests, replies);
+        bool Declares(int index) => tools[index].Contains("mcp__docs__search");
+        Check(Declares(0) && !Declares(1) && Declares(2) && Declares(3), "disable withdraws, enable and reconnect declare: " + string.Join(" | ", tools.Select(names => string.Join(",", names))));
+        Check(!Declares(4) && tools[4].Contains("tool_search"), "deferred: not declared, tool_search activated: " + string.Join(",", tools[4]));
+        // The effective view must not hide initial publication failure or retain a withdrawn direct tool.
+        Check(ToolNames(requests[0]).Contains("mcp__docs__search"), "first full request declares docs");
+        Check(!ToolNames(requests[1]).Contains("mcp__docs__search"), "disabled full request withdraws docs");
+        Check(ToolNames(requests[4]).Contains("tool_search"), "deferred full request declares tool_search");
+        var unknown = requests[0] with { Body = """{"thread":{"type":"continue","previous_message_id":"uncompleted"},"messages":[]}""" };
+        var reset = requests[0] with { Body = """{"thread":{"type":"create"},"messages":[]}""" };
+        Throws<InvalidOperationException>(() => EffectiveToolNames([unknown], [replies[0]]));
+        Throws<InvalidOperationException>(() => EffectiveToolNames([requests[0], unknown], replies[..2]));
+        Names([], EffectiveToolNames([requests[0], reset], replies[..2])[1], "new thread resets prior declarations");
+        var changed = requests[0] with { Body = JsonSerializer.Serialize(new { thread = new { type = "continue", previous_message_id = replies[0] }, tools = Array.Empty<object>() }) };
+        Throws<InvalidOperationException>(() => EffectiveToolNames([requests[0], changed], replies[..2]));
         // setExposure registers the tools again without a new connection; enable and reconnect connect.
         Equal(3, fixture.Servers.Count(server => server.Name == "docs"), "connected again after enable and reconnect, not after exposure changes");
     });

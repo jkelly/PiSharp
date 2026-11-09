@@ -39,6 +39,7 @@ internal static partial class Program
     private static async Task IdLessReads(string[] paths)
     {
         using var sandbox = new Sandbox("id-less-read");
+        sandbox.UseFullAnthropicTranscript();
         foreach (var path in paths) sandbox.Write("project/" + path, "contents of " + path + "\n");
         sandbox.Respond = (_, index) => index == 0 ? AnthropicToolCalls([.. paths.Select(path => ("", "read"))], paths) : AnthropicText("done");
         var (code, stdout, stderr) = await sandbox.Run(["-p", "--provider", "anthropic", "--model", "claude-sonnet-4-5", "--tools", "read", "go"]);
@@ -90,6 +91,7 @@ internal static partial class Program
     private static async Task NamelessCall((string Id, string Name)[] calls, string replay)
     {
         using var sandbox = new Sandbox("nameless-call");
+        sandbox.UseFullAnthropicTranscript();
         sandbox.Write("project/a.txt", "secret contents");
         sandbox.Respond = (_, index) => index == 0 ? AnthropicToolCalls(calls) : AnthropicText("done");
         var (code, stdout, stderr) = await sandbox.Run(["-p", "--provider", "anthropic", "--model", "claude-sonnet-4-5", "--tools", "read", "go"]);

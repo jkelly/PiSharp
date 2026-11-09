@@ -14,7 +14,8 @@ internal static partial class Program
         ("bridge.before-agent-start-user-and-custom-message-runs", BeforeAgentStartTriggers),
         ("bridge.reaches-tools-and-namespace-aliases-in-getAllTools-and-loadouts", ReachesToolsInfo),
         ("bridge.reaches-tools-of-a-typescript-tool-reaches-all", ReachesToolsDescriptor),
-        ("bridge.print-mode-exits-while-a-command-triggered-run-starts", TriggeredRunAtPrintModeExit),
+        ("bridge.print-mode-exits-while-a-command-triggered-run-starts", () => TriggeredRunAtPrintModeExit(forceCompatibility: false)),
+        ("bridge.print-mode-exits-while-a-command-triggered-run-starts-compatibility", () => TriggeredRunAtPrintModeExit(forceCompatibility: true)),
         ("bridge.a-run-starting-while-the-command-response-is-written-settles", TriggeredRunStartsWhileTheResponseIsWritten),
     ];
 
@@ -143,23 +144,26 @@ internal static partial class Program
     // stderr, the JSON session header alone, no model request.) In PiSharp the run may already have started on another thread when
     // the command's prompt resolves, so JSON mode may carry its start events, as Pi's would if the run started first; it never carries
     // the run's end, its settlement or an assistant message.
-    private static async Task TriggeredRunAtPrintModeExit()
+    private static async Task TriggeredRunAtPrintModeExit(bool forceCompatibility)
     {
         using var sandbox = NodeSandbox("triggered-run-at-print-exit");
+        sandbox.ForceCompatibilityModules = forceCompatibility;
+        var expectedError = sandbox.UseCompatibilityModules
+            ? "Warning: Extensions are not running against the Pi 1.5.0 packages: compatibility modules explicitly selected by the embedding host\n" : "";
         // A late answer: a run that reached the model before print mode read the last message still has no assistant text there.
         sandbox.Respond = (_, _) => { Thread.Sleep(2000); return AnthropicText("late answer"); };
         var extension = sandbox.Write(Path.Combine(sandbox.Cwd, "kick.ts"), LateTriggerExtension);
         var (code, stdout, stderr) = await sandbox.Run([.. new[] { "-p" }, .. Model, "-e", extension, "/kick"]);
         Equal(0, code, "text mode exit; " + stderr);
         Equal("", stdout, "text mode prints nothing of the run");
-        Equal("", stderr, "text mode stderr");
+        Equal(expectedError, stderr, "text mode reports only the selected runtime warning");
         var lines = LogLines(sandbox);
         Check(lines.Contains("""["handler_end"]""") && lines.Contains("""["session_shutdown"]"""), "handler and shutdown ran: " + string.Join(" | ", lines));
 
         File.Delete(Path.Combine(sandbox.Cwd, "probe.log"));
         (code, stdout, stderr) = await sandbox.Run([.. new[] { "--mode", "json" }, .. Model, "-e", extension, "/kick"]);
         Equal(0, code, "json mode exit; " + stderr);
-        Equal("", stderr, "json mode stderr");
+        Equal(expectedError, stderr, "json mode reports only the selected runtime warning");
         var records = stdout.Split('\n', StringSplitOptions.RemoveEmptyEntries).Select(line => JsonNode.Parse(line)!).ToList();
         Equal("session", records[0]["type"]!.GetValue<string>(), "the session header first: " + stdout);
         foreach (var record in records.Skip(1))

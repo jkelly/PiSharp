@@ -9,13 +9,14 @@ import { basename, dirname, join, resolve } from 'node:path';
 const options = {};
 for (let index = 2; index < process.argv.length; index += 2) {
   const key = process.argv[index];
-  if (!['--daemon', '--report', '--rid', '--work'].includes(key) || !process.argv[index + 1]) throw new Error(`Invalid argument ${key}`);
+  if (!['--daemon', '--report', '--rid', '--work', '--version'].includes(key) || !process.argv[index + 1]) throw new Error(`Invalid argument ${key}`);
   options[key.slice(2)] = process.argv[index + 1];
 }
-if (!options.daemon || !options.report || !options.rid || !options.work) throw new Error('--daemon, --report, --rid and --work are required');
+if (!options.daemon || !options.report || !options.rid || !options.work || !options.version) throw new Error('--daemon, --report, --rid, --work and --version are required');
+if (!/^\d+\.\d+\.\d+(?:\.\d+)?(?:-[0-9A-Za-z]+(?:[.-][0-9A-Za-z]+)*)?$/.test(options.version)) throw new Error('--version must be the evaluated product version without build metadata');
 
 const daemon = resolve(options.daemon), work = resolve(options.work), cases = [];
-const report = { schemaVersion: 1, kind: 'published-native-daemon-protocol-smoke', rid: options.rid,
+const report = { schemaVersion: 1, kind: 'published-native-daemon-protocol-smoke', rid: options.rid, expectedVersion: options.version,
   startedUtc: new Date().toISOString(), platform: process.platform, architecture: process.arch, cases };
 let connection;
 async function test(name, action) {
@@ -169,6 +170,8 @@ try {
   connection = new Connection(); await deadline(connection.synced.promise, 'startup sync');
   await test('hello-native-host-and-capabilities', async () => {
     const { json } = await connection.request('hello', { protocol: 1 }).done;
+    report.reportedVersion = json.version;
+    assert.equal(json.version, options.version, 'Hello version must match the built artifact version used by SSH');
     assert.equal(json.protocol, 1); assert.ok(json.features.includes('process'));
     assert.equal(json.os, process.platform === 'win32' ? 'windows' : process.platform === 'darwin' ? 'macos' : 'linux');
     assert.equal(json.arch, process.arch === 'arm64' ? 'aarch64' : 'x86_64'); assert.equal(json.pid, connection.child.pid);

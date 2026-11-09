@@ -72,6 +72,32 @@ internal static partial class Program
                 ];
                 var served = 0;
                 var handler = new RecordingHandler(_ => Sse(streams[Interlocked.Increment(ref served) - 1]));
+                // The fixture issued these response IDs itself. Only a continuation naming one
+                // of them may inherit earlier results; a create/full request stands on its own.
+                List<(string Id, string Text, bool IsError)> EffectiveResults(int through)
+                {
+                    var replies = new Dictionary<string, List<(string Id, string Text, bool IsError)>>(StringComparer.Ordinal);
+                    List<(string Id, string Text, bool IsError)> effective = [];
+                    for (var index = 0; index <= through; index++)
+                    {
+                        var body = handler.Requests[index].Json;
+                        effective = [];
+                        if (body.TryGetProperty("thread", out var thread))
+                        {
+                            if (thread.GetProperty("type").GetString() == "continue")
+                            {
+                                var parent = thread.GetProperty("previous_message_id").GetString()!;
+                                Check(replies.TryGetValue(parent, out var inherited), "continuation names a response issued by this fixture");
+                                effective.AddRange(inherited!);
+                            }
+                            else Equal("create", thread.GetProperty("type").GetString(), "new fixture thread");
+                        }
+                        effective.AddRange(ToolResultsOf(body));
+                        Equal(effective.Count, effective.Select(result => result.Id).Distinct(StringComparer.Ordinal).Count(), "results are neither lost nor replayed twice");
+                        replies.Add($"msg_m2_{index + 1}", effective);
+                    }
+                    return effective;
+                }
                 var models = new NativeDurableModelsOptions
                 {
                     Environment = Env(new() { ["ANTHROPIC_API_KEY"] = "test-anthropic-key" }),
@@ -100,14 +126,17 @@ internal static partial class Program
                     Equal(declared["properties"].ToJson(), schema["properties"].ToJson(), name + " schema properties");
                     Equal(declared["required"].ToJson(), schema["required"].ToJson(), name + " schema required");
                 }
-                Contains(handler.Requests[0].Body, "You are a concise coding assistant.", "preamble");
-                Contains(handler.Requests[0].Body, $"<cwd>\\n{JsonEncodedText.Encode(Path.GetFullPath(work))}\\n</cwd>", "cwd section");
+                var system = handler.Requests[0].Json.GetProperty("system");
+                var systemText = system.ValueKind == JsonValueKind.String ? system.GetString()!
+                    : string.Join("\n", system.EnumerateArray().Select(block => block.GetProperty("text").GetString()));
+                Contains(systemText, "You are a concise coding assistant.", "preamble");
+                Contains(systemText, $"<cwd>\n{Path.GetFullPath(work)}\n</cwd>", "cwd section");
 
-                // Each following request carries the previous tool results.
-                var afterRead = ToolResultsOf(handler.Requests[1].Json);
+                // Each following request carries or explicitly continues the previous tool results.
+                var afterRead = EffectiveResults(1);
                 Equal(1, afterRead.Count, "results in request 2");
                 Equal(("toolu_m2_read", "hello world\n", false), afterRead[0], "read result");
-                var afterBash = ToolResultsOf(handler.Requests[3].Json);
+                var afterBash = EffectiveResults(3);
                 Equal("toolu_m2_read|toolu_m2_edit|toolu_m2_bash", string.Join("|", afterBash.Select(result => result.Id)), "results in request 4");
                 Equal(("toolu_m2_edit", "Successfully replaced 1 block(s) in notes.txt.", false), afterBash[1], "edit result");
                 Equal(("toolu_m2_bash", "hello durable\n", false), afterBash[2], "bash result");
@@ -139,14 +168,14 @@ internal static partial class Program
                 }
                 finally { await session.CloseAsync(DurableContext.Background); }
 
-                // A reopened Harness continues the conversation: the next request carries the whole tool turn.
+                // A reopened Harness continues the conversation, including the whole tool turn.
                 var resumed = new StringWriter();
                 Equal(0, await ChatApp.RunAsync(ChatApp.Parse(["--provider", "anthropic", "--model", "claude-sonnet-4-5", "--dir", directory, "--continue",
                     "--tools", "--cwd", work, "Does it still say that?"])!, resumed, models), "resumed exit code: " + resumed);
                 Contains(resumed.ToString(), "assistant: notes.txt now says hello durable.", "earlier turn shown");
                 Contains(resumed.ToString(), "It still says hello durable.", "second answer");
                 Equal(5, handler.Requests.Count, "requests after resume");
-                Equal("toolu_m2_read|toolu_m2_edit|toolu_m2_bash", string.Join("|", ToolResultsOf(handler.Requests[4].Json).Select(result => result.Id)),
+                Equal("toolu_m2_read|toolu_m2_edit|toolu_m2_bash", string.Join("|", EffectiveResults(4).Select(result => result.Id)),
                     "the resumed request carries the tool turn");
             }
             finally

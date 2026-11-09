@@ -29,10 +29,12 @@ internal static class GapFileToolsTests
     }
     private static async Task Search()
     {
+        // Resolve prerequisites outside ToolInvoker so a missing executable cannot look like a limit failure.
+        var rg = Executable("rg"); var fd = Executable("fd");
         using var temp = new Temp(); var directory = Directory.CreateDirectory(Path.Combine(temp.Root, "search")).FullName;
         var nested = Directory.CreateDirectory(Path.Combine(directory, "src")).FullName;
         await File.WriteAllTextAsync(Path.Combine(nested, "utf16.txt"), "before\r\nneedle\r\nafter\r\n", Encoding.Unicode);
-        var tool = new PiGrepTool(temp.Root, temp.Root, _ => ValueTask.FromResult<string?>(Executable("rg")));
+        var tool = new PiGrepTool(temp.Root, temp.Root, _ => ValueTask.FromResult<string?>(rg));
         async Task<ToolResult> Run(object args) => await Invoke(new ToolInvoker([tool], new Allow()), "grep", args);
         var result = await Run(new { pattern = "needle", path = directory, glob = "./src/*.txt", context = 1, limit = 1 });
         Equal("src/utf16.txt-1- before\nsrc/utf16.txt:2: needle\nsrc/utf16.txt-3- after", Text(result));
@@ -40,12 +42,21 @@ internal static class GapFileToolsTests
         await File.WriteAllTextAsync(Path.Combine(nested, "utf16.txt"), "needle\nneedle\n", Encoding.Unicode);
         foreach (var limit in new[] { 0d, -1d, 1.9 })
         { var limited = await Run(new { pattern = "needle", path = directory, glob = "src/*.txt", limit }); Check(limited.Details.ToString().Contains("matchLimitReached"), "Missing extra-match proof."); Check(!Text(limited).Contains(":2:"), "Normalized limit admitted a second match."); }
-        var find = new PiFindTool(directory, directory, _ => ValueTask.FromResult<string?>(Executable("fd")));
-        var exact = await Invoke(new ToolInvoker([find], new Allow()), "find", new { pattern = "*.txt", limit = 1 });
-        Check(!exact.HasProperty("details"), "Exact find limit reported truncation.");
+        var find = new PiFindTool(directory, directory, _ => ValueTask.FromResult<string?>(fd));
+        foreach (var limit in new[] { 0d, -2d, 1d, 1.9 })
+        {
+            var exact = await Invoke(new ToolInvoker([find], new Allow()), "find", new { pattern = "*.txt", limit });
+            Equal("src/utf16.txt", Text(exact));
+            Check(!exact.HasProperty("details"), "Exact find limit reported truncation.");
+        }
         await File.WriteAllTextAsync(Path.Combine(directory, "other.txt"), "needle");
         foreach (var limit in new[] { 0d, -2d, 1.9 })
-        { var capped = await Invoke(new ToolInvoker([find], new Allow()), "find", new { pattern = "*.txt", limit }); Check(capped.Details.ToString().Contains("resultLimitReached"), "Find did not normalize limit."); Check(Text(capped).Split("\n\n")[0].Split('\n').Length == 1, "Find exceeded limit."); }
+        {
+            var capped = await Invoke(new ToolInvoker([find], new Allow()), "find", new { pattern = "*.txt", limit });
+            var text = Text(capped);
+            Check(capped.Details.Value.GetProperty("resultLimitReached").GetInt32() == 1, "Find did not normalize limit.");
+            Check(text.Split("\n\n")[0].Split('\n').Length == 1, "Find exceeded limit.");
+        }
         var link = Path.Combine(temp.Root, "alias");
         try { Directory.CreateSymbolicLink(link, directory); } catch (Exception e) when (e is UnauthorizedAccessException or IOException) { Console.WriteLine("INFO symlink fixture unavailable: " + e.GetType().Name); return; }
         Check(Text(await Run(new { pattern = "needle", path = link, glob = "./src/*.txt" })).Contains("src/utf16.txt:1: needle"), "Symlink rooted glob failed.");

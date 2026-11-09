@@ -12,7 +12,8 @@ internal static partial class Program
         ("rebuild.reload-loads-any-number-of-extensions", ReloadManyExtensions),
         ("rebuild.late-before-agent-start-handlers-are-unbounded", ManyBeforeAgentStartHandlers),
         ("rebuild.late-handler-for-a-custom-event-name", LateCustomEvent),
-        ("rebuild.mcp-servers-registered-again-on-reload", McpServersOnReload),
+        ("rebuild.mcp-servers-registered-again-on-reload", () => McpServersOnReload(forceCompatibility: false)),
+        ("rebuild.mcp-servers-registered-again-on-reload-compatibility", () => McpServersOnReload(forceCompatibility: true)),
         ("rebuild.prompt-waits-for-a-tool-registered-by-a-command", PromptWaitsForLateTool),
         ("rebuild.session-start-reasons", SessionStartReasons),
         ("rebuild.ctx-compact-in-print-mode", PrintModeCompact),
@@ -113,9 +114,10 @@ internal static partial class Program
 
     // agent-session.ts reload: the new runtime's extensions register their MCP servers again (the previous runtime's leave); a server
     // registered after loading is registered at once.
-    private static async Task McpServersOnReload()
+    private static async Task McpServersOnReload(bool forceCompatibility)
     {
         using var sandbox = NodeSandbox("mcp-reload");
+        sandbox.ForceCompatibilityModules = forceCompatibility;
         var path = sandbox.Write(Path.Combine(sandbox.Cwd, "servers.ts"), McpExtension("docs"));
         await using var host = await StartHost(sandbox, path);
         var servers = new PiSharp.Cli.Mcp.McpRegisteredServers();
@@ -123,9 +125,13 @@ internal static partial class Program
         Names(["docs"], servers.List().Select(server => server.Name), "registered while loading");
         activation.Registry.SharedEventBus.Emit("late", null);
         await WaitUntil(() => servers.List().Any(server => server.Name == "late-docs"));
+        Names(["docs", "late-docs"], servers.List().Select(server => server.Name), "old generation's late registration is observable");
         File.WriteAllText(path, McpExtension("wiki"));
         await host.ReloadExtensionsAsync(CancellationToken.None);
         Names(["wiki"], servers.List().Select(server => server.Name), "the reloaded runtime's servers replace the previous runtime's");
+        activation.Registry.SharedEventBus.Emit("late", null);
+        await WaitUntil(() => servers.List().Any(server => server.Name == "late-wiki"));
+        Names(["wiki", "late-wiki"], servers.List().Select(server => server.Name), "only the new generation handles late registration");
         Check(servers.List().All(server => PiSharp.Cli.Pi.PiPaths.Comparer.Equals(server.ExtensionPath, path)), "owned by the extension path");
     }
 

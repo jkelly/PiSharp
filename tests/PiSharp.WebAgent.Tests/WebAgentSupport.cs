@@ -130,7 +130,9 @@ internal static partial class Program
         {
             if (start.DataDirectory is null && start.EnvironmentData is null)
                 throw new InvalidOperationException("A test app needs a temporary data folder (--data or PISHARP_WEBAGENT_DATA), never the user's own.");
-            var info = new ProcessStartInfo("dotnet") { RedirectStandardOutput = true, RedirectStandardError = true, UseShellExecute = false };
+            var dotnetHost = Environment.GetEnvironmentVariable("PISHARP_TEST_DOTNET");
+            var info = new ProcessStartInfo(string.IsNullOrWhiteSpace(dotnetHost) ? "dotnet" : dotnetHost)
+            { RedirectStandardOutput = true, RedirectStandardError = true, UseShellExecute = false };
             info.ArgumentList.Add(AppDll());
             if (start.Faux) info.ArgumentList.Add("--faux");
             if (start.DataDirectory is not null)
@@ -140,6 +142,8 @@ internal static partial class Program
             }
             foreach (var argument in hostArguments) info.ArgumentList.Add(argument);
             info.ArgumentList.Add("--Logging:LogLevel:Default=Warning");
+            // Test children keep console warnings, without writing to the machine-wide Windows Event Log.
+            info.ArgumentList.Add("--Logging:EventLog:LogLevel:Default=None");
             foreach (var argument in start.Arguments) info.ArgumentList.Add(argument);
             // No provider key, URL setting or data folder of this machine reaches the app under test.
             foreach (var name in info.Environment.Keys.ToList())

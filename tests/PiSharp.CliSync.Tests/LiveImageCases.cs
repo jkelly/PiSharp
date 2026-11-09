@@ -25,7 +25,10 @@ internal static partial class Program
         foreach (var provider in BuiltinProviders.All.Select(item => item.Id).OrderBy(id => id == preferred ? 0 : 1))
         {
             if (ImageRouteExclusions.Contains(provider) || preferred is not null && provider != preferred) continue;
-            var model = BuiltinModelCatalog.Get(provider).Models.FirstOrDefault(item => item.Type == CatalogModelType.Chat &&
+            // Provider registration also includes reviewed additions without a historical package shard.
+            var catalog = ReviewedModelCatalog.Apply(provider, BuiltinModelCatalog.Has(provider) ? BuiltinModelCatalog.Get(provider) : null)
+                ?? throw new InvalidOperationException("No live catalog for built-in provider " + provider);
+            var model = catalog.Models.FirstOrDefault(item => item.Type == CatalogModelType.Chat &&
                 item.DeclaredApi == api && item.DeclaresImageInput && LiveSessionSelection.SupportedApi(provider, api));
             if (model is not null) return (provider, model.Id);
         }
@@ -106,6 +109,6 @@ internal static partial class Program
             Check(stops.Length == 1 && stops[0] == "stop:", $"{api} ({provider}/{model}) stream did not complete: {string.Join(",", stops)}");
             routed.Add($"{api}: {provider}/{model} {requests[0].Url} body {Encoding.UTF8.GetByteCount(body)} bytes");
         }
-        foreach (var route in routed) Console.WriteLine("  " + route);
+        foreach (var route in routed) Console.Error.WriteLine("  " + route);
     });
 }

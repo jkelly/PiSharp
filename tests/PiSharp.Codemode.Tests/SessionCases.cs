@@ -36,9 +36,9 @@ internal static partial class Program
 
     private const string MessagesUrl = "https://api.anthropic.com/v1/messages?beta=true";
     private static string Frame(string type, object value) => "event: " + type + "\ndata: " + JsonSerializer.Serialize(value) + "\n\n";
-    private static HttpResponseMessage Stream(object block, string? delta, string stop)
+    private static HttpResponseMessage Stream(object block, string? delta, string stop, string responseId = "authored")
     {
-        var start = Frame("message_start", new { type = "message_start", message = new { id = "authored", role = "assistant", model = "claude-sonnet-4-5",
+        var start = Frame("message_start", new { type = "message_start", message = new { id = responseId, role = "assistant", model = "claude-sonnet-4-5",
             content = Array.Empty<object>(), usage = new { input_tokens = 2, output_tokens = 0 } } });
         var body = start + Frame("content_block_start", new { type = "content_block_start", index = 0, content_block = block })
             + (delta is null ? "" : Frame("content_block_delta", new { type = "content_block_delta", index = 0,
@@ -48,9 +48,9 @@ internal static partial class Program
             + Frame("message_stop", new { type = "message_stop" });
         return new(HttpStatusCode.OK) { Content = new StringContent(body, Encoding.UTF8, "text/event-stream") };
     }
-    private static HttpResponseMessage TextReply(string text) => Stream(new { type = "text", text = "" }, text, "end_turn");
-    private static HttpResponseMessage CallReply(string id, string name, object input) =>
-        Stream(new { type = "tool_use", id, name, input = new { } }, JsonSerializer.Serialize(input), "tool_use");
+    private static HttpResponseMessage TextReply(string text, string responseId = "authored") => Stream(new { type = "text", text = "" }, text, "end_turn", responseId);
+    private static HttpResponseMessage CallReply(string id, string name, object input, string responseId = "authored") =>
+        Stream(new { type = "tool_use", id, name, input = new { } }, JsonSerializer.Serialize(input), "tool_use", responseId);
 
     /// <summary>A fake `docs` MCP server; tools/call answers with the query it received and records the invocation identity.</summary>
     private sealed class DocsServer(TimeSpan initializeDelay = default) : IMcpAdmittedRequestChannel
@@ -176,6 +176,31 @@ internal static partial class Program
     private static JsonElement[] DeclaredTools(Seen request) =>
         JsonDocument.Parse(request.Body!).RootElement.TryGetProperty("tools", out var tools) ? [.. tools.EnumerateArray()] : [];
     private static string[] ToolNamesOf(Seen request) => [.. DeclaredTools(request).Select(tool => tool.GetProperty("name").GetString()!)];
+    // Reconstruct declarations only from a preceding reply this fake provider completed.
+    // The production continuation deliberately omits unchanged tools/system, not their effective declaration.
+    private static JsonElement[][] EffectiveDeclarations(Seen[] requests, IReadOnlyList<string> replyIds)
+    {
+        Equal(requests.Length, replyIds.Count, "one completed provider reply per request");
+        var result = new List<JsonElement[]>();
+        for (var index = 0; index < requests.Length; index++)
+        {
+            using var document = JsonDocument.Parse(requests[index].Body!);
+            var body = document.RootElement;
+            if (body.TryGetProperty("thread", out var thread) && thread.GetProperty("type").GetString() == "continue")
+            {
+                Check(index > 0, "continuation has no completed parent");
+                Equal(replyIds[index - 1], thread.GetProperty("previous_message_id").GetString(), "continuation names preceding completed reply");
+                Check(!body.TryGetProperty("tools", out _) && !body.TryGetProperty("system", out _), "continuation inherits unchanged declarations and system");
+                result.Add(result[index - 1]);
+            }
+            else
+            {
+                if (body.TryGetProperty("thread", out thread)) Equal("create", thread.GetProperty("type").GetString(), "full request thread type");
+                result.Add(body.TryGetProperty("tools", out var tools) ? [.. tools.EnumerateArray().Select(tool => tool.Clone())] : []);
+            }
+        }
+        return [.. result];
+    }
     private static string[] ToolResultTexts(Seen request) => [.. JsonDocument.Parse(request.Body!).RootElement.GetProperty("messages").EnumerateArray().Last()
         .GetProperty("content").EnumerateArray().Where(block => block.GetProperty("type").GetString() == "tool_result")
         .Select(block => block.GetProperty("content") is { ValueKind: JsonValueKind.String } text ? text.GetString()!
@@ -197,7 +222,8 @@ internal static partial class Program
         Case("session.codemode-server-connects-and-scripts-call-its-tools", () => WithSessionRoot("codemode", CodemodeDocs, async (root, fixture) =>
         {
             var code = "const r = await tools.mcp__docs__search({ query: \"install\" });\ntext(r.content[0].text);\nreturn [r.structuredContent.hits, \"_meta\" in r, (await searchTools(\"documentation\"))[0].name];";
-            var provider = new Endpoint(() => TextReply("ready"), () => CallReply("toolu_cm", "codemode", new { code }), () => TextReply("done"));
+            string[] replies = ["codemode-ready", "codemode-call", "codemode-done"];
+            var provider = new Endpoint(() => TextReply("ready", replies[0]), () => CallReply("toolu_cm", "codemode", new { code }, replies[1]), () => TextReply("done", replies[2]));
             await using var rpc = new Rpc(SessionArgs(root, "new-lazy"), provider, fixture.Host());
             await WaitConnected(fixture, rpc);
             await rpc.Prompt("p1", "hello");
@@ -206,10 +232,19 @@ internal static partial class Program
             Names([], Diagnostics(rpc.Error.ToString()), "no MCP problem reported");
             var requests = provider.Snapshot();
             Equal(3, requests.Length, "provider requests");
-            var declared = DeclaredTools(requests[1]).Single(tool => tool.GetProperty("name").GetString() == "codemode");
+            var declarations = EffectiveDeclarations(requests, replies);
+            Check(DeclaredTools(requests[0]).Any(tool => tool.GetProperty("name").GetString() == "codemode"), "initial full request declares codemode");
+            var declared = declarations[1].Single(tool => tool.GetProperty("name").GetString() == "codemode");
             var description = declared.GetProperty("description").GetString()!;
             Check(description.StartsWith("Run JavaScript that calls other tools.", StringComparison.Ordinal), "codemode description: " + description);
-            Check(!ToolNamesOf(requests[1]).Any(name => name.StartsWith("mcp__", StringComparison.Ordinal)), "codemode MCP tools are not declared");
+            Check(!declarations[1].Any(tool => tool.GetProperty("name").GetString()!.StartsWith("mcp__", StringComparison.Ordinal)), "codemode MCP tools are not declared");
+            var unknown = requests[1] with { Body = """{"thread":{"type":"continue","previous_message_id":"uncompleted"},"messages":[]}""" };
+            Throws<InvalidOperationException>(() => EffectiveDeclarations([unknown], replies[..1]), "initial continuation cannot acquire codemode");
+            Throws<InvalidOperationException>(() => EffectiveDeclarations([requests[0], unknown], replies[..2]), "unknown response cannot supply codemode");
+            var reset = requests[1] with { Body = """{"thread":{"type":"create"},"messages":[]}""" };
+            Equal(0, EffectiveDeclarations([requests[0], reset], replies[..2])[1].Length, "new thread cannot inherit stale codemode");
+            var changed = requests[1] with { Body = JsonSerializer.Serialize(new { thread = new { type = "continue", previous_message_id = replies[0] }, tools = Array.Empty<object>() }) };
+            Throws<InvalidOperationException>(() => EffectiveDeclarations([requests[0], changed], replies[..2]), "continuation cannot replace inherited declarations");
             Equal("Raw JavaScript source.", declared.GetProperty("input_schema").GetProperty("properties").GetProperty("code").GetProperty("description").GetString(), "schema");
             var result = ToolResultTexts(requests[2]).Single();
             Check(result.StartsWith("Script completed\nWall time ", StringComparison.Ordinal) && result.Contains("==> text 1/2 <==\nFound: install guide.\n==> text 2/2 <==\n[1,false,\"mcp__docs__search\"]", StringComparison.Ordinal), "result: " + result);

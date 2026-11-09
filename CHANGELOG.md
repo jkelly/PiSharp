@@ -1,5 +1,37 @@
 # Changelog
 
+## [1.5.0.1]
+
+**Unreleased — preparation in progress.** The published release remains 1.5.0. This candidate keeps the Pi 1.5.0 baseline and adds reviewed backports and native implementations; no release tag or candidate package publication is claimed. See the [candidate guide](https://pisharp.ai/docs/guides/gap-updates/) and [full notes](https://github.com/jkelly/PiSharp/blob/main/docs/release-notes/1.5.0.1.md).
+
+### New experimental source libraries
+
+- Chord v2 host, reload, jobs, links and remote routes, plus a distinct legacy protocol-4 runtime
+- Native Chord hosting: plugin generations, HTTP and process workers
+- Durable.Store with real-host examples 35–37, shared storage, followed views and registry composition
+- Env.Protocol and Env: framed remote filesystem/process/watch adapters, SSH bootstrap and a separately packaged native daemon; Windows PTY remains `ENOTSUP`
+- Preparation inventory: 28 libraries plus the CLI (29 packages); the five added libraries are unpublished
+
+### Corrections and tooling
+
+- Provider schemas, histories, headers, retries, output budgets, catalog/configuration and classifier routing
+- Bounded Anthropic threads and UTF-16 prepared payloads, hooks and optional captures
+- Durable compaction/transaction lookup, model request options, SQLite bulk execution/telemetry and delta tracking
+- Mixed-line-ending edits, bounded reads/searches, Unicode/argument handling, persisted thinking, MCP/RPC shutdown/order and hosted settings
+- Shell authentication, accurate update results, macOS modifier queries and Node overlay lifecycle
+- Repository evaluations, package-only consumer checks and required regression/native validation workflows
+
+### Release preparation corrections
+
+- Classify the awaited primary plugin-loader failure before aggregating additional fault evidence, preserving initialization versus load diagnostics
+- Patch strict tools in Responses/Codex initial and incremental developer `additional_tools` declarations, rejecting malformed or ambiguous targets
+- Correct Unix hosting mutex cancellation and HTTP request-target routing, and use private Unix pipe paths for native process transports
+- Derive the daemon handshake version from its build so a 1.5.0.1 artifact agrees with the SSH trusted-artifact version check
+- Preserve file-URL query and hash components in the Node compatibility loader so reloads retain their fresh module identity; reproduced with real Node
+- Repair CI prerequisites and evidence parsing: actual strict result statuses, resolved SDK executable, integrity-pinned historical archive and required `fd` setup. These controls do not establish hosted or upstream parity
+
+Historical pins and capture evidence remain separate from current source mappings. Local Windows receipts do not establish all-platform or complete upstream parity. Publication waits for the [four release gates](https://pisharp.ai/docs/contribute/releasing/#four-required-validation-gates) at the intended source revision.
+
 ## [1.5.0] - 2026-11-05
 
 PiSharp moves from Pi v1.2.0 to Pi v1.5.0, with the changes of Pi 1.3.0 and 1.4.0. pi-env, the rest of Chord and pi-evals follow in experimental 1.5.0.x patches. Durable sessions that 1.5.0 has opened can't go back to 1.2.0.x, so copy them first if you may need to. Update the CLI with `dotnet tool update -g PiSharp.Cli`. Full notes are in the [release notes](https://github.com/jkelly/PiSharp/blob/main/docs/release-notes/1.5.0.md).

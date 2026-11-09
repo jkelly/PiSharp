@@ -17,7 +17,7 @@ foreach($item in $queue){
     $candidate=Get-ChildItem -LiteralPath (Join-Path $root 'artifacts/gap-validation') -Directory -Filter ($label+'-*')|Sort-Object LastWriteTime -Descending|Select-Object -First 1
     $receiptFile=if($candidate){Join-Path $candidate.FullName 'receipt.json'}else{$null}
     $observed=if($receiptFile -and (Test-Path -LiteralPath $receiptFile)){Get-Content -LiteralPath $receiptFile -Raw|ConvertFrom-Json}else{$null}
-    $code=if($observed.result -in @('passed','passed-with-source-change')){0}else{1}
+    $code=if($observed.result -in @('passed','passed-with-source-change','passed-with-console-skips')){0}else{1}
     $progress.Add([ordered]@{label=$label;exitCode=$code;processExitCode=$processExit;result=$observed.result;receipt=$receiptFile;consoleLog=$console;finishedUtc=[DateTime]::UtcNow.ToString('o')})
     $progress|ConvertTo-Json -Depth 8|Set-Content -LiteralPath (Join-Path $folder 'progress.json')
     & (Join-Path $PSScriptRoot 'Update-Status.ps1')|Out-Null

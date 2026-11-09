@@ -22,6 +22,7 @@ internal static partial class Program
         OfflineSessionProfile? profile = null;
         try
         {
+            root = await new PiSharp.Tools.Files.LocalFileOperations().CanonicalizeAsync(root, default);
             profile = await OfflineSessionProfile.CreateAsync(root, Path.Combine(root, "session.jsonl"), null, [], [], [], default,
                 originalSystemPrompt: new OriginalSystemPromptAdmission { CustomPrompt = "Custom." });
             var source = new McpServersPromptSource();

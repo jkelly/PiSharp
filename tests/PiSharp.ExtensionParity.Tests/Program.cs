@@ -147,6 +147,9 @@ internal static partial class Program
         public Dictionary<string, string?> Vars { get; } = new(StringComparer.Ordinal);
         public List<Seen> Requests { get; } = [];
         public Func<Seen, int, HttpResponseMessage> Respond { get; set; } = (_, _) => AnthropicText("ok");
+        public bool ForceCompatibilityModules { get; set; }
+        public string? PiModules => ForceCompatibilityModules || Vars.ContainsKey("PISHARP_PI_RUNTIME_DIR") ? null : ReviewedPiRuntime.Value;
+        public bool UseCompatibilityModules => ForceCompatibilityModules || !Vars.ContainsKey("PISHARP_PI_RUNTIME_DIR") && ReviewedPiRuntime.Value is null;
         /// <summary>The run's MCP host (by agent directory); null uses one without servers of its own.</summary>
         public Func<string, PiSharp.Cli.Mcp.McpSessionHost>? McpHost { get; set; }
         public Sandbox(string name, bool trusted = true)
@@ -178,8 +181,8 @@ internal static partial class Program
             Func<string[], PiEntryOptions, CancellationToken, Task<int>>? runInteractive = null, Stream? rpcInput = null, Stream? rpcOutput = null) => new()
         {
             Cwd = Cwd, Home = Home, GetEnvironment = name => Vars.GetValueOrDefault(name), SetEnvironment = (name, value) => Vars[name] = value,
-            PiModules = Vars.ContainsKey("PISHARP_PI_RUNTIME_DIR") ? null : ReviewedPiRuntime.Value,
-            UseCompatibilityModules = !Vars.ContainsKey("PISHARP_PI_RUNTIME_DIR") && ReviewedPiRuntime.Value is null,
+            PiModules = this.PiModules,
+            UseCompatibilityModules = this.UseCompatibilityModules,
             Stdout = stdout, Stderr = stderr, Stdin = new StringReader(stdin ?? ""), StdinIsTty = stdin is null, StdoutIsTty = interactive,
             LiveRuntime = Runtime(), CreateMcpHost = McpHost ?? (agentDir => new PiSharp.Cli.Mcp.McpSessionHost(agentDir, Home, () => [])),
             RunInteractive = runInteractive, OpenRpcInput = rpcInput is null ? null : () => rpcInput, OpenRpcOutput = rpcOutput is null ? null : () => rpcOutput,
@@ -229,8 +232,8 @@ internal static partial class Program
     private static HttpResponseMessage Sse(string body) => new(HttpStatusCode.OK) { Content = new StringContent(body, Encoding.UTF8, "text/event-stream") };
 
     /// <summary>An Anthropic Messages stream answering with one text block.</summary>
-    internal static HttpResponseMessage AnthropicText(string text) => Sse(
-        Frame("message_start", new { type = "message_start", message = new { id = "msg_1", role = "assistant", model = "claude-sonnet-4-5", content = Array.Empty<object>(), usage = new { input_tokens = 3, output_tokens = 0 } } })
+    internal static HttpResponseMessage AnthropicText(string text, string responseId = "msg_1") => Sse(
+        Frame("message_start", new { type = "message_start", message = new { id = responseId, role = "assistant", model = "claude-sonnet-4-5", content = Array.Empty<object>(), usage = new { input_tokens = 3, output_tokens = 0 } } })
         + Frame("content_block_start", new { type = "content_block_start", index = 0, content_block = new { type = "text", text = "" } })
         + Frame("content_block_delta", new { type = "content_block_delta", index = 0, delta = new { type = "text_delta", text } })
         + Frame("content_block_stop", new { type = "content_block_stop", index = 0 })
@@ -238,8 +241,8 @@ internal static partial class Program
         + Frame("message_stop", new { type = "message_stop" }));
 
     /// <summary>An Anthropic Messages stream calling one tool.</summary>
-    internal static HttpResponseMessage AnthropicToolCall(string name, object input, string id = "toolu_01") => Sse(
-        Frame("message_start", new { type = "message_start", message = new { id = "msg_t", role = "assistant", model = "claude-sonnet-4-5", content = Array.Empty<object>(), usage = new { input_tokens = 3, output_tokens = 0 } } })
+    internal static HttpResponseMessage AnthropicToolCall(string name, object input, string id = "toolu_01", string responseId = "msg_t") => Sse(
+        Frame("message_start", new { type = "message_start", message = new { id = responseId, role = "assistant", model = "claude-sonnet-4-5", content = Array.Empty<object>(), usage = new { input_tokens = 3, output_tokens = 0 } } })
         + Frame("content_block_start", new { type = "content_block_start", index = 0, content_block = new { type = "tool_use", id, name, input = new { } } })
         + Frame("content_block_delta", new { type = "content_block_delta", index = 0, delta = new { type = "input_json_delta", partial_json = JsonSerializer.Serialize(input) } })
         + Frame("content_block_stop", new { type = "content_block_stop", index = 0 })

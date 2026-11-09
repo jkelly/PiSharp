@@ -48,6 +48,32 @@ internal static partial class Program
         JsonDocument.Parse(request.Body!).RootElement.TryGetProperty("tools", out var tools)
             ? [.. tools.EnumerateArray().Select(tool => tool.GetProperty("name").GetString()!)] : [];
 
+    // Continuations inherit declarations only from a response this fake server actually returned.
+    // A full create resets the declaration set; absent tools alone never imply inheritance.
+    private static string[][] EffectiveAnthropicTools(Seen[] requests, IReadOnlyList<string> replyIds)
+    {
+        Equal(requests.Length, replyIds.Count, "one completed fake response per request");
+        var result = new List<string[]>();
+        for (var index = 0; index < requests.Length; index++)
+        {
+            using var document = JsonDocument.Parse(requests[index].Body!);
+            var body = document.RootElement;
+            if (body.TryGetProperty("thread", out var thread) && thread.GetProperty("type").GetString() == "continue")
+            {
+                Check(index > 0, "continuation has no completed parent");
+                Equal(replyIds[index - 1], thread.GetProperty("previous_message_id").GetString(), "continuation parent is the preceding completed response");
+                Check(!body.TryGetProperty("tools", out _) && !body.TryGetProperty("system", out _), "continuation inherits unchanged tools and system");
+                result.Add(result[index - 1]);
+            }
+            else
+            {
+                if (body.TryGetProperty("thread", out thread)) Equal("create", thread.GetProperty("type").GetString(), "full request creates a thread");
+                result.Add(ToolNames(requests[index]));
+            }
+        }
+        return [.. result];
+    }
+
     // mcp.exposure-and-prompt + mcp.oauth: the global mcp.json is read at session start. The direct server's tool reaches the first
     // request; a failing direct server is reported and left out (the session still starts); a codemode server connects in the
     // background with a supplied or the built-in codemode implementation (PiSharp.Codemode.Tests; deferred servers connect with the
@@ -86,9 +112,16 @@ internal static partial class Program
             Discovery = discovery ? _ => [McpDiscoveryExecutableDefinition.CreateCodemode("sync-codemode", "Fixture codemode",
                 (_, _, _) => ValueTask.FromResult(JsonData.Parse("{\"content\":[]}")))] : null
         };
-        async Task<(Seen[] Requests, string Error)> Session(McpSessionHost host, params string[] extra)
+        async Task<(Seen[] Requests, string[][] Tools, string Error)> Session(McpSessionHost host, params string[] extra)
         {
-            var provider = new LiveEndpoint(seen => seen.Url == MessagesUrl ? AnthropicStream() : throw new InvalidOperationException("Unexpected URL " + seen.Url));
+            var replies = new List<string>();
+            var provider = new LiveEndpoint(seen =>
+            {
+                Equal(MessagesUrl, seen.Url, "MCP provider URL");
+                var id = "mcp-response-" + replies.Count;
+                replies.Add(id);
+                return AnthropicStream(id);
+            });
             await using var rpc = new LiveRpc([.. LiveArgs(root, "anthropic", "claude-sonnet-4-5"), .. extra],
                 new(Env(("ANTHROPIC_API_KEY", "env-key")), () => provider), host);
             await rpc.Prompt("first", "first");
@@ -96,12 +129,20 @@ internal static partial class Program
             if (!extra.Contains("--no-mcp")) await laterConnected.Task.WaitAsync(TimeSpan.FromSeconds(20));
             await rpc.Prompt("second", "second");
             Equal(0, await rpc.Finish(), "exit code; " + rpc.Error);
-            return (provider.Snapshot(), rpc.Error.ToString());
+            var requests = provider.Snapshot();
+            Equal(2, requests.Length, "both MCP prompts reach the provider");
+            Check(ToolNames(requests[0]).Length > 0, "initial request carries full declarations");
+            return (requests, EffectiveAnthropicTools(requests, replies), rpc.Error.ToString());
         }
 
-        var (requests, error) = await Session(Host(discovery: true));
-        foreach (var request in requests) Check(ToolNames(request).Contains("mcp__docs__search"), "direct MCP tool declared: " + string.Join(",", ToolNames(request)));
-        Check(!requests.SelectMany(ToolNames).Any(name => name.Contains("broken", StringComparison.Ordinal) || name.Contains("off", StringComparison.Ordinal)),
+        var (requests, tools, error) = await Session(Host(discovery: true));
+        var unknownParent = requests[1] with { Body = """{"messages":[],"thread":{"type":"continue","previous_message_id":"unknown-response"}}""" };
+        Throws<InvalidOperationException>(() => EffectiveAnthropicTools([requests[0], unknownParent], ["mcp-response-0", "mcp-response-1"]), "unknown parent cannot inherit MCP declarations");
+        Throws<InvalidOperationException>(() => EffectiveAnthropicTools([unknownParent], ["mcp-response-0"]), "initial continuation cannot inherit MCP declarations");
+        var reset = requests[1] with { Body = """{"messages":[],"thread":{"type":"create"}}""" };
+        Names([], EffectiveAnthropicTools([requests[0], reset], ["mcp-response-0", "mcp-response-1"])[1], "new thread cannot inherit stale MCP declarations");
+        foreach (var names in tools) Check(names.Contains("mcp__docs__search"), "direct MCP tool declared: " + string.Join(",", names));
+        Check(!tools.SelectMany(names => names).Any(name => name.Contains("broken", StringComparison.Ordinal) || name.Contains("off", StringComparison.Ordinal)),
             "failed and disabled servers declare nothing");
         Names(["MCP servers need attention:\n  broken: failed: initialize refused"], McpDiagnostics(error), "startup report with discovery");
         Equal(1, channels["later"].Single().Lists, "background server listed its tools");
@@ -112,17 +153,17 @@ internal static partial class Program
         // connects in the background as well and nothing but the failing server is reported.
         channels.Clear();
         laterConnected = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        (requests, error) = await Session(Host(discovery: false));
-        Check(requests.All(request => ToolNames(request).Contains("mcp__docs__search")), "direct tool without discovery");
-        Check(requests.All(request => ToolNames(request).Contains("codemode")), "built-in codemode declared");
+        (requests, tools, error) = await Session(Host(discovery: false));
+        Check(tools.All(names => names.Contains("mcp__docs__search")), "direct tool without discovery");
+        Check(tools.All(names => names.Contains("codemode")), "built-in codemode declared");
         Names(["MCP servers need attention:\n  broken: failed: initialize refused"], McpDiagnostics(error), "startup report without discovery");
         Equal(1, channels["later"].Single().Lists, "codemode server connected with the built-in codemode");
 
         // --no-mcp: nothing is read or connected.
         channels.Clear();
-        (requests, error) = await Session(Host(discovery: true), "--no-mcp");
+        (requests, tools, error) = await Session(Host(discovery: true), "--no-mcp");
         Check(channels.IsEmpty && McpDiagnostics(error).Length == 0, "--no-mcp connects nothing");
-        Check(!requests.SelectMany(ToolNames).Any(name => name.StartsWith("mcp__", StringComparison.Ordinal)), "--no-mcp declares no MCP tool");
+        Check(!tools.SelectMany(names => names).Any(name => name.StartsWith("mcp__", StringComparison.Ordinal)), "--no-mcp declares no MCP tool");
     });
 
     // mcp.oauth: an HTTP server without an Authorization header uses OAuth; the session reads the stored token from the durable

@@ -21,6 +21,7 @@
 using System.Net;
 using System.Text;
 using System.Text.Json.Nodes;
+using PiSharp.Contracts;
 using PiSharp.WebAgent.Runs;
 
 namespace PiSharp.WebAgent.Routing;
@@ -31,6 +32,7 @@ public sealed class RunPatchException(string message) : HttpRequestException(mes
 /// <summary>The routing path's capture hook (see the file comment).</summary>
 public sealed class RunCaptureHandler : DelegatingHandler
 {
+    private static readonly UTF8Encoding StrictUtf8 = new(false, true);
     private readonly bool ownsInner;
     private int disposed;
 
@@ -255,7 +257,9 @@ public sealed class RunCaptureHandler : DelegatingHandler
         try
         {
             if (zstd) bytes = PiSharp.AI.Compression.ZstdDecoder.Decompress(bytes);
-            body = JsonNode.Parse(bytes) as JsonObject
+            // Decode strictly before the UTF-16-preserving JSON edit: replacement decoding would turn malformed wire bytes
+            // into a different valid request instead of refusing it as the previous byte-oriented JSON path did.
+            body = JsonUtf16.MutableNode(StrictUtf8.GetString(bytes)) as JsonObject
                 ?? throw new RunPatchException($"PiSharp could not apply this run's options to the {api} request (its body is not a JSON object), so it was not sent.");
         }
         catch (Exception error) when (error is not (RunPatchException or OutOfMemoryException))
@@ -265,7 +269,9 @@ public sealed class RunCaptureHandler : DelegatingHandler
         var missing = RunModelOptions.ApplyToBody(body, context.Patch, context.StrictTools, context.Api, context.Cache);
         if (missing.Count > 0)
             throw new RunPatchException($"PiSharp could not mark {string.Join(", ", missing)} strict in the {api} request (not among its tools), so it was not sent.");
-        var patched = Encoding.UTF8.GetBytes(body.ToJsonString());
+        // Provider JSON can carry escaped lone UTF-16 surrogates (including arbitrary argument/schema property names).
+        // Use the same owned JSON helpers as the transports when editing it, so a run option cannot change those values.
+        var patched = Encoding.UTF8.GetBytes(JsonUtf16.ToJsonString(body));
         // A zstd body goes out as zstd again (its Content-Encoding header is copied below), as the transport sent it.
         var replaced = new ByteArrayContent(zstd ? PiSharp.AI.Compression.Zstd.Compress(patched) : patched);
         replaced.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("application/json") { CharSet = "utf-8" };

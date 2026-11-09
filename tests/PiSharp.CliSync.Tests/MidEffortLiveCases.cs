@@ -27,7 +27,7 @@ internal static partial class Program
     }
 
     // claude-sonnet-5-5 (thinkingLevelMap off/minimal null, compat.supportsMidConvoEffort): the live session admits the model with
-    // upstream's levels, clamps "off" up to "low", and every request carries managed adaptive thinking, both betas and one effort
+    // upstream's levels, clamps "off" up to "low", and every request carries managed adaptive thinking, the complete beta set and one effort
     // marker per recorded assistant turn plus the active one; each response records its providerThinkingLevel.
     private static Task LiveManagedEffortLevels() => WithLiveRoot("live-managed-effort", async root =>
     {
@@ -49,19 +49,21 @@ internal static partial class Program
         var expected = new[]
         {
             "[{\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"one\"" + cached + "}]}," + Marker("low") + "]",
-            "[{\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"one\"}]}," + Marker("low") +
-                ",{\"role\":\"assistant\",\"content\":[{\"type\":\"thinking\",\"thinking\":\"plan\",\"signature\":\"sig\"},{\"type\":\"text\",\"text\":\"ok\"}]}," +
-                "{\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"two\"" + cached + "}]}," + Marker("max") + "]"
+            // The verified parent already owns "one", its low marker and the authored thinking/text reply.
+            "[{\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"two\"" + cached + "}]}," + Marker("max") + "]"
         };
         for (var index = 0; index < 2; index++)
         {
             var body = JsonDocument.Parse(requests[index].Body!).RootElement;
+            var thread = body.GetProperty("thread");
+            Equal(index == 0 ? "create" : "continue", thread.GetProperty("type").GetString(), "thread mode " + index);
+            if (index == 1) Equal("authored", thread.GetProperty("previous_message_id").GetString(), "managed continuation references the completed authored response");
             Equal(expected[index], body.GetProperty("messages").GetRawText(), "messages " + index);
             Equal("""{"type":"adaptive","display":"summarized","block_binding":{"prefix_mismatch_behavior":"drop_block"}}""", body.GetProperty("thinking").GetRawText(), "thinking " + index);
             // Pi 1.5.0 fixes the top-level effort at "low" (it was "high" in 1.2.0); the markers carry the level.
             Equal("""{"effort":"low"}""", body.GetProperty("output_config").GetRawText(), "output_config " + index);
             Check(!body.TryGetProperty("temperature", out _), "temperature sent");
-            Equal("mid-conversation-output-config-2026-07-01,thinking-binding-controls-2026-08-01", requests[index].Headers["anthropic-beta"], "betas " + index);
+            Equal("mid-conversation-output-config-2026-07-01,thinking-binding-controls-2026-08-01,message-threads-2026-08-12", requests[index].Headers["anthropic-beta"], "betas " + index);
         }
         var levels = rpc.Events.Where(record => record.Value.GetProperty("type").GetString() == "message_end" &&
                 record.Value.GetProperty("message").GetProperty("role").GetString() == "assistant")
@@ -81,12 +83,14 @@ internal static partial class Program
             var summary = connection.CreateTransport(summary: true);
             Names(["off"], ThinkingLevels.GetSupported(summary, selection.Model), model + " summary levels");
             StreamEvent? last = null;
-            await foreach (var frame in summary.StreamAsync(new(selection.Model, [new("user", JsonData.Parse("""{"role":"user","content":"summarize","timestamp":1}"""))], 1) { ThinkingLevel = "off" }))
+            await foreach (var frame in summary.StreamAsync(new(selection.Model, [new("user", JsonData.Parse("""{"role":"user","content":"summarize","timestamp":1}"""))], 1)
+                { ThinkingLevel = "off", SessionId = "legacy-summary-" + model, DisableContinuation = true }))
                 last = frame;
             var recorded = last is StreamDone done && done.Message.ExtraProperties?.TryGet("providerThinkingLevel", out var value) == true ? value!.Value.GetString() : null;
             Check(last is StreamDone, model + " summary terminal");
             Equal(effort, recorded, model + " summary providerThinkingLevel");
             var body = JsonDocument.Parse(endpoint.Snapshot().Single().Body!).RootElement;
+            Check(!body.TryGetProperty("thread", out _), model + " explicitly disabled continuation retains full legacy payload");
             Equal(thinking, body.TryGetProperty("thinking", out var sent) ? sent.GetRawText() : null, model + " summary thinking");
             Equal(effort is null ? null : "[{\"role\":\"user\",\"content\":\"summarize\"}," + Marker(effort) + "]",
                 effort is null ? null : body.GetProperty("messages").GetRawText(), model + " summary messages");

@@ -11,6 +11,7 @@ public sealed class ProcessAddressLock : IDisposable
     private ProcessAddressLock(ManualResetEvent released, Task finished) { this.released = released; this.finished = finished; }
     public static async Task<ProcessAddressLock> AcquireAsync(string name, string directory, CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         Directory.CreateDirectory(directory);
         var key = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(Path.GetFullPath(directory) + "|" + name)));
         var mutexName = (OperatingSystem.IsWindows() ? "Local\\" : "") + "PiSharpChord-" + key;
@@ -19,16 +20,24 @@ public sealed class ProcessAddressLock : IDisposable
         // Mutex ownership is thread-affine. One dedicated worker takes and releases it; the caller may dispose on any thread.
         var finished = Task.Factory.StartNew(() =>
         {
-            using var mutex = new Mutex(false, mutexName); var held = false;
+            Mutex? mutex = null; var held = false;
             try
             {
-                try { held = WaitHandle.WaitAny([mutex, cancellationToken.WaitHandle]) == 0; }
-                catch (AbandonedMutexException) { held = true; }
-                if (!held) { acquired.TrySetCanceled(cancellationToken); return; }
+                mutex = new Mutex(false, mutexName);
+                // Unix cannot combine a named mutex with another wait handle. Keep every
+                // bounded wait and the eventual release on this same ownership thread.
+                while (!held)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    try { held = mutex.WaitOne(50); }
+                    catch (AbandonedMutexException) { held = true; }
+                }
+                cancellationToken.ThrowIfCancellationRequested();
                 acquired.TrySetResult(); released.WaitOne();
             }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { acquired.TrySetCanceled(cancellationToken); }
             catch (Exception error) { acquired.TrySetException(error); }
-            finally { if (held) mutex.ReleaseMutex(); }
+            finally { if (held) mutex!.ReleaseMutex(); mutex?.Dispose(); }
         }, CancellationToken.None, TaskCreationOptions.LongRunning, TaskScheduler.Default);
         try { await acquired.Task.ConfigureAwait(false); return new(released, finished); }
         catch { released.Set(); await finished.ConfigureAwait(false); released.Dispose(); throw; }

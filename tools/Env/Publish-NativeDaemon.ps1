@@ -14,7 +14,7 @@ $evidence=Join-Path $output 'evidence'
 $publish=Join-Path $output 'publish'
 $package=Join-Path $output 'package'
 New-Item -ItemType Directory -Path $evidence,$publish,$package -Force|Out-Null
-$manifest=[ordered]@{schemaVersion=1;kind='env-native-package';result='failed';startedUtc=[DateTime]::UtcNow.ToString('o');stages=@();rid=$null;checkoutSha=$null;binary=$null}
+$manifest=[ordered]@{schemaVersion=1;kind='env-native-package';result='failed';startedUtc=[DateTime]::UtcNow.ToString('o');stages=@();rid=$null;checkoutSha=$null;expectedVersion=$null;binary=$null}
 $stages=[Collections.Generic.List[object]]::new()
 function Invoke-Stage([string]$Name,[string]$Executable,[string[]]$Arguments){
     $log=Join-Path $evidence ($Name+'.log')
@@ -83,6 +83,15 @@ try {
         }
     }
     $prerequisites|Set-Content -LiteralPath (Join-Path $evidence 'prerequisites.log')
+    # Evaluate with the selected SDK and publish configuration so environment
+    # Version/VersionPrefix/VersionSuffix overrides are included, not parsed from props.
+    Invoke-Stage 'evaluated-version' $DotnetPath @('msbuild','src/PiSharp.Env.Daemon/PiSharp.Env.Daemon.csproj','-nologo','-getProperty:Version',
+        '-p:Configuration=Release',"-p:RuntimeIdentifier=$rid",'-p:SelfContained=true','-p:PiSharpEnvNativePublish=true',
+        '-p:StripSymbols=true','-p:DebugType=None','-p:DebugSymbols=false','-p:RestoreLockedMode=false','-p:RestoreSources=https://api.nuget.org/v3/index.json',
+        '-p:UseSharedCompilation=false','-p:ILLinkTreatWarningsAsErrors=true','-p:IlcTreatWarningsAsErrors=true','-p:TrimmerSingleWarn=false')
+    $expectedVersion=(Get-Content -LiteralPath (Join-Path $evidence 'evaluated-version.log') -Raw).Trim()
+    if($expectedVersion -cnotmatch '^[0-9]+\.[0-9]+\.[0-9]+(?:\.[0-9]+)?(?:-[0-9A-Za-z]+(?:[.-][0-9A-Za-z]+)*)?$'){throw 'The selected SDK did not evaluate a valid daemon product version.'}
+    $manifest.expectedVersion=$expectedVersion
     Invoke-Stage 'publish' $DotnetPath @('publish','src/PiSharp.Env.Daemon/PiSharp.Env.Daemon.csproj','-c','Release','-r',$rid,'--self-contained','true','-o',$publish,'--disable-build-servers','-m:1',
         '-p:PiSharpEnvNativePublish=true','-p:StripSymbols=true','-p:DebugType=None','-p:DebugSymbols=false','-p:RestoreLockedMode=false','-p:RestoreSources=https://api.nuget.org/v3/index.json',
         '-p:UseSharedCompilation=false','-p:ILLinkTreatWarningsAsErrors=true','-p:IlcTreatWarningsAsErrors=true','-p:TrimmerSingleWarn=false')
@@ -102,9 +111,9 @@ try {
         throw
     }
     $manifest.distributionManifest=[ordered]@{file='native-package-manifest.json';sha256=(Get-FileHash -LiteralPath (Join-Path $package 'native-package-manifest.json') -Algorithm SHA256).Hash.ToLowerInvariant()}
-    Invoke-Stage 'protocol-smoke' 'node' @('tools/Env/native-smoke.mjs','--daemon',$binary,'--rid',$rid,'--work',(Join-Path $output 'smoke-work'),'--report',(Join-Path $evidence 'protocol-smoke.json'))
+    Invoke-Stage 'protocol-smoke' 'node' @('tools/Env/native-smoke.mjs','--daemon',$binary,'--rid',$rid,'--version',$expectedVersion,'--work',(Join-Path $output 'smoke-work'),'--report',(Join-Path $evidence 'protocol-smoke.json'))
     $smoke=Get-Content -LiteralPath (Join-Path $evidence 'protocol-smoke.json') -Raw|ConvertFrom-Json
-    if($smoke.result -ne 'passed' -or $smoke.binary.sha256 -ne $manifest.binary.sha256 -or $smoke.distribution.manifestSha256 -ne $manifest.distributionManifest.sha256){throw 'Protocol smoke must pass against the exact packaged binary and notices manifest.'}
+    if($smoke.result -ne 'passed' -or $smoke.expectedVersion -cne $expectedVersion -or $smoke.reportedVersion -cne $expectedVersion -or $smoke.binary.sha256 -ne $manifest.binary.sha256 -or $smoke.distribution.manifestSha256 -ne $manifest.distributionManifest.sha256){throw 'Protocol smoke must pass against the exact packaged version, binary and notices manifest.'}
     if(-not $IsWindows){
         Invoke-Stage 'published-terminal-suite' $DotnetPath @('run','--project','tests/PiSharp.Env.Terminal.Tests/PiSharp.Env.Terminal.Tests.csproj','-c','Release','--disable-build-servers',
             '-p:RestoreLockedMode=false','-p:RestoreSources=https://api.nuget.org/v3/index.json','-p:UseSharedCompilation=false','--','--external-daemon',$binary)

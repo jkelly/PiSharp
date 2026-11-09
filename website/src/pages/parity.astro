@@ -33,9 +33,15 @@ const assessedOn = new Date(`${parity.assessedOn}T00:00:00Z`).toLocaleDateString
 		<h1 class="ps-h1">How close to <em>Pi</em> are we?</h1>
 		<p class="ps-lede">PiSharp makes three separate promises and tracks each one separately. The baseline below is read from the port's pinned compatibility lock file.</p>
 		<p class="ps-muted assessed">
-			Statuses are assessed against the {parity.baseline} baseline, from PiSharp's own test suites and its <a href={links.compatibility}>compatibility inventories</a>. Last assessed on {assessedOn}, for the next release, {parity.release}. "Ported" means it works and PiSharp's tests cover it. Some suites compare against output captured from Pi 1.1.0 itself, such as session files; the rest are authored tests. Differences that remain are named in the notes and listed below the tables.
+			The published assessment below uses the {parity.baseline} baseline, from PiSharp's own test suites and its <a href={links.compatibility}>compatibility inventories</a>. Assessed on {assessedOn} for release {parity.release}. "Ported" means it works and PiSharp's tests cover it. Some suites compare against output captured from Pi 1.1.0 itself, such as session files; the rest are authored tests. Candidate source coverage is listed separately below, preserving the original assessment and evidence pins.
 		</p>
 	</div>
+
+	<section class="ps-section" style="padding-top: 0">
+		<h2 class="ps-h3">Candidate 1.5.0.1: source coverage</h2>
+		<p class="ps-muted">The tables below preserve the published 1.5.0 assessment and its historical capture pins. The candidate adds Chord v2 and legacy runtimes, native hosting, Durable.Store, Env and evaluation tooling, and closes reviewed provider, tool and lifecycle gaps. Source implementation is complete for the authorized gap plan; release and platform qualification remain separate.</p>
+		<p class="ps-muted"><a href="/docs/guides/gap-updates/">Read the candidate updates</a> and the <a href="https://github.com/jkelly/PiSharp/blob/main/compatibility/gap-status-2026-11-08.json">current source/test mapping</a>. Windows local receipts do not establish all-platform parity. Windows PTY remains unsupported; browser/Cloudflare exclusions and native runtime policy differences remain explicit.</p>
+	</section>
 
 	<div class="strip">
 		<div><div class="ps-mono k">PISHARP</div><div class="ps-mono v">{versions.pisharp}</div></div>
@@ -45,7 +51,7 @@ const assessedOn = new Date(`${parity.assessedOn}T00:00:00Z`).toLocaleDateString
 		</div>
 		<div><div class="ps-mono k">LATEST PI</div><div class="ps-mono v">{versions.latestPi}</div></div>
 		<div class="info">
-			<strong>{inSync ? 'In sync with the latest Pi' : `Sync to Pi ${versions.latestPi} in progress`}</strong>
+			<strong>{inSync ? 'Published baseline matches the latest Pi' : `Sync to Pi ${versions.latestPi} in progress`}</strong>
 			<span>PiSharp's version always names the Pi release it matches. A fourth number (such as {versions.pisharp}.2) is a C#-only patch. <a href="/docs/versioning/">How versions work</a></span>
 		</div>
 	</div>
@@ -100,7 +106,8 @@ const assessedOn = new Date(`${parity.assessedOn}T00:00:00Z`).toLocaleDateString
 	}
 
 	<section class="ps-section" style="margin-top: 5rem">
-		<h2 class="ps-h2">Known differences</h2>
+		<h2 class="ps-h2">Published 1.5.0 differences</h2>
+		<p class="ps-muted">This historical list describes the published packages. Candidate resolutions are summarized above and in the current mapping; retained entries are not claims that all these gaps remain in candidate source.</p>
 		<div class="devs">
 			{
 				parity.deviations.map((group: { title: string; blurb: string; items: { title: string; notes: string }[] }) => (

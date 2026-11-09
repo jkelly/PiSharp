@@ -4,6 +4,7 @@ using System.IO.Pipes;
 using System.Text.Json.Nodes;
 using PiSharp.Chord.Contracts;
 using PiSharp.Chord.Host;
+using PiSharp.Chord.Legacy;
 using PiSharp.Chord.Hosting.Plugins;
 using PiSharp.Chord.Link;
 using PiSharp.Tools.Processes;
@@ -50,7 +51,7 @@ public sealed class ProcessWorkers : IAsyncDisposable, IPluginRolloutStep
         internal string Value { get { lock (sync) return value; } }
         internal void Add(string text) { lock (sync) { value += text; if (value.Length > 64 * 1024) value = value[^65536..]; } }
     }
-    private sealed class Child(OwnedChildProcess process, NamedPipeServerStream data, WorkerControl control, ObservedLink link, JsonObject principal, OutputTail tail)
+    private sealed class Child(OwnedChildProcess process, NamedPipeServerStream data, WorkerControl control, ObservedLink link, JsonObject principal, OutputTail tail, PrivatePipeDirectory addresses)
     {
         internal OwnedChildProcess Process { get; } = process;
         internal NamedPipeServerStream Data { get; } = data;
@@ -81,6 +82,7 @@ public sealed class ProcessWorkers : IAsyncDisposable, IPluginRolloutStep
             try { await Control.DisposeAsync().ConfigureAwait(false); } catch (Exception error) { failures.Add(error); }
             if (ControlReader is { } reader) try { await reader.ConfigureAwait(false); } catch (Exception error) { failures.Add(error); }
             try { await Process.DisposeAsync().ConfigureAwait(false); } catch (Exception error) { failures.Add(error); }
+            try { addresses.Dispose(); } catch (Exception error) { failures.Add(error); }
             if (failures.Count > 0) throw new AggregateException(failures);
         }
     }
@@ -130,6 +132,7 @@ public sealed class ProcessWorkers : IAsyncDisposable, IPluginRolloutStep
     {
         await Task.Yield();
         OwnedChildProcess? process = null; NamedPipeServerStream? data = null; WorkerControl? control = null; NamedPipeServerStream? controlPipe = null;
+        PrivatePipeDirectory? addresses = null;
         var tail = new OutputTail();
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(closing.Token); timeout.CancelAfter(options.StartTimeout);
         try
@@ -137,7 +140,8 @@ public sealed class ProcessWorkers : IAsyncDisposable, IPluginRolloutStep
             PluginBuildSet? shipped; lock (sync) shipped = currentBuild;
             var build = shipped ?? await options.Plugins(entry.Address, ChordContext.WithAbortSignal(timeout.Token, ChordContext.Background)).WaitAsync(timeout.Token).ConfigureAwait(false);
             var dataValue = options.StartData is { } makeData ? await makeData(entry.Address, ChordContext.WithAbortSignal(timeout.Token, ChordContext.Background)).WaitAsync(timeout.Token).ConfigureAwait(false) : options.Data?.Invoke(entry.Address);
-            var dataName = "pisharp-chord-" + Guid.NewGuid().ToString("N"); var controlName = dataName + "-control";
+            addresses = PrivatePipeDirectory.Create();
+            var dataName = addresses.Name("data"); var controlName = addresses.Name("control");
             data = new(dataName, PipeDirection.InOut, 1, PipeTransmissionMode.Byte, PipeOptions.Asynchronous | PipeOptions.CurrentUserOnly);
             controlPipe = new(controlName, PipeDirection.InOut, 1, PipeTransmissionMode.Byte, PipeOptions.Asynchronous | PipeOptions.CurrentUserOnly);
             var start = new ProcessStartInfo(options.Executable) { UseShellExecute = false, CreateNoWindow = true, RedirectStandardError = true, RedirectStandardOutput = true };
@@ -154,7 +158,7 @@ public sealed class ProcessWorkers : IAsyncDisposable, IPluginRolloutStep
             var principal = options.Principal(entry.Address);
             await control.SendAsync(new("start", new(new(entry.Address.Kind, entry.Address.Params, entry.Address.Key), principal, options.ParentPrincipal, build, options.LockDirectory, dataValue)), timeout.Token).ConfigureAwait(false);
             if ((await control.ReceiveAsync(timeout.Token).ConfigureAwait(false)).Kind != "started") throw new IOException("worker did not start");
-            var child = new Child(process, data, control, new(new FramedPipeLink(data, data, leaveOpen: true)), principal, tail);
+            var child = new Child(process, data, control, new(new FramedPipeLink(data, data, leaveOpen: true)), principal, tail, addresses);
             lock (sync) entry.Child = child;
             child.Link.Observe(() => _ = LinkLostAsync(entry, child));
             child.ControlReader = ReadControlsAsync(entry, child);
@@ -171,6 +175,7 @@ public sealed class ProcessWorkers : IAsyncDisposable, IPluginRolloutStep
             }
             try { if (control is not null) await control.DisposeAsync().ConfigureAwait(false); else controlPipe?.Dispose(); } catch (Exception cleanup) { failures.Add(cleanup); }
             try { data?.Dispose(); } catch (Exception cleanup) { failures.Add(cleanup); }
+            try { addresses?.Dispose(); } catch (Exception cleanup) { failures.Add(cleanup); }
             lock (sync) { if (closing.IsCancellationRequested) entries.Remove(entry.Address.Key); else entry.Failure = "worker failed to start"; }
             if (!closing.IsCancellationRequested) Report(entry.Address, new WorkerProcessException(error.Message, tail.Value, failures.Count == 1 ? error : new AggregateException(failures))); throw new IOException("worker failed to start");
         }

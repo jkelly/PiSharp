@@ -1,5 +1,6 @@
 using System.Buffers.Binary;
 using System.IO.Pipes;
+using System.Reflection;
 using System.Text;
 using System.Text.Json.Nodes;
 using PiSharp.Env.Daemon;
@@ -33,6 +34,11 @@ async Task FileOperations()
 {
     await using var wire = await Wire.Open(new() { WorkingDirectory = root });
     var hello = await wire.Call("hello", new() { ["protocol"] = 1 });
+    var daemonAssembly = typeof(EnvDaemonOptions).Assembly;
+    var builtVersion = daemonAssembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion.Split('+', 2)[0]
+        ?? daemonAssembly.GetName().Version!.ToString();
+    Check(hello.Json["version"]!.GetValue<string>() == builtVersion && !builtVersion.Contains('+'), "hello reports the built daemon product version without source metadata");
+    Check(Num(hello.Json, "protocol") == 1, "product version does not change protocol 1");
     Check(hello.Json["features"]!.AsArray().Any(x => x!.GetValue<string>() == "listFiles"), "listFiles feature");
     var path = Path.Combine(root, "nested", "file.txt");
     var first = await wire.Call("write", new() { ["path"] = path, ["keep"] = true }, "alpha\n"u8.ToArray());
@@ -84,10 +90,11 @@ async Task MalformedJson()
 
 async Task Limits()
 {
-    await using var wire = await Wire.Open(new() { WorkingDirectory = root, MaxHandles = 1 });
+    await using var wire = await Wire.Open(new() { WorkingDirectory = root, MaxHandles = 1, Version = "explicit-test-version" });
     var error = await wire.Call("lstat", new() { ["path"] = root }, allowError: true);
     Check(error.Type == FrameType.Error, "hello required");
-    await wire.Call("hello", new() { ["protocol"] = 1 });
+    var hello = await wire.Call("hello", new() { ["protocol"] = 1 });
+    Check(hello.Json["version"]!.GetValue<string>() == "explicit-test-version", "explicit daemon version override is retained");
     var handle = await wire.Call("opendir", new() { ["path"] = root });
     error = await wire.Call("opendir", new() { ["path"] = root }, allowError: true);
     Check(error.Json["code"]!.GetValue<string>() == "EMFILE", "handle limit");
@@ -253,19 +260,34 @@ sealed class Wire : IAsyncDisposable
 {
     private readonly NamedPipeServerStream server;
     private readonly EnvDaemonSession session;
+    private readonly string? pipeDirectory;
     private uint id;
     public NamedPipeClientStream Client { get; }
     public Task SessionTask { get; }
-    private Wire(NamedPipeServerStream server, NamedPipeClientStream client, EnvDaemonSession session)
-    { this.server = server; Client = client; this.session = session; SessionTask = Task.Run(() => session.RunAsync()); }
+    private Wire(NamedPipeServerStream server, NamedPipeClientStream client, EnvDaemonSession session, string? pipeDirectory)
+    { this.server = server; Client = client; this.session = session; this.pipeDirectory = pipeDirectory; SessionTask = Task.Run(() => session.RunAsync()); }
     public static async Task<Wire> Open(EnvDaemonOptions options, bool ignoreReadCancellation = false)
     {
-        var name = "pisharp-env-" + Guid.NewGuid().ToString("N");
-        var server = new NamedPipeServerStream(name, PipeDirection.InOut, 1, PipeTransmissionMode.Byte, PipeOptions.Asynchronous);
-        var connect = server.WaitForConnectionAsync();
-        var client = new NamedPipeClientStream(".", name, PipeDirection.InOut, PipeOptions.Asynchronous);
-        await client.ConnectAsync(); await connect;
-        return new(server, client, new EnvDaemonSession(ignoreReadCancellation ? new IgnoreReadCancellation(server) : server, server, options));
+        var leaf = "pse-" + Guid.NewGuid().ToString("N");
+        // .NET supports absolute Unix pipe paths; avoid a long macOS TMPDIR/CoreFxPipe_ prefix.
+        var directory = OperatingSystem.IsWindows() ? null : Path.Combine("/tmp", leaf);
+        if (!OperatingSystem.IsWindows()) Directory.CreateDirectory(directory!, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+        var name = directory is null ? leaf : Path.Combine(directory, "wire");
+        NamedPipeServerStream? server = null; NamedPipeClientStream? client = null;
+        try
+        {
+            server = new NamedPipeServerStream(name, PipeDirection.InOut, 1, PipeTransmissionMode.Byte, PipeOptions.Asynchronous | PipeOptions.CurrentUserOnly);
+            var connect = server.WaitForConnectionAsync();
+            client = new NamedPipeClientStream(".", name, PipeDirection.InOut, PipeOptions.Asynchronous);
+            await client.ConnectAsync(); await connect;
+            return new(server, client, new EnvDaemonSession(ignoreReadCancellation ? new IgnoreReadCancellation(server) : server, server, options), directory);
+        }
+        catch
+        {
+            client?.Dispose(); server?.Dispose();
+            if (directory is not null) Directory.Delete(directory);
+            throw;
+        }
     }
     public uint NextId() => ++id;
     public async Task<ProtocolFrame> Read()
@@ -286,9 +308,20 @@ sealed class Wire : IAsyncDisposable
     }
     public async ValueTask DisposeAsync()
     {
-        await Client.DisposeAsync();
-        try { await SessionTask.WaitAsync(TimeSpan.FromSeconds(10)); } catch (IOException) { }
-        await session.DisposeAsync(); await server.DisposeAsync();
+        try
+        {
+            await Client.DisposeAsync();
+            try { await SessionTask.WaitAsync(TimeSpan.FromSeconds(10)); } catch (IOException) { }
+        }
+        finally
+        {
+            try { await session.DisposeAsync(); }
+            finally
+            {
+                await server.DisposeAsync();
+                if (pipeDirectory is not null) Directory.Delete(pipeDirectory);
+            }
+        }
     }
 }
 sealed class IgnoreReadCancellation(Stream inner) : Stream

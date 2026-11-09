@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Reflection;
 using System.Text.Json.Nodes;
 
 namespace PiSharp.Env.Daemon;
@@ -27,7 +28,7 @@ public sealed class EnvDaemonOptions
 {
     public string? Token { get; init; }
     public string WorkingDirectory { get; init; } = Environment.CurrentDirectory;
-    public string Version { get; init; } = "1.5.0";
+    public string Version { get; init; } = BuiltVersion();
     public int MaxHandles { get; init; } = 4096;
     public int FileWorkers { get; init; } = 16;
     public int MaxPendingRequests { get; init; } = 1024;
@@ -37,6 +38,16 @@ public sealed class EnvDaemonOptions
     public TimeSpan ShutdownDrainTimeout { get; init; } = TimeSpan.FromSeconds(2);
     public IReadOnlyList<IEnvDaemonOperation> Operations { get; init; } = [];
     public IReadOnlyList<string> Features { get; init; } = [];
+
+    private static string BuiltVersion()
+    {
+        var assembly = typeof(EnvDaemonOptions).Assembly;
+        // The SDK appends source provenance after '+'. SSH compares the product
+        // version with the verified artifact, not that informational suffix.
+        return assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion.Split('+', 2)[0]
+            ?? assembly.GetName().Version?.ToString()
+            ?? throw new InvalidOperationException("The daemon assembly has no build version.");
+    }
 }
 
 public sealed class EnvDaemonRequest

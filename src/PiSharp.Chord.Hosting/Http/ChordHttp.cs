@@ -201,7 +201,9 @@ public sealed class ChordHttp : IAsyncDisposable
     {
         var request = native.Request; var hosts = request.Headers.Host;
         if (hosts.Count != 1 || string.IsNullOrWhiteSpace(hosts[0]) || hosts[0]!.Any(x => x is '@' or '/' or '\\' or ',' or '\r' or '\n' or '\0')) throw new HttpFailure(403);
-        if (native.Features.Get<Microsoft.AspNetCore.Http.Features.IHttpRequestFeature>()?.RawTarget is { } target && Uri.TryCreate(target, UriKind.Absolute, out _)) throw new HttpFailure(403);
+        if (native.Features.Get<Microsoft.AspNetCore.Http.Features.IHttpRequestFeature>()?.RawTarget is { } target &&
+            (target.StartsWith("http://", StringComparison.OrdinalIgnoreCase) || target.StartsWith("https://", StringComparison.OrdinalIgnoreCase)) &&
+            Uri.TryCreate(target, UriKind.Absolute, out _)) throw new HttpFailure(403);
         var forwarded = request.Headers.Keys.Any(x => x.Equals("Forwarded", StringComparison.OrdinalIgnoreCase) || x.StartsWith("X-Forwarded-", StringComparison.OrdinalIgnoreCase));
         var localAddress = native.Connection.LocalIpAddress;
         var local = localAddress is not null && IPAddress.IsLoopback(localAddress);

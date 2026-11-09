@@ -1014,8 +1014,8 @@
       "originalSha256": "2551376cd09efe8406c1558c4e98f334f34756d1fa900e8e30a5a5dcf400421c"
     },
     {
-      "currentSha256": "77e1c5c49510f3934e6ec04b3aec1887211993d7b207b6e7c69d29e80e6e377c",
-      "currentBytes": 762,
+      "currentSha256": "6ae8e191e5c23d89f14a77d96d98c39429f33002683a93d86ff559a389ed260c",
+      "currentBytes": 764,
       "originalBytes": 380,
       "path": "Directory.Build.props",
       "originalSha256": "ac5ce47d0629f5b040a1615dbc4cc69ce4babde81f727f8392252c3b06a40ad9"
@@ -5872,8 +5872,8 @@
       "originalSha256": "0f5f73cc466a7aa3c8939d483b171da02d34d7fff0518ab80964f1311c92e6a9"
     },
     {
-      "currentSha256": "cc5c7a728cb7dbd0e814cb2d7920367de78963f96effbfe744cbd3ae9c1f48d7",
-      "currentBytes": 7863,
+      "currentSha256": "75fe5caf79104110ad2a1b1342d86fa6a97bacd6e93ec895f3ed6b1638d02b86",
+      "currentBytes": 8665,
       "originalBytes": 3622,
       "path": "README.md",
       "originalSha256": "1b053b228b07ff43b8ba7d37d19e4ea3a1d6214731dfa4a1f2ef6f3240f292df"
@@ -9211,8 +9211,8 @@
       "originalSha256": "97e42517f461dd57dc040638a56744d3e98ca7ad44fe74c889ec1ed6942c2c8c"
     },
     {
-      "currentSha256": "5f94b37e81d50f2844c35b47313a1938af4d1a9bebc39735d5817349d599a4a5",
-      "currentBytes": 15477,
+      "currentSha256": "a05bf43a2e6395b04978266fcbda50097429b5100b585ff70e2f2a0197bc60b4",
+      "currentBytes": 16171,
       "originalBytes": 15477,
       "path": "src/PiSharp.Extensions.Runtime/Loading/PluginAssemblyLoader.cs",
       "originalSha256": "5f94b37e81d50f2844c35b47313a1938af4d1a9bebc39735d5817349d599a4a5"
@@ -12963,8 +12963,8 @@
       "originalSha256": "54e70e5a07f9df5dd693e10245b78b1365968b690d2f0326d5d86ad8b94871bc"
     },
     {
-      "currentSha256": "6aa3d180b3d9cd2710bc7435d1b4226027da6d338ca7bc15e54f40af82618f66",
-      "currentBytes": 26911,
+      "currentSha256": "0be35022830a0a5591bbe5b9d633555398857054f57222b5858dcfb38361345e",
+      "currentBytes": 26921,
       "originalBytes": 26911,
       "path": "tests/PiSharp.Extensions.ContractTests/CallbackToolActivationTests.cs",
       "originalSha256": "6aa3d180b3d9cd2710bc7435d1b4226027da6d338ca7bc15e54f40af82618f66"
@@ -13033,8 +13033,8 @@
       "originalSha256": "f31e8df26c0af15f0e04bd68ad99aec72a91c17e4a4028bd5970d8764db10ed9"
     },
     {
-      "currentSha256": "3b28fae0f856a2e2892a35e12a6b2de186ce584e2fba6e96b055e12bc5ba8a4a",
-      "currentBytes": 34186,
+      "currentSha256": "09af061da9e4e5c7f9a53713b439b4148a591f5628060370ffada3b08af44d86",
+      "currentBytes": 34985,
       "originalBytes": 34186,
       "path": "tests/PiSharp.Extensions.ContractTests/ExtensionSessionSnapshotTests.cs",
       "originalSha256": "3b28fae0f856a2e2892a35e12a6b2de186ce584e2fba6e96b055e12bc5ba8a4a"
@@ -13047,8 +13047,8 @@
       "originalSha256": "4ec729641442f8e41cc640df4b6f245992701d47252ecdf033704a9a9731368e"
     },
     {
-      "currentSha256": "1d6dc97ba2d2759abbae9c8e2a792b1cf20bc4366d72674ea43241debaaae004",
-      "currentBytes": 24657,
+      "currentSha256": "54c21c37141ef91161b5e562a0b32d486902caff87e9c4e761639939f1b11648",
+      "currentBytes": 25111,
       "originalBytes": 24657,
       "path": "tests/PiSharp.Extensions.ContractTests/ExtensionToolInvocationTests.cs",
       "originalSha256": "1d6dc97ba2d2759abbae9c8e2a792b1cf20bc4366d72674ea43241debaaae004"
@@ -13131,8 +13131,8 @@
       "originalSha256": "6f779347efd7adcb6dc250f4ec7ddc53f34d2d12a0a5cd9a74bb851d6ad2c57e"
     },
     {
-      "currentSha256": "e0859e5097efd468f9682e3e8771aa72842c4aa940ed30290b4edb05bd913fa3",
-      "currentBytes": 19950,
+      "currentSha256": "3827b6c7b261d151ab9918803288c3095c2e8a580afab0cb188b36ce6df0dbfd",
+      "currentBytes": 20410,
       "originalBytes": 19950,
       "path": "tests/PiSharp.Extensions.ContractTests/McpResourceRuntimeBridgeTests.cs",
       "originalSha256": "e0859e5097efd468f9682e3e8771aa72842c4aa940ed30290b4edb05bd913fa3"
@@ -13187,8 +13187,8 @@
       "originalSha256": "c5a53ac94ce28b63c6fb47ba865b49d45cb0a6e17c9a7d401129fec2aed0d968"
     },
     {
-      "currentSha256": "5010e469d56e3ed54d5124899ff2c5e5a15893b87a1405878c77de60ead7d07c",
-      "currentBytes": 40819,
+      "currentSha256": "0b891ec545743efb3acf08e053ce9b42dc925e1aa3717ec606f67124681e7d7f",
+      "currentBytes": 44758,
       "originalBytes": 40819,
       "path": "tests/PiSharp.Extensions.ContractTests/PublishedLoaderTests.cs",
       "originalSha256": "5010e469d56e3ed54d5124899ff2c5e5a15893b87a1405878c77de60ead7d07c"
@@ -13236,8 +13236,8 @@
       "originalSha256": "a4ef40265ca326a62b0b55f6748b04721b0f5d713cf41222f3749891cd3891b4"
     },
     {
-      "currentSha256": "872659dbb8d0d01a90a4749b1f36a904c230715931dd2056ccdeb3797196f6a1",
-      "currentBytes": 42970,
+      "currentSha256": "7d0f3369e296c91121b20b312688f36df72c72a9d633ab88c6b1c6167a0dfd08",
+      "currentBytes": 43077,
       "originalBytes": 42970,
       "path": "tests/PiSharp.Extensions.ContractTests/RegisteredExtensionToolTests.cs",
       "originalSha256": "872659dbb8d0d01a90a4749b1f36a904c230715931dd2056ccdeb3797196f6a1"
@@ -13285,8 +13285,8 @@
       "originalSha256": "4c20c91b664e6d9a2000e738313f16b8b723ef2b8ff8ad4baeb7af682dc8f62d"
     },
     {
-      "currentSha256": "9938debe0c3a138c76b188c888e338e757517d0ea9f866bea27850e51c8e1740",
-      "currentBytes": 11768,
+      "currentSha256": "85989263c29e102fcc09716c98ba1d13c00bcc8ec7b621fde70a1bf1a8af0cae",
+      "currentBytes": 13450,
       "originalBytes": 11768,
       "path": "tests/PiSharp.Extensions.ContractTests/SessionCreationPreflightRegistryTests.cs",
       "originalSha256": "9938debe0c3a138c76b188c888e338e757517d0ea9f866bea27850e51c8e1740"
@@ -13327,8 +13327,8 @@
       "originalSha256": "d3f82c7945c70f0e20933b286d9f4091b9e2d4e6888885f6eaf09e3c1ed3e4a8"
     },
     {
-      "currentSha256": "9d3143346b0a74ec2f555850de1740cb65142aaee27e213356661238fe455459",
-      "currentBytes": 22964,
+      "currentSha256": "86d160ffda6fd9cd490a8f5d6d10d472ca9a571836b5ecb583989717f4042ab2",
+      "currentBytes": 25929,
       "originalBytes": 22964,
       "path": "tests/PiSharp.Extensions.ContractTests/ToolActivationTests.cs",
       "originalSha256": "9d3143346b0a74ec2f555850de1740cb65142aaee27e213356661238fe455459"

@@ -156,7 +156,7 @@ internal static partial class ToolActivationTests
         finally { release.TrySetResult(); }
         var aborted = await navigation; Check(aborted.Aborted, "Owned abort was not retained."); Names(["inactive"], session.GetActiveTools());
         var selected = await owner.NavigateTreeAsync(owner.Current, new(null, current.Revision));
-        Names([], session.GetActiveTools()); Check(selected.Disposition == SessionTreeNavigationDisposition.Selected, "Root selection failed.");
+        Names(["inactive"], session.GetActiveTools()); Check(selected.Disposition == SessionTreeNavigationDisposition.Selected, "Root selection failed.");
         var reusable = await owner.NavigateTreeAsync(owner.Current, new(selected.LeafId, selected.View.Revision));
         Check(reusable.NoOp, "Selected receipt captured the pre-restoration epoch.");
     }

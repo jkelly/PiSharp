@@ -72,7 +72,16 @@ export function resolve(specifier, context, nextResolve) {
   const virtual = table.get(specifier);
   if (virtual) return { url: pathToFileURL(virtual).href, shortCircuit: true };
   const relative = resolveRelative(specifier, context.parentURL);
-  if (relative) return { url: pathToFileURL(relative).href, shortCircuit: true };
+  if (relative) {
+    const resolved = pathToFileURL(relative);
+    // fileURLToPath resolves the disk path but drops the URL's module identity. Reload uses a
+    // fresh query to bypass Node's ESM cache; retain both URL components after path resolution.
+    if (specifier.startsWith('file:')) {
+      const requested = new URL(specifier);
+      resolved.search = requested.search; resolved.hash = requested.hash;
+    }
+    return { url: resolved.href, shortCircuit: true };
+  }
   return nextResolve(specifier, context);
 }
 

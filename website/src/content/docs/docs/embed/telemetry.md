@@ -15,6 +15,8 @@ sidebar:
 
 To send spans to a tracing backend, implement the contract yourself and check your adapter with the conformance kit described below.
 
+The unpublished 1.5.0.1 candidate adds a SQLite recorder in `PiSharp.Chord.TelemetrySqlite`, supplied by the new [Chord library](/docs/embed/chord/). `SqliteTelemetry.CreateAsync(database, options, timeProvider)` creates it; `SqliteTelemetryOptions` bounds retention and queued spans. It implements telemetry context, store, propagation and metrics, exposes dropped span/measurement counts, and is asynchronously disposable. The database remains caller-owned. See the [source](https://github.com/jkelly/PiSharp/blob/main/src/PiSharp.Chord/TelemetrySqlite/SqliteTelemetry.cs) for lifecycle and queue behavior. This recorder is host-owned and local; the CLI still does not enable telemetry automatically.
+
 ## Install
 
 `PiSharp.AI` references `PiSharp.Telemetry`, so any project that uses the chat transports already has it. To use it on its own:

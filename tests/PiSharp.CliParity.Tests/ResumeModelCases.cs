@@ -24,15 +24,15 @@ internal static partial class Program
             Equal(3, sandbox.Requests[^1].Json.GetProperty("messages").GetArrayLength(), "the history is continued");
             // --model wins over the session's model (buildSessionOptions sets options.model).
             Equal("anthropic/claude-sonnet-4-5", await StateModel(sandbox, "--session", haiku, "--provider", "anthropic", "--model", "claude-sonnet-4-5"), "--model");
-            // A model that no longer exists: findInitialModel's anthropic default (Pi 1.1.0: anthropic/claude-opus-4-8).
+            // A model that no longer exists: findInitialModel's reviewed Anthropic default (F09, upstream 7d073328).
             var gone = SeedSession(sandbox, "gone.jsonl", "anthropic", "claude-gone-9");
-            Equal("anthropic/claude-opus-4-8", await StateModel(sandbox, "--session", gone), "unknown model falls back");
+            Equal("anthropic/claude-opus-5-5", await StateModel(sandbox, "--session", gone), "unknown model falls back");
             // The fallback model answers the continued session; nothing is recorded for it before its response (sdk.ts appends no
             // model_change for a continued session; the response itself names the model).
             var before = File.ReadAllLines(gone).Length;
             (code, stdout, stderr) = await sandbox.Run("-p", "--session", gone, "after fallback");
             Check(code == 0 && stdout == "ok\n", $"print on the fallback model: {code} {stdout} {stderr}");
-            Equal("claude-opus-4-8", sandbox.Requests[^1].Json.GetProperty("model").GetString(), "the request goes to the fallback model");
+            Equal("claude-opus-5-5", sandbox.Requests[^1].Json.GetProperty("model").GetString(), "the request goes to the fallback model");
             Check(!File.ReadLines(gone).Skip(before).Any(line => line.Contains("\"type\":\"model_change\"", StringComparison.Ordinal)), "no model_change recorded");
             // No auth for the session's provider: another provider's default (Pi 1.5.0: openai/gpt-6.1-sol).
             sandbox.Vars.Remove("ANTHROPIC_API_KEY"); sandbox.Vars["OPENAI_API_KEY"] = "sk-openai";
@@ -52,7 +52,7 @@ internal static partial class Program
             var gone = SeedSession(sandbox, "gone.jsonl", "anthropic", "claude-gone-9");
             var haiku = SeedSession(sandbox, "haiku.jsonl", "anthropic", "claude-haiku-4-5");
             // rpc-mode.ts switch_session (and /resume) recreate the session as sdk.ts does: a branch model that is not available falls
-            // back to findInitialModel as a continued session, not to the model in use (Pi 1.1.0: claude-opus-4-8 after haiku was set).
+            // back to findInitialModel as a continued session, not to the model in use (reviewed default: claude-opus-5-5).
             var responses = await RpcSequence(sandbox, ["--mode", "rpc"],
                 """{"id":"1","type":"set_model","provider":"anthropic","modelId":"claude-haiku-4-5"}""",
                 """{"id":"2","type":"switch_session","sessionPath":""" + JsonValue.Create(gone)!.ToJsonString() + "}",
@@ -60,7 +60,7 @@ internal static partial class Program
                 """{"id":"4","type":"switch_session","sessionPath":""" + JsonValue.Create(haiku)!.ToJsonString() + "}",
                 """{"id":"5","type":"get_state"}""");
             Check(responses[1]["success"]!.GetValue<bool>(), "switched: " + responses[1].ToJsonString());
-            Equal("claude-opus-4-8", responses[2]["data"]!["model"]!["id"]!.GetValue<string>(), "unavailable model falls back");
+            Equal("claude-opus-5-5", responses[2]["data"]!["model"]!["id"]!.GetValue<string>(), "unavailable model falls back");
             Equal("claude-haiku-4-5", responses[4]["data"]!["model"]!["id"]!.GetValue<string>(), "available model restored");
         }),
         ("resume.cli-model-is-the-model-of-every-session-the-run-opens", async () =>

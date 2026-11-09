@@ -32,10 +32,10 @@ internal static partial class Program
         public Seen[] Snapshot() { lock (Requests) return [.. Requests]; }
     }
 
-    private static HttpResponseMessage AnthropicStream()
+    private static HttpResponseMessage AnthropicStream(string replyId = "authored")
     {
         static string Frame(string type, object value) => "event: " + type + "\ndata: " + JsonSerializer.Serialize(value) + "\n\n";
-        var stream = Frame("message_start", new { type = "message_start", message = new { id = "authored", role = "assistant", model = "claude-sonnet-4-5", content = Array.Empty<object>(), usage = new { input_tokens = 2, output_tokens = 0 } } })
+        var stream = Frame("message_start", new { type = "message_start", message = new { id = replyId, role = "assistant", model = "claude-sonnet-4-5", content = Array.Empty<object>(), usage = new { input_tokens = 2, output_tokens = 0 } } })
             + Frame("content_block_start", new { type = "content_block_start", index = 0, content_block = new { type = "text", text = "" } })
             + Frame("content_block_delta", new { type = "content_block_delta", index = 0, delta = new { type = "text_delta", text = "ok" } })
             + Frame("content_block_stop", new { type = "content_block_stop", index = 0 })
@@ -130,7 +130,7 @@ internal static partial class Program
     private static async Task WithLiveRoot(string name, Func<string, Task> run)
     {
         var root = Temp(name + "-" + Guid.NewGuid().ToString("N")); Directory.CreateDirectory(root);
-        try { await run(Path.GetFullPath(root)); }
+        try { await run(await new PiSharp.Tools.Files.LocalFileOperations().CanonicalizeAsync(root, default)); }
         finally { try { Directory.Delete(root, true); } catch (IOException) { } }
     }
 

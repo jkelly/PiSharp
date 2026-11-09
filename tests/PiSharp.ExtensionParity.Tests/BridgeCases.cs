@@ -31,8 +31,8 @@ internal static partial class Program
         var host = await PiSharp.Cli.Extensions.Pi.PiExtensionHost.StartAsync(new(sandbox.Cwd, sandbox.AgentDir, "tui", true)
         {
             GetEnvironment = name => sandbox.Vars.GetValueOrDefault(name),
-            PiModules = sandbox.Vars.ContainsKey("PISHARP_PI_RUNTIME_DIR") ? null : ReviewedPiRuntime.Value,
-            UseCompatibilityModules = !sandbox.Vars.ContainsKey("PISHARP_PI_RUNTIME_DIR") && ReviewedPiRuntime.Value is null
+            PiModules = sandbox.PiModules,
+            UseCompatibilityModules = sandbox.UseCompatibilityModules
         }, CancellationToken.None);
         await host.LoadAsync([extension], CancellationToken.None);
         Check(host.Errors.IsEmpty, "load errors: " + string.Join("; ", host.Errors.Select(error => error.Error)));

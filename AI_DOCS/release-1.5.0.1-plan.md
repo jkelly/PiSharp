@@ -1,0 +1,58 @@
+# Website update and 1.5.0.1 preparation
+
+Root: `C:/Users/jksof/.codex/worktrees/close-upstream-gaps/PiSharp`, branch `codex/prepare-1.5.0.1`, starting commit `3024b1e09e1add83e8cfeeb73bc4235a026b517c`.
+
+The user requests the existing website be updated for the completed gap implementation and a new release be prepared. GitHub confirms 1.5.0 is the latest published release. The next candidate is 1.5.0.1, preserving Pi 1.5.0 as the baseline. Preparation does not authorize pushing a version tag that automatically publishes NuGet packages.
+
+## Contracts
+
+- Published installation links and version labels remain 1.5.0 until publication is verified. A 1.5.0.1 changelog entry uses `kind: patch`, `baseline: 1.5.0`, `status: in-progress`; it is excluded from the released RSS feed.
+- `compatibility/public-release.json` can describe the candidate with publication flags false only if the current published 1.5.0 record is preserved in `previousReleases`. Historical pins and release evidence are retained.
+- Five added experimental libraries bring the package list to 28 libraries plus the CLI. Before publication their website links point to source/preparation docs, not nonexistent NuGet versions.
+- Document Chord/hosting/legacy, Durable.Store, Env/Protocol/daemon, Anthropic threads, Durable options, tools, auth/update behavior, and evaluation tooling from actual source/examples. Preserve experimental diagnostics, Windows PTY `ENOTSUP`, and evidence qualifications. No complete upstream or all-platform parity claim.
+- Existing Astro/Starlight appearance is retained. Build the static site, check internal links and preview changed pages. Website source pushed to main deploys through `.github/workflows/website.yml`.
+- Release candidates keep exact sibling versions and the pinned upstream source. Build/validate candidate packages and an external package-only consumer. Required hosted failures are diagnosed before readiness is claimed.
+- Main owns all .NET builds and final Git/remote mutations. Agents may run independent website/runner checks; do not concurrently build .NET. All agents use this C: root, not the prior E: implementation worktree.
+
+## Work packages
+
+| id | agent_type | complexity | model | reasoning_effort | service_tier | complexity_reason | goal | depends_on | owned_paths | inputs | outputs | verification | status |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| WEB1 | worker | hard | gpt-6.1-sol | high | ultrafast | Cross-page documentation and release-state presentation | Update existing website and candidate changelog | Discovery complete | website/**; CHANGELOG.md generation | gap reports, source/examples, candidate contracts | Current feature docs, package/parity data, candidate entry | Site build, links, rendered pages | complete |
+| REL1 | worker | hard | gpt-6.1-sol | high | ultrafast | Version and publication metadata must remain consistent | Prepare 1.5.0.1 metadata and release notes | Discovery complete | Directory.Build.props; compatibility/public-release.json; README.md; docs/release-notes/1.5.0.1.md | Current release record and source scope | Unpublished candidate and reviewable notes | Static consistency; main runs package gate | complete |
+| CI1 | explorer | hard | gpt-6.1-sol | high | ultrafast | New hosted jobs expose multiple unknown failures | Diagnose release blockers and propose bounded fixes | Main commit CI available | Read-only; artifacts/release-prep; own report | Actions runs 42544805935, 42544805898 and current core/Durable runs | Exact failing cases, source paths and fixes | Actual logs/artifacts, no inference of success | complete |
+| MAC1 | worker | hard | gpt-6.1-sol | high | ultrafast | Native PTY drain/backpressure differs by OS | Fix macOS native terminal slow-consumer failure | Native log and case confirmed | tests/PiSharp.Env.Terminal.Tests; src/PiSharp.Env.Daemon/Native and terminal files as necessary | Job 128927362248; Program.cs:113-121 | Evidence-backed correction preserving byte drain | Focused tests and hosted macOS rerun | complete |
+| FINAL | main | hard | gpt-6.1-sol (guidance) | high | default | Integrate, validate artifacts and deploy documentation | Updated website plus reviewable release candidate | WEB1, REL1, CI1, MAC1, CI2, HOST1, CLI1, EXT1, FILE1, REL2, RUN1, CLI2, EXT2, CI3, WEB2 | Integration, integrity records, Git, release validation | Worker outputs | Candidate packages, site deployment, readiness report | Local checks and exact-SHA hosted evidence | running |
+| CI2 | worker | hard | gpt-6.1-sol | high | ultrafast | Hosted runner policy and prerequisites differ from local environment | Repair actual runner/status/prerequisite failures | CI1 runner diagnosis complete | tools/ci; core/gap/release/macOS workflows | CI1 artifacts | Strict portable regression runner and verified prerequisites | Offline runner controls and hosted matrix | complete |
+| HOST1 | worker | hard | gpt-6.1-sol | high | ultrafast | Unix mutex, request URI and pipe path behavior | Repair confirmed hosting portability failures | CI1 hosting diagnosis complete | Chord.Hosting; related legacy pipe fixture only if needed | CI1 artifacts | Portable ownership/routing/address behavior | Hosting tests and hosted Unix jobs | complete |
+| CLI1 | worker | hard | gpt-6.1-sol | high | ultrafast | New provider catalogue admission and source-derived CLI expectations | Repair confirmed CliSync/catalogue failures | CI1 CliSync diagnosis complete | BuiltinModelCatalog; CliSync tests; narrow catalogue regressions | CI1 artifacts and reviewed model source | Catalogue access and current behavior controls | Full CliSync/Models tests | complete |
+| EXT1 | explorer | very hard | gpt-6.1-sol | xhigh | ultrafast | Ten extension contract failures span independent lifecycle invariants | Classify and resolve exact extension release blockers | CI1 extension artifact diagnosis complete | Extensions.ContractTests and scoped extension runtime after root agreement | Current core artifacts | Evidence-backed fixes without weakening admission/ownership | Focused/full contract tests | complete |
+| FILE1 | worker | hard | gpt-6.1-sol | high | ultrafast | fd limit behavior differs on hosted tools | Repair exact find limit regression | CI1 Tools diagnosis complete | Tools file limits and tests | Core Tools console evidence | Exact-limit correctness | Focused tool tests | complete |
+| REL2 | worker | hard | gpt-6.1-sol | high | ultrafast | SSH artifact version must match the daemon handshake | Report built candidate daemon version and verify it | REL1 complete | Env.Daemon options; daemon test; native publish/smoke version checks | Existing SSH exact-version contract | Build-derived hello version and smoke evidence | Daemon tests and NativeAOT smoke | complete |
+| RUN1 | worker | hard | gpt-6.1-sol | high | ultrafast | Codex incremental tool declarations affect hosted run patching | Fix strict-tool option patching for Codex additional_tools | CI1 late WebAgent diagnosis complete | WebAgent RunModelOptions/RunCaptureHandler; narrow run tests | Actual 539-case report | Full/incremental declaration support without weakening refusal | Focused/full WebAgent tests | complete |
+
+| CLI2 | worker | hard | gpt-6.1-sol | high | ultrafast | Hosted macOS exposes older CLI/interactive contracts | Resolve actual CliParity/InteractiveParity failures | CI1 late artifacts available | CliParity and InteractiveParity tests; runtime only by root agreement | macos-late-triage.json, source contracts | Correct current assertions with negative controls | Main focused/full suites | complete |
+| EXT2 | worker | hard | gpt-6.1-sol | high | ultrafast | Reload and extension history invariants require source evidence | Resolve actual ExtensionParity failures | CI1 late artifacts available | ExtensionParity tests; NodeBridge pi-host/loader-hooks.mjs approved after reproduction | macOS extension artifacts | Source-backed lifecycle and provider assertions | Main focused/full suite | complete |
+| CI3 | worker | hard | gpt-6.1-sol | high | ultrafast | MCP/codemode provider history assertions may hide real defects | Resolve actual McpParity and Codemode failures | CI1 late artifacts available | McpParity and Codemode tests; runtime by root agreement | macOS late artifacts | Verified disposition and regression controls | Main focused/full suites | complete |
+| WEB2 | worker | hard | gpt-6.1-sol | high | ultrafast | Final correction notes and generated changelog must agree | Document validated release corrections | WEB1, release correction source proof | Candidate changelog; release notes; generated CHANGELOG | Release correction reports | Updated candidate notes | 60 pages and 4383 links pass | complete |
+| REL3 | worker | hard | gpt-6.1-sol | high | ultrafast | Preparing a draft must remain compatible with gated tag publication | Admit an existing draft only after all publication gates | Release workflow reviewed | tools/release/publish-github-release.mjs and tests; release workflow final release step | Existing create-only publication step | Draft-safe tag-bound release helper | Offline fake gh create/promote/refusal controls | complete |
+
+Requested subagent tier is Ultrafast; effective tier is unverified because the delegation tool exposes no tier selection. The main model is unchanged.
+
+## Initial hosted evidence
+
+- Main website deployment succeeded for 3024b1e0.
+- Windows and Linux native distribution jobs succeeded. macOS failed the slow-consumer terminal drain check, not compilation or basic PTY startup.
+- Production Pi runtime installer succeeded. All nine gap matrix jobs failed and require artifact-level triage; other main workflows were still running or queued at discovery.
+
+## Local integration checkpoint
+
+Main confirmed full Chord 875, legacy cluster 25, hosting 14, ModelRuntime 14, CliSync and Models passes. Tools passes 164 groups with its explicit unavailable Windows symlink branch retained. An initial ContractTests build exposed CS4007 in the revised asynchronous byte comparison; main materialized the read before comparing spans without changing the assertion. Managed Env tests first encountered the previously committed NativeAOT RID lock shape; the next managed restore regenerates the default lock shape before execution. M2 retains its read/edit/bash/storage/reopen assertions while resolving only fixture-issued message-thread ancestors.
+
+The 543-case WebAgent run began before the final strict UTF-8 boundary correction; its receipt must retain that source-change qualification. The final narrow capture gate rebuilds and exercises plain and zstd malformed-byte refusal as well as UTF-16 preservation. Earlier failed receipts are retained. Hosted qualification and candidate artifact admission remain final gates.
+
+## Worker completion and final admission
+
+A complete worker row records its source/report handoff. Main FINAL owns runtime integration, immutable candidate packaging, website deployment and hosted admission; worker completion is not a claim that every listed platform check passed. All worker sources are now handed off. The late-start extension fixture preserves the selected reviewed/compatibility runtime and proves no sandbox-local installer starts. WebAgent test children disable only Windows Event Log writes, retaining console warnings, and honor PISHARP_TEST_DOTNET: the machine default runtime is 10.0.11 while the selected SDK carries 10.0.12. Production logging is unchanged.
+
+Final local receipt qualifications, package hashes, native manifests and hosted run IDs will be carried in the candidate preparation artifact and unpublished GitHub draft. No version tag or NuGet publication is authorized by this preparation.

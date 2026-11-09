@@ -3,6 +3,7 @@ using System.Net.WebSockets;
 using System.Text;
 using System.Text.Json.Nodes;
 using PiSharp.Chord.Link;
+using PiSharp.Chord.Legacy;
 using PiSharp.Chord.Data;
 
 internal static partial class Program
@@ -189,11 +190,23 @@ internal static partial class Program
         });
         yield return Case("link.transports.framed-pipe-duplex",async()=>
         {
-            var name="pisharp-link-"+Guid.NewGuid().ToString("N"); using var server=new NamedPipeServerStream(name,PipeDirection.InOut,1,PipeTransmissionMode.Byte,PipeOptions.Asynchronous);
-            using var client=new NamedPipeClientStream(".",name,PipeDirection.InOut,PipeOptions.Asynchronous);
-            await Task.WhenAll(server.WaitForConnectionAsync(),client.ConnectAsync()); using var a=new FramedPipeLink(server,server); using var b=new FramedPipeLink(client,client);
-            var received=new TaskCompletionSource<byte[]>(TaskCreationOptions.RunContinuationsAsynchronously); b.OnMessage(m=>received.TrySetResult(m.ToArray())); a.Send(new byte[]{0,10,255});
-            Sequence(new byte[]{0,10,255},await received.Task.WaitAsync(TimeSpan.FromSeconds(5)),"framed pipe bytes");
+            var addresses=PrivatePipeDirectory.Create(); var name=addresses.Name("link");
+            var directory=OperatingSystem.IsWindows()?null:Path.GetDirectoryName(name)!;
+            using(addresses)
+            {
+                if(!OperatingSystem.IsWindows())
+                {
+                    Check(Path.IsPathFullyQualified(name)&&Encoding.UTF8.GetByteCount(name)<104,"absolute pipe path fits macOS independently of TMPDIR");
+                    Equal(UnixFileMode.UserRead|UnixFileMode.UserWrite|UnixFileMode.UserExecute,File.GetUnixFileMode(directory!),"private pipe directory permissions");
+                    using var other=PrivatePipeDirectory.Create(); Check(name!=other.Name("link"),"pipe directories are unique");
+                }
+                using var server=new NamedPipeServerStream(name,PipeDirection.InOut,1,PipeTransmissionMode.Byte,PipeOptions.Asynchronous|PipeOptions.CurrentUserOnly);
+                using var client=new NamedPipeClientStream(".",name,PipeDirection.InOut,PipeOptions.Asynchronous);
+                await Task.WhenAll(server.WaitForConnectionAsync(),client.ConnectAsync()); using var a=new FramedPipeLink(server,server); using var b=new FramedPipeLink(client,client);
+                var received=new TaskCompletionSource<byte[]>(TaskCreationOptions.RunContinuationsAsynchronously); b.OnMessage(m=>received.TrySetResult(m.ToArray())); a.Send(new byte[]{0,10,255});
+                Sequence(new byte[]{0,10,255},await received.Task.WaitAsync(TimeSpan.FromSeconds(5)),"framed pipe bytes");
+            }
+            Check(directory is null||!Directory.Exists(directory),"pipe directory removed after streams close");
         });
         yield return Case("link.transports.framed-pipe-bad-length",async()=>
         {

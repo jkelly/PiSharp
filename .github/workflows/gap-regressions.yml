@@ -77,6 +77,8 @@ jobs:
         run: |
           python -m unittest discover -s tools/ci -p 'test_gap_runner.py' -v
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          node --test tools/ci/historical-ai-archive.test.mjs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Install the locked extension runtime fixture
         if: matrix.group == 'core'
         shell: pwsh

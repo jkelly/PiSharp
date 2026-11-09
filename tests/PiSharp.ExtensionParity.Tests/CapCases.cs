@@ -73,15 +73,56 @@ internal static partial class Program
                 } });
             }
             """);
-        sandbox.Respond = (_, index) => index == 0 ? AnthropicToolCall("queue_many", new { }) : AnthropicText("ack " + index);
+        var replyIds = new List<string>();
+        sandbox.Respond = (_, index) =>
+        {
+            var replyId = "queued-reply-" + index; replyIds.Add(replyId);
+            return index == 0 ? AnthropicToolCall("queue_many", new { }, responseId: replyId) : AnthropicText("ack " + index, replyId);
+        };
         var (code, _, stderr) = await sandbox.Run([.. new[] { "-p" }, .. Model, "-e", extension, "Queue"]);
         Equal(0, code, "exit; " + stderr);
-        var users = sandbox.Requests.Last().Json.GetProperty("messages").EnumerateArray()
-            .Where(message => message.GetProperty("role").GetString() == "user")
-            .Select(message => message.GetProperty("content")).Select(content => content.ValueKind == JsonValueKind.String ? content.GetString()!
-                : string.Concat(content.EnumerateArray().Select(item => item.TryGetProperty("text", out var t) ? t.GetString() : ""))).ToList();
-        Check(users.Any(text => text == "L" + new string('y', 100_000)), "the 100,000-character follow-up was delivered");
-        Check(Enumerable.Range(0, 300).All(index => users.Contains("follow " + index)), "every one of the 300 follow-ups was delivered: " + users.Count);
+        var users = EffectiveAnthropicUserPrompts(sandbox.Requests, replyIds);
+        Names(["Queue", "L" + new string('y', 100_000), .. Enumerable.Range(0, 300).Select(index => "follow " + index)], users,
+            "every complete follow-up reaches the model exactly once in queue order");
+        var unknown = sandbox.Requests[1] with { Body = """{"messages":[],"thread":{"type":"continue","previous_message_id":"unknown"}}""" };
+        Throws<InvalidOperationException>(() => EffectiveAnthropicUserPrompts([sandbox.Requests[0], unknown], replyIds.Take(2).ToArray()), "unknown parent cannot inherit user prompts");
+        Throws<InvalidOperationException>(() => EffectiveAnthropicUserPrompts([unknown], [replyIds[0]]), "initial continuation cannot inherit user prompts");
+        var reset = unknown with { Body = """{"messages":[],"thread":{"type":"create"}}""" };
+        Names([], EffectiveAnthropicUserPrompts([sandbox.Requests[0], reset], replyIds.Take(2).ToArray()), "new thread does not inherit prior prompts");
+    }
+
+    // The fake server knows each completed response id. A continuation carries only the newly appended segment;
+    // a full request supplies its own complete history. A missing/foreign parent never authorizes inheritance.
+    private static List<string> EffectiveAnthropicUserPrompts(IReadOnlyList<Seen> requests, IReadOnlyList<string> replyIds)
+    {
+        Equal(requests.Count, replyIds.Count, "one completed response per observed request");
+        var users = new List<string>();
+        for (var index = 0; index < requests.Count; index++)
+        {
+            var body = requests[index].Json;
+            if (body.TryGetProperty("thread", out var thread) && thread.GetProperty("type").GetString() == "continue")
+            {
+                Check(index > 0, "continuation has no completed parent");
+                Equal(replyIds[index - 1], thread.GetProperty("previous_message_id").GetString(), "continuation parent was actually returned");
+                Check(!body.TryGetProperty("tools", out _) && !body.TryGetProperty("system", out _), "unchanged continuation inherits tools and system");
+            }
+            else
+            {
+                if (body.TryGetProperty("thread", out thread)) Equal("create", thread.GetProperty("type").GetString(), "full request starts a thread");
+                users.Clear();
+            }
+            foreach (var message in body.GetProperty("messages").EnumerateArray().Where(message => message.GetProperty("role").GetString() == "user"))
+            {
+                var content = message.GetProperty("content");
+                if (content.ValueKind == JsonValueKind.String) users.Add(content.GetString()!);
+                else
+                {
+                    var text = content.EnumerateArray().Where(item => item.GetProperty("type").GetString() == "text").ToArray();
+                    if (text.Length > 0) users.Add(string.Concat(text.Select(item => item.GetProperty("text").GetString())));
+                }
+            }
+        }
+        return users;
     }
 
     // runner.ts emitContext/emitInput: a context handler sees every message of a session longer than 1,024 messages (formerly a

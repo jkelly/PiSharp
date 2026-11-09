@@ -383,8 +383,11 @@ internal static class ExtensionSessionSnapshotTests
         var options = new ExtensionRegistryOptions
         {
             MaximumConcurrentDispatches = 1,
-            MaximumJsonCharacters = ExtensionSessionSnapshotLimits.MaximumCharacters,
-            MaximumJsonDepth = 4
+            MaximumJsonCharacters = 32,
+            MaximumJsonDepth = 4,
+            MaximumSessionBranchEntries = 4,
+            MaximumSessionCharacters = 512,
+            MaximumSessionUtf8Bytes = 512
         };
         await using var registry = new ExtensionRegistry(options, null, provider);
         var calls = 0;
@@ -423,27 +426,35 @@ internal static class ExtensionSessionSnapshotTests
             ExtensionRegistrationFailure.InvalidDescriptor);
         await Reject(View(1, null, JsonData.Parse("{\"number\":1e999}")), ExtensionRegistrationFailure.InvalidDescriptor);
         await Reject(View(1, null, JsonData.Parse("{\"text\":\"\\ud800\"}")), ExtensionRegistrationFailure.InvalidDescriptor);
-        await Reject(View(1, null, JsonData.Parse("{\"a\":{\"b\":{\"c\":{\"d\":{\"e\":0}}}}}")),
-            ExtensionRegistrationFailure.InvalidDescriptor);
+        var deepEntry = JsonData.Parse("{\"a\":{\"b\":{\"c\":{\"d\":{\"e\":0}}}}}");
+        provider.Current = View(1, null, deepEntry);
+        await registry.InvokeToolAsync(captured, "session-tool", JsonData.EmptyObject);
+        Equal(deepEntry.ToString(), received!.BranchEntries.Single().ToString());
         using (var permissive = JsonDocument.Parse("{\"value\":1,}", new JsonDocumentOptions { AllowTrailingCommas = true }))
             await Reject(View(1, null, JsonData.FromElement(permissive.RootElement)), ExtensionRegistrationFailure.InvalidDescriptor);
 
-        var maximumCount = Enumerable.Repeat(JsonData.EmptyObject, ExtensionSessionSnapshotLimits.MaximumBranchEntries).ToImmutableArray();
+        var maximumCount = Enumerable.Repeat(JsonData.EmptyObject, options.MaximumSessionBranchEntries).ToImmutableArray();
         provider.Current = valid with { BranchEntries = maximumCount };
         await registry.InvokeToolAsync(captured, "session-tool", JsonData.EmptyObject);
-        Equal(ExtensionSessionSnapshotLimits.MaximumBranchEntries, received!.BranchEntries.Length);
+        Equal(options.MaximumSessionBranchEntries, received!.BranchEntries.Length);
         await Reject(valid with { BranchEntries = maximumCount.Add(JsonData.EmptyObject) }, ExtensionRegistrationFailure.LimitExceeded);
 
         const string emptyPayload = "{\"payload\":\"\"}";
-        var remainingCharacters = ExtensionSessionSnapshotLimits.MaximumCharacters - valid.SessionId.Length - emptyPayload.Length;
+        var remainingCharacters = (int)options.MaximumSessionCharacters - valid.SessionId.Length - emptyPayload.Length;
         var exact = JsonData.Parse("{\"payload\":\"" + new string('x', remainingCharacters) + "\"}");
         provider.Current = View(1, null, exact);
         await registry.InvokeToolAsync(captured, "session-tool", JsonData.EmptyObject);
         Equal(exact.ToString(), received!.BranchEntries.Single().ToString());
         await Reject(View(1, null, exact, JsonData.EmptyObject), ExtensionRegistrationFailure.LimitExceeded);
+        var remainingBytes = (int)options.MaximumSessionUtf8Bytes - valid.SessionId.Length - emptyPayload.Length;
+        var exactUtf8 = JsonData.Parse("{\"payload\":\"" + new string('\u4e00', remainingBytes / 3) + new string('x', remainingBytes % 3) + "\"}");
+        provider.Current = View(1, null, exactUtf8);
+        await registry.InvokeToolAsync(captured, "session-tool", JsonData.EmptyObject);
+        Equal(exactUtf8.ToString(), received!.BranchEntries.Single().ToString());
+        await Reject(View(1, null, exactUtf8, JsonData.EmptyObject), ExtensionRegistrationFailure.LimitExceeded);
         var tooManyBytes = JsonData.Parse("{\"payload\":\"" +
-            new string('\u4e00', ExtensionSessionSnapshotLimits.MaximumUtf8Bytes / 3) + "\"}");
-        True(tooManyBytes.ToString().Length < ExtensionSessionSnapshotLimits.MaximumCharacters);
+            new string('\u4e00', (int)options.MaximumSessionUtf8Bytes / 3) + "\"}");
+        True(tooManyBytes.ToString().Length < options.MaximumSessionCharacters);
         await Reject(View(1, null, tooManyBytes), ExtensionRegistrationFailure.LimitExceeded);
 
         provider.Current = new(new string('s', options.MaximumIdentifierCharacters), long.MaxValue,
@@ -453,8 +464,8 @@ internal static class ExtensionSessionSnapshotTests
         Equal(options.MaximumIdentifierCharacters, received.SelectedLeafId!.Length);
         Equal(long.MaxValue, received.Generation);
 
-        // The per-entry JSON budget still applies independently of the aggregate branch budget.
-        await using var small = new ExtensionRegistry(new() { MaximumJsonCharacters = 32 }, null, provider);
+        // Snapshot bounds are explicit and independent of the executable/registration JSON budget.
+        await using var small = new ExtensionRegistry(new() { MaximumJsonCharacters = 32, MaximumSessionCharacters = 32 }, null, provider);
         var smallCalls = 0;
         await small.ActivateAsync("small", new DelegateExtension((entries, _) =>
         {

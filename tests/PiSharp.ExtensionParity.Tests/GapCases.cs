@@ -19,11 +19,13 @@ internal static partial class Program
         ("gap.extension-tools-run-in-parallel-unless-sequential", ExecutionMode),
         ("gap.output-schema-reaches-codemode-declarations", OutputSchema),
         ("gap.builtin-tool-factory-with-custom-operations", BuiltinFactoryOperations),
+        ("gap.builtin-tool-factory-custom-operations-refuse-in-compatibility-modules", BuiltinFactoryCompatibilityRefusal),
         ("gap.pi-events-shared-with-native-extensions", EventsBridge),
         ("gap.send-message-from-an-idle-command-appends-and-displays", SendMessageWhileIdle),
         ("gap.shortcuts-run-with-a-fresh-context", ShortcutContext),
         ("gap.registrations-after-the-factory-take-effect", LateRegistrations),
-        ("gap.reload-reloads-extensions-and-resources", Reload),
+        ("gap.reload-reloads-extensions-and-resources", () => Reload(forceCompatibility: false)),
+        ("gap.reload-reloads-extensions-and-resources-compatibility", () => Reload(forceCompatibility: true)),
         ("gap.chat-provider-registration-and-unregistration", ChatProvider),
         ("gap.chat-provider-long-stream-lossless", LongChatProvider),
         ("gap.editor-component-and-autocomplete-provider", EditorAndAutocomplete),
@@ -270,30 +272,65 @@ internal static partial class Program
                 parameters: { type: "object", properties: {} },
                 outputSchema: { type: "object", properties: { count: { type: "number" } }, required: ["count"] },
                 async execute() { return { content: [{ type: "text", text: "3" }], structuredContent: { count: 3 } }; } });
+              pi.registerTool({ name: "untyped_counter", label: "Untyped", description: "No output schema", exposure: "codemode",
+                parameters: { type: "object", properties: {} },
+                async execute() { return { content: [{ type: "text", text: "3" }] }; } });
             }
             """);
-        var (code, _, stderr) = await sandbox.Run([.. new[] { "-p" }, .. Model, "--tools", "read,codemode,counter", "-e", extension, "hi"]);
+        var (code, _, stderr) = await sandbox.Run([.. new[] { "-p" }, .. Model, "--tools", "read,codemode,counter,untyped_counter", "-e", extension, "hi"]);
         Equal(0, code, "exit; " + stderr);
-        var request = sandbox.Requests[0].Body!;
-        Check(request.Contains("counter(args: { [key: string]: unknown; }): Promise<{ count: number; }>", StringComparison.Ordinal), "typed codemode declaration: " + request);
+        var tools = sandbox.Requests[0].Json.GetProperty("tools").EnumerateArray().ToDictionary(
+            tool => tool.GetProperty("name").GetString()!, tool => tool.GetProperty("description").GetString()!, StringComparer.Ordinal);
+        Check(!tools.ContainsKey("counter") && !tools.ContainsKey("untyped_counter"), "script tools must not become direct model declarations");
+        var declaration = tools["codemode"];
+        Check(declaration.Contains("counter(args: { [key: string]: unknown; }): Promise<{ count: number; }>", StringComparison.Ordinal),
+            "typed codemode declaration: " + declaration);
+        // A tool without an output schema retains the text-result default (ToDeclaration's TextOutputSchema).
+        Check(declaration.Contains("untyped_counter(args: { [key: string]: unknown; }): Promise<string>", StringComparison.Ordinal),
+            "absent output schema must not inherit another tool's result type: " + declaration);
     }
 
     // tools/bash.ts BashOperations: a built-in tool definition made by the factory with custom operations runs them.
     private static async Task BuiltinFactoryOperations()
     {
+        RequirePiRuntime();
         using var sandbox = NodeSandbox("factory-operations");
-        var extension = sandbox.Write(Path.Combine(sandbox.Cwd, "remote.ts"), """
-            import { createBashToolDefinition } from "@earendil-works/pi-coding-agent";
-            export default function (pi: any) {
-              pi.registerTool(createBashToolDefinition(process.cwd(), { operations: {
-                exec: async (command: string, cwd: string, options: any) => { options.onData(Buffer.from("remote ran: " + command + "\n")); return { exitCode: 0 }; },
-              } }));
-            }
-            """);
+        var extension = sandbox.Write(Path.Combine(sandbox.Cwd, "remote.ts"), FactoryOperationsExtension);
         sandbox.Respond = (_, index) => index == 0 ? AnthropicToolCall("bash", new { command = "uname -a" }) : AnthropicText("done");
         var (code, _, stderr) = await sandbox.Run([.. new[] { "-p" }, .. Model, "-e", extension, "go"]);
         Equal(0, code, "exit; " + stderr);
+        Check(!stderr.Contains("compatibility modules", StringComparison.Ordinal), "custom operations use the reviewed installed runtime: " + stderr);
         Check(ToolResultText(sandbox.Requests[1]).Contains("remote ran: uname -a", StringComparison.Ordinal), "custom operations ran: " + sandbox.Requests[1].Body);
+        Equal("""["exec","uname -a"]""", LogLines(sandbox).Single(), "the custom operation ran exactly once");
+    }
+
+    private const string FactoryOperationsExtension = """
+            import { createBashToolDefinition } from "@earendil-works/pi-coding-agent";
+            import { appendFileSync } from "node:fs";
+            export default function (pi: any) {
+              pi.registerTool(createBashToolDefinition(process.cwd(), { operations: {
+                exec: async (command: string, cwd: string, options: any) => {
+                  appendFileSync(process.cwd() + "/probe.log", JSON.stringify(["exec", command]) + "\n");
+                  options.onData(Buffer.from("remote ran: " + command + "\n")); return { exitCode: 0 };
+                },
+              } }));
+            }
+            """;
+
+    private static async Task BuiltinFactoryCompatibilityRefusal()
+    {
+        using var sandbox = NodeSandbox("factory-operations-compatibility");
+        sandbox.ForceCompatibilityModules = true;
+        var extension = sandbox.Write(Path.Combine(sandbox.Cwd, "remote.ts"), FactoryOperationsExtension);
+        sandbox.Respond = (_, index) => index == 0 ? AnthropicToolCall("bash", new { command = "uname -a" }) : AnthropicText("done");
+        var (code, stdout, stderr) = await sandbox.Run([.. new[] { "-p" }, .. Model, "-e", extension, "go"]);
+        Equal(0, code, "exit; " + stderr);
+        Equal("done", stdout.Trim(), "the refusal still reaches the next model turn");
+        Equal("Built-in tools with custom operations are not available in the PiSharp Node bridge", ToolResultText(sandbox.Requests[1]), "explicit fallback limitation");
+        var result = sandbox.Requests[1].Json.GetProperty("messages").EnumerateArray().Last().GetProperty("content").EnumerateArray()
+            .Single(item => item.GetProperty("type").GetString() == "tool_result");
+        Check(result.GetProperty("is_error").GetBoolean(), "fallback limitation remains a failed tool result");
+        Equal(0, LogLines(sandbox).Length, "fallback did not execute the custom operation");
     }
 
     // event-bus.ts: pi.events is one bus; Node extensions and the native extensions of the session see each other's emissions.
@@ -360,9 +397,10 @@ internal static partial class Program
 
     // agent-session.ts reload(): /reload shuts the extensions down (reason "reload"), loads them again with fresh modules, rereads the
     // prompt templates, skills and context files, and starts them (reason "reload"); ctx.reload() does the same from a command.
-    private static async Task Reload()
+    private static async Task Reload(bool forceCompatibility)
     {
         using var sandbox = NodeSandbox("reload");
+        sandbox.ForceCompatibilityModules = forceCompatibility;
         var path = sandbox.Write(Path.Combine(sandbox.Cwd, "reloadable.ts"), ReloadExtension("v1", ""));
         sandbox.Write(Path.Combine(sandbox.Cwd, "AGENTS.md"), "First context.\n");
         var steps = new Queue<string>([

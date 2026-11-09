@@ -65,6 +65,8 @@ jobs:
         run: |
           uname -m
           export TMPDIR="$(cd "$TMPDIR" && pwd -P)/"
+          export PISHARP_TEST_DOTNET="$(command -v dotnet)"
+          node tools/ci/ensure-historical-ai-archive.mjs
           dotnet run --project "tests/${{ matrix.suite }}/${{ matrix.suite }}.csproj" -c Release \
             -p:RestoreSources=https://api.nuget.org/v3/index.json -p:RestoreLockedMode=false \
             -- --report "$RUNNER_TEMP/${{ matrix.suite }}.json"

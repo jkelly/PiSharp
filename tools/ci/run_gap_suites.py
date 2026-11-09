@@ -5,12 +5,26 @@ import json
 import os
 import platform
 import re
+import shutil
 import sys
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 
 from owned_process import Cancelled, install_cancel_handlers, run_owned
+
+PASS_STATUSES = ("PASS", "PASS_AUTHORED_NATIVE_ONLY", "PASS_AUTHORED_NATIVE", "PASS_UPSTREAM_CAPTURE")
+
+
+def resolve_sdk_host(executable):
+    """Use the selected SDK host for apphost-launched tests and their children."""
+    found = shutil.which(executable)
+    if not found:
+        raise FileNotFoundError(f"Configured dotnet host not found: {executable}")
+    host = Path(found).resolve(strict=True)
+    if not host.is_file():
+        raise ValueError("Configured dotnet host is not a regular file")
+    return str(host)
 
 
 def now():
@@ -131,7 +145,7 @@ def parse_evidence(text, policy, host):
                 observed_skips.append(case)
             else:
                 errors.append(f"unexpected skip: {case['id']}")
-        elif case["status"] not in ("PASS", "PASS_AUTHORED_NATIVE_ONLY", "PASS_AUTHORED_NATIVE"):
+        elif case["status"] not in PASS_STATUSES:
             errors.append(f"nonpassing/unknown status: {case['id']}: {case['status']}")
     # Nested console markers are observations about a registered case, never cases.
     # Keep its emitted PASS line as raw evidence while recording the body's real skip.
@@ -148,7 +162,7 @@ def parse_evidence(text, policy, host):
     for line in text.splitlines():
         if re.match(r"^(?:SKIP|SKIPPED)(?:\s|:|$)", line, re.I) and not any(a.get("line") == line for a in allowed):
             errors.append(f"unexpected skip output: {line}")
-    passed = sum(case["status"] in ("PASS", "PASS_AUTHORED_NATIVE_ONLY", "PASS_AUTHORED_NATIVE") for case in cases)
+    passed = sum(case["status"] in PASS_STATUSES for case in cases)
     skipped = sum(case["status"] in ("SKIP", "SKIPPED") for case in cases)
     return {"format": mode, "cases": cases, "summaries": summaries, "errors": errors,
             "consoleSkipObservations": console_skips,
@@ -179,6 +193,11 @@ def execute(root, output, manifest_path, group, executable="dotnet", build_secon
                 raise ValueError("unsafe suite identity")
             ledger["suites"].append({"suite": name, "result": "planned", "stages": [], "evidence": None})
         save()
+        child_environment = dict(os.environ)
+        if isinstance(executable, str):
+            executable = resolve_sdk_host(executable)
+            child_environment["PISHARP_TEST_DOTNET"] = executable
+            ledger["dotnetHost"] = executable
         checkout = {"name": "checkout", "checkoutSha": None, "startedUtc": now(), "result": "running",
                     "stdout": str(run_dir / "checkout.stdout.log"), "stderr": str(run_dir / "checkout.stderr.log")}
         ledger["checkoutStage"] = checkout
@@ -225,7 +244,7 @@ def execute(root, output, manifest_path, group, executable="dotnet", build_secon
                     save()
                     try:
                         stage.update(run_owned(command, root, stage["stdout"], stage["stderr"], timeout,
-                                               lambda running: (stage.update(running), save())))
+                                               lambda running: (stage.update(running), save()), env=child_environment))
                         stage["result"] = "passed" if stage["exitCode"] == 0 and not stage["timedOut"] else "failed"
                     except (Cancelled, KeyboardInterrupt) as error:
                         stage.update(getattr(error, "process_result", {}))
@@ -285,11 +304,12 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--group", required=True, choices=["core", "chord", "env", "runtime-installer"])
     parser.add_argument("--output-directory", default="artifacts/gap-ci")
+    parser.add_argument("--dotnet", default=os.environ.get("PISHARP_TEST_DOTNET", "dotnet"))
     args = parser.parse_args()
     root = Path(__file__).resolve().parents[2]
     install_cancel_handlers()
     os.environ["MSBUILDDISABLENODEREUSE"] = "1"
-    return execute(root, root / args.output_directory, Path(__file__).with_name("gap-suites.json"), args.group)
+    return execute(root, root / args.output_directory, Path(__file__).with_name("gap-suites.json"), args.group, args.dotnet)
 
 
 if __name__ == "__main__":

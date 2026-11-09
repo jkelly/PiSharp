@@ -31,6 +31,10 @@ PiSharp 1.5.0 moves from Pi v1.2.0 to Pi v1.5.0, with Pi 1.3.0 and 1.4.0 in betw
 
 The custom agents, media tools, service tiers and the durable device server, new in 1.2.0.2, are still PiSharp's own and experimental.
 
+## Candidate 1.5.0.1
+
+The published release remains **1.5.0**. The [unpublished candidate](/docs/guides/gap-updates/) adds Chord/hosting, Durable.Store, remote environments and the native daemon, Anthropic message threads, evaluation tooling and provider/tool/lifecycle corrections. Its preparation inventory is 29 packages, with five new experimental libraries. [Release validation](/docs/contribute/releasing/) and publication are separate from implementation.
+
 ## Where to go next
 
 - [Quickstart](/docs/quickstart/): install PiSharp with `dotnet tool install -g PiSharp.Cli` and run it.

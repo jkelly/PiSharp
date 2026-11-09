@@ -223,7 +223,8 @@ internal static class RegisteredExtensionToolTests
             Equal(mode == "initial-schema" ? 0 : 1, hookCalls);
             Equal(mode == "policy" ? 1 : 0, policy.Calls);
             Equal(mode is "block" or "throw" or "initial-schema" ? 0 : 1, tailCalls);
-            False(outcome.Result.Content.Single().Text.Contains("SECRET", StringComparison.Ordinal));
+            if (mode == "block") Equal("SECRET block payload", outcome.Result.Content.Single().Text);
+            else False(outcome.Result.Content.Single().Text.Contains("SECRET", StringComparison.Ordinal));
             Equal(mode == "block", outcome.Result.Terminate);
             Equal(mode == "block" ? 1 : 2, source.Requests.Count);
             await Acknowledged(session, deadline.Token);

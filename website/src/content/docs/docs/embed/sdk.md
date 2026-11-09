@@ -47,7 +47,7 @@ dotnet tool install -g PiSharp.Cli
 
 ## Packages
 
-These are the 24 packages of the 1.5.0 release, the 23 libraries and the `PiSharp.Cli` tool. `PiSharp.Telemetry` is new in 1.5.0. The [SDK page](/sdk/) lists the same set.
+These are the 24 packages of the published 1.5.0 release, the 23 libraries and the `PiSharp.Cli` tool. `PiSharp.Telemetry` is new in 1.5.0. The [SDK page](/sdk/) also lists five unpublished candidate libraries, clearly marked with source links: [Chord and Chord.Hosting](/docs/embed/chord/), [Durable.Store](/docs/embed/durable-store/), and [Env.Protocol and Env](/docs/embed/env/). The 1.5.0.1 preparation inventory is 28 libraries plus the CLI, 29 packages. Keep published references at 1.5.0 until the candidate is published; all sibling references must use the same exact release version.
 
 | Package | Group | Purpose | Docs |
 | --- | --- | --- | --- |

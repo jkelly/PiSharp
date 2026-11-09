@@ -105,9 +105,10 @@ internal static class McpResourceRuntimeBridgeTests
     private static async Task Methods()
     {
         var channel = new Channel(); await using var runtime = Runtime(channel); await runtime.ConnectAsync(); var context = new Context();
+        var expectedResponseBytes = 16 * 1024 * 1024;
         channel.Handler = (method, parameters, options, token) =>
         {
-            Check(options.InvocationIdentity == Options(context).InvocationIdentity && options.TimeoutMilliseconds == 2000 && options.MaximumResponseBytes == 1_048_576 && options.OnProgress is not null);
+            Check(options.InvocationIdentity == Options(context).InvocationIdentity && options.TimeoutMilliseconds == 2000 && options.MaximumResponseBytes == expectedResponseBytes && options.OnProgress is not null);
             Check(method != "resources/read" || parameters!.Value.GetProperty("uri").GetString() == "data://a");
             return Task.FromResult(Channel.Response(method));
         };
@@ -118,6 +119,11 @@ internal static class McpResourceRuntimeBridgeTests
             Check(result.Server == "demo");
         }
         Check(string.Join(',', channel.Requests) == "initialize,resources/list,resources/templates/list,resources/read");
+        expectedResponseBytes = 1_048_576;
+        var bounded = new McpResourceTools(() => [runtime.CaptureResourceServer(context)], Save,
+            new(MaximumResponseBytes: expectedResponseBytes));
+        Check((await bounded.ExecuteAsync(McpResourceTools.ListResources, Json("""{"server":"demo"}"""), context)).Server == "demo");
+        Check(channel.Requests[^1] == "resources/list");
     }
     private static async Task Admission()
     {

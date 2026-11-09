@@ -87,14 +87,27 @@ internal static partial class ToolActivationTests
             await session.PromptAsync(Input());
             Names(["inactive", "code"], Declared(fixture.Source.Requests[0]));
             Check(fixture.Effects.SequenceEqual(["inactive"]), "Explicit default-inactive activation failed.");
+            var beforeSelection = await ReadShared(fixture.PathFor("persist"));
             await session.SetActiveToolsAsync([]);
             Names([], session.GetActiveTools());
+            var afterSelection = await ReadShared(fixture.PathFor("persist"));
+            Check(beforeSelection.SequenceEqual(afterSelection), "Idle tool selection wrote before a request.");
         }
         finally { await owner.DisposeAsync(); }
         await using var reopened = await fixture.Open(fixture.PathFor("persist"), default);
-        Names([], reopened.GetActiveTools());
-        await reopened.SetActiveToolsAsync(["code", "outer"]);
+        Names(["inactive", "code"], reopened.GetActiveTools());
+        await reopened.SetActiveToolsAsync([]);
+        var beforePrompt = reopened.Snapshot.Log.Entries.Length;
+        await reopened.PromptAsync(Input());
+        Names([], Declared(fixture.Source.Requests[^1]));
+        Check(reopened.Snapshot.Log.Entries.Length > beforePrompt, "Request did not checkpoint the selected empty loadout.");
         await reopened.DisposeAsync();
+        await using var empty = await fixture.Open(fixture.PathFor("persist"), default);
+        Names([], empty.GetActiveTools());
+        await empty.SetActiveToolsAsync(["code", "outer"]);
+        await empty.PromptAsync(Input());
+        Names(["code", "outer"], Declared(fixture.Source.Requests[^1]));
+        await empty.DisposeAsync();
         await using var again = await fixture.Open(fixture.PathFor("persist"), default);
         Names(["code", "outer"], again.GetActiveTools());
         Check(fixture.Binding.Registrations.Length == 7, "Deactivation unregistered callable tools.");
@@ -126,23 +139,42 @@ internal static partial class ToolActivationTests
 
     private static async Task CancelActivation()
     {
-        await using var fixture = await Fixture.Create();
+        using var during = new CancellationTokenSource(); var armed = false; var preparations = 0;
+        await using var fixture = await Fixture.Create((name, _) =>
+        { if (armed && name == "code") { preparations++; during.Cancel(); } return null; });
         var session = await fixture.New("cancel-activation");
         await using var owner = fixture.Owner(session);
         var before = await ReadShared(fixture.PathFor("cancel-activation"));
         using var cancelled = new CancellationTokenSource(); cancelled.Cancel();
-        await Throws<OperationCanceledException>(() => session.SetActiveToolsAsync(["inactive"], cancelled.Token));
-        using var during = new CancellationTokenSource();
-        fixture.Clock = () => { during.Cancel(); return 1; };
-        await Throws<OperationCanceledException>(() => session.SetActiveToolsAsync(["code"], during.Token));
-        fixture.Clock = () => 1;
+        var admissionCancellation = await Capture<OperationCanceledException>(() => session.SetActiveToolsAsync(["inactive"], cancelled.Token));
+        Check(admissionCancellation.CancellationToken == cancelled.Token && preparations == 0, "Pre-canceled admission lost its caller token or reached preparation.");
+        armed = true;
+        var operation = session.SetActiveToolsAsync(["code"], during.Token);
+        var failure = await Capture<AggregateException>(() => operation);
+        Check(failure.InnerExceptions.Count == 2 && failure.InnerExceptions[0] is OperationCanceledException preparation &&
+            failure.InnerExceptions[1] is OperationCanceledException drain && !ReferenceEquals(preparation, drain) &&
+            preparation.CancellationToken == drain.CancellationToken && preparation.CancellationToken != during.Token &&
+            preparation.CancellationToken.IsCancellationRequested,
+            "Preparation and diagnostic admission did not retain both cancellations with their exact shared linked work token.");
+        Check(operation.IsFaulted && ReferenceEquals(operation.Exception!.InnerException, failure), "Cancellation evidence was replaced or the aggregate became a canceled task.");
+        armed = false; Check(preparations == 1, "Cancellation did not reach actual loadout preparation.");
         var afterCancelledActivation = await ReadShared(fixture.PathFor("cancel-activation"));
         Check(before.SequenceEqual(afterCancelledActivation), "Cancelled activation changed the durable file.");
         Names(["direct", "outer"], session.GetActiveTools());
+        Names(["direct", "outer"], session.Snapshot.Agent.Tools.Select(tool => tool.Name));
+        Check(fixture.Effects.Count == 0 && fixture.Source.Requests.Count == 0 && fixture.LoadoutErrors.Count == 0 &&
+            session.Snapshot.Fault is null && !session.Snapshot.IsConfiguring, "Canceled preparation caused effects, diagnostics or a poisoned reservation.");
         await Throws<SessionRuntimeRegistryException>(() => session.SetActiveToolsAsync(default));
         await Throws<ArgumentException>(() => session.ConfigureAsync(new(SystemMessage: fixture.Binding.CreateDeclarationMessage("", 1))
             { ActiveToolNames = [] }));
         Names(["direct", "outer"], session.GetActiveTools());
+        await session.SetActiveToolsAsync(["inactive"]);
+        Names(["inactive"], session.GetActiveTools());
+        var afterRecovery = await ReadShared(fixture.PathFor("cancel-activation"));
+        Check(before.SequenceEqual(afterRecovery), "Recovered memory-only activation changed the durable file.");
+
+        static async Task<T> Capture<T>(Func<Task> action) where T : Exception
+        { try { await action(); } catch (T error) { return error; } throw new InvalidOperationException("Expected " + typeof(T).Name); }
     }
 
     private static async Task CancelInvocation()

@@ -31,9 +31,9 @@ internal static partial class Program
 
     private const string MessagesUrl = "https://api.anthropic.com/v1/messages?beta=true";
     private static string Frame(string type, object value) => "event: " + type + "\ndata: " + JsonSerializer.Serialize(value) + "\n\n";
-    private static HttpResponseMessage Stream(object block, string? delta, string stop)
+    private static HttpResponseMessage Stream(object block, string? delta, string stop, string responseId = "authored")
     {
-        var start = Frame("message_start", new { type = "message_start", message = new { id = "authored", role = "assistant", model = "claude-sonnet-4-5",
+        var start = Frame("message_start", new { type = "message_start", message = new { id = responseId, role = "assistant", model = "claude-sonnet-4-5",
             content = Array.Empty<object>(), usage = new { input_tokens = 2, output_tokens = 0 } } });
         var body = start + Frame("content_block_start", new { type = "content_block_start", index = 0, content_block = block })
             + (delta is null ? "" : Frame("content_block_delta", new { type = "content_block_delta", index = 0,
@@ -43,7 +43,7 @@ internal static partial class Program
             + Frame("message_stop", new { type = "message_stop" });
         return new(HttpStatusCode.OK) { Content = new StringContent(body, Encoding.UTF8, "text/event-stream") };
     }
-    internal static HttpResponseMessage Text(string text) => Stream(new { type = "text", text = "" }, text, "end_turn");
+    internal static HttpResponseMessage Text(string text, string responseId = "authored") => Stream(new { type = "text", text = "" }, text, "end_turn", responseId);
     internal static HttpResponseMessage Call(string id, string name, object input) =>
         Stream(new { type = "tool_use", id, name, input = new { } }, JsonSerializer.Serialize(input), "tool_use");
 
@@ -221,6 +221,32 @@ internal static partial class Program
 
     internal static string[] ToolNames(Seen request) =>
         JsonDocument.Parse(request.Body!).RootElement.TryGetProperty("tools", out var tools) ? [.. tools.EnumerateArray().Select(tool => tool.GetProperty("name").GetString()!)] : [];
+
+    // Anthropic continuation inherits unchanged declarations from a response actually returned by this fixture.
+    // Missing tools on a create or an unknown parent never acquire declarations from another request.
+    private static string[][] EffectiveToolNames(Seen[] requests, IReadOnlyList<string> replyIds)
+    {
+        Equal(requests.Length, replyIds.Count, "one completed provider reply per request");
+        var result = new List<string[]>();
+        for (var index = 0; index < requests.Length; index++)
+        {
+            using var document = JsonDocument.Parse(requests[index].Body!);
+            var body = document.RootElement;
+            if (body.TryGetProperty("thread", out var thread) && thread.GetProperty("type").GetString() == "continue")
+            {
+                Check(index > 0, "continuation has no completed parent");
+                Equal(replyIds[index - 1], thread.GetProperty("previous_message_id").GetString(), "continuation names preceding completed reply");
+                Check(!body.TryGetProperty("tools", out _) && !body.TryGetProperty("system", out _), "continuation inherits unchanged declarations and system");
+                result.Add(result[index - 1]);
+            }
+            else
+            {
+                if (body.TryGetProperty("thread", out thread)) Equal("create", thread.GetProperty("type").GetString(), "full request thread type");
+                result.Add(ToolNames(requests[index]));
+            }
+        }
+        return [.. result];
+    }
 
     /// <summary>The text of each tool_result block in the request's last message.</summary>
     internal static string[] ToolResults(Seen request) => [.. JsonDocument.Parse(request.Body!).RootElement.GetProperty("messages").EnumerateArray().Last()

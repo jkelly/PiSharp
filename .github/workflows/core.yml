@@ -35,7 +35,7 @@ jobs:
           node-version: '22'
       - name: Install native search prerequisite
         shell: pwsh
-        run: choco install ripgrep --yes --no-progress
+        run: choco install ripgrep fd --yes --no-progress
       - name: Run console suite with native fixture prerequisites
         shell: pwsh
         run: ./tools/ci/run-core-suite.ps1 -Suite '${{ matrix.suite }}' -ReportDirectory '${{ runner.temp }}/core'
@@ -65,7 +65,8 @@ jobs:
           node-version: '22'
       - name: Offline applicability and worklist structure
         run: |
-          node --test tools/CompatibilityReport/sync-applicability.test.mjs tools/ci/validation-manifest.test.mjs
+          node --test tools/CompatibilityReport/sync-applicability.test.mjs tools/ci/validation-manifest.test.mjs tools/release/publish-github-release.test.mjs
+          node --test tools/ci/historical-ai-archive.test.mjs
           node tools/DurablePortMap/check-worklist.mjs --offline
       - name: Fetch immutable upstream objects
         shell: bash

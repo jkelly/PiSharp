@@ -126,6 +126,7 @@ internal static partial class Program
         ("json-fidelity.lone-surrogate-names-travel-through-rpc-tool-arguments-and-session", async () =>
         {
             using var sandbox = new Sandbox("json-fidelity-names");
+            sandbox.UseFullAnthropicTranscript();
             const string arguments = "{\"path\":\"a.txt\",\"content\":\"x\",\"k\\ud800\":[\"v\\udc00\",{\"\\udfff\":1}]}";
             sandbox.Respond = (_, index) => index == 0 ? AnthropicStream(ToolUseBlock(0, "toolu_n", arguments), "tool_use") : AnthropicText("done");
             var (exit, frames, stderr) = await RunRpcPrompt(sandbox, "{\"id\":\"p\",\"type\":\"prompt\",\"message\":\"go\",\"x\\ud800\":1}");
@@ -286,6 +287,7 @@ internal static partial class Program
         ("json-fidelity.deep-values-pass-rpc-tool-arguments-and-sessions", async () =>
         {
             using var sandbox = new Sandbox("json-fidelity-deep");
+            sandbox.UseFullAnthropicTranscript();
             static string Deep(int levels) => new string('[', levels - 1) + "{\"leaf\":1}" + new string(']', levels - 1);
             var deep = Deep(900);
             var partial = "{\"path\":\"deep.txt\",\"content\":\"ok\",\"deep\":" + deep + "}";

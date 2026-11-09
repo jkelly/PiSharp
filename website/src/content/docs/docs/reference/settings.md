@@ -82,7 +82,7 @@ See [Sessions](/docs/guides/sessions/) for compaction and branch summaries.
 | `transport` | `auto`, `sse`, `websocket`, `websocket-cached` | `auto` | How OpenAI Codex requests travel. See [OpenAI Codex transport](/docs/guides/providers/#openai-codex-transport). |
 | `httpProxy` | string | none | Global only. Proxy URL. PiSharp sets `HTTP_PROXY` and `HTTPS_PROXY` from it when they're unset. |
 | `httpIdleTimeoutMs` | number, or `"disabled"` | `300000` | How long a provider request may wait for headers and for each body chunk. `0` or `"disabled"` turns it off. An invalid value is an error at startup. |
-| `websocketConnectTimeoutMs` | number, or `"disabled"` | none | Pi's WebSocket connect timeout. PiSharp parses it but ignores it: the Codex WebSocket gets a fixed 15 seconds. |
+| `websocketConnectTimeoutMs` | number, or `"disabled"` | none | Published 1.5.0 uses a fixed 15 seconds. Candidate 1.5.0.1 propagates the configured WebSocket connection timeout. |
 | `cacheWarming` | `off`, `streaming`, `idle` | `streaming` | Keeps the provider's prompt cache warm by resending the last request with a one-token answer. `streaming` warms during an agent run, `idle` also between runs (up to 30 minutes), when that is expected to save money. Global only, because each refresh costs money. |
 
 ## Tools and shell

@@ -51,6 +51,7 @@ internal static partial class Program
         ("validation.read-runs-with-coerced-arguments-and-the-session-keeps-the-model-arguments", async () =>
         {
             using var sandbox = new Sandbox("validation-coerce");
+            sandbox.UseFullAnthropicTranscript();
             var file = sandbox.Write(Path.Combine(sandbox.Cwd, "lines.txt"), "one\ntwo\nthree\nfour");
             sandbox.Respond = (_, index) => index == 0 ? AnthropicToolCall("read", new { path = file, offset = "2", limit = "2" }) : AnthropicText("done");
             var (code, stdout, stderr) = await sandbox.Run("-p", "--provider", "anthropic", "--model", "claude-sonnet-4-5", "read it");

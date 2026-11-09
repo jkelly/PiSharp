@@ -20,6 +20,7 @@ internal static class PublishedLoaderTests
         ("private contract copies and an actually compiled future ABI reject before execution", SharedAbi),
         ("missing managed, framework, malformed-image and native dependencies fail closed", DependencyAdmission),
         ("published initialization failure/cancellation and loader close join rollback", ActivationSettlement),
+        ("published loader primary classification preserves activation task fault evidence", ActivationFailureEvidence),
         ("published callback/disposal barriers share cleanup and release cooperative load contexts", LifetimeSettlement),
         ("published private callback accepts exact short and long Windows path aliases while rejecting distinct locations", ManagedPathIdentity),
         ("quiescence. loaded published owner retains package and reservation until actual drain and shutdown", QuiescenceSettlement)
@@ -271,6 +272,59 @@ internal static class PublishedLoaderTests
         Equal(0, fixtures.MarkerCount);
         Equal(0, registry.CaptureSnapshot().Registrations.Length);
         Equal(0, Directory.GetDirectories(fixtures.Snapshots).Length);
+    }
+
+    private static async Task ActivationFailureEvidence()
+    {
+        RequireQualifiedProfile();
+        using var fixtures = await Fixtures.CreateAsync();
+        await using var registry = new ExtensionRegistry();
+        await using var loader = new PluginAssemblyLoader(fixtures.Options);
+        Task<RegistrationScope>? activation = null;
+        var failure = await Throws<PluginLoadException>(() => loader.LoadAsync(fixtures.Fail.Metadata, fixtures.Fail.Root,
+            ExtensionSourceScope.Explicit, "approved-fixture-suite", fixtures.Fail.Inspection, fixtures.Fail.Execution, registry,
+            activateOwner: (id, extension, token) => activation = registry.ActivateAsync(id, extension, token)));
+        Equal(PluginLoadFailure.InitializationFailed, failure.Failure);
+        Evidence(failure.InnerException!, activation!, activation!.Exception!.InnerExceptions[0]);
+        Equal(1, fixtures.Count("PublishedFixture.Fail", "dispose"));
+
+        using var cancelled = new CancellationTokenSource(); cancelled.Cancel();
+        // A plugin's own aggregate is an ordinary load failure; its nested OCE is not loader cancellation.
+        var userAggregate = new AggregateException("authored aggregate", new OperationCanceledException(cancelled.Token));
+        var aggregateOriginal = Task.FromException<RegistrationScope>(userAggregate);
+        var aggregateFailure = await Throws<PluginLoadException>(() => LoadOriginal(aggregateOriginal));
+        Equal(PluginLoadFailure.LoadFailed, aggregateFailure.Failure);
+        Evidence(aggregateFailure.InnerException!, aggregateOriginal, userAggregate);
+
+        // Preserve every fault from a faulted activation even when awaiting it throws an OCE.
+        var cancellation = new OperationCanceledException(cancelled.Token);
+        var secondary = new InvalidOperationException("authored secondary activation fault");
+        var faults = new TaskCompletionSource<RegistrationScope>(TaskCreationOptions.RunContinuationsAsynchronously);
+        faults.SetException([cancellation, secondary]);
+        var canceledFailure = await Throws<OperationCanceledException>(() => LoadOriginal(faults.Task));
+        Equal(cancelled.Token, canceledFailure.CancellationToken);
+        Evidence(canceledFailure.InnerException!, faults.Task, cancellation);
+        True(ReferenceEquals(secondary, faults.Task.Exception!.InnerExceptions[1]));
+
+        var canceledOriginal = Task.FromCanceled<RegistrationScope>(cancelled.Token);
+        Equal(cancelled.Token, (await Throws<OperationCanceledException>(() => LoadOriginal(canceledOriginal))).CancellationToken);
+        Equal(0, registry.CaptureSnapshot().Registrations.Length);
+        Equal(0, Directory.GetDirectories(fixtures.Snapshots).Length);
+        Equal(3, fixtures.Count("PublishedFixture.One", "dispose"));
+
+        Task<LoadedExtension> LoadOriginal(Task<RegistrationScope> original) => loader.LoadAsync(fixtures.One.Metadata,
+            fixtures.One.Root, ExtensionSourceScope.Explicit, "approved-fixture-suite", fixtures.One.Inspection,
+            fixtures.One.Execution, registry, activateOwner: (_, _, _) => original);
+        static void Evidence(Exception error, Task<RegistrationScope> original, Exception primary)
+        {
+            True(error is AggregateException { InnerExceptions.Count: 2 });
+            var retained = (AggregateException)error;
+            var expected = original.Exception!.InnerExceptions;
+            True(retained.InnerExceptions[0] is AggregateException);
+            var actual = ((AggregateException)retained.InnerExceptions[0]).InnerExceptions;
+            True(expected.Count == actual.Count && expected.Zip(actual).All(pair => ReferenceEquals(pair.First, pair.Second)));
+            True(ReferenceEquals(primary, retained.InnerExceptions[1]));
+        }
     }
 
     private static async Task ActivationSettlement()

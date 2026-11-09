@@ -343,6 +343,7 @@ internal static class Program
     private static DefaultHttpContext Request(string method, string path, int port = 8123)
     {
         var context = new DefaultHttpContext(); context.Request.Method = method; context.Request.Path = path; context.Request.Host = new("localhost", port);
+        context.Features.Get<Microsoft.AspNetCore.Http.Features.IHttpRequestFeature>()!.RawTarget = path;
         context.Connection.LocalIpAddress = IPAddress.Loopback; context.Connection.LocalPort = port; context.Response.Body = new MemoryStream(); return context;
     }
     private static string Body(DefaultHttpContext context) => Encoding.UTF8.GetString(((MemoryStream)context.Response.Body).ToArray());
@@ -369,6 +370,14 @@ internal static class Program
         var facet = Facet.Define((_, self) => { self.Contribute(HttpRegistries.Http, contribution); self.Contribute(HttpRegistries.Authenticators, (HttpAuthenticator)((_, _) => { authCalls++; return Task.FromResult<JsonObject?>(new() { ["kind"] = "user" }); })); });
         await host.LoadAsync([new("chord.http", http.Facet), new("test.web", facet)], Context);
         var good = Request("GET", "/hello/Ada"); await http.HandleAsync(good); Check(good.Response.StatusCode == 200 && Body(good) == "wrapped:Ada", "route/wrapper pipeline");
+        var rootTarget = Request("GET", "/"); await http.HandleAsync(rootTarget); Check(rootTarget.Response.StatusCode == 404, "origin-form root target rejected before routing");
+        foreach (var target in new[] { "/hello/Ada?next=http://foreign.example", "http://localhost:8123/hello/Ada", "HTTPS://foreign.example/hello/Ada" })
+        {
+            var form = Request("GET", "/hello/Ada");
+            form.Features.Get<Microsoft.AspNetCore.Http.Features.IHttpRequestFeature>()!.RawTarget = target;
+            await http.HandleAsync(form);
+            Check(form.Response.StatusCode == (target.StartsWith('/') ? 200 : 403), "origin-form/proxy-form request-target admission: " + target);
+        }
         var before = authCalls; var hook = Request("POST", "/hook"); hook.Request.Headers.Origin = "https://foreign.example"; await http.HandleAsync(hook);
         Check(Body(hook) == "wrapped:anonymous" && authCalls == before, "cross-site hook must run anonymous without authentication");
         var denied = Request("POST", "/private"); denied.Request.Headers.Origin = "https://foreign.example"; await http.HandleAsync(denied); Check(denied.Response.StatusCode == 403, "foreign origin admitted");
@@ -476,7 +485,18 @@ internal static class Program
     {
         var root = Temp(); using var first = await ProcessAddressLock.AcquireAsync("address", root); using var cancellation = new CancellationTokenSource(TimeSpan.FromMilliseconds(100));
         try { using var second = await ProcessAddressLock.AcquireAsync("address", root, cancellation.Token); throw new Exception("second process lock admitted"); } catch (OperationCanceledException) { }
-        first.Dispose(); using var acquired = await ProcessAddressLock.AcquireAsync("address", root); Check(acquired is not null, "released address lock remained held");
+        var waiting = ProcessAddressLock.AcquireAsync("address", root);
+        await Task.Delay(100); Check(!waiting.IsCompleted, "contended address lock did not wait");
+        first.Dispose(); using (var acquired = await waiting.WaitAsync(TimeSpan.FromSeconds(2))) Check(acquired is not null, "released address lock remained held");
+        using var canceled = new CancellationTokenSource(); canceled.Cancel();
+        try { using var invalid = await ProcessAddressLock.AcquireAsync("address", root, canceled.Token); throw new Exception("pre-canceled address lock admitted"); } catch (OperationCanceledException) { }
+        using (var afterCancel = await ProcessAddressLock.AcquireAsync("address", root).WaitAsync(TimeSpan.FromSeconds(2))) Check(afterCancel is not null, "canceled acquisition retained mutex ownership");
+        var key = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(Encoding.UTF8.GetBytes(Path.GetFullPath(root) + "|abandoned")));
+        using var abandoned = new Mutex(false, (OperatingSystem.IsWindows() ? "Local\\" : "") + "PiSharpChord-" + key);
+        var owner = new Thread(() => abandoned.WaitOne()); owner.Start();
+        Check(owner.Join(TimeSpan.FromSeconds(2)), "abandoned mutex fixture did not finish");
+        using var recovered = await ProcessAddressLock.AcquireAsync("abandoned", root).WaitAsync(TimeSpan.FromSeconds(2));
+        Check(recovered is not null, "abandoned address lock was not acquired");
     }
     private static async Task FailedAddedPlugin()
     {

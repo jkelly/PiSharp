@@ -89,3 +89,7 @@ Current reviewed head: 34f19a66. User authorizes review, fixes, CI validation an
 PR48 review results: seven confirmed defects fixed in36,40,42,46,51,57,61. Focused regression suites and independent rereview passed. The seven modified workflows also passed fresh gpt-6.1-sol strict tool-result comparisons with the authorized environment key. The main agent owns full-catalog revalidation, commit/push and final CI-gated merge.
 
 PR48 integration verification: sample solution rebuilt with0 warnings/errors; all62 self-test programs and demos and13 shared runtime tests passed. All7 modified workflows passed fresh gpt-6.1-sol comparisons. The additional46 count-boundary test passed. Awaiting final-head CI before the authorized merge.
+
+## Website and 1.5.0.1 preparation
+
+The active dependency-marked work packages are in [release-1.5.0.1-plan.md](release-1.5.0.1-plan.md): WEB1, REL1, CI1, MAC1 and FINAL. This phase starts after gap implementation commit 3024b1e0 reached main. Earlier workflow tables remain historical.

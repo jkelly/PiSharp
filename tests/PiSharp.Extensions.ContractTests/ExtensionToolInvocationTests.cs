@@ -203,14 +203,22 @@ internal static class ExtensionToolInvocationTests
         }
         await using (var registry = new ExtensionRegistry(new() { MaximumJsonCharacters = 256 }))
         {
-            var calls = 0; await registry.ActivateAsync("owner", Extension((input, context, token) => { calls++; return ValueTask.FromResult(Result("unused")); }));
-            foreach (var id in new[] { "", " ", "id\0bad", "\ud800", new string('i', 257) })
+            var ids = new List<string>();
+            await registry.ActivateAsync("owner", Extension((input, context, token) =>
+            { ids.Add(Invocation(context).ToolCallId); return ValueTask.FromResult(Result("unused")); }));
+            foreach (var id in new[] { "", " ", new string('i', 256) })
+            {
+                await registry.InvokeToolAsync(registry.CaptureSnapshot(), "native_invocation", Args("ok"), id,
+                    (partial, token) => ValueTask.CompletedTask);
+                Equal(id, ids[^1]); // API-supplied ids are retained exactly, including id-less calls.
+            }
+            foreach (var id in new[] { null!, "id\0bad", "\ud800", new string('i', 257) })
                 Equal(ExtensionRegistrationFailure.InvalidDescriptor, (await Throws<ExtensionRegistrationException>(() => registry.InvokeToolAsync(registry.CaptureSnapshot(),
                     "native_invocation", Args("ok"), id, (partial, token) => ValueTask.CompletedTask).AsTask())).Failure);
             ExtensionToolUpdateCallback first = (partial, token) => ValueTask.CompletedTask;
             ExtensionToolUpdateCallback second = (partial, token) => ValueTask.CompletedTask;
             await Throws<ExtensionRegistrationException>(() => registry.InvokeToolAsync(registry.CaptureSnapshot(), "native_invocation", Args("ok"), "real-id", first + second).AsTask());
-            Equal(0, calls);
+            Equal(3, ids.Count);
         }
     }
 

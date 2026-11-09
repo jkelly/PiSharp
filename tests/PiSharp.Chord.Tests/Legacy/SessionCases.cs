@@ -89,8 +89,8 @@ internal static partial class Program
         });
         yield return Case("legacy.link.native-pipe-transfer",async()=>
         {
-            var name="pisharp-legacy-"+Guid.NewGuid().ToString("N");
-            using var server=new NamedPipeServerStream(name,PipeDirection.InOut,1,PipeTransmissionMode.Byte,PipeOptions.Asynchronous);
+            using var addresses=PrivatePipeDirectory.Create(); var name=addresses.Name("legacy");
+            using var server=new NamedPipeServerStream(name,PipeDirection.InOut,1,PipeTransmissionMode.Byte,PipeOptions.Asynchronous|PipeOptions.CurrentUserOnly);
             using var client=new NamedPipeClientStream(".",name,PipeDirection.InOut,PipeOptions.Asynchronous);
             var accepted=server.WaitForConnectionAsync(); await client.ConnectAsync(5000); await accepted;
             var a=new LegacyPipeLink(server);var b=new LegacyPipeLink(client);
@@ -100,8 +100,8 @@ internal static partial class Program
         });
         yield return Case("legacy.link.native-websocket-transfer",async()=>
         {
-            var name="pisharp-legacy-ws-"+Guid.NewGuid().ToString("N");
-            using var server=new NamedPipeServerStream(name,PipeDirection.InOut,1,PipeTransmissionMode.Byte,PipeOptions.Asynchronous);
+            using var addresses=PrivatePipeDirectory.Create(); var name=addresses.Name("websocket");
+            using var server=new NamedPipeServerStream(name,PipeDirection.InOut,1,PipeTransmissionMode.Byte,PipeOptions.Asynchronous|PipeOptions.CurrentUserOnly);
             using var client=new NamedPipeClientStream(".",name,PipeDirection.InOut,PipeOptions.Asynchronous);
             var accepted=server.WaitForConnectionAsync(); await client.ConnectAsync(5000); await accepted;
             using var left=System.Net.WebSockets.WebSocket.CreateFromStream(server,true,null,TimeSpan.FromSeconds(10));

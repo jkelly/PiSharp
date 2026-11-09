@@ -40,6 +40,12 @@ Releases are prepared on a `release/<version>` branch, such as `release/1.5.0`, 
 
 A separate commit then re-seals the derivative integrity table, because `Directory.Build.props`, `README.md`, `THIRD-PARTY-NOTICES.md` and other files above are pinned there. See [Derivative integrity pins](/docs/contribute/porting/#derivative-integrity-pins).
 
+### Current preparation: 1.5.0.1
+
+The candidate is **1.5.0.1**, on the unchanged Pi v1.5.0 source pin. The inventory is 28 libraries plus the CLI (29 packages). Chord, Chord.Hosting, Durable.Store, Env.Protocol and Env are added experimental libraries and remain unpublished. An external package-only consumer must validate their exact sibling references and framework requirements. The native daemon is a separate artifact.
+
+`compatibility/public-release.json` keeps publication flags false and preserves the complete published 1.5.0 record in `previousReleases`. The website continues to show 1.5.0 as published. The candidate changelog uses `kind: patch`, `baseline: 1.5.0`, `status: in-progress` and is excluded from released RSS. No release tag has been created as part of preparation.
+
 ### Regenerate CHANGELOG.md
 
 `CHANGELOG.md` ships next to the CLI, where What's New and `/changelog` read it. It is generated from `website/src/content/changelog/*.md`, newest version first, as `## [version] - date` sections in Pi's format, with site-relative links made absolute. The `InteractiveParity` case `changelog.sync.generated-from-website` fails when the file is out of date. With `PISHARP_WRITE_CHANGELOG=1`, it rewrites the file instead:
@@ -69,14 +75,14 @@ The package list is written out in several places. A new library needs all of th
 
 ## Dry run
 
-Run the release workflow by hand from the Actions tab to build and check a version without publishing anything. It takes two inputs:
+Run the release workflow by hand from the Actions tab to build and check a version without publishing anything. Set `version` explicitly to `1.5.0.1` for this candidate. It takes two inputs:
 
 | Input | Default | Effect |
 | --- | --- | --- |
 | `version` | `1.5.0` | The version to build and validate. |
 | `skip_tests` | `false` | Skip the 22 release-list suites in a dry run. Core and Durable validation still run. |
 
-A dry run runs only the build job. The publish and GitHub release jobs run only for a pushed tag.
+A dry run runs the build and the reusable validation gates. The publish and GitHub release jobs run only for a pushed tag.
 
 You can also build the packages locally. See [Install your build as a tool](/docs/contribute/build/#install-your-build-as-a-tool).
 
@@ -85,13 +91,24 @@ You can also build the packages locally. See [Install your build as a tool](/doc
 Once the release branch is merged, tag the merge commit and push the tag:
 
 ```sh
-git tag v1.5.0 <merge commit>
-git push origin v1.5.0
+git tag v1.5.0.1 <qualified merge commit>
+git push origin v1.5.0.1
 ```
 
 ## The release workflow
 
-`release.yml` has three packaging/publication jobs plus two reusable validation gates. The core and Durable workflows receive the exact release `github.sha`. Both must succeed before NuGet publication and the GitHub release can run. Durable's gate includes the three-OS suites, zero-retention reruns, SQL Server, hosting/server checks and the four SQLite publish RIDs. Separate web/browser suites are optional and do not gate this core release path.
+`release.yml` has three packaging/publication jobs plus four reusable validation gates, each receiving the exact release `github.sha`. Required failures must be diagnosed and corrected before readiness is claimed. Local Windows receipts or a workflow definition do not establish hosted success. Separate web/browser suites are optional for this release path.
+
+### Four required validation gates
+
+| Gate | Required evidence |
+| --- | --- |
+| `core-validation` / `core.yml` | Core suites and provenance at the exact source SHA. |
+| `durable-validation` / `durable.yml` | Three-OS suites, zero-retention reruns, SQL Server, hosting/server checks and four SQLite publish RIDs. |
+| `gap-validation` / `gap-regressions.yml` | Registered gap/Chord/Env suites, exact case/skip ledgers, production Pi runtime installer and fresh-cache provenance. |
+| `native-env-validation` / `env-native.yml` | Native daemon publish, notices/integrity and real platform smoke/PTY checks. Windows verifies explicit PTY `ENOTSUP`. |
+
+The build/package validation is also required. The 29-package inventory and new-library consumer gate must pass against the intended candidate sources. A successful platform job covers its tested toolchain/ABI, not additional RIDs or older operating systems. Review actual logs and artifacts before marking the candidate ready.
 
 ### Build
 

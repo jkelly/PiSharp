@@ -1,4 +1,4 @@
-export type Package = { id: string; description: string; group: 'Core' | 'Frontends' | 'Extensions'; nuget?: boolean; tool?: boolean; optional?: boolean; experimental?: boolean; docs?: string };
+export type Package = { id: string; description: string; group: 'Core' | 'Frontends' | 'Extensions'; nuget?: boolean; tool?: boolean; optional?: boolean; experimental?: boolean; unpublished?: boolean; docs?: string };
 
 export const packages: Package[] = [
 	{ id: 'PiSharp.Contracts', group: 'Core', nuget: true, description: 'Shared message, streaming and JSON contracts used by every other package, and the JSON Schema validator for tool arguments, a port of pi-schema (experimental).' },
@@ -17,6 +17,11 @@ export const packages: Package[] = [
 	{ id: 'PiSharp.Durable', group: 'Core', nuget: true, experimental: true, description: "A port of Pi's durable agent harness. Sessions commit every step before showing it and resume after a crash." },
 	{ id: 'PiSharp.Durable.Tools', group: 'Core', nuget: true, experimental: true, description: 'The execution environment, coding tools, tool_search, code mode and media tools for durable sessions.' },
 	{ id: 'PiSharp.Durable.Sqlite', group: 'Core', nuget: true, experimental: true, description: 'SQLite storage for durable sessions, on Microsoft.Data.Sqlite.' },
+	{ id: 'PiSharp.Chord', group: 'Core', unpublished: true, experimental: true, docs: '/docs/embed/chord/', description: 'Candidate: reactive Chord v2 host, store, registries, jobs, links and remote routes, plus the separate legacy protocol-4 runtime. PISHARP_CHORD001.' },
+	{ id: 'PiSharp.Chord.Hosting', group: 'Core', unpublished: true, experimental: true, docs: '/docs/embed/chord/', description: 'Candidate: native plugin generations, HTTP and process workers. Requires the ASP.NET Core shared framework. PISHARP_CHORD001.' },
+	{ id: 'PiSharp.Durable.Store', group: 'Core', unpublished: true, experimental: true, docs: '/docs/embed/durable-store/', description: 'Candidate: Durable storage and composed registries on the real Chord host, with examples 35–37. PISHARP_DURABLE001.' },
+	{ id: 'PiSharp.Env.Protocol', group: 'Core', unpublished: true, experimental: true, docs: '/docs/embed/env/', description: 'Candidate: bounded pi-env framing for native remote filesystem and process transports. PISHARP_ENV001.' },
+	{ id: 'PiSharp.Env', group: 'Core', unpublished: true, experimental: true, docs: '/docs/embed/env/', description: 'Candidate: reconnecting remote environments, watches, processes, Unix terminals and verified SSH bootstrap. The daemon is a separate native artifact. PISHARP_ENV001.' },
 	{ id: 'PiSharp.CustomAgents', group: 'Core', nuget: true, experimental: true, docs: '/docs/custom-agents/overview/', description: 'Typed workflows, agent teams, subagents, messaging, and typed and dynamic tools, on the durable harness.' },
 	{ id: 'PiSharp.CustomAgents.JavaScript', group: 'Core', nuget: true, experimental: true, docs: '/docs/custom-agents/tools/', description: "JavaScript tools and workflow actions for custom agents, in code mode's Jint sandbox." },
 	{ id: 'PiSharp.CustomAgents.Scripting', group: 'Core', nuget: true, experimental: true, docs: '/docs/custom-agents/tools/', description: 'C# script tools and workflow actions for custom agents, compiled with Roslyn.' },

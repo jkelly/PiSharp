@@ -13,7 +13,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from owned_process import Cancelled, run_owned
-from run_gap_suites import execute, parse_evidence
+from run_gap_suites import execute, parse_evidence, resolve_sdk_host
 
 
 def cleanup_fixture(temporary):
@@ -51,8 +51,27 @@ class ProcessTests(unittest.TestCase):
         self.assertIn("actual output", (self.root / "out").read_text())
         self.assertIn("actual error", (self.root / "err").read_text())
 
+    def test_selected_host_is_resolved_and_propagated_to_owned_child(self):
+        host = resolve_sdk_host(sys.executable)
+        self.assertTrue(Path(host).is_absolute())
+        result = run_owned([sys.executable, "-c", "import os; print(os.environ['PISHARP_TEST_DOTNET'])"],
+                           self.root, self.root / "out", self.root / "err", 5,
+                           env=dict(os.environ) | {"PISHARP_TEST_DOTNET": host})
+        self.assertEqual(result["exitCode"], 0)
+        self.assertEqual((self.root / "out").read_text().strip(), host)
+        with self.assertRaises(FileNotFoundError):
+            resolve_sdk_host(str(self.root / "missing-dotnet"))
+
     def test_hang_is_bounded(self):
-        result = self.run_child("import time; print('before hang', flush=True); time.sleep(100)", .3)
+        # Establish fixture readiness separately from the short hang deadline;
+        # a busy host may need more than 300ms merely to start Python.
+        def ready(_):
+            until = time.monotonic() + 2
+            while "before hang" not in (self.root / "out").read_text():
+                if time.monotonic() >= until:
+                    self.fail("hang fixture did not become ready")
+                time.sleep(.01)
+        result = self.run_child("import time; print('before hang', flush=True); time.sleep(100)", .3, ready)
         self.assertTrue(result["timedOut"])
         self.assertLess(result["durationSeconds"], 5)
         self.assertIn("before hang", (self.root / "out").read_text())
@@ -172,6 +191,29 @@ class EvidenceTests(unittest.TestCase):
         self.assertEqual(evidence["cases"], [])
         self.assertFalse(evidence["individualCasesAvailable"])
 
+    def test_captured_json_pass_retains_status_and_unknown_pass_status_fails(self):
+        policy = {"format": "json", "requireDeclaredCount": True}
+        report = {"cases": 1, "failures": 0, "results": [{"Id": "captured", "status": "PASS_UPSTREAM_CAPTURE"}]}
+        evidence = parse_evidence(json.dumps(report), policy, "Linux")
+        self.assertFalse(evidence["errors"])
+        self.assertEqual(evidence["cases"][0]["status"], "PASS_UPSTREAM_CAPTURE")
+        self.assertEqual(evidence["counts"], {"cases": 1, "passed": 1, "skipped": 0, "failed": 0})
+        report["results"][0]["status"] = "PASS_INVENTED"
+        self.assertTrue(parse_evidence(json.dumps(report), policy, "Linux")["errors"])
+
+    def test_adapter_requires_every_actual_platform_case_and_final_trace(self):
+        policy = json.loads(Path(__file__).with_name("gap-suites.json").read_text())["policies"]["PiSharp.Env.Adapter.Tests"]
+        summary = "PASS remote adapters: paths, chunked transfers, lines, listing, errors, exec, cancellation and session fencing"
+        for host, count in (("Windows", 54), ("Linux", 60), ("Darwin", 60)):
+            ids = policy["expectedCaseIds"][host]
+            raw = summary + "\n" + "\n".join("PASS " + case for case in ids)
+            evidence = parse_evidence(raw, policy, host)
+            self.assertFalse(evidence["errors"], evidence["errors"])
+            self.assertEqual(evidence["counts"]["passed"], count)
+            self.assertTrue(evidence["individualCasesAvailable"])
+            for incomplete in (summary, raw.rsplit("\n", 1)[0], raw + "\nSKIP unavailable", raw + "\nPASS invented-case"):
+                self.assertTrue(parse_evidence(incomplete, policy, host)["errors"])
+
     def test_registered_daemon_and_legacy_platform_skips(self):
         policies = json.loads(Path(__file__).with_name("gap-suites.json").read_text())["policies"]
         for name, host, summary in (("PiSharp.Env.Daemon.Tests", "Windows", "PASS: 10 daemon integration tests"),
@@ -253,6 +295,26 @@ class LedgerTests(unittest.TestCase):
         _, second = self.run_plan()
         self.assertNotEqual(ledger["runDirectory"], second["runDirectory"])
         self.assertTrue(Path(ledger["runDirectory"], "manifest.json").is_file())
+
+    def test_sdk_host_reaches_every_build_test_and_test_descendant(self):
+        self.manifest.write_text(json.dumps(self.plan))
+        self.fake.write_text("import os,subprocess,sys\n"
+                             "assert os.environ['PISHARP_TEST_DOTNET']==sys.executable\n"
+                             "subprocess.run([sys.executable,'-c',\"import os,sys; assert os.environ['PISHARP_TEST_DOTNET']==sys.executable\"],check=True)\n"
+                             "if sys.argv[1]=='run': print('PASS first\\n1/1 passed')\n")
+        actual = run_owned
+        stages = []
+        def launch(command, *args, **kwargs):
+            if command[0] == sys.executable:
+                stages.append(command[1])
+                self.assertEqual(kwargs["env"]["PISHARP_TEST_DOTNET"], sys.executable)
+                command = [sys.executable, str(self.fake), *command[1:]]
+            return actual(command, *args, **kwargs)
+        with patch("run_gap_suites.resolve_sdk_host", return_value=sys.executable), patch("run_gap_suites.run_owned", side_effect=launch):
+            code = execute(self.root, self.output, self.manifest, "core", sys.executable)
+        self.assertEqual(code, 0)
+        self.assertEqual(stages, ["build", "run", "build", "run"])
+        self.assertEqual(json.loads((self.output / "manifest.json").read_text())["dotnetHost"], sys.executable)
 
     def test_missing_project_retains_whole_plan(self):
         (self.root / "tests/One/One.csproj").unlink()

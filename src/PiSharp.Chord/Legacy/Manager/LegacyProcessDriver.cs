@@ -29,23 +29,25 @@ public sealed class LegacyProcessDriver(LegacyProcessDriverOptions options) : IL
     public const string LockEnvironmentVariable = "CHORD2_LOCK";
     public ILegacyHostInstance Spawn()
     {
-        var name = "pisharp-chord4-" + Guid.NewGuid().ToString("N");
-        var pipe = new NamedPipeServerStream(name, PipeDirection.InOut, 1, PipeTransmissionMode.Byte, PipeOptions.Asynchronous | PipeOptions.CurrentUserOnly);
-        var start = new ProcessStartInfo(options.FileName)
-        {
-            UseShellExecute = false, CreateNoWindow = true, RedirectStandardOutput = true, RedirectStandardError = true,
-        };
-        start.WorkingDirectory = Path.GetFullPath(options.WorkingDirectory ?? System.Environment.CurrentDirectory);
-        foreach (var argument in options.Arguments) start.ArgumentList.Add(argument);
-        // A child never inherits the parent's storage lock name.
-        start.Environment.Remove(LockEnvironmentVariable);
-        start.Environment.Remove(PipeEnvironmentVariable);
-        foreach (var pair in options.Environment) start.Environment[pair.Key] = pair.Value;
-        if (options.Lock is not null) start.Environment[LockEnvironmentVariable] = options.Lock;
-        start.Environment[PipeEnvironmentVariable] = name;
+        var addresses = PrivatePipeDirectory.Create();
+        NamedPipeServerStream? pipe = null;
         OwnedChildProcess? process = null;
         try
         {
+            var name = addresses.Name("control");
+            pipe = new NamedPipeServerStream(name, PipeDirection.InOut, 1, PipeTransmissionMode.Byte, PipeOptions.Asynchronous | PipeOptions.CurrentUserOnly);
+            var start = new ProcessStartInfo(options.FileName)
+            {
+                UseShellExecute = false, CreateNoWindow = true, RedirectStandardOutput = true, RedirectStandardError = true,
+            };
+            start.WorkingDirectory = Path.GetFullPath(options.WorkingDirectory ?? System.Environment.CurrentDirectory);
+            foreach (var argument in options.Arguments) start.ArgumentList.Add(argument);
+            // A child never inherits the parent's storage lock name.
+            start.Environment.Remove(LockEnvironmentVariable);
+            start.Environment.Remove(PipeEnvironmentVariable);
+            foreach (var pair in options.Environment) start.Environment[pair.Key] = pair.Value;
+            if (options.Lock is not null) start.Environment[LockEnvironmentVariable] = options.Lock;
+            start.Environment[PipeEnvironmentVariable] = name;
             // Spawn is a synchronous legacy Driver seam. Native admission completes before
             // returning, outside the Chord host dispatcher, and does not run a shell.
             process = OwnedChildProcess.StartAsync(start).GetAwaiter().GetResult();
@@ -57,15 +59,19 @@ public sealed class LegacyProcessDriver(LegacyProcessDriverOptions options) : IL
             });
             process.OwnReader(Mirror(process.StandardOutput, "stdout", options.OnOutput));
             process.OwnReader(Mirror(process.StandardError, "stderr", options.OnOutput));
-            var instance = new Instance(process, channel, options.OnMessage);
+            var instance = new Instance(process, channel, options.OnMessage, addresses);
             if (options.Init is not null) instance.Send(new("init") { Value = options.Init.DeepClone() });
             channel.Start();
             return instance;
         }
         catch
         {
-            pipe.Dispose();
-            if (process is not null) process.DisposeAsync().AsTask().GetAwaiter().GetResult();
+            try
+            {
+                pipe?.Dispose();
+                if (process is not null) process.DisposeAsync().AsTask().GetAwaiter().GetResult();
+            }
+            finally { addresses.Dispose(); }
             throw;
         }
     }
@@ -90,13 +96,14 @@ public sealed class LegacyProcessDriver(LegacyProcessDriverOptions options) : IL
         private readonly object gate = new();
         private readonly OwnedChildProcess process;
         private readonly LegacyFramedPipeChannel channel;
+        private readonly PrivatePipeDirectory addresses;
         private readonly List<Action<LegacyControlMessage>> listeners = [];
         private readonly Queue<LegacyControlMessage> backlog = new();
         private bool killed;
         private Task? stopping;
-        internal Instance(OwnedChildProcess process, LegacyFramedPipeChannel channel, Action<JsonNode?>? onMessage)
+        internal Instance(OwnedChildProcess process, LegacyFramedPipeChannel channel, Action<JsonNode?>? onMessage, PrivatePipeDirectory addresses)
         {
-            this.process = process; this.channel = channel; Pid = process.Id;
+            this.process = process; this.channel = channel; this.addresses = addresses; Pid = process.Id;
             channel.Message += message =>
             {
                 if (message is JsonObject wrapper && LegacyControlMessage.FromJson(wrapper["chord2control"]) is { } control)
@@ -135,10 +142,37 @@ public sealed class LegacyProcessDriver(LegacyProcessDriverOptions options) : IL
             if (stop is not null) await stop.ConfigureAwait(false);
             channel.Dispose();
             var exit = new LegacyProcessExit(code, wasKilled ? "SIGKILL" : null);
-            await process.DisposeAsync().ConfigureAwait(false);
+            try { await process.DisposeAsync().ConfigureAwait(false); }
+            finally { addresses.Dispose(); }
             lock (gate) { listeners.Clear(); backlog.Clear(); }
             return exit;
         }
+    }
+}
+
+/// <summary>Private native pipe addresses whose Unix paths do not depend on TMPDIR length.</summary>
+internal sealed class PrivatePipeDirectory : IDisposable
+{
+    private readonly string stem;
+    private readonly string? directory;
+    private int disposed;
+    private PrivatePipeDirectory(string stem, string? directory) { this.stem = stem; this.directory = directory; }
+    internal static PrivatePipeDirectory Create()
+    {
+        var stem = "psc-" + Guid.NewGuid().ToString("N");
+        if (OperatingSystem.IsWindows()) return new(stem, null);
+        // .NET PipeStream.GetPipePath explicitly accepts absolute Unix socket paths to
+        // bypass the TMPDIR/CoreFxPipe_ prefix and its macOS sockaddr_un length limit.
+        var directory = Path.Combine("/tmp", stem);
+        Directory.CreateDirectory(directory, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+        return new(stem, directory);
+    }
+    internal string Name(string endpoint) => directory is null ? stem + "-" + endpoint : Path.Combine(directory, endpoint);
+    public void Dispose()
+    {
+        if (Interlocked.Exchange(ref disposed, 1) != 0 || directory is null) return;
+        // Streams unlink their own sockets first. Never recursively remove unowned files.
+        try { Directory.Delete(directory); } catch (DirectoryNotFoundException) { }
     }
 }
 

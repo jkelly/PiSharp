@@ -65,6 +65,13 @@ internal static partial class Program
         }));
         yield return ("catalog-f09.qwen-cn-exact-allowlist-and-auth", Sync(() =>
         {
+            const string provider = "qwen-token-plan-individual-cn";
+            Check(BuiltinProviders.All.Any(item => item.Id == provider), "reviewed provider is registered");
+            Check(!BuiltinModelCatalog.Has(provider), "reviewed provider does not invent a historical shard");
+            var missingShard = Throws<BuiltinCatalogException>(() => BuiltinModelCatalog.Get(provider), "no historical shard");
+            Equal("LiveCatalogUnavailable", missingShard.Code, "missing shard retains explicit failure");
+            var reviewed = ReviewedModelCatalog.Apply(provider, null)!;
+            Equal(10, reviewed.Models.Length, "reviewed-only provider admits its exact model set");
             var registry = ModelRegistry.Create(new());
             var models = registry.GetAll().Where(m => m.Provider == "qwen-token-plan-individual-cn").OrderBy(m => m.Id, StringComparer.Ordinal).ToArray();
             Names(["deepseek-v4-flash-0731", "deepseek-v4-pro", "deepseek-v4-pro-0813", "glm-5.2", "glm-5.3", "qwen3.6-flash", "qwen3.7-max", "qwen3.7-plus", "qwen3.8-flash", "qwen3.8-max"], models.Select(m => m.Id), "individual CN allowlist");

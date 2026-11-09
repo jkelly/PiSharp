@@ -174,7 +174,7 @@ The device server needs the ASP.NET Core runtime. The .NET SDK includes it; with
 - **A lost lock fails the session.** Pi's agent ends its process when its session lock is lost; PiSharp fails the session instead, so the TUI can say why before it exits with 1. Either way nothing more is saved.
 - **Images use SkiaSharp.** Upstream resizes images with Photon compiled to WebAssembly. PiSharp applies the same rules through the image codec its main `read` tool uses.
 - **No Cloudflare adapters.** The Cloudflare Durable Object storage and image processor are not ported, nor is the browser's IndexedDB storage.
-- **No Chord host yet.** Upstream v1.5.0 can run Durable on Chord v2's host and store; PiSharp ports Chord v2's store and registries but not its host yet, so those examples wait.
+- **Chord is candidate source.** The unpublished 1.5.0.1 candidate implements the real [Chord host](/docs/embed/chord/) and [Durable.Store examples 35–37](/docs/embed/durable-store/). Published 1.5.0 packages do not include these new libraries.
 - **Questions and plan mode are PiSharp's.** `pi-durable` has no `ask_user_question` tool and no plan mode. PiSharp adds both, in `PiSharp.Durable.Tools` and in `pisharp durable`, so a session that used them stores two document kinds that Pi doesn't know (`pisharp.interaction` and `pisharp.plan-mode`).
 
 ## Libraries

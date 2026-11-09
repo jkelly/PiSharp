@@ -835,7 +835,7 @@ public static class RunModelOptions
 
     /// <summary>Applies a run's request changes to the provider's request body (<paramref name="api"/>'s shape): merges
     /// <paramref name="patch"/> (objects merge, anything else replaces) and marks the tools named in <paramref name="strictTools"/> strict.</summary>
-    /// <returns>The strict tools it did not find in the body (the request must not be sent without them).</returns>
+    /// <returns>The strict tools it could not unambiguously mark in the body (the request must not be sent without them).</returns>
     public static IReadOnlyList<string> ApplyToBody(JsonObject body, JsonObject? patch, IReadOnlyCollection<string>? strictTools, string? api) =>
         ApplyToBody(body, patch, strictTools, api, null);
 
@@ -847,15 +847,44 @@ public static class RunModelOptions
         if (patch is not null) Merge(body, (JsonObject)patch.DeepClone(), "", null);
         if (cache is not null) ApplyCache(body, cache);
         if (strictTools is not { Count: > 0 }) return [];
-        var missing = new HashSet<string>(strictTools, StringComparer.Ordinal);
-        foreach (var tool in (body["tools"] as JsonArray ?? []).OfType<JsonObject>())
+        var required = new HashSet<string>(strictTools, StringComparer.Ordinal);
+        var found = new Dictionary<string, List<JsonObject>>(StringComparer.Ordinal);
+        var invalid = new HashSet<string>(StringComparer.Ordinal);
+        var rootNames = new HashSet<string>(StringComparer.Ordinal);
+        void Batch(JsonNode? node, bool root)
         {
-            // Chat Completions nests a function's definition ({type: function, function: {name, parameters, strict}}); the Responses and
-            // Codex APIs keep it flat ({type: function, name, parameters, strict}).
-            var definition = api == CompletionsApi ? tool["function"] as JsonObject : tool;
-            if (definition?["name"] is JsonValue value && value.TryGetValue<string>(out var name) && missing.Remove(name)) definition["strict"] = true;
+            if (node is not JsonArray tools) { invalid.UnionWith(required); return; }
+            var batchNames = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var tool in tools.OfType<JsonObject>())
+            {
+                // Chat Completions nests functions; the Responses family keeps them flat.
+                var definition = api == CompletionsApi ? tool["function"] as JsonObject : tool;
+                if (definition is null || definition["name"] is not JsonValue value || !value.TryGetValue<string>(out var name) || !required.Contains(name)) continue;
+                if (!batchNames.Add(name) || !root && rootNames.Contains(name) ||
+                    tool["type"] is not JsonValue kind || !kind.TryGetValue<string>(out var type) || type != "function")
+                    invalid.Add(name);
+                if (root) rootNames.Add(name);
+                if (!found.TryGetValue(name, out var definitions)) found[name] = definitions = [];
+                definitions.Add(definition);
+            }
         }
-        return [.. missing.Order(StringComparer.Ordinal)];
+        if (body.ContainsKey("tools")) Batch(body["tools"], root: true);
+        // Pi v1.5.0 openai-responses-shared.ts getResponsesToolSupport/convertResponsesMessages: on these APIs the initial
+        // tools and subsequent changes can live in direct input additional_tools items. Later batches replace same-name
+        // inline definitions, so every occurrence must be strict; they cannot replace a top-level tool. Do not search arbitrary
+        // nested tools (user content, tool results, or another API's body) as declarations.
+        if ((api is ResponsesApi or AzureResponsesApi or CodexApi) && body["input"] is JsonArray input)
+            foreach (var item in input.OfType<JsonObject>())
+                if (item["type"] is JsonValue kind && kind.TryGetValue<string>(out var type) && type == "additional_tools")
+                {
+                    if (item["role"] is not JsonValue role || !role.TryGetValue<string>(out var roleName) || roleName != "developer")
+                        invalid.UnionWith(required);
+                    else Batch(item["tools"], root: false);
+                }
+        foreach (var (name, definitions) in found)
+            if (!invalid.Contains(name))
+                foreach (var definition in definitions) definition["strict"] = true;
+        return [.. required.Where(name => !found.ContainsKey(name) || invalid.Contains(name)).Order(StringComparer.Ordinal)];
     }
 
     /// <summary>Sets the request body's prompt caching to <paramref name="cache"/>: <c>none</c> takes every breakpoint, cache key and retention

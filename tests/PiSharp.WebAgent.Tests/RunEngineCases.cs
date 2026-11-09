@@ -596,7 +596,11 @@ internal static partial class Program
             Equal(false, body["parallel_tool_calls"]?.GetValue<bool>(), "parallel tool calls off");
             Equal("run-session-1", body["prompt_cache_key"]?.GetValue<string>(), "the session id as prompt_cache_key");
             Equal("run-session-1", sent.Header("session-id"), "and as Codex's session header");
-            Equal(true, body["tools"]?[0]?["strict"]?.GetValue<bool>(), "the strict tool");
+            // Pi v1.5.0: this model supports tool changes, so even the initial declarations are inline additional_tools.
+            Check(body["tools"] is null, "the transport did not duplicate inline declarations at the root");
+            var declared = body["input"]!.AsArray().OfType<JsonObject>().Single(item => item["type"]?.GetValue<string>() == "additional_tools");
+            Equal("developer", declared["role"]?.GetValue<string>(), "the declaration's role");
+            Equal(("get_weather", true), (declared["tools"]?[0]?["name"]?.GetValue<string>(), declared["tools"]?[0]?["strict"]?.GetValue<bool>()), "the inline strict tool");
             Check(body["model"]?.GetValue<string>() == model && body["input"] is JsonArray && body["stream"]?.GetValue<bool>() == true, "otherwise the transport's own request");
             Check(run.Options?["applied"]?.AsArray().Select(item => item!.GetValue<string>()).Contains(RunModelOptions.ServiceTier) == true, "History records the tier as applied");
 

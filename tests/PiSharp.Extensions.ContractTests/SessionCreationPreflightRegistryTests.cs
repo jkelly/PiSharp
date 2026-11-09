@@ -18,11 +18,10 @@ internal static class SessionCreationPreflightRegistryTests
         var empty = Target([]); var objectRecord = JsonData.Parse("{}");
         var cases = new List<(string Name, ExtensionSessionSnapshot Snapshot, ExtensionRegistryOptions? Options)>
         {
-            ("count", Target(Enumerable.Repeat(objectRecord, 4097).ToImmutableArray()), null),
-            ("per-record", Target([JsonData.Parse("{\"s\":\"" + new string('x', 33) + "\"}")]), new() { MaximumJsonCharacters = 32 }),
-            ("aggregate-characters", Target(Enumerable.Repeat(JsonData.Parse("{\"s\":\"" + new string('x', 260) + "\"}"), 4096).ToImmutableArray()), null),
-            ("aggregate-utf8", Target(Enumerable.Repeat(JsonData.Parse("{\"s\":\"" + new string('é', 180) + "\"}"), 3000).ToImmutableArray()), null),
-            ("depth", Target([JsonData.Parse("{\"a\":{\"b\":{\"c\":1}}}")]), new() { MaximumJsonDepth = 2 }),
+            ("count", Target(Enumerable.Repeat(objectRecord, 4097).ToImmutableArray()), new() { MaximumSessionBranchEntries = 4096 }),
+            ("explicit-small-aggregate", Target([JsonData.Parse("{\"s\":\"" + new string('x', 33) + "\"}")]), new() { MaximumJsonCharacters = 32, MaximumSessionCharacters = 32 }),
+            ("aggregate-characters", Target(Enumerable.Repeat(JsonData.Parse("{\"s\":\"" + new string('x', 260) + "\"}"), 4096).ToImmutableArray()), new() { MaximumSessionCharacters = 1_048_576 }),
+            ("aggregate-utf8", Target(Enumerable.Repeat(JsonData.Parse("{\"s\":\"" + new string('é', 180) + "\"}"), 3000).ToImmutableArray()), new() { MaximumSessionUtf8Bytes = 1_048_576 }),
             ("session-id", empty with { SessionId = "bad identity" }, null),
             ("generation", empty with { Generation = 0 }, null),
             ("selected-leaf", empty with { SelectedLeafId = "bad leaf" }, null),
@@ -42,6 +41,28 @@ internal static class SessionCreationPreflightRegistryTests
             await registry.InvokeCommandAsync(registry.CaptureSnapshot(), "create", JsonData.Null);
             Check(provider.ValidationCalls == 1 && !provider.Committed && provider.SourceWrites == 1 && provider.Fresh is null,
                 "Staged rejection crossed effects or lost source scope: " + test.Name);
+        }
+        // These exceed the historical defaults or executable JSON bounds, but fit the current complete-view policy.
+        var validCases = new (ExtensionSessionSnapshot Snapshot, ExtensionRegistryOptions? Options)[]
+        {
+            (Target(Enumerable.Repeat(objectRecord, 4097).ToImmutableArray()), null),
+            (cases[2].Snapshot, null),
+            (cases[3].Snapshot, null),
+            (Target([JsonData.Parse("{\"a\":{\"b\":{\"c\":1}}}"), JsonData.Parse("{\"s\":\"" + new string('x', 33) + "\"}")]),
+                new() { MaximumJsonCharacters = 32, MaximumJsonDepth = 2 })
+        };
+        foreach (var test in validCases)
+        {
+            var provider = new Provider(test.Snapshot); await using var registry = new ExtensionRegistry(test.Options, null, provider);
+            await Activate(registry, async context =>
+            {
+                var result = await context.CreateSessionAsync(new(ExtensionSessionCreationKind.New));
+                Check(result is not null && result.Context.SessionSnapshot!.BranchEntries.Select(entry => entry.ToString())
+                    .SequenceEqual(test.Snapshot.BranchEntries.Select(entry => entry.ToString())), "Valid staged view was truncated or changed.");
+            });
+            await registry.InvokeCommandAsync(registry.CaptureSnapshot(), "create", JsonData.Null);
+            Check(provider.ValidationCalls == 1 && provider.Committed && provider.SourceWrites == 0 && provider.Fresh?.Closed == true,
+                "Valid complete-view creation did not commit and join its new scope.");
         }
         var raw = JsonData.Parse("{\"n\":1.00e400}"); var opaque = new OpaqueProvider(Target([raw]));
         await using var accepted = new ExtensionRegistry(null, null, opaque);
@@ -86,7 +107,7 @@ internal static class SessionCreationPreflightRegistryTests
     private static async Task CommittedFailure()
     {
         var provider = new Provider(Target([])) { AfterCommit = Target(Enumerable.Repeat(JsonData.Parse("{}"), 4097).ToImmutableArray()) };
-        await using var registry = new ExtensionRegistry(null, null, provider); var observed = false;
+        await using var registry = new ExtensionRegistry(new() { MaximumSessionBranchEntries = 4096 }, null, provider); var observed = false;
         await Activate(registry, async context =>
         {
             try { await context.CreateSessionAsync(new(ExtensionSessionCreationKind.New)); throw new Exception("Postcommit invalid context was admitted."); }

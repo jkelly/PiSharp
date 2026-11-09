@@ -55,6 +55,15 @@ internal static partial class Program
 
         var endpoint = new LiveEndpoint(seen => seen.Url == MessagesUrl ? AnthropicStream() : throw new InvalidOperationException("Unexpected URL " + seen.Url));
         string[] args = ["session", "rpc", "--session", path, "--workspace", root, "--live", "--provider", "anthropic", "--model", "claude-sonnet-4-5", "--session-mode", "open"];
+        // Canonicalizing fixture metadata must not admit a genuinely different explicit workspace.
+        var otherWorkspace = Path.Combine(root, "different-workspace"); Directory.CreateDirectory(otherWorkspace);
+        var mismatchArgs = args.ToArray(); mismatchArgs[5] = otherWorkspace;
+        await using (var mismatch = new LiveRpc(mismatchArgs, new LiveSessionRuntime(Env(("ANTHROPIC_API_KEY", "env-key")), () => endpoint)))
+        {
+            Equal(2, await mismatch.Finish(), "different workspace exit code");
+            Equal("WorkspaceMismatch", JsonDocument.Parse(mismatch.Error.ToString()).RootElement.GetProperty("code").GetString(), "different workspace rejected");
+            Equal(0, endpoint.Snapshot().Length, "workspace mismatch sends no provider request");
+        }
         await using (var rpc = new LiveRpc(args, new LiveSessionRuntime(Env(("ANTHROPIC_API_KEY", "env-key")), () => endpoint)))
         {
             await rpc.Prompt("long", "final question");
@@ -69,6 +78,6 @@ internal static partial class Program
         Check(missing.Length == 0, $"request lacks {missing.Length} of {markers.Count} message markers, first {missing.FirstOrDefault()}");
         // Each turn is a user message, an assistant tool use, its result and an answer; the final prompt is last.
         Check(messages.GetArrayLength() >= 4 * Turns + 1 && text.Contains("final question", StringComparison.Ordinal), "request messages " + messages.GetArrayLength());
-        Console.WriteLine($"  long session: {count} records, {messages.GetArrayLength()} request messages, body {Encoding.UTF8.GetByteCount(text)} bytes");
+        Console.Error.WriteLine($"  long session: {count} records, {messages.GetArrayLength()} request messages, body {Encoding.UTF8.GetByteCount(text)} bytes");
     });
 }

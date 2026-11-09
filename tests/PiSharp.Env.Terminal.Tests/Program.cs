@@ -112,14 +112,41 @@ internal static class Program
         });
         await Case("native-terminal-drains-output-through-slow-consumer", async () =>
         {
-            await using var connection = Connect("--daemon"); long received = 0;
+            await using var connection = Connect("--daemon"); var output = new Collector();
+            var consumerEntered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var releaseConsumer = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var chunks = 0;
             await using var terminal = await RemoteTerminal.OpenAsync(connection, Options("/bin/sh", new()) with
             {
                 Argv = ["/bin/sh", "-c", "head -c 524288 /dev/zero"],
-                OnData = bytes => { Interlocked.Add(ref received, bytes.Length); Thread.Sleep(150); }
+                OnData = bytes =>
+                {
+                    output.Add(bytes);
+                    if (Interlocked.Increment(ref chunks) != 1) return;
+                    consumerEntered.TrySetResult();
+                    if (!releaseConsumer.Task.Wait(TimeSpan.FromSeconds(10)))
+                        throw new TimeoutException("Slow consumer was not released");
+                }
             });
-            Check(await terminal.Exited.WaitAsync(TimeSpan.FromSeconds(20)) == 0 && received == 524288,
-                "exit grace does not discard output waiting on the transport");
+            try
+            {
+                await consumerEntered.Task.WaitAsync(TimeSpan.FromSeconds(10));
+                // Block once beyond the 100 ms drain grace. Per-chunk sleeps make the total
+                // delay depend on the OS's PTY read sizes, rather than consumer backpressure.
+                await Task.Delay(350);
+                Check(!terminal.Exited.IsCompleted, "exit must wait for the blocked output consumer");
+            }
+            finally { releaseConsumer.TrySetResult(); }
+            int exitCode;
+            try { exitCode = await terminal.Exited.WaitAsync(TimeSpan.FromSeconds(20)); }
+            catch (TimeoutException error)
+            { throw new Exception($"Terminal drain timed out after {output.Bytes.Length} bytes in {Volatile.Read(ref chunks)} chunks", error); }
+            var received = output.Bytes;
+            Check(exitCode == 0 && received.Length == 524288 && received.All(value => value == 0),
+                $"all raw output arrives before exit (exit={exitCode}, bytes={received.Length}, chunks={chunks})");
+            Check(!IsPresent(terminal.Pid), "terminal exit reaps its session leader");
+            Check((await Throws<RemoteError>(async () => await terminal.ForegroundAsync())).Code == "EBADF",
+                "drained terminal releases its daemon handle");
         });
         await Case("native-terminal-foreground-job-and-close", async () =>
         {
@@ -192,6 +219,11 @@ internal static class Program
         });
     }
 
+    private static bool IsPresent(int pid)
+    {
+        try { using var process = Process.GetProcessById(pid); return true; }
+        catch (ArgumentException) { return false; }
+    }
     private static bool IsRunning(int pid)
     {
         try

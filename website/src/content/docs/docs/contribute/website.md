@@ -40,6 +40,8 @@ Starlight renders the title, so a page starts with an intro paragraph and uses `
 
 No link checker runs when the site builds. Check new links yourself, and write internal links root-relative with a trailing slash, such as `/docs/reference/settings/`.
 
+During 1.5.0.1 preparation, keep the published header and install references at **1.5.0**. `src/data/site.ts` reads the last published record from `compatibility/public-release.json`, including `previousReleases` while a candidate's publication flags are false. Candidate changelogs use `status: in-progress`; the released RSS feed excludes them, and the changelog page omits their GitHub release link. Mark unpublished SDK libraries with `unpublished: true` and provide a source guide instead of a NuGet install command. The current preparation inventory is 29 packages; the five new libraries are unpublished.
+
 ## The sidebar
 
 The sidebar in `astro.config.mjs` is listed by hand, as groups of slugs:

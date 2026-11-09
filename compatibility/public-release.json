@@ -1,17 +1,17 @@
 {
   "schemaVersion": 1,
   "product": "PiSharp",
-  "version": "1.5.0",
-  "proposedReleaseTag": "v1.5.0",
+  "version": "1.5.0.1",
+  "proposedReleaseTag": "v1.5.0.1",
   "upstream": {
     "repository": "https://github.com/earendil-works/pi",
     "tag": "v1.5.0",
     "commit": "f9a26365568127461c47a07a37dcb42c140a3ac5"
   },
   "versionMeaning": "Upstream porting baseline, not a claim of complete behavioral parity.",
-  "productAndPackageVersion": "1.5.0",
+  "productAndPackageVersion": "1.5.0.1",
   "assemblyIdentityPolicy": {
-    "defaultSdkDerivedVersion": "1.5.0.0",
+    "defaultSdkDerivedVersion": "1.5.0.1",
     "fixedSupervisorAssembly": "PiSharp.ExtensionHost",
     "fixedSupervisorAssemblyVersion": "1.0.0.0",
     "fixedSupervisorReason": "Retain the exact existing approved system-import identity; no loader guard is relaxed."
@@ -21,25 +21,49 @@
     "versionSpecificPackageConsumptionQualified": false,
     "fullProviderParity": false,
     "completeNativeGateReady": false,
-    "status": "Released 2026-11-06: the Pi v1.2.0 to v1.5.0 sync (decision 0013), phases 0 to 4 and the close-out. Of the 283 applicability rows marked 1.5.0, 232 are ported, 19 ported with a deferral, 9 already ported and 23 no-op; the 43 rows of phases 5 to 7 (pi-env, the rest of Chord, pi-evals) follow in experimental 1.5.0.x patches. PiSharp.Telemetry is a new [Experimental] package (24 packages in all). The durable packages move to pi-durable v1.5.0, whose stored formats PiSharp 1.2.0.x cannot open. PiSharp.Chord and PiSharp.Durable.Store are not packed and not in the tool; the Web Agent, Durable Web, Durable.MSSQL and Web.Common stay unpacked, and Durable.Hosting, Durable.Server, Durable.Client and ModelRuntime ship inside the PiSharp.Cli tool but not as packages, as in 1.2.0.2."
+    "status": "Unpublished 1.5.0.1 candidate on the unchanged Pi v1.5.0 baseline. Source implements the November 8 gap plan: 23 corrections, Durable APIs and Store, current and distinct legacy Chord runtimes, native hosting, Env protocol/client/daemon, Anthropic message threads, schema/store captures and repository evaluations. The candidate prepares 28 libraries plus the CLI (29 packages), including five new experimental libraries. Earlier Windows implementation and package-consumer receipts retain their original versions and source fingerprints; candidate-specific package, consumer and exact-source platform qualification remain pending. No complete upstream, provider or all-platform parity is claimed."
   },
   "releaseCandidate": {
-    "branch": "release/1.5.0",
+    "branch": "codex/prepare-1.5.0.1",
     "decision": "docs/decisions/0013-pi-1.5.0-sync.md",
     "applicability": "compatibility/sync-1.5.0-applicability.json",
-    "experimental": ["PiSharp.Telemetry (PISHARP_TELEMETRY001)", "PiSharp.Contracts.Schema, the pi-schema port (PISHARP_SCHEMA001)", "client identity (PISHARP_IDENTITY001)", "streaming tool-call arguments (PISHARP_AI001)", "device-code sign-in hints (PISHARP_AUTH001)", "pi.exec() output limits (PISHARP_EXEC001)", "extension UI additions (PISHARP_EXTUI001)", "code mode worker admission (PISHARP_CODEMODE001)", "ToolSearchDocument.NamespaceText (PISHARP_TOOLSEARCH001)", "TUI additions (PISHARP_TUI001)", "PiSharp.Durable, PiSharp.Durable.Tools and PiSharp.Durable.Sqlite on pi-durable v1.5.0 (PISHARP_DURABLE001)"],
-    "sourceOnly": ["PiSharp.Chord (PISHARP_CHORD001)", "PiSharp.Durable.Store", "PiSharp.WebAgent", "PiSharp.Durable.Web", "PiSharp.Durable.MSSQL", "PiSharp.Durable.Hosting", "PiSharp.Durable.Server", "PiSharp.Durable.Client", "PiSharp.ModelRuntime", "PiSharp.Web.Common"],
-    "laterPatches": "Phases 5 to 7 of decision 0013 (pi-env, the rest of Chord, pi-evals) as experimental 1.5.0.x patches on the v1.5.0 baseline.",
-    "notes": "docs/release-notes/1.5.0.md",
-    "changelog": "website/src/content/changelog/1.5.0.md"
+    "experimental": [
+      "PiSharp.Telemetry (PISHARP_TELEMETRY001)",
+      "PiSharp.Contracts.Schema, the pi-schema port (PISHARP_SCHEMA001)",
+      "client identity (PISHARP_IDENTITY001)",
+      "streaming tool-call arguments (PISHARP_AI001)",
+      "device-code sign-in hints (PISHARP_AUTH001)",
+      "pi.exec() output limits (PISHARP_EXEC001)",
+      "extension UI additions (PISHARP_EXTUI001)",
+      "code mode worker admission (PISHARP_CODEMODE001)",
+      "ToolSearchDocument.NamespaceText (PISHARP_TOOLSEARCH001)",
+      "TUI additions (PISHARP_TUI001)",
+      "PiSharp.Durable, PiSharp.Durable.Tools and PiSharp.Durable.Sqlite on pi-durable v1.5.0 (PISHARP_DURABLE001)",
+      "PiSharp.Chord and PiSharp.Chord.Hosting (PISHARP_CHORD001)",
+      "PiSharp.Durable.Store (PISHARP_DURABLE001 and PISHARP_CHORD001)",
+      "PiSharp.Env.Protocol and PiSharp.Env (PISHARP_ENV001; Env also uses PISHARP_DURABLE001)"
+    ],
+    "sourceOnly": [
+      "PiSharp.WebAgent",
+      "PiSharp.Durable.Web",
+      "PiSharp.Durable.MSSQL",
+      "PiSharp.Durable.Hosting",
+      "PiSharp.Durable.Server",
+      "PiSharp.Durable.Client",
+      "PiSharp.ModelRuntime",
+      "PiSharp.Web.Common",
+      "PiSharp.Env.Daemon (separate NativeAOT artifact)",
+      "PiSharp.Evals (repository tool)"
+    ],
+    "notes": "docs/release-notes/1.5.0.1.md",
+    "changelog": "website/src/content/changelog/1.5.0.1.md",
+    "gapStatus": "compatibility/gap-status-2026-11-08.json",
+    "reviewedUpstreamThrough": "7d073328e44337d3292a7db9b0f0308f679c5e97"
   },
   "publication": {
-    "tagCreated": true,
-    "binaryReleasePublished": true,
-    "nugetPackagesPublished": true,
-    "publishedOn": "2026-11-06",
-    "tagCommit": "ab4754a5f3bcd1d68a71f3eaed1b4426803921c7",
-    "releaseRun": "42138967030"
+    "tagCreated": false,
+    "binaryReleasePublished": false,
+    "nugetPackagesPublished": false
   },
   "previousReleases": [
     {
@@ -169,6 +193,83 @@
       "publishedOn": "2026-11-02",
       "tagCommit": "92e2f8b42223e275cde2b03eea880529ee81f464",
       "releaseRun": "41376026307"
+    },
+    {
+      "schemaVersion": 1,
+      "product": "PiSharp",
+      "version": "1.5.0",
+      "proposedReleaseTag": "v1.5.0",
+      "upstream": {
+        "repository": "https://github.com/earendil-works/pi",
+        "tag": "v1.5.0",
+        "commit": "f9a26365568127461c47a07a37dcb42c140a3ac5"
+      },
+      "versionMeaning": "Upstream porting baseline, not a claim of complete behavioral parity.",
+      "productAndPackageVersion": "1.5.0",
+      "assemblyIdentityPolicy": {
+        "defaultSdkDerivedVersion": "1.5.0.0",
+        "fixedSupervisorAssembly": "PiSharp.ExtensionHost",
+        "fixedSupervisorAssemblyVersion": "1.0.0.0",
+        "fixedSupervisorReason": "Retain the exact existing approved system-import identity; no loader guard is relaxed."
+      },
+      "qualification": {
+        "versionSpecificProductsQualified": false,
+        "versionSpecificPackageConsumptionQualified": false,
+        "fullProviderParity": false,
+        "completeNativeGateReady": false,
+        "status": "Released 2026-11-06: the Pi v1.2.0 to v1.5.0 sync (decision 0013), phases 0 to 4 and the close-out. Of the 283 applicability rows marked 1.5.0, 232 are ported, 19 ported with a deferral, 9 already ported and 23 no-op; the 43 rows of phases 5 to 7 (pi-env, the rest of Chord, pi-evals) follow in experimental 1.5.0.x patches. PiSharp.Telemetry is a new [Experimental] package (24 packages in all). The durable packages move to pi-durable v1.5.0, whose stored formats PiSharp 1.2.0.x cannot open. PiSharp.Chord and PiSharp.Durable.Store are not packed and not in the tool; the Web Agent, Durable Web, Durable.MSSQL and Web.Common stay unpacked, and Durable.Hosting, Durable.Server, Durable.Client and ModelRuntime ship inside the PiSharp.Cli tool but not as packages, as in 1.2.0.2."
+      },
+      "releaseCandidate": {
+        "branch": "release/1.5.0",
+        "decision": "docs/decisions/0013-pi-1.5.0-sync.md",
+        "applicability": "compatibility/sync-1.5.0-applicability.json",
+        "experimental": [
+          "PiSharp.Telemetry (PISHARP_TELEMETRY001)",
+          "PiSharp.Contracts.Schema, the pi-schema port (PISHARP_SCHEMA001)",
+          "client identity (PISHARP_IDENTITY001)",
+          "streaming tool-call arguments (PISHARP_AI001)",
+          "device-code sign-in hints (PISHARP_AUTH001)",
+          "pi.exec() output limits (PISHARP_EXEC001)",
+          "extension UI additions (PISHARP_EXTUI001)",
+          "code mode worker admission (PISHARP_CODEMODE001)",
+          "ToolSearchDocument.NamespaceText (PISHARP_TOOLSEARCH001)",
+          "TUI additions (PISHARP_TUI001)",
+          "PiSharp.Durable, PiSharp.Durable.Tools and PiSharp.Durable.Sqlite on pi-durable v1.5.0 (PISHARP_DURABLE001)"
+        ],
+        "sourceOnly": [
+          "PiSharp.Chord (PISHARP_CHORD001)",
+          "PiSharp.Durable.Store",
+          "PiSharp.WebAgent",
+          "PiSharp.Durable.Web",
+          "PiSharp.Durable.MSSQL",
+          "PiSharp.Durable.Hosting",
+          "PiSharp.Durable.Server",
+          "PiSharp.Durable.Client",
+          "PiSharp.ModelRuntime",
+          "PiSharp.Web.Common"
+        ],
+        "laterPatches": "Phases 5 to 7 of decision 0013 (pi-env, the rest of Chord, pi-evals) as experimental 1.5.0.x patches on the v1.5.0 baseline.",
+        "notes": "docs/release-notes/1.5.0.md",
+        "changelog": "website/src/content/changelog/1.5.0.md"
+      },
+      "publication": {
+        "tagCreated": true,
+        "binaryReleasePublished": true,
+        "nugetPackagesPublished": true,
+        "publishedOn": "2026-11-06",
+        "tagCommit": "ab4754a5f3bcd1d68a71f3eaed1b4426803921c7",
+        "releaseRun": "42138967030"
+      },
+      "historicalArtifacts": "Earlier private versions and their qualification receipts retain their original identities; no artifact is renamed or relabeled.",
+      "tag": "v1.5.0",
+      "upstreamTag": "v1.5.0",
+      "upstreamCommit": "f9a26365568127461c47a07a37dcb42c140a3ac5",
+      "tagCreated": true,
+      "githubReleasePublished": true,
+      "nugetPackagesPublished": true,
+      "publishedOn": "2026-11-06",
+      "tagCommit": "ab4754a5f3bcd1d68a71f3eaed1b4426803921c7",
+      "releaseRun": "42138967030"
     }
   ],
   "historicalArtifacts": "Earlier private versions and their qualification receipts retain their original identities; no artifact is renamed or relabeled."

@@ -122,7 +122,7 @@ internal static partial class Program
             var lines = actual[index].Split('\n', StringSplitOptions.RemoveEmptyEntries);
             foreach (var line in lines)
                 if (PiSharp.AI.StreamingJson.JsonReformat(line) != line) problems.Add("not JSON.stringify(entry): " + line);
-            var want = NormalizeSession(expected[index].Select(FollowPi120).Select(FollowPi150), "pi", problems);
+            var want = NormalizeSession(FollowReviewedThinkingCheckpoint(expected[index].Select(FollowPi120).Select(FollowPi150), name), "pi + authored C13 delta", problems);
             var have = NormalizeSession(lines.Select(line => Scrub(line, sandbox.Root)), "pisharp", problems);
             for (var line = 0; line < Math.Max(want.Count, have.Count); line++)
             {
@@ -137,6 +137,35 @@ internal static partial class Program
             if (!want.SequenceEqual(have, StringComparer.Ordinal)) problems.Add("requests:\n  pi:      " + string.Join(", ", want) + "\n  pisharp: " + string.Join(", ", have));
         }
         Check(problems.Count == 0, string.Join("\n", problems));
+    }
+
+    // Authored delta, never a recapture: C13 at upstream 7860ff52 (frozen audit 7d073328) records the effective live thinking
+    // selection on the destination branch before its next prompt. Preserve every original captured line and field except the
+    // second user's new checkpoint parent and the subsequently restored third response's thinkingLevel. Compare the added
+    // checkpoint byte-for-byte after the same identity/time normalization as every other entry; no actual record is ignored.
+    private static IEnumerable<string> FollowReviewedThinkingCheckpoint(IEnumerable<string> captured, string scenario)
+    {
+        if (scenario is not ("resume" or "resumemodel")) return captured;
+        var lines = captured.Select(line => JsonNode.Parse(line)!.AsObject()).ToList();
+        var user = lines.Single(line => line["type"]?.GetValue<string>() == "message" && line["message"]?["role"]?.GetValue<string>() == "user" &&
+            line["message"]?["content"]?[0]?["text"]?.GetValue<string>() == "second");
+        const string checkpointId = "f0000001";
+        Check(lines.All(line => line["id"]?.GetValue<string>() != checkpointId), "authored checkpoint identity must be fresh");
+        var level = scenario == "resume" ? "low" : "high";
+        var checkpoint = new JsonObject
+        {
+            ["type"] = "thinking_level_change", ["id"] = checkpointId, ["parentId"] = user["parentId"]!.DeepClone(),
+            ["timestamp"] = user["timestamp"]!.DeepClone(), ["thinkingLevel"] = level
+        };
+        user["parentId"] = checkpointId;
+        lines.Insert(lines.IndexOf(user), checkpoint);
+        if (scenario == "resumemodel")
+        {
+            var third = lines.Single(line => line["message"]?["responseId"]?.GetValue<string>() == "msg_3")["message"]!;
+            Equal("low", third["thinkingLevel"]!.GetValue<string>(), "historical third turn used the uncheckpointed level");
+            third["thinkingLevel"] = "high"; // --continue now restores the acknowledged high checkpoint.
+        }
+        return lines.Select(line => line.ToJsonString(new JsonSerializerOptions { Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping }));
     }
 
     /// <summary>The sandbox root becomes &lt;ROOT&gt; and the application directory (where the docs the system prompt names live) Pi's

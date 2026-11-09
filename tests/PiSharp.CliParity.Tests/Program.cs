@@ -106,6 +106,7 @@ internal static partial class Program
         public string Cwd { get; set; }
         public Dictionary<string, string?> Vars { get; } = new(StringComparer.Ordinal);
         public List<Seen> Requests { get; } = [];
+        public bool RequireFullAnthropicTranscript { get; private set; }
         public Func<Seen, int, HttpResponseMessage> Respond { get; set; } = (_, _) => AnthropicText("ok");
         /// <summary>Requests to the remote model catalog (main.ts RPC background refresh); every catalog answers 404.</summary>
         public List<string> CatalogRequests { get; } = [];
@@ -128,6 +129,12 @@ internal static partial class Program
             Directory.CreateDirectory(Path.GetDirectoryName(path)!);
             File.WriteAllText(path, text, new UTF8Encoding(false));
             return path;
+        }
+        // Projection/replay cases explicitly exercise the supported legacy wire form. Other cases keep threads enabled.
+        public void UseFullAnthropicTranscript()
+        {
+            Write(Path.Combine(AgentDir, "models.json"), """{"providers":{"anthropic":{"modelOverrides":{"claude-sonnet-4-5":{"compat":{"supportsMessageThreads":false}}}}}}""");
+            RequireFullAnthropicTranscript = true;
         }
         public LiveSessionRuntime Runtime() => new(name => Vars.GetValueOrDefault(name), () => new Endpoint(this),
             Path.Combine(AgentDir, "auth.json"), ModelsPath: Path.Combine(AgentDir, "models.json"))
@@ -167,6 +174,12 @@ internal static partial class Program
             foreach (var header in request.Headers.Concat(request.Content?.Headers.AsEnumerable() ?? [])) headers[header.Key] = string.Join(", ", header.Value);
             var seen = new Seen(request.Method.Method, request.RequestUri!.AbsoluteUri, headers,
                 request.Content is null ? null : await request.Content.ReadAsStringAsync(cancellationToken));
+            if (sandbox.RequireFullAnthropicTranscript && request.RequestUri.AbsolutePath.EndsWith("/messages", StringComparison.Ordinal))
+            {
+                using var body = JsonDocument.Parse(seen.Body!, new JsonDocumentOptions { MaxDepth = PiSharp.Contracts.JsonData.MaximumDepth });
+                Check(!body.RootElement.TryGetProperty("thread", out _), "explicitly disabled threads must send the full transcript");
+                Check(!headers.TryGetValue("anthropic-beta", out var beta) || !beta.Contains("message-threads-2026-08-12", StringComparison.Ordinal), "disabled threads must not advertise the thread beta");
+            }
             int index;
             lock (sandbox.Requests) { sandbox.Requests.Add(seen); index = sandbox.Requests.Count - 1; }
             return sandbox.Respond(seen, index);
@@ -186,8 +199,8 @@ internal static partial class Program
     private static HttpResponseMessage Sse(string body) => new(HttpStatusCode.OK) { Content = new StringContent(body, Encoding.UTF8, "text/event-stream") };
 
     /// <summary>An Anthropic Messages stream answering with one text block.</summary>
-    internal static HttpResponseMessage AnthropicText(string text, string stopReason = "end_turn") => Sse(
-        Frame("message_start", new { type = "message_start", message = new { id = "msg_1", role = "assistant", model = "claude-sonnet-4-5", content = Array.Empty<object>(), usage = new { input_tokens = 3, output_tokens = 0 } } })
+    internal static HttpResponseMessage AnthropicText(string text, string stopReason = "end_turn", string responseId = "msg_1") => Sse(
+        Frame("message_start", new { type = "message_start", message = new { id = responseId, role = "assistant", model = "claude-sonnet-4-5", content = Array.Empty<object>(), usage = new { input_tokens = 3, output_tokens = 0 } } })
         + Frame("content_block_start", new { type = "content_block_start", index = 0, content_block = new { type = "text", text = "" } })
         + Frame("content_block_delta", new { type = "content_block_delta", index = 0, delta = new { type = "text_delta", text } })
         + Frame("content_block_stop", new { type = "content_block_stop", index = 0 })

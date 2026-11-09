@@ -174,16 +174,26 @@ internal static class InteractiveModeCases
                 "{\"type\":\"thinking_level_change\",\"id\":\"a2\",\"parentId\":\"a1\",\"timestamp\":\"2026-10-09T10:00:00.002Z\",\"thinkingLevel\":\"off\"}",
                 "{\"type\":\"message\",\"id\":\"a3\",\"parentId\":\"a2\",\"timestamp\":\"2026-10-09T10:00:00.003Z\",\"message\":{\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"first\"}],\"timestamp\":1}}",
                 "{\"type\":\"message\",\"id\":\"a4\",\"parentId\":\"a3\",\"timestamp\":\"2026-10-09T10:00:00.004Z\",\"message\":{\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"ok\"}],\"api\":\"anthropic-messages\",\"provider\":\"anthropic\",\"model\":\"claude-sonnet-5-5\",\"usage\":{\"input\":3,\"output\":2,\"cacheRead\":0,\"cacheWrite\":0,\"totalTokens\":5,\"cost\":{\"input\":0,\"output\":0,\"cacheRead\":0,\"cacheWrite\":0,\"total\":0}},\"stopReason\":\"stop\",\"timestamp\":2}}") + "\n");
+            var original = InteractiveHarness.ReadShared(session);
             pi.Start("--session", session, "--tui-mode", "regular");
             await pi.WaitFor("escape interrupt");
             await pi.WaitUntil(text => text.Contains("claude-sonnet-5-5 • low", StringComparison.Ordinal), "resumed at the clamped level");
             await pi.Submit("/reload");
             await pi.WaitFor("Reloaded keybindings, extensions, skills, prompts, themes, and context files");
+            Equal(original, InteractiveHarness.ReadShared(session), "opening and reload do not append a thinking checkpoint");
             await pi.Submit("after reload");
             await pi.WaitFor("Hello from the fake model.");
             var state = await pi.Mode!.Rpc.RequestAsync(new System.Text.Json.Nodes.JsonObject { ["type"] = "get_state" });
             Equal("low", state?["thinkingLevel"]?.GetValue<string>(), "level after reload and a turn");
-            Equal(2, InteractiveHarness.ReadShared(session).Split("thinking_level_change").Length, "only the recorded \"off\" change; the clamped level is not recorded");
+            // C13 (upstream 7860ff52): the next prompt records the effective selection, preserving the original off entry.
+            var entries = InteractiveHarness.ReadShared(session).Split('\n', StringSplitOptions.RemoveEmptyEntries)
+                .Select(line => System.Text.Json.Nodes.JsonNode.Parse(line)!).ToArray();
+            var changes = entries.Where(entry => entry["type"]?.GetValue<string>() == "thinking_level_change").ToArray();
+            Equal("off,low", string.Join(',', changes.Select(entry => entry["thinkingLevel"]!.GetValue<string>())), "exactly the original and one effective checkpoint");
+            var prompt = entries.Single(entry => entry["message"]?["role"]?.GetValue<string>() == "user" &&
+                entry["message"]?["content"]?[0]?["text"]?.GetValue<string>() == "after reload");
+            Check(Array.IndexOf(entries, changes[1]) < Array.IndexOf(entries, prompt), "effective checkpoint precedes prompt execution");
+            Check(InteractiveHarness.ReadShared(session).StartsWith(original, StringComparison.Ordinal), "earlier session bytes stay unchanged");
         });
         yield return ("e2e.slash.model-switch-clamps-thinking", Case("model-clamped", async pi =>
         {

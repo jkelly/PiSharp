@@ -32,7 +32,7 @@ export default defineConfig({
 			sidebar: [
 				{
 					label: 'Get started',
-					items: ['docs', 'docs/quickstart', 'docs/coming-from-pi', 'docs/versioning'],
+					items: ['docs', 'docs/quickstart', 'docs/coming-from-pi', 'docs/versioning', 'docs/guides/gap-updates'],
 				},
 				{
 					label: 'Use PiSharp',
@@ -72,6 +72,10 @@ export default defineConfig({
 						'docs/embed/model-operations',
 						'docs/embed/codemode',
 						'docs/embed/durable',
+						'docs/embed/chord',
+						'docs/embed/durable-store',
+						'docs/embed/env',
+						'docs/embed/anthropic-threads',
 						'docs/embed/telemetry',
 						'docs/embed/media',
 					],
@@ -104,6 +108,7 @@ export default defineConfig({
 					items: [
 						'docs/contribute/build',
 						'docs/contribute/testing',
+						'docs/contribute/evaluations',
 						'docs/contribute/porting',
 						'docs/contribute/releasing',
 						'docs/contribute/website',

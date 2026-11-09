@@ -97,6 +97,8 @@ public sealed class PluginAssemblyLoader : IAsyncDisposable
         }
         catch (Exception original)
         {
+            // Fault evidence must not change the classification of the exception actually awaited.
+            var primary = original;
             var failures = new List<Exception>();
             var activationAggregate = activationOriginal?.Exception;
             if (activationAggregate is not null) original = new AggregateException("Original loader activation fault.", activationAggregate, original);
@@ -120,8 +122,19 @@ public sealed class PluginAssemblyLoader : IAsyncDisposable
             }
             Release(reservation);
             reservation.Ready.TrySetResult(null);
-            if (original is PluginLoadException or OperationCanceledException) System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(original).Throw();
-            throw Failure(original is ExtensionRegistrationException ? PluginLoadFailure.InitializationFailed : PluginLoadFailure.LoadFailed,
+            if (primary is OperationCanceledException cancellation)
+            {
+                if (!ReferenceEquals(primary, original))
+                    throw new OperationCanceledException(cancellation.Message, original, cancellation.CancellationToken);
+                System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(primary).Throw();
+            }
+            if (primary is PluginLoadException diagnostic)
+            {
+                if (!ReferenceEquals(primary, original))
+                    throw Failure(diagnostic.Failure, diagnostic.OwnerId, diagnostic.Operation, original);
+                System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(primary).Throw();
+            }
+            throw Failure(primary is ExtensionRegistrationException ? PluginLoadFailure.InitializationFailed : PluginLoadFailure.LoadFailed,
                 manifest.Id, "activate", original);
         }
         finally { operation?.Dispose(); }

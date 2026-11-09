@@ -83,7 +83,7 @@ class WindowsJob:
             self.handle = None
 
 
-def run_owned(command, cwd, stdout_path, stderr_path, timeout, on_start=None):
+def run_owned(command, cwd, stdout_path, stderr_path, timeout, on_start=None, *, env=None):
     if isinstance(timeout, bool) or not math.isfinite(timeout) or timeout <= 0:
         raise ValueError("timeout must be positive and finite")
     started = time.monotonic()
@@ -97,7 +97,7 @@ def run_owned(command, cwd, stdout_path, stderr_path, timeout, on_start=None):
             old_mode = job.api.SetErrorMode(0x8003) if job else None
             try:
                 process = subprocess.Popen(command, cwd=cwd, stdin=subprocess.DEVNULL, stdout=out, stderr=err,
-                                           shell=False, close_fds=True,
+                                           shell=False, close_fds=True, env=env,
                                            creationflags=0x08000004 if job else 0,
                                            start_new_session=not job)
             finally:

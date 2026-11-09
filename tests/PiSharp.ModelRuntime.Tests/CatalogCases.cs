@@ -2,8 +2,8 @@ using PiSharp.AI.Catalogs;
 using PiSharp.Cli.Authentication;
 using PiSharp.Cli.Models;
 
-// The built-in catalog (W2 brief, WU2): PiSharp.ModelRuntime embeds every pi-ai 1.2.0 shard by link from src/PiSharp.Cli/Models under the
-// CLI's resource names, and a registry composes them without the CLI's models.json.
+// The built-in catalog (W2 brief, WU2): PiSharp.ModelRuntime embeds every pi-ai 1.5.0 shard under the historical CLI resource names.
+// The registry composes these verified shards and explicit reviewed additions without the CLI's models.json.
 internal static partial class Program
 {
     private static IEnumerable<(string, Func<Task>)> CatalogCases() =>
@@ -28,8 +28,18 @@ internal static partial class Program
             var catalog = BuiltinModelCatalog.Get(provider);
             Check(catalog.Models.Length > 0, provider + " has no models");
         }
-        // Every built-in provider of pi-ai has its shard.
-        foreach (var provider in BuiltinProviders.All) Check(BuiltinModelCatalog.Has(provider.Id), provider.Id + " has no shard");
+        // Reviewed providers can be newer than the frozen package; every other provider still needs its original shard.
+        var reviewedOnly = BuiltinProviders.All.Where(provider => !BuiltinModelCatalog.Has(provider.Id)).Select(provider => provider.Id).Order(StringComparer.Ordinal);
+        Check(reviewedOnly.SequenceEqual(ReviewedModelCatalog.AdditionalProviders.Order(StringComparer.Ordinal), StringComparer.Ordinal),
+            "only explicitly reviewed providers lack historical shards");
+        foreach (var provider in ReviewedModelCatalog.AdditionalProviders)
+        {
+            Check(!resources.Contains(provider, StringComparer.Ordinal), provider + " must not invent a historical resource");
+            var unavailable = Throws<BuiltinCatalogException>(() => BuiltinModelCatalog.Get(provider), provider + " has no historical shard");
+            Equal("LiveCatalogUnavailable", unavailable.Code, provider + " frozen catalog failure");
+            var catalog = ReviewedModelCatalog.Apply(provider, null);
+            Check(catalog is not null && catalog.Models.Length > 0, provider + " has no reviewed models");
+        }
         // CopilotCatalog reads the github-copilot shard from the same assembly.
         var copilot = BuiltinModelCatalog.Get("github-copilot").Models.First(model => model.Type == CatalogModelType.Chat);
         Check(CopilotCatalog.Contains(copilot.Id), "the Copilot catalog reads its shard");
@@ -43,8 +53,15 @@ internal static partial class Program
         var ids = registry.GetProviderIds();
         Check(BuiltinProviders.All.Select(provider => provider.Id).SequenceEqual(ids, StringComparer.Ordinal), "providers in pi-ai order: " + string.Join(",", ids));
         foreach (var provider in BuiltinProviders.All)
-            Check(registry.GetAllOfType(CatalogModelType.Chat, provider.Id).Count > 0 || BuiltinModelCatalog.Get(provider.Id).Models.All(model => model.Type != CatalogModelType.Chat),
+        {
+            var catalog = ReviewedModelCatalog.Apply(provider.Id, BuiltinModelCatalog.Has(provider.Id) ? BuiltinModelCatalog.Get(provider.Id) : null)
+                ?? throw new InvalidOperationException(provider.Id + " has neither historical nor reviewed models");
+            Check(registry.GetAllOfType(CatalogModelType.Chat, provider.Id).Count > 0 || catalog.Models.All(model => model.Type != CatalogModelType.Chat),
                 provider.Id + " composes its chat models");
+            if (!BuiltinModelCatalog.Has(provider.Id))
+                foreach (var model in catalog.Models)
+                    Check(registry.GetAllOfType(model.Type, provider.Id).Any(item => item.Id == model.Id), provider.Id + "/" + model.Id + " reviewed model composes without a historical shard");
+        }
         var openai = registry.Find("openai", ModelResolver.DefaultModelFor("openai")!);
         Check(openai is { Provider: "openai" } && openai.Pinned is not null, "the pinned default OpenAI model");
         Equal(null, registry.CheckAuth("openai"), "nothing configured");

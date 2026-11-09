@@ -56,11 +56,33 @@ internal static partial class Program
         var onlyStdin = new List<string>();
         Equal("README contents", PiInitialMessage.Build(onlyStdin, null, [], "README contents").Message, "stdin alone");
         using var sandbox = new Sandbox("messages");
+        sandbox.Respond = (_, index) => AnthropicText("ok", responseId: "initial-" + index);
         var (code, stdout, stderr) = await sandbox.Run("-p", "--provider", "anthropic", "--model", "claude-sonnet-4-5", "first", "second", "third");
         Equal(0, code, "exit; " + stderr);
         Equal(3, sandbox.Requests.Count, "three prompts");
-        Equal(5, sandbox.Requests[2].Json.GetProperty("messages").GetArrayLength(), "third request carries the conversation");
+        for (var index = 0; index < 3; index++)
+        {
+            var body = sandbox.Requests[index].Json;
+            var thread = body.GetProperty("thread");
+            Equal(index == 0 ? "create" : "continue", thread.GetProperty("type").GetString(), "thread mode " + index);
+            if (index > 0)
+            {
+                Equal("initial-" + (index - 1), thread.GetProperty("previous_message_id").GetString(), "completed preceding response " + index);
+                Check(!body.TryGetProperty("system", out _) && !body.TryGetProperty("tools", out _), "continuation inherits only the known parent's system/tools");
+            }
+            var sent = body.GetProperty("messages");
+            Equal(1, sent.GetArrayLength(), "one new user message " + index);
+            Equal(new[] { "first", "second", "third" }[index], sent[0].GetProperty("content")[0].GetProperty("text").GetString(), "ordered prompt " + index);
+        }
         Equal("ok\n", stdout, "only the final answer is printed");
+        using var legacy = new Sandbox("messages-full");
+        legacy.UseFullAnthropicTranscript();
+        var (legacyCode, legacyOut, legacyError) = await legacy.Run("-p", "--provider", "anthropic", "--model", "claude-sonnet-4-5", "first", "second", "third");
+        Equal(0, legacyCode, "legacy exit; " + legacyError);
+        Equal("ok\n", legacyOut, "legacy final answer");
+        Equal(3, legacy.Requests.Count, "legacy prompt count");
+        for (var index = 0; index < 3; index++)
+            Equal(2 * index + 1, legacy.Requests[index].Json.GetProperty("messages").GetArrayLength(), "full legacy conversation " + index);
     }
 
     // print-mode.ts: a final assistant message that failed prints its error message to stderr and exits 1; JSON mode still exits 0.

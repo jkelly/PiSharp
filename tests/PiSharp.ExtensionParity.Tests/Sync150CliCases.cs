@@ -120,19 +120,31 @@ internal static partial class Program
         using var sandbox = NodeSandbox("sync150-key-hints-reload");
         var extension = sandbox.Write(Path.Combine(sandbox.Cwd, "hints.ts"), KeyHintRenderer);
         var keybindings = new Dictionary<string, IReadOnlyList<string>> { ["app.tools.expand"] = ["ctrl+e"] };
+        (string Modules, string? PiModules, string? Fallback) selectedProfile;
         await using (var host = await StartHost(sandbox, extension))
         {
+            selectedProfile = (host.Modules, host.PiModules, host.RuntimeFallback);
             await host.ConfigureEditorAsync(keybindings, [], CancellationToken.None);
             Equal("ctrl+e | ctrl+e to expand", await RenderNote(host), "configured");
             await host.ReloadExtensionsAsync(CancellationToken.None);
             Check(host.Errors.IsEmpty, "reload errors: " + string.Join("; ", host.Errors.Select(error => error.Error)));
             Equal("ctrl+e | ctrl+e to expand", await RenderNote(host), "after a reload");
         }
+        var localRuntime = Path.Combine(sandbox.AgentDir, "pisharp", "pi-runtime");
+        Check(!Directory.Exists(localRuntime), "The selected test runtime must not install into the sandbox.");
         await using var late = PiSharp.Cli.Extensions.Pi.PiExtensionHost.CreateWithoutNode(new(sandbox.Cwd, sandbox.AgentDir, "tui", true)
-            { GetEnvironment = name => sandbox.Vars.GetValueOrDefault(name) });
+        {
+            GetEnvironment = name => sandbox.Vars.GetValueOrDefault(name),
+            PiModules = sandbox.PiModules,
+            UseCompatibilityModules = sandbox.UseCompatibilityModules
+        });
         await late.ConfigureEditorAsync(keybindings, [], CancellationToken.None);
         await late.LoadAsync([extension], CancellationToken.None);
         Check(late.Errors.IsEmpty, "load errors: " + string.Join("; ", late.Errors.Select(error => error.Error)));
+        Equal(selectedProfile.Modules, late.Modules, "late start keeps the selected module profile");
+        Equal(selectedProfile.PiModules, late.PiModules, "late start keeps the exact installed modules path");
+        Equal(selectedProfile.Fallback, late.RuntimeFallback, "late start keeps the exact compatibility disposition");
+        Check(!Directory.Exists(localRuntime), "Late start must not create a production installer directory or staging files.");
         Equal("ctrl+e | ctrl+e to expand", await RenderNote(late), "a Node host that starts later");
     }
 

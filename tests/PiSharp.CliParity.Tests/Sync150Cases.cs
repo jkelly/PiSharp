@@ -10,6 +10,8 @@ using PiSharp.Tools.Processes.Unix;
 // utils/shell.ts (killProcessTree's SIGSTOP on macOS) and test/tools.test.ts (grep --no-config and a lone CR, through real ripgrep).
 // Pi 1.5.0 behaviour. The grep inputs and expectations are the upstream tests', read from the source; the others are authored. Real
 // processes run only where noted: rg on this machine's PATH (skipped without it), and /bin/sh on Linux and macOS.
+// Authored postbaseline C06 delta (8da141c2, reviewed at 7d073328): PiGrepTool now consumes ripgrep's bounded context records,
+// preserving a lone CR inside a line while stripping CRLF line terminators. This supersedes the old display's dropped-CR assertion.
 internal static partial class Program
 {
     private static IEnumerable<(string, Func<Task>)> Sync150Cases() =>
@@ -65,8 +67,12 @@ internal static partial class Program
             using var sandbox = new Sandbox("grep-lone-cr");
             File.WriteAllText(Path.Combine(sandbox.Cwd, "lone-cr.txt"), "before\rprogress\nneedle\nafter");
             var output = await Grep(rg, sandbox.Cwd, """{"pattern":"needle","path":"lone-cr.txt","context":1}""");
-            Check(output.Contains("lone-cr.txt-1- beforeprogress", StringComparison.Ordinal) && output.Contains("lone-cr.txt:2: needle", StringComparison.Ordinal) &&
-                output.Contains("lone-cr.txt-3- after", StringComparison.Ordinal), output);
+            Equal("lone-cr.txt-1- before\rprogress\nlone-cr.txt:2: needle\nlone-cr.txt-3- after", output,
+                "reviewed context preserves the interior CR and exact ripgrep line numbers");
+            // CR in a CRLF delimiter is still removed; it must not produce a fourth line or enter the displayed text.
+            File.WriteAllText(Path.Combine(sandbox.Cwd, "lone-cr.txt"), "before\r\nneedle\r\nafter\r\n");
+            var crlf = await Grep(rg, sandbox.Cwd, """{"pattern":"needle","path":"lone-cr.txt","context":1}""");
+            Equal("lone-cr.txt-1- before\nlone-cr.txt:2: needle\nlone-cr.txt-3- after", crlf, "CRLF terminators are stripped without altering line numbers");
         }),
         // Authored: `sleep; touch` killed while sleeping must never reach the touch. macOS stops the group first, so a killed sleep
         // cannot wake its shell into the next command before the shell itself is killed; Linux signals the group at once.
