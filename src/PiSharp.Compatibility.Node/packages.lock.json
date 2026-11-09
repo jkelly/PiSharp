@@ -8,19 +8,19 @@
       "pisharp.extensionhost": {
         "type": "Project",
         "dependencies": {
-          "PiSharp.Contracts": "[1.0.0, )"
+          "PiSharp.Contracts": "[1.5.0.1, )"
         }
       },
       "pisharp.extensions.abstractions": {
         "type": "Project",
         "dependencies": {
-          "PiSharp.Contracts": "[1.0.0, )"
+          "PiSharp.Contracts": "[1.5.0.1, )"
         }
       },
       "pisharp.extensions.runtime": {
         "type": "Project",
         "dependencies": {
-          "PiSharp.Extensions.Abstractions": "[1.0.0, )"
+          "PiSharp.Extensions.Abstractions": "[1.5.0.1, )"
         }
       }
     }

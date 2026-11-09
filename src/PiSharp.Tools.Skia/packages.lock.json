@@ -33,15 +33,15 @@
       "pisharp.agent": {
         "type": "Project",
         "dependencies": {
-          "PiSharp.AI": "[1.1.0.1, )",
-          "PiSharp.Contracts": "[1.1.0.1, )"
+          "PiSharp.AI": "[1.5.0.1, )",
+          "PiSharp.Contracts": "[1.5.0.1, )"
         }
       },
       "pisharp.ai": {
         "type": "Project",
         "dependencies": {
-          "PiSharp.Contracts": "[1.1.0.1, )",
-          "PiSharp.Telemetry": "[1.1.0.1, )"
+          "PiSharp.Contracts": "[1.5.0.1, )",
+          "PiSharp.Telemetry": "[1.5.0.1, )"
         }
       },
       "pisharp.contracts": {
@@ -53,8 +53,8 @@
       "pisharp.tools": {
         "type": "Project",
         "dependencies": {
-          "PiSharp.Agent": "[1.1.0.1, )",
-          "PiSharp.Contracts": "[1.1.0.1, )"
+          "PiSharp.Agent": "[1.5.0.1, )",
+          "PiSharp.Contracts": "[1.5.0.1, )"
         }
       }
     }

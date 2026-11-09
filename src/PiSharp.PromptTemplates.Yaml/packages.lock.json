@@ -11,22 +11,22 @@
       "pisharp.agent": {
         "type": "Project",
         "dependencies": {
-          "PiSharp.AI": "[1.0.0, )",
-          "PiSharp.Contracts": "[1.0.0, )"
+          "PiSharp.AI": "[1.5.0.1, )",
+          "PiSharp.Contracts": "[1.5.0.1, )"
         }
       },
       "pisharp.ai": {
         "type": "Project",
         "dependencies": {
-          "PiSharp.Contracts": "[1.0.0, )",
-          "PiSharp.Telemetry": "[1.0.0, )"
+          "PiSharp.Contracts": "[1.5.0.1, )",
+          "PiSharp.Telemetry": "[1.5.0.1, )"
         }
       },
       "pisharp.codingagent": {
         "type": "Project",
         "dependencies": {
-          "PiSharp.Agent": "[1.0.0, )",
-          "PiSharp.Sessions": "[1.0.0, )"
+          "PiSharp.Agent": "[1.5.0.1, )",
+          "PiSharp.Sessions": "[1.5.0.1, )"
         }
       },
       "pisharp.contracts": {
@@ -35,7 +35,7 @@
       "pisharp.sessions": {
         "type": "Project",
         "dependencies": {
-          "PiSharp.Contracts": "[1.0.0, )"
+          "PiSharp.Contracts": "[1.5.0.1, )"
         }
       },
       "pisharp.telemetry": {

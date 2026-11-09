@@ -22,7 +22,7 @@
       "pisharp.extensions.abstractions": {
         "type": "Project",
         "dependencies": {
-          "PiSharp.Contracts": "[1.5.0, )"
+          "PiSharp.Contracts": "[1.5.0.1, )"
         }
       }
     }

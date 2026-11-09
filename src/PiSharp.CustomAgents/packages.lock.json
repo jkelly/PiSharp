@@ -5,8 +5,8 @@
       "pisharp.ai": {
         "type": "Project",
         "dependencies": {
-          "PiSharp.Contracts": "[1.2.0.1, )",
-          "PiSharp.Telemetry": "[1.2.0.1, )"
+          "PiSharp.Contracts": "[1.5.0.1, )",
+          "PiSharp.Telemetry": "[1.5.0.1, )"
         }
       },
       "pisharp.contracts": {
@@ -15,14 +15,14 @@
       "pisharp.durable": {
         "type": "Project",
         "dependencies": {
-          "PiSharp.AI": "[1.2.0.1, )",
-          "PiSharp.Contracts": "[1.2.0.1, )"
+          "PiSharp.AI": "[1.5.0.1, )",
+          "PiSharp.Contracts": "[1.5.0.1, )"
         }
       },
       "pisharp.extensions.abstractions": {
         "type": "Project",
         "dependencies": {
-          "PiSharp.Contracts": "[1.2.0.1, )"
+          "PiSharp.Contracts": "[1.5.0.1, )"
         }
       },
       "pisharp.telemetry": {
