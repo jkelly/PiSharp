@@ -93,7 +93,6 @@ internal static class Program
         if (args.Contains("--worker")) return await WorkerMain.RunAsync(async worker =>
         {
             var host = Hosts.Create(new() { Address = worker.Address(PluginTestContracts.Worker), Principal = worker.Start.Principal, OnError = _ => { } });
-            var bootstrapped = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
             var facet = Facet.Define((h, _) =>
             {
                 h.Serve(PluginTestContracts.Bootstrap, (_, _, self) =>
@@ -101,19 +100,21 @@ internal static class Program
                     self.Open(async context =>
                     {
                         using var parent = await host.GetAsync(PluginTestContracts.ParentService, new(), context);
-                        var ready = await parent.CallAsync("ready", null, context);
-                        bootstrapped.TrySetResult(); return ready;
+                        return await parent.CallAsync("ready", null, context);
                     }, async (_, _, _) => { if (worker.Start.Data?["closeMarker"]?.GetValue<string>() is { } marker) await File.WriteAllTextAsync(marker, "closed"); });
                     return new(new Dictionary<string, object?>());
                 });
                 h.Serve(PluginTestContracts.Remote, (_, _, self) =>
                 {
                     self.Get(PluginTestContracts.ParentService, new());
+                    // Remote readiness must follow the native's committed acquisition, not
+                    // merely entry into its asynchronous open callback.
+                    self.Get(PluginTestContracts.Bootstrap, new());
                     return new(new Dictionary<string, object?> { ["pid"] = (HostMethod)((_, _) => Task.FromResult<object?>(JsonValue.Create(Environment.ProcessId))) }, "reader");
                 });
             });
             await worker.LoadPluginsAsync(host, [new("test.core", facet)]);
-            await bootstrapped.Task.WaitAsync(worker.Context.AbortSignal ?? CancellationToken.None);
+            using var bootstrap = await host.GetAsync(PluginTestContracts.Bootstrap, new(), worker.Context);
             if (args.Contains("--hold-startup")) await Task.Delay(Timeout.InfiniteTimeSpan);
             return host;
         });
@@ -134,6 +135,14 @@ internal static class Program
             ("processes.natural-and-crashed-leader-kill-descendants", Descendants),
             ("workers.address-lock-waits-and-cancels", AddressLock),
         };
+        if (args.Length != 0)
+        {
+            if (args.Length != 2 || args[0] != "--only") throw new ArgumentException("Use [--only <case name>[,<case name>...]].");
+            var selected = args[1].Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+            if (selected.Length == 0 || selected.Any(name => !cases.Any(test => test.Name == name)))
+                throw new ArgumentException("--only must select existing hosting case names.");
+            cases = cases.Where(test => selected.Contains(test.Name, StringComparer.Ordinal)).ToArray();
+        }
         var results = new List<object>(); var failures = 0;
         foreach (var test in cases)
         {
@@ -591,6 +600,8 @@ internal static class Program
         var core = Facet.Define((facet, _) => facet.Serve(PluginTestContracts.ParentService, (_, _, _) => new(new Dictionary<string, object?> { ["ready"] = (HostMethod)((_, _) => Task.FromResult<object?>(JsonValue.Create(1))) }, "reader")));
         await host.LoadAsync([new("test.parent", core), new("test.workers", workers.Facet)], Context);
         using var reference = await host.GetAsync(PluginTestContracts.Remote, new() { ["id"] = "startup" }, Context);
+        // The worker's Remote depends on Bootstrap, so this response proves its native
+        // acquisition completed while the initializer is still held before returning.
         var pid = ((JsonNode)(await reference.CallAsync("pid", null, Context))!).GetValue<int>();
         Check(workers.State.Values.Any(state => state.Status == "starting"), "fixture initializer already returned");
         await workers.CloseAsync().WaitAsync(TimeSpan.FromSeconds(10));

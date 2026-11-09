@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Runtime.CompilerServices;
 using System.Runtime.Loader;
 using System.Reflection;
@@ -10,15 +11,20 @@ internal static partial class Program
         foreach (var test in ActualRemoteRetentionCases()) yield return test;
         yield return ("retention.shared-bindings-lru-and-reacquire", async () =>
         {
-            var closed = new List<string>(); var created = 0;
-            using var pool = new LegacyBindingRetention<string, Binding>(key => { created++; return new(key); }, item => closed.Add(item.Name), item => item.Hydrated,
+            var closed = new ConcurrentQueue<string>(); var created = 0;
+            using var pool = new LegacyBindingRetention<string, Binding>(key => { created++; return new(key); }, item => closed.Enqueue(item.Name), item => item.Hydrated,
                 _ => TimeSpan.FromMilliseconds(200), capacity: 2);
             var a = pool.Acquire("a"); var second = pool.Acquire("a"); Check(ReferenceEquals(a.Value, second.Value) && created == 1, "Binding was not shared.");
             a.Dispose(); Check(pool.Lingering == 0, "Active reference lingered."); second.Dispose();
             var reused = pool.Acquire("a"); Check(created == 1, "Reacquire opened another binding."); reused.Dispose();
             pool.Acquire("b").Dispose(); pool.Acquire("c").Dispose();
             Check(closed.SequenceEqual(["a"]) && pool.Lingering == 2, "LRU capacity did not evict oldest release.");
-            await Eventually(() => pool.Count == 0); Check(closed.Order().SequenceEqual(new[] { "a", "b", "c" }), "Expiry leaked or double-closed bindings.");
+            // Expiry detaches under the pool gate, then closes outside it. Observe the close callbacks too;
+            // Count == 0 alone does not mean they have finished, and timer callbacks may run concurrently.
+            await Eventually(() => pool.Count == 0 && closed.Count >= 3);
+            Check(closed.Order().SequenceEqual(new[] { "a", "b", "c" }), "Expiry leaked or double-closed bindings.");
+            pool.Dispose();
+            Check(closed.Order().SequenceEqual(new[] { "a", "b", "c" }), "Disposing the expired pool closed a binding twice.");
         });
         yield return ("retention.unhydrated-release-and-released-reference-gc", () =>
         {

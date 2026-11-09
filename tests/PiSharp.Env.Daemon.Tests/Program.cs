@@ -11,6 +11,8 @@ Directory.CreateDirectory(root);
 var passed = 0;
 try
 {
+    // Path.GetTempPath can name a symlinked ancestor (macOS /var). Use an independent OS oracle for the expected physical root.
+    root = await PhysicalDirectory(root);
     await Run("framed filesystem and descriptor identity", FileOperations);
     await Run("malformed JSON stays synchronized", MalformedJson);
     await Run("hello validation and handle limits", Limits);
@@ -29,6 +31,39 @@ finally { Directory.Delete(root, recursive: true); }
 async Task Run(string name, Func<Task> test) { await test(); passed++; Console.WriteLine("PASS " + name); }
 static void Check(bool value, string message) { if (!value) throw new Exception(message); }
 static long Num(JsonObject value, string name) => value[name]!.GetValue<long>();
+
+static async Task<string> PhysicalDirectory(string directory)
+{
+    if (OperatingSystem.IsWindows()) return directory;
+    var start = new System.Diagnostics.ProcessStartInfo("/bin/pwd")
+    {
+        WorkingDirectory = directory, UseShellExecute = false,
+        RedirectStandardOutput = true, RedirectStandardError = true
+    };
+    start.ArgumentList.Add("-P");
+    using var child = System.Diagnostics.Process.Start(start) ?? throw new Exception("Could not start physical-directory oracle");
+    var output = child.StandardOutput.ReadToEndAsync();
+    var error = child.StandardError.ReadToEndAsync();
+    try
+    {
+        await child.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(10));
+        await Task.WhenAll(output, error).WaitAsync(TimeSpan.FromSeconds(5));
+        Check(child.ExitCode == 0 && (await error).Length == 0, "pwd -P failed: " + await error);
+        var text = await output;
+        Check(text.EndsWith('\n'), "pwd -P did not terminate its path with LF");
+        var physical = text[..^1];
+        Check(Path.IsPathFullyQualified(physical) && Directory.Exists(physical), "pwd -P did not return an existing absolute directory");
+        return physical;
+    }
+    finally
+    {
+        if (!child.HasExited)
+            try { child.Kill(entireProcessTree: true); }
+            catch (InvalidOperationException) when (child.HasExited) { }
+        await child.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        await Task.WhenAll(output, error).WaitAsync(TimeSpan.FromSeconds(5));
+    }
+}
 
 async Task FileOperations()
 {
@@ -66,7 +101,23 @@ async Task FileOperations()
     var list = await wire.Call("listFiles", new() { ["path"] = root, ["gitignore"] = false, ["maxEntries"] = 1 });
     Check(Num(list.Json, "count") == 1 && list.Json["truncated"]!.GetValue<bool>(), "bounded listing");
     var real = await wire.Call("realpath", new() { ["path"] = path });
-    Check(real.Json["path"]!.GetValue<string>() == path, "realpath");
+    Check(real.Json["path"]!.GetValue<string>() == path, $"realpath: expected <{path}>, actual <{real.Json["path"]}>");
+    if (!OperatingSystem.IsWindows())
+    {
+        // A link in an ancestor must be resolved too, rather than merely normalizing or resolving the final path component.
+        var target = Path.Combine(root, "physical-ancestor");
+        Directory.CreateDirectory(Path.Combine(target, "nested"));
+        var alias = Path.Combine(root, "ancestor-link");
+        Directory.CreateSymbolicLink(alias, target);
+        var linkedDirectory = Path.Combine(alias, "nested");
+        var expectedDirectory = await PhysicalDirectory(linkedDirectory);
+        Check(expectedDirectory != linkedDirectory, "ancestor-symlink control must have a distinct physical path");
+        var linkedFile = Path.Combine(linkedDirectory, "linked.txt");
+        await File.WriteAllTextAsync(linkedFile, "physical file");
+        var resolved = await wire.Call("realpath", new() { ["path"] = linkedFile });
+        var expected = Path.Combine(expectedDirectory, "linked.txt");
+        Check(resolved.Json["path"]!.GetValue<string>() == expected, $"ancestor realpath: expected <{expected}>, actual <{resolved.Json["path"]}>");
+    }
     await wire.Call("truncate", new() { ["path"] = path, ["size"] = 2 });
     await wire.Call("fsync", new() { ["path"] = path });
     var tmp = await wire.Call("mkdtemp", new() { ["path"] = Path.Combine(root, "temp-") });

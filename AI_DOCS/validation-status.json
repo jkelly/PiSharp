@@ -2,8 +2,70 @@
   "previousSnapshot": "validation-status-implementation-3024b1e0.json",
   "schemaVersion": 1,
   "scope": "local worktree execution only; not hosted CI",
-  "generatedUtc": "2026-11-09T02:41:53.4767431Z",
+  "generatedUtc": "2026-11-09T02:59:57.2892210Z",
   "latestByScope": [
+    {
+      "label": "release-startup-repeat-5",
+      "project": "C:\\Users\\jksof\\.codex\\worktrees\\close-upstream-gaps\\PiSharp\\tests\\PiSharp.Chord.Hosting.Tests\\PiSharp.Chord.Hosting.Tests.csproj",
+      "scopeIdentity": "C:\\Users\\jksof\\.codex\\worktrees\\close-upstream-gaps\\PiSharp\\tests\\PiSharp.Chord.Hosting.Tests\\PiSharp.Chord.Hosting.Tests.csproj|--only|workers.startup-shutdown-closes-connected-host|{}|buildOnly=False",
+      "selection": {
+        "testArgs": [
+          "--only",
+          "workers.startup-shutdown-closes-connected-host"
+        ],
+        "filters": {},
+        "buildOnly": false
+      },
+      "parametersFile": "C:\\Users\\jksof\\.codex\\worktrees\\close-upstream-gaps\\PiSharp\\artifacts\\gap-validation\\queue-36d320ac34ea4c2d9039ddb7ec0b3cf3\\release-startup-repeat-5.json",
+      "platform": {
+        "os": "Microsoft Windows 10.0.26300",
+        "architecture": "X64"
+      },
+      "sdk": {
+        "path": "E:/AI/PiSharp/PiSharp/artifacts/sample-tools/dotnet/dotnet.exe",
+        "launcherSha256": "21a46f1e5235cf4e844b9de5429f0e198b9c97a41f0503a66442f1d639ca3ee6",
+        "configuredVersion": "10.0.401"
+      },
+      "testArguments": [
+        "--only",
+        "workers.startup-shutdown-closes-connected-host"
+      ],
+      "result": "passed",
+      "recordedResult": "passed",
+      "startedUtc": "2026-11-09T02:57:14.833775Z",
+      "finishedUtc": "2026-11-09T02:57:20.7118978Z",
+      "source": {
+        "head": "6cc81569772cc5ddd79b73eb6b46b18cdd497b5e",
+        "dirty": true,
+        "beforeSha256": "de25736394f8009039de1bb44e36d6fa4975405f1c2d5d27993002a7be4130d3",
+        "manifest": "C:\\Users\\jksof\\.codex\\worktrees\\close-upstream-gaps\\PiSharp\\artifacts\\gap-validation\\release-startup-repeat-5-c58cdead4ac1431ba32ce1fb5b421a13\\source-before.json",
+        "afterSha256": "de25736394f8009039de1bb44e36d6fa4975405f1c2d5d27993002a7be4130d3",
+        "changedDuringRun": false
+      },
+      "buildExit": null,
+      "buildArguments": null,
+      "testExit": 0,
+      "caseEvidence": {
+        "kind": "console-json",
+        "selectedCount": 1,
+        "declaredCount": 1,
+        "cases": [
+          {
+            "id": "workers.startup-shutdown-closes-connected-host",
+            "status": "PASS_AUTHORED_NATIVE",
+            "reason": null
+          }
+        ],
+        "originalExecuted": null,
+        "sourceDerivedOracle": null,
+        "consoleSkipObservations": []
+      },
+      "error": null,
+      "receipt": "C:\\Users\\jksof\\.codex\\worktrees\\close-upstream-gaps\\PiSharp\\artifacts\\gap-validation\\release-startup-repeat-5-c58cdead4ac1431ba32ce1fb5b421a13\\receipt.json",
+      "diagnostics": [
+        "PASS workers.startup-shutdown-closes-connected-host (3567 ms)"
+      ]
+    },
     {
       "label": "release-hosting",
       "project": "C:\\Users\\jksof\\.codex\\worktrees\\close-upstream-gaps\\PiSharp\\tests\\PiSharp.Chord.Hosting.Tests\\PiSharp.Chord.Hosting.Tests.csproj",
@@ -151,6 +213,59 @@
         "PASS workers.startup-shutdown-closes-connected-host (3276 ms)",
         "PASS processes.natural-and-crashed-leader-kill-descendants (186 ms)",
         "PASS workers.address-lock-waits-and-cancels (292 ms)"
+      ]
+    },
+    {
+      "label": "release-host-startup-barrier",
+      "project": "C:\\Users\\jksof\\.codex\\worktrees\\close-upstream-gaps\\PiSharp\\tests\\PiSharp.Chord.Hosting.Tests\\PiSharp.Chord.Hosting.Tests.csproj",
+      "scopeIdentity": "C:\\Users\\jksof\\.codex\\worktrees\\close-upstream-gaps\\PiSharp\\tests\\PiSharp.Chord.Hosting.Tests\\PiSharp.Chord.Hosting.Tests.csproj||{}|buildOnly=False",
+      "selection": {
+        "testArgs": [],
+        "filters": {},
+        "buildOnly": false
+      },
+      "parametersFile": null,
+      "platform": {
+        "os": "Microsoft Windows 10.0.26300",
+        "architecture": "X64"
+      },
+      "sdk": {
+        "path": "E:/AI/PiSharp/PiSharp/artifacts/sample-tools/dotnet/dotnet.exe",
+        "launcherSha256": "21a46f1e5235cf4e844b9de5429f0e198b9c97a41f0503a66442f1d639ca3ee6",
+        "configuredVersion": "10.0.401"
+      },
+      "testArguments": null,
+      "result": "failed",
+      "recordedResult": "failed",
+      "startedUtc": "2026-11-09T02:53:50.9736278Z",
+      "finishedUtc": "2026-11-09T02:53:53.2043105Z",
+      "source": {
+        "head": "6cc81569772cc5ddd79b73eb6b46b18cdd497b5e",
+        "dirty": true,
+        "beforeSha256": "de25736394f8009039de1bb44e36d6fa4975405f1c2d5d27993002a7be4130d3",
+        "manifest": "C:\\Users\\jksof\\.codex\\worktrees\\close-upstream-gaps\\PiSharp\\artifacts\\gap-validation\\release-host-startup-barrier-f48aeb85029f4588bfdf8abf7bb6f5be\\source-before.json",
+        "afterSha256": "de25736394f8009039de1bb44e36d6fa4975405f1c2d5d27993002a7be4130d3",
+        "changedDuringRun": false
+      },
+      "buildExit": 1,
+      "buildArguments": [
+        "build",
+        "C:\\Users\\jksof\\.codex\\worktrees\\close-upstream-gaps\\PiSharp\\tests\\PiSharp.Chord.Hosting.Tests\\PiSharp.Chord.Hosting.Tests.csproj",
+        "--disable-build-servers",
+        "--configuration",
+        "Debug",
+        "-m:1",
+        "-nr:false",
+        "-p:RestoreLockedMode=false",
+        "-p:UseSharedCompilation=false",
+        "'-p:RunAnalyzers=false','-p:RestorePackagesPath=E:/AI/PiSharp/gap-implementation/artifacts/nuget-cache','-p:RestoreLockedMode=true'"
+      ],
+      "testExit": null,
+      "caseEvidence": null,
+      "error": "System.Management.Automation.RuntimeException: Build failed or timed out (1).",
+      "receipt": "C:\\Users\\jksof\\.codex\\worktrees\\close-upstream-gaps\\PiSharp\\artifacts\\gap-validation\\release-host-startup-barrier-f48aeb85029f4588bfdf8abf7bb6f5be\\receipt.json",
+      "diagnostics": [
+        "MSBUILD : error MSB1008: Only one project can be specified."
       ]
     },
     {
@@ -337,6 +452,211 @@
       },
       "error": null,
       "receipt": "C:\\Users\\jksof\\.codex\\worktrees\\close-upstream-gaps\\PiSharp\\artifacts\\gap-validation\\release-legacy-25dc2325f4104a1d83bc7e000bc83f41\\receipt.json",
+      "diagnostics": [
+        "PASS cluster.ahead-child-refused-and-client-not-participant",
+        "PASS cluster.discovery-reauthorizes-and-admits-expired-request",
+        "PASS cluster.reconnect-replaces-parent-with-isolated-close",
+        "PASS cluster.catchup-merges-modules-and-removal-tombstones",
+        "PASS cluster.invalidates-or-restamps-only-matching-peer",
+        "PASS retention.actual-remote-linger-reacquire-and-lru",
+        "PASS retention.actual-upstream-reconnect-reholds-again",
+        "PASS retention.shared-bindings-lru-and-reacquire",
+        "PASS retention.unhydrated-release-and-released-reference-gc",
+        "PASS retention.collectible-assembly-shared-identity-and-alias",
+        "PASS retention.actual-host-pins-module-until-root-retires",
+        "PASS retention.old-resource-close-loads-private-dependency-before-unload",
+        "PASS manager.admission-cleans-natural-exit-before-ready",
+        "PASS manager.concurrent-start-stop-replace-real-child",
+        "PASS manager.kernel-lock-and-replace",
+        "PASS manager.does-not-inherit-parent-lock",
+        "PASS manager.fatal-and-readiness-timeout-cleanup",
+        "PASS manager.busy-to-idle-clock-and-policy",
+        "PASS manager.grace-kills-descendants",
+        "PASS manager.graceful-exit-kills-descendants-windows"
+      ]
+    },
+    {
+      "label": "release-legacy-final",
+      "project": "C:\\Users\\jksof\\.codex\\worktrees\\close-upstream-gaps\\PiSharp\\tests\\PiSharp.Chord.Legacy.Cluster.Tests\\PiSharp.Chord.Legacy.Cluster.Tests.csproj",
+      "scopeIdentity": "C:\\Users\\jksof\\.codex\\worktrees\\close-upstream-gaps\\PiSharp\\tests\\PiSharp.Chord.Legacy.Cluster.Tests\\PiSharp.Chord.Legacy.Cluster.Tests.csproj||{}|buildOnly=False",
+      "selection": {
+        "testArgs": [],
+        "filters": {},
+        "buildOnly": false
+      },
+      "parametersFile": "C:\\Users\\jksof\\.codex\\worktrees\\close-upstream-gaps\\PiSharp\\artifacts\\gap-validation\\queue-9d05a3ed212c404cae32a2955c932e2e\\release-legacy-final.json",
+      "platform": {
+        "os": "Microsoft Windows 10.0.26300",
+        "architecture": "X64"
+      },
+      "sdk": {
+        "path": "E:/AI/PiSharp/PiSharp/artifacts/sample-tools/dotnet/dotnet.exe",
+        "launcherSha256": "21a46f1e5235cf4e844b9de5429f0e198b9c97a41f0503a66442f1d639ca3ee6",
+        "configuredVersion": "10.0.401"
+      },
+      "testArguments": null,
+      "result": "passed",
+      "recordedResult": "passed",
+      "startedUtc": "2026-11-09T02:59:16.7979759Z",
+      "finishedUtc": "2026-11-09T02:59:28.8590094Z",
+      "source": {
+        "head": "6cc81569772cc5ddd79b73eb6b46b18cdd497b5e",
+        "dirty": true,
+        "beforeSha256": "f19b71d6575e93c3a3a0d68699f43f4aac8f524b3fd284f8e7b2aa732acdbf5e",
+        "manifest": "C:\\Users\\jksof\\.codex\\worktrees\\close-upstream-gaps\\PiSharp\\artifacts\\gap-validation\\release-legacy-final-babb06ef21804e1f92cf21f327a46221\\source-before.json",
+        "afterSha256": "f19b71d6575e93c3a3a0d68699f43f4aac8f524b3fd284f8e7b2aa732acdbf5e",
+        "changedDuringRun": false
+      },
+      "buildExit": 0,
+      "buildArguments": [
+        "build",
+        "C:\\Users\\jksof\\.codex\\worktrees\\close-upstream-gaps\\PiSharp\\tests\\PiSharp.Chord.Legacy.Cluster.Tests\\PiSharp.Chord.Legacy.Cluster.Tests.csproj",
+        "--disable-build-servers",
+        "--configuration",
+        "Debug",
+        "-m:1",
+        "-nr:false",
+        "-p:RestoreLockedMode=false",
+        "-p:UseSharedCompilation=false",
+        "-p:RunAnalyzers=false",
+        "-p:RestorePackagesPath=E:/AI/PiSharp/gap-implementation/artifacts/nuget-cache",
+        "-p:RestoreLockedMode=true"
+      ],
+      "testExit": 0,
+      "caseEvidence": {
+        "kind": "observed-case-lines",
+        "selectedCount": 25,
+        "cases": [
+          {
+            "id": "cluster.actual-host-routes-and-reloads-existing-reference",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "cluster.parent-first-fifo-commit-and-prefix",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "cluster.vote-failure-rolls-every-host-back",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "cluster.vote-timeout-aborts-loading-child-and-can-retry",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "cluster.late-child-fenced-and-reconciled",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "cluster.ahead-child-refused-and-client-not-participant",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "cluster.discovery-reauthorizes-and-admits-expired-request",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "cluster.reconnect-replaces-parent-with-isolated-close",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "cluster.catchup-merges-modules-and-removal-tombstones",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "cluster.invalidates-or-restamps-only-matching-peer",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "retention.actual-remote-linger-reacquire-and-lru",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "retention.actual-upstream-reconnect-reholds-again",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "retention.shared-bindings-lru-and-reacquire",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "retention.unhydrated-release-and-released-reference-gc",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "retention.collectible-assembly-shared-identity-and-alias",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "retention.actual-host-pins-module-until-root-retires",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "retention.old-resource-close-loads-private-dependency-before-unload",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "manager.admission-cleans-natural-exit-before-ready",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "manager.concurrent-start-stop-replace-real-child",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "manager.kernel-lock-and-replace",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "manager.does-not-inherit-parent-lock",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "manager.fatal-and-readiness-timeout-cleanup",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "manager.busy-to-idle-clock-and-policy",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "manager.grace-kills-descendants",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "manager.graceful-exit-kills-descendants-windows",
+            "status": "PASS",
+            "detail": null
+          }
+        ],
+        "consoleSkipObservations": []
+      },
+      "error": null,
+      "receipt": "C:\\Users\\jksof\\.codex\\worktrees\\close-upstream-gaps\\PiSharp\\artifacts\\gap-validation\\release-legacy-final-babb06ef21804e1f92cf21f327a46221\\receipt.json",
       "diagnostics": [
         "PASS cluster.ahead-child-refused-and-client-not-participant",
         "PASS cluster.discovery-reauthorizes-and-admits-expired-request",
@@ -9933,6 +10253,129 @@
       ]
     },
     {
+      "label": "release-daemon-final",
+      "project": "C:\\Users\\jksof\\.codex\\worktrees\\close-upstream-gaps\\PiSharp\\tests\\PiSharp.Env.Daemon.Tests\\PiSharp.Env.Daemon.Tests.csproj",
+      "scopeIdentity": "C:\\Users\\jksof\\.codex\\worktrees\\close-upstream-gaps\\PiSharp\\tests\\PiSharp.Env.Daemon.Tests\\PiSharp.Env.Daemon.Tests.csproj||{}|buildOnly=False",
+      "selection": {
+        "testArgs": [],
+        "filters": {},
+        "buildOnly": false
+      },
+      "parametersFile": "C:\\Users\\jksof\\.codex\\worktrees\\close-upstream-gaps\\PiSharp\\artifacts\\gap-validation\\queue-9d05a3ed212c404cae32a2955c932e2e\\release-daemon-final.json",
+      "platform": {
+        "os": "Microsoft Windows 10.0.26300",
+        "architecture": "X64"
+      },
+      "sdk": {
+        "path": "E:/AI/PiSharp/PiSharp/artifacts/sample-tools/dotnet/dotnet.exe",
+        "launcherSha256": "21a46f1e5235cf4e844b9de5429f0e198b9c97a41f0503a66442f1d639ca3ee6",
+        "configuredVersion": "10.0.401"
+      },
+      "testArguments": null,
+      "result": "passed-with-console-skips",
+      "recordedResult": "passed-with-console-skips",
+      "startedUtc": "2026-11-09T02:59:31.3877022Z",
+      "finishedUtc": "2026-11-09T02:59:55.7820259Z",
+      "source": {
+        "head": "6cc81569772cc5ddd79b73eb6b46b18cdd497b5e",
+        "dirty": true,
+        "beforeSha256": "571ce015dbdf44d40a68f3a9685d93898cb08a28a931d15a0d0940eadad6eed6",
+        "manifest": "C:\\Users\\jksof\\.codex\\worktrees\\close-upstream-gaps\\PiSharp\\artifacts\\gap-validation\\release-daemon-final-bfd7e99539844f7eadb3d24007377765\\source-before.json",
+        "afterSha256": "571ce015dbdf44d40a68f3a9685d93898cb08a28a931d15a0d0940eadad6eed6",
+        "changedDuringRun": false
+      },
+      "buildExit": 0,
+      "buildArguments": [
+        "build",
+        "C:\\Users\\jksof\\.codex\\worktrees\\close-upstream-gaps\\PiSharp\\tests\\PiSharp.Env.Daemon.Tests\\PiSharp.Env.Daemon.Tests.csproj",
+        "--disable-build-servers",
+        "--configuration",
+        "Debug",
+        "-m:1",
+        "-nr:false",
+        "-p:RestoreLockedMode=false",
+        "-p:UseSharedCompilation=false",
+        "-p:RunAnalyzers=false",
+        "-p:RestorePackagesPath=E:/AI/PiSharp/gap-implementation/artifacts/nuget-cache",
+        "-p:RestoreLockedMode=true"
+      ],
+      "testExit": 0,
+      "caseEvidence": {
+        "kind": "observed-case-lines",
+        "selectedCount": 10,
+        "cases": [
+          {
+            "id": "framed filesystem and descriptor identity",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "malformed JSON stays synchronized",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "hello validation and handle limits",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "cancel registered before worker starts",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "disconnect releases resources and kept handles",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "partial frame terminates session",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "startup token, heartbeat and silence shutdown",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "pipelined chunks retain arrival order",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "bounded disconnect and late ownership cleanup",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "raw FIFO daemon exits after EOF and SIGTERM",
+            "status": "SKIP",
+            "detail": null,
+            "reason": "SKIP Unix raw FIFO EOF/SIGTERM regression on Windows"
+          }
+        ],
+        "consoleSkipObservations": [
+          "SKIP Unix raw FIFO EOF/SIGTERM regression on Windows"
+        ]
+      },
+      "error": null,
+      "receipt": "C:\\Users\\jksof\\.codex\\worktrees\\close-upstream-gaps\\PiSharp\\artifacts\\gap-validation\\release-daemon-final-bfd7e99539844f7eadb3d24007377765\\receipt.json",
+      "diagnostics": [
+        "PASS framed filesystem and descriptor identity",
+        "PASS malformed JSON stays synchronized",
+        "PASS hello validation and handle limits",
+        "PASS cancel registered before worker starts",
+        "PASS disconnect releases resources and kept handles",
+        "PASS partial frame terminates session",
+        "PASS startup token, heartbeat and silence shutdown",
+        "PASS pipelined chunks retain arrival order",
+        "PASS bounded disconnect and late ownership cleanup",
+        "PASS raw FIFO daemon exits after EOF and SIGTERM"
+      ]
+    },
+    {
       "label": "release-env-terminal",
       "project": "C:\\Users\\jksof\\.codex\\worktrees\\close-upstream-gaps\\PiSharp\\tests\\PiSharp.Env.Terminal.Tests\\PiSharp.Env.Terminal.Tests.csproj",
       "scopeIdentity": "C:\\Users\\jksof\\.codex\\worktrees\\close-upstream-gaps\\PiSharp\\tests\\PiSharp.Env.Terminal.Tests\\PiSharp.Env.Terminal.Tests.csproj||{\"PISHARP_TEST_PI150_NODE_MODULES\":\"E:/AI/PiSharp/gap-implementation/artifacts/node-runtime-150/node_modules\"}|buildOnly=False",
@@ -10974,7 +11417,7 @@
       ]
     },
     {
-      "label": "release-extensions",
+      "label": "release-extensions-v2",
       "project": "C:\\Users\\jksof\\.codex\\worktrees\\close-upstream-gaps\\PiSharp\\tests\\PiSharp.Extensions.ContractTests\\PiSharp.Extensions.ContractTests.csproj",
       "scopeIdentity": "C:\\Users\\jksof\\.codex\\worktrees\\close-upstream-gaps\\PiSharp\\tests\\PiSharp.Extensions.ContractTests\\PiSharp.Extensions.ContractTests.csproj||{\"PISHARP_TEST_PI150_NODE_MODULES\":\"E:/AI/PiSharp/gap-implementation/artifacts/node-runtime-150/node_modules\"}|buildOnly=False",
       "selection": {
@@ -10984,7 +11427,7 @@
         },
         "buildOnly": false
       },
-      "parametersFile": "C:\\Users\\jksof\\.codex\\worktrees\\close-upstream-gaps\\PiSharp\\artifacts\\gap-validation\\queue-24f31277d9a74083b2c38e561ce85671\\release-extensions.json",
+      "parametersFile": "C:\\Users\\jksof\\.codex\\worktrees\\close-upstream-gaps\\PiSharp\\artifacts\\gap-validation\\queue-67c0edc3ffe5494d89c91a18b04202e2\\release-extensions-v2.json",
       "platform": {
         "os": "Microsoft Windows 10.0.26300",
         "architecture": "X64"
@@ -10997,17 +11440,17 @@
       "testArguments": null,
       "result": "failed",
       "recordedResult": "failed",
-      "startedUtc": "2026-11-09T01:52:17.8564533Z",
-      "finishedUtc": "2026-11-09T01:52:26.7080867Z",
+      "startedUtc": "2026-11-09T02:13:17.6861881Z",
+      "finishedUtc": "2026-11-09T02:13:37.2915829Z",
       "source": {
         "head": "3024b1e09e1add83e8cfeeb73bc4235a026b517c",
         "dirty": true,
-        "beforeSha256": "66b31f6e0c48aff74d2d2e1fc337399523e4ac9c0f85f5467aaf75720bcf9d2b",
-        "manifest": "C:\\Users\\jksof\\.codex\\worktrees\\close-upstream-gaps\\PiSharp\\artifacts\\gap-validation\\release-extensions-c7a17d645d17403996a5280c966fdee8\\source-before.json",
-        "afterSha256": "66b31f6e0c48aff74d2d2e1fc337399523e4ac9c0f85f5467aaf75720bcf9d2b",
+        "beforeSha256": "d051992d2147bf09b690b5d8a96315f016a2a0b04134f321c9533dd97c7327a2",
+        "manifest": "C:\\Users\\jksof\\.codex\\worktrees\\close-upstream-gaps\\PiSharp\\artifacts\\gap-validation\\release-extensions-v2-29fe75fed67c48859d1c25b1ca99ecc9\\source-before.json",
+        "afterSha256": "d051992d2147bf09b690b5d8a96315f016a2a0b04134f321c9533dd97c7327a2",
         "changedDuringRun": false
       },
-      "buildExit": 1,
+      "buildExit": 0,
       "buildArguments": [
         "build",
         "C:\\Users\\jksof\\.codex\\worktrees\\close-upstream-gaps\\PiSharp\\tests\\PiSharp.Extensions.ContractTests\\PiSharp.Extensions.ContractTests.csproj",
@@ -11019,16 +11462,1969 @@
         "-p:RestoreLockedMode=false",
         "-p:UseSharedCompilation=false",
         "-p:RunAnalyzers=false",
-        "-p:RestorePackagesPath=E:/AI/PiSharp/gap-implementation/artifacts/nuget-cache",
-        "-p:RestoreLockedMode=true"
+        "-p:RestorePackagesPath=E:/AI/PiSharp/gap-implementation/artifacts/nuget-cache"
       ],
-      "testExit": null,
-      "caseEvidence": null,
-      "error": "System.Management.Automation.RuntimeException: Build failed or timed out (1).",
-      "receipt": "C:\\Users\\jksof\\.codex\\worktrees\\close-upstream-gaps\\PiSharp\\artifacts\\gap-validation\\release-extensions-c7a17d645d17403996a5280c966fdee8\\receipt.json",
+      "testExit": 1,
+      "caseEvidence": {
+        "kind": "observed-case-lines",
+        "selectedCount": 386,
+        "cases": [
+          {
+            "id": "consumer async initialization publishes one immutable transaction",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "failure and cancellation rollback join cleanup without disturbing another owner",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "owner IDs, registration IDs, names and core reservations have deterministic conflicts",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "captured observations survive removal and reject dispatch-dependent disposal",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "scope disposal stops admission, cancels and joins callbacks and cleanup once",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "generation checks, callback errors and registry cleanup settle owned work",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "staged, active and retired resources obey inclusive cumulative bounds",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "registered extension supplies owned result through actual two-turn Agent and provider projection",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "extension arguments revalidate and final policy rejects altered identity, denied input and unsupported validators",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "captured extension bindings reject removal and old owner generations without replacing callback authority",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "extension Agent abort, session cancellation and registry disposal join actual callbacks and shared cleanup",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "extension result presence, termination, malformed output and binding quotas pass real invocation boundaries",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "actual two-turn Agent forwards original invocation identity and identical authorized final arguments with progress",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "invocation-aware execution follows final denial and preserves legacy contexts and prepared adapters",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "concurrent registered tool invocations retain separate real IDs, arguments, contexts and update receipts",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "cancellation and registry disposal join ignored update receipts and callback finally before revoking stale contexts",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "invocation progress rejects malformed data, configured bounds, overlapping delivery and exhausted source quotas",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "manifest preflight hashes real bytes without loading or constructing code",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "matching hashes require explicit root/manifest/scope/policy-bound trust",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "unsupported API, runtime, TFM, RID, feature, capability and override reject before reads",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "manifest retained syntax, Unicode, shape and inclusive character/byte budgets",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "package paths reject traversal, devices, UNC, ADS, missing and reparse artifacts",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "cancellation and read faults join actual stream cleanup before settlement",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "caller cancellation during opened and held closing joins cleanup without publishing admission",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "noncanceled closing faults retain sanitized denial and unexpected exception policy",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "caller cancellation wins over closing faults only after owned cleanup settles",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "published fixture denial and identity changes precede module/constructor execution",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "session-snapshot. published required feature rejects unavailable hosts before executable work",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "published conflicting private versions use exact owned bytes and shared host contracts",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "private contract copies and an actually compiled future ABI reject before execution",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "missing managed, framework, malformed-image and native dependencies fail closed",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "published initialization failure/cancellation and loader close join rollback",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "published loader primary classification preserves activation task fault evidence",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "published callback/disposal barriers share cleanup and release cooperative load contexts",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "published private callback accepts exact short and long Windows path aliases while rejecting distinct locations",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "quiescence. loaded published owner retains package and reservation until actual drain and shutdown",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "published native extension executes through HTTP Agent durable acknowledgement and reopen without replay",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "published native extension final policy and complete schema admission prevent callback effects",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "published native callback cancellation and concurrent session/loader close join execution and shutdown",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "complete source catalog retains all 41 pinned event subscriptions and mandatory semantics",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "input transforms compose, preserve nullish images and stop when handled",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "input no-result, invalid proposal and handler failure retain prior state",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "input cancellation owns separate tokens and joins admitted callback work",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "tool argument replacements compose and the first block stops dispatch",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "tool-call failure blocks execution while requested cancellation remains cancellation",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "tool-result patches compose and content redaction clears stale structured content",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "tool-result absence/null/raw numbers/opaque fields and outcome error remain distinct",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "tool-result invalid or failed hook continues; cancellation does not produce partial success",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "all three captured dispatches survive removal and defer newly added handlers",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "handler identities, bounds and foreign snapshots are admitted explicitly",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "nested and concurrent reducer dispatch admission cannot wait on itself",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "strict retained JSON and finite/Unicode/UTF8 admission rejects permissive and oversized inputs",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "registered reducers and tools publish atomically and rollback together",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "registered input handlers preserve owner order and admitted removal semantics",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "registered tool calls retain exact replacements and first-block decisions",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "registered tool result patches preserve null and complete result admission",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "registered callback leases guard participant disposal and retired capacity",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "registered scope cancellation joins callbacks and throwing lifetime cleanup",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "registered dispatch retains shared admission and recursive limits",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "registered typed admission rejects stale generations and invalid descriptors",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "registered hooks traverse real two-turn durable assistant and result barriers",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "registered hooks cannot bypass full schema, final policy or first block",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "prepared replacements re-resolve the same adapter before exact final action policy",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "registered result projection retains raw status and nullish source after-hook behavior",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "registered callback cancellation and removal join real durable session cleanup",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "durable assistant and result checkpoint failure stop registered continuation",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "registered-tool-image.progress-identity.actual-progress-hooks-canonical-sink-source-request",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "registered-tool-image.progress-nullish.actual-progress-hooks-canonical-sink-source-request",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "registered-tool-image.progress-image-patch.actual-progress-hooks-canonical-sink-source-request",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "registered-tool-image.progress-empty-patch.actual-progress-hooks-canonical-sink-source-request",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "registered-tool-image.canceled-progress-joins-callback-cleanup-before-idle-and-no-continuation",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "registered input transforms reach actual durable checkpoint, provider history and reopen",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "handled input preserves both real queues, history, clocks and physical storage",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "registered input owner order, errors and removal retain admitted callbacks only",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "registered active inputs use real steering/follow-up and settled barrier queues",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "held input cancellation, self-wait and concurrent disposal join owner and storage cleanup",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "input and final envelope bounds fail before Agent effects and uncertain append blocks provider",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "runtime combined native-extension invoker revalidates final actions and durably projects registered results",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "runtime registered hooks cannot bypass initial-final schema first-block errors or exact final policy",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "runtime composed hook snapshot retains current dispatch and requires refreshed binding after removal",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "runtime composed hook cancellation joins actual owner callback and durable session cleanup",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "runtime prepared hook options preserve legacy path and validate limits before effects",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "supervisor system import requires exact separate grant before compiled module/constructor effects",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "approved private supervisor import does not grant another private assembly or unknown native dependency",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "approved system handle survives callback/plugin joins and releases after shared disposal",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "prepare-loadout-diagnostic.binding-failure-reaches-captured-sink-once",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "prepare-loadout-diagnostic.held-reporter-shares-original-task-and-retains-capacity",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "prepare-loadout-diagnostic.reporter-failure-retains-original-cause-and-skips-later-effects",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "prepare-loadout-diagnostic.stale-and-retired-generations-cannot-report-as-current",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "prepare-loadout-diagnostic.admission-cancellation-and-captures-during-delivery-preserve-batches",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "prepare-loadout-diagnostic.foreign-cancellation-and-reporter-self-wait-preserve-causes",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "prepare-loadout-diagnostic.unknown-tools-bounds-and-repeated-occurrences-remain-explicit",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "session-shutdown-registry. absent handlers return false and unrelated topics remain untouched",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "session-shutdown-registry. reason and destination are preserved and malformed events are rejected",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "session-shutdown-registry. failures report sanitized identities and continue in owner order",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "session-shutdown-registry. admitted removal retains callbacks and later captures see replacement",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "session-shutdown-registry. cleanup joins original callback and repeat notifications remain host owned",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "session-shutdown-registry. reporter failure propagates and releases all participant leases",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "session-shutdown-registry. stale foreign and retired snapshots reject before callbacks",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "before-agent-start.custom-tailed restored history continues without another prompt or duplicate input",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "before-agent-start.failed assistant recovery retains custom tail and completes internal continuation",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "before-agent-start.actual durable custom entries survive reopen while forced prompts remain request-only",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "before-agent-start.shared binding keeps prepared prompt state isolated between agents",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "before-agent-start.once per prompt with ordered snapshots and continuation projection",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "before-agent-start.invalid custom content and callback errors retain prior prompt and continue",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "before-agent-start.operation session and owner cancellation join held cleanup before any request",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "before-agent-start.custom-message run fires before_agent_start as messageType custom and keeps its prompt for every request",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "before-agent-start.custom-message run carries pending nextTurn messages and handler messages",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "before-agent-start.custom message sent while before_agent_start runs is queued into the starting run",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "before-agent-start.custom message without triggerTurn sent while the run starts is recorded before it and in its first request",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "before-agent-start.abort requested while before_agent_start runs aborts the run as it starts",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "before-agent-start.user message sent while the run starts requires a delivery mode",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "context-with-system.conversation identity preserves system positions and changed lists replay tool state",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "context-with-system.conversation phase precedes full phase and snapshots new full handlers",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "context-with-system.ordered native handlers change model requests but preserve durable history",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "context-with-system.removal retains admitted handler then disappears on the next request",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "context-with-system.invalid returns and exceptions diagnose and continue; empty replacement is honored",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "context-with-system.operation session and owner cancellation join callback cleanup before settlement",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "context-with-system.an operation cancelled while a handler runs is the request token's cancellation",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "context-with-system.malformed user and system content diagnoses before transport and retains prior context",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "context-with-system.legacy preparation cannot rewrite canonical history through the new seam",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "nested-broker-sdk.registered hooks retain parent IDs and final native target denial",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "nested-broker-sdk.actual two-turn Agent keeps nested calls out of transcript and delivers updates",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "nested-broker-sdk.owner retirement joins nested native finally before extension disposal",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "nested-broker-sdk.old generation refuses effects while replacement gets fresh metadata",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "nested-broker-sdk.same registered tool can reenter with bounded depth",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "nested-broker-sdk.ignored nested call and update receipt retain callback lease",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "nested-broker-sdk.legacy dispatch has no invented broker or invocation ID",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "native tool activation descriptor defaults distinguish registered declared and callable sets",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "native tool activation normal native nested pipeline rejects hidden model-only and denied final actions",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "native tool activation durable ordered activation reaches real requests and survives reopen",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "native tool activation active request captures old loadout and busy publication is rejected",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "native tool activation cancelled callable joins original cleanup and stale capabilities refuse effects",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "native tool activation invalid exposure rolls back registration and hidden transcript admission fails",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "native tool activation loadout callbacks share original metadata and later active descriptions win",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "native tool activation hidden declarations retain execution and durable activation across reopen",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "native tool activation loadout errors continue and invalid results merge no partial changes",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "native tool activation hidden projection filters additions and removals after forced system context",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "native tool activation callback selection publishes matching next-request scheduler through mandatory policy",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "native tool activation cancelled batch joins ignored child and retains selection for next prompt",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "native tool activation post-ack cancellation retains actual checkpoint and matching Agent selection",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "native tool activation host setter supersedes pending proposal including no-op durable selection",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "native tool activation navigation validates epoch restores pending state and returns usable post-epoch revision",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "native tool activation navigation restoration overflow fails before Agent or context publication",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "native tool activation parallel prepared proposals cannot overwrite newer accepted selection",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "native tool activation preparation reentrancy and cancellation preserve prior logical selection",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "native tool activation retained native callback and retired attachment cannot schedule effects",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "native tool activation registration teardown joins original preparation lease before cancellation returns",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "native tool activation request boundary retries changed selection before admitting any checkpoint",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "native tool activation queued steering receives activation checkpoint before its user input",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "native tool activation pending system content survives while stale tool intent cannot undo activation",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "native tool activation host configuration rejects steering and followup queues without mutation",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "native tool activation held configuration preparation rejects late queues and preserves active-run steering",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "native tool activation namespace lookup matches source absent unknown exact name and optional description",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "native tool activation namespace capture stays immutable across registry replacement and later binding",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "native tool activation namespace metadata preserves session activation ordering and final policy authority",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "native tool activation namespace metadata uses existing registration and session size budgets",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "quiescence. callback drain precedes lease and leaves other owners available",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "quiescence. cancelled wait restores admission without abandoning or cancelling its callback",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "quiescence. pre-cancelled pause changes no descriptors or revision",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "quiescence. one pause owns resume and repeated old disposal cannot release another pause",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "quiescence. shutdown defeats a pending pause and joins its actual callback",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "quiescence. retained old lease cannot revive a disposed or replaced generation",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "quiescence. removed descriptors retain their already admitted callback drain",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "quiescence. captured multi-owner dispatch drains callbacks not yet invoked",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "quiescence. callback cannot wait for quiescence of any owner leased by its dispatch",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "quiescence. failed callback releases its lease and still establishes actual idle",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "session-snapshot. absent hosts and pure callbacks preserve optional availability",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "session-snapshot. concurrent callbacks retain independent owned branch views",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "session-snapshot. UI catalog invocation and reducer capabilities share the captured context",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "session-snapshot. capture failures and caller cancellation release admission before plugin entry",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "session-snapshot. cancellation after action admission awaits scope cleanup before releasing callback",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "session-snapshot. owner disposal joins a held capture and retained data grants no admission",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "session-snapshot. identities JSON and inclusive view budgets reject without truncation",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "session-creation-registry. optional feature requires configured creation broker",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "session-creation-registry. explicit opaque session capability preserves numeric spelling while executable input remains finite",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "session-creation-registry. typed veto is ordered and failure remains distinct from cancellation",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "session-creation-registry. shutdown joins admitted veto handler cleanup and rejects old snapshot",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "session-creation-preflight.same-eventual-count-size-depth-identity-number-policy",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "session-creation-preflight.older-broker-fails-before-effects",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "session-creation-preflight.cancelled-validation-keeps-source-scope",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "session-creation-preflight.postcommit-context-error-has-receipt-and-joined-cleanup",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "session-catalog-sdk.owned-list-does-not-alias-host-array",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "session-catalog-sdk.query-and-result-bounds-before-return",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "session-catalog-sdk.cancellation-before-and-after-host-read",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "session-catalog-sdk.legacy-resume-and-switch-fail-before-effects",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "session-state.selected-owner-kind-latest-and-opaque-data",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "session-state.explicit-version-error-and-canceled-context",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "command-catalog.command catalogs contain owned metadata and retain the admitted revision",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "command-catalog.completion preserves owned arrays, explicit null and absent callbacks",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "command-catalog.completion denies removed, replaced, foreign and disposed admissions",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "command-catalog.owner disposal cancels and joins a held completion before plugin cleanup",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "command-catalog.caller cancellation retains completion admission until callback cleanup ends",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "command-catalog.completion rejects invalid scalars, prefix bounds and invalid result values",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "command-catalog.command provenance and completion callbacks obey descriptor admission bounds",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "command-catalog.command contexts preserve catalog and UI identity through awaited scope cleanup",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "mcp-configuration.defaults-and-absent-files",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "mcp-configuration.trusted-layering-preserves-order-disabled-and-errors",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "mcp-configuration.untrusted-project-is-not-parsed",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "mcp-configuration.invalid-root-preference-and-json-diagnostics",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "mcp-configuration.server-validation-and-transport-precedence",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "mcp-configuration.oauth-loopback-port-and-null-validation",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "mcp-configuration.literal-command-env-and-unknown-metadata-stay-inert",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "mcp-configuration.exact-before-first-wildcard-and-literal-regex-text",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "mcp-configuration.json-last-duplicate-and-array-index-enumeration",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "mcp-configuration.configured-entries-win-over-extension-registration",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "mcp-configuration.provider-tool-name-length-collision-and-utf16",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "mcp-configuration.catalog-metadata-exposure-schema-and-description",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "mcp-configuration.disabled-disconnected-and-resource-discovery",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "mcp-configuration.borrowed-catalog-refresh-retains-name-ownership",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "mcp-configuration.schema-ownership-and-document-lifetime",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "mcp-runtime.initialize-roots-protocol-and-paging",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "mcp-runtime.startup-original-coalesces-until-publication",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "mcp-runtime.disabled-and-capability-absent-no-tool-acquisition",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "mcp-runtime.invalid-initialize-closes-acquired-lease",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "mcp-runtime.held-initialize-close-fences-late-protocol-notify",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "mcp-runtime.native-call-identity-progress-and-structured-result",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "mcp-runtime.close-joins-held-call-and-repeats-exact-task",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "mcp-runtime.caller-cancel-joins-original-request-cleanup",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "mcp-runtime.late-acquired-lease-closes-without-start-or-publication",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "mcp-runtime.notification-refresh-withdraws-last-acknowledged-tools",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "mcp-runtime.close-drops-late-refresh-before-publication",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "mcp-runtime.publication-failure-retains-old-and-stops-automatic-republication",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "mcp-runtime.mismatched-receipt-and-reentry-refuse-before-effects",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "mcp-runtime.close-joins-already-committed-publication-receipt",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "mcp-runtime.swallowed-progress-failure-and-repeat-close-fault-identity",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "mcp-runtime.close-joins-held-native-progress-original",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "mcp-runtime.native-progress-reentry-refuses-before-effects",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "mcp-runtime.definite-disconnect-is-not-replayed-and-next-call-reconnects",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "mcp-runtime.refresh-disconnect-retires-joins-cleanup-and-later-reconnects",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "mcp-runtime.tools-call-shape-rejection-retains-one-original-request",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "mcp-runtime.response-schema-tools-pages-and-cursor-bounds",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "mcp-runtime.close-initiates-physical-stop-before-request-cancellation-callback-join",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "mcp-runtime.startup-close-initiates-physical-stop-before-start-cancellation-callback-join",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "mcp-runtime.close-retains-cancellation-callback-and-physical-cleanup-original-faults",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "mcp-transport.actual-jsonl-channel-runtime-initialize-list-call",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "mcp-transport.split-crlf-blank-frames-and-out-of-order-ids",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "mcp-transport.remote-error-code-data-and-result-size",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "mcp-transport.progress-meta-and-joined-native-delivery",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "mcp-transport.caller-cancel-writes-and-initialize-exclusion",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "mcp-transport.deadline-reset-and-original-cancel-write",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "mcp-transport.incoming-ping-roots-and-method-not-found",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "mcp-transport.notification-refresh-does-not-block-reader",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "mcp-transport.notification-disconnect-retains-callback-close-and-lazy-reconnect",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "mcp-transport.notification-retirement-cleanup-fault-remains-owned",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "mcp-transport.external-close-joins-deferred-retirement-without-cycle",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "mcp-transport.held-send-close-joins-and-stable-cleanup-fault",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "mcp-transport.held-start-close-joins-no-reader-effects",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "mcp-transport.close-initiates-owner-stop-before-cancellation-callback-join",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "mcp-transport.stdio-frame-limit-and-partial-eof",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "mcp-transport.http-json-batch-session-protocol-and-delete",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "mcp-transport.http-sse-eof-filter-and-get-resumption-no-post-replay",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "mcp-transport.http-sse-all-line-endings-and-byte-boundaries",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "mcp-transport.http-sse-cr-framing-retains-byte-bounds",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "mcp-transport.http-get-after-initialized-and-405",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "mcp-transport.http-rejections-and-configured-body-bounds",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "mcp-transport.http-cancel-joins-held-send-and-held-delete",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "mcp-transport.post-get-disposal-unblocks-held-read-originals",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "mcp-transport.http-read-and-cleanup-faults-preserve-originals",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "mcp-transport.http-physical-stop-joins-pending-headers-and-late-response",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "mcp-transport.http-legacy-delegate-has-no-stop-authority",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "mcp-transport.http-admitted-send-stop-disposal-reentry-rejects-before-effects",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "mcp-transport.sse-terminal-read-cleanup-and-exhaustion-retain-originals",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "mcp-transport.resumed-sse-cleanup-never-becomes-success-or-retry",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "mcp-transport.held-notification-close-and-progress-fault-original",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "mcp-transport.callback-limit-refuses-before-second-host-effect",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "mcp-transport.finite-inflight-id-and-callback-admission",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "resource-reload.bounded-immutable-extensible-catalog-diff",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "resource-reload.successful-reload-joins-retirement-before-start",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "resource-reload.held-invalidation-joins-despite-host-cancellation",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "resource-reload.stage-failure-preserves-old-authority",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "resource-reload.shutdown-reporter-failure-joins-candidate-rollback",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "resource-reload.invalidation-failure-does-not-invent-old-authority",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "resource-reload.rejected-publication-cleans-both-with-original-causes",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "resource-reload.uncertain-publication-retains-candidate-for-owner-recovery",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "resource-reload.post-commit-failures-preserve-new-authority",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "resource-reload.admission-cancellation-original-join-and-self-wait",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "tool-catalog. prepare inert atomic commit and stable published receipt",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "tool-catalog. withdrawn old handle cannot remove reused id",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "tool-catalog. stale plans and foreign ownership leave current snapshot unchanged",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "tool-catalog. malformed and colliding batches fail before mutation",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "tool-catalog. held retired callback remains charged until original settles",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "tool-catalog. new old-entry lease after prepare rechecks limits before commit",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "mcp-http-originals.disconnect-before-held-notification-single-original",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "mcp-http-originals.disconnect-before-held-notification-multiple-original-faults",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "mcp-http-originals.disconnect-before-held-notification-faulted-oce",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "mcp-http-originals.separate-notification-failures-retained-through-close",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "mcp-http-originals.genuinely-canceled-notification-retains-successful-owned-close",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "mcp-http-originals.notification-empty-aggregate-task-evidence",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "mcp-http-originals.notification-empty-aggregate-sync-evidence",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "mcp-http-originals.notification-nested-aggregate-task-evidence",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "mcp-http-originals.notification-nested-aggregate-sync-evidence",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "mcp-http-originals.notification-duplicate-aggregate-task-evidence",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "mcp-http-originals.notification-duplicate-aggregate-sync-evidence",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "mcp-http-originals.notification-single-oce-task-evidence",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "mcp-http-originals.notification-single-oce-sync-evidence",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "mcp-http-originals.notification-duplicate-task-entries-evidence",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "mcp-http-originals.owned-get-995-abort-retains-original-without-disconnect",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "mcp-http-originals.nonstop-get-995-remains-original-failure",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "mcp-http-originals.unrelated-get-io-during-close-remains-failure",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "mcp-http-originals.faulted-get-oce-during-close-remains-failure",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "mcp-http-originals.owned-get-abort-does-not-hide-independent-disposal-failure",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "mcp-http-originals.unrelated-get-read-and-disposal-faults-both-retained",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "host-reload.captured-flags-tool-policy-and-lifecycle",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "host-reload.explicit-allowlist-exclusions-and-no-bindings",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "host-reload.held-stage-failure-joins-candidate-cleanup",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "host-reload.stage-and-cleanup-retain-both-original-faults",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "host-reload.held-publication-keeps-original-join-and-stale-context",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "host-reload.stale-publication-receipt-retains-candidate",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "host-reload.held-retirement-prevents-start-and-keeps-new-authority",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "host-reload.startup-fault-stops-following-hooks",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "host-reload.rejected-publication-cleans-both",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "host-reload.candidate-cannot-reuse-current-payload-or-id",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "host-reload.held-stage-retains-completed-original-task-faults",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "host-reload.held-retirement-retains-completed-original-task-faults",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "host-reload.original-task-cancellation-versus-faulted-oce",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "host-reload.rejects-all-multicast-slots-before-invocation",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "mcp-resources.selected-page-filter-and-template-shape",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "mcp-resources.aggregate-pages-errors-and-call-time-capture",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "mcp-resources.read-text-image-binary-and-structured-originals",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "mcp-resources.held-request-cancellation-joins-original",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "mcp-resources.held-output-cancellation-and-reentry-joins-original",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "mcp-resources.cursor-cycle-and-page-response-item-bounds",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "mcp-resources.utf8-middle-truncation-full-output-and-image-retention",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "mcp-resources.generation-domains-and-native-invocation-identity",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "mcp-resources.multicast-request-and-saver-refuse-before-effects",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "mcp-resources.held-selected-request-retains-complete-original-faults",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "mcp-resources.aggregate-request-fault-evidence-survives-result-projection",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "mcp-resources.held-binary-and-truncation-saver-faults-retained",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "mcp-resources.faulted-request-oce-remains-faulted",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "mcp-resources.faulted-saver-oce-remains-fallback-with-evidence",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "mcp-resources.owned-original-cancellation-and-mismatched-canceled-original",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "mcp-resources.owner-cancel-does-not-supersede-held-request-or-saver-faults",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "mcp-resource-runtime-bridge.actual-list-template-read-bridge-and-native-identity",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "mcp-resource-runtime-bridge.stale-generation-identity-method-and-options-refuse-before-acquire",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "mcp-resource-runtime-bridge.capability-absent-refuses-resource-effects",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "mcp-resource-runtime-bridge.held-request-close-joins-physical-request-and-cleanup-originals",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "mcp-resource-runtime-bridge.owned-cancel-maps-proven-original-to-leaf-token",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "mcp-resource-runtime-bridge.faulted-and-synchronous-oce-stay-faulted-with-all-original-faults",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "mcp-resource-runtime-bridge.definite-disconnect-retires-original-before-later-reconnect-without-replay",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "mcp-resource-runtime-bridge.held-native-progress-and-reentry-originals-joined-through-close",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "mcp-resource-runtime-bridge.swallowed-progress-first-oce-and-cleanup-faults-retained",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "mcp-resource-runtime-bridge.swallowed-progress-limit-rejection-still-faults-owning-request",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "mcp-resource-runtime-bridge.multicast-factory-and-publisher-refuse-before-effects",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "mcp-resource-runtime-bridge.physical-close-multiple-faults-retained",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "mcp-oauth-state.exact-server-isolation-and-foreign-state-replacement",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "mcp-oauth-state.token-expiry-capture-and-absent-expiry-reset",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "mcp-oauth-state.selective-invalidation-preserves-unrelated-values",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "mcp-oauth-state.held-write-fences-read-and-preserves-ordered-updates",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "mcp-oauth-state.write-failure-is-sticky-and-retains-complete-original",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "mcp-oauth-state.missing-verifier-and-synchronous-store-failure",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "mcp-channel-extension.dynamic-roots-capability-and-per-wire-request",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "mcp-channel-extension.generic-handler-replacement-and-physical-response",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "mcp-channel-extension.close-joins-held-roots-and-physical-response",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "mcp-channel-extension.wire-cancellation-stops-and-joins-owned-original",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "mcp-channel-extension.static-roots-and-default-ping-remain-reachable",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "mcp-dynamic-roots.each-request-evaluates-current-roots-and-copies-result",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "mcp-dynamic-roots.close-joins-held-callback-and-fences-fresh-admission",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "mcp-dynamic-roots.single-use-valuetask-is-captured-and-consumed-once",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "mcp-dynamic-roots.multi-fault-original-preserves-nested-and-duplicate-identities",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "mcp-dynamic-roots.faulted-oce-original-remains-faulted-with-complete-evidence",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "mcp-dynamic-roots.actual-owned-cancellation-is-canceled-and-close-joins",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "mcp-dynamic-roots.synchronous-callback-error-retains-null-original-and-same-evidence",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "mcp-dynamic-roots.borrowed-callback-close-reentry-refuses-before-stop",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "mcp-dynamic-roots.array-response-utf8-and-request-bounds-have-no-new-authority",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "mcp-incoming-registry.replacement-removal-and-opaque-reply",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "mcp-incoming-registry.unknown-method-awaits-physical-response",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "mcp-incoming-registry.close-joins-held-handler-and-response",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "mcp-incoming-registry.cancellation-id-refuses-duplicate-and-joins-original",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "mcp-incoming-registry.handler-and-send-full-fault-dags-retained",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "mcp-incoming-registry.synchronous-empty-failure-and-null-result",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "mcp-incoming-registry.borrowed-handler-and-sender-close-reentry",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "mcp-incoming-registry.finite-method-inflight-request-and-byte-bounds",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "mcp-registration-facade.same-owner-replacement-preserves-order-and-copied-snapshots",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "mcp-registration-facade.foreign-register-refuses-and-foreign-unregister-is-noop",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "mcp-registration-facade.configured-server-wins-in-admitted-host-publication",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "mcp-registration-facade.invalid-configuration-has-no-publication-or-acquisition",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "mcp-registration-facade.inactive-and-canceled-owner-refuse-before-publication",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "mcp-registration-facade.publication-reentry-refuses-before-effects",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "mcp-registration-facade.publisher-fault-fences-replay-and-retains-original",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "mcp-registration-facade.foreign-owner-or-revision-receipt-fences-uncertain-commit",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "mcp-registration-facade.exact-owner-retirement-removes-only-owned-rows-after-close",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "custom-registry.held-original-and-dispose-before-plugin-unload",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "custom-registry.self-native-ancestor-and-unrelated-component-close",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "custom-registry.session-cancel-frame-free-register-held-original",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "native tool activation cancelled activation has no durable or live publication",
+            "status": "FAIL",
+            "detail": "native tool activation cancelled activation has no durable or live publication: System.AggregateException: Loadout preparation and diagnostic delivery failed. (The operation was canceled.) (The operation was canceled.)"
+          }
+        ],
+        "consoleSkipObservations": []
+      },
+      "error": null,
+      "receipt": "C:\\Users\\jksof\\.codex\\worktrees\\close-upstream-gaps\\PiSharp\\artifacts\\gap-validation\\release-extensions-v2-29fe75fed67c48859d1c25b1ca99ecc9\\receipt.json",
       "diagnostics": [
-        "C:\\Users\\jksof\\.codex\\worktrees\\close-upstream-gaps\\PiSharp\\tests\\PiSharp.Extensions.ContractTests\\ToolActivationTests.cs(93,19): error CS4007: Instance of type 'System.ReadOnlySpan<byte>' cannot be preserved across 'await' or 'yield' boundary. [C:\\Users\\jksof\\.codex\\worktrees\\close-upstream-gaps\\PiSharp\\tests\\PiSharp.Extensions.ContractTests\\PiSharp.Extensions.ContractTests.csproj]",
-        "C:\\Users\\jksof\\.codex\\worktrees\\close-upstream-gaps\\PiSharp\\tests\\PiSharp.Extensions.ContractTests\\ToolActivationTests.cs(93,19): error CS4007: Instance of type 'System.ReadOnlySpan<byte>' cannot be preserved across 'await' or 'yield' boundary. [C:\\Users\\jksof\\.codex\\worktrees\\close-upstream-gaps\\PiSharp\\tests\\PiSharp.Extensions.ContractTests\\PiSharp.Extensions.ContractTests.csproj]"
+        "PASS mcp-incoming-registry.unknown-method-awaits-physical-response",
+        "PASS mcp-incoming-registry.close-joins-held-handler-and-response",
+        "PASS mcp-incoming-registry.cancellation-id-refuses-duplicate-and-joins-original",
+        "PASS mcp-incoming-registry.handler-and-send-full-fault-dags-retained",
+        "PASS mcp-incoming-registry.synchronous-empty-failure-and-null-result",
+        "PASS mcp-incoming-registry.borrowed-handler-and-sender-close-reentry",
+        "PASS mcp-incoming-registry.finite-method-inflight-request-and-byte-bounds",
+        "PASS mcp-registration-facade.same-owner-replacement-preserves-order-and-copied-snapshots",
+        "PASS mcp-registration-facade.foreign-register-refuses-and-foreign-unregister-is-noop",
+        "PASS mcp-registration-facade.configured-server-wins-in-admitted-host-publication",
+        "PASS mcp-registration-facade.invalid-configuration-has-no-publication-or-acquisition",
+        "PASS mcp-registration-facade.inactive-and-canceled-owner-refuse-before-publication",
+        "PASS mcp-registration-facade.publication-reentry-refuses-before-effects",
+        "PASS mcp-registration-facade.publisher-fault-fences-replay-and-retains-original",
+        "PASS mcp-registration-facade.foreign-owner-or-revision-receipt-fences-uncertain-commit",
+        "PASS mcp-registration-facade.exact-owner-retirement-removes-only-owned-rows-after-close",
+        "PASS custom-registry.held-original-and-dispose-before-plugin-unload",
+        "PASS custom-registry.self-native-ancestor-and-unrelated-component-close",
+        "PASS custom-registry.session-cancel-frame-free-register-held-original",
+        "FAIL native tool activation cancelled activation has no durable or live publication: System.AggregateException: Loadout preparation and diagnostic delivery failed. (The operation was canceled.) (The operation was canceled.)"
       ]
     },
     {
@@ -32346,6 +34742,129 @@
       ]
     },
     {
+      "label": "release-daemon-final",
+      "project": "C:\\Users\\jksof\\.codex\\worktrees\\close-upstream-gaps\\PiSharp\\tests\\PiSharp.Env.Daemon.Tests\\PiSharp.Env.Daemon.Tests.csproj",
+      "scopeIdentity": "C:\\Users\\jksof\\.codex\\worktrees\\close-upstream-gaps\\PiSharp\\tests\\PiSharp.Env.Daemon.Tests\\PiSharp.Env.Daemon.Tests.csproj||{}|buildOnly=False",
+      "selection": {
+        "testArgs": [],
+        "filters": {},
+        "buildOnly": false
+      },
+      "parametersFile": "C:\\Users\\jksof\\.codex\\worktrees\\close-upstream-gaps\\PiSharp\\artifacts\\gap-validation\\queue-9d05a3ed212c404cae32a2955c932e2e\\release-daemon-final.json",
+      "platform": {
+        "os": "Microsoft Windows 10.0.26300",
+        "architecture": "X64"
+      },
+      "sdk": {
+        "path": "E:/AI/PiSharp/PiSharp/artifacts/sample-tools/dotnet/dotnet.exe",
+        "launcherSha256": "21a46f1e5235cf4e844b9de5429f0e198b9c97a41f0503a66442f1d639ca3ee6",
+        "configuredVersion": "10.0.401"
+      },
+      "testArguments": null,
+      "result": "passed-with-console-skips",
+      "recordedResult": "passed-with-console-skips",
+      "startedUtc": "2026-11-09T02:59:31.3877022Z",
+      "finishedUtc": "2026-11-09T02:59:55.7820259Z",
+      "source": {
+        "head": "6cc81569772cc5ddd79b73eb6b46b18cdd497b5e",
+        "dirty": true,
+        "beforeSha256": "571ce015dbdf44d40a68f3a9685d93898cb08a28a931d15a0d0940eadad6eed6",
+        "manifest": "C:\\Users\\jksof\\.codex\\worktrees\\close-upstream-gaps\\PiSharp\\artifacts\\gap-validation\\release-daemon-final-bfd7e99539844f7eadb3d24007377765\\source-before.json",
+        "afterSha256": "571ce015dbdf44d40a68f3a9685d93898cb08a28a931d15a0d0940eadad6eed6",
+        "changedDuringRun": false
+      },
+      "buildExit": 0,
+      "buildArguments": [
+        "build",
+        "C:\\Users\\jksof\\.codex\\worktrees\\close-upstream-gaps\\PiSharp\\tests\\PiSharp.Env.Daemon.Tests\\PiSharp.Env.Daemon.Tests.csproj",
+        "--disable-build-servers",
+        "--configuration",
+        "Debug",
+        "-m:1",
+        "-nr:false",
+        "-p:RestoreLockedMode=false",
+        "-p:UseSharedCompilation=false",
+        "-p:RunAnalyzers=false",
+        "-p:RestorePackagesPath=E:/AI/PiSharp/gap-implementation/artifacts/nuget-cache",
+        "-p:RestoreLockedMode=true"
+      ],
+      "testExit": 0,
+      "caseEvidence": {
+        "kind": "observed-case-lines",
+        "selectedCount": 10,
+        "cases": [
+          {
+            "id": "framed filesystem and descriptor identity",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "malformed JSON stays synchronized",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "hello validation and handle limits",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "cancel registered before worker starts",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "disconnect releases resources and kept handles",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "partial frame terminates session",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "startup token, heartbeat and silence shutdown",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "pipelined chunks retain arrival order",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "bounded disconnect and late ownership cleanup",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "raw FIFO daemon exits after EOF and SIGTERM",
+            "status": "SKIP",
+            "detail": null,
+            "reason": "SKIP Unix raw FIFO EOF/SIGTERM regression on Windows"
+          }
+        ],
+        "consoleSkipObservations": [
+          "SKIP Unix raw FIFO EOF/SIGTERM regression on Windows"
+        ]
+      },
+      "error": null,
+      "receipt": "C:\\Users\\jksof\\.codex\\worktrees\\close-upstream-gaps\\PiSharp\\artifacts\\gap-validation\\release-daemon-final-bfd7e99539844f7eadb3d24007377765\\receipt.json",
+      "diagnostics": [
+        "PASS framed filesystem and descriptor identity",
+        "PASS malformed JSON stays synchronized",
+        "PASS hello validation and handle limits",
+        "PASS cancel registered before worker starts",
+        "PASS disconnect releases resources and kept handles",
+        "PASS partial frame terminates session",
+        "PASS startup token, heartbeat and silence shutdown",
+        "PASS pipelined chunks retain arrival order",
+        "PASS bounded disconnect and late ownership cleanup",
+        "PASS raw FIFO daemon exits after EOF and SIGTERM"
+      ]
+    },
+    {
       "label": "release-daemon-v2",
       "project": "C:\\Users\\jksof\\.codex\\worktrees\\close-upstream-gaps\\PiSharp\\tests\\PiSharp.Env.Daemon.Tests\\PiSharp.Env.Daemon.Tests.csproj",
       "scopeIdentity": "C:\\Users\\jksof\\.codex\\worktrees\\close-upstream-gaps\\PiSharp\\tests\\PiSharp.Env.Daemon.Tests\\PiSharp.Env.Daemon.Tests.csproj||{\"PISHARP_TEST_PI150_NODE_MODULES\":\"E:/AI/PiSharp/gap-implementation/artifacts/node-runtime-150/node_modules\"}|buildOnly=False",
@@ -37877,6 +40396,59 @@
       ]
     },
     {
+      "label": "release-host-startup-barrier",
+      "project": "C:\\Users\\jksof\\.codex\\worktrees\\close-upstream-gaps\\PiSharp\\tests\\PiSharp.Chord.Hosting.Tests\\PiSharp.Chord.Hosting.Tests.csproj",
+      "scopeIdentity": "C:\\Users\\jksof\\.codex\\worktrees\\close-upstream-gaps\\PiSharp\\tests\\PiSharp.Chord.Hosting.Tests\\PiSharp.Chord.Hosting.Tests.csproj||{}|buildOnly=False",
+      "selection": {
+        "testArgs": [],
+        "filters": {},
+        "buildOnly": false
+      },
+      "parametersFile": null,
+      "platform": {
+        "os": "Microsoft Windows 10.0.26300",
+        "architecture": "X64"
+      },
+      "sdk": {
+        "path": "E:/AI/PiSharp/PiSharp/artifacts/sample-tools/dotnet/dotnet.exe",
+        "launcherSha256": "21a46f1e5235cf4e844b9de5429f0e198b9c97a41f0503a66442f1d639ca3ee6",
+        "configuredVersion": "10.0.401"
+      },
+      "testArguments": null,
+      "result": "failed",
+      "recordedResult": "failed",
+      "startedUtc": "2026-11-09T02:53:50.9736278Z",
+      "finishedUtc": "2026-11-09T02:53:53.2043105Z",
+      "source": {
+        "head": "6cc81569772cc5ddd79b73eb6b46b18cdd497b5e",
+        "dirty": true,
+        "beforeSha256": "de25736394f8009039de1bb44e36d6fa4975405f1c2d5d27993002a7be4130d3",
+        "manifest": "C:\\Users\\jksof\\.codex\\worktrees\\close-upstream-gaps\\PiSharp\\artifacts\\gap-validation\\release-host-startup-barrier-f48aeb85029f4588bfdf8abf7bb6f5be\\source-before.json",
+        "afterSha256": "de25736394f8009039de1bb44e36d6fa4975405f1c2d5d27993002a7be4130d3",
+        "changedDuringRun": false
+      },
+      "buildExit": 1,
+      "buildArguments": [
+        "build",
+        "C:\\Users\\jksof\\.codex\\worktrees\\close-upstream-gaps\\PiSharp\\tests\\PiSharp.Chord.Hosting.Tests\\PiSharp.Chord.Hosting.Tests.csproj",
+        "--disable-build-servers",
+        "--configuration",
+        "Debug",
+        "-m:1",
+        "-nr:false",
+        "-p:RestoreLockedMode=false",
+        "-p:UseSharedCompilation=false",
+        "'-p:RunAnalyzers=false','-p:RestorePackagesPath=E:/AI/PiSharp/gap-implementation/artifacts/nuget-cache','-p:RestoreLockedMode=true'"
+      ],
+      "testExit": null,
+      "caseEvidence": null,
+      "error": "System.Management.Automation.RuntimeException: Build failed or timed out (1).",
+      "receipt": "C:\\Users\\jksof\\.codex\\worktrees\\close-upstream-gaps\\PiSharp\\artifacts\\gap-validation\\release-host-startup-barrier-f48aeb85029f4588bfdf8abf7bb6f5be\\receipt.json",
+      "diagnostics": [
+        "MSBUILD : error MSB1008: Only one project can be specified."
+      ]
+    },
+    {
       "label": "release-hosting",
       "project": "C:\\Users\\jksof\\.codex\\worktrees\\close-upstream-gaps\\PiSharp\\tests\\PiSharp.Chord.Hosting.Tests\\PiSharp.Chord.Hosting.Tests.csproj",
       "scopeIdentity": "C:\\Users\\jksof\\.codex\\worktrees\\close-upstream-gaps\\PiSharp\\tests\\PiSharp.Chord.Hosting.Tests\\PiSharp.Chord.Hosting.Tests.csproj||{\"PISHARP_TEST_PI150_NODE_MODULES\":\"E:/AI/PiSharp/gap-implementation/artifacts/node-runtime-150/node_modules\"}|buildOnly=False",
@@ -38022,6 +40594,153 @@
         "PASS workers.real-process-route-stop-restart (8039 ms)",
         "PASS workers.startup-shutdown-closes-connected-host (3276 ms)",
         "PASS processes.natural-and-crashed-leader-kill-descendants (186 ms)",
+        "PASS workers.address-lock-waits-and-cancels (292 ms)"
+      ]
+    },
+    {
+      "label": "release-hosting-final",
+      "project": "C:\\Users\\jksof\\.codex\\worktrees\\close-upstream-gaps\\PiSharp\\tests\\PiSharp.Chord.Hosting.Tests\\PiSharp.Chord.Hosting.Tests.csproj",
+      "scopeIdentity": "C:\\Users\\jksof\\.codex\\worktrees\\close-upstream-gaps\\PiSharp\\tests\\PiSharp.Chord.Hosting.Tests\\PiSharp.Chord.Hosting.Tests.csproj||{}|buildOnly=False",
+      "selection": {
+        "testArgs": [],
+        "filters": {},
+        "buildOnly": false
+      },
+      "parametersFile": "C:\\Users\\jksof\\.codex\\worktrees\\close-upstream-gaps\\PiSharp\\artifacts\\gap-validation\\queue-36d320ac34ea4c2d9039ddb7ec0b3cf3\\release-hosting-final.json",
+      "platform": {
+        "os": "Microsoft Windows 10.0.26300",
+        "architecture": "X64"
+      },
+      "sdk": {
+        "path": "E:/AI/PiSharp/PiSharp/artifacts/sample-tools/dotnet/dotnet.exe",
+        "launcherSha256": "21a46f1e5235cf4e844b9de5429f0e198b9c97a41f0503a66442f1d639ca3ee6",
+        "configuredVersion": "10.0.401"
+      },
+      "testArguments": null,
+      "result": "passed",
+      "recordedResult": "passed",
+      "startedUtc": "2026-11-09T02:54:20.1487347Z",
+      "finishedUtc": "2026-11-09T02:56:42.0716669Z",
+      "source": {
+        "head": "6cc81569772cc5ddd79b73eb6b46b18cdd497b5e",
+        "dirty": true,
+        "beforeSha256": "de25736394f8009039de1bb44e36d6fa4975405f1c2d5d27993002a7be4130d3",
+        "manifest": "C:\\Users\\jksof\\.codex\\worktrees\\close-upstream-gaps\\PiSharp\\artifacts\\gap-validation\\release-hosting-final-651ad521d0e94da595dc25c9bd6e4c71\\source-before.json",
+        "afterSha256": "de25736394f8009039de1bb44e36d6fa4975405f1c2d5d27993002a7be4130d3",
+        "changedDuringRun": false
+      },
+      "buildExit": 0,
+      "buildArguments": [
+        "build",
+        "C:\\Users\\jksof\\.codex\\worktrees\\close-upstream-gaps\\PiSharp\\tests\\PiSharp.Chord.Hosting.Tests\\PiSharp.Chord.Hosting.Tests.csproj",
+        "--disable-build-servers",
+        "--configuration",
+        "Debug",
+        "-m:1",
+        "-nr:false",
+        "-p:RestoreLockedMode=false",
+        "-p:UseSharedCompilation=false",
+        "-p:RunAnalyzers=false",
+        "-p:RestorePackagesPath=E:/AI/PiSharp/gap-implementation/artifacts/nuget-cache",
+        "-p:RestoreLockedMode=true"
+      ],
+      "testExit": 0,
+      "caseEvidence": {
+        "kind": "console-json",
+        "selectedCount": 14,
+        "declaredCount": 14,
+        "cases": [
+          {
+            "id": "plugins.discovery-validates-and-orders",
+            "status": "PASS_AUTHORED_NATIVE",
+            "reason": null
+          },
+          {
+            "id": "plugins.rollout-continues-failures-and-stops-explicitly",
+            "status": "PASS_AUTHORED_NATIVE",
+            "reason": null
+          },
+          {
+            "id": "plugins.new-failed-plugin-retains-dirty-mark",
+            "status": "PASS_AUTHORED_NATIVE",
+            "reason": null
+          },
+          {
+            "id": "plugins.builder-natural-exit-joins-descendant-pipes",
+            "status": "PASS_AUTHORED_NATIVE",
+            "reason": null
+          },
+          {
+            "id": "plugins.build-load-reload-failure-and-collectible-context",
+            "status": "PASS_AUTHORED_NATIVE",
+            "reason": null
+          },
+          {
+            "id": "http.routes-wraps-origin-and-anonymous-webhook",
+            "status": "PASS_AUTHORED_NATIVE",
+            "reason": null
+          },
+          {
+            "id": "http.streaming-ranges-files-and-signed-cookies",
+            "status": "PASS_AUTHORED_NATIVE",
+            "reason": null
+          },
+          {
+            "id": "http.real-loopback-listener-and-websocket",
+            "status": "PASS_AUTHORED_NATIVE",
+            "reason": null
+          },
+          {
+            "id": "http.close-drains-then-seals-active-request",
+            "status": "PASS_AUTHORED_NATIVE",
+            "reason": null
+          },
+          {
+            "id": "http.listener-failed-start-disposes-services",
+            "status": "PASS_AUTHORED_NATIVE",
+            "reason": null
+          },
+          {
+            "id": "workers.real-process-route-stop-restart",
+            "status": "PASS_AUTHORED_NATIVE",
+            "reason": null
+          },
+          {
+            "id": "workers.startup-shutdown-closes-connected-host",
+            "status": "PASS_AUTHORED_NATIVE",
+            "reason": null
+          },
+          {
+            "id": "processes.natural-and-crashed-leader-kill-descendants",
+            "status": "PASS_AUTHORED_NATIVE",
+            "reason": null
+          },
+          {
+            "id": "workers.address-lock-waits-and-cancels",
+            "status": "PASS_AUTHORED_NATIVE",
+            "reason": null
+          }
+        ],
+        "originalExecuted": null,
+        "sourceDerivedOracle": null,
+        "consoleSkipObservations": []
+      },
+      "error": null,
+      "receipt": "C:\\Users\\jksof\\.codex\\worktrees\\close-upstream-gaps\\PiSharp\\artifacts\\gap-validation\\release-hosting-final-651ad521d0e94da595dc25c9bd6e4c71\\receipt.json",
+      "diagnostics": [
+        "PASS plugins.discovery-validates-and-orders (69 ms)",
+        "PASS plugins.rollout-continues-failures-and-stops-explicitly (64 ms)",
+        "PASS plugins.new-failed-plugin-retains-dirty-mark (110 ms)",
+        "PASS plugins.builder-natural-exit-joins-descendant-pipes (184 ms)",
+        "PASS plugins.build-load-reload-failure-and-collectible-context (96612 ms)",
+        "PASS http.routes-wraps-origin-and-anonymous-webhook (18 ms)",
+        "PASS http.streaming-ranges-files-and-signed-cookies (13 ms)",
+        "PASS http.real-loopback-listener-and-websocket (168 ms)",
+        "PASS http.close-drains-then-seals-active-request (97 ms)",
+        "PASS http.listener-failed-start-disposes-services (20 ms)",
+        "PASS workers.real-process-route-stop-restart (7076 ms)",
+        "PASS workers.startup-shutdown-closes-connected-host (3361 ms)",
+        "PASS processes.natural-and-crashed-leader-kill-descendants (172 ms)",
         "PASS workers.address-lock-waits-and-cancels (292 ms)"
       ]
     },
@@ -41911,6 +44630,211 @@
       ]
     },
     {
+      "label": "release-legacy-final",
+      "project": "C:\\Users\\jksof\\.codex\\worktrees\\close-upstream-gaps\\PiSharp\\tests\\PiSharp.Chord.Legacy.Cluster.Tests\\PiSharp.Chord.Legacy.Cluster.Tests.csproj",
+      "scopeIdentity": "C:\\Users\\jksof\\.codex\\worktrees\\close-upstream-gaps\\PiSharp\\tests\\PiSharp.Chord.Legacy.Cluster.Tests\\PiSharp.Chord.Legacy.Cluster.Tests.csproj||{}|buildOnly=False",
+      "selection": {
+        "testArgs": [],
+        "filters": {},
+        "buildOnly": false
+      },
+      "parametersFile": "C:\\Users\\jksof\\.codex\\worktrees\\close-upstream-gaps\\PiSharp\\artifacts\\gap-validation\\queue-9d05a3ed212c404cae32a2955c932e2e\\release-legacy-final.json",
+      "platform": {
+        "os": "Microsoft Windows 10.0.26300",
+        "architecture": "X64"
+      },
+      "sdk": {
+        "path": "E:/AI/PiSharp/PiSharp/artifacts/sample-tools/dotnet/dotnet.exe",
+        "launcherSha256": "21a46f1e5235cf4e844b9de5429f0e198b9c97a41f0503a66442f1d639ca3ee6",
+        "configuredVersion": "10.0.401"
+      },
+      "testArguments": null,
+      "result": "passed",
+      "recordedResult": "passed",
+      "startedUtc": "2026-11-09T02:59:16.7979759Z",
+      "finishedUtc": "2026-11-09T02:59:28.8590094Z",
+      "source": {
+        "head": "6cc81569772cc5ddd79b73eb6b46b18cdd497b5e",
+        "dirty": true,
+        "beforeSha256": "f19b71d6575e93c3a3a0d68699f43f4aac8f524b3fd284f8e7b2aa732acdbf5e",
+        "manifest": "C:\\Users\\jksof\\.codex\\worktrees\\close-upstream-gaps\\PiSharp\\artifacts\\gap-validation\\release-legacy-final-babb06ef21804e1f92cf21f327a46221\\source-before.json",
+        "afterSha256": "f19b71d6575e93c3a3a0d68699f43f4aac8f524b3fd284f8e7b2aa732acdbf5e",
+        "changedDuringRun": false
+      },
+      "buildExit": 0,
+      "buildArguments": [
+        "build",
+        "C:\\Users\\jksof\\.codex\\worktrees\\close-upstream-gaps\\PiSharp\\tests\\PiSharp.Chord.Legacy.Cluster.Tests\\PiSharp.Chord.Legacy.Cluster.Tests.csproj",
+        "--disable-build-servers",
+        "--configuration",
+        "Debug",
+        "-m:1",
+        "-nr:false",
+        "-p:RestoreLockedMode=false",
+        "-p:UseSharedCompilation=false",
+        "-p:RunAnalyzers=false",
+        "-p:RestorePackagesPath=E:/AI/PiSharp/gap-implementation/artifacts/nuget-cache",
+        "-p:RestoreLockedMode=true"
+      ],
+      "testExit": 0,
+      "caseEvidence": {
+        "kind": "observed-case-lines",
+        "selectedCount": 25,
+        "cases": [
+          {
+            "id": "cluster.actual-host-routes-and-reloads-existing-reference",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "cluster.parent-first-fifo-commit-and-prefix",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "cluster.vote-failure-rolls-every-host-back",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "cluster.vote-timeout-aborts-loading-child-and-can-retry",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "cluster.late-child-fenced-and-reconciled",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "cluster.ahead-child-refused-and-client-not-participant",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "cluster.discovery-reauthorizes-and-admits-expired-request",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "cluster.reconnect-replaces-parent-with-isolated-close",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "cluster.catchup-merges-modules-and-removal-tombstones",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "cluster.invalidates-or-restamps-only-matching-peer",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "retention.actual-remote-linger-reacquire-and-lru",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "retention.actual-upstream-reconnect-reholds-again",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "retention.shared-bindings-lru-and-reacquire",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "retention.unhydrated-release-and-released-reference-gc",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "retention.collectible-assembly-shared-identity-and-alias",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "retention.actual-host-pins-module-until-root-retires",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "retention.old-resource-close-loads-private-dependency-before-unload",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "manager.admission-cleans-natural-exit-before-ready",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "manager.concurrent-start-stop-replace-real-child",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "manager.kernel-lock-and-replace",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "manager.does-not-inherit-parent-lock",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "manager.fatal-and-readiness-timeout-cleanup",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "manager.busy-to-idle-clock-and-policy",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "manager.grace-kills-descendants",
+            "status": "PASS",
+            "detail": null
+          },
+          {
+            "id": "manager.graceful-exit-kills-descendants-windows",
+            "status": "PASS",
+            "detail": null
+          }
+        ],
+        "consoleSkipObservations": []
+      },
+      "error": null,
+      "receipt": "C:\\Users\\jksof\\.codex\\worktrees\\close-upstream-gaps\\PiSharp\\artifacts\\gap-validation\\release-legacy-final-babb06ef21804e1f92cf21f327a46221\\receipt.json",
+      "diagnostics": [
+        "PASS cluster.ahead-child-refused-and-client-not-participant",
+        "PASS cluster.discovery-reauthorizes-and-admits-expired-request",
+        "PASS cluster.reconnect-replaces-parent-with-isolated-close",
+        "PASS cluster.catchup-merges-modules-and-removal-tombstones",
+        "PASS cluster.invalidates-or-restamps-only-matching-peer",
+        "PASS retention.actual-remote-linger-reacquire-and-lru",
+        "PASS retention.actual-upstream-reconnect-reholds-again",
+        "PASS retention.shared-bindings-lru-and-reacquire",
+        "PASS retention.unhydrated-release-and-released-reference-gc",
+        "PASS retention.collectible-assembly-shared-identity-and-alias",
+        "PASS retention.actual-host-pins-module-until-root-retires",
+        "PASS retention.old-resource-close-loads-private-dependency-before-unload",
+        "PASS manager.admission-cleans-natural-exit-before-ready",
+        "PASS manager.concurrent-start-stop-replace-real-child",
+        "PASS manager.kernel-lock-and-replace",
+        "PASS manager.does-not-inherit-parent-lock",
+        "PASS manager.fatal-and-readiness-timeout-cleanup",
+        "PASS manager.busy-to-idle-clock-and-policy",
+        "PASS manager.grace-kills-descendants",
+        "PASS manager.graceful-exit-kills-descendants-windows"
+      ]
+    },
+    {
       "label": "release-m2-v2",
       "project": "C:\\Users\\jksof\\.codex\\worktrees\\close-upstream-gaps\\PiSharp\\tests\\PiSharp.Durable.Tests\\PiSharp.Durable.Tests.csproj",
       "scopeIdentity": "C:\\Users\\jksof\\.codex\\worktrees\\close-upstream-gaps\\PiSharp\\tests\\PiSharp.Durable.Tests\\PiSharp.Durable.Tests.csproj|--only|m2.sqlite.|{\"PISHARP_TEST_PI150_NODE_MODULES\":\"E:/AI/PiSharp/gap-implementation/artifacts/node-runtime-150/node_modules\"}|buildOnly=False",
@@ -43119,6 +46043,316 @@
       "error": null,
       "receipt": "C:\\Users\\jksof\\.codex\\worktrees\\close-upstream-gaps\\PiSharp\\artifacts\\gap-validation\\release-models-416944383bea4923b02e7456b2e1d664\\receipt.json",
       "diagnostics": []
+    },
+    {
+      "label": "release-startup-repeat-1",
+      "project": "C:\\Users\\jksof\\.codex\\worktrees\\close-upstream-gaps\\PiSharp\\tests\\PiSharp.Chord.Hosting.Tests\\PiSharp.Chord.Hosting.Tests.csproj",
+      "scopeIdentity": "C:\\Users\\jksof\\.codex\\worktrees\\close-upstream-gaps\\PiSharp\\tests\\PiSharp.Chord.Hosting.Tests\\PiSharp.Chord.Hosting.Tests.csproj|--only|workers.startup-shutdown-closes-connected-host|{}|buildOnly=False",
+      "selection": {
+        "testArgs": [
+          "--only",
+          "workers.startup-shutdown-closes-connected-host"
+        ],
+        "filters": {},
+        "buildOnly": false
+      },
+      "parametersFile": "C:\\Users\\jksof\\.codex\\worktrees\\close-upstream-gaps\\PiSharp\\artifacts\\gap-validation\\queue-36d320ac34ea4c2d9039ddb7ec0b3cf3\\release-startup-repeat-1.json",
+      "platform": {
+        "os": "Microsoft Windows 10.0.26300",
+        "architecture": "X64"
+      },
+      "sdk": {
+        "path": "E:/AI/PiSharp/PiSharp/artifacts/sample-tools/dotnet/dotnet.exe",
+        "launcherSha256": "21a46f1e5235cf4e844b9de5429f0e198b9c97a41f0503a66442f1d639ca3ee6",
+        "configuredVersion": "10.0.401"
+      },
+      "testArguments": [
+        "--only",
+        "workers.startup-shutdown-closes-connected-host"
+      ],
+      "result": "passed",
+      "recordedResult": "passed",
+      "startedUtc": "2026-11-09T02:56:44.6024233Z",
+      "finishedUtc": "2026-11-09T02:56:50.4640639Z",
+      "source": {
+        "head": "6cc81569772cc5ddd79b73eb6b46b18cdd497b5e",
+        "dirty": true,
+        "beforeSha256": "de25736394f8009039de1bb44e36d6fa4975405f1c2d5d27993002a7be4130d3",
+        "manifest": "C:\\Users\\jksof\\.codex\\worktrees\\close-upstream-gaps\\PiSharp\\artifacts\\gap-validation\\release-startup-repeat-1-fab54f527e7a4fcb9655682be2dd1d5f\\source-before.json",
+        "afterSha256": "de25736394f8009039de1bb44e36d6fa4975405f1c2d5d27993002a7be4130d3",
+        "changedDuringRun": false
+      },
+      "buildExit": null,
+      "buildArguments": null,
+      "testExit": 0,
+      "caseEvidence": {
+        "kind": "console-json",
+        "selectedCount": 1,
+        "declaredCount": 1,
+        "cases": [
+          {
+            "id": "workers.startup-shutdown-closes-connected-host",
+            "status": "PASS_AUTHORED_NATIVE",
+            "reason": null
+          }
+        ],
+        "originalExecuted": null,
+        "sourceDerivedOracle": null,
+        "consoleSkipObservations": []
+      },
+      "error": null,
+      "receipt": "C:\\Users\\jksof\\.codex\\worktrees\\close-upstream-gaps\\PiSharp\\artifacts\\gap-validation\\release-startup-repeat-1-fab54f527e7a4fcb9655682be2dd1d5f\\receipt.json",
+      "diagnostics": [
+        "PASS workers.startup-shutdown-closes-connected-host (3583 ms)"
+      ]
+    },
+    {
+      "label": "release-startup-repeat-2",
+      "project": "C:\\Users\\jksof\\.codex\\worktrees\\close-upstream-gaps\\PiSharp\\tests\\PiSharp.Chord.Hosting.Tests\\PiSharp.Chord.Hosting.Tests.csproj",
+      "scopeIdentity": "C:\\Users\\jksof\\.codex\\worktrees\\close-upstream-gaps\\PiSharp\\tests\\PiSharp.Chord.Hosting.Tests\\PiSharp.Chord.Hosting.Tests.csproj|--only|workers.startup-shutdown-closes-connected-host|{}|buildOnly=False",
+      "selection": {
+        "testArgs": [
+          "--only",
+          "workers.startup-shutdown-closes-connected-host"
+        ],
+        "filters": {},
+        "buildOnly": false
+      },
+      "parametersFile": "C:\\Users\\jksof\\.codex\\worktrees\\close-upstream-gaps\\PiSharp\\artifacts\\gap-validation\\queue-36d320ac34ea4c2d9039ddb7ec0b3cf3\\release-startup-repeat-2.json",
+      "platform": {
+        "os": "Microsoft Windows 10.0.26300",
+        "architecture": "X64"
+      },
+      "sdk": {
+        "path": "E:/AI/PiSharp/PiSharp/artifacts/sample-tools/dotnet/dotnet.exe",
+        "launcherSha256": "21a46f1e5235cf4e844b9de5429f0e198b9c97a41f0503a66442f1d639ca3ee6",
+        "configuredVersion": "10.0.401"
+      },
+      "testArguments": [
+        "--only",
+        "workers.startup-shutdown-closes-connected-host"
+      ],
+      "result": "passed",
+      "recordedResult": "passed",
+      "startedUtc": "2026-11-09T02:56:52.4359858Z",
+      "finishedUtc": "2026-11-09T02:56:58.2674404Z",
+      "source": {
+        "head": "6cc81569772cc5ddd79b73eb6b46b18cdd497b5e",
+        "dirty": true,
+        "beforeSha256": "de25736394f8009039de1bb44e36d6fa4975405f1c2d5d27993002a7be4130d3",
+        "manifest": "C:\\Users\\jksof\\.codex\\worktrees\\close-upstream-gaps\\PiSharp\\artifacts\\gap-validation\\release-startup-repeat-2-83c44c9ce67e4466a587c5d44180166a\\source-before.json",
+        "afterSha256": "de25736394f8009039de1bb44e36d6fa4975405f1c2d5d27993002a7be4130d3",
+        "changedDuringRun": false
+      },
+      "buildExit": null,
+      "buildArguments": null,
+      "testExit": 0,
+      "caseEvidence": {
+        "kind": "console-json",
+        "selectedCount": 1,
+        "declaredCount": 1,
+        "cases": [
+          {
+            "id": "workers.startup-shutdown-closes-connected-host",
+            "status": "PASS_AUTHORED_NATIVE",
+            "reason": null
+          }
+        ],
+        "originalExecuted": null,
+        "sourceDerivedOracle": null,
+        "consoleSkipObservations": []
+      },
+      "error": null,
+      "receipt": "C:\\Users\\jksof\\.codex\\worktrees\\close-upstream-gaps\\PiSharp\\artifacts\\gap-validation\\release-startup-repeat-2-83c44c9ce67e4466a587c5d44180166a\\receipt.json",
+      "diagnostics": [
+        "PASS workers.startup-shutdown-closes-connected-host (3583 ms)"
+      ]
+    },
+    {
+      "label": "release-startup-repeat-3",
+      "project": "C:\\Users\\jksof\\.codex\\worktrees\\close-upstream-gaps\\PiSharp\\tests\\PiSharp.Chord.Hosting.Tests\\PiSharp.Chord.Hosting.Tests.csproj",
+      "scopeIdentity": "C:\\Users\\jksof\\.codex\\worktrees\\close-upstream-gaps\\PiSharp\\tests\\PiSharp.Chord.Hosting.Tests\\PiSharp.Chord.Hosting.Tests.csproj|--only|workers.startup-shutdown-closes-connected-host|{}|buildOnly=False",
+      "selection": {
+        "testArgs": [
+          "--only",
+          "workers.startup-shutdown-closes-connected-host"
+        ],
+        "filters": {},
+        "buildOnly": false
+      },
+      "parametersFile": "C:\\Users\\jksof\\.codex\\worktrees\\close-upstream-gaps\\PiSharp\\artifacts\\gap-validation\\queue-36d320ac34ea4c2d9039ddb7ec0b3cf3\\release-startup-repeat-3.json",
+      "platform": {
+        "os": "Microsoft Windows 10.0.26300",
+        "architecture": "X64"
+      },
+      "sdk": {
+        "path": "E:/AI/PiSharp/PiSharp/artifacts/sample-tools/dotnet/dotnet.exe",
+        "launcherSha256": "21a46f1e5235cf4e844b9de5429f0e198b9c97a41f0503a66442f1d639ca3ee6",
+        "configuredVersion": "10.0.401"
+      },
+      "testArguments": [
+        "--only",
+        "workers.startup-shutdown-closes-connected-host"
+      ],
+      "result": "passed",
+      "recordedResult": "passed",
+      "startedUtc": "2026-11-09T02:56:59.9521017Z",
+      "finishedUtc": "2026-11-09T02:57:05.8563087Z",
+      "source": {
+        "head": "6cc81569772cc5ddd79b73eb6b46b18cdd497b5e",
+        "dirty": true,
+        "beforeSha256": "de25736394f8009039de1bb44e36d6fa4975405f1c2d5d27993002a7be4130d3",
+        "manifest": "C:\\Users\\jksof\\.codex\\worktrees\\close-upstream-gaps\\PiSharp\\artifacts\\gap-validation\\release-startup-repeat-3-016454d87f39411288172f45145a13e7\\source-before.json",
+        "afterSha256": "de25736394f8009039de1bb44e36d6fa4975405f1c2d5d27993002a7be4130d3",
+        "changedDuringRun": false
+      },
+      "buildExit": null,
+      "buildArguments": null,
+      "testExit": 0,
+      "caseEvidence": {
+        "kind": "console-json",
+        "selectedCount": 1,
+        "declaredCount": 1,
+        "cases": [
+          {
+            "id": "workers.startup-shutdown-closes-connected-host",
+            "status": "PASS_AUTHORED_NATIVE",
+            "reason": null
+          }
+        ],
+        "originalExecuted": null,
+        "sourceDerivedOracle": null,
+        "consoleSkipObservations": []
+      },
+      "error": null,
+      "receipt": "C:\\Users\\jksof\\.codex\\worktrees\\close-upstream-gaps\\PiSharp\\artifacts\\gap-validation\\release-startup-repeat-3-016454d87f39411288172f45145a13e7\\receipt.json",
+      "diagnostics": [
+        "PASS workers.startup-shutdown-closes-connected-host (3574 ms)"
+      ]
+    },
+    {
+      "label": "release-startup-repeat-4",
+      "project": "C:\\Users\\jksof\\.codex\\worktrees\\close-upstream-gaps\\PiSharp\\tests\\PiSharp.Chord.Hosting.Tests\\PiSharp.Chord.Hosting.Tests.csproj",
+      "scopeIdentity": "C:\\Users\\jksof\\.codex\\worktrees\\close-upstream-gaps\\PiSharp\\tests\\PiSharp.Chord.Hosting.Tests\\PiSharp.Chord.Hosting.Tests.csproj|--only|workers.startup-shutdown-closes-connected-host|{}|buildOnly=False",
+      "selection": {
+        "testArgs": [
+          "--only",
+          "workers.startup-shutdown-closes-connected-host"
+        ],
+        "filters": {},
+        "buildOnly": false
+      },
+      "parametersFile": "C:\\Users\\jksof\\.codex\\worktrees\\close-upstream-gaps\\PiSharp\\artifacts\\gap-validation\\queue-36d320ac34ea4c2d9039ddb7ec0b3cf3\\release-startup-repeat-4.json",
+      "platform": {
+        "os": "Microsoft Windows 10.0.26300",
+        "architecture": "X64"
+      },
+      "sdk": {
+        "path": "E:/AI/PiSharp/PiSharp/artifacts/sample-tools/dotnet/dotnet.exe",
+        "launcherSha256": "21a46f1e5235cf4e844b9de5429f0e198b9c97a41f0503a66442f1d639ca3ee6",
+        "configuredVersion": "10.0.401"
+      },
+      "testArguments": [
+        "--only",
+        "workers.startup-shutdown-closes-connected-host"
+      ],
+      "result": "passed",
+      "recordedResult": "passed",
+      "startedUtc": "2026-11-09T02:57:07.3722057Z",
+      "finishedUtc": "2026-11-09T02:57:13.2521455Z",
+      "source": {
+        "head": "6cc81569772cc5ddd79b73eb6b46b18cdd497b5e",
+        "dirty": true,
+        "beforeSha256": "de25736394f8009039de1bb44e36d6fa4975405f1c2d5d27993002a7be4130d3",
+        "manifest": "C:\\Users\\jksof\\.codex\\worktrees\\close-upstream-gaps\\PiSharp\\artifacts\\gap-validation\\release-startup-repeat-4-927b15a9915941f5804c1a673d7c93f2\\source-before.json",
+        "afterSha256": "de25736394f8009039de1bb44e36d6fa4975405f1c2d5d27993002a7be4130d3",
+        "changedDuringRun": false
+      },
+      "buildExit": null,
+      "buildArguments": null,
+      "testExit": 0,
+      "caseEvidence": {
+        "kind": "console-json",
+        "selectedCount": 1,
+        "declaredCount": 1,
+        "cases": [
+          {
+            "id": "workers.startup-shutdown-closes-connected-host",
+            "status": "PASS_AUTHORED_NATIVE",
+            "reason": null
+          }
+        ],
+        "originalExecuted": null,
+        "sourceDerivedOracle": null,
+        "consoleSkipObservations": []
+      },
+      "error": null,
+      "receipt": "C:\\Users\\jksof\\.codex\\worktrees\\close-upstream-gaps\\PiSharp\\artifacts\\gap-validation\\release-startup-repeat-4-927b15a9915941f5804c1a673d7c93f2\\receipt.json",
+      "diagnostics": [
+        "PASS workers.startup-shutdown-closes-connected-host (3526 ms)"
+      ]
+    },
+    {
+      "label": "release-startup-repeat-5",
+      "project": "C:\\Users\\jksof\\.codex\\worktrees\\close-upstream-gaps\\PiSharp\\tests\\PiSharp.Chord.Hosting.Tests\\PiSharp.Chord.Hosting.Tests.csproj",
+      "scopeIdentity": "C:\\Users\\jksof\\.codex\\worktrees\\close-upstream-gaps\\PiSharp\\tests\\PiSharp.Chord.Hosting.Tests\\PiSharp.Chord.Hosting.Tests.csproj|--only|workers.startup-shutdown-closes-connected-host|{}|buildOnly=False",
+      "selection": {
+        "testArgs": [
+          "--only",
+          "workers.startup-shutdown-closes-connected-host"
+        ],
+        "filters": {},
+        "buildOnly": false
+      },
+      "parametersFile": "C:\\Users\\jksof\\.codex\\worktrees\\close-upstream-gaps\\PiSharp\\artifacts\\gap-validation\\queue-36d320ac34ea4c2d9039ddb7ec0b3cf3\\release-startup-repeat-5.json",
+      "platform": {
+        "os": "Microsoft Windows 10.0.26300",
+        "architecture": "X64"
+      },
+      "sdk": {
+        "path": "E:/AI/PiSharp/PiSharp/artifacts/sample-tools/dotnet/dotnet.exe",
+        "launcherSha256": "21a46f1e5235cf4e844b9de5429f0e198b9c97a41f0503a66442f1d639ca3ee6",
+        "configuredVersion": "10.0.401"
+      },
+      "testArguments": [
+        "--only",
+        "workers.startup-shutdown-closes-connected-host"
+      ],
+      "result": "passed",
+      "recordedResult": "passed",
+      "startedUtc": "2026-11-09T02:57:14.833775Z",
+      "finishedUtc": "2026-11-09T02:57:20.7118978Z",
+      "source": {
+        "head": "6cc81569772cc5ddd79b73eb6b46b18cdd497b5e",
+        "dirty": true,
+        "beforeSha256": "de25736394f8009039de1bb44e36d6fa4975405f1c2d5d27993002a7be4130d3",
+        "manifest": "C:\\Users\\jksof\\.codex\\worktrees\\close-upstream-gaps\\PiSharp\\artifacts\\gap-validation\\release-startup-repeat-5-c58cdead4ac1431ba32ce1fb5b421a13\\source-before.json",
+        "afterSha256": "de25736394f8009039de1bb44e36d6fa4975405f1c2d5d27993002a7be4130d3",
+        "changedDuringRun": false
+      },
+      "buildExit": null,
+      "buildArguments": null,
+      "testExit": 0,
+      "caseEvidence": {
+        "kind": "console-json",
+        "selectedCount": 1,
+        "declaredCount": 1,
+        "cases": [
+          {
+            "id": "workers.startup-shutdown-closes-connected-host",
+            "status": "PASS_AUTHORED_NATIVE",
+            "reason": null
+          }
+        ],
+        "originalExecuted": null,
+        "sourceDerivedOracle": null,
+        "consoleSkipObservations": []
+      },
+      "error": null,
+      "receipt": "C:\\Users\\jksof\\.codex\\worktrees\\close-upstream-gaps\\PiSharp\\artifacts\\gap-validation\\release-startup-repeat-5-c58cdead4ac1431ba32ce1fb5b421a13\\receipt.json",
+      "diagnostics": [
+        "PASS workers.startup-shutdown-closes-connected-host (3567 ms)"
+      ]
     },
     {
       "label": "release-terminal-v2",
